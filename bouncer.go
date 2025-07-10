@@ -297,7 +297,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// if our IP is in the trusted list we bypass the next checks
-	bouncer.log.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
+	bouncer.log.Trace(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
 	if isTrusted {
 		bouncer.next.ServeHTTP(rw, req)
 		return
@@ -313,7 +313,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		value, cacheErr := bouncer.cacheClient.Get(remoteIP)
 		if cacheErr != nil {
 			cacheErrString := cacheErr.Error()
-			bouncer.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s isBanned:false %s", remoteIP, cacheErrString))
+			bouncer.log.Trace(fmt.Sprintf("ServeHTTP:Get ip:%s isBanned:false %s", remoteIP, cacheErrString))
 			if !bouncer.redisUnreachableBlock && cacheErrString == cache.CacheUnreachable {
 				bouncer.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s redisUnreachable=true", remoteIP))
 				handleNextServeHTTP(bouncer, remoteIP, rw, req)
@@ -325,7 +325,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 		} else {
-			bouncer.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, value))
+			bouncer.log.Trace(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, value))
 			if value == cache.NoBannedValue {
 				handleNextServeHTTP(bouncer, remoteIP, rw, req)
 			} else {
@@ -402,7 +402,7 @@ func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter) {
 }
 
 func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, rw http.ResponseWriter, req *http.Request) {
-	bouncer.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
+	bouncer.log.Trace(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
 	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue {
 		if bouncer.captchaClient.Check(remoteIP) {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
@@ -418,7 +418,7 @@ func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, 
 func handleNextServeHTTP(bouncer *Bouncer, remoteIP string, rw http.ResponseWriter, req *http.Request) {
 	if bouncer.appsecEnabled {
 		if err := appsecQuery(bouncer, remoteIP, req); err != nil {
-			bouncer.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
+			bouncer.log.Trace(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
 			handleBanServeHTTP(bouncer, rw)
 			return
 		}
@@ -428,10 +428,11 @@ func handleNextServeHTTP(bouncer *Bouncer, remoteIP string, rw http.ResponseWrit
 
 func handleStreamTicker(bouncer *Bouncer) {
 	if err := handleStreamCache(bouncer); err != nil {
-		bouncer.log.Debug(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", updateFailure, isCrowdsecStreamHealthy, err.Error()))
 		if bouncer.updateMaxFailure != -1 && updateFailure >= bouncer.updateMaxFailure && isCrowdsecStreamHealthy {
 			isCrowdsecStreamHealthy = false
 			bouncer.log.Error(fmt.Sprintf("handleStreamTicker:error updateFailure:%d %s", updateFailure, err.Error()))
+		} else {
+			bouncer.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", updateFailure, isCrowdsecStreamHealthy, err.Error()))
 		}
 		updateFailure++
 	} else {
