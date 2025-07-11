@@ -397,7 +397,7 @@ func handleBanServeHTTP(bouncer *Bouncer, rw http.ResponseWriter) {
 	rw.WriteHeader(bouncer.remediationStatusCode)
 	_, err := fmt.Fprint(rw, bouncer.banTemplateString)
 	if err != nil {
-		bouncer.log.Error("handleBanServeHTTP could not write template to ResponseWriter")
+		bouncer.log.Warn(fmt.Sprintf("handleBanServeHTTP could not write template to ResponseWriter: %s", err.Error()))
 	}
 }
 
@@ -443,7 +443,7 @@ func handleStreamTicker(bouncer *Bouncer) {
 
 func handleMetricsTicker(bouncer *Bouncer) {
 	if err := reportMetrics(bouncer); err != nil {
-		bouncer.log.Error("handleMetricsTicker:reportMetrics " + err.Error())
+		bouncer.log.Error(fmt.Sprintf("handleMetricsTicker:reportMetrics %s", err.Error()))
 	}
 }
 
@@ -686,7 +686,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) error {
 
 	res, err := bouncer.httpClient.Do(req)
 	if err != nil {
-		bouncer.log.Error("appsecQuery:unreachable")
+		bouncer.log.Error(fmt.Sprintf("appsecQuery:unreachable %s", err.Error()))
 		if bouncer.appsecUnreachableBlock {
 			return fmt.Errorf("appsecQuery:unreachable %w", err)
 		}
