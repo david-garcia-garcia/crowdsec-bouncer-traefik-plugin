@@ -18,7 +18,7 @@ type mockTransport struct {
 	err      error
 }
 
-func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (m *mockTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
 	return m.response, m.err
 }
 
@@ -165,7 +165,9 @@ func TestCaptchaValidation(t *testing.T) {
 			// Add form data if provided
 			if len(tt.formData) > 0 {
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-				req.ParseForm()
+				if err := req.ParseForm(); err != nil {
+					t.Fatalf("Failed to parse form: %v", err)
+				}
 				for key, value := range tt.formData {
 					req.Form.Set(key, value)
 				}

@@ -113,7 +113,7 @@ func TestNew_WithLogFile(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Read the file and verify content
-	content, err := os.ReadFile(logFile) // nolint:gosec // G304: This is a test file with controlled path
+	content, err := os.ReadFile(logFile) //nolint:gosec // G304: This is a test file with controlled path
 	if err != nil {
 		t.Fatalf("Failed to read log file: %v", err)
 	}

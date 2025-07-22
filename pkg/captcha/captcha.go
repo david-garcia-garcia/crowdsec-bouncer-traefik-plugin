@@ -105,7 +105,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	}
 }
 
-// getCacheKey generates the cache key for captcha validation
+// getCacheKey generates the cache key for captcha validation.
 func (c *Client) getCacheKey(remoteIP, hostname string) string {
 	return remoteIP + "_" + hostname + "_captcha"
 }
