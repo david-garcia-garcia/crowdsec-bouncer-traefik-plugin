@@ -84,7 +84,9 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	}
 	if valid {
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
-		c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds)
+		hostname := r.Host
+		cacheKey := c.getCacheKey(remoteIP, hostname)
+		c.cacheClient.Set(cacheKey, cache.CaptchaDoneValue, c.gracePeriodSeconds)
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
 	}
@@ -103,16 +105,23 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	}
 }
 
+// getCacheKey generates the cache key for captcha validation
+func (c *Client) getCacheKey(remoteIP, hostname string) string {
+	return remoteIP + "_" + hostname + "_captcha"
+}
+
 // Check Verify if the captcha is already done.
-func (c *Client) Check(remoteIP string) bool {
-	value, _ := c.cacheClient.Get(remoteIP + "_captcha")
+func (c *Client) Check(remoteIP, hostname string) bool {
+	cacheKey := c.getCacheKey(remoteIP, hostname)
+	value, _ := c.cacheClient.Get(cacheKey)
 	passed := value == cache.CaptchaDoneValue
-	c.log.Debug(fmt.Sprintf("captcha:Check ip:%s pass:%v", remoteIP, passed))
+	c.log.Debug(fmt.Sprintf("captcha:Check ip:%s hostname:%s pass:%v", remoteIP, hostname, passed))
 	return passed
 }
 
 type responseProvider struct {
-	Success bool `json:"success"`
+	Success  bool   `json:"success"`
+	Hostname string `json:"hostname"`
 }
 
 // Validate Verify the captcha from provider API.
@@ -147,6 +156,17 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	c.log.Debug(fmt.Sprintf("captcha:Validate success:%v", captchaResponse.Success))
+	c.log.Debug(fmt.Sprintf("captcha:Validate success:%v hostname:%s", captchaResponse.Success, captchaResponse.Hostname))
+
+	// Validate hostname matches the request hostname
+	requestHostname := r.Host
+	if captchaResponse.Hostname != "" && requestHostname != "" {
+		if captchaResponse.Hostname != requestHostname {
+			// This is something that should not be happening....
+			c.log.Debug(fmt.Sprintf("captcha:Validate hostname validation failed: request hostname '%s' != captcha hostname '%s'", requestHostname, captchaResponse.Hostname))
+			return false, nil
+		}
+	}
+
 	return captchaResponse.Success, nil
 }

@@ -409,7 +409,7 @@ func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, 
 	bouncer.log.Trace(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
 	// Only serve captcha for GET requests, fallback to BAN for other methods
 	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method == http.MethodGet {
-		if bouncer.captchaClient.Check(remoteIP) {
+		if bouncer.captchaClient.Check(remoteIP, req.Host) {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 			return
 		}
