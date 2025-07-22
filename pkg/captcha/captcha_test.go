@@ -165,8 +165,8 @@ func TestCaptchaValidation(t *testing.T) {
 			// Add form data if provided
 			if len(tt.formData) > 0 {
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-				if err := req.ParseForm(); err != nil {
-					t.Fatalf("Failed to parse form: %v", err)
+				if parseErr := req.ParseForm(); parseErr != nil {
+					t.Fatalf("Failed to parse form: %v", parseErr)
 				}
 				for key, value := range tt.formData {
 					req.Form.Set(key, value)
