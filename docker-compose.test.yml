@@ -5,6 +5,10 @@ services:
     restart: unless-stopped
     command:
       - "--log.level=DEBUG"
+      - "--accesslog"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--accesslog.format=json"
+      - "--accesslog.fields.headers.names.X-Crowdsec-Remediation=keep"
       - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
@@ -12,6 +16,7 @@ services:
       - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "traefik-logs:/var/log/traefik"
       - "./ban.html:/ban.html:ro"
       - "./captcha.html:/captcha.html:ro"
       - "./:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
@@ -92,6 +97,7 @@ services:
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.updateintervalseconds=5"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.crowdsecmode=none"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaHtmlFilePath=/captcha.html"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
 
   # Test service - disabled bouncer
   disabled:
@@ -109,6 +115,29 @@ services:
       - "traefik.http.middlewares.bouncer-disabled.plugin.bouncer.enabled=false"
       - "traefik.http.middlewares.bouncer-disabled.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.bouncer-disabled.plugin.bouncer.loglevel=DEBUG"
+
+  # Test service - remediation headers
+  remediation-headers:
+    image: traefik/whoami
+    container_name: "remediation-headers-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.remediation-headers.rule=PathPrefix(`/remediation-headers`)"
+      - "traefik.http.routers.remediation-headers.entrypoints=web"
+      - "traefik.http.routers.remediation-headers.middlewares=bouncer-remediation-headers@docker"
+      - "traefik.http.services.remediation-headers.loadbalancer.server.port=80"
+      
+      # Bouncer middleware with custom remediation header
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.crowdseclapiurl=http://crowdsec:8080/"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.updateintervalseconds=5"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.crowdsecmode=none"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.banHtmlFilePath=/ban.html"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.6.8
@@ -149,6 +178,7 @@ services:
 volumes:
   crowdsec-db-test:
   crowdsec-config-test:
+  traefik-logs:
 
 networks:
   default:
