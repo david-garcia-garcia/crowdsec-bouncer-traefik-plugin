@@ -285,10 +285,10 @@ func TestCaptchaMethodBasedLogic(t *testing.T) {
 			expectBanFallback: true,
 		},
 		{
-			name:              "POST with captcha remediation should fallback to ban",
+			name:              "POST with captcha remediation should allow captcha",
 			method:            http.MethodPost,
 			remediation:       cache.CaptchaValue,
-			expectBanFallback: true,
+			expectBanFallback: false,
 		},
 		{
 			name:              "PUT with captcha remediation should fallback to ban",
@@ -307,7 +307,7 @@ func TestCaptchaMethodBasedLogic(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test the core logic: should we use captcha or fallback to ban?
-			shouldUseCaptcha := tt.remediation == cache.CaptchaValue && tt.method == http.MethodGet
+			shouldUseCaptcha := tt.remediation == cache.CaptchaValue && (tt.method == http.MethodGet || tt.method == http.MethodPost)
 
 			if shouldUseCaptcha == tt.expectBanFallback {
 				t.Errorf("Method %s with %s remediation: expected ban fallback %v, but logic would use captcha %v",
