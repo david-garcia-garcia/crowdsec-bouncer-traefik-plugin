@@ -188,6 +188,90 @@ Describe "Basic CrowdSec Bouncer Integration Test" {
             $result.Success | Should -Be $true -Because "IP should be able to access endpoint after decision removal"
         }
     }
+
+    It "Should include custom remediation header in Traefik access logs when blocking requests" {
+        # Clear any existing Traefik logs
+        Write-Host "🧹 Clearing existing Traefik access logs..." -ForegroundColor Yellow
+        docker exec traefik-test sh -c 'echo "" > /var/log/traefik/access.log' 2>$null
+        
+        # Add a ban decision
+        Write-Host "➕ Adding ban decision for custom header test ($script:TestIP)" -ForegroundColor Yellow
+        $addCommand = "cscli decisions add --ip $script:TestIP --duration 1h --type ban --reason 'Custom header test'"
+        $result = docker exec crowdsec-test sh -c $addCommand
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to add decision: $result"
+        }
+        Write-Host "✅ Ban decision added for header test" -ForegroundColor Green
+        
+        # Make a request to the endpoint with custom remediation headers configured
+        Write-Host "🌐 Making request to remediation-headers endpoint..." -ForegroundColor Yellow
+        $headers = @{ "X-Forwarded-For" = $script:TestIP }
+        try {
+            # We expect this to be blocked (403), but we're interested in the headers
+            Invoke-WebRequest -Uri "$script:TraefikUrl/remediation-headers" -Headers $headers -UseBasicParsing -TimeoutSec 5
+        }
+        catch {
+            Write-Host "✅ Request blocked as expected (checking for custom header in logs)" -ForegroundColor Green
+        }
+        
+        # Give Traefik a moment to write the access log
+        Start-Sleep 2
+        
+        # Read the Traefik access logs
+        Write-Host "📋 Reading Traefik access logs..." -ForegroundColor Yellow
+        $logContent = docker exec traefik-test cat /var/log/traefik/access.log
+        
+        if ([string]::IsNullOrWhiteSpace($logContent)) {
+            throw "No access log content found"
+        }
+        
+        Write-Host "📄 Access log content:" -ForegroundColor Gray
+        Write-Host $logContent -ForegroundColor Gray
+        
+        # Parse the JSON log entries
+        $logLines = $logContent -split "`n" | Where-Object { $_.Trim() -ne "" }
+        $foundCustomHeader = $false
+        
+        foreach ($line in $logLines) {
+            try {
+                $logEntry = $line | ConvertFrom-Json
+                
+                # Look for our test endpoint and the custom remediation header
+                # Note: JSON property names with hyphens need special access
+                $remediationHeader = $logEntry.'downstream_X-Crowdsec-Remediation'
+                if ($logEntry.RequestPath -eq "/remediation-headers" -and $remediationHeader) {
+                    Write-Host "✅ Found custom remediation header in logs!" -ForegroundColor Green
+                    Write-Host "  Header value: $remediationHeader" -ForegroundColor Green
+                    Write-Host "  Status code: $($logEntry.DownstreamStatus)" -ForegroundColor Green
+                    
+                    # Verify the header value is 'ban'
+                    $remediationHeader | Should -Be "ban" -Because "Custom remediation header should contain 'ban' for ban decisions"
+                    $foundCustomHeader = $true
+                    break
+                }
+            }
+            catch {
+                Write-Host "⚠️ Could not parse log line: $line" -ForegroundColor Yellow
+            }
+        }
+        
+        if (-not $foundCustomHeader) {
+            Write-Host "❌ Custom remediation header not found in access logs" -ForegroundColor Red
+            Write-Host "Available log entries:" -ForegroundColor Yellow
+            foreach ($line in $logLines) {
+                try {
+                    $logEntry = $line | ConvertFrom-Json
+                    Write-Host "  Path: $($logEntry.RequestPath), Status: $($logEntry.DownstreamStatus)" -ForegroundColor Yellow
+                }
+                catch { }
+            }
+            $foundCustomHeader | Should -Be $true -Because "Custom remediation header should appear in Traefik access logs when blocking requests"
+        }
+        
+        # Cleanup: Remove the decision
+        Write-Host "🧹 Cleaning up ban decision..." -ForegroundColor Yellow
+        docker exec crowdsec-test cscli decisions delete --ip $script:TestIP 2>$null
+    }
 }
 
 AfterAll {
