@@ -452,6 +452,10 @@ func startTicker(name string, updateInterval int64, log *logger.Log, work func()
 	stop := make(chan bool, 1)
 	go func() {
 		defer log.Debug(name + "_ticker:stopped")
+
+		// Execute work immediately on ticker setup
+		go work()
+
 		for {
 			select {
 			case <-ticker.C:
