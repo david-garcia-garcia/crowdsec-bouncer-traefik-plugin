@@ -5,3 +5,6 @@ conf
 db
 logs
 docker-compose.dev.yml
+
+crowdsec/*
+debug*

@@ -1,7 +1,8 @@
-// Package captcha implements utility for captcha management.
+// Package captcha implements captcha validation.
 package captcha
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -76,6 +77,8 @@ func (c *Client) New(log *logger.Log, cacheClient *cache.Client, httpClient *htt
 
 // ServeHTTP Handle captcha html page or validation.
 func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP string) {
+	ctx := r.Context() // Use request context
+
 	valid, err := c.Validate(r)
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP:validate " + err.Error())
@@ -86,7 +89,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
 		hostname := r.Host
 		cacheKey := c.getCacheKey(remoteIP, hostname)
-		c.cacheClient.Set(cacheKey, cache.CaptchaDoneValue, c.gracePeriodSeconds)
+		c.cacheClient.Set(ctx, cacheKey, cache.CaptchaDoneValue, c.gracePeriodSeconds)
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
 	}
@@ -110,10 +113,10 @@ func (c *Client) getCacheKey(remoteIP, hostname string) string {
 	return remoteIP + "_" + hostname + "_captcha"
 }
 
-// Check Verify if the captcha is already done.
-func (c *Client) Check(remoteIP, hostname string) bool {
+// Check check if the remoteIP has a captcha resolved for the hostname.
+func (c *Client) Check(ctx context.Context, remoteIP, hostname string) bool {
 	cacheKey := c.getCacheKey(remoteIP, hostname)
-	value, _ := c.cacheClient.Get(cacheKey)
+	value, _ := c.cacheClient.Get(ctx, cacheKey)
 	passed := value == cache.CaptchaDoneValue
 	c.log.Debug(fmt.Sprintf("captcha:Check ip:%s hostname:%s pass:%v", remoteIP, hostname, passed))
 	return passed

@@ -79,7 +79,7 @@ type Config struct {
 	RedisCacheHost                           string   `json:"redisCacheHost,omitempty"`
 	RedisCachePassword                       string   `json:"redisCachePassword,omitempty"`
 	RedisCachePasswordFile                   string   `json:"redisCachePasswordFile,omitempty"`
-	RedisCacheDatabase                       string   `json:"redisCacheDatabase,omitempty"`
+	RedisCacheDatabase                       int      `json:"redisCacheDatabase,omitempty"`
 	RedisCacheUnreachableBlock               bool     `json:"redisCacheUnreachableBlock,omitempty"`
 	BanHTMLFilePath                          string   `json:"banHtmlFilePath,omitempty"`
 	CaptchaHTMLFilePath                      string   `json:"captchaHtmlFilePath,omitempty"`
@@ -137,7 +137,7 @@ func New() *Config {
 		RedisCacheEnabled:              false,
 		RedisCacheHost:                 "redis:6379",
 		RedisCachePassword:             "",
-		RedisCacheDatabase:             "",
+		RedisCacheDatabase:             0,
 		RedisCacheUnreachableBlock:     true,
 	}
 }

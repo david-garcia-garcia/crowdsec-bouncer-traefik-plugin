@@ -1,6 +1,7 @@
 package captcha
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -140,7 +141,7 @@ func TestCaptchaValidation(t *testing.T) {
 			// Create logger and cache
 			log := logger.New("DEBUG", "")
 			cacheClient := &cache.Client{}
-			cacheClient.New(log, false, "", "", "")
+			cacheClient.New(log, false, "", "", 0)
 
 			// Create mock HTTP client
 			var mockClient *http.Client
@@ -190,7 +191,7 @@ func TestCaptchaCheckAndSet(t *testing.T) {
 	// Create logger and cache
 	log := logger.New("DEBUG", "")
 	cacheClient := &cache.Client{}
-	cacheClient.New(log, false, "", "", "")
+	cacheClient.New(log, false, "", "", 0)
 
 	// Create captcha client
 	client := &Client{}
@@ -203,26 +204,26 @@ func TestCaptchaCheckAndSet(t *testing.T) {
 	testHostname := "example.com"
 
 	// Initially should not be checked
-	if client.Check(testIP, testHostname) {
+	if client.Check(context.Background(), testIP, testHostname) {
 		t.Error("Expected Check to return false for uncached IP+hostname")
 	}
 
 	// Simulate successful validation by setting cache directly
 	cacheKey := client.getCacheKey(testIP, testHostname)
-	client.cacheClient.Set(cacheKey, cache.CaptchaDoneValue, 300)
+	client.cacheClient.Set(context.Background(), cacheKey, cache.CaptchaDoneValue, 300)
 
 	// Now should be checked
-	if !client.Check(testIP, testHostname) {
+	if !client.Check(context.Background(), testIP, testHostname) {
 		t.Error("Expected Check to return true for cached IP+hostname")
 	}
 
 	// Different hostname should not be checked
-	if client.Check(testIP, "different.com") {
+	if client.Check(context.Background(), testIP, "different.com") {
 		t.Error("Expected Check to return false for different hostname")
 	}
 
 	// Different IP should not be checked
-	if client.Check("10.0.0.1", testHostname) {
+	if client.Check(context.Background(), "10.0.0.1", testHostname) {
 		t.Error("Expected Check to return false for different IP")
 	}
 }
@@ -233,7 +234,7 @@ func TestCaptchaCheckAndSet(t *testing.T) {
 func TestCaptchaNew(t *testing.T) {
 	log := logger.New("DEBUG", "")
 	cacheClient := &cache.Client{}
-	cacheClient.New(log, false, "", "", "")
+	cacheClient.New(log, false, "", "", 0)
 
 	tests := []struct {
 		name        string
