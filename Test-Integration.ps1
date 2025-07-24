@@ -16,7 +16,10 @@
     Skip waiting for services to be ready (assumes they're already running)
 
 .PARAMETER TestPath
-    Path to the Pester test file (defaults to ./tests/integration-tests.Tests.ps1)
+    Path to the Pester test file (defaults to ./tests/simple-bouncer.Tests.ps1)
+
+.PARAMETER TestSuite
+    Which test suite to run: simple, redis, integration, or all (defaults to simple)
 
 .PARAMETER TestMode
     Which test mode to run: stream, live, none, or all (defaults to all)
@@ -26,11 +29,19 @@
 
 .EXAMPLE
     ./Test-Integration.ps1
-    Runs the full integration test suite
+    Runs the simple bouncer test suite (default)
 
 .EXAMPLE
-    ./Test-Integration.ps1 -TestMode stream -HttpTimeoutSeconds 60
-    Tests only stream mode with 60 second timeout
+    ./Test-Integration.ps1 -TestSuite redis
+    Runs Redis cache integration tests
+
+.EXAMPLE
+    ./Test-Integration.ps1 -TestSuite redis -TestMode stream
+    Runs Redis cache tests in stream mode
+
+.EXAMPLE
+    ./Test-Integration.ps1 -TestSuite all -HttpTimeoutSeconds 60
+    Runs all test suites with 60 second timeout
 
 .EXAMPLE
     ./Test-Integration.ps1 -SkipDockerCleanup
@@ -42,6 +53,8 @@ param(
     [switch]$SkipDockerCleanup,
     [switch]$SkipWait,
     [string]$TestPath = "./tests/simple-bouncer.Tests.ps1",
+    [ValidateSet("simple", "redis", "integration", "all")]
+    [string]$TestSuite = "simple",
     [ValidateSet("stream", "live", "none", "all")]
     [string]$TestMode = "all",
     [int]$HttpTimeoutSeconds = 30
@@ -143,11 +156,41 @@ function Test-CrowdSecAPI {
     return $false
 }
 
+function Test-DragonflyDB {
+    param(
+        [int]$TimeoutSeconds = 60
+    )
+    
+    Write-Step "Testing DragonflyDB connection..."
+    $elapsed = 0
+    
+    do {
+        try {
+            # Test DragonflyDB connection using docker exec
+            $result = docker exec dragonfly-test redis-cli -a testpassword123 ping 2>$null
+            if ($result -eq "PONG") {
+                Write-Success "DragonflyDB is responding!"
+                return $true
+            }
+        }
+        catch {
+            Write-Host "  DragonflyDB test failed: $($_.Exception.Message)" -ForegroundColor Yellow
+            Start-Sleep 3
+            $elapsed += 3
+        }
+        
+    } while ($elapsed -lt $TimeoutSeconds)
+    
+    Write-Error "DragonflyDB failed to respond within $TimeoutSeconds seconds"
+    return $false
+}
+
 # Main execution
 try {
     Write-Host ""
     Write-Host "🚀 CrowdSec Bouncer Traefik Plugin Integration Test Runner" -ForegroundColor $Colors.Info
     Write-Host "=========================================================" -ForegroundColor $Colors.Info
+    Write-Host "Test Suite: $TestSuite" -ForegroundColor $Colors.Info
     Write-Host "Test Mode: $TestMode" -ForegroundColor $Colors.Info
     Write-Host "HTTP Timeout: $HttpTimeoutSeconds seconds" -ForegroundColor $Colors.Info
     Write-Host ""
@@ -236,7 +279,10 @@ try {
         $servicesReady = @(
             (Test-ServiceHealth -Url "http://localhost:8080/api/rawdata" -ServiceName "Traefik API" -TimeoutSeconds 60),
             (Test-ServiceHealth -Url "http://localhost:8000/whoami" -ServiceName "Whoami test service" -TimeoutSeconds 60),
-            (Test-CrowdSecAPI -ApiKey $env:BOUNCER_API_KEY -TimeoutSeconds 90)
+            (Test-ServiceHealth -Url "http://localhost:8000/redis-cache" -ServiceName "Redis cache test service" -TimeoutSeconds 60),
+            (Test-ServiceHealth -Url "http://localhost:8000/redis-cache-permissive" -ServiceName "Redis cache permissive test service" -TimeoutSeconds 60),
+            (Test-CrowdSecAPI -ApiKey $env:BOUNCER_API_KEY -TimeoutSeconds 90),
+            (Test-DragonflyDB -TimeoutSeconds 60)
         )
         
         if ($servicesReady -contains $false) {
@@ -262,14 +308,53 @@ try {
     Write-Step "Running Pester integration tests..."
     Write-Host ""
     
-    if (-not (Test-Path $TestPath)) {
-        Write-Error "Test file not found: $TestPath"
+    # Determine which test files to run based on TestSuite
+    $testFiles = @()
+    switch ($TestSuite) {
+        "simple" { 
+            $testFiles = @("./tests/simple-bouncer.Tests.ps1") 
+        }
+        "redis" { 
+            $testFiles = @("./tests/redis-cache.Tests.ps1") 
+        }
+        "integration" { 
+            $testFiles = @("./tests/integration-tests.Tests.ps1") 
+        }
+        "all" { 
+            $testFiles = @(
+                "./tests/simple-bouncer.Tests.ps1",
+                "./tests/redis-cache.Tests.ps1",
+                "./tests/integration-tests.Tests.ps1"
+            )
+        }
+    }
+    
+    # If TestPath is explicitly provided, use that instead
+    if ($PSBoundParameters.ContainsKey('TestPath')) {
+        $testFiles = @($TestPath)
+    }
+    
+    # Filter out non-existent test files
+    $existingTestFiles = $testFiles | Where-Object { Test-Path $_ }
+    $missingTestFiles = $testFiles | Where-Object { -not (Test-Path $_) }
+    
+    if ($missingTestFiles) {
+        Write-Warning "Some test files were not found:"
+        $missingTestFiles | ForEach-Object { Write-Warning "  - $_" }
+    }
+    
+    if ($existingTestFiles.Count -eq 0) {
+        Write-Error "No test files found to execute!"
         exit 1
     }
+    
+    Write-Host "Test files to execute:" -ForegroundColor $Colors.Info
+    $existingTestFiles | ForEach-Object { Write-Host "  - $_" -ForegroundColor Gray }
+    Write-Host ""
 
     try {
         $pesterConfig = New-PesterConfiguration
-        $pesterConfig.Run.Path = $TestPath
+        $pesterConfig.Run.Path = $existingTestFiles
         $pesterConfig.Output.Verbosity = 'Detailed'
         $pesterConfig.Run.Exit = $false
         $pesterConfig.Run.PassThru = $true
@@ -328,7 +413,10 @@ finally {
         Write-Host "Services available at:" -ForegroundColor Gray
         Write-Host "  - Traefik Dashboard: http://localhost:8080" -ForegroundColor Gray
         Write-Host "  - Test Service: http://localhost:8000/whoami" -ForegroundColor Gray
+        Write-Host "  - Redis Cache Service: http://localhost:8000/redis-cache" -ForegroundColor Gray
+        Write-Host "  - Redis Cache Permissive Service: http://localhost:8000/redis-cache-permissive" -ForegroundColor Gray
         Write-Host "  - CrowdSec LAPI: http://localhost:8081/v1/decisions" -ForegroundColor Gray
+        Write-Host "  - DragonflyDB: localhost:6379 (password: testpassword123)" -ForegroundColor Gray
     }
     
     Write-Host ""

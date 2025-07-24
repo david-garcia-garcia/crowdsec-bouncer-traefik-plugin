@@ -3,16 +3,18 @@
 package cache
 
 import (
+	"context"
 	"testing"
 
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 func Test_Get(t *testing.T) {
+	ctx := context.Background()
 	IPInCache := "10.0.0.10"
 	IPNotInCache := "10.0.0.20"
 	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
-	client.Set(IPInCache, BannedValue, 10)
+	client.Set(ctx, IPInCache, BannedValue, 10)
 	type args struct {
 		clientIP string
 	}
@@ -30,7 +32,7 @@ func Test_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := client.Get(tt.args.clientIP)
+			got, err := client.Get(ctx, tt.args.clientIP)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -47,6 +49,7 @@ func Test_Get(t *testing.T) {
 }
 
 func Test_Set(t *testing.T) {
+	ctx := context.Background()
 	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
 	IPInCache := "10.0.0.11"
 	type args struct {
@@ -68,8 +71,8 @@ func Test_Set(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client.Set(tt.args.clientIP, tt.args.value, tt.args.duration)
-			got, err := client.Get(tt.args.clientIP)
+			client.Set(ctx, tt.args.clientIP, tt.args.value, tt.args.duration)
+			got, err := client.Get(ctx, tt.args.clientIP)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Set() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -86,10 +89,11 @@ func Test_Set(t *testing.T) {
 }
 
 func Test_Delete(t *testing.T) {
+	ctx := context.Background()
 	IPInCache := "10.0.0.12"
 	IPNotInCache := "10.0.0.22"
 	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
-	client.Set(IPInCache, BannedValue, 10)
+	client.Set(ctx, IPInCache, BannedValue, 10)
 	type args struct {
 		clientIP string
 	}
@@ -106,8 +110,8 @@ func Test_Delete(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client.Delete(tt.args.clientIP)
-			got, err := client.Get(tt.args.clientIP)
+			client.Delete(ctx, tt.args.clientIP)
+			got, err := client.Get(ctx, tt.args.clientIP)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Delete() error = %v, wantErr %v", err, tt.wantErr)
 				return

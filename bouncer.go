@@ -283,6 +283,9 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Get request context for cache operations
+	ctx := req.Context()
+
 	// Here we check for the trusted IPs in the forwardedCustomHeader
 	remoteIP, err := ip.GetRemoteIP(req, bouncer.serverPoolStrategy, bouncer.forwardedCustomHeader)
 	if err != nil {
@@ -310,7 +313,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// TODO This should be simplified
 	if bouncer.crowdsecMode != configuration.NoneMode {
-		value, cacheErr := bouncer.cacheClient.Get(remoteIP)
+		value, cacheErr := bouncer.cacheClient.Get(ctx, remoteIP)
 		if cacheErr != nil {
 			cacheErrString := cacheErr.Error()
 			bouncer.log.Trace(fmt.Sprintf("ServeHTTP:Get ip:%s isBanned:false %s", remoteIP, cacheErrString))
@@ -344,7 +347,7 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			handleBanServeHTTP(bouncer, rw, req.Method)
 		}
 	} else {
-		value, err := handleNoStreamCache(bouncer, remoteIP)
+		value, err := handleNoStreamCache(bouncer, ctx, remoteIP)
 		if value == cache.NoBannedValue {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 		} else {
@@ -409,7 +412,7 @@ func handleRemediationServeHTTP(bouncer *Bouncer, remoteIP, remediation string, 
 	bouncer.log.Trace(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
 	// Only serve captcha for GET and POST requests, fallback to BAN for other methods. We need POST because the actual captcha post-processing is done in the POST request.
 	if bouncer.captchaClient.Valid && remediation == cache.CaptchaValue && (req.Method == http.MethodGet || req.Method == http.MethodPost) {
-		if bouncer.captchaClient.Check(remoteIP, req.Host) {
+		if bouncer.captchaClient.Check(req.Context(), remoteIP, req.Host) {
 			handleNextServeHTTP(bouncer, remoteIP, rw, req)
 			return
 		}
@@ -475,7 +478,7 @@ func startTicker(name string, updateInterval int64, log *logger.Log, work func()
 }
 
 // We are now in none or live mode.
-func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
+func handleNoStreamCache(bouncer *Bouncer, ctx context.Context, remoteIP string) (string, error) {
 	isLiveMode := bouncer.crowdsecMode == configuration.LiveMode
 	routeURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
@@ -490,7 +493,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 
 	if bytes.Equal(body, []byte("null")) {
 		if isLiveMode {
-			bouncer.cacheClient.Set(remoteIP, cache.NoBannedValue, bouncer.defaultDecisionTimeout)
+			bouncer.cacheClient.Set(ctx, remoteIP, cache.NoBannedValue, bouncer.defaultDecisionTimeout)
 		}
 		return cache.NoBannedValue, nil
 	}
@@ -502,7 +505,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 	}
 	if len(decisions) == 0 {
 		if isLiveMode {
-			bouncer.cacheClient.Set(remoteIP, cache.NoBannedValue, bouncer.defaultDecisionTimeout)
+			bouncer.cacheClient.Set(ctx, remoteIP, cache.NoBannedValue, bouncer.defaultDecisionTimeout)
 		}
 		return cache.NoBannedValue, nil
 	}
@@ -532,7 +535,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 		if bouncer.defaultDecisionTimeout < durationSecond {
 			durationSecond = bouncer.defaultDecisionTimeout
 		}
-		bouncer.cacheClient.Set(remoteIP, value, durationSecond)
+		bouncer.cacheClient.Set(ctx, remoteIP, value, durationSecond)
 	}
 	return value, errors.New("handleNoStreamCache:banned")
 }
@@ -574,7 +577,9 @@ func handleStreamCache(bouncer *Bouncer) error {
 	// Instead of blocking the goroutine interval for all the secondary node,
 	// if the master service is shut down, other goroutine can take the lead
 	// because updated routine information is in the cache
-	_, err := bouncer.cacheClient.Get(cacheTimeoutKey)
+	ctx := context.Background() // Background context for non-request operations
+
+	_, err := bouncer.cacheClient.Get(ctx, cacheTimeoutKey)
 	if err == nil {
 		bouncer.log.Debug("handleStreamCache:alreadyUpdated")
 		return nil
@@ -582,7 +587,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	if err.Error() != cache.CacheMiss {
 		return err
 	}
-	bouncer.cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, bouncer.updateInterval-1)
+	bouncer.cacheClient.Set(ctx, cacheTimeoutKey, cache.NoBannedValue, bouncer.updateInterval-1)
 	streamRouteURL := url.URL{
 		Scheme:   bouncer.crowdsecScheme,
 		Host:     bouncer.crowdsecHost,
@@ -610,11 +615,11 @@ func handleStreamCache(bouncer *Bouncer) error {
 			default:
 				bouncer.log.Debug("handleStreamCache:unknownType " + decision.Type)
 			}
-			bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
+			bouncer.cacheClient.Set(ctx, decision.Value, value, int64(duration.Seconds()))
 		}
 	}
 	for _, decision := range stream.Deleted {
-		bouncer.cacheClient.Delete(decision.Value)
+		bouncer.cacheClient.Delete(ctx, decision.Value)
 	}
 	bouncer.log.Debug("handleStreamCache:updated")
 	lapiStreamInitialized = true

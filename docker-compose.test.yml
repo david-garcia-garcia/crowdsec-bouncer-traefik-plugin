@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: "traefik:v3.0.0"
+    image: "traefik:v3.5.0-rc2"
     container_name: "traefik-test"
     restart: unless-stopped
     command:
@@ -14,6 +14,7 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      - "--experimental.localplugins.bouncer.settings.useunsafe=true"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "traefik-logs:/var/log/traefik"
@@ -138,6 +139,81 @@ services:
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.crowdsecmode=none"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.banHtmlFilePath=/ban.html"
+
+  # Test service - redis cache enabled
+  redis-cache:
+    image: traefik/whoami
+    container_name: "redis-cache-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.redis-cache.rule=PathPrefix(`/redis-cache`)"
+      - "traefik.http.routers.redis-cache.entrypoints=web"
+      - "traefik.http.routers.redis-cache.middlewares=bouncer-redis-cache@docker"
+      - "traefik.http.services.redis-cache.loadbalancer.server.port=80"
+      
+      # Redis-enabled bouncer middleware
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.crowdseclapiurl=http://crowdsec:8080/"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.updateintervalseconds=5"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.crowdsecmode=live"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.redisCacheEnabled=true"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.redisCacheHost=dragonfly:6379"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.redisCachePassword=testpassword123"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.redisCacheDatabase=0"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.redisCacheUnreachableBlock=true"
+    depends_on:
+      - dragonfly
+
+  # Test service - redis cache with unreachable block disabled
+  redis-cache-permissive:
+    image: traefik/whoami
+    container_name: "redis-cache-permissive-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.redis-cache-permissive.rule=PathPrefix(`/redis-cache-permissive`)"
+      - "traefik.http.routers.redis-cache-permissive.entrypoints=web"
+      - "traefik.http.routers.redis-cache-permissive.middlewares=bouncer-redis-cache-permissive@docker"
+      - "traefik.http.services.redis-cache-permissive.loadbalancer.server.port=80"
+      
+      # Redis-enabled bouncer middleware with unreachable block disabled
+      - "traefik.http.middlewares.bouncer-redis-cache-permissive.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-redis-cache-permissive.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-redis-cache-permissive.plugin.bouncer.crowdseclapiurl=http://crowdsec:8080/"
+      - "traefik.http.middlewares.bouncer-redis-cache-permissive.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-redis-cache-permissive.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-redis-cache-permissive.plugin.bouncer.updateintervalseconds=5"
+      - "traefik.http.middlewares.bouncer-redis-cache-permissive.plugin.bouncer.crowdsecmode=live"
+      - "traefik.http.middlewares.bouncer-redis-cache-permissive.plugin.bouncer.redisCacheEnabled=true"
+      - "traefik.http.middlewares.bouncer-redis-cache-permissive.plugin.bouncer.redisCacheHost=dragonfly:6379"
+      - "traefik.http.middlewares.bouncer-redis-cache-permissive.plugin.bouncer.redisCachePassword=testpassword123"
+      - "traefik.http.middlewares.bouncer-redis-cache-permissive.plugin.bouncer.redisCacheDatabase=1"
+      - "traefik.http.middlewares.bouncer-redis-cache-permissive.plugin.bouncer.redisCacheUnreachableBlock=false"
+    depends_on:
+      - dragonfly
+
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.31.2
+    container_name: "dragonfly-test"
+    restart: unless-stopped
+    command: 
+      - "--requirepass=testpassword123"
+      - "--bind=0.0.0.0"
+      - "--port=6379"
+    environment:
+      - DFLY_requirepass=testpassword123
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "testpassword123", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.6.8
