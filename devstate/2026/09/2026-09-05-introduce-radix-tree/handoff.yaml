@@ -1,0 +1,15 @@
+issueKey: 2026-09-05-introduce-radix-tree
+jobName: 2026-09-05-introduce-radix-tree
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 81de9ffe2e70c3954075f770fd5e8221c8281c89639b68f497801cc7618d2985
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
