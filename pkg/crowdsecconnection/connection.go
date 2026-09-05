@@ -38,6 +38,15 @@ const (
 	crowdsecCapiLoginRoute   = "v2/watchers/login"
 	crowdsecCapiStreamRoute  = "v2/decisions/stream"
 	cacheTimeoutKey          = "updated"
+	appsecResponseBodyLimit  = 1 << 20 // 1 MiB
+)
+
+// Structured AppSec JSON action values CrowdSec 1.8 puts in the envelope body.
+const (
+	AppsecActionAllow     = "allow"
+	AppsecActionBan       = "ban"
+	AppsecActionCaptcha   = "captcha"
+	AppsecActionChallenge = "challenge"
 )
 
 // Decision is the body returned from Crowdsec LAPI.
@@ -70,6 +79,15 @@ type AppsecPolicy struct {
 	FailureBlock        bool
 	UnreachableBlock    bool
 	UnreadableBodyBlock bool
+}
+
+// AppsecResponse is the structured AppSec JSON envelope CrowdSec 1.8 returns for a remediation.
+type AppsecResponse struct {
+	Action          string              `json:"action"`
+	HTTPStatus      int                 `json:"http_status"`
+	UserBodyContent string              `json:"user_body_content,omitempty"`
+	UserCookies     []string            `json:"user_cookies,omitempty"`
+	UserHeaders     map[string][]string `json:"user_headers,omitempty"`
 }
 
 // CrowdsecConnection owns stream ticker, isolated cache, LAPI/CAPI HTTP, metrics, and AppSec HTTP client.
@@ -558,7 +576,8 @@ func isMethodWithBody(method string) bool {
 }
 
 // AppsecQuery forwards the request to this connection's AppSec HTTP client.
-func (c *CrowdsecConnection) AppsecQuery(ip string, httpReq *http.Request, pol AppsecPolicy) error {
+// A structured JSON envelope is returned when AppSec supplies a non-empty action.
+func (c *CrowdsecConnection) AppsecQuery(ip string, httpReq *http.Request, pol AppsecPolicy) (*AppsecResponse, error) {
 	routeURL := url.URL{
 		Scheme: c.appsecScheme,
 		Host:   c.appsecHost,
@@ -568,7 +587,7 @@ func (c *CrowdsecConnection) AppsecQuery(ip string, httpReq *http.Request, pol A
 	switch {
 	case isBodyUnreadable(httpReq):
 		if pol.UnreadableBodyBlock && isMethodWithBody(httpReq.Method) {
-			return errors.New("appsecQuery:unreadableBody dropped")
+			return nil, errors.New("appsecQuery:unreadableBody dropped")
 		}
 		req, _ = http.NewRequest(http.MethodGet, routeURL.String(), nil)
 	case c.appsecBodyLimit > 0 && httpReq.Body != nil:
@@ -577,7 +596,7 @@ func (c *CrowdsecConnection) AppsecQuery(ip string, httpReq *http.Request, pol A
 		teeReader := io.TeeReader(limitedReader, &bodyBuffer)
 		bodyBytes, err := io.ReadAll(teeReader)
 		if err != nil {
-			return fmt.Errorf("appsecQuery:GetBody %w", err)
+			return nil, fmt.Errorf("appsecQuery:GetBody %w", err)
 		}
 		httpReq.Body = io.NopCloser(io.MultiReader(&bodyBuffer, httpReq.Body))
 		req, _ = http.NewRequest(http.MethodPost, routeURL.String(), bytes.NewBuffer(bodyBytes))
@@ -602,9 +621,9 @@ func (c *CrowdsecConnection) AppsecQuery(ip string, httpReq *http.Request, pol A
 	if err != nil || isReverseProxyError(res.StatusCode) {
 		c.log.Error("appsecQuery:unreachable")
 		if pol.UnreachableBlock {
-			return fmt.Errorf("appsecQuery:unreachable %w", err)
+			return nil, fmt.Errorf("appsecQuery:unreachable %w", err)
 		}
-		return nil
+		return nil, nil
 	}
 	defer func() {
 		if _, errDrain := io.Copy(io.Discard, res.Body); errDrain != nil {
@@ -617,14 +636,52 @@ func (c *CrowdsecConnection) AppsecQuery(ip string, httpReq *http.Request, pol A
 	if res.StatusCode == http.StatusInternalServerError {
 		c.log.Info("appsecQuery:failure")
 		if pol.FailureBlock {
-			return errors.New("appsecQuery statusCode:500")
+			return nil, errors.New("appsecQuery statusCode:500")
 		}
-		return nil
+		return nil, nil
 	}
-	if res.StatusCode != http.StatusOK {
-		return errors.New("appsecQuery statusCode:" + strconv.Itoa(res.StatusCode))
+
+	// Bound the AppSec body so a runaway engine cannot fill the plugin process.
+	body, err := io.ReadAll(io.LimitReader(res.Body, appsecResponseBodyLimit+1))
+	if err != nil {
+		return nil, fmt.Errorf("appsecQuery:readBody %w", err)
 	}
-	return nil
+	if len(body) > appsecResponseBodyLimit {
+		c.log.Debug("appsecQuery:responseBodyTooLarge")
+		if res.StatusCode == http.StatusOK {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("appsecQuery:responseBodyTooLarge statusCode:%d", res.StatusCode)
+	}
+
+	decision, parseErr := parseAppsecResponse(body)
+	if parseErr == nil && decision.Action != "" {
+		return decision, nil
+	}
+
+	if res.StatusCode == http.StatusOK {
+		if parseErr != nil && len(bytes.TrimSpace(body)) > 0 {
+			c.log.Debug("appsecQuery:parseBody " + parseErr.Error())
+		}
+		return nil, nil
+	}
+	if parseErr != nil && len(bytes.TrimSpace(body)) > 0 {
+		c.log.Debug("appsecQuery:parseBody " + parseErr.Error())
+	}
+	return nil, fmt.Errorf("appsecQuery statusCode:%d", res.StatusCode)
+}
+
+// parseAppsecResponse unmarshals a CrowdSec AppSec JSON envelope. Empty bodies are not structured.
+func parseAppsecResponse(body []byte) (*AppsecResponse, error) {
+	body = bytes.TrimSpace(body)
+	if len(body) == 0 {
+		return nil, errors.New("empty appsec response body")
+	}
+	var decision AppsecResponse
+	if err := json.Unmarshal(body, &decision); err != nil {
+		return nil, err
+	}
+	return &decision, nil
 }
 
 func (c *CrowdsecConnection) reportMetrics() error {

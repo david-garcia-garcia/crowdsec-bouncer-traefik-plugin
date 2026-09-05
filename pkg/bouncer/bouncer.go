@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"text/template"
 	"time"
 
@@ -252,11 +253,80 @@ func (b *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Request,
 			UnreachableBlock:    b.appsecUnreachableBlock,
 			UnreadableBodyBlock: b.appsecUnreadableBodyBlock,
 		}
-		if err := b.conn.AppsecQuery(remoteIP, req, pol); err != nil {
+		decision, err := b.conn.AppsecQuery(remoteIP, req, pol)
+		if err != nil {
 			b.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
 			b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
 			return
 		}
+		if decision != nil && decision.Action != "" && decision.Action != crowdsecconnection.AppsecActionAllow {
+			switch decision.Action {
+			case crowdsecconnection.AppsecActionBan:
+				b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
+				return
+			case crowdsecconnection.AppsecActionCaptcha:
+				b.handleRemediationServeHTTP(rw, req, remoteIP, cache.CaptchaValue)
+				return
+			case crowdsecconnection.AppsecActionChallenge:
+				if decision.UserBodyContent == "" {
+					b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
+					return
+				}
+			}
+			b.handleAppsecResponseServeHTTP(rw, req, decision)
+			return
+		}
 	}
 	b.next.ServeHTTP(rw, req)
+}
+
+// handleAppsecResponseServeHTTP writes a structured AppSec envelope (challenge HTML, cookies, headers) to the client.
+func (b *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req *http.Request, decision *crowdsecconnection.AppsecResponse) {
+	if b.conn != nil {
+		b.conn.IncBlocked()
+	}
+
+	// Copy AppSec-supplied headers, skipping hop-by-hop names and Set-Cookie (cookies have their own field).
+	for name, values := range decision.UserHeaders {
+		if isHopByHopHeader(name) || strings.EqualFold(name, "Set-Cookie") {
+			continue
+		}
+		rw.Header()[http.CanonicalHeaderKey(name)] = values
+	}
+	for _, cookie := range decision.UserCookies {
+		rw.Header().Add("Set-Cookie", cookie)
+	}
+	if b.remediationCustomHeader != "" {
+		rw.Header().Set(b.remediationCustomHeader, decision.Action)
+	}
+	if rw.Header().Get("Content-Type") == "" && b.banTemplateContentType != "" {
+		rw.Header().Set("Content-Type", b.banTemplateContentType)
+	}
+
+	status := decision.HTTPStatus
+	if status == 0 {
+		status = http.StatusOK
+	}
+	if status < 100 || status > 999 {
+		status = b.remediationStatusCode
+	}
+
+	rw.WriteHeader(status)
+
+	if req.Method == http.MethodHead || decision.UserBodyContent == "" {
+		return
+	}
+	if _, err := rw.Write([]byte(decision.UserBodyContent)); err != nil {
+		b.log.Warn("handleAppsecResponseServeHTTP could not write appsec response: " + err.Error())
+	}
+}
+
+// isHopByHopHeader reports names that must not be copied from AppSec onto the client response.
+func isHopByHopHeader(name string) bool {
+	switch http.CanonicalHeaderKey(name) {
+	case "Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization", "Te", "Trailers", "Transfer-Encoding", "Upgrade":
+		return true
+	default:
+		return false
+	}
 }

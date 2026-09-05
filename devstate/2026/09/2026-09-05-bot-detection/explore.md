@@ -47,33 +47,33 @@ Empty or non-JSON non-200 from AppSec. Today's `AppsecQuery` error → `handleBa
 ## Open questions
 
 - Q: What exact JSON fields and HTTP status does CrowdSec 1.8.0 AppSec send for challenge vs ban vs allow?
-  Decision: assumed — follow PR 343 field names (`action`, `http_status`, `user_body_content`, `user_cookies`, `user_headers`). Treat listener 200 with `action=allow` or empty body as pass; non-200 with parseable non-allow action as relay; non-200 without JSON as legacy ban. Research subagent may tighten this; do not invent extra fields.
-  By: explore
+  Decision: resolved — listener 200 is allow; listener 403 carries JSON `action` / `http_status` / `user_body_content` / `user_cookies` / `user_headers`. Challenge is always listener 403 plus `action: challenge`. Browser status is `http_status` (200 page/submit, 307 grant). Missing `http_status` → 200. Empty challenge body → ban. Source: knowledge/research/ext_crowdsec_appsec_bot-detection/.
+  By: implement
 
 - Q: Does Traefik need a new plugin option for bot-detection?
-  Decision: assumed — no. AppSec enabled plus challenge paths through the same middleware (PR 343 body; alexstrassheim comment only flags `crowdsecAppsecUnreadableBodyBlock: false` for their HTTP/3 setup, which we already gate with `isMethodWithBody`).
-  By: explore
+  Decision: resolved — no. AppSec enabled plus challenge paths through the same middleware.
+  By: implement
 
 - Q: Who already owns the client address AppSec should see?
   Decision: resolved — `pkg/ip.GetRemoteIP` in `Bouncer.ServeHTTP`; `AppsecQuery` already receives that `ip` and sets `X-Crowdsec-Appsec-Ip`. Reuse. Do not parse `RemoteAddr` or cookies for identity.
   By: explore
 
 - Q: How must `/crowdsec-internal/challenge` be wired in our stacks?
-  Decision: assumed — Traefik router `PathPrefix(/crowdsec-internal/challenge)` with the same bouncer middleware; service load-balancer to CrowdSec AppSec port 7422 so the engine receives the callback body after a pass. Protected app routes keep their existing backends.
-  By: explore
+  Decision: resolved — Traefik router `PathPrefix(/crowdsec-internal/challenge)` with the same bouncer middleware; service load-balancer to the AppSec port so origin never sees the callback.
+  By: implement
 
 - Q: Which CrowdSec image and hub items for real e2e?
-  Decision: assumed — `crowdsecurity/crowdsec:v1.8.0` (bot-detection shipped in 1.8.0 per issue 389). Add `crowdsecurity/appsec-bot-*` (or the 1.8 published collection name if hub renamed it) to `COLLECTIONS` / `acquis.yaml` `appsec_configs` without dropping `appsec-crs-inband`. If 1.8.0 cannot load both, prefer a second AppSec-enabled whoami route rather than dropping CRS coverage.
-  By: explore
+  Decision: resolved — `crowdsecurity/crowdsec:v1.8.0`, collection `crowdsecurity/appsec-bot-challenge`, acquis `crowdsecurity/appsec-bot-*` on port 7423 so CRS on 7422 stays unchallenged.
+  By: implement
 
 - Q: Should structured `action=ban` use AppSec HTML or the operator ban template?
-  Decision: assumed — keep `handleBanServeHTTP` / `banTemplate` (PR 343 review item 5, later tests in that PR). Relay is for non-ban actions.
-  By: explore
+  Decision: resolved — keep `handleBanServeHTTP` / `banTemplate`.
+  By: implement
 
 - Q: Do we increment `blockedRequests` for a challenge?
-  Decision: assumed — yes, same as today's AppSec ban path (`IncBlocked` via `handleBanServeHTTP`). Challenge relay should call the same counter so metrics stay consistent with a remediation that stopped `next`.
-  By: explore
+  Decision: resolved — yes, same as AppSec ban (`IncBlocked` on relay).
+  By: implement
 
 - Q: Reproduce issue 389 in this worktree?
-  Decision: assumed — not reproduced live (no CrowdSec 1.8 lab in prepare). Code path on `master` is confirmed: `AppsecQuery` errors on any non-200 and `handleNextServeHTTP` always bans. Real e2e in implement is the reproduction.
-  By: explore
+  Decision: assumed — not reproduced live in explore; unit/mock cover the protocol; real e2e is the live reproduction.
+  By: implement

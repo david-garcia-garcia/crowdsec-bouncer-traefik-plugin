@@ -23,11 +23,19 @@ The bouncer SHALL pass the address from `pkg/ip.GetRemoteIP` into `AppsecQuery` 
 - **THEN** `AppsecQuery` returns a nil error and the request proceeds to `next`
 
 ### Requirement: Challenge is relayed to the client
-When the structured `action` is neither empty, `allow`, nor `ban`, the bouncer SHALL write `http_status`, `user_headers`, `user_cookies` (as `Set-Cookie`), and `user_body_content` to the client and MUST NOT call `next`. `http_status` outside 100–999 or zero SHALL fall back to `remediationStatusCode`. Missing `Content-Type` SHALL fall back to `banTemplateContentType` when that is set. The remediation custom header, when configured, SHALL be set to the action. `blockedRequests` SHALL increment.
+When the structured `action` is neither empty, `allow`, nor `ban`, the bouncer SHALL write `http_status`, `user_headers`, `user_cookies` (as `Set-Cookie`), and `user_body_content` to the client and MUST NOT call `next`. `http_status` of zero SHALL be treated as 200. `http_status` outside 100–999 SHALL fall back to `remediationStatusCode`. Missing `Content-Type` SHALL fall back to `banTemplateContentType` when that is set. The remediation custom header, when configured, SHALL be set to the action. `blockedRequests` SHALL increment. A `challenge` action with empty `user_body_content` SHALL ban instead of writing an empty page.
 
 #### Scenario: Challenge HTML and cookie are served
 - **WHEN** AppSec returns a parseable `action` `challenge` with `http_status` 200, HTML body, Content-Type, and a `__crowdsec_challenge` cookie
 - **THEN** the client receives that status, headers, cookie, and body, and the backend is not called
+
+#### Scenario: Empty challenge body is a ban
+- **WHEN** AppSec returns `action` `challenge` and `user_body_content` is empty
+- **THEN** the client is forbidden with the operator ban page
+
+#### Scenario: Missing http_status defaults to 200
+- **WHEN** a challenge envelope omits `http_status` or sets it to 0
+- **THEN** the client status is 200
 
 #### Scenario: Out-of-range status is clamped
 - **WHEN** the structured response has `http_status` 42
