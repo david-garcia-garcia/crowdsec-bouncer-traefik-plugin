@@ -5,7 +5,7 @@ JobName: 2026-09-05-add-fail-mode
 | Phase | Work | Card | At |
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-05T12:07:21.136Z |
-| explore | [x] | [ ] | |
+| explore | [x] | [x] | 2026-09-05T12:13:02.444Z |
 | propose | [ ] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
