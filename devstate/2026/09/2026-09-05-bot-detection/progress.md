@@ -9,6 +9,6 @@ JobName: 2026-09-05-bot-detection
 | propose | [x] | [x] | 2026-09-05T12:08:12.2095955Z |
 | implement | [x] | [x] | 2026-09-05T12:39:21.9101333Z |
 | codereview | [x] | [x] | 2026-09-05T12:45:16.8391787Z |
-| devdocsimpact | [ ] | [ ] | |
-| archive | [ ] | [ ] | |
+| destocsimpact | [x] | [x] | 2026-09-05T12:47:06.0087622Z |
+| archive | [x] | [x] | 2026-09-05T12:50:06.9434526Z |
 | pullrequest | [ ] | [ ] | |

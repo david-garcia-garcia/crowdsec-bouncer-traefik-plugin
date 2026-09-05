@@ -29,3 +29,15 @@ phase: codereview
 findings: P3 5 (3 standards, 4 spec; security none; performance none)
 fixed: test helper, captcha relay, empty 200 test, spec allow-return and port 7423
 skipped: judgement rename of `decision`; judgement extra log fields
+
+## destocsimpact (2026-09-05)
+phase: destocsimpact
+findings: stale-usage 1
+fixed: core_plugin_appsec.md How-to (non-allow non-ban relays)
+skipped: none
+
+## archive (2026-09-05)
+phase: archive
+findings: none
+fixed: catalog core_plugin_appsec_bot-detection; fold build_e2e_pester_crowdsec-stack; moved openspec/changes/archive/2026-09-05-appsec-bot-detection
+skipped: none
