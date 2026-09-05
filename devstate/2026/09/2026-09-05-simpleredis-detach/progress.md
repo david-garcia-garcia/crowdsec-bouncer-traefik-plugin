@@ -9,6 +9,6 @@ JobName: 2026-09-05-simpleredis-detach
 | propose | [x] | [x] | 2026-09-05T12:12:24Z |
 | implement | [x] | [x] | 2026-09-05T12:14:44Z |
 | codereview | [x] | [x] | 2026-09-05T12:16:40Z |
-| devdocsimpact | [x] | [ ] | |
-| archive | [ ] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-05T12:17:29Z |
+| archive | [x] | [ ] | |
 | pullrequest | [ ] | [ ] | |
