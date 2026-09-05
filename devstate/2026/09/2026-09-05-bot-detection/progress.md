@@ -8,7 +8,7 @@ JobName: 2026-09-05-bot-detection
 | explore | [x] | [x] | 2026-09-05T12:04:09.9399139Z |
 | propose | [x] | [x] | 2026-09-05T12:08:12.2095955Z |
 | implement | [x] | [x] | 2026-09-05T12:39:21.9101333Z |
-| codereview | [ ] | [ ] | |
+| codereview | [x] | [x] | 2026-09-05T12:45:16.8391787Z |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
