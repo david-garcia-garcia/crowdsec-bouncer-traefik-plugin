@@ -165,6 +165,40 @@ func Test_nextReader(t *testing.T) {
 	}
 }
 
+// Test_NewKeepsRedisReadersByPointer fails if Client.New copies a pooled SimpleRedis by value or aliases reader pointers (upstream crowdsec-bouncer-traefik-plugin#381).
+func Test_NewKeepsRedisReadersByPointer(t *testing.T) {
+	client := &Client{}
+	client.New(logger.New("INFO", ""), true, "127.0.0.1:1", []string{"127.0.0.1:2", "127.0.0.1:3"}, "", "", "p")
+	defer client.Close()
+	rc, ok := client.cache.(*redisCache)
+	if !ok {
+		t.Fatalf("cache type %T, want *redisCache", client.cache)
+	}
+	if rc.writer == nil {
+		t.Fatal("writer is nil")
+	}
+	if len(rc.readers) != 2 {
+		t.Fatalf("len(readers)=%d, want 2", len(rc.readers))
+	}
+	if rc.readers[0] == nil || rc.readers[1] == nil {
+		t.Fatal("a reader pointer is nil")
+	}
+	if rc.readers[0] == rc.readers[1] {
+		t.Fatal("both read hosts share one SimpleRedis pointer")
+	}
+	if rc.readers[0] == rc.writer || rc.readers[1] == rc.writer {
+		t.Fatal("a reader aliases the writer")
+	}
+	// First Add(1)%2 is 1, then 0, then 1.
+	want := []int{1, 0, 1, 0}
+	for call, idx := range want {
+		got := indexOfReader(rc, rc.nextReader())
+		if got != idx {
+			t.Errorf("call %d: nextReader() -> reader[%d], want reader[%d] (same pointer as New stored)", call, got, idx)
+		}
+	}
+}
+
 func Test_memoryClientsDoNotShare(t *testing.T) {
 	a := &Client{}
 	b := &Client{}

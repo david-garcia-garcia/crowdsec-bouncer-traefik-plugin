@@ -26,6 +26,13 @@ After `Init`, each `SimpleRedis` used by the cache SHALL be referenced by pointe
 - **WHEN** `redisCache` has one or more read hosts
 - **THEN** `nextReader` returns `*simpleredis.SimpleRedis` that points at a reader (or the writer when there are no readers), not a copy of the struct
 
+### Requirement: Client.New holds Redis readers by pointer
+`Client.New` with Redis enabled SHALL allocate a distinct `*simpleredis.SimpleRedis` for the writer and for each `readHosts` entry, call `Init` on that pointer, and store those pointers on `redisCache`. It MUST NOT copy a `SimpleRedis` value into `readers` after `Init`. `nextReader` SHALL return the stored pointers (or the writer when `readHosts` is empty).
+
+#### Scenario: New stores distinct reader pointers
+- **WHEN** `Client.New` is called with Redis enabled and two read hosts
+- **THEN** `redisCache` has a non-nil writer pointer, two non-nil reader pointers distinct from each other and from the writer, and `nextReader` returns those same reader pointers
+
 ### Requirement: Close stops new dials
 After `Close`, `Get`/`MGet`/`Set`/`Del` SHALL return `redis:unreachable` and MUST NOT open a new TCP connection. In-flight commands on a borrowed socket MAY finish; `release` MUST close that socket instead of returning it to the idle list. `Close` SHALL remain safe to call more than once.
 
