@@ -61,3 +61,12 @@ fixed: synced core_plugin_connection_source-files; moved change to archive
 skipped: none
 head: a33ddf195fe5f9462e2cd227e538592fe53e1bb1
 ci: not seen
+
+## pullrequest (2026-09-05)
+phase: pullrequest
+findings: none
+fixed: dropped WIP title; CI succeeded
+skipped: none
+pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/16
+head: 12e77498fa8f2f51b8a897f2df6e99a0e13b1ce0
+ci: success (Main Process, e2e binary+mock, e2e docker+pester)
