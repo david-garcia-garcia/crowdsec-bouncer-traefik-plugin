@@ -9,6 +9,6 @@ JobName: 2026-09-05-split-ip-trust
 | propose | [x] | [x] | 2026-09-05T16:32:56.176Z |
 | implement | [x] | [x] | 2026-09-05T16:37:03.532Z |
 | codereview | [x] | [x] | 2026-09-05T16:38:54.697Z |
-| devdocsimpact | [x] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-05T16:40:28.362Z |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |

@@ -29,3 +29,9 @@ phase: codereview
 findings: Leave a trail on TestGetRemoteIP
 fixed: added job comment
 skipped: none
+
+## devdocsimpact (2026-09-05T16:40:28.362Z)
+phase: devdocsimpact
+findings: language-gap GetRemoteIP; stale How-to
+fixed: Language + How-to on core_plugin_ip.md
+skipped: none
