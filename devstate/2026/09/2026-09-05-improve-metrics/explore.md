@@ -49,16 +49,16 @@ active_decisions  unit ip              labels origin + ip_type
   By: explore
 
 - Q: Should this plugin also send `processed` and `active_decisions` (the other two names official docs intend and cscli aggregates)?
-  Decision: assumed — yes. Ticket asked for every other thing LAPI actually ingest that official bouncers send. `processed` = every request the bouncer handled (pass + drop), `ip_type` only. `active_decisions` = current cache/range membership gauge, unit `ip`, labels `origin` + `ip_type` when those facts exist on stored decisions.
-  By: explore
+  Decision: assumed — yes. `processed` = every enabled request (trusted bypass, pass, drop), `ip_type` only. `active_decisions` = stream/alone gauge of stored decision records (Ip, header, Range CIDRs), not expanded hosts; live/none omit the gauge (TTL cannot decrement).
+  By: propose
 
 - Q: What origin (if any) for AppSec drops, failure-action bans, and stream-unhealthy remediations that have no LAPI decision?
   Decision: assumed — AppSec structured/ban/challenge → `origin=appsec`. Failure-action / stream-unhealthy / redis-tech with no decision → `dropped` with `ip_type` (and `remediation`) and **empty origin** so cscli still totals them but does not invent an origin bucket. Do not invent `origin=plugin`.
   By: explore
 
 - Q: Stream/live cache currently stores only a remediation letter. Origin/scenario needed at drop time will be missing on cache hits unless we persist them.
-  Decision: assumed — persist origin (after lists-rewrite) and ip family is computed at request from GetRemoteIP, not stored. Persist remediation type we already store. Do not persist raw scenario except as the `lists:` suffix when origin was lists. Matching keys stay as they are (IP / header / range).
-  By: explore
+  Decision: assumed — persist origin (after lists-rewrite) on Ip and header cache values as letter + U+001F + origin. Range-index stays `cidr=letter` (range-only drops omit origin). ip_type from GetRemoteIP at request. Matching keys unchanged.
+  By: propose
 
 - Q: Who owns the client address used for `ip_type`?
   Decision: resolved — `pkg/ip.GetRemoteIP` already computed the client IP. Classify that output (`net.ParseIP` To4 vs v6). Do not parse `RemoteAddr` on the metrics path.

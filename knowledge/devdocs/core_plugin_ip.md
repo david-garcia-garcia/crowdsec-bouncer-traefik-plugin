@@ -26,6 +26,7 @@ Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker st
 - Convert a bare IP to `/32` or `/128` before `AddCIDR`.
 - Range stream/alone membership reuses `Helper` as two boolean sets on the connection. Do not put Range in Checker.
 - One-CIDR questions (`InNetwork`) live in `pkg/ip/network.go`, not in Checker.
+- Classify an already-resolved address with `Family` / `FamilyOfHostOrCIDR` for usage-metrics `ip_type`. Do not parse `RemoteAddr`.
 
 ## Pattern snippet
 

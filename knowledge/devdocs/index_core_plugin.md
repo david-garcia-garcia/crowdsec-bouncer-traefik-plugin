@@ -20,3 +20,8 @@ priority: normal
 local: core_plugin_ip.md
 description: How this plugin stores trusted hop and client CIDRs and answers membership.
 
+## LAPI usage-metrics
+priority: normal
+local: core_plugin_lapi_usage-metrics.md
+description: How this plugin POSTs CrowdSec usage-metrics with origin and ip_type labels.
+
