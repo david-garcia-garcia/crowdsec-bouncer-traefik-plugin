@@ -25,3 +25,12 @@ skipped: none
 verdict: in progress
 change: prove-redis-readers-by-pointer
 ci: Main Process succeeded 33965459118
+
+## implement (2026-09-05T12:18:55Z)
+phase: implement
+findings: none
+fixed: Test_NewKeepsRedisReadersByPointer
+skipped: none
+verdict: in progress
+localTests: passed
+ci: Main Process in progress 33965673833
