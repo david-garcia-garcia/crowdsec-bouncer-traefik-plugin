@@ -80,3 +80,15 @@ Each stream or alone connection SHALL rebuild in-process Range membership from `
 #### Scenario: Ban wins over a longer captcha prefix
 - **WHEN** stream has a Range ban `10.0.0.0/8` and a Range captcha `10.1.0.0/16` and the client IP is `10.1.2.3`
 - **THEN** the request is forbidden, not captcha
+
+### Requirement: Matching does not import Traefik config
+Cached request lookup SHALL take a caller boolean that says whether to consult Range membership. Callers that already know Crowdsec mode SHALL pass true for stream and alone, and false for live and none. The matching package MUST NOT import the Traefik plugin configuration package.
+
+#### Scenario: True consults Range membership
+- **WHEN** the caller passes true and Range membership holds a ban that contains the client IP
+- **THEN** the request is remediating from that membership
+
+#### Scenario: False skips Range membership
+- **WHEN** the caller passes false and Range membership holds a ban that contains the client IP
+- **THEN** Range matching does not remediate from that membership
+
