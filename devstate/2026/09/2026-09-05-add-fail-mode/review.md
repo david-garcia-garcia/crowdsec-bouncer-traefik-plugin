@@ -13,8 +13,8 @@ fixed: none (stop at explore)
 skipped: propose and later phases (caller)
 
 
-## propose (2026-09-05)
-phase: propose
+## implement (2026-09-05)
+phase: implement
 findings: none
-fixed: none
-skipped: implement
+fixed: Crowdsec-prefixed failure actions applied (b50f987)
+skipped: CI still in progress at card time
