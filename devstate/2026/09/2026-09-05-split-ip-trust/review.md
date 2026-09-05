@@ -11,3 +11,9 @@ phase: explore
 findings: GetRemoteIP/XFF untested; Checker tests already exist. File names checker.go/network.go.
 fixed: none (no product apply)
 skipped: none
+
+## propose (2026-09-05T16:32:56.176Z)
+phase: propose
+findings: Fold GetRemoteIP hop-walk into core_plugin_ip_radix-lookup. File names in design.
+fixed: none (no product apply)
+skipped: none
