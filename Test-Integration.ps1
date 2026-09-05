@@ -16,7 +16,7 @@
     Skip waiting for services to be ready (assumes they're already running)
 
 .PARAMETER TestPath
-    Path to the Pester test files or directory (defaults to ./tests/ to run all test files)
+    Path to the Pester test files (defaults to ./tests/*.Tests.ps1 so mock e2e under tests/e2e/ is not included)
 
 
 .PARAMETER HttpTimeoutSeconds
@@ -39,7 +39,7 @@
 param(
     [switch]$SkipDockerCleanup,
     [switch]$SkipWait,
-    [string]$TestPath = "./tests/",
+    [string]$TestPath = "./tests/*.Tests.ps1",
     [int]$HttpTimeoutSeconds = 30
 )
 

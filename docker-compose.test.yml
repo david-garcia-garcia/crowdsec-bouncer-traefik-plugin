@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: "traefik:v3.0.0"
+    image: "traefik:v3.7.11"
     container_name: "traefik-test"
     restart: unless-stopped
     command:
@@ -28,12 +28,6 @@ services:
       - "8080:8080"
     depends_on:
       - crowdsec
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/rawdata"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
 
   # Test service - basic whoami
   whoami:
@@ -50,7 +44,7 @@ services:
       # Bouncer middleware with test configuration
       - "traefik.http.middlewares.bouncer-test.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-test.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
-      - "traefik.http.middlewares.bouncer-test.plugin.bouncer.crowdseclapiurl=http://crowdsec:8080/"
+      - "traefik.http.middlewares.bouncer-test.plugin.bouncer.crowdseclapishost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-test.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-test.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-test.plugin.bouncer.updateintervalseconds=5"
@@ -74,7 +68,7 @@ services:
       # Strict bouncer middleware for testing blocks
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
-      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.crowdseclapiurl=http://crowdsec:8080/"
+      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.crowdseclapishost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.updateintervalseconds=5"
@@ -98,7 +92,7 @@ services:
       # Captcha-enabled bouncer middleware
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
-      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.crowdseclapiurl=http://crowdsec:8080/"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.crowdseclapishost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.updateintervalseconds=5"
@@ -143,7 +137,7 @@ services:
       # Bouncer middleware with custom remediation header
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
-      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.crowdseclapiurl=http://crowdsec:8080/"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.crowdseclapishost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.updateintervalseconds=5"
@@ -168,7 +162,7 @@ services:
       # Stream mode bouncer middleware
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
-      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.crowdseclapiurl=http://crowdsec:8080/"
+      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.crowdseclapishost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.updateintervalseconds=5"
@@ -177,7 +171,7 @@ services:
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.6.8
+    image: crowdsecurity/crowdsec:v1.7.8
     container_name: "crowdsec-test"
     restart: unless-stopped
     environment:
@@ -193,6 +187,7 @@ services:
       # Minimal setup for testing
       DISABLE_AGENT: "false"
       DISABLE_ONLINE_API: "true"
+      CROWDSEC_BYPASS_DB_VOLUME_CHECK: "true"
       # Test mode settings
       LEVEL_DEBUG: "true"
       # Use persistent volumes to cache downloaded databases
