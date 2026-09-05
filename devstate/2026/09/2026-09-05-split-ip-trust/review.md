@@ -17,3 +17,9 @@ phase: propose
 findings: Fold GetRemoteIP hop-walk into core_plugin_ip_radix-lookup. File names in design.
 fixed: none (no product apply)
 skipped: none
+
+## implement (2026-09-05T16:37:03.532Z)
+phase: implement
+findings: none
+fixed: pkg/ip split to checker.go/network.go; GetRemoteIP tests
+skipped: none
