@@ -104,6 +104,7 @@ func TestCheckerContainsCatchAllFamily(t *testing.T) {
 	})
 }
 
+// TestGetRemoteIP covers the forwarded-header walk and RemoteAddr fallback.
 func TestGetRemoteIP(t *testing.T) {
 	log := slog.Default()
 	hopChecker, err := NewChecker(log, []string{"10.0.0.1", "10.0.0.0/8"})
