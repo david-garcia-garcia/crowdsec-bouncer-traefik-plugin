@@ -1,0 +1,15 @@
+issueKey: 2026-09-05-performance-ip-range
+jobName: 2026-09-05-performance-ip-range
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: 1089524f72b07dddb912233cfb85bd10f5d6b1cfbd99e1fa606feac223c46e4f
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
