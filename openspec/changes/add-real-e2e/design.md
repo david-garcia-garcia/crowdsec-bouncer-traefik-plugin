@@ -24,7 +24,7 @@ Client IP owner: Traefik `forwardedHeaders` plus plugin `forwardedHeadersTrusted
 1. **Pester 273, not bash 333.** Human: mock and real are different suites; keep them separate; use PowerShell like the original proposal.
 2. **Pin `traefik:v3.7.11` and `crowdsecurity/crowdsec:v1.7.8`.** 273 had Traefik v3.0.0 and Crowdsec v1.6.8.
 3. **Replace `crowdseclapiurl` with `crowdseclapishost=crowdsec:8080`.** Unknown Traefik labels are ignored; the Go field is host/scheme/path.
-4. **Default Pester path `./tests/*.Tests.ps1`** so Invoke-Pester does not recurse into `tests/e2e/mock/`.
+4. **Real suite lives in `tests/e2e/real/`.** Sibling of `tests/e2e/mock/`. Default Pester path is that folder’s `*.Tests.ps1`. Compose bind-mounts the repository root for the local plugin.
 5. **CI job uses runner `pwsh`** (ubuntu-latest includes PowerShell) and `Install-Module Pester`. Do not apt-install Microsoft packages unless `pwsh` is missing.
 6. **Remove Traefik wget healthcheck.** Traefik v3.7 images do not ship wget; `Test-Integration.ps1` already polls the API.
 7. **Checkout path** `go/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin` in Main.

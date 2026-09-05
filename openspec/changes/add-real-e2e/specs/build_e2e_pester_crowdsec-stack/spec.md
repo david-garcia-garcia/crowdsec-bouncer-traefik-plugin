@@ -5,14 +5,18 @@ Defines the Pester real-stack suite that boots Docker Traefik and Crowdsec, load
 ## ADDED Requirements
 
 ### Requirement: Pester suite is separate from mock e2e
-The repository SHALL keep `tests/e2e/mock/` and `make e2e_mock` as the mock suite. Real-stack coverage SHALL live in `Test-Integration.ps1`, `docker-compose.test.yml`, and `tests/*.Tests.ps1`, and SHALL NOT replace the mock suite.
+The repository SHALL keep `tests/e2e/mock/` and `make e2e_mock` as the mock suite. Real-stack coverage SHALL live entirely under `tests/e2e/real/` (`Test-Integration.ps1`, `docker-compose.test.yml`, `*.Tests.ps1`) and SHALL NOT replace the mock suite or share that folder.
 
 #### Scenario: Mock suite still present
 - **WHEN** a reviewer inspects `tests/e2e/mock/` and `.github/workflows/e2e.yml`
 - **THEN** `make e2e_mock` still exists and CI still has a job that runs it
 
+#### Scenario: Real suite is its own folder
+- **WHEN** a reviewer inspects `tests/e2e/`
+- **THEN** Pester cases, the compose file, and `Test-Integration.ps1` are under `tests/e2e/real/` and not at the repository root or mixed into `tests/e2e/mock/`
+
 ### Requirement: Real stack boots Traefik and Crowdsec
-`docker-compose.test.yml` SHALL start Traefik (local plugin bind-mount) and Crowdsec. Pester tests SHALL add and delete decisions with `cscli` in the Crowdsec container and send client identity only via `X-Forwarded-For`.
+`tests/e2e/real/docker-compose.test.yml` SHALL start Traefik (local plugin bind-mount of the repository root) and Crowdsec. Pester tests SHALL add and delete decisions with `cscli` in the Crowdsec container and send client identity only via `X-Forwarded-For`.
 
 #### Scenario: Ban then unban on whoami
 - **WHEN** the stack is up and a ban decision is added for the test IP
@@ -31,7 +35,7 @@ The repository SHALL keep `tests/e2e/mock/` and `make e2e_mock` as the mock suit
 - **THEN** the captcha route returns the captcha HTML rather than a plain allow
 
 ### Requirement: CI runs Pester and mock as separate jobs
-GitHub Actions on pull requests SHALL run `./Test-Integration.ps1` (PowerShell + Pester) in one job and `make e2e_mock` in another. Traefik and Crowdsec image tags SHALL match this tree’s examples (`traefik:v3.7.11`, `crowdsecurity/crowdsec:v1.7.8`).
+GitHub Actions on pull requests SHALL run `tests/e2e/real/Test-Integration.ps1` (PowerShell + Pester) in one job and `make e2e_mock` in another. Traefik and Crowdsec image tags SHALL match this tree’s examples (`traefik:v3.7.11`, `crowdsecurity/crowdsec:v1.7.8`).
 
 #### Scenario: Pull request runs both jobs
 - **WHEN** a pull request is opened against this repository

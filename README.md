@@ -776,7 +776,7 @@ make e2e_mock
 Real-stack e2e (Docker Traefik + Crowdsec, Pester):
 
 ```bash
-./Test-Integration.ps1
+./tests/e2e/real/Test-Integration.ps1
 # or
 make e2e_pester
 ```

@@ -25,7 +25,7 @@ jobs:
           # single source of truth and builds the mock on the supported version.
           go-version-file: go.mod
       # CI mock job: Traefik binary + mock LAPI (no Docker, no real Crowdsec).
-      # Real-stack Pester lives in the e2e-pester job (`./Test-Integration.ps1`).
+      # Real-stack Pester lives in tests/e2e/real/ (`Test-Integration.ps1`).
       # `-k` keeps going after a failing mock scenario so the logs cover all of
       # them, while make still exits non-zero if any scenario failed.
       - name: Run mock scenarios
@@ -49,7 +49,7 @@ jobs:
         run: Install-Module -Name Pester -Force -Scope CurrentUser -SkipPublisherCheck
       - name: Run Pester real-stack tests
         shell: pwsh
-        run: ./Test-Integration.ps1 -HttpTimeoutSeconds 60 -SkipDockerCleanup
+        run: ./tests/e2e/real/Test-Integration.ps1 -HttpTimeoutSeconds 60 -SkipDockerCleanup
       - name: Show container logs on failure
         if: failure()
         run: |
@@ -64,8 +64,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: pester-test-results
-          path: test-results.xml
+          path: tests/e2e/real/test-results.xml
           if-no-files-found: ignore
       - name: Stop test stack
         if: always()
-        run: docker compose -f docker-compose.test.yml down -v --remove-orphans
+        run: docker compose -f tests/e2e/real/docker-compose.test.yml down -v --remove-orphans

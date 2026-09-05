@@ -16,22 +16,22 @@
     Skip waiting for services to be ready (assumes they're already running)
 
 .PARAMETER TestPath
-    Path to the Pester test files (defaults to ./tests/*.Tests.ps1 so mock e2e under tests/e2e/ is not included)
+    Path to the Pester test files (defaults to this suite folder so tests/e2e/mock is not included)
 
 
 .PARAMETER HttpTimeoutSeconds
     HTTP timeout for bouncer testing (defaults to 30)
 
 .EXAMPLE
-    ./Test-Integration.ps1
+    ./tests/e2e/real/Test-Integration.ps1
     Runs the full integration test suite
 
 .EXAMPLE
-    ./Test-Integration.ps1 -TestPath "./tests/mode_stream.Tests.ps1" -HttpTimeoutSeconds 60
+    ./tests/e2e/real/Test-Integration.ps1 -TestPath "./tests/e2e/real/mode_stream.Tests.ps1" -HttpTimeoutSeconds 60
     Tests only stream mode with 60 second timeout
 
 .EXAMPLE
-    ./Test-Integration.ps1 -SkipDockerCleanup
+    ./tests/e2e/real/Test-Integration.ps1 -SkipDockerCleanup
     Runs tests but leaves Docker services running for debugging
 #>
 
@@ -39,11 +39,12 @@
 param(
     [switch]$SkipDockerCleanup,
     [switch]$SkipWait,
-    [string]$TestPath = "./tests/*.Tests.ps1",
+    [string]$TestPath = "$PSScriptRoot/*.Tests.ps1",
     [int]$HttpTimeoutSeconds = 30
 )
 
 $ErrorActionPreference = "Stop"
+$ComposeFile = Join-Path $PSScriptRoot "docker-compose.test.yml"
 
 # Colors for output
 $Colors = @{
@@ -208,12 +209,12 @@ try {
 
     # Clean up any existing services
     Write-Step "Cleaning up any existing services..."
-    docker compose -f docker-compose.test.yml down -v --remove-orphans 2>$null
+    docker compose -f $ComposeFile down -v --remove-orphans 2>$null
 
     # Start Docker services
     Write-Step "Starting Docker Compose services for testing..."
     try {
-        docker compose -f docker-compose.test.yml up -d
+        docker compose -f $ComposeFile up -d
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to start Docker services"
         }
@@ -238,7 +239,7 @@ try {
             Write-Error "One or more services failed to start properly"
             if (-not $SkipDockerCleanup) {
                 Write-Step "Cleaning up Docker services..."
-                docker compose -f docker-compose.test.yml down -v
+                docker compose -f $ComposeFile down -v
             }
             exit 1
         }
@@ -269,7 +270,7 @@ try {
         $pesterConfig.Run.Exit = $false
         $pesterConfig.Run.PassThru = $true
         $pesterConfig.TestResult.Enabled = $true
-        $pesterConfig.TestResult.OutputPath = "./test-results.xml"
+        $pesterConfig.TestResult.OutputPath = Join-Path $PSScriptRoot "test-results.xml"
         
         
         $result = Invoke-Pester -Configuration $pesterConfig
@@ -307,7 +308,7 @@ finally {
     if (-not $SkipDockerCleanup) {
         Write-Step "Cleaning up Docker services..."
         try {
-            docker compose -f docker-compose.test.yml down -v --remove-orphans 2>$null
+            docker compose -f $ComposeFile down -v --remove-orphans 2>$null
             Write-Success "Docker services stopped and cleaned up"
         }
         catch {
@@ -315,7 +316,7 @@ finally {
         }
     } else {
         Write-Warning "Skipping Docker cleanup (services left running for debugging)"
-        Write-Host "To manually stop services, run: docker compose -f docker-compose.test.yml down -v" -ForegroundColor Gray
+        Write-Host "To manually stop services, run: docker compose -f tests/e2e/real/docker-compose.test.yml down -v" -ForegroundColor Gray
         Write-Host "Services available at:" -ForegroundColor Gray
         Write-Host "  - Traefik Dashboard: http://localhost:8080" -ForegroundColor Gray
         Write-Host "  - Test Service: http://localhost:8000/whoami" -ForegroundColor Gray

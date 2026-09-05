@@ -10,5 +10,5 @@ docker-compose.dev.yml
 # across local runs; CI runs on fresh runners so it is recreated every time.
 tests/e2e/mock/.cache/
 
-# Pester NUnit output from Test-Integration.ps1
-test-results.xml
+# Pester NUnit output from the real-stack suite
+tests/e2e/real/test-results.xml

@@ -20,9 +20,9 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "traefik-logs:/var/log/traefik"
-      - "./ban.html:/ban.html:ro"
-      - "./captcha.html:/captcha.html:ro"
-      - "./:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      - "../../../ban.html:/ban.html:ro"
+      - "../../../captcha.html:/captcha.html:ro"
+      - "../../..:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
     ports:
       - "8000:80"
       - "8080:8080"
