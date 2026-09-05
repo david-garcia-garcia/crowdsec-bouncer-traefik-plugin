@@ -15,3 +15,10 @@ findings: empty TestNew/stream tables; Windows logger FD leak in logging tests
 fixed: none
 skipped: logger close; keyed connections; .traefik.yml import move
 head: 67a304af4adaa0cf48997d9d459876a9dbee7e54
+
+## explore (2026-09-05T07:01:57.287Z)
+phase: explore
+findings: New discards Traefik ctx; sync.Once was wrong vs sister reclaim
+fixed: explore now uses pkg/reclaim for CrowdsecConnection; key assumed connection-field hash
+skipped: WAF name+full-config key (would split tickers per alias)
+head: 0c87fadfb590610e13ddf3bff0e761d62c8cf972
