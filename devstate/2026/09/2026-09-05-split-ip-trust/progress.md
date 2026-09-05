@@ -11,4 +11,4 @@ JobName: 2026-09-05-split-ip-trust
 | codereview | [x] | [x] | 2026-09-05T16:38:54.697Z |
 | devdocsimpact | [x] | [x] | 2026-09-05T16:40:28.362Z |
 | archive | [x] | [x] | 2026-09-05T16:42:12.139Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-05T16:45:53.483Z |

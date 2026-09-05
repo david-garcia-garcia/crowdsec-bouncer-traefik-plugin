@@ -41,3 +41,9 @@ phase: archive
 findings: none
 fixed: folded GetRemoteIP hop-walk into core_plugin_ip_radix-lookup; moved change to archive
 skipped: none
+
+## pullrequest (2026-09-05T16:45:53.483Z)
+phase: pullrequest
+findings: none
+fixed: PR title ready; CI succeeded; final card on PR summary
+skipped: none
