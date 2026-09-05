@@ -205,7 +205,7 @@ function Get-WhoamiCountryCode {
         [string]$Content
     )
 
-    $match = [regex]::Match($Content, '(?im)^X-Ipcountry:\s*([A-Za-z]{2})\s*$')
+    $match = [regex]::Match($Content, '(?im)X-Ipcountry:\s*([A-Za-z]{2})\b')
     if ($match.Success) {
         return $match.Groups[1].Value.ToUpperInvariant()
     }

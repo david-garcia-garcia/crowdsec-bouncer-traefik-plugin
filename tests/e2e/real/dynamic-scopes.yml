@@ -46,6 +46,7 @@ http:
           httpTimeoutSeconds: 60
           logLevel: DEBUG
           updateIntervalSeconds: 5
+          streamStartupBlock: false
           crowdsecMode: stream
           decisionScopeHeaders:
             Country: X-IPCountry

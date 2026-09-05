@@ -59,7 +59,10 @@ jobs:
           docker logs crowdsec-test 2>/dev/null || true
           echo "=== traefik-test ==="
           docker logs traefik-test 2>/dev/null || true
-      - name: Upload Pester results
+      - name: Show Pester results XML
+        if: always()
+        run: |
+          if [ -f tests/e2e/real/test-results.xml ]; then cat tests/e2e/real/test-results.xml; else echo "no test-results.xml"; fi
         if: always()
         uses: actions/upload-artifact@v7
         with:

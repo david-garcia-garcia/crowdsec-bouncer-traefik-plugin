@@ -203,6 +203,10 @@ try {
         
         if ($servicesReady -contains $false) {
             Write-StepError "One or more services failed to start properly"
+            Write-Host "=== docker ps -a ===" -ForegroundColor Yellow
+            docker ps -a
+            Write-Host "=== traefik-test logs ===" -ForegroundColor Yellow
+            docker logs traefik-test 2>&1 | Select-Object -Last 80
             if (-not $SkipDockerCleanup) {
                 Write-Step "Cleaning up Docker services..."
                 docker compose -f $ComposeFile down -v
@@ -254,6 +258,12 @@ try {
             Write-Host "  Failed: $($result.FailedCount)" -ForegroundColor $Colors.Error
             Write-Host "  Skipped: $($result.SkippedCount)" -ForegroundColor $Colors.Warning
             Write-Host "  Duration: $($result.Duration)" -ForegroundColor Gray
+            foreach ($failed in $result.Failed) {
+                Write-Host "  FAIL: $($failed.ExpandedPath)" -ForegroundColor $Colors.Error
+                if ($failed.ErrorRecord) {
+                    Write-Host "        $($failed.ErrorRecord.Exception.Message)" -ForegroundColor Yellow
+                }
+            }
             $exitCode = 1
         } else {
             Write-ConsoleWarning "Could not determine test results"

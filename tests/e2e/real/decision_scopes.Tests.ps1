@@ -80,7 +80,7 @@ Describe "CrowdSec Range and header-mapped scopes" {
             $probe = Test-HttpRequest -Endpoint "/scope-none" -IP $script:PublicIP -TraefikUrl $script:TraefikUrl
             $probe.StatusCode | Should -Be 200
             $country = Get-WhoamiCountryCode -Content $probe.Content
-            $country | Should -Match '^[A-Z]{2}$' -Because "geoblock must enrich X-IPCountry for a public IP"
+            $country | Should -Match '^[A-Z]{2}$' -Because "geoblock must enrich X-IPCountry for a public IP; body was: $($probe.Content)"
             $country | Should -Not -BeIn @("XX", "T1")
 
             Add-TestScopeDecision -Scope "Country" -Value $country -Type "ban"
