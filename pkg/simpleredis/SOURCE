@@ -1,0 +1,4 @@
+Copied from https://github.com/maxlerebourg/simpleredis
+commit f8801cc098d2ae1743a6f82cb1e60a97e9461b7f
+branch pool-redis-connections (https://github.com/maxlerebourg/simpleredis/pull/8)
+
