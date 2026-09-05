@@ -89,12 +89,17 @@ function Test-HttpRequest {
     }
     
     try {
-        $response = Invoke-WebRequest -Uri "$TraefikUrl$Endpoint" -Headers $headers -TimeoutSec $TimeoutSec -UseBasicParsing
-        
+        $response = Invoke-WebRequest -Uri "$TraefikUrl$Endpoint" -Headers $headers -TimeoutSec $TimeoutSec -UseBasicParsing -SkipHttpErrorCheck
+        $contentType = $response.Headers["Content-Type"]
+        if ($contentType -is [System.Array]) {
+            $contentType = $contentType[0]
+        }
+
         return @{
-            StatusCode = $response.StatusCode
+            StatusCode = [int]$response.StatusCode
             Content = $response.Content
-            Success = $true
+            ContentType = "$contentType"
+            Success = ($response.StatusCode -ge 200 -and $response.StatusCode -lt 300)
         }
     }
     catch {

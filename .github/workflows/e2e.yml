@@ -41,7 +41,7 @@ jobs:
   e2e-pester:
     name: e2e (docker + pester)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
       - name: Install Pester

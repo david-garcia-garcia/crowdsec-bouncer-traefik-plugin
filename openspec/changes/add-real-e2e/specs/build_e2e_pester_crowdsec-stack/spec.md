@@ -34,6 +34,22 @@ The repository SHALL keep `tests/e2e/mock/` and `make e2e_mock` as the mock suit
 - **WHEN** a captcha decision exists for the client
 - **THEN** the captcha route returns the captcha HTML rather than a plain allow
 
+#### Scenario: Live mode re-queries after the cached allow expires
+- **WHEN** live-mode routes are used, a request is allowed, then a ban is added for that `X-Forwarded-For`
+- **THEN** the next request is forbidden only after `defaultDecisionSeconds`, and a different IP still passes
+
+#### Scenario: Trusted client IP bypasses a ban
+- **WHEN** `clientTrustedIPs` includes the test IP and both that IP and an untrusted IP are banned
+- **THEN** the trusted `X-Forwarded-For` is allowed and the untrusted one is forbidden
+
+#### Scenario: Custom ban page body and Content-Type
+- **WHEN** a ban exists and the route sets `banHtmlFilePath` to the suite’s custom HTML
+- **THEN** the response is forbidden, `Content-Type` is HTML, and the body contains `E2E_CUSTOM_BAN_PAGE_MARKER`
+
+#### Scenario: Real AppSec CRS blocks SQLi
+- **WHEN** AppSec is enabled against the Crowdsec CRS inband engine
+- **THEN** a benign `/appsec` request is allowed and a SQL-injection query string is forbidden
+
 ### Requirement: CI runs Pester and mock as separate jobs
 GitHub Actions on pull requests SHALL run `tests/e2e/real/Test-Integration.ps1` (PowerShell + Pester) in one job and `make e2e_mock` in another. Traefik and Crowdsec image tags SHALL match this tree’s examples (`traefik:v3.7.11`, `crowdsecurity/crowdsec:v1.7.8`).
 

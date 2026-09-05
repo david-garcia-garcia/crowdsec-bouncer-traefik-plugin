@@ -232,7 +232,8 @@ try {
         $servicesReady = @(
             (Test-ServiceHealth -Url "http://localhost:8080/api/rawdata" -ServiceName "Traefik API" -TimeoutSeconds 60),
             (Test-ServiceHealth -Url "http://localhost:8000/whoami" -ServiceName "Whoami test service" -TimeoutSeconds 60),
-            (Test-CrowdSecAPI -ApiKey $env:BOUNCER_API_KEY -TimeoutSeconds 90)
+            (Test-CrowdSecAPI -ApiKey $env:BOUNCER_API_KEY -TimeoutSeconds 180),
+            (Test-ServiceHealth -Url "http://localhost:8000/appsec" -ServiceName "AppSec route" -TimeoutSeconds 180)
         )
         
         if ($servicesReady -contains $false) {

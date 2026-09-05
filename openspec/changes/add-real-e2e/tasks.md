@@ -7,7 +7,8 @@
 - [x] 2.1 Add `Test-Integration.ps1`, `docker-compose.test.yml`, `tests/TestUtils.ps1`, and `tests/*.Tests.ps1` from branch `272`
 - [x] 2.2 Pin Traefik to `traefik:v3.7.11` and Crowdsec to `crowdsecurity/crowdsec:v1.7.8`; replace `crowdseclapiurl` with `crowdseclapishost`; drop Traefik wget healthcheck
 - [x] 2.3 Default Pester `TestPath` to `./tests/*.Tests.ps1` so mock e2e under `tests/e2e/` is not picked up
-- [x] 2.4 Add `make e2e_pester` that runs `pwsh -File ./Test-Integration.ps1`
+- [x] 2.4 Add `make e2e_pester` that runs `pwsh -File ./tests/e2e/real/Test-Integration.ps1`
+- [x] 2.5 Port PR 333 coverage missing from 273 into Pester: live mode, trusted IPs, custom ban page, real AppSec CRS
 
 ## 3. CI and docs
 
