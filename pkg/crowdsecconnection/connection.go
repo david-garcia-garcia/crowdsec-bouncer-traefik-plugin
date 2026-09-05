@@ -150,7 +150,6 @@ func Prepare(cfg *configuration.Config, log *slog.Logger) error {
 
 // New constructs a CrowdsecConnection and starts tickers. Call Prepare first. Close stops them.
 //
-//nolint:nestif,gocognit,funlen,maintidx
 func New(config *configuration.Config, log *slog.Logger) (*CrowdsecConnection, error) {
 	var err error
 	var tlsAppsecConfig *tls.Config
@@ -381,7 +380,7 @@ func (c *CrowdsecConnection) handleNoStreamCache(remoteIP string) (string, error
 		Scheme:   c.crowdsecScheme,
 		Host:     c.crowdsecHost,
 		Path:     c.crowdsecPath + crowdsecLapiRoute,
-		RawQuery: fmt.Sprintf("ip=%v", remoteIP),
+		RawQuery: "ip=" + remoteIP,
 	}
 	body, err := c.crowdsecQuery(routeURL.String(), nil)
 	if err != nil {
