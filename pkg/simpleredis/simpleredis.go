@@ -60,7 +60,7 @@ type SimpleRedis struct {
 	closed bool
 }
 
-// Close drains idle pooled connections and stops pooling. In-flight commands still finish; their sockets are closed on release. Safe to call more than once.
+// Close drains idle pooled connections and stops pooling. Further Get/Set/Del/MGet return redis:unreachable and do not dial. In-flight commands still finish; their sockets are closed on release. Safe to call more than once.
 func (sr *SimpleRedis) Close() {
 	sr.mu.Lock()
 	if sr.closed {
@@ -152,6 +152,10 @@ func (sr *SimpleRedis) borrow() (*pooledConn, bool, error) {
 	now := time.Now()
 
 	sr.mu.Lock()
+	if sr.closed {
+		sr.mu.Unlock()
+		return nil, false, errUnreachable
+	}
 	for len(sr.idle) > 0 {
 		conn := sr.idle[len(sr.idle)-1]
 		sr.idle = sr.idle[:len(sr.idle)-1]
@@ -168,6 +172,13 @@ func (sr *SimpleRedis) borrow() (*pooledConn, bool, error) {
 	}
 	if reused != nil {
 		return reused, true, nil
+	}
+
+	sr.mu.Lock()
+	closed := sr.closed
+	sr.mu.Unlock()
+	if closed {
+		return nil, false, errUnreachable
 	}
 	conn, err := sr.dial()
 	return conn, false, err
