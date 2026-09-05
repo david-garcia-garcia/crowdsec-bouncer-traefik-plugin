@@ -1,5 +1,13 @@
 # Review
 
+## codereview (2026-09-05T11:32:19Z)
+phase: codereview
+findings: Standards 8, Spec 2, Security none, Performance 4
+fixed: Leave a trail comments; strongestLiveDecision; ban-wins merge; stream Range outside e2e; ApplyRangeBatch
+skipped: Config align; dual header maps; PreferRemediation vs LAPI pick; radix tree; range-index byte cap; per-header live HTTP
+ci: Main Process 33963490015 success; e2e 33963489900 success
+head: 103cfa432df4d93898de60327daa9a6bdcd861a9
+
 ## implement (2026-09-05T11:12:49Z)
 phase: implement
 findings: none
