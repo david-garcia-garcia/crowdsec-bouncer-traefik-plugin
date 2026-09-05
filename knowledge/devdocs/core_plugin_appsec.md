@@ -30,7 +30,7 @@ decision, err := b.conn.AppsecQuery(remoteIP, req, pol)
 
 ## Key files
 
-- `pkg/crowdsecconnection/connection.go`
+- `pkg/crowdsecconnection/connection_appsec.go`
 - `pkg/bouncer/bouncer.go`
 
 ## Gotchas
