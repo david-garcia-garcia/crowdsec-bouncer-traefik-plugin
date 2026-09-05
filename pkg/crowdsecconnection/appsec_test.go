@@ -243,8 +243,8 @@ func Test_appsecQuery_oversizedOKResponsePasses(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AppsecQuery() returned error: %v", err)
 	}
-	if decision != nil {
-		t.Fatalf("AppsecQuery() returned decision: %#v", decision)
+	if decision == nil || decision.Action != AppsecActionAllow {
+		t.Fatalf("AppsecQuery() want allow for oversized 200, got %#v", decision)
 	}
 }
 

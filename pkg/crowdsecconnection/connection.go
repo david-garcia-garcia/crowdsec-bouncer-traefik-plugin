@@ -82,12 +82,20 @@ type AppsecPolicy struct {
 }
 
 // AppsecResponse is the structured AppSec JSON envelope CrowdSec 1.8 returns for a remediation.
+// Field tags match CrowdSec's snake_case wire names (http_status, user_body_content, …).
+//
+//nolint:tagliatelle
 type AppsecResponse struct {
 	Action          string              `json:"action"`
 	HTTPStatus      int                 `json:"http_status"`
 	UserBodyContent string              `json:"user_body_content,omitempty"`
 	UserCookies     []string            `json:"user_cookies,omitempty"`
 	UserHeaders     map[string][]string `json:"user_headers,omitempty"`
+}
+
+// appsecAllow returns a pass-through decision so AppsecQuery never uses (nil, nil).
+func appsecAllow() *AppsecResponse {
+	return &AppsecResponse{Action: AppsecActionAllow}
 }
 
 // CrowdsecConnection owns stream ticker, isolated cache, LAPI/CAPI HTTP, metrics, and AppSec HTTP client.
@@ -578,32 +586,47 @@ func isMethodWithBody(method string) bool {
 // AppsecQuery forwards the request to this connection's AppSec HTTP client.
 // A structured JSON envelope is returned when AppSec supplies a non-empty action.
 func (c *CrowdsecConnection) AppsecQuery(ip string, httpReq *http.Request, pol AppsecPolicy) (*AppsecResponse, error) {
+	req, err := c.newAppsecForwardRequest(ip, httpReq, pol)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := c.httpAppsecClient.Do(req)
+	if err != nil || isReverseProxyError(res.StatusCode) {
+		c.log.Error("appsecQuery:unreachable")
+		if pol.UnreachableBlock {
+			return nil, fmt.Errorf("appsecQuery:unreachable %w", err)
+		}
+		return appsecAllow(), nil
+	}
+	defer c.drainAppsecResponse(res)
+
+	if res.StatusCode == http.StatusInternalServerError {
+		c.log.Info("appsecQuery:failure")
+		if pol.FailureBlock {
+			return nil, errors.New("appsecQuery statusCode:500")
+		}
+		return appsecAllow(), nil
+	}
+
+	body, err := c.readCappedAppsecBody(res)
+	if err != nil {
+		return nil, err
+	}
+	return interpretAppsecBody(res.StatusCode, body, c.log)
+}
+
+// newAppsecForwardRequest builds the AppSec listener request, copying client headers and identity.
+func (c *CrowdsecConnection) newAppsecForwardRequest(ip string, httpReq *http.Request, pol AppsecPolicy) (*http.Request, error) {
 	routeURL := url.URL{
 		Scheme: c.appsecScheme,
 		Host:   c.appsecHost,
 		Path:   c.appsecPath,
 	}
-	var req *http.Request
-	switch {
-	case isBodyUnreadable(httpReq):
-		if pol.UnreadableBodyBlock && isMethodWithBody(httpReq.Method) {
-			return nil, errors.New("appsecQuery:unreadableBody dropped")
-		}
-		req, _ = http.NewRequest(http.MethodGet, routeURL.String(), nil)
-	case c.appsecBodyLimit > 0 && httpReq.Body != nil:
-		var bodyBuffer bytes.Buffer
-		limitedReader := io.LimitReader(httpReq.Body, c.appsecBodyLimit)
-		teeReader := io.TeeReader(limitedReader, &bodyBuffer)
-		bodyBytes, err := io.ReadAll(teeReader)
-		if err != nil {
-			return nil, fmt.Errorf("appsecQuery:GetBody %w", err)
-		}
-		httpReq.Body = io.NopCloser(io.MultiReader(&bodyBuffer, httpReq.Body))
-		req, _ = http.NewRequest(http.MethodPost, routeURL.String(), bytes.NewBuffer(bodyBytes))
-	default:
-		req, _ = http.NewRequest(http.MethodGet, routeURL.String(), nil)
+	req, err := c.newAppsecBodyRequest(routeURL.String(), httpReq, pol)
+	if err != nil {
+		return nil, err
 	}
-
 	for key, headers := range httpReq.Header {
 		for _, value := range headers {
 			req.Header.Add(key, value)
@@ -616,59 +639,74 @@ func (c *CrowdsecConnection) AppsecQuery(ip string, httpReq *http.Request, pol A
 	req.Header.Set(crowdsecAppsecURIHeader, httpReq.URL.String())
 	req.Header.Set(crowdsecAppsecUserAgent, httpReq.Header.Get("User-Agent"))
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+c.pluginVersion)
+	return req, nil
+}
 
-	res, err := c.httpAppsecClient.Do(req)
-	if err != nil || isReverseProxyError(res.StatusCode) {
-		c.log.Error("appsecQuery:unreachable")
-		if pol.UnreachableBlock {
-			return nil, fmt.Errorf("appsecQuery:unreachable %w", err)
+// newAppsecBodyRequest chooses GET (no/unreadable body) or POST (copied client body) toward AppSec.
+func (c *CrowdsecConnection) newAppsecBodyRequest(target string, httpReq *http.Request, pol AppsecPolicy) (*http.Request, error) {
+	switch {
+	case isBodyUnreadable(httpReq):
+		if pol.UnreadableBodyBlock && isMethodWithBody(httpReq.Method) {
+			return nil, errors.New("appsecQuery:unreadableBody dropped")
 		}
-		return nil, nil
+		req, _ := http.NewRequest(http.MethodGet, target, nil)
+		return req, nil
+	case c.appsecBodyLimit > 0 && httpReq.Body != nil:
+		var bodyBuffer bytes.Buffer
+		limitedReader := io.LimitReader(httpReq.Body, c.appsecBodyLimit)
+		teeReader := io.TeeReader(limitedReader, &bodyBuffer)
+		bodyBytes, err := io.ReadAll(teeReader)
+		if err != nil {
+			return nil, fmt.Errorf("appsecQuery:GetBody %w", err)
+		}
+		httpReq.Body = io.NopCloser(io.MultiReader(&bodyBuffer, httpReq.Body))
+		req, _ := http.NewRequest(http.MethodPost, target, bytes.NewBuffer(bodyBytes))
+		return req, nil
+	default:
+		req, _ := http.NewRequest(http.MethodGet, target, nil)
+		return req, nil
 	}
-	defer func() {
-		if _, errDrain := io.Copy(io.Discard, res.Body); errDrain != nil {
-			c.log.Debug("appsecQuery:drainBody " + errDrain.Error())
-		}
-		if err = res.Body.Close(); err != nil {
-			c.log.Error("appsecQuery:closeBody " + err.Error())
-		}
-	}()
-	if res.StatusCode == http.StatusInternalServerError {
-		c.log.Info("appsecQuery:failure")
-		if pol.FailureBlock {
-			return nil, errors.New("appsecQuery statusCode:500")
-		}
-		return nil, nil
-	}
+}
 
-	// Bound the AppSec body so a runaway engine cannot fill the plugin process.
+// drainAppsecResponse consumes leftover bytes so the AppSec HTTP connection can be reused.
+func (c *CrowdsecConnection) drainAppsecResponse(res *http.Response) {
+	if _, errDrain := io.Copy(io.Discard, res.Body); errDrain != nil {
+		c.log.Debug("appsecQuery:drainBody " + errDrain.Error())
+	}
+	if errClose := res.Body.Close(); errClose != nil {
+		c.log.Error("appsecQuery:closeBody " + errClose.Error())
+	}
+}
+
+// readCappedAppsecBody reads at most 1 MiB. Oversized HTTP 200 is treated as allow; oversized non-200 is an error.
+func (c *CrowdsecConnection) readCappedAppsecBody(res *http.Response) ([]byte, error) {
 	body, err := io.ReadAll(io.LimitReader(res.Body, appsecResponseBodyLimit+1))
 	if err != nil {
 		return nil, fmt.Errorf("appsecQuery:readBody %w", err)
 	}
-	if len(body) > appsecResponseBodyLimit {
-		c.log.Debug("appsecQuery:responseBodyTooLarge")
-		if res.StatusCode == http.StatusOK {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("appsecQuery:responseBodyTooLarge statusCode:%d", res.StatusCode)
+	if len(body) <= appsecResponseBodyLimit {
+		return body, nil
 	}
+	c.log.Debug("appsecQuery:responseBodyTooLarge")
+	if res.StatusCode == http.StatusOK {
+		return []byte{}, nil
+	}
+	return nil, fmt.Errorf("appsecQuery:responseBodyTooLarge statusCode:%d", res.StatusCode)
+}
 
+// interpretAppsecBody maps a listener status and JSON body to an allow, structured envelope, or error.
+func interpretAppsecBody(statusCode int, body []byte, log *slog.Logger) (*AppsecResponse, error) {
 	decision, parseErr := parseAppsecResponse(body)
 	if parseErr == nil && decision.Action != "" {
 		return decision, nil
 	}
-
-	if res.StatusCode == http.StatusOK {
-		if parseErr != nil && len(bytes.TrimSpace(body)) > 0 {
-			c.log.Debug("appsecQuery:parseBody " + parseErr.Error())
-		}
-		return nil, nil
-	}
 	if parseErr != nil && len(bytes.TrimSpace(body)) > 0 {
-		c.log.Debug("appsecQuery:parseBody " + parseErr.Error())
+		log.Debug("appsecQuery:parseBody " + parseErr.Error())
 	}
-	return nil, fmt.Errorf("appsecQuery statusCode:%d", res.StatusCode)
+	if statusCode == http.StatusOK {
+		return appsecAllow(), nil
+	}
+	return nil, fmt.Errorf("appsecQuery statusCode:%d", statusCode)
 }
 
 // parseAppsecResponse unmarshals a CrowdSec AppSec JSON envelope. Empty bodies are not structured.
