@@ -1,7 +1,8 @@
 # Real-stack e2e (Docker Traefik + Crowdsec, Pester)
 
-This suite boots **Traefik and Crowdsec in Docker**, loads the plugin as a
-local Traefik plugin, and asserts remediations against a live LAPI.
+This suite boots **Traefik, Crowdsec, and Dragonfly** in Docker, loads the plugin as a
+local Traefik plugin, and asserts remediations against a live LAPI. Dragonfly is
+the functional Redis-protocol cache for `redis_cache.Tests.ps1`.
 
 It is a different domain from [`../mock/`](../mock/) (Traefik binary + mock
 LAPI). Do not mix the two trees.

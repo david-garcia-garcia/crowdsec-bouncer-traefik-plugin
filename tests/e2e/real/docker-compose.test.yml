@@ -29,6 +29,7 @@ services:
       - "8080:8080"
     depends_on:
       - crowdsec
+      - dragonfly
 
   # Test service - basic whoami
   whoami:
@@ -192,6 +193,52 @@ services:
       - "traefik.http.middlewares.bouncer-live.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
       - "traefik.http.middlewares.bouncer-live.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
+  # Live mode with Dragonfly as the Redis-protocol cache (not in-process TTL map)
+  redis-cache:
+    image: traefik/whoami
+    container_name: "redis-cache-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.redis-cache.rule=PathPrefix(`/redis-cache`)"
+      - "traefik.http.routers.redis-cache.entrypoints=web"
+      - "traefik.http.routers.redis-cache.middlewares=bouncer-redis-cache@docker"
+      - "traefik.http.services.redis-cache.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.crowdsecmode=live"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.defaultdecisionseconds=2"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.rediscacheenabled=true"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.rediscachehost=dragonfly:6379"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+  # Same Dragonfly cache with a longer live TTL so a Traefik restart still hits Redis
+  redis-cache-hold:
+    image: traefik/whoami
+    container_name: "redis-cache-hold-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.redis-cache-hold.rule=PathPrefix(`/redis-cache-hold`)"
+      - "traefik.http.routers.redis-cache-hold.entrypoints=web"
+      - "traefik.http.routers.redis-cache-hold.middlewares=bouncer-redis-cache-hold@docker"
+      - "traefik.http.services.redis-cache-hold.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.crowdsecmode=live"
+      - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.defaultdecisionseconds=120"
+      - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.rediscacheenabled=true"
+      - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.rediscachehost=dragonfly:6379"
+      - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
   # Trusted client IPs bypass even when banned (PR 333)
   trusted:
     image: traefik/whoami
@@ -257,6 +304,15 @@ services:
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.crowdsecappsechost=crowdsec:7422"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2
+    container_name: "dragonfly-test"
+    restart: unless-stopped
+    ulimits:
+      memlock: -1
+    labels:
+      - "traefik.enable=false"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.7.8
