@@ -35,3 +35,9 @@ phase: devdocsimpact
 findings: language-gap GetRemoteIP; stale How-to
 fixed: Language + How-to on core_plugin_ip.md
 skipped: none
+
+## archive (2026-09-05T16:42:12.139Z)
+phase: archive
+findings: none
+fixed: folded GetRemoteIP hop-walk into core_plugin_ip_radix-lookup; moved change to archive
+skipped: none
