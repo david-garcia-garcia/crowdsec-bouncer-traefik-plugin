@@ -13,7 +13,7 @@ description: Official Crowdsec Docker and cscli behavior this product relies on.
 ## simpleredis
 priority: normal
 local: index_ext_simpleredis.md
-description: SimpleRedis client API and pooling behaviour this product relies on.
+description: Historical facts about maxlerebourg/simpleredis. This plugin owns pkg/simpleredis and does not treat that repo as upstream.
 
 ## dragonfly
 priority: normal
