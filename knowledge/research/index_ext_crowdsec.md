@@ -24,3 +24,8 @@ description: Official CrowdSec AppSec HTTP verdict codes a remediation component
 priority: normal
 local: ext_crowdsec_bouncers_failure-action/
 description: How CrowdSec bouncers behave when LAPI or AppSec is down, times out, or returns 500.
+
+## AppSec bot-detection challenge
+priority: normal
+local: ext_crowdsec_appsec_bot-detection/
+description: CrowdSec AppSec challenge-mode wire protocol a bouncer must implement to serve bot detection.

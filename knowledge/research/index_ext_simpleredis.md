@@ -1,6 +1,6 @@
 # ext / simpleredis
 
-## Pooled SimpleRedis client (PR #8)
+## Pooled SimpleRedis client (historical pin)
 priority: normal
 local: ext_simpleredis_client_pooled-mget/
-description: Exported API, connection pool, RESP encoding, and main-branch reply bugs on the pool-redis-connections branch.
+description: Historical extract of maxlerebourg/simpleredis pool-redis-connections at f8801cc. This plugin no longer treats that repo as upstream.

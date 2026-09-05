@@ -62,14 +62,7 @@ func newStreamingRequest(done <-chan struct{}) *http.Request {
 }
 
 func appsecConn(appsecURL *url.URL, client *http.Client) *CrowdsecConnection {
-	return &CrowdsecConnection{
-		appsecScheme:     appsecURL.Scheme,
-		appsecHost:       appsecURL.Host,
-		appsecPath:       "/",
-		appsecBodyLimit:  10485760,
-		httpAppsecClient: client,
-		log:              logger.New("INFO", ""),
-	}
+	return NewTestAppsecConnection(appsecURL, client, logger.New("INFO", ""))
 }
 
 func Test_appsecQuery_streamingDoesNotBlock(t *testing.T) {
@@ -83,7 +76,8 @@ func Test_appsecQuery_streamingDoesNotBlock(t *testing.T) {
 	defer close(done)
 	finished := make(chan error, 1)
 	go func() {
-		finished <- conn.AppsecQuery("1.2.3.4", newStreamingRequest(done), AppsecPolicy{UnreachableBlock: true, FailureBlock: true})
+		_, err := conn.AppsecQuery("1.2.3.4", newStreamingRequest(done), AppsecPolicy{UnreachableBlock: true, FailureBlock: true})
+		finished <- err
 	}()
 	select {
 	case err := <-finished:
@@ -106,7 +100,8 @@ func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
 	defer close(done)
 	finished := make(chan error, 1)
 	go func() {
-		finished <- conn.AppsecQuery("1.2.3.4", newStreamingRequest(done), AppsecPolicy{UnreadableBodyBlock: true})
+		_, err := conn.AppsecQuery("1.2.3.4", newStreamingRequest(done), AppsecPolicy{UnreadableBodyBlock: true})
+		finished <- err
 	}()
 	select {
 	case err := <-finished:
@@ -136,7 +131,8 @@ func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 	defer close(done)
 	finished := make(chan error, 1)
 	go func() {
-		finished <- conn.AppsecQuery("1.2.3.4", newUnreadableGetRequest(done), AppsecPolicy{UnreadableBodyBlock: true})
+		_, err := conn.AppsecQuery("1.2.3.4", newUnreadableGetRequest(done), AppsecPolicy{UnreadableBodyBlock: true})
+		finished <- err
 	}()
 	select {
 	case err := <-finished:
@@ -168,7 +164,7 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 			const calls = 10
 			for i := 0; i < calls; i++ { //nolint:intrange
 				req, _ := http.NewRequest(http.MethodGet, "http://localhost/", nil)
-				_ = conn.AppsecQuery("1.2.3.4", req, AppsecPolicy{FailureBlock: false})
+				_, _ = conn.AppsecQuery("1.2.3.4", req, AppsecPolicy{FailureBlock: false})
 			}
 			mu.Lock()
 			defer mu.Unlock()
@@ -176,5 +172,102 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 				t.Errorf("AppsecQuery() opened %d connections for %d calls, want 1 (response body not drained?)", len(conns), calls)
 			}
 		})
+	}
+}
+
+func Test_appsecQuery_allowJSONPasses(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write([]byte(`{"action":"allow"}`))
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	decision, err := appsecConn(appsecURL, appsecServer.Client()).AppsecQuery("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), AppsecPolicy{})
+	if err != nil {
+		t.Fatalf("AppsecQuery() returned error: %v", err)
+	}
+	if decision == nil || decision.Action != AppsecActionAllow {
+		t.Fatalf("AppsecQuery() want allow decision, got %#v", decision)
+	}
+}
+
+func Test_appsecQuery_emptyOKPasses(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	decision, err := appsecConn(appsecURL, appsecServer.Client()).AppsecQuery("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), AppsecPolicy{})
+	if err != nil {
+		t.Fatalf("AppsecQuery() returned error: %v", err)
+	}
+	if decision == nil || decision.Action != AppsecActionAllow {
+		t.Fatalf("AppsecQuery() want allow for empty 200, got %#v", decision)
+	}
+}
+
+func Test_appsecQuery_challengeJSON(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusForbidden)
+		_, _ = rw.Write([]byte(`{"action":"challenge","http_status":200,"user_body_content":"<html>challenge</html>"}`))
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	decision, err := appsecConn(appsecURL, appsecServer.Client()).AppsecQuery("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), AppsecPolicy{})
+	if err != nil {
+		t.Fatalf("AppsecQuery() returned error: %v", err)
+	}
+	if decision == nil || decision.Action != AppsecActionChallenge {
+		t.Fatalf("AppsecQuery() want challenge, got %#v", decision)
+	}
+	if decision.HTTPStatus != http.StatusOK || decision.UserBodyContent != "<html>challenge</html>" {
+		t.Fatalf("AppsecQuery() challenge fields: %#v", decision)
+	}
+}
+
+func Test_appsecQuery_emptyForbiddenErrors(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusForbidden)
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	decision, err := appsecConn(appsecURL, appsecServer.Client()).AppsecQuery("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), AppsecPolicy{})
+	if err == nil {
+		t.Fatal("AppsecQuery() expected error for empty 403")
+	}
+	if decision != nil {
+		t.Fatalf("AppsecQuery() returned decision: %#v", decision)
+	}
+}
+
+func Test_appsecQuery_oversizedOKResponsePasses(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(rw, strings.Repeat("x", int(appsecResponseBodyLimit)+1))
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	decision, err := appsecConn(appsecURL, appsecServer.Client()).AppsecQuery("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), AppsecPolicy{})
+	if err != nil {
+		t.Fatalf("AppsecQuery() returned error: %v", err)
+	}
+	if decision == nil || decision.Action != AppsecActionAllow {
+		t.Fatalf("AppsecQuery() want allow for oversized 200, got %#v", decision)
+	}
+}
+
+func Test_appsecQuery_oversizedForbiddenResponseBlocks(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusForbidden)
+		_, _ = io.WriteString(rw, strings.Repeat("x", int(appsecResponseBodyLimit)+1))
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	decision, err := appsecConn(appsecURL, appsecServer.Client()).AppsecQuery("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), AppsecPolicy{})
+	if err == nil {
+		t.Fatal("AppsecQuery() expected error, got nil")
+	}
+	if decision != nil {
+		t.Fatalf("AppsecQuery() returned decision: %#v", decision)
 	}
 }
