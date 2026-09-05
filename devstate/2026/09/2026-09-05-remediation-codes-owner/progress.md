@@ -6,7 +6,7 @@ JobName: 2026-09-05-remediation-codes-owner
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-05T16:26:06.843Z |
 | explore | [x] | [x] | 2026-09-05T16:27:56.722Z |
-| propose | [x] | [ ] | |
+| propose | [x] | [x] | 2026-09-05T16:30:54.513Z |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
