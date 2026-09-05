@@ -765,6 +765,22 @@ docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m -t captcha # this
 docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha
 ```
 
+### Testing
+
+Mock e2e (Traefik binary + mock LAPI, no Crowdsec):
+
+```bash
+make e2e_mock
+```
+
+Real-stack e2e (Docker Traefik + Crowdsec, Pester):
+
+```bash
+./tests/e2e/real/Test-Integration.ps1
+# or
+make e2e_pester
+```
+
 ### Examples
 
 #### 1. Behind another proxy service (ex: clouflare) [examples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/behind-proxy/README.md)

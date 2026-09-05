@@ -1,9 +1,9 @@
-.PHONY: lint test vendor clean e2e_mock
+.PHONY: lint test vendor clean e2e_mock e2e_pester
 
 export GO111MODULE=on
 
-# Binary/mock suite (Traefik binary + mock LAPI). This is what CI runs.
-# The local Docker suite (make e2e) lives in a separate PR/branch.
+# Binary/mock suite (Traefik binary + mock LAPI). CI job "e2e (binary + mock LAPI)".
+# Real-stack Pester suite (Docker Traefik + Crowdsec): make e2e_pester / tests/e2e/real/Test-Integration.ps1
 E2E_MOCK_SCENARIOS := $(notdir $(wildcard tests/e2e/mock/scenarios/*))
 
 default: lint test
@@ -21,6 +21,9 @@ e2e_mock: $(addprefix e2e_mock_,$(E2E_MOCK_SCENARIOS))
 
 e2e_mock_%:
 	bash ./tests/e2e/mock/scenarios/$*/run.sh
+
+e2e_pester:
+	pwsh -File ./tests/e2e/real/Test-Integration.ps1
 
 vendor:
 	go mod vendor

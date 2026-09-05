@@ -1,0 +1,311 @@
+services:
+  traefik:
+    image: "traefik:v3.7.11"
+    container_name: "traefik-test"
+    restart: unless-stopped
+    command:
+      - "--log.level=DEBUG"
+      - "--accesslog"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--accesslog.format=json"
+      - "--accesslog.bufferingSize=0"  # Disable buffering for immediate log writes in tests
+      - "--accesslog.fields.headers.names.X-Crowdsec-Remediation=keep"
+      - "--accesslog.fields.headers.names.X-Forwarded-For=keep"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.forwardedHeaders.trustedIPs=172.20.0.0/16"
+      - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "traefik-logs:/var/log/traefik"
+      - "../../../ban.html:/ban.html:ro"
+      - "../../../captcha.html:/captcha.html:ro"
+      - "./ban.html:/e2e-ban.html:ro"
+      - "../../..:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+    ports:
+      - "8000:80"
+      - "8080:8080"
+    depends_on:
+      - crowdsec
+
+  # Test service - basic whoami
+  whoami:
+    image: traefik/whoami
+    container_name: "whoami-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=PathPrefix(`/whoami`)"
+      - "traefik.http.routers.whoami.entrypoints=web"
+      - "traefik.http.routers.whoami.middlewares=bouncer-test@docker"
+      - "traefik.http.services.whoami.loadbalancer.server.port=80"
+      
+      # Bouncer middleware with test configuration
+      - "traefik.http.middlewares.bouncer-test.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-test.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-test.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-test.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-test.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-test.plugin.bouncer.updateintervalseconds=5"
+      - "traefik.http.middlewares.bouncer-test.plugin.bouncer.crowdsecmode=none"
+      - "traefik.http.middlewares.bouncer-test.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
+      - "traefik.http.middlewares.bouncer-test.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-test.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+  # Test service - protected endpoint
+  protected:
+    image: traefik/whoami
+    container_name: "protected-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.protected.rule=PathPrefix(`/protected`)"
+      - "traefik.http.routers.protected.entrypoints=web"
+      - "traefik.http.routers.protected.middlewares=bouncer-strict@docker"
+      - "traefik.http.services.protected.loadbalancer.server.port=80"
+      
+      # Strict bouncer middleware for testing blocks
+      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.updateintervalseconds=5"
+      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.crowdsecmode=none"
+      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.banHtmlFilePath=/ban.html"
+      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+  # Test service - captcha enabled
+  captcha:
+    image: traefik/whoami
+    container_name: "captcha-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.captcha.rule=PathPrefix(`/captcha`)"
+      - "traefik.http.routers.captcha.entrypoints=web"
+      - "traefik.http.routers.captcha.middlewares=bouncer-captcha@docker"
+      - "traefik.http.services.captcha.loadbalancer.server.port=80"
+      
+      # Captcha-enabled bouncer middleware
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.updateintervalseconds=5"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.crowdsecmode=none"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaHtmlFilePath=/captcha.html"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaProvider=hcaptcha"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaSiteKey=test-site-key"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaSecretKey=test-secret-key"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+  # Test service - disabled bouncer
+  disabled:
+    image: traefik/whoami
+    container_name: "disabled-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.disabled.rule=PathPrefix(`/disabled`)"
+      - "traefik.http.routers.disabled.entrypoints=web"
+      - "traefik.http.routers.disabled.middlewares=bouncer-disabled@docker"
+      - "traefik.http.services.disabled.loadbalancer.server.port=80"
+      
+      # Disabled bouncer middleware
+      - "traefik.http.middlewares.bouncer-disabled.plugin.bouncer.enabled=false"
+      - "traefik.http.middlewares.bouncer-disabled.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-disabled.plugin.bouncer.loglevel=DEBUG"
+
+  # Test service - remediation headers
+  remediation-headers:
+    image: traefik/whoami
+    container_name: "remediation-headers-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.remediation-headers.rule=PathPrefix(`/remediation-headers`)"
+      - "traefik.http.routers.remediation-headers.entrypoints=web"
+      - "traefik.http.routers.remediation-headers.middlewares=bouncer-remediation-headers@docker"
+      - "traefik.http.services.remediation-headers.loadbalancer.server.port=80"
+      
+      # Bouncer middleware with custom remediation header
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.updateintervalseconds=5"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.crowdsecmode=none"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.banHtmlFilePath=/ban.html"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+  # Test service - stream mode
+  stream:
+    image: traefik/whoami
+    container_name: "stream-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.stream.rule=PathPrefix(`/stream`)"
+      - "traefik.http.routers.stream.entrypoints=web"
+      - "traefik.http.routers.stream.middlewares=bouncer-stream@docker"
+      - "traefik.http.services.stream.loadbalancer.server.port=80"
+      
+      # Stream mode bouncer middleware
+      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.updateintervalseconds=5"
+      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.crowdsecmode=stream"
+      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+  # Live mode: cache an allow, then re-query after defaultDecisionSeconds (PR 333)
+  live:
+    image: traefik/whoami
+    container_name: "live-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.live.rule=PathPrefix(`/live`)"
+      - "traefik.http.routers.live.entrypoints=web"
+      - "traefik.http.routers.live.middlewares=bouncer-live@docker"
+      - "traefik.http.services.live.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.bouncer-live.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-live.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-live.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-live.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-live.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-live.plugin.bouncer.crowdsecmode=live"
+      - "traefik.http.middlewares.bouncer-live.plugin.bouncer.defaultdecisionseconds=2"
+      - "traefik.http.middlewares.bouncer-live.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-live.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+  # Trusted client IPs bypass even when banned (PR 333)
+  trusted:
+    image: traefik/whoami
+    container_name: "trusted-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.trusted.rule=PathPrefix(`/trusted`)"
+      - "traefik.http.routers.trusted.entrypoints=web"
+      - "traefik.http.routers.trusted.middlewares=bouncer-trusted@docker"
+      - "traefik.http.services.trusted.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.crowdsecmode=stream"
+      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.updateintervalseconds=5"
+      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.clienttrustedips=172.19.0.10/32"
+      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+  # Custom ban HTML body + Content-Type (PR 333)
+  custom-ban:
+    image: traefik/whoami
+    container_name: "custom-ban-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.custom-ban.rule=PathPrefix(`/custom-ban`)"
+      - "traefik.http.routers.custom-ban.entrypoints=web"
+      - "traefik.http.routers.custom-ban.middlewares=bouncer-custom-ban@docker"
+      - "traefik.http.services.custom-ban.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.crowdsecmode=none"
+      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.banhtmlfilepath=/e2e-ban.html"
+      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
+      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+  # Real AppSec CRS inband (PR 333), not the mock rpc2 stand-in
+  appsec:
+    image: traefik/whoami
+    container_name: "appsec-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.appsec.rule=PathPrefix(`/appsec`)"
+      - "traefik.http.routers.appsec.entrypoints=web"
+      - "traefik.http.routers.appsec.middlewares=bouncer-appsec@docker"
+      - "traefik.http.services.appsec.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.crowdsecmode=none"
+      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.crowdsecappsecenabled=true"
+      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.crowdsecappsechost=crowdsec:7422"
+      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:v1.7.8
+    container_name: "crowdsec-test"
+    restart: unless-stopped
+    environment:
+      # Minimal collections for testing
+      COLLECTIONS: "crowdsecurity/traefik crowdsecurity/appsec-crs-inband"
+      CUSTOM_HOSTNAME: "crowdsec-test"
+      # Test bouncer key
+      BOUNCER_KEY_TRAEFIK_TEST: "40796d93c2958f9e58345514e67740e5"
+      # Disable aggressive collections that cause 150k decision issue
+      DISABLE_COLLECTIONS: "crowdsecurity/iptables crowdsecurity/linux crowdsecurity/sshd"
+      # Enable debugging
+      PARSERS: "crowdsecurity/syslog-logs crowdsecurity/dateparse-enrich"
+      # Minimal setup for testing
+      DISABLE_AGENT: "false"
+      DISABLE_ONLINE_API: "true"
+      CROWDSEC_BYPASS_DB_VOLUME_CHECK: "true"
+      # Test mode settings
+      LEVEL_DEBUG: "true"
+      # Use persistent volumes to cache downloaded databases
+    volumes:
+      - "crowdsec-db-test:/var/lib/crowdsec/data/"
+      - "crowdsec-config-test:/etc/crowdsec/"
+      - "./acquis.yaml:/etc/crowdsec/acquis.yaml:ro"
+    labels:
+      - "traefik.enable=false"
+    healthcheck:
+      test: ["CMD", "cscli", "version"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    ports:
+      # Expose LAPI for testing
+      - "8081:8080"
+
+
+
+volumes:
+  crowdsec-db-test:
+  crowdsec-config-test:
+  traefik-logs:
+
+networks:
+  default:
+    name: crowdsec-test-network
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1 

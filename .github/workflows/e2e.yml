@@ -24,12 +24,9 @@ jobs:
           # Track go.mod (Go 1.22) — the plugin's yaegi-bound floor. Keeps the
           # single source of truth and builds the mock on the supported version.
           go-version-file: go.mod
-      # CI runs the binary/mock suite only: Traefik as a downloaded binary +
-      # a small LAPI mock (no Docker, no real Crowdsec). It validates the
-      # plugin's own behaviour. Crowdsec / AppSec correctness is upstream's
-      # responsibility, so those are intentionally out of scope here. The
-      # Docker suite (tests/e2e/scenarios) stays available for local debugging.
-      # `-k` keeps going after a failing scenario so the logs cover all of
+      # CI mock job: Traefik binary + mock LAPI (no Docker, no real Crowdsec).
+      # Real-stack Pester lives in tests/e2e/real/ (`Test-Integration.ps1`).
+      # `-k` keeps going after a failing mock scenario so the logs cover all of
       # them, while make still exits non-zero if any scenario failed.
       - name: Run mock scenarios
         run: make -k e2e_mock
@@ -40,3 +37,35 @@ jobs:
           name: e2e-logs
           path: /tmp/e2e-mock-*.log
           if-no-files-found: ignore
+
+  e2e-pester:
+    name: e2e (docker + pester)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Pester
+        shell: pwsh
+        run: Install-Module -Name Pester -Force -Scope CurrentUser -SkipPublisherCheck
+      - name: Run Pester real-stack tests
+        shell: pwsh
+        run: ./tests/e2e/real/Test-Integration.ps1 -HttpTimeoutSeconds 60 -SkipDockerCleanup
+      - name: Show container logs on failure
+        if: failure()
+        run: |
+          echo "=== docker ps -a ==="
+          docker ps -a
+          echo "=== crowdsec-test ==="
+          docker logs crowdsec-test 2>/dev/null || true
+          echo "=== traefik-test ==="
+          docker logs traefik-test 2>/dev/null || true
+      - name: Upload Pester results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pester-test-results
+          path: tests/e2e/real/test-results.xml
+          if-no-files-found: ignore
+      - name: Stop test stack
+        if: always()
+        run: docker compose -f tests/e2e/real/docker-compose.test.yml down -v --remove-orphans
