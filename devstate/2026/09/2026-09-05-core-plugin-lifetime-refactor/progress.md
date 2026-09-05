@@ -6,7 +6,7 @@ JobName: 2026-09-05-core-plugin-lifetime-refactor
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-05T06:53:07.300Z |
 | explore | [x] | [x] | 2026-09-05T07:01:57.287Z |
-| propose | [x] | [ ] | |
+| propose | [x] | [x] | 2026-09-05T07:48:50.000Z |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |

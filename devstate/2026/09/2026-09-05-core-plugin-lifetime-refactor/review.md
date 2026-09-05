@@ -22,3 +22,13 @@ findings: New discards Traefik ctx; sync.Once was wrong vs sister reclaim
 fixed: explore now uses pkg/reclaim for CrowdsecConnection; key assumed connection-field hash
 skipped: WAF name+full-config key (would split tickers per alias)
 head: 0c87fadfb590610e13ddf3bff0e761d62c8cf972
+
+## propose (2026-09-05T07:48:50.000Z)
+phase: propose
+findings: none
+fixed: none
+skipped: logger close
+qualify: qualified-with-gaps
+change: crowdsec-connection-bouncer-split
+pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/6
+head: 57b10f6f0048365485dc1ab6d3211d5b6fda4f1e
