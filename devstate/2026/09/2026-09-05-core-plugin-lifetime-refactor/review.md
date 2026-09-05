@@ -46,3 +46,10 @@ findings: P3 11 hard Leave a trail / Name for the scope; 1 judgement Duplicated 
 fixed: version bump path, stale log prefixes, job comments, routeHandler local
 skipped: decisionRemediation helper (judgement)
 head: 7ae1d26582a9552669d0fdbffc9dd67ed297773c
+
+## devdocsimpact (2026-09-05T08:33:14.680Z)
+phase: devdocsimpact
+findings: missing packets for plugin/reclaim/isolated cache/mock e2e; stale Redis keyPrefix
+fixed: core_plugin_middleware, std_go_reclaim, core_cache_client, build_e2e_mock; updated core_cache_redis
+skipped: none
+head: 37e8d20d1acf58099a7b387b4e131352bbbe1857

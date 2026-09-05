@@ -9,6 +9,6 @@ JobName: 2026-09-05-core-plugin-lifetime-refactor
 | propose | [x] | [x] | 2026-09-05T07:48:50.000Z |
 | implement | [x] | [x] | 2026-09-05T08:23:22.919Z |
 | codereview | [x] | [x] | 2026-09-05T08:29:39.778Z |
-| devdocsimpact | [ ] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-05T08:33:14.680Z |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
