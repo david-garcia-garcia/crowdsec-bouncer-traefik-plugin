@@ -23,6 +23,7 @@ Allowlist of root + domain: `openspec/specs/domains.md`.
 
 ### plugin
 
+- decisions
 - middleware
 
 ## std
