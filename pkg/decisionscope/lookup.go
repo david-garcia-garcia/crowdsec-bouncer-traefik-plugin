@@ -53,22 +53,18 @@ func RequestScopeValues(headers map[string]string, req *http.Request) map[string
 	return out
 }
 
-// LookupCachedRemediation checks Ip, then Range, then every present header scope (ban over captcha).
+// LookupCachedRemediation merges Ip, Range, and present header-scope hits. Ban wins across those scopes.
 func LookupCachedRemediation(cacheClient *cache.Client, mode, remoteIP string, scopes map[string]string) (string, error) {
 	useRangeIndex := mode == configuration.StreamMode || mode == configuration.AloneMode
 	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, scopes, useRangeIndex))
 	if err != nil {
 		return "", err
 	}
-	if value := found[remoteIP]; IsActiveRemediation(value) {
-		return value, nil
-	}
+	// Merge Ip, Range, and header hits so a Country ban beats a Range captcha.
+	chosen := found[remoteIP]
 	if useRangeIndex {
-		if rangeValue := MatchRangeFromIndex(found[RangeIndexKey], remoteIP); IsActiveRemediation(rangeValue) {
-			return rangeValue, nil
-		}
+		chosen = PreferRemediation(chosen, MatchRangeFromIndex(found[RangeIndexKey], remoteIP))
 	}
-	chosen := ""
 	for scope, identifier := range scopes {
 		if identifier == "" {
 			continue

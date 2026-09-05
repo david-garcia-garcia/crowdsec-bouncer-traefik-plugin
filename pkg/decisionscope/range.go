@@ -13,18 +13,35 @@ func AddRange(cacheClient *cache.Client, cidr, remediation string, _ int64) {
 	if network == "" || !IsActiveRemediation(remediation) {
 		return
 	}
-	index := upsertIndexCIDR(readRangeIndex(cacheClient), network, remediation)
-	cacheClient.Set(RangeIndexKey, index, rangeIndexTTL)
+	ApplyRangeBatch(cacheClient, map[string]string{network: remediation}, nil)
 }
 
 // RemoveRange drops a Range decision from the shared index.
 func RemoveRange(cacheClient *cache.Client, cidr string) {
-	next := removeCIDRFromIndex(readRangeIndex(cacheClient), strings.TrimSpace(cidr))
-	if next == "" {
+	ApplyRangeBatch(cacheClient, nil, []string{strings.TrimSpace(cidr)})
+}
+
+// ApplyRangeBatch upserts and removes Range lines with one cache read and one write.
+func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, removals []string) {
+	if len(upserts) == 0 && len(removals) == 0 {
+		return
+	}
+	index := readRangeIndex(cacheClient)
+	for cidr, remediation := range upserts {
+		network := strings.TrimSpace(cidr)
+		if network == "" || !IsActiveRemediation(remediation) {
+			continue
+		}
+		index = upsertIndexCIDR(index, network, remediation)
+	}
+	for _, cidr := range removals {
+		index = removeCIDRFromIndex(index, strings.TrimSpace(cidr))
+	}
+	if index == "" {
 		cacheClient.Delete(RangeIndexKey)
 		return
 	}
-	cacheClient.Set(RangeIndexKey, next, rangeIndexTTL)
+	cacheClient.Set(RangeIndexKey, index, rangeIndexTTL)
 }
 
 // MatchRange returns the remediation for a containing CIDR. Ban wins if several match.
@@ -55,6 +72,7 @@ func MatchRangeFromIndex(index, remoteIP string) string {
 	return chosen
 }
 
+// parseIndexLine splits one cidr=remediation line. A missing equals leaves remediation empty.
 func parseIndexLine(line string) (string, string) {
 	trimmed := strings.TrimSpace(line)
 	if trimmed == "" {
@@ -67,6 +85,7 @@ func parseIndexLine(line string) (string, string) {
 	return network, remediation
 }
 
+// upsertIndexCIDR replaces or appends one CIDR line. Ban/captcha for that CIDR is the last write.
 func upsertIndexCIDR(index, cidr, remediation string) string {
 	kept := make([]string, 0)
 	replaced := false
@@ -92,6 +111,7 @@ func upsertIndexCIDR(index, cidr, remediation string) string {
 	return strings.Join(kept, "\n")
 }
 
+// readRangeIndex returns the cached range-index blob, or empty on miss or error.
 func readRangeIndex(cacheClient *cache.Client) string {
 	index, err := cacheClient.Get(RangeIndexKey)
 	if err != nil {
@@ -100,6 +120,7 @@ func readRangeIndex(cacheClient *cache.Client) string {
 	return index
 }
 
+// removeCIDRFromIndex drops every line whose CIDR equals cidr.
 func removeCIDRFromIndex(index, cidr string) string {
 	kept := make([]string, 0)
 	for _, line := range strings.Split(index, "\n") {

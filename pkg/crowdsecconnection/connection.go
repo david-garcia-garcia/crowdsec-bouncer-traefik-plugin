@@ -468,16 +468,33 @@ func (c *CrowdsecConnection) handleStreamCache() error {
 	if err != nil {
 		return fmt.Errorf("handleStreamCache:parsingBody %w", err)
 	}
+	rangeUpserts := make(map[string]string)
+	var rangeRemovals []string
 	for _, decision := range stream.New {
 		duration, parseErr := time.ParseDuration(decision.Duration)
 		if parseErr != nil {
 			continue
 		}
+		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
+			value := decisionscope.RemediationValue(decision.Type)
+			cidr := strings.TrimSpace(decision.Value)
+			if value != "" && cidr != "" {
+				rangeUpserts[cidr] = value
+			}
+			continue
+		}
 		c.storeStreamDecision(decision, int64(duration.Seconds()))
 	}
 	for _, decision := range stream.Deleted {
+		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
+			if cidr := strings.TrimSpace(decision.Value); cidr != "" {
+				rangeRemovals = append(rangeRemovals, cidr)
+			}
+			continue
+		}
 		c.deleteStreamDecision(decision)
 	}
+	decisionscope.ApplyRangeBatch(c.cacheClient, rangeUpserts, rangeRemovals)
 	c.log.Debug("handleStreamCache:updated")
 	c.isCrowdsecStreamStartup = false
 	return nil

@@ -14,6 +14,7 @@ BeforeAll {
     $script:NoneOutside = "10.56.1.8"
     $script:StreamRange = "10.57.0.0/16"
     $script:StreamInside = "10.57.1.8"
+    $script:StreamOutside = "10.58.1.8"
     $script:PublicIP = "8.8.8.8"
 
     $result = Wait-ForCondition -Description "CrowdSec LAPI to be ready" -TimeoutSeconds 60 -RetryIntervalSeconds 2 -Condition {
@@ -59,6 +60,9 @@ Describe "CrowdSec Range and header-mapped scopes" {
                 return ($response.StatusCode -in @(403, 429))
             }
             $result.Success | Should -Be $true -Because "Stream mode should match Range via range-index"
+
+            $allowed = Test-HttpRequest -Endpoint "/scope-stream" -IP $script:StreamOutside -TraefikUrl $script:TraefikUrl
+            $allowed.StatusCode | Should -Be 200 -Because "an IP outside the Range must stay allowed while the ban is active"
 
             Remove-TestRangeDecision -Range $script:StreamRange
 

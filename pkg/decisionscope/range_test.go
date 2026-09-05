@@ -66,6 +66,31 @@ func TestLookupCachedRemediationMiss(t *testing.T) {
 	}
 }
 
+func TestLookupCachedRemediationBanWinsAcrossScopes(t *testing.T) {
+	client := newTestDecisionCache()
+	AddRange(client, "10.0.0.0/8", cache.CaptchaValue, 60)
+	client.Set(HeaderScopeKey(ScopeCountry, "FR"), cache.BannedValue, 60)
+	got, err := LookupCachedRemediation(client, "stream", "10.1.2.3", map[string]string{ScopeCountry: "FR"})
+	if err != nil || got != cache.BannedValue {
+		t.Fatalf("range captcha + country ban got %q %v, want ban", got, err)
+	}
+}
+
+func TestApplyRangeBatchOneWrite(t *testing.T) {
+	client := newTestDecisionCache()
+	ApplyRangeBatch(client, map[string]string{
+		"10.0.0.0/8":  cache.CaptchaValue,
+		"10.1.0.0/16": cache.BannedValue,
+	}, nil)
+	if got := MatchRange(client, "10.1.2.3"); got != cache.BannedValue {
+		t.Fatalf("batch upsert got %q, want ban", got)
+	}
+	ApplyRangeBatch(client, nil, []string{"10.1.0.0/16"})
+	if got := MatchRange(client, "10.1.2.3"); got != cache.CaptchaValue {
+		t.Fatalf("after removal got %q, want captcha from remaining /8", got)
+	}
+}
+
 func TestLookupCachedRemediationNoneSkipsRangeIndex(t *testing.T) {
 	client := newTestDecisionCache()
 	AddRange(client, "10.0.0.0/8", cache.BannedValue, 60)
