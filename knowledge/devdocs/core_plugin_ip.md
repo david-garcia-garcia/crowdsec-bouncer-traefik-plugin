@@ -10,6 +10,10 @@ _Avoid_: Range index, LAPI decision value, geolocation
 In-tree radix of CIDRs (`pkg/iplookup.Helper`). Insert at construction; `IsContained` is membership plus longest prefix length. No associated remediation.
 _Avoid_: range-index, per-CIDR cache key, `InNetwork` (one network)
 
+**GetRemoteIP**:
+The owner of the client address for a request. Walks the custom forwarded header most-recent-first against the trusted-hop pool, then the host of `RemoteAddr`.
+_Avoid_: parsing `RemoteAddr` on the connection, a second X-Forwarded-For walk, Traefik ipstrategy as a second owner
+
 ## Overview
 
 Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker stores those CIDRs in `pkg/iplookup`. Stream/alone Range uses two Helpers on CrowdsecConnection (ban set, captcha set), not Checker. Use `ip.InNetwork` when the question is one CIDR (blob line parse). Do not parse `RemoteAddr` in the helper; classify `GetRemoteIP`.
@@ -17,9 +21,11 @@ Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker st
 ## How to use
 
 - Build the Checker once in `bouncer.New` from config lists.
+- Resolve the client address with `GetRemoteIP` (server/trusted-hop pool + custom header). Then `Contains` on that string for the client pool. Do not parse `RemoteAddr` again.
 - Call `Contains` / `ContainsIP` on the request path. Do not walk a CIDR slice beside the helper.
 - Convert a bare IP to `/32` or `/128` before `AddCIDR`.
 - Range stream/alone membership reuses `Helper` as two boolean sets on the connection. Do not put Range in Checker.
+- One-CIDR questions (`InNetwork`) live in `pkg/ip/network.go`, not in Checker.
 
 ## Pattern snippet
 
@@ -30,7 +36,8 @@ ok, err := checker.Contains(remoteIP)
 
 ## Key files
 
-- `pkg/ip/ip.go`
+- `pkg/ip/checker.go`
+- `pkg/ip/network.go`
 - `pkg/iplookup/`
 - `pkg/bouncer/bouncer.go`
 - `pkg/configuration/validate.go` (`validateParamsIPs`)
