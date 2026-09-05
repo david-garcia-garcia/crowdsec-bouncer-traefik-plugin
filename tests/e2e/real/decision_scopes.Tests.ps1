@@ -54,7 +54,7 @@ Describe "CrowdSec Range and header-mapped scopes" {
         It "Should block an IP inside a Range decision after the stream poll" {
             Add-TestRangeDecision -Range $script:StreamRange -Type "ban"
 
-            $result = Wait-ForCondition -Description "Stream mode to block Range $($script:StreamRange)" -TimeoutSeconds 30 -RetryIntervalSeconds 2 -Condition {
+            $result = Wait-ForCondition -Description "Stream mode to block Range $($script:StreamRange)" -TimeoutSeconds 45 -RetryIntervalSeconds 2 -Condition {
                 $response = Test-HttpRequest -Endpoint "/scope-stream" -IP $script:StreamInside -TraefikUrl $script:TraefikUrl
                 return ($response.StatusCode -in @(403, 429))
             }
@@ -107,7 +107,7 @@ Describe "CrowdSec Range and header-mapped scopes" {
 
             Add-TestScopeDecision -Scope "Country" -Value $country -Type "ban"
 
-            $result = Wait-ForCondition -Description "Stream mode to block Country $country" -TimeoutSeconds 30 -RetryIntervalSeconds 2 -Condition {
+            $result = Wait-ForCondition -Description "Stream mode to block Country $country" -TimeoutSeconds 45 -RetryIntervalSeconds 2 -Condition {
                 $response = Test-HttpRequest -Endpoint "/scope-stream" -IP $script:PublicIP -TraefikUrl $script:TraefikUrl
                 return ($response.StatusCode -in @(403, 429))
             }

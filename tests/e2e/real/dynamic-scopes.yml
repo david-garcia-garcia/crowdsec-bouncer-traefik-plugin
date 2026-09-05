@@ -25,10 +25,10 @@ http:
     bouncer-scope-none:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecLapiKey: "40796d93c2958f9e58345514e67740e5"
           crowdsecLapiHost: crowdsec:8080
-          httpTimeoutSeconds: 60
+          httpTimeoutSeconds: "60"
           logLevel: DEBUG
           crowdsecMode: none
           decisionScopeHeaders:
@@ -40,13 +40,13 @@ http:
     bouncer-scope-stream:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecLapiKey: "40796d93c2958f9e58345514e67740e5"
           crowdsecLapiHost: crowdsec:8080
-          httpTimeoutSeconds: 60
+          httpTimeoutSeconds: "60"
           logLevel: DEBUG
-          updateIntervalSeconds: 5
-          streamStartupBlock: false
+          updateIntervalSeconds: "2"
+          streamStartupBlock: "false"
           crowdsecMode: stream
           decisionScopeHeaders:
             Country: X-IPCountry
