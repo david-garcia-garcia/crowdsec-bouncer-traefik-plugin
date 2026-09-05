@@ -49,7 +49,7 @@ Describe "CrowdSec Bouncer Dragonfly Redis cache" {
         It "Should still block after Traefik restart when the ban lives in Dragonfly" {
             Add-TestDecision -IP $script:RedisBannedIP -Type "ban"
 
-            $blocked = Test-HttpRequest -Endpoint "/redis-cache-hold" -IP $script:RedisBannedIP -TraefikUrl $script:TraefikUrl
+            $blocked = Test-HttpRequest -Endpoint "/hold-redis" -IP $script:RedisBannedIP -TraefikUrl $script:TraefikUrl
             $blocked.StatusCode | Should -BeIn @(403, 429) -Because "first miss must query LAPI and cache the ban in Dragonfly"
 
             Remove-TestDecision -IP $script:RedisBannedIP
@@ -72,8 +72,11 @@ Describe "CrowdSec Bouncer Dragonfly Redis cache" {
                 throw "Traefik did not become ready after restart"
             }
 
-            $stillBlocked = Test-HttpRequest -Endpoint "/redis-cache-hold" -IP $script:RedisBannedIP -TraefikUrl $script:TraefikUrl
-            $stillBlocked.StatusCode | Should -BeIn @(403, 429) -Because "in-memory cache would miss after restart; Dragonfly must still hold the ban"
+            $stillBlocked = Wait-ForCondition -Description "Dragonfly-cached ban on /hold-redis after Traefik restart" -TimeoutSeconds 30 -RetryIntervalSeconds 1 -Condition {
+                $response = Test-HttpRequest -Endpoint "/hold-redis" -IP $script:RedisBannedIP -TraefikUrl $script:TraefikUrl
+                return ($response.StatusCode -in @(403, 429))
+            }
+            $stillBlocked.Success | Should -Be $true -Because "in-memory cache would miss after restart; Dragonfly must still hold the ban"
         }
     }
 }

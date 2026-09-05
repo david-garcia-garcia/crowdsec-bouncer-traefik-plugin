@@ -216,14 +216,16 @@ services:
       - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
       - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
-  # Same Dragonfly cache with a longer live TTL so a Traefik restart still hits Redis
+  # Same Dragonfly cache with a longer live TTL so a Traefik restart still hits Redis.
+  # Path must not be under `/redis-cache` — PathPrefix(`/redis-cache`) would steal it
+  # and apply the 2s TTL, so the ban would expire during docker restart.
   redis-cache-hold:
     image: traefik/whoami
     container_name: "redis-cache-hold-test"
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.redis-cache-hold.rule=PathPrefix(`/redis-cache-hold`)"
+      - "traefik.http.routers.redis-cache-hold.rule=PathPrefix(`/hold-redis`)"
       - "traefik.http.routers.redis-cache-hold.entrypoints=web"
       - "traefik.http.routers.redis-cache-hold.middlewares=bouncer-redis-cache-hold@docker"
       - "traefik.http.services.redis-cache-hold.loadbalancer.server.port=80"
