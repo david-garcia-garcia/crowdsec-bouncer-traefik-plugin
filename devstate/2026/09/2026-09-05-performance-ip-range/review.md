@@ -35,3 +35,9 @@ phase: devdocsimpact
 findings: none
 fixed: none
 skipped: none
+
+## archive (2026-09-05)
+phase: archive
+findings: none
+fixed: synced core_plugin_decisions_scopes and core_plugin_ip_radix-lookup; moved change to archive/2026-09-05-in-process-range-membership
+skipped: none
