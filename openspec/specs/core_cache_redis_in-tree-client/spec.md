@@ -1,6 +1,6 @@
 ## Purpose
 
-The plugin Redis cache uses an in-tree copy of the pooled SimpleRedis client from simpleredis PR #8, not the published v1.0.12 module.
+The plugin Redis cache uses this repository’s pooled SimpleRedis client in `pkg/simpleredis`, not the published `github.com/maxlerebourg/simpleredis` module.
 
 ## Requirements
 
