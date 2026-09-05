@@ -1,5 +1,21 @@
 # Review
 
+## pullrequest (2026-09-05T11:42:50Z)
+phase: pullrequest
+findings: none
+fixed: PR title ✨ feat(decisionscope): honor Range and header-mapped CrowdSec decisions
+skipped: none
+ci: Main Process 33963976927 success; e2e 33963976933 success
+head: d2dcdd511dc2defc75e956c173afd3d4ad71151a
+pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/7
+
+## archive (2026-09-05T11:42:50Z)
+phase: archive
+findings: none
+fixed: synced core_plugin_decisions_scopes (new) and build_e2e_pester_crowdsec-stack (fold); moved openspec/changes/archive/2026-09-05-honor-range-and-header-decisions
+skipped: none
+head: d2dcdd511dc2defc75e956c173afd3d4ad71151a
+
 ## devdocsimpact (2026-09-05T11:38:12Z)
 phase: devdocsimpact
 findings: missing-packet Decision scopes; stale cache GetMany; stale e2e Country/file-provider; stale mock scope-headers
