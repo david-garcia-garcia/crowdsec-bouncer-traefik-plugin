@@ -16,9 +16,9 @@ Use `pkg/simpleredis` for Redis-protocol GET/SET/DEL. Hold each client by pointe
 
 ## How to use
 
-- `Client.New(..., isRedis=true, writeHost, readHosts, pass, database)` inits the writer and each reader.
-- One key per request: `Get`/`Set`/`Del`. `MGet` exists on the package for later multi-key reads.
-- Cache keys for remediations are the client IP Traefik already resolved.
+- `Client.New(..., isRedis=true, writeHost, readHosts, pass, database, keyPrefix)` inits the writer and each reader. `keyPrefix` is `crowdsecconnection.IdentityHex` so two Connections on one Redis do not collide.
+- One key per request: `Get`/`Set`/`Del`. The logical key is still the client IP; Redis stores `prefix:key`.
+- Cache keys for remediations are the client IP Traefik already resolved, namespaced by connection identity when Redis is on.
 
 ## Pattern snippet
 
@@ -39,3 +39,4 @@ value, err := r.Get(key)
 - Do not copy `SimpleRedis` by value after `Init`.
 - The mock e2e Redis stand-in must speak RESP arrays; inline GET is leftover compatibility.
 - Real-stack Redis-cache e2e uses Dragonfly, not Redis.
+- Pass a non-empty `keyPrefix` (connection identity hex) when two Crowdsec backends share one Redis.
