@@ -4,6 +4,7 @@
 package iplookup
 
 import (
+	"errors"
 	"fmt"
 	"net"
 )
@@ -47,7 +48,7 @@ func (tree *ipRadixTree) insert(cidr *net.IPNet) {
 	current := tree.root
 
 	// Walk prefix bits, creating missing children.
-	for i := 0; i < prefixLen; i++ {
+	for i := range prefixLen {
 		actualBitPos := bitStart + i
 		bytePos := actualBitPos / 8
 		bitPos := 7 - (actualBitPos % 8)
@@ -165,7 +166,7 @@ func NewHelper(cidrBlocks []string) (*Helper, error) {
 // The int is the longest matching prefix length (0 when not found).
 func (helper *Helper) IsContained(ipAddr net.IP) (bool, int, error) {
 	if ipAddr == nil {
-		return false, 0, fmt.Errorf("IP address is nil")
+		return false, 0, errors.New("IP address is nil")
 	}
 	found, prefixLen := helper.tree.contains(ipAddr)
 	return found, prefixLen, nil
