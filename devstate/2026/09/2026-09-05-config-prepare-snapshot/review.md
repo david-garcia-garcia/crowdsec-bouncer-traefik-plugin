@@ -59,3 +59,12 @@ findings: none
 fixed: WIP dropped; title ♻️ refactor(plugin): copy Traefik Config before Prepare mutates it
 skipped: none
 CI: success
+
+## sync (2026-09-05)
+
+phase: sync
+findings: none
+fixed: merged origin/master (connection split, pkg/ip checker/network); no conflicts
+skipped: none
+CI: success
+mergeable: clean
