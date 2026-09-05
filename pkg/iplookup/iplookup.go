@@ -48,7 +48,8 @@ func (tree *ipRadixTree) insert(cidr *net.IPNet) {
 	current := tree.root
 
 	// Walk prefix bits, creating missing children.
-	for i := range prefixLen {
+	// Yaegi v0.16.1 (Traefik) does not compile `for i := range n`.
+	for i := 0; i < prefixLen; i++ { //nolint:intrange
 		actualBitPos := bitStart + i
 		bytePos := actualBitPos / 8
 		bitPos := 7 - (actualBitPos % 8)
