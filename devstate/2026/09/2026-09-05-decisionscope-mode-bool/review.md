@@ -28,5 +28,13 @@ findings: P3 1 (ServeHTTP gocyclo 21)
 fixed: hoisted useRangeMembership and reused for stream/alone vs live
 skipped: none
 
+## codereview (2026-09-05)
+
+phase: codereview
+findings: none
+fixed: none
+skipped: none
+
+
 
 
