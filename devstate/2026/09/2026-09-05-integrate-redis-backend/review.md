@@ -49,3 +49,11 @@ findings: none
 fixed: catalog sync + move to archive/2026-09-05-in-tree-simpleredis-dragonfly-e2e
 skipped: none
 validators: spec-map OK, artifact-names OK
+
+## pullrequest (2026-09-05)
+phase: pullrequest
+findings: none
+fixed: PR title gitmoji; hold path `/hold-redis`; dedicated hold IP
+skipped: none
+ci: Main 33952778932 success; E2E 33952778940 success on 24dd8b8
+verdict: ready for review

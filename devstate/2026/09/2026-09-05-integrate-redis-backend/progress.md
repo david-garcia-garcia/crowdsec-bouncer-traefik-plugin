@@ -11,4 +11,4 @@ JobName: 2026-09-05-integrate-redis-backend
 | codereview | [x] | [x] | 2026-09-05T07:17:10.3913623Z |
 | devdocsimpact | [x] | [x] | 2026-09-05T07:19:06.5400154Z |
 | archive | [x] | [x] | 2026-09-05T07:19:19.7004106Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-05T07:36:02.6179327Z |
