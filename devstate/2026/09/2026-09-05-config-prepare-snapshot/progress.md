@@ -8,7 +8,7 @@ JobName: 2026-09-05-config-prepare-snapshot
 | explore | [x] | [x] | 2026-09-05T16:30:28.366Z |
 | propose | [x] | [x] | 2026-09-05T16:33:11.662Z |
 | implement | [x] | [x] | 2026-09-05T16:36:55.013Z |
-| codereview | [x] | [ ] | |
-| devdocsimpact | [ ] | [ ] | |
-| archive | [ ] | [ ] | |
+| codereview | [x] | [x] | 2026-09-05T16:42:28.402Z |
+| devdocsimpact | [x] | [ ] | |
+| archive | [x] | [ ] | |
 | pullrequest | [ ] | [ ] | |

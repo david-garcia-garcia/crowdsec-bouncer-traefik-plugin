@@ -31,3 +31,10 @@ findings: none
 fixed: plugin.go copy-then-mutate; TestNew_DoesNotMutateCallerConfig
 skipped: none
 localTests: passed
+
+## codereview (2026-09-05)
+
+phase: codereview
+findings: Standards 1 hard Leave a trail
+fixed: TestNew_DoesNotMutateCallerConfig job comment
+skipped: none
