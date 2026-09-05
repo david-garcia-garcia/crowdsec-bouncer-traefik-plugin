@@ -54,5 +54,13 @@ fixed: none
 skipped: none
 head: d3c8fa0
 
+## archive (2026-09-05)
+
+phase: archive
+findings: none
+fixed: moved change to openspec/changes/archive/2026-09-05-simpleredis-detach
+skipped: none
+head: e573ddc
+
 
 
