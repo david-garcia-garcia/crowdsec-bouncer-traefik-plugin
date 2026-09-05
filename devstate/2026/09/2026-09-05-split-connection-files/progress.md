@@ -6,7 +6,7 @@ JobName: 2026-09-05-split-connection-files
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-05T16:25:32Z |
 | explore | [x] | [x] | 2026-09-05T16:27:07Z |
-| propose | [x] | [ ] | |
+| propose | [x] | [x] | 2026-09-05T16:30:01Z |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |

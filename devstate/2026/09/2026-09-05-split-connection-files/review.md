@@ -18,3 +18,13 @@ skipped: none
 assumed: DTO file placement; route/header constant placement
 head: c1996ac999e91a4a07e76281a04143dc97423ad0
 ci: in progress
+
+## propose (2026-09-05)
+phase: propose
+findings: none
+fixed: none
+skipped: none
+change: split-connection-files
+spec: core_plugin_connection_source-files (new)
+head: d946538b8648447eb6eb92485e0ae94a7ef33f14
+ci: in progress
