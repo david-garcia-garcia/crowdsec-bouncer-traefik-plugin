@@ -27,3 +27,27 @@ phase: implement
 findings: none
 fixed: delivery card now names upstream PR 273 and PR 333
 skipped: folder move and 333 coverage still uncommitted
+
+## codereview (2026-09-05)
+phase: codereview
+findings: runner duplicated waits; live cache not asserted; captcha accepted 429
+fixed: TestUtils reuse, Write-StepError, live immediate-allow, captcha HTML
+skipped: stream pre-interval allow (racy); research corpus; judgement dup BeforeAll
+
+## devdocsimpact (2026-09-05)
+phase: devdocsimpact
+findings: empty catalog; missing Real-stack e2e packet
+fixed: knowledge/devdocs/build_e2e_real.md plus indexes
+skipped: none
+
+## archive (2026-09-05)
+phase: archive
+findings: none
+fixed: specs folded new into openspec/specs; change moved to archive/2026-09-05-add-real-e2e
+skipped: none
+
+## pullrequest (2026-09-05)
+phase: pullrequest
+findings: none
+fixed: title ✅ test(e2e): add Pester real Traefik+Crowdsec suite; CI green
+skipped: none
