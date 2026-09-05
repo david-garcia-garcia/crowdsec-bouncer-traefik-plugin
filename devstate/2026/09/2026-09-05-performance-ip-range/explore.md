@@ -64,7 +64,7 @@ Measured this phase: `go test ./pkg/decisionscope ./pkg/iplookup` passed. O(n) w
   By: explore
 
 - Q: How do request-path reads see a rebuild?
-  Decision: assumed — build a new Helper pair from the blob, then store it with `atomic.Pointer`. Do not mutate a Helper in place (no delete API). A reader sees the previous complete pair or the new complete pair.
+  Decision: assumed — build a new Helper pair from the blob, then store it with `atomic.Value` (`*RangeMembership`). Do not mutate a Helper in place (no delete API). A reader sees the previous complete pair or the new complete pair. (`atomic.Pointer` would need generics Yaegi may not load.)
   By: explore
 
 - Q: What if Redis is unreachable during a follower hydrate?

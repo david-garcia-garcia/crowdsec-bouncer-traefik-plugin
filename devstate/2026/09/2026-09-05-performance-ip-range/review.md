@@ -11,3 +11,9 @@ phase: explore
 findings: none
 fixed: none
 skipped: CI not seen; ticket bench not re-run; assumed blob compare, RangeMembership arg, startStream hydrate, atomic swap, keep tree on Redis hydrate failure
+
+## propose (2026-09-05)
+phase: propose
+findings: none
+fixed: none
+skipped: CI not seen
