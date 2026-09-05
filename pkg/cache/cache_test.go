@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
-	simpleredis "github.com/maxlerebourg/simpleredis"
+	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis"
 )
 
 func Test_Get(t *testing.T) {
@@ -126,11 +126,11 @@ func Test_Delete(t *testing.T) {
 
 // indexOfReader returns the position of r inside rc.readers, or -1 when r is the writer (the no-readers fallback).
 func indexOfReader(rc *redisCache, r *simpleredis.SimpleRedis) int {
-	if r == &rc.writer {
+	if r == rc.writer {
 		return -1
 	}
 	for i := range rc.readers {
-		if r == &rc.readers[i] {
+		if r == rc.readers[i] {
 			return i
 		}
 	}
@@ -151,7 +151,11 @@ func Test_nextReader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rc := &redisCache{log: logger.New("INFO", "")}
-			rc.readers = make([]simpleredis.SimpleRedis, tt.readers)
+			rc.writer = &simpleredis.SimpleRedis{}
+			rc.readers = make([]*simpleredis.SimpleRedis, tt.readers)
+			for i := range rc.readers {
+				rc.readers[i] = &simpleredis.SimpleRedis{}
+			}
 			for call, want := range tt.want {
 				if got := indexOfReader(rc, rc.nextReader()); got != want {
 					t.Errorf("call %d: nextReader() -> reader[%d], want reader[%d]", call, got, want)

@@ -3,3 +3,5 @@
 ## ext
 - traefik
 - crowdsec
+- simpleredis
+- dragonfly

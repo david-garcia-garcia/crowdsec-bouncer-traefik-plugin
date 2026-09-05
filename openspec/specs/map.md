@@ -11,4 +11,11 @@ Allowlist of root + domain: `openspec/specs/domains.md`.
 
 ### e2e
 
+- mock
 - pester
+
+## core
+
+### cache
+
+- redis

@@ -39,5 +39,8 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 ## Gotchas
 
 - Compose bind-mounts the **repository root** into Traefik’s local plugin path (`../../..` from this folder).
+- Redis-cache cases need Dragonfly (`docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2`) on the compose network as `dragonfly:6379`.
+- Do not put a second Redis route under `PathPrefix(`/redis-cache`)` (for example `/redis-cache-hold`). Traefik can apply the short-TTL middleware to that path; the restart proof uses `/hold-redis`.
+- Redis cache keys are the client IP. A long-TTL restart case MUST use a different `X-Forwarded-For` than a short-TTL case, or a cache hit will keep the 2s key and never `SET EX 120`.
 - AppSec cases need Crowdsec `appsec-crs-inband` and `acquis.yaml` on 7422; first boot downloads CRS.
 - The test LAPI key `40796d93c2958f9e58345514e67740e5` is a fixture, not a production secret.
