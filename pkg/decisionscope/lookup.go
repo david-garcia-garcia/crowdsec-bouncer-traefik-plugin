@@ -54,16 +54,17 @@ func RequestScopeValues(headers map[string]string, req *http.Request) map[string
 }
 
 // LookupCachedRemediation merges Ip, Range, and present header-scope hits. Ban wins across those scopes.
-func LookupCachedRemediation(cacheClient *cache.Client, mode, remoteIP string, scopes map[string]string) (string, error) {
-	useRangeIndex := mode == configuration.StreamMode || mode == configuration.AloneMode
-	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, scopes, useRangeIndex))
+// Stream and alone Range hits come from membership, not from a range-index GetMany.
+func LookupCachedRemediation(cacheClient *cache.Client, mode, remoteIP string, scopes map[string]string, membership *RangeMembership) (string, error) {
+	useRangeMembership := mode == configuration.StreamMode || mode == configuration.AloneMode
+	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, scopes, false))
 	if err != nil {
 		return "", err
 	}
 	// Merge Ip, Range, and header hits so a Country ban beats a Range captcha.
 	chosen := found[remoteIP]
-	if useRangeIndex {
-		chosen = PreferRemediation(chosen, MatchRangeFromIndex(found[RangeIndexKey], remoteIP))
+	if useRangeMembership {
+		chosen = PreferRemediation(chosen, membership.Remediation(remoteIP))
 	}
 	for scope, identifier := range scopes {
 		if identifier == "" {
@@ -80,7 +81,7 @@ func LookupCachedRemediation(cacheClient *cache.Client, mode, remoteIP string, s
 	return "", errors.New(cache.CacheMiss)
 }
 
-// LookupCacheKeys is the GetMany key list: IP, optional range-index, then present header scopes.
+// LookupCacheKeys is the GetMany key list: IP, optional range-index (unused on the request path), then present header scopes.
 func LookupCacheKeys(remoteIP string, scopes map[string]string, useRangeIndex bool) []string {
 	keys := []string{remoteIP}
 	if useRangeIndex {
