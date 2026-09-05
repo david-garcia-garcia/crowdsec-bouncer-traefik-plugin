@@ -252,7 +252,7 @@ func GetTemplate(path string) (*template.Template, string, error) {
 
 // ValidateParams validate all the param gave by user.
 //
-//nolint:gocyclo,gocognit,nestif
+//nolint:gocyclo,gocognit,nestif,funlen
 func ValidateParams(config *Config, log *slog.Logger) error {
 	if err := validateParamsRequired(config); err != nil {
 		return err

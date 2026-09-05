@@ -100,7 +100,7 @@ func TestIPCacheKey(t *testing.T) {
 
 func TestRequestScopeValuesSkipsMissingHeader(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, "http://example.invalid/", nil)
-	req.Header.Set("CF-IPCountry", "fr")
+	req.Header.Set("Cf-Ipcountry", "fr")
 	got := RequestScopeValues(map[string]string{ScopeCountry: "CF-IPCountry", ScopeAS: "CF-ASN"}, req)
 	if got[ScopeCountry] != "FR" {
 		t.Fatalf("Country: %+v", got)
