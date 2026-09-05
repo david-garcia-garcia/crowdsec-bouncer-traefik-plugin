@@ -10,6 +10,8 @@ BeforeAll {
     $script:ApiKey = "40796d93c2958f9e58345514e67740e5"
     $script:RedisBannedIP = "172.19.0.30"
     $script:RedisCleanIP = "172.19.0.31"
+    # Hold route uses a different IP so it cannot inherit the 2s TTL key from the first test.
+    $script:RedisHoldIP = "172.19.0.32"
 
     $result = Wait-ForCondition -Description "CrowdSec LAPI to be ready" -TimeoutSeconds 60 -RetryIntervalSeconds 2 -Condition {
         Invoke-CrowdSecAPI -Endpoint "/v1/decisions?limit=1" -TimeoutSec 5 -ApiKey $script:ApiKey -CrowdSecApiUrl $script:CrowdSecApiUrl
@@ -47,12 +49,12 @@ Describe "CrowdSec Bouncer Dragonfly Redis cache" {
         }
 
         It "Should still block after Traefik restart when the ban lives in Dragonfly" {
-            Add-TestDecision -IP $script:RedisBannedIP -Type "ban"
+            Add-TestDecision -IP $script:RedisHoldIP -Type "ban"
 
-            $blocked = Test-HttpRequest -Endpoint "/hold-redis" -IP $script:RedisBannedIP -TraefikUrl $script:TraefikUrl
+            $blocked = Test-HttpRequest -Endpoint "/hold-redis" -IP $script:RedisHoldIP -TraefikUrl $script:TraefikUrl
             $blocked.StatusCode | Should -BeIn @(403, 429) -Because "first miss must query LAPI and cache the ban in Dragonfly"
 
-            Remove-TestDecision -IP $script:RedisBannedIP
+            Remove-TestDecision -IP $script:RedisHoldIP
 
             docker restart traefik-test
             if ($LASTEXITCODE -ne 0) {
@@ -73,7 +75,7 @@ Describe "CrowdSec Bouncer Dragonfly Redis cache" {
             }
 
             $stillBlocked = Wait-ForCondition -Description "Dragonfly-cached ban on /hold-redis after Traefik restart" -TimeoutSeconds 30 -RetryIntervalSeconds 1 -Condition {
-                $response = Test-HttpRequest -Endpoint "/hold-redis" -IP $script:RedisBannedIP -TraefikUrl $script:TraefikUrl
+                $response = Test-HttpRequest -Endpoint "/hold-redis" -IP $script:RedisHoldIP -TraefikUrl $script:TraefikUrl
                 return ($response.StatusCode -in @(403, 429))
             }
             $stillBlocked.Success | Should -Be $true -Because "in-memory cache would miss after restart; Dragonfly must still hold the ban"
