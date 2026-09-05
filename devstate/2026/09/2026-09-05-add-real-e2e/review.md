@@ -15,3 +15,9 @@ phase: propose
 findings: none
 fixed: OpenSpec add-real-e2e (two new specs); validate --strict passed
 skipped: product apply
+
+## implement (2026-09-05)
+phase: implement
+findings: Windows go test TempDir lock on bouncer.log after assertions passed
+fixed: Pester tests/*.Tests.ps1 + Test-Integration.ps1 in CI; Yaegi checkout path
+skipped: four-axis code review

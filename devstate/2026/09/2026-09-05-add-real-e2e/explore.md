@@ -25,27 +25,25 @@ IssueKey: 2026-09-05-add-real-e2e
 
 ## Decisions
 
-Port **upstream PR 333** (`feat/e2e-docker`, bash + Compose under `tests/e2e/scenarios/`) onto this `master`, not the closed Pester PR 273.
+Keep **mock e2e** (`tests/e2e/mock/`, bash, CI `e2e_mock`) and add the **Pester real-stack suite** from closed PR 273 as a **separate** suite. Do not land upstream PR 333’s bash `tests/e2e/scenarios/` — that is a third layout, not this ticket.
 
-Why: `master` already describes that layout (`make e2e`, `tests/e2e/scenarios`). In-tree mock e2e is bash. 273 is stale (Traefik v3.0.0, Pester on Ubuntu, old action majors). 333’s seven scenarios match the mock set except redis / tls-system-ca / scope-headers (those stay mock-only).
+Human (2026-09-05): Pester is a different e2e from master’s mock; use PowerShell like the original proposal; adjust CI so those tests run.
 
-Pin images to this tree’s examples, not 333’s older Traefik tag: `traefik:v3.7.11`, `crowdsecurity/crowdsec:v1.7.8`. Mock binary pin is already `v3.7.11` in `tests/e2e/mock/lib/common.sh`.
+Pin images to this tree’s examples: `traefik:v3.7.11`, `crowdsecurity/crowdsec:v1.7.8`. Replace 273’s `crowdseclapiurl` labels with `crowdseclapishost` (current plugin field; default is already `crowdsec:8080`).
 
-Run the Docker suite **in GitHub Actions on this fork** (`make e2e`) in addition to mock. Caller asked for a PR that passes CI and for the real tests to be reviewed. 333 left Docker local-only for upstream; this ticket is this repo.
+Run Pester in GitHub Actions on this fork in addition to mock. Keep `e2e_mock`. Do not change bouncer runtime Go.
 
-Keep mock CI. Do not delete `e2e_mock`. Do not port Pester. Do not change bouncer runtime Go.
-
-This `origin/master` has **no** `openspec/` tree. Propose bootstraps `openspec/specs/domains.md` and a new `build_e2e_*` spec. Knowledge/devdocs is also absent here; usage packet for the Docker harness is produced when the files exist.
+This `origin/master` has **no** `openspec/` tree. Propose bootstraps `openspec/specs/domains.md` and a `build_e2e_*` spec.
 
 ## Open questions
 
 - Q: Which implementation to land — Pester 273, bash 333, or a hybrid?
-  Decision: assumed — port bash Docker suite from `upstream/feat/e2e-docker` (PR 333) onto current `master`; do not port Pester 273.
-  By: explore
+  Decision: resolved — Pester + Docker Compose from PR 273 as a separate real-stack suite; keep mock e2e; do not land bash 333.
+  By: implement
 
 - Q: Should GitHub Actions in this repo run the Docker suite, or keep it local-only like 333?
-  Decision: assumed — run `make e2e` in CI on this fork (new or extended workflow) so the PR proves real-stack coverage; keep `make e2e_mock` as well.
-  By: explore
+  Decision: resolved — run `./Test-Integration.ps1` in CI on this fork; keep `make e2e_mock` as a separate job.
+  By: implement
 
 - Q: Which Traefik / Crowdsec image tags?
   Decision: assumed — `traefik:v3.7.11` and `crowdsecurity/crowdsec:v1.7.8` (this tree’s `docker-compose.yml` / examples), not 333’s `traefik:v3.7.1`.
