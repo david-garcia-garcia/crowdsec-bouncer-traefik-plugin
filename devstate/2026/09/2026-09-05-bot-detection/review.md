@@ -41,3 +41,9 @@ phase: archive
 findings: none
 fixed: catalog core_plugin_appsec_bot-detection; fold build_e2e_pester_crowdsec-stack; moved openspec/changes/archive/2026-09-05-appsec-bot-detection
 skipped: none
+
+## pullrequest (2026-09-05)
+phase: pullrequest
+findings: none
+fixed: WIP title dropped; CI green on b92c882 (Main + mock + Pester)
+skipped: none

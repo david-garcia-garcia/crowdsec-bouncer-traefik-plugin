@@ -11,4 +11,4 @@ JobName: 2026-09-05-bot-detection
 | codereview | [x] | [x] | 2026-09-05T12:45:16.8391787Z |
 | destocsimpact | [x] | [x] | 2026-09-05T12:47:06.0087622Z |
 | archive | [x] | [x] | 2026-09-05T12:50:06.9434526Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-05T13:03:08.5707607Z |
