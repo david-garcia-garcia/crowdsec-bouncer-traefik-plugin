@@ -14,3 +14,13 @@ description: How tests inject and clear remediations on a real Crowdsec LAPI.
 priority: normal
 local: ext_crowdsec_decisions_scopes/
 description: Official CrowdSec decision scope values a bouncer can receive and how each is matched.
+
+## AppSec protocol
+priority: normal
+local: ext_crowdsec_appsec_protocol/
+description: Official CrowdSec AppSec HTTP verdict codes a remediation component must honour.
+
+## Bouncer failure action
+priority: normal
+local: ext_crowdsec_bouncers_failure-action/
+description: How CrowdSec bouncers behave when LAPI or AppSec is down, times out, or returns 500.
