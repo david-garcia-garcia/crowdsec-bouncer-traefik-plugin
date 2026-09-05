@@ -25,6 +25,7 @@ type identity struct {
 	UpdateIntervalSeconds         int64    `json:"updateIntervalSeconds"`
 	MetricsUpdateIntervalSeconds  int64    `json:"metricsUpdateIntervalSeconds"`
 	UpdateMaxFailure              int64    `json:"updateMaxFailure"`
+	LapiFailureAction             string   `json:"lapiFailureAction"`
 	StreamStartupBlock            bool     `json:"streamStartupBlock"`
 	DefaultDecisionSeconds        int64    `json:"defaultDecisionSeconds"`
 	HTTPTimeoutSeconds            int64    `json:"httpTimeoutSeconds"`
@@ -61,6 +62,7 @@ func identityFrom(cfg *configuration.Config) identity {
 		UpdateIntervalSeconds:         cfg.UpdateIntervalSeconds,
 		MetricsUpdateIntervalSeconds:  cfg.MetricsUpdateIntervalSeconds,
 		UpdateMaxFailure:              cfg.UpdateMaxFailure,
+		LapiFailureAction:             configuration.EffectiveFailureAction(cfg.CrowdsecLapiFailureAction),
 		StreamStartupBlock:            cfg.StreamStartupBlock,
 		DefaultDecisionSeconds:        cfg.DefaultDecisionSeconds,
 		HTTPTimeoutSeconds:            cfg.HTTPTimeoutSeconds,
