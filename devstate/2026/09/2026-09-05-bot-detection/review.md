@@ -11,3 +11,9 @@ phase: explore
 findings: none
 fixed: none
 skipped: live CrowdSec 1.8 reproduce (no lab). Research packet still in flight.
+
+## propose (2026-09-05)
+phase: propose
+findings: none
+fixed: none
+skipped: none. Change appsec-bot-detection validated.
