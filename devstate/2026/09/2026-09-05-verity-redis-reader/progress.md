@@ -6,7 +6,7 @@ JobName: 2026-09-05-verity-redis-reader
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-05T12:10:31Z |
 | explore | [x] | [x] | 2026-09-05T12:12:52Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
