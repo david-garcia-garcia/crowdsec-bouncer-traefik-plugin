@@ -38,3 +38,16 @@ phase: codereview
 findings: Standards 1 hard Leave a trail
 fixed: TestNew_DoesNotMutateCallerConfig job comment
 skipped: none
+
+## devdocsimpact (2026-09-05)
+
+phase: devdocsimpact
+findings: language-gap Prepared snapshot
+skipped: none
+
+## archive (2026-09-05)
+
+phase: archive
+findings: none
+fixed: folded into core_plugin_middleware_instance-reclaim; moved to archive/2026-09-05-config-prepare-snapshot
+skipped: none
