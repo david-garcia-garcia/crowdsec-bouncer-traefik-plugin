@@ -51,3 +51,11 @@ phase: archive
 findings: none
 fixed: folded into core_plugin_middleware_instance-reclaim; moved to archive/2026-09-05-config-prepare-snapshot
 skipped: none
+
+## pullrequest (2026-09-05)
+
+phase: pullrequest
+findings: none
+fixed: WIP dropped; title ♻️ refactor(plugin): copy Traefik Config before Prepare mutates it
+skipped: none
+CI: success

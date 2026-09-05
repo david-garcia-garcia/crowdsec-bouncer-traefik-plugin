@@ -37,16 +37,16 @@ Reclaim still keys on `IdentityHex` of connection fields. Client address stays `
   By: explore
 
 - Q: Where does the copy live — Prepare return vs plugin.go before mutate?
-  Decision: assumed — copy at the start of `plugin.go` `New` (`prepared := *config`), then existing Prepare/Key/New/Bouncer calls take `&prepared`. Prepare signature stays `Prepare(cfg *Config, log) error` mutating cfg. Moving copy into Prepare would still leave plugin.go alias/ToUpper writes on Traefik’s pointer unless those move too; one copy at the constructor is smaller.
-  By: explore
+  Decision: resolved — copy at the start of `plugin.go` `New` (`prepared := *config`), then existing Prepare/Key/New/Bouncer calls take `&prepared`.
+  By: implement
 
 - Q: Shallow vs deep copy of slice/map fields?
-  Decision: assumed — shallow (`*cfg`). This ticket does not write those fields; DecisionScopeHeaders identity is a sibling.
-  By: explore
+  Decision: resolved — shallow (`*cfg`). This ticket does not write those fields; DecisionScopeHeaders identity is a sibling.
+  By: implement
 
 - Q: Do captcha key writes in `bouncer.New` move into Prepare?
-  Decision: assumed — no. Pass the snapshot into `bouncer.New`; those writes stay on the snapshot. Bound the ask: do not fold captcha loading into Prepare.
-  By: explore
+  Decision: resolved — no. Pass the snapshot into `bouncer.New`; those writes stay on the snapshot.
+  By: implement
 
 - Q: Who owns reclaim identity (connection hash) vs Traefik’s Config DTO vs client address?
   Decision: resolved — `IdentityHex` on the prepared snapshot owns the reclaim key. Traefik/Yaegi owns the CreateConfig pointer (do not mutate it). Client address stays `pkg/ip.GetRemoteIP`. Do not put DecisionScopeHeaders in identity (sibling).
