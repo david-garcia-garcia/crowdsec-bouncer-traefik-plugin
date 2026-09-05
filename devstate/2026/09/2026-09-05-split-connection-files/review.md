@@ -28,3 +28,12 @@ change: split-connection-files
 spec: core_plugin_connection_source-files (new)
 head: d946538b8648447eb6eb92485e0ae94a7ef33f14
 ci: in progress
+
+## implement (2026-09-05)
+phase: implement
+findings: none
+fixed: split connection.go into five job files
+skipped: root plugin logging tests failed TempDir cleanup on Windows (assertions passed)
+localTests: passed (pkg/crowdsecconnection, pkg/bouncer)
+head: 7d82094471c8fa2b28c132f0eda6524d6c70333a
+ci: Main Process success; e2e in progress
