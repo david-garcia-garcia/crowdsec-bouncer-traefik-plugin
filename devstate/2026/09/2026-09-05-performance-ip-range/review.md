@@ -23,3 +23,9 @@ phase: implement
 findings: none
 fixed: in-process RangeMembership on CrowdsecConnection; request path no longer MGETs range-index
 skipped: E2E still in progress on fdc2e4e; Windows logging TempDir cleanup flake
+
+## codereview (2026-09-05)
+phase: codereview
+findings: Standards 1 hard (LookupCacheKeys useRangeIndex), Standards 2 judgement (shared blob loop)
+fixed: dropped useRangeIndex from LookupCacheKeys
+skipped: extract shared blob-line iteration; CI in progress on e033765
