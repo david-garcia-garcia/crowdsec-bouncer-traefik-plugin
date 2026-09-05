@@ -11,5 +11,5 @@ localTests: none
 requirement: requirement.md
 comments: none
 explore: explore.md
-change: none
+change: add-real-e2e
 pr: { id: 4, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/4 }

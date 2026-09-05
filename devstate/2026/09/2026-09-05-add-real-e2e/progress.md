@@ -6,7 +6,7 @@ JobName: 2026-09-05-add-real-e2e
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-05T05:48:39.5157319Z |
 | explore | [x] | [x] | 2026-09-05T05:53:08.4626156Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [x] | 2026-09-05T05:56:21.3177264Z |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
