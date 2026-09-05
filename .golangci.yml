@@ -34,14 +34,14 @@ linters-settings:
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis
           - github.com/leprosus/golang-ttl-map
-          - github.com/maxlerebourg/simpleredis
       Test:
         files:
           - $test
         allow:
           - $gostd
-          - github.com/maxlerebourg/simpleredis
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
@@ -80,6 +80,8 @@ issues:
   max-same-issues: 0
   exclude:
     - "G402: TLS InsecureSkipVerify may be true."
+  exclude-files:
+    - pkg/simpleredis/
   exclude-rules:
     - path: (.+)_test.go
       linters:
