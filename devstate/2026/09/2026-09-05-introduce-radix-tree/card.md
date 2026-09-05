@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-05T12:36:59.102Z
+Developer review: in progress — 2026-09-05T12:40:25.832Z
 
 ## What this changes
 **Operators.** None.
 
 **Admin users.** None.
 
-**Developers.** Research packet `knowledge/research/ext_traefik-geoblock_iplookup/` records the traefik-geoblock radix helper this change will copy. `pkg/ip.Checker` is still the linear CIDR scan. Explore decided: in-tree `pkg/iplookup.Helper`, Checker only, Range unchanged.
+**Developers.** OpenSpec change `trusted-ip-radix-lookup` and spec `core_plugin_ip_radix-lookup` are on the branch. Product Checker is still the linear scan until implement. Usage packet `knowledge/devdocs/core_plugin_ip.md` describes the intended Helper/Checker split.
 
 **End users.** None.
 
@@ -13,16 +13,16 @@ Developer review: in progress — 2026-09-05T12:36:59.102Z
 Trusted-IP and CIDR membership still walk every entry on each request. Large `ForwardedHeadersTrustedIPs` / `ClientTrustedIPs` lists stay O(n) with no tree in this module. Range remediation is the same linear walk; this ticket does not change that path.
 
 ## Merge readiness
-Explore written; propose has not started. 6 items remain.
+Propose is apply-ready; implement has not started. 5 items remain.
 
 Priority: P3 — internal lookup speed; membership results are already correct
-Reviewed head: e889397
+Reviewed head: 9d95fa3
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Stub PR open; no apply yet; CI not seen |
+| Overall readiness | 1/6 | Specs written; no apply yet; CI not seen |
 | CI proof | 1/6 | Pushed; checks not seen |
 | Local tests proof | N/A | Before implement |
 | Review resolution | 6/6 | No PR comments |
@@ -31,7 +31,7 @@ Owner decision: Required. See Decision needed.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-05-introduce-radix-tree pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | trusted-ip-radix-lookup | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/13 | pr-host List |
 | CI | not seen | pr-host CI |
 | Local tests | none | handoff.yaml localTests |
@@ -40,13 +40,13 @@ Owner decision: Required. See Decision needed.
 | Performance | None. | no codereview.md |
 
 ## Specs
-None.
+- [core_plugin_ip_radix-lookup](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-05-introduce-radix-tree/openspec/changes/trusted-ip-radix-lookup/proposal.md) — added
 
 ## Follow-up issues
 - [ ] [note] [large] Range remediation still linear (`pkg/decisionscope.MatchRangeFromIndex`) → future radix that can store remediation per CIDR — this ticket forbids Range wiring. Geoblock helper is membership-only.
 
 ## How this fits together
-Local ticket 2026-09-05-introduce-radix-tree, branch of the same name, stub PR 13 into master. Explore is written; next is propose.
+Local ticket 2026-09-05-introduce-radix-tree, PR 13 into master, change `trusted-ip-radix-lookup`. Next is implement.
 
 ## Decision needed
 | Question | Decision | By |
@@ -75,26 +75,25 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as Specs |
+| Specs in this PR | 1 added / 0 modified | Same list as Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | e8893973e0bd3c437098df3e0e08bc3d333f63ff | Card must match the branch you measured |
+| Reviewed head | 9d95fa39ee2bdc05b33c66ee40562f6ed1d0cc30 | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: Copy geoblock bit-walk into `pkg/iplookup` and point Checker at it, versus master still scanning slices.
+Best possible solution: In-tree `pkg/iplookup.Helper` wired only into Checker, versus master slice scan.
 
-Do we have a high-confidence way to reproduce? Yes, `go test ./pkg/ip/` passed; Checker has no tests and `ContainsIP` is two loops.
+Do we have a high-confidence way to reproduce? Yes, `ContainsIP` loops in `pkg/ip/ip.go`.
 
-Is this the best way to solve the issue? Yes versus master — in-tree helper, no new module, Range left linear as required.
+Is this the best way to solve the issue? Yes versus master — copy geoblock bit-walk, no new module, Range left linear.
 
 ### Evidence
 What I checked:
-- `go test ./pkg/ip/ -count=1` passed
-- `openspec list --json` empty active changes
-- Research notes `ext_traefik-geoblock_iplookup`
-- `core_plugin_decisionscope.md` Avoid radix for Range index
+- `openspec validate trusted-ip-radix-lookup --type change --strict` passed
+- `validate-artifact-names.mjs` OK
+- FindSpecHost new `core_plugin_ip_radix-lookup`
 
 ### Rank-up moves
 None.

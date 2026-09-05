@@ -6,7 +6,7 @@ JobName: 2026-09-05-introduce-radix-tree
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-05T12:35:30.549Z |
 | explore | [x] | [x] | 2026-09-05T12:37:55.704Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [x] | 2026-09-05T12:41:34.629Z |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
