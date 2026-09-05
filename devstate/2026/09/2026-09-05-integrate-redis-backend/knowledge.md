@@ -5,3 +5,8 @@
 - created knowledge/research/index_ext_dragonfly.md
 - updated knowledge/research/index.md
 - updated knowledge/research/domains.md
+- created knowledge/devdocs/core_cache_redis.md
+- created knowledge/devdocs/index_core_cache.md
+- updated knowledge/devdocs/index.md
+- updated knowledge/devdocs/domains.md
+- updated knowledge/devdocs/build_e2e_real.md

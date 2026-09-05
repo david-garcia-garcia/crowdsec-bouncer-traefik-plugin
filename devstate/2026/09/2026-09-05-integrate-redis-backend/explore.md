@@ -41,36 +41,36 @@ Add Dragonfly to `tests/e2e/real/docker-compose.test.yml` and a live-mode route 
 
 - Q: Where does the in-tree client live?
   Decision: assumed — `pkg/simpleredis`, same layout as `pkg/cache`. Import path is this module plus `/pkg/simpleredis`.
-  By: explore
+  By: implement
 
 - Q: Copy sources vs `replace` to the PR branch?
   Decision: assumed — copy PR #8 sources into the module. Ticket asked for a package in this project; Yaegi/localPlugins cannot fetch an untagged GitHub branch.
-  By: explore
+  By: implement
 
 - Q: Must `pkg/cache` call `MGet` now?
   Decision: assumed — no. Ship `MGet` on the package. Cache stays `Get`/`Set`/`Del` until a later change needs multi-key reads.
-  By: explore
+  By: implement
 
 - Q: How to stop copying `SimpleRedis` by value?
   Decision: assumed — `writer *simpleredis.SimpleRedis` and `readers []*simpleredis.SimpleRedis`. `nextReader` already returns a pointer.
-  By: explore
+  By: implement
 
 - Q: Dragonfly image and tag for real-stack e2e?
   Decision: assumed — `docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2` (latest GitHub release 2026-09-03; official registry from [Install with Docker](https://www.dragonflydb.io/docs/getting-started/docker)). Port 6379. `ulimits.memlock: -1`. No password unless the suite needs AUTH.
-  By: explore
+  By: implement
 
 - Q: What does “functional redis backend” e2e assert?
   Decision: assumed — a live-mode (or stream) whoami route with `redisCacheEnabled` + `redisCacheHost=dragonfly:6379`. Prove: cache miss then LAPI allow; cached allow until TTL; ban then block after TTL; Traefik restart still sees the Dragonfly-held value (in-memory map would miss). Client identity only via `X-Forwarded-For`.
-  By: explore
+  By: implement
 
 - Q: Must mock e2e Redis keep passing after RESP?
   Decision: assumed — yes. CI `make e2e_mock` includes `tests/e2e/mock/scenarios/redis`. Update `serveRedis` to parse RESP arrays (still accept inline).
-  By: explore
+  By: implement
 
 - Q: Who already owns the client address the bouncer remediates in these tests?
   Decision: assumed — Traefik `forwardedHeaders` plus plugin `forwardedHeadersTrustedIps`. Cache key is that IP. Do not parse `RemoteAddr` in the harness.
-  By: explore
+  By: implement
 
 - Q: Pin Dragonfly in operator examples (`examples/redis-cache/`)?
   Decision: assumed — no. Ticket is e2e coverage, not example rewrite.
-  By: explore
+  By: implement
