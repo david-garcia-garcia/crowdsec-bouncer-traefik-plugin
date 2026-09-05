@@ -285,6 +285,49 @@ services:
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
+  # Range + header-mapped scopes in none mode (live LAPI ?ip= / ?scope=&value=)
+  scope-none:
+    image: traefik/whoami
+    container_name: "scope-none-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.scope-none.rule=PathPrefix(`/scope-none`)"
+      - "traefik.http.routers.scope-none.entrypoints=web"
+      - "traefik.http.routers.scope-none.middlewares=bouncer-scope-none@docker"
+      - "traefik.http.services.scope-none.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.bouncer-scope-none.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-scope-none.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-scope-none.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-scope-none.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-scope-none.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-scope-none.plugin.bouncer.crowdsecmode=none"
+      - "traefik.http.middlewares.bouncer-scope-none.plugin.bouncer.decisionScopeHeaders.Country=CF-IPCountry"
+      - "traefik.http.middlewares.bouncer-scope-none.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-scope-none.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+  # Range + header-mapped scopes in stream mode (range-index + stream scopes=)
+  scope-stream:
+    image: traefik/whoami
+    container_name: "scope-stream-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.scope-stream.rule=PathPrefix(`/scope-stream`)"
+      - "traefik.http.routers.scope-stream.entrypoints=web"
+      - "traefik.http.routers.scope-stream.middlewares=bouncer-scope-stream@docker"
+      - "traefik.http.services.scope-stream.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.bouncer-scope-stream.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-scope-stream.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-scope-stream.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-scope-stream.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-scope-stream.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-scope-stream.plugin.bouncer.updateintervalseconds=5"
+      - "traefik.http.middlewares.bouncer-scope-stream.plugin.bouncer.crowdsecmode=stream"
+      - "traefik.http.middlewares.bouncer-scope-stream.plugin.bouncer.decisionScopeHeaders.Country=CF-IPCountry"
+      - "traefik.http.middlewares.bouncer-scope-stream.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-scope-stream.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
   # Real AppSec CRS inband (PR 333), not the mock rpc2 stand-in
   appsec:
     image: traefik/whoami
