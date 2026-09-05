@@ -47,6 +47,7 @@ type identity struct {
 	LapiTLSCertificateBouncer     string   `json:"lapiTlsCert"`
 }
 
+// identityFrom maps configuration.Config into reclaim identity fields.
 func identityFrom(cfg *configuration.Config) identity {
 	return identity{
 		Mode:                          cfg.CrowdsecMode,

@@ -4,13 +4,13 @@ name: Release (2/2) Publish
 # Release (1/2) Prepare.
 #
 # Triggered by the release PR landing on main. The tag is created on that
-# commit, so version.go inside the released source always matches the tag —
+# commit, so pkg/crowdsecconnection/version.go inside the released source always matches the tag —
 # no post-release patching, no force-moved tags.
 
 on:
   push:
     branches: [main]
-    paths: ["version.go"]
+    paths: ["pkg/crowdsecconnection/version.go"]
 
 permissions:
   contents: write
@@ -29,10 +29,10 @@ jobs:
         id: resolve
         run: |
           version="$(git log -1 --format='%B' | grep -oP '🔖 release \Kv[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?' || true)"
-          [ -z "$version" ] && { echo "version.go changed outside a release commit, nothing to do"; echo "release=false" >> "$GITHUB_OUTPUT"; exit 0; }
+          [ -z "$version" ] && { echo "pkg/crowdsecconnection/version.go changed outside a release commit, nothing to do"; echo "release=false" >> "$GITHUB_OUTPUT"; exit 0; }
 
-          in_source="$(sed -n 's/.*pluginVersion = "\([^"]*\)".*/\1/p' version.go)"
-          [ "$in_source" != "$version" ] && { echo "::error::commit says $version but version.go reads $in_source"; exit 1; }
+          in_source="$(sed -n 's/.*Version = "\([^"]*\)".*/\1/p' pkg/crowdsecconnection/version.go)"
+          [ "$in_source" != "$version" ] && { echo "::error::commit says $version but pkg/crowdsecconnection/version.go reads $in_source"; exit 1; }
           git rev-parse -q --verify "refs/tags/$version" >/dev/null && { echo "::error::tag $version already exists"; exit 1; }
 
           echo "release=true" >> "$GITHUB_OUTPUT"

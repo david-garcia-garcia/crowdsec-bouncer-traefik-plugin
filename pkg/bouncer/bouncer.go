@@ -39,7 +39,7 @@ type Bouncer struct {
 	conn                      *crowdsecconnection.CrowdsecConnection
 }
 
-// New returns a per-router handler bound to conn (ForRoute).
+// New returns a per-router handler bound to conn.
 func New(next http.Handler, name string, config *configuration.Config, conn *crowdsecconnection.CrowdsecConnection, log *slog.Logger) (http.Handler, error) {
 	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(log, config.ClientTrustedIPs)
@@ -50,7 +50,7 @@ func New(next http.Handler, name string, config *configuration.Config, conn *cro
 		banTemplate, banTemplateContentType, _ = configuration.GetTemplate(config.BanFilePath)
 	}
 
-	b := &Bouncer{
+	routeHandler := &Bouncer{
 		next:                      next,
 		name:                      name,
 		template:                  template.New("CrowdsecBouncer").Delims("[[", "]]"),
@@ -72,12 +72,12 @@ func New(next http.Handler, name string, config *configuration.Config, conn *cro
 		captchaClient:             &captcha.Client{},
 	}
 	if config.CrowdsecMode == configuration.AppsecMode {
-		b.log.Debug("Bouncer initialized name:" + name)
-		return b, nil
+		routeHandler.log.Debug("Bouncer initialized name:" + name)
+		return routeHandler, nil
 	}
 	config.CaptchaSiteKey, _ = configuration.GetVariable(config, "CaptchaSiteKey")
 	config.CaptchaSecretKey, _ = configuration.GetVariable(config, "CaptchaSecretKey")
-	err := b.captchaClient.New(
+	err := routeHandler.captchaClient.New(
 		log,
 		conn.Cache(),
 		&http.Client{
@@ -99,8 +99,8 @@ func New(next http.Handler, name string, config *configuration.Config, conn *cro
 		log.Error("CaptchaClient not valid " + err.Error())
 		return nil, err
 	}
-	b.log.Debug("Bouncer initialized name:" + name)
-	return b, nil
+	routeHandler.log.Debug("Bouncer initialized name:" + name)
+	return routeHandler, nil
 }
 
 // Connection is the reclaimed CrowdsecConnection this route uses.
@@ -113,7 +113,7 @@ func (b *Bouncer) SameConnection(other *Bouncer) bool {
 	return other != nil && b.conn == other.conn
 }
 
-// ServeHTTP principal function of plugin.
+// ServeHTTP is the per-router middleware handler.
 //
 //nolint:nestif
 func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -181,12 +181,12 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	} else {
 		value, err := b.conn.LiveLookup(remoteIP)
 		if err != nil {
-			b.log.Debug("handleNoStreamCache:crowdsecQuery " + err.Error())
+			b.log.Debug("ServeHTTP:LiveLookup " + err.Error())
 		}
 		if value == cache.NoBannedValue {
 			b.handleNextServeHTTP(rw, req, remoteIP)
 		} else {
-			b.log.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s isBanned:%v %s", remoteIP, value, err.Error()))
+			b.log.Debug(fmt.Sprintf("ServeHTTP:LiveLookup ip:%s isBanned:%v %s", remoteIP, value, err.Error()))
 			b.handleRemediationServeHTTP(rw, req, remoteIP, value)
 		}
 	}

@@ -39,9 +39,6 @@ const (
 	cacheTimeoutKey          = "updated"
 )
 
-// Version is what the plugin reports to the Crowdsec LAPI.
-const Version = "v1.7.1"
-
 // Decision is the body returned from Crowdsec LAPI.
 type Decision struct {
 	ID        int    `json:"id"`
@@ -139,7 +136,7 @@ func Prepare(cfg *configuration.Config, log *slog.Logger) error {
 		}
 		apiAppsecKey, errAppsecKey := configuration.GetVariable(cfg, "CrowdsecAppsecKey")
 		if errAppsecKey != nil {
-			log.Info("Prepare:crowdsecLapiKey fail to get CrowdsecAppsecKey and no client certificate setup " + errAppsecKey.Error())
+			log.Info("Prepare:crowdsecAppsecKey fail to get CrowdsecAppsecKey and no client certificate setup " + errAppsecKey.Error())
 		} else {
 			cfg.CrowdsecAppsecKey = apiAppsecKey
 		}
@@ -252,13 +249,14 @@ func New(config *configuration.Config, log *slog.Logger) (*CrowdsecConnection, e
 	return conn, nil
 }
 
+// startStream starts the stream ticker and initial poll for stream and alone modes.
 func (c *CrowdsecConnection) startStream(config *configuration.Config, log *slog.Logger) error {
 	if config.CrowdsecMode != configuration.StreamMode && config.CrowdsecMode != configuration.AloneMode {
 		return nil
 	}
 	if config.CrowdsecMode == configuration.AloneMode {
 		if err := c.getToken(); err != nil {
-			c.log.Error("New:getToken " + err.Error())
+			c.log.Error("startStream:getToken " + err.Error())
 			return err
 		}
 	}
@@ -430,7 +428,7 @@ func (c *CrowdsecConnection) handleNoStreamCache(remoteIP string) (string, error
 	case "captcha":
 		value = cache.CaptchaValue
 	default:
-		c.log.Info("handleStreamCache:unknownType " + decision.Type)
+		c.log.Info("handleNoStreamCache:unknownType " + decision.Type)
 	}
 	if isLiveMode && c.defaultDecisionTimeout > 0 {
 		durationSecond := int64(duration.Seconds())

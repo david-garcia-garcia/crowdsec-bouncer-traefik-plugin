@@ -27,6 +27,7 @@ const (
 	CacheUnreachable = "cache:unreachable"
 )
 
+// localCache is the per-Client in-memory TTL store.
 type localCache struct {
 	store *ttl_map.Heap
 }
