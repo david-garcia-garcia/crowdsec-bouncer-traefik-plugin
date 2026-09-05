@@ -5,7 +5,7 @@ JobName: 2026-09-05-add-real-e2e
 | Phase | Work | Card | At |
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-05T05:48:39.5157319Z |
-| explore | [ ] | [ ] | |
+| explore | [x] | [x] | 2026-09-05T05:53:08.4626156Z |
 | propose | [ ] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
