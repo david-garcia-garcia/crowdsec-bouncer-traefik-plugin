@@ -4,63 +4,59 @@ IssueKey: 2026-09-05-core-plugin-lifetime-refactor
 ## Concepts
 
 **Plugin (Yaegi package)**:
-The Go package Traefik evals for `CreateConfig` and `New`. Today that is root `crowdsec_bouncer_traefik_plugin` (`bouncer.go`). Traefik looks those two names up on `basePkg` after `import` of `.traefik.yml` `import`. It does not require a type named `Config` for middleware. Subpackages are GOPATH-loadable; they cannot replace the root constructor.
+The Go package Traefik evals for `CreateConfig` and `New`. Today that is root `crowdsec_bouncer_traefik_plugin` (`bouncer.go`). Traefik looks those two names up on `basePkg` after `import` of `.traefik.yml` `import`. Subpackages cannot replace the root constructor.
 Owner: `knowledge/research/ext_traefik_plugins_yaegi-constructor/notes.md`.
 
+**Reclaim table**:
+A process-wide keyed store of `any` plus holder contexts. First `Open` for a key runs `create`. Later `Open` with a live context binds another holder. When every holder’s context is Done, grace starts (`DefaultGrace` 10s). An `Open` in that window is a reclaim (same incarnation, no `create`). If grace elapses, the table cancels the incarnation lifetime and calls `Close()` if the value has it. `ctx` is Traefik’s `New` context (`WithCancel`); the next dynamic config cancels it ~1 ms before the next `New`. Not `req.Context()`, not `context.Background()` as the production holder (Background is accepted in tests).
+Owner (sister): `D:\repositories\traefik-geoblock\pkg\reclaim\table.go`, `knowledge/devdocs/std_go_reclaim.md`; WAF `D:\repositories\traefik-modsecurity\modsecurity.go` `bindPlugin`, `knowledge/devdocs/core_plugin_reclaim.md`.
+_Avoid_: `sync.Once` that never disposes; package globals; ignoring Traefik `New` ctx (`bouncer.go` today: `New(_ context.Context, …)`).
+
 **CrowdsecConnection**:
-The process instance that talks to Crowdsec (LAPI/CAPI), owns the decision cache client, stream ticker, stream health, metrics ticker, and the HTTP clients used for those jobs. Not an HTTP handler. Not created per router.
+The reclaim *value* for one Crowdsec LAPI/CAPI identity. Owns cache client, stream ticker, stream health, metrics ticker, LAPI/CAPI HTTP, AppSec HTTP client. Implements `Close()` to stop tickers and drop idle connections. Not an `http.Handler`. Not created per router. Mapped to geoblock/modsecurity **Plugin** (shared core).
 
 **Bouncer**:
-The per-router `http.Handler` Traefik gets back from `New`. It decides what happens on one incoming request (trusted IP, remediation, captcha page, ban template, whether to call AppSec on pass). It does not start tickers.
+The per-router `http.Handler` Traefik gets back from `New`. Holds `next` plus per-route request policy (trusted IPs, ban/captcha, Enabled, whether to call AppSec on pass) and a pointer to the reclaimed Connection. Mapped to geoblock/modsecurity **Route** / `ForRoute(next)`. Cannot be the reclaim value (`next` is per router).
 
 **Client address**:
-Already owned by `pkg/ip.GetRemoteIP` (forwarded header + trusted proxy checker). The Bouncer calls that owner and passes the IP string into the Connection. The Connection does not parse `RemoteAddr`.
+Already owned by `pkg/ip.GetRemoteIP`. Bouncer calls that; Connection receives the IP string.
 
 ## Decisions
 
-Recommended layout (no code in this phase):
+Copy `pkg/reclaim` from geoblock (stdlib table, non-generic `any`, Yaegi-safe `create func() (any, error)`). Do not rewrite it. Do not use `Table[*T]` from another package (Yaegi panics).
+
+Root `New` must **use** Traefik `ctx` (stop discarding it):
 
 ```
-github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
-│
-├─ plugin.go                 package crowdsec_bouncer_traefik_plugin
-│                            CreateConfig, New only
-│                            New → CrowdsecConnection.Shared(config)
-│                                → bouncer.New(next, name, routeCfg, conn)
-│
-├─ version.go                stay at root (metrics pluginVersion) or move with Connection
-│
-├─ pkg/crowdsecconnection/   type CrowdsecConnection
-│                            cache client, LAPI/CAPI HTTP, stream ticker,
-│                            stream health, metrics, AppSec HTTP client
-│
-├─ pkg/bouncer/              type Bouncer (http.Handler)
-│                            next, trusted IPs, ban/captcha, route flags
-│                            holds *CrowdsecConnection
-│
-└─ pkg/cache, captcha, configuration, ip, logger   unchanged jobs
+New(ctx, next, config, name)
+  Prepare/validate config
+  logger := …
+  stored, err := reclaim.Open(ctx, connectionKey(config), logger, func() (any, error) {
+      return newCrowdsecConnection(config, logger)
+  })
+  conn := stored.(*CrowdsecConnection)
+  return bouncer.New(next, name, routeCfg, conn)   // ForRoute
 ```
 
-Request path after the split:
-
 ```
-Traefik router build
-        │  New(ctx, next, config, name)   // once per router handler, not per request
+Traefik dynamic config
+        │  cancels previous New ctx (~1 ms), then New again
         ▼
-┌───────────────────┐     Shared/sync.Once (first New wins)
-│ Plugin (root pkg) │──────────────────────────────┐
-└─────────┬─────────┘                              ▼
-          │                              ┌─────────────────────┐
-          │                              │ CrowdsecConnection  │
-          │                              │ cache, stream ticker│
-          │                              │ LAPI/CAPI, metrics  │
-          │                              └──────────▲──────────┘
-          ▼                                         │ Lookup(ip) / LiveQuery / Healthy
-┌───────────────────┐                               │
-│ Bouncer (route)   │───────────────────────────────┘
+┌───────────────────┐
+│ plugin.go         │  reclaim.Open(ctx, key, logger, create)
+│ CreateConfig, New │
+└─────────┬─────────┘
+          │ bind / reclaim / create
+          ▼
+┌─────────────────────┐     last holder Done → orphan → grace 10s
+│ CrowdsecConnection  │     Open in grace → reclaim (no create)
+│ cache, stream ticker│     grace elapsed → Close() (stop tickers)
+│ LAPI/CAPI, metrics  │
+└──────────▲──────────┘
+           │ Lookup / LiveQuery / Healthy
+┌───────────────────┐
+│ Bouncer (route)   │  new each New; holds this next
 │ ServeHTTP         │
-│ GetRemoteIP       │
-│ captcha / ban     │
 └───────────────────┘
 ```
 
@@ -68,77 +64,84 @@ Current vs desired ownership:
 
 | Job | Today | After |
 | --- | --- | --- |
-| Yaegi `CreateConfig`/`New` | `bouncer.go` mixed with everything | root `plugin.go` only |
-| Stream ticker / health / `updateFailure` | package globals in `bouncer.go` 65–73, started at `New` 302–317 | fields on `CrowdsecConnection` |
-| In-memory/redis cache client | each `Bouncer` has a `cache.Client` wrapping process `ttl_map` (`pkg/cache/cache.go` 31) | Connection holds the client; Bouncer does not construct cache |
-| LAPI/CAPI HTTP | new `http.Client` per `New` (`bouncer.go` 244–252) | one client on Connection |
-| AppSec HTTP | new client per `New`; host listed as first-wins in comment 47–62 | Connection owns client+host; Bouncer calls it when that route has AppSec enabled |
-| Captcha challenge | `captcha.Client` on `Bouncer` | stays on Bouncer (request UX); grace/cache keys via Connection cache |
-| Trusted IPs, ban template, remediation headers | `Bouncer` | `Bouncer` |
-| `blockedRequests` / metrics push | globals + `reportMetrics(bouncer)` | Connection (`RecordDropped` from Bouncer) |
-| Client IP | `ip.GetRemoteIP` from Bouncer | unchanged owner |
+| Yaegi `CreateConfig`/`New` | `bouncer.go`; **`ctx` ignored** | root `plugin.go`; `ctx` is reclaim holder |
+| Stream ticker / health | package globals; never stopped | Connection fields; `Close()` stops them |
+| Cache client | each Bouncer wraps process `ttl_map` | Connection holds the client |
+| LAPI/CAPI HTTP | new `http.Client` per `New` | one client on that Connection incarnation |
+| AppSec HTTP | new client per `New`; host first-wins | Connection owns client+host; Bouncer calls on pass when enabled |
+| Captcha | on `Bouncer` | stays on Bouncer; cache via Connection |
+| Ban template, trusted IPs, `next` | `Bouncer` | `Bouncer` (not in Connection key) |
+| Metrics / dropped count | globals | Connection; `Close` ends the push loop |
+| Client IP | `ip.GetRemoteIP` | unchanged |
 
-First-wins stays an explicit Connection rule (not hidden globals): the first `New` that calls `Shared` supplies LAPI host, stream interval, redis, AppSec host, metrics interval. Later routers share that instance even if their YAML differs. Same operator-visible behavior as `bouncer.go` 47–62.
+**Key (assumed, differs from WAF on purpose):** `crowdsecconnection:` + FNV of the **connection** fields only (mode, LAPI/CAPI, redis, update/metrics intervals, AppSec host/client settings, HTTP timeout). Not Traefik middleware `name`. Not ban/captcha/trusted IPs/`Enabled`.
+
+Sisters key `plugin:` + **name** + full config hash, so two WAF middleware names never share a core (`traefik-modsecurity/plugin_reuse_test.go` `TestNew_DifferentName_DoesNotShareCore`). Crowdsec today shares one stream across every middleware via globals. Putting `name` in the Connection key would start **one ticker per middleware name** (regression vs today). Connection identity is LAPI, not the Traefik alias.
+
+Same LAPI, two names, N routers → one Connection, N Bouncers. Config reload (cancel all holders, `New` within 10s) → `reclaim_reclaim`, same ticker. Last route gone + 10s → `Close()`. Two different LAPI hosts → two Connections (this **does** change first-wins-everything when operators actually configured two Crowdsecs; that is the instance the ticket asked for).
 
 ## Reproduced
 
-Not a runtime bug ticket. The claimed tangle is in tree.
-
-- Traefik calls `New` once per router handler build, not per request, not once per process. Sourced in `ext_traefik_plugins_yaegi-constructor/notes.md`.
-- First `New` with stream/alone mode starts `streamTicker`; later `New` sees non-nil and skips (`bouncer.go` 302–317). Same for `metricsTicker` (319–326).
-- `TestNew`, `TestBouncer_ServeHTTP`, `Test_handleNoStreamCache`, `Test_handleStreamCache`, `Test_crowdsecQuery` are empty TODO tables (`bouncer_test.go` 43–194). Ban-template tests construct `Bouncer` by hand and never go through `New`.
-- `go test ./...` on this Windows worktree: `pkg/cache`, `pkg/configuration`, `pkg/logger` ok. Root package FAIL only in `TestBouncerFileLoggingLevels` / `TestBouncerFileLoggingCommonFormat` TempDir cleanup: log file still open (`pkg/logger` `OpenFile` never closed). Assertions printed success. Not the lifetime bug; logger FD leak is out of scope unless we park the logger on Connection later.
+- Traefik `New` per router-handler build: `ext_traefik_plugins_yaegi-constructor`.
+- This plugin discards `ctx` (`New(_ context.Context`) and never stops tickers. Sisters bind `ctx` with reclaim because Traefik cancels then reconstructs across a ~1 ms gap (`std_go_reclaim` gotcha).
+- WAF `bindPlugin`: `reclaim.Open` then `ForRoute(next)` (`traefik-modsecurity/modsecurity.go` 40–53). Geoblock the same (`plugin.go` 42–54).
+- Empty `TestNew` / stream / query tables (`bouncer_test.go` 43–194).
+- `go test ./...` Windows: pkg tests ok; root logging tests fail TempDir cleanup (open log FD). Not the lifetime bug.
 
 ## Coverage bar (this change)
 
-Compiled `go test` owns lifetime. Existing mock e2e + real Pester e2e remain Yaegi-load proof. Do not add a third harness.
+Compiled `go test` owns lifetime. Copy the WAF reuse test shape (`plugin_reuse_test.go`): `reclaim.ResetWith` in cleanup; cancelable holder ctx (not Background for grace tests). Existing mock e2e + real Pester stay Yaegi-load proof.
 
-Must-have tests (replace empty TODOs; do not leave scaffolding):
+Must-have:
 
-1. `CrowdsecConnection.Shared` is once: two `New`/`Shared` calls return the same pointer; the second does not start a second ticker.
-2. Parallel `Shared` (race): still one ticker.
-3. Stream sync against `httptest` LAPI: `new`/`deleted` decisions land in the injected cache; `startup` query flag follows health/startup.
-4. After `UpdateMaxFailure` stream errors, `Healthy` is false; a stream-mode Bouncer bans with `ReasonTECH`.
-5. Live miss: Connection queries LAPI, writes cache, Bouncer remediates from the returned value.
-6. Bouncer `ServeHTTP` with an injected Connection: disabled pass-through; trusted IP bypass; cache hit pass/ban/captcha; stream unhealthy; live miss. Uses `ip.GetRemoteIP` (do not re-parse `RemoteAddr`).
-7. Plugin `New` twice: both handlers share one Connection.
-8. Ban/HEAD template tests move with `pkg/bouncer` and keep today’s method/content-type matrix.
-
-Inject `http.RoundTripper` (or `httptest.Server`), cache client, and a fake ticker/clock into Connection in tests. Production `Shared` wires the real ones. Do not add a second production `New` that only tests may call (`newTestConnection` is the test name).
+1. Two `New` with live ctx and the same connection fields → same `*CrowdsecConnection`, one ticker (including different middleware names).
+2. Parallel `Open` race: one incarnation.
+3. Cancel all holders, `Open` same key before grace → reclaim, no second `create`, ticker still running (`reclaim_reclaim`).
+4. Cancel, wait past grace → `Close()` ran; next `Open` creates a new Connection (`reclaim_dispose`).
+5. Different LAPI host (different key) → two Connections, two tickers.
+6. Stream sync against `httptest` LAPI; unhealthy after `UpdateMaxFailure`; live miss query.
+7. Bouncer `ServeHTTP` with injected Connection: disabled, trusted IP, cache hit pass/ban/captcha, stream unhealthy, live miss. `ip.GetRemoteIP` only.
+8. Ban/HEAD template matrix moves with `pkg/bouncer`.
+9. Production `create` takes **no** args (Yaegi). Tests use `newTestConnection` / `reclaim.NewTable` with short grace.
 
 ## Out of this design
 
-- Changing `.traefik.yml` `import` to a subpackage (`pkg/plugin`). Yaegi could load a prefixed import; catalog and local bind-mounts today target the module root. Thin the root package instead.
-- Keying Connection by LAPI host/key (true multi-Crowdsec per Traefik process). That would change first-wins. Out of scope.
-- Splitting `pkg/cache`’s process `ttl_map` into per-Connection maps in production memory mode (behavior change for tests/redis-less). Connection holds `*cache.Client`; tests inject a client.
+- Changing `.traefik.yml` `import` to a subpackage.
+- Rewriting `pkg/reclaim` (copy from geoblock).
+- Keying Connection by Traefik middleware **name** (WAF’s `plugin:name:hash`). That would split tickers per alias.
+- Splitting `pkg/cache` process `ttl_map` (two Connections would still share memory keys until a later change).
 - Public JSON config field names.
 
 ## Open questions
 
 - Q: Must `CreateConfig`/`New` stay in the module-root package?
-  Decision: assumed — yes. Keep `.traefik.yml` `import` as the module path. Thin root to `plugin.go`. Do not set `basePkg`. Sourced: Yaegi evals `basePkg.New` on the imported package (`ext_traefik_plugins_yaegi-constructor`).
+  Decision: assumed — yes. Thin root to `plugin.go`. Do not change `.traefik.yml` `import`.
   By: explore
 
-- Q: One CrowdsecConnection per process, or one per LAPI identity?
-  Decision: assumed — one per process via `Shared`/`sync.Once`, first `New` wins. Matches today’s globals. Keyed connections would be a product change.
+- Q: How is CrowdsecConnection shared — `sync.Once`, or reclaim?
+  Decision: resolved — reclaim table, copied from geoblock/modsecurity. Traefik `New` ctx is the holder. `Close()` on unreclaimed incarnation. Not `sync.Once`.
+  By: explore
+
+- Q: Reclaim key = middleware name + full config (WAF), or connection-field hash without name?
+  Decision: assumed — `crowdsecconnection:` + hash of LAPI/CAPI/redis/stream/AppSec client fields only. Name and ban/captcha/trusted IPs stay off the key so two aliases with the same LAPI share one ticker (today’s globals) without first-wins hiding a second LAPI.
   By: explore
 
 - Q: Does captcha live on Connection or Bouncer?
-  Decision: assumed — Bouncer (challenge HTML/provider is request UX). Cache keys for captcha grace go through the Connection’s cache client.
+  Decision: assumed — Bouncer. Cache keys through Connection.
   By: explore
 
 - Q: Does AppSec live on Connection or Bouncer?
-  Decision: assumed — Connection owns the AppSec HTTP client and host (already first-wins in `bouncer.go` 47–62). Bouncer calls Connection on the pass path when that route has `CrowdsecAppsecEnabled`.
+  Decision: assumed — Connection owns HTTP client+host (in the reclaim key). Bouncer calls it on pass when that route has AppSec enabled.
   By: explore
 
 - Q: Type spelling `CrowdSecConnection` vs `CrowdsecConnection`?
-  Decision: assumed — `CrowdsecConnection` and package `crowdsecconnection`, matching `CrowdsecLapiHost` / `CrowdsecMode`.
+  Decision: assumed — `CrowdsecConnection` / `pkg/crowdsecconnection`.
   By: explore
 
 - Q: Who owns client address?
-  Decision: resolved — `pkg/ip.GetRemoteIP` already owns it. Bouncer calls that; Connection receives the IP string only. Do not reconstruct from `RemoteAddr`.
+  Decision: resolved — `pkg/ip.GetRemoteIP`. Connection receives the IP string only.
   By: explore
 
 - Q: How far does “exquisite” coverage go beyond compiled tests?
-  Decision: assumed — lifetime is `go test` with fake LAPI and injected cache (list in Coverage bar). Mock e2e + real Pester stay the Yaegi proof. No new e2e suite in this change.
+  Decision: assumed — `go test` with reclaim grace/reclaim/dispose plus fake LAPI. Existing e2e is Yaegi proof.
   By: explore
