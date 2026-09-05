@@ -149,7 +149,6 @@ func Prepare(cfg *configuration.Config, log *slog.Logger) error {
 }
 
 // New constructs a CrowdsecConnection and starts tickers. Call Prepare first. Close stops them.
-//
 func New(config *configuration.Config, log *slog.Logger) (*CrowdsecConnection, error) {
 	var err error
 	var tlsAppsecConfig *tls.Config
@@ -237,21 +236,8 @@ func New(config *configuration.Config, log *slog.Logger) (*CrowdsecConnection, e
 		IdentityHex(config),
 	)
 
-	if config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode {
-		if config.CrowdsecMode == configuration.AloneMode {
-			if err := conn.getToken(); err != nil {
-				conn.log.Error("New:getToken " + err.Error())
-				return nil, err
-			}
-		}
-		if config.StreamStartupBlock {
-			conn.handleStreamTicker()
-		} else {
-			go conn.handleStreamTicker()
-		}
-		conn.streamStop = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
-			conn.handleStreamTicker()
-		})
+	if err := conn.startStream(config, log); err != nil {
+		return nil, err
 	}
 
 	if config.MetricsUpdateIntervalSeconds > 0 {
@@ -264,6 +250,27 @@ func New(config *configuration.Config, log *slog.Logger) (*CrowdsecConnection, e
 
 	conn.log.Debug("CrowdsecConnection initialized mode:" + config.CrowdsecMode)
 	return conn, nil
+}
+
+func (c *CrowdsecConnection) startStream(config *configuration.Config, log *slog.Logger) error {
+	if config.CrowdsecMode != configuration.StreamMode && config.CrowdsecMode != configuration.AloneMode {
+		return nil
+	}
+	if config.CrowdsecMode == configuration.AloneMode {
+		if err := c.getToken(); err != nil {
+			c.log.Error("New:getToken " + err.Error())
+			return err
+		}
+	}
+	if config.StreamStartupBlock {
+		c.handleStreamTicker()
+	} else {
+		go c.handleStreamTicker()
+	}
+	c.streamStop = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
+		c.handleStreamTicker()
+	})
+	return nil
 }
 
 // Close stops tickers and idle HTTP connections. Safe to call more than once.
@@ -460,7 +467,7 @@ func (c *CrowdsecConnection) getToken() error {
 		c.crowdsecKey = login.Token
 		return nil
 	}
-	c.log.Warn(fmt.Sprintf("getToken statusCode:%d", login.Code))
+	c.log.Warn("getToken statusCode:" + strconv.Itoa(login.Code))
 	return fmt.Errorf("getToken statusCode:%d", login.Code)
 }
 
@@ -479,11 +486,15 @@ func (c *CrowdsecConnection) handleStreamCache() error {
 		leaseDuration = 1
 	}
 	c.cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, leaseDuration)
+	startup := "startup=false"
+	if !c.isCrowdsecStreamHealthy || c.isCrowdsecStreamStartup {
+		startup = "startup=true"
+	}
 	streamRouteURL := url.URL{
 		Scheme:   c.crowdsecScheme,
 		Host:     c.crowdsecHost,
 		Path:     c.crowdsecPath + c.crowdsecStreamRoute,
-		RawQuery: fmt.Sprintf("startup=%t", !c.isCrowdsecStreamHealthy || c.isCrowdsecStreamStartup),
+		RawQuery: startup,
 	}
 	atomic.AddInt64(&c.streamFetches, 1)
 	body, err := c.crowdsecQuery(streamRouteURL.String(), nil)
