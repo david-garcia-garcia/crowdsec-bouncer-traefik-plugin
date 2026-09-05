@@ -19,6 +19,7 @@ import (
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
 const (
@@ -90,6 +91,7 @@ type CrowdsecConnection struct {
 	crowdsecStreamRoute    string
 	crowdsecHeader         string
 	redisUnreachableBlock  bool
+	decisionScopeHeaders   map[string]string // CrowdSec header scope → request header
 
 	appsecScheme    string
 	appsecHost      string
@@ -196,6 +198,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		updateMaxFailure:        config.UpdateMaxFailure,
 		defaultDecisionTimeout:  config.DefaultDecisionSeconds,
 		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
+		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		crowdsecHeader:          crowdsecHeader,
 		log:                     log,
@@ -341,9 +344,9 @@ func (c *CrowdsecConnection) IncBlocked() {
 	atomic.AddInt64(&c.blockedRequests, 1)
 }
 
-// LiveLookup queries LAPI for one IP (none/live mode) and may write this connection's cache.
-func (c *CrowdsecConnection) LiveLookup(remoteIP string) (string, error) {
-	return c.handleNoStreamCache(remoteIP)
+// LiveLookup queries LAPI for one IP and mapped header scopes (none/live mode).
+func (c *CrowdsecConnection) LiveLookup(remoteIP string, scopes map[string]string) (string, error) {
+	return c.handleNoStreamCache(remoteIP, scopes)
 }
 
 func (c *CrowdsecConnection) handleStreamTicker() {
@@ -384,65 +387,25 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 	return stop
 }
 
-func (c *CrowdsecConnection) handleNoStreamCache(remoteIP string) (string, error) {
+func (c *CrowdsecConnection) handleNoStreamCache(remoteIP string, scopes map[string]string) (string, error) {
 	isLiveMode := c.crowdsecMode == configuration.LiveMode
-	routeURL := url.URL{
-		Scheme:   c.crowdsecScheme,
-		Host:     c.crowdsecHost,
-		Path:     c.crowdsecPath + crowdsecLapiRoute,
-		RawQuery: "ip=" + remoteIP,
-	}
-	body, err := c.crowdsecQuery(routeURL.String(), nil)
+	chosen, parsedDuration, err := c.queryLiveDecisions(fmt.Sprintf("ip=%v", remoteIP))
 	if err != nil {
 		return cache.BannedValue, err
 	}
-
-	if bytes.Equal(body, []byte("null")) {
-		if isLiveMode {
+	for scope, identifier := range scopes {
+		chosen, parsedDuration = c.mergeLiveScope(chosen, parsedDuration, scope, identifier, isLiveMode)
+	}
+	if !decisionscope.IsActiveRemediation(chosen) {
+		if isLiveMode && c.defaultDecisionTimeout > 0 {
 			c.cacheClient.Set(remoteIP, cache.NoBannedValue, c.defaultDecisionTimeout)
 		}
 		return cache.NoBannedValue, nil
-	}
-
-	var decisions []Decision
-	err = json.Unmarshal(body, &decisions)
-	if err != nil {
-		return cache.BannedValue, fmt.Errorf("handleNoStreamCache:parseBody %w", err)
-	}
-	if len(decisions) == 0 {
-		if isLiveMode {
-			c.cacheClient.Set(remoteIP, cache.NoBannedValue, c.defaultDecisionTimeout)
-		}
-		return cache.NoBannedValue, nil
-	}
-	var decision Decision
-	for _, d := range decisions {
-		decision = d
-		if decision.Type == "ban" {
-			break
-		}
-	}
-	duration, err := time.ParseDuration(decision.Duration)
-	if err != nil {
-		return cache.BannedValue, fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
-	}
-	var value string
-	switch decision.Type {
-	case "ban":
-		value = cache.BannedValue
-	case "captcha":
-		value = cache.CaptchaValue
-	default:
-		c.log.Info("handleNoStreamCache:unknownType " + decision.Type)
 	}
 	if isLiveMode && c.defaultDecisionTimeout > 0 {
-		durationSecond := int64(duration.Seconds())
-		if c.defaultDecisionTimeout < durationSecond {
-			durationSecond = c.defaultDecisionTimeout
-		}
-		c.cacheClient.Set(remoteIP, value, durationSecond)
+		c.cacheClient.Set(remoteIP, chosen, c.liveCacheTTL(parsedDuration))
 	}
-	return value, errors.New("handleNoStreamCache:banned")
+	return chosen, errors.New("handleNoStreamCache:banned")
 }
 
 func (c *CrowdsecConnection) getToken() error {
@@ -489,15 +452,11 @@ func (c *CrowdsecConnection) handleStreamCache() error {
 		leaseDuration = 1
 	}
 	c.cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, leaseDuration)
-	startup := "startup=false"
-	if !c.isCrowdsecStreamHealthy || c.isCrowdsecStreamStartup {
-		startup = "startup=true"
-	}
 	streamRouteURL := url.URL{
 		Scheme:   c.crowdsecScheme,
 		Host:     c.crowdsecHost,
 		Path:     c.crowdsecPath + c.crowdsecStreamRoute,
-		RawQuery: startup,
+		RawQuery: c.streamQuery(),
 	}
 	atomic.AddInt64(&c.streamFetches, 1)
 	body, err := c.crowdsecQuery(streamRouteURL.String(), nil)
@@ -510,22 +469,14 @@ func (c *CrowdsecConnection) handleStreamCache() error {
 		return fmt.Errorf("handleStreamCache:parsingBody %w", err)
 	}
 	for _, decision := range stream.New {
-		duration, err := time.ParseDuration(decision.Duration)
-		if err == nil {
-			var value string
-			switch decision.Type {
-			case "ban":
-				value = cache.BannedValue
-			case "captcha":
-				value = cache.CaptchaValue
-			default:
-				c.log.Info("handleStreamCache:unknownType " + decision.Type)
-			}
-			c.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
+		duration, parseErr := time.ParseDuration(decision.Duration)
+		if parseErr != nil {
+			continue
 		}
+		c.storeStreamDecision(decision, int64(duration.Seconds()))
 	}
 	for _, decision := range stream.Deleted {
-		c.cacheClient.Delete(decision.Value)
+		c.deleteStreamDecision(decision)
 	}
 	c.log.Debug("handleStreamCache:updated")
 	c.isCrowdsecStreamStartup = false
