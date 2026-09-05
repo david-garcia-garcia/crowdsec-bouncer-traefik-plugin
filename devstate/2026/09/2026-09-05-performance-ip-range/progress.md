@@ -9,6 +9,6 @@ JobName: 2026-09-05-performance-ip-range
 | propose | [x] | [x] | 2026-09-05T15:41:04.873Z |
 | implement | [x] | [x] | 2026-09-05T15:45:59.865Z |
 | codereview | [x] | [x] | 2026-09-05T15:58:08.044Z |
-| devdocsimpact | [x] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-05T16:00:10.285Z |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |

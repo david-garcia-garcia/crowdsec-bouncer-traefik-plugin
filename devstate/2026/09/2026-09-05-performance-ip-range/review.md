@@ -29,3 +29,9 @@ phase: codereview
 findings: Standards 1 hard (LookupCacheKeys useRangeIndex), Standards 2 judgement (shared blob loop)
 fixed: dropped useRangeIndex from LookupCacheKeys
 skipped: extract shared blob-line iteration; CI in progress on e033765
+
+## devdocsimpact (2026-09-05)
+phase: devdocsimpact
+findings: none
+fixed: none
+skipped: none
