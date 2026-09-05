@@ -15,8 +15,8 @@ A CrowdSec scope other than Ip/Range whose value comes from a request header nam
 _Avoid_: GeoIP inside this plugin, client-set country as the real-stack proof
 
 **decisionScopeHeaders**:
-Public Traefik plugin map from CrowdSec scope name to header name. Empty means header scopes are off. Keys `Ip` and `Range` are rejected.
-_Avoid_: putting Country on the reclaim key, parsing `RemoteAddr` for country
+Public Traefik plugin map from CrowdSec scope name to header name. Empty means header scopes are off. Keys `Ip` and `Range` are rejected. The **normalized** map is on CrowdsecConnection reclaim identity (stream `scopes=` and ingest). The bouncer reads that map; it does not store a copy.
+_Avoid_: GeoIP inside this plugin, client-set country as the real-stack proof, a second copy on Bouncer
 
 ## Overview
 
@@ -24,7 +24,7 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 
 ## How to use
 
-- Pass `decisionScopeHeaders` from config into the connection (stream `scopes=` and live `scope`+`value` queries) and into the bouncer (request headers).
+- Pass `decisionScopeHeaders` from config into the connection (identity, stream `scopes=`, live `scope`+`value` queries). The bouncer reads `conn.DecisionScopeHeaders()` for request headers. Do not store a second copy on Bouncer.
 - Resolve the client IP with `pkg/ip.GetRemoteIP`. Then `LookupCachedRemediation` with `conn.RangeMembership()` in stream/alone/live cache hits.
 - Stream Range items: collect the tick, then `ApplyRangeBatch` (one read, one write). Hydrate membership from the blob after apply and on a lease hit. Do not GET+SET per Range line.
 - Live/none: keep `?ip=` (LAPI expands Range). Add `scope`+`value` when a mapped header is present. Skip `range-index` and membership on none.
@@ -33,7 +33,7 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 ## Pattern snippet
 
 ```go
-scopes := decisionscope.RequestScopeValues(headers, req)
+scopes := decisionscope.RequestScopeValues(conn.DecisionScopeHeaders(), req)
 value, err := decisionscope.LookupCachedRemediation(cacheClient, mode, remoteIP, scopes, conn.RangeMembership())
 ```
 
@@ -44,6 +44,7 @@ value, err := decisionscope.LookupCachedRemediation(cacheClient, mode, remoteIP,
 - `pkg/bouncer/bouncer.go`
 - `pkg/crowdsecconnection/connection.go`
 - `pkg/crowdsecconnection/connection_decisions.go`
+- `pkg/crowdsecconnection/identity.go`
 
 ## Gotchas
 

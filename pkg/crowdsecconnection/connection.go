@@ -406,6 +406,11 @@ func (c *CrowdsecConnection) Mode() string {
 	return c.crowdsecMode
 }
 
+// DecisionScopeHeaders is the normalized CrowdSec scope → request header map this connection streams and matches.
+func (c *CrowdsecConnection) DecisionScopeHeaders() map[string]string {
+	return c.decisionScopeHeaders
+}
+
 // StreamHealthy is true while stream polling is succeeding.
 func (c *CrowdsecConnection) StreamHealthy() bool {
 	return c.isCrowdsecStreamHealthy

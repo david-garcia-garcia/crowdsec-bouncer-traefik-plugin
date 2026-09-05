@@ -38,7 +38,6 @@ type Bouncer struct {
 	captchaClient           *captcha.Client
 	log                     *slog.Logger
 	conn                    *crowdsecconnection.CrowdsecConnection
-	decisionScopeHeaders    map[string]string // CrowdSec header scope → request header
 }
 
 // New returns a per-router handler bound to conn.
@@ -67,7 +66,6 @@ func New(next http.Handler, name string, config *configuration.Config, conn *cro
 		traceCustomHeader:       config.TraceHeadersCustomName,
 		log:                     log,
 		conn:                    conn,
-		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
 		serverPoolStrategy:      &ip.PoolStrategy{Checker: serverChecker},
 		clientPoolStrategy:      &ip.PoolStrategy{Checker: clientChecker},
 		captchaClient:           &captcha.Client{},
@@ -147,7 +145,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	// Mapped scope headers for this request. Missing headers are omitted.
-	scopes := decisionscope.RequestScopeValues(b.decisionScopeHeaders, req)
+	scopes := decisionscope.RequestScopeValues(b.conn.DecisionScopeHeaders(), req)
 
 	if b.conn.Mode() != configuration.NoneMode {
 		value, cacheErr := decisionscope.LookupCachedRemediation(b.conn.Cache(), b.conn.Mode(), remoteIP, scopes, b.conn.RangeMembership())

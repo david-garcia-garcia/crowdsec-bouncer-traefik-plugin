@@ -3,11 +3,11 @@
 ## Language
 
 **CrowdsecConnection**:
-The reclaim value for one Crowdsec backend: stream/metrics tickers, LAPI/CAPI HTTP, AppSec client, an isolated cache, and in-process Range membership. Keyed by connection fields, not middleware name.
+The reclaim value for one Crowdsec backend: stream/metrics tickers, LAPI/CAPI HTTP, AppSec client, an isolated cache, and in-process Range membership. Keyed by connection fields including the normalized `decisionScopeHeaders` map, not middleware name.
 _Avoid_: Bouncer, Plugin, process singleton, `sync.Once`
 
 **Bouncer**:
-The per-router `http.Handler` Traefik gets back from `New`. Holds `next`, request policy (trusted IPs, ban/captcha, Enabled, AppSec-on-pass), and a pointer to the reclaimed CrowdsecConnection.
+The per-router `http.Handler` Traefik gets back from `New`. Holds `next`, request policy (trusted IPs, ban/captcha, Enabled, AppSec-on-pass), and a pointer to the reclaimed CrowdsecConnection. Header-mapped scopes are read from that connection, not stored again.
 _Avoid_: ForRoute, Plugin core, the reclaim value
 
 **Failure action**:
@@ -49,7 +49,7 @@ return bouncer.New(next, name, config, conn, log)
 
 ## Gotchas
 
-- Do not put middleware name, `next`, ban/captcha templates, trusted IPs, or Enabled in the reclaim key.
+- Do not put middleware name, `next`, ban/captcha templates, trusted IPs, Enabled, or AppSec failure action in the reclaim key. Do put the normalized `decisionScopeHeaders` map there.
 - `crowdsecLapiFailureAction` is on CrowdsecConnection identity (shared with `updateMaxFailure`). `crowdsecAppsecFailureAction` stays on Bouncer.
-- Same connection fields share one ticker; different LAPI/mode/redis/interval are two Connections in one Traefik.
+- Same connection fields (including the normalized `decisionScopeHeaders` map) share one ticker; different LAPI/mode/redis/interval/header maps are two Connections in one Traefik.
 - `Close()` stops tickers, idle LAPI/AppSec HTTP, and the cache Redis pool when no constructor ctx remains and grace elapses. Do not use `sync.Once`.

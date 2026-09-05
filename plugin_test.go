@@ -130,6 +130,62 @@ func TestNew_SameConnectionFields_ShareIncarnation(t *testing.T) {
 	}
 }
 
+func TestNew_DifferentDecisionScopeHeaders_IsolatedConnection(t *testing.T) {
+	reclaim.ResetWith(0)
+	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+
+	var zero int64
+	srv := liveLAPI(t, nil, &zero)
+	t.Cleanup(func() { srv.Close() })
+	u, _ := url.Parse(srv.URL)
+	ctx := context.Background()
+
+	cfgCountry := cfgLiveAt(u.Host)
+	cfgCountry.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	cfgUser := cfgLiveAt(u.Host)
+	cfgUser.DecisionScopeHeaders = map[string]string{"username": "X-User"}
+
+	countryRoute, err := New(ctx, testNextOK(), cfgCountry, "map-country")
+	if err != nil {
+		t.Fatal(err)
+	}
+	userRoute, err := New(ctx, testNextOK(), cfgUser, "map-user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if testRoute(t, countryRoute).SameConnection(testRoute(t, userRoute)) {
+		t.Fatal("different decisionScopeHeaders must not share a CrowdsecConnection")
+	}
+}
+
+func TestNew_SameDecisionScopeHeaders_ShareConnection(t *testing.T) {
+	reclaim.ResetWith(0)
+	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+
+	var zero int64
+	srv := liveLAPI(t, nil, &zero)
+	t.Cleanup(func() { srv.Close() })
+	u, _ := url.Parse(srv.URL)
+	ctx := context.Background()
+
+	cfgA := cfgLiveAt(u.Host)
+	cfgA.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	cfgB := cfgLiveAt(u.Host)
+	cfgB.DecisionScopeHeaders = map[string]string{"country": "CF-IPCountry"}
+
+	a, err := New(ctx, testNextOK(), cfgA, "map-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := New(ctx, testNextOK(), cfgB, "map-b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !testRoute(t, a).SameConnection(testRoute(t, b)) {
+		t.Fatal("normalized decisionScopeHeaders must share one CrowdsecConnection")
+	}
+}
+
 func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 	reclaim.ResetWith(0)
 	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
