@@ -55,8 +55,25 @@ type SimpleRedis struct {
 	pass     string
 	database string
 
-	mu   sync.Mutex
-	idle []*pooledConn
+	mu     sync.Mutex
+	idle   []*pooledConn
+	closed bool
+}
+
+// Close drains idle pooled connections and stops pooling. In-flight commands still finish; their sockets are closed on release. Safe to call more than once.
+func (sr *SimpleRedis) Close() {
+	sr.mu.Lock()
+	if sr.closed {
+		sr.mu.Unlock()
+		return
+	}
+	sr.closed = true
+	idle := sr.idle
+	sr.idle = nil
+	sr.mu.Unlock()
+	for _, conn := range idle {
+		conn.close()
+	}
 }
 
 // Init sets the redisHost used to connect to redis.
@@ -164,7 +181,7 @@ func (sr *SimpleRedis) release(conn *pooledConn, reusable bool) {
 	conn.lastUsed = time.Now()
 
 	sr.mu.Lock()
-	if len(sr.idle) >= maxIdleConns {
+	if sr.closed || len(sr.idle) >= maxIdleConns {
 		sr.mu.Unlock()
 		conn.close()
 		return

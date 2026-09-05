@@ -56,6 +56,9 @@ func (lc *localCache) delete(key string) {
 	lc.heap().Del(key)
 }
 
+// close is a no-op: the TTL map has no sockets or background goroutine.
+func (lc *localCache) close() {}
+
 // prefixed namespaces Redis keys so two Clients on one host do not share remediations.
 func prefixed(prefix, key string) string {
 	if prefix == "" {
@@ -112,10 +115,21 @@ func (rc *redisCache) delete(key string) {
 	}
 }
 
+// close drains the writer and every reader idle pool.
+func (rc *redisCache) close() {
+	if rc.writer != nil {
+		rc.writer.Close()
+	}
+	for _, reader := range rc.readers {
+		reader.Close()
+	}
+}
+
 type cacheInterface interface {
 	set(key, value string, duration int64)
 	get(key string) (string, error)
 	delete(key string)
+	close()
 }
 
 // Client Cache client.
@@ -161,4 +175,12 @@ func (c *Client) Get(key string) (string, error) {
 func (c *Client) Set(key string, value string, duration int64) {
 	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
 	c.cache.set(key, value, duration)
+}
+
+// Close drains Redis idle pools. Memory clients have nothing to stop. Safe to call more than once.
+func (c *Client) Close() {
+	if c == nil || c.cache == nil {
+		return
+	}
+	c.cache.close()
 }

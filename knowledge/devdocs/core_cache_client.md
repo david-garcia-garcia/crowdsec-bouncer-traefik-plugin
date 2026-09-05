@@ -15,6 +15,7 @@ Construct a new `Client` on each CrowdsecConnection. Pass `crowdsecconnection.Id
 - Memory: `Client.New(..., isRedis=false, ..., keyPrefix)` — prefix is ignored; each Client owns a map.
 - Redis: pass identity hex as `keyPrefix`. Logical keys stay the client IP; the store writes `prefix:key`.
 - Same reclaim key → same Connection → same Client (share-by-identity, not a process dump).
+- `Client.Close()` drains Redis idle pools. Call it from `CrowdsecConnection.Close()`. Memory clients are a no-op.
 
 ## Pattern snippet
 

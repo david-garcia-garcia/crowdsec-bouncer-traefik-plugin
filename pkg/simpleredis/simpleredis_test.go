@@ -336,3 +336,32 @@ func TestStaleConnectionIsRetried(t *testing.T) {
 		t.Fatalf("opened %d connections, want 2", fake.connections())
 	}
 }
+
+func TestCloseDrainsIdleAndDoesNotRepool(t *testing.T) {
+	fake, addr := startFakeRedis(t, map[string]string{"hit": "t"})
+	var redis SimpleRedis
+	redis.Init(addr, "", "")
+
+	if _, err := redis.Get("hit"); err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if len(redis.idle) != 1 {
+		t.Fatalf("after Get idle = %d, want 1", len(redis.idle))
+	}
+
+	redis.Close()
+	if len(redis.idle) != 0 {
+		t.Fatalf("after Close idle = %d, want 0", len(redis.idle))
+	}
+	redis.Close()
+
+	if _, err := redis.Get("hit"); err != nil {
+		t.Fatalf("Get after Close: %v", err)
+	}
+	if fake.connections() != 2 {
+		t.Fatalf("Get after Close opened %d connections, want 2", fake.connections())
+	}
+	if len(redis.idle) != 0 {
+		t.Fatalf("release after Close idle = %d, want 0", len(redis.idle))
+	}
+}

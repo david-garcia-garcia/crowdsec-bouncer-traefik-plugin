@@ -45,4 +45,4 @@ return bouncer.New(next, name, config, conn, log)
 
 - Do not put middleware name, `next`, ban/captcha templates, trusted IPs, or Enabled in the reclaim key.
 - Same connection fields share one ticker; different LAPI/mode/redis/interval are two Connections in one Traefik.
-- `Close()` runs when no constructor ctx remains and grace elapses. Do not use `sync.Once`.
+- `Close()` stops tickers, idle LAPI/AppSec HTTP, and the cache Redis pool when no constructor ctx remains and grace elapses. Do not use `sync.Once`.

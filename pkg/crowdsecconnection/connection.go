@@ -273,7 +273,7 @@ func (c *CrowdsecConnection) startStream(config *configuration.Config, log *slog
 	return nil
 }
 
-// Close stops tickers and idle HTTP connections. Safe to call more than once.
+// Close stops tickers, idle HTTP connections, and the cache Redis pool. Safe to call more than once.
 func (c *CrowdsecConnection) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -287,6 +287,9 @@ func (c *CrowdsecConnection) Close() {
 	c.metricsStop = nil
 	closeIdle(c.httpClient)
 	closeIdle(c.httpAppsecClient)
+	if c.cacheClient != nil {
+		c.cacheClient.Close()
+	}
 }
 
 func stopTicker(stop chan bool) {

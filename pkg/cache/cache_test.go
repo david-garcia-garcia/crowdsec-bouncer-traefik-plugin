@@ -178,6 +178,17 @@ func Test_memoryClientsDoNotShare(t *testing.T) {
 	if err.Error() != CacheMiss {
 		t.Fatalf("client B err %v, want %s", err, CacheMiss)
 	}
+	a.Close()
+	b.Close()
+}
+
+func Test_ClientCloseRedis(t *testing.T) {
+	client := &Client{}
+	client.New(logger.New("INFO", ""), true, "127.0.0.1:1", []string{"127.0.0.1:1"}, "", "", "p")
+	client.Close()
+	client.Close()
+	var empty *Client
+	empty.Close()
 }
 
 func Test_prefixed(t *testing.T) {
