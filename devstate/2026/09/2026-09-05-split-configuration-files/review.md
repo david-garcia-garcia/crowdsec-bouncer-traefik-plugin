@@ -38,3 +38,27 @@ skipped: none
 localTests: passed
 ci: 33978900213 Main Process success; 33978900205 e2e success
 head: 2fe6288dc50ca5a850874034c8b369a30a5ebce7
+
+## codereview (2026-09-05)
+
+phase: codereview
+findings: 1 judgement duplicated validPEM
+fixed: none
+skipped: validPEM copy (no shared test package in Bound the ask)
+head: dc20c0e97a3bcf5fe4a36f85d73c06436e1fc2aa
+
+## devdocsimpact (2026-09-05)
+
+phase: devdocsimpact
+findings: stale-usage Key files on middleware, ip, decisionscope
+fixed: updated those three packets
+skipped: no new packet
+head: dc20c0e97a3bcf5fe4a36f85d73c06436e1fc2aa
+
+## archive (2026-09-05)
+
+phase: archive
+findings: none
+fixed: synced core_plugin_config_file-owners; moved change to archive/2026-09-05-split-configuration-files
+skipped: none
+head: dc20c0e97a3bcf5fe4a36f85d73c06436e1fc2aa

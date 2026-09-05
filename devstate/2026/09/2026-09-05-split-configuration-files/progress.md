@@ -8,7 +8,7 @@ JobName: 2026-09-05-split-configuration-files
 | explore | [x] | [x] | 2026-09-05T16:29:00.526Z |
 | propose | [x] | [x] | 2026-09-05T16:32:49.014Z |
 | implement | [x] | [x] | 2026-09-05T16:50:45.384Z |
-| codereview | [ ] | [ ] | |
-| devdocsimpact | [ ] | [ ] | |
-| archive | [ ] | [ ] | |
+| codereview | [x] | [x] | 2026-09-05T16:53:49.357Z |
+| devdocsimpact | [x] | [x] | 2026-09-05T16:54:50.724Z |
+| archive | [x] | [x] | 2026-09-05T16:55:21.213Z |
 | pullrequest | [ ] | [ ] | |
