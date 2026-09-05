@@ -4,7 +4,6 @@ import (
 	"net"
 	"strings"
 
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/iplookup"
 )
 
@@ -27,7 +26,7 @@ func MembershipFromIndex(index string) *RangeMembership {
 			continue
 		}
 		helper := captcha
-		if remediation == cache.BannedValue {
+		if remediation == BannedValue {
 			helper = ban
 		}
 		if err := helper.AddCIDR(network); err != nil {
@@ -49,13 +48,13 @@ func (membership *RangeMembership) Remediation(remoteIP string) string {
 	if membership.ban != nil {
 		found, _, err := membership.ban.IsContained(parsed)
 		if err == nil && found {
-			return cache.BannedValue
+			return BannedValue
 		}
 	}
 	if membership.captcha != nil {
 		found, _, err := membership.captcha.IsContained(parsed)
 		if err == nil && found {
-			return cache.CaptchaValue
+			return CaptchaValue
 		}
 	}
 	return ""

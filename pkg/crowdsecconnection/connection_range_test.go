@@ -17,16 +17,16 @@ func newTestRangeConn(t *testing.T) (*CrowdsecConnection, *cache.Client) {
 
 func TestHydrateRangeMembershipFromBlob(t *testing.T) {
 	conn, client := newTestRangeConn(t)
-	decisionscope.AddRange(client, "10.0.0.0/8", cache.BannedValue, 60)
+	decisionscope.AddRange(client, "10.0.0.0/8", decisionscope.BannedValue, 60)
 	conn.hydrateRangeMembership()
-	if got := conn.RangeMembership().Remediation("10.1.2.3"); got != cache.BannedValue {
+	if got := conn.RangeMembership().Remediation("10.1.2.3"); got != decisionscope.BannedValue {
 		t.Fatalf("hydrate got %q, want ban", got)
 	}
 }
 
 func TestHydrateRangeMembershipEmptyBlob(t *testing.T) {
 	conn, client := newTestRangeConn(t)
-	decisionscope.AddRange(client, "10.0.0.0/8", cache.BannedValue, 60)
+	decisionscope.AddRange(client, "10.0.0.0/8", decisionscope.BannedValue, 60)
 	conn.hydrateRangeMembership()
 	client.Delete(decisionscope.RangeIndexKey)
 	conn.hydrateRangeMembership()
@@ -37,7 +37,7 @@ func TestHydrateRangeMembershipEmptyBlob(t *testing.T) {
 
 func TestHydrateRangeMembershipKeepsLastOnUnreachable(t *testing.T) {
 	conn, client := newTestRangeConn(t)
-	decisionscope.AddRange(client, "10.0.0.0/8", cache.BannedValue, 60)
+	decisionscope.AddRange(client, "10.0.0.0/8", decisionscope.BannedValue, 60)
 	conn.hydrateRangeMembership()
 
 	unreachable := &cache.Client{}
@@ -45,19 +45,19 @@ func TestHydrateRangeMembershipKeepsLastOnUnreachable(t *testing.T) {
 	defer unreachable.Close()
 	conn.cacheClient = unreachable
 	conn.hydrateRangeMembership()
-	if got := conn.RangeMembership().Remediation("10.1.2.3"); got != cache.BannedValue {
+	if got := conn.RangeMembership().Remediation("10.1.2.3"); got != decisionscope.BannedValue {
 		t.Fatalf("unreachable hydrate wiped membership, got %q", got)
 	}
 }
 
 func TestHandleStreamCacheLeaseHitHydrates(t *testing.T) {
 	conn, client := newTestRangeConn(t)
-	client.Set(cacheTimeoutKey, cache.NoBannedValue, 60)
-	decisionscope.AddRange(client, "10.0.0.0/8", cache.BannedValue, 60)
+	client.Set(cacheTimeoutKey, decisionscope.NoBannedValue, 60)
+	decisionscope.AddRange(client, "10.0.0.0/8", decisionscope.BannedValue, 60)
 	if err := conn.handleStreamCache(); err != nil {
 		t.Fatalf("lease hit: %v", err)
 	}
-	if got := conn.RangeMembership().Remediation("10.1.2.3"); got != cache.BannedValue {
+	if got := conn.RangeMembership().Remediation("10.1.2.3"); got != decisionscope.BannedValue {
 		t.Fatalf("lease hit hydrate got %q, want ban", got)
 	}
 }

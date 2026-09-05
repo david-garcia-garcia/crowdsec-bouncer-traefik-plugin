@@ -169,7 +169,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit remediation:%s", remoteIP, value))
 			b.handleRemediationServeHTTP(rw, req, remoteIP, value)
 			return
-		case value == cache.NoBannedValue:
+		case value == decisionscope.NoBannedValue:
 			b.handleNextServeHTTP(rw, req, remoteIP)
 			return
 		}
@@ -192,7 +192,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			b.log.Debug("ServeHTTP:LiveLookup " + err.Error())
 		}
-		if value == cache.NoBannedValue {
+		if value == decisionscope.NoBannedValue {
 			b.handleNextServeHTTP(rw, req, remoteIP)
 			return
 		}
@@ -207,7 +207,7 @@ func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req *http.Reque
 	case configuration.FailureActionPassthrough:
 		b.handleNextServeHTTP(rw, req, remoteIP)
 	case configuration.FailureActionCaptcha:
-		b.handleRemediationServeHTTP(rw, req, remoteIP, cache.CaptchaValue)
+		b.handleRemediationServeHTTP(rw, req, remoteIP, decisionscope.CaptchaValue)
 	default:
 		b.handleBanServeHTTP(rw, req, remoteIP, banReason)
 	}
@@ -246,7 +246,7 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Request, 
 
 func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, remediation string) {
 	b.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
-	if b.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method != http.MethodHead {
+	if b.captchaClient.Valid && remediation == decisionscope.CaptchaValue && req.Method != http.MethodHead {
 		if b.captchaClient.Check(remoteIP) {
 			b.handleNextServeHTTP(rw, req, remoteIP)
 			return
@@ -274,7 +274,7 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req *http.Request
 	}
 	decision, err := b.conn.AppsecQuery(remoteIP, req, pol)
 	if errors.Is(err, crowdsecconnection.ErrFailureCaptcha) {
-		b.handleRemediationServeHTTP(rw, req, remoteIP, cache.CaptchaValue)
+		b.handleRemediationServeHTTP(rw, req, remoteIP, decisionscope.CaptchaValue)
 		return true
 	}
 	if err != nil {

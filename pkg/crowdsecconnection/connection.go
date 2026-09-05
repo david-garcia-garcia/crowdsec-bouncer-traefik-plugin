@@ -485,9 +485,9 @@ func (c *CrowdsecConnection) handleNoStreamCache(remoteIP string, scopes map[str
 	}
 	if !decisionscope.IsActiveRemediation(chosen) {
 		if isLiveMode && c.defaultDecisionTimeout > 0 {
-			c.cacheClient.Set(remoteIP, cache.NoBannedValue, c.defaultDecisionTimeout)
+			c.cacheClient.Set(remoteIP, decisionscope.NoBannedValue, c.defaultDecisionTimeout)
 		}
-		return cache.NoBannedValue, nil
+		return decisionscope.NoBannedValue, nil
 	}
 	if isLiveMode && c.defaultDecisionTimeout > 0 {
 		c.cacheClient.Set(remoteIP, chosen, c.liveCacheTTL(parsedDuration))
@@ -539,7 +539,7 @@ func (c *CrowdsecConnection) handleStreamCache() error {
 	if leaseDuration < 1 {
 		leaseDuration = 1
 	}
-	c.cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, leaseDuration)
+	c.cacheClient.Set(cacheTimeoutKey, decisionscope.NoBannedValue, leaseDuration)
 	streamRouteURL := url.URL{
 		Scheme:   c.crowdsecScheme,
 		Host:     c.crowdsecHost,

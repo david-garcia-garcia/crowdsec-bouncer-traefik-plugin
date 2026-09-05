@@ -13,7 +13,7 @@ Construct a new `Client` on each CrowdsecConnection. Pass `crowdsecconnection.Id
 ## How to use
 
 - Memory: `Client.New(..., isRedis=false, ..., keyPrefix)` — prefix is ignored; each Client owns a map.
-- Redis: pass identity hex as `keyPrefix`. Logical keys are the client IP, `scope:value`, and `range-index`; the store writes `prefix:key`.
+- Redis: pass identity hex as `keyPrefix`. Logical keys are the client IP, `scope:value`, and `range-index`; the store writes `prefix:key`. Payloads are opaque strings. Ban/captcha/none codes live on `pkg/decisionscope`. Captcha grace-done (`d`) lives on `pkg/captcha`.
 - Same reclaim key → same Connection → same Client (share-by-identity, not a process dump).
 - `Client.Close()` drains Redis idle pools. Call it from `CrowdsecConnection.Close()`. Memory clients are a no-op.
 
