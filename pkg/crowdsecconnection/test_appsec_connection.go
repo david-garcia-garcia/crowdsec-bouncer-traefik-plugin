@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
 // NewTestAppsecConnection returns a CrowdsecConnection that only performs AppsecQuery against client.
@@ -15,5 +17,12 @@ func NewTestAppsecConnection(appsecURL *url.URL, client *http.Client, log *slog.
 		appsecBodyLimit:  10485760,
 		httpAppsecClient: client,
 		log:              log,
+	}
+}
+
+// NewTestLapiFailureActionConnection returns a connection that only exposes LapiFailureAction.
+func NewTestLapiFailureActionConnection(action string) *CrowdsecConnection {
+	return &CrowdsecConnection{
+		lapiFailureAction: configuration.EffectiveFailureAction(action),
 	}
 }

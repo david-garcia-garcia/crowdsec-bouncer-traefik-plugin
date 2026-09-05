@@ -73,7 +73,7 @@ func (c *CrowdsecConnection) queryLiveDecisions(rawQuery string) (string, time.D
 	}
 	body, err := c.crowdsecQuery(routeURL.String(), nil)
 	if err != nil {
-		return cache.BannedValue, 0, err
+		return "", 0, err
 	}
 	if bytes.Equal(body, []byte("null")) {
 		return cache.NoBannedValue, 0, nil
@@ -81,7 +81,7 @@ func (c *CrowdsecConnection) queryLiveDecisions(rawQuery string) (string, time.D
 	var items []Decision
 	err = json.Unmarshal(body, &items)
 	if err != nil {
-		return cache.BannedValue, 0, fmt.Errorf("handleNoStreamCache:parseBody %w", err)
+		return "", 0, fmt.Errorf("handleNoStreamCache:parseBody %w", err)
 	}
 	if len(items) == 0 {
 		return cache.NoBannedValue, 0, nil
@@ -92,7 +92,7 @@ func (c *CrowdsecConnection) queryLiveDecisions(rawQuery string) (string, time.D
 	}
 	parsedDuration, err := time.ParseDuration(picked.Duration)
 	if err != nil {
-		return cache.BannedValue, 0, fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
+		return "", 0, fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
 	}
 	value := decisionscope.RemediationValue(picked.Type)
 	if value == "" {

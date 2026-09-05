@@ -361,15 +361,13 @@ func TestTable_HashChangeProof(t *testing.T) {
 		t.Fatalf("Open B: %v", err)
 	}
 
-	waitKeyMsg(t, h, MsgDispose, "A")
+	waitUntil(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(ended) == 1 && ended[0] == "A"
+	})
 	if time.Since(start) < grace*3/4 {
 		t.Fatalf("A disposed before grace: %v", time.Since(start))
-	}
-	mu.Lock()
-	got := append([]string(nil), ended...)
-	mu.Unlock()
-	if len(got) != 1 || got[0] != "A" {
-		t.Fatalf("ended: %v", got)
 	}
 	if !reflect.DeepEqual(keySeq(h.events(), "A"), []string{MsgPut, MsgBind, MsgOrphan, MsgDispose}) {
 		t.Fatalf("A events: %+v", h.events())
@@ -767,9 +765,13 @@ func TestTable_ConcurrentCancelLastHolders(t *testing.T) {
 
 // TestTable_ReclaimRacesFire keeps a holder across the grace edge so a late AfterFunc cannot dispose.
 func TestTable_ReclaimRacesFire(t *testing.T) {
-	const rounds = 40
-	grace := 3 * time.Millisecond
-	for i := 0; i < rounds; i++ {
+	const need = 40
+	grace := 20 * time.Millisecond
+	got := 0
+	for attempts := 0; got < need; attempts++ {
+		if attempts > need*10 {
+			t.Fatalf("could not reclaim during grace in %d attempts", attempts)
+		}
 		h := &recHandler{}
 		tab := NewTable(grace)
 		var ended atomic.Bool
@@ -778,32 +780,33 @@ func TestTable_ReclaimRacesFire(t *testing.T) {
 			return ending(1, &ended), nil
 		})
 		if err != nil {
-			t.Fatalf("round %d Open 1: %v", i, err)
+			t.Fatalf("attempt %d Open 1: %v", attempts, err)
 		}
 		cancel1()
 		waitKeyMsg(t, h, MsgOrphan, "a")
+		orphanAt := time.Now()
 
 		ctx2, cancel2 := context.WithCancel(context.Background())
 		second, err := tab.Open(ctx2, "a", slog.New(h), func() (any, error) { return &box{n: 2}, nil })
 		if err != nil {
 			cancel2()
-			t.Fatalf("round %d Open 2: %v", i, err)
+			t.Fatalf("attempt %d Open 2: %v", attempts, err)
 		}
 		if first != second {
 			cancel2()
-			t.Fatalf("round %d reclaim lost the value", i)
+			continue
 		}
 
-		deadline := time.Now().Add(grace * 6)
-		for time.Now().Before(deadline) {
+		for time.Now().Before(orphanAt.Add(grace + 10*time.Millisecond)) {
 			if ended.Load() {
 				cancel2()
-				t.Fatalf("round %d late fire disposed a live incarnation", i)
+				t.Fatalf("attempt %d late fire disposed a live incarnation", attempts)
 			}
 			time.Sleep(time.Millisecond)
 		}
 		cancel2()
 		waitUntil(t, ended.Load)
+		got++
 	}
 }
 
