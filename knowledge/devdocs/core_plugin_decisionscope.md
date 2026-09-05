@@ -44,6 +44,8 @@ value, err := decisionscope.LookupCachedRemediation(cacheClient, useRangeMembers
 - `pkg/bouncer/bouncer.go`
 - `pkg/crowdsecconnection/connection.go`
 - `pkg/crowdsecconnection/connection_decisions.go`
+- `pkg/crowdsecconnection/connection_stream.go`
+- `pkg/crowdsecconnection/connection_live.go`
 
 ## Gotchas
 
