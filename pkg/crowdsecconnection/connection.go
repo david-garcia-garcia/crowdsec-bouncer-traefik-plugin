@@ -67,7 +67,7 @@ type Login struct {
 	Expire string `json:"expire"`
 }
 
-// AppsecPolicy is per-route AppSec drop behaviour. The HTTP client and host live on CrowdsecConnection.
+// AppsecPolicy is per-route AppSec drop behavior. The HTTP client and host live on CrowdsecConnection.
 type AppsecPolicy struct {
 	FailureBlock        bool
 	UnreachableBlock    bool
@@ -112,7 +112,7 @@ type CrowdsecConnection struct {
 	metricsStop             chan bool
 	lastMetricsPush         time.Time
 	blockedRequests         int64
-	streamFetches           atomic.Int64
+	streamFetches           int64
 }
 
 // Prepare resolves secrets and CAPI/LAPI routing on cfg. Call before Key and New.
@@ -150,7 +150,7 @@ func Prepare(cfg *configuration.Config, log *slog.Logger) error {
 
 // New constructs a CrowdsecConnection and starts tickers. Call Prepare first. Close stops them.
 //
-//nolint:nestif,gocyclo,gocognit,funlen,maintidx
+//nolint:nestif,gocognit,funlen,maintidx
 func New(config *configuration.Config, log *slog.Logger) (*CrowdsecConnection, error) {
 	var err error
 	var tlsAppsecConfig *tls.Config
@@ -324,7 +324,7 @@ func (c *CrowdsecConnection) RedisUnreachableBlock() bool {
 
 // StreamFetches is how many times this connection actually called the stream endpoint.
 func (c *CrowdsecConnection) StreamFetches() int64 {
-	return c.streamFetches.Load()
+	return atomic.LoadInt64(&c.streamFetches)
 }
 
 // IncBlocked increments the dropped-request metric.
@@ -486,7 +486,7 @@ func (c *CrowdsecConnection) handleStreamCache() error {
 		Path:     c.crowdsecPath + c.crowdsecStreamRoute,
 		RawQuery: fmt.Sprintf("startup=%t", !c.isCrowdsecStreamHealthy || c.isCrowdsecStreamStartup),
 	}
-	c.streamFetches.Add(1)
+	atomic.AddInt64(&c.streamFetches, 1)
 	body, err := c.crowdsecQuery(streamRouteURL.String(), nil)
 	if err != nil {
 		return err

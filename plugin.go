@@ -37,8 +37,9 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		return nil, err
 	}
 
-	if err := crowdsecconnection.Prepare(config, log); err != nil {
-		return nil, err
+	prepErr := crowdsecconnection.Prepare(config, log)
+	if prepErr != nil {
+		return nil, prepErr
 	}
 
 	stored, err := reclaim.Open(ctx, crowdsecconnection.Key(config), log, func() (any, error) {

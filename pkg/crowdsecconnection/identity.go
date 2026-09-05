@@ -19,7 +19,7 @@ type identity struct {
 	LapiHost                      string   `json:"lapiHost"`
 	LapiPath                      string   `json:"lapiPath"`
 	LapiKey                       string   `json:"lapiKey"`
-	CapiMachineID                 string   `json:"capiMachineID"`
+	CapiMachineID                 string   `json:"capiMachineId"`
 	CapiPassword                  string   `json:"capiPassword"`
 	CapiScenarios                 []string `json:"capiScenarios"`
 	UpdateIntervalSeconds         int64    `json:"updateIntervalSeconds"`
@@ -40,10 +40,10 @@ type identity struct {
 	AppsecKey                     string   `json:"appsecKey"`
 	AppsecBodyLimit               int64    `json:"appsecBodyLimit"`
 	AppsecTLSInsecureVerify       bool     `json:"appsecTlsInsecureVerify"`
-	AppsecTLSCertificateAuthority string   `json:"appsecTlsCA"`
+	AppsecTLSCertificateAuthority string   `json:"appsecTlsCa"`
 	AppsecTLSCertificateBouncer   string   `json:"appsecTlsCert"`
 	LapiTLSInsecureVerify         bool     `json:"lapiTlsInsecureVerify"`
-	LapiTLSCertificateAuthority   string   `json:"lapiTlsCA"`
+	LapiTLSCertificateAuthority   string   `json:"lapiTlsCa"`
 	LapiTLSCertificateBouncer     string   `json:"lapiTlsCert"`
 }
 
@@ -87,7 +87,7 @@ func identityFrom(cfg *configuration.Config) identity {
 func IdentityHex(cfg *configuration.Config) string {
 	b, err := json.Marshal(identityFrom(cfg))
 	if err != nil {
-		return fmt.Sprintf("%v", cfg)
+		return fmt.Sprint(cfg)
 	}
 	h := fnv.New64a()
 	_, _ = h.Write(b)
