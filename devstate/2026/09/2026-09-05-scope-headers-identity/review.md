@@ -27,3 +27,10 @@ fixed: identity map + getter + drop Bouncer copy; tests; usage packets
 skipped: none
 localTests: passed
 
+## codereview (2026-09-05)
+phase: codereview
+findings: none
+fixed: none
+skipped: none
+pin: origin/master...HEAD
+
