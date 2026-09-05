@@ -1,3 +1,5 @@
+name: crowdsec-bouncer-e2e
+
 services:
   traefik:
     image: "traefik:v3.7.11"
@@ -15,9 +17,10 @@ services:
       - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.constraints=Label(`com.docker.compose.project`,`crowdsec-bouncer-e2e`)"
       - "--providers.file.filename=/etc/traefik/dynamic-scopes.yml"
       - "--entrypoints.web.address=:80"
-      - "--entrypoints.web.forwardedHeaders.trustedIPs=172.20.0.0/16"
+      - "--entrypoints.web.forwardedHeaders.trustedIPs=172.16.0.0/12,192.168.0.0/16,10.0.0.0/8,127.0.0.1/32"
       - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
       - "--experimental.localplugins.geoblock.modulename=github.com/david-garcia-garcia/traefik-geoblock"
       - "--experimental.localplugins.geoblock.settings.useunsafe=true"

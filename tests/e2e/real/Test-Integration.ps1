@@ -188,16 +188,16 @@ try {
         Write-Step "Waiting for services to become ready..."
         
         $servicesReady = @(
-            (Wait-ForHttpStatus -Url "http://localhost:8080/api/rawdata" -ExpectedStatusCodes @(200) -TimeoutSeconds 60).Success,
-            (Wait-ForHttpStatus -Url "http://localhost:8000/whoami" -ExpectedStatusCodes @(200) -TimeoutSeconds 60).Success,
-            (Wait-ForHttpStatus -Url "http://localhost:8000/redis-cache" -ExpectedStatusCodes @(200) -TimeoutSeconds 60).Success,
-            (Wait-ForHttpStatus -Url "http://localhost:8000/hold-redis" -ExpectedStatusCodes @(200) -TimeoutSeconds 60).Success,
-            (Wait-ForHttpStatus -Url "http://localhost:8000/scope-none" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
-            (Wait-ForHttpStatus -Url "http://localhost:8000/scope-stream" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
             (Wait-ForCondition -Description "CrowdSec LAPI" -TimeoutSeconds 180 -RetryIntervalSeconds 3 -Condition {
                 Invoke-CrowdSecAPI -Endpoint "/v1/decisions?limit=1" -TimeoutSec 5 -ApiKey $env:BOUNCER_API_KEY
                 return $true
             }).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8080/api/rawdata" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/whoami" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/redis-cache" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/hold-redis" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/scope-none" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/scope-stream" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/appsec" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success
         )
         

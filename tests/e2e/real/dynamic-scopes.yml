@@ -34,7 +34,8 @@ http:
           decisionScopeHeaders:
             Country: X-IPCountry
           forwardedHeadersTrustedIps:
-            - "172.20.0.1/32"
+            - "172.16.0.0/12"
+            - "127.0.0.1/32"
           forwardedHeadersCustomName: X-Forwarded-For
     bouncer-scope-stream:
       plugin:
@@ -49,7 +50,8 @@ http:
           decisionScopeHeaders:
             Country: X-IPCountry
           forwardedHeadersTrustedIps:
-            - "172.20.0.1/32"
+            - "172.16.0.0/12"
+            - "127.0.0.1/32"
           forwardedHeadersCustomName: X-Forwarded-For
     chain-scope-none:
       chain:
