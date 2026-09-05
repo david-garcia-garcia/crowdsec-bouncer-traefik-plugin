@@ -1,11 +1,11 @@
 ## Purpose
 
-The plugin Redis cache uses an in-tree copy of the pooled SimpleRedis client from simpleredis PR #8, not the published v1.0.12 module.
+The plugin Redis cache uses this repository’s pooled SimpleRedis client in `pkg/simpleredis`, not the published `github.com/maxlerebourg/simpleredis` module.
 
 ## Requirements
 
 ### Requirement: In-tree package is the Redis client
-The plugin SHALL import `github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis` for Redis GET/SET/DEL (and SHALL expose `MGet` on that package). Runtime SHALL NOT import `github.com/maxlerebourg/simpleredis`. The in-tree sources SHALL match simpleredis PR #8 (`pool-redis-connections`: pooled connections, RESP arrays, `Init`/`Get`/`Set`/`Del`/`MGet`).
+The plugin SHALL import `github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis` for Redis GET/SET/DEL (and SHALL expose `MGet` on that package). Runtime SHALL NOT import `github.com/maxlerebourg/simpleredis`. `pkg/simpleredis` is this plugin’s Redis client (pooled connections, RESP arrays, `Init`/`Get`/`Set`/`Del`/`MGet`). It MUST NOT be required to match an outside simpleredis repository or pull request. `pkg/simpleredis` MUST NOT contain `LICENSE` or `SOURCE` pin files.
 
 #### Scenario: Cache compiles against pkg/simpleredis
 - **WHEN** a reviewer inspects `pkg/cache/cache.go` and `go.mod`
@@ -13,7 +13,11 @@ The plugin SHALL import `github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
 
 #### Scenario: MGet is available without cache calling it
 - **WHEN** a caller uses `pkg/simpleredis`
-- **THEN** `MGet([]string) ([][]byte, error)` exists; `pkg/cache` still uses `Get`/`Set`/`Del` for one key per request
+- **THEN** `MGet([]string) ([][]byte, error)` exists
+
+#### Scenario: Package has no upstream pin files
+- **WHEN** a reviewer inspects `pkg/simpleredis`
+- **THEN** `LICENSE` and `SOURCE` are absent
 
 ### Requirement: Pooled client is not copied by value
 After `Init`, each `SimpleRedis` used by the cache SHALL be referenced by pointer (`writer` and `readers`). The cache MUST NOT store `SimpleRedis` values in a slice after initialisation.

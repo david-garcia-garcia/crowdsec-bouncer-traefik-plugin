@@ -3,7 +3,7 @@
 ## Language
 
 **In-tree SimpleRedis**:
-The pooled Redis client copied into `pkg/simpleredis` from simpleredis PR #8 (`Init`/`Get`/`Set`/`Del`/`MGet`/`Close`, RESP arrays, idle connections).
+This plugin’s pooled Redis client in `pkg/simpleredis` (`Init`/`Get`/`Set`/`Del`/`MGet`/`Close`, RESP arrays, idle connections).
 _Avoid_: published `github.com/maxlerebourg/simpleredis`, v1.0.12 vendor copy
 
 **Redis cache**:
@@ -33,7 +33,6 @@ values, err := r.MGet([]string{key, "range-index"})
 
 - `pkg/simpleredis/simpleredis.go`
 - `pkg/cache/cache.go`
-- `pkg/simpleredis/SOURCE`
 
 ## Gotchas
 
