@@ -42,7 +42,7 @@ CrowdSec's remediation spec names one fallback enum per backend: `lapi_failure_a
 
 ## Decisions
 
-- Stop after explore until the remaining assumed rows are accepted.
+- Human accepted the sketch (2026-09-05). Remaining wrap/default/ownership rows are resolved.
 - Public names: `LapiFailureAction` and `AppsecFailureAction` (human).
 - `AppsecFailureAction` replaces all three AppSec block booleans (human).
 - Do not flip this plugin's fail-closed defaults to CrowdSec's passthrough without an explicit human yes.
@@ -52,11 +52,11 @@ CrowdSec's remediation spec names one fallback enum per backend: `lapi_failure_a
 ## Open questions
 
 - Q: Does `LapiFailureAction` replace `UpdateMaxFailure`, or only name the action after the counter trips?
-  Decision: assumed — wrap, do not delete. Keep `UpdateMaxFailure` as the stream/alone unhealthy counter. `LapiFailureAction` is the ServeHTTP action on cache miss when unhealthy, and the LiveLookup error action. `-1` still means never unhealthy.
+  Decision: resolved — wrap, do not delete. Keep `UpdateMaxFailure` as the stream/alone unhealthy counter. `LapiFailureAction` is the ServeHTTP action on cache miss when unhealthy, and the LiveLookup error action. `-1` still means never unhealthy.
   By: explore
 
 - Q: What happens in live mode, which has no counter and already returns `BannedValue` on any LAPI error?
-  Decision: assumed — live uses `LapiFailureAction` per request (no new counter). `passthrough` → treat the error as allow; `ban` → current `BannedValue`; `captcha` only if a captcha provider is configured, else validate as ban.
+  Decision: resolved — live uses `LapiFailureAction` per request (no new counter). `passthrough` → treat the error as allow; `ban` → current `BannedValue`; `captcha` only if a captcha provider is configured, else validate as ban.
   By: explore
 
 - Q: Does `AppsecFailureAction` replace the three AppSec block booleans?
@@ -68,13 +68,13 @@ CrowdSec's remediation spec names one fallback enum per backend: `lapi_failure_a
   By: explore
 
 - Q: Default value — this plugin's fail-closed `ban`, or CrowdSec spec `passthrough`?
-  Decision: assumed — `ban` so dest `master` does not silently flip to fail-open.
+  Decision: resolved — `ban` so dest `master` does not silently flip to fail-open.
   By: explore
 
 - Q: When stream is unhealthy, should `passthrough` skip AppSec too, or still call AppSec on the pass path?
-  Decision: assumed — `LapiFailureAction=passthrough` uses the existing pass path (`handleNextServeHTTP`), so AppSec still runs if enabled.
+  Decision: resolved — `LapiFailureAction=passthrough` uses the existing pass path (`handleNextServeHTTP`), so AppSec still runs if enabled.
   By: explore
 
 - Q: Who owns the new keys on reclaim — CrowdsecConnection identity vs per-router Bouncer?
-  Decision: assumed — `LapiFailureAction` on CrowdsecConnection identity (with `UpdateMaxFailure`). `AppsecFailureAction` on Bouncer / `AppsecPolicy`, not in identity.
+  Decision: resolved — `LapiFailureAction` on CrowdsecConnection identity (with `UpdateMaxFailure`). `AppsecFailureAction` on Bouncer / `AppsecPolicy`, not in identity.
   By: explore
