@@ -201,7 +201,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 	var err error
 	var tlsAppsecConfig *tls.Config
 	if config.CrowdsecAppsecEnabled {
-		tlsAppsecConfig, err = configuration.GetTLSConfigCrowdsec(config, log, true)
+		tlsAppsecConfig, err = getTLSConfigCrowdsec(config, log, true)
 		if err != nil {
 			log.Error("New:getTLSConfigCrowdsec fail to get tlsAppsecConfig " + err.Error())
 			return nil, err
@@ -217,7 +217,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 	} else {
 		crowdsecStreamRoute = crowdsecLapiStreamRoute
 		crowdsecHeader = crowdsecLapiHeader
-		tlsConfig, err = configuration.GetTLSConfigCrowdsec(config, log, false)
+		tlsConfig, err = getTLSConfigCrowdsec(config, log, false)
 		if err != nil {
 			log.Error("New:getTLSConfigCrowdsec fail to get tlsConfig " + err.Error())
 			return nil, err
