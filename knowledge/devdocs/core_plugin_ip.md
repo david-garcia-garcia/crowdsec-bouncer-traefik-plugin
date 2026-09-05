@@ -30,7 +30,8 @@ ok, err := checker.Contains(remoteIP)
 
 ## Key files
 
-- `pkg/ip/ip.go`
+- `pkg/ip/checker.go`
+- `pkg/ip/network.go`
 - `pkg/iplookup/`
 - `pkg/bouncer/bouncer.go`
 - `pkg/configuration/configuration.go` (`validateParamsIPs`)

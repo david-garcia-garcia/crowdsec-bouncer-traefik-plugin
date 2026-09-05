@@ -2,36 +2,10 @@ package ip
 
 import (
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
-
-func TestInNetwork(t *testing.T) {
-	tests := []struct {
-		name    string
-		addr    string
-		network string
-		want    bool
-		wantErr bool
-	}{
-		{name: "CIDR contains", addr: "10.1.2.3", network: "10.0.0.0/8", want: true},
-		{name: "CIDR misses", addr: "11.0.0.1", network: "10.0.0.0/8", want: false},
-		{name: "bare IP equals", addr: "1.2.3.4", network: "1.2.3.4", want: true},
-		{name: "bare IP differs", addr: "1.2.3.4", network: "1.2.3.5", want: false},
-		{name: "bad address", addr: "not-an-ip", network: "10.0.0.0/8", wantErr: true},
-		{name: "bad network", addr: "1.2.3.4", network: "not-a-net", wantErr: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := InNetwork(tt.addr, tt.network)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("InNetwork(%q, %q) err=%v wantErr=%v", tt.addr, tt.network, err, tt.wantErr)
-			}
-			if !tt.wantErr && got != tt.want {
-				t.Fatalf("InNetwork(%q, %q)=%v want %v", tt.addr, tt.network, got, tt.want)
-			}
-		})
-	}
-}
 
 func TestCheckerContains(t *testing.T) {
 	log := slog.Default()
@@ -128,4 +102,71 @@ func TestCheckerContainsCatchAllFamily(t *testing.T) {
 			t.Fatalf("Contains IPv6 under ::/0 = %v, %v want true", ok, err)
 		}
 	})
+}
+
+func TestGetRemoteIP(t *testing.T) {
+	log := slog.Default()
+	hopChecker, err := NewChecker(log, []string{"10.0.0.1", "10.0.0.0/8"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	strategy := &PoolStrategy{Checker: hopChecker}
+
+	t.Run("trusted hops skipped, client kept", func(t *testing.T) {
+		req := newTestTrustRequest("192.0.2.9:80", "X-Forwarded-For", "203.0.113.10, 10.0.0.1")
+		got, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
+		if err != nil || got != "203.0.113.10" {
+			t.Fatalf("GetRemoteIP = %q, %v want 203.0.113.10", got, err)
+		}
+	})
+
+	t.Run("empty header uses RemoteAddr", func(t *testing.T) {
+		req := newTestTrustRequest("192.0.2.1:12345", "X-Forwarded-For", "")
+		got, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
+		if err != nil || got != "192.0.2.1" {
+			t.Fatalf("GetRemoteIP = %q, %v want 192.0.2.1", got, err)
+		}
+	})
+
+	t.Run("all hops trusted uses RemoteAddr", func(t *testing.T) {
+		req := newTestTrustRequest("192.0.2.9:80", "X-Forwarded-For", "10.0.0.1")
+		got, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
+		if err != nil || got != "192.0.2.9" {
+			t.Fatalf("GetRemoteIP = %q, %v want 192.0.2.9", got, err)
+		}
+	})
+
+	t.Run("empty header segments skipped", func(t *testing.T) {
+		req := newTestTrustRequest("192.0.2.9:80", "X-Forwarded-For", "203.0.113.10, , 10.0.0.1")
+		got, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
+		if err != nil || got != "203.0.113.10" {
+			t.Fatalf("GetRemoteIP = %q, %v want 203.0.113.10", got, err)
+		}
+	})
+
+	t.Run("custom header name", func(t *testing.T) {
+		req := newTestTrustRequest("192.0.2.9:80", "X-Real-IP", "203.0.113.10, 10.0.0.1")
+		got, err := GetRemoteIP(req, strategy, "X-Real-IP")
+		if err != nil || got != "203.0.113.10" {
+			t.Fatalf("GetRemoteIP custom header = %q, %v want 203.0.113.10", got, err)
+		}
+	})
+
+	t.Run("RemoteAddr without port fails", func(t *testing.T) {
+		req := newTestTrustRequest("192.0.2.1", "X-Forwarded-For", "")
+		_, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
+		if err == nil {
+			t.Fatal("expected error for RemoteAddr without port")
+		}
+	})
+}
+
+// newTestTrustRequest builds a request with RemoteAddr and an optional forwarded header.
+func newTestTrustRequest(remoteAddr, headerName, headerVal string) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, "http://example.test/", nil)
+	req.RemoteAddr = remoteAddr
+	if headerVal != "" {
+		req.Header.Set(headerName, headerVal)
+	}
+	return req
 }
