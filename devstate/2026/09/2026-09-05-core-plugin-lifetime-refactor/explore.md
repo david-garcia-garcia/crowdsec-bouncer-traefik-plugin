@@ -21,6 +21,10 @@ The per-router `http.Handler` Traefik gets back from `New`. Holds `next` plus pe
 **Client address**:
 Already owned by `pkg/ip.GetRemoteIP`. Bouncer calls that; Connection receives the IP string.
 
+## Purpose
+
+Kill first-wins globals so **one Traefik process can run two Crowdsec bouncer configs at once**: side-by-side config comparison, and multiple Crowdsec backends. Readability is a consequence. If two live configs still share a ticker or a cache, the split failed.
+
 ## Decisions
 
 Copy `pkg/reclaim` from geoblock (stdlib table, non-generic `any`, Yaegi-safe `create func() (any, error)`). Do not rewrite it. Do not use `Table[*T]` from another package (Yaegi panics).
@@ -74,11 +78,11 @@ Current vs desired ownership:
 | Metrics / dropped count | globals | Connection; `Close` ends the push loop |
 | Client IP | `ip.GetRemoteIP` | unchanged |
 
-**Key (assumed, differs from WAF on purpose):** `crowdsecconnection:` + FNV of the **connection** fields only (mode, LAPI/CAPI, redis, update/metrics intervals, AppSec host/client settings, HTTP timeout). Not Traefik middleware `name`. Not ban/captcha/trusted IPs/`Enabled`.
+**Key (resolved for two configs):** `crowdsecconnection:` + FNV of **connection** fields (mode, LAPI/CAPI, redis, update/metrics intervals, AppSec host/client settings, HTTP timeout). Not Traefik middleware `name`. Not ban/captcha/trusted IPs/`Enabled`.
 
-Sisters key `plugin:` + **name** + full config hash, so two WAF middleware names never share a core (`traefik-modsecurity/plugin_reuse_test.go` `TestNew_DifferentName_DoesNotShareCore`). Crowdsec today shares one stream across every middleware via globals. Putting `name` in the Connection key would start **one ticker per middleware name** (regression vs today). Connection identity is LAPI, not the Traefik alias.
+Same connection fields, two middleware names, N routers → one Connection (one backend, many routes). **Different** connection fields (other LAPI host/key, other mode, other redis, other stream interval, …) → **two Connections in the same process**, isolated caches and tickers. That is the product behavior. Today’s first-wins (`bouncer.go` 47–62) is what we remove.
 
-Same LAPI, two names, N routers → one Connection, N Bouncers. Config reload (cancel all holders, `New` within 10s) → `reclaim_reclaim`, same ticker. Last route gone + 10s → `Close()`. Two different LAPI hosts → two Connections (this **does** change first-wins-everything when operators actually configured two Crowdsecs; that is the instance the ticket asked for).
+WAF keys `plugin:` + name + full config so two *names* never share a core. We do not copy that for Connection: two aliases aimed at the same LAPI should still share one ticker. Two aliases aimed at different LAPIs (or different stream/live/redis) must not.
 
 ## Reproduced
 
@@ -90,19 +94,23 @@ Same LAPI, two names, N routers → one Connection, N Bouncers. Config reload (c
 
 ## Coverage bar (this change)
 
-Compiled `go test` owns lifetime. Copy the WAF reuse test shape (`plugin_reuse_test.go`): `reclaim.ResetWith` in cleanup; cancelable holder ctx (not Background for grace tests). Existing mock e2e + real Pester stay Yaegi-load proof.
+The claim to prove: **two bouncer configs in one process do not share ticker, cache, or LAPI**. First-wins is a failing test, not a comment.
+
+Compiled `go test` owns that claim (two `httptest` LAPIs, two `New` in one test). Copy WAF reuse tests for reclaim (`plugin_reuse_test.go`): `reclaim.ResetWith` in cleanup; cancelable holder ctx. Mock e2e proves the same claim **through Traefik** (one binary, two named middlewares). Existing scenarios stay. Real Pester is extra, not a substitute for the two-config tests.
 
 Must-have:
 
-1. Two `New` with live ctx and the same connection fields → same `*CrowdsecConnection`, one ticker (including different middleware names).
-2. Parallel `Open` race: one incarnation.
-3. Cancel all holders, `Open` same key before grace → reclaim, no second `create`, ticker still running (`reclaim_reclaim`).
-4. Cancel, wait past grace → `Close()` ran; next `Open` creates a new Connection (`reclaim_dispose`).
-5. Different LAPI host (different key) → two Connections, two tickers, **isolated caches** (A’s `Set` is not B’s `Get`, including Redis prefix).
-6. Stream sync against `httptest` LAPI; unhealthy after `UpdateMaxFailure`; live miss query.
-7. Bouncer `ServeHTTP` with injected Connection: disabled, trusted IP, cache hit pass/ban/captcha, stream unhealthy, live miss. `ip.GetRemoteIP` only.
-8. Ban/HEAD template matrix moves with `pkg/bouncer`.
-9. Production `create` takes **no** args (Yaegi). Tests use `newTestConnection` / `reclaim.NewTable` with short grace.
+1. Two `New` with live ctx and the **same** connection fields → same `*CrowdsecConnection`, one ticker (including different middleware names).
+2. Parallel `Open` race: one incarnation per key.
+3. Cancel all holders, `Open` same key before grace → reclaim, no second `create`.
+4. Cancel, wait past grace → `Close()`; next `Open` is a new Connection.
+5. **Two configs in one process (the point):** `New` with LAPI-A and `New` with LAPI-B (two `httptest` servers). Two Connection pointers. Ban IP X only on A → Bouncer-A remediates X, Bouncer-B does not. Isolated caches (A `Set` ≠ B `Get`). Two stream tickers; A’s stream `new` does not appear in B. Same IP can be banned on A and allowed on B at the same time.
+6. Side-by-side **mode** configs: stream Connection vs live Connection in one process; live miss queries only B’s LAPI; stream poll only A’s stream endpoint.
+7. Redis prefix: two Connections, same Redis host, isolated keys (decisions, `"updated"` lease, captcha grace).
+8. Bouncer `ServeHTTP` matrix with injected Connection: disabled, trusted IP, cache hit pass/ban/captcha, stream unhealthy, live miss. `ip.GetRemoteIP` only.
+9. Ban/HEAD template matrix moves with `pkg/bouncer`.
+10. Production `create` takes **no** args (Yaegi).
+11. **Mock e2e:** one Traefik, two routers, two middleware names, two LAPI mocks (or two keys). Request on router A follows config A; router B follows config B. Fail if first-wins (B sees A’s stream/cache). New scenario under `tests/e2e/mock/scenarios/`, not a third harness.
 
 ## Out of this design
 
@@ -124,7 +132,7 @@ Memory-mode store is **not** the package `ttl_map`. Each Connection owns an isol
   By: explore
 
 - Q: Reclaim key = middleware name + full config (WAF), or connection-field hash without name?
-  Decision: assumed — `crowdsecconnection:` + hash of LAPI/CAPI/redis/stream/AppSec client fields only. Name and ban/captcha/trusted IPs stay off the key so two aliases with the same LAPI share one ticker (today’s globals) without first-wins hiding a second LAPI.
+  Decision: resolved — `crowdsecconnection:` + hash of connection fields (not name). Same backend shares; different backends/configs are two Connections in one Traefik. That is the ticket.
   By: explore
 
 - Q: Does captcha live on Connection or Bouncer?
@@ -144,7 +152,7 @@ Memory-mode store is **not** the package `ttl_map`. Each Connection owns an isol
   By: explore
 
 - Q: How far does “exquisite” coverage go beyond compiled tests?
-  Decision: assumed — `go test` with reclaim grace/reclaim/dispose plus fake LAPI. Existing e2e is Yaegi proof.
+  Decision: resolved — `go test` must fail if two configs in one process share ticker/cache/LAPI (two httptest LAPIs). Mock e2e adds one scenario: one Traefik, two middlewares, two LAPIs. Real Pester is not a substitute.
   By: explore
 
 - Q: Is the memory cache a process singleton?
