@@ -49,6 +49,14 @@ findings: none
 fixed: none
 skipped: none
 
+## pullrequest (2026-09-05)
+
+phase: pullrequest
+findings: none
+fixed: none
+skipped: e2e mock captcha failed once then succeeded on retry
+
+
 
 
 
