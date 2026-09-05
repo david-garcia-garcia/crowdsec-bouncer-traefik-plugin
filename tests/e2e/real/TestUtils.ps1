@@ -177,6 +177,7 @@ function Test-HttpRequest {
             StatusCode = [int]$response.StatusCode
             Content = $response.Content
             ContentType = "$contentType"
+            Headers = $response.Headers
             Success = ($response.StatusCode -ge 200 -and $response.StatusCode -lt 300)
         }
     }
@@ -192,6 +193,7 @@ function Test-HttpRequest {
         return @{
             StatusCode = $statusCode
             Content = $content
+            Headers = @{}
             Success = $false
             Error = $_.Exception.Message
         }

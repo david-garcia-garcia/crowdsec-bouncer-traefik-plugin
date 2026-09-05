@@ -14,3 +14,8 @@ description: How tests inject and clear remediations on a real Crowdsec LAPI.
 priority: normal
 local: ext_crowdsec_decisions_scopes/
 description: Official CrowdSec decision scope values a bouncer can receive and how each is matched.
+
+## AppSec bot-detection challenge
+priority: normal
+local: ext_crowdsec_appsec_bot-detection/
+description: CrowdSec AppSec challenge-mode wire protocol a bouncer must implement to serve bot detection.

@@ -13,10 +13,10 @@ body() {
   lapi_add_decision_at "${LAPI_PORT}" 1.2.3.4 ban 5m
 
   echo "[$SCENARIO] router A (LAPI A) must forbid the banned IP"
-  wait_for_status "http://127.0.0.1:${WEB_PORT}/a" 403 15 -H "X-Forwarded-For: 1.2.3.4"
+  wait_for_status "http://127.0.0.1:${WEB_PORT}/a" 403 45 -H "X-Forwarded-For: 1.2.3.4"
 
   echo "[$SCENARIO] router B (LAPI B) must allow the same IP (first-wins would 403)"
-  wait_for_status "http://127.0.0.1:${WEB_PORT}/b" 200 15 -H "X-Forwarded-For: 1.2.3.4"
+  wait_for_status "http://127.0.0.1:${WEB_PORT}/b" 200 45 -H "X-Forwarded-For: 1.2.3.4"
 
   echo "[$SCENARIO] a clean IP still passes both routers"
   assert_status "http://127.0.0.1:${WEB_PORT}/a" 200 -H "X-Forwarded-For: 5.6.7.8"

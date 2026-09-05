@@ -214,7 +214,13 @@ func main() {
 		// exercised without standing up the real WAF.
 		go func() {
 			log.Fatal(http.ListenAndServe(*appsecAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "403") {
+				uri := r.Header.Get("X-Crowdsec-Appsec-Uri")
+				if strings.Contains(uri, "challenge") {
+					w.WriteHeader(http.StatusForbidden)
+					_, _ = w.Write([]byte(`{"action":"challenge","http_status":200,"user_body_content":"<html>e2e-challenge</html>","user_cookies":["__crowdsec_challenge=e2e; Path=/; HttpOnly"],"user_headers":{"Content-Type":["text/html"]}}`))
+					return
+				}
+				if strings.Contains(uri, "403") {
 					w.WriteHeader(http.StatusForbidden)
 				}
 				if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "500") {

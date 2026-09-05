@@ -19,6 +19,11 @@ body() {
   echo "[$SCENARIO] request that return 403 must be blocked (AppSec 403)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo/403" 403 -H "X-Forwarded-For: 1.2.3.4"
 
+  echo "[$SCENARIO] structured challenge JSON is relayed (status/body/cookie)"
+  assert_status "http://127.0.0.1:${WEB_PORT}/foo/challenge" 200 -H "X-Forwarded-For: 1.2.3.4"
+  assert_body_contains "http://127.0.0.1:${WEB_PORT}/foo/challenge" "e2e-challenge" -H "X-Forwarded-For: 1.2.3.4"
+  assert_header "http://127.0.0.1:${WEB_PORT}/foo/challenge" "Set-Cookie" "__crowdsec_challenge=e2e; Path=/; HttpOnly" -H "X-Forwarded-For: 1.2.3.4"
+
   echo "[$SCENARIO] request that return 500 must be blocked (because CrowdsecAppsecFailureBlock = true) (AppSec 500)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo/500" 403 -H "X-Forwarded-For: 1.2.3.4"
 
