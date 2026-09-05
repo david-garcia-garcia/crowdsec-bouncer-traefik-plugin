@@ -9,6 +9,6 @@ JobName: 2026-09-05-support-range-and-header-decisions
 | propose | [x] | [x] | 2026-09-05T09:43:30Z |
 | implement | [x] | [x] | 2026-09-05T11:12:49Z |
 | codereview | [x] | [x] | 2026-09-05T11:32:19Z |
-| devdocsimpact | [x] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-05T11:38:12Z |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |

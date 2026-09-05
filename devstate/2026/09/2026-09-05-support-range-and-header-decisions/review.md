@@ -1,5 +1,13 @@
 # Review
 
+## devdocsimpact (2026-09-05T11:38:12Z)
+phase: devdocsimpact
+findings: missing-packet Decision scopes; stale cache GetMany; stale e2e Country/file-provider; stale mock scope-headers
+fixed: core_plugin_decisionscope.md; core_cache_redis.md; core_cache_client.md; build_e2e_real.md; build_e2e_mock.md; core_plugin_middleware.md
+skipped: none
+ci: Main Process 33963724584 success; e2e 33963724592 success
+head: af64a74564a7aaeef802e029df5822f376c2ef19
+
 ## codereview (2026-09-05T11:32:19Z)
 phase: codereview
 findings: Standards 8, Spec 2, Security none, Performance 4
