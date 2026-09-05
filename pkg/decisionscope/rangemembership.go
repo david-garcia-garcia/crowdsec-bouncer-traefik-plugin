@@ -27,7 +27,7 @@ func MembershipFromIndex(index string) *RangeMembership {
 			continue
 		}
 		helper := captcha
-		if remediation == cache.BannedValue {
+		if cache.RemediationKind(remediation) == cache.BannedValue {
 			helper = ban
 		}
 		if err := helper.AddCIDR(network); err != nil {

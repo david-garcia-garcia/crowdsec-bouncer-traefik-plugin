@@ -159,7 +159,11 @@ type CrowdsecConnection struct {
 	streamStop              chan bool
 	metricsStop             chan bool
 	lastMetricsPush         time.Time
-	blockedRequests         int64
+	startedAt               time.Time
+	metricsMu               sync.Mutex
+	windowCounters          map[usageMetricKey]int64
+	activeDecisions         map[usageMetricKey]int64
+	activeDecisionSlots     map[string]usageMetricKey
 	streamFetches           int64
 }
 
@@ -252,6 +256,10 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		crowdsecHeader:          crowdsecHeader,
 		log:                     log,
 		pluginVersion:           pluginVersion,
+		startedAt:               time.Now(),
+		windowCounters:          make(map[usageMetricKey]int64),
+		activeDecisions:         make(map[usageMetricKey]int64),
+		activeDecisionSlots:     make(map[string]usageMetricKey),
 		isCrowdsecStreamStartup: true,
 		isCrowdsecStreamHealthy: true,
 		httpClient: &http.Client{
@@ -426,11 +434,6 @@ func (c *CrowdsecConnection) StreamFetches() int64 {
 	return atomic.LoadInt64(&c.streamFetches)
 }
 
-// IncBlocked increments the dropped-request metric.
-func (c *CrowdsecConnection) IncBlocked() {
-	atomic.AddInt64(&c.blockedRequests, 1)
-}
-
 // LiveLookup queries LAPI for one IP and mapped header scopes (none/live mode).
 func (c *CrowdsecConnection) LiveLookup(remoteIP string, scopes map[string]string) (string, error) {
 	return c.handleNoStreamCache(remoteIP, scopes)
@@ -568,6 +571,7 @@ func (c *CrowdsecConnection) handleStreamCache() error {
 			cidr := strings.TrimSpace(decision.Value)
 			if value != "" && cidr != "" {
 				rangeUpserts[cidr] = value
+				c.rememberActiveDecision("range:"+cidr, MetricsOrigin(decision.Origin, decision.Scenario), cidr)
 			}
 			continue
 		}
@@ -577,6 +581,7 @@ func (c *CrowdsecConnection) handleStreamCache() error {
 		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
 			if cidr := strings.TrimSpace(decision.Value); cidr != "" {
 				rangeRemovals = append(rangeRemovals, cidr)
+				c.forgetActiveDecision("range:" + cidr)
 			}
 			continue
 		}
@@ -777,66 +782,4 @@ func parseAppsecResponse(body []byte) (*AppsecResponse, error) {
 		return nil, err
 	}
 	return &decision, nil
-}
-
-func (c *CrowdsecConnection) reportMetrics() error {
-	now := time.Now()
-	currentCount := atomic.LoadInt64(&c.blockedRequests)
-	windowSizeSeconds := int(now.Sub(c.lastMetricsPush).Seconds())
-
-	c.log.Debug(fmt.Sprintf("reportMetrics: blocked_requests=%d window_size=%ds", currentCount, windowSizeSeconds))
-
-	metrics := map[string]interface{}{
-		"remediation_components": []map[string]interface{}{
-			{
-				"version": c.pluginVersion,
-				"type":    "bouncer",
-				"name":    "traefik_plugin",
-				"metrics": []map[string]interface{}{
-					{
-						"items": []map[string]interface{}{
-							{
-								"name":  "dropped",
-								"value": currentCount,
-								"unit":  "request",
-								"labels": map[string]string{
-									"type": "traefik_plugin",
-								},
-							},
-						},
-						"meta": map[string]interface{}{
-							"window_size_seconds": windowSizeSeconds,
-							"utc_now_timestamp":   now.Unix(),
-						},
-					},
-				},
-				"utc_startup_timestamp": time.Now().Unix(),
-				"feature_flags":         []string{},
-				"os": map[string]string{
-					"name":    "unknown",
-					"version": "unknown",
-				},
-			},
-		},
-	}
-
-	data, err := json.Marshal(metrics)
-	if err != nil {
-		return fmt.Errorf("reportMetrics:marshal %w", err)
-	}
-
-	metricsURL := url.URL{
-		Scheme: c.crowdsecScheme,
-		Host:   c.crowdsecHost,
-		Path:   c.crowdsecPath + crowdsecLapiMetricsRoute,
-	}
-
-	_, err = c.crowdsecQuery(metricsURL.String(), data)
-	if err != nil {
-		return fmt.Errorf("reportMetrics:query %w", err)
-	}
-
-	atomic.StoreInt64(&c.blockedRequests, 0)
-	c.lastMetricsPush = now
-	return nil
 }

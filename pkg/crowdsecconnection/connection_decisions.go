@@ -27,10 +27,14 @@ func (c *CrowdsecConnection) storeStreamDecision(item Decision, duration int64) 
 		c.log.Debug("handleStreamCache:unknownType " + item.Type)
 		return
 	}
+	origin := MetricsOrigin(item.Origin, item.Scenario)
+	stored := cache.RemediationWithOrigin(value, origin)
 	scope := decisionscope.NormalizeScope(item.Scope)
 	switch scope {
 	case decisionscope.ScopeIP, "":
-		c.cacheClient.Set(decisionscope.IPCacheKey(item.Value), value, duration)
+		slot := decisionscope.IPCacheKey(item.Value)
+		c.cacheClient.Set(slot, stored, duration)
+		c.rememberActiveDecision(slot, origin, item.Value)
 	case decisionscope.ScopeRange:
 		return
 	default:
@@ -42,7 +46,9 @@ func (c *CrowdsecConnection) storeStreamDecision(item Decision, duration int64) 
 		if identifier == "" {
 			return
 		}
-		c.cacheClient.Set(decisionscope.HeaderScopeKey(scope, identifier), value, duration)
+		slot := decisionscope.HeaderScopeKey(scope, identifier)
+		c.cacheClient.Set(slot, stored, duration)
+		c.rememberActiveDecision(slot, origin, item.Value)
 	}
 }
 
@@ -51,14 +57,18 @@ func (c *CrowdsecConnection) deleteStreamDecision(item Decision) {
 	scope := decisionscope.NormalizeScope(item.Scope)
 	switch scope {
 	case decisionscope.ScopeIP, "":
-		c.cacheClient.Delete(decisionscope.IPCacheKey(item.Value))
+		slot := decisionscope.IPCacheKey(item.Value)
+		c.forgetActiveDecision(slot)
+		c.cacheClient.Delete(slot)
 		c.cacheClient.Delete(item.Value)
 	case decisionscope.ScopeRange:
 		return
 	default:
 		identifier := decisionscope.NormalizeHeaderScopeValue(scope, item.Value)
 		if identifier != "" {
-			c.cacheClient.Delete(decisionscope.HeaderScopeKey(scope, identifier))
+			slot := decisionscope.HeaderScopeKey(scope, identifier)
+			c.forgetActiveDecision(slot)
+			c.cacheClient.Delete(slot)
 		}
 	}
 }
@@ -98,7 +108,7 @@ func (c *CrowdsecConnection) queryLiveDecisions(rawQuery string) (string, time.D
 	if value == "" {
 		return cache.NoBannedValue, 0, nil
 	}
-	return value, parsedDuration, nil
+	return cache.RemediationWithOrigin(value, MetricsOrigin(picked.Origin, picked.Scenario)), parsedDuration, nil
 }
 
 // strongestLiveDecision returns the first ban in items, else the first captcha.

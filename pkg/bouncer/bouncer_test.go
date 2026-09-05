@@ -39,7 +39,7 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 			}
 			rw := httptest.NewRecorder()
 			req := &http.Request{Method: tt.method}
-			b.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST")
+			b.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST", "")
 			if rw.Code != http.StatusForbidden {
 				t.Errorf("Expected status code 403, got %d", rw.Code)
 			}
@@ -80,7 +80,7 @@ func TestHandleBanServeHTTPContentType(t *testing.T) {
 			}
 			rw := httptest.NewRecorder()
 			req := &http.Request{Method: http.MethodGet}
-			b.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST")
+			b.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST", "")
 			if got := rw.Header().Get("Content-Type"); got != tt.banTemplateContentType {
 				t.Errorf("Expected Content-Type %q, got %q", tt.banTemplateContentType, got)
 			}
