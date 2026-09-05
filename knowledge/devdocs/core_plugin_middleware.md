@@ -14,6 +14,10 @@ _Avoid_: ForRoute, Plugin core, the reclaim value
 The operator enum (`passthrough` | `ban` | `captcha`) this plugin applies when LAPI or AppSec does not return a usable verdict. LAPI action is on CrowdsecConnection identity; AppSec action is per-router on Bouncer. Default is `ban`.
 _Avoid_: fail mode, FailMode, the three removed AppSec block bools, AppSec JSON `action: captcha`
 
+**Prepared snapshot**:
+A copy of Traefik’s `*configuration.Config` that `New` mutates (log level, path aliases, Prepare). Reclaim identity and Crowdsec connection construction use this copy.
+_Avoid_: Traefik’s live Config pointer, Prepared type
+
 ## Overview
 
 Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New` must use the constructor `ctx` as the reclaim holder. Do not change `.traefik.yml` `import`.
