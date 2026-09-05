@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-05T16:30:47Z
+Developer review: in progress — 2026-09-05T16:34:38Z
 
 ## What this changes
 **Operators.** None.
 
 **Admin users.** None.
 
-**Developers.** OpenSpec change `put-decision-scope-headers-on-identity` folds `core_plugin_middleware_instance-reclaim` and `core_plugin_decisions_scopes` so the normalized `decisionScopeHeaders` map is on CrowdsecConnection identity. Go apply is not landed yet.
+**Developers.** `CrowdsecConnection` reclaim identity now includes the normalized `decisionScopeHeaders` map. `Bouncer` no longer stores a copy; `ServeHTTP` reads `conn.DecisionScopeHeaders()`. Two `New()` with the same LAPI host and different maps do not `SameConnection`.
 
 **End users.** None.
 
@@ -13,18 +13,18 @@ Developer review: in progress — 2026-09-05T16:30:47Z
 On master, `decisionScopeHeaders` is copied onto both `Bouncer` and `CrowdsecConnection` and is omitted from reclaim identity. Two Traefik routers with the same LAPI and different maps share one stream ticker and cache; the first `New` wins, so Country/AS ingest for the second route is wrong. Until this PR lands, operators cannot attach two header maps to one LAPI in the same Traefik.
 
 ## Merge readiness
-Proposal is apply-ready; product Go has not changed yet. 1 item remains.
+Apply is on the branch; remote CI is still running. 1 item remains.
 
 Priority: P2 — Real operator pain, with a workaround or limited blast radius
-Reviewed head: ade8383
+Reviewed head: 683620b
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Proposal landed; CI in progress; Go apply not done |
-| CI proof | 3/6 | Main Process and mock e2e succeeded; docker pester in progress |
-| Local tests proof | N/A | Before implement; remote CI covers proof |
+| Overall readiness | 3/6 | Apply landed; CI in progress |
+| CI proof | 3/6 | Checks in progress on 683620b |
+| Local tests proof | N/A | Remote CI covers proof; `go test ./pkg/...` passed; `TestNew_*` passed |
 | Review resolution | 6/6 | No PR comments |
 
 ## Verification
@@ -33,12 +33,12 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-05-scope-headers-identity pushed | `git` |
 | OpenSpec | put-decision-scope-headers-on-identity | `openspec/changes/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/18 | GitHub MCP |
-| CI | build 33978014893 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33978014893 | GitHub MCP get_check_runs |
-| Local tests | none | handoff.yaml |
+| CI | build 33978297592 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33978297592 | GitHub MCP get_check_runs |
+| Local tests | passed | handoff.yaml; `go test ./pkg/...`; `go test -run TestNew_|TestServeHTTP .` |
 | PR comments | no comments | GitHub MCP |
-| Security | None. | no codereview.md |
-| Performance | None. | no codereview.md |
-| Dead | None. | no codereview.md |
+| Security | None. | no codereview.md yet |
+| Performance | None. | no codereview.md yet |
+| Dead | None. | no codereview.md yet |
 
 ## Specs
 - [core_plugin_middleware_instance-reclaim](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-05-scope-headers-identity/openspec/changes/put-decision-scope-headers-on-identity/proposal.md) — modified
@@ -48,7 +48,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local ticket 2026-09-05-scope-headers-identity, stub PR 18. Propose folded two existing specs. Next is implement.
+Local ticket 2026-09-05-scope-headers-identity, PR 18. Identity apply is on 683620b. Next is five-axis code review.
 
 ## Decision needed
 | Question | Decision | By |
@@ -60,8 +60,7 @@ Local ticket 2026-09-05-scope-headers-identity, stub PR 18. Propose folded two e
 | Getter name on CrowdsecConnection? | assumed — `DecisionScopeHeaders()` returning the stored normalized map. Callers must not mutate it. | explore |
 
 ## Before merge
-- [ ] Apply identity + getter + drop Bouncer copy
-- [ ] Prove two `New()` with the same LAPI host and different maps do not `SameConnection`
+- [ ] Wait for CI on 683620b to succeed
 
 ## Findings
 None.
@@ -82,22 +81,23 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | ade8383eea083b4fc3412ba441ca1c22543f0174 | Card must match the branch you measured |
+| Reviewed head | 683620bbfd641d8608486546b86d5a8dfb1977ec | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: Fold the map onto existing reclaim identity versus master, matching LAPI failure action and unlike per-route AppSec failure action.
+Best possible solution: Put the normalized map on existing reclaim identity versus master so stream `scopes=` cannot be stolen by the first `New`.
 
-Do we have a high-confidence way to reproduce? Yes, `identity.go` omits the map.
+Do we have a high-confidence way to reproduce? Yes, `TestNew_DifferentDecisionScopeHeaders_IsolatedConnection` now fails on master and passes here.
 
-Is this the best way to solve the issue? Yes versus master: stream `scopes=` is a connection fact.
+Is this the best way to solve the issue? Yes versus master: stream ingest is a connection fact, unlike per-route AppSec failure action.
 
 ### Evidence
 What I checked:
-- `openspec validate put-decision-scope-headers-on-identity` valid (openspec 1.7.0)
-- FindSpecHost fold `core_plugin_middleware_instance-reclaim` and `core_plugin_decisions_scopes`
+- `go test -run TestNew_|TestServeHTTP .` passed (683620b)
+- `go test ./pkg/...` passed
+- Root `TestBouncerFileLogging*` fail on Windows TempDir cleanup only (assertions already passed)
 
 ### Rank-up moves
 None.

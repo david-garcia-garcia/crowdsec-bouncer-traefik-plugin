@@ -19,3 +19,11 @@ findings: none
 fixed: none
 skipped: none
 change: put-decision-scope-headers-on-identity
+
+## implement (2026-09-05)
+phase: implement
+findings: none
+fixed: identity map + getter + drop Bouncer copy; tests; usage packets
+skipped: none
+localTests: passed
+
