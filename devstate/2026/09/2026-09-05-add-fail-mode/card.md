@@ -34,7 +34,7 @@ Owner decision: None.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-05-add-fail-mode pushed | git @ c2d6141 |
-| OpenSpec | lapi-appsec-failure-action | openspec/changes/lapi-appsec-failure-action/ |
+| OpenSpec | lapi-appsec-failure-action | openspec/changes/archive/2026-09-05-lapi-appsec-failure-action/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/10 | pr-host |
 | CI | build 33969597623 in_progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33969597623 ; e2e 33969597637 in_progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33969597637 | get_check_runs |
 | Local tests | passed | handoff.yaml; `go test ./pkg/configuration/ ./pkg/bouncer/` after review fixes |
@@ -43,13 +43,12 @@ Owner decision: None.
 | Performance | None. | destate/codereview.md |
 
 ## Specs
-- [core_plugin_lapi_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-05-add-fail-mode/openspec/changes/lapi-appsec-failure-action/proposal.md) — added
-- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-05-add-fail-mode/openspec/changes/lapi-appsec-failure-action/proposal.md) — added
-- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-05-add-fail-mode/openspec/changes/lapi-appsec-failure-action/proposal.md) — modified
+- [core_plugin_lapi_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-05-add-fail-mode/openspec/changes/archive/2026-09-05-lapi-appsec-failure-action/proposal.md) — added
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-05-add-fail-mode/openspec/changes/archive/2026-09-05-lapi-appsec-failure-action/proposal.md) — added
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-05-add-fail-mode/openspec/changes/archive/2026-09-05-lapi-appsec-failure-action/proposal.md) — modified
 
 ## Follow-up issues
-- [ ] [note] [large] public `crowdsecAppsecFailureBlock` / `crowdsecAppsecUnreachableBlock` / `crowdsecAppsecUnreadableBodyBlock` → `crowdsecAppsecFailureAction`
-- [ ] [note] [large] public `updateMaxFailure` vs new `crowdsecLapiFailureAction`
+None.
 
 ## How this fits together
 Ticket on dest `master`. Stub PR 10. Review applied empty-reject and live `ReasonLAPI`. Devdocs impact next.
