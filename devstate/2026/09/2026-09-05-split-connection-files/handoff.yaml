@@ -1,0 +1,17 @@
+issueKey: 2026-09-05-split-connection-files
+jobName: 2026-09-05-split-connection-files
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: 6ccf01340e3e1ecb21627ba3a28a0434843c6533176e34c0fe5b1b3e0f3f6241
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr:
+  id: 16
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/16
