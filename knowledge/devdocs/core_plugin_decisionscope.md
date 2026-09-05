@@ -40,7 +40,7 @@ value, err := decisionscope.LookupCachedRemediation(cacheClient, mode, remoteIP,
 ## Key files
 
 - `pkg/decisionscope/`
-- `pkg/configuration/configuration.go` (`DecisionScopeHeaders`)
+- `pkg/configuration/config.go` (`DecisionScopeHeaders`)
 - `pkg/bouncer/bouncer.go`
 - `pkg/crowdsecconnection/connection.go`
 - `pkg/crowdsecconnection/connection_decisions.go`

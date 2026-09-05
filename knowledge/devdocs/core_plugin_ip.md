@@ -33,7 +33,7 @@ ok, err := checker.Contains(remoteIP)
 - `pkg/ip/ip.go`
 - `pkg/iplookup/`
 - `pkg/bouncer/bouncer.go`
-- `pkg/configuration/configuration.go` (`validateParamsIPs`)
+- `pkg/configuration/validate.go` (`validateParamsIPs`)
 
 ## Gotchas
 
