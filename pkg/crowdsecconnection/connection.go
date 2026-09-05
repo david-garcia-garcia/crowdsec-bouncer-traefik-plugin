@@ -468,7 +468,7 @@ func (c *CrowdsecConnection) getToken() error {
 		return nil
 	}
 	c.log.Warn("getToken statusCode:" + strconv.Itoa(login.Code))
-	return fmt.Errorf("getToken statusCode:%d", login.Code)
+	return errors.New("getToken statusCode:" + strconv.Itoa(login.Code))
 }
 
 func (c *CrowdsecConnection) handleStreamCache() error {
@@ -651,7 +651,7 @@ func (c *CrowdsecConnection) AppsecQuery(ip string, httpReq *http.Request, pol A
 		return nil
 	}
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("appsecQuery statusCode:%d", res.StatusCode)
+		return errors.New("appsecQuery statusCode:" + strconv.Itoa(res.StatusCode))
 	}
 	return nil
 }
