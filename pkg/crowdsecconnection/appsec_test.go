@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
@@ -76,7 +77,7 @@ func Test_appsecQuery_streamingDoesNotBlock(t *testing.T) {
 	defer close(done)
 	finished := make(chan error, 1)
 	go func() {
-		_, err := conn.AppsecQuery("1.2.3.4", newStreamingRequest(done), AppsecPolicy{UnreachableBlock: true, FailureBlock: true})
+		_, err := conn.AppsecQuery("1.2.3.4", newStreamingRequest(done), AppsecPolicy{FailureAction: configuration.FailureActionPassthrough})
 		finished <- err
 	}()
 	select {
@@ -100,7 +101,7 @@ func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
 	defer close(done)
 	finished := make(chan error, 1)
 	go func() {
-		_, err := conn.AppsecQuery("1.2.3.4", newStreamingRequest(done), AppsecPolicy{UnreadableBodyBlock: true})
+		_, err := conn.AppsecQuery("1.2.3.4", newStreamingRequest(done), AppsecPolicy{FailureAction: configuration.FailureActionBan})
 		finished <- err
 	}()
 	select {
@@ -131,7 +132,7 @@ func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 	defer close(done)
 	finished := make(chan error, 1)
 	go func() {
-		_, err := conn.AppsecQuery("1.2.3.4", newUnreadableGetRequest(done), AppsecPolicy{UnreadableBodyBlock: true})
+		_, err := conn.AppsecQuery("1.2.3.4", newUnreadableGetRequest(done), AppsecPolicy{FailureAction: configuration.FailureActionBan})
 		finished <- err
 	}()
 	select {
@@ -164,7 +165,7 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 			const calls = 10
 			for i := 0; i < calls; i++ { //nolint:intrange
 				req, _ := http.NewRequest(http.MethodGet, "http://localhost/", nil)
-				_, _ = conn.AppsecQuery("1.2.3.4", req, AppsecPolicy{FailureBlock: false})
+				_, _ = conn.AppsecQuery("1.2.3.4", req, AppsecPolicy{FailureAction: configuration.FailureActionPassthrough})
 			}
 			mu.Lock()
 			defer mu.Unlock()

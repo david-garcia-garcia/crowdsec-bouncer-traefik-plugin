@@ -390,22 +390,14 @@ make run
   - string
   - default: "/"
   - Crowdsec Appsec Server available on this path. Will be appended to CrowdsecAppsecHost. Need to finish with "/".
-- CrowdsecAppsecFailureBlock
-  - bool
-  - default: true
-  - Block request when Crowdsec Appsec Server have a [status 500](https://docs.crowdsec.net/docs/next/appsec/protocol#response-code).
-- CrowdsecAppsecUnreachableBlock
-  - bool
-  - default: true
-  - Block request when Crowdsec Appsec Server is unreachable.
+- CrowdsecAppsecFailureAction
+  - string
+  - default: `ban`, expected values are: `passthrough`, `ban`, `captcha`
+  - What to do when AppSec does not return a usable verdict: HTTP 500, unreachable (dial or 502/503/504), or an unreadable HTTP/2 or HTTP/3 body on a method that would send a body. `ban` drops the request. `passthrough` lets 500/unreachable continue as allow, and sends a headers-only GET to AppSec when the body cannot be buffered. `captcha` uses the plugin captcha client (`captchaProvider` must be set). **BREAKING:** this key replaces `crowdsecAppsecFailureBlock`, `crowdsecAppsecUnreachableBlock`, and `crowdsecAppsecUnreadableBodyBlock`. Operators who had those bools set to `false` MUST set `crowdsecAppsecFailureAction: passthrough`.
 - CrowdsecAppsecBodyLimit
   - int64
   - default: 10485760 (= 10MB)
   - Transmit only the first number of bytes to Crowdsec Appsec Server.
-- CrowdsecAppsecUnreadableBodyBlock
-  - bool
-  - default: true
-  - Behaviour when the request body cannot be buffered for inspection (HTTP/2 or HTTP/3 request without a `Content-Length`, typically a bidirectional gRPC stream). When `false` the request is forwarded to the Appsec Server with headers only (the body is left to stream through untouched). When `true` the request is blocked outright. Mirrors the reference bouncers' `APPSEC_DROP_UNREADABLE_BODY` option.
 - CrowdsecAppsecKey
   - string
   - default: value of `CrowdsecLapiKey`
@@ -498,6 +490,10 @@ make run
   - int64
   - default: 0
   - Used only in `stream` and `alone` mode, the maximum number of time we can not reach Crowdsec before blocking traffic (set -1 to never block)
+- CrowdsecLapiFailureAction
+  - string
+  - default: `ban`, expected values are: `passthrough`, `ban`, `captcha`
+  - What to do when LAPI does not return a usable verdict: live/none HTTP or parse error, or a cache miss while stream/alone is unhealthy after `updateMaxFailure`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the existing pass path (AppSec still runs if enabled). `captcha` uses the plugin captcha client (`captchaProvider` must be set).
 - StreamStartupBlock
   - bool
   - default: true
@@ -637,6 +633,7 @@ http:
           LogFilePath: ""
           updateIntervalSeconds: 60
           updateMaxFailure: 0
+          crowdsecLapiFailureAction: ban
           streamStartupBlock: true
           defaultDecisionSeconds: 60
           remediationStatusCode: 403
@@ -646,10 +643,8 @@ http:
           crowdsecAppsecScheme: ""
           crowdsecAppsecHost: crowdsec:7422
           crowdsecAppsecPath: "/"
-          crowdsecAppsecFailureBlock: true
-          crowdsecAppsecUnreachableBlock: true
+          crowdsecAppsecFailureAction: ban
           crowdsecAppsecBodyLimit: 10485760
-          crowdsecAppsecUnreadableBodyBlock: false
           crowdsecLapiKey: privateKey-foo
           crowdsecLapiScheme: http
           crowdsecLapiHost: crowdsec:8080

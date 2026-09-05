@@ -45,5 +45,6 @@ return bouncer.New(next, name, config, conn, log)
 ## Gotchas
 
 - Do not put middleware name, `next`, ban/captcha templates, trusted IPs, or Enabled in the reclaim key.
+- `crowdsecLapiFailureAction` is on CrowdsecConnection identity (shared with `updateMaxFailure`). `crowdsecAppsecFailureAction` stays on Bouncer.
 - Same connection fields share one ticker; different LAPI/mode/redis/interval are two Connections in one Traefik.
 - `Close()` stops tickers, idle LAPI/AppSec HTTP, and the cache Redis pool when no constructor ctx remains and grace elapses. Do not use `sync.Once`.

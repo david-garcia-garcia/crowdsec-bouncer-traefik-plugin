@@ -8,6 +8,7 @@ import (
 	"text/template"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
@@ -302,4 +303,75 @@ func TestHandleNextServeHTTPAllowCallsNext(t *testing.T) {
 	if !nextCalled {
 		t.Fatal("next handler should be called for allow")
 	}
+}
+
+func TestApplyLapiFailureAction(t *testing.T) {
+	t.Run("passthrough calls next", func(t *testing.T) {
+		nextCalled := false
+		b := &Bouncer{
+			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				nextCalled = true
+			}),
+			log:  logger.New("ERROR", ""),
+			conn: crowdsecconnection.NewTestLapiFailureActionConnection(configuration.FailureActionPassthrough),
+		}
+		b.applyLapiFailureAction(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10")
+		if !nextCalled {
+			t.Fatal("passthrough should use the pass path")
+		}
+	})
+	t.Run("ban forbids", func(t *testing.T) {
+		b := &Bouncer{
+			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Error("next handler should not be called")
+			}),
+			remediationStatusCode: http.StatusForbidden,
+			log:                   logger.New("ERROR", ""),
+			conn:                  crowdsecconnection.NewTestLapiFailureActionConnection(configuration.FailureActionBan),
+		}
+		recorder := httptest.NewRecorder()
+		b.applyLapiFailureAction(recorder, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10")
+		if recorder.Code != http.StatusForbidden {
+			t.Fatalf("ban want 403, got %d", recorder.Code)
+		}
+	})
+}
+
+func TestHandleNextServeHTTPAppsecFailureAction(t *testing.T) {
+	t.Run("500 passthrough calls next", func(t *testing.T) {
+		appsec := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer appsec.Close()
+		appsecURL, err := url.Parse(appsec.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		nextCalled := false
+		b := &Bouncer{
+			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				nextCalled = true
+			}),
+			appsecEnabled:       true,
+			appsecFailureAction: configuration.FailureActionPassthrough,
+			log:                 logger.New("ERROR", ""),
+			conn:                crowdsecconnection.NewTestAppsecConnection(appsecURL, appsec.Client(), logger.New("ERROR", "")),
+		}
+		b.handleNextServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10")
+		if !nextCalled {
+			t.Fatal("passthrough on AppSec 500 should call next")
+		}
+	})
+	t.Run("500 ban forbids", func(t *testing.T) {
+		b, appsec := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}, nil)
+		defer appsec.Close()
+		b.appsecFailureAction = configuration.FailureActionBan
+		recorder := httptest.NewRecorder()
+		b.handleNextServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10")
+		if recorder.Code != http.StatusForbidden {
+			t.Fatalf("ban on AppSec 500 want 403, got %d", recorder.Code)
+		}
+	})
 }

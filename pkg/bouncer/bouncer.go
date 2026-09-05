@@ -2,6 +2,7 @@
 package bouncer
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -23,23 +24,21 @@ type Bouncer struct {
 	name     string
 	template *template.Template
 
-	enabled                   bool
-	appsecEnabled             bool
-	appsecFailureBlock        bool
-	appsecUnreachableBlock    bool
-	appsecUnreadableBodyBlock bool
-	remediationStatusCode     int
-	remediationCustomHeader   string
-	forwardedCustomHeader     string
-	banTemplate               *template.Template
-	banTemplateContentType    string
-	traceCustomHeader         string
-	clientPoolStrategy        *ip.PoolStrategy
-	serverPoolStrategy        *ip.PoolStrategy
-	captchaClient             *captcha.Client
-	log                       *slog.Logger
-	conn                      *crowdsecconnection.CrowdsecConnection
-	decisionScopeHeaders      map[string]string // CrowdSec header scope → request header
+	enabled                 bool
+	appsecEnabled           bool
+	appsecFailureAction     string
+	remediationStatusCode   int
+	remediationCustomHeader string
+	forwardedCustomHeader   string
+	banTemplate             *template.Template
+	banTemplateContentType  string
+	traceCustomHeader       string
+	clientPoolStrategy      *ip.PoolStrategy
+	serverPoolStrategy      *ip.PoolStrategy
+	captchaClient           *captcha.Client
+	log                     *slog.Logger
+	conn                    *crowdsecconnection.CrowdsecConnection
+	decisionScopeHeaders    map[string]string // CrowdSec header scope → request header
 }
 
 // New returns a per-router handler bound to conn.
@@ -54,26 +53,24 @@ func New(next http.Handler, name string, config *configuration.Config, conn *cro
 	}
 
 	routeHandler := &Bouncer{
-		next:                      next,
-		name:                      name,
-		template:                  template.New("CrowdsecBouncer").Delims("[[", "]]"),
-		enabled:                   config.Enabled,
-		appsecEnabled:             config.CrowdsecAppsecEnabled,
-		appsecFailureBlock:        config.CrowdsecAppsecFailureBlock,
-		appsecUnreachableBlock:    config.CrowdsecAppsecUnreachableBlock,
-		appsecUnreadableBodyBlock: config.CrowdsecAppsecUnreadableBodyBlock,
-		remediationCustomHeader:   config.RemediationHeadersCustomName,
-		forwardedCustomHeader:     config.ForwardedHeadersCustomName,
-		remediationStatusCode:     config.RemediationStatusCode,
-		banTemplate:               banTemplate,
-		banTemplateContentType:    banTemplateContentType,
-		traceCustomHeader:         config.TraceHeadersCustomName,
-		log:                       log,
-		conn:                      conn,
-		decisionScopeHeaders:      decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
-		serverPoolStrategy:        &ip.PoolStrategy{Checker: serverChecker},
-		clientPoolStrategy:        &ip.PoolStrategy{Checker: clientChecker},
-		captchaClient:             &captcha.Client{},
+		next:                    next,
+		name:                    name,
+		template:                template.New("CrowdsecBouncer").Delims("[[", "]]"),
+		enabled:                 config.Enabled,
+		appsecEnabled:           config.CrowdsecAppsecEnabled,
+		appsecFailureAction:     configuration.EffectiveFailureAction(config.CrowdsecAppsecFailureAction),
+		remediationCustomHeader: config.RemediationHeadersCustomName,
+		forwardedCustomHeader:   config.ForwardedHeadersCustomName,
+		remediationStatusCode:   config.RemediationStatusCode,
+		banTemplate:             banTemplate,
+		banTemplateContentType:  banTemplateContentType,
+		traceCustomHeader:       config.TraceHeadersCustomName,
+		log:                     log,
+		conn:                    conn,
+		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
+		serverPoolStrategy:      &ip.PoolStrategy{Checker: serverChecker},
+		clientPoolStrategy:      &ip.PoolStrategy{Checker: clientChecker},
+		captchaClient:           &captcha.Client{},
 	}
 	if config.CrowdsecMode == configuration.AppsecMode {
 		routeHandler.log.Debug("Bouncer initialized name:" + name)
@@ -183,19 +180,36 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			b.handleNextServeHTTP(rw, req, remoteIP)
 		} else {
 			b.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", remoteIP))
-			b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
+			b.applyLapiFailureAction(rw, req, remoteIP)
 		}
 	} else {
 		value, err := b.conn.LiveLookup(remoteIP, scopes)
+		if err != nil && !decisionscope.IsActiveRemediation(value) {
+			b.log.Debug("ServeHTTP:LiveLookup " + err.Error())
+			b.applyLapiFailureAction(rw, req, remoteIP)
+			return
+		}
 		if err != nil {
 			b.log.Debug("ServeHTTP:LiveLookup " + err.Error())
 		}
 		if value == cache.NoBannedValue {
 			b.handleNextServeHTTP(rw, req, remoteIP)
-		} else {
-			b.log.Debug(fmt.Sprintf("ServeHTTP:LiveLookup ip:%s isBanned:%v %s", remoteIP, value, err.Error()))
-			b.handleRemediationServeHTTP(rw, req, remoteIP, value)
+			return
 		}
+		b.log.Debug(fmt.Sprintf("ServeHTTP:LiveLookup ip:%s isBanned:%v", remoteIP, value))
+		b.handleRemediationServeHTTP(rw, req, remoteIP, value)
+	}
+}
+
+// applyLapiFailureAction remediates a live LAPI error or stream-unhealthy cache miss.
+func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req *http.Request, remoteIP string) {
+	switch b.conn.LapiFailureAction() {
+	case configuration.FailureActionPassthrough:
+		b.handleNextServeHTTP(rw, req, remoteIP)
+	case configuration.FailureActionCaptcha:
+		b.handleRemediationServeHTTP(rw, req, remoteIP, cache.CaptchaValue)
+	default:
+		b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
 	}
 }
 
@@ -249,11 +263,13 @@ func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *http.R
 func (b *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string) {
 	if b.appsecEnabled {
 		pol := crowdsecconnection.AppsecPolicy{
-			FailureBlock:        b.appsecFailureBlock,
-			UnreachableBlock:    b.appsecUnreachableBlock,
-			UnreadableBodyBlock: b.appsecUnreadableBodyBlock,
+			FailureAction: b.appsecFailureAction,
 		}
 		decision, err := b.conn.AppsecQuery(remoteIP, req, pol)
+		if errors.Is(err, crowdsecconnection.ErrFailureCaptcha) {
+			b.handleRemediationServeHTTP(rw, req, remoteIP, cache.CaptchaValue)
+			return
+		}
 		if err != nil {
 			b.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
 			b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)

@@ -74,11 +74,30 @@ type Login struct {
 	Expire string `json:"expire"`
 }
 
-// AppsecPolicy is per-route AppSec drop behavior. The HTTP client and host live on CrowdsecConnection.
+// AppsecPolicy is per-route AppSec fallback when the listener does not return a usable verdict.
 type AppsecPolicy struct {
-	FailureBlock        bool
-	UnreachableBlock    bool
-	UnreadableBodyBlock bool
+	FailureAction string
+}
+
+// ErrFailureCaptcha tells the bouncer to run pkg/captcha instead of ban or next.
+var ErrFailureCaptcha = errors.New("failureAction captcha")
+
+// resultForFailureAction maps a configured fallback to allow, captcha, or an error ban.
+func resultForFailureAction(action, errMsg string) (*AppsecResponse, error) {
+	switch configuration.EffectiveFailureAction(action) {
+	case configuration.FailureActionPassthrough:
+		return appsecAllow(), nil
+	case configuration.FailureActionCaptcha:
+		return nil, ErrFailureCaptcha
+	default:
+		return nil, errors.New(errMsg)
+	}
+}
+
+// resultForFailureActionErr is resultForFailureAction when only an error is needed (request build).
+func resultForFailureActionErr(action, errMsg string) error {
+	_, err := resultForFailureAction(action, errMsg)
+	return err
 }
 
 // AppsecResponse is the structured AppSec JSON envelope CrowdSec 1.8 returns for a remediation.
@@ -113,6 +132,7 @@ type CrowdsecConnection struct {
 	crowdsecScenarios      []string
 	updateInterval         int64
 	updateMaxFailure       int64
+	lapiFailureAction      string
 	defaultDecisionTimeout int64
 	crowdsecStreamRoute    string
 	crowdsecHeader         string
@@ -222,6 +242,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		crowdsecScenarios:       config.CrowdsecCapiScenarios,
 		updateInterval:          config.UpdateIntervalSeconds,
 		updateMaxFailure:        config.UpdateMaxFailure,
+		lapiFailureAction:       configuration.EffectiveFailureAction(config.CrowdsecLapiFailureAction),
 		defaultDecisionTimeout:  config.DefaultDecisionSeconds,
 		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
 		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
@@ -355,6 +376,11 @@ func (c *CrowdsecConnection) StreamHealthy() bool {
 	return c.isCrowdsecStreamHealthy
 }
 
+// LapiFailureAction is the fallback when LAPI does not return a usable verdict.
+func (c *CrowdsecConnection) LapiFailureAction() string {
+	return c.lapiFailureAction
+}
+
 // RedisUnreachableBlock is the redis fail-closed flag for this connection.
 func (c *CrowdsecConnection) RedisUnreachableBlock() bool {
 	return c.redisUnreachableBlock
@@ -417,7 +443,7 @@ func (c *CrowdsecConnection) handleNoStreamCache(remoteIP string, scopes map[str
 	isLiveMode := c.crowdsecMode == configuration.LiveMode
 	chosen, parsedDuration, err := c.queryLiveDecisions(fmt.Sprintf("ip=%v", remoteIP))
 	if err != nil {
-		return cache.BannedValue, err
+		return "", err
 	}
 	for scope, identifier := range scopes {
 		chosen, parsedDuration = c.mergeLiveScope(chosen, parsedDuration, scope, identifier, isLiveMode)
@@ -594,19 +620,13 @@ func (c *CrowdsecConnection) AppsecQuery(ip string, httpReq *http.Request, pol A
 	res, err := c.httpAppsecClient.Do(req)
 	if err != nil || isReverseProxyError(res.StatusCode) {
 		c.log.Error("appsecQuery:unreachable")
-		if pol.UnreachableBlock {
-			return nil, fmt.Errorf("appsecQuery:unreachable %w", err)
-		}
-		return appsecAllow(), nil
+		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
 	defer c.drainAppsecResponse(res)
 
 	if res.StatusCode == http.StatusInternalServerError {
 		c.log.Info("appsecQuery:failure")
-		if pol.FailureBlock {
-			return nil, errors.New("appsecQuery statusCode:500")
-		}
-		return appsecAllow(), nil
+		return resultForFailureAction(pol.FailureAction, "appsecQuery statusCode:500")
 	}
 
 	body, err := c.readCappedAppsecBody(res)
@@ -646,8 +666,8 @@ func (c *CrowdsecConnection) newAppsecForwardRequest(ip string, httpReq *http.Re
 func (c *CrowdsecConnection) newAppsecBodyRequest(target string, httpReq *http.Request, pol AppsecPolicy) (*http.Request, error) {
 	switch {
 	case isBodyUnreadable(httpReq):
-		if pol.UnreadableBodyBlock && isMethodWithBody(httpReq.Method) {
-			return nil, errors.New("appsecQuery:unreadableBody dropped")
+		if isMethodWithBody(httpReq.Method) && configuration.EffectiveFailureAction(pol.FailureAction) != configuration.FailureActionPassthrough {
+			return nil, resultForFailureActionErr(pol.FailureAction, "appsecQuery:unreadableBody dropped")
 		}
 		req, _ := http.NewRequest(http.MethodGet, target, nil)
 		return req, nil

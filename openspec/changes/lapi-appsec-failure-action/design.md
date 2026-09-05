@@ -21,11 +21,11 @@ See proposal.md — Why. After merge with `master`, `AppsecQuery` returns `(*App
 
 2. **`AppsecPolicy` holds `FailureAction string` (or a small named type in `pkg/configuration`).** Replace the three bools. `AppsecQuery` maps `ban` to today’s error return, `passthrough` to `appsecAllow()`, `captcha` to a dedicated result the bouncer turns into `pkg/captcha` — not AppSec JSON `action: captcha`. Alternative: return captcha as `AppsecResponse{Action:"captcha"}` — rejected; that envelope is HTML relay, not the LAPI captcha client.
 
-3. **Live lookup: do not return `BannedValue` on transport/HTTP error.** Return a distinguishable miss/error and let ServeHTTP apply `LapiFailureAction`. Alternative: encode the action inside `queryLiveDecisions` — rejected; the connection should classify the LAPI failure, the bouncer applies the action (same split as AppSec).
+3. **Live lookup: do not return `BannedValue` on transport/HTTP error.** Return a distinguishable miss/error and let ServeHTTP apply `CrowdsecLapiFailureAction`. Alternative: encode the action inside `queryLiveDecisions` — rejected; the connection should classify the LAPI failure, the bouncer applies the action (same split as AppSec).
 
-4. **Stream unhealthy miss stays in `Bouncer.ServeHTTP`.** Replace `handleBanServeHTTP(..., ReasonTECH)` with a helper that switches on `LapiFailureAction`. Cache hits stay above that branch.
+4. **Stream unhealthy miss stays in `Bouncer.ServeHTTP`.** Replace `handleBanServeHTTP(..., ReasonTECH)` with a helper that switches on `CrowdsecLapiFailureAction`. Cache hits stay above that branch.
 
-5. **Reclaim:** add `LapiFailureAction` to `identity`. Do not add `AppsecFailureAction` to identity. Alternative: both on identity — rejected; explore said two routers may disagree on AppSec fallback.
+5. **Reclaim:** add `CrowdsecLapiFailureAction` to `identity`. Do not add `CrowdsecAppsecFailureAction` to identity. Alternative: both on identity — rejected; explore said two routers may disagree on AppSec fallback.
 
 6. **Validate `captcha` only when `CaptchaProvider` is set.** Same gate as existing captcha config. Alternative: treat missing provider as `ban` at request time — rejected; fail at ValidateParams so Traefik does not start with a silent downgrade.
 
