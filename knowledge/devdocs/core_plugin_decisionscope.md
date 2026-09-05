@@ -45,6 +45,8 @@ value, err := decisionscope.LookupCachedRemediation(cacheClient, mode, remoteIP,
 - `pkg/crowdsecconnection/connection.go`
 - `pkg/crowdsecconnection/connection_decisions.go`
 - `pkg/crowdsecconnection/identity.go`
+- `pkg/crowdsecconnection/connection_stream.go`
+- `pkg/crowdsecconnection/connection_live.go`
 
 ## Gotchas
 
