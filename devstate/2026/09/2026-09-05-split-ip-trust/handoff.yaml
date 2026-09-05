@@ -1,0 +1,15 @@
+issueKey: 2026-09-05-split-ip-trust
+jobName: 2026-09-05-split-ip-trust
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 97f00627414684f1f8020ac94c3fcf0f80152d2017d05ed77e596c263fe69806
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
