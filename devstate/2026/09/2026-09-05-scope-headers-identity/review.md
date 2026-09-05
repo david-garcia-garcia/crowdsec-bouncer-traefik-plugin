@@ -34,3 +34,9 @@ fixed: none
 skipped: none
 pin: origin/master...HEAD
 
+## devdocsimpact (2026-09-05)
+phase: devdocsimpact
+findings: stale-usage already produced in implement
+fixed: none
+skipped: none
+

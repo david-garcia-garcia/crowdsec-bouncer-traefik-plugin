@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-05T16:37:10Z
+Developer review: in progress — 2026-09-05T16:38:48Z
 
 ## What this changes
 **Operators.** None.
@@ -13,10 +13,10 @@ Developer review: in progress — 2026-09-05T16:37:10Z
 On master, `decisionScopeHeaders` is copied onto both `Bouncer` and `CrowdsecConnection` and is omitted from reclaim identity. Two Traefik routers with the same LAPI and different maps share one stream ticker and cache; the first `New` wins, so Country/AS ingest for the second route is wrong.
 
 ## Merge readiness
-Five-axis review found no hard items. Remote CI is still running. 1 item remains.
+Usage packets already match the apply. Remote CI is still running. 1 item remains.
 
 Priority: P2 — Real operator pain, with a workaround or limited blast radius
-Reviewed head: ddc9023
+Reviewed head: 3640232
 Owner decision: Required. See Decision needed.
 
 ## Review scores
@@ -48,7 +48,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local ticket 2026-09-05-scope-headers-identity, PR 18. Five-axis review of origin/master...HEAD (excluding devstate/.cursor) was clean.
+Local ticket 2026-09-05-scope-headers-identity, PR 18. Devdocs impact: stale-usage on middleware and decisionscope packets already produced in implement.
 
 ## Decision needed
 | Question | Decision | By |
@@ -81,7 +81,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | ddc9023a4e5c7a206a71007dea8283367382f2da | Card must match the branch you measured |
+| Reviewed head | 364023265afc1b09f72f8293c95cec1e96bbd7a2 | Card must match the branch you measured |
 
 ### Stored data model
 None.
