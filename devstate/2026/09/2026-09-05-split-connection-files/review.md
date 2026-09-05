@@ -9,3 +9,12 @@ qualify: qualified
 pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/16
 head: d1be3863f6e79078c018ea0c763e55bfb64d616e
 ci: in progress
+
+## explore (2026-09-05)
+phase: explore
+findings: none
+fixed: none
+skipped: none
+assumed: DTO file placement; route/header constant placement
+head: c1996ac999e91a4a07e76281a04143dc97423ad0
+ci: in progress
