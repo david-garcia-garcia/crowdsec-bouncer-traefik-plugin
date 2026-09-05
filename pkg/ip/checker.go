@@ -13,8 +13,6 @@ import (
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/iplookup"
 )
 
-// CHECKER
-
 // Checker allows to check that addresses are in a trusted IPs.
 type Checker struct {
 	trustedCIDRs *iplookup.Helper
@@ -82,6 +80,7 @@ func hostCIDR(addr net.IP) string {
 	return addr.String() + "/128"
 }
 
+// parseIP parses a dotted or compact address string into net.IP.
 func parseIP(addr string) (net.IP, error) {
 	userIP := net.ParseIP(addr)
 	if userIP == nil {
@@ -90,25 +89,6 @@ func parseIP(addr string) (net.IP, error) {
 
 	return userIP, nil
 }
-
-// InNetwork reports whether addr is inside network (CIDR) or equals a bare IP.
-func InNetwork(addr, network string) (bool, error) {
-	ipAddr, err := parseIP(addr)
-	if err != nil {
-		return false, fmt.Errorf("InNetwork:parseAddress %w", err)
-	}
-	_, ipNet, cidrErr := net.ParseCIDR(strings.TrimSpace(network))
-	if cidrErr == nil {
-		return ipNet.Contains(ipAddr), nil
-	}
-	other, err := parseIP(strings.TrimSpace(network))
-	if err != nil {
-		return false, fmt.Errorf("InNetwork:parseNetwork %s %w", network, err)
-	}
-	return ipAddr.Equal(other), nil
-}
-
-// STRATEGY
 
 // PoolStrategy is a strategy based on an IP Checker.
 // It allows to check whether addresses are in a given pool of IPs.
@@ -128,6 +108,7 @@ func (s *PoolStrategy) getIP(req *http.Request, customHeader string) string {
 
 	xffs := strings.Split(xff, ",")
 
+	// Walk most-recent hop first (right to left).
 	for i := len(xffs) - 1; i >= 0; i-- {
 		xffTrimmed := strings.TrimSpace(xffs[i])
 		if len(xffTrimmed) == 0 {
@@ -141,12 +122,15 @@ func (s *PoolStrategy) getIP(req *http.Request, customHeader string) string {
 	return ""
 }
 
-// GetRemoteIP It returns the first IP that is not in the pool, or the empty string otherwise.
+// GetRemoteIP returns the client address for a request.
+// It walks the custom forwarded header most-recent-first against the trusted-hop pool,
+// then falls back to the host of req.RemoteAddr.
 func GetRemoteIP(req *http.Request, strategy *PoolStrategy, customHeader string) (string, error) {
 	remoteIP := strategy.getIP(req, customHeader)
 	if len(remoteIP) != 0 {
 		return remoteIP, nil
 	}
+	// Header walk found no untrusted hop; use the socket peer.
 	remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
 		return "", fmt.Errorf("GetRemoteIP:extractIP: %w", err)
