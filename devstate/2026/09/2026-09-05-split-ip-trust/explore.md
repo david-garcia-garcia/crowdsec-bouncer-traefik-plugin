@@ -67,5 +67,5 @@ Ticket nickname “hop-trust” is not Language. Types stay Checker, PoolStrateg
   By: explore
 
 - Q: New spec leaf vs fold into `core_plugin_ip_radix-lookup`?
-  Decision: assumed — fold. Add a requirement that hop-trust types (`Checker`, `PoolStrategy`, `GetRemoteIP`) live in `pkg/ip/checker.go` with unit tests for GetRemoteIP and the forwarded-header walk, and that `InNetwork` lives in `pkg/ip/network.go`. No new spec id.
-  By: explore
+  Decision: resolved — fold. Spec delta is GetRemoteIP hop-walk (ADDED). File names stay in design.md (`checker.go` / `network.go`), not a new spec id.
+  By: propose
