@@ -5,7 +5,7 @@ Governs what this plugin does when AppSec does not return a usable verdict: list
 ## ADDED Requirements
 
 ### Requirement: CrowdsecAppsecFailureAction is the public AppSec fallback
-Public config `crowdsecAppsecFailureAction` SHALL be one of `passthrough`, `ban`, or `captcha`. The default SHALL be `ban`. `captcha` SHALL be rejected at ValidateParams unless a captcha provider is configured. Empty or unknown values SHALL be rejected. This key SHALL be per-router (not on CrowdsecConnection identity) so two routes can disagree on AppSec fallback against one LAPI.
+Public config `crowdsecAppsecFailureAction` SHALL be one of `passthrough`, `ban`, or `captcha`. The default SHALL be `ban`. `captcha` SHALL be rejected at ValidateParams unless a captcha provider is configured. Empty SHALL be treated as `ban` (same as omit). Unknown values SHALL be rejected. This key SHALL be per-router (not on CrowdsecConnection identity) so two routes can disagree on AppSec fallback against one LAPI.
 
 #### Scenario: Default is ban
 - **WHEN** the operator omits `crowdsecAppsecFailureAction` and AppSec returns HTTP 500

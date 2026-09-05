@@ -132,8 +132,11 @@ func contains(source []string, target string) bool {
 	return false
 }
 
-// validateFailureAction accepts passthrough, ban, or captcha. Empty is rejected; CreateConfig uses New() defaults.
+// validateFailureAction accepts empty (treated as ban at runtime), passthrough, ban, or captcha.
 func validateFailureAction(name, action, captchaProvider string) error {
+	if action == "" {
+		return nil
+	}
 	if !contains([]string{FailureActionPassthrough, FailureActionBan, FailureActionCaptcha}, action) {
 		return errors.New(name + ": must be one of 'passthrough', 'ban' or 'captcha'")
 	}

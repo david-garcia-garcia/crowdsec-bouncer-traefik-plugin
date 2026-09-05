@@ -5,7 +5,7 @@ Governs what this plugin does when CrowdSec LAPI does not return a usable verdic
 ## ADDED Requirements
 
 ### Requirement: CrowdsecLapiFailureAction is the public LAPI fallback
-Public config `crowdsecLapiFailureAction` SHALL be one of `passthrough`, `ban`, or `captcha`. The default SHALL be `ban`. `captcha` SHALL be rejected at ValidateParams unless a captcha provider is configured. Empty or unknown values SHALL be rejected.
+Public config `crowdsecLapiFailureAction` SHALL be one of `passthrough`, `ban`, or `captcha`. The default SHALL be `ban`. `captcha` SHALL be rejected at ValidateParams unless a captcha provider is configured. Empty SHALL be treated as `ban` (same as omit). Unknown values SHALL be rejected.
 
 #### Scenario: Default is ban
 - **WHEN** the operator omits `crowdsecLapiFailureAction`

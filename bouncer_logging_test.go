@@ -47,6 +47,8 @@ func getTestConfig() *configuration.Config {
 		CrowdsecAppsecEnabled:                false,
 		CrowdsecAppsecHost:                   "",
 		CrowdsecAppsecPath:                   "",
+		CrowdsecAppsecFailureAction:          configuration.FailureActionBan,
+		CrowdsecLapiFailureAction:            configuration.FailureActionBan,
 		CrowdsecLapiTLSInsecureVerify:        true,
 		CrowdsecLapiTLSCertificateBouncer:    "",
 		CrowdsecLapiTLSCertificateBouncerKey: "",
