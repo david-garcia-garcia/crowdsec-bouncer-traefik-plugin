@@ -37,6 +37,17 @@ CrowdSec Range matching SHALL keep using the shared `range-index` blob and per-l
 - **WHEN** stream has a Range ban `10.0.0.0/8` and the client IP is `10.1.2.3`
 - **THEN** the request is forbidden even though the trusted-IP pool uses prefix lookup
 
+### Requirement: Catch-all CIDRs stay same-family
+Trusted-pool membership SHALL follow `net.IPNet.Contains` address-family rules. `0.0.0.0/0` SHALL NOT match IPv6. `::/0` SHALL NOT match IPv4.
+
+#### Scenario: IPv4 catch-all does not trust IPv6
+- **WHEN** `ClientTrustedIPs` contains `0.0.0.0/0` and the client IP is `2001:db8::1`
+- **THEN** the request is not treated as a trusted client
+
+#### Scenario: IPv6 catch-all does not trust IPv4
+- **WHEN** `ClientTrustedIPs` contains `::/0` and the client IP is `203.0.113.10`
+- **THEN** the request is not treated as a trusted client
+
 ### Requirement: Client IP still comes from GetRemoteIP
 Trusted-pool membership SHALL classify the address already produced by `pkg/ip.GetRemoteIP`. It MUST NOT parse `RemoteAddr` a second time to feed the prefix structure.
 

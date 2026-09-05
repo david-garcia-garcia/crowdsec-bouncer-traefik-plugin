@@ -40,3 +40,4 @@ ok, err := checker.Contains(remoteIP)
 - `IsContained` prefix length is for longest-match callers. Checker is boolean any-match.
 - The helper does not store remediation strings. Range ban/captcha cannot ride this tree yet.
 - Invalid CIDR fails `NewChecker` / `AddCIDR`; config validate already constructs a Checker and discards it.
+- `0.0.0.0/0` is IPv4 only; `::/0` is IPv6 only. A shared radix root would mark `/0` on both families.

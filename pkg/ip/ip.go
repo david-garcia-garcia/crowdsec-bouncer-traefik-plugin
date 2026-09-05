@@ -17,31 +17,32 @@ import (
 
 // Checker allows to check that addresses are in a trusted IPs.
 type Checker struct {
-	helper *iplookup.Helper
+	trustedCIDRs *iplookup.Helper
 }
 
 // NewChecker builds a new Checker given a list of CIDR-Strings to trusted IPs.
 func NewChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
-	helper := iplookup.NewEmptyHelper()
+	trustedCIDRs := iplookup.NewEmptyHelper()
 
 	for _, ipMaskRaw := range trustedIPs {
 		ipMask := strings.TrimSpace(ipMaskRaw)
 		// Bare addresses enter the tree as a host prefix.
 		if ipAddr := net.ParseIP(ipMask); ipAddr != nil {
-			if err := helper.AddCIDR(hostCIDR(ipAddr)); err != nil {
+			if err := trustedCIDRs.AddCIDR(hostCIDR(ipAddr)); err != nil {
 				return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipMask, err)
 			}
 			log.Debug(fmt.Sprintf("IP %v is trusted", ipAddr))
 			continue
 		}
 
-		if err := helper.AddCIDR(ipMask); err != nil {
+		// CIDR strings are inserted as given (not rewritten to a host prefix).
+		if err := trustedCIDRs.AddCIDR(ipMask); err != nil {
 			return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipMask, err)
 		}
 		log.Debug(fmt.Sprintf("IP network %v is trusted", ipMask))
 	}
 
-	return &Checker{helper: helper}, nil
+	return &Checker{trustedCIDRs: trustedCIDRs}, nil
 }
 
 // Contains checks if provided address is in the trusted IPs.
@@ -60,10 +61,13 @@ func (ip *Checker) Contains(addr string) (bool, error) {
 
 // ContainsIP checks if provided address is in the trusted IPs.
 func (ip *Checker) ContainsIP(addr net.IP) bool {
-	if ip.helper == nil {
+	// An uninitialized Checker trusts nothing.
+	if ip.trustedCIDRs == nil {
 		return false
 	}
-	found, _, err := ip.helper.IsContained(addr)
+	// Boolean any-match: ignore longest-prefix length.
+	found, _, err := ip.trustedCIDRs.IsContained(addr)
+	// Nil IP is an error from the helper and is not trusted.
 	if err != nil {
 		return false
 	}

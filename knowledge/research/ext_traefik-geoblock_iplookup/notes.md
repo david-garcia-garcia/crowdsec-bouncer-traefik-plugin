@@ -26,6 +26,8 @@ One binary trie (`left` = bit 0, `right` = bit 1). Every IP is a 16-byte array. 
 
 Owner: `…@0c2f46da:pkg/iplookup/iplookup.go` (`insert`, `contains`). Extract: `.sources/iplookup.go.md`. Mixed-family cases: `TestIpLookupHelper_MixedIPv4AndIPv6`. Extract: `.sources/iplookup_test.go.md`.
 
+`insert` with `prefixLen == 0` marks that shared `root` as an endpoint. `contains` starts both families at the same root, so `0.0.0.0/0` matches IPv6 and `::/0` matches IPv4. Owner: `…@0c2f46da:pkg/iplookup/iplookup.go` (`insert` after the bit walk, `contains` `current := tree.root`). This plugin’s `pkg/iplookup` keeps separate v4/v6 roots so membership matches `net.IPNet.Contains`.
+
 Nodes store **boolean membership plus prefix length only** (`isEndpoint`, `prefixLen`). There is no associated value, payload, or decision object. `contains` / `IsContained` return whether any endpoint was hit and that endpoint’s `prefixLen`.
 
 Owner: `…@0c2f46da:pkg/iplookup/iplookup.go` (`radixNode`, `contains`, `IsContained`). Extract: `.sources/iplookup.go.md`.

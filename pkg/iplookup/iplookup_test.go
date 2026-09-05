@@ -249,6 +249,49 @@ func TestHelper_OverlappingRanges(t *testing.T) {
 	}
 }
 
+func TestHelper_CatchAllStaysSameFamily(t *testing.T) {
+	v4, err := NewHelper([]string{"0.0.0.0/0"})
+	if err != nil {
+		t.Fatalf("Failed to create Helper: %v", err)
+	}
+	v6, err := NewHelper([]string{"::/0"})
+	if err != nil {
+		t.Fatalf("Failed to create Helper: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		helper  *Helper
+		ip      string
+		want    bool
+		wantLen int
+	}{
+		{"IPv4 catch-all matches IPv4", v4, "8.8.8.8", true, 0},
+		{"IPv4 catch-all misses IPv6", v4, "2001:db8::1", false, 0},
+		{"IPv6 catch-all matches IPv6", v6, "2001:db8::1", true, 0},
+		{"IPv6 catch-all misses IPv4", v6, "8.8.8.8", false, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ip := net.ParseIP(tt.ip)
+			if ip == nil {
+				t.Fatalf("Invalid IP address: %s", tt.ip)
+			}
+			found, prefixLen, err := tt.helper.IsContained(ip)
+			if err != nil {
+				t.Fatalf("IsContained returned error: %v", err)
+			}
+			if found != tt.want {
+				t.Errorf("IsContained(%s) = %v, want %v", tt.ip, found, tt.want)
+			}
+			if found && prefixLen != tt.wantLen {
+				t.Errorf("IsContained(%s) prefix = %d, want %d", tt.ip, prefixLen, tt.wantLen)
+			}
+		})
+	}
+}
+
 func TestHelper_NilIP(t *testing.T) {
 	helper := NewEmptyHelper()
 	found, prefixLen, err := helper.IsContained(nil)

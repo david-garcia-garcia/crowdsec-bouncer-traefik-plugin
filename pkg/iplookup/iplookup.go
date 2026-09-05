@@ -17,16 +17,27 @@ type radixNode struct {
 	right      *radixNode // bit 1
 }
 
-// ipRadixTree is a binary trie of IPv4 and IPv6 CIDRs in one 16-byte bit space.
+// ipRadixTree is a binary trie of CIDRs. IPv4 and IPv6 use separate roots so
+// a family catch-all (/0) cannot match the other family.
 type ipRadixTree struct {
-	root *radixNode
+	v4Root *radixNode
+	v6Root *radixNode
 }
 
 // newIPRadixTree returns an empty tree.
 func newIPRadixTree() *ipRadixTree {
 	return &ipRadixTree{
-		root: &radixNode{},
+		v4Root: &radixNode{},
+		v6Root: &radixNode{},
 	}
+}
+
+// familyRoot is the walk start for that address family.
+func (tree *ipRadixTree) familyRoot(isIPv4 bool) *radixNode {
+	if isIPv4 {
+		return tree.v4Root
+	}
+	return tree.v6Root
 }
 
 // insert stores one CIDR. IPv4 is walked from bit 96 of the IPv4-mapped form.
@@ -45,9 +56,9 @@ func (tree *ipRadixTree) insert(cidr *net.IPNet) {
 		bitStart = 0
 	}
 
-	current := tree.root
+	current := tree.familyRoot(isIPv4)
 
-	// Walk prefix bits, creating missing children.
+	// Walk prefix bits, creating missing children. /0 marks this family root.
 	for i := 0; i < prefixLen; i++ {
 		actualBitPos := bitStart + i
 		bytePos := actualBitPos / 8
@@ -87,7 +98,7 @@ func (tree *ipRadixTree) contains(ip net.IP) (bool, int) {
 		maxPrefixLen = 128
 	}
 
-	current := tree.root
+	current := tree.familyRoot(isIPv4)
 	longestMatch := 0
 	found := false
 

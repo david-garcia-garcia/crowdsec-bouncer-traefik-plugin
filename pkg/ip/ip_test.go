@@ -94,4 +94,34 @@ func TestCheckerContains(t *testing.T) {
 			t.Fatal("expected error for 192.168.1.0/33")
 		}
 	})
+
+	t.Run("IPv4 catch-all does not match IPv6", func(t *testing.T) {
+		checker, err := NewChecker(log, []string{"0.0.0.0/0"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ok, err := checker.Contains("2001:db8::1")
+		if err != nil || ok {
+			t.Fatalf("Contains IPv6 under 0.0.0.0/0 = %v, %v want false", ok, err)
+		}
+		ok, err = checker.Contains("203.0.113.10")
+		if err != nil || !ok {
+			t.Fatalf("Contains IPv4 under 0.0.0.0/0 = %v, %v want true", ok, err)
+		}
+	})
+
+	t.Run("IPv6 catch-all does not match IPv4", func(t *testing.T) {
+		checker, err := NewChecker(log, []string{"::/0"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ok, err := checker.Contains("203.0.113.10")
+		if err != nil || ok {
+			t.Fatalf("Contains IPv4 under ::/0 = %v, %v want false", ok, err)
+		}
+		ok, err = checker.Contains("2001:db8::1")
+		if err != nil || !ok {
+			t.Fatalf("Contains IPv6 under ::/0 = %v, %v want true", ok, err)
+		}
+	})
 }
