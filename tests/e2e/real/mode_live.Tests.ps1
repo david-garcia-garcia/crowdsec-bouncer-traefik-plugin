@@ -34,6 +34,9 @@ Describe "CrowdSec Bouncer Live Mode Tests" {
 
             Add-TestDecision -IP $script:LiveBannedIP -Type "ban"
 
+            $stillCached = Test-HttpRequest -Endpoint "/live" -IP $script:LiveBannedIP -TraefikUrl $script:TraefikUrl
+            $stillCached.StatusCode | Should -Be 200 -Because "live mode must keep the cached allow until defaultDecisionSeconds expires"
+
             $blocked = Wait-ForCondition -Description "live mode to re-query LAPI and block $($script:LiveBannedIP)" -TimeoutSeconds 15 -RetryIntervalSeconds 1 -Condition {
                 $response = Test-HttpRequest -Endpoint "/live" -IP $script:LiveBannedIP -TraefikUrl $script:TraefikUrl
                 return ($response.StatusCode -in @(403, 429))

@@ -45,6 +45,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ComposeFile = Join-Path $PSScriptRoot "docker-compose.test.yml"
+. "$PSScriptRoot/TestUtils.ps1"
 
 # Colors for output
 $Colors = @{
@@ -54,90 +55,28 @@ $Colors = @{
     Error = "Red"
 }
 
+# Print a numbered runner step to the console.
 function Write-Step {
     param([string]$Message, [string]$Color = "Cyan")
     Write-Host "🔄 $Message" -ForegroundColor $Color
 }
 
+# Print a success line to the console.
 function Write-Success {
     param([string]$Message)
     Write-Host "✅ $Message" -ForegroundColor $Colors.Success
 }
 
-function Write-Warning {
+# Print a warning line to the console.
+function Write-ConsoleWarning {
     param([string]$Message)
     Write-Host "⚠️  $Message" -ForegroundColor $Colors.Warning
 }
 
-function Write-Error {
+# Print a failure line to the console without calling the Write-Error cmdlet.
+function Write-StepError {
     param([string]$Message)
     Write-Host "❌ $Message" -ForegroundColor $Colors.Error
-}
-
-function Test-ServiceHealth {
-    param(
-        [string]$Url,
-        [string]$ServiceName,
-        [int]$TimeoutSeconds = 120,
-        [int]$RetryIntervalSeconds = 3,
-        [int]$ExpectedStatusCode = 200
-    )
-    
-    Write-Step "Waiting for $ServiceName to be ready..."
-    $elapsed = 0
-    
-    do {
-        try {
-            $response = Invoke-WebRequest -Uri $Url -Method Get -TimeoutSec 10 -UseBasicParsing -ErrorAction SilentlyContinue
-            if ($response.StatusCode -eq $ExpectedStatusCode) {
-                Write-Success "$ServiceName is ready! (Status: $($response.StatusCode))"
-                return $true
-            }
-        }
-        catch {
-            # Service not ready yet, continue waiting
-        }
-        
-        Start-Sleep $RetryIntervalSeconds
-        $elapsed += $RetryIntervalSeconds
-        
-        if ($elapsed % 15 -eq 0) {
-            Write-Host "  Still waiting for $ServiceName... ($elapsed/$TimeoutSeconds seconds)" -ForegroundColor Gray
-        }
-        
-    } while ($elapsed -lt $TimeoutSeconds)
-    
-    Write-Error "$ServiceName failed to become ready within $TimeoutSeconds seconds"
-    return $false
-}
-
-function Test-CrowdSecAPI {
-    param(
-        [string]$ApiKey,
-        [int]$TimeoutSeconds = 60
-    )
-    
-    Write-Step "Testing CrowdSec LAPI connection..."
-    $elapsed = 0
-    
-    do {
-        try {
-            $headers = @{ "X-Api-Key" = $ApiKey }
-            $response = Invoke-RestMethod -Uri "http://localhost:8081/v1/decisions?limit=1" -Headers $headers -TimeoutSec 5
-            Write-Success "CrowdSec LAPI is responding!"
-            return $true
-        }
-        catch {
-            Write-Host "  LAPI test failed: $($_.Exception.Message)" -ForegroundColor Yellow
-            Write-Host "  Status Code: $($_.Exception.Response.StatusCode)" -ForegroundColor Yellow
-            Start-Sleep 3
-            $elapsed += 3
-        }
-        
-    } while ($elapsed -lt $TimeoutSeconds)
-    
-    Write-Error "CrowdSec LAPI failed to respond within $TimeoutSeconds seconds"
-    return $false
 }
 
 # Main execution
@@ -155,21 +94,21 @@ try {
         Import-Module Pester -Force -ErrorAction Stop
         $pesterVersion = (Get-Module Pester).Version
         if ($pesterVersion.Major -lt 5) {
-            Write-Warning "Pester version $pesterVersion detected. Upgrading to v5+..."
+            Write-ConsoleWarning "Pester version $pesterVersion detected. Upgrading to v5+..."
             Install-Module -Name Pester -Force -Scope CurrentUser -SkipPublisherCheck
             Import-Module Pester -Force
         }
         Write-Success "Pester $pesterVersion is available"
     }
     catch {
-        Write-Error "Pester module not found. Installing Pester..."
+        Write-StepError "Pester module not found. Installing Pester..."
         try {
             Install-Module -Name Pester -Force -Scope CurrentUser -SkipPublisherCheck
             Import-Module Pester -Force
             Write-Success "Pester installed and imported successfully"
         }
         catch {
-            Write-Error "Failed to install Pester: $($_.Exception.Message)"
+            Write-StepError "Failed to install Pester: $($_.Exception.Message)"
             exit 1
         }
     }
@@ -181,11 +120,11 @@ try {
         if ($dockerInfo -eq "linux") {
             Write-Success "Docker is using Linux containers"
         } else {
-            Write-Warning "Docker may not be using Linux containers. Some tests may fail."
+            Write-ConsoleWarning "Docker may not be using Linux containers. Some tests may fail."
         }
     }
     catch {
-        Write-Warning "Could not verify Docker container type"
+        Write-ConsoleWarning "Could not verify Docker container type"
     }
 
     # Check if Docker Compose is available
@@ -199,7 +138,7 @@ try {
         }
     }
     catch {
-        Write-Error "Docker Compose is not available. Please install Docker Desktop or Docker Compose."
+        Write-StepError "Docker Compose is not available. Please install Docker Desktop or Docker Compose."
         exit 1
     }
 
@@ -221,7 +160,7 @@ try {
         Write-Success "Docker services started successfully"
     }
     catch {
-        Write-Error "Failed to start Docker services: $($_.Exception.Message)"
+        Write-StepError "Failed to start Docker services: $($_.Exception.Message)"
         exit 1
     }
 
@@ -230,14 +169,17 @@ try {
         Write-Step "Waiting for services to become ready..."
         
         $servicesReady = @(
-            (Test-ServiceHealth -Url "http://localhost:8080/api/rawdata" -ServiceName "Traefik API" -TimeoutSeconds 60),
-            (Test-ServiceHealth -Url "http://localhost:8000/whoami" -ServiceName "Whoami test service" -TimeoutSeconds 60),
-            (Test-CrowdSecAPI -ApiKey $env:BOUNCER_API_KEY -TimeoutSeconds 180),
-            (Test-ServiceHealth -Url "http://localhost:8000/appsec" -ServiceName "AppSec route" -TimeoutSeconds 180)
+            (Wait-ForHttpStatus -Url "http://localhost:8080/api/rawdata" -ExpectedStatusCodes @(200) -TimeoutSeconds 60).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/whoami" -ExpectedStatusCodes @(200) -TimeoutSeconds 60).Success,
+            (Wait-ForCondition -Description "CrowdSec LAPI" -TimeoutSeconds 180 -RetryIntervalSeconds 3 -Condition {
+                Invoke-CrowdSecAPI -Endpoint "/v1/decisions?limit=1" -TimeoutSec 5 -ApiKey $env:BOUNCER_API_KEY
+                return $true
+            }).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/appsec" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success
         )
         
         if ($servicesReady -contains $false) {
-            Write-Error "One or more services failed to start properly"
+            Write-StepError "One or more services failed to start properly"
             if (-not $SkipDockerCleanup) {
                 Write-Step "Cleaning up Docker services..."
                 docker compose -f $ComposeFile down -v
@@ -252,7 +194,7 @@ try {
         Start-Sleep 10
         
     } else {
-        Write-Warning "Skipping service readiness check (assuming services are already running)"
+        Write-ConsoleWarning "Skipping service readiness check (assuming services are already running)"
     }
 
     # Run Pester tests
@@ -260,7 +202,7 @@ try {
     Write-Host ""
     
     if (-not (Test-Path $TestPath)) {
-        Write-Error "Test path not found: $TestPath"
+        Write-StepError "Test path not found: $TestPath"
         exit 1
     }
 
@@ -284,24 +226,24 @@ try {
             Write-Host "  Duration: $($result.Duration)" -ForegroundColor Gray
             $exitCode = 0
         } elseif ($result) {
-            Write-Error "$($result.FailedCount) test(s) failed out of $($result.TotalCount) total tests"
+            Write-StepError "$($result.FailedCount) test(s) failed out of $($result.TotalCount) total tests"
             Write-Host "  Passed: $($result.PassedCount)" -ForegroundColor $Colors.Success
             Write-Host "  Failed: $($result.FailedCount)" -ForegroundColor $Colors.Error
             Write-Host "  Skipped: $($result.SkippedCount)" -ForegroundColor $Colors.Warning
             Write-Host "  Duration: $($result.Duration)" -ForegroundColor Gray
             $exitCode = 1
         } else {
-            Write-Warning "Could not determine test results"
+            Write-ConsoleWarning "Could not determine test results"
             $exitCode = 1
         }
     }
     catch {
-        Write-Error "Failed to run Pester tests: $($_.Exception.Message)"
+        Write-StepError "Failed to run Pester tests: $($_.Exception.Message)"
         $exitCode = 1
     }
 }
 catch {
-    Write-Error "Unexpected error: $($_.Exception.Message)"
+    Write-StepError "Unexpected error: $($_.Exception.Message)"
     $exitCode = 1
 }
 finally {
@@ -313,10 +255,10 @@ finally {
             Write-Success "Docker services stopped and cleaned up"
         }
         catch {
-            Write-Warning "Failed to clean up Docker services: $($_.Exception.Message)"
+            Write-ConsoleWarning "Failed to clean up Docker services: $($_.Exception.Message)"
         }
     } else {
-        Write-Warning "Skipping Docker cleanup (services left running for debugging)"
+        Write-ConsoleWarning "Skipping Docker cleanup (services left running for debugging)"
         Write-Host "To manually stop services, run: docker compose -f tests/e2e/real/docker-compose.test.yml down -v" -ForegroundColor Gray
         Write-Host "Services available at:" -ForegroundColor Gray
         Write-Host "  - Traefik Dashboard: http://localhost:8080" -ForegroundColor Gray

@@ -46,12 +46,8 @@ Describe "CrowdSec Bouncer Captcha Remediation Tests" {
             
             # Test captcha endpoint with the same IP
             $response = Test-HttpRequest -Endpoint "/captcha" -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl
-            $response.StatusCode | Should -BeIn @(200, 429)
-            
-            # If captcha is working, response should contain captcha content
-            if ($response.StatusCode -eq 200) {
-                $response.Content | Should -Match "captcha|challenge"
-            }
+            $response.StatusCode | Should -Be 200
+            $response.Content | Should -Match "captcha|challenge"
             
             # Verify custom remediation header in Traefik access logs
             $logResult = Get-TraefikAccessLogs
