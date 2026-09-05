@@ -14,3 +14,10 @@ findings: none
 fixed: none
 skipped: none
 open-questions: 9 assumed
+
+## propose (2026-09-05)
+phase: propose
+findings: none
+fixed: none
+skipped: none
+change: in-tree-simpleredis-dragonfly-e2e
