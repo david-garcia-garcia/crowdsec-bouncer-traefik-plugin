@@ -1,0 +1,15 @@
+issueKey: 2026-09-05-core-plugin-lifetime-refactor
+jobName: 2026-09-05-core-plugin-lifetime-refactor
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 1adfdddfc6affb1692ba2e1f49f8d6c60cf317425745a7f367e9be6adc55c909
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: { id: 6, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/6 }
