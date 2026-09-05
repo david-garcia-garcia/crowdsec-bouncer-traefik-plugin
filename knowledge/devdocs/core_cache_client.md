@@ -13,7 +13,7 @@ Construct a new `Client` on each CrowdsecConnection. Pass `crowdsecconnection.Id
 ## How to use
 
 - Memory: `Client.New(..., isRedis=false, ..., keyPrefix)` — prefix is ignored; each Client owns a map.
-- Redis: pass identity hex as `keyPrefix`. Logical keys stay the client IP; the store writes `prefix:key`.
+- Redis: pass identity hex as `keyPrefix`. Logical keys are the client IP, `scope:value`, and `range-index`; the store writes `prefix:key`.
 - Same reclaim key → same Connection → same Client (share-by-identity, not a process dump).
 - `Client.Close()` drains Redis idle pools. Call it from `CrowdsecConnection.Close()`. Memory clients are a no-op.
 
@@ -32,4 +32,4 @@ c.New(log, redisOn, writeHost, readHosts, pass, database, crowdsecconnection.Ide
 ## Gotchas
 
 - No migration of existing Redis keys: two Connections that previously shared keys now isolate.
-- Real-stack restart cases still need distinct `X-Forwarded-For` per TTL, because the logical key is still the client IP inside one Connection.
+- Real-stack restart cases still need distinct `X-Forwarded-For` per TTL, because an Ip key is still the client IP inside one Connection. Header-scope and `range-index` keys are extra keys on the same Client.

@@ -30,6 +30,18 @@ jobs:
       # them, while make still exits non-zero if any scenario failed.
       - name: Run mock scenarios
         run: make -k e2e_mock
+      - name: Surface mock logs as annotations
+        if: failure()
+        run: |
+          shopt -s nullglob
+          logs=(/tmp/e2e-mock-*.log)
+          if [ ${#logs[@]} -eq 0 ]; then
+            echo "::error::mock e2e failed with no /tmp/e2e-mock-*.log"
+            exit 0
+          fi
+          for f in "${logs[@]}"; do
+            echo "::error::$(basename "$f"): $(tr '\n' ' ' < "$f" | head -c 1800)"
+          done
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v7
@@ -59,6 +71,16 @@ jobs:
           docker logs crowdsec-test 2>/dev/null || true
           echo "=== traefik-test ==="
           docker logs traefik-test 2>/dev/null || true
+      - name: Show Pester results XML
+        if: always()
+        run: |
+          if [ -f tests/e2e/real/test-results.xml ]; then
+            cat tests/e2e/real/test-results.xml
+            echo "::error::$(tr '\n' ' ' < tests/e2e/real/test-results.xml | head -c 2000)"
+          else
+            echo "no test-results.xml"
+            echo "::error::no test-results.xml (Pester did not write results)"
+          fi
       - name: Upload Pester results
         if: always()
         uses: actions/upload-artifact@v7

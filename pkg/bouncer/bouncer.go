@@ -12,6 +12,7 @@ import (
 	captcha "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
@@ -37,6 +38,7 @@ type Bouncer struct {
 	captchaClient             *captcha.Client
 	log                       *slog.Logger
 	conn                      *crowdsecconnection.CrowdsecConnection
+	decisionScopeHeaders      map[string]string // CrowdSec header scope → request header
 }
 
 // New returns a per-router handler bound to conn.
@@ -67,6 +69,7 @@ func New(next http.Handler, name string, config *configuration.Config, conn *cro
 		traceCustomHeader:         config.TraceHeadersCustomName,
 		log:                       log,
 		conn:                      conn,
+		decisionScopeHeaders:      decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
 		serverPoolStrategy:        &ip.PoolStrategy{Checker: serverChecker},
 		clientPoolStrategy:        &ip.PoolStrategy{Checker: clientChecker},
 		captchaClient:             &captcha.Client{},
@@ -145,11 +148,15 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Mapped scope headers for this request. Missing headers are omitted.
+	scopes := decisionscope.RequestScopeValues(b.decisionScopeHeaders, req)
+
 	if b.conn.Mode() != configuration.NoneMode {
-		value, cacheErr := b.conn.Cache().Get(remoteIP)
-		if cacheErr != nil {
+		value, cacheErr := decisionscope.LookupCachedRemediation(b.conn.Cache(), b.conn.Mode(), remoteIP, scopes)
+		switch {
+		case cacheErr != nil:
 			cacheErrString := cacheErr.Error()
-			b.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s isBanned:false %s", remoteIP, cacheErrString))
+			b.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s cache:%s", remoteIP, cacheErrString))
 			if !b.conn.RedisUnreachableBlock() && cacheErrString == cache.CacheUnreachable {
 				b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s redisUnreachable=true", remoteIP))
 				b.handleNextServeHTTP(rw, req, remoteIP)
@@ -160,13 +167,12 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
 				return
 			}
-		} else {
-			b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, value))
-			if value == cache.NoBannedValue {
-				b.handleNextServeHTTP(rw, req, remoteIP)
-			} else {
-				b.handleRemediationServeHTTP(rw, req, remoteIP, value)
-			}
+		case decisionscope.IsActiveRemediation(value):
+			b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit remediation:%s", remoteIP, value))
+			b.handleRemediationServeHTTP(rw, req, remoteIP, value)
+			return
+		case value == cache.NoBannedValue:
+			b.handleNextServeHTTP(rw, req, remoteIP)
 			return
 		}
 	}
@@ -179,7 +185,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
 		}
 	} else {
-		value, err := b.conn.LiveLookup(remoteIP)
+		value, err := b.conn.LiveLookup(remoteIP, scopes)
 		if err != nil {
 			b.log.Debug("ServeHTTP:LiveLookup " + err.Error())
 		}

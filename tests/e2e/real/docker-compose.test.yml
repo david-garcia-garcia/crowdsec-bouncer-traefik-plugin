@@ -1,3 +1,5 @@
+name: crowdsec-bouncer-e2e
+
 services:
   traefik:
     image: "traefik:v3.7.11"
@@ -11,19 +13,28 @@ services:
       - "--accesslog.bufferingSize=0"  # Disable buffering for immediate log writes in tests
       - "--accesslog.fields.headers.names.X-Crowdsec-Remediation=keep"
       - "--accesslog.fields.headers.names.X-Forwarded-For=keep"
+      - "--accesslog.fields.headers.names.X-IPCountry=keep"
       - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.constraints=Label(`com.docker.compose.project`,`crowdsec-bouncer-e2e`)"
+      - "--providers.file.filename=/etc/traefik/dynamic-scopes.yml"
       - "--entrypoints.web.address=:80"
-      - "--entrypoints.web.forwardedHeaders.trustedIPs=172.20.0.0/16"
+      - "--entrypoints.web.forwardedHeaders.trustedIPs=172.16.0.0/12,192.168.0.0/16,10.0.0.0/8,127.0.0.1/32"
       - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      - "--experimental.localplugins.geoblock.modulename=github.com/david-garcia-garcia/traefik-geoblock"
+      - "--experimental.localplugins.geoblock.settings.useunsafe=true"
+    environment:
+      TRAEFIK_PLUGIN_GEOBLOCK_PATH: /plugins-local/src/github.com/david-garcia-garcia/traefik-geoblock
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "traefik-logs:/var/log/traefik"
       - "../../../ban.html:/ban.html:ro"
       - "../../../captcha.html:/captcha.html:ro"
       - "./ban.html:/e2e-ban.html:ro"
+      - "./dynamic-scopes.yml:/etc/traefik/dynamic-scopes.yml:ro"
       - "../../..:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      - "./.geoblock:/plugins-local/src/github.com/david-garcia-garcia/traefik-geoblock"
     ports:
       - "8000:80"
       - "8080:8080"
@@ -285,6 +296,30 @@ services:
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
+  # Range + Country via file-provider chain (geoblock enrich then bouncer). Nested maps live in dynamic-scopes.yml.
+  scope-none:
+    image: traefik/whoami
+    container_name: "scope-none-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.scope-none.rule=PathPrefix(`/scope-none`)"
+      - "traefik.http.routers.scope-none.entrypoints=web"
+      - "traefik.http.routers.scope-none.middlewares=chain-scope-none@file"
+      - "traefik.http.services.scope-none.loadbalancer.server.port=80"
+
+  # Range + Country in stream mode (range-index + stream scopes=Country)
+  scope-stream:
+    image: traefik/whoami
+    container_name: "scope-stream-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.scope-stream.rule=PathPrefix(`/scope-stream`)"
+      - "traefik.http.routers.scope-stream.entrypoints=web"
+      - "traefik.http.routers.scope-stream.middlewares=chain-scope-stream@file"
+      - "traefik.http.services.scope-stream.loadbalancer.server.port=80"
+
   # Real AppSec CRS inband (PR 333), not the mock rpc2 stand-in
   appsec:
     image: traefik/whoami
@@ -326,6 +361,8 @@ services:
       CUSTOM_HOSTNAME: "crowdsec-test"
       # Test bouncer key
       BOUNCER_KEY_TRAEFIK_TEST: "40796d93c2958f9e58345514e67740e5"
+      # Separate stream session so scopes=ip,range,country does not share the default key
+      BOUNCER_KEY_TRAEFIK_SCOPES: "a1b2c3d4e5f60718293a4b5c6d7e8f90"
       # Disable aggressive collections that cause 150k decision issue
       DISABLE_COLLECTIONS: "crowdsecurity/iptables crowdsecurity/linux crowdsecurity/sshd"
       # Enable debugging

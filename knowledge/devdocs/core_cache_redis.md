@@ -12,13 +12,13 @@ _Avoid_: local TTL map, mock `serveRedis`
 
 ## Overview
 
-Use `pkg/simpleredis` for Redis-protocol GET/SET/DEL. Hold each client by pointer after `Init` so the pool mutex is not copied. Do not import the published module.
+Use `pkg/simpleredis` for Redis-protocol GET/SET/DEL/MGET. Hold each client by pointer after `Init` so the pool mutex is not copied. Do not import the published module.
 
 ## How to use
 
 - `Client.New(..., isRedis=true, writeHost, readHosts, pass, database, keyPrefix)` inits the writer and each reader. `keyPrefix` is `crowdsecconnection.IdentityHex` so two Connections on one Redis do not collide.
-- One key per request: `Get`/`Set`/`Del`. The logical key is still the client IP; Redis stores `prefix:key`.
-- Cache keys for remediations are the client IP Traefik already resolved, namespaced by connection identity when Redis is on.
+- Request lookup uses `GetMany` (Redis `MGET`, one `nextReader()`): the client IP, optional `range-index`, and each present header-scope key. Prefix each logical key. Missing keys are omitted from the result map.
+- Cache keys for remediations are the client IP, `scope:value` for header-mapped scopes, and one `range-index` blob, namespaced by connection identity when Redis is on.
 - `SimpleRedis.Close()` drains idle sockets and refuses to pool again. `cache.Client.Close()` closes the writer and every reader. `CrowdsecConnection.Close()` calls that.
 
 ## Pattern snippet
@@ -26,7 +26,7 @@ Use `pkg/simpleredis` for Redis-protocol GET/SET/DEL. Hold each client by pointe
 ```go
 r := &simpleredis.SimpleRedis{}
 r.Init(host, pass, database)
-value, err := r.Get(key)
+values, err := r.MGet([]string{key, "range-index"})
 ```
 
 ## Key files

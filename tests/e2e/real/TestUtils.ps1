@@ -57,6 +57,49 @@ function Add-TestDecision {
     return $true
 }
 
+# Helper function to create a Range decision using cscli --range
+function Add-TestRangeDecision {
+    param(
+        [string]$Range,
+        [string]$Type = "ban",
+        [string]$Duration = "1h",
+        [string]$Reason = "Integration test range decision"
+    )
+
+    Write-Host "➕ Adding $Type Range decision for $Range" -ForegroundColor Yellow
+
+    $addCommand = "cscli decisions add --range $Range --duration $Duration --type $Type --reason '$Reason'"
+    $result = docker exec crowdsec-test sh -c $addCommand
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to add range decision: $result"
+    }
+
+    Write-Host "✅ Range decision added successfully via cscli" -ForegroundColor Green
+    return $true
+}
+
+# Helper function to create a named-scope decision using cscli --scope/--value
+function Add-TestScopeDecision {
+    param(
+        [string]$Scope,
+        [string]$Value,
+        [string]$Type = "ban",
+        [string]$Duration = "1h",
+        [string]$Reason = "Integration test scope decision"
+    )
+
+    Write-Host "➕ Adding $Type $Scope decision for $Value" -ForegroundColor Yellow
+
+    $addCommand = "cscli decisions add --scope $Scope --value $Value --duration $Duration --type $Type --reason '$Reason'"
+    $result = docker exec crowdsec-test sh -c $addCommand
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to add scope decision: $result"
+    }
+
+    Write-Host "✅ Scope decision added successfully via cscli" -ForegroundColor Green
+    return $true
+}
+
 # Helper function to remove decisions for an IP using cscli
 function Remove-TestDecision {
     param(
@@ -72,6 +115,37 @@ function Remove-TestDecision {
     return $true
 }
 
+# Helper function to remove a Range decision using cscli --range
+function Remove-TestRangeDecision {
+    param(
+        [string]$Range
+    )
+
+    $result = docker exec crowdsec-test cscli decisions delete --range $Range 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "⚠️ Failed to remove Range decision for $Range" -ForegroundColor Yellow
+    } else {
+        Write-Host "✅ Removed Range decision for $Range" -ForegroundColor Green
+    }
+    return $true
+}
+
+# Helper function to remove a named-scope decision using cscli --scope/--value
+function Remove-TestScopeDecision {
+    param(
+        [string]$Scope,
+        [string]$Value
+    )
+
+    $result = docker exec crowdsec-test cscli decisions delete --scope $Scope --value $Value 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "⚠️ Failed to remove $Scope decision for $Value" -ForegroundColor Yellow
+    } else {
+        Write-Host "✅ Removed $Scope decision for $Value" -ForegroundColor Green
+    }
+    return $true
+}
+
 # Helper function to test HTTP request
 function Test-HttpRequest {
     param(
@@ -80,12 +154,16 @@ function Test-HttpRequest {
         [int]$ExpectedStatusCode = 200,
         [string]$ExpectedContent = $null,
         [int]$TimeoutSec = 10,
-        [string]$TraefikUrl = "http://localhost:8000"
+        [string]$TraefikUrl = "http://localhost:8000",
+        [hashtable]$ExtraHeaders = @{}
     )
     
     $headers = @{
         "X-Forwarded-For" = $IP
         "User-Agent" = "Integration-Test-Client"
+    }
+    foreach ($headerName in $ExtraHeaders.Keys) {
+        $headers[$headerName] = $ExtraHeaders[$headerName]
     }
     
     try {
@@ -118,6 +196,20 @@ function Test-HttpRequest {
             Error = $_.Exception.Message
         }
     }
+}
+
+# Parse the ISO country code geoblock wrote onto a whoami response body.
+function Get-WhoamiCountryCode {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Content
+    )
+
+    $match = [regex]::Match($Content, '(?im)X-Ipcountry:\s*([A-Za-z]{2})\b')
+    if ($match.Success) {
+        return $match.Groups[1].Value.ToUpperInvariant()
+    }
+    return $null
 }
 
 # Helper function to wait for a specific HTTP status code with timeout

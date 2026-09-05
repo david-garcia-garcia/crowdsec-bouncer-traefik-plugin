@@ -326,3 +326,27 @@ func Test_getContentTypeFromPath(t *testing.T) {
 		})
 	}
 }
+
+func Test_validateDecisionScopeHeaders(t *testing.T) {
+	cfg := getMinimalConfig()
+	cfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	if err := validateDecisionScopeHeaders(cfg); err != nil {
+		t.Fatalf("valid Country map: %v", err)
+	}
+	cfg.DecisionScopeHeaders = map[string]string{"Ip": "X-Real-IP"}
+	if err := validateDecisionScopeHeaders(cfg); err == nil {
+		t.Fatal("Ip key must be rejected")
+	}
+	cfg.DecisionScopeHeaders = map[string]string{"RANGE": "X-Range"}
+	if err := validateDecisionScopeHeaders(cfg); err == nil {
+		t.Fatal("Range key must be rejected")
+	}
+	cfg.DecisionScopeHeaders = map[string]string{"": "X-Empty"}
+	if err := validateDecisionScopeHeaders(cfg); err == nil {
+		t.Fatal("empty scope must be rejected")
+	}
+	cfg.DecisionScopeHeaders = map[string]string{"username": "  "}
+	if err := validateDecisionScopeHeaders(cfg); err == nil {
+		t.Fatal("empty header must be rejected")
+	}
+}

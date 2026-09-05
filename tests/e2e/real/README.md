@@ -12,6 +12,8 @@ Harness shape is the author’s [PR 273](https://github.com/maxlerebourg/crowdse
 [PR 333](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/333)
 as Pester, not bash: live mode, trusted IPs, custom ban page, real AppSec CRS.
 
+Country matching on `/scope-none` and `/scope-stream` chains [traefik-geoblock](https://github.com/david-garcia-garcia/traefik-geoblock) in enrich mode, then the bouncer. `Test-Integration.ps1` clones geoblock `v1.2.0` into `.geoblock/` (gitignored) before `docker compose up`. Nested plugin maps live in `dynamic-scopes.yml` (file provider).
+
 ```bash
 ./tests/e2e/real/Test-Integration.ps1
 # or from the repo root

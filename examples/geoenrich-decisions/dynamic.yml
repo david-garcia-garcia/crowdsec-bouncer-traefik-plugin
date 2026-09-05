@@ -1,0 +1,44 @@
+# Nested plugin maps belong in a file provider. Docker labels do not decode
+# decisionScopeHeaders or geoblock databaseSources reliably.
+http:
+  middlewares:
+    geo-enrich:
+      plugin:
+        geoblock:
+          mode: enrich
+          countryHeader: X-IPCountry
+          allowPrivate: true
+          logLevel: INFO
+          ipHeaderStrategy: CheckFirstNonePrivate
+          ipHeaders:
+            - x-forwarded-for
+          requestHeaderEnrich:
+            X-IPCountry: country
+          databaseSources:
+            default_ip2location:
+              enabled: false
+            seed:
+              path: /plugins-local/src/github.com/david-garcia-garcia/traefik-geoblock/seeds/IP2LOCATION-LITE-DB1.IPV6.BIN
+              databaseType: bin
+              fieldsPreconfigured: ip2location_lite
+    crowdsec:
+      plugin:
+        bouncer:
+          enabled: true
+          logLevel: DEBUG
+          crowdsecMode: live
+          crowdsecLapiKey: "40796d93c2958f9e58345514e67740e5"
+          crowdsecLapiHost: crowdsec:8080
+          forwardedHeadersTrustedIps:
+            - "172.16.0.0/12"
+            - "192.168.0.0/16"
+            - "10.0.0.0/8"
+            - "127.0.0.1/32"
+          forwardedHeadersCustomName: X-Forwarded-For
+          decisionScopeHeaders:
+            Country: X-IPCountry
+    crowdsec-geo:
+      chain:
+        middlewares:
+          - geo-enrich
+          - crowdsec

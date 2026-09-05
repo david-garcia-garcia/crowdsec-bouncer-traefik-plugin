@@ -19,6 +19,8 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 - Run `./tests/e2e/real/Test-Integration.ps1` or `make e2e_pester` from the repo root.
 - Keep new cases as `tests/e2e/real/*.Tests.ps1`. Do not put them in `tests/e2e/mock/` or at `tests/` root.
 - Identify the client only with `X-Forwarded-For`. Do not parse `RemoteAddr`.
+- Nested plugin maps (`decisionScopeHeaders`, geoblock `databaseSources`) MUST use the file provider (`tests/e2e/real/dynamic-scopes.yml`). Docker labels do not decode those maps.
+- Country matching uses traefik-geoblock enrich on a **public** `X-Forwarded-For`. Do not inject a client-set country header for that case.
 - CI job `e2e (docker + pester)` runs this suite; `e2e (binary + mock LAPI)` stays the mock job.
 
 ## Pattern snippet
@@ -33,6 +35,7 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 
 - `tests/e2e/real/Test-Integration.ps1`
 - `tests/e2e/real/docker-compose.test.yml`
+- `tests/e2e/real/dynamic-scopes.yml`
 - `tests/e2e/real/*.Tests.ps1`
 - `.github/workflows/e2e.yml`
 
@@ -44,3 +47,4 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 - Redis cache keys are the client IP. A long-TTL restart case MUST use a different `X-Forwarded-For` than a short-TTL case, or a cache hit will keep the 2s key and never `SET EX 120`.
 - AppSec cases need Crowdsec `appsec-crs-inband` and `acquis.yaml` on 7422; first boot downloads CRS.
 - The test LAPI key `40796d93c2958f9e58345514e67740e5` is a fixture, not a production secret.
+- The file-provider stream bouncer uses a second fixture key (`BOUNCER_KEY_TRAEFIK_SCOPES`). Do not share one LAPI stream key with the docker-label `/stream` middleware or the polls race.

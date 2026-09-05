@@ -38,6 +38,7 @@ linters-settings:
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
           - github.com/leprosus/golang-ttl-map
       Test:
         files:
@@ -53,6 +54,7 @@ linters-settings:
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
 
 linters:
   enable-all: true

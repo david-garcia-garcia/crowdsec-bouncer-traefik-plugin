@@ -48,6 +48,24 @@ func (lc *localCache) get(key string) (string, error) {
 	return "", errors.New(CacheMiss)
 }
 
+func (lc *localCache) getMany(keys []string) (map[string]string, error) {
+	out := make(map[string]string)
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		value, err := lc.get(key)
+		if err == nil {
+			out[key] = value
+			continue
+		}
+		if err.Error() == CacheUnreachable {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
 func (lc *localCache) set(key, value string, duration int64) {
 	lc.heap().Set(key, value, duration)
 }
@@ -103,6 +121,38 @@ func (rc *redisCache) get(key string) (string, error) {
 	return "", errors.New(CacheMiss)
 }
 
+func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
+	logical := make([]string, 0, len(keys))
+	prefixedNames := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		logical = append(logical, key)
+		prefixedNames = append(prefixedNames, prefixed(rc.prefix, key))
+	}
+	if len(prefixedNames) == 0 {
+		return map[string]string{}, nil
+	}
+	values, err := rc.nextReader().MGet(prefixedNames)
+	if err != nil {
+		switch err.Error() {
+		case simpleredis.RedisUnreachable:
+			return nil, errors.New(CacheUnreachable)
+		default:
+			return nil, err
+		}
+	}
+	out := make(map[string]string)
+	for i, key := range logical {
+		if i >= len(values) || values[i] == nil || len(values[i]) == 0 {
+			continue
+		}
+		out[key] = string(values[i])
+	}
+	return out, nil
+}
+
 func (rc *redisCache) set(key, value string, duration int64) {
 	if err := rc.writer.Set(prefixed(rc.prefix, key), []byte(value), duration); err != nil {
 		rc.log.Error("cache:setDecisionRedisCache" + err.Error())
@@ -128,6 +178,7 @@ func (rc *redisCache) close() {
 type cacheInterface interface {
 	set(key, value string, duration int64)
 	get(key string) (string, error)
+	getMany(keys []string) (map[string]string, error)
 	delete(key string)
 	close()
 }
@@ -169,6 +220,13 @@ func (c *Client) Delete(key string) {
 func (c *Client) Get(key string) (string, error) {
 	c.log.Debug(fmt.Sprintf("cache:Get key:%v", key))
 	return c.cache.get(key)
+}
+
+// GetMany returns the values for the given keys. Missing keys are omitted.
+// Redis issues one MGET on a single reader. Unreachable returns CacheUnreachable.
+func (c *Client) GetMany(keys []string) (map[string]string, error) {
+	c.log.Debug(fmt.Sprintf("cache:GetMany keys:%v", keys))
+	return c.cache.getMany(keys)
 }
 
 // Set update the cache with the IP as key and the value banned / not banned.

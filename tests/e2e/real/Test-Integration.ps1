@@ -44,6 +44,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$PSNativeCommandUseErrorActionPreference = $false
 $ComposeFile = Join-Path $PSScriptRoot "docker-compose.test.yml"
 . "$PSScriptRoot/TestUtils.ps1"
 
@@ -150,6 +151,25 @@ try {
     Write-Step "Cleaning up any existing services..."
     docker compose -f $ComposeFile down -v --remove-orphans 2>$null
 
+    # Pin traefik-geoblock for Country e2e (enrich writes X-IPCountry). Not committed.
+    $geoblockDir = Join-Path $PSScriptRoot ".geoblock"
+    $geoblockTag = "v1.2.0"
+    $geoblockPlugin = Join-Path $geoblockDir "plugin.go"
+    if (-not (Test-Path $geoblockPlugin)) {
+        Write-Step "Cloning traefik-geoblock $geoblockTag for Country e2e..."
+        if (Test-Path $geoblockDir) {
+            Remove-Item -Recurse -Force $geoblockDir
+        }
+        git -c advice.detachedHead=false clone --depth 1 --branch $geoblockTag https://github.com/david-garcia-garcia/traefik-geoblock.git $geoblockDir
+        if ($LASTEXITCODE -ne 0) {
+            Write-StepError "Failed to clone traefik-geoblock $geoblockTag"
+            exit 1
+        }
+        Write-Success "traefik-geoblock $geoblockTag cloned"
+    } else {
+        Write-Success "traefik-geoblock source already present"
+    }
+
     # Start Docker services
     Write-Step "Starting Docker Compose services for testing..."
     try {
@@ -169,19 +189,25 @@ try {
         Write-Step "Waiting for services to become ready..."
         
         $servicesReady = @(
-            (Wait-ForHttpStatus -Url "http://localhost:8080/api/rawdata" -ExpectedStatusCodes @(200) -TimeoutSeconds 60).Success,
-            (Wait-ForHttpStatus -Url "http://localhost:8000/whoami" -ExpectedStatusCodes @(200) -TimeoutSeconds 60).Success,
-            (Wait-ForHttpStatus -Url "http://localhost:8000/redis-cache" -ExpectedStatusCodes @(200) -TimeoutSeconds 60).Success,
-            (Wait-ForHttpStatus -Url "http://localhost:8000/hold-redis" -ExpectedStatusCodes @(200) -TimeoutSeconds 60).Success,
             (Wait-ForCondition -Description "CrowdSec LAPI" -TimeoutSeconds 180 -RetryIntervalSeconds 3 -Condition {
                 Invoke-CrowdSecAPI -Endpoint "/v1/decisions?limit=1" -TimeoutSec 5 -ApiKey $env:BOUNCER_API_KEY
                 return $true
             }).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8080/api/rawdata" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/whoami" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/redis-cache" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/hold-redis" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/scope-none" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/scope-stream" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/appsec" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success
         )
         
         if ($servicesReady -contains $false) {
             Write-StepError "One or more services failed to start properly"
+            Write-Host "=== docker ps -a ===" -ForegroundColor Yellow
+            docker ps -a
+            Write-Host "=== traefik-test logs ===" -ForegroundColor Yellow
+            docker logs traefik-test 2>&1 | Select-Object -Last 80
             if (-not $SkipDockerCleanup) {
                 Write-Step "Cleaning up Docker services..."
                 docker compose -f $ComposeFile down -v
@@ -233,6 +259,12 @@ try {
             Write-Host "  Failed: $($result.FailedCount)" -ForegroundColor $Colors.Error
             Write-Host "  Skipped: $($result.SkippedCount)" -ForegroundColor $Colors.Warning
             Write-Host "  Duration: $($result.Duration)" -ForegroundColor Gray
+            foreach ($failed in $result.Failed) {
+                Write-Host "  FAIL: $($failed.ExpandedPath)" -ForegroundColor $Colors.Error
+                if ($failed.ErrorRecord) {
+                    Write-Host "        $($failed.ErrorRecord.Exception.Message)" -ForegroundColor Yellow
+                }
+            }
             $exitCode = 1
         } else {
             Write-ConsoleWarning "Could not determine test results"

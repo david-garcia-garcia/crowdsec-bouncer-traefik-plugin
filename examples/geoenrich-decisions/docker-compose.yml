@@ -1,0 +1,73 @@
+services:
+  traefik:
+    image: "traefik:v3.7.11"
+    container_name: "traefik"
+    restart: unless-stopped
+    environment:
+      TRAEFIK_PLUGIN_GEOBLOCK_PATH: /plugins-local/src/github.com/david-garcia-garcia/traefik-geoblock
+    command:
+      - "--log.level=INFO"
+      - "--accesslog"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--accesslog.format=json"
+      - "--accesslog.fields.headers.names.X-IPCountry=keep"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.forwardedHeaders.trustedIPs=172.16.0.0/12,192.168.0.0/16,10.0.0.0/8,127.0.0.1/32"
+      # Local bouncer: this tree (decisionScopeHeaders is not in catalog v1.7.1).
+      - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      # Local geoblock: clone into ./geoblock (see README / make run_geoenrich).
+      - "--experimental.localplugins.geoblock.modulename=github.com/david-garcia-garcia/traefik-geoblock"
+      - "--experimental.localplugins.geoblock.settings.useunsafe=true"
+      # Catalog alternative after a bouncer release that includes decisionScopeHeaders:
+      # - "--experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      # - "--experimental.plugins.bouncer.version=v1.7.1"
+      # - "--experimental.plugins.geoblock.modulename=github.com/david-garcia-garcia/traefik-geoblock"
+      # - "--experimental.plugins.geoblock.version=v1.2.0"
+      # - "--experimental.plugins.geoblock.settings.useunsafe=true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - logs-geoenrich:/var/log/traefik
+      - "./dynamic.yml:/etc/traefik/dynamic.yml:ro"
+      - ./../../:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      - ./geoblock:/plugins-local/src/github.com/david-garcia-garcia/traefik-geoblock
+    ports:
+      - 8000:80
+      - 8080:8080
+    depends_on:
+      - crowdsec
+
+  whoami:
+    image: traefik/whoami
+    container_name: "simple-service-foo"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.router-foo.rule=PathPrefix(`/foo`)"
+      - "traefik.http.routers.router-foo.entrypoints=web"
+      - "traefik.http.routers.router-foo.middlewares=crowdsec-geo@file"
+      - "traefik.http.services.service-foo.loadbalancer.server.port=80"
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:v1.7.8
+    container_name: "crowdsec"
+    restart: unless-stopped
+    environment:
+      COLLECTIONS: crowdsecurity/traefik
+      CUSTOM_HOSTNAME: crowdsec
+      BOUNCER_KEY_TRAEFIK_DEV: 40796d93c2958f9e58345514e67740e5
+    volumes:
+      - './acquis.yaml:/etc/crowdsec/acquis.yaml:ro'
+      - logs-geoenrich:/var/log/traefik:ro
+      - crowdsec-db-geoenrich:/var/lib/crowdsec/data/
+      - crowdsec-config-geoenrich:/etc/crowdsec/
+    labels:
+      - "traefik.enable=false"
+
+volumes:
+  logs-geoenrich:
+  crowdsec-db-geoenrich:
+  crowdsec-config-geoenrich:

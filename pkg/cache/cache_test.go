@@ -209,3 +209,32 @@ func Test_redisCacheUsesPrefix(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func Test_GetMany(t *testing.T) {
+	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
+	client.Set("a", BannedValue, 10)
+	client.Set("b", CaptchaValue, 10)
+	got, err := client.GetMany([]string{"a", "missing", "b", ""})
+	if err != nil {
+		t.Fatalf("GetMany err %v", err)
+	}
+	if got["a"] != BannedValue || got["b"] != CaptchaValue {
+		t.Fatalf("GetMany got %+v", got)
+	}
+	if _, ok := got["missing"]; ok {
+		t.Fatal("missing key must be omitted")
+	}
+	if _, ok := got[""]; ok {
+		t.Fatal("empty key must be omitted")
+	}
+}
+
+func Test_GetManyUnreachable(t *testing.T) {
+	client := &Client{}
+	client.New(logger.New("INFO", ""), true, "127.0.0.1:1", nil, "", "", "p")
+	defer client.Close()
+	_, err := client.GetMany([]string{"k"})
+	if err == nil || err.Error() != CacheUnreachable {
+		t.Fatalf("GetMany unreachable got %v, want %s", err, CacheUnreachable)
+	}
+}

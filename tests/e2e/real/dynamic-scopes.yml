@@ -1,0 +1,66 @@
+# File provider: nested plugin maps (decisionScopeHeaders, geoblock databaseSources)
+# do not decode reliably as Docker labels. Chain geo-enrich then the bouncer so
+# Country matching uses a looked-up header, not a client-set test header.
+http:
+  middlewares:
+    geo-enrich:
+      plugin:
+        geoblock:
+          mode: enrich
+          countryHeader: X-IPCountry
+          allowPrivate: true
+          logLevel: DEBUG
+          ipHeaderStrategy: CheckFirstNonePrivate
+          ipHeaders:
+            - x-forwarded-for
+          requestHeaderEnrich:
+            X-IPCountry: country
+          databaseSources:
+            default_ip2location:
+              enabled: false
+            seed:
+              path: /plugins-local/src/github.com/david-garcia-garcia/traefik-geoblock/seeds/IP2LOCATION-LITE-DB1.IPV6.BIN
+              databaseType: bin
+              fieldsPreconfigured: ip2location_lite
+    bouncer-scope-none:
+      plugin:
+        bouncer:
+          enabled: "true"
+          crowdsecLapiKey: "40796d93c2958f9e58345514e67740e5"
+          crowdsecLapiHost: crowdsec:8080
+          httpTimeoutSeconds: "60"
+          logLevel: DEBUG
+          crowdsecMode: none
+          decisionScopeHeaders:
+            Country: X-IPCountry
+          forwardedHeadersTrustedIps:
+            - "172.16.0.0/12"
+            - "127.0.0.1/32"
+          forwardedHeadersCustomName: X-Forwarded-For
+    bouncer-scope-stream:
+      plugin:
+        bouncer:
+          enabled: "true"
+          crowdsecLapiKey: "a1b2c3d4e5f60718293a4b5c6d7e8f90"
+          crowdsecLapiHost: crowdsec:8080
+          httpTimeoutSeconds: "60"
+          logLevel: DEBUG
+          updateIntervalSeconds: "2"
+          streamStartupBlock: "false"
+          crowdsecMode: stream
+          decisionScopeHeaders:
+            Country: X-IPCountry
+          forwardedHeadersTrustedIps:
+            - "172.16.0.0/12"
+            - "127.0.0.1/32"
+          forwardedHeadersCustomName: X-Forwarded-For
+    chain-scope-none:
+      chain:
+        middlewares:
+          - geo-enrich
+          - bouncer-scope-none
+    chain-scope-stream:
+      chain:
+        middlewares:
+          - geo-enrich
+          - bouncer-scope-stream

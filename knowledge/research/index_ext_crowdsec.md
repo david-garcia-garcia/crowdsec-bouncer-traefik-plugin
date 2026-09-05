@@ -9,3 +9,8 @@ description: How the Crowdsec Docker image registers bouncers and hub collection
 priority: normal
 local: ext_crowdsec_cscli_decisions/
 description: How tests inject and clear remediations on a real Crowdsec LAPI.
+
+## Decision scopes
+priority: normal
+local: ext_crowdsec_decisions_scopes/
+description: Official CrowdSec decision scope values a bouncer can receive and how each is matched.
