@@ -66,8 +66,8 @@ Spec host: MASTER allowlist has `plugin`, not 383's `bouncer`. New spec `core_pl
   By: explore
 
 - Q: How do real-stack tests inject Range and header-mapped scopes?
-  Decision: assumed — `cscli decisions add --range` and `--scope <name> --value <v>` (v1.7 docs). Extend `Test-HttpRequest` with extra headers. New compose middleware `decisionScopeHeaders` (Country/AS/username) on a dedicated path so existing tests stay header-free. Cover stream (cache) and none (live LAPI) for Range; header scopes at least on none plus stream `scopes=`.
-  By: explore
+  Decision: assumed — `cscli decisions add --range` and `--scope <name> --value <v>` (v1.7 docs). Range uses private `X-Forwarded-For`. Country is proven with traefik-geoblock enrich (public IP → `X-IPCountry`), not a client-set `CF-IPCountry`. Nested plugin maps use a file provider. Mock `scope-headers` still injects synthetic headers. Cover stream (cache) and none (live LAPI) for Range and Country.
+  By: implement
 
 - Q: Should [PR 368](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/368) merge onto `master` first?
   Decision: assumed — no. Stream-only Range keyed off `/` in `decision.Value`; does not close [#271](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/271).
