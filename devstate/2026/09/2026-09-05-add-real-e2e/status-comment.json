@@ -1,5 +1,5 @@
 {
-  "commentId": "local",
+  "commentId": "pr-body",
   "issueKey": "2026-09-05-add-real-e2e",
   "markerValue": "[sgsi-dev-ticket-status:2026-09-05-add-real-e2e]",
   "issueHost": "local"
