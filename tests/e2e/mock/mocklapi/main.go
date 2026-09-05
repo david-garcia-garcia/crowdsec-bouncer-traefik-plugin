@@ -164,46 +164,49 @@ func main() {
 	// bouncer's system-trust-store path. Backend and AppSec stay plaintext.
 	lapiTLSCert := flag.String("lapi-tls-cert", "", "PEM cert to serve the LAPI over HTTPS (optional)")
 	lapiTLSKey := flag.String("lapi-tls-key", "", "PEM key for --lapi-tls-cert")
+	lapiOnly := flag.Bool("lapi-only", false, "serve only the LAPI mux (second Crowdsec backend in dual-bouncer)")
 	flag.Parse()
 
-	go func() {
-		log.Fatal(http.ListenAndServe(*backendAddr, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			_, _ = w.Write([]byte("E2E_BACKEND_OK\n"))
-		})))
-	}()
+	if !*lapiOnly {
+		go func() {
+			log.Fatal(http.ListenAndServe(*backendAddr, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte("E2E_BACKEND_OK\n"))
+			})))
+		}()
 
-	// AppSec mock: the plugin forwards the request metadata in X-Crowdsec-Appsec-*
-	// headers and reads our status — 200 allows, 403 blocks. We emulate one
-	// deterministic virtual-patching rule (block any URI containing "rpc2", the
-	// exact probe from examples/appsec-enabled) so the plugin's AppSec path is
-	// exercised without standing up the real WAF.
-	go func() {
-		log.Fatal(http.ListenAndServe(*appsecAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "403") {
-				w.WriteHeader(http.StatusForbidden)
-			}
-			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "500") {
-				w.WriteHeader(http.StatusInternalServerError)
-			}
-			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "502") {
-				w.WriteHeader(http.StatusBadGateway)
-			}
-			// Read body
-			body, err := io.ReadAll(r.Body)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			defer r.Body.Close()
-			if strings.Contains(string(body), "a=0") {
-				w.WriteHeader(http.StatusForbidden)
-				return
-			}
-		})))
-	}()
+		// AppSec mock: the plugin forwards the request metadata in X-Crowdsec-Appsec-*
+		// headers and reads our status — 200 allows, 403 blocks. We emulate one
+		// deterministic virtual-patching rule (block any URI containing "rpc2", the
+		// exact probe from examples/appsec-enabled) so the plugin's AppSec path is
+		// exercised without standing up the real WAF.
+		go func() {
+			log.Fatal(http.ListenAndServe(*appsecAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "403") {
+					w.WriteHeader(http.StatusForbidden)
+				}
+				if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "500") {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "502") {
+					w.WriteHeader(http.StatusBadGateway)
+				}
+				// Read body
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				defer r.Body.Close()
+				if strings.Contains(string(body), "a=0") {
+					w.WriteHeader(http.StatusForbidden)
+					return
+				}
+			})))
+		}()
 
-	go serveRedis(*redisAddr, false)
-	go serveRedis(*redisReadAddr, true)
+		go serveRedis(*redisAddr, false)
+		go serveRedis(*redisReadAddr, true)
+	}
 
 	mux := http.NewServeMux()
 

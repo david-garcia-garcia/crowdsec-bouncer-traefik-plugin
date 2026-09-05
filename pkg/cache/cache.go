@@ -27,13 +27,20 @@ const (
 	CacheUnreachable = "cache:unreachable"
 )
 
-//nolint:gochecknoglobals
-var cache = ttl_map.New()
+// localCache is the per-Client in-memory TTL store.
+type localCache struct {
+	store *ttl_map.Heap
+}
 
-type localCache struct{}
+func (lc *localCache) heap() *ttl_map.Heap {
+	if lc.store == nil {
+		lc.store = ttl_map.New()
+	}
+	return lc.store
+}
 
-func (localCache) get(key string) (string, error) {
-	value, isCached := cache.Get(key)
+func (lc *localCache) get(key string) (string, error) {
+	value, isCached := lc.heap().Get(key)
 	valueString, isValid := value.(string)
 	if isCached && isValid && len(valueString) > 0 {
 		return valueString, nil
@@ -41,16 +48,28 @@ func (localCache) get(key string) (string, error) {
 	return "", errors.New(CacheMiss)
 }
 
-func (localCache) set(key, value string, duration int64) {
-	cache.Set(key, value, duration)
+func (lc *localCache) set(key, value string, duration int64) {
+	lc.heap().Set(key, value, duration)
 }
 
-func (localCache) delete(key string) {
-	cache.Del(key)
+func (lc *localCache) delete(key string) {
+	lc.heap().Del(key)
+}
+
+// close is a no-op: the TTL map has no sockets or background goroutine.
+func (lc *localCache) close() {}
+
+// prefixed namespaces Redis keys so two Clients on one host do not share remediations.
+func prefixed(prefix, key string) string {
+	if prefix == "" {
+		return key
+	}
+	return prefix + ":" + key
 }
 
 type redisCache struct {
 	log     *slog.Logger
+	prefix  string
 	writer  *simpleredis.SimpleRedis
 	readers []*simpleredis.SimpleRedis
 	counter atomic.Uint64
@@ -66,7 +85,7 @@ func (rc *redisCache) nextReader() *simpleredis.SimpleRedis {
 }
 
 func (rc *redisCache) get(key string) (string, error) {
-	value, err := rc.nextReader().Get(key)
+	value, err := rc.nextReader().Get(prefixed(rc.prefix, key))
 	if err != nil {
 		switch err.Error() {
 		case simpleredis.RedisMiss:
@@ -85,14 +104,24 @@ func (rc *redisCache) get(key string) (string, error) {
 }
 
 func (rc *redisCache) set(key, value string, duration int64) {
-	if err := rc.writer.Set(key, []byte(value), duration); err != nil {
+	if err := rc.writer.Set(prefixed(rc.prefix, key), []byte(value), duration); err != nil {
 		rc.log.Error("cache:setDecisionRedisCache" + err.Error())
 	}
 }
 
 func (rc *redisCache) delete(key string) {
-	if err := rc.writer.Del(key); err != nil {
+	if err := rc.writer.Del(prefixed(rc.prefix, key)); err != nil {
 		rc.log.Error("cache:deleteDecisionRedisCache " + err.Error())
+	}
+}
+
+// close drains the writer and every reader idle pool.
+func (rc *redisCache) close() {
+	if rc.writer != nil {
+		rc.writer.Close()
+	}
+	for _, reader := range rc.readers {
+		reader.Close()
 	}
 }
 
@@ -100,6 +129,7 @@ type cacheInterface interface {
 	set(key, value string, duration int64)
 	get(key string) (string, error)
 	delete(key string)
+	close()
 }
 
 // Client Cache client.
@@ -108,11 +138,11 @@ type Client struct {
 	log   *slog.Logger
 }
 
-// New Initialize cache client.
-func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts []string, pass, database string) {
+// New Initialize cache client. keyPrefix namespaces Redis keys; memory clients ignore it and each own a map.
+func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts []string, pass, database, keyPrefix string) {
 	c.log = log
 	if isRedis {
-		rc := &redisCache{log: log}
+		rc := &redisCache{log: log, prefix: keyPrefix}
 		// Hold each client by pointer after Init so the pool mutex is not copied.
 		rc.writer = &simpleredis.SimpleRedis{}
 		rc.writer.Init(writeHost, pass, database)
@@ -123,9 +153,9 @@ func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts
 		}
 		c.cache = rc
 	} else {
-		c.cache = &localCache{}
+		c.cache = &localCache{store: ttl_map.New()}
 	}
-	c.log.Debug(fmt.Sprintf("cache:New initialized isRedis:%v writeHost:%v readHosts:%v", isRedis, writeHost, readHosts))
+	c.log.Debug(fmt.Sprintf("cache:New initialized isRedis:%v writeHost:%v readHosts:%v prefix:%v", isRedis, writeHost, readHosts, keyPrefix))
 }
 
 // Delete delete decision in cache.
@@ -145,4 +175,12 @@ func (c *Client) Get(key string) (string, error) {
 func (c *Client) Set(key string, value string, duration int64) {
 	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
 	c.cache.set(key, value, duration)
+}
+
+// Close drains Redis idle pools. Memory clients have nothing to stop. Safe to call more than once.
+func (c *Client) Close() {
+	if c == nil || c.cache == nil {
+		return
+	}
+	c.cache.close()
 }

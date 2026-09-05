@@ -5,3 +5,7 @@
 
 ## core
 - cache
+- plugin
+
+## std
+- go

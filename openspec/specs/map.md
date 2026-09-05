@@ -18,4 +18,15 @@ Allowlist of root + domain: `openspec/specs/domains.md`.
 
 ### cache
 
+- client
 - redis
+
+### plugin
+
+- middleware
+
+## std
+
+### go
+
+- reclaim

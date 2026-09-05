@@ -3,7 +3,7 @@
 ## Language
 
 **In-tree SimpleRedis**:
-The pooled Redis client copied into `pkg/simpleredis` from simpleredis PR #8 (`Init`/`Get`/`Set`/`Del`/`MGet`, RESP arrays, idle connections).
+The pooled Redis client copied into `pkg/simpleredis` from simpleredis PR #8 (`Init`/`Get`/`Set`/`Del`/`MGet`/`Close`, RESP arrays, idle connections).
 _Avoid_: published `github.com/maxlerebourg/simpleredis`, v1.0.12 vendor copy
 
 **Redis cache**:
@@ -16,9 +16,10 @@ Use `pkg/simpleredis` for Redis-protocol GET/SET/DEL. Hold each client by pointe
 
 ## How to use
 
-- `Client.New(..., isRedis=true, writeHost, readHosts, pass, database)` inits the writer and each reader.
-- One key per request: `Get`/`Set`/`Del`. `MGet` exists on the package for later multi-key reads.
-- Cache keys for remediations are the client IP Traefik already resolved.
+- `Client.New(..., isRedis=true, writeHost, readHosts, pass, database, keyPrefix)` inits the writer and each reader. `keyPrefix` is `crowdsecconnection.IdentityHex` so two Connections on one Redis do not collide.
+- One key per request: `Get`/`Set`/`Del`. The logical key is still the client IP; Redis stores `prefix:key`.
+- Cache keys for remediations are the client IP Traefik already resolved, namespaced by connection identity when Redis is on.
+- `SimpleRedis.Close()` drains idle sockets and refuses to pool again. `cache.Client.Close()` closes the writer and every reader. `CrowdsecConnection.Close()` calls that.
 
 ## Pattern snippet
 
@@ -37,5 +38,7 @@ value, err := r.Get(key)
 ## Gotchas
 
 - Do not copy `SimpleRedis` by value after `Init`.
+- After `Close()`, a later command may still dial; that socket is closed on release, not kept idle.
 - The mock e2e Redis stand-in must speak RESP arrays; inline GET is leftover compatibility.
 - Real-stack Redis-cache e2e uses Dragonfly, not Redis.
+- Pass a non-empty `keyPrefix` (connection identity hex) when two Crowdsec backends share one Redis.
