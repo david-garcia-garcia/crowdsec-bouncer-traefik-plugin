@@ -22,6 +22,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - Type-assert the stored value to `*crowdsecconnection.CrowdsecConnection` and return `bouncer.New(...)`.
 - Put stream tickers, LAPI HTTP, and cache on CrowdsecConnection. Put captcha and templates on Bouncer.
 - Resolve client IP with `pkg/ip.GetRemoteIP`. Do not parse `RemoteAddr` on the connection.
+- Range and header-mapped CrowdSec scopes live in `pkg/decisionscope`. Do not geolocate in `New` or `ServeHTTP`.
 - Watch logs `reclaim_put|bind|orphan|reclaim|dispose`.
 
 ## Pattern snippet
