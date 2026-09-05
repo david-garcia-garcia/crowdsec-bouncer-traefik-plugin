@@ -40,3 +40,16 @@ findings: stale-usage already produced in implement
 fixed: none
 skipped: none
 
+## archive (2026-09-05)
+phase: archive
+findings: none
+fixed: catalog synced; change moved to archive/2026-09-05-put-decision-scope-headers-on-identity
+skipped: none
+
+## pullrequest (2026-09-05)
+phase: pullrequest
+findings: none
+fixed: title 🐛 fix(crowdsecconnection): put decisionScopeHeaders on reclaim identity
+skipped: none
+ci: success 33978659998 / 33978659993
+

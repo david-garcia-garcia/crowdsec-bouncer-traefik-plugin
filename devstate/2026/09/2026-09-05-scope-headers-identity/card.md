@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-05T16:40:40Z
+Developer review: ready for review — 2026-09-05T16:48:58Z
 
 ## What this changes
 **Operators.** None.
@@ -13,17 +13,17 @@ Developer review: in progress — 2026-09-05T16:40:40Z
 On master, `decisionScopeHeaders` is copied onto both `Bouncer` and `CrowdsecConnection` and is omitted from reclaim identity. Two Traefik routers with the same LAPI and different maps share one stream ticker and cache; the first `New` wins, so Country/AS ingest for the second route is wrong.
 
 ## Merge readiness
-Change is archived and catalog synced. Remote CI is still running. 1 item remains.
+Ready for review. 0 items remain.
 
 Priority: P2 — Real operator pain, with a workaround or limited blast radius
-Reviewed head: 0a42cac
+Reviewed head: 774d0fd
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Archived; CI in progress |
-| CI proof | 3/6 | Main Process in progress |
+| Overall readiness | 6/6 | CI succeeded; no open comments |
+| CI proof | 6/6 | Main Process, mock e2e, and docker pester succeeded |
 | Local tests proof | N/A | Remote CI covers proof |
 | Review resolution | 6/6 | No PR comments |
 
@@ -33,7 +33,7 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-05-scope-headers-identity pushed | `git` |
 | OpenSpec | put-decision-scope-headers-on-identity (archived) | `openspec/changes/archive/2026-09-05-put-decision-scope-headers-on-identity/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/18 | GitHub MCP |
-| CI | build 33978602122 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33978602122 | GitHub MCP get_check_runs |
+| CI | build 33978659998 success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33978659998 | GitHub MCP get_check_runs (Main Process) |
 | Local tests | passed | handoff.yaml |
 | PR comments | no comments | GitHub MCP |
 | Security | None. | devstate/codereview.md |
@@ -48,7 +48,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local ticket 2026-09-05-scope-headers-identity, PR 18. OpenSpec change archived. Next is pullrequest title + wait for CI.
+Local ticket 2026-09-05-scope-headers-identity, PR 18 against master. Title is `🐛 fix(crowdsecconnection): put decisionScopeHeaders on reclaim identity`. CI on 774d0fd succeeded (Main Process, mock e2e, docker pester).
 
 ## Decision needed
 | Question | Decision | By |
@@ -60,8 +60,7 @@ Local ticket 2026-09-05-scope-headers-identity, PR 18. OpenSpec change archived.
 | Getter name on CrowdsecConnection? | assumed — `DecisionScopeHeaders()` returning the stored normalized map. Callers must not mutate it. | explore |
 
 ## Before merge
-- [ ] Wait for CI to succeed
-- [ ] Drop WIP from the PR title
+None.
 
 ## Findings
 None.
@@ -82,22 +81,23 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 0a42cacebe8f361342b86d11f0262afaeec90541 | Card must match the branch you measured |
+| Reviewed head | 774d0fd043d4e7bd2b877708eb3e22f471562198 | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: Put the normalized map on existing reclaim identity versus master.
+Best possible solution: Put the normalized map on existing reclaim identity versus master so stream `scopes=` cannot be stolen by the first `New`.
 
-Do we have a high-confidence way to reproduce? Yes, isolation test in `plugin_test.go`.
+Do we have a high-confidence way to reproduce? Yes, `TestNew_DifferentDecisionScopeHeaders_IsolatedConnection`.
 
-Is this the best way to solve the issue? Yes versus master.
+Is this the best way to solve the issue? Yes versus master: stream ingest is a connection fact, unlike per-route AppSec failure action.
 
 ### Evidence
 What I checked:
-- Catalog sync + `validate-spec-map` OK + `validate-artifact-names` OK
-- Archive folder `openspec/changes/archive/2026-09-05-put-decision-scope-headers-on-identity/`
+- Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33978659998
+- e2e mock + docker pester success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33978659993
+- Five-axis review none (`codereview.md`)
 
 ### Rank-up moves
 None.
