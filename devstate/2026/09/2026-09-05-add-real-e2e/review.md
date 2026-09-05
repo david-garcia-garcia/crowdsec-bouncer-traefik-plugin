@@ -21,3 +21,9 @@ phase: implement
 findings: Windows go test TempDir lock on bouncer.log after assertions passed
 fixed: Pester tests/*.Tests.ps1 + Test-Integration.ps1 in CI; Yaegi checkout path
 skipped: four-axis code review
+
+## implement-card (2026-09-05)
+phase: implement
+findings: none
+fixed: delivery card now names upstream PR 273 and PR 333
+skipped: folder move and 333 coverage still uncommitted
