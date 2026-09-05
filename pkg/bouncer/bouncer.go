@@ -264,9 +264,6 @@ func (b *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Request,
 			case crowdsecconnection.AppsecActionBan:
 				b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
 				return
-			case crowdsecconnection.AppsecActionCaptcha:
-				b.handleRemediationServeHTTP(rw, req, remoteIP, cache.CaptchaValue)
-				return
 			case crowdsecconnection.AppsecActionChallenge:
 				if decision.UserBodyContent == "" {
 					b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)

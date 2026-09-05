@@ -12,6 +12,7 @@ func NewTestAppsecConnection(appsecURL *url.URL, client *http.Client, log *slog.
 		appsecScheme:     appsecURL.Scheme,
 		appsecHost:       appsecURL.Host,
 		appsecPath:       "/",
+		appsecBodyLimit:  10485760,
 		httpAppsecClient: client,
 		log:              log,
 	}

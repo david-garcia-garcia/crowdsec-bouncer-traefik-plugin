@@ -62,14 +62,7 @@ func newStreamingRequest(done <-chan struct{}) *http.Request {
 }
 
 func appsecConn(appsecURL *url.URL, client *http.Client) *CrowdsecConnection {
-	return &CrowdsecConnection{
-		appsecScheme:     appsecURL.Scheme,
-		appsecHost:       appsecURL.Host,
-		appsecPath:       "/",
-		appsecBodyLimit:  10485760,
-		httpAppsecClient: client,
-		log:              logger.New("INFO", ""),
-	}
+	return NewTestAppsecConnection(appsecURL, client, logger.New("INFO", ""))
 }
 
 func Test_appsecQuery_streamingDoesNotBlock(t *testing.T) {
@@ -195,6 +188,21 @@ func Test_appsecQuery_allowJSONPasses(t *testing.T) {
 	}
 	if decision == nil || decision.Action != AppsecActionAllow {
 		t.Fatalf("AppsecQuery() want allow decision, got %#v", decision)
+	}
+}
+
+func Test_appsecQuery_emptyOKPasses(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	decision, err := appsecConn(appsecURL, appsecServer.Client()).AppsecQuery("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), AppsecPolicy{})
+	if err != nil {
+		t.Fatalf("AppsecQuery() returned error: %v", err)
+	}
+	if decision == nil || decision.Action != AppsecActionAllow {
+		t.Fatalf("AppsecQuery() want allow for empty 200, got %#v", decision)
 	}
 }
 

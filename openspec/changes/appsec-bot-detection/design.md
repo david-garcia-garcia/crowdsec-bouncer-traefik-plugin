@@ -27,7 +27,7 @@ See proposal.md — Why. `master` owns AppSec HTTP on `CrowdsecConnection.Appsec
 
 5. **Body cap 1 MiB**; oversized 200 passes, oversized non-200 errors (PR 343 tests). Clamp `http_status` to 100–999.
 
-6. **Real e2e image `crowdsecurity/crowdsec:v1.8.0`.** Challenge router `PathPrefix(/crowdsec-internal/challenge)` + same middleware + backend `:7422`. Keep CRS `/appsec`. Mocklapi grows a JSON challenge URI so CI does not depend on hub download for the protocol.
+6. **Real e2e image `crowdsecurity/crowdsec:v1.8.0`.** Challenge router `PathPrefix(/crowdsec-internal/challenge)` + same middleware + backend `:7423` so CRS on `:7422` is not challenged. Keep CRS `/appsec`. Mocklapi grows a JSON challenge URI so CI does not depend on hub download for the protocol.
 
 7. **Yaegi:** keep `CreateConfig`/`New` on the module root. New types live under `pkg/crowdsecconnection` and `pkg/bouncer`.
 

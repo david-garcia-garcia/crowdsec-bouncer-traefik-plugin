@@ -10,7 +10,7 @@ GitHub Actions on pull requests SHALL run `tests/e2e/real/Test-Integration.ps1` 
 ## ADDED Requirements
 
 ### Requirement: Real stack covers AppSec bot-detection challenge
-The Pester suite SHALL boot Crowdsec `v1.8.0` with AppSec bot-detection loaded (`crowdsecurity/appsec-bot-*` or the published 1.8 hub equivalent) in addition to CRS inband. A Traefik route SHALL send `/crowdsec-internal/challenge` through the same AppSec-enabled bouncer middleware, with the service backend on Crowdsec AppSec port 7422. Client identity SHALL remain `X-Forwarded-For`. Existing CRS allow/block cases on `/appsec` SHALL remain.
+The Pester suite SHALL boot Crowdsec `v1.8.0` with AppSec bot-detection loaded (`crowdsecurity/appsec-bot-*` or the published 1.8 hub equivalent) in addition to CRS inband. A Traefik route SHALL send `/crowdsec-internal/challenge` through the same AppSec-enabled bouncer middleware, with the service backend on Crowdsec AppSec port 7423 (CRS stays on 7422). Client identity SHALL remain `X-Forwarded-For`. Existing CRS allow/block cases on `/appsec` SHALL remain.
 
 #### Scenario: Challenge is not a silent 403
 - **WHEN** bot-detection is loaded and a client without a solved challenge cookie requests the bot-detection route
