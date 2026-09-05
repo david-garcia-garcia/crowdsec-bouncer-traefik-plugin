@@ -53,3 +53,17 @@ findings: missing packets for plugin/reclaim/isolated cache/mock e2e; stale Redi
 fixed: core_plugin_middleware, std_go_reclaim, core_cache_client, build_e2e_mock; updated core_cache_redis
 skipped: none
 head: 37e8d20d1acf58099a7b387b4e131352bbbe1857
+
+## archive (2026-09-05T08:35:19.460Z)
+phase: archive
+findings: none
+fixed: four spec ids synced to openspec/specs; change moved to archive/2026-09-05-crowdsec-connection-bouncer-split
+skipped: none
+head: 24a90906d053201a19aea0ab306906a72bfd9efc
+
+## pullrequest (2026-09-05T08:44:54.022Z)
+phase: pullrequest
+findings: mock e2e failed once on 24a9090 (exit 2); retried with dual-bouncer poll + log dump
+fixed: wait_for_status on dual-bouncer; print scenario logs on fail; ready title; CI green on 40c19d5
+skipped: none
+head: 40c19d59fd40077de70472eea216ed6c24c2614b
