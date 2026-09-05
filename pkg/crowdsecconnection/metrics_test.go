@@ -13,23 +13,6 @@ import (
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-type usageMetricsPayload struct {
-	RemediationComponents []usageMetricsComponent `json:"remediation_components"`
-}
-
-type usageMetricsComponent struct {
-	UTCStartupTimestamp int64    `json:"utc_startup_timestamp"`
-	FeatureFlags        []string `json:"feature_flags"`
-	Metrics             []struct {
-		Items []usageMetricsItem `json:"items"`
-	} `json:"metrics"`
-}
-
-type usageMetricsItem struct {
-	Name   string            `json:"name"`
-	Labels map[string]string `json:"labels"`
-}
-
 func TestMetricsOriginListsRewrite(t *testing.T) {
 	if got := MetricsOrigin("lists", "firehol_level1"); got != "lists:firehol_level1" {
 		t.Fatalf("got %q", got)
@@ -47,25 +30,22 @@ func TestReportMetricsOfficialLabels(t *testing.T) {
 	if err := conn.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
-	component := decodeUsageMetricsComponent(t, *body)
-	assertOfficialUsageItems(t, component.Metrics[0].Items)
+	assertOfficialUsageItems(t, usageMetricItems(t, *body))
 }
 
 func TestReportMetricsStartupTimestampStable(t *testing.T) {
 	conn, body := newUsageMetricsConn(t)
-	started := conn.startedAt.Unix()
+	started := float64(conn.startedAt.Unix())
 	if err := conn.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
-	first := decodeUsageMetricsComponent(t, *body)
-	if first.UTCStartupTimestamp != started {
-		t.Fatalf("startup %d", first.UTCStartupTimestamp)
+	if usageStartupTimestamp(t, *body) != started {
+		t.Fatalf("startup %v", usageStartupTimestamp(t, *body))
 	}
 	if err := conn.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
-	second := decodeUsageMetricsComponent(t, *body)
-	if second.UTCStartupTimestamp != started {
+	if usageStartupTimestamp(t, *body) != started {
 		t.Fatal("startup moved")
 	}
 }
@@ -108,44 +88,87 @@ func newUsageMetricsConn(t *testing.T) (*CrowdsecConnection, *[]byte) {
 	return conn, gotBody
 }
 
-func decodeUsageMetricsComponent(t *testing.T, body []byte) usageMetricsComponent {
+func decodeUsageObject(t *testing.T, body []byte) map[string]interface{} {
 	t.Helper()
-	var payload usageMetricsPayload
+	var payload map[string]interface{}
 	if err := json.Unmarshal(body, &payload); err != nil {
 		t.Fatal(err)
 	}
-	if len(payload.RemediationComponents) == 0 {
-		t.Fatal("no remediation_components")
-	}
-	component := payload.RemediationComponents[0]
-	if len(component.Metrics) == 0 {
-		t.Fatal("no metrics windows")
-	}
-	return component
+	return payload
 }
 
-func assertOfficialUsageItems(t *testing.T, items []usageMetricsItem) {
+func asObject(t *testing.T, value interface{}) map[string]interface{} {
+	t.Helper()
+	obj, ok := value.(map[string]interface{})
+	if !ok {
+		t.Fatalf("want object got %T", value)
+	}
+	return obj
+}
+
+func asArray(t *testing.T, value interface{}) []interface{} {
+	t.Helper()
+	arr, ok := value.([]interface{})
+	if !ok {
+		t.Fatalf("want array got %T", value)
+	}
+	return arr
+}
+
+func usageComponent(t *testing.T, body []byte) map[string]interface{} {
+	t.Helper()
+	components := asArray(t, decodeUsageObject(t, body)["remediation_components"])
+	if len(components) == 0 {
+		t.Fatal("no remediation_components")
+	}
+	return asObject(t, components[0])
+}
+
+func usageStartupTimestamp(t *testing.T, body []byte) float64 {
+	t.Helper()
+	stamp, ok := usageComponent(t, body)["utc_startup_timestamp"].(float64)
+	if !ok {
+		t.Fatal("utc_startup_timestamp missing")
+	}
+	return stamp
+}
+
+func usageMetricItems(t *testing.T, body []byte) []interface{} {
+	t.Helper()
+	windows := asArray(t, usageComponent(t, body)["metrics"])
+	if len(windows) == 0 {
+		t.Fatal("no metrics windows")
+	}
+	return asArray(t, asObject(t, windows[0])["items"])
+}
+
+func assertOfficialUsageItems(t *testing.T, items []interface{}) {
 	t.Helper()
 	foundDropped, foundProcessed, foundActive := false, false, false
-	for _, item := range items {
-		if _, ok := item.Labels["type"]; ok {
+	for _, raw := range items {
+		item := asObject(t, raw)
+		labels := map[string]interface{}{}
+		if rawLabels, ok := item["labels"]; ok && rawLabels != nil {
+			labels = asObject(t, rawLabels)
+		}
+		if _, ok := labels["type"]; ok {
 			t.Fatal("labels.type must not be sent")
 		}
-		switch item.Name {
+		switch item["name"] {
 		case "dropped":
 			foundDropped = true
-			if item.Labels["origin"] != "lists:firehol_level1" || item.Labels["ip_type"] != "ipv4" || item.Labels["remediation"] != "ban" {
-				t.Fatalf("dropped labels %#v", item.Labels)
+			if labels["origin"] != "lists:firehol_level1" || labels["ip_type"] != "ipv4" || labels["remediation"] != "ban" {
+				t.Fatalf("dropped labels %#v", labels)
 			}
 		case "processed":
 			foundProcessed = true
-			if _, ok := item.Labels["origin"]; ok {
-				t.Fatalf("processed should omit origin %#v", item.Labels)
+			if _, ok := labels["origin"]; ok {
+				t.Fatalf("processed should omit origin %#v", labels)
 			}
 		case "active_decisions":
 			foundActive = true
-			if item.Labels["origin"] != "crowdsec" || item.Labels["ip_type"] != "ipv4" {
-				t.Fatalf("active labels %#v", item.Labels)
+			if labels["origin"] != "crowdsec" || labels["ip_type"] != "ipv4" {
+				t.Fatalf("active labels %#v", labels)
 			}
 		}
 	}
