@@ -66,7 +66,7 @@ Current vs desired ownership:
 | --- | --- | --- |
 | Yaegi `CreateConfig`/`New` | `bouncer.go`; **`ctx` ignored** | root `plugin.go`; `ctx` is reclaim holder |
 | Stream ticker / health | package globals; never stopped | Connection fields; `Close()` stops them |
-| Cache client | each Bouncer wraps process `ttl_map` | Connection holds the client |
+| Cache client | each Bouncer wraps process `ttl_map` | Connection owns a **private** memory map or Redis client; Bouncer/captcha use that Client |
 | LAPI/CAPI HTTP | new `http.Client` per `New` | one client on that Connection incarnation |
 | AppSec HTTP | new client per `New`; host first-wins | Connection owns client+host; Bouncer calls on pass when enabled |
 | Captcha | on `Bouncer` | stays on Bouncer; cache via Connection |
@@ -109,8 +109,9 @@ Must-have:
 - Changing `.traefik.yml` `import` to a subpackage.
 - Rewriting `pkg/reclaim` (copy from geoblock).
 - Keying Connection by Traefik middleware **name** (WAF’s `plugin:name:hash`). That would split tickers per alias.
-- Splitting `pkg/cache` process `ttl_map` (two Connections would still share memory keys until a later change).
 - Public JSON config field names.
+
+Memory-mode store is **not** the package `ttl_map`. Each Connection owns its own map (or a Redis client). Tests inject a Client. No process-wide decision/captcha/lease keys.
 
 ## Open questions
 
@@ -144,4 +145,8 @@ Must-have:
 
 - Q: How far does “exquisite” coverage go beyond compiled tests?
   Decision: assumed — `go test` with reclaim grace/reclaim/dispose plus fake LAPI. Existing e2e is Yaegi proof.
+  By: explore
+
+- Q: Is the memory cache a process singleton?
+  Decision: resolved — no. `pkg/cache` `var cache = ttl_map.New()` goes. Each Connection owns its store so tests do not leak keys. Redis stays per-Connection client. Captcha still uses that same Client (keys `ip+"_captcha"`).
   By: explore
