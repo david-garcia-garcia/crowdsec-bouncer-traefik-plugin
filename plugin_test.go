@@ -34,11 +34,11 @@ func testRoute(t *testing.T, h http.Handler) *bouncer.Bouncer {
 	return b
 }
 
-func liveLAPI(t *testing.T, banned map[string]bool, hits *atomic.Int64) *httptest.Server {
+func liveLAPI(t *testing.T, banned map[string]bool, hits *int64) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "stream") {
-			hits.Add(1)
+			atomic.AddInt64(hits, 1)
 			_ = json.NewEncoder(w).Encode(map[string][]crowdsecconnection.Decision{
 				"new":     {},
 				"deleted": {},
@@ -46,7 +46,7 @@ func liveLAPI(t *testing.T, banned map[string]bool, hits *atomic.Int64) *httptes
 			return
 		}
 		if strings.Contains(r.URL.Path, "decisions") {
-			hits.Add(1)
+			atomic.AddInt64(hits, 1)
 			ip := r.URL.Query().Get("ip")
 			if banned[ip] {
 				_ = json.NewEncoder(w).Encode([]crowdsecconnection.Decision{{
@@ -112,8 +112,9 @@ func TestNew_SameConnectionFields_ShareIncarnation(t *testing.T) {
 	reclaim.ResetWith(0)
 	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
 
-	srv := liveLAPI(t, nil, &atomic.Int64{})
-	t.Cleanup(srv.Close)
+	var zero int64
+	srv := liveLAPI(t, nil, &zero)
+	t.Cleanup(func() { srv.Close() })
 	u, _ := url.Parse(srv.URL)
 	ctx := context.Background()
 	a, err := New(ctx, testNextOK(), cfgLiveAt(u.Host), "alias-a")
@@ -133,11 +134,11 @@ func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 	reclaim.ResetWith(0)
 	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
 
-	var hitsA, hitsB atomic.Int64
+	var hitsA, hitsB int64
 	lapiA := liveLAPI(t, map[string]bool{"1.2.3.4": true}, &hitsA)
 	lapiB := liveLAPI(t, map[string]bool{}, &hitsB)
-	t.Cleanup(lapiA.Close)
-	t.Cleanup(lapiB.Close)
+	t.Cleanup(func() { lapiA.Close() })
+	t.Cleanup(func() { lapiB.Close() })
 	ua, _ := url.Parse(lapiA.URL)
 	ub, _ := url.Parse(lapiB.URL)
 
@@ -175,8 +176,9 @@ func TestNew_ReclaimWithinGrace(t *testing.T) {
 	reclaim.ResetWith(500 * time.Millisecond)
 	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
 
-	srv := liveLAPI(t, nil, &atomic.Int64{})
-	t.Cleanup(srv.Close)
+	var zero int64
+	srv := liveLAPI(t, nil, &zero)
+	t.Cleanup(func() { srv.Close() })
 	u, _ := url.Parse(srv.URL)
 	ctx, cancel := context.WithCancel(context.Background())
 	first, err := New(ctx, testNextOK(), cfgLiveAt(u.Host), "reclaim")
@@ -199,8 +201,9 @@ func TestNew_DisposeAfterGrace(t *testing.T) {
 	reclaim.ResetWith(20 * time.Millisecond)
 	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
 
-	srv := liveLAPI(t, nil, &atomic.Int64{})
-	t.Cleanup(srv.Close)
+	var zero int64
+	srv := liveLAPI(t, nil, &zero)
+	t.Cleanup(func() { srv.Close() })
 	u, _ := url.Parse(srv.URL)
 	ctx, cancel := context.WithCancel(context.Background())
 	first, err := New(ctx, testNextOK(), cfgLiveAt(u.Host), "dispose")
@@ -223,11 +226,11 @@ func TestNew_StreamVsLive_SideBySide(t *testing.T) {
 	reclaim.ResetWith(0)
 	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
 
-	var streamHits, liveHits atomic.Int64
+	var streamHits, liveHits int64
 	streamSrv := liveLAPI(t, map[string]bool{"9.9.9.9": true}, &streamHits)
 	liveSrv := liveLAPI(t, map[string]bool{}, &liveHits)
-	t.Cleanup(streamSrv.Close)
-	t.Cleanup(liveSrv.Close)
+	t.Cleanup(func() { streamSrv.Close() })
+	t.Cleanup(func() { liveSrv.Close() })
 	us, _ := url.Parse(streamSrv.URL)
 	ul, _ := url.Parse(liveSrv.URL)
 
@@ -244,13 +247,13 @@ func TestNew_StreamVsLive_SideBySide(t *testing.T) {
 		t.Fatal("stream and live configs must be two connections")
 	}
 
-	beforeLive := liveHits.Load()
+	beforeLive := atomic.LoadInt64(&liveHits)
 	rw := httptest.NewRecorder()
 	hl.ServeHTTP(rw, reqForIP("5.6.7.8"))
 	if rw.Code != http.StatusOK {
 		t.Fatalf("live miss: got %d", rw.Code)
 	}
-	if liveHits.Load() <= beforeLive {
+	if atomic.LoadInt64(&liveHits) <= beforeLive {
 		t.Fatal("live ServeHTTP must query only the live LAPI")
 	}
 
@@ -263,9 +266,9 @@ func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
 	reclaim.ResetWith(0)
 	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
 
-	var hits atomic.Int64
+	var hits int64
 	srv := liveLAPI(t, map[string]bool{"8.8.8.8": true}, &hits)
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	u, _ := url.Parse(srv.URL)
 	ctx := context.Background()
 
@@ -313,11 +316,11 @@ func TestNew_TwoStreamConnections_BothPoll(t *testing.T) {
 	reclaim.ResetWith(0)
 	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
 
-	var hitsA, hitsB atomic.Int64
+	var hitsA, hitsB int64
 	a := liveLAPI(t, nil, &hitsA)
 	b := liveLAPI(t, nil, &hitsB)
-	t.Cleanup(a.Close)
-	t.Cleanup(b.Close)
+	t.Cleanup(func() { a.Close() })
+	t.Cleanup(func() { b.Close() })
 	ua, _ := url.Parse(a.URL)
 	ub, _ := url.Parse(b.URL)
 	ctx := context.Background()
@@ -332,7 +335,7 @@ func TestNew_TwoStreamConnections_BothPoll(t *testing.T) {
 	if testRoute(t, ha).Connection().StreamFetches() < 1 || testRoute(t, hb).Connection().StreamFetches() < 1 {
 		t.Fatal("each stream connection must fetch its own LAPI")
 	}
-	if hitsA.Load() < 1 || hitsB.Load() < 1 {
-		t.Fatalf("LAPI hits A=%d B=%d", hitsA.Load(), hitsB.Load())
+	if atomic.LoadInt64(&hitsA) < 1 || atomic.LoadInt64(&hitsB) < 1 {
+		t.Fatalf("LAPI hits A=%d B=%d", atomic.LoadInt64(&hitsA), atomic.LoadInt64(&hitsB))
 	}
 }
