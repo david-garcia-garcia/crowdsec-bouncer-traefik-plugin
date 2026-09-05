@@ -46,24 +46,24 @@ MatchRangeFromIndex ──► ip.InNetwork  (unchanged, linear)
   By: explore
 
 - Q: Package path and exported names for the copied helper?
-  Decision: assumed — `pkg/iplookup`, type `Helper`, constructors `NewHelper` / `NewEmptyHelper`, methods `AddCIDR`, `IsContained`, `Count`. Package name supplies “IP lookup”; do not keep geoblock `IpLookupHelper`.
-  By: explore
+  Decision: resolved — `pkg/iplookup`, type `Helper`, constructors `NewHelper` / `NewEmptyHelper`.
+  By: implement
 
 - Q: How do bare trusted IPs enter a CIDR-only tree?
-  Decision: assumed — `NewChecker` formats a parsed IPv4 as `ip/32` and IPv6 as `ip/128`, then `AddCIDR`. Equivalent to today’s exact `Equal` list.
-  By: explore
+  Decision: resolved — `NewChecker` formats IPv4 as `/32` and IPv6 as `/128` then `AddCIDR`.
+  By: implement
 
 - Q: Integrate the tree into Range remediation in this change?
   Decision: resolved — no. Caller forbade it. `MatchRangeFromIndex` stays linear. Follow-up on `issues.md`.
   By: explore
 
 - Q: Copy geoblock files verbatim or adapt names/comments to this module?
-  Decision: assumed — adapt (Helper names, this module import path, Apache-2.0 header plus a one-line source cite to traefik-geoblock@0c2f46da). Keep the bit-walk algorithm and tests.
-  By: explore
+  Decision: resolved — adapted names; package comment cites traefik-geoblock@0c2f46da.
+  By: implement
 
 - Q: Which other lookup sites besides Checker?
-  Decision: assumed — none in this change. `validateParamsIPs` already constructs `NewChecker` (gets the tree for free). Mock LAPI and Range stay linear.
-  By: explore
+  Decision: resolved — none this change. `validateParamsIPs` uses `NewChecker`.
+  By: implement
 
 ## Evidence
 
