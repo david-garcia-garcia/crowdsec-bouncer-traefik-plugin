@@ -47,6 +47,17 @@ findings: none
 fixed: none
 skipped: none
 
+## archive (2026-09-05)
 
+phase: archive
+findings: none
+fixed: folded specs; moved change to archive/2026-09-05-remediation-codes-owner
+skipped: none
 
+## pullrequest (2026-09-05)
 
+phase: pullrequest
+findings: none
+fixed: none
+skipped: none
+ci: success Main Process 33978549867; e2e 33978549780

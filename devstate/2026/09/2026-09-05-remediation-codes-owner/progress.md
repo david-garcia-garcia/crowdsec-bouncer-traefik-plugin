@@ -10,5 +10,5 @@ JobName: 2026-09-05-remediation-codes-owner
 | implement | [x] | [x] | 2026-09-05T16:35:37.364Z |
 | codereview | [x] | [x] | 2026-09-05T16:36:56.789Z |
 | devdocsimpact | [x] | [x] | 2026-09-05T16:38:17.727Z |
-| archive | [x] | [ ] | |
-| pullrequest | [ ] | [ ] | |
+| archive | [x] | [x] | 2026-09-05T16:39:28.263Z |
+| pullrequest | [x] | [x] | 2026-09-05T16:42:18.028Z |
