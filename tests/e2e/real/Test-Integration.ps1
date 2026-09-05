@@ -44,6 +44,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$PSNativeCommandUseErrorActionPreference = $false
 $ComposeFile = Join-Path $PSScriptRoot "docker-compose.test.yml"
 . "$PSScriptRoot/TestUtils.ps1"
 
@@ -159,7 +160,7 @@ try {
         if (Test-Path $geoblockDir) {
             Remove-Item -Recurse -Force $geoblockDir
         }
-        git clone --depth 1 --branch $geoblockTag https://github.com/david-garcia-garcia/traefik-geoblock.git $geoblockDir
+        git -c advice.detachedHead=false clone --depth 1 --branch $geoblockTag https://github.com/david-garcia-garcia/traefik-geoblock.git $geoblockDir
         if ($LASTEXITCODE -ne 0) {
             Write-StepError "Failed to clone traefik-geoblock $geoblockTag"
             exit 1

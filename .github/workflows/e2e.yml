@@ -62,7 +62,13 @@ jobs:
       - name: Show Pester results XML
         if: always()
         run: |
-          if [ -f tests/e2e/real/test-results.xml ]; then cat tests/e2e/real/test-results.xml; else echo "no test-results.xml"; fi
+          if [ -f tests/e2e/real/test-results.xml ]; then
+            cat tests/e2e/real/test-results.xml
+            echo "::error::$(tr '\n' ' ' < tests/e2e/real/test-results.xml | head -c 2000)"
+          else
+            echo "no test-results.xml"
+            echo "::error::no test-results.xml (Pester did not write results)"
+          fi
       - name: Upload Pester results
         if: always()
         uses: actions/upload-artifact@v7
