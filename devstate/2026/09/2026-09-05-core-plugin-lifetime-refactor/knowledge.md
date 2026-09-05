@@ -6,4 +6,4 @@
 - created knowledge/devdocs/build_e2e_mock.md
 - updated knowledge/devdocs/core_cache_redis.md
 - updated knowledge/devdocs/index.md
-- updated knowledge/devdocs/domains.md
+- updated knowledge/devdocs/core_plugin_middleware.md
