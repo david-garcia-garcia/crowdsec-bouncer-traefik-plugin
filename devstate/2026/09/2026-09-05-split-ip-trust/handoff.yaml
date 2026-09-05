@@ -7,7 +7,7 @@ repoSlug: crowdsec-bouncer-traefik-plugin
 destBranch: master
 qualify: qualified-with-gaps
 src: 97f00627414684f1f8020ac94c3fcf0f80152d2017d05ed77e596c263fe69806
-localTests: none
+localTests: passed
 requirement: requirement.md
 comments: none
 explore: explore.md
