@@ -22,7 +22,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 
 - Keep `CreateConfig` / `New` on the module root (`plugin.go`).
 - Keep `pluginVersion` in root `version.go` (release workflow bumps it). Pass it into `crowdsecconnection.New`.
-- Call `crowdsecconnection.Prepare` then `reclaim.Open(ctx, crowdsecconnection.Key(config), log, create)`.
+- Copy Traefik’s `*configuration.Config` before any write. Call `crowdsecconnection.Prepare` then `reclaim.Open(ctx, crowdsecconnection.Key(&prepared), log, create)` on that snapshot. Do not assign through Yaegi’s pointer.
 - Type-assert the stored value to `*crowdsecconnection.CrowdsecConnection` and return `bouncer.New(...)`.
 - Put stream tickers, LAPI HTTP, cache, and Range membership on CrowdsecConnection. Put captcha and templates on Bouncer.
 - Resolve client IP with `pkg/ip.GetRemoteIP`. Do not parse `RemoteAddr` on the connection.
@@ -33,11 +33,13 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 ## Pattern snippet
 
 ```go
-stored, err := reclaim.Open(ctx, crowdsecconnection.Key(config), log, func() (any, error) {
-	return crowdsecconnection.New(config, log, pluginVersion)
+prepared := *config
+// LogLevel / path aliases / Prepare mutate prepared only.
+stored, err := reclaim.Open(ctx, crowdsecconnection.Key(&prepared), log, func() (any, error) {
+	return crowdsecconnection.New(&prepared, log, pluginVersion)
 })
 conn := stored.(*crowdsecconnection.CrowdsecConnection)
-return bouncer.New(next, name, config, conn, log)
+return bouncer.New(next, name, &prepared, conn, log)
 ```
 
 ## Key files
@@ -50,6 +52,7 @@ return bouncer.New(next, name, config, conn, log)
 ## Gotchas
 
 - Do not put middleware name, `next`, ban/captcha templates, trusted IPs, or Enabled in the reclaim key.
+- Do not write Traefik’s Config pointer in `New` (LogLevel, path aliases, Prepare). Identity hashes the snapshot.
 - `crowdsecLapiFailureAction` is on CrowdsecConnection identity (shared with `updateMaxFailure`). `crowdsecAppsecFailureAction` stays on Bouncer.
 - Same connection fields share one ticker; different LAPI/mode/redis/interval are two Connections in one Traefik.
 - `Close()` stops tickers, idle LAPI/AppSec HTTP, and the cache Redis pool when no constructor ctx remains and grace elapses. Do not use `sync.Once`.
