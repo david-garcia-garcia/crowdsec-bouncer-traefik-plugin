@@ -11,4 +11,4 @@ JobName: 2026-09-05-performance-ip-range
 | codereview | [x] | [x] | 2026-09-05T15:58:08.044Z |
 | devdocsimpact | [x] | [x] | 2026-09-05T16:00:10.285Z |
 | archive | [x] | [x] | 2026-09-05T16:02:20.366Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [ ] | |
