@@ -14,3 +14,12 @@ findings: none
 fixed: none
 skipped: none
 decision: copy-then-mutate in plugin.go New; IdentityHex on snapshot
+
+## propose (2026-09-05)
+
+phase: propose
+findings: none
+fixed: none
+skipped: none
+change: config-prepare-snapshot
+fold: core_plugin_middleware_instance-reclaim
