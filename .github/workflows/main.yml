@@ -71,8 +71,11 @@ jobs:
           go mod vendor
           # git diff --exit-code ./vendor/
 
-      - name: Lint and Tests
-        run: make
+      - name: Lint
+        run: make lint
+
+      - name: Tests
+        run: make test
 
       - name: Run tests with Yaegi
         run: make yaegi_test
