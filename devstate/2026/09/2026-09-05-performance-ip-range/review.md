@@ -41,3 +41,9 @@ phase: archive
 findings: none
 fixed: synced core_plugin_decisions_scopes and core_plugin_ip_radix-lookup; moved change to archive/2026-09-05-in-process-range-membership
 skipped: none
+
+## pullrequest (2026-09-05)
+phase: pullrequest
+findings: none
+fixed: dropped WIP title; Main and E2E succeeded on 71f53e6
+skipped: none
