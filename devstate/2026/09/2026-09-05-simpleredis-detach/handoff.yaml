@@ -1,0 +1,15 @@
+issueKey: 2026-09-05-simpleredis-detach
+jobName: 2026-09-05-simpleredis-detach
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: 5b6196b1c7951a17c15b95d1885cbabcda204e6cd9e25099af1bd3570b6ed4a0
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: simpleredis-detach
+pr: { id: 11, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/11 }
