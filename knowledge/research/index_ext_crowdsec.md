@@ -29,3 +29,8 @@ description: How CrowdSec bouncers behave when LAPI or AppSec is down, times out
 priority: normal
 local: ext_crowdsec_appsec_bot-detection/
 description: CrowdSec AppSec challenge-mode wire protocol a bouncer must implement to serve bot detection.
+
+## LAPI stream cursor
+priority: normal
+local: ext_crowdsec_lapi_stream-cursor/
+description: Where CrowdSec LAPI stores /v1/decisions/stream progress and which bouncer row owns it.

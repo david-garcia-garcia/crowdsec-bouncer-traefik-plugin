@@ -117,7 +117,7 @@ func appsecAllow() *AppsecResponse {
 	return &AppsecResponse{Action: AppsecActionAllow}
 }
 
-// CrowdsecConnection owns stream ticker, isolated cache, LAPI/CAPI HTTP, metrics, and AppSec HTTP client.
+// CrowdsecConnection owns stream ticker, isolated cache, in-process Range membership, LAPI/CAPI HTTP, metrics, and AppSec HTTP client.
 type CrowdsecConnection struct {
 	mu     sync.Mutex
 	closed bool
@@ -148,6 +148,8 @@ type CrowdsecConnection struct {
 	httpClient       *http.Client
 	httpAppsecClient *http.Client
 	cacheClient      *cache.Client
+	rangeMembership  atomic.Value // *decisionscope.RangeMembership rebuilt from range-index
+	lastRangeIndex   atomic.Value // string of the blob last used to build membership
 	log              *slog.Logger
 	pluginVersion    string
 
@@ -312,6 +314,7 @@ func (c *CrowdsecConnection) startStream(config *configuration.Config, log *slog
 			return err
 		}
 	}
+	c.hydrateRangeMembership()
 	if config.StreamStartupBlock {
 		c.handleStreamTicker()
 	} else {
@@ -364,6 +367,38 @@ func closeIdle(client *http.Client) {
 // Cache is this connection's isolated cache Client.
 func (c *CrowdsecConnection) Cache() *cache.Client {
 	return c.cacheClient
+}
+
+// RangeMembership is the current in-process Range lookup, or nil before the first hydrate.
+func (c *CrowdsecConnection) RangeMembership() *decisionscope.RangeMembership {
+	stored := c.rangeMembership.Load()
+	if stored == nil {
+		return nil
+	}
+	membership, _ := stored.(*decisionscope.RangeMembership)
+	return membership
+}
+
+// hydrateRangeMembership rebuilds Range membership from the shared blob when the raw string changed.
+func (c *CrowdsecConnection) hydrateRangeMembership() {
+	index, err := c.cacheClient.Get(decisionscope.RangeIndexKey)
+	if err != nil {
+		if err.Error() != cache.CacheMiss {
+			return
+		}
+		index = ""
+	}
+	c.storeRangeMembership(index)
+}
+
+// storeRangeMembership replaces the in-process trees when index differs from the last hydrate.
+func (c *CrowdsecConnection) storeRangeMembership(index string) {
+	previous, _ := c.lastRangeIndex.Load().(string)
+	if c.rangeMembership.Load() != nil && previous == index {
+		return
+	}
+	c.rangeMembership.Store(decisionscope.MembershipFromIndex(index))
+	c.lastRangeIndex.Store(index)
 }
 
 // Mode is the Crowdsec mode for this connection.
@@ -493,6 +528,7 @@ func (c *CrowdsecConnection) handleStreamCache() error {
 	_, err := c.cacheClient.Get(cacheTimeoutKey)
 	if err == nil {
 		c.log.Debug("handleStreamCache:alreadyUpdated")
+		c.hydrateRangeMembership()
 		c.isCrowdsecStreamStartup = false
 		return nil
 	}
@@ -547,6 +583,7 @@ func (c *CrowdsecConnection) handleStreamCache() error {
 		c.deleteStreamDecision(decision)
 	}
 	decisionscope.ApplyRangeBatch(c.cacheClient, rangeUpserts, rangeRemovals)
+	c.hydrateRangeMembership()
 	c.log.Debug("handleStreamCache:updated")
 	c.isCrowdsecStreamStartup = false
 	return nil

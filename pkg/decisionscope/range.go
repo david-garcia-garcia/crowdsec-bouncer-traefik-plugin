@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
-	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
 // AddRange upserts a Range decision on the shared index as cidr=remediation.
@@ -42,34 +41,6 @@ func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, remov
 		return
 	}
 	cacheClient.Set(RangeIndexKey, index, rangeIndexTTL)
-}
-
-// MatchRange returns the remediation for a containing CIDR. Ban wins if several match.
-func MatchRange(cacheClient *cache.Client, remoteIP string) string {
-	return MatchRangeFromIndex(readRangeIndex(cacheClient), remoteIP)
-}
-
-// MatchRangeFromIndex walks cidr=remediation lines. Ban wins if several match.
-func MatchRangeFromIndex(index, remoteIP string) string {
-	if index == "" {
-		return ""
-	}
-	chosen := ""
-	for _, line := range strings.Split(index, "\n") {
-		network, remediation := parseIndexLine(line)
-		if network == "" || !IsActiveRemediation(remediation) {
-			continue
-		}
-		inside, err := ip.InNetwork(remoteIP, network)
-		if err != nil || !inside {
-			continue
-		}
-		chosen = PreferRemediation(chosen, remediation)
-		if chosen == cache.BannedValue {
-			return cache.BannedValue
-		}
-	}
-	return chosen
 }
 
 // parseIndexLine splits one cidr=remediation line. A missing equals leaves remediation empty.

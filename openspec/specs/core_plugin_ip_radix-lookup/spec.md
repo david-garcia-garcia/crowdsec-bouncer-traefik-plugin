@@ -1,6 +1,6 @@
 ## Purpose
 
-Trusted-IP and trusted-CIDR membership answers in time bounded by address size, not by how many networks the operator listed, without changing public config or Range remediation.
+Trusted-IP and trusted-CIDR membership answers in time bounded by address size, not by how many networks the operator listed, without changing public config. Stream and alone Range may reuse boolean CIDR prefix membership without storing a remediation on that helper.
 
 ## Requirements
 
@@ -30,12 +30,16 @@ Building the trusted-IP pool SHALL fail when an entry is neither a parseable IP 
 - **WHEN** config validate runs with `ClientTrustedIPs` containing `192.168.1.0/33`
 - **THEN** validation returns an error
 
-### Requirement: Range remediation stays a per-network walk
-CrowdSec Range matching SHALL keep using the shared `range-index` blob and per-line CIDR tests. This capability MUST NOT require Range matching to share the trusted-IP prefix structure.
+### Requirement: Range membership may reuse boolean CIDR prefix lookup
+Stream and alone Range matching MAY use the same boolean CIDR prefix membership as the trusted-IP pool. That membership MUST NOT store a remediation payload. Ban and captcha SHALL be separate sets so longest-prefix-wins cannot hide a containing ban behind a longer captcha. Range membership MUST NOT live in the trusted-IP Checker. Public trusted-IP config keys SHALL stay `forwardedHeadersTrustedIps` and `clientTrustedIps`.
 
-#### Scenario: Range ban still matches by CIDR line
+#### Scenario: Range ban still matches by CIDR containment
 - **WHEN** stream has a Range ban `10.0.0.0/8` and the client IP is `10.1.2.3`
 - **THEN** the request is forbidden even though the trusted-IP pool uses prefix lookup
+
+#### Scenario: Captcha prefix does not hide a containing ban
+- **WHEN** stream has a Range ban `10.0.0.0/8` and a Range captcha `10.1.0.0/16` and the client IP is `10.1.2.3`
+- **THEN** the request is forbidden, not captcha
 
 ### Requirement: Catch-all CIDRs stay same-family
 Trusted-pool membership SHALL follow `net.IPNet.Contains` address-family rules. `0.0.0.0/0` SHALL NOT match IPv6. `::/0` SHALL NOT match IPv4.
