@@ -13,14 +13,18 @@ func newTestDecisionCache() *cache.Client {
 	return client
 }
 
-func TestMatchRangeBanWins(t *testing.T) {
+func remediationFromRangeIndex(client *cache.Client, remoteIP string) string {
+	return MembershipFromIndex(readRangeIndex(client)).Remediation(remoteIP)
+}
+
+func TestAddRangeBanWins(t *testing.T) {
 	client := newTestDecisionCache()
 	AddRange(client, "10.0.0.0/8", cache.CaptchaValue, 60)
 	AddRange(client, "10.1.0.0/16", cache.BannedValue, 60)
-	if got := MatchRange(client, "10.1.2.3"); got != cache.BannedValue {
+	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != cache.BannedValue {
 		t.Fatalf("got %q, want ban", got)
 	}
-	if got := MatchRange(client, "11.0.0.1"); got != "" {
+	if got := remediationFromRangeIndex(client, "11.0.0.1"); got != "" {
 		t.Fatalf("outside range got %q", got)
 	}
 }
@@ -29,7 +33,7 @@ func TestRemoveRange(t *testing.T) {
 	client := newTestDecisionCache()
 	AddRange(client, "192.168.0.0/16", cache.BannedValue, 60)
 	RemoveRange(client, "192.168.0.0/16")
-	if got := MatchRange(client, "192.168.1.1"); got != "" {
+	if got := remediationFromRangeIndex(client, "192.168.1.1"); got != "" {
 		t.Fatalf("removed range still matched: %q", got)
 	}
 }
@@ -38,14 +42,8 @@ func TestAddRangeUpdatesRemediation(t *testing.T) {
 	client := newTestDecisionCache()
 	AddRange(client, "10.0.0.0/8", cache.CaptchaValue, 60)
 	AddRange(client, "10.0.0.0/8", cache.BannedValue, 60)
-	if got := MatchRange(client, "10.1.2.3"); got != cache.BannedValue {
+	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != cache.BannedValue {
 		t.Fatalf("upsert got %q, want ban", got)
-	}
-}
-
-func TestMatchRangeFromIndexInline(t *testing.T) {
-	if got := MatchRangeFromIndex("10.0.0.0/8="+cache.CaptchaValue+"\n10.1.0.0/16="+cache.BannedValue, "10.1.2.3"); got != cache.BannedValue {
-		t.Fatalf("inline index got %q", got)
 	}
 }
 
@@ -82,11 +80,11 @@ func TestApplyRangeBatchOneWrite(t *testing.T) {
 		"10.0.0.0/8":  cache.CaptchaValue,
 		"10.1.0.0/16": cache.BannedValue,
 	}, nil)
-	if got := MatchRange(client, "10.1.2.3"); got != cache.BannedValue {
+	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != cache.BannedValue {
 		t.Fatalf("batch upsert got %q, want ban", got)
 	}
 	ApplyRangeBatch(client, nil, []string{"10.1.0.0/16"})
-	if got := MatchRange(client, "10.1.2.3"); got != cache.CaptchaValue {
+	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != cache.CaptchaValue {
 		t.Fatalf("after removal got %q, want captcha from remaining /8", got)
 	}
 }

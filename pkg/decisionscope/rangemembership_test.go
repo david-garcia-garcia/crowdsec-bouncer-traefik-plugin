@@ -14,6 +14,14 @@ func TestMembershipFromIndexBanWinsOverLongerCaptcha(t *testing.T) {
 	}
 }
 
+func TestMembershipFromIndexLongerBanWinsOverCaptcha(t *testing.T) {
+	index := "10.0.0.0/8=" + cache.CaptchaValue + "\n10.1.0.0/16=" + cache.BannedValue
+	got := MembershipFromIndex(index).Remediation("10.1.2.3")
+	if got != cache.BannedValue {
+		t.Fatalf("got %q, want ban", got)
+	}
+}
+
 func TestMembershipFromIndexCaptchaOnly(t *testing.T) {
 	index := "10.0.0.0/8=" + cache.CaptchaValue
 	got := MembershipFromIndex(index).Remediation("10.1.2.3")
