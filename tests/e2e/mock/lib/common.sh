@@ -268,6 +268,7 @@ _scenario_cleanup() {
   if (( rc != 0 )); then
     dump_diagnostics > "$SCENARIO_LOG" 2>&1 || true
     echo "[$SCENARIO_NAME] failed. Logs written to $SCENARIO_LOG" >&2
+    cat "$SCENARIO_LOG" >&2 || true
   fi
   stop_stack
   exit $rc
