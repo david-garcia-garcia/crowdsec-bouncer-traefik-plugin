@@ -48,3 +48,10 @@ phase: archive
 findings: none
 fixed: folded Close/handshake requirements; moved archive/2026-09-05-simpleredis-comms-review
 skipped: none
+
+## pullrequest (2026-09-05)
+
+phase: pullrequest
+findings: e2e mock and Main Tests each failed once, then succeeded on retrigger
+fixed: none (flake retriggers)
+skipped: none

@@ -11,4 +11,4 @@ JobName: 2026-09-05-review-simpleredis
 | codereview | [x] | [x] | 2026-09-05T09:53:27.6759741Z |
 | devdocsimpact | [x] | [x] | 2026-09-05T09:53:27.7072026Z |
 | archive | [x] | [x] | 2026-09-05T09:53:27.7388843Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-05T10:05:53.2292919Z |
