@@ -32,3 +32,10 @@ qualify: qualified-with-gaps
 change: crowdsec-connection-bouncer-split
 pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/6
 head: 57b10f6f0048365485dc1ab6d3211d5b6fda4f1e
+
+## implement (2026-09-05T08:23:22.919Z)
+phase: implement
+findings: none
+fixed: reclaim CrowdsecConnection; isolated cache; dual-bouncer mock e2e; CI green on a72cb8c
+skipped: logger OpenFile close (note large)
+head: a72cb8c374fa227d27503352c19886bbe5888d91
