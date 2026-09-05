@@ -35,6 +35,9 @@ linters-settings:
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer
           - github.com/leprosus/golang-ttl-map
       Test:
         files:
@@ -47,6 +50,9 @@ linters-settings:
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer
 
 linters:
   enable-all: true

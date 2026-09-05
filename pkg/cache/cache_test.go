@@ -164,3 +164,37 @@ func Test_nextReader(t *testing.T) {
 		})
 	}
 }
+
+func Test_memoryClientsDoNotShare(t *testing.T) {
+	a := &Client{}
+	b := &Client{}
+	a.New(logger.New("INFO", ""), false, "", nil, "", "", "")
+	b.New(logger.New("INFO", ""), false, "", nil, "", "", "")
+	a.Set("1.2.3.4", BannedValue, 10)
+	got, err := b.Get("1.2.3.4")
+	if err == nil || got != "" {
+		t.Fatalf("client B got %q err %v, want miss", got, err)
+	}
+	if err.Error() != CacheMiss {
+		t.Fatalf("client B err %v, want %s", err, CacheMiss)
+	}
+}
+
+func Test_prefixed(t *testing.T) {
+	if got := prefixed("", "ip"); got != "ip" {
+		t.Fatalf("empty prefix: got %q", got)
+	}
+	if got := prefixed("ab", "ip"); got != "ab:ip" {
+		t.Fatalf("prefix: got %q", got)
+	}
+	if got := prefixed("a", "updated"); got != "a:updated" {
+		t.Fatalf("lease key: got %q", got)
+	}
+}
+
+func Test_redisCacheUsesPrefix(t *testing.T) {
+	rc := &redisCache{prefix: "conn1"}
+	if got := prefixed(rc.prefix, "1.2.3.4"); got != "conn1:1.2.3.4" {
+		t.Fatalf("got %q", got)
+	}
+}

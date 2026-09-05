@@ -1,0 +1,256 @@
+// Package bouncer is the per-router Crowdsec handler Traefik gets back from New.
+package bouncer
+
+import (
+	"fmt"
+	"log/slog"
+	"net/http"
+	"text/template"
+	"time"
+
+	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	captcha "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
+	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection"
+	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
+)
+
+// Bouncer is one Traefik router handler. It is not the reclaim value.
+type Bouncer struct {
+	next     http.Handler
+	name     string
+	template *template.Template
+
+	enabled                   bool
+	appsecEnabled             bool
+	appsecFailureBlock        bool
+	appsecUnreachableBlock    bool
+	appsecUnreadableBodyBlock bool
+	remediationStatusCode     int
+	remediationCustomHeader   string
+	forwardedCustomHeader     string
+	banTemplate               *template.Template
+	banTemplateContentType    string
+	traceCustomHeader         string
+	clientPoolStrategy        *ip.PoolStrategy
+	serverPoolStrategy        *ip.PoolStrategy
+	captchaClient             *captcha.Client
+	log                       *slog.Logger
+	conn                      *crowdsecconnection.CrowdsecConnection
+}
+
+// New returns a per-router handler bound to conn (ForRoute).
+func New(next http.Handler, name string, config *configuration.Config, conn *crowdsecconnection.CrowdsecConnection, log *slog.Logger) (http.Handler, error) {
+	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
+	clientChecker, _ := ip.NewChecker(log, config.ClientTrustedIPs)
+
+	var banTemplate *template.Template
+	var banTemplateContentType string
+	if config.BanFilePath != "" {
+		banTemplate, banTemplateContentType, _ = configuration.GetTemplate(config.BanFilePath)
+	}
+
+	b := &Bouncer{
+		next:                      next,
+		name:                      name,
+		template:                  template.New("CrowdsecBouncer").Delims("[[", "]]"),
+		enabled:                   config.Enabled,
+		appsecEnabled:             config.CrowdsecAppsecEnabled,
+		appsecFailureBlock:        config.CrowdsecAppsecFailureBlock,
+		appsecUnreachableBlock:    config.CrowdsecAppsecUnreachableBlock,
+		appsecUnreadableBodyBlock: config.CrowdsecAppsecUnreadableBodyBlock,
+		remediationCustomHeader:   config.RemediationHeadersCustomName,
+		forwardedCustomHeader:     config.ForwardedHeadersCustomName,
+		remediationStatusCode:     config.RemediationStatusCode,
+		banTemplate:               banTemplate,
+		banTemplateContentType:    banTemplateContentType,
+		traceCustomHeader:         config.TraceHeadersCustomName,
+		log:                       log,
+		conn:                      conn,
+		serverPoolStrategy:        &ip.PoolStrategy{Checker: serverChecker},
+		clientPoolStrategy:        &ip.PoolStrategy{Checker: clientChecker},
+		captchaClient:             &captcha.Client{},
+	}
+	if config.CrowdsecMode == configuration.AppsecMode {
+		b.log.Debug("Bouncer initialized name:" + name)
+		return b, nil
+	}
+	config.CaptchaSiteKey, _ = configuration.GetVariable(config, "CaptchaSiteKey")
+	config.CaptchaSecretKey, _ = configuration.GetVariable(config, "CaptchaSecretKey")
+	err := b.captchaClient.New(
+		log,
+		conn.Cache(),
+		&http.Client{
+			Transport: &http.Transport{MaxIdleConns: 10, MaxIdleConnsPerHost: 10, IdleConnTimeout: 30 * time.Second},
+			Timeout:   time.Duration(config.HTTPTimeoutSeconds) * time.Second,
+		},
+		config.CaptchaProvider,
+		config.CaptchaCustomJsURL,
+		config.CaptchaCustomKey,
+		config.CaptchaCustomResponse,
+		config.CaptchaCustomValidateURL,
+		config.CaptchaSiteKey,
+		config.CaptchaSecretKey,
+		config.RemediationHeadersCustomName,
+		config.CaptchaFilePath,
+		config.CaptchaGracePeriodSeconds,
+	)
+	if err != nil {
+		log.Error("CaptchaClient not valid " + err.Error())
+		return nil, err
+	}
+	b.log.Debug("Bouncer initialized name:" + name)
+	return b, nil
+}
+
+// Connection is the reclaimed CrowdsecConnection this route uses.
+func (b *Bouncer) Connection() *crowdsecconnection.CrowdsecConnection {
+	return b.conn
+}
+
+// SameConnection reports whether two routes share one CrowdsecConnection pointer.
+func (b *Bouncer) SameConnection(other *Bouncer) bool {
+	return other != nil && b.conn == other.conn
+}
+
+// ServeHTTP principal function of plugin.
+//
+//nolint:nestif
+func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if !b.enabled {
+		b.next.ServeHTTP(rw, req)
+		return
+	}
+
+	remoteIP, err := ip.GetRemoteIP(req, b.serverPoolStrategy, b.forwardedCustomHeader)
+	if err != nil {
+		b.log.Error(fmt.Sprintf("ServeHTTP:getRemoteIp ip:%s %s", remoteIP, err.Error()))
+		b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
+		return
+	}
+	isTrusted, err := b.clientPoolStrategy.Checker.Contains(remoteIP)
+	if err != nil {
+		b.log.Error(fmt.Sprintf("ServeHTTP:checkerContains ip:%s %s", remoteIP, err.Error()))
+		b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
+		return
+	}
+	b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
+	if isTrusted {
+		b.next.ServeHTTP(rw, req)
+		return
+	}
+
+	if b.conn.Mode() == configuration.AppsecMode {
+		b.handleNextServeHTTP(rw, req, remoteIP)
+		return
+	}
+
+	if b.conn.Mode() != configuration.NoneMode {
+		value, cacheErr := b.conn.Cache().Get(remoteIP)
+		if cacheErr != nil {
+			cacheErrString := cacheErr.Error()
+			b.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s isBanned:false %s", remoteIP, cacheErrString))
+			if !b.conn.RedisUnreachableBlock() && cacheErrString == cache.CacheUnreachable {
+				b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s redisUnreachable=true", remoteIP))
+				b.handleNextServeHTTP(rw, req, remoteIP)
+				return
+			}
+			if cacheErrString != cache.CacheMiss {
+				b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", remoteIP, cacheErrString))
+				b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
+				return
+			}
+		} else {
+			b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit isBanned:%v", remoteIP, value))
+			if value == cache.NoBannedValue {
+				b.handleNextServeHTTP(rw, req, remoteIP)
+			} else {
+				b.handleRemediationServeHTTP(rw, req, remoteIP, value)
+			}
+			return
+		}
+	}
+
+	if b.conn.Mode() == configuration.StreamMode || b.conn.Mode() == configuration.AloneMode {
+		if b.conn.StreamHealthy() {
+			b.handleNextServeHTTP(rw, req, remoteIP)
+		} else {
+			b.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", remoteIP))
+			b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
+		}
+	} else {
+		value, err := b.conn.LiveLookup(remoteIP)
+		if err != nil {
+			b.log.Debug("handleNoStreamCache:crowdsecQuery " + err.Error())
+		}
+		if value == cache.NoBannedValue {
+			b.handleNextServeHTTP(rw, req, remoteIP)
+		} else {
+			b.log.Debug(fmt.Sprintf("ServeHTTP:handleNoStreamCache ip:%s isBanned:%v %s", remoteIP, value, err.Error()))
+			b.handleRemediationServeHTTP(rw, req, remoteIP, value)
+		}
+	}
+}
+
+func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, reason string) {
+	if b.conn != nil {
+		b.conn.IncBlocked()
+	}
+
+	if b.remediationCustomHeader != "" {
+		rw.Header().Set(b.remediationCustomHeader, "ban")
+	}
+	rw.Header().Set("Content-Type", b.banTemplateContentType)
+	rw.WriteHeader(b.remediationStatusCode)
+	if b.banTemplate == nil || req.Method == http.MethodHead {
+		return
+	}
+	templateData := map[string]string{
+		"RemediationReason": reason,
+		"ClientIP":          remoteIP,
+	}
+
+	if b.traceCustomHeader != "" {
+		headerVal := req.Header.Get(b.traceCustomHeader)
+		if headerVal != "" {
+			templateData["TraceID"] = headerVal
+		}
+	}
+
+	err := b.banTemplate.Execute(rw, templateData)
+	if err != nil {
+		b.log.Warn("handleBanServeHTTP could not write template to ResponseWriter: " + err.Error())
+	}
+}
+
+func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP, remediation string) {
+	b.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", remoteIP, remediation))
+	if b.captchaClient.Valid && remediation == cache.CaptchaValue && req.Method != http.MethodHead {
+		if b.captchaClient.Check(remoteIP) {
+			b.handleNextServeHTTP(rw, req, remoteIP)
+			return
+		}
+		if b.conn != nil {
+			b.conn.IncBlocked()
+		}
+		b.captchaClient.ServeHTTP(rw, req, remoteIP)
+		return
+	}
+	b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonLAPI)
+}
+
+func (b *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string) {
+	if b.appsecEnabled {
+		pol := crowdsecconnection.AppsecPolicy{
+			FailureBlock:        b.appsecFailureBlock,
+			UnreachableBlock:    b.appsecUnreachableBlock,
+			UnreadableBodyBlock: b.appsecUnreadableBodyBlock,
+		}
+		if err := b.conn.AppsecQuery(remoteIP, req, pol); err != nil {
+			b.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
+			b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
+			return
+		}
+	}
+	b.next.ServeHTTP(rw, req)
+}
