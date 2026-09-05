@@ -21,4 +21,12 @@ findings: none
 fixed: none
 skipped: none
 
+## implement (2026-09-05)
+
+phase: implement
+findings: P3 1 (ServeHTTP gocyclo 21)
+fixed: hoisted useRangeMembership and reused for stream/alone vs live
+skipped: none
+
+
 
