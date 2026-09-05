@@ -29,7 +29,7 @@ See proposal.md — Why. `master` split Yaegi `New` (`plugin.go`) from `pkg/boun
 
 6. **Identity:** IP from `GetRemoteIP`; Country/AS/custom from the mapped header. Missing header skips that scope.
 
-7. **Real e2e:** dedicated compose path with `decisionScopeHeaders` so existing tests stay header-free. `cscli --range` and `--scope`/`--value`. Extra headers on `Test-HttpRequest`. Mock `scope-headers` kept for CI speed.
+7. **Real e2e:** dedicated compose path with `decisionScopeHeaders` so existing tests stay header-free. `cscli --range` and `--scope`/`--value`. Range uses private `X-Forwarded-For`. Country uses traefik-geoblock enrich on a public IP (`X-IPCountry`), not a client-set test header. Nested maps via file provider. Mock `scope-headers` kept for CI speed.
 
 ## Risks / Trade-offs
 

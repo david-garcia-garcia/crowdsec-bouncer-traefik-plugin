@@ -37,7 +37,7 @@ Decision **scopes** supported by the plugin are `Ip`, `Range` (CIDR), and any ot
 
 `decisionScopeHeaders` maps a CrowdSec **scope name** (the map key) to a request **header name** (the map value). The key selects how the header is interpreted, not the header name:
 
-- `Country` (any case: `country`, `Country`): ISO 3166-1 alpha-2, case-insensitive. Cloudflare `XX` and `T1` do not match. Example header: `CF-IPCountry`.
+- `Country` (any case: `country`, `Country`): ISO 3166-1 alpha-2, case-insensitive. Cloudflare `XX` and `T1` do not match. Example headers: `CF-IPCountry`, or `X-IPCountry` from a geoenrich middleware.
 - `AS` (any case: `as`, `AS`): decimal ASN. A leading `AS` / `as` on the header or the decision is ignored. Example header: `CF-ASN`.
 - Any other key (`username`, `session`, …): trimmed header string, compared as-is to the decision value. The key must match the scope LAPI stored (`username` is not `user`).
 - `Ip` and `Range` cannot be mapped. IP comes from the client address; Range is CIDR containment.
@@ -46,12 +46,12 @@ Range uses one shared cache key (`range-index`) of `cidr=remediation` lines. A r
 
 ```yaml
 decisionScopeHeaders:
-  Country: CF-IPCountry
+  Country: X-IPCountry
   AS: CF-ASN
   username: X-User
 ```
 
-The plugin does not resolve GeoIP or invent header values. Every `decisionScopeHeaders` scope is taken from the request as-is (CDN, reverse proxy, or a Traefik middleware). If the client can set that header, they can change matching — use only values you trust when the header is not client-controlled.
+The plugin does not resolve GeoIP or invent header values. Every `decisionScopeHeaders` scope is taken from the request as-is (CDN, reverse proxy, or a Traefik middleware such as [traefik-geoblock](https://github.com/david-garcia-garcia/traefik-geoblock)). If the client can set that header, they can change matching — use only values you trust when the header is not client-controlled. A worked chain is in [examples/geoenrich-decisions](examples/geoenrich-decisions/README.md).
 
 On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still has a decision to verify the user behavior. See the example captcha for more informations and configuration intructions.  
 The following captcha providers are supported now:
@@ -668,7 +668,7 @@ http:
             - 192.168.1.0/24
           forwardedHeadersCustomName: X-Custom-Header
           decisionScopeHeaders: {}
-            # Country: CF-IPCountry  # key Country (any case) → ISO country matcher
+            # Country: X-IPCountry    # key Country (any case) → ISO country matcher (CDN or geoenrich)
             # AS: CF-ASN             # key AS (any case) → ASN matcher
             # username: X-User       # any other key → trimmed exact match
           remediationHeadersCustomName: cs-remediation
@@ -832,6 +832,8 @@ make e2e_pester
 #### 10. Using Traefik with Custom Ban HTML Page [examples/custom-ban-page/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/custom-ban-page/README.md)
 
 #### 11. Using Traefik with Custom Captcha Whiketkeeper[examples/custom-captcha/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/custom-captcha/README.md)
+
+#### 12. Using a geoenrich plugin for CrowdSec Country decisions [examples/geoenrich-decisions/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/geoenrich-decisions/README.md)
 
 ### Local Mode
 

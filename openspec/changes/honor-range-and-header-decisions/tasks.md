@@ -31,7 +31,9 @@
 
 - [x] 7.1 Extend `TestUtils` with `--range` / `--scope` `--value` injectors and extra request headers
 - [x] 7.2 Dedicated compose middleware with `decisionScopeHeaders`; Pester for Range (stream + none) and a header-mapped Country (or custom) scope
+- [x] 7.3 Chain traefik-geoblock enrich on `/scope-none` and `/scope-stream`; Country tests use a public IP and the enriched `X-IPCountry` (file provider for nested maps)
 
 ## 8. Docs
 
 - [x] 8.1 README: `decisionScopeHeaders` examples, no GeoIP, header trust warning
+- [x] 8.2 Add `examples/geoenrich-decisions` (geoblock enrich then bouncer Country)

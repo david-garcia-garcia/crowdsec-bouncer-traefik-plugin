@@ -9,8 +9,8 @@ On `master` this plugin remediates only by exact client IP. CrowdSec already iss
 - Match Country, AS, and any other mapped scope from those headers. This plugin does not geolocate.
 - When several scopes hit, ban wins over captcha.
 - Use in-tree SimpleRedis `MGet` for the multi-key lookup (do not keep 383's looped GET).
-- Real-stack Pester coverage for Range and a header-mapped scope. Keep a mock `scope-headers` scenario for fast CI.
-- README documents the new key.
+- Real-stack Pester coverage for Range and a header-mapped Country via geoblock enrich (public IP). Keep a mock `scope-headers` scenario for fast CI (synthetic headers).
+- README documents the new key. `examples/geoenrich-decisions` chains geoblock enrich then the bouncer.
 
 ## Capabilities
 
@@ -25,6 +25,6 @@ On `master` this plugin remediates only by exact client IP. CrowdSec already iss
 ## Impact
 
 - `pkg/bouncer/bouncer.go` lookup, `pkg/crowdsecconnection/connection.go` stream/live, `pkg/configuration` `decisionScopeHeaders`, `pkg/cache` `GetMany` via `MGet`, new `pkg/decisionscope`, `pkg/ip.InNetwork`.
-- `tests/e2e/real/` (Pester + TestUtils + compose labels) and `tests/e2e/mock/scenarios/scope-headers/`.
-- README public key. Redis logical keys grow (`scope:value`, `range-index`) but stay prefixed by connection identity.
+- `tests/e2e/real/` (Pester + TestUtils + file-provider chain with traefik-geoblock) and `tests/e2e/mock/scenarios/scope-headers/`.
+- `examples/geoenrich-decisions`. README public key. Redis logical keys grow (`scope:value`, `range-index`) but stay prefixed by connection identity.
 - No GeoIP. No radix tree. Do not merge [PR 368](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/368).
