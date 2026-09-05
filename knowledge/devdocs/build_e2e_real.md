@@ -39,5 +39,6 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 ## Gotchas
 
 - Compose bind-mounts the **repository root** into Traefik’s local plugin path (`../../..` from this folder).
+- Redis-cache cases need Dragonfly (`docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2`) on the compose network as `dragonfly:6379`.
 - AppSec cases need Crowdsec `appsec-crs-inband` and `acquis.yaml` on 7422; first boot downloads CRS.
 - The test LAPI key `40796d93c2958f9e58345514e67740e5` is a fixture, not a production secret.
