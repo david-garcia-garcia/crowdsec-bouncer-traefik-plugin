@@ -1,0 +1,15 @@
+issueKey: 2026-09-05-review-simpleredis
+jobName: 2026-09-05-review-simpleredis
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: main
+qualify: qualified-with-gaps
+src: 63748c369f7c1bc57f0e72978c9c8c3250b1eae33c90a396a0d3dbb9300f1b81
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
