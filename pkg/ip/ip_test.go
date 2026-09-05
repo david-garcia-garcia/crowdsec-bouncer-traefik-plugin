@@ -94,6 +94,10 @@ func TestCheckerContains(t *testing.T) {
 			t.Fatal("expected error for 192.168.1.0/33")
 		}
 	})
+}
+
+func TestCheckerContainsCatchAllFamily(t *testing.T) {
+	log := slog.Default()
 
 	t.Run("IPv4 catch-all does not match IPv6", func(t *testing.T) {
 		checker, err := NewChecker(log, []string{"0.0.0.0/0"})
