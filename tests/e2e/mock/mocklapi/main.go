@@ -19,6 +19,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -49,14 +50,13 @@ func list(m map[string]Decision) []Decision {
 	return out
 }
 
-// --- Redis mock (inline-command wire format, as spoken by simpleredis) ---
+// --- Redis mock (RESP arrays as spoken by pkg/simpleredis, plus inline GET) ---
 
 // serveRedis is a hardcoded stand-in. When verdicts is true it plays a replica
-// that holds decisions: every line is scanned for known IPs, 1.2.3.4 → "f"
-// (clean), 1.2.3.5 → "t" (banned); any other GET is a miss ($-1). When verdicts
-// is false it plays the primary and answers every GET with a miss, so a
-// scenario can prove reads are served from the replica and not the primary.
-// SET, DEL, AUTH, SELECT get +OK (they don't read the response anyway).
+// that holds decisions: GET of 1.2.3.4 → "f" (clean), 1.2.3.5 → "t" (banned);
+// any other GET is a miss ($-1). When verdicts is false it plays the primary
+// and answers every GET with a miss, so a scenario can prove reads are served
+// from the replica and not the primary. SET, DEL, AUTH, SELECT get +OK.
 func serveRedis(addr string, verdicts bool) {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -73,23 +73,76 @@ func serveRedis(addr string, verdicts bool) {
 			defer conn.Close()
 			rd := bufio.NewReader(conn)
 			for {
-				line, _, err := rd.ReadLine()
+				cmd, args, err := readRedisCommand(rd)
 				if err != nil {
 					return
 				}
-				s := string(line)
-				switch {
-				case verdicts && strings.Contains(s, "1.2.3.4"):
-					conn.Write([]byte("$1\r\nf\r\n"))
-				case verdicts && strings.Contains(s, "1.2.3.5"):
-					conn.Write([]byte("$1\r\nt\r\n"))
-				case strings.HasPrefix(strings.ToUpper(s), "GET "):
-					conn.Write([]byte("$-1\r\n"))
-				default:
-					conn.Write([]byte("+OK\r\n"))
-				}
+				_, _ = conn.Write(redisMockReply(cmd, args, verdicts))
 			}
 		}(conn)
+	}
+}
+
+// readRedisCommand reads one RESP array command or one inline space-separated line.
+func readRedisCommand(rd *bufio.Reader) (string, []string, error) {
+	line, err := rd.ReadString('\n')
+	if err != nil {
+		return "", nil, err
+	}
+	line = strings.TrimRight(line, "\r\n")
+	// RESP array: *<n> then n bulk strings ($len + payload).
+	if strings.HasPrefix(line, "*") {
+		count, convErr := strconv.Atoi(line[1:])
+		if convErr != nil || count < 1 {
+			return "", nil, io.ErrUnexpectedEOF
+		}
+		parts := make([]string, 0, count)
+		for i := 0; i < count; i++ {
+			head, headErr := rd.ReadString('\n')
+			if headErr != nil {
+				return "", nil, headErr
+			}
+			head = strings.TrimRight(head, "\r\n")
+			if !strings.HasPrefix(head, "$") {
+				return "", nil, io.ErrUnexpectedEOF
+			}
+			length, lenErr := strconv.Atoi(head[1:])
+			if lenErr != nil || length < 0 {
+				return "", nil, io.ErrUnexpectedEOF
+			}
+			buf := make([]byte, length+2)
+			if _, readErr := io.ReadFull(rd, buf); readErr != nil {
+				return "", nil, readErr
+			}
+			parts = append(parts, string(buf[:length]))
+		}
+		return strings.ToUpper(parts[0]), parts[1:], nil
+	}
+	// Inline command: space-separated tokens on one line (legacy GET).
+	fields := strings.Fields(line)
+	if len(fields) == 0 {
+		return "", nil, io.ErrUnexpectedEOF
+	}
+	return strings.ToUpper(fields[0]), fields[1:], nil
+}
+
+// redisMockReply returns the RESP bytes for one mock command.
+func redisMockReply(cmd string, args []string, verdicts bool) []byte {
+	key := ""
+	if len(args) > 0 {
+		key = args[0]
+	}
+	switch cmd {
+	case "GET":
+		if verdicts && strings.Contains(key, "1.2.3.4") {
+			return []byte("$1\r\nf\r\n")
+		}
+		if verdicts && strings.Contains(key, "1.2.3.5") {
+			return []byte("$1\r\nt\r\n")
+		}
+		return []byte("$-1\r\n")
+	default:
+		return []byte("+OK\r\n")
 	}
 }
 
@@ -111,46 +164,49 @@ func main() {
 	// bouncer's system-trust-store path. Backend and AppSec stay plaintext.
 	lapiTLSCert := flag.String("lapi-tls-cert", "", "PEM cert to serve the LAPI over HTTPS (optional)")
 	lapiTLSKey := flag.String("lapi-tls-key", "", "PEM key for --lapi-tls-cert")
+	lapiOnly := flag.Bool("lapi-only", false, "serve only the LAPI mux (second Crowdsec backend in dual-bouncer)")
 	flag.Parse()
 
-	go func() {
-		log.Fatal(http.ListenAndServe(*backendAddr, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			_, _ = w.Write([]byte("E2E_BACKEND_OK\n"))
-		})))
-	}()
+	if !*lapiOnly {
+		go func() {
+			log.Fatal(http.ListenAndServe(*backendAddr, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte("E2E_BACKEND_OK\n"))
+			})))
+		}()
 
-	// AppSec mock: the plugin forwards the request metadata in X-Crowdsec-Appsec-*
-	// headers and reads our status — 200 allows, 403 blocks. We emulate one
-	// deterministic virtual-patching rule (block any URI containing "rpc2", the
-	// exact probe from examples/appsec-enabled) so the plugin's AppSec path is
-	// exercised without standing up the real WAF.
-	go func() {
-		log.Fatal(http.ListenAndServe(*appsecAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "403") {
-				w.WriteHeader(http.StatusForbidden)
-			}
-			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "500") {
-				w.WriteHeader(http.StatusInternalServerError)
-			}
-			if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "502") {
-				w.WriteHeader(http.StatusBadGateway)
-			}
-			// Read body
-			body, err := io.ReadAll(r.Body)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			defer r.Body.Close()
-			if strings.Contains(string(body), "a=0") {
-				w.WriteHeader(http.StatusForbidden)
-				return
-			}
-		})))
-	}()
+		// AppSec mock: the plugin forwards the request metadata in X-Crowdsec-Appsec-*
+		// headers and reads our status — 200 allows, 403 blocks. We emulate one
+		// deterministic virtual-patching rule (block any URI containing "rpc2", the
+		// exact probe from examples/appsec-enabled) so the plugin's AppSec path is
+		// exercised without standing up the real WAF.
+		go func() {
+			log.Fatal(http.ListenAndServe(*appsecAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "403") {
+					w.WriteHeader(http.StatusForbidden)
+				}
+				if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "500") {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				if strings.Contains(r.Header.Get("X-Crowdsec-Appsec-Uri"), "502") {
+					w.WriteHeader(http.StatusBadGateway)
+				}
+				// Read body
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				defer r.Body.Close()
+				if strings.Contains(string(body), "a=0") {
+					w.WriteHeader(http.StatusForbidden)
+					return
+				}
+			})))
+		}()
 
-	go serveRedis(*redisAddr, false)
-	go serveRedis(*redisReadAddr, true)
+		go serveRedis(*redisAddr, false)
+		go serveRedis(*redisReadAddr, true)
+	}
 
 	mux := http.NewServeMux()
 

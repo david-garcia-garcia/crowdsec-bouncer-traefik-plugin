@@ -1,0 +1,44 @@
+http:
+  routers:
+    router-a:
+      rule: "PathPrefix(`/a`)"
+      entryPoints:
+        - web
+      service: backend
+      middlewares:
+        - bouncer-a
+    router-b:
+      rule: "PathPrefix(`/b`)"
+      entryPoints:
+        - web
+      service: backend
+      middlewares:
+        - bouncer-b
+  services:
+    backend:
+      loadBalancer:
+        servers:
+          - url: "@@BACKEND_URL@@"
+  middlewares:
+    bouncer-a:
+      plugin:
+        bouncer:
+          enabled: "true"
+          crowdsecMode: live
+          defaultDecisionSeconds: "2"
+          crowdsecLapiScheme: http
+          crowdsecLapiHost: "@@LAPI_HOST@@"
+          crowdsecLapiKey: "@@APIKEY@@"
+          forwardedHeadersTrustedIps:
+            - "127.0.0.1/32"
+    bouncer-b:
+      plugin:
+        bouncer:
+          enabled: "true"
+          crowdsecMode: live
+          defaultDecisionSeconds: "2"
+          crowdsecLapiScheme: http
+          crowdsecLapiHost: "@@LAPI_HOST_B@@"
+          crowdsecLapiKey: "@@APIKEY@@"
+          forwardedHeadersTrustedIps:
+            - "127.0.0.1/32"

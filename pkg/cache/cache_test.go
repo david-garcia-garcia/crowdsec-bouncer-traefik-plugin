@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
-	simpleredis "github.com/maxlerebourg/simpleredis"
+	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis"
 )
 
 func Test_Get(t *testing.T) {
@@ -126,11 +126,11 @@ func Test_Delete(t *testing.T) {
 
 // indexOfReader returns the position of r inside rc.readers, or -1 when r is the writer (the no-readers fallback).
 func indexOfReader(rc *redisCache, r *simpleredis.SimpleRedis) int {
-	if r == &rc.writer {
+	if r == rc.writer {
 		return -1
 	}
 	for i := range rc.readers {
-		if r == &rc.readers[i] {
+		if r == rc.readers[i] {
 			return i
 		}
 	}
@@ -151,12 +151,61 @@ func Test_nextReader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rc := &redisCache{log: logger.New("INFO", "")}
-			rc.readers = make([]simpleredis.SimpleRedis, tt.readers)
+			rc.writer = &simpleredis.SimpleRedis{}
+			rc.readers = make([]*simpleredis.SimpleRedis, tt.readers)
+			for i := range rc.readers {
+				rc.readers[i] = &simpleredis.SimpleRedis{}
+			}
 			for call, want := range tt.want {
 				if got := indexOfReader(rc, rc.nextReader()); got != want {
 					t.Errorf("call %d: nextReader() -> reader[%d], want reader[%d]", call, got, want)
 				}
 			}
 		})
+	}
+}
+
+func Test_memoryClientsDoNotShare(t *testing.T) {
+	a := &Client{}
+	b := &Client{}
+	a.New(logger.New("INFO", ""), false, "", nil, "", "", "")
+	b.New(logger.New("INFO", ""), false, "", nil, "", "", "")
+	a.Set("1.2.3.4", BannedValue, 10)
+	got, err := b.Get("1.2.3.4")
+	if err == nil || got != "" {
+		t.Fatalf("client B got %q err %v, want miss", got, err)
+	}
+	if err.Error() != CacheMiss {
+		t.Fatalf("client B err %v, want %s", err, CacheMiss)
+	}
+	a.Close()
+	b.Close()
+}
+
+func Test_ClientCloseRedis(_ *testing.T) {
+	client := &Client{}
+	client.New(logger.New("INFO", ""), true, "127.0.0.1:1", []string{"127.0.0.1:1"}, "", "", "p")
+	client.Close()
+	client.Close()
+	var empty *Client
+	empty.Close()
+}
+
+func Test_prefixed(t *testing.T) {
+	if got := prefixed("", "ip"); got != "ip" {
+		t.Fatalf("empty prefix: got %q", got)
+	}
+	if got := prefixed("ab", "ip"); got != "ab:ip" {
+		t.Fatalf("prefix: got %q", got)
+	}
+	if got := prefixed("a", "updated"); got != "a:updated" {
+		t.Fatalf("lease key: got %q", got)
+	}
+}
+
+func Test_redisCacheUsesPrefix(t *testing.T) {
+	rc := &redisCache{prefix: "conn1"}
+	if got := prefixed(rc.prefix, "1.2.3.4"); got != "conn1:1.2.3.4" {
+		t.Fatalf("got %q", got)
 	}
 }

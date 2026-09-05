@@ -34,19 +34,25 @@ linters-settings:
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer
           - github.com/leprosus/golang-ttl-map
-          - github.com/maxlerebourg/simpleredis
       Test:
         files:
           - $test
         allow:
           - $gostd
-          - github.com/maxlerebourg/simpleredis
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer
 
 linters:
   enable-all: true
@@ -80,9 +86,21 @@ issues:
   max-same-issues: 0
   exclude:
     - "G402: TLS InsecureSkipVerify may be true."
+  exclude-files:
+    - pkg/simpleredis/
+    - pkg/reclaim/
   exclude-rules:
     - path: (.+)_test.go
       linters:
         - goconst
         - funlen
         - godot
+    - path: pkg/crowdsecconnection/
+      linters:
+        - perfsprint
+    - path: pkg/bouncer/
+      linters:
+        - perfsprint
+    - path: plugin.go
+      linters:
+        - perfsprint

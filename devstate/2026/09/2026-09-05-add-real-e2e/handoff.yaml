@@ -1,0 +1,15 @@
+issueKey: 2026-09-05-add-real-e2e
+jobName: 2026-09-05-add-real-e2e
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: b4cb0c6e4bf5106bb5af6714505787da85143441b115b8a8b549440ec7894b58
+localTests: failed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: add-real-e2e
+pr: { id: 4, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/4 }
