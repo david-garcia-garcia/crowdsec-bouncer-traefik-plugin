@@ -10,5 +10,5 @@ JobName: 2026-09-05-split-connection-files
 | implement | [x] | [x] | 2026-09-05T16:35:10Z |
 | codereview | [x] | [x] | 2026-09-05T16:36:50Z |
 | devdocsimpact | [x] | [x] | 2026-09-05T16:38:13Z |
-| archive | [x] | [ ] | |
+| archive | [x] | [x] | 2026-09-05T16:40:01Z |
 | pullrequest | [ ] | [ ] | |

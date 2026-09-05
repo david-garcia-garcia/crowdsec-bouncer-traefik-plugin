@@ -53,3 +53,11 @@ fixed: core_plugin_appsec.md and core_plugin_decisionscope.md Key files
 skipped: none
 head: a5b91618f3855cb147622502aa9cd08ef5275a56
 ci: in progress
+
+## archive (2026-09-05)
+phase: archive
+findings: none
+fixed: synced core_plugin_connection_source-files; moved change to archive
+skipped: none
+head: a33ddf195fe5f9462e2cd227e538592fe53e1bb1
+ci: not seen
