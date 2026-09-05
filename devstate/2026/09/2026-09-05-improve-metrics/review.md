@@ -48,3 +48,11 @@ findings: none
 fixed: catalog sync + archive/2026-09-05-align-lapi-usage-metrics
 skipped: none
 
+## pullrequest (2026-09-05)
+
+phase: pullrequest
+findings: Main Process, e2e mock, and e2e pester succeeded on 13225c0
+fixed: golangci forcetypeassert/gocognit/tagliatelle in metrics_test.go; captcha mock wait 30s
+skipped: none
+
+
