@@ -71,3 +71,13 @@ fixed: ready title; waited CI
 skipped: none
 ci: 33979392712 Main Process success; 33979392705 e2e success
 head: c0016bfcb14144b1c845f0cff00e6a5cc291fb29
+
+## sync (2026-09-05)
+
+phase: deliverreview after merge origin/master
+findings: map.md conflict (config vs connection)
+fixed: kept both families; TLS stayed in tls.go
+skipped: none
+ci: 33991196323 Main Process success; 33991196312 e2e success
+head: 334b81c00047906e408bdaaa85741c9e30909280
+mergeable: clean
