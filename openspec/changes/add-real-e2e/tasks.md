@@ -1,16 +1,16 @@
 ## 1. Checkout path for Yaegi on this fork
 
-- [ ] 1.1 In `.github/workflows/main.yml`, set the checkout `path` to `go/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin` (the `go.mod` module path), not `github.com/${{ github.repository }}`
+- [x] 1.1 In `.github/workflows/main.yml`, set the checkout `path` to `go/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin` (the `go.mod` module path), not `github.com/${{ github.repository }}`. Set `defaults.run.working-directory` to the same path.
 
-## 2. Docker e2e harness from upstream PR 333
+## 2. Pester real-stack suite from PR 273
 
-- [ ] 2.1 Copy `tests/e2e/lib/common.sh` and `tests/e2e/README.md` from `upstream/feat/e2e-docker`
-- [ ] 2.2 Copy all seven scenario directories from `upstream/feat/e2e-docker` into `tests/e2e/scenarios/` (`stream-mode`, `live-mode`, `none-mode`, `trusted-ips`, `custom-ban-page`, `captcha`, `appsec`)
-- [ ] 2.3 Pin every scenario compose Traefik image to `traefik:v3.7.11`; keep Crowdsec `crowdsecurity/crowdsec:v1.7.8`
-- [ ] 2.4 Add `make e2e` and `make e2e_%` next to existing `e2e_mock` targets; discover scenarios from `tests/e2e/scenarios/*`
+- [x] 2.1 Add `Test-Integration.ps1`, `docker-compose.test.yml`, `tests/TestUtils.ps1`, and `tests/*.Tests.ps1` from branch `272`
+- [x] 2.2 Pin Traefik to `traefik:v3.7.11` and Crowdsec to `crowdsecurity/crowdsec:v1.7.8`; replace `crowdseclapiurl` with `crowdseclapishost`; drop Traefik wget healthcheck
+- [x] 2.3 Default Pester `TestPath` to `./tests/*.Tests.ps1` so mock e2e under `tests/e2e/` is not picked up
+- [x] 2.4 Add `make e2e_pester` that runs `pwsh -File ./Test-Integration.ps1`
 
 ## 3. CI and docs
 
-- [ ] 3.1 Add a GitHub Actions job that runs `make e2e` on pull requests; keep the mock `make e2e_mock` job
-- [ ] 3.2 Update `tests/e2e/mock/README.md` and Makefile comments so they no longer say the Docker suite lives only in another PR
-- [ ] 3.3 Run existing local tests (`make` / `go test`); set `localTests` from the result
+- [x] 3.1 Add a GitHub Actions job that runs `./Test-Integration.ps1`; keep the mock `make e2e_mock` job
+- [x] 3.2 Add a README testing note for `./Test-Integration.ps1` without copying 273’s unrelated README churn
+- [x] 3.3 Run existing local tests (`go test`); set `localTests` from the result
