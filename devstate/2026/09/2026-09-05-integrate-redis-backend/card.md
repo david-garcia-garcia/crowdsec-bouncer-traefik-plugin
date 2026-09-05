@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-05T06:56:52.1926584Z
+Developer review: in progress — 2026-09-05T07:03:23.8442801Z
 
 ## What this changes
-**Operators.** None. (`redisCache*` keys unchanged versus `master`.)
+**Operators.** None. (`redisCache*` keys are unchanged versus `master`.)
 
 **Admin users.** None.
 
-**Developers.** OpenSpec change `in-tree-simpleredis-dragonfly-e2e` is apply-ready: in-tree `pkg/simpleredis` from PR #8, mock RESP, Dragonfly Pester. Product Go not applied yet.
+**Developers.** Redis cache uses in-tree `pkg/simpleredis` (simpleredis PR #8 pool + RESP + `MGet`). `pkg/cache` holds clients by pointer. Mock e2e Redis parses RESP. Real-stack e2e adds Dragonfly and `redis_cache.Tests.ps1`.
 
 **End users.** None.
 
@@ -13,18 +13,18 @@ Developer review: in progress — 2026-09-05T06:56:52.1926584Z
 On `master` the Redis cache still depends on published `simpleredis` v1.0.12 (one TCP dial per command, inline protocol). There is no real-stack e2e against a functional Redis-protocol backend. Without this PR the plugin cannot take PR #8’s pool/`MGet` client in-tree, and Dragonfly cache behaviour stays untested.
 
 ## Merge readiness
-Propose complete; implement has not started. 5 phases remain.
+Apply is on the branch; CI for this head is still running. 4 phases remain after implement.
 
 Priority: P3 — tests and in-tree client packaging; no current public-contract break claimed
-Reviewed head: fc5f374
+Reviewed head: fe5da7e
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Specs written; CI not measured on this head |
-| CI proof | 1/6 | Pushed pending; CI not seen for fc5f374 |
-| Local tests proof | N/A | Before implement |
+| Overall readiness | 3/6 | Local pkg tests passed; CI in progress |
+| CI proof | 3/6 | Main and E2E in progress on fe5da7e |
+| Local tests proof | N/A | Remote PR; CI is the proof axis |
 | Review resolution | 6/6 | OPEN PR; no reviewer comments |
 
 ## Verification
@@ -33,11 +33,11 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-05-integrate-redis-backend pushed | `git` / origin |
 | OpenSpec | in-tree-simpleredis-dragonfly-e2e | `openspec/changes/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/5 | pr-host |
-| CI | not seen | pr-host CI |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 33951488186 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33951488186 | GitHub Actions Main; E2E https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33951488135 |
+| Local tests | passed | `go test ./pkg/...` (cache + simpleredis ok). Root `TestBouncerFileLogging*` failed on Windows file-lock cleanup, unrelated |
 | PR comments | no comments | none |
-| Security | None. | no codereview.md |
-| Performance | None. | no codereview.md |
+| Security | None. | no codereview.md yet |
+| Performance | None. | no codereview.md yet |
 
 ## Specs
 - [core_cache_redis_in-tree-client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-05-integrate-redis-backend/openspec/changes/in-tree-simpleredis-dragonfly-e2e/proposal.md) — added
@@ -48,24 +48,24 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-PR #5 holds the card. Change `in-tree-simpleredis-dragonfly-e2e` is apply-ready.
+PR #5 apply: `pkg/simpleredis` from f8801cc, mock RESP, Dragonfly Pester. CI still running on fe5da7e.
 
 ## Decision needed
 | Question | Decision | By |
 | --- | --- | --- |
-| Where does the in-tree client live? | assumed — `pkg/simpleredis` | explore |
-| Copy sources vs `replace` to the PR branch? | assumed — copy PR #8 sources into the module | explore |
-| Must `pkg/cache` call `MGet` now? | assumed — no; ship `MGet` on the package only | explore |
-| How to stop copying `SimpleRedis` by value? | assumed — store `*simpleredis.SimpleRedis` | explore |
-| Dragonfly image and tag? | assumed — `docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2` | explore |
-| What does functional redis e2e assert? | assumed — live-mode redisCache against Dragonfly; survive Traefik restart | explore |
-| Must mock e2e Redis keep passing after RESP? | assumed — yes; parse RESP arrays in `serveRedis` | explore |
-| Who owns the client address in tests? | assumed — Traefik forwarded headers + plugin trusted IPs | explore |
-| Pin Dragonfly in operator examples? | assumed — no | explore |
+| Where does the in-tree client live? | assumed — `pkg/simpleredis` | implement |
+| Copy sources vs `replace` to the PR branch? | assumed — copy PR #8 sources into the module | implement |
+| Must `pkg/cache` call `MGet` now? | assumed — no; ship `MGet` on the package only | implement |
+| How to stop copying `SimpleRedis` by value? | assumed — store `*simpleredis.SimpleRedis` | implement |
+| Dragonfly image and tag? | assumed — `docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2` | implement |
+| What does functional redis e2e assert? | assumed — live-mode redisCache against Dragonfly; survive Traefik restart | implement |
+| Must mock e2e Redis keep passing after RESP? | assumed — yes; parse RESP arrays in `serveRedis` | implement |
+| Who owns the client address in tests? | assumed — Traefik forwarded headers + plugin trusted IPs | implement |
+| Pin Dragonfly in operator examples? | assumed — no | implement |
 
 ## Before merge
-- [ ] Land in-tree simpleredis from PR #8 and Dragonfly real-stack e2e
-- [ ] Green CI on PR #5
+- [ ] Green CI on PR #5 (Main + E2E)
+- [x] Land in-tree simpleredis from PR #8 and Dragonfly real-stack e2e
 
 ## Findings
 None.
@@ -83,22 +83,23 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 2 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | fc5f3747a1339e752e8a3f7f7fb06ee91292cd25 | Card must match the branch you measured |
+| Reviewed head | fe5da7ee79d5e8a5de165fe25902d0d3222014cc | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: Not applied yet versus `master`.
+Best possible solution: In-tree PR #8 client instead of an untagged `replace`, with Dragonfly e2e instead of mock-only Redis.
 
-Do we have a high-confidence way to reproduce? Yes.
+Do we have a high-confidence way to reproduce? Yes, `go test ./pkg/simpleredis ./pkg/cache` and Pester `redis_cache.Tests.ps1`.
 
-Is this the best way to solve the issue? In-tree copy vs `replace` is the Yaegi-safe path recorded in explore.
+Is this the best way to solve the issue? Yes versus `master`: Yaegi can load `pkg/simpleredis` from the plugin tree.
 
 ### Evidence
 What I checked:
-- Apply-ready OpenSpec change `in-tree-simpleredis-dragonfly-e2e` (4/4 artifacts)
-- FindSpecHost: new `core_cache_redis_in-tree-client`, fold `build_e2e_pester_crowdsec-stack`, new `build_e2e_mock_redis-resp`
+- `go test ./pkg/...` passed (simpleredis fake-redis suite + cache round-robin)
+- `go.mod` no longer requires `github.com/maxlerebourg/simpleredis`
+- CI Main 33951488186 and E2E 33951488135 in progress on fe5da7e
 
 ### Rank-up moves
 None.

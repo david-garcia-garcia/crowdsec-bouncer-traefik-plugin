@@ -21,3 +21,11 @@ findings: none
 fixed: none
 skipped: none
 change: in-tree-simpleredis-dragonfly-e2e
+
+## implement (2026-09-05)
+phase: implement
+findings: none
+fixed: in-tree pkg/simpleredis, mock RESP, Dragonfly e2e
+skipped: none
+localTests: passed
+ci: in progress Main 33951488186 E2E 33951488135
