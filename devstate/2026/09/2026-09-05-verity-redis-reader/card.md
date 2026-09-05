@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-05T12:18:55Z
+Developer review: ready for review — 2026-09-05T12:28:34Z
 
 ## What this changes
 **Operators.** None.
 
 **Admin users.** None.
 
-**Developers.** `Test_NewKeepsRedisReadersByPointer` in `pkg/cache/cache_test.go` fails if `Client.New` copies pooled `SimpleRedis` readers by value or aliases them. OpenSpec change `prove-redis-readers-by-pointer` adds that construction-site scenario to `core_cache_redis_in-tree-client`.
+**Developers.** `Test_NewKeepsRedisReadersByPointer` in `pkg/cache/cache_test.go` fails if `Client.New` copies pooled `SimpleRedis` readers by value or aliases them. Spec `core_cache_redis_in-tree-client` gains a `Client.New` construction-site scenario. Production `pkg/cache/cache.go` is unchanged (already pointer-safe).
 
 **End users.** None.
 
@@ -13,17 +13,17 @@ Developer review: in progress — 2026-09-05T12:18:55Z
 On `master`, pooled `SimpleRedis` readers are pointers, but `Test_nextReader` never calls `Client.New`. Without a construction-site test, the copy-by-value pattern from [upstream #381](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/381) can return (go vet `copylocks` on the pool mutex) and this fork would not notice.
 
 ## Merge readiness
-The proving test is on the branch. Local `go test ./pkg/cache/` passed. CI for this head is still in progress. 1 item remains (green CI on this SHA).
+Ready for review. CI succeeded on this head. No open PR comments.
 
 Priority: P3 — spec, docs, tests, or internal clarity — no current user or operator harm
-Reviewed head: 5cb960f
+Reviewed head: 0b5105f
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI in progress on this head |
-| CI proof | 3/6 | Main Process in progress |
+| Overall readiness | 6/6 | CI succeeded; no open comments |
+| CI proof | 6/6 | Main Process succeeded |
 | Local tests proof | N/A | Remote PR; localTests passed |
 | Review resolution | 6/6 | No PR comments |
 
@@ -31,22 +31,22 @@ Owner decision: Required. See Decision needed.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-05-verity-redis-reader pushed | `git` / origin |
-| OpenSpec | prove-redis-readers-by-pointer | `openspec/changes/` |
+| OpenSpec | prove-redis-readers-by-pointer (archived) | `openspec/changes/archive/2026-09-05-prove-redis-readers-by-pointer/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/12 | pr-host |
-| CI | build 33965673833 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33965673833/job/101305254466 | pr-host CI |
-| Local tests | passed | handoff.yaml localTests; `go test ./pkg/cache ./pkg/simpleredis` |
+| CI | build 33965992999 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33965992999/job/101306106174 | pr-host CI |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | comments: none |
-| Security | None. | destate/codereview.md absent |
-| Performance | None. | destate/codereview.md absent |
+| Security | None. | destate/codereview.md |
+| Performance | None. | destate/codereview.md |
 
 ## Specs
-- [core_cache_redis_in-tree-client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-05-verity-redis-reader/openspec/changes/prove-redis-readers-by-pointer/proposal.md) — modified
+- [core_cache_redis_in-tree-client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-05-verity-redis-reader/openspec/changes/archive/2026-09-05-prove-redis-readers-by-pointer/proposal.md) — modified
 
 ## Follow-up issues
 - [ ] [note] [large] Spec `core_cache_redis_in-tree-client` scenario “MGet is available without cache calling it” still says `pkg/cache` uses `Get` per key — GetMany already landed. Not taken.
 
 ## How this fits together
-Local ticket `2026-09-05-verity-redis-reader` on `master` → PR #12. Implement added `Test_NewKeepsRedisReadersByPointer`. Waiting on CI for this SHA.
+Local ticket `2026-09-05-verity-redis-reader` on `master` → PR #12. This fork was not affected by upstream #381 reader copies; `Test_NewKeepsRedisReadersByPointer` is the proof. Main, mock e2e, and Pester e2e succeeded on 0b5105f.
 
 ## Decision needed
 | Question | Decision | By |
@@ -55,8 +55,7 @@ Local ticket `2026-09-05-verity-redis-reader` on `master` → PR #12. Implement 
 | Should we change `pkg/cache/cache.go` anyway? | assumed — no. Code already holds pointers; Bound the ask is a regression test plus a spec scenario. | explore |
 
 ## Before merge
-- [ ] Wait for CI on 5cb960f to succeed
-- [x] Add a `Client.New` test that fails if Redis readers are copied by value (upstream #381)
+None.
 
 ## Findings
 None.
@@ -74,24 +73,27 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 5cb960f46685de82f406d626a34176aa66cc4bfc | Card must match the branch you measured |
+| Reviewed head | 0b5105fcc4eda568069fd3e4485f0dc2feb66bb8 | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: versus `master`, a `Client.New` pointer-identity test plus a folded spec scenario; production cache unchanged.
+Best possible solution: versus `master`, a `Client.New` pointer-identity test and a folded spec scenario; production cache unchanged.
 
-Do we have a high-confidence way to reproduce? Yes — the new test fails if New aliases readers or `nextReader` returns a struct copy; `go test ./pkg/cache/` passed.
+Do we have a high-confidence way to reproduce? Yes — the new test fails if New aliases readers or `nextReader` returns a struct copy; `go test ./pkg/cache/` passed; CI Main + both e2e jobs succeeded.
 
 Is this the best way to solve the issue? Yes — this fork is not affected; the test is the proof the ticket asked for.
 
 ### Evidence
 What I checked:
 - `go test ./pkg/cache/ ./pkg/simpleredis/ -count=1` passed
-- `go vet ./pkg/cache/` clean
-- `Test_NewKeepsRedisReadersByPointer` added in `pkg/cache/cache_test.go`
-- CI Main Process in progress on run 33965673833
+- Four-axis code review: all none
+- Devdocs impact: none (usage already says hold by pointer)
+- CI Main Process succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33965992999/job/101306106174
+- e2e mock succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33965993015/job/101306106436
+- e2e Pester succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33965993015/job/101306106314
+- Earlier mock e2e failure on 5cb960f (custom-ban-page) did not reproduce on 0b5105f
 
 ### Rank-up moves
 None.

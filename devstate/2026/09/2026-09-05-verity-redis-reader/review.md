@@ -34,3 +34,34 @@ skipped: none
 verdict: in progress
 localTests: passed
 ci: Main Process in progress 33965673833
+
+## codereview (2026-09-05T12:25:23Z)
+phase: codereview
+findings: none
+fixed: none
+skipped: none
+verdict: in progress
+pin: origin/master
+
+## destate-impact (2026-09-05T12:25:23Z)
+phase: destate-impact
+findings: none
+fixed: none
+skipped: none
+
+## archive (2026-09-05T12:25:23Z)
+phase: archive
+findings: none
+fixed: none
+skipped: none
+archived: openspec/changes/archive/2026-09-05-prove-redis-readers-by-pointer
+
+## pullrequest (2026-09-05T12:28:34Z)
+phase: pullrequest
+findings: none
+fixed: none
+skipped: none
+verdict: ready for review
+ci: Main Process succeeded 33965992999; e2e mock + pester succeeded 33965993015
+
+
