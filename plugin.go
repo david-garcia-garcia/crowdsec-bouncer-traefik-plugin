@@ -21,29 +21,34 @@ func CreateConfig() *configuration.Config {
 
 // New is the Traefik Yaegi constructor. It reclaims a CrowdsecConnection and returns a per-router Bouncer.
 func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
-	config.LogLevel = strings.ToUpper(config.LogLevel)
-	log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
+	// Snapshot Traefik's Config so Yaegi's pointer is not rewritten.
+	prepared := *config
+	prepared.LogLevel = strings.ToUpper(prepared.LogLevel)
+	log := logger.NewWithFormat(prepared.LogLevel, prepared.LogFilePath, prepared.LogFormat)
 
-	if config.BanFilePath == "" && config.BanHTMLFilePath != "" {
-		config.BanFilePath = config.BanHTMLFilePath
+	// Deprecated HTML path aliases apply on the snapshot only.
+	if prepared.BanFilePath == "" && prepared.BanHTMLFilePath != "" {
+		prepared.BanFilePath = prepared.BanHTMLFilePath
 	}
-	if config.CaptchaHTMLFilePath != "" {
-		config.CaptchaFilePath = config.CaptchaHTMLFilePath
+	if prepared.CaptchaHTMLFilePath != "" {
+		prepared.CaptchaFilePath = prepared.CaptchaHTMLFilePath
 	}
 
-	err := configuration.ValidateParams(config, log)
+	err := configuration.ValidateParams(&prepared, log)
 	if err != nil {
 		log.Error("New:validateParams " + err.Error())
 		return nil, err
 	}
 
-	prepErr := crowdsecconnection.Prepare(config, log)
+	// Inline secrets and rewrite CAPI routing on the snapshot.
+	prepErr := crowdsecconnection.Prepare(&prepared, log)
 	if prepErr != nil {
 		return nil, prepErr
 	}
 
-	stored, err := reclaim.Open(ctx, crowdsecconnection.Key(config), log, func() (any, error) {
-		return crowdsecconnection.New(config, log, pluginVersion)
+	// Reclaim the Crowdsec backend by identity of the prepared snapshot.
+	stored, err := reclaim.Open(ctx, crowdsecconnection.Key(&prepared), log, func() (any, error) {
+		return crowdsecconnection.New(&prepared, log, pluginVersion)
 	})
 	if err != nil {
 		return nil, err
@@ -52,5 +57,5 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	if !ok {
 		return nil, fmt.Errorf("%s: reclaim: want *crowdsecconnection.CrowdsecConnection, got %T", name, stored)
 	}
-	return bouncer.New(next, name, config, conn, log)
+	return bouncer.New(next, name, &prepared, conn, log)
 }
