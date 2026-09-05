@@ -70,6 +70,21 @@ Decision `type` `ban` and `captcha` SHALL keep their current remediations. Unkno
 - **WHEN** the client IP is inside a Range captcha and a mapped Country ban also matches
 - **THEN** the request is banned, not captcha
 
+### Requirement: Decision remediations are decisionscope codes
+`pkg/decisionscope` SHALL own the ban, captcha, and none cache payloads as `BannedValue` (`t`), `CaptchaValue` (`c`), and `NoBannedValue` (`f`). `RemediationValue` SHALL map LAPI type `ban` to `BannedValue` and `captcha` to `CaptchaValue`. Callers that compare or store a decision remediation SHALL use those names. Wire values MUST remain `t`, `c`, and `f` so existing Redis and memory entries stay valid.
+
+#### Scenario: LAPI ban still stores t
+- **WHEN** a decision type is `ban`
+- **THEN** the cached remediation is `t`
+
+#### Scenario: LAPI captcha still stores c
+- **WHEN** a decision type is `captcha`
+- **THEN** the cached remediation is `c`
+
+#### Scenario: None is f
+- **WHEN** a live miss or inactive lookup stores a none payload
+- **THEN** the cached value is `f`
+
 ### Requirement: Stream Range membership hydrates from the shared blob
 Each stream or alone connection SHALL rebuild in-process Range membership from `range-index` at stream start and on the stream ticker. A ticker that skips LAPI SHALL still hydrate when the blob changed. Rebuild SHALL use separate ban and captcha CIDR sets so a longer captcha prefix cannot hide a containing ban. Client IP SHALL remain the address already produced by `pkg/ip.GetRemoteIP`.
 
