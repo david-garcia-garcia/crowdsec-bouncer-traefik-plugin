@@ -45,3 +45,11 @@ fixed: none
 skipped: none
 head: 650156c64c1d91da00e9adedda0b24df12b2768f
 ci: Main Process success; e2e in progress
+
+## devdocsimpact (2026-09-05)
+phase: devdocsimpact
+findings: 2 stale-usage Key files
+fixed: core_plugin_appsec.md and core_plugin_decisionscope.md Key files
+skipped: none
+head: a5b91618f3855cb147622502aa9cd08ef5275a56
+ci: in progress
