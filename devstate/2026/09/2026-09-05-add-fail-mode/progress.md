@@ -8,7 +8,7 @@ JobName: 2026-09-05-add-fail-mode
 | explore | [x] | [x] | 2026-09-05T12:13:02.444Z |
 | propose | [x] | [x] | 2026-09-05T13:25:01.129Z |
 | implement | [x] | [x] | 2026-09-05T13:36:17.897Z |
-| codereview | [x] | [ ] | |
-| devdocsimpact | [ ] | [ ] | |
-| archive | [ ] | [ ] | |
+| codereview | [x] | [x] | 2026-09-05T13:40:55.310Z |
+| destateimpact | [x] | [ ] | |
+| archive | [x] | [ ] | |
 | pullrequest | [ ] | [ ] | |

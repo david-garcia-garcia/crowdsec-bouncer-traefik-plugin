@@ -10,6 +10,10 @@ _Avoid_: Bouncer, Plugin, process singleton, `sync.Once`
 The per-router `http.Handler` Traefik gets back from `New`. Holds `next`, request policy (trusted IPs, ban/captcha, Enabled, AppSec-on-pass), and a pointer to the reclaimed CrowdsecConnection.
 _Avoid_: ForRoute, Plugin core, the reclaim value
 
+**Failure action**:
+The operator enum (`passthrough` | `ban` | `captcha`) this plugin applies when LAPI or AppSec does not return a usable verdict. LAPI action is on CrowdsecConnection identity; AppSec action is per-router on Bouncer. Default is `ban`.
+_Avoid_: fail mode, FailMode, the three removed AppSec block bools, AppSec JSON `action: captcha`
+
 ## Overview
 
 Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New` must use the constructor `ctx` as the reclaim holder. Do not change `.traefik.yml` `import`.
@@ -23,6 +27,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - Put stream tickers, LAPI HTTP, and cache on CrowdsecConnection. Put captcha and templates on Bouncer.
 - Resolve client IP with `pkg/ip.GetRemoteIP`. Do not parse `RemoteAddr` on the connection.
 - Range and header-mapped CrowdSec scopes live in `pkg/decisionscope`. Do not geolocate in `New` or `ServeHTTP`.
+- Live LAPI error and stream-unhealthy cache miss use `crowdsecLapiFailureAction`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled).
 - Watch logs `reclaim_put|bind|orphan|reclaim|dispose`.
 
 ## Pattern snippet

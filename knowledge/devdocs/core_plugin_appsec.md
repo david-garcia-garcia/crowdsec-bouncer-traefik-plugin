@@ -38,3 +38,4 @@ decision, err := b.conn.AppsecQuery(remoteIP, req, pol)
 - Challenge always arrives as AppSec listener 403 plus JSON `action: challenge`. Browser status is `http_status` (often 200, sometimes 307).
 - Missing `http_status` is 200. Values outside 100–999 use `remediationStatusCode`.
 - Do not send `/crowdsec-internal/challenge/*` to origin.
+- `AppsecQuery` `captcha` failure action is `ErrFailureCaptcha` → `pkg/captcha`. Do not treat that error as AppSec JSON `action: captcha`.
