@@ -6,7 +6,7 @@ JobName: 2026-09-05-scope-headers-identity
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-05T16:26:01Z |
 | explore | [x] | [x] | 2026-09-05T16:28:41Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
