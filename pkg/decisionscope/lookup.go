@@ -57,7 +57,7 @@ func RequestScopeValues(headers map[string]string, req *http.Request) map[string
 // Stream and alone Range hits come from membership, not from a range-index GetMany.
 func LookupCachedRemediation(cacheClient *cache.Client, mode, remoteIP string, scopes map[string]string, membership *RangeMembership) (string, error) {
 	useRangeMembership := mode == configuration.StreamMode || mode == configuration.AloneMode
-	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, scopes, false))
+	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, scopes))
 	if err != nil {
 		return "", err
 	}
@@ -81,12 +81,9 @@ func LookupCachedRemediation(cacheClient *cache.Client, mode, remoteIP string, s
 	return "", errors.New(cache.CacheMiss)
 }
 
-// LookupCacheKeys is the GetMany key list: IP, optional range-index (unused on the request path), then present header scopes.
-func LookupCacheKeys(remoteIP string, scopes map[string]string, useRangeIndex bool) []string {
+// LookupCacheKeys is the GetMany key list for the request path: IP, then present header scopes. Range is not a cache key.
+func LookupCacheKeys(remoteIP string, scopes map[string]string) []string {
 	keys := []string{remoteIP}
-	if useRangeIndex {
-		keys = append(keys, RangeIndexKey)
-	}
 	for scope, identifier := range scopes {
 		if identifier != "" {
 			keys = append(keys, HeaderScopeKey(scope, identifier))
