@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -76,7 +77,7 @@ func (sr *SimpleRedis) Close() {
 	}
 }
 
-// Init sets the redisHost used to connect to redis.
+// Init sets host, password, and database. Call once before concurrent use; not mutex-protected.
 func (sr *SimpleRedis) Init(host, pass, database string) {
 	sr.host = host
 	sr.pass = pass
@@ -134,7 +135,8 @@ func (sr *SimpleRedis) exec(args ...[]byte) ([][]byte, error) {
 	}
 	values, reusable, err := sr.do(conn, args)
 	sr.release(conn, reusable)
-	if err == nil || reusable || !reused {
+	// Timeouts are not retried: a stalled peer will stall the next dial too.
+	if err == nil || reusable || !reused || err == errTimeout {
 		return values, err
 	}
 	// Dead pooled conn: borrow again so Close cannot skip the closed check.
@@ -350,7 +352,8 @@ func replyError(message []byte) error {
 }
 
 func ioError(err error) error {
-	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+	// errors.Is, not a net.Error assert: Yaegi has panicked on that interface across the interpreter boundary.
+	if errors.Is(err, os.ErrDeadlineExceeded) {
 		return errTimeout
 	}
 	return errUnreachable

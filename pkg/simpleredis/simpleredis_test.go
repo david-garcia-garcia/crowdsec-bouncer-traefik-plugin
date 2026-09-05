@@ -402,6 +402,51 @@ func TestAuthAndSelectOncePerDial(t *testing.T) {
 	}
 }
 
+func TestTimeoutOnReusedConnIsNotRetried(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	var accepts int
+	var mu sync.Mutex
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			accepts++
+			mu.Unlock()
+			go func(conn net.Conn) {
+				defer conn.Close()
+				reader := bufio.NewReader(conn)
+				if _, err := readCommand(reader); err != nil {
+					return
+				}
+				io.WriteString(conn, "$1\r\nt\r\n")
+				time.Sleep(3 * time.Second)
+			}(conn)
+		}
+	}()
+
+	var redis SimpleRedis
+	redis.Init(listener.Addr().String(), "", "")
+	if _, err := redis.Get("hit"); err != nil {
+		t.Fatalf("first Get: %v", err)
+	}
+	if _, err := redis.Get("hit"); err == nil || err.Error() != RedisTimeout {
+		t.Fatalf("second Get = %v, want %s", err, RedisTimeout)
+	}
+	mu.Lock()
+	got := accepts
+	mu.Unlock()
+	if got != 1 {
+		t.Fatalf("opened %d connections, want 1 (timeout must not retry)", got)
+	}
+}
+
 func TestIoTimeout(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
