@@ -84,6 +84,7 @@ func (f *fakeRedis) connections() int {
 	return f.conns
 }
 
+// handshakeCounts returns AUTH, SELECT, and GET commands seen on this fake.
 func (f *fakeRedis) handshakeCounts() (auths, selects, gets int) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

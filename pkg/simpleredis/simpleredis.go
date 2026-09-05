@@ -137,7 +137,8 @@ func (sr *SimpleRedis) exec(args ...[]byte) ([][]byte, error) {
 	if err == nil || reusable || !reused {
 		return values, err
 	}
-	conn, err = sr.dial()
+	// Dead pooled conn: borrow again so Close cannot skip the closed check.
+	conn, _, err = sr.borrow()
 	if err != nil {
 		return nil, err
 	}
