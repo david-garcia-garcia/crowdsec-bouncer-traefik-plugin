@@ -63,5 +63,7 @@ fixed: none
 skipped: none
 verdict: ready for review
 ci: Main Process succeeded 33965992999; e2e mock + pester succeeded 33965993015
+retrigger: destate card commit b640af5 hit mock/pester flakes (scope-headers startup; country stream poll); Main still green
+
 
 
