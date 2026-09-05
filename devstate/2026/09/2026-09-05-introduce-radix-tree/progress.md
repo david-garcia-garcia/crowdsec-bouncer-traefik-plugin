@@ -8,7 +8,7 @@ JobName: 2026-09-05-introduce-radix-tree
 | explore | [x] | [x] | 2026-09-05T12:37:55.704Z |
 | propose | [x] | [x] | 2026-09-05T12:41:34.629Z |
 | implement | [x] | [x] | 2026-09-05T13:06:14.149Z |
-| codereview | [ ] | [ ] | |
-| devdocsimpact | [ ] | [ ] | |
-| archive | [ ] | [ ] | |
+| codereview | [x] | [x] | 2026-09-05T13:08:04.277Z |
+| devdocsimpact | [x] | [x] | 2026-09-05T13:08:04.277Z |
+| archive | [x] | [ ] | |
 | pullrequest | [ ] | [ ] | |
