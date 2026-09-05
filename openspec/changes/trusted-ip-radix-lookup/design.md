@@ -29,6 +29,8 @@ See proposal.md — Why. `pkg/ip.Checker` today holds `[]*net.IP` plus `[]*net.I
 
 6. **Identity:** classify `GetRemoteIP` output only.
 
+7. **Yaegi bit-walk loops stay C-style.** `for i := range n` fails Traefik's Yaegi v0.16.1 (`yaegi_test` / plugin load). `intrange` is silenced with `//nolint:intrange` on insert.
+
 ## Risks / Trade-offs
 
 - [Copied algorithm drifts from geoblock] → cite `traefik-geoblock@0c2f46da` in the file header; port its tests.
