@@ -23,3 +23,11 @@ fixed: none
 skipped: none
 change: config-prepare-snapshot
 fold: core_plugin_middleware_instance-reclaim
+
+## implement (2026-09-05)
+
+phase: implement
+findings: none
+fixed: plugin.go copy-then-mutate; TestNew_DoesNotMutateCallerConfig
+skipped: none
+localTests: passed
