@@ -10,5 +10,8 @@ docker-compose.dev.yml
 # across local runs; CI runs on fresh runners so it is recreated every time.
 tests/e2e/mock/.cache/
 
+# Pinned traefik-geoblock clone for real-stack Country e2e (Test-Integration.ps1)
+tests/e2e/real/.geoblock/
+
 # Pester NUnit output from the real-stack suite
 tests/e2e/real/test-results.xml

@@ -198,6 +198,20 @@ function Test-HttpRequest {
     }
 }
 
+# Parse the ISO country code geoblock wrote onto a whoami response body.
+function Get-WhoamiCountryCode {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Content
+    )
+
+    $match = [regex]::Match($Content, '(?im)^X-Ipcountry:\s*([A-Za-z]{2})\s*$')
+    if ($match.Success) {
+        return $match.Groups[1].Value.ToUpperInvariant()
+    }
+    return $null
+}
+
 # Helper function to wait for a specific HTTP status code with timeout
 function Wait-ForHttpStatus {
     param(

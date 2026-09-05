@@ -14,7 +14,7 @@ BeforeAll {
     $script:NoneOutside = "10.56.1.8"
     $script:StreamRange = "10.57.0.0/16"
     $script:StreamInside = "10.57.1.8"
-    $script:HeaderIP = "172.19.0.80"
+    $script:PublicIP = "8.8.8.8"
 
     $result = Wait-ForCondition -Description "CrowdSec LAPI to be ready" -TimeoutSeconds 60 -RetryIntervalSeconds 2 -Condition {
         Invoke-CrowdSecAPI -Endpoint "/v1/decisions?limit=1" -TimeoutSec 5 -ApiKey $script:ApiKey -CrowdSecApiUrl $script:CrowdSecApiUrl
@@ -70,37 +70,45 @@ Describe "CrowdSec Range and header-mapped scopes" {
         }
     }
 
-    Context "Country header in none mode" -Tag "scopes" {
+    Context "Country via geoblock enrich in none mode" -Tag "scopes" {
         BeforeEach {
             Clear-TraefikAccessLogs
             Remove-AllTestDecisions
         }
 
-        It "Should block when the mapped Country header matches and skip when it does not" {
-            Add-TestScopeDecision -Scope "Country" -Value "FR" -Type "ban"
+        It "Should block a public IP after CrowdSec bans the enriched country" {
+            $probe = Test-HttpRequest -Endpoint "/scope-none" -IP $script:PublicIP -TraefikUrl $script:TraefikUrl
+            $probe.StatusCode | Should -Be 200
+            $country = Get-WhoamiCountryCode -Content $probe.Content
+            $country | Should -Match '^[A-Z]{2}$' -Because "geoblock must enrich X-IPCountry for a public IP"
+            $country | Should -Not -BeIn @("XX", "T1")
 
-            $blocked = Test-HttpRequest -Endpoint "/scope-none" -IP $script:HeaderIP -TraefikUrl $script:TraefikUrl -ExtraHeaders @{ "CF-IPCountry" = "fr" }
+            Add-TestScopeDecision -Scope "Country" -Value $country -Type "ban"
+
+            $blocked = Test-HttpRequest -Endpoint "/scope-none" -IP $script:PublicIP -TraefikUrl $script:TraefikUrl
             $blocked.StatusCode | Should -BeIn @(403, 429)
 
-            $other = Test-HttpRequest -Endpoint "/scope-none" -IP $script:HeaderIP -TraefikUrl $script:TraefikUrl -ExtraHeaders @{ "CF-IPCountry" = "DE" }
-            $other.StatusCode | Should -Be 200
-
-            $missing = Test-HttpRequest -Endpoint "/scope-none" -IP $script:HeaderIP -TraefikUrl $script:TraefikUrl
-            $missing.StatusCode | Should -Be 200
+            $private = Test-HttpRequest -Endpoint "/scope-none" -IP $script:NoneInside -TraefikUrl $script:TraefikUrl
+            $private.StatusCode | Should -Be 200 -Because "PRIVATE country from a RFC1918 IP must skip Country matching"
         }
     }
 
-    Context "Country header in stream mode" -Tag "scopes" {
+    Context "Country via geoblock enrich in stream mode" -Tag "scopes" {
         BeforeEach {
             Clear-TraefikAccessLogs
             Remove-AllTestDecisions
         }
 
-        It "Should block after the stream poll when the mapped Country header matches" {
-            Add-TestScopeDecision -Scope "Country" -Value "US" -Type "ban"
+        It "Should block after the stream poll when CrowdSec bans the enriched country" {
+            $probe = Test-HttpRequest -Endpoint "/scope-stream" -IP $script:PublicIP -TraefikUrl $script:TraefikUrl
+            $probe.StatusCode | Should -Be 200
+            $country = Get-WhoamiCountryCode -Content $probe.Content
+            $country | Should -Match '^[A-Z]{2}$' -Because "geoblock must enrich X-IPCountry for a public IP"
 
-            $result = Wait-ForCondition -Description "Stream mode to block Country US" -TimeoutSeconds 30 -RetryIntervalSeconds 2 -Condition {
-                $response = Test-HttpRequest -Endpoint "/scope-stream" -IP $script:HeaderIP -TraefikUrl $script:TraefikUrl -ExtraHeaders @{ "CF-IPCountry" = "us" }
+            Add-TestScopeDecision -Scope "Country" -Value $country -Type "ban"
+
+            $result = Wait-ForCondition -Description "Stream mode to block Country $country" -TimeoutSeconds 30 -RetryIntervalSeconds 2 -Condition {
+                $response = Test-HttpRequest -Endpoint "/scope-stream" -IP $script:PublicIP -TraefikUrl $script:TraefikUrl
                 return ($response.StatusCode -in @(403, 429))
             }
             $result.Success | Should -Be $true -Because "Stream scopes= must include Country"

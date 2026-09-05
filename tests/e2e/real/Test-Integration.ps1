@@ -150,6 +150,25 @@ try {
     Write-Step "Cleaning up any existing services..."
     docker compose -f $ComposeFile down -v --remove-orphans 2>$null
 
+    # Pin traefik-geoblock for Country e2e (enrich writes X-IPCountry). Not committed.
+    $geoblockDir = Join-Path $PSScriptRoot ".geoblock"
+    $geoblockTag = "v1.2.0"
+    $geoblockPlugin = Join-Path $geoblockDir "plugin.go"
+    if (-not (Test-Path $geoblockPlugin)) {
+        Write-Step "Cloning traefik-geoblock $geoblockTag for Country e2e..."
+        if (Test-Path $geoblockDir) {
+            Remove-Item -Recurse -Force $geoblockDir
+        }
+        git clone --depth 1 --branch $geoblockTag https://github.com/david-garcia-garcia/traefik-geoblock.git $geoblockDir
+        if ($LASTEXITCODE -ne 0) {
+            Write-StepError "Failed to clone traefik-geoblock $geoblockTag"
+            exit 1
+        }
+        Write-Success "traefik-geoblock $geoblockTag cloned"
+    } else {
+        Write-Success "traefik-geoblock source already present"
+    }
+
     # Start Docker services
     Write-Step "Starting Docker Compose services for testing..."
     try {
@@ -173,6 +192,8 @@ try {
             (Wait-ForHttpStatus -Url "http://localhost:8000/whoami" -ExpectedStatusCodes @(200) -TimeoutSeconds 60).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/redis-cache" -ExpectedStatusCodes @(200) -TimeoutSeconds 60).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/hold-redis" -ExpectedStatusCodes @(200) -TimeoutSeconds 60).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/scope-none" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/scope-stream" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
             (Wait-ForCondition -Description "CrowdSec LAPI" -TimeoutSeconds 180 -RetryIntervalSeconds 3 -Condition {
                 Invoke-CrowdSecAPI -Endpoint "/v1/decisions?limit=1" -TimeoutSec 5 -ApiKey $env:BOUNCER_API_KEY
                 return $true
