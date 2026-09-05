@@ -9,37 +9,40 @@ import (
 	"net"
 	"net/http"
 	"strings"
+
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/iplookup"
 )
 
 // CHECKER
 
 // Checker allows to check that addresses are in a trusted IPs.
 type Checker struct {
-	authorizedIPs    []*net.IP
-	authorizedIPsNet []*net.IPNet
+	trustedCIDRs *iplookup.Helper
 }
 
 // NewChecker builds a new Checker given a list of CIDR-Strings to trusted IPs.
 func NewChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
-	checker := &Checker{}
+	trustedCIDRs := iplookup.NewEmptyHelper()
 
 	for _, ipMaskRaw := range trustedIPs {
 		ipMask := strings.TrimSpace(ipMaskRaw)
+		// Bare addresses enter the tree as a host prefix.
 		if ipAddr := net.ParseIP(ipMask); ipAddr != nil {
-			checker.authorizedIPs = append(checker.authorizedIPs, &ipAddr)
+			if err := trustedCIDRs.AddCIDR(hostCIDR(ipAddr)); err != nil {
+				return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipMask, err)
+			}
 			log.Debug(fmt.Sprintf("IP %v is trusted", ipAddr))
 			continue
 		}
 
-		_, ipAddr, err := net.ParseCIDR(ipMask)
-		if err != nil {
-			return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipAddr, err)
+		// CIDR strings are inserted as given (not rewritten to a host prefix).
+		if err := trustedCIDRs.AddCIDR(ipMask); err != nil {
+			return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipMask, err)
 		}
-		checker.authorizedIPsNet = append(checker.authorizedIPsNet, ipAddr)
-		log.Debug(fmt.Sprintf("IP network %v is trusted", ipAddr))
+		log.Debug(fmt.Sprintf("IP network %v is trusted", ipMask))
 	}
 
-	return checker, nil
+	return &Checker{trustedCIDRs: trustedCIDRs}, nil
 }
 
 // Contains checks if provided address is in the trusted IPs.
@@ -58,19 +61,25 @@ func (ip *Checker) Contains(addr string) (bool, error) {
 
 // ContainsIP checks if provided address is in the trusted IPs.
 func (ip *Checker) ContainsIP(addr net.IP) bool {
-	for _, authorizedIP := range ip.authorizedIPs {
-		if authorizedIP.Equal(addr) {
-			return true
-		}
+	// An uninitialized Checker trusts nothing.
+	if ip.trustedCIDRs == nil {
+		return false
 	}
-
-	for _, authorizedNet := range ip.authorizedIPsNet {
-		if authorizedNet.Contains(addr) {
-			return true
-		}
+	// Boolean any-match: ignore longest-prefix length.
+	found, _, err := ip.trustedCIDRs.IsContained(addr)
+	// Nil IP is an error from the helper and is not trusted.
+	if err != nil {
+		return false
 	}
+	return found
+}
 
-	return false
+// hostCIDR formats a bare address as a host prefix for the lookup helper.
+func hostCIDR(addr net.IP) string {
+	if v4 := addr.To4(); v4 != nil {
+		return v4.String() + "/32"
+	}
+	return addr.String() + "/128"
 }
 
 func parseIP(addr string) (net.IP, error) {
