@@ -6,7 +6,7 @@ JobName: 2026-09-05-split-configuration-files
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-05T16:26:14.703Z |
 | explore | [x] | [x] | 2026-09-05T16:29:00.526Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |

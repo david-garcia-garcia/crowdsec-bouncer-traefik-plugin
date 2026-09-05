@@ -84,5 +84,5 @@ IssueKey: 2026-09-05-split-configuration-files
   By: explore
 
 - Q: Which spec leaf hosts the file-owner and TLS-builder requirements?
-  Decision: assumed — **new** `core_plugin_config_file-owners` (FindSpecHost at propose). Not a small adjustment to `core_plugin_middleware_instance-reclaim` (that leaf is reclaim/`New`, not config-file jobs). CreateConfig-on-root stays on the middleware spec unchanged.
-  By: explore
+  Decision: resolved — **new** `core_plugin_config_file-owners` (FindSpecHost at propose: not a small adjustment to `core_plugin_middleware_instance-reclaim`; candidates: that leaf and `core_plugin_config_file-owners`; confidence medium).
+  By: propose
