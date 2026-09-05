@@ -39,3 +39,10 @@ findings: none
 fixed: reclaim CrowdsecConnection; isolated cache; dual-bouncer mock e2e; CI green on a72cb8c
 skipped: logger OpenFile close (note large)
 head: a72cb8c374fa227d27503352c19886bbe5888d91
+
+## codereview (2026-09-05T08:29:39.778Z)
+phase: codereview
+findings: P3 11 hard Leave a trail / Name for the scope; 1 judgement Duplicated Code
+fixed: version bump path, stale log prefixes, job comments, routeHandler local
+skipped: decisionRemediation helper (judgement)
+head: 7ae1d26582a9552669d0fdbffc9dd67ed297773c

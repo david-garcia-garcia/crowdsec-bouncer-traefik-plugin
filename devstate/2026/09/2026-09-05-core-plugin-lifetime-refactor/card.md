@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-05T08:21:46.900Z
+Developer review: in progress — 2026-09-05T08:29:39.778Z
 
 ## What this changes
-**Operators.** Two Crowdsec bouncer middlewares in one Traefik now keep isolated LAPI streams and caches. Same connection fields still share one backend; different LAPI/mode/redis/interval are two live backends. Watch debug lines `reclaim_put|bind|orphan|reclaim|dispose`.
+**Operators.** Two Crowdsec bouncer middlewares in one Traefik now keep isolated LAPI streams and caches. Same connection fields still share one backend; different LAPI/mode/redis/interval are two live backends. Watch debug lines `reclaim_put|bind|orphan|reclaim|dispose`. Release workflows bump `crowdsecconnection.Version` in `pkg/crowdsecconnection/version.go`.
 
 **Admin users.** None.
 
-**Developers.** Root `plugin.go` `New` reclaims `*crowdsecconnection.CrowdsecConnection` by connection-field hash (not middleware name) and returns `pkg/bouncer` ForRoute. Memory cache is per Client; Redis keys are prefixed with that identity. Mock e2e `dual-bouncer` covers two middlewares / two LAPIs.
+**Developers.** Root `plugin.go` `New` reclaims `*crowdsecconnection.CrowdsecConnection` by connection-field hash (not middleware name) and returns `pkg/bouncer` per-router handler. Memory cache is per Client; Redis keys are prefixed with that identity. Mock e2e `dual-bouncer` covers two middlewares / two LAPIs.
 
 **End users.** A client IP can be banned on one Crowdsec backend and allowed on another in the same Traefik process.
 
@@ -13,31 +13,31 @@ Developer review: in progress — 2026-09-05T08:21:46.900Z
 On `master`, stream ticker, decision cache, and LAPI health are process globals, so a second Crowdsec bouncer config in the same Traefik is first-wins. Operators cannot run two backends or compare configs side-by-side. Without this change that sharing stays the product.
 
 ## Merge readiness
-Implement is on `a72cb8c` with green CI. Code review, usage docs, and archive still remain. 3 items remain.
+Code review applied 11 hard trail fixes on `7ae1d26`. CI on this head is still running. Usage docs and archive remain. 3 items remain.
 
 Priority: P2 — operators cannot run two Crowdsec configs in one Traefik; workaround is a second Traefik
-Reviewed head: a72cb8c
+Reviewed head: 7ae1d26
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | CI succeeded on the implement head |
-| CI proof | 6/6 | All three required checks succeeded on `a72cb8c` |
+| Overall readiness | 3/6 | CI on the review-fix head is still in progress |
+| CI proof | 3/6 | All three required checks in progress on `7ae1d26` |
 | Local tests proof | N/A | Remote PR; CI covers it |
 | Review resolution | 6/6 | No PR comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-05-core-plugin-lifetime-refactor pushed | `git` `a72cb8c374fa227d27503352c19886bbe5888d91` |
+| Branch | 2026-09-05-core-plugin-lifetime-refactor pushed | `git` `7ae1d26582a9552669d0fdbffc9dd67ed297773c` |
 | OpenSpec | crowdsec-connection-bouncer-split | `openspec/changes/crowdsec-connection-bouncer-split/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/6 | GitHub PR list |
-| CI | Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33954888144/job/101276285360 ; e2e (binary + mock LAPI) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33954888143/job/101276285745 ; e2e (docker + pester) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33954888143/job/101276285558 | GitHub check runs |
+| CI | Main Process in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33955403166/job/101277731644 ; e2e (binary + mock LAPI) in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33955403160/job/101277731835 ; e2e (docker + pester) in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33955403160/job/101277731696 | GitHub check runs |
 | Local tests | passed | handoff.yaml localTests (`go test` except known Windows log TempDir) |
 | PR comments | no comments | GitHub PR comments |
-| Security | None. | no codereview.md yet |
-| Performance | None. | no codereview.md yet |
+| Security | None. | devstate/codereview.md |
+| Performance | None. | devstate/codereview.md |
 
 ## Specs
 - [core_plugin_middleware_instance-reclaim](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-05-core-plugin-lifetime-refactor/openspec/changes/crowdsec-connection-bouncer-split/proposal.md) — added
@@ -52,23 +52,23 @@ Owner decision: Required. See Decision needed.
 - [ ] [note] [large] `pkg/logger` never closes `OpenFile`; Windows logging tests fail TempDir cleanup.
 
 ## How this fits together
-Worktree from `origin/master`. Stub PR #6 is the durable card. Implement split is green; remaining phases are code review, usage docs, archive, ready title.
+Worktree from `origin/master`. Stub PR #6 is the durable card. Code review hard trail fixes are on `7ae1d26`; remaining work is usage docs, archive, and a ready title.
 
 ## Decision needed
 | Question | Decision | By |
 | --- | --- | --- |
 | Must CreateConfig/New stay in the module-root package? | assumed — yes; thin root to plugin.go | explore |
 | Does captcha live on Connection or Bouncer? | assumed — Bouncer | explore |
-| Does AppSec live on Connection or Bouncer? | assumed — Connection owns client+host; Bouncer calls on pass when enabled | explore |
+| Does AppSec live on Connection or Bouncer? | assumed — Connection owns client+host; Bouncer calls on pass when that route has AppSec enabled | explore |
 | Type spelling CrowdSecConnection vs CrowdsecConnection? | assumed — CrowdsecConnection / crowdsecconnection | explore |
 
 ## Before merge
-- [ ] Code review, usage docs, archive the OpenSpec change
+- [ ] Usage docs and archive the OpenSpec change
 - [ ] Drop the 🚧 stub title
-- [x] CI succeeded on `a72cb8c`
+- [ ] CI succeeded on `7ae1d26`
 
 ## Findings
-None.
+- [P3] Stale logs, comments, and release Version trail after the Connection/Bouncer split — FIX — applied on `7ae1d26`. Path: `pkg/crowdsecconnection/version.go`. Reply none.
 
 ## Agent review details
 
@@ -83,13 +83,13 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 4 added / 0 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | a72cb8c374fa227d27503352c19886bbe5888d91 | Card must match the branch you measured |
+| Reviewed head | 7ae1d26582a9552669d0fdbffc9dd67ed297773c | Card must match the branch you measured |
 
 ### Stored data model
 Redis cache keys are now prefixed with the connection identity hex when redis is enabled. Memory mode is a private map per Client (not a process dump). No migration of existing Redis keys — two Connections that previously shared keys now isolate.
 
 ### Technical review
-Best possible solution: Copy `pkg/reclaim`; store CrowdsecConnection as the incarnation keyed by connection fields; Bouncer is ForRoute. Isolated cache so two backends cannot share remediations.
+Best possible solution: Copy `pkg/reclaim`; store CrowdsecConnection as the incarnation keyed by connection fields; Bouncer is the per-router handler. Isolated cache so two backends cannot share remediations.
 
 Do we have a high-confidence way to reproduce? Yes — two httptest LAPIs in `plugin_test.go`; mock e2e `dual-bouncer`.
 
@@ -97,8 +97,8 @@ Is this the best way to solve the issue? Yes vs `master`: connection-field key (
 
 ### Evidence
 What I checked:
-- `go test` on new packages and plugin tests (Windows logging TempDir still fails as on master)
-- GitHub check runs on `a72cb8c` all success
+- Four-axis review of `origin/master...HEAD` (Standards / Spec / Security / Performance)
+- GitHub check runs on `7ae1d26` all in progress
 
 ### Rank-up moves
-None.
+- Extract one `decisionRemediation` helper for the duplicated ban/captcha/default switch in stream vs live (judgement, not applied)
