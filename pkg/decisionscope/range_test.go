@@ -50,7 +50,7 @@ func TestAddRangeUpdatesRemediation(t *testing.T) {
 func TestLookupCachedRemediationHeaderScope(t *testing.T) {
 	client := newTestDecisionCache()
 	client.Set(HeaderScopeKey(ScopeCountry, "FR"), cache.BannedValue, 60)
-	got, err := LookupCachedRemediation(client, "stream", "203.0.113.10", map[string]string{ScopeCountry: "FR"}, nil)
+	got, err := LookupCachedRemediation(client, true, "203.0.113.10", map[string]string{ScopeCountry: "FR"}, nil)
 	if err != nil || got != cache.BannedValue {
 		t.Fatalf("got %q %v, want ban", got, err)
 	}
@@ -58,7 +58,7 @@ func TestLookupCachedRemediationHeaderScope(t *testing.T) {
 
 func TestLookupCachedRemediationMiss(t *testing.T) {
 	client := newTestDecisionCache()
-	_, err := LookupCachedRemediation(client, "stream", "203.0.113.10", nil, nil)
+	_, err := LookupCachedRemediation(client, true, "203.0.113.10", nil, nil)
 	if err == nil || err.Error() != cache.CacheMiss {
 		t.Fatalf("want cache miss, got %v", err)
 	}
@@ -68,7 +68,7 @@ func TestLookupCachedRemediationBanWinsAcrossScopes(t *testing.T) {
 	client := newTestDecisionCache()
 	AddRange(client, "10.0.0.0/8", cache.CaptchaValue, 60)
 	client.Set(HeaderScopeKey(ScopeCountry, "FR"), cache.BannedValue, 60)
-	got, err := LookupCachedRemediation(client, "stream", "10.1.2.3", map[string]string{ScopeCountry: "FR"}, MembershipFromIndex(readRangeIndex(client)))
+	got, err := LookupCachedRemediation(client, true, "10.1.2.3", map[string]string{ScopeCountry: "FR"}, MembershipFromIndex(readRangeIndex(client)))
 	if err != nil || got != cache.BannedValue {
 		t.Fatalf("range captcha + country ban got %q %v, want ban", got, err)
 	}
@@ -92,7 +92,7 @@ func TestApplyRangeBatchOneWrite(t *testing.T) {
 func TestLookupCachedRemediationNoneSkipsRangeIndex(t *testing.T) {
 	client := newTestDecisionCache()
 	AddRange(client, "10.0.0.0/8", cache.BannedValue, 60)
-	got, err := LookupCachedRemediation(client, "none", "10.1.2.3", nil, MembershipFromIndex(readRangeIndex(client)))
+	got, err := LookupCachedRemediation(client, false, "10.1.2.3", nil, MembershipFromIndex(readRangeIndex(client)))
 	if err == nil || err.Error() != cache.CacheMiss {
 		t.Fatalf("none mode should miss range-index, got %q %v", got, err)
 	}
@@ -102,11 +102,11 @@ func TestLookupCachedRemediationStreamUsesMembershipNotBlob(t *testing.T) {
 	client := newTestDecisionCache()
 	AddRange(client, "10.0.0.0/8", cache.CaptchaValue, 60)
 	banOnly := MembershipFromIndex("10.0.0.0/8=" + cache.BannedValue)
-	got, err := LookupCachedRemediation(client, "stream", "10.1.2.3", nil, banOnly)
+	got, err := LookupCachedRemediation(client, true, "10.1.2.3", nil, banOnly)
 	if err != nil || got != cache.BannedValue {
 		t.Fatalf("membership must win over unread blob, got %q %v", got, err)
 	}
-	_, missErr := LookupCachedRemediation(client, "stream", "10.1.2.3", nil, MembershipFromIndex(""))
+	_, missErr := LookupCachedRemediation(client, true, "10.1.2.3", nil, MembershipFromIndex(""))
 	if missErr == nil || missErr.Error() != cache.CacheMiss {
 		t.Fatalf("empty membership must not read blob, got %v", missErr)
 	}

@@ -150,7 +150,9 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	scopes := decisionscope.RequestScopeValues(b.decisionScopeHeaders, req)
 
 	if b.conn.Mode() != configuration.NoneMode {
-		value, cacheErr := decisionscope.LookupCachedRemediation(b.conn.Cache(), b.conn.Mode(), remoteIP, scopes, b.conn.RangeMembership())
+		// Stream and alone consult Range membership; live does not.
+		useRangeMembership := b.conn.Mode() == configuration.StreamMode || b.conn.Mode() == configuration.AloneMode
+		value, cacheErr := decisionscope.LookupCachedRemediation(b.conn.Cache(), useRangeMembership, remoteIP, scopes, b.conn.RangeMembership())
 		switch {
 		case cacheErr != nil:
 			cacheErrString := cacheErr.Error()

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
-	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
 // IsActiveRemediation reports whether value is ban or captcha.
@@ -54,9 +53,8 @@ func RequestScopeValues(headers map[string]string, req *http.Request) map[string
 }
 
 // LookupCachedRemediation merges Ip, Range, and present header-scope hits. Ban wins across those scopes.
-// Stream and alone Range hits come from membership, not from a range-index GetMany.
-func LookupCachedRemediation(cacheClient *cache.Client, mode, remoteIP string, scopes map[string]string, membership *RangeMembership) (string, error) {
-	useRangeMembership := mode == configuration.StreamMode || mode == configuration.AloneMode
+// When useRangeMembership is true, Range hits come from membership, not from a range-index GetMany.
+func LookupCachedRemediation(cacheClient *cache.Client, useRangeMembership bool, remoteIP string, scopes map[string]string, membership *RangeMembership) (string, error) {
 	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, scopes))
 	if err != nil {
 		return "", err

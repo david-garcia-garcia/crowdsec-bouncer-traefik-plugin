@@ -25,7 +25,7 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 ## How to use
 
 - Pass `decisionScopeHeaders` from config into the connection (stream `scopes=` and live `scope`+`value` queries) and into the bouncer (request headers).
-- Resolve the client IP with `pkg/ip.GetRemoteIP`. Then `LookupCachedRemediation` with `conn.RangeMembership()` in stream/alone/live cache hits.
+- Resolve the client IP with `pkg/ip.GetRemoteIP`. Then `LookupCachedRemediation` with `useRangeMembership` true for stream/alone (and `conn.RangeMembership()`).
 - Stream Range items: collect the tick, then `ApplyRangeBatch` (one read, one write). Hydrate membership from the blob after apply and on a lease hit. Do not GET+SET per Range line.
 - Live/none: keep `?ip=` (LAPI expands Range). Add `scope`+`value` when a mapped header is present. Skip `range-index` and membership on none.
 - CAPI (alone) omits `scopes=`. Apply any streamed scope this bouncer is configured to match.
@@ -34,7 +34,7 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 
 ```go
 scopes := decisionscope.RequestScopeValues(headers, req)
-value, err := decisionscope.LookupCachedRemediation(cacheClient, mode, remoteIP, scopes, conn.RangeMembership())
+value, err := decisionscope.LookupCachedRemediation(cacheClient, useRangeMembership, remoteIP, scopes, conn.RangeMembership())
 ```
 
 ## Key files
