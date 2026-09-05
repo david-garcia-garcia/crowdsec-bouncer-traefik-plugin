@@ -28,3 +28,13 @@ skipped: none
 change: split-configuration-files
 spec: core_plugin_config_file-owners (new)
 head: 9b3ed0ed2ed41df7f5f27cc1e1803cef2f0dd16b
+
+## implement (2026-09-05)
+
+phase: implement
+findings: mock captcha e2e timed out at 15s; retried; aligned wait to 45s
+fixed: split configuration files; moved TLS to crowdsecconnection/tls.go; captcha e2e wait 45s
+skipped: none
+localTests: passed
+ci: 33978900213 Main Process success; 33978900205 e2e success
+head: 2fe6288dc50ca5a850874034c8b369a30a5ebce7
