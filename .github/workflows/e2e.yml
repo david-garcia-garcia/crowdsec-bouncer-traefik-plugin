@@ -30,6 +30,18 @@ jobs:
       # them, while make still exits non-zero if any scenario failed.
       - name: Run mock scenarios
         run: make -k e2e_mock
+      - name: Surface mock logs as annotations
+        if: failure()
+        run: |
+          shopt -s nullglob
+          logs=(/tmp/e2e-mock-*.log)
+          if [ ${#logs[@]} -eq 0 ]; then
+            echo "::error::mock e2e failed with no /tmp/e2e-mock-*.log"
+            exit 0
+          fi
+          for f in "${logs[@]}"; do
+            echo "::error::$(basename "$f"): $(tr '\n' ' ' < "$f" | head -c 1800)"
+          done
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v7
