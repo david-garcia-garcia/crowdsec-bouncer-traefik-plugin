@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -60,7 +61,7 @@ type SimpleRedis struct {
 	closed bool
 }
 
-// Close drains idle pooled connections and stops pooling. In-flight commands still finish; their sockets are closed on release. Safe to call more than once.
+// Close drains idle pooled connections and stops pooling. Further Get/Set/Del/MGet return redis:unreachable and do not dial. In-flight commands still finish; their sockets are closed on release. Safe to call more than once.
 func (sr *SimpleRedis) Close() {
 	sr.mu.Lock()
 	if sr.closed {
@@ -76,7 +77,7 @@ func (sr *SimpleRedis) Close() {
 	}
 }
 
-// Init sets the redisHost used to connect to redis.
+// Init sets host, password, and database. Call once before concurrent use; not mutex-protected.
 func (sr *SimpleRedis) Init(host, pass, database string) {
 	sr.host = host
 	sr.pass = pass
@@ -134,10 +135,12 @@ func (sr *SimpleRedis) exec(args ...[]byte) ([][]byte, error) {
 	}
 	values, reusable, err := sr.do(conn, args)
 	sr.release(conn, reusable)
-	if err == nil || reusable || !reused {
+	// Timeouts are not retried: a stalled peer will stall the next dial too.
+	if err == nil || reusable || !reused || err == errTimeout {
 		return values, err
 	}
-	conn, err = sr.dial()
+	// Dead pooled conn: borrow again so Close cannot skip the closed check.
+	conn, _, err = sr.borrow()
 	if err != nil {
 		return nil, err
 	}
@@ -152,6 +155,10 @@ func (sr *SimpleRedis) borrow() (*pooledConn, bool, error) {
 	now := time.Now()
 
 	sr.mu.Lock()
+	if sr.closed {
+		sr.mu.Unlock()
+		return nil, false, errUnreachable
+	}
 	for len(sr.idle) > 0 {
 		conn := sr.idle[len(sr.idle)-1]
 		sr.idle = sr.idle[:len(sr.idle)-1]
@@ -168,6 +175,13 @@ func (sr *SimpleRedis) borrow() (*pooledConn, bool, error) {
 	}
 	if reused != nil {
 		return reused, true, nil
+	}
+
+	sr.mu.Lock()
+	closed := sr.closed
+	sr.mu.Unlock()
+	if closed {
+		return nil, false, errUnreachable
 	}
 	conn, err := sr.dial()
 	return conn, false, err
@@ -338,7 +352,8 @@ func replyError(message []byte) error {
 }
 
 func ioError(err error) error {
-	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+	// errors.Is, not a net.Error assert: Yaegi has panicked on that interface across the interpreter boundary.
+	if errors.Is(err, os.ErrDeadlineExceeded) {
 		return errTimeout
 	}
 	return errUnreachable

@@ -8,12 +8,16 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 )
 
 type fakeRedis struct {
-	mu    sync.Mutex
-	store map[string]string
-	conns int
+	mu      sync.Mutex
+	store   map[string]string
+	conns   int
+	auths   int
+	selects int
+	gets    int
 }
 
 func startFakeRedis(t *testing.T, store map[string]string) (*fakeRedis, string) {
@@ -50,7 +54,14 @@ func (f *fakeRedis) serve(conn net.Conn) {
 		}
 		f.mu.Lock()
 		switch args[0] {
+		case "AUTH":
+			f.auths++
+			io.WriteString(conn, "+OK\r\n")
+		case "SELECT":
+			f.selects++
+			io.WriteString(conn, "+OK\r\n")
 		case "GET":
+			f.gets++
 			io.WriteString(conn, bulk(f.store, args[1]))
 		case "MGET":
 			fmt.Fprintf(conn, "*%d\r\n", len(args)-1)
@@ -73,6 +84,12 @@ func (f *fakeRedis) connections() int {
 	return f.conns
 }
 
+// handshakeCounts returns AUTH, SELECT, and GET commands seen on this fake.
+func (f *fakeRedis) handshakeCounts() (auths, selects, gets int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.auths, f.selects, f.gets
+}
 func bulk(store map[string]string, name string) string {
 	value, found := store[name]
 	if !found {
@@ -355,13 +372,123 @@ func TestCloseDrainsIdleAndDoesNotRepool(t *testing.T) {
 	}
 	redis.Close()
 
-	if _, err := redis.Get("hit"); err != nil {
-		t.Fatalf("Get after Close: %v", err)
+	if _, err := redis.Get("hit"); err == nil || err.Error() != RedisUnreachable {
+		t.Fatalf("Get after Close = %v, want %s", err, RedisUnreachable)
 	}
-	if fake.connections() != 2 {
-		t.Fatalf("Get after Close opened %d connections, want 2", fake.connections())
+	if fake.connections() != 1 {
+		t.Fatalf("Get after Close opened %d connections, want 1", fake.connections())
 	}
 	if len(redis.idle) != 0 {
 		t.Fatalf("release after Close idle = %d, want 0", len(redis.idle))
+	}
+}
+
+func TestAuthAndSelectOncePerDial(t *testing.T) {
+	fake, addr := startFakeRedis(t, map[string]string{"hit": "t"})
+	var redis SimpleRedis
+	redis.Init(addr, "secret", "2")
+
+	for i := 0; i < 3; i++ {
+		if _, err := redis.Get("hit"); err != nil {
+			t.Fatalf("Get %d: %v", i, err)
+		}
+	}
+	auths, selects, gets := fake.handshakeCounts()
+	if fake.connections() != 1 {
+		t.Fatalf("opened %d connections, want 1", fake.connections())
+	}
+	if auths != 1 || selects != 1 || gets != 3 {
+		t.Fatalf("AUTH=%d SELECT=%d GET=%d, want 1, 1, 3", auths, selects, gets)
+	}
+}
+
+func TestTimeoutOnReusedConnIsNotRetried(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	var accepts int
+	var mu sync.Mutex
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			accepts++
+			mu.Unlock()
+			go func(conn net.Conn) {
+				defer conn.Close()
+				reader := bufio.NewReader(conn)
+				if _, err := readCommand(reader); err != nil {
+					return
+				}
+				io.WriteString(conn, "$1\r\nt\r\n")
+				time.Sleep(3 * time.Second)
+			}(conn)
+		}
+	}()
+
+	var redis SimpleRedis
+	redis.Init(listener.Addr().String(), "", "")
+	if _, err := redis.Get("hit"); err != nil {
+		t.Fatalf("first Get: %v", err)
+	}
+	if _, err := redis.Get("hit"); err == nil || err.Error() != RedisTimeout {
+		t.Fatalf("second Get = %v, want %s", err, RedisTimeout)
+	}
+	mu.Lock()
+	got := accepts
+	mu.Unlock()
+	if got != 1 {
+		t.Fatalf("opened %d connections, want 1 (timeout must not retry)", got)
+	}
+}
+
+func TestIoTimeout(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		time.Sleep(3 * time.Second)
+	}()
+
+	var redis SimpleRedis
+	redis.Init(listener.Addr().String(), "", "")
+	if _, err := redis.Get("hit"); err == nil || err.Error() != RedisTimeout {
+		t.Fatalf("Get = %v, want %s", err, RedisTimeout)
+	}
+}
+
+func TestIdleTimeoutOpensANewConnection(t *testing.T) {
+	fake, addr := startFakeRedis(t, map[string]string{"hit": "t"})
+	var redis SimpleRedis
+	redis.Init(addr, "", "")
+
+	if _, err := redis.Get("hit"); err != nil {
+		t.Fatalf("first Get: %v", err)
+	}
+	redis.mu.Lock()
+	if len(redis.idle) != 1 {
+		redis.mu.Unlock()
+		t.Fatalf("idle = %d, want 1", len(redis.idle))
+	}
+	redis.idle[0].lastUsed = time.Now().Add(-idleTimeout - time.Second)
+	redis.mu.Unlock()
+
+	if _, err := redis.Get("hit"); err != nil {
+		t.Fatalf("Get after idle timeout: %v", err)
+	}
+	if fake.connections() != 2 {
+		t.Fatalf("opened %d connections, want 2", fake.connections())
 	}
 }

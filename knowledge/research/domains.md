@@ -5,3 +5,4 @@
 - crowdsec
 - simpleredis
 - dragonfly
+- redis

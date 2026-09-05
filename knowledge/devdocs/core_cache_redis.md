@@ -38,7 +38,7 @@ value, err := r.Get(key)
 ## Gotchas
 
 - Do not copy `SimpleRedis` by value after `Init`.
-- After `Close()`, a later command may still dial; that socket is closed on release, not kept idle.
+- After `Close()`, further Get/Set/Del/MGet return `redis:unreachable` and do not dial.
 - The mock e2e Redis stand-in must speak RESP arrays; inline GET is leftover compatibility.
 - Real-stack Redis-cache e2e uses Dragonfly, not Redis.
 - Pass a non-empty `keyPrefix` (connection identity hex) when two Crowdsec backends share one Redis.
