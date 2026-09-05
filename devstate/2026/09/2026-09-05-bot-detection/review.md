@@ -17,3 +17,9 @@ phase: propose
 findings: none
 fixed: none
 skipped: none. Change appsec-bot-detection validated.
+
+## implement (2026-09-05)
+phase: implement
+findings: none
+fixed: AppsecQuery parse + Bouncer challenge relay; golangci split of AppsecQuery; mock /challenge; real e2e CrowdSec v1.8.0
+skipped: issue status comment on maxlerebourg#389 (different owner)

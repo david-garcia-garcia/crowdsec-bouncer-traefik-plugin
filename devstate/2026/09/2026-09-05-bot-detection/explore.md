@@ -75,5 +75,5 @@ Empty or non-JSON non-200 from AppSec. Today's `AppsecQuery` error → `handleBa
   By: implement
 
 - Q: Reproduce issue 389 in this worktree?
-  Decision: assumed — not reproduced live in explore; unit/mock cover the protocol; real e2e is the live reproduction.
+  Decision: resolved — real e2e (CrowdSec v1.8.0 + appsec-bot-challenge) passed on GitHub Actions; mock AppSec challenge scenario passed locally in Linux and on CI.
   By: implement
