@@ -1,10 +1,10 @@
 name: Release (1/2) Prepare
 
-# Step 1 of the release process: bump crowdsecconnection.Version *before* the tag exists.
+# Step 1 of the release process: bump pluginVersion *before* the tag exists.
 #
-# The version reported to the Crowdsec LAPI lives in pkg/crowdsecconnection/version.go,
-# so it has to be correct in the very commit the tag points at. Anything that patches
-# that file after the release is published is too late: Traefik's plugin
+# The version reported to the Crowdsec LAPI lives in version.go, so it has to
+# be correct in the very commit the tag points at. Anything that patches
+# version.go after the release is published is too late: Traefik's plugin
 # service caches the plugin archive per module+version, so users keep the
 # source that was there when the tag was first resolved (see #322, #363).
 #
@@ -48,14 +48,14 @@ jobs:
             exit 1
           fi
 
-      - name: Bump pkg/crowdsecconnection/version.go
+      - name: Bump version.go
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          sed -i 's/Version = "[^"]*"/Version = "'"$VERSION"'"/' pkg/crowdsecconnection/version.go
-          cat pkg/crowdsecconnection/version.go
-          if git diff --quiet -- pkg/crowdsecconnection/version.go; then
-            echo "::error::pkg/crowdsecconnection/version.go already reads $VERSION, nothing to release"
+          sed -i 's/pluginVersion = "[^"]*"/pluginVersion = "'"$VERSION"'"/' version.go
+          cat version.go
+          if git diff --quiet -- version.go; then
+            echo "::error::version.go already reads $VERSION, nothing to release"
             exit 1
           fi
 
@@ -71,7 +71,7 @@ jobs:
           git push -u origin "release/$VERSION"
 
           cat > /tmp/pr-body.md <<EOF
-          Bumps \`crowdsecconnection.Version\` to \`$VERSION\` so the tag carries the version
+          Bumps \`pluginVersion\` to \`$VERSION\` so the tag carries the version
           the plugin reports to the Crowdsec LAPI.
 
           Merging this PR tags \`$VERSION\` on the resulting commit and publishes

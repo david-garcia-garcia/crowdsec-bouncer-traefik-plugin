@@ -43,7 +43,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	}
 
 	stored, err := reclaim.Open(ctx, crowdsecconnection.Key(config), log, func() (any, error) {
-		return crowdsecconnection.New(config, log)
+		return crowdsecconnection.New(config, log, pluginVersion)
 	})
 	if err != nil {
 		return nil, err

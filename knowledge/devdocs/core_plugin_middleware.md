@@ -17,6 +17,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 ## How to use
 
 - Keep `CreateConfig` / `New` on the module root (`plugin.go`).
+- Keep `pluginVersion` in root `version.go` (release workflow bumps it). Pass it into `crowdsecconnection.New`.
 - Call `crowdsecconnection.Prepare` then `reclaim.Open(ctx, crowdsecconnection.Key(config), log, create)`.
 - Type-assert the stored value to `*crowdsecconnection.CrowdsecConnection` and return `bouncer.New(...)`.
 - Put stream tickers, LAPI HTTP, and cache on CrowdsecConnection. Put captcha and templates on Bouncer.
@@ -27,7 +28,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 
 ```go
 stored, err := reclaim.Open(ctx, crowdsecconnection.Key(config), log, func() (any, error) {
-	return crowdsecconnection.New(config, log)
+	return crowdsecconnection.New(config, log, pluginVersion)
 })
 conn := stored.(*crowdsecconnection.CrowdsecConnection)
 return bouncer.New(next, name, config, conn, log)

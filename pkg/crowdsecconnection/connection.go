@@ -101,6 +101,7 @@ type CrowdsecConnection struct {
 	httpAppsecClient *http.Client
 	cacheClient      *cache.Client
 	log              *slog.Logger
+	pluginVersion    string
 
 	isCrowdsecStreamStartup bool
 	isCrowdsecStreamHealthy bool
@@ -146,7 +147,7 @@ func Prepare(cfg *configuration.Config, log *slog.Logger) error {
 }
 
 // New constructs a CrowdsecConnection and starts tickers. Call Prepare first. Close stops them.
-func New(config *configuration.Config, log *slog.Logger) (*CrowdsecConnection, error) {
+func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (*CrowdsecConnection, error) {
 	var err error
 	var tlsAppsecConfig *tls.Config
 	if config.CrowdsecAppsecEnabled {
@@ -198,6 +199,7 @@ func New(config *configuration.Config, log *slog.Logger) (*CrowdsecConnection, e
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		crowdsecHeader:          crowdsecHeader,
 		log:                     log,
+		pluginVersion:           pluginVersion,
 		isCrowdsecStreamStartup: true,
 		isCrowdsecStreamHealthy: true,
 		httpClient: &http.Client{
@@ -541,7 +543,7 @@ func (c *CrowdsecConnection) crowdsecQuery(stringURL string, data []byte) ([]byt
 		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
 	}
 	req.Header.Set(c.crowdsecHeader, c.crowdsecKey)
-	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+Version)
+	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+c.pluginVersion)
 
 	res, err := c.httpClient.Do(req)
 	if err != nil || isReverseProxyError(res.StatusCode) {
@@ -623,7 +625,7 @@ func (c *CrowdsecConnection) AppsecQuery(ip string, httpReq *http.Request, pol A
 	req.Header.Set(crowdsecAppsecHostHeader, httpReq.Host)
 	req.Header.Set(crowdsecAppsecURIHeader, httpReq.URL.String())
 	req.Header.Set(crowdsecAppsecUserAgent, httpReq.Header.Get("User-Agent"))
-	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+Version)
+	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+c.pluginVersion)
 
 	res, err := c.httpAppsecClient.Do(req)
 	if err != nil || isReverseProxyError(res.StatusCode) {
@@ -664,7 +666,7 @@ func (c *CrowdsecConnection) reportMetrics() error {
 	metrics := map[string]interface{}{
 		"remediation_components": []map[string]interface{}{
 			{
-				"version": Version,
+				"version": c.pluginVersion,
 				"type":    "bouncer",
 				"name":    "traefik_plugin",
 				"metrics": []map[string]interface{}{
