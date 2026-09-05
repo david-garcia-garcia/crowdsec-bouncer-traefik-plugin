@@ -361,6 +361,8 @@ services:
       CUSTOM_HOSTNAME: "crowdsec-test"
       # Test bouncer key
       BOUNCER_KEY_TRAEFIK_TEST: "40796d93c2958f9e58345514e67740e5"
+      # Separate stream session so scopes=ip,range,country does not share the default key
+      BOUNCER_KEY_TRAEFIK_SCOPES: "a1b2c3d4e5f60718293a4b5c6d7e8f90"
       # Disable aggressive collections that cause 150k decision issue
       DISABLE_COLLECTIONS: "crowdsecurity/iptables crowdsecurity/linux crowdsecurity/sshd"
       # Enable debugging
