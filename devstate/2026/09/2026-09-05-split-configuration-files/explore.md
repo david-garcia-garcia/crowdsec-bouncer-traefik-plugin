@@ -56,28 +56,28 @@ IssueKey: 2026-09-05-split-configuration-files
 ## Open questions
 
 - Q: Exact sibling file names (`config.go` vs keeping `configuration.go`)?
-  Decision: assumed — `config.go` (DTO + `New` + existing enums), `secrets.go`, `template.go`, `validate.go`. Remove `configuration.go` after the split so one mixed file does not remain.
-  By: explore
+  Decision: resolved — `config.go` (DTO + `New` + existing enums), `secrets.go`, `template.go`, `validate.go`. Removed `configuration.go` after the split.
+  By: implement
 
 - Q: `mode.go` or constants file for enums?
-  Decision: assumed — keep the existing const block in `config.go`. A `mode.go` would mis-name log/captcha/failure/scheme constants. Ticket’s names were examples.
-  By: explore
+  Decision: resolved — kept the existing const block in `config.go`. Ticket names were examples.
+  By: implement
 
 - Q: Does `GetTLSConfigCrowdsec` stay exported after the move?
-  Decision: assumed — no. Only `crowdsecconnection.New` calls it. Unexport as `getTLSConfigCrowdsec` in `pkg/crowdsecconnection`. Tests in that package can still call it.
-  By: explore
+  Decision: resolved — no. Unexported as `getTLSConfigCrowdsec` in `pkg/crowdsecconnection`.
+  By: implement
 
 - Q: Do TLS tests stay in `configuration_test.go`?
-  Decision: assumed — no. Move `Test_GetTLSConfigCrowdsec` and shared `validPEM` with the symbols. Other tests stay in `configuration_test.go`.
-  By: explore
+  Decision: resolved — `Test_getTLSConfigCrowdsec` and a TLS `validPEM` live in `pkg/crowdsecconnection/tls_test.go`. `validPEM` remains in `configuration_test.go` for `validateParamsTLS`.
+  By: implement
 
 - Q: Should HTTP client construction move into `tls.go` as well?
-  Decision: assumed — no. Ticket says move the TLS builder next to client construction, not extract the clients. Sibling `2026-09-05-split-connection-files` owns connection.go splits.
-  By: explore
+  Decision: resolved — no. `New` still builds `http.Client` in `connection.go`.
+  By: implement
 
 - Q: Does `validateParamsTLS` move with the runtime builder?
-  Decision: assumed — no. It is config validation (PEM parse at ValidateParams). Runtime client TLS is `getTLSConfig`.
-  By: explore
+  Decision: resolved — no. It stays in `validate.go`.
+  By: implement
 
 - Q: Who owns client address / Host / trust hop for this change?
   Decision: resolved — none of this ticket’s files set or reconstruct identity. `pkg/ip` and connection identity stay owners elsewhere.
