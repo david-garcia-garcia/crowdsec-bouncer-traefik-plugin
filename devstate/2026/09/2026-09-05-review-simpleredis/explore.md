@@ -53,8 +53,8 @@ Measured: `go test ./pkg/cache` previously passed on main; after dest merge the 
   By: explore
 
 - Q: Extra optimizations (pipelining, unsafe buffers, rename `do`/`clean`)?
-  Decision: assumed — no, except Close-without-redial. Renames stay skipped (golangci excludes the pin).
-  By: explore
+  Decision: resolved — no pipelining/rename. Applied Close-without-redial, Yaegi-safe deadline via `errors.Is`, and no timeout retry on a reused conn.
+  By: implement
 
 - Q: Who owns client IP / Host identity?
   Decision: resolved — none in this change. Redis keys stay whatever cache already passes.
