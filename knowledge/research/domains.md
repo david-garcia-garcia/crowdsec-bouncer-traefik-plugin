@@ -6,3 +6,4 @@
 - simpleredis
 - dragonfly
 - redis
+- traefik-geoblock

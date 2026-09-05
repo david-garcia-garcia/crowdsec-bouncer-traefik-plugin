@@ -104,6 +104,12 @@ Describe "CrowdSec Range and header-mapped scopes" {
         }
 
         It "Should block after the stream poll when CrowdSec bans the enriched country" {
+            $ready = Wait-ForCondition -Description "Stream mode to allow public IP before Country probe" -TimeoutSeconds 30 -RetryIntervalSeconds 2 -Condition {
+                $response = Test-HttpRequest -Endpoint "/scope-stream" -IP $script:PublicIP -TraefikUrl $script:TraefikUrl
+                return ($response.StatusCode -eq 200)
+            }
+            $ready.Success | Should -Be $true -Because "stale Country cache from the none-mode test must drain before the probe"
+
             $probe = Test-HttpRequest -Endpoint "/scope-stream" -IP $script:PublicIP -TraefikUrl $script:TraefikUrl
             $probe.StatusCode | Should -Be 200
             $country = Get-WhoamiCountryCode -Content $probe.Content
