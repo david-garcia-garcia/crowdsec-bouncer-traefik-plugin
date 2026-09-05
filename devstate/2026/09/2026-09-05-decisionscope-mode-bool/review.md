@@ -6,3 +6,11 @@ phase: prepare
 findings: none
 fixed: none
 skipped: product apply not started; CI not seen on stub PR #20
+
+## explore (2026-09-05)
+
+phase: explore
+findings: none
+fixed: none
+skipped: assumed bool name `useRangeMembership`; fold spec onto `core_plugin_decisions_scopes`; no connection helper
+
