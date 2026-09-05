@@ -180,13 +180,13 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			b.handleNextServeHTTP(rw, req, remoteIP)
 		} else {
 			b.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", remoteIP))
-			b.applyLapiFailureAction(rw, req, remoteIP)
+			b.applyLapiFailureAction(rw, req, remoteIP, configuration.ReasonTECH)
 		}
 	} else {
 		value, err := b.conn.LiveLookup(remoteIP, scopes)
 		if err != nil && !decisionscope.IsActiveRemediation(value) {
 			b.log.Debug("ServeHTTP:LiveLookup " + err.Error())
-			b.applyLapiFailureAction(rw, req, remoteIP)
+			b.applyLapiFailureAction(rw, req, remoteIP, configuration.ReasonLAPI)
 			return
 		}
 		if err != nil {
@@ -202,14 +202,14 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 // applyLapiFailureAction remediates a live LAPI error or stream-unhealthy cache miss.
-func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req *http.Request, remoteIP string) {
+func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req *http.Request, remoteIP, banReason string) {
 	switch b.conn.LapiFailureAction() {
 	case configuration.FailureActionPassthrough:
 		b.handleNextServeHTTP(rw, req, remoteIP)
 	case configuration.FailureActionCaptcha:
 		b.handleRemediationServeHTTP(rw, req, remoteIP, cache.CaptchaValue)
 	default:
-		b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH)
+		b.handleBanServeHTTP(rw, req, remoteIP, banReason)
 	}
 }
 

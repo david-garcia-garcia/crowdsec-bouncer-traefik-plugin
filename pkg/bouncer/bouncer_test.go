@@ -315,7 +315,7 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			log:  logger.New("ERROR", ""),
 			conn: crowdsecconnection.NewTestLapiFailureActionConnection(configuration.FailureActionPassthrough),
 		}
-		b.applyLapiFailureAction(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10")
+		b.applyLapiFailureAction(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10", configuration.ReasonTECH)
 		if !nextCalled {
 			t.Fatal("passthrough should use the pass path")
 		}
@@ -330,7 +330,7 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			conn:                  crowdsecconnection.NewTestLapiFailureActionConnection(configuration.FailureActionBan),
 		}
 		recorder := httptest.NewRecorder()
-		b.applyLapiFailureAction(recorder, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10")
+		b.applyLapiFailureAction(recorder, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10", configuration.ReasonLAPI)
 		if recorder.Code != http.StatusForbidden {
 			t.Fatalf("ban want 403, got %d", recorder.Code)
 		}

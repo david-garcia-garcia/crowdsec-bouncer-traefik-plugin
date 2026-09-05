@@ -141,7 +141,7 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Captcha LAPI action without provider", args: args{config: cfgCaptchaNoProvider}, wantErr: true},
 		{name: "Captcha LAPI action with provider", args: args{config: cfgCaptchaWithProvider}, wantErr: false},
 		{name: "Unknown AppSec failure action", args: args{config: cfgUnknownAction}, wantErr: true},
-		{name: "Empty failure actions use default", args: args{config: cfgEmptyAction}, wantErr: false},
+		{name: "Empty failure actions are rejected", args: args{config: cfgEmptyAction}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
