@@ -53,3 +53,10 @@ fixed: title 🐛 fix(crowdsecconnection): put decisionScopeHeaders on reclaim i
 skipped: none
 ci: success 33978659998 / 33978659993
 
+## merge (2026-09-05)
+phase: merge
+findings: none
+fixed: merge origin/master; keep identity map + DecisionScopeHeaders() on connection.go
+skipped: none
+ci: success 33991231123 / 33991231104
+
