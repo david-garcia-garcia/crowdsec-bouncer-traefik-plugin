@@ -23,3 +23,9 @@ phase: implement
 findings: none
 fixed: pkg/ip split to checker.go/network.go; GetRemoteIP tests
 skipped: none
+
+## codereview (2026-09-05T16:38:54.697Z)
+phase: codereview
+findings: Leave a trail on TestGetRemoteIP
+fixed: added job comment
+skipped: none
