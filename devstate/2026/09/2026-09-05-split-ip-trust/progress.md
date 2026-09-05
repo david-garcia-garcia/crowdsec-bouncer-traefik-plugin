@@ -5,7 +5,7 @@ JobName: 2026-09-05-split-ip-trust
 | Phase | Work | Card | At |
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-05T16:27:38.852Z |
-| explore | [x] | [ ] | |
+| explore | [x] | [x] | 2026-09-05T16:29:54.246Z |
 | propose | [ ] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
