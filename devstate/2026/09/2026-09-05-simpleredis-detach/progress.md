@@ -11,4 +11,4 @@ JobName: 2026-09-05-simpleredis-detach
 | codereview | [x] | [x] | 2026-09-05T12:16:40Z |
 | devdocsimpact | [x] | [x] | 2026-09-05T12:17:29Z |
 | archive | [x] | [x] | 2026-09-05T12:18:57Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-05T12:24:28Z |
