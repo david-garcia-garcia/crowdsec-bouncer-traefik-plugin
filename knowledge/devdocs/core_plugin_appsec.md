@@ -17,7 +17,7 @@ _Avoid_: CrowdSec LAPI captcha remediation
 ## How to use
 
 - Enable with existing `crowdsecAppsecEnabled`. Do not add a bot-detection plugin key.
-- `action` allow or empty 200 → `next`. `ban` → `handleBanServeHTTP`. `challenge` with a body → relay. Empty challenge body → ban.
+- `action` allow or empty 200 → `next`. `ban` → `handleBanServeHTTP`. Any other non-allow action (challenge, AppSec captcha HTML) → relay. Empty `challenge` body → ban. AppSec `captcha` is not `pkg/captcha`.
 - Route `PathPrefix(/crowdsec-internal/challenge)` through the same middleware; service backend is the AppSec listener.
 - Copy request `Cookie` through to AppSec (already copied with other headers). Do not parse `__crowdsec_challenge` in this plugin.
 
