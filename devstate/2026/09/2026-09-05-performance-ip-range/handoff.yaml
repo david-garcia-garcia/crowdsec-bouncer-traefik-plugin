@@ -10,6 +10,6 @@ src: 1089524f72b07dddb912233cfb85bd10f5d6b1cfbd99e1fa606feac223c46e4f
 localTests: none
 requirement: requirement.md
 comments: none
-explore: none
+explore: explore.md
 change: none
 pr: { id: 14, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/14 }
