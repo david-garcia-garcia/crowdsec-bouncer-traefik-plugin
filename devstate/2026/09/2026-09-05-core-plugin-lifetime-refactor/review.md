@@ -67,3 +67,10 @@ findings: mock e2e failed once on 24a9090 (exit 2); retried with dual-bouncer po
 fixed: wait_for_status on dual-bouncer; print scenario logs on fail; ready title; CI green on 40c19d5
 skipped: none
 head: 40c19d59fd40077de70472eea216ed6c24c2614b
+
+## pullrequest (2026-09-05T09:14:00.108Z)
+phase: pullrequest
+findings: Main Process failed on f4e5bea (revive unused t in Test_ClientCloseRedis)
+fixed: drain Redis idle pools on CrowdsecConnection.Close; unused-parameter lint; CI green on f7f9ba0
+skipped: logger OpenFile close; failed New without Close; in-flight ticker HTTP
+head: f7f9ba024d6559f91996d372ce7b77b21ed06ee9
