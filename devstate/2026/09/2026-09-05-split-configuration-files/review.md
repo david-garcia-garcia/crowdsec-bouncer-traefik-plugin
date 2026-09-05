@@ -62,3 +62,12 @@ findings: none
 fixed: synced core_plugin_config_file-owners; moved change to archive/2026-09-05-split-configuration-files
 skipped: none
 head: dc20c0e97a3bcf5fe4a36f85d73c06436e1fc2aa
+
+## pullrequest (2026-09-05)
+
+phase: pullrequest
+findings: none
+fixed: ready title; waited CI
+skipped: none
+ci: 33979392712 Main Process success; 33979392705 e2e success
+head: c0016bfcb14144b1c845f0cff00e6a5cc291fb29
