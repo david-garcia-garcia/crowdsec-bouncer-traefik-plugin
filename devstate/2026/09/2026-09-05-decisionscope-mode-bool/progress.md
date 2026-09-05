@@ -10,5 +10,5 @@ JobName: 2026-09-05-decisionscope-mode-bool
 | implement | [x] | [x] | 2026-09-05T16:36:00.134Z |
 | codereview | [x] | [x] | 2026-09-05T16:38:59.641Z |
 | devdocsimpact | [x] | [x] | 2026-09-05T16:40:01.833Z |
-| archive | [x] | [ ] | |
+| archive | [x] | [x] | 2026-09-05T16:41:15.324Z |
 | pullrequest | [ ] | [ ] | |
