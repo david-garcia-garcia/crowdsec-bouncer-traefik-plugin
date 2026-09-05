@@ -1,0 +1,9 @@
+host: local
+ref: none
+title: add-real-e2e
+url: none
+number: none
+legacyUpstreamPr: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/273
+legacyHead: 272
+destRepo: david-garcia-garcia/crowdsec-bouncer-traefik-plugin
+destBranch: master
