@@ -14,3 +14,11 @@ findings: none
 fixed: none
 skipped: assumed bool name `useRangeMembership`; fold spec onto `core_plugin_decisions_scopes`; no connection helper
 
+## propose (2026-09-05)
+
+phase: propose
+findings: none
+fixed: none
+skipped: none
+
+
