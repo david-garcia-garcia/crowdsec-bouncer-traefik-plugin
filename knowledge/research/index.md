@@ -19,3 +19,8 @@ description: SimpleRedis client API and pooling behaviour this product relies on
 priority: normal
 local: index_ext_dragonfly.md
 description: Official Dragonfly Redis-protocol and Docker image behaviour this product relies on.
+
+## redis
+priority: normal
+local: index_ext_redis.md
+description: Official Redis Go client surface and toolchain constraints.

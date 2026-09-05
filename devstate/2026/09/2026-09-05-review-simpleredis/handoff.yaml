@@ -4,12 +4,12 @@ issueHost: local
 issueRef: none
 prHost: github
 repoSlug: crowdsec-bouncer-traefik-plugin
-destBranch: main
-qualify: qualified-with-gaps
+destBranch: master
+qualify: qualified
 src: 63748c369f7c1bc57f0e72978c9c8c3250b1eae33c90a396a0d3dbb9300f1b81
-localTests: none
+localTests: passed
 requirement: requirement.md
 comments: none
-explore: none
-change: none
+explore: explore.md
+change: simpleredis-comms-review
 pr: { id: 8, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/8 }

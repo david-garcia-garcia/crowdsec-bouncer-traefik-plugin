@@ -2,44 +2,36 @@
 IssueKey: 2026-09-05-review-simpleredis
 
 ## Problem
-The Redis communication layer (`github.com/maxlerebourg/simpleredis` v1.0.12) should be as performant and resource-efficient as possible without adding much complexity or code. The ticket asks to compare that client with the official Redis Go library, have an Opus-class analysis for leaks, races, and optimizations, allow Traefik plugin `unsafe` only when the gain is worth it, fill communication-layer test gaps, and deliver a PR with passing CI.
+The Redis communication layer (`pkg/simpleredis`) should be as performant and resource-efficient as possible without adding much complexity or code. Compare it with official Go Redis, review for leaks/races/optimizations, use Traefik `useUnsafe` only if worth it, fill communication-layer test gaps, deliver a PR against `master` with CI green.
 
 ## Current (code)
-- Redis I/O is `vendor/github.com/maxlerebourg/simpleredis/simpleredis.go` (`go.mod` require `v1.0.12`). `askRedis` dials TCP per `Get`/`Set`/`Del`, optionally sends inline `AUTH`/`SELECT`, then the command, then `defer conn.Close()`.
-- Protocol is inline (`genRedisArray` joins args with spaces + `\r\n`), not RESP arrays. `tests/e2e/mock/mocklapi/main.go` `serveRedis` parses that same inline line format.
-- `Set`/`Del` call `askRedis` and always `return nil` (`simpleredis.go` Set/Del). `Get` creates a `chan redisCmd` that `askRedis` does not receive from; AUTH/SELECT `waitRedis` may send on that channel with nobody listening.
-- `pkg/cache/cache.go` `redisCache` holds `simpleredis.SimpleRedis` by value (`writer`, `readers`). `get` maps `RedisMiss` / `RedisUnreachable`. `set`/`delete` log errors that v1.0.12 never returns.
-- `.traefik.yml` has no `unsafe` / `useUnsafe` field. CI (`.github/workflows/main.yml`) runs `make yaegi_test` against Yaegi v0.16.1 (Go 1.22).
-- Tests: `pkg/cache/cache_test.go` covers local cache and `nextReader` round-robin only — no Redis wire round-trip. Vendor package has no `_test.go`. Mock e2e `tests/e2e/mock/scenarios/redis/` exercises cache routing against `serveRedis`, not a real Redis protocol server.
+- Dest is `master`. Redis I/O is in-tree `pkg/simpleredis/simpleredis.go` (copied from simpleredis PR #8 @ f8801cc, plus `Close`). Idle pool max 8, RESP arrays, `Get`/`MGet`/`Set`/`Del`, AUTH/SELECT on dial. `pkg/cache` holds `*SimpleRedis`. `CrowdsecConnection.Close` calls `cacheClient.Close`.
+- After `Close`, `TestCloseDrainsIdleAndDoesNotRepool` still expects `Get` to **dial a new TCP connection** (`simpleredis_test.go` want 2 conns). `borrow` does not check `closed` before `dial`.
+- Tests cover hit/miss, reuse, concurrent cap, newlines, MGET, NOAUTH, Set error, unreachable, stale retry, Close drain. Missing: AUTH success once per dial, SELECT once per dial, I/O timeout, idle-timeout eviction, `Get` after Close must not dial.
+- `.traefik.yml` has no `useUnsafe`. CI Yaegi v0.16.1 / Go 1.22 (`.github/workflows/main.yml`).
+- Official `github.com/redis/go-redis/v9` @ 8010edc is `go 1.24`, imports `unsafe` and `syscall` on Linux (`knowledge/research/ext_redis_go-redis`).
 
 ## Desired
-- Keep the public cache/config surface unless the communication layer cannot improve without it.
-- After reviewing official Go Redis (`github.com/redis/go-redis` or the current official module) versus this client, adopt the smallest durable delta that is faster and cheaper on connections/CPU/allocs, without a large new abstraction.
-- Use Traefik `unsafe` only if measured (or clearly evidenced) gains justify leaving Yaegi-safe stdlib.
-- Opus-class review of the chosen implementation for leaks, races, and optimizations; take the ones that stay simple and short.
-- Fill unit-test gaps on the communication layer (protocol, errors, reuse, AUTH/SELECT, timeout).
-- Deliver one OPEN PR to `main` with CI green and the delivery card on the PR summary.
+- Keep the in-tree client. Do not take go-redis. Do not set `useUnsafe`.
+- After Close, do not dial; return unreachable. In-flight commands may finish; sockets close on release (already true).
+- Fill AUTH, SELECT, timeout, idle-timeout, and no-redial-after-Close tests.
+- Small comments / names only if they stay short. No pipelining, no Redis TLS, no cache GetMany, no Dragonfly e2e.
 
 ## Affected
-- `vendor/github.com/maxlerebourg/simpleredis/simpleredis.go` (or a replacement in-tree client if the published module cannot be patched — CI `go mod vendor` restores vendor).
-- `pkg/cache/cache.go` import and call sites that speak Get/Set/Del (and any new batch API the client grows).
-- `.golangci.yml` depguard exceptions for the Redis client module.
-- Communication-layer tests (new `pkg/...` tests). Mock Redis in `tests/e2e/mock/mocklapi/main.go` only if the wire format changes.
-- `.traefik.yml` only if `unsafe` is taken.
+- `pkg/simpleredis/simpleredis.go` (`borrow` after Close).
+- `pkg/simpleredis/simpleredis_test.go`.
+- `pkg/simpleredis/SOURCE` if the pin note needs a local-delta line.
+- Spec fold: `core_cache_redis_in-tree-client`.
 
 ## Out of scope
-- Cache policy, TTL semantics, decision value strings, replica round-robin policy, `redisCacheUnreachableBlock`.
+- Cache policy, TTL, replica round-robin, `redisCacheUnreachableBlock`, key prefix.
 - CrowdSec LAPI/AppSec, captcha, ban pages.
-- Dragonfly/real-stack e2e and other work on sibling branch `2026-09-05-integrate-redis-backend` except as research of an already-written in-tree client.
-- Replacing Redis with another backend.
+- Replacing Redis. Taking go-redis. Setting `useUnsafe`.
+- Dragonfly/real-stack e2e (already on dest).
 
 ## Unknowns
-- Whether Yaegi can load `github.com/redis/go-redis` even with Traefik `unsafe`; what `unsafe` actually unlocks in Traefik v3.
-- Whether an in-tree copy (sibling ticket already copied simpleredis PR #8 pool + RESP + `MGET` into `pkg/simpleredis`) is the intended base, versus starting from vendored v1.0.12 on `main`.
-- Which official Redis Go module version is compatible with Go 1.22 / Yaegi v0.16.1.
+None that block: go-redis and `useUnsafe` are documented in `knowledge/research/`.
 
 ## Tensions
-- Ticket says review official Redis Go library; this plugin is a Yaegi plugin today (`make yaegi_test`). A full `go-redis` client may be incompatible regardless of `unsafe`.
-- Ticket says do not add much complexity or length; pooling, RESP, pipelining, and `go-redis` pull in opposite directions.
-- Sibling ticket `2026-09-05-integrate-redis-backend` (dest `master`, PR #5) already inlined a pooled RESP client. This run’s dest is `main` (`origin/HEAD`), which still vendors v1.0.12. Stacking vs independent in-tree client is an explore decision.
-- `pkg/cache` stores `SimpleRedis` by value; a pooled client with a mutex must not be copied — that is communication-layer, not cache policy.
+- Ticket asked to review official Go Redis; dest already chose an in-tree Yaegi-safe client. Taking go-redis would fight Go 1.22 + Yaegi.
+- `TestCloseDrainsIdleAndDoesNotRepool` currently encodes redial-after-Close as desired; this change reverses that.
