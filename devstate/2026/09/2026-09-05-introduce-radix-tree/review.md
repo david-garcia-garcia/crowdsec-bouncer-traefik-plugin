@@ -44,6 +44,6 @@ skipped: none
 
 ## pullrequest (2026-09-05)
 phase: pullrequest
-findings: none
-fixed: none
-skipped: none
+findings: destate-only mock e2e flake on d66a759; merged origin/master (dirty vs #9/#12)
+fixed: merge origin/master; kept both AppSec and Trusted-IP index rows
+skipped: Range radix still deferred (issues.md)
