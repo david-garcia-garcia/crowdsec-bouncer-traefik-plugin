@@ -92,6 +92,8 @@ func reqForIP(ip string) *http.Request {
 	return req
 }
 
+// TestNew_DoesNotMutateCallerConfig checks New leaves Traefik's Config pointer unchanged
+// (mixed-case LogLevel; ban HTML alias stays off the caller BanFilePath).
 func TestNew_DoesNotMutateCallerConfig(t *testing.T) {
 	reclaim.ResetWith(0)
 	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
