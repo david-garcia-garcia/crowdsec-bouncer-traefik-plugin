@@ -37,4 +37,32 @@ Describe "CrowdSec Bouncer Real AppSec Tests" {
             $response.StatusCode | Should -Be 403
         }
     }
+
+    Context "AppSec bot-detection challenge" -Tag "appsec", "bot-detection" {
+        BeforeEach {
+            Clear-TraefikAccessLogs
+            Remove-AllTestDecisions
+        }
+
+        It "Should not silently ban when bot-detection is loaded" {
+            $browser = @{
+                "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+            $response = Test-HttpRequest -Endpoint "/bot-detection" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl -ExtraHeaders $browser
+            $cookie = ""
+            if ($response.Headers -and $response.Headers["Set-Cookie"]) {
+                $cookie = [string]$response.Headers["Set-Cookie"]
+            }
+            $isChallenge = ($response.Content -match "crowdsec|fpscanner|challenge") -or ($cookie -match "__crowdsec_challenge")
+            $isExemptAllow = ($response.StatusCode -eq 200) -and ($response.Content -match "Hostname:")
+            $isSilentBan = ($response.StatusCode -eq 403) -and (-not $isChallenge)
+            $isSilentBan | Should -BeFalse
+            ($isChallenge -or $isExemptAllow) | Should -BeTrue
+        }
+
+        It "Should keep challenge assets off the origin whoami" {
+            $response = Test-HttpRequest -Endpoint "/crowdsec-internal/challenge/fpscanner.js" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl
+            $response.Content | Should -Not -Match "Hostname:"
+        }
+    }
 }

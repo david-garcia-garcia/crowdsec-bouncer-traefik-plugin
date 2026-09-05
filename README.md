@@ -19,7 +19,7 @@ The Crowdsec utility will provide the community blocklist which contains highly 
 
 When used with Crowdsec it will leverage the local API which will analyze Traefik logs and take decisions on the requests made by users/bots. Malicious actors will be banned based on patterns used against your website.
 
-Appsec feature is supported from plugin version 1.2.0 and Crowdsec 1.6.0.
+Appsec feature is supported from plugin version 1.2.0 and Crowdsec 1.6.0. CrowdSec 1.8 AppSec **bot-detection** (challenge HTML, `__crowdsec_challenge` cookie, `/crowdsec-internal/challenge/*`) is supported by this plugin: enable AppSec as usual and route that path prefix through the **same** CrowdSec middleware as the protected app so the callback is not sent to origin. There is no extra plugin option. See [CrowdSec bot detection](https://docs.crowdsec.net/docs/next/appsec/bot_detection/intro.md).
 
 The AppSec Component offers:
 
@@ -370,7 +370,7 @@ make run
 - CrowdsecAppsecEnabled
   - bool
   - default: false
-  - Enable Crowdsec Appsec Server (WAF).
+  - Enable Crowdsec Appsec Server (WAF). CrowdSec 1.8 bot-detection needs this set, plus a Traefik router `PathPrefix(/crowdsec-internal/challenge)` using this same middleware.
 - CrowdsecAppsecHost
   - string
   - default: "crowdsec:7422"

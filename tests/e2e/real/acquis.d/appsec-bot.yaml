@@ -1,0 +1,7 @@
+listen_addr: 0.0.0.0:7423
+appsec_configs:
+  - crowdsecurity/appsec-bot-*
+name: e2eAppSecBot
+source: appsec
+labels:
+  type: appsec

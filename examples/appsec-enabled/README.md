@@ -22,6 +22,8 @@ curl http://localhost:8000/foo/rpc2
 ```
 You should get a 403 on http://localhost:8000/foo/rpc2
 
+CrowdSec 1.8 bot-detection uses the same `crowdsecappsecenabled` / `crowdsecappsechost` labels. Add a Traefik router for `PathPrefix(/crowdsec-internal/challenge)` with that middleware, pointing the service at the AppSec listener (port 7422). Install `crowdsecurity/appsec-bot-challenge` on the engine and list `crowdsecurity/appsec-bot-*` in the AppSec acquisition. No extra plugin key.
+
 To play the demo environment run:
 ```bash
 make run_appsec
