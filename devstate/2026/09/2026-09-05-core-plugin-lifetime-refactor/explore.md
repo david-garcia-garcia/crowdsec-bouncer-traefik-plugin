@@ -66,7 +66,7 @@ Current vs desired ownership:
 | --- | --- | --- |
 | Yaegi `CreateConfig`/`New` | `bouncer.go`; **`ctx` ignored** | root `plugin.go`; `ctx` is reclaim holder |
 | Stream ticker / health | package globals; never stopped | Connection fields; `Close()` stops them |
-| Cache client | each Bouncer wraps process `ttl_map` | Connection owns a **private** memory map or Redis client; Bouncer/captcha use that Client |
+| Cache client | each Bouncer wraps process `ttl_map` | Each Connection has an **isolated** store. Memory: private `ttl_map`, not the package var. Redis: same host still isolated via a key prefix = connection identity. Bouncer and captcha use that Connection’s Client only |
 | LAPI/CAPI HTTP | new `http.Client` per `New` | one client on that Connection incarnation |
 | AppSec HTTP | new client per `New`; host first-wins | Connection owns client+host; Bouncer calls on pass when enabled |
 | Captcha | on `Bouncer` | stays on Bouncer; cache via Connection |
@@ -98,7 +98,7 @@ Must-have:
 2. Parallel `Open` race: one incarnation.
 3. Cancel all holders, `Open` same key before grace → reclaim, no second `create`, ticker still running (`reclaim_reclaim`).
 4. Cancel, wait past grace → `Close()` ran; next `Open` creates a new Connection (`reclaim_dispose`).
-5. Different LAPI host (different key) → two Connections, two tickers.
+5. Different LAPI host (different key) → two Connections, two tickers, **isolated caches** (A’s `Set` is not B’s `Get`, including Redis prefix).
 6. Stream sync against `httptest` LAPI; unhealthy after `UpdateMaxFailure`; live miss query.
 7. Bouncer `ServeHTTP` with injected Connection: disabled, trusted IP, cache hit pass/ban/captcha, stream unhealthy, live miss. `ip.GetRemoteIP` only.
 8. Ban/HEAD template matrix moves with `pkg/bouncer`.
@@ -111,7 +111,7 @@ Must-have:
 - Keying Connection by Traefik middleware **name** (WAF’s `plugin:name:hash`). That would split tickers per alias.
 - Public JSON config field names.
 
-Memory-mode store is **not** the package `ttl_map`. Each Connection owns its own map (or a Redis client). Tests inject a Client. No process-wide decision/captcha/lease keys.
+Memory-mode store is **not** the package `ttl_map`. Each Connection owns an isolated cache space (private map, or Redis keys prefixed with that connection’s identity). Tests inject a Client. Captcha uses that same Client (`ip+"_captcha"`). The `"updated"` stream lease is per Connection, not process-wide.
 
 ## Open questions
 
@@ -148,5 +148,5 @@ Memory-mode store is **not** the package `ttl_map`. Each Connection owns its own
   By: explore
 
 - Q: Is the memory cache a process singleton?
-  Decision: resolved — no. `pkg/cache` `var cache = ttl_map.New()` goes. Each Connection owns its store so tests do not leak keys. Redis stays per-Connection client. Captcha still uses that same Client (keys `ip+"_captcha"`).
+  Decision: resolved — each Connection has isolated cache space. Drop `pkg/cache` `var cache`. Memory: one `ttl_map` per Client. Redis: prefix every key with the connection identity so two Connections on one Redis do not share decisions, captcha grace, or the `"updated"` lease. Same reclaim key → same Connection → same cache (that is share-by-identity, not a process dump).
   By: explore
