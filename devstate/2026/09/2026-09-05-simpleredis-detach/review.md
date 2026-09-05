@@ -28,4 +28,14 @@ skipped: none
 change: simpleredis-detach
 head: ba7405bd8655ad1015c5147b4d6bf8f7c73e1266
 
+## implement (2026-09-05)
+
+phase: implement
+findings: none
+fixed: deleted LICENSE and SOURCE; rewrote live spec and usage
+skipped: none
+localTests: passed
+head: c77e9c49fc68b95350c85abb30dfcf20dc688452
+
+
 
