@@ -261,36 +261,42 @@ func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *http.R
 }
 
 func (b *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string) {
-	if b.appsecEnabled {
-		pol := crowdsecconnection.AppsecPolicy{
-			FailureAction: b.appsecFailureAction,
-		}
-		decision, err := b.conn.AppsecQuery(remoteIP, req, pol)
-		if errors.Is(err, crowdsecconnection.ErrFailureCaptcha) {
-			b.handleRemediationServeHTTP(rw, req, remoteIP, cache.CaptchaValue)
-			return
-		}
-		if err != nil {
-			b.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
-			b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
-			return
-		}
-		if decision != nil && decision.Action != "" && decision.Action != crowdsecconnection.AppsecActionAllow {
-			switch decision.Action {
-			case crowdsecconnection.AppsecActionBan:
-				b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
-				return
-			case crowdsecconnection.AppsecActionChallenge:
-				if decision.UserBodyContent == "" {
-					b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
-					return
-				}
-			}
-			b.handleAppsecResponseServeHTTP(rw, req, decision)
-			return
-		}
+	if b.appsecEnabled && b.applyAppsecServeHTTP(rw, req, remoteIP) {
+		return
 	}
 	b.next.ServeHTTP(rw, req)
+}
+
+// applyAppsecServeHTTP queries AppSec and writes a remediation when the request must not reach origin.
+func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string) bool {
+	pol := crowdsecconnection.AppsecPolicy{
+		FailureAction: b.appsecFailureAction,
+	}
+	decision, err := b.conn.AppsecQuery(remoteIP, req, pol)
+	if errors.Is(err, crowdsecconnection.ErrFailureCaptcha) {
+		b.handleRemediationServeHTTP(rw, req, remoteIP, cache.CaptchaValue)
+		return true
+	}
+	if err != nil {
+		b.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
+		b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
+		return true
+	}
+	if decision == nil || decision.Action == "" || decision.Action == crowdsecconnection.AppsecActionAllow {
+		return false
+	}
+	switch decision.Action {
+	case crowdsecconnection.AppsecActionBan:
+		b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
+		return true
+	case crowdsecconnection.AppsecActionChallenge:
+		if decision.UserBodyContent == "" {
+			b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
+			return true
+		}
+	}
+	b.handleAppsecResponseServeHTTP(rw, req, decision)
+	return true
 }
 
 // handleAppsecResponseServeHTTP writes a structured AppSec envelope (challenge HTML, cookies, headers) to the client.
