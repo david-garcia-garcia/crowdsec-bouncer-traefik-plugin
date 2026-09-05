@@ -37,3 +37,11 @@ skipped: root plugin logging tests failed TempDir cleanup on Windows (assertions
 localTests: passed (pkg/crowdsecconnection, pkg/bouncer)
 head: 7d82094471c8fa2b28c132f0eda6524d6c70333a
 ci: Main Process success; e2e in progress
+
+## codereview (2026-09-05)
+phase: codereview
+findings: none on all five axes
+fixed: none
+skipped: none
+head: 650156c64c1d91da00e9adedda0b24df12b2768f
+ci: Main Process success; e2e in progress
