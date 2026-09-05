@@ -113,6 +113,7 @@ func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts
 	c.log = log
 	if isRedis {
 		rc := &redisCache{log: log}
+		// Hold each client by pointer after Init so the pool mutex is not copied.
 		rc.writer = &simpleredis.SimpleRedis{}
 		rc.writer.Init(writeHost, pass, database)
 		for _, h := range readHosts {

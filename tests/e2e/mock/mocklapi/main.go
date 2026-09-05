@@ -90,6 +90,7 @@ func readRedisCommand(rd *bufio.Reader) (string, []string, error) {
 		return "", nil, err
 	}
 	line = strings.TrimRight(line, "\r\n")
+	// RESP array: *<n> then n bulk strings ($len + payload).
 	if strings.HasPrefix(line, "*") {
 		count, convErr := strconv.Atoi(line[1:])
 		if convErr != nil || count < 1 {
@@ -117,6 +118,7 @@ func readRedisCommand(rd *bufio.Reader) (string, []string, error) {
 		}
 		return strings.ToUpper(parts[0]), parts[1:], nil
 	}
+	// Inline command: space-separated tokens on one line (legacy GET).
 	fields := strings.Fields(line)
 	if len(fields) == 0 {
 		return "", nil, io.ErrUnexpectedEOF
