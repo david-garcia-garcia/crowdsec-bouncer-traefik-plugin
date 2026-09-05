@@ -1,70 +1,65 @@
-Developer review: in progress — 2026-09-05T12:13:02.444Z
+Developer review: in progress — 2026-09-05T13:25:01.129Z
 
 IssueKey: 2026-09-05-add-fail-mode
 JobName: 2026-09-05-add-fail-mode
 
 ## What this changes
-**Operators.** None.
+**Operators.** None yet. Proposed keys `lapiFailureAction` and `appsecFailureAction` (default `ban`); three AppSec block bools will be removed.
 
 **Admin users.** None.
 
-**Developers.** Explore journal plus research `ext_crowdsec_bouncers_failure-action/` and `ext_crowdsec_appsec_protocol/`. No `lapiFailMode` / `appsecFailMode` keys on `master` yet.
+**Developers.** OpenSpec change `lapi-appsec-failure-action`: `core_plugin_lapi_failure-action`, `core_plugin_appsec_failure-action`, and a delta on `core_plugin_appsec_bot-detection`. Merged `origin/master` (bot-detection #9).
 
 **End users.** None.
 
 ## Motivation
-On `master`, LAPI and AppSec unavailability is split across `updateMaxFailure` (stream/alone), live lookups that ban on any LAPI error, and three AppSec booleans. CrowdSec's spec uses `lapi_failure_action` / `appsec_failure_action` (default passthrough). Without a named fail-mode, operators cannot set one policy per backend, and a naive new key would fight those knobs.
+On `master`, LAPI/AppSec unavailability is split across `updateMaxFailure`, live ban-on-error, and three AppSec booleans. Without the two CrowdSec-shaped actions, operators cannot set one fallback per backend.
 
 ## Merge readiness
-Explore complete; this run stops here. Owner decision required. 6 items remain on Decision needed.
+Propose complete; implement not started. 1 item remains.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: f24a365
-Owner decision: Required. See Decision needed.
+Reviewed head: 57a6be6
+Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Explore done; CI in progress; no product keys |
-| CI proof | 3/6 | Checks in progress on run 33965408137 / 33965408138 |
-| Local tests proof | N/A | Before implement (`localTests: none`) |
+| Overall readiness | 3/6 | Specs written; CI in progress or not re-measured after merge |
+| CI proof | 3/6 | Checks not re-queried after merge 192a3de |
+| Local tests proof | N/A | Before implement |
 | Review resolution | N/A | No PR comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-05-add-fail-mode pushed | `git` @ f24a365 |
-| OpenSpec | none | `openspec/` unchanged vs master |
+| Branch | 2026-09-05-add-fail-mode pushed | git @ 57a6be6 |
+| OpenSpec | lapi-appsec-failure-action | openspec/changes/lapi-appsec-failure-action/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/10 | pr-host |
-| CI | build 33965408137 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33965408137 ; build 33965408138 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/33965408138 | pr-host get_check_runs |
-| Local tests | none | handoff.yaml localTests |
-| PR comments | no comments | pr-host Comment-List empty |
+| CI | not seen | not re-measured this phase |
+| Local tests | none | handoff.yaml |
+| PR comments | no comments | none |
 | Security | None. | destate/codereview.md absent |
 | Performance | None. | destate/codereview.md absent |
 
 ## Specs
-None.
+- [core_plugin_lapi_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-05-add-fail-mode/openspec/changes/lapi-appsec-failure-action/proposal.md) — added
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-05-add-fail-mode/openspec/changes/lapi-appsec-failure-action/proposal.md) — added
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-05-add-fail-mode/openspec/changes/lapi-appsec-failure-action/proposal.md) — modified
 
 ## Follow-up issues
-- [ ] [note] [large] Rename `crowdsecAppsecFailureBlock` / `crowdsecAppsecUnreachableBlock` → `appsecFailMode` — replacing published Traefik plugin keys is a contract break. Explore assumed replace.
-- [ ] [note] [large] `updateMaxFailure` vs new `lapiFailMode` — they overlap stream unavailability. Explore assumed wrap.
+- [ ] [note] [large] Removing the three AppSec block bools is a published-key break. Operators with `false` must set `appsecFailureAction: passthrough`.
+- [ ] [note] [large] `updateMaxFailure` kept as the stream counter next to `lapiFailureAction`.
 
 ## How this fits together
-Local ticket on dest `master`, stub PR 10. Explore mapped the fights and stopped. Propose does not start until the Decision needed rows are accepted or changed.
+Ticket on dest `master` after merge (bot-detection). Stub PR 10. Human accepted `LapiFailureAction` / `AppsecFailureAction`. Implement next.
 
 ## Decision needed
-| Question | Decision | By |
-| --- | --- | --- |
-| Does `LapiFailMode` replace `UpdateMaxFailure`, or only name the action after the counter trips? | assumed — wrap, do not delete. Keep `UpdateMaxFailure` as the stream/alone unhealthy counter. `LapiFailMode` is the ServeHTTP action on cache miss when unhealthy, and the LiveLookup error action. `-1` still means never unhealthy. | explore |
-| What happens in live mode, which has no counter and already returns `BannedValue` on any LAPI error? | assumed — live uses `LapiFailMode` per request (no new counter). `passthrough` → treat the error as allow; `ban` → current `BannedValue`; `captcha` only if a captcha provider is configured, else validate as ban. | explore |
-| Does one `AppsecFailMode` replace `CrowdsecAppsecFailureBlock` + `CrowdsecAppsecUnreachableBlock`? | assumed — replace those two booleans with one enum aligned to CrowdSec `appsec_failure_action` (`passthrough` \| `ban` \| `captcha`). Same action for HTTP 500 and unreachable. Keep `CrowdsecAppsecUnreadableBodyBlock`. | explore |
-| Which JSON key names and which enum strings? | assumed — public keys `lapiFailMode` and `appsecFailMode`. Values `passthrough` \| `ban` \| `captcha`. Defaults stay this plugin's fail-closed: `ban` (not spec passthrough). | explore |
-| When stream is unhealthy, should `passthrough` skip AppSec too, or still call AppSec on the pass path? | assumed — `LapiFailMode=passthrough` uses the existing pass path, so AppSec still runs if enabled. | explore |
-| Who owns the new keys on reclaim — CrowdsecConnection identity vs per-router Bouncer? | assumed — `LapiFailMode` on CrowdsecConnection identity (with `UpdateMaxFailure`). `AppsecFailMode` on Bouncer / `AppsecPolicy`, not in identity. | explore |
+None.
 
 ## Before merge
-- [ ] [P2] Human accept or rewrite the Decision needed rows before propose.
-- [ ] Do not start propose until that answer (caller stop at explore).
+- [ ] Implement tasks.md
+- [ ] Wait for CI on the apply
 
 ## Findings
 None.
@@ -80,28 +75,25 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as Specs |
+| Specs in this PR | 2 added / 1 modified | Same list as Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | f24a365ede0b78b97ea6744acb708bf3dcbfca51 | Card must match the branch you measured |
+| Reviewed head | 57a6be61a7ca1c81afda0710ca1598ea3d1d72d5 | Card must match the branch you measured |
 
 ### Stored data model
-None.
+Public Traefik plugin config will gain two string enums and drop three bools (not landed yet).
 
 ### Technical review
-Best possible solution: Not yet — wrap `UpdateMaxFailure` and replace the two AppSec bools is the assumed shape vs `master`; the human can pick otherwise.
+Best possible solution: Two CrowdSec-named actions plus keeping `UpdateMaxFailure` matches dest `master` and the spec; challenge relay from #9 stays.
 
-Do we have a high-confidence way to reproduce? Yes — `go test ./pkg/crowdsecconnection/` passed; stream-unhealthy ServeHTTP has no unit test and was traced in source.
+Do we have a high-confidence way to reproduce? Yes — current bool/counter paths on `master` after merge.
 
-Is this the best way to solve the issue? Not yet — Decision needed.
+Is this the best way to solve the issue? Yes for the agreed public surface; apply next.
 
 ### Evidence
 What I checked:
-- `handleStreamTicker` / `ServeHTTP` stream unhealthy (`pkg/crowdsecconnection/connection.go`, `pkg/bouncer/bouncer.go`, dest 4c07224)
-- Live LAPI error → `BannedValue` (`pkg/crowdsecconnection/connection_decisions.go`)
-- `AppsecQuery` 500 vs unreachable vs other non-200 (`pkg/crowdsecconnection/connection.go`)
-- Official `lapi_failure_action` / `appsec_failure_action` (`knowledge/research/ext_crowdsec_bouncers_failure-action/`)
-- `go test ./pkg/crowdsecconnection/` passed
-- CI in progress (runs 33965408137, 33965408138)
+- Merged origin/master 82dc3ce (bot-detection) with research index union
+- OpenSpec apply-ready `lapi-appsec-failure-action`
+- `AppsecQuery` now returns `(*AppsecResponse, error)` — failure action must not break challenge relay
 
 ### Rank-up moves
 None.

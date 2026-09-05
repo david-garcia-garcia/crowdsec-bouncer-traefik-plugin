@@ -12,3 +12,9 @@ findings: UpdateMaxFailure fights LapiFailMode; AppSec bools fight AppsecFailMod
 fixed: none (stop at explore)
 skipped: propose and later phases (caller)
 
+
+## propose (2026-09-05)
+phase: propose
+findings: none
+fixed: none
+skipped: implement
