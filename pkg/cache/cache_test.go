@@ -182,7 +182,7 @@ func Test_memoryClientsDoNotShare(t *testing.T) {
 	b.Close()
 }
 
-func Test_ClientCloseRedis(t *testing.T) {
+func Test_ClientCloseRedis(_ *testing.T) {
 	client := &Client{}
 	client.New(logger.New("INFO", ""), true, "127.0.0.1:1", []string{"127.0.0.1:1"}, "", "", "p")
 	client.Close()
