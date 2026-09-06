@@ -1,15 +1,18 @@
 package bouncer
 
 import (
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"text/template"
 
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec"
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
@@ -383,4 +386,91 @@ func TestHandleNextServeHTTPAppsecFailureAction(t *testing.T) {
 			t.Fatalf("ban on AppSec 500 want 403, got %d", recorder.Code)
 		}
 	})
+}
+
+// testCaptchaGraceBouncer is a captcha-valid bouncer with grace already set for 192.0.2.10.
+func testCaptchaGraceBouncer(t *testing.T, next http.HandlerFunc) *Bouncer {
+	t.Helper()
+	log := logger.New("ERROR", "")
+	cacheClient := &cache.Client{}
+	cacheClient.New(log, false, "", nil, "", "", "")
+	captchaClient := &captcha.Client{}
+	err := captchaClient.New(
+		log,
+		cacheClient,
+		&http.Client{},
+		configuration.HcaptchaProvider,
+		"", "", "", "",
+		"site", "secret",
+		"X-Remediation",
+		"",
+		60,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cacheClient.Set("192.0.2.10_captcha", cache.CaptchaDoneValue, 60)
+	return &Bouncer{
+		next:                    next,
+		captchaClient:           captchaClient,
+		log:                     log,
+		remediationCustomHeader: "X-Remediation",
+	}
+}
+
+func TestHandleRemediationServeHTTPCaptchaFormPostAfterGraceRedirects(t *testing.T) {
+	nextCalled := false
+	b := testCaptchaGraceBouncer(t, func(http.ResponseWriter, *http.Request) {
+		nextCalled = true
+	})
+	form := url.Values{}
+	form.Set("h-captcha-response", "used-token")
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/login", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recorder := httptest.NewRecorder()
+	b.handleRemediationServeHTTP(recorder, testClientRequest(req, "192.0.2.10"), cache.CaptchaValue, "lapi")
+	if nextCalled {
+		t.Fatal("captcha form POST after grace must not call next")
+	}
+	if recorder.Code != http.StatusFound {
+		t.Fatalf("status want 302 got %d", recorder.Code)
+	}
+	if got := recorder.Header().Get("X-Remediation"); got != "solved-captcha" {
+		t.Fatalf("header want solved-captcha got %q", got)
+	}
+}
+
+func TestHandleRemediationServeHTTPOrdinaryPostAfterGraceKeepsBody(t *testing.T) {
+	var nextMethod, nextBody string
+	b := testCaptchaGraceBouncer(t, func(_ http.ResponseWriter, r *http.Request) {
+		nextMethod = r.Method
+		raw, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		nextBody = string(raw)
+	})
+	payload := "username=alice&password=secret"
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/login", strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	b.handleRemediationServeHTTP(httptest.NewRecorder(), testClientRequest(req, "192.0.2.10"), cache.CaptchaValue, "lapi")
+	if nextMethod != http.MethodPost {
+		t.Fatalf("ordinary POST must reach next, method %q", nextMethod)
+	}
+	if nextBody != payload {
+		t.Fatalf("origin body want %q got %q", payload, nextBody)
+	}
+}
+
+func TestHandleRemediationServeHTTPGetAfterGraceCallsNext(t *testing.T) {
+	nextCalled := false
+	b := testCaptchaGraceBouncer(t, func(http.ResponseWriter, *http.Request) {
+		nextCalled = true
+	})
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/login", nil)
+	b.handleRemediationServeHTTP(httptest.NewRecorder(), testClientRequest(req, "192.0.2.10"), cache.CaptchaValue, "lapi")
+	if !nextCalled {
+		t.Fatal("GET during grace must call next")
+	}
 }
