@@ -67,7 +67,9 @@ func newQueryClient(appsecURL *url.URL, client *http.Client) *Client {
 }
 
 func Test_appsecQuery_streamingDoesNotBlock(t *testing.T) {
-	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+	var gotMethod string
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
 		rw.WriteHeader(http.StatusOK)
 	}))
 	defer appsecServer.Close()
@@ -84,6 +86,9 @@ func Test_appsecQuery_streamingDoesNotBlock(t *testing.T) {
 	case err := <-finished:
 		if err != nil {
 			t.Errorf("Query() on streaming request returned error: %v", err)
+		}
+		if gotMethod != http.MethodGet {
+			t.Errorf("AppSec method = %q, want GET", gotMethod)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Query() blocked on a streaming request body (issue #323 regression)")
