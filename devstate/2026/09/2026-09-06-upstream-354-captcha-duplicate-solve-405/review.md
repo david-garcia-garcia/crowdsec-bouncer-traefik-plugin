@@ -10,8 +10,8 @@ findings: reproduced grace Check true + captcha POST relays POST to next (no Loc
 fixed: n/a
 skipped: product apply deferred to propose/implement
 
-## propose (2026-09-06)
-phase: propose
-findings: new spec core_plugin_captcha_solved-form-post; change redirect-solved-captcha-form-post apply-ready
-fixed: n/a
-skipped: runtime apply deferred to implement
+## implement (2026-09-06)
+phase: implement
+findings: grace captcha form POST now 302; ordinary POST body restored; go test captcha+bouncer passed; CI queued
+fixed: pkg/captcha IsCaptchaFormPost+WriteSolvedRedirect; bouncer handleRemediationServeHTTP intercept
+skipped: usage packet (note large)
