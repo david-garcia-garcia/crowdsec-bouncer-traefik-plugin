@@ -9,6 +9,6 @@ JobName: 2026-09-06-upstream-370-stream-poll-lease-interval-one
 | propose | [x] | [x] | 2026-09-06T15:13:58Z |
 | implement | [x] | [x] | 2026-09-06T15:27:55Z |
 | codereview | [x] | [x] | 2026-09-06T15:31:15Z |
-| devdocsimpact | [x] | [ ] | |
-| archive | [x] | [ ] | |
-| pullrequest | [ ] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-06T15:33:47Z |
+| archive | [x] | [x] | 2026-09-06T15:33:47Z |
+| pullrequest | [x] | [x] | 2026-09-06T15:41:14Z |
