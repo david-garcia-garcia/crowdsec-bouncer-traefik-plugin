@@ -1,0 +1,4 @@
+- created knowledge/research/ext_traefik-modsecurity_health_tracker/
+- created knowledge/devdocs/core_plugin_health.md
+- updated knowledge/devdocs/core_plugin_middleware.md
+- updated knowledge/devdocs/index_core_plugin.md

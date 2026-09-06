@@ -7,3 +7,4 @@
 - dragonfly
 - redis
 - traefik-geoblock
+- traefik-modsecurity

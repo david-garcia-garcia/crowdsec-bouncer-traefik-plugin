@@ -117,6 +117,15 @@ func Test_ValidateParams(t *testing.T) {
 	cfgEmptyAction := getMinimalConfig()
 	cfgEmptyAction.CrowdsecLapiFailureAction = ""
 	cfgEmptyAction.CrowdsecAppsecFailureAction = ""
+	cfgBackoffTimeout := getMinimalConfig()
+	cfgBackoffTimeout.LapiFailureBackoffTimeout = -1
+	cfgBackoffWindow := getMinimalConfig()
+	cfgBackoffWindow.AppsecFailureBackoffBucketWindow = -1
+	cfgBackoffThreshold := getMinimalConfig()
+	cfgBackoffThreshold.LapiFailureBackoffBucketThreshold = -2
+	cfgBackoffOptOut := getMinimalConfig()
+	cfgBackoffOptOut.LapiFailureBackoffBucketThreshold = -1
+	cfgBackoffOptOut.AppsecFailureBackoffTimeout = 0
 	type args struct {
 		config *Config
 	}
@@ -142,6 +151,10 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Captcha LAPI action with provider", args: args{config: cfgCaptchaWithProvider}, wantErr: false},
 		{name: "Unknown AppSec failure action", args: args{config: cfgUnknownAction}, wantErr: true},
 		{name: "Empty failure actions use default ban", args: args{config: cfgEmptyAction}, wantErr: false},
+		{name: "Negative LAPI backoff timeout", args: args{config: cfgBackoffTimeout}, wantErr: true},
+		{name: "Negative AppSec backoff window", args: args{config: cfgBackoffWindow}, wantErr: true},
+		{name: "LAPI backoff threshold less than -1", args: args{config: cfgBackoffThreshold}, wantErr: true},
+		{name: "Backoff opt-out threshold -1 and timeout 0", args: args{config: cfgBackoffOptOut}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

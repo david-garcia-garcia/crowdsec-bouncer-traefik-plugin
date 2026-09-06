@@ -25,3 +25,8 @@ priority: normal
 local: core_plugin_lapi_usage-metrics.md
 description: How this plugin POSTs CrowdSec usage-metrics with origin and ip_type labels.
 
+## Failure backoff Tracker
+priority: normal
+local: core_plugin_health.md
+description: How this plugin skips LAPI and AppSec HTTP after repeated backend failures.
+

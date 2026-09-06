@@ -482,6 +482,30 @@ make run
   - int64
   - default: 10
   - Default timeout in seconds for contacting Crowdsec LAPI
+- LapiFailureBackoffTimeout
+  - int64
+  - default: 30
+  - Seconds to skip live/none LAPI HTTP after the failure threshold is reached. Set 0 to never skip.
+- LapiFailureBackoffBucketWindow
+  - int64
+  - default: 30
+  - Tumbling window in seconds for counting live LAPI failures. Set 0 so the count never resets except after backoff.
+- LapiFailureBackoffBucketThreshold
+  - int64
+  - default: 5
+  - Live LAPI failures inside the window that trip backoff. Set -1 to never trip.
+- AppsecFailureBackoffTimeout
+  - int64
+  - default: 30
+  - Seconds to skip AppSec HTTP after the failure threshold is reached. Set 0 to never skip.
+- AppsecFailureBackoffBucketWindow
+  - int64
+  - default: 30
+  - Tumbling window in seconds for counting AppSec listener failures. Set 0 so the count never resets except after backoff.
+- AppsecFailureBackoffBucketThreshold
+  - int64
+  - default: 5
+  - AppSec unreachable/500 failures inside the window that trip backoff. Set -1 to never trip.
 - UpdateIntervalSeconds
   - int64
   - default: 60

@@ -1,0 +1,17 @@
+issueKey: 2026-09-06-crowdsec-client-failure-ratelimit
+jobName: 2026-09-06-crowdsec-client-failure-ratelimit
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:ca5aa7a231b3b6d882f2624b8ec5814ce005288ad928949bfe4c19cf1405720f
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: crowdsec-client-failure-backoff
+pr:
+  id: 55
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/55

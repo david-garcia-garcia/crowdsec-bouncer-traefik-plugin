@@ -7,7 +7,7 @@ The reclaim value for one CrowdSec LAPI/CAPI decisions backend: stream/metrics t
 _Avoid_: CrowdsecConnection, AppSec client, Bouncer, Plugin, process singleton, `sync.Once`
 
 **AppSec Client**:
-The reclaim value for one CrowdSec AppSec listener: HTTP client, host, key, TLS, body limit. Keyed by AppSec URL+key+TLS. Not the LAPI Client.
+The reclaim value for one CrowdSec AppSec listener: HTTP client, host, key, TLS, body limit, and failure-backoff Tracker. Keyed by AppSec URL+key+TLS+timeout+backoff knobs. Not the LAPI Client.
 _Avoid_: CrowdsecConnection, LAPI, `AppsecQuery` on the LAPI type
 
 **Stream session**:
@@ -35,6 +35,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - Resolve client IP with `pkg/ip.GetRemoteIP`. Fold `remoteIP`, parsed `net.IP`, and `ipType` into `clientRequest`. Keep the name `req`. Do not parse `RemoteAddr` on LAPI or AppSec. Do not put scopes or origin on that type.
 - Range and header-mapped CrowdSec scopes live in `pkg/decisionscope`. Do not geolocate in `New` or `ServeHTTP`.
 - Live LAPI error and stream-unhealthy cache miss use `crowdsecLapiFailureAction`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled).
+- Skip live LAPI HTTP and AppSec HTTP while that client's Tracker is unhealthy (`pkg/health`). Apply the same failure action without waiting on `HTTPTimeoutSeconds`. Stream polls still use `updateMaxFailure`.
 - Watch logs `reclaim_put|bind|orphan|reclaim|dispose`.
 
 ## Pattern snippet
@@ -64,6 +65,7 @@ return bouncer.New(next, name, config, nil, appsecClient, log)
 
 - Do not put middleware name, `next`, ban/captcha templates, trusted IPs, Enabled, or AppSec knobs in the LAPI reclaim key.
 - `crowdsecLapiFailureAction` is on LAPI Client identity (shared with `updateMaxFailure`). `crowdsecAppsecFailureAction` stays on Bouncer.
+- LAPI live/none identity includes the three LAPI backoff knobs. AppSec identity includes the three AppSec backoff knobs. Stream session prefix does not.
 - Stream/alone: CrowdSec stores one `GET /v1/decisions/stream` cursor per hashed API key plus the IP LAPI sees (this process’s outbound address). Reclaim `Open` key is session prefix plus settings hash. A second live middleware on the same LAPI URL+key is warn-and-wire via `PeekLivePrefix` (first New wins LAPI knobs, not AppSec). Last holder Sleeps tickers; reload with the same snapshot Wakes (`startup=false`); a new snapshot Opens a new key and the sleeper dies on grace. Isolated backends need a second bouncer key. Live/none split on LAPI identity (intervals included, AppSec excluded).
 - LAPI `Close()` stops tickers, idle LAPI HTTP, and the cache Redis pool. AppSec `Close()` releases idle AppSec HTTP. Do not use `sync.Once`.
 - Both puts use `OpenWithGrace` 30s (`ReclaimGraceDuration`). `reclaim.DefaultGrace` stays 10s.

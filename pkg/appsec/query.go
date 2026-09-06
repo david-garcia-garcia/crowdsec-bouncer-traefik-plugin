@@ -90,6 +90,11 @@ func isMethodWithBody(method string) bool {
 // Query forwards the request to this AppSec HTTP client.
 // A structured JSON envelope is returned when AppSec supplies a non-empty action.
 func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response, error) {
+	if c.appsecBackoffUnhealthy() {
+		c.log.Debug("appsecQuery:backoff")
+		return resultForFailureAction(pol.FailureAction, "appsecQuery:backoff")
+	}
+
 	req, err := c.newAppsecForwardRequest(ip, httpReq, pol)
 	if err != nil {
 		return nil, err
@@ -97,12 +102,14 @@ func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response,
 
 	res, err := c.httpClient.Do(req)
 	if err != nil || isReverseProxyError(res.StatusCode) {
+		c.recordAppsecFailure()
 		c.log.Error("appsecQuery:unreachable")
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
 	defer c.drainResponse(res)
 
 	if res.StatusCode == http.StatusInternalServerError {
+		c.recordAppsecFailure()
 		c.log.Info("appsecQuery:failure")
 		return resultForFailureAction(pol.FailureAction, "appsecQuery statusCode:500")
 	}

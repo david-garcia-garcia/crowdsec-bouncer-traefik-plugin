@@ -17,59 +17,65 @@ const keyPrefix = "lapi:"
 // bouncer row. Ban/captcha templates, trusted IPs, Enabled, middleware name,
 // and log path are not included here either.
 type identity struct {
-	Mode                         string   `json:"mode"`
-	LapiScheme                   string   `json:"lapiScheme"`
-	LapiHost                     string   `json:"lapiHost"`
-	LapiPath                     string   `json:"lapiPath"`
-	LapiKey                      string   `json:"lapiKey"`
-	CapiMachineID                string   `json:"capiMachineId"`
-	CapiPassword                 string   `json:"capiPassword"`
-	CapiScenarios                []string `json:"capiScenarios"`
-	UpdateIntervalSeconds        int64    `json:"updateIntervalSeconds"`
-	MetricsUpdateIntervalSeconds int64    `json:"metricsUpdateIntervalSeconds"`
-	UpdateMaxFailure             int64    `json:"updateMaxFailure"`
-	LapiFailureAction            string   `json:"lapiFailureAction"`
-	StreamStartupBlock           bool     `json:"streamStartupBlock"`
-	DefaultDecisionSeconds       int64    `json:"defaultDecisionSeconds"`
-	HTTPTimeoutSeconds           int64    `json:"httpTimeoutSeconds"`
-	RedisCacheEnabled            bool     `json:"redisCacheEnabled"`
-	RedisCacheHost               string   `json:"redisCacheHost"`
-	RedisCacheReadHosts          []string `json:"redisCacheReadHosts"`
-	RedisCachePassword           string   `json:"redisCachePassword"`
-	RedisCacheDatabase           string   `json:"redisCacheDatabase"`
-	RedisCacheUnreachableBlock   bool     `json:"redisCacheUnreachableBlock"`
-	LapiTLSInsecureVerify        bool     `json:"lapiTlsInsecureVerify"`
-	LapiTLSCertificateAuthority  string   `json:"lapiTlsCa"`
-	LapiTLSCertificateBouncer    string   `json:"lapiTlsCert"`
+	Mode                              string   `json:"mode"`
+	LapiScheme                        string   `json:"lapiScheme"`
+	LapiHost                          string   `json:"lapiHost"`
+	LapiPath                          string   `json:"lapiPath"`
+	LapiKey                           string   `json:"lapiKey"`
+	CapiMachineID                     string   `json:"capiMachineId"`
+	CapiPassword                      string   `json:"capiPassword"`
+	CapiScenarios                     []string `json:"capiScenarios"`
+	UpdateIntervalSeconds             int64    `json:"updateIntervalSeconds"`
+	MetricsUpdateIntervalSeconds      int64    `json:"metricsUpdateIntervalSeconds"`
+	UpdateMaxFailure                  int64    `json:"updateMaxFailure"`
+	LapiFailureAction                 string   `json:"lapiFailureAction"`
+	StreamStartupBlock                bool     `json:"streamStartupBlock"`
+	DefaultDecisionSeconds            int64    `json:"defaultDecisionSeconds"`
+	HTTPTimeoutSeconds                int64    `json:"httpTimeoutSeconds"`
+	LapiFailureBackoffTimeout         int64    `json:"lapiFailureBackoffTimeout"`
+	LapiFailureBackoffBucketWindow    int64    `json:"lapiFailureBackoffBucketWindow"`
+	LapiFailureBackoffBucketThreshold int64    `json:"lapiFailureBackoffBucketThreshold"`
+	RedisCacheEnabled                 bool     `json:"redisCacheEnabled"`
+	RedisCacheHost                    string   `json:"redisCacheHost"`
+	RedisCacheReadHosts               []string `json:"redisCacheReadHosts"`
+	RedisCachePassword                string   `json:"redisCachePassword"`
+	RedisCacheDatabase                string   `json:"redisCacheDatabase"`
+	RedisCacheUnreachableBlock        bool     `json:"redisCacheUnreachableBlock"`
+	LapiTLSInsecureVerify             bool     `json:"lapiTlsInsecureVerify"`
+	LapiTLSCertificateAuthority       string   `json:"lapiTlsCa"`
+	LapiTLSCertificateBouncer         string   `json:"lapiTlsCert"`
 }
 
 // identityFrom maps configuration.Config into reclaim identity fields.
 func identityFrom(cfg *configuration.Config) identity {
 	return identity{
-		Mode:                         cfg.CrowdsecMode,
-		LapiScheme:                   cfg.CrowdsecLapiScheme,
-		LapiHost:                     cfg.CrowdsecLapiHost,
-		LapiPath:                     cfg.CrowdsecLapiPath,
-		LapiKey:                      cfg.CrowdsecLapiKey,
-		CapiMachineID:                cfg.CrowdsecCapiMachineID,
-		CapiPassword:                 cfg.CrowdsecCapiPassword,
-		CapiScenarios:                cfg.CrowdsecCapiScenarios,
-		UpdateIntervalSeconds:        cfg.UpdateIntervalSeconds,
-		MetricsUpdateIntervalSeconds: cfg.MetricsUpdateIntervalSeconds,
-		UpdateMaxFailure:             cfg.UpdateMaxFailure,
-		LapiFailureAction:            configuration.EffectiveFailureAction(cfg.CrowdsecLapiFailureAction),
-		StreamStartupBlock:           cfg.StreamStartupBlock,
-		DefaultDecisionSeconds:       cfg.DefaultDecisionSeconds,
-		HTTPTimeoutSeconds:           cfg.HTTPTimeoutSeconds,
-		RedisCacheEnabled:            cfg.RedisCacheEnabled,
-		RedisCacheHost:               cfg.RedisCacheHost,
-		RedisCacheReadHosts:          cfg.RedisCacheReadHosts,
-		RedisCachePassword:           cfg.RedisCachePassword,
-		RedisCacheDatabase:           cfg.RedisCacheDatabase,
-		RedisCacheUnreachableBlock:   cfg.RedisCacheUnreachableBlock,
-		LapiTLSInsecureVerify:        cfg.CrowdsecLapiTLSInsecureVerify,
-		LapiTLSCertificateAuthority:  cfg.CrowdsecLapiTLSCertificateAuthority,
-		LapiTLSCertificateBouncer:    cfg.CrowdsecLapiTLSCertificateBouncer,
+		Mode:                              cfg.CrowdsecMode,
+		LapiScheme:                        cfg.CrowdsecLapiScheme,
+		LapiHost:                          cfg.CrowdsecLapiHost,
+		LapiPath:                          cfg.CrowdsecLapiPath,
+		LapiKey:                           cfg.CrowdsecLapiKey,
+		CapiMachineID:                     cfg.CrowdsecCapiMachineID,
+		CapiPassword:                      cfg.CrowdsecCapiPassword,
+		CapiScenarios:                     cfg.CrowdsecCapiScenarios,
+		UpdateIntervalSeconds:             cfg.UpdateIntervalSeconds,
+		MetricsUpdateIntervalSeconds:      cfg.MetricsUpdateIntervalSeconds,
+		UpdateMaxFailure:                  cfg.UpdateMaxFailure,
+		LapiFailureAction:                 configuration.EffectiveFailureAction(cfg.CrowdsecLapiFailureAction),
+		StreamStartupBlock:                cfg.StreamStartupBlock,
+		DefaultDecisionSeconds:            cfg.DefaultDecisionSeconds,
+		HTTPTimeoutSeconds:                cfg.HTTPTimeoutSeconds,
+		LapiFailureBackoffTimeout:         cfg.LapiFailureBackoffTimeout,
+		LapiFailureBackoffBucketWindow:    cfg.LapiFailureBackoffBucketWindow,
+		LapiFailureBackoffBucketThreshold: cfg.LapiFailureBackoffBucketThreshold,
+		RedisCacheEnabled:                 cfg.RedisCacheEnabled,
+		RedisCacheHost:                    cfg.RedisCacheHost,
+		RedisCacheReadHosts:               cfg.RedisCacheReadHosts,
+		RedisCachePassword:                cfg.RedisCachePassword,
+		RedisCacheDatabase:                cfg.RedisCacheDatabase,
+		RedisCacheUnreachableBlock:        cfg.RedisCacheUnreachableBlock,
+		LapiTLSInsecureVerify:             cfg.CrowdsecLapiTLSInsecureVerify,
+		LapiTLSCertificateAuthority:       cfg.CrowdsecLapiTLSCertificateAuthority,
+		LapiTLSCertificateBouncer:         cfg.CrowdsecLapiTLSCertificateBouncer,
 	}
 }
 
