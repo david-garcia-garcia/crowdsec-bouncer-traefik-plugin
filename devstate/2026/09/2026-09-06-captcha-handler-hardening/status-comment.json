@@ -1,5 +1,5 @@
 {
-  "commentId": "pending",
+  "commentId": "pr-body",
   "issueKey": "2026-09-06-captcha-handler-hardening",
   "markerValue": "2026-09-06-captcha-handler-hardening",
   "issueHost": "local"
