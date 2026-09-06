@@ -393,7 +393,11 @@ make run
 - CrowdsecAppsecFailureAction
   - string
   - default: `ban`, expected values are: `passthrough`, `ban`, `captcha`
-  - What to do when AppSec does not return a usable verdict: HTTP 500 or unreachable (dial or 502/503/504). `ban` drops the request. `passthrough` lets 500/unreachable continue as allow. `captcha` uses the plugin captcha client (`captchaProvider` must be set). HTTP/2 or HTTP/3 requests whose body cannot be buffered (no Content-Length, typical of gRPC streams) always send a headers-only GET to AppSec; this key does not drop those requests. **BREAKING:** this key replaces `crowdsecAppsecFailureBlock`, `crowdsecAppsecUnreachableBlock`, and `crowdsecAppsecUnreadableBodyBlock`. Operators who had those bools set to `false` MUST set `crowdsecAppsecFailureAction: passthrough` for 500/unreachable.
+  - What to do when AppSec does not return a usable verdict: HTTP 500 or unreachable (dial or 502/503/504). `ban` drops the request. `passthrough` lets 500/unreachable continue as allow. `captcha` uses the plugin captcha client (`captchaProvider` must be set). This key does not drop HTTP/2 or HTTP/3 requests whose body cannot be buffered; use `CrowdsecAppsecUnreadableBodyBlock` for that. **BREAKING:** this key replaces `crowdsecAppsecFailureBlock` and `crowdsecAppsecUnreachableBlock`. Operators who had those bools set to `false` MUST set `crowdsecAppsecFailureAction: passthrough` for 500/unreachable.
+- CrowdsecAppsecUnreadableBodyBlock
+  - bool
+  - default: `false`
+  - When `true`, POST/PUT/PATCH/DELETE requests whose body cannot be buffered (HTTP/2 or HTTP/3 with no Content-Length, typical of gRPC streams) are dropped without calling AppSec. Default `false` sends a headers-only GET to AppSec and leaves the original stream untouched (lua `APPSEC_DROP_UNREADABLE_BODY`). Independent of `CrowdsecAppsecFailureAction`. GET/HEAD are never dropped by this key.
 - CrowdsecAppsecBodyLimit
   - int64
   - default: 10485760 (= 10MB)
@@ -644,6 +648,7 @@ http:
           crowdsecAppsecHost: crowdsec:7422
           crowdsecAppsecPath: "/"
           crowdsecAppsecFailureAction: ban
+          crowdsecAppsecUnreadableBodyBlock: false
           crowdsecAppsecBodyLimit: 10485760
           crowdsecLapiKey: privateKey-foo
           crowdsecLapiScheme: http

@@ -31,9 +31,10 @@ const (
 	ActionChallenge = "challenge"
 )
 
-// Policy is per-route AppSec fallback when the listener does not return a usable verdict.
+// Policy is per-route AppSec fallback and unreadable-body drop.
 type Policy struct {
-	FailureAction string
+	FailureAction       string
+	UnreadableBodyBlock bool
 }
 
 // ErrFailureCaptcha tells the bouncer to run pkg/captcha instead of ban or next.
@@ -73,10 +74,20 @@ func isBodyUnreadable(httpReq *http.Request) bool {
 	return httpReq.Body != nil && httpReq.Body != http.NoBody && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
 }
 
+// isMethodWithBody is true for methods that may carry a request body toward AppSec.
+func isMethodWithBody(method string) bool {
+	switch method {
+	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+		return true
+	default:
+		return false
+	}
+}
+
 // Query forwards the request to this AppSec HTTP client.
 // A structured JSON envelope is returned when AppSec supplies a non-empty action.
 func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response, error) {
-	req, err := c.newAppsecForwardRequest(ip, httpReq)
+	req, err := c.newAppsecForwardRequest(ip, httpReq, pol)
 	if err != nil {
 		return nil, err
 	}
@@ -101,13 +112,13 @@ func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response,
 }
 
 // newAppsecForwardRequest builds the AppSec listener request, copying client headers and identity.
-func (c *Client) newAppsecForwardRequest(ip string, httpReq *http.Request) (*http.Request, error) {
+func (c *Client) newAppsecForwardRequest(ip string, httpReq *http.Request, pol Policy) (*http.Request, error) {
 	routeURL := url.URL{
 		Scheme: c.appsecScheme,
 		Host:   c.appsecHost,
 		Path:   c.appsecPath,
 	}
-	req, err := c.newAppsecBodyRequest(routeURL.String(), httpReq)
+	req, err := c.newAppsecBodyRequest(routeURL.String(), httpReq, pol)
 	if err != nil {
 		return nil, err
 	}
@@ -127,9 +138,12 @@ func (c *Client) newAppsecForwardRequest(ip string, httpReq *http.Request) (*htt
 }
 
 // newAppsecBodyRequest chooses GET (no/unreadable body) or POST (copied client body) toward AppSec.
-func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request) (*http.Request, error) {
+func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol Policy) (*http.Request, error) {
 	switch {
 	case isBodyUnreadable(httpReq):
+		if pol.UnreadableBodyBlock && isMethodWithBody(httpReq.Method) {
+			return nil, errors.New("appsecQuery:unreadableBody dropped")
+		}
 		// HTTP/2+ streams have no finite body to copy; inspect headers only (issue #323).
 		req, _ := http.NewRequest(http.MethodGet, target, nil)
 		return req, nil

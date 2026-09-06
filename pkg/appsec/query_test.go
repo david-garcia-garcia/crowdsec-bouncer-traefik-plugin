@@ -155,6 +155,123 @@ func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 	}
 }
 
+func Test_isMethodWithBody(t *testing.T) {
+	tests := []struct {
+		method string
+		want   bool
+	}{
+		{method: http.MethodPost, want: true},
+		{method: http.MethodPut, want: true},
+		{method: http.MethodPatch, want: true},
+		{method: http.MethodDelete, want: true},
+		{method: http.MethodGet, want: false},
+		{method: http.MethodHead, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.method, func(t *testing.T) {
+			if got := isMethodWithBody(tt.method); got != tt.want {
+				t.Errorf("isMethodWithBody(%q) = %v, want %v", tt.method, got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_appsecQuery_unreadableBodyDroppedWhenBlock(t *testing.T) {
+	appsecCalled := false
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		appsecCalled = true
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	client := newQueryClient(appsecURL, appsecServer.Client())
+	done := make(chan struct{})
+	defer close(done)
+	finished := make(chan error, 1)
+	go func() {
+		_, err := client.Query("1.2.3.4", newStreamingRequest(done), Policy{
+			FailureAction:       configuration.FailureActionBan,
+			UnreadableBodyBlock: true,
+		})
+		finished <- err
+	}()
+	select {
+	case err := <-finished:
+		if err == nil || !strings.Contains(err.Error(), "unreadableBody dropped") {
+			t.Errorf("Query() want unreadableBody dropped, got %v", err)
+		}
+		if appsecCalled {
+			t.Error("AppSec was called; want drop before the listener")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Query() blocked on a streaming request body (issue #323 regression)")
+	}
+}
+
+func Test_appsecQuery_unreadableBodyGetNotDroppedWhenBlock(t *testing.T) {
+	var gotMethod string
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	client := newQueryClient(appsecURL, appsecServer.Client())
+	done := make(chan struct{})
+	defer close(done)
+	finished := make(chan error, 1)
+	go func() {
+		_, err := client.Query("1.2.3.4", newUnreadableGetRequest(done), Policy{
+			FailureAction:       configuration.FailureActionBan,
+			UnreadableBodyBlock: true,
+		})
+		finished <- err
+	}()
+	select {
+	case err := <-finished:
+		if err != nil {
+			t.Errorf("Query() on an unreadable GET with UnreadableBodyBlock returned error: %v", err)
+		}
+		if gotMethod != http.MethodGet {
+			t.Errorf("AppSec method = %q, want GET", gotMethod)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Query() blocked on an HTTP/3 GET request body (issue #351 regression)")
+	}
+}
+
+func Test_appsecQuery_unreadableBodyDroppedWhenBlockDespitePassthrough(t *testing.T) {
+	appsecCalled := false
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		appsecCalled = true
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	client := newQueryClient(appsecURL, appsecServer.Client())
+	done := make(chan struct{})
+	defer close(done)
+	finished := make(chan error, 1)
+	go func() {
+		_, err := client.Query("1.2.3.4", newStreamingRequest(done), Policy{
+			FailureAction:       configuration.FailureActionPassthrough,
+			UnreadableBodyBlock: true,
+		})
+		finished <- err
+	}()
+	select {
+	case err := <-finished:
+		if err == nil || !strings.Contains(err.Error(), "unreadableBody dropped") {
+			t.Errorf("Query() want unreadableBody dropped under passthrough, got %v", err)
+		}
+		if appsecCalled {
+			t.Error("AppSec was called; passthrough must not override UnreadableBodyBlock")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Query() blocked on a streaming request body (issue #323 regression)")
+	}
+}
+
 func Test_appsecQuery_reusesConnection(t *testing.T) {
 	for _, status := range []int{http.StatusOK, http.StatusForbidden, http.StatusInternalServerError} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
