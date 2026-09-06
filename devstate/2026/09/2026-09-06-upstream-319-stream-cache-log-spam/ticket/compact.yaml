@@ -1,0 +1,4 @@
+host: local
+ref: none
+title: "[BUG] Traefik logs filling up with \"msg=handleStreamCache:updated\" after upgrade to v1.6.0-alpha"
+url: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/319

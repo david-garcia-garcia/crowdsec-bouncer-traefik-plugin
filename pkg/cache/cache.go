@@ -13,14 +13,6 @@ import (
 )
 
 const (
-	// BannedValue Banned string.
-	BannedValue = "t"
-	// NoBannedValue No banned string.
-	NoBannedValue = "f"
-	// CaptchaValue Need captcha string.
-	CaptchaValue = "c"
-	// CaptchaDoneValue Captcha done string.
-	CaptchaDoneValue = "d"
 	// CacheMiss error string when cache is miss.
 	CacheMiss = "cache:miss"
 	// CacheUnreachable error string when cache is unreachable.

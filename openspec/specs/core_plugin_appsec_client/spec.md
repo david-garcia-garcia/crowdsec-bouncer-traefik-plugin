@@ -57,3 +57,10 @@ Public config `crowdsecAppsecTimeoutMilliseconds` SHALL be an integer millisecon
 #### Scenario: Unreachable AppSec with a short timeout and passthrough
 - **WHEN** AppSec does not answer within the configured AppSec timeout and `crowdsecAppsecFailureAction` is `passthrough`
 - **THEN** the request proceeds as allow without waiting the LAPI timeout
+
+### Requirement: AppSec User-Agent includes plugin version
+AppSec Query SHALL set the outbound `User-Agent` to `Crowdsec-Bouncer-Traefik-Plugin/` plus the plugin version passed into the AppSec Client. It MUST NOT leave that header empty when a version was passed.
+
+#### Scenario: Query User-Agent matches constructed version
+- **WHEN** an AppSec Client constructed with plugin version `v9.9.9-test` queries the AppSec listener
+- **THEN** the outbound request `User-Agent` is `Crowdsec-Bouncer-Traefik-Plugin/v9.9.9-test`

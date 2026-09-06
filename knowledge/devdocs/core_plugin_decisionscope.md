@@ -20,7 +20,7 @@ _Avoid_: putting Country on the reclaim key, parsing `RemoteAddr` for country
 
 ## Overview
 
-Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from the blob, and the request lookup that merges Ip, Range, and header hits. Ban wins over captcha across those scopes. This package must not geolocate.
+Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from the blob, and the request lookup that merges Ip, Range, and header hits. Ban, captcha, and none payloads are `BannedValue` (`t`), `CaptchaValue` (`c`), and `NoBannedValue` (`f`) on that package. Ban wins over captcha across those scopes. This package must not geolocate.
 
 ## How to use
 

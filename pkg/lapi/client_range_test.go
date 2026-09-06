@@ -18,16 +18,16 @@ func newTestRangeClient(t *testing.T) (*Client, *cache.Client) {
 
 func TestHydrateRangeMembershipFromBlob(t *testing.T) {
 	lapiClient, cacheClient := newTestRangeClient(t)
-	decisionscope.AddRange(cacheClient, "10.0.0.0/8", cache.BannedValue, 60)
+	decisionscope.AddRange(cacheClient, "10.0.0.0/8", decisionscope.BannedValue, 60)
 	lapiClient.hydrateRangeMembership()
-	if got := lapiClient.RangeMembership().Remediation(net.ParseIP("10.1.2.3")); got != cache.BannedValue {
+	if got := lapiClient.RangeMembership().Remediation(net.ParseIP("10.1.2.3")); got != decisionscope.BannedValue {
 		t.Fatalf("hydrate got %q, want ban", got)
 	}
 }
 
 func TestHydrateRangeMembershipEmptyBlob(t *testing.T) {
 	lapiClient, cacheClient := newTestRangeClient(t)
-	decisionscope.AddRange(cacheClient, "10.0.0.0/8", cache.BannedValue, 60)
+	decisionscope.AddRange(cacheClient, "10.0.0.0/8", decisionscope.BannedValue, 60)
 	lapiClient.hydrateRangeMembership()
 	cacheClient.Delete(decisionscope.RangeIndexKey)
 	lapiClient.hydrateRangeMembership()
@@ -38,7 +38,7 @@ func TestHydrateRangeMembershipEmptyBlob(t *testing.T) {
 
 func TestHydrateRangeMembershipKeepsLastOnUnreachable(t *testing.T) {
 	lapiClient, cacheClient := newTestRangeClient(t)
-	decisionscope.AddRange(cacheClient, "10.0.0.0/8", cache.BannedValue, 60)
+	decisionscope.AddRange(cacheClient, "10.0.0.0/8", decisionscope.BannedValue, 60)
 	lapiClient.hydrateRangeMembership()
 
 	unreachable := &cache.Client{}
@@ -46,19 +46,19 @@ func TestHydrateRangeMembershipKeepsLastOnUnreachable(t *testing.T) {
 	defer unreachable.Close()
 	lapiClient.cacheClient = unreachable
 	lapiClient.hydrateRangeMembership()
-	if got := lapiClient.RangeMembership().Remediation(net.ParseIP("10.1.2.3")); got != cache.BannedValue {
+	if got := lapiClient.RangeMembership().Remediation(net.ParseIP("10.1.2.3")); got != decisionscope.BannedValue {
 		t.Fatalf("unreachable hydrate wiped membership, got %q", got)
 	}
 }
 
 func TestHandleStreamCacheLeaseHitHydrates(t *testing.T) {
 	lapiClient, cacheClient := newTestRangeClient(t)
-	cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, 60)
-	decisionscope.AddRange(cacheClient, "10.0.0.0/8", cache.BannedValue, 60)
+	cacheClient.Set(cacheTimeoutKey, decisionscope.NoBannedValue, 60)
+	decisionscope.AddRange(cacheClient, "10.0.0.0/8", decisionscope.BannedValue, 60)
 	if err := lapiClient.handleStreamCache(); err != nil {
 		t.Fatalf("lease hit: %v", err)
 	}
-	if got := lapiClient.RangeMembership().Remediation(net.ParseIP("10.1.2.3")); got != cache.BannedValue {
+	if got := lapiClient.RangeMembership().Remediation(net.ParseIP("10.1.2.3")); got != decisionscope.BannedValue {
 		t.Fatalf("lease hit hydrate got %q, want ban", got)
 	}
 }

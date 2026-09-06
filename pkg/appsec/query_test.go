@@ -176,6 +176,29 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 	}
 }
 
+// Test_appsecQuery_userAgentIncludesPluginVersion checks AppSec Query User-Agent includes the Client plugin version.
+func Test_appsecQuery_userAgentIncludesPluginVersion(t *testing.T) {
+	const wantVersion = "v9.9.9-test"
+	gotUA := ""
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		gotUA = r.Header.Get("User-Agent")
+		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write([]byte(`{"action":"allow"}`))
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	client := newQueryClient(appsecURL, appsecServer.Client())
+	client.pluginVersion = wantVersion
+	_, err := client.Query("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), Policy{})
+	if err != nil {
+		t.Fatalf("Query() returned error: %v", err)
+	}
+	wantUA := "Crowdsec-Bouncer-Traefik-Plugin/" + wantVersion
+	if gotUA != wantUA {
+		t.Fatalf("User-Agent %q want %q", gotUA, wantUA)
+	}
+}
+
 func Test_appsecQuery_allowJSONPasses(t *testing.T) {
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusOK)
@@ -223,6 +246,25 @@ func Test_appsecQuery_challengeJSON(t *testing.T) {
 	}
 	if decision.HTTPStatus != http.StatusOK || decision.UserBodyContent != "<html>challenge</html>" {
 		t.Fatalf("Query() challenge fields: %#v", decision)
+	}
+}
+
+func Test_appsecQuery_captchaJSON(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusForbidden)
+		_, _ = rw.Write([]byte(`{"action":"captcha","http_status":403,"user_body_content":"<html>captcha</html>"}`))
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), Policy{})
+	if err != nil {
+		t.Fatalf("Query() returned error: %v", err)
+	}
+	if decision == nil || decision.Action != ActionCaptcha {
+		t.Fatalf("Query() want captcha, got %#v", decision)
+	}
+	if decision.HTTPStatus != http.StatusForbidden || decision.UserBodyContent != "<html>captcha</html>" {
+		t.Fatalf("Query() captcha fields: %#v", decision)
 	}
 }
 

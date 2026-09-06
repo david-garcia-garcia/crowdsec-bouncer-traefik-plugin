@@ -14,6 +14,11 @@ import (
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
+const (
+	// CaptchaDoneValue is the cache payload for a solved captcha still in grace.
+	CaptchaDoneValue = "d"
+)
+
 // Client Captcha client.
 type Client struct {
 	Valid                   bool
@@ -95,7 +100,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	}
 	if valid {
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
-		c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds)
+		c.cacheClient.Set(remoteIP+"_captcha", CaptchaDoneValue, c.gracePeriodSeconds)
 		if c.remediationCustomHeader != "" {
 			rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
 		}
@@ -120,7 +125,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 // Check Verify if the captcha is already done.
 func (c *Client) Check(remoteIP string) bool {
 	value, _ := c.cacheClient.Get(remoteIP + "_captcha")
-	passed := value == cache.CaptchaDoneValue
+	passed := value == CaptchaDoneValue
 	c.log.Debug(fmt.Sprintf("captcha:Check ip:%s pass:%v", remoteIP, passed))
 	return passed
 }

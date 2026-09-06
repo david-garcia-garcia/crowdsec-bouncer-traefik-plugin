@@ -191,7 +191,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit remediation:%s", req.remoteIP, value))
 			b.handleRemediationServeHTTP(rw, req, value, origin)
 			return
-		case value == cache.NoBannedValue:
+		case value == decisionscope.NoBannedValue:
 			b.handleNextServeHTTP(rw, req)
 			return
 		}
@@ -220,7 +220,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 				return
 			}
 		}
-		if kind == cache.NoBannedValue {
+		if kind == decisionscope.NoBannedValue {
 			b.handleNextServeHTTP(rw, req)
 			return
 		}
@@ -235,7 +235,7 @@ func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req clientReque
 	case configuration.FailureActionPassthrough:
 		b.handleNextServeHTTP(rw, req)
 	case configuration.FailureActionCaptcha:
-		b.handleRemediationServeHTTP(rw, req, cache.CaptchaValue, origin)
+		b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, origin)
 	default:
 		b.handleBanServeHTTP(rw, req, banReason, origin)
 	}
@@ -289,7 +289,7 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientRequest, remediation, origin string) {
 	kind := cache.RemediationKind(remediation)
 	b.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", req.remoteIP, kind))
-	if b.captchaClient.Valid && kind == cache.CaptchaValue && req.Method != http.MethodHead {
+	if b.captchaClient.Valid && kind == decisionscope.CaptchaValue && req.Method != http.MethodHead {
 		if b.captchaClient.Check(req.remoteIP) {
 			b.handleNextServeHTTP(rw, req)
 			return
@@ -316,7 +316,7 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientRequest
 	}
 	decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
 	if errors.Is(err, appsec.ErrFailureCaptcha) {
-		b.handleRemediationServeHTTP(rw, req, cache.CaptchaValue, lapi.OriginPluginAppsecFailure)
+		b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginAppsecFailure)
 		return true
 	}
 	if err != nil {

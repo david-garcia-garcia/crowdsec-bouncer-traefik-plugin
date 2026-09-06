@@ -9,8 +9,8 @@ import (
 	"text/template"
 
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec"
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -104,17 +104,17 @@ func TestCaptchaMethodBasedLogic(t *testing.T) {
 		remediation       string
 		expectBanFallback bool
 	}{
-		{name: "GET with captcha remediation should allow captcha", method: http.MethodGet, remediation: cache.CaptchaValue, expectBanFallback: false},
-		{name: "HEAD with captcha remediation should fallback to ban", method: http.MethodHead, remediation: cache.CaptchaValue, expectBanFallback: true},
-		{name: "POST with captcha remediation should allow captcha", method: http.MethodPost, remediation: cache.CaptchaValue, expectBanFallback: false},
-		{name: "PUT with captcha remediation should allow captcha", method: http.MethodPut, remediation: cache.CaptchaValue, expectBanFallback: false},
-		{name: "DELETE with captcha remediation should allow captcha", method: http.MethodDelete, remediation: cache.CaptchaValue, expectBanFallback: false},
-		{name: "PATCH with captcha remediation should allow captcha", method: http.MethodPatch, remediation: cache.CaptchaValue, expectBanFallback: false},
-		{name: "OPTIONS with captcha remediation should allow captcha", method: http.MethodOptions, remediation: cache.CaptchaValue, expectBanFallback: false},
+		{name: "GET with captcha remediation should allow captcha", method: http.MethodGet, remediation: decisionscope.CaptchaValue, expectBanFallback: false},
+		{name: "HEAD with captcha remediation should fallback to ban", method: http.MethodHead, remediation: decisionscope.CaptchaValue, expectBanFallback: true},
+		{name: "POST with captcha remediation should allow captcha", method: http.MethodPost, remediation: decisionscope.CaptchaValue, expectBanFallback: false},
+		{name: "PUT with captcha remediation should allow captcha", method: http.MethodPut, remediation: decisionscope.CaptchaValue, expectBanFallback: false},
+		{name: "DELETE with captcha remediation should allow captcha", method: http.MethodDelete, remediation: decisionscope.CaptchaValue, expectBanFallback: false},
+		{name: "PATCH with captcha remediation should allow captcha", method: http.MethodPatch, remediation: decisionscope.CaptchaValue, expectBanFallback: false},
+		{name: "OPTIONS with captcha remediation should allow captcha", method: http.MethodOptions, remediation: decisionscope.CaptchaValue, expectBanFallback: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			shouldUseCaptcha := tt.remediation == cache.CaptchaValue && tt.method != http.MethodHead
+			shouldUseCaptcha := tt.remediation == decisionscope.CaptchaValue && tt.method != http.MethodHead
 			if shouldUseCaptcha == tt.expectBanFallback {
 				t.Errorf("Method %s with %s remediation: expected ban fallback %v, but logic would use captcha %v",
 					tt.method, tt.remediation, tt.expectBanFallback, shouldUseCaptcha)
@@ -177,6 +177,67 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 	}
 	if got := recorder.Header().Get("X-Remediation"); got != appsec.ActionChallenge {
 		t.Fatalf("expected custom remediation header challenge, got %q", got)
+	}
+}
+
+func TestHandleNextServeHTTPRelaysStructuredAppsecCaptcha(t *testing.T) {
+	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{
+			"action":"captcha",
+			"http_status":403,
+			"user_body_content":"<html>captcha</html>",
+			"user_cookies":["captcha=pending; Path=/; HttpOnly"],
+			"user_headers":{
+				"Content-Type":["text/html"],
+				"Cache-Control":["no-store"]
+			}
+		}`))
+	}, nil)
+	defer appsecServer.Close()
+
+	recorder := httptest.NewRecorder()
+	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected captcha status 403, got %d", recorder.Code)
+	}
+	if got := recorder.Body.String(); got != "<html>captcha</html>" {
+		t.Fatalf("expected appsec captcha body, got %q", got)
+	}
+	if got := recorder.Header().Get("Content-Type"); got != "text/html" {
+		t.Fatalf("expected Content-Type relayed, got %q", got)
+	}
+	if got := recorder.Header().Get("Set-Cookie"); got != "captcha=pending; Path=/; HttpOnly" {
+		t.Fatalf("expected Set-Cookie relayed, got %q", got)
+	}
+	if got := recorder.Header().Get("X-Remediation"); got != appsec.ActionCaptcha {
+		t.Fatalf("expected custom remediation header captcha, got %q", got)
+	}
+}
+
+func TestHandleNextServeHTTPEmptyCaptchaBodyRelaysStatus(t *testing.T) {
+	banTemplate, err := template.New("ban").Parse("<html>operator ban for {{.ClientIP}}</html>")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"action":"captcha","http_status":403}`))
+	}, banTemplate)
+	defer appsecServer.Close()
+
+	recorder := httptest.NewRecorder()
+	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected captcha status 403, got %d", recorder.Code)
+	}
+	if got := recorder.Body.String(); got != "" {
+		t.Fatalf("expected empty captcha body, got %q", got)
+	}
+	if got := recorder.Header().Get("X-Remediation"); got != appsec.ActionCaptcha {
+		t.Fatalf("expected custom remediation header captcha, got %q", got)
 	}
 }
 

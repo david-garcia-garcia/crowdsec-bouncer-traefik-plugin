@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
@@ -108,6 +108,40 @@ func TestServeHTTP(t *testing.T) {
 	handler.ServeHTTP(recorder, req)
 }
 
+// TestNew_LAPIUserAgentUsesVersionGo checks New sends LAPI User-Agent from version.go pluginVersion.
+func TestNew_LAPIUserAgentUsesVersionGo(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
+
+	gotUA := ""
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotUA = r.Header.Get("User-Agent")
+		if strings.Contains(r.URL.Path, "decisions") {
+			_, _ = w.Write([]byte("null"))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+	u, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	h, err := New(ctx, testNextOK(), cfgLiveAt(u.Host), "version-ua")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.ServeHTTP(httptest.NewRecorder(), reqForIP("192.0.2.1"))
+	if pluginVersion == "" {
+		t.Fatal("pluginVersion must not be empty")
+	}
+	wantUA := "Crowdsec-Bouncer-Traefik-Plugin/" + pluginVersion
+	if gotUA != wantUA {
+		t.Fatalf("User-Agent %q want %q", gotUA, wantUA)
+	}
+}
+
 func TestNew_SameLapiClientFields_ShareIncarnation(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
@@ -167,7 +201,7 @@ func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 	}
 
 	got, err := testRoute(t, hb).LapiClient().Cache().Get("1.2.3.4")
-	if err == nil && got == cache.BannedValue {
+	if err == nil && got == decisionscope.BannedValue {
 		t.Fatal("B's cache must not contain A's ban")
 	}
 }

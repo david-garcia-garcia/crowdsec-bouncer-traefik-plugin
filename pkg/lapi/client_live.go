@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
@@ -25,9 +24,9 @@ func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string) 
 	}
 	if !decisionscope.IsActiveRemediation(chosen) {
 		if isLiveMode && c.defaultDecisionTimeout > 0 {
-			c.cacheClient.Set(remoteIP, cache.NoBannedValue, c.defaultDecisionTimeout)
+			c.cacheClient.Set(remoteIP, decisionscope.NoBannedValue, c.defaultDecisionTimeout)
 		}
-		return cache.NoBannedValue, nil
+		return decisionscope.NoBannedValue, nil
 	}
 	if isLiveMode && c.defaultDecisionTimeout > 0 {
 		c.cacheClient.Set(remoteIP, chosen, c.liveCacheTTL(parsedDuration))

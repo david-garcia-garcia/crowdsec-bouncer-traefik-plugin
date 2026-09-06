@@ -1,0 +1,17 @@
+issueKey: 2026-09-05-remediation-codes-owner
+jobName: 2026-09-05-remediation-codes-owner
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: ed9af8f87497bb5a4584cb9cef403472ca9c7465eda5a105251790a9ff9a2504
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: remediation-codes-owner
+pr:
+  id: 19
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/19
