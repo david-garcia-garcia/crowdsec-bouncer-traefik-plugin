@@ -15,3 +15,9 @@ phase: propose
 findings: none
 fixed: serialize-stream-poll OpenSpec artifacts; folded instance-reclaim and lapi_connection
 skipped: none
+
+## implement (2026-09-06)
+phase: implement
+findings: none
+fixed: streamPollMu TryLock skip; crowdsecQuery context deadline; tests; CI green
+skipped: root-package Windows log-file cleanup flake on go test ./...
