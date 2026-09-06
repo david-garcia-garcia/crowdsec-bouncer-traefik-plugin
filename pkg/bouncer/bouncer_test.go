@@ -8,10 +8,11 @@ import (
 	"testing"
 	"text/template"
 
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec"
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
@@ -124,8 +125,8 @@ func TestCaptchaMethodBasedLogic(t *testing.T) {
 
 func testBouncerWithAppsec(t *testing.T, handler http.HandlerFunc, banTemplate *template.Template) (*Bouncer, *httptest.Server) {
 	t.Helper()
-	appsec := httptest.NewServer(handler)
-	appsecURL, err := url.Parse(appsec.URL)
+	appsecServer := httptest.NewServer(handler)
+	appsecURL, err := url.Parse(appsecServer.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,12 +140,12 @@ func testBouncerWithAppsec(t *testing.T, handler http.HandlerFunc, banTemplate *
 		banTemplate:             banTemplate,
 		banTemplateContentType:  "text/html; charset=utf-8",
 		log:                     logger.New("DEBUG", ""),
-		conn:                    crowdsecconnection.NewTestAppsecConnection(appsecURL, appsec.Client(), logger.New("DEBUG", "")),
-	}, appsec
+		appsecClient:            appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("DEBUG", "")),
+	}, appsecServer
 }
 
 func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
-	b, appsec := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte(`{
 			"action":"challenge",
@@ -157,7 +158,7 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 			}
 		}`))
 	}, nil)
-	defer appsec.Close()
+	defer appsecServer.Close()
 
 	recorder := httptest.NewRecorder()
 	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
@@ -174,16 +175,16 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 	if got := recorder.Header().Get("Set-Cookie"); got != "__crowdsec_challenge=value; Path=/; HttpOnly" {
 		t.Fatalf("expected Set-Cookie relayed, got %q", got)
 	}
-	if got := recorder.Header().Get("X-Remediation"); got != crowdsecconnection.AppsecActionChallenge {
+	if got := recorder.Header().Get("X-Remediation"); got != appsec.ActionChallenge {
 		t.Fatalf("expected custom remediation header challenge, got %q", got)
 	}
 }
 
 func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
-	b, appsec := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 	}, nil)
-	defer appsec.Close()
+	defer appsecServer.Close()
 
 	recorder := httptest.NewRecorder()
 	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
@@ -201,11 +202,11 @@ func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, appsec := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte(`{"action":"ban","http_status":403,"user_body_content":"appsec default page"}`))
 	}, banTemplate)
-	defer appsec.Close()
+	defer appsecServer.Close()
 
 	recorder := httptest.NewRecorder()
 	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
@@ -223,11 +224,11 @@ func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
 }
 
 func TestHandleNextServeHTTPChallengeFallsBackToBanContentType(t *testing.T) {
-	b, appsec := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte(`{"action":"challenge","http_status":200,"user_body_content":"<html>challenge</html>"}`))
 	}, nil)
-	defer appsec.Close()
+	defer appsecServer.Close()
 
 	recorder := httptest.NewRecorder()
 	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
@@ -241,11 +242,11 @@ func TestHandleNextServeHTTPChallengeFallsBackToBanContentType(t *testing.T) {
 }
 
 func TestHandleNextServeHTTPOutOfRangeStatusDoesNotPanic(t *testing.T) {
-	b, appsec := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte(`{"action":"challenge","http_status":42,"user_body_content":"<html>challenge</html>"}`))
 	}, nil)
-	defer appsec.Close()
+	defer appsecServer.Close()
 
 	recorder := httptest.NewRecorder()
 	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
@@ -256,11 +257,11 @@ func TestHandleNextServeHTTPOutOfRangeStatusDoesNotPanic(t *testing.T) {
 }
 
 func TestHandleNextServeHTTPEmptyChallengeBodyBans(t *testing.T) {
-	b, appsec := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte(`{"action":"challenge","http_status":200}`))
 	}, nil)
-	defer appsec.Close()
+	defer appsecServer.Close()
 
 	recorder := httptest.NewRecorder()
 	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
@@ -274,11 +275,11 @@ func TestHandleNextServeHTTPEmptyChallengeBodyBans(t *testing.T) {
 }
 
 func TestHandleNextServeHTTPZeroStatusIs200(t *testing.T) {
-	b, appsec := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte(`{"action":"challenge","user_body_content":"<html>challenge</html>"}`))
 	}, nil)
-	defer appsec.Close()
+	defer appsecServer.Close()
 
 	recorder := httptest.NewRecorder()
 	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
@@ -289,12 +290,12 @@ func TestHandleNextServeHTTPZeroStatusIs200(t *testing.T) {
 }
 
 func TestHandleNextServeHTTPAllowCallsNext(t *testing.T) {
-	appsec := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"action":"allow"}`))
 	}))
-	defer appsec.Close()
-	appsecURL, err := url.Parse(appsec.URL)
+	defer appsecServer.Close()
+	appsecURL, err := url.Parse(appsecServer.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +306,7 @@ func TestHandleNextServeHTTPAllowCallsNext(t *testing.T) {
 		}),
 		appsecEnabled: true,
 		log:           logger.New("ERROR", ""),
-		conn:          crowdsecconnection.NewTestAppsecConnection(appsecURL, appsec.Client(), logger.New("ERROR", "")),
+		appsecClient:  appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")),
 	}
 	b.handleNextServeHTTP(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 	if !nextCalled {
@@ -320,10 +321,10 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 				nextCalled = true
 			}),
-			log:  logger.New("ERROR", ""),
-			conn: crowdsecconnection.NewTestLapiFailureActionConnection(configuration.FailureActionPassthrough),
+			log:        logger.New("ERROR", ""),
+			lapiClient: lapi.NewTestLapiFailureActionClient(configuration.FailureActionPassthrough),
 		}
-		b.applyLapiFailureAction(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), configuration.ReasonTECH, crowdsecconnection.OriginPluginTechStreamFail)
+		b.applyLapiFailureAction(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), configuration.ReasonTECH, lapi.OriginPluginTechStreamFail)
 		if !nextCalled {
 			t.Fatal("passthrough should use the pass path")
 		}
@@ -335,10 +336,10 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			}),
 			remediationStatusCode: http.StatusForbidden,
 			log:                   logger.New("ERROR", ""),
-			conn:                  crowdsecconnection.NewTestLapiFailureActionConnection(configuration.FailureActionBan),
+			lapiClient:            lapi.NewTestLapiFailureActionClient(configuration.FailureActionBan),
 		}
 		recorder := httptest.NewRecorder()
-		b.applyLapiFailureAction(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), configuration.ReasonLAPI, crowdsecconnection.OriginPluginLapiFailure)
+		b.applyLapiFailureAction(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
 		if recorder.Code != http.StatusForbidden {
 			t.Fatalf("ban want 403, got %d", recorder.Code)
 		}
@@ -347,11 +348,11 @@ func TestApplyLapiFailureAction(t *testing.T) {
 
 func TestHandleNextServeHTTPAppsecFailureAction(t *testing.T) {
 	t.Run("500 passthrough calls next", func(t *testing.T) {
-		appsec := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 		}))
-		defer appsec.Close()
-		appsecURL, err := url.Parse(appsec.URL)
+		defer appsecServer.Close()
+		appsecURL, err := url.Parse(appsecServer.URL)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -363,7 +364,7 @@ func TestHandleNextServeHTTPAppsecFailureAction(t *testing.T) {
 			appsecEnabled:       true,
 			appsecFailureAction: configuration.FailureActionPassthrough,
 			log:                 logger.New("ERROR", ""),
-			conn:                crowdsecconnection.NewTestAppsecConnection(appsecURL, appsec.Client(), logger.New("ERROR", "")),
+			appsecClient:        appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")),
 		}
 		b.handleNextServeHTTP(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 		if !nextCalled {
@@ -371,10 +372,10 @@ func TestHandleNextServeHTTPAppsecFailureAction(t *testing.T) {
 		}
 	})
 	t.Run("500 ban forbids", func(t *testing.T) {
-		b, appsec := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+		b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 		}, nil)
-		defer appsec.Close()
+		defer appsecServer.Close()
 		b.appsecFailureAction = configuration.FailureActionBan
 		recorder := httptest.NewRecorder()
 		b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))

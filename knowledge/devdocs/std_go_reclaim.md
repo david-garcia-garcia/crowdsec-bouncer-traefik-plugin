@@ -8,13 +8,13 @@ _Avoid_: `sync.Once`, process singleton, middleware-name key
 
 ## Overview
 
-Copy `pkg/reclaim` as-is. Call `reclaim.Open` with Traefik’s `New` ctx. Same-package values may implement `Sleep`/`Wake`/`Close`. A value defined in another package MUST be returned as `*reclaim.Wrapped` (funcs, not a type assert): Yaegi v0.16 panics on asserting a foreign concrete type to those interfaces. CrowdsecConnection puts use `OpenWithGrace(..., ReclaimGraceDuration, ...)` (30s). Do not change table `DefaultGrace` (10s) to special-case one type.
+Copy `pkg/reclaim` as-is. Call `reclaim.Open` with Traefik’s `New` ctx. Same-package values may implement `Sleep`/`Wake`/`Close`. A value defined in another package MUST be returned as `*reclaim.Wrapped` (funcs, not a type assert): Yaegi v0.16 panics on asserting a foreign concrete type to those interfaces. LAPI Client and AppSec Client puts use `OpenWithGrace(..., ReclaimGraceDuration, ...)` (30s). Do not change table `DefaultGrace` (10s) to special-case one type.
 
 ## How to use
 
 - `reclaim.Open(ctx, key, logger, create)` on the process table. Last holder `Sleep()`s if the value has it; Open during grace `Wake()`s.
-- CrowdsecConnection `create` returns `*reclaim.Wrapped` (`Sleep`/`Wake`/`Close` as funcs). Peek still returns `*CrowdsecConnection`.
-- CrowdsecConnection puts use `OpenWithGrace(..., ReclaimGraceDuration, ...)` (30s). Do not change table `DefaultGrace` (10s) to special-case one type.
+- LAPI Client and AppSec Client `create` returns `*reclaim.Wrapped` (`Sleep`/`Wake`/`Close` as funcs). Peek still returns the concrete `*lapi.Client` or `*appsec.Client`.
+- LAPI and AppSec puts use `OpenWithGrace(..., ReclaimGraceDuration, ...)` (30s). Do not change table `DefaultGrace` (10s) to special-case one type.
 - `create` runs only for a first put or after grace Close.
 - Tests: `reclaim.ResetForTest()` / `reclaim.ResetForTestWith(grace)` only.
 - `Peek(key)` inspects holders/sleep without binding (`View`). `PeekLivePrefix(prefix)` returns one live slot under that stem. Callers do not Close slots.
@@ -24,11 +24,11 @@ Copy `pkg/reclaim` as-is. Call `reclaim.Open` with Traefik’s `New` ctx. Same-p
 
 ```go
 stored, err := reclaim.OpenWithGrace(ctx, key, log, 30*time.Second, func() (any, error) {
-	conn, err := newConnection()
+	client, err := newClient()
 	if err != nil {
 		return nil, err
 	}
-	return &reclaim.Wrapped{Value: conn, Sleep: conn.Sleep, Wake: conn.Wake, Close: conn.Close}, nil
+	return &reclaim.Wrapped{Value: client, Sleep: client.Sleep, Wake: client.Wake, Close: client.Close}, nil
 })
 ```
 

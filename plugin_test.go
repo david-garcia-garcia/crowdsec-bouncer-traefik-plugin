@@ -14,7 +14,7 @@ import (
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -39,7 +39,7 @@ func liveLAPI(t *testing.T, banned map[string]bool, hits *int64) *httptest.Serve
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "stream") {
 			atomic.AddInt64(hits, 1)
-			_ = json.NewEncoder(w).Encode(map[string][]crowdsecconnection.Decision{
+			_ = json.NewEncoder(w).Encode(map[string][]lapi.Decision{
 				"new":     {},
 				"deleted": {},
 			})
@@ -49,7 +49,7 @@ func liveLAPI(t *testing.T, banned map[string]bool, hits *int64) *httptest.Serve
 			atomic.AddInt64(hits, 1)
 			ip := r.URL.Query().Get("ip")
 			if banned[ip] {
-				_ = json.NewEncoder(w).Encode([]crowdsecconnection.Decision{{
+				_ = json.NewEncoder(w).Encode([]lapi.Decision{{
 					Value:    ip,
 					Type:     "ban",
 					Duration: "1h",
@@ -108,7 +108,7 @@ func TestServeHTTP(t *testing.T) {
 	handler.ServeHTTP(recorder, req)
 }
 
-func TestNew_SameConnectionFields_ShareIncarnation(t *testing.T) {
+func TestNew_SameLapiClientFields_ShareIncarnation(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
@@ -125,8 +125,8 @@ func TestNew_SameConnectionFields_ShareIncarnation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !testRoute(t, a).SameConnection(testRoute(t, b)) {
-		t.Fatal("same connection fields and different names must share one CrowdsecConnection")
+	if !testRoute(t, a).SameLapiClient(testRoute(t, b)) {
+		t.Fatal("same LAPI fields and different names must share one lapi.Client")
 	}
 }
 
@@ -151,8 +151,8 @@ func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if testRoute(t, ha).SameConnection(testRoute(t, hb)) {
-		t.Fatal("different LAPI hosts must not share a CrowdsecConnection")
+	if testRoute(t, ha).SameLapiClient(testRoute(t, hb)) {
+		t.Fatal("different LAPI hosts must not share a lapi.Client")
 	}
 
 	ra := httptest.NewRecorder()
@@ -166,7 +166,7 @@ func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 		t.Fatalf("bouncer B: got %d want 200", rb.Code)
 	}
 
-	got, err := testRoute(t, hb).Connection().Cache().Get("1.2.3.4")
+	got, err := testRoute(t, hb).LapiClient().Cache().Get("1.2.3.4")
 	if err == nil && got == cache.BannedValue {
 		t.Fatal("B's cache must not contain A's ban")
 	}
@@ -185,15 +185,15 @@ func TestNew_ReclaimWithinGrace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	conn1 := testRoute(t, first).Connection()
+	firstLapiClient := testRoute(t, first).LapiClient()
 	cancel()
 	time.Sleep(50 * time.Millisecond)
 	second, err := New(context.Background(), testNextOK(), cfgLiveAt(u.Host), "reclaim")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if testRoute(t, second).Connection() != conn1 {
-		t.Fatal("Open within grace must reclaim the same CrowdsecConnection")
+	if testRoute(t, second).LapiClient() != firstLapiClient {
+		t.Fatal("Open within grace must reclaim the same lapi.Client")
 	}
 }
 
@@ -211,20 +211,20 @@ func TestNew_DisposeAfterGrace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	conn1 := testRoute(t, first).Connection()
+	firstLapiClient := testRoute(t, first).LapiClient()
 	cancel()
 	time.Sleep(150 * time.Millisecond)
-	view := reclaim.Peek(crowdsecconnection.Key(cfg))
+	view := reclaim.Peek(lapi.Key(cfg))
 	if !view.OK || view.Holders != 0 || !view.Sleeping {
-		t.Fatalf("CrowdsecConnection must still be in its 30s grace after table 20ms: found=%v holders=%d sleeping=%v", view.OK, view.Holders, view.Sleeping)
+		t.Fatalf("lapi.Client must still be in its 30s grace after table 20ms: found=%v holders=%d sleeping=%v", view.OK, view.Holders, view.Sleeping)
 	}
-	time.Sleep(crowdsecconnection.ReclaimGraceDuration)
+	time.Sleep(lapi.ReclaimGraceDuration)
 	second, err := New(context.Background(), testNextOK(), cfgLiveAt(u.Host), "dispose")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if testRoute(t, second).Connection() == conn1 {
-		t.Fatal("after CrowdsecConnection grace the previous incarnation must be disposed")
+	if testRoute(t, second).LapiClient() == firstLapiClient {
+		t.Fatal("after lapi.Client grace the previous incarnation must be disposed")
 	}
 }
 
@@ -249,7 +249,7 @@ func TestNew_StreamVsLive_SideBySide(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if testRoute(t, hs).SameConnection(testRoute(t, hl)) {
+	if testRoute(t, hs).SameLapiClient(testRoute(t, hl)) {
 		t.Fatal("stream and live configs must be two connections")
 	}
 
@@ -263,7 +263,7 @@ func TestNew_StreamVsLive_SideBySide(t *testing.T) {
 		t.Fatal("live ServeHTTP must query only the live LAPI")
 	}
 
-	if testRoute(t, hs).Connection().StreamFetches() < 1 {
+	if testRoute(t, hs).LapiClient().StreamFetches() < 1 {
 		t.Fatal("stream connection must poll its own stream endpoint")
 	}
 }
@@ -338,7 +338,7 @@ func TestNew_TwoStreamConnections_BothPoll(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if testRoute(t, ha).Connection().StreamFetches() < 1 || testRoute(t, hb).Connection().StreamFetches() < 1 {
+	if testRoute(t, ha).LapiClient().StreamFetches() < 1 || testRoute(t, hb).LapiClient().StreamFetches() < 1 {
 		t.Fatal("each stream connection must fetch its own LAPI")
 	}
 	if atomic.LoadInt64(&hitsA) < 1 || atomic.LoadInt64(&hitsB) < 1 {
@@ -373,7 +373,7 @@ func TestNew_SameStreamKeyDifferentMetrics_SharesConnection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !testRoute(t, owner).SameConnection(testRoute(t, joiner)) {
+	if !testRoute(t, owner).SameLapiClient(testRoute(t, joiner)) {
 		t.Fatal("same LAPI key and different metrics interval must share one stream connection")
 	}
 	if atomic.LoadInt64(&hits) != 1 {
@@ -397,8 +397,8 @@ func TestNew_StreamSnapshotChangeDuringGrace_ReplacesTicker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	oldConn := testRoute(t, first).Connection()
-	fetchesBeforeCancel := oldConn.StreamFetches()
+	oldLapiClient := testRoute(t, first).LapiClient()
+	fetchesBeforeCancel := oldLapiClient.StreamFetches()
 	cancel()
 	waitPluginStreamInGrace(t, firstCfg)
 
@@ -408,21 +408,21 @@ func TestNew_StreamSnapshotChangeDuringGrace_ReplacesTicker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	newConn := testRoute(t, reloaded).Connection()
-	if newConn == oldConn {
+	newLapiClient := testRoute(t, reloaded).LapiClient()
+	if newLapiClient == oldLapiClient {
 		t.Fatal("changed snapshot during grace must not reclaim the old ticker")
 	}
-	if oldConn.StreamFetches() != fetchesBeforeCancel {
+	if oldLapiClient.StreamFetches() != fetchesBeforeCancel {
 		t.Fatal("old ticker must be stopped before the new poller starts")
 	}
-	if newConn.StreamFetches() < 1 {
+	if newLapiClient.StreamFetches() < 1 {
 		t.Fatal("new snapshot must poll LAPI")
 	}
 }
 
 func waitPluginStreamInGrace(t *testing.T, cfg *configuration.Config) {
 	t.Helper()
-	sessionKey := crowdsecconnection.SessionKey(cfg)
+	sessionKey := lapi.SessionKey(cfg)
 	deadline := time.Now().Add(2 * time.Second)
 	var view reclaim.View
 	for time.Now().Before(deadline) {

@@ -3,11 +3,11 @@
 ## Language
 
 **Range index**:
-One cache blob at key `range-index` whose lines are `cidr=remediation`. Remediation MAY be the letter only or the letter plus U+001F plus a metrics origin. Redis-sharing instances share this document (prefixed by connection identity). Stream and alone rebuild in-process membership from it on the ticker and at stream start.
+One cache blob at key `range-index` whose lines are `cidr=remediation`. Remediation MAY be the letter only or the letter plus U+001F plus a metrics origin. Redis-sharing instances share this document (prefixed by LAPI identity). Stream and alone rebuild in-process membership from it on the ticker and at stream start.
 _Avoid_: walking the blob on the request path, one cache key per CIDR, LAPI `?ip=` on the stream path
 
 **Range membership**:
-Two boolean CIDR sets (ban, captcha) on the reclaimed CrowdsecConnection plus the stored remediation string per CIDR. Stream/alone request lookup asks this pair. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s stored suffix.
+Two boolean CIDR sets (ban, captcha) on the reclaimed LAPI Client plus the stored remediation string per CIDR. Stream/alone request lookup asks this pair. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s stored suffix.
 _Avoid_: trusted-IP Checker, one LPM tree with a stored remediation, `sync.Once`, package globals
 
 **Header-mapped scope**:
@@ -24,8 +24,8 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 
 ## How to use
 
-- Pass `decisionScopeHeaders` from config into the connection (stream `scopes=` and live `scope`+`value` queries) and into the bouncer (request headers).
-- Resolve the client IP with `pkg/ip.GetRemoteIP`. Then `LookupCachedRemediation` with `useRangeMembership` true for stream/alone (and `conn.RangeMembership()`). Pass `req.ipAddr` into Range membership. Matching uses the first letter; origin is for usage-metrics only. Do not put scopes on `clientRequest`.
+- Pass `decisionScopeHeaders` from config into the LAPI Client (stream `scopes=` and live `scope`+`value` queries) and into the bouncer (request headers).
+- Resolve the client IP with `pkg/ip.GetRemoteIP`. Then `LookupCachedRemediation` with `useRangeMembership` true for stream/alone (and `lapiClient.RangeMembership()`). Pass `req.ipAddr` into Range membership. Matching uses the first letter; origin is for usage-metrics only. Do not put scopes on `clientRequest`.
 - Stream Range items: collect the tick, then `ApplyRangeBatch` (one read, one write) with `RemediationWithOrigin`. Hydrate membership from the blob after apply and on a lease hit. Do not GET+SET per Range line.
 - Live/none: keep `?ip=` (LAPI expands Range). Add `scope`+`value` when a mapped header is present. Skip `range-index` and membership on none.
 - CAPI (alone) omits `scopes=`. Apply any streamed scope this bouncer is configured to match.
@@ -34,8 +34,8 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 
 ```go
 scopes := decisionscope.RequestScopeValues(headers, req)
-kind, origin, err := decisionscope.LookupCachedRemediation(cacheClient, useRangeMembership, req.remoteIP, req.ipAddr, scopes, conn.RangeMembership())
-conn.IncDropped(origin, req.ipType, "ban")
+kind, origin, err := decisionscope.LookupCachedRemediation(cacheClient, useRangeMembership, req.remoteIP, req.ipAddr, scopes, lapiClient.RangeMembership())
+lapiClient.IncDropped(origin, req.ipType, "ban")
 ```
 
 ## Key files
@@ -44,10 +44,10 @@ conn.IncDropped(origin, req.ipType, "ban")
 - `pkg/configuration/configuration.go` (`DecisionScopeHeaders`)
 - `pkg/bouncer/bouncer.go`
 - `pkg/bouncer/clientrequest.go`
-- `pkg/crowdsecconnection/connection.go`
-- `pkg/crowdsecconnection/connection_decisions.go`
-- `pkg/crowdsecconnection/connection_stream.go`
-- `pkg/crowdsecconnection/connection_live.go`
+- `pkg/lapi/client.go`
+- `pkg/lapi/client_decisions.go`
+- `pkg/lapi/client_stream.go`
+- `pkg/lapi/client_live.go`
 
 ## Gotchas
 
