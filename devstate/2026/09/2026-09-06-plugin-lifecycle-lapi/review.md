@@ -54,3 +54,10 @@ findings: none
 fixed: folded three deltas into catalog; moved change to archive/2026-09-06-one-stream-per-lapi-session
 skipped: none
 
+## pullrequest (2026-09-06)
+
+phase: pullrequest
+findings: none
+fixed: gitmoji title; reused PR 23; CI green on 7f0007f
+skipped: none
+
