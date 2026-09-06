@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: none
 fixed: n/a
 skipped: none
+
+## archive (2026-09-06)
+phase: archive
+findings: none
+fixed: synced core_plugin_appsec_failure-action; moved to archive/2026-09-06-appsec-delete-unreadable-body
+skipped: none
