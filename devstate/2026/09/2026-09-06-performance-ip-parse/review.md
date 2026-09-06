@@ -26,4 +26,13 @@ fixed: none
 skipped: none
 change: parse-client-ip-once
 
+## implement (2026-09-06)
+
+phase: implement
+findings: none
+fixed: parse-once wiring at GetRemoteIP / ServeHTTP / Range
+skipped: none
+localTests: passed
+
+
 
