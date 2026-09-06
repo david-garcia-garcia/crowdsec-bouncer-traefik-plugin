@@ -49,8 +49,8 @@ When stream or alone mode is unhealthy, cache hits SHALL still apply. A cache mi
 - **THEN** that ban still applies regardless of `crowdsecLapiFailureAction`
 
 ### Requirement: CrowdsecLapiFailureAction is on the connection identity
-Routers that share one Crowdsec backend SHALL share `crowdsecLapiFailureAction` (it is part of the reclaim identity with `UpdateMaxFailure`). Two routers MUST NOT disagree on LAPI fallback against one connection.
+Routers that share one LAPI backend SHALL share `crowdsecLapiFailureAction` (it is part of the LAPI reclaim identity with `UpdateMaxFailure`). Two routers MUST NOT disagree on LAPI fallback against one `lapi.Client`.
 
 #### Scenario: Same LAPI action is shared
-- **WHEN** two middlewares reclaim the same CrowdsecConnection
+- **WHEN** two middlewares reclaim the same `lapi.Client`
 - **THEN** both use the same `crowdsecLapiFailureAction`

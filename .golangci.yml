@@ -36,7 +36,8 @@ linters-settings:
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/iplookup
@@ -53,7 +54,8 @@ linters-settings:
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi
+          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/iplookup
@@ -99,7 +101,10 @@ issues:
         - goconst
         - funlen
         - godot
-    - path: pkg/crowdsecconnection/
+    - path: pkg/lapi/
+      linters:
+        - perfsprint
+    - path: pkg/appsec/
       linters:
         - perfsprint
     - path: pkg/bouncer/

@@ -5,22 +5,22 @@ Relay CrowdSec 1.8 AppSec structured remediations (bot-detection challenge HTML,
 ## Requirements
 
 ### Requirement: Client IP for AppSec is GetRemoteIP
-The bouncer SHALL pass the address from `pkg/ip.GetRemoteIP` into `AppsecQuery` as today (`X-Crowdsec-Appsec-Ip`). AppSec MUST NOT parse `RemoteAddr` or cookies to invent a second client address.
+The bouncer SHALL pass the address from `pkg/ip.GetRemoteIP` into `appsec.Client.Query` as today (`X-Crowdsec-Appsec-Ip`). AppSec MUST NOT parse `RemoteAddr` or cookies to invent a second client address.
 
 #### Scenario: Forwarded IP is the AppSec client
 - **WHEN** Traefik forwards a trusted `X-Forwarded-For` and AppSec is enabled
 - **THEN** the AppSec request includes that address in `X-Crowdsec-Appsec-Ip`
 
-### Requirement: Structured AppSec JSON is parsed on the connection
-`CrowdsecConnection.AppsecQuery` SHALL read a bounded AppSec response body (1 MiB) and, when the body is JSON with a non-empty `action`, return that structured result together with a nil error. Fields SHALL be `action`, `http_status`, `user_body_content`, `user_cookies`, and `user_headers`. An empty body or JSON without `action` on HTTP 200 SHALL pass (nil error; the result is an allow action). HTTP 500 and unreachable SHALL honor `CrowdsecAppsecFailureAction` (`passthrough` | `ban` | `captcha`) instead of `FailureBlock` / `UnreachableBlock`. The response body SHALL be drained so the AppSec HTTP client can reuse the connection.
+### Requirement: Structured AppSec JSON is parsed on the AppSec client
+`appsec.Client.Query` SHALL read a bounded AppSec response body (1 MiB) and, when the body is JSON with a non-empty `action`, return that structured result together with a nil error. Fields SHALL be `action`, `http_status`, `user_body_content`, `user_cookies`, and `user_headers`. An empty body or JSON without `action` on HTTP 200 SHALL pass (nil error; the result is an allow action). HTTP 500 and unreachable SHALL honor `CrowdsecAppsecFailureAction` (`passthrough` | `ban` | `captcha`) instead of `FailureBlock` / `UnreachableBlock`. The response body SHALL be drained so the AppSec HTTP client can reuse the connection.
 
 #### Scenario: Allow JSON passes
 - **WHEN** AppSec returns HTTP 200 with `{"action":"allow"}`
-- **THEN** `AppsecQuery` returns a nil error and the request proceeds to `next`
+- **THEN** `Query` returns a nil error and the request proceeds to `next`
 
 #### Scenario: Empty 200 still passes
 - **WHEN** AppSec returns HTTP 200 with an empty body
-- **THEN** `AppsecQuery` returns a nil error and the request proceeds to `next`
+- **THEN** `Query` returns a nil error and the request proceeds to `next`
 
 ### Requirement: Challenge is relayed to the client
 When the structured `action` is neither empty, `allow`, nor `ban`, the bouncer SHALL write `http_status`, `user_headers`, `user_cookies` (as `Set-Cookie`), and `user_body_content` to the client and MUST NOT call `next`. `http_status` of zero SHALL be treated as 200. `http_status` outside 100–999 SHALL fall back to `remediationStatusCode`. Missing `Content-Type` SHALL fall back to `banTemplateContentType` when that is set. The remediation custom header, when configured, SHALL be set to the action. `blockedRequests` SHALL increment. A `challenge` action with empty `user_body_content` SHALL ban instead of writing an empty page.

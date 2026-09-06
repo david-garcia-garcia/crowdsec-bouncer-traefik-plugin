@@ -3,15 +3,14 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
 // CreateConfig creates the default plugin configuration.
@@ -19,7 +18,9 @@ func CreateConfig() *configuration.Config {
 	return configuration.New()
 }
 
-// New is the Traefik Yaegi constructor. It reclaims a CrowdsecConnection and returns a per-router Bouncer.
+// New is the Traefik Yaegi constructor. It reclaims LAPI and AppSec backends and returns a per-router Bouncer.
+// Stream/alone: one LAPI client per LAPI URL+key (CrowdSec one stream cursor per
+// hashed key + outbound IP). Live/none: reclaim by LAPI identity. AppSec: reclaim by listener URL+key.
 func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
 	// Snapshot Traefik's Config so Yaegi's pointer is not rewritten.
 	prepared := *config
@@ -40,22 +41,41 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		return nil, err
 	}
 
-	// Inline secrets and rewrite CAPI routing on the snapshot.
-	prepErr := crowdsecconnection.Prepare(&prepared, log)
-	if prepErr != nil {
+	if prepErr := lapi.Prepare(&prepared, log); prepErr != nil {
+		return nil, prepErr
+	}
+	if prepErr := appsec.Prepare(&prepared, log); prepErr != nil {
 		return nil, prepErr
 	}
 
-	// Reclaim the Crowdsec backend by identity of the prepared snapshot.
-	stored, err := reclaim.Open(ctx, crowdsecconnection.Key(&prepared), log, func() (any, error) {
-		return crowdsecconnection.New(&prepared, log, pluginVersion)
-	})
-	if err != nil {
-		return nil, err
+	var lapiClient *lapi.Client
+	// Stream and alone poll GET /v1/decisions/stream. CrowdSec stores that
+	// cursor on the bouncer row selected by hashed X-Api-Key plus the IP LAPI
+	// sees (this process’s outbound address), not per middleware and not per
+	// metrics interval. OpenStream keeps one ticker per URL+key in this process.
+	if prepared.CrowdsecMode == configuration.StreamMode || prepared.CrowdsecMode == configuration.AloneMode {
+		var streamErr error
+		lapiClient, streamErr = lapi.OpenStream(ctx, &prepared, log, name, pluginVersion)
+		if streamErr != nil {
+			return nil, streamErr
+		}
+	} else if prepared.CrowdsecMode != configuration.AppsecMode {
+		// Live/none do not use stream_cursor. Two Clients on one key
+		// stay valid (?ip= lookups). Reclaim by LAPI identity, including intervals.
+		var openErr error
+		lapiClient, openErr = lapi.OpenLive(ctx, &prepared, log, name, pluginVersion)
+		if openErr != nil {
+			return nil, openErr
+		}
 	}
-	conn, ok := stored.(*crowdsecconnection.CrowdsecConnection)
-	if !ok {
-		return nil, fmt.Errorf("%s: reclaim: want *crowdsecconnection.CrowdsecConnection, got %T", name, stored)
+
+	var appsecClient *appsec.Client
+	if prepared.CrowdsecAppsecEnabled {
+		var appsecErr error
+		appsecClient, appsecErr = appsec.Open(ctx, &prepared, log, name, pluginVersion)
+		if appsecErr != nil {
+			return nil, appsecErr
+		}
 	}
-	return bouncer.New(next, name, &prepared, conn, log)
+	return bouncer.New(next, name, &prepared, lapiClient, appsecClient, log)
 }

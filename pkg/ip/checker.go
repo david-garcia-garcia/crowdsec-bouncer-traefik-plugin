@@ -60,7 +60,7 @@ func (ip *Checker) Contains(addr string) (bool, error) {
 // ContainsIP checks if provided address is in the trusted IPs.
 func (ip *Checker) ContainsIP(addr net.IP) bool {
 	// An uninitialized Checker trusts nothing.
-	if ip.trustedCIDRs == nil {
+	if ip == nil || ip.trustedCIDRs == nil {
 		return false
 	}
 	// Boolean any-match: ignore longest-prefix length.
@@ -98,42 +98,48 @@ type PoolStrategy struct {
 
 // GetIP checks the list of Forwarded IPs (most recent first) against the
 // Checker pool of IPs. It returns the first IP that is not in the pool, or the
-// empty string otherwise.
-func (s *PoolStrategy) getIP(req *http.Request, customHeader string) string {
+// empty string otherwise. The net.IP is the parse of that hop when parseable.
+func (s *PoolStrategy) getIP(req *http.Request, customHeader string) (string, net.IP) {
 	if s.Checker == nil {
-		return ""
+		return "", nil
 	}
 
 	xff := req.Header.Get(customHeader)
 
 	xffs := strings.Split(xff, ",")
 
-	// Walk most-recent hop first (right to left).
+	// Walk most-recent hop first (right to left). Keep the winning hop’s parse.
 	for i := len(xffs) - 1; i >= 0; i-- {
 		xffTrimmed := strings.TrimSpace(xffs[i])
 		if len(xffTrimmed) == 0 {
 			continue
 		}
-		if contain, _ := s.Checker.Contains(xffTrimmed); !contain {
-			return xffTrimmed
+		hopIP, err := parseIP(xffTrimmed)
+		if err != nil {
+			// Unparseable hop is not in the pool (same as Contains parse error).
+			return xffTrimmed, nil
+		}
+		if !s.Checker.ContainsIP(hopIP) {
+			return xffTrimmed, hopIP
 		}
 	}
 
-	return ""
+	return "", nil
 }
 
 // GetRemoteIP returns the client address for a request.
 // It walks the custom forwarded header most-recent-first against the trusted-hop pool,
-// then falls back to the host of req.RemoteAddr.
-func GetRemoteIP(req *http.Request, strategy *PoolStrategy, customHeader string) (string, error) {
-	remoteIP := strategy.getIP(req, customHeader)
+// then falls back to the host of req.RemoteAddr. The net.IP is that chosen address when parseable.
+func GetRemoteIP(req *http.Request, strategy *PoolStrategy, customHeader string) (string, net.IP, error) {
+	remoteIP, parsed := strategy.getIP(req, customHeader)
 	if len(remoteIP) != 0 {
-		return remoteIP, nil
+		return remoteIP, parsed, nil
 	}
 	// Header walk found no untrusted hop; use the socket peer.
 	remoteIP, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
-		return "", fmt.Errorf("GetRemoteIP:extractIP: %w", err)
+		return "", nil, fmt.Errorf("GetRemoteIP:extractIP: %w", err)
 	}
-	return remoteIP, nil
+	parsed, _ = parseIP(remoteIP)
+	return remoteIP, parsed, nil
 }
