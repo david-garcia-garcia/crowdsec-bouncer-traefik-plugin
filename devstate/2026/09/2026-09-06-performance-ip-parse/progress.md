@@ -8,7 +8,7 @@ JobName: 2026-09-06-performance-ip-parse
 | explore | [x] | [x] | 2026-09-06T05:26:11Z |
 | propose | [x] | [x] | 2026-09-06T05:28:55Z |
 | implement | [x] | [x] | 2026-09-06T05:35:12Z |
-| codereview | [ ] | [ ] | |
+| codereview | [x] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
