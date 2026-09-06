@@ -9,6 +9,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
@@ -96,11 +98,17 @@ func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response,
 	}
 
 	res, err := c.httpClient.Do(req)
-	if err != nil || isReverseProxyError(res.StatusCode) {
+	if res != nil {
+		defer c.drainResponse(res)
+	}
+	if err != nil {
 		c.log.Error("appsecQuery:unreachable")
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
-	defer c.drainResponse(res)
+	if isReverseProxyError(res.StatusCode) {
+		c.log.Error("appsecQuery:unreachable")
+		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
+	}
 
 	if res.StatusCode == http.StatusInternalServerError {
 		c.log.Info("appsecQuery:failure")
@@ -109,7 +117,8 @@ func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response,
 
 	body, err := c.readCappedAppsecBody(res)
 	if err != nil {
-		return nil, err
+		c.log.Info("appsecQuery:failure")
+		return resultForFailureAction(pol.FailureAction, err.Error())
 	}
 	return interpretAppsecBody(res.StatusCode, body, c.log)
 }
@@ -126,10 +135,17 @@ func (c *Client) newAppsecForwardRequest(ip string, httpReq *http.Request, pol P
 		return nil, err
 	}
 	for key, headers := range httpReq.Header {
+		if isHopByHopHeader(key) || isBodyMetadataHeader(key) {
+			continue
+		}
 		for _, value := range headers {
 			req.Header.Add(key, value)
 		}
 	}
+	if req.ContentLength >= 0 {
+		req.Header.Set("Content-Length", strconv.FormatInt(req.ContentLength, 10))
+	}
+	req.Header.Del("Transfer-Encoding")
 	req.Header.Set(crowdsecAppsecHeader, c.appsecKey)
 	req.Header.Set(crowdsecAppsecIPHeader, ip)
 	req.Header.Set(crowdsecAppsecVerbHeader, httpReq.Method)
@@ -149,7 +165,23 @@ func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol 
 		}
 		req, _ := http.NewRequest(http.MethodGet, target, nil)
 		return req, nil
-	case c.appsecBodyLimit > 0 && httpReq.Body != nil:
+	case httpReq.Body != nil && httpReq.Body != http.NoBody && isMethodWithBody(httpReq.Method):
+		bodyBytes, err := c.readForwardBody(httpReq)
+		if err != nil {
+			return nil, err
+		}
+		req, _ := http.NewRequest(http.MethodPost, target, bytes.NewBuffer(bodyBytes))
+		return req, nil
+	default:
+		req, _ := http.NewRequest(http.MethodGet, target, nil)
+		return req, nil
+	}
+}
+
+// readForwardBody reads the client body for AppSec, applying the configured limit when positive.
+// appsecBodyLimit 0 means unlimited (forward the full body).
+func (c *Client) readForwardBody(httpReq *http.Request) ([]byte, error) {
+	if c.appsecBodyLimit > 0 {
 		var bodyBuffer bytes.Buffer
 		limitedReader := io.LimitReader(httpReq.Body, c.appsecBodyLimit)
 		teeReader := io.TeeReader(limitedReader, &bodyBuffer)
@@ -158,11 +190,31 @@ func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol 
 			return nil, fmt.Errorf("appsecQuery:GetBody %w", err)
 		}
 		httpReq.Body = io.NopCloser(io.MultiReader(&bodyBuffer, httpReq.Body))
-		req, _ := http.NewRequest(http.MethodPost, target, bytes.NewBuffer(bodyBytes))
-		return req, nil
+		return bodyBytes, nil
+	}
+	bodyBytes, err := io.ReadAll(httpReq.Body)
+	if err != nil {
+		return nil, fmt.Errorf("appsecQuery:GetBody %w", err)
+	}
+	httpReq.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	return bodyBytes, nil
+}
+
+func isHopByHopHeader(name string) bool {
+	switch strings.ToLower(name) {
+	case "connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailers", "transfer-encoding", "upgrade":
+		return true
 	default:
-		req, _ := http.NewRequest(http.MethodGet, target, nil)
-		return req, nil
+		return false
+	}
+}
+
+func isBodyMetadataHeader(name string) bool {
+	switch strings.ToLower(name) {
+	case "content-length", "transfer-encoding":
+		return true
+	default:
+		return false
 	}
 }
 

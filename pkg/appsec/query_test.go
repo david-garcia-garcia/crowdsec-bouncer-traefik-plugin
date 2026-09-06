@@ -146,7 +146,9 @@ func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 }
 
 func Test_appsecQuery_reusesConnection(t *testing.T) {
-	for _, status := range []int{http.StatusOK, http.StatusForbidden, http.StatusInternalServerError} {
+	statuses := []int{http.StatusOK, http.StatusForbidden, http.StatusInternalServerError,
+		http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout}
+	for _, status := range statuses {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			var mu sync.Mutex
 			conns := map[string]bool{}
@@ -272,3 +274,106 @@ func Test_appsecQuery_oversizedForbiddenResponseBlocks(t *testing.T) {
 		t.Fatalf("Query() returned decision: %#v", decision)
 	}
 }
+
+func Test_appsecQuery_forwardContentLengthMatchesTruncatedBody(t *testing.T) {
+	const limit = 8
+	var gotLength string
+	var gotBody []byte
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		gotLength = r.Header.Get("Content-Length")
+		gotBody, _ = io.ReadAll(r.Body)
+		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write([]byte(`{"action":"allow"}`))
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	client := NewTestClientWithBodyLimit(appsecURL, appsecServer.Client(), logger.New("INFO", ""), limit)
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/", strings.NewReader("0123456789abcdef"))
+	req.Header.Set("Content-Length", "16")
+	req.Header.Set("Transfer-Encoding", "chunked")
+	_, err := client.Query("1.2.3.4", req, Policy{FailureAction: configuration.FailureActionPassthrough})
+	if err != nil {
+		t.Fatalf("Query() returned error: %v", err)
+	}
+	if gotLength != "8" {
+		t.Fatalf("Content-Length = %q, want 8", gotLength)
+	}
+	if string(gotBody) != "01234567" {
+		t.Fatalf("forwarded body = %q, want truncated prefix", string(gotBody))
+	}
+}
+
+func Test_appsecQuery_bodyLimitZeroForwardsFullPost(t *testing.T) {
+	payload := strings.Repeat("a", 32)
+	var gotMethod string
+	var gotBody []byte
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotBody, _ = io.ReadAll(r.Body)
+		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write([]byte(`{"action":"allow"}`))
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	client := NewTestClientWithBodyLimit(appsecURL, appsecServer.Client(), logger.New("INFO", ""), 0)
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/", strings.NewReader(payload))
+	_, err := client.Query("1.2.3.4", req, Policy{FailureAction: configuration.FailureActionPassthrough})
+	if err != nil {
+		t.Fatalf("Query() returned error: %v", err)
+	}
+	if gotMethod != http.MethodPost {
+		t.Fatalf("AppSec method = %q, want POST", gotMethod)
+	}
+	if string(gotBody) != payload {
+		t.Fatalf("forwarded body length = %d, want %d", len(gotBody), len(payload))
+	}
+}
+
+type errReadCloser struct {
+	err error
+}
+
+func (e errReadCloser) Read(_ []byte) (int, error) { return 0, e.err }
+func (errReadCloser) Close() error                 { return nil }
+
+func Test_appsecQuery_failureActionOnReadError(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+		if flusher, ok := rw.(http.Flusher); ok {
+			flusher.Flush()
+		}
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	transport := appsecServer.Client().Transport
+	client := &http.Client{Transport: transport}
+	queryClient := newQueryClient(appsecURL, client)
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/", nil)
+
+	origTransport := queryClient.httpClient.Transport
+	queryClient.httpClient.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		res, err := origTransport.RoundTrip(r)
+		if err != nil {
+			return nil, err
+		}
+		res.Body = errReadCloser{err: io.ErrUnexpectedEOF}
+		return res, nil
+	})
+
+	_, err := queryClient.Query("1.2.3.4", req, Policy{FailureAction: configuration.FailureActionBan})
+	if err == nil {
+		t.Fatal("ban on read error expected an error")
+	}
+
+	decision, err := queryClient.Query("1.2.3.4", req, Policy{FailureAction: configuration.FailureActionPassthrough})
+	if err != nil {
+		t.Fatalf("passthrough on read error: %v", err)
+	}
+	if decision == nil || decision.Action != ActionAllow {
+		t.Fatalf("passthrough on read error want allow, got %#v", decision)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
