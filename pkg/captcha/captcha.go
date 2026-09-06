@@ -122,6 +122,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	c.renderCaptcha(rw, r)
 }
 
+// renderCaptcha writes the captcha HTML page with HTTP 200.
 func (c *Client) renderCaptcha(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", c.templateContentType)
 	if c.remediationCustomHeader != "" {

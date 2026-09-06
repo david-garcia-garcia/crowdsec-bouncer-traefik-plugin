@@ -238,8 +238,8 @@ func (c *Client) Set(key string, value string, duration int64) error {
 	return c.cache.set(key, value, duration)
 }
 
-// NewFailingSetClient returns a memory client whose Set always returns setErr (tests).
-func NewFailingSetClient(log *slog.Logger, setErr error) *Client {
+// NewFailingSetClientForTest returns a memory client whose Set always returns setErr.
+func NewFailingSetClientForTest(log *slog.Logger, setErr error) *Client {
 	return &Client{
 		cache: &failingSetCache{err: setErr},
 		log:   log,

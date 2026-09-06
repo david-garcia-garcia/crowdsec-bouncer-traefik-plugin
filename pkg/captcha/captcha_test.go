@@ -223,7 +223,7 @@ func TestServeHTTPFailedCacheWriteRendersCaptcha(t *testing.T) {
 	defer srv.Close()
 
 	log := logger.New("INFO", "")
-	failCache := cache.NewFailingSetClient(log, errors.New("cache write failed"))
+	failCache := cache.NewFailingSetClientForTest(log, errors.New("cache write failed"))
 
 	c := newTestClient(t, configuration.CustomProvider, writeTestTemplate(t, testTemplate), failCache, srv.URL)
 	c.infoProvider.validate = srv.URL
