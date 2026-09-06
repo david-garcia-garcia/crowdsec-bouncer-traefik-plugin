@@ -11,8 +11,11 @@ import (
 
 const keyPrefix = "crowdsecconnection:"
 
-// identity is the reclaim-key payload. Ban/captcha templates, trusted IPs,
-// Enabled, middleware name, and log path are not included.
+// identity is the live/none reclaim-key payload (full connection fields).
+// Stream/alone use streamSession instead: LAPI URL+key only, so intervals
+// cannot start a second GET /v1/decisions/stream poller on the same CrowdSec
+// bouncer row. Ban/captcha templates, trusted IPs, Enabled, middleware name,
+// and log path are not included here either.
 type identity struct {
 	Mode                          string   `json:"mode"`
 	LapiScheme                    string   `json:"lapiScheme"`
@@ -86,15 +89,20 @@ func identityFrom(cfg *configuration.Config) identity {
 	}
 }
 
-// IdentityHex is the Redis key prefix and the hash suffix of the reclaim key.
+// hashBytes is FNV-64a hex used by IdentityHex and SessionHex.
+func hashBytes(payload []byte) string {
+	hasher := fnv.New64a()
+	_, _ = hasher.Write(payload)
+	return strconv.FormatUint(hasher.Sum64(), 16)
+}
+
+// IdentityHex is the Redis key prefix for live/none and the hash suffix of Key.
 func IdentityHex(cfg *configuration.Config) string {
 	b, err := json.Marshal(identityFrom(cfg))
 	if err != nil {
 		return fmt.Sprint(cfg)
 	}
-	h := fnv.New64a()
-	_, _ = h.Write(b)
-	return strconv.FormatUint(h.Sum64(), 16)
+	return hashBytes(b)
 }
 
 // Key is the process reclaim table key for one CrowdsecConnection.

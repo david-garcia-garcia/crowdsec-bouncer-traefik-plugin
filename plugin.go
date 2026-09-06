@@ -20,6 +20,8 @@ func CreateConfig() *configuration.Config {
 }
 
 // New is the Traefik Yaegi constructor. It reclaims a CrowdsecConnection and returns a per-router Bouncer.
+// Stream/alone: one connection per LAPI URL+key (CrowdSec one stream cursor per
+// hashed key + outbound IP). Live/none/appsec: reclaim by full connection identity.
 func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
 	config.LogLevel = strings.ToUpper(config.LogLevel)
 	log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
@@ -42,6 +44,20 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		return nil, prepErr
 	}
 
+	// Stream and alone poll GET /v1/decisions/stream. CrowdSec stores that
+	// cursor on the bouncer row selected by hashed X-Api-Key plus the IP LAPI
+	// sees (this process’s outbound address), not per middleware and not per
+	// metrics interval. OpenStream keeps one ticker per URL+key in this process.
+	if config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode {
+		conn, err := crowdsecconnection.OpenStream(ctx, config, log, name, pluginVersion)
+		if err != nil {
+			return nil, err
+		}
+		return bouncer.New(next, name, config, conn, log)
+	}
+
+	// Live/none/appsec do not use stream_cursor. Two Connections on one key
+	// stay valid (?ip= lookups). Reclaim by full identity, including intervals.
 	stored, err := reclaim.Open(ctx, crowdsecconnection.Key(config), log, func() (any, error) {
 		return crowdsecconnection.New(config, log, pluginVersion)
 	})

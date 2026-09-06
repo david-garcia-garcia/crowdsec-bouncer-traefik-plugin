@@ -29,8 +29,9 @@ type Decision struct {
 
 // CrowdsecConnection owns stream ticker, isolated cache, in-process Range membership, LAPI/CAPI HTTP, metrics, and AppSec HTTP client.
 type CrowdsecConnection struct {
-	mu     sync.Mutex
-	closed bool
+	mu       sync.Mutex
+	closed   bool
+	sleeping bool // last reclaim holder gone; tickers stopped until Wake or Close
 
 	crowdsecScheme         string
 	crowdsecHost           string
@@ -41,6 +42,7 @@ type CrowdsecConnection struct {
 	crowdsecPassword       string
 	crowdsecScenarios      []string
 	updateInterval         int64
+	metricsInterval        int64
 	updateMaxFailure       int64
 	lapiFailureAction      string
 	defaultDecisionTimeout int64
@@ -78,6 +80,8 @@ type CrowdsecConnection struct {
 	activeDecisions         map[usageMetricKey]int64
 	activeDecisionSlots     map[string]usageMetricKey
 	streamFetches           int64
+	streamOwner             string         // first middleware New that created this stream session
+	streamSettings          streamSettings // knobs that must not start a second poller; warn-and-wire if a joiner differs
 }
 
 // Prepare resolves secrets and CAPI/LAPI routing on cfg. Call before Key and New.
@@ -160,6 +164,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		crowdsecPassword:        config.CrowdsecCapiPassword,
 		crowdsecScenarios:       config.CrowdsecCapiScenarios,
 		updateInterval:          config.UpdateIntervalSeconds,
+		metricsInterval:         config.MetricsUpdateIntervalSeconds,
 		updateMaxFailure:        config.UpdateMaxFailure,
 		lapiFailureAction:       configuration.EffectiveFailureAction(config.CrowdsecLapiFailureAction),
 		defaultDecisionTimeout:  config.DefaultDecisionSeconds,
@@ -198,6 +203,10 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 	if config.CrowdsecMode == configuration.AppsecMode {
 		return conn, nil
 	}
+	// Stream/alone prefix is SessionHex (LAPI URL+key), not IdentityHex.
+	// IdentityHex still includes intervals, so two middlewares on one key
+	// used to get two prefixes and two incomplete caches while sharing one
+	// CrowdSec stream cursor. Warn-and-wire must read the same keys.
 	conn.cacheClient.New(
 		log,
 		config.RedisCacheEnabled,
@@ -205,7 +214,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		config.RedisCacheReadHosts,
 		config.RedisCachePassword,
 		config.RedisCacheDatabase,
-		IdentityHex(config),
+		CachePrefix(config),
 	)
 
 	if err := conn.startStream(config, log); err != nil {
@@ -215,7 +224,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 	if config.MetricsUpdateIntervalSeconds > 0 {
 		conn.lastMetricsPush = time.Now()
 		go conn.handleMetricsTicker()
-		conn.metricsStop = startTicker("metrics", config.MetricsUpdateIntervalSeconds, log, func() {
+		conn.metricsStop = startTicker("metrics", conn.metricsInterval, log, func() {
 			conn.handleMetricsTicker()
 		})
 	}
@@ -232,6 +241,7 @@ func (c *CrowdsecConnection) Close() {
 		return
 	}
 	c.closed = true
+	c.sleeping = false
 	stopTicker(c.streamStop)
 	stopTicker(c.metricsStop)
 	c.streamStop = nil
@@ -240,6 +250,47 @@ func (c *CrowdsecConnection) Close() {
 	closeIdle(c.httpAppsecClient)
 	if c.cacheClient != nil {
 		c.cacheClient.Close()
+	}
+}
+
+// Sleep stops stream and metrics tickers and keeps HTTP, cache, and the LAPI
+// cursor. Reclaim calls this when the last constructor ctx is gone. Not Close.
+func (c *CrowdsecConnection) Sleep() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed || c.sleeping {
+		return
+	}
+	c.sleeping = true
+	stopTicker(c.streamStop)
+	stopTicker(c.metricsStop)
+	c.streamStop = nil
+	c.metricsStop = nil
+}
+
+// Wake starts stream and metrics tickers again after Sleep. startup=false: the
+// cache is still warm; CrowdSec still holds stream_cursor on the bouncer row.
+func (c *CrowdsecConnection) Wake() {
+	c.mu.Lock()
+	if c.closed || !c.sleeping {
+		c.mu.Unlock()
+		return
+	}
+	c.sleeping = false
+	resumeStream := c.crowdsecMode == configuration.StreamMode || c.crowdsecMode == configuration.AloneMode
+	if resumeStream && c.streamStop == nil {
+		c.streamStop = startTicker("stream", c.updateInterval, c.log, func() {
+			c.handleStreamTicker()
+		})
+	}
+	if c.metricsInterval > 0 && c.metricsStop == nil {
+		c.metricsStop = startTicker("metrics", c.metricsInterval, c.log, func() {
+			c.handleMetricsTicker()
+		})
+	}
+	c.mu.Unlock()
+	if resumeStream {
+		go c.handleStreamTicker()
 	}
 }
 

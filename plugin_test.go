@@ -339,3 +339,91 @@ func TestNew_TwoStreamConnections_BothPoll(t *testing.T) {
 		t.Fatalf("LAPI hits A=%d B=%d", atomic.LoadInt64(&hitsA), atomic.LoadInt64(&hitsB))
 	}
 }
+
+func TestNew_SameStreamKeyDifferentMetrics_SharesConnection(t *testing.T) {
+	// CrowdSec stores both stream_cursor and usage-metrics on the bouncer row
+	// (hashed X-Api-Key + the IP LAPI sees). Two metrics intervals on one key
+	// must share one connection: a second ticker would steal stream deltas and
+	// POST a second metrics window for the same bouncer. Interval is first-wins.
+	reclaim.ResetWith(0)
+	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+
+	var hits int64
+	srv := liveLAPI(t, nil, &hits)
+	t.Cleanup(func() { srv.Close() })
+	u, _ := url.Parse(srv.URL)
+
+	fast := cfgStreamAt(u.Host, 60)
+	fast.MetricsUpdateIntervalSeconds = 1
+	slow := cfgStreamAt(u.Host, 60)
+	slow.MetricsUpdateIntervalSeconds = 600
+
+	ctx := context.Background()
+	owner, err := New(ctx, testNextOK(), fast, "stream-fast")
+	if err != nil {
+		t.Fatal(err)
+	}
+	joiner, err := New(ctx, testNextOK(), slow, "stream-slow")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !testRoute(t, owner).SameConnection(testRoute(t, joiner)) {
+		t.Fatal("same LAPI key and different metrics interval must share one stream connection")
+	}
+	if atomic.LoadInt64(&hits) != 1 {
+		t.Fatalf("one ticker must poll once at startup, hits=%d", atomic.LoadInt64(&hits))
+	}
+}
+
+func TestNew_StreamSnapshotChangeDuringGrace_ReplacesTicker(t *testing.T) {
+	reclaim.ResetWith(500 * time.Millisecond)
+	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+
+	var hits int64
+	srv := liveLAPI(t, nil, &hits)
+	t.Cleanup(func() { srv.Close() })
+	u, _ := url.Parse(srv.URL)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	firstCfg := cfgStreamAt(u.Host, 60)
+	firstCfg.MetricsUpdateIntervalSeconds = 1
+	first, err := New(ctx, testNextOK(), firstCfg, "stream-old")
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldConn := testRoute(t, first).Connection()
+	fetchesBeforeCancel := oldConn.StreamFetches()
+	cancel()
+	waitPluginStreamInGrace(t, firstCfg)
+
+	reloadCfg := cfgStreamAt(u.Host, 60)
+	reloadCfg.MetricsUpdateIntervalSeconds = 600
+	reloaded, err := New(context.Background(), testNextOK(), reloadCfg, "stream-new")
+	if err != nil {
+		t.Fatal(err)
+	}
+	newConn := testRoute(t, reloaded).Connection()
+	if newConn == oldConn {
+		t.Fatal("changed snapshot during grace must not reclaim the old ticker")
+	}
+	if oldConn.StreamFetches() != fetchesBeforeCancel {
+		t.Fatal("old ticker must be stopped before the new poller starts")
+	}
+	if newConn.StreamFetches() < 1 {
+		t.Fatal("new snapshot must poll LAPI")
+	}
+}
+
+func waitPluginStreamInGrace(t *testing.T, cfg *configuration.Config) {
+	t.Helper()
+	sessionKey := crowdsecconnection.SessionKey(cfg)
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		_, holders, sleeping, found := reclaim.Peek(sessionKey)
+		if found && holders == 0 && sleeping {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("stream session did not enter grace")
+}
