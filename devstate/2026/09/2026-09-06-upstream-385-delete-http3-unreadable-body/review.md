@@ -27,3 +27,9 @@ phase: codereview
 findings: none
 fixed: n/a
 skipped: none
+
+## devdocsimpact (2026-09-06)
+phase: devdocsimpact
+findings: none
+fixed: n/a
+skipped: none
