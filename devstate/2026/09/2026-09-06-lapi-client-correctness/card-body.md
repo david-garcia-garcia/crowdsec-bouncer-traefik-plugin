@@ -13,17 +13,17 @@ Developer review: in progress — 2026-09-06T15:13:07Z
 On `master`, `pkg/lapi` races concurrent stream polls that can mask LAPI failures, drops alone-mode POST bodies on 401 retry, and fail-opens live header-scope query errors — leaving bans unenforced. Transport handling is unsafe to maintain. Without this change those defects remain in production paths.
 
 ## Merge readiness
-Devdocs impact complete; codereview complete; all hard findings fixed. 0 open axis items. CI pending on head e632995.
+Devdocs impact complete; codereview complete; all hard findings fixed. 0 open axis items. CI pending on head 6188659.
 
 Priority: P1 — scope fail-open and alone-mode POST retry make production enforcement unsafe today.
-Reviewed head: e632995
+Reviewed head: 6188659
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 3/6 | Local tests passed; CI pending |
-| CI proof | 1 | pushed; checks not seen on head e632995 |
+| CI proof | 1 | pushed; checks not seen on head 6188659 |
 | Local tests proof | 6/6 | go test ./pkg/lapi/ -count=1 passed after codereview fixes |
 | Review resolution | 6/6 | OPEN PR #30, no review comments |
 
@@ -33,7 +33,7 @@ Owner decision: None.
 | Branch | 2026-09-06-lapi-client-correctness pushed | git push origin |
 | OpenSpec | lapi-client-correctness | openspec validate --strict passed |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/30 | GitHub |
-| CI | not seen on head e632995 | GitHub PR checks |
+| CI | not seen on head 6188659 | GitHub PR checks |
 | Local tests | passed | go test ./pkg/lapi/ -count=1 |
 | PR comments | no comments | devstate/comments.md absent |
 
@@ -52,7 +52,7 @@ Bug-hunt ticket → branch `2026-09-06-lapi-client-correctness` → PR #30 → O
 None.
 
 ## Before merge
-- [ ] [P2] Wait for CI green on head e632995
+- [ ] [P2] Wait for CI green on head 6188659
 - [x] Run devdocsimpact phase (stream-poll and http-query packets)
 - [x] Run codereview phase (five-axis review)
 - [x] Fix scope error IP-ban preservation and method comment
@@ -79,7 +79,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 2 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Inventory at prepare |
-| Reviewed head | e632995709282dabae729c0f5f8fac1e7905cf68 | Card matches branch head |
+| Reviewed head | 6188659 | Card matches branch head after devdocs commit |
 
 ### Stored data model
 None.
@@ -95,8 +95,8 @@ Is this the best way to solve the issue? Yes — defects share crowdsecQuery and
 What I checked:
 - Devdocs impact on origin/master...HEAD (pkg/lapi units vs knowledge/devdocs catalog)
 - Five-axis codereview on origin/master...HEAD (exclude devstate/.cursor)
-- go test ./pkg/lapi/ -count=1 — passed (e632995)
-- GitHub PR #30 checks — not seen on head e632995
+- go test ./pkg/lapi/ -count=1 — passed (6188659)
+- GitHub PR #30 checks — not seen on head 6188659
 
 ### Rank-up moves
 None.
