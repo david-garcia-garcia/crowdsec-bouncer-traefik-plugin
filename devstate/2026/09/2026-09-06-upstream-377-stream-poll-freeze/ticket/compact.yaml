@@ -1,0 +1,3 @@
+host: local
+ref: none
+title: Plugin periodically stops calling GET /v1/decisions/stream for exactly ~20 minutes, while POST /v1/usage-metrics keeps working

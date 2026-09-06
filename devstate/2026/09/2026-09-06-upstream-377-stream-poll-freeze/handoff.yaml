@@ -1,0 +1,15 @@
+issueKey: 2026-09-06-upstream-377-stream-poll-freeze
+jobName: 2026-09-06-upstream-377-stream-poll-freeze
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:4f576d3c1fba79f7db9923e69d34e9fd1121c89c6f0263c7a22b82ba5711ab12
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
