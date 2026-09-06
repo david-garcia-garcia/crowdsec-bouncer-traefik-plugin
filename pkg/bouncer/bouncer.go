@@ -126,7 +126,9 @@ func (b *Bouncer) SameLapiClient(other *Bouncer) bool {
 // alone: same as stream, but the ticker is CAPI (no local CrowdSec).
 // appsec: no LAPI; skip to the pass path (AppSec if enabled).
 //
-//nolint:nestif
+// ServeHTTP is a mode dispatcher; gocyclo/funlen fire on the flattened branches.
+//
+//nolint:gocyclo,funlen
 func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	if !b.enabled {
 		b.next.ServeHTTP(rw, httpReq)
