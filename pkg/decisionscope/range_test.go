@@ -79,14 +79,18 @@ func TestLookupCachedRemediationBanWinsAcrossScopes(t *testing.T) {
 
 func TestApplyRangeBatchOneWrite(t *testing.T) {
 	client := newTestDecisionCache()
-	ApplyRangeBatch(client, map[string]string{
+	if err := ApplyRangeBatch(client, map[string]string{
 		"10.0.0.0/8":  cache.CaptchaValue,
 		"10.1.0.0/16": cache.BannedValue,
-	}, nil)
+	}, nil); err != nil {
+		t.Fatalf("batch upsert: %v", err)
+	}
 	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != cache.BannedValue {
 		t.Fatalf("batch upsert got %q, want ban", got)
 	}
-	ApplyRangeBatch(client, nil, []string{"10.1.0.0/16"})
+	if err := ApplyRangeBatch(client, nil, []string{"10.1.0.0/16"}); err != nil {
+		t.Fatalf("batch removal: %v", err)
+	}
 	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != cache.CaptchaValue {
 		t.Fatalf("after removal got %q, want captcha from remaining /8", got)
 	}
@@ -127,7 +131,9 @@ func TestLookupCachedRemediationOriginSuffix(t *testing.T) {
 func TestApplyRangeBatchRoundTripOriginSuffix(t *testing.T) {
 	client := newTestDecisionCache()
 	stored := cache.RemediationWithOrigin(cache.BannedValue, "crowdsec")
-	ApplyRangeBatch(client, map[string]string{"10.0.0.0/8": stored}, nil)
+	if err := ApplyRangeBatch(client, map[string]string{"10.0.0.0/8": stored}, nil); err != nil {
+		t.Fatalf("round-trip apply: %v", err)
+	}
 	index, _ := readRangeIndex(client)
 	if index != "10.0.0.0/8="+stored {
 		t.Fatalf("blob %q", index)

@@ -102,13 +102,13 @@ func TestIPCacheKey(t *testing.T) {
 	}
 }
 
-func TestIpLookupCacheKey(t *testing.T) {
+func TestIPLookupCacheKey(t *testing.T) {
 	expanded := "2001:db8:0:0:0:0:0:1"
-	if got := IpLookupCacheKey(expanded, net.ParseIP(expanded)); got != "2001:db8::1" {
+	if got := IPLookupCacheKey(expanded, net.ParseIP(expanded)); got != "2001:db8::1" {
 		t.Fatalf("expanded IPv6: %q", got)
 	}
 	mapped := "::ffff:203.0.113.10"
-	if got := IpLookupCacheKey(mapped, net.ParseIP(mapped)); got != "203.0.113.10" {
+	if got := IPLookupCacheKey(mapped, net.ParseIP(mapped)); got != "203.0.113.10" {
 		t.Fatalf("IPv4-mapped: %q", got)
 	}
 }

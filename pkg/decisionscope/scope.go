@@ -132,8 +132,8 @@ func IPCacheKey(value string) string {
 	return trimmed
 }
 
-// IpLookupCacheKey is the request-path Ip cache key aligned with IPCacheKey store canonicalization.
-func IpLookupCacheKey(remoteIP string, ipAddr net.IP) string {
+// IPLookupCacheKey is the request-path Ip cache key aligned with IPCacheKey store canonicalization.
+func IPLookupCacheKey(remoteIP string, ipAddr net.IP) string {
 	trimmed := strings.TrimSpace(remoteIP)
 	key := IPCacheKey(remoteIP)
 	if key != trimmed {

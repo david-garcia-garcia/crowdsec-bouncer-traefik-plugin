@@ -12,12 +12,12 @@ func AddRange(cacheClient *cache.Client, cidr, remediation string, _ int64) {
 	if network == "" || !IsActiveRemediation(remediation) {
 		return
 	}
-	ApplyRangeBatch(cacheClient, map[string]string{network: remediation}, nil)
+	_ = ApplyRangeBatch(cacheClient, map[string]string{network: remediation}, nil)
 }
 
 // RemoveRange drops a Range decision from the shared index.
 func RemoveRange(cacheClient *cache.Client, cidr string) {
-	ApplyRangeBatch(cacheClient, nil, []string{strings.TrimSpace(cidr)})
+	_ = ApplyRangeBatch(cacheClient, nil, []string{strings.TrimSpace(cidr)})
 }
 
 // ApplyRangeBatch upserts and removes Range lines with one cache read and one write.
