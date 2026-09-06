@@ -112,6 +112,17 @@ func Test_ValidateParams(t *testing.T) {
 	cfgCaptchaWithProvider.CrowdsecLapiFailureAction = FailureActionCaptcha
 	cfgCaptchaWithProvider.CaptchaProvider = HcaptchaProvider
 	cfgCaptchaWithProvider.CaptchaFilePath = ""
+	cfgTrycapOK := getMinimalConfig()
+	cfgTrycapOK.CaptchaProvider = TrycapProvider
+	cfgTrycapOK.CaptchaTrycapInstanceURL = "https://cap.example.com"
+	cfgTrycapOK.CaptchaFilePath = ""
+	cfgTrycapNoURL := getMinimalConfig()
+	cfgTrycapNoURL.CaptchaProvider = TrycapProvider
+	cfgTrycapNoURL.CaptchaFilePath = ""
+	cfgTrycapBadURL := getMinimalConfig()
+	cfgTrycapBadURL.CaptchaProvider = TrycapProvider
+	cfgTrycapBadURL.CaptchaTrycapInstanceURL = "not-a-url"
+	cfgTrycapBadURL.CaptchaFilePath = ""
 	cfgUnknownAction := getMinimalConfig()
 	cfgUnknownAction.CrowdsecAppsecFailureAction = "block"
 	cfgEmptyAction := getMinimalConfig()
@@ -140,6 +151,9 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Invalid log level Warning", args: args{config: cfg10}, wantErr: true},
 		{name: "Captcha LAPI action without provider", args: args{config: cfgCaptchaNoProvider}, wantErr: true},
 		{name: "Captcha LAPI action with provider", args: args{config: cfgCaptchaWithProvider}, wantErr: false},
+		{name: "Trycap with instance URL", args: args{config: cfgTrycapOK}, wantErr: false},
+		{name: "Trycap without instance URL", args: args{config: cfgTrycapNoURL}, wantErr: true},
+		{name: "Trycap with invalid instance URL", args: args{config: cfgTrycapBadURL}, wantErr: true},
 		{name: "Unknown AppSec failure action", args: args{config: cfgUnknownAction}, wantErr: true},
 		{name: "Empty failure actions use default ban", args: args{config: cfgEmptyAction}, wantErr: false},
 	}

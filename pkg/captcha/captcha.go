@@ -2,6 +2,7 @@
 package captcha
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -13,6 +14,8 @@ import (
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
+
+const trycapWidgetJS = "https://cdn.jsdelivr.net/npm/cap-widget@0.1.57"
 
 // Client Captcha client.
 type Client struct {
@@ -31,10 +34,12 @@ type Client struct {
 
 // Information for self-hosted provider.
 type infoProvider struct {
-	js       string
-	key      string
-	response string
-	validate string
+	js          string
+	key         string
+	response    string
+	validate    string
+	jsonBody    bool
+	apiEndpoint string
 }
 
 //nolint:gochecknoglobals
@@ -59,8 +64,21 @@ var infoProviders = map[string]*infoProvider{
 	},
 }
 
+// trycapInfoProvider builds Cap Standalone widget JS, cap-token field, and JSON siteverify URLs.
+func trycapInfoProvider(instanceURL, siteKey string) *infoProvider {
+	base := strings.TrimRight(instanceURL, "/") + "/" + strings.Trim(siteKey, "/") + "/"
+	return &infoProvider{
+		js:          trycapWidgetJS,
+		key:         "cap-widget",
+		response:    "cap-token",
+		validate:    base + "siteverify",
+		jsonBody:    true,
+		apiEndpoint: base,
+	}
+}
+
 // New Initialize captcha client.
-func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, trycapInstanceURL, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
@@ -68,6 +86,8 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 	var info *infoProvider
 	if provider == configuration.CustomProvider {
 		info = &infoProvider{js: js, key: key, response: response, validate: validate}
+	} else if provider == configuration.TrycapProvider {
+		info = trycapInfoProvider(trycapInstanceURL, siteKey)
 	} else {
 		info = infoProviders[provider]
 	}
@@ -108,9 +128,10 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	}
 	rw.WriteHeader(http.StatusOK)
 	err = c.template.Execute(rw, map[string]string{
-		"SiteKey":     c.siteKey,
-		"FrontendJS":  c.infoProvider.js,
-		"FrontendKey": c.infoProvider.key,
+		"SiteKey":        c.siteKey,
+		"FrontendJS":     c.infoProvider.js,
+		"FrontendKey":    c.infoProvider.key,
+		"CapApiEndpoint": c.infoProvider.apiEndpoint,
 	})
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP captchaTemplateServe " + err.Error())
@@ -140,10 +161,7 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 		c.log.Debug("captcha:Validate no captcha response found in request")
 		return false, nil
 	}
-	var body = url.Values{}
-	body.Add("secret", c.secretKey)
-	body.Add("response", response)
-	res, err := c.httpClient.PostForm(c.infoProvider.validate, body)
+	res, err := c.postSiteverify(r, response)
 	if err != nil {
 		return false, err
 	}
@@ -163,4 +181,27 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	}
 	c.log.Debug(fmt.Sprintf("captcha:Validate success:%v", captchaResponse.Success))
 	return captchaResponse.Success, nil
+}
+
+// postSiteverify POSTs the token: JSON for Cap Standalone, urlencoded PostForm otherwise.
+func (c *Client) postSiteverify(r *http.Request, token string) (*http.Response, error) {
+	if !c.infoProvider.jsonBody {
+		body := url.Values{}
+		body.Add("secret", c.secretKey)
+		body.Add("response", token)
+		return c.httpClient.PostForm(c.infoProvider.validate, body)
+	}
+	payload, err := json.Marshal(map[string]string{
+		"secret":   c.secretKey,
+		"response": token,
+	})
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, c.infoProvider.validate, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	return c.httpClient.Do(req)
 }

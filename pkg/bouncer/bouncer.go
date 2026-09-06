@@ -96,6 +96,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		config.CaptchaCustomValidateURL,
 		config.CaptchaSiteKey,
 		config.CaptchaSecretKey,
+		config.CaptchaTrycapInstanceURL,
 		config.RemediationHeadersCustomName,
 		config.CaptchaFilePath,
 		config.CaptchaGracePeriodSeconds,

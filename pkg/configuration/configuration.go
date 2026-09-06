@@ -39,6 +39,8 @@ const (
 	RecaptchaProvider = "recaptcha"
 	TurnstileProvider = "turnstile"
 	CustomProvider    = "custom"
+	// TrycapProvider is Cap Standalone (trycap.dev).
+	TrycapProvider = "trycap"
 	// FailureActionPassthrough lets the request continue when LAPI or AppSec is down.
 	FailureActionPassthrough = "passthrough"
 	// FailureActionBan remediates as a ban when LAPI or AppSec is down.
@@ -116,6 +118,7 @@ type Config struct {
 	CaptchaCustomValidateURL                   string            `json:"captchaCustomValidateUrl,omitempty"`
 	CaptchaCustomKey                           string            `json:"captchaCustomKey,omitempty"`
 	CaptchaCustomResponse                      string            `json:"captchaCustomResponse,omitempty"`
+	CaptchaTrycapInstanceURL                   string            `json:"captchaTrycapInstanceUrl,omitempty"`
 	CaptchaSiteKey                             string            `json:"captchaSiteKey,omitempty"`
 	CaptchaSiteKeyFile                         string            `json:"captchaSiteKeyFile,omitempty"`
 	CaptchaSecretKey                           string            `json:"captchaSecretKey,omitempty"`
@@ -188,6 +191,7 @@ func New() *Config {
 		CaptchaCustomValidateURL:        "",
 		CaptchaCustomKey:                "",
 		CaptchaCustomResponse:           "",
+		CaptchaTrycapInstanceURL:        "",
 		CaptchaSiteKey:                  "",
 		CaptchaSecretKey:                "",
 		CaptchaGracePeriodSeconds:       1800,
@@ -462,8 +466,8 @@ func validateParamsIPs(log *slog.Logger, listIP []string, key string) error {
 }
 
 func validateCaptcha(config *Config) error {
-	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider}, config.CaptchaProvider) {
-		return fmt.Errorf("CaptchaProvider: must be one of '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider)
+	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider, TrycapProvider}, config.CaptchaProvider) {
+		return fmt.Errorf("CaptchaProvider: must be one of '%s', '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider, TrycapProvider)
 	}
 	if config.CaptchaProvider == CustomProvider {
 		if config.CaptchaCustomKey == "" || config.CaptchaCustomResponse == "" || config.CaptchaCustomValidateURL == "" || config.CaptchaCustomJsURL == "" {
@@ -475,6 +479,23 @@ func validateCaptcha(config *Config) error {
 				config.CaptchaCustomJsURL,
 			)
 		}
+	}
+	if config.CaptchaProvider == TrycapProvider {
+		if err := validateTrycapInstanceURL(config.CaptchaTrycapInstanceURL); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateTrycapInstanceURL requires an http or https origin for Cap Standalone.
+func validateTrycapInstanceURL(raw string) error {
+	if raw == "" {
+		return errors.New("CaptchaTrycapInstanceUrl: cannot be empty when CaptchaProvider is trycap")
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || (parsed.Scheme != HTTP && parsed.Scheme != HTTPS) || parsed.Host == "" {
+		return errors.New("CaptchaTrycapInstanceUrl: must be an http or https URL")
 	}
 	return nil
 }

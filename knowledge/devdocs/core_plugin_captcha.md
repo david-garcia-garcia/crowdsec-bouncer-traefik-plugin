@@ -18,9 +18,9 @@ Put captcha and templates on Bouncer. `bouncer.New` calls `captcha.Client.New`. 
 
 - Add a built-in by a `CaptchaProvider` constant, an `infoProviders` row, and `validateCaptcha` allowlist. Do not overload `custom` for a provider whose verify encoding is not urlencoded `PostForm`.
 - Self-hosted providers whose verify URL includes the site key: take an instance origin on Config, join `{instance}/{siteKey}/` and `{instance}/{siteKey}/siteverify` in `New`. Do not make the operator paste the joined siteverify URL into `CaptchaCustomValidateURL`.
-- Template execute map today: `SiteKey`, `FrontendJS`, `FrontendKey`. A provider that is not class+`data-sitekey` must pass extra keys and branch in `captcha.html`. Keep one default file; `captchaFilePath` stays the operator override.
-- `Validate` reads `r.FormValue(infoProvider.response)`. Urlencoded providers use `PostForm` `secret`+`response`. JSON providers POST `application/json` `{"secret","response"}` and still decode `success`.
-- Grace cache key is `remoteIP+"_captcha"`. `remoteIP` is Bouncer `clientRequest.remoteIP` from `pkg/ip.GetRemoteIP`. Do not parse `RemoteAddr` in this package.
+- Template execute map: `SiteKey`, `FrontendJS`, `FrontendKey`, and `CapApiEndpoint` (empty unless the provider is Cap Standalone / `trycap`). A provider that is not class+`data-sitekey` must branch in `captcha.html`. Keep one default file; `captchaFilePath` stays the operator override.
+- `Validate` reads `r.FormValue(infoProvider.response)`. Urlencoded providers use `PostForm` `secret`+`response`. JSON providers (`trycap`) POST `application/json` `{"secret","response"}` and still decode `success`.
+- Pass `CaptchaTrycapInstanceURL` from `bouncer.New` into captcha `New`. Grace cache key is `remoteIP+"_captcha"`. `remoteIP` is Bouncer `clientRequest.remoteIP` from `pkg/ip.GetRemoteIP`. Do not parse `RemoteAddr` in this package.
 
 ## Pattern snippet
 
@@ -31,6 +31,7 @@ err := routeHandler.captchaClient.New(
 	config.CaptchaCustomJsURL, config.CaptchaCustomKey,
 	config.CaptchaCustomResponse, config.CaptchaCustomValidateURL,
 	config.CaptchaSiteKey, config.CaptchaSecretKey,
+	config.CaptchaTrycapInstanceURL,
 	config.RemediationHeadersCustomName,
 	config.CaptchaFilePath, config.CaptchaGracePeriodSeconds,
 )

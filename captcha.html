@@ -277,7 +277,11 @@
       }
     }
   </style>
+  {{ if .CapApiEndpoint }}
+  <script type="module" src="{{ .FrontendJS }}"></script>
+  {{ else }}
   <script src="{{ .FrontendJS }}" async defer></script>
+  {{ end }}
 </head>
 
 <body class="h-screen w-screen p-4">
@@ -294,8 +298,12 @@
         <h1 class="text-2xl lg:text-3xl xl:text-4xl">CrowdSec Captcha</h1>
       </div>
       <form action="" method="POST" class="flex flex-col items-center space-y-1" id="captcha-form">
+        {{ if .CapApiEndpoint }}
+        <cap-widget data-cap-api-endpoint="{{ .CapApiEndpoint }}"></cap-widget>
+        {{ else }}
         <div id="captcha" class="{{ .FrontendKey }}" data-sitekey="{{ .SiteKey }}" data-callback="captchaCallback">
         </div>
+        {{ end }}
       </form>
       <div class="flex justify-center flex-wrap">
         <p class="my-3">This security check has been powered by</p>
@@ -330,9 +338,15 @@
     </div>
   </div>
   <script>
+    {{ if .CapApiEndpoint }}
+    document.querySelector('cap-widget').addEventListener('solve', function () {
+      setTimeout(() => document.querySelector('#captcha-form').submit(), 500);
+    });
+    {{ else }}
     function captchaCallback() {
       setTimeout(() => document.querySelector('#captcha-form').submit(), 500);
     }
+    {{ end }}
   </script>
 </body>
 </html>
