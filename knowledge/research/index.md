@@ -29,3 +29,8 @@ description: Official Redis Go client surface and toolchain constraints.
 priority: normal
 local: index_ext_traefik-geoblock.md
 description: Facts about the traefik-geoblock plugin this product may reuse.
+
+## cloudflare
+priority: normal
+local: index_ext_cloudflare.md
+description: Official Cloudflare HTTP-header behavior this product may resemble.
