@@ -1,0 +1,15 @@
+issueKey: 2026-09-06-plugin-constructor-rollback
+jobName: 2026-09-06-plugin-constructor-rollback
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: cef370249b6d04a0b1b0de4df7d8fb8094f60137ffc3f4465977bfb08e65ec0f
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
