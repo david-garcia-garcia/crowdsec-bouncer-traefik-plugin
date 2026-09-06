@@ -13,7 +13,8 @@ verdicts:
 - added core_plugin_lapi_connection
 - added core_plugin_appsec_client
 - modified core_plugin_middleware_instance-reclaim
-- modified core_plugin_connection_source-files (REMOVED both requirements)
+- modified core_plugin_connection_source-files (REMOVED both requirements; catalog folder deleted at archive)
 - modified core_plugin_appsec_bot-detection
 - modified core_plugin_appsec_failure-action
 - modified core_plugin_lapi_failure-action
+
