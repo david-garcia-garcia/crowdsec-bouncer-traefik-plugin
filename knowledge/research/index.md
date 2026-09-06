@@ -29,3 +29,8 @@ description: Official Redis Go client surface and toolchain constraints.
 priority: normal
 local: index_ext_traefik-geoblock.md
 description: Facts about the traefik-geoblock plugin this product may reuse.
+
+## capjs
+priority: normal
+local: index_ext_capjs.md
+description: Official CapJS Standalone captcha API behavior this product may integrate.
