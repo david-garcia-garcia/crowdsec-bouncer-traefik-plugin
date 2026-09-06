@@ -10,7 +10,7 @@ import (
 // Scopes, remediation origin, and captcha state are other jobs and stay off this type.
 type clientRequest struct {
 	*http.Request
-	remoteIP string // cache, LAPI, AppSec, logs, ban template ClientIP
 	ipAddr   net.IP // same address as net.IP; nil when unparseable
 	ipType   string // FamilyOfIP(ipAddr): ipv4, ipv6, or empty
+	remoteIP string // cache, LAPI, AppSec, logs, ban template ClientIP
 }

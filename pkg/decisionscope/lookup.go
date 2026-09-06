@@ -69,20 +69,17 @@ func RequestScopeValues(headers map[string]string, req *http.Request) map[string
 }
 
 // LookupCachedRemediation merges Ip, Range, and present header-scope hits. Ban wins across those scopes.
-// When useRangeMembership is true, also check whether ipAddr sits in an in-memory CIDR from a Range decision.
-// When false, skip that CIDR check (live and none expand Range through LAPI instead).
+// Range comes from membership.Remediation; nil or empty membership is a miss (live/none never hydrate).
 // The first return is ban, captcha, or none; the second is the metrics origin of the winning cache value.
 // remoteIP is the cache key; ipAddr is the same address GetRemoteIP already parsed.
-func LookupCachedRemediation(cacheClient *cache.Client, useRangeMembership bool, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, error) {
+func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, error) {
 	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, scopes))
 	if err != nil {
 		return "", "", err
 	}
 	// Merge Ip, Range, and header hits so a Country ban beats a Range captcha.
 	chosen := found[remoteIP]
-	if useRangeMembership {
-		chosen = PreferRemediation(chosen, membership.Remediation(ipAddr))
-	}
+	chosen = PreferRemediation(chosen, membership.Remediation(ipAddr))
 	for scope, identifier := range scopes {
 		if identifier == "" {
 			continue
