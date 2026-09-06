@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -139,6 +141,59 @@ func TestErrorLevel(t *testing.T) {
 	messageCount := strings.Count(output, testMessage)
 	if messageCount != 1 {
 		t.Errorf("Expected 1 occurrence of test message at ERROR level, got %d", messageCount)
+	}
+}
+
+func TestNewWithFormatJSONCaseInsensitive(t *testing.T) {
+	for _, format := range []string{"JSON", "json", "Json"} {
+		t.Run(format, func(t *testing.T) {
+			logPath := filepath.Join(t.TempDir(), "format.log")
+			t.Cleanup(ResetSharedLogFilesForTest)
+			logger := NewWithFormat("INFO", logPath, format)
+			if logger == nil {
+				t.Fatal("expected logger")
+			}
+
+			testMessage := "json format case test"
+			logger.Info(testMessage)
+
+			data, err := os.ReadFile(logPath)
+			if err != nil {
+				t.Fatalf("read log file: %v", err)
+			}
+
+			lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+			if len(lines) != 1 {
+				t.Fatalf("expected 1 log line, got %d: %q", len(lines), string(data))
+			}
+
+			var logEntry map[string]interface{}
+			if err := json.Unmarshal([]byte(lines[0]), &logEntry); err != nil {
+				t.Fatalf("expected valid JSON, got %v output=%q", err, lines[0])
+			}
+			if logEntry["level"] != "INFO" {
+				t.Errorf("expected level INFO, got %v", logEntry["level"])
+			}
+			if logEntry["msg"] != testMessage {
+				t.Errorf("expected msg %q, got %v", testMessage, logEntry["msg"])
+			}
+			if logEntry["component"] != "CrowdsecBouncerTraefikPlugin" {
+				t.Errorf("expected component, got %v", logEntry["component"])
+			}
+		})
+	}
+}
+
+func TestSharedLogFilePerPath(t *testing.T) {
+	logPath := filepath.Join(t.TempDir(), "shared.log")
+	t.Cleanup(ResetSharedLogFilesForTest)
+
+	_ = NewWithFormat("INFO", logPath, "common")
+	_ = NewWithFormat("INFO", logPath, "common")
+	_ = NewWithFormat("INFO", logPath, "json")
+
+	if count := sharedLogFileCountForTest(); count != 1 {
+		t.Fatalf("expected 1 shared log file, got %d", count)
 	}
 }
 
