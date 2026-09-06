@@ -1,30 +1,30 @@
-Developer review: in progress — 2026-09-06T15:14:06Z
+Developer review: in progress — 2026-09-06T15:19:41Z
 
 ## What this changes
-**Operators.** None.
+**Operators.** Set `captchaCustomValidateBody: json` (and `captchaCustomResponse: cap-token`) when `captchaProvider` is `custom` so CapJS Standalone `/siteverify` accepts the plugin's POST. Omit or `form` keeps today's urlencoded `secret`/`response`.
 
 **Admin users.** None.
 
-**Developers.** OpenSpec change `custom-captcha-verify-body` adds spec `core_plugin_captcha_custom-verify`; usage packet `knowledge/devdocs/core_plugin_captcha.md` and research `ext_capjs_siteverify/` land with it.
+**Developers.** `pkg/captcha.Client.Validate` posts JSON `secret`/`response` when custom body is `json`; otherwise `PostForm`. Spec `core_plugin_captcha_custom-verify`.
 
-**End users.** None.
+**End users.** Solved CapJS challenges can pass verification when the operator sets the JSON knob.
 
 ## Motivation
-On `master`, custom captcha verification always sends urlencoded `secret` and `response` via `PostForm`. CapJS Standalone expects JSON `POST` to `/siteverify` with the same keys. Operators pointing `CaptchaCustomValidateURL` at CapJS cannot verify solved challenges without an external adapter proxy. Without this change, CapJS users stay blocked on custom captcha despite existing custom-provider config knobs.
+On `master`, custom captcha verification always sends urlencoded `secret` and `response` via `PostForm`. CapJS Standalone expects JSON `POST` to `/siteverify` with the same keys. Without this change, CapJS users stay blocked on custom captcha despite existing custom-provider config knobs.
 
 ## Merge readiness
-Propose complete; implement not started. 5 items remain.
+Implement landed; CI still queued. 4 items remain.
 
 Priority: P2 — real operator pain configuring CapJS custom captcha, with Wicketkeeper as workaround for urlencoded providers only.
-Reviewed head: b979f45
+Reviewed head: 147e8bf
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI in progress; apply not landed |
-| CI proof | 3/6 | Main Process in progress; e2e queued |
-| Local tests proof | N/A | Before implement |
+| Overall readiness | 3/6 | Product apply landed; CI queued |
+| CI proof | 3/6 | Main Process queued on 147e8bf |
+| Local tests proof | N/A | Remote PR; CI proof covers this |
 | Review resolution | N/A | No PR comments inventoried |
 
 ## Verification
@@ -33,8 +33,8 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-06-upstream-318-capjs-custom-captcha pushed | git / pr-host |
 | OpenSpec | custom-captcha-verify-body | openspec/changes/custom-captcha-verify-body/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/52 | pr-host |
-| CI | build 34041574737 queued; Main Process 34041574848 in progress | pr-host CI |
-| Local tests | none | handoff.yaml localTests |
+| CI | Main Process 34041944785 queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041944785 | pr-host CI |
+| Local tests | passed | go test ./pkg/captcha ./pkg/configuration ./pkg/bouncer |
 | PR comments | no comments | devstate/comments.md absent |
 
 ## Specs
@@ -45,7 +45,7 @@ Owner decision: Required. See Decision needed.
 - [ ] [note] [large] Wicketkeeper example documents urlencoded `secret`/`response`; official `/v0/siteverify` is JSON `token`/`nonce`/`response`.
 
 ## How this fits together
-Local ticket upstream#318 → branch `2026-09-06-upstream-318-capjs-custom-captcha` → stub PR #52. Propose is apply-ready; implement next.
+Local ticket upstream#318 → branch `2026-09-06-upstream-318-capjs-custom-captcha` → PR #52. Implement added `captchaCustomValidateBody`; code review next.
 
 ## Decision needed
 | Question | Decision | By |
@@ -68,22 +68,22 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 0 modified | Same list as Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | b979f45b1829a9e132e55d5b7e2ef3a506bbc56a | Card matches branch measured at propose close |
+| Reviewed head | 147e8bf266dee73b62719cecc4f9696f85505d60 | Card matches branch measured at implement close |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: public `captchaCustomValidateBody` `form`/`json` (default form) applied only for custom provider.
+Best possible solution: custom-only `form`/`json` enum defaulting to form so Wicketkeeper stays on `PostForm` and CapJS can opt into JSON `secret`/`response`.
 
-Do we have a high-confidence way to reproduce? No product tests yet.
+Do we have a high-confidence way to reproduce? Yes — `pkg/captcha` httptest asserts JSON vs urlencoded bodies.
 
-Is this the best way to solve the issue? Yes — matches explore.
+Is this the best way to solve the issue? Yes — matches explore and Cap Standalone docs.
 
 ### Evidence
 What I checked:
-- openspec status 4/4 for custom-captcha-verify-body
-- FindSpecHost new core_plugin_captcha_custom-verify
+- `go test ./pkg/captcha/ ./pkg/configuration/ ./pkg/bouncer/` passed
+- `pkg/captcha/captcha.go` `postSiteverify` JSON vs PostForm
 
 ### Rank-up moves
 None.

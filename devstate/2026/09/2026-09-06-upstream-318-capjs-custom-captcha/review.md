@@ -15,3 +15,9 @@ phase: propose
 findings: none
 fixed: n/a
 skipped: extra fields still assumed out of scope
+
+## implement (2026-09-06T15:19:41Z)
+phase: implement
+findings: none
+fixed: captchaCustomValidateBody json vs form siteverify
+skipped: extra fields / Wicketkeeper official JSON
