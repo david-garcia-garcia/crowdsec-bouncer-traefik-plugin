@@ -11,8 +11,8 @@ import (
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 )
 
-// newStreamTickClient builds a stream Client that can poll a mock LAPI without starting tickers.
-func newStreamTickClient(t *testing.T, log *slog.Logger, host string, httpClient *http.Client) *Client {
+// newTestStreamTickClient builds a stream Client that can poll a mock LAPI without starting tickers.
+func newTestStreamTickClient(t *testing.T, log *slog.Logger, host string, httpClient *http.Client) *Client {
 	t.Helper()
 	cacheClient := &cache.Client{}
 	cacheClient.New(log, false, "", nil, "", "", "")
@@ -32,8 +32,8 @@ func newStreamTickClient(t *testing.T, log *slog.Logger, host string, httpClient
 	}
 }
 
-// captureStreamTickLog runs fn with a JSON slog handler at level and returns the buffer.
-func captureStreamTickLog(t *testing.T, level slog.Level, fn func(*slog.Logger)) string {
+// captureTestStreamTickLog runs fn with a JSON slog handler at level and returns the buffer.
+func captureTestStreamTickLog(t *testing.T, level slog.Level, fn func(*slog.Logger)) string {
 	t.Helper()
 	var buf bytes.Buffer
 	fn(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: level})))
@@ -43,7 +43,7 @@ func captureStreamTickLog(t *testing.T, level slog.Level, fn func(*slog.Logger))
 // TestHandleStreamCacheUpdatedIsDebug proves a successful LAPI fetch logs at DEBUG, not INFO.
 func TestHandleStreamCacheUpdatedIsDebug(t *testing.T) {
 	server, _ := testStreamLAPI(t)
-	parsed, err := url.Parse(server.URL)
+	serverURL, err := url.Parse(server.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,8 +57,8 @@ func TestHandleStreamCacheUpdatedIsDebug(t *testing.T) {
 		{slog.LevelDebug, true},
 	} {
 		t.Run(tc.level.String(), func(t *testing.T) {
-			logged := captureStreamTickLog(t, tc.level, func(log *slog.Logger) {
-				client := newStreamTickClient(t, log, parsed.Host, server.Client())
+			logged := captureTestStreamTickLog(t, tc.level, func(log *slog.Logger) {
+				client := newTestStreamTickClient(t, log, serverURL.Host, server.Client())
 				if err := client.handleStreamCache(); err != nil {
 					t.Fatalf("handleStreamCache: %v", err)
 				}
@@ -81,8 +81,8 @@ func TestHandleStreamCacheAlreadyUpdatedIsDebug(t *testing.T) {
 		{slog.LevelDebug, true},
 	} {
 		t.Run(tc.level.String(), func(t *testing.T) {
-			logged := captureStreamTickLog(t, tc.level, func(log *slog.Logger) {
-				client := newStreamTickClient(t, log, "unused", nil)
+			logged := captureTestStreamTickLog(t, tc.level, func(log *slog.Logger) {
+				client := newTestStreamTickClient(t, log, "unused", nil)
 				client.cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, 60)
 				if err := client.handleStreamCache(); err != nil {
 					t.Fatalf("handleStreamCache: %v", err)
