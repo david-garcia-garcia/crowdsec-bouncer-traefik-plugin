@@ -99,7 +99,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	if err != nil {
 		if errors.Is(err, ErrRetryableVerify) {
 			c.log.Info("captcha:ServeHTTP:validate " + err.Error())
-			c.renderCaptcha(rw, r)
+			c.renderCaptcha(rw)
 			return
 		}
 		c.log.Info("captcha:ServeHTTP:validate " + err.Error())
@@ -110,7 +110,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
 		if err := c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds); err != nil {
 			c.log.Error("captcha:ServeHTTP grace cache write failed: " + err.Error())
-			c.renderCaptcha(rw, r)
+			c.renderCaptcha(rw)
 			return
 		}
 		if c.remediationCustomHeader != "" {
@@ -119,11 +119,11 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
 	}
-	c.renderCaptcha(rw, r)
+	c.renderCaptcha(rw)
 }
 
 // renderCaptcha writes the captcha HTML page with HTTP 200.
-func (c *Client) renderCaptcha(rw http.ResponseWriter, r *http.Request) {
+func (c *Client) renderCaptcha(rw http.ResponseWriter) {
 	rw.Header().Set("Content-Type", c.templateContentType)
 	if c.remediationCustomHeader != "" {
 		rw.Header().Set(c.remediationCustomHeader, "captcha")

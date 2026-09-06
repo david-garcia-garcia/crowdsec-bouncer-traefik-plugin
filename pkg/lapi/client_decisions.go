@@ -33,7 +33,7 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 	switch scope {
 	case decisionscope.ScopeIP, "":
 		slot := decisionscope.IPCacheKey(item.Value)
-		c.cacheClient.Set(slot, stored, duration)
+		_ = c.cacheClient.Set(slot, stored, duration)
 		c.rememberActiveDecision(slot, origin, item.Value)
 	case decisionscope.ScopeRange:
 		return
@@ -47,7 +47,7 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 			return
 		}
 		slot := decisionscope.HeaderScopeKey(scope, identifier)
-		c.cacheClient.Set(slot, stored, duration)
+		_ = c.cacheClient.Set(slot, stored, duration)
 		c.rememberActiveDecision(slot, origin, item.Value)
 	}
 }
@@ -149,10 +149,10 @@ func (c *Client) cacheLiveScope(key, value string, parsedDuration time.Duration,
 		return
 	}
 	if !decisionscope.IsActiveRemediation(value) {
-		c.cacheClient.Set(key, cache.NoBannedValue, c.defaultDecisionTimeout)
+		_ = c.cacheClient.Set(key, cache.NoBannedValue, c.defaultDecisionTimeout)
 		return
 	}
-	c.cacheClient.Set(key, value, c.liveCacheTTL(parsedDuration))
+	_ = c.cacheClient.Set(key, value, c.liveCacheTTL(parsedDuration))
 }
 
 // liveCacheTTL is the live-mode cache TTL: min(decision duration, defaultDecisionTimeout).

@@ -19,6 +19,7 @@ import (
 
 const testTemplate = `<html><body>{{ .SiteKey }} {{ .FrontendKey }}</body></html>`
 
+//nolint:unparam // table-driven helpers keep a stable signature across captcha tests.
 func writeTestTemplate(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -29,6 +30,7 @@ func writeTestTemplate(t *testing.T, content string) string {
 	return path
 }
 
+//nolint:unparam // provider varies in New-path tests; Validate tests use custom provider.
 func newTestClient(t *testing.T, provider, templatePath string, cacheClient *cache.Client, validateURL string) *Client {
 	t.Helper()
 	log := logger.New("INFO", "")
@@ -54,6 +56,7 @@ func newTestClient(t *testing.T, provider, templatePath string, cacheClient *cac
 	return c
 }
 
+//nolint:unparam // status is fixed today; kept for non-200 cases later.
 func siteverifyStub(t *testing.T, status int, contentType, body string, check func(*http.Request)) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

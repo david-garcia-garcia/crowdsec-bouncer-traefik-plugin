@@ -250,19 +250,19 @@ type failingSetCache struct {
 	err error
 }
 
-func (f *failingSetCache) set(key, value string, duration int64) error {
+func (f *failingSetCache) set(_, _ string, _ int64) error {
 	return f.err
 }
 
-func (f *failingSetCache) get(key string) (string, error) {
+func (f *failingSetCache) get(_ string) (string, error) {
 	return "", errors.New(CacheMiss)
 }
 
-func (f *failingSetCache) getMany(keys []string) (map[string]string, error) {
+func (f *failingSetCache) getMany(_ []string) (map[string]string, error) {
 	return map[string]string{}, nil
 }
 
-func (f *failingSetCache) delete(key string) {}
+func (f *failingSetCache) delete(_ string) {}
 
 func (f *failingSetCache) close() {}
 

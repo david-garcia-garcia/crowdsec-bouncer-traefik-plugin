@@ -32,13 +32,13 @@ Bouncer calls `Check` before remediation, then `ServeHTTP` on captcha decisions 
 ```go
 valid, err := c.Validate(r, remoteIP)
 if errors.Is(err, ErrRetryableVerify) {
-	c.renderCaptcha(rw, r)
+	c.renderCaptcha(rw)
 	return
 }
 if valid {
 	if err := c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds); err != nil {
 		c.log.Error("grace cache write failed: " + err.Error())
-		c.renderCaptcha(rw, r)
+		c.renderCaptcha(rw)
 		return
 	}
 	http.Redirect(rw, r, r.URL.String(), http.StatusFound)
