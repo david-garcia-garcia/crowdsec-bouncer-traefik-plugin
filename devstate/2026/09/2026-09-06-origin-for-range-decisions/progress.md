@@ -8,7 +8,7 @@ JobName: 2026-09-06-origin-for-range-decisions
 | explore | [x] | [x] | 2026-09-06T05:26:48Z |
 | propose | [x] | [x] | 2026-09-06T05:29:01Z |
 | implement | [x] | [x] | 2026-09-06T05:31:42Z |
-| codereview | [x] | [ ] | |
-| devdocsimpact | [ ] | [ ] | |
+| codereview | [x] | [x] | 2026-09-06T05:38:31Z |
+| devdocsimpact | [x] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
