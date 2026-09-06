@@ -3,8 +3,12 @@
 ## Language
 
 **CrowdsecConnection**:
-The reclaim value for one Crowdsec backend: stream/metrics tickers, LAPI/CAPI HTTP, AppSec client, an isolated cache, and in-process Range membership. Keyed by connection fields, not middleware name.
+The reclaim value for one Crowdsec backend: stream/metrics tickers, LAPI/CAPI HTTP, AppSec client, an isolated cache, and in-process Range membership. Stream/alone: keyed by stream session plus settings hash. Live/none: keyed by full connection fields. Not middleware name.
 _Avoid_: Bouncer, Plugin, process singleton, `sync.Once`
+
+**Stream session**:
+The CrowdSec bouncer row this process polls: LAPI scheme, host, and path plus lapiKey (CAPI machine and password in alone). Settings such as metrics interval are not the session; `PeekLivePrefix` finds a live sibling on that stem.
+_Avoid_: middleware name, IdentityHex, `scopes=`
 
 **Bouncer**:
 The per-router `http.Handler` Traefik gets back from `New`. Holds `next`, request policy (trusted IPs, ban/captcha, Enabled, AppSec-on-pass), and a pointer to the reclaimed CrowdsecConnection.
@@ -22,8 +26,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 
 - Keep `CreateConfig` / `New` on the module root (`plugin.go`).
 - Keep `pluginVersion` in root `version.go` (release workflow bumps it). Pass it into `crowdsecconnection.New`.
-- Call `crowdsecconnection.Prepare` then `reclaim.Open(ctx, crowdsecconnection.Key(config), log, create)`.
-- Type-assert the stored value to `*crowdsecconnection.CrowdsecConnection` and return `bouncer.New(...)`.
+- Call `crowdsecconnection.Prepare`. Stream/alone: `crowdsecconnection.OpenStream(ctx, config, log, name, pluginVersion)` (one ticker per stream session). Live/none/appsec: `crowdsecconnection.OpenLive(ctx, config, log, name, pluginVersion)`. Return `bouncer.New(...)`.
 - Put stream tickers, LAPI HTTP, cache, and Range membership on CrowdsecConnection. Put captcha and templates on Bouncer.
 - Resolve client IP with `pkg/ip.GetRemoteIP`. Fold `remoteIP`, parsed `net.IP`, and `ipType` into `clientRequest`. Keep the name `req`. Do not parse `RemoteAddr` on the connection. Do not put scopes or origin on that type.
 - Range and header-mapped CrowdSec scopes live in `pkg/decisionscope`. Do not geolocate in `New` or `ServeHTTP`.
@@ -33,10 +36,11 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 ## Pattern snippet
 
 ```go
-stored, err := reclaim.Open(ctx, crowdsecconnection.Key(config), log, func() (any, error) {
-	return crowdsecconnection.New(config, log, pluginVersion)
-})
-conn := stored.(*crowdsecconnection.CrowdsecConnection)
+if config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode {
+	conn, err := crowdsecconnection.OpenStream(ctx, config, log, name, pluginVersion)
+	return bouncer.New(next, name, config, conn, log)
+}
+conn, err := crowdsecconnection.OpenLive(ctx, config, log, name, pluginVersion)
 return bouncer.New(next, name, config, conn, log)
 ```
 
@@ -52,5 +56,7 @@ return bouncer.New(next, name, config, conn, log)
 
 - Do not put middleware name, `next`, ban/captcha templates, trusted IPs, or Enabled in the reclaim key.
 - `crowdsecLapiFailureAction` is on CrowdsecConnection identity (shared with `updateMaxFailure`). `crowdsecAppsecFailureAction` stays on Bouncer.
-- Same connection fields share one ticker; different LAPI/mode/redis/interval are two Connections in one Traefik.
+- Stream/alone: CrowdSec stores one `GET /v1/decisions/stream` cursor per hashed API key plus the IP LAPI sees (this process’s outbound address). Reclaim `Open` key is session prefix plus settings hash. A second live middleware on the same LAPI URL+key is warn-and-wire via `PeekLivePrefix` (first New wins those knobs). Last holder Sleeps tickers; reload with the same snapshot Wakes (`startup=false`); a new snapshot Opens a new key and the sleeper dies on grace. Isolated backends need a second bouncer key. Live/none still split on full identity (intervals included).
 - `Close()` stops tickers, idle LAPI/AppSec HTTP, and the cache Redis pool when no constructor ctx remains and grace elapses. Do not use `sync.Once`.
+- `CrowdsecConnection` is put with `OpenWithGrace` 30s (`ReclaimGraceDuration`). `reclaim.DefaultGrace` stays 10s. `ResetForTestWith` does not shorten a CrowdsecConnection slot.
+- Lifecycle INFO lines: `crowdsec connection started|sleeping|waking|closed`. Stream health transitions: `crowdsec stream became unhealthy|healthy` (not every poll).

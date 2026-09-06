@@ -50,10 +50,14 @@ func (c *CrowdsecConnection) handleStreamTicker() {
 		c.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", c.updateFailure, c.isCrowdsecStreamHealthy, err.Error()))
 		if c.updateMaxFailure != -1 && c.updateFailure >= c.updateMaxFailure && c.isCrowdsecStreamHealthy {
 			c.isCrowdsecStreamHealthy = false
+			c.logInfo(MsgStreamUnhealthy)
 			c.log.Error(fmt.Sprintf("handleStreamTicker:error updateFailure:%d %s", c.updateFailure, err.Error()))
 		}
 		c.updateFailure++
 	} else {
+		if !c.isCrowdsecStreamHealthy {
+			c.logInfo(MsgStreamHealthy)
+		}
 		c.isCrowdsecStreamHealthy = true
 		c.updateFailure = 0
 	}

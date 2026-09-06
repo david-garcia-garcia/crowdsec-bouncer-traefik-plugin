@@ -41,3 +41,4 @@ conn.IncDropped(cache.RemediationOrigin(stored), req.ipType, "ban")
 - `cscli metrics show bouncers` reads `origin` and `ip_type` only. Do not send a `scenario` label.
 - `processed` is `ip_type` only and is incremented with `atomic.AddInt64` (no `metricsMu`). `dropped` may add `origin` and `remediation` and uses `metricsMu`. `active_decisions` is stream/alone only and counts records, not hosts in a CIDR.
 - HTTP success from LAPI is 201.
+- Sleep and Close POST the remaining window (`drainMetrics`) so a Traefik reload does not drop counters. Sleep drains in a goroutine (reclaim holds the table lock). Close drains synchronously before idle HTTP is closed. A failed POST restores the window for the next drain or ticker. `metricsInterval == 0` skips drain.

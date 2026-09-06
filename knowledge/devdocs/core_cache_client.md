@@ -3,17 +3,17 @@
 ## Language
 
 **Isolated cache**:
-One `pkg/cache.Client` store per CrowdsecConnection. Memory is a private TTL map on that Client. Redis keys are prefixed with `IdentityHex` so two Connections on one Redis do not share remediations, captcha grace, or the `"updated"` lease.
+One `pkg/cache.Client` store per CrowdsecConnection. Memory is a private TTL map on that Client. Redis keys are prefixed with `CachePrefix`: stream/alone use the LAPI URL+key session hex so warn-and-wire shares remediations; live/none use `IdentityHex`.
 _Avoid_: process `ttl_map`, shared `var cache`, bare client-IP Redis keys
 
 ## Overview
 
-Construct a new `Client` on each CrowdsecConnection. Pass `crowdsecconnection.IdentityHex(cfg)` as Redis `keyPrefix`. Do not restore a package-level map.
+Construct a new `Client` on each CrowdsecConnection. Pass `crowdsecconnection.CachePrefix(cfg)` as Redis `keyPrefix`. Do not restore a package-level map.
 
 ## How to use
 
 - Memory: `Client.New(..., isRedis=false, ..., keyPrefix)` — prefix is ignored; each Client owns a map.
-- Redis: pass identity hex as `keyPrefix`. Logical keys are the client IP, `scope:value`, and `range-index`; the store writes `prefix:key`.
+- Redis: pass `crowdsecconnection.CachePrefix(cfg)` as `keyPrefix` (stream/alone session hex, live/none `IdentityHex`). Logical keys are the client IP, `scope:value`, and `range-index`; the store writes `prefix:key`.
 - Same reclaim key → same Connection → same Client (share-by-identity, not a process dump).
 - `Client.Close()` drains Redis idle pools. Call it from `CrowdsecConnection.Close()`. Memory clients are a no-op.
 
@@ -21,13 +21,14 @@ Construct a new `Client` on each CrowdsecConnection. Pass `crowdsecconnection.Id
 
 ```go
 c := &cache.Client{}
-c.New(log, redisOn, writeHost, readHosts, pass, database, crowdsecconnection.IdentityHex(cfg))
+c.New(log, redisOn, writeHost, readHosts, pass, database, crowdsecconnection.CachePrefix(cfg))
 ```
 
 ## Key files
 
 - `pkg/cache/cache.go`
 - `pkg/crowdsecconnection/identity.go`
+- `pkg/crowdsecconnection/session.go`
 
 ## Gotchas
 

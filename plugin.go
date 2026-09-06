@@ -3,7 +3,6 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -11,7 +10,6 @@ import (
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
 // CreateConfig creates the default plugin configuration.
@@ -20,6 +18,8 @@ func CreateConfig() *configuration.Config {
 }
 
 // New is the Traefik Yaegi constructor. It reclaims a CrowdsecConnection and returns a per-router Bouncer.
+// Stream/alone: one connection per LAPI URL+key (CrowdSec one stream cursor per
+// hashed key + outbound IP). Live/none/appsec: reclaim by full connection identity.
 func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
 	config.LogLevel = strings.ToUpper(config.LogLevel)
 	log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
@@ -42,15 +42,23 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		return nil, prepErr
 	}
 
-	stored, err := reclaim.Open(ctx, crowdsecconnection.Key(config), log, func() (any, error) {
-		return crowdsecconnection.New(config, log, pluginVersion)
-	})
-	if err != nil {
-		return nil, err
+	// Stream and alone poll GET /v1/decisions/stream. CrowdSec stores that
+	// cursor on the bouncer row selected by hashed X-Api-Key plus the IP LAPI
+	// sees (this process’s outbound address), not per middleware and not per
+	// metrics interval. OpenStream keeps one ticker per URL+key in this process.
+	if config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode {
+		conn, streamErr := crowdsecconnection.OpenStream(ctx, config, log, name, pluginVersion)
+		if streamErr != nil {
+			return nil, streamErr
+		}
+		return bouncer.New(next, name, config, conn, log)
 	}
-	conn, ok := stored.(*crowdsecconnection.CrowdsecConnection)
-	if !ok {
-		return nil, fmt.Errorf("%s: reclaim: want *crowdsecconnection.CrowdsecConnection, got %T", name, stored)
+
+	// Live/none/appsec do not use stream_cursor. Two Connections on one key
+	// stay valid (?ip= lookups). Reclaim by full identity, including intervals.
+	conn, openErr := crowdsecconnection.OpenLive(ctx, config, log, name, pluginVersion)
+	if openErr != nil {
+		return nil, openErr
 	}
 	return bouncer.New(next, name, config, conn, log)
 }

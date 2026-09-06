@@ -1,7 +1,8 @@
 #!/usr/bin/env pwsh
 
 # Real-stack proof that this plugin's POST /v1/usage-metrics shows up in
-# `cscli metrics show bouncers`. Stream interval is 1s on /stream and /appsec.
+# `cscli metrics show bouncers`. Stream interval is 1s on /stream and /trusted
+# (shared session) and on /appsec.
 
 BeforeAll {
     . "$PSScriptRoot/TestUtils.ps1"
