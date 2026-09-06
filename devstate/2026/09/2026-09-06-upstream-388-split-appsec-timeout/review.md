@@ -16,8 +16,8 @@ findings: all five axes none
 fixed: n/a
 skipped: n/a
 
-## devdocsimpact (2026-09-06)
-phase: devdocsimpact
-findings: none — AppSec Client and middleware packets already current
+## archive (2026-09-06)
+phase: archive
+findings: catalog synced; change moved to archive/2026-09-06-split-appsec-timeout
 fixed: n/a
 skipped: n/a
