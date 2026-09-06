@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-06T12:39:22Z
+Developer review: in progress — 2026-09-06T13:11:26Z
 
 ## What this changes
-**Operators.** None versus `master` yet (OpenSpec + usage Language only). Live Redis prefix will change once the apply lands.
+**Operators.** Live/none Redis cache keys use prefix `lapi:` and no longer hash AppSec host/key/TLS (one-time miss on upgrade). Plugin JSON/YAML keys are unchanged. Lifecycle logs stay `crowdsec connection started|sleeping|waking|closed`.
 
 **Admin users.** None.
 
-**Developers.** OpenSpec change `separate-lapi-appsec-packages`: `pkg/lapi` + `pkg/appsec`, Bouncer holds both reclaim pointers. Specs added `core_plugin_lapi_connection` and `core_plugin_appsec_client`.
+**Developers.** `pkg/crowdsecconnection` is now `pkg/lapi` (`lapi.Client`) plus `pkg/appsec` (`appsec.Client`). Bouncer holds `lapiClient` and `appsecClient`. Neither package imports the other. `crowdsecMode: appsec` skips LAPI Open.
 
 **End users.** None.
 
@@ -13,18 +13,18 @@ Developer review: in progress — 2026-09-06T12:39:22Z
 On `master`, `pkg/crowdsecconnection` is one reclaim type for CrowdSec LAPI decisions and AppSec WAF. Developers cannot change one job without reading the other, and spec `core_plugin_connection_source-files` still forbids a new import path. Without this work, later LAPI and AppSec changes keep landing in the same type.
 
 ## Merge readiness
-Propose is apply-ready; product code is not landed. Implement remains.
+Apply landed and CI succeeded. Code review of the apply diff remains. 1 item remains.
 
 Priority: P3 — internal package clarity, no current operator or user harm
-Reviewed head: c84e835
+Reviewed head: 5123527
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Propose ready; product apply not started |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34032980438 |
-| Local tests proof | N/A | `localTests: none` (before implement) |
+| Overall readiness | 6/6 | CI succeeded; no open PR comments |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34035078833 |
+| Local tests proof | N/A | `prHost` remote; CI covers |
 | Review resolution | 6/6 | no open PR comments |
 
 ## Verification
@@ -33,8 +33,8 @@ Owner decision: None.
 | Branch | 2026-09-06-domain-lapi-appsec pushed | `git` |
 | OpenSpec | separate-lapi-appsec-packages | `openspec/changes/separate-lapi-appsec-packages/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/26 | pr-host |
-| CI | build 34032980438 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34032980438 | pr-host CI |
-| Local tests | none | handoff.yaml |
+| CI | build 34035078833 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34035078833 | pr-host CI |
+| Local tests | passed | handoff.yaml |
 | PR comments | no comments | get_comments |
 
 ## Specs
@@ -50,13 +50,14 @@ Owner decision: None.
 - [ ] [take] [small] Spec `core_plugin_connection_source-files` → lapi + appsec package-layout specs — catalog folder still exists until archive. Not taken: archive sync.
 
 ## How this fits together
-Agreed explore → OpenSpec `separate-lapi-appsec-packages` on PR 26. Implement next.
+Local ticket on branch `2026-09-06-domain-lapi-appsec`, OpenSpec `separate-lapi-appsec-packages`, PR 26. Apply is on HEAD `5123527`; CI Main Process succeeded.
 
 ## Decision needed
 None.
 
 ## Before merge
-- [ ] Implement `pkg/lapi` and `pkg/appsec`
+- [ ] Code review of the apply diff
+- [x] Implement `pkg/lapi` and `pkg/appsec`
 - [x] Explore decisions resolved
 - [x] Propose apply-ready
 
@@ -73,22 +74,24 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 2 added / 5 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | c84e835d1b4e8583020266b426462865c7e4d406 | Card must match the branch you measured |
+| Reviewed head | 51235275d777b05ce8fb54eec6b278e1b92fbce3 | Card must match the branch you measured |
 
 ### Stored data model
-None.
+- Changed: Redis `keyPrefix` / `lapi.CachePrefix` — string — sample `crowdsecconnection:<hex>` → `lapi:<hex>` (live identity dropped AppSec host/key/TLS). Upgrade: old keys not rewritten; one-time miss.
 
 ### Technical review
 Best possible solution: Two packages and two reclaim keys versus the mixed `CrowdsecConnection` on `master`.
 
 Do we have a high-confidence way to reproduce? Yes — `pkg/crowdsecconnection/connection.go` still holds both clients on `master`.
 
-Is this the best way to solve the issue? Yes — agreed in explore.
+Is this the best way to solve the issue? Yes — agreed in explore; types are both `Client`.
 
 ### Evidence
 What I checked:
-- `openspec status --change separate-lapi-appsec-packages` 4/4 complete
-- CI run 34032980438 succeeded (GitHub MCP)
+- `go test ./pkg/lapi/ ./pkg/appsec/ ./pkg/bouncer/ .` passed (skip Windows logging TempDir cleanup)
+- CI Main Process 34035078833 succeeded; e2e 34035078830 succeeded (GitHub MCP get_check_runs)
 
 ### Rank-up moves
 None.
+
+[sgsi-dev-ticket-status:2026-09-06-domain-lapi-appsec]

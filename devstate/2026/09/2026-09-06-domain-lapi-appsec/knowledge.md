@@ -2,3 +2,10 @@
 - updated knowledge/devdocs/core_plugin_middleware.md
 - updated knowledge/devdocs/core_plugin_appsec.md
 - updated knowledge/devdocs/index_core_plugin.md
+- updated knowledge/devdocs/core_cache_client.md
+- updated knowledge/devdocs/core_cache_redis.md
+- updated knowledge/devdocs/core_plugin_decisionscope.md
+- updated knowledge/devdocs/core_plugin_ip.md
+- updated knowledge/devdocs/core_plugin_lapi_usage-metrics.md
+- updated knowledge/devdocs/index_core_cache.md
+- updated knowledge/devdocs/std_go_reclaim.md
