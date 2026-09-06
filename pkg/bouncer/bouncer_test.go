@@ -10,6 +10,7 @@ import (
 
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec"
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
@@ -381,6 +382,103 @@ func TestHandleNextServeHTTPAppsecFailureAction(t *testing.T) {
 		b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 		if recorder.Code != http.StatusForbidden {
 			t.Fatalf("ban on AppSec 500 want 403, got %d", recorder.Code)
+		}
+	})
+}
+
+func newTestCaptchaBouncer(t *testing.T) (*Bouncer, *bool) {
+	t.Helper()
+	cacheClient := &cache.Client{}
+	cacheClient.New(logger.New("INFO", ""), false, "", nil, "", "", "")
+	captchaClient := &captcha.Client{}
+	if err := captchaClient.New(
+		logger.New("INFO", ""),
+		cacheClient,
+		&http.Client{},
+		configuration.CustomProvider,
+		"http://captcha.localhost:8000/fast.js",
+		"/v0/challenge",
+		"wicketkeeper",
+		"wicketkeeper_solution",
+		"http://wicketkeeper:8080/v0/siteverify",
+		"site",
+		"secret",
+		"X-Remediation",
+		"../captcha/testdata/captcha.html",
+		1800,
+	); err != nil {
+		t.Fatal(err)
+	}
+	nextCalled := false
+	b := &Bouncer{
+		captchaClient:           captchaClient,
+		log:                     logger.New("INFO", ""),
+		remediationStatusCode:   http.StatusForbidden,
+		remediationCustomHeader: "X-Remediation",
+		banTemplateContentType:  "text/html; charset=utf-8",
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			nextCalled = true
+		}),
+	}
+	return b, &nextCalled
+}
+
+func TestHandleRemediationCustomResourcePassthrough(t *testing.T) {
+	t.Run("captcha GET for JS reaches next", func(t *testing.T) {
+		b, nextCalled := newTestCaptchaBouncer(t)
+		rw := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "http://whoami.localhost/fast.js", nil)
+		b.handleRemediationServeHTTP(rw, testClientRequest(req, "203.0.113.10"), cache.CaptchaValue, "crowdsec")
+		if !*nextCalled {
+			t.Fatal("expected next handler for captcha-flagged JS path")
+		}
+	})
+	t.Run("captcha HEAD for JS reaches next", func(t *testing.T) {
+		b, nextCalled := newTestCaptchaBouncer(t)
+		rw := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodHead, "http://whoami.localhost/fast.js", nil)
+		b.handleRemediationServeHTTP(rw, testClientRequest(req, "203.0.113.10"), cache.CaptchaValue, "crowdsec")
+		if !*nextCalled {
+			t.Fatal("expected next handler for captcha-flagged HEAD JS path")
+		}
+	})
+	t.Run("captcha GET other path serves captcha HTML", func(t *testing.T) {
+		b, nextCalled := newTestCaptchaBouncer(t)
+		rw := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "http://whoami.localhost/foo", nil)
+		b.handleRemediationServeHTTP(rw, testClientRequest(req, "203.0.113.10"), cache.CaptchaValue, "crowdsec")
+		if *nextCalled {
+			t.Fatal("next handler must not run for unmatched captcha path")
+		}
+		if rw.Code != http.StatusOK {
+			t.Fatalf("captcha HTML want 200, got %d", rw.Code)
+		}
+		if got := rw.Header().Get("X-Remediation"); got != "captcha" {
+			t.Fatalf("X-Remediation=%q, want captcha", got)
+		}
+	})
+	t.Run("captcha unmatched HEAD still bans", func(t *testing.T) {
+		b, nextCalled := newTestCaptchaBouncer(t)
+		rw := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodHead, "http://whoami.localhost/foo", nil)
+		b.handleRemediationServeHTTP(rw, testClientRequest(req, "203.0.113.10"), cache.CaptchaValue, "crowdsec")
+		if *nextCalled {
+			t.Fatal("next handler must not run for unmatched captcha HEAD")
+		}
+		if rw.Code != http.StatusForbidden {
+			t.Fatalf("unmatched captcha HEAD want 403, got %d", rw.Code)
+		}
+	})
+	t.Run("banned GET for JS stays banned", func(t *testing.T) {
+		b, nextCalled := newTestCaptchaBouncer(t)
+		rw := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "http://whoami.localhost/fast.js", nil)
+		b.handleRemediationServeHTTP(rw, testClientRequest(req, "203.0.113.10"), cache.BannedValue, "crowdsec")
+		if *nextCalled {
+			t.Fatal("next handler must not run for ban on JS path")
+		}
+		if rw.Code != http.StatusForbidden {
+			t.Fatalf("ban want 403, got %d", rw.Code)
 		}
 	})
 }

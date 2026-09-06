@@ -27,6 +27,9 @@ type Client struct {
 	httpClient              *http.Client
 	log                     *slog.Logger
 	infoProvider            *infoProvider
+	challengeURL            string
+	customJsPath            string
+	customChallengePath     string
 }
 
 // Information for self-hosted provider.
@@ -60,14 +63,18 @@ var infoProviders = map[string]*infoProvider{
 }
 
 // New Initialize captcha client.
-func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, challenge, key, response, validate, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
 	}
 	var info *infoProvider
+	// Custom provider URLs come from config; catalog providers keep their CDN endpoints.
 	if provider == configuration.CustomProvider {
 		info = &infoProvider{js: js, key: key, response: response, validate: validate}
+		c.challengeURL = challenge
+		c.customJsPath = customResourcePath(js)
+		c.customChallengePath = customResourcePath(challenge)
 	} else {
 		info = infoProviders[provider]
 	}
@@ -83,6 +90,36 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 	c.httpClient = httpClient
 	c.cacheClient = cacheClient
 	return nil
+}
+
+// customResourcePath returns the path of a custom captcha JS or challenge config URL.
+func customResourcePath(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	if parsed.Path == "" || !strings.HasPrefix(parsed.Path, "/") {
+		return ""
+	}
+	return parsed.Path
+}
+
+// IsCustomResourceRequest reports whether this request is a custom captcha JS or challenge path.
+func (c *Client) IsCustomResourceRequest(r *http.Request) bool {
+	if !c.Valid || r == nil || r.URL == nil {
+		return false
+	}
+	requestPath := r.URL.Path
+	if requestPath == "" {
+		return false
+	}
+	if c.customJsPath != "" && requestPath == c.customJsPath {
+		return true
+	}
+	return c.customChallengePath != "" && requestPath == c.customChallengePath
 }
 
 // ServeHTTP Handle captcha html page or validation.
@@ -108,9 +145,10 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	}
 	rw.WriteHeader(http.StatusOK)
 	err = c.template.Execute(rw, map[string]string{
-		"SiteKey":     c.siteKey,
-		"FrontendJS":  c.infoProvider.js,
-		"FrontendKey": c.infoProvider.key,
+		"SiteKey":      c.siteKey,
+		"FrontendJS":   c.infoProvider.js,
+		"FrontendKey":  c.infoProvider.key,
+		"ChallengeURL": c.challengeURL,
 	})
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP captchaTemplateServe " + err.Error())

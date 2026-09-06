@@ -91,6 +91,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		},
 		config.CaptchaProvider,
 		config.CaptchaCustomJsURL,
+		config.CaptchaCustomChallengeURL,
 		config.CaptchaCustomKey,
 		config.CaptchaCustomResponse,
 		config.CaptchaCustomValidateURL,
@@ -289,14 +290,21 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientRequest, remediation, origin string) {
 	kind := cache.RemediationKind(remediation)
 	b.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", req.remoteIP, kind))
-	if b.captchaClient.Valid && kind == cache.CaptchaValue && req.Method != http.MethodHead {
-		if b.captchaClient.Check(req.remoteIP) {
+	if b.captchaClient.Valid && kind == cache.CaptchaValue {
+		// Custom JS/challenge paths must reach origin even on HEAD (captcha HEAD otherwise bans).
+		if b.captchaClient.IsCustomResourceRequest(req.Request) {
 			b.handleNextServeHTTP(rw, req)
 			return
 		}
-		b.recordDropped(origin, req.ipType, "captcha")
-		b.captchaClient.ServeHTTP(rw, req.Request, req.remoteIP)
-		return
+		if req.Method != http.MethodHead {
+			if b.captchaClient.Check(req.remoteIP) {
+				b.handleNextServeHTTP(rw, req)
+				return
+			}
+			b.recordDropped(origin, req.ipType, "captcha")
+			b.captchaClient.ServeHTTP(rw, req.Request, req.remoteIP)
+			return
+		}
 	}
 	b.handleBanServeHTTP(rw, req, configuration.ReasonLAPI, origin)
 }

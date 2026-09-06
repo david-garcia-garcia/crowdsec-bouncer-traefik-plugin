@@ -522,7 +522,10 @@ make run
   - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile` or `custom`
 - CaptchaCustomJsURL
   - string
-  - If CaptchaProvider is `custom`, URL used to load the challenge in the HTML (in case of hcaptcha: `https://hcaptcha.com/1/api.js`)
+  - If CaptchaProvider is `custom`, URL used to load the challenge in the HTML (in case of hcaptcha: `https://hcaptcha.com/1/api.js`). Captcha-flagged requests whose path equals this URL's path are passed through to origin (banned IPs are not).
+- CaptchaCustomChallengeURL
+  - string
+  - If CaptchaProvider is `custom`, URL of the challenge endpoint (for example wicketkeeper `/v0/challenge`). Optional; empty means no challenge pass-through. Captcha-flagged requests whose path equals this URL's path are passed through to origin (banned IPs are not).
 - CaptchaCustomValidateURL
   - string
   - If CaptchaProvider is `custom`, URL used to validate the challenge (in case of hcaptcha: `https://api.hcaptcha.com/siteverify`)
