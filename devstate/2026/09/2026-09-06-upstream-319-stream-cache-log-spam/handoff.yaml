@@ -1,0 +1,29 @@
+issueKey: 2026-09-06-upstream-319-stream-cache-log-spam
+
+jobName: 2026-09-06-upstream-319-stream-cache-log-spam
+
+issueHost: local
+
+issueRef: none
+
+prHost: github
+
+repoSlug: crowdsec-bouncer-traefik-plugin
+
+destBranch: master
+
+qualify: qualified-with-gaps
+
+src: a272f91c005c1d100470e429c7b3b616b3dec8dbde5ebe8fa78748ec3c1a7116
+
+localTests: none
+
+requirement: requirement.md
+
+comments: none
+
+explore: none
+
+change: none
+
+pr: none
