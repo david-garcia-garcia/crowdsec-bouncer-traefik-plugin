@@ -21,27 +21,26 @@ import (
 
 // Bouncer is one Traefik router handler. It is not the reclaim value.
 type Bouncer struct {
-	next     http.Handler
-	name     string
-	template *template.Template
-
-	enabled                 bool
-	crowdsecMode            string
+	appsecClient            *appsec.Client
 	appsecEnabled           bool
 	appsecFailureAction     string
-	remediationStatusCode   int
-	remediationCustomHeader string
-	forwardedCustomHeader   string
 	banTemplate             *template.Template
 	banTemplateContentType  string
-	traceCustomHeader       string
-	clientPoolStrategy      *ip.PoolStrategy
-	serverPoolStrategy      *ip.PoolStrategy
 	captchaClient           *captcha.Client
-	log                     *slog.Logger
-	lapiClient              *lapi.Client
-	appsecClient            *appsec.Client
+	clientPoolStrategy      *ip.PoolStrategy
+	crowdsecMode            string
 	decisionScopeHeaders    map[string]string // CrowdSec header scope → request header
+	enabled                 bool
+	forwardedCustomHeader   string
+	lapiClient              *lapi.Client
+	log                     *slog.Logger
+	name                    string
+	next                    http.Handler
+	remediationCustomHeader string
+	remediationStatusCode   int
+	serverPoolStrategy      *ip.PoolStrategy
+	template                *template.Template
+	traceCustomHeader       string
 }
 
 // New returns a per-router handler bound to lapiClient and appsecClient.
@@ -56,26 +55,26 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 	}
 
 	routeHandler := &Bouncer{
-		next:                    next,
-		name:                    name,
-		template:                template.New("CrowdsecBouncer").Delims("[[", "]]"),
-		enabled:                 config.Enabled,
-		crowdsecMode:            config.CrowdsecMode,
+		appsecClient:            appsecClient,
 		appsecEnabled:           config.CrowdsecAppsecEnabled,
 		appsecFailureAction:     configuration.EffectiveFailureAction(config.CrowdsecAppsecFailureAction),
-		remediationCustomHeader: config.RemediationHeadersCustomName,
-		forwardedCustomHeader:   config.ForwardedHeadersCustomName,
-		remediationStatusCode:   config.RemediationStatusCode,
 		banTemplate:             banTemplate,
 		banTemplateContentType:  banTemplateContentType,
-		traceCustomHeader:       config.TraceHeadersCustomName,
-		log:                     log,
-		lapiClient:              lapiClient,
-		appsecClient:            appsecClient,
-		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
-		serverPoolStrategy:      &ip.PoolStrategy{Checker: serverChecker},
-		clientPoolStrategy:      &ip.PoolStrategy{Checker: clientChecker},
 		captchaClient:           &captcha.Client{},
+		clientPoolStrategy:      &ip.PoolStrategy{Checker: clientChecker},
+		crowdsecMode:            config.CrowdsecMode,
+		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
+		enabled:                 config.Enabled,
+		forwardedCustomHeader:   config.ForwardedHeadersCustomName,
+		lapiClient:              lapiClient,
+		log:                     log,
+		name:                    name,
+		next:                    next,
+		remediationCustomHeader: config.RemediationHeadersCustomName,
+		remediationStatusCode:   config.RemediationStatusCode,
+		serverPoolStrategy:      &ip.PoolStrategy{Checker: serverChecker},
+		template:                template.New("CrowdsecBouncer").Delims("[[", "]]"),
+		traceCustomHeader:       config.TraceHeadersCustomName,
 	}
 	if config.CrowdsecMode == configuration.AppsecMode {
 		routeHandler.log.Debug("Bouncer initialized name:" + name)
@@ -137,9 +136,9 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	remoteIP, ipAddr, err := ip.GetRemoteIP(httpReq, b.serverPoolStrategy, b.forwardedCustomHeader)
 	req := clientRequest{
 		Request:  httpReq,
-		remoteIP: remoteIP,
 		ipAddr:   ipAddr,
 		ipType:   ip.FamilyOfIP(ipAddr),
+		remoteIP: remoteIP,
 	}
 	b.recordProcessed(req.ipType)
 	if err != nil {
