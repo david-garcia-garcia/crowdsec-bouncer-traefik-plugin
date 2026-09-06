@@ -87,3 +87,7 @@ Spec `core_plugin_middleware_instance-reclaim`: keep “same session ⇒ one tic
 - Q: Who owns stream-session identity (cursor / bouncer row)?
   Decision: assumed — CrowdSec LAPI owns the cursor on the bouncer row. This plugin reuses that: at most one in-process poller per URL+key (and TLS cert). Do not invent a second cursor. Request client IP stays `pkg/ip.GetRemoteIP`.
   By: explore
+
+- Q: Do two Traefik processes with in-memory cache and the same LAPI key steal deltas?
+  Decision: assumed — out of this change. Same key + same LAPI-visible client IP already share one bouncer row (pre-existing). Distinct source IPs get distinct rows (`ext_crowdsec_lapi_stream-cursor`). Shared Redis + `"updated"` lease is the multi-instance store. In-process uniqueness does not create or fix the NAT-to-one-IP case.
+  By: explore
