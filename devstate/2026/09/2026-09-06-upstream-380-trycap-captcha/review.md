@@ -10,3 +10,10 @@ findings: first-class trycap; JSON siteverify; dedicated instance URL; one defau
 fixed: explore.md decisions, ext_cap_standalone research, core_plugin_captcha usage
 skipped: none
 
+## propose (2026-09-06)
+phase: propose
+findings: new spec core_plugin_captcha_trycap-provider; change trycap-captcha-provider
+fixed: proposal, design, tasks, spec delta
+skipped: none
+
+
