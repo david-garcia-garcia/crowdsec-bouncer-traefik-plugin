@@ -236,13 +236,13 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 		}
 		conn.streamOwner = middlewareName
 		conn.streamSettings = joinerSettings
-		return conn, nil
+		return wrappedConnection(conn), nil
 	}
 
 	bindKey := joinerKey
-	liveKey, liveVal, _, foundLive := reclaim.PeekLivePrefix(SessionPrefix(cfg))
-	if foundLive && liveKey != joinerKey {
-		existing, _ := liveVal.(*CrowdsecConnection)
+	live := reclaim.PeekLivePrefix(SessionPrefix(cfg))
+	if live.OK && live.Key != joinerKey {
+		existing, _ := live.Value.(*CrowdsecConnection)
 		if existing != nil {
 			ownerName := existing.streamOwner
 			if ownerName == "" {
@@ -250,10 +250,10 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 			}
 			warnWiredToOwner(log, ownerName, middlewareName, existing.streamSettings, joinerSettings)
 		}
-		bindKey = liveKey
+		bindKey = live.Key
 	}
 
-	_, holderCount, _, foundSleeper := reclaim.Peek(bindKey)
+	sleeper := reclaim.Peek(bindKey)
 	stored, openErr := reclaim.OpenWithGrace(ctx, bindKey, log, ReclaimGraceDuration, create)
 	if openErr != nil {
 		return nil, openErr
@@ -263,7 +263,7 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 		return nil, typedErr
 	}
 	// Sleeper belonged to another middleware that is gone. Take the name for later warnings.
-	if foundSleeper && holderCount == 0 && sessionConn.streamOwner != middlewareName {
+	if sleeper.OK && sleeper.Holders == 0 && sessionConn.streamOwner != middlewareName {
 		sessionConn.streamOwner = middlewareName
 	}
 	return sessionConn, nil
@@ -272,12 +272,25 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 // OpenLive reclaims a CrowdsecConnection by full identity (live/none/appsec).
 func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, pluginVersion string) (*CrowdsecConnection, error) {
 	stored, openErr := reclaim.OpenWithGrace(ctx, Key(cfg), log, ReclaimGraceDuration, func() (any, error) {
-		return New(cfg, log, pluginVersion)
+		conn, err := New(cfg, log, pluginVersion)
+		if err != nil {
+			return nil, err
+		}
+		return wrappedConnection(conn), nil
 	})
 	if openErr != nil {
 		return nil, openErr
 	}
 	return streamConn("live", stored)
+}
+
+func wrappedConnection(conn *CrowdsecConnection) *reclaim.Wrapped {
+	return &reclaim.Wrapped{
+		Value: conn,
+		Sleep: conn.Sleep,
+		Wake:  conn.Wake,
+		Close: conn.Close,
+	}
 }
 
 // streamConn type-asserts the reclaim value to *CrowdsecConnection.

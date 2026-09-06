@@ -978,9 +978,9 @@ func TestTable_PeekDuringGrace(t *testing.T) {
 	}
 	cancel()
 	waitKeyMsg(t, h, MsgOrphan, "a")
-	stored, holders, sleeping, ok := tab.Peek("a")
-	if !ok || stored != first || holders != 0 || !sleeping {
-		t.Fatalf("peek ok=%v holders=%d sleeping=%v stored=%v", ok, holders, sleeping, stored)
+	view := tab.Peek("a")
+	if !view.OK || view.Value != first || view.Holders != 0 || !view.Sleeping {
+		t.Fatalf("peek ok=%v holders=%d sleeping=%v stored=%v", view.OK, view.Holders, view.Sleeping, view.Value)
 	}
 	if ended.Load() {
 		t.Fatal("peek must not dispose")
@@ -1010,20 +1010,20 @@ func TestTable_PeekLivePrefixFindsLiveIgnoresSleeper(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	foundKey, foundVal, holders, ok := tab.PeekLivePrefix("sess:")
-	if !ok || foundKey != "sess:new" || foundVal != live || holders != 1 {
-		t.Fatalf("live prefix: key=%q holders=%d ok=%v", foundKey, holders, ok)
+	liveView := tab.PeekLivePrefix("sess:")
+	if !liveView.OK || liveView.Key != "sess:new" || liveView.Value != live || liveView.Holders != 1 {
+		t.Fatalf("live prefix: key=%q holders=%d ok=%v", liveView.Key, liveView.Holders, liveView.OK)
 	}
-	if foundVal == sleeper {
+	if liveView.Value == sleeper {
 		t.Fatal("PeekLivePrefix must ignore a sleeping leftover")
 	}
 
-	missKey, _, _, miss := tab.PeekLivePrefix("other:")
-	if miss || missKey != "" {
-		t.Fatalf("unrelated prefix must miss: key=%q ok=%v", missKey, miss)
+	miss := tab.PeekLivePrefix("other:")
+	if miss.OK || miss.Key != "" {
+		t.Fatalf("unrelated prefix must miss: key=%q ok=%v", miss.Key, miss.OK)
 	}
-	emptyKey, _, _, emptyOK := tab.PeekLivePrefix("")
-	if emptyOK || emptyKey != "" {
+	empty := tab.PeekLivePrefix("")
+	if empty.OK || empty.Key != "" {
 		t.Fatal("empty prefix must miss")
 	}
 }
@@ -1046,9 +1046,9 @@ func TestTable_PeekLivePrefixPicksSmallestLiveKey(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	foundKey, _, holders, ok := tab.PeekLivePrefix("sess:")
-	if !ok || foundKey != "sess:a" || holders != 1 {
-		t.Fatalf("want sess:a, got key=%q holders=%d ok=%v", foundKey, holders, ok)
+	view := tab.PeekLivePrefix("sess:")
+	if !view.OK || view.Key != "sess:a" || view.Holders != 1 {
+		t.Fatalf("want sess:a, got key=%q holders=%d ok=%v", view.Key, view.Holders, view.OK)
 	}
 }
 

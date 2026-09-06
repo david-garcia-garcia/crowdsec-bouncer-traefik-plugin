@@ -58,6 +58,9 @@ type slot struct {
 	graceTimer *time.Timer
 	graceGen   uint64
 	logger     *slog.Logger
+	sleep      func()
+	wake       func()
+	closeFn    func()
 }
 
 // NewTable builds an empty table. Zero grace means no wait after the last holder. A negative grace becomes DefaultGrace.
@@ -79,55 +82,77 @@ func requireContext(ctx context.Context) {
 	}
 }
 
-// waitCtx returns when ctx is done. Prefer Done(); if it is nil (Background), poll Err.
+// waitCtx returns when ctx is done. Yaegi v0.16 often gives a Done channel that
+// never receives after cancel, while Err is set. Poll Err so orphan/Sleep still
+// run. Native Go still returns immediately when Done closes.
 func waitCtx(ctx context.Context) {
-	if done := ctx.Done(); done != nil {
-		<-done
-		return
-	}
 	for ctx.Err() == nil {
+		if done := ctx.Done(); done != nil {
+			select {
+			case <-done:
+				return
+			case <-time.After(20 * time.Millisecond):
+			}
+			continue
+		}
 		time.Sleep(20 * time.Millisecond)
 	}
 }
 
-// closer is an optional Close on a stored value, called when the incarnation ends.
+// closer is an optional Close on a same-package stored value.
 type closer interface {
 	Close()
 }
 
-// sleeper is an optional pause on a stored value. Last holder gone → Sleep;
+// sleeper is an optional pause on a same-package stored value. Last holder gone → Sleep;
 // Open during grace → Wake. Close still runs when grace elapses. Sleep is not Close.
 type sleeper interface {
 	Sleep()
 	Wake()
 }
 
-// stopValue calls Close if v has it. Used for a lost create and when life ends.
-func stopValue(v any) {
-	if c, ok := v.(closer); ok {
-		c.Close()
-	}
+// Wrapped is a create() result with Sleep/Wake/Close already as funcs.
+// Another package MUST return *Wrapped: Yaegi v0.16 panics when this table
+// type-asserts a foreign concrete type to closer or sleeper.
+type Wrapped struct {
+	Value any
+	Sleep func()
+	Wake  func()
+	Close func()
 }
 
-// sleepValue calls Sleep if v has it. Called on last holder gone.
-func sleepValue(v any) {
-	if s, ok := v.(sleeper); ok {
-		s.Sleep()
+func unwrap(created any) (value any, sleep, wake, closeFn func()) {
+	if wrapped, ok := created.(*Wrapped); ok {
+		value = wrapped.Value
+		if value == nil {
+			value = wrapped
+		}
+		return value, wrapped.Sleep, wrapped.Wake, wrapped.Close
 	}
+	sleep, wake = sleeperFuncs(created)
+	closeFn = closerFunc(created)
+	return created, sleep, wake, closeFn
 }
 
-// wakeValue calls Wake if v has it. Called when Open reclaims a sleeper.
-func wakeValue(v any) {
-	if s, ok := v.(sleeper); ok {
-		s.Wake()
+func sleeperFuncs(value any) (sleep, wake func()) {
+	if s, ok := value.(sleeper); ok {
+		return s.Sleep, s.Wake
 	}
+	return nil, nil
+}
+
+func closerFunc(value any) func() {
+	if c, ok := value.(closer); ok {
+		return c.Close
+	}
+	return nil
 }
 
 // Open returns the stored value for key, creating it once, and tracks ctx until it is done.
 // Slot wait after the last holder is the table grace. Use OpenWithGrace to set a different wait.
 // create takes no arguments: Yaegi cannot call func(context.Context) (any, error) (it assigns life onto the value).
 // logger is required; it is the only logger for this Open and is stored on the slot for orphan and dispose.
-// If the value has Close(), the table calls it when this incarnation ends.
+// If the value has Close(), or create returned *Wrapped with Close, the table calls it when this incarnation ends.
 func (t *Table) Open(ctx context.Context, key string, logger *slog.Logger, create func() (any, error)) (any, error) {
 	wait := time.Duration(0)
 	if t != nil {
@@ -151,24 +176,25 @@ func (t *Table) OpenWithGrace(ctx context.Context, key string, logger *slog.Logg
 	if e, ok := t.items[key]; ok {
 		id, reclaimed := t.bindLocked(e)
 		e.logger = logger
-		v := e.value
-		if reclaimed {
-			wakeValue(v)
+		stored := e.value
+		if reclaimed && e.wake != nil {
+			e.wake()
 		}
 		t.mu.Unlock()
 		t.logBind(logger, key, reclaimed)
 		go t.watch(key, id, e, ctx)
-		return v, nil
+		return stored, nil
 	}
 	t.mu.Unlock()
 
 	// Create outside the lock so two first Opens can race.
 	life, cancel := context.WithCancel(context.Background())
-	v, err := create()
+	created, err := create()
 	if err != nil {
 		cancel()
 		return nil, err
 	}
+	value, sleep, wake, closeFn := unwrap(created)
 
 	t.mu.Lock()
 	// Another Open won: keep the stored value and drop this extra create.
@@ -176,12 +202,14 @@ func (t *Table) OpenWithGrace(ctx context.Context, key string, logger *slog.Logg
 		id, reclaimed := t.bindLocked(e)
 		e.logger = logger
 		exist := e.value
-		if reclaimed {
-			wakeValue(exist)
+		if reclaimed && e.wake != nil {
+			e.wake()
 		}
 		t.mu.Unlock()
 		cancel()
-		stopValue(v)
+		if closeFn != nil {
+			closeFn()
+		}
 		t.logBind(logger, key, reclaimed)
 		go t.watch(key, id, e, ctx)
 		return exist, nil
@@ -189,11 +217,14 @@ func (t *Table) OpenWithGrace(ctx context.Context, key string, logger *slog.Logg
 
 	// First put for this key. Close the value when life is canceled (fire / ResetForTest).
 	e := &slot{
-		value:   v,
+		value:   value,
 		cancel:  cancel,
 		holders: map[uint64]struct{}{},
 		grace:   grace,
 		logger:  logger,
+		sleep:   sleep,
+		wake:    wake,
+		closeFn: closeFn,
 	}
 	t.items[key] = e
 	t.keys = append(t.keys, key)
@@ -201,12 +232,14 @@ func (t *Table) OpenWithGrace(ctx context.Context, key string, logger *slog.Logg
 	t.mu.Unlock()
 	go func() {
 		waitCtx(life)
-		stopValue(v)
+		if closeFn != nil {
+			closeFn()
+		}
 	}()
 	logger.Debug(MsgPut, "key", key)
 	t.logBind(logger, key, false)
 	go t.watch(key, id, e, ctx)
-	return v, nil
+	return value, nil
 }
 
 // bindLocked attaches a holder and invalidates grace if this Open reclaimed the key. Caller holds t.mu.
@@ -251,7 +284,9 @@ func (t *Table) drop(key string, id uint64, e *slot) {
 	}
 
 	// Last holder gone: Sleep (tickers off) then arm grace. Close waits for fire.
-	sleepValue(e.value)
+	if e.sleep != nil {
+		e.sleep()
+	}
 	e.graceGen++
 	gen := e.graceGen
 	orphanLog := e.logger
@@ -276,7 +311,7 @@ func (t *Table) fire(key string, e *slot, gen uint64) {
 	}
 	cancel := e.cancel
 	disposeLog := e.logger
-	stored := e.value
+	closeFn := e.closeFn
 	delete(t.items, key)
 	t.keys = dropStoredKey(t.keys, key)
 	t.mu.Unlock()
@@ -285,21 +320,33 @@ func (t *Table) fire(key string, e *slot, gen uint64) {
 	}
 	// Close after Sleep. fire is grace elapsed or ResetForTest. Callers do not Close slots.
 	disposeLog.Debug(MsgDispose, "key", key)
-	stopValue(stored)
+	if closeFn != nil {
+		closeFn()
+	}
+}
+
+// View is a slot inspected without binding a constructor context.
+// One struct: Yaegi v0.16 corrupts a 4-value (any, int, bool, bool) return.
+type View struct {
+	Key      string
+	Value    any
+	Holders  int
+	Sleeping bool
+	OK       bool
 }
 
 // Peek returns the stored value for key without adding a holder and without create.
-// holders is the live constructor-context count. sleeping is true when the last
-// holder is gone and the dispose timer is armed. ok is false when the key is absent.
-func (t *Table) Peek(key string) (interface{}, int, bool, bool) {
+// Holders is the live constructor-context count. Sleeping is true when the last
+// holder is gone and the dispose timer is armed. OK is false when the key is absent.
+func (t *Table) Peek(key string) View {
 	if t == nil {
-		return nil, 0, false, false
+		return View{}
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	e, found := t.items[key]
 	if !found {
-		return nil, 0, false, false
+		return View{}
 	}
 	n := 0
 	if e.holders != nil {
@@ -309,24 +356,24 @@ func (t *Table) Peek(key string) (interface{}, int, bool, bool) {
 	if e.graceTimer != nil {
 		sleeping = true
 	}
-	return e.value, n, sleeping, true
+	return View{Key: key, Value: e.value, Holders: n, Sleeping: sleeping, OK: true}
 }
 
 // PeekLivePrefix returns one live slot whose key starts with prefix, without binding.
 // Sleeping slots are ignored so a grace leftover cannot steal a new snapshot’s Open.
 // Several live matches: the lexicographically smallest key. Empty prefix: miss.
 // Index-style loops: Yaegi v0.16 panics on ranging map values of *slot.
-func (t *Table) PeekLivePrefix(prefix string) (string, interface{}, int, bool) {
+func (t *Table) PeekLivePrefix(prefix string) View {
 	if t == nil {
-		return "", nil, 0, false
+		return View{}
 	}
 	if prefix == "" {
-		return "", nil, 0, false
+		return View{}
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	chosenKey := ""
-	var chosenValue interface{}
+	var chosenValue any
 	chosenHolders := 0
 	i := 0
 	for i < len(t.keys) {
@@ -353,9 +400,9 @@ func (t *Table) PeekLivePrefix(prefix string) (string, interface{}, int, bool) {
 		}
 	}
 	if chosenKey == "" {
-		return "", nil, 0, false
+		return View{}
 	}
-	return chosenKey, chosenValue, chosenHolders, true
+	return View{Key: chosenKey, Value: chosenValue, Holders: chosenHolders, OK: true}
 }
 
 // keyHasPrefix reports whether value starts with prefix (no strings.HasPrefix: Yaegi).

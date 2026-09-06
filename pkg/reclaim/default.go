@@ -35,12 +35,12 @@ func OpenWithGrace(ctx context.Context, key string, logger *slog.Logger, grace t
 }
 
 // Peek is Default().Peek: inspect a key without binding a constructor context.
-func Peek(key string) (any, int, bool, bool) {
+func Peek(key string) View {
 	return Default().Peek(key)
 }
 
 // PeekLivePrefix is Default().PeekLivePrefix: a live slot under prefix, no bind.
-func PeekLivePrefix(prefix string) (string, any, int, bool) {
+func PeekLivePrefix(prefix string) View {
 	return Default().PeekLivePrefix(prefix)
 }
 

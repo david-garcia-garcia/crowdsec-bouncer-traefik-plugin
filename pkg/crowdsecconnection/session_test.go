@@ -190,8 +190,8 @@ func waitStreamSessionInGrace(t *testing.T, cfg *configuration.Config) {
 	sessionKey := SessionKey(cfg)
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		_, holderCount, sleeping, found := reclaim.Peek(sessionKey)
-		if found && holderCount == 0 && sleeping {
+		view := reclaim.Peek(sessionKey)
+		if view.OK && view.Holders == 0 && view.Sleeping {
 			return
 		}
 		time.Sleep(time.Millisecond)

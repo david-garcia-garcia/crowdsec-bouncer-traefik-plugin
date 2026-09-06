@@ -214,9 +214,9 @@ func TestNew_DisposeAfterGrace(t *testing.T) {
 	conn1 := testRoute(t, first).Connection()
 	cancel()
 	time.Sleep(150 * time.Millisecond)
-	_, holders, sleeping, found := reclaim.Peek(crowdsecconnection.Key(cfg))
-	if !found || holders != 0 || !sleeping {
-		t.Fatal("CrowdsecConnection must still be in its 30s grace after table 20ms")
+	view := reclaim.Peek(crowdsecconnection.Key(cfg))
+	if !view.OK || view.Holders != 0 || !view.Sleeping {
+		t.Fatalf("CrowdsecConnection must still be in its 30s grace after table 20ms: found=%v holders=%d sleeping=%v", view.OK, view.Holders, view.Sleeping)
 	}
 	time.Sleep(crowdsecconnection.ReclaimGraceDuration)
 	second, err := New(context.Background(), testNextOK(), cfgLiveAt(u.Host), "dispose")
@@ -424,12 +424,13 @@ func waitPluginStreamInGrace(t *testing.T, cfg *configuration.Config) {
 	t.Helper()
 	sessionKey := crowdsecconnection.SessionKey(cfg)
 	deadline := time.Now().Add(2 * time.Second)
+	var view reclaim.View
 	for time.Now().Before(deadline) {
-		_, holders, sleeping, found := reclaim.Peek(sessionKey)
-		if found && holders == 0 && sleeping {
+		view = reclaim.Peek(sessionKey)
+		if view.OK && view.Holders == 0 && view.Sleeping {
 			return
 		}
 		time.Sleep(time.Millisecond)
 	}
-	t.Fatal("stream session did not enter grace")
+	t.Fatalf("stream session did not enter grace: found=%v holders=%d sleeping=%v", view.OK, view.Holders, view.Sleeping)
 }
