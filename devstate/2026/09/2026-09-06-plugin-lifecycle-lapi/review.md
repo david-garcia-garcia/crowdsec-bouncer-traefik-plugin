@@ -39,3 +39,11 @@ phase: codereview
 findings: Standards 8 (5 hard naming/comments, 3 judgement); Spec none; Security none; Performance none; Dead 1 hard (Open leftover)
 fixed: connectionFromStored; connErr; OpenLive middlewareName; helper comments (122e06b)
 skipped: judgement names/test helper extract; Open kept as specified public API
+
+## devdocsimpact (2026-09-06)
+
+phase: devdocsimpact
+findings: language-gap Stream session; stale-usage OpenLive, CachePrefix, Redis namespace
+fixed: core_plugin_middleware.md; core_cache_client.md; core_cache_redis.md
+skipped: none
+
