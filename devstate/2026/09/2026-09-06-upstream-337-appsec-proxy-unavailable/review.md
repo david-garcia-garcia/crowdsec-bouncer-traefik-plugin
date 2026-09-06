@@ -15,3 +15,9 @@ phase: propose
 findings: none
 fixed: n/a
 skipped: n/a
+
+## implement (2026-09-06)
+phase: implement
+findings: none
+fixed: Test_appsecQuery_failureActionOnReverseProxyError
+skipped: e2e passthrough; drain on reverse-proxy statuses
