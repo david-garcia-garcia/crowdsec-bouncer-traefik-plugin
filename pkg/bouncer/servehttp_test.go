@@ -46,9 +46,11 @@ func testUnreachableCache(t *testing.T) *cache.Client {
 	return c
 }
 
-func testServeHTTPRequest(clientIP string) *http.Request {
+const testServeHTTPClientIP = "192.0.2.10"
+
+func testServeHTTPRequest() *http.Request {
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
-	req.RemoteAddr = clientIP + ":12345"
+	req.RemoteAddr = testServeHTTPClientIP + ":12345"
 	return req
 }
 
@@ -129,7 +131,10 @@ func TestNew_appsecModeInitializesCaptchaForFailureAction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b := handler.(*Bouncer)
+	b, ok := handler.(*Bouncer)
+	if !ok {
+		t.Fatal("expected *Bouncer handler")
+	}
 	if !b.captchaClient.Valid {
 		t.Fatal("appsec failure-action captcha must initialize captcha client")
 	}
@@ -145,7 +150,10 @@ func TestNew_appsecModeSkipsCaptchaWhenNotNeeded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b := handler.(*Bouncer)
+	b, ok := handler.(*Bouncer)
+	if !ok {
+		t.Fatal("expected *Bouncer handler")
+	}
 	if b.captchaClient.Valid {
 		t.Fatal("appsec ban failure action must not initialize captcha")
 	}
@@ -161,7 +169,7 @@ func TestServeHTTP_cacheHitBan(t *testing.T) {
 	})
 	b := testBouncerForServeHTTP(t, lapiClient, nil)
 	recorder := httptest.NewRecorder()
-	b.ServeHTTP(recorder, testServeHTTPRequest("192.0.2.10"))
+	b.ServeHTTP(recorder, testServeHTTPRequest())
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("cache ban want 403, got %d", recorder.Code)
 	}
@@ -181,7 +189,7 @@ func TestServeHTTP_cacheHitCaptcha(t *testing.T) {
 	b := testBouncerForServeHTTP(t, lapiClient, nil)
 	b.captchaClient = testValidCaptchaClient(t, cacheClient)
 	recorder := httptest.NewRecorder()
-	b.ServeHTTP(recorder, testServeHTTPRequest("192.0.2.10"))
+	b.ServeHTTP(recorder, testServeHTTPRequest())
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("captcha want 200, got %d", recorder.Code)
 	}
@@ -200,7 +208,7 @@ func TestServeHTTP_streamUnhealthyFailureActions(t *testing.T) {
 		})
 		b := testBouncerForServeHTTP(t, lapiClient, nil)
 		recorder := httptest.NewRecorder()
-		b.ServeHTTP(recorder, testServeHTTPRequest("192.0.2.10"))
+		b.ServeHTTP(recorder, testServeHTTPRequest())
 		if recorder.Code != http.StatusForbidden {
 			t.Fatalf("stream unhealthy ban want 403, got %d", recorder.Code)
 		}
@@ -216,7 +224,7 @@ func TestServeHTTP_streamUnhealthyFailureActions(t *testing.T) {
 		b := testBouncerForServeHTTP(t, lapiClient, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			nextCalled = true
 		}))
-		b.ServeHTTP(httptest.NewRecorder(), testServeHTTPRequest("192.0.2.10"))
+		b.ServeHTTP(httptest.NewRecorder(), testServeHTTPRequest())
 		if !nextCalled {
 			t.Fatal("stream unhealthy passthrough should call next")
 		}
@@ -232,7 +240,7 @@ func TestServeHTTP_streamUnhealthyFailureActions(t *testing.T) {
 		b := testBouncerForServeHTTP(t, lapiClient, nil)
 		b.captchaClient = testValidCaptchaClient(t, cacheClient)
 		recorder := httptest.NewRecorder()
-		b.ServeHTTP(recorder, testServeHTTPRequest("192.0.2.10"))
+		b.ServeHTTP(recorder, testServeHTTPRequest())
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("stream unhealthy captcha want 200, got %d", recorder.Code)
 		}
@@ -252,7 +260,7 @@ func TestServeHTTP_redisUnreachable(t *testing.T) {
 		})
 		b := testBouncerForServeHTTP(t, lapiClient, nil)
 		recorder := httptest.NewRecorder()
-		b.ServeHTTP(recorder, testServeHTTPRequest("192.0.2.10"))
+		b.ServeHTTP(recorder, testServeHTTPRequest())
 		if recorder.Code != http.StatusForbidden {
 			t.Fatalf("redis unreachable block want 403, got %d", recorder.Code)
 		}
@@ -268,7 +276,7 @@ func TestServeHTTP_redisUnreachable(t *testing.T) {
 		b := testBouncerForServeHTTP(t, lapiClient, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			nextCalled = true
 		}))
-		b.ServeHTTP(httptest.NewRecorder(), testServeHTTPRequest("192.0.2.10"))
+		b.ServeHTTP(httptest.NewRecorder(), testServeHTTPRequest())
 		if !nextCalled {
 			t.Fatal("redis unreachable passthrough should call next")
 		}
@@ -298,14 +306,14 @@ func TestHandleRemediationServeHTTP(t *testing.T) {
 	banTemplate, _ := template.New("ban").Parse("<html>ban</html>")
 
 	tests := []struct {
-		name           string
-		method         string
-		remediation    string
-		captchaValid   bool
-		captchaPassed  bool
-		wantStatus     int
+		name            string
+		method          string
+		remediation     string
+		captchaValid    bool
+		captchaPassed   bool
+		wantStatus      int
 		wantRemediation string
-		wantNext       bool
+		wantNext        bool
 	}{
 		{name: "GET captcha serves page", method: http.MethodGet, remediation: cache.CaptchaValue, captchaValid: true, wantStatus: http.StatusOK, wantRemediation: "captcha"},
 		{name: "HEAD captcha bans", method: http.MethodHead, remediation: cache.CaptchaValue, captchaValid: true, wantStatus: http.StatusForbidden, wantRemediation: "ban"},
