@@ -497,7 +497,7 @@ func TestNew_AppsecModeEnabled_SkipsLAPI(t *testing.T) {
 	appsecSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
-	t.Cleanup(appsecSrv.Close)
+	t.Cleanup(func() { appsecSrv.Close() })
 	u, _ := url.Parse(appsecSrv.URL)
 
 	h, err := New(context.Background(), testNextOK(), cfgAppsecAt(u.Host), "appsec-only")
@@ -522,8 +522,8 @@ func TestNew_LiveWithAppSecEnabled_DistinctReclaimKeys(t *testing.T) {
 	appsecSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
-	t.Cleanup(lapiSrv.Close)
-	t.Cleanup(appsecSrv.Close)
+	t.Cleanup(func() { lapiSrv.Close() })
+	t.Cleanup(func() { appsecSrv.Close() })
 	lapiURL, _ := url.Parse(lapiSrv.URL)
 	appsecURL, _ := url.Parse(appsecSrv.URL)
 	cfg := cfgLiveWithAppsecAt(lapiURL.Host, appsecURL.Host)
@@ -551,7 +551,7 @@ func TestNew_AppsecOpenFailsAfterLAPI_RollsBackLAPIHolder(t *testing.T) {
 
 	var hits int64
 	srv := liveLAPI(t, nil, &hits)
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	u, _ := url.Parse(srv.URL)
 	cfg := cfgLiveAt(u.Host)
 	cfg.CrowdsecAppsecEnabled = true
@@ -599,7 +599,7 @@ func TestNew_StreamMode_OpensStreamSession(t *testing.T) {
 
 	var hits int64
 	srv := liveLAPI(t, nil, &hits)
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	u, _ := url.Parse(srv.URL)
 	cfg := cfgStreamAt(u.Host, 60)
 
