@@ -2,6 +2,7 @@ package lapi
 
 import (
 	"net/url"
+	"sync/atomic"
 	"testing"
 )
 
@@ -32,7 +33,7 @@ func TestHandleStreamCacheIntervalOneStoresLease(t *testing.T) {
 	if got := lapiClient.StreamFetches(); got != 1 {
 		t.Fatalf("first poll streamFetches=%d, want 1", got)
 	}
-	if got := *hits; got != 1 {
+	if got := atomic.LoadInt64(hits); got != 1 {
 		t.Fatalf("first poll LAPI hits=%d, want 1", got)
 	}
 
@@ -42,7 +43,7 @@ func TestHandleStreamCacheIntervalOneStoresLease(t *testing.T) {
 	if got := lapiClient.StreamFetches(); got != 1 {
 		t.Fatalf("lease hit streamFetches=%d, want 1", got)
 	}
-	if got := *hits; got != 1 {
+	if got := atomic.LoadInt64(hits); got != 1 {
 		t.Fatalf("lease hit LAPI hits=%d, want 1", got)
 	}
 }
