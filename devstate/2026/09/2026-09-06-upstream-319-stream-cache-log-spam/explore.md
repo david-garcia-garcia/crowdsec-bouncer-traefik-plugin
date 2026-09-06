@@ -40,12 +40,12 @@ IssueKey: 2026-09-06-upstream-319-stream-cache-log-spam
 ## Open questions
 
 - Q: slog record capture vs static inspection of `log.Debug` call sites?
-  Decision: assumed — slog JSON buffer capture (INFO absent + DEBUG present) for both tick messages.
-  By: explore
+  Decision: resolved — slog JSON buffer capture (INFO absent + DEBUG present) for both tick messages in `client_stream_log_test.go`.
+  By: implement
 
 - Q: Is a lease-miss (full LAPI fetch) test needed in addition to lease-hit?
-  Decision: assumed — yes; both strings were the upstream spam surface; cover `updated` and `alreadyUpdated`.
-  By: explore
+  Decision: resolved — yes; `TestHandleStreamCacheUpdatedIsDebug` and `TestHandleStreamCacheAlreadyUpdatedIsDebug`.
+  By: implement
 
 - Q: Spec host for the log-level invariant?
   Decision: resolved — fold onto `core_plugin_lapi_connection` (FindSpecHost: fold, high; candidates: core_plugin_lapi_connection, core_plugin_lapi_failure-action, core_plugin_middleware_instance-reclaim, core_cache_client_isolated-store).

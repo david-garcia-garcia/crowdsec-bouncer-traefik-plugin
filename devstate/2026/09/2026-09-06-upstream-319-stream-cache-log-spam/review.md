@@ -15,3 +15,9 @@ phase: propose
 findings: FindSpecHost fold core_plugin_lapi_connection (high)
 fixed: change prove-stream-cache-tick-debug apply-ready
 skipped: no comments.md items
+
+## implement (2026-09-06)
+phase: implement
+findings: tests pin both tick messages at DEBUG; no product log-level change
+fixed: pkg/lapi/client_stream_log_test.go; middleware gotcha names the DEBUG ticks
+skipped: none

@@ -16,7 +16,7 @@ qualify: qualified-with-gaps
 
 src: a272f91c005c1d100470e429c7b3b616b3dec8dbde5ebe8fa78748ec3c1a7116
 
-localTests: none
+localTests: passed
 
 requirement: requirement.md
 
