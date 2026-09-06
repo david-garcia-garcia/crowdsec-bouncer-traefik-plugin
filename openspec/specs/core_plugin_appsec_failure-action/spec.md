@@ -16,7 +16,7 @@ Public config `crowdsecAppsecFailureAction` SHALL be one of `passthrough`, `ban`
 - **THEN** each route applies its own AppSec fallback
 
 ### Requirement: One action covers 500 and unreachable
-`CrowdsecAppsecFailureAction` SHALL apply to AppSec HTTP 500 and to transport failure or HTTP 502/503/504. `ban` SHALL drop the request. `passthrough` SHALL continue as allow (then `next`). `captcha` SHALL use the configured captcha client (`pkg/captcha`), not AppSec JSON `action: captcha`. This action MUST NOT drop a request solely because the body cannot be buffered.
+`CrowdsecAppsecFailureAction` SHALL apply to AppSec HTTP 500 and to transport failure or HTTP 502/503/504. `ban` SHALL drop the request. `passthrough` SHALL continue as allow (then `next`). `captcha` SHALL use the configured captcha client (`pkg/captcha`), not AppSec JSON `action: captcha`. This action MUST NOT drop a request solely because the body cannot be buffered. HTTP 502, 503, and 504 from the AppSec listener SHALL be unreachable (same fallback as a transport failure), not a generic non-200 ban.
 
 #### Scenario: Unreachable passthrough
 - **WHEN** AppSec is unreachable and `crowdsecAppsecFailureAction` is `passthrough`
@@ -24,6 +24,14 @@ Public config `crowdsecAppsecFailureAction` SHALL be one of `passthrough`, `ban`
 
 #### Scenario: Unreachable ban
 - **WHEN** AppSec is unreachable and `crowdsecAppsecFailureAction` is `ban`
+- **THEN** the client is forbidden with `ReasonAPPSEC`
+
+#### Scenario: Reverse-proxy HTTP 502, 503, or 504 passthrough
+- **WHEN** the AppSec listener returns HTTP 502, 503, or 504 and `crowdsecAppsecFailureAction` is `passthrough`
+- **THEN** the request proceeds to `next` (same as transport unreachable)
+
+#### Scenario: Reverse-proxy HTTP 502, 503, or 504 ban
+- **WHEN** the AppSec listener returns HTTP 502, 503, or 504 and `crowdsecAppsecFailureAction` is `ban`
 - **THEN** the client is forbidden with `ReasonAPPSEC`
 
 ### Requirement: Unreadable body is headers-only AppSec GET

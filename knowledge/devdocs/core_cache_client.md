@@ -13,7 +13,7 @@ Construct a new `Client` on each LAPI Client. Pass `lapi.CachePrefix(cfg)` as Re
 ## How to use
 
 - Memory: `Client.New(..., isRedis=false, ..., keyPrefix)` — prefix is ignored; each Client owns a map.
-- Redis: pass `lapi.CachePrefix(cfg)` as `keyPrefix` (stream/alone session hex, live/none `IdentityHex`). Logical keys are the client IP, `scope:value`, and `range-index`; the store writes `prefix:key`.
+- Redis: pass `lapi.CachePrefix(cfg)` as `keyPrefix` (stream/alone session hex, live/none `IdentityHex`). Logical keys are the client IP, `scope:value`, and `range-index`; the store writes `prefix:key`. Payloads are opaque strings. Ban/captcha/none codes live on `pkg/decisionscope`. Captcha grace-done (`d`) lives on `pkg/captcha`.
 - Same reclaim key → same LAPI Client → same cache Client (share-by-identity, not a process dump).
 - `Client.Close()` drains Redis idle pools. Call it from `lapi.Client.Close()`. Memory clients are a no-op.
 
