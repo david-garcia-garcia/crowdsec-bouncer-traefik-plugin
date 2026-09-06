@@ -6,7 +6,7 @@ JobName: 2026-09-06-upstream-380-trycap-captcha
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-06T15:05:42Z |
 | explore | [x] | [x] | 2026-09-06T15:12:11Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
