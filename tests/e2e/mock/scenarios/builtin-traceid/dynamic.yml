@@ -24,11 +24,5 @@ http:
           crowdsecLapiKey: "@@APIKEY@@"
           forwardedHeadersTrustedIps:
             - "127.0.0.1/32"
-          captchaProvider: turnstile
-          # Cloudflare Turnstile public test keys: render a valid widget without
-          # contacting a real API key.
-          captchaSiteKey: "1x00000000000000000000AA"
-          captchaSecretKey: "1x0000000000000000000000000000000AA"
-          captchaHtmlFilePath: "@@SCENARIO_DIR@@/captcha.html"
-          captchaGracePeriodSeconds: "10"
+          banFilePath: "@@SCENARIO_DIR@@/ban.json"
           remediationTraceIdCustomName: "X-Trace-ID"

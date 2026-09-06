@@ -21,26 +21,27 @@ import (
 
 // Bouncer is one Traefik router handler. It is not the reclaim value.
 type Bouncer struct {
-	appsecClient            *appsec.Client
-	appsecEnabled           bool
-	appsecFailureAction     string
-	banTemplate             *template.Template
-	banTemplateContentType  string
-	captchaClient           *captcha.Client
-	clientPoolStrategy      *ip.PoolStrategy
-	crowdsecMode            string
-	decisionScopeHeaders    map[string]string // CrowdSec header scope → request header
-	enabled                 bool
-	forwardedCustomHeader   string
-	lapiClient              *lapi.Client
-	log                     *slog.Logger
-	name                    string
-	next                    http.Handler
-	remediationCustomHeader string
-	remediationStatusCode   int
-	serverPoolStrategy      *ip.PoolStrategy
-	template                *template.Template
-	traceCustomHeader       string
+	appsecClient             *appsec.Client
+	appsecEnabled            bool
+	appsecFailureAction      string
+	banTemplate              *template.Template
+	banTemplateContentType   string
+	captchaClient            *captcha.Client
+	clientPoolStrategy       *ip.PoolStrategy
+	crowdsecMode             string
+	decisionScopeHeaders     map[string]string // CrowdSec header scope → request header
+	enabled                  bool
+	forwardedCustomHeader    string
+	lapiClient               *lapi.Client
+	log                      *slog.Logger
+	name                     string
+	next                     http.Handler
+	remediationCustomHeader  string
+	remediationStatusCode    int
+	remediationTraceIDHeader string
+	serverPoolStrategy       *ip.PoolStrategy
+	template                 *template.Template
+	traceCustomHeader        string
 }
 
 // New returns a per-router handler bound to lapiClient and appsecClient.
@@ -55,26 +56,27 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 	}
 
 	routeHandler := &Bouncer{
-		appsecClient:            appsecClient,
-		appsecEnabled:           config.CrowdsecAppsecEnabled,
-		appsecFailureAction:     configuration.EffectiveFailureAction(config.CrowdsecAppsecFailureAction),
-		banTemplate:             banTemplate,
-		banTemplateContentType:  banTemplateContentType,
-		captchaClient:           &captcha.Client{},
-		clientPoolStrategy:      &ip.PoolStrategy{Checker: clientChecker},
-		crowdsecMode:            config.CrowdsecMode,
-		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
-		enabled:                 config.Enabled,
-		forwardedCustomHeader:   config.ForwardedHeadersCustomName,
-		lapiClient:              lapiClient,
-		log:                     log,
-		name:                    name,
-		next:                    next,
-		remediationCustomHeader: config.RemediationHeadersCustomName,
-		remediationStatusCode:   config.RemediationStatusCode,
-		serverPoolStrategy:      &ip.PoolStrategy{Checker: serverChecker},
-		template:                template.New("CrowdsecBouncer").Delims("[[", "]]"),
-		traceCustomHeader:       config.TraceHeadersCustomName,
+		appsecClient:             appsecClient,
+		appsecEnabled:            config.CrowdsecAppsecEnabled,
+		appsecFailureAction:      configuration.EffectiveFailureAction(config.CrowdsecAppsecFailureAction),
+		banTemplate:              banTemplate,
+		banTemplateContentType:   banTemplateContentType,
+		captchaClient:            &captcha.Client{},
+		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
+		crowdsecMode:             config.CrowdsecMode,
+		decisionScopeHeaders:     decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
+		enabled:                  config.Enabled,
+		forwardedCustomHeader:    config.ForwardedHeadersCustomName,
+		lapiClient:               lapiClient,
+		log:                      log,
+		name:                     name,
+		next:                     next,
+		remediationCustomHeader:  config.RemediationHeadersCustomName,
+		remediationStatusCode:    config.RemediationStatusCode,
+		remediationTraceIDHeader: config.RemediationTraceIDCustomName,
+		serverPoolStrategy:       &ip.PoolStrategy{Checker: serverChecker},
+		template:                 template.New("CrowdsecBouncer").Delims("[[", "]]"),
+		traceCustomHeader:        config.TraceHeadersCustomName,
 	}
 	if config.CrowdsecMode == configuration.AppsecMode {
 		routeHandler.log.Debug("Bouncer initialized name:" + name)
@@ -97,6 +99,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		config.CaptchaSiteKey,
 		config.CaptchaSecretKey,
 		config.RemediationHeadersCustomName,
+		config.RemediationTraceIDCustomName,
 		config.CaptchaFilePath,
 		config.CaptchaGracePeriodSeconds,
 	)
@@ -262,6 +265,10 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 	if b.remediationCustomHeader != "" {
 		rw.Header().Set(b.remediationCustomHeader, "ban")
 	}
+	traceID := b.newRemediationTraceID()
+	if b.remediationTraceIDHeader != "" && traceID != "" {
+		rw.Header().Set(b.remediationTraceIDHeader, traceID)
+	}
 	rw.Header().Set("Content-Type", b.banTemplateContentType)
 	rw.WriteHeader(b.remediationStatusCode)
 	if b.banTemplate == nil || req.Method == http.MethodHead {
@@ -271,8 +278,9 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 		"RemediationReason": reason,
 		"ClientIP":          req.remoteIP,
 	}
-
-	if b.traceCustomHeader != "" {
+	if b.remediationTraceIDHeader != "" {
+		templateData["TraceID"] = traceID
+	} else if b.traceCustomHeader != "" {
 		headerVal := req.Header.Get(b.traceCustomHeader)
 		if headerVal != "" {
 			templateData["TraceID"] = headerVal
@@ -295,7 +303,7 @@ func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientR
 			return
 		}
 		b.recordDropped(origin, req.ipType, "captcha")
-		b.captchaClient.ServeHTTP(rw, req.Request, req.remoteIP)
+		b.captchaClient.ServeHTTP(rw, req.Request, req.remoteIP, b.newRemediationTraceID())
 		return
 	}
 	b.handleBanServeHTTP(rw, req, configuration.ReasonLAPI, origin)

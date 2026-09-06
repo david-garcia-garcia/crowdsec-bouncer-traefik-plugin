@@ -554,6 +554,10 @@ make run
   - string
   - default: ""
   - Request Header name whose value to inject in ban HTML response (default empty ""=disabled)
+- RemediationTraceIDCustomName
+  - string
+  - default: ""
+  - Response header name for a plugin-generated 16-hex TraceID on ban and captcha HTML pages (default empty ""=disabled). When set, the same value is available in those templates as `{{ .TraceID }}`. Incoming `TraceHeadersCustomName` passthrough is used only when this key is empty.
 
 ### Configuration
 
@@ -701,6 +705,7 @@ http:
           captchaHTMLFilePath: /captcha.html
           banHTMLFilePath: /ban.html
           traceHeadersCustomName: X-Request-ID
+          remediationTraceIdCustomName: X-Trace-ID
           metricsUpdateIntervalSeconds: 600
 ```
 

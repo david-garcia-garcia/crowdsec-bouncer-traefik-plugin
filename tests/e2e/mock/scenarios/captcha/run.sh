@@ -22,6 +22,24 @@ body() {
   echo "[$SCENARIO] captcha response is HTTP 200 (the captcha page itself, not a 403)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 1.2.3.4"
 
+  echo "[$SCENARIO] captcha page carries a generated 16-hex X-Trace-ID matching the body"
+  local headers body trace
+  headers=$(mktemp)
+  body=$(mktemp)
+  curl -s -D "$headers" -o "$body" -H "X-Forwarded-For: 1.2.3.4" "http://127.0.0.1:${WEB_PORT}/foo"
+  trace=$(tr -d '\r' <"$headers" | awk -F': ' 'tolower($1) == "x-trace-id" { print $2; exit }')
+  if [[ ! "$trace" =~ ^[0-9a-f]{16}$ ]]; then
+    echo "[$SCENARIO] expected 16 lowercase hex X-Trace-ID, got \"$trace\"" >&2
+    cat "$headers" >&2
+    return 1
+  fi
+  if ! grep -q "trace: ${trace}" "$body"; then
+    echo "[$SCENARIO] body missing generated trace id ${trace}:" >&2
+    cat "$body" >&2
+    return 1
+  fi
+  rm -f "$headers" "$body"
+
   echo "[$SCENARIO] non-flagged IP must still pass through to the backend"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 5.6.7.8"
 }

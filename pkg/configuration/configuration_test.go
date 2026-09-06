@@ -26,6 +26,13 @@ func getMinimalConfig() *Config {
 	return cfg
 }
 
+func TestNew_RemediationTraceIDCustomNameDefault(t *testing.T) {
+	cfg := New()
+	if cfg.RemediationTraceIDCustomName != "" {
+		t.Errorf("RemediationTraceIDCustomName default = %q, want empty", cfg.RemediationTraceIDCustomName)
+	}
+}
+
 func Test_contains(t *testing.T) {
 	type args struct {
 		source []string
