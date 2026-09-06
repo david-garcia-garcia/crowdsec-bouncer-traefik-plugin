@@ -15,6 +15,9 @@ import (
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
+// trycapWidgetJS is the Cap widget script. The @ is an npm version pin, not a URL password.
+//
+//nolint:gosec // G101 flags npm @version in the URL
 const trycapWidgetJS = "https://cdn.jsdelivr.net/npm/cap-widget@0.1.57"
 
 // Client Captcha client.
