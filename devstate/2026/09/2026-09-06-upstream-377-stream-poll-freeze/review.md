@@ -9,3 +9,9 @@ phase: explore
 findings: none
 fixed: TryLock skip + request timeout chosen; overlapping lease-as-success reproduced
 skipped: 20-minute freeze not reproduced in native Go
+
+## propose (2026-09-06)
+phase: propose
+findings: none
+fixed: serialize-stream-poll OpenSpec artifacts; folded instance-reclaim and lapi_connection
+skipped: none
