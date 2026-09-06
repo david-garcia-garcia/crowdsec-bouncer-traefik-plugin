@@ -39,3 +39,9 @@ phase: archive
 findings: catalog spec core_plugin_captcha_custom-resource-passthrough
 fixed: moved to archive/2026-09-06-captcha-custom-resource-passthrough
 skipped: n/a
+
+## pullrequest (2026-09-06)
+phase: pullrequest
+findings: CI green after e2e retrigger
+fixed: n/a
+skipped: n/a
