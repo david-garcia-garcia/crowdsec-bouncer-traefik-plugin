@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"testing"
+	"time"
 
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
@@ -117,6 +118,24 @@ func Test_ValidateParams(t *testing.T) {
 	cfgEmptyAction := getMinimalConfig()
 	cfgEmptyAction.CrowdsecLapiFailureAction = ""
 	cfgEmptyAction.CrowdsecAppsecFailureAction = ""
+	cfgLapiTimeoutNeg := getMinimalConfig()
+	cfgLapiTimeoutNeg.CrowdsecLapiHTTPTimeoutSeconds = -1
+	cfgLapiTimeoutZero := getMinimalConfig()
+	cfgLapiTimeoutZero.CrowdsecLapiHTTPTimeoutSeconds = 0
+	cfgLapiTimeoutSec := getMinimalConfig()
+	cfgLapiTimeoutSec.CrowdsecLapiHTTPTimeoutSeconds = 30
+	cfgAppsecTimeoutNeg := getMinimalConfig()
+	cfgAppsecTimeoutNeg.CrowdsecAppsecHTTPTimeoutSeconds = -1
+	cfgAppsecTimeoutZero := getMinimalConfig()
+	cfgAppsecTimeoutZero.CrowdsecAppsecHTTPTimeoutSeconds = 0
+	cfgAppsecTimeoutSec := getMinimalConfig()
+	cfgAppsecTimeoutSec.CrowdsecAppsecHTTPTimeoutSeconds = 1
+	cfgCaptchaTimeoutNeg := getMinimalConfig()
+	cfgCaptchaTimeoutNeg.CaptchaSiteverifyHTTPTimeoutSeconds = -1
+	cfgCaptchaTimeoutZero := getMinimalConfig()
+	cfgCaptchaTimeoutZero.CaptchaSiteverifyHTTPTimeoutSeconds = 0
+	cfgCaptchaTimeoutSec := getMinimalConfig()
+	cfgCaptchaTimeoutSec.CaptchaSiteverifyHTTPTimeoutSeconds = 5
 	type args struct {
 		config *Config
 	}
@@ -142,6 +161,15 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Captcha LAPI action with provider", args: args{config: cfgCaptchaWithProvider}, wantErr: false},
 		{name: "Unknown AppSec failure action", args: args{config: cfgUnknownAction}, wantErr: true},
 		{name: "Empty failure actions use default ban", args: args{config: cfgEmptyAction}, wantErr: false},
+		{name: "Negative LAPI HTTP timeout seconds rejected", args: args{config: cfgLapiTimeoutNeg}, wantErr: true},
+		{name: "Zero LAPI HTTP timeout seconds inherits HTTPTimeoutSeconds", args: args{config: cfgLapiTimeoutZero}, wantErr: false},
+		{name: "Positive LAPI HTTP timeout seconds accepted", args: args{config: cfgLapiTimeoutSec}, wantErr: false},
+		{name: "Negative AppSec HTTP timeout seconds rejected", args: args{config: cfgAppsecTimeoutNeg}, wantErr: true},
+		{name: "Zero AppSec HTTP timeout seconds inherits HTTPTimeoutSeconds", args: args{config: cfgAppsecTimeoutZero}, wantErr: false},
+		{name: "Positive AppSec HTTP timeout seconds accepted", args: args{config: cfgAppsecTimeoutSec}, wantErr: false},
+		{name: "Negative captcha siteverify HTTP timeout seconds rejected", args: args{config: cfgCaptchaTimeoutNeg}, wantErr: true},
+		{name: "Zero captcha siteverify HTTP timeout seconds inherits HTTPTimeoutSeconds", args: args{config: cfgCaptchaTimeoutZero}, wantErr: false},
+		{name: "Positive captcha siteverify HTTP timeout seconds accepted", args: args{config: cfgCaptchaTimeoutSec}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -149,6 +177,34 @@ func Test_ValidateParams(t *testing.T) {
 				t.Errorf("validateParams() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func Test_EffectiveHTTPTimeouts(t *testing.T) {
+	inherit := New()
+	inherit.HTTPTimeoutSeconds = 10
+	if got := EffectiveLapiHTTPTimeout(inherit); got != 10*time.Second {
+		t.Fatalf("lapi inherit: %v", got)
+	}
+	if got := EffectiveAppsecHTTPTimeout(inherit); got != 10*time.Second {
+		t.Fatalf("appsec inherit: %v", got)
+	}
+	if got := EffectiveCaptchaSiteverifyHTTPTimeout(inherit); got != 10*time.Second {
+		t.Fatalf("captcha inherit: %v", got)
+	}
+	override := New()
+	override.HTTPTimeoutSeconds = 10
+	override.CrowdsecLapiHTTPTimeoutSeconds = 30
+	override.CrowdsecAppsecHTTPTimeoutSeconds = 1
+	override.CaptchaSiteverifyHTTPTimeoutSeconds = 5
+	if got := EffectiveLapiHTTPTimeout(override); got != 30*time.Second {
+		t.Fatalf("lapi override: %v", got)
+	}
+	if got := EffectiveAppsecHTTPTimeout(override); got != 1*time.Second {
+		t.Fatalf("appsec override: %v", got)
+	}
+	if got := EffectiveCaptchaSiteverifyHTTPTimeout(override); got != 5*time.Second {
+		t.Fatalf("captcha override: %v", got)
 	}
 }
 

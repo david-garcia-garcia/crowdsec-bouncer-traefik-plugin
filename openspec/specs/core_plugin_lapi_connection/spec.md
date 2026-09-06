@@ -33,3 +33,18 @@ Successful stream cache ticks SHALL emit `handleStreamCache:updated` after a LAP
 - **WHEN** stream mode ticks while the stream lease is already held
 - **THEN** `handleStreamCache:alreadyUpdated` is present at DEBUG
 - **AND** that message is absent when the logger is at INFO
+
+### Requirement: LAPI HTTP timeout inherits HTTPTimeoutSeconds
+Public config `crowdsecLapiHttpTimeoutSeconds` SHALL be an integer second timeout for the LAPI HTTP client. Zero or omit SHALL use `httpTimeoutSeconds`. A value greater than zero SHALL be that many seconds. A negative value SHALL be rejected at ValidateParams. Live/none reclaim identity and stream settings SHALL hash the effective LAPI timeout, not the raw fallback field.
+
+#### Scenario: Omit inherits HTTPTimeoutSeconds
+- **WHEN** the operator omits `crowdsecLapiHttpTimeoutSeconds` and sets `httpTimeoutSeconds` to 10
+- **THEN** LAPI HTTP calls use a 10 second timeout
+
+#### Scenario: Explicit seconds override HTTPTimeoutSeconds
+- **WHEN** the operator sets `crowdsecLapiHttpTimeoutSeconds` to 30 and `httpTimeoutSeconds` to 10
+- **THEN** LAPI HTTP calls use a 30 second timeout
+
+#### Scenario: Same effective timeout shares live identity
+- **WHEN** one middleware inherits a 10 second LAPI timeout from `httpTimeoutSeconds` and another sets `crowdsecLapiHttpTimeoutSeconds` to 10
+- **THEN** both use the same live/none LAPI identity hash

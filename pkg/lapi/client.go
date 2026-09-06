@@ -166,7 +166,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 				IdleConnTimeout:     30 * time.Second,
 				TLSClientConfig:     tlsConfig,
 			},
-			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
+			Timeout: configuration.EffectiveLapiHTTPTimeout(config),
 		},
 		cacheClient: &cache.Client{},
 	}

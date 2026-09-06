@@ -69,7 +69,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 				IdleConnTimeout:     30 * time.Second,
 				TLSClientConfig:     tlsAppsecConfig,
 			},
-			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
+			Timeout: configuration.EffectiveAppsecHTTPTimeout(config),
 		},
 	}, nil
 }

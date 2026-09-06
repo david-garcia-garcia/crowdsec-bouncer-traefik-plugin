@@ -7,7 +7,7 @@ The reclaim value for one CrowdSec LAPI/CAPI decisions backend: stream/metrics t
 _Avoid_: CrowdsecConnection, AppSec client, Bouncer, Plugin, process singleton, `sync.Once`
 
 **AppSec Client**:
-The reclaim value for one CrowdSec AppSec listener: HTTP client, host, key, TLS, body limit. Keyed by AppSec URL+key+TLS. Not the LAPI Client.
+The reclaim value for one CrowdSec AppSec listener: HTTP client, host, key, TLS, body limit, HTTP timeout. Keyed by AppSec URL+key+TLS+effective timeout. Not the LAPI Client.
 _Avoid_: CrowdsecConnection, LAPI, `AppsecQuery` on the LAPI type
 
 **Stream session**:
@@ -31,7 +31,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - Keep `CreateConfig` / `New` on the module root (`plugin.go`).
 - Keep `pluginVersion` in root `version.go` (release workflow bumps it). Pass it into `lapi.New` and `appsec.New`.
 - Call `lapi.Prepare` then `appsec.Prepare`. Stream/alone: `lapi.OpenStream`. Live/none: `lapi.OpenLive`. `crowdsecMode: appsec`: skip LAPI Open. When `crowdsecAppsecEnabled`: `appsec.Open`. Return `bouncer.New(..., lapiClient, appsecClient, ...)`.
-- Put stream tickers, LAPI HTTP, cache, and Range membership on `lapi.Client`. Put AppSec HTTP on `appsec.Client`. Put captcha and templates on Bouncer.
+- Put stream tickers, LAPI HTTP, cache, and Range membership on `lapi.Client`. Put AppSec HTTP on `appsec.Client`. Put captcha and templates on Bouncer. LAPI `http.Client.Timeout` is `EffectiveLapiHTTPTimeout`. AppSec timeout is `EffectiveAppsecHTTPTimeout`. Captcha siteverify timeout is `EffectiveCaptchaSiteverifyHTTPTimeout`. `HTTPTimeoutSeconds` is the default those three inherit.
 - Resolve client IP with `pkg/ip.GetRemoteIP`. Fold `remoteIP`, parsed `net.IP`, and `ipType` into `clientRequest`. Keep the name `req`. Do not parse `RemoteAddr` on LAPI or AppSec. Do not put scopes or origin on that type.
 - Range and header-mapped CrowdSec scopes live in `pkg/decisionscope`. Do not geolocate in `New` or `ServeHTTP`.
 - Live LAPI error and stream-unhealthy cache miss use `crowdsecLapiFailureAction`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled).

@@ -112,7 +112,7 @@ func settingsFrom(cfg *configuration.Config) streamSettings {
 		LapiFailureAction:            configuration.EffectiveFailureAction(cfg.CrowdsecLapiFailureAction),
 		StreamStartupBlock:           cfg.StreamStartupBlock,
 		DefaultDecisionSeconds:       cfg.DefaultDecisionSeconds,
-		HTTPTimeoutSeconds:           cfg.HTTPTimeoutSeconds,
+		HTTPTimeoutSeconds:           configuration.EffectiveLapiHTTPTimeoutSeconds(cfg),
 		RedisCacheEnabled:            cfg.RedisCacheEnabled,
 		RedisCacheHost:               cfg.RedisCacheHost,
 		RedisCacheReadHosts:          cfg.RedisCacheReadHosts,

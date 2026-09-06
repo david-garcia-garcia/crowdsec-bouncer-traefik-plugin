@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
+	"time"
 
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
@@ -69,6 +70,7 @@ type Config struct {
 	CrowdsecAppsecTLSCertificateBouncerKeyFile string            `json:"crowdsecAppsecTlsCertificateBouncerKeyFile,omitempty"`
 	CrowdsecAppsecBodyLimit                    int64             `json:"crowdsecAppsecBodyLimit,omitempty"`
 	CrowdsecAppsecFailureAction                string            `json:"crowdsecAppsecFailureAction,omitempty"`
+	CrowdsecAppsecHTTPTimeoutSeconds           int64             `json:"crowdsecAppsecHttpTimeoutSeconds,omitempty"`
 	CrowdsecLapiScheme                         string            `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost                           string            `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiPath                           string            `json:"crowdsecLapiPath,omitempty"`
@@ -90,6 +92,7 @@ type Config struct {
 	MetricsUpdateIntervalSeconds               int64             `json:"metricsUpdateIntervalSeconds,omitempty"`
 	UpdateMaxFailure                           int64             `json:"updateMaxFailure,omitempty"`
 	CrowdsecLapiFailureAction                  string            `json:"crowdsecLapiFailureAction,omitempty"`
+	CrowdsecLapiHTTPTimeoutSeconds             int64             `json:"crowdsecLapiHttpTimeoutSeconds,omitempty"`
 	StreamStartupBlock                         bool              `json:"streamStartupBlock,omitempty"`
 	DefaultDecisionSeconds                     int64             `json:"defaultDecisionSeconds,omitempty"`
 	RemediationStatusCode                      int               `json:"remediationStatusCode,omitempty"`
@@ -121,6 +124,7 @@ type Config struct {
 	CaptchaSecretKey                           string            `json:"captchaSecretKey,omitempty"`
 	CaptchaSecretKeyFile                       string            `json:"captchaSecretKeyFile,omitempty"`
 	CaptchaGracePeriodSeconds                  int64             `json:"captchaGracePeriodSeconds,omitempty"`
+	CaptchaSiteverifyHTTPTimeoutSeconds        int64             `json:"captchaSiteverifyHttpTimeoutSeconds,omitempty"`
 }
 
 func contains(source []string, target string) bool {
@@ -152,6 +156,44 @@ func EffectiveFailureAction(action string) string {
 		return FailureActionBan
 	}
 	return action
+}
+
+// effectiveHTTPTimeoutSeconds is the override when greater than zero, otherwise fallbackSeconds.
+func effectiveHTTPTimeoutSeconds(overrideSeconds, fallbackSeconds int64) int64 {
+	if overrideSeconds > 0 {
+		return overrideSeconds
+	}
+	return fallbackSeconds
+}
+
+// EffectiveLapiHTTPTimeoutSeconds is the LAPI HTTP timeout in seconds: CrowdsecLapiHTTPTimeoutSeconds when set, otherwise HTTPTimeoutSeconds.
+func EffectiveLapiHTTPTimeoutSeconds(config *Config) int64 {
+	return effectiveHTTPTimeoutSeconds(config.CrowdsecLapiHTTPTimeoutSeconds, config.HTTPTimeoutSeconds)
+}
+
+// EffectiveLapiHTTPTimeout is the LAPI HTTP client deadline.
+func EffectiveLapiHTTPTimeout(config *Config) time.Duration {
+	return time.Duration(EffectiveLapiHTTPTimeoutSeconds(config)) * time.Second
+}
+
+// EffectiveAppsecHTTPTimeoutSeconds is the AppSec HTTP timeout in seconds: CrowdsecAppsecHTTPTimeoutSeconds when set, otherwise HTTPTimeoutSeconds.
+func EffectiveAppsecHTTPTimeoutSeconds(config *Config) int64 {
+	return effectiveHTTPTimeoutSeconds(config.CrowdsecAppsecHTTPTimeoutSeconds, config.HTTPTimeoutSeconds)
+}
+
+// EffectiveAppsecHTTPTimeout is the AppSec HTTP client deadline.
+func EffectiveAppsecHTTPTimeout(config *Config) time.Duration {
+	return time.Duration(EffectiveAppsecHTTPTimeoutSeconds(config)) * time.Second
+}
+
+// EffectiveCaptchaSiteverifyHTTPTimeoutSeconds is the captcha siteverify HTTP timeout in seconds: CaptchaSiteverifyHTTPTimeoutSeconds when set, otherwise HTTPTimeoutSeconds.
+func EffectiveCaptchaSiteverifyHTTPTimeoutSeconds(config *Config) int64 {
+	return effectiveHTTPTimeoutSeconds(config.CaptchaSiteverifyHTTPTimeoutSeconds, config.HTTPTimeoutSeconds)
+}
+
+// EffectiveCaptchaSiteverifyHTTPTimeout is the captcha siteverify HTTP client deadline.
+func EffectiveCaptchaSiteverifyHTTPTimeout(config *Config) time.Duration {
+	return time.Duration(EffectiveCaptchaSiteverifyHTTPTimeoutSeconds(config)) * time.Second
 }
 
 // New creates the default plugin configuration.
@@ -491,8 +533,11 @@ func validateParamsRequired(config *Config) error {
 		}
 	}
 	requiredInt0 := map[string]int64{
-		"CrowdsecAppsecBodyLimit":      config.CrowdsecAppsecBodyLimit,
-		"MetricsUpdateIntervalSeconds": config.MetricsUpdateIntervalSeconds,
+		"CrowdsecAppsecBodyLimit":             config.CrowdsecAppsecBodyLimit,
+		"MetricsUpdateIntervalSeconds":        config.MetricsUpdateIntervalSeconds,
+		"CrowdsecLapiHTTPTimeoutSeconds":      config.CrowdsecLapiHTTPTimeoutSeconds,
+		"CrowdsecAppsecHTTPTimeoutSeconds":    config.CrowdsecAppsecHTTPTimeoutSeconds,
+		"CaptchaSiteverifyHTTPTimeoutSeconds": config.CaptchaSiteverifyHTTPTimeoutSeconds,
 	}
 	for key, val := range requiredInt0 {
 		if val < 0 {
