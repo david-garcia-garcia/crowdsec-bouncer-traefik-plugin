@@ -90,8 +90,10 @@ func Test_appsecQuery_streamingDoesNotBlock(t *testing.T) {
 	}
 }
 
-func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
-	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+func Test_appsecQuery_unreadableBodyQueriesHeadersOnlyUnderBan(t *testing.T) {
+	var gotMethod string
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
 		rw.WriteHeader(http.StatusOK)
 	}))
 	defer appsecServer.Close()
@@ -106,8 +108,11 @@ func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
 	}()
 	select {
 	case err := <-finished:
-		if err == nil {
-			t.Error("Query() expected an error to block the request, got nil")
+		if err != nil {
+			t.Errorf("Query() on streaming request under ban returned error: %v", err)
+		}
+		if gotMethod != http.MethodGet {
+			t.Errorf("AppSec method = %q, want GET", gotMethod)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Query() blocked on a streaming request body (issue #323 regression)")

@@ -393,7 +393,7 @@ make run
 - CrowdsecAppsecFailureAction
   - string
   - default: `ban`, expected values are: `passthrough`, `ban`, `captcha`
-  - What to do when AppSec does not return a usable verdict: HTTP 500, unreachable (dial or 502/503/504), or an unreadable HTTP/2 or HTTP/3 body on a method that would send a body. `ban` drops the request. `passthrough` lets 500/unreachable continue as allow, and sends a headers-only GET to AppSec when the body cannot be buffered. `captcha` uses the plugin captcha client (`captchaProvider` must be set). **BREAKING:** this key replaces `crowdsecAppsecFailureBlock`, `crowdsecAppsecUnreachableBlock`, and `crowdsecAppsecUnreadableBodyBlock`. Operators who had those bools set to `false` MUST set `crowdsecAppsecFailureAction: passthrough`.
+  - What to do when AppSec does not return a usable verdict: HTTP 500 or unreachable (dial or 502/503/504). `ban` drops the request. `passthrough` lets 500/unreachable continue as allow. `captcha` uses the plugin captcha client (`captchaProvider` must be set). HTTP/2 or HTTP/3 requests whose body cannot be buffered (no Content-Length, typical of gRPC streams) always send a headers-only GET to AppSec; this key does not drop those requests. **BREAKING:** this key replaces `crowdsecAppsecFailureBlock`, `crowdsecAppsecUnreachableBlock`, and `crowdsecAppsecUnreadableBodyBlock`. Operators who had those bools set to `false` MUST set `crowdsecAppsecFailureAction: passthrough` for 500/unreachable.
 - CrowdsecAppsecBodyLimit
   - int64
   - default: 10485760 (= 10MB)

@@ -23,7 +23,7 @@ _Avoid_: CrowdSec LAPI captcha remediation
 - Enable with existing `crowdsecAppsecEnabled`. Do not add a bot-detection plugin key.
 - Open with `appsec.Open` (reclaim by AppSec URL+key+TLS). Do not construct the AppSec client inside `lapi.New`.
 - `action` allow or empty 200 → `next`. `ban` → `handleBanServeHTTP`. Any other non-allow action (challenge, AppSec captcha HTML) → relay. Empty `challenge` body → ban. AppSec `captcha` is not `pkg/captcha`.
-- AppSec HTTP 500, unreachable, and unreadable body use per-router `crowdsecAppsecFailureAction` (`passthrough` | `ban` | `captcha`), not the three removed block bools. `captcha` here is `pkg/captcha`, not AppSec JSON `action: captcha`.
+- AppSec HTTP 500 and unreachable use per-router `crowdsecAppsecFailureAction` (`passthrough` | `ban` | `captcha`), not the three removed block bools. An HTTP/2+ body that cannot be buffered is a headers-only GET to AppSec, not a failure-action drop. `captcha` here is `pkg/captcha`, not AppSec JSON `action: captcha`.
 - Route `PathPrefix(/crowdsec-internal/challenge)` through the same middleware; service backend is the AppSec listener.
 - Copy request `Cookie` through to AppSec (already copied with other headers). Do not parse `__crowdsec_challenge` in this plugin.
 
