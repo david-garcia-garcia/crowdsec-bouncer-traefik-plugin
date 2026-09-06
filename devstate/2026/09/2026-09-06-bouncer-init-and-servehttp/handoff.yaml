@@ -1,0 +1,15 @@
+issueKey: 2026-09-06-bouncer-init-and-servehttp
+jobName: 2026-09-06-bouncer-init-and-servehttp
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: c27c6bbfa965d7944d2ca7a3fd2e0ceb4daee7d5f5e34251af0afe380c60daf1
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
