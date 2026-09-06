@@ -5,7 +5,7 @@ JobName: 2026-09-06-upstream-354-captcha-duplicate-solve-405
 | Phase | Work | Card | At |
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-06T15:06:06Z |
-| explore | [x] | [ ] | |
+| explore | [x] | [x] | 2026-09-06T15:11:50Z |
 | propose | [ ] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
