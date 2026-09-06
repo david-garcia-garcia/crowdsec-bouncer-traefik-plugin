@@ -1,0 +1,15 @@
+issueKey: 2026-09-06-logger-file-and-format
+jobName: 2026-09-06-logger-file-and-format
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:d1eb078ec869b21cd94af7400dee272a132924e8919b36ae9e8a3451c32c4851
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
