@@ -136,9 +136,9 @@ func TestNew_LAPIUserAgentUsesVersionGo(t *testing.T) {
 	if pluginVersion == "" {
 		t.Fatal("pluginVersion must not be empty")
 	}
-	want := "Crowdsec-Bouncer-Traefik-Plugin/" + pluginVersion
-	if gotUA != want {
-		t.Fatalf("User-Agent %q want %q", gotUA, want)
+	wantUA := "Crowdsec-Bouncer-Traefik-Plugin/" + pluginVersion
+	if gotUA != wantUA {
+		t.Fatalf("User-Agent %q want %q", gotUA, wantUA)
 	}
 }
 
