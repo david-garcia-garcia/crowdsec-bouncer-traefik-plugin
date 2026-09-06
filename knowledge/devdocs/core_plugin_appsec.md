@@ -23,7 +23,7 @@ _Avoid_: CrowdSec LAPI captcha remediation
 - Enable with existing `crowdsecAppsecEnabled`. Do not add a bot-detection plugin key.
 - Open with `appsec.Open` (reclaim by AppSec URL+key+TLS). Do not construct the AppSec client inside `lapi.New`.
 - `action` allow or empty 200 → `next`. `ban` → `handleBanServeHTTP`. Any other non-allow action (challenge, AppSec captcha HTML) → relay. Empty `challenge` body → ban. Empty `captcha` body still relays `http_status` (not the operator ban page). AppSec `captcha` is not `pkg/captcha`.
-- AppSec HTTP 500, unreachable, and unreadable body use per-router `crowdsecAppsecFailureAction` (`passthrough` | `ban` | `captcha`), not the three removed block bools. `captcha` here is `pkg/captcha`, not AppSec JSON `action: captcha`.
+- AppSec HTTP 500, unreachable (transport failure or listener HTTP 502/503/504), and unreadable body use per-router `crowdsecAppsecFailureAction` (`passthrough` | `ban` | `captcha`), not the three removed block bools. `captcha` here is `pkg/captcha`, not AppSec JSON `action: captcha`.
 - Route `PathPrefix(/crowdsec-internal/challenge)` through the same middleware; service backend is the AppSec listener.
 - Copy request `Cookie` through to AppSec (already copied with other headers). Do not parse `__crowdsec_challenge` in this plugin.
 
@@ -46,3 +46,4 @@ decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
 - Do not send `/crowdsec-internal/challenge/*` to origin.
 - `Query` `captcha` failure action is `ErrFailureCaptcha` → `pkg/captcha`. Do not treat that error as AppSec JSON `action: captcha`.
 - Empty `crowdsecAppsecKey` still falls back to `crowdsecLapiKey` in `appsec.Prepare`. Call `lapi.Prepare` first.
+- HTTP 502, 503, and 504 from the AppSec listener are unreachable (same `crowdsecAppsecFailureAction` as a transport failure), not a generic non-200 ban.

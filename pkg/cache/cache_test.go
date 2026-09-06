@@ -13,7 +13,7 @@ func Test_Get(t *testing.T) {
 	IPInCache := "10.0.0.10"
 	IPNotInCache := "10.0.0.20"
 	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
-	client.Set(IPInCache, BannedValue, 10)
+	client.Set(IPInCache, "t", 10)
 	type args struct {
 		clientIP string
 	}
@@ -24,7 +24,7 @@ func Test_Get(t *testing.T) {
 		wantErr  bool
 		valueErr string
 	}{
-		{name: "Fetch Known valid IP", args: args{clientIP: IPInCache}, want: BannedValue, wantErr: false, valueErr: ""},
+		{name: "Fetch Known valid IP", args: args{clientIP: IPInCache}, want: "t", wantErr: false, valueErr: ""},
 		{name: "Fetch Unknown valid IP", args: args{clientIP: IPNotInCache}, want: "", wantErr: true, valueErr: CacheMiss},
 		{name: "Fetch invalid value", args: args{clientIP: "test"}, want: "", wantErr: true, valueErr: CacheMiss},
 		{name: "Fetch empty value", args: args{clientIP: ""}, want: "", wantErr: true, valueErr: CacheMiss},
@@ -63,9 +63,9 @@ func Test_Set(t *testing.T) {
 		wantErr  bool
 		valueErr string
 	}{
-		{name: "Set valid IP in local cache for 0 sec", args: args{clientIP: IPInCache, value: BannedValue, duration: 0}, want: "", wantErr: true, valueErr: CacheMiss},
-		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: BannedValue, duration: 10}, want: BannedValue, wantErr: false, valueErr: ""},
-		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: NoBannedValue, duration: 10}, want: NoBannedValue, wantErr: false, valueErr: ""},
+		{name: "Set valid IP in local cache for 0 sec", args: args{clientIP: IPInCache, value: "t", duration: 0}, want: "", wantErr: true, valueErr: CacheMiss},
+		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: "t", duration: 10}, want: "t", wantErr: false, valueErr: ""},
+		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: "f", duration: 10}, want: "f", wantErr: false, valueErr: ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -90,7 +90,7 @@ func Test_Delete(t *testing.T) {
 	IPInCache := "10.0.0.12"
 	IPNotInCache := "10.0.0.22"
 	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
-	client.Set(IPInCache, BannedValue, 10)
+	client.Set(IPInCache, "t", 10)
 	type args struct {
 		clientIP string
 	}
@@ -204,7 +204,7 @@ func Test_memoryClientsDoNotShare(t *testing.T) {
 	b := &Client{}
 	a.New(logger.New("INFO", ""), false, "", nil, "", "", "")
 	b.New(logger.New("INFO", ""), false, "", nil, "", "", "")
-	a.Set("1.2.3.4", BannedValue, 10)
+	a.Set("1.2.3.4", "t", 10)
 	got, err := b.Get("1.2.3.4")
 	if err == nil || got != "" {
 		t.Fatalf("client B got %q err %v, want miss", got, err)
@@ -246,13 +246,13 @@ func Test_redisCacheUsesPrefix(t *testing.T) {
 
 func Test_GetMany(t *testing.T) {
 	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
-	client.Set("a", BannedValue, 10)
-	client.Set("b", CaptchaValue, 10)
+	client.Set("a", "t", 10)
+	client.Set("b", "c", 10)
 	got, err := client.GetMany([]string{"a", "missing", "b", ""})
 	if err != nil {
 		t.Fatalf("GetMany err %v", err)
 	}
-	if got["a"] != BannedValue || got["b"] != CaptchaValue {
+	if got["a"] != "t" || got["b"] != "c" {
 		t.Fatalf("GetMany got %+v", got)
 	}
 	if _, ok := got["missing"]; ok {

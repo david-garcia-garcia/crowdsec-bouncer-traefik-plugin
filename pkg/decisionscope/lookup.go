@@ -10,19 +10,28 @@ import (
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 )
 
+const (
+	// BannedValue is the cache payload for a ban remediation.
+	BannedValue = "t"
+	// NoBannedValue is the cache payload for no active remediation.
+	NoBannedValue = "f"
+	// CaptchaValue is the cache payload for a captcha remediation.
+	CaptchaValue = "c"
+)
+
 // IsActiveRemediation reports whether value is ban or captcha (origin suffix ignored).
 func IsActiveRemediation(value string) bool {
 	kind := cache.RemediationKind(value)
-	return kind == cache.BannedValue || kind == cache.CaptchaValue
+	return kind == BannedValue || kind == CaptchaValue
 }
 
-// RemediationValue maps a CrowdSec decision type to a cache remediation.
+// RemediationValue maps a CrowdSec decision type to a decisionscope remediation code.
 func RemediationValue(decisionType string) string {
 	switch decisionType {
 	case "ban":
-		return cache.BannedValue
+		return BannedValue
 	case "captcha":
-		return cache.CaptchaValue
+		return CaptchaValue
 	default:
 		return ""
 	}
@@ -32,10 +41,10 @@ func RemediationValue(decisionType string) string {
 func PreferRemediation(current, incoming string) string {
 	currentKind := cache.RemediationKind(current)
 	incomingKind := cache.RemediationKind(incoming)
-	if currentKind == cache.BannedValue {
+	if currentKind == BannedValue {
 		return current
 	}
-	if incomingKind == cache.BannedValue {
+	if incomingKind == BannedValue {
 		return incoming
 	}
 	if IsActiveRemediation(current) {
