@@ -46,8 +46,8 @@ Client IP stays `pkg/ip.GetRemoteIP` → `Query(ip, …)`. This change does not 
   By: explore
 
 - Q: Is the fix a default-only flip of `CrowdsecAppsecFailureAction` to `passthrough`, or always headers-only GET for unreadable streaming POST regardless of `ban`?
-  Decision: assumed — always headers-only GET for `isBodyUnreadable`; keep `CrowdsecAppsecFailureAction` default `ban` for 500/unreachable. Unreadable body is not AppSec-down. Changing the enum default would fail-open AppSec 500 as a drive-by.
-  By: explore
+  Decision: resolved — always headers-only GET for `isBodyUnreadable`; keep `CrowdsecAppsecFailureAction` default `ban` for 500/unreachable. Unreadable body is not AppSec-down. Changing the enum default would fail-open AppSec 500 as a drive-by.
+  By: propose
 
 - Q: Who already owns the client address for the AppSec query?
   Decision: resolved — `pkg/ip.GetRemoteIP` on `clientRequest.remoteIP`; `appsec.Client.Query` takes that IP. Reuse it. Do not parse `X-Real-Ip` in AppSec.
