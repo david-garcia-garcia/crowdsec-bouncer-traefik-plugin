@@ -201,7 +201,7 @@ func warnWiredToOwner(log *slog.Logger, ownerName, joinerName string, owner, joi
 	)
 }
 
-// OpenStream reclaims one Connection per stream session (LAPI URL+key).
+// OpenStream reclaims one Client per stream session (LAPI URL+key).
 //
 // SessionKey is session prefix plus this snapshot’s hash. PeekLivePrefix on
 // SessionPrefix finds another live middleware on the same CrowdSec row
@@ -210,23 +210,23 @@ func warnWiredToOwner(log *slog.Logger, ownerName, joinerName string, owner, joi
 // different snapshot → warn-and-wire Open of their key. Sleeping leftover
 // with a different snapshot is a different key: Open creates; the sleeper
 // dies on grace Close.
-func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Connection, error) {
+func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
 	joinerKey := SessionKey(cfg)
 	joinerSettings := settingsFrom(cfg)
 	create := func() (any, error) {
-		conn, err := New(cfg, log, pluginVersion)
+		client, err := New(cfg, log, pluginVersion)
 		if err != nil {
 			return nil, err
 		}
-		conn.streamOwner = middlewareName
-		conn.streamSettings = joinerSettings
-		return wrappedConnection(conn), nil
+		client.streamOwner = middlewareName
+		client.streamSettings = joinerSettings
+		return wrappedClient(client), nil
 	}
 
 	bindKey := joinerKey
 	live := reclaim.PeekLivePrefix(SessionPrefix(cfg))
 	if live.OK && live.Key != joinerKey {
-		existing, _ := live.Value.(*Connection)
+		existing, _ := live.Value.(*Client)
 		if existing != nil {
 			ownerName := existing.streamOwner
 			if ownerName == "" {
@@ -242,46 +242,46 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	if openErr != nil {
 		return nil, openErr
 	}
-	conn, connErr := connectionFromStored(middlewareName, stored)
-	if connErr != nil {
-		return nil, connErr
+	client, clientErr := clientFromStored(middlewareName, stored)
+	if clientErr != nil {
+		return nil, clientErr
 	}
 	// Sleeper belonged to another middleware that is gone. Take the name for later warnings.
-	if sleeper.OK && sleeper.Holders == 0 && conn.streamOwner != middlewareName {
-		conn.streamOwner = middlewareName
+	if sleeper.OK && sleeper.Holders == 0 && client.streamOwner != middlewareName {
+		client.streamOwner = middlewareName
 	}
-	return conn, nil
+	return client, nil
 }
 
-// OpenLive reclaims a Connection by full identity (live/none).
-func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Connection, error) {
+// OpenLive reclaims a Client by full identity (live/none).
+func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
 	stored, openErr := reclaim.OpenWithGrace(ctx, Key(cfg), log, ReclaimGraceDuration, func() (any, error) {
-		conn, err := New(cfg, log, pluginVersion)
+		client, err := New(cfg, log, pluginVersion)
 		if err != nil {
 			return nil, err
 		}
-		return wrappedConnection(conn), nil
+		return wrappedClient(client), nil
 	})
 	if openErr != nil {
 		return nil, openErr
 	}
-	return connectionFromStored(middlewareName, stored)
+	return clientFromStored(middlewareName, stored)
 }
 
-// wrappedConnection is the reclaim create() result: funcs, not a type assert (Yaegi).
-func wrappedConnection(conn *Connection) *reclaim.Wrapped {
+// wrappedClient is the reclaim create() result: funcs, not a type assert (Yaegi).
+func wrappedClient(client *Client) *reclaim.Wrapped {
 	return &reclaim.Wrapped{
-		Value: conn,
-		Sleep: conn.Sleep,
-		Wake:  conn.Wake,
-		Close: conn.Close,
+		Value: client,
+		Sleep: client.Sleep,
+		Wake:  client.Wake,
+		Close: client.Close,
 	}
 }
 
-func connectionFromStored(middlewareName string, stored any) (*Connection, error) {
-	conn, ok := stored.(*Connection)
+func clientFromStored(middlewareName string, stored any) (*Client, error) {
+	client, ok := stored.(*Client)
 	if !ok {
-		return nil, fmt.Errorf("%s: reclaim: want *lapi.Connection, got %T", middlewareName, stored)
+		return nil, fmt.Errorf("%s: reclaim: want *lapi.Client, got %T", middlewareName, stored)
 	}
-	return conn, nil
+	return client, nil
 }

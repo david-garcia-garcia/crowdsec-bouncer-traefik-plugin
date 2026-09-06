@@ -23,7 +23,7 @@ type Stream struct {
 }
 
 // startStream starts the stream ticker and initial poll for stream and alone modes.
-func (c *Connection) startStream(config *configuration.Config, log *slog.Logger) error {
+func (c *Client) startStream(config *configuration.Config, log *slog.Logger) error {
 	if config.CrowdsecMode != configuration.StreamMode && config.CrowdsecMode != configuration.AloneMode {
 		return nil
 	}
@@ -45,7 +45,7 @@ func (c *Connection) startStream(config *configuration.Config, log *slog.Logger)
 	return nil
 }
 
-func (c *Connection) handleStreamTicker() {
+func (c *Client) handleStreamTicker() {
 	if err := c.handleStreamCache(); err != nil {
 		c.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", c.updateFailure, c.isCrowdsecStreamHealthy, err.Error()))
 		if c.updateMaxFailure != -1 && c.updateFailure >= c.updateMaxFailure && c.isCrowdsecStreamHealthy {
@@ -63,7 +63,7 @@ func (c *Connection) handleStreamTicker() {
 	}
 }
 
-func (c *Connection) handleStreamCache() error {
+func (c *Client) handleStreamCache() error {
 	_, err := c.cacheClient.Get(cacheTimeoutKey)
 	if err == nil {
 		c.log.Debug("handleStreamCache:alreadyUpdated")

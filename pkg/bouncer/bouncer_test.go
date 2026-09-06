@@ -175,7 +175,7 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 	if got := recorder.Header().Get("Set-Cookie"); got != "__crowdsec_challenge=value; Path=/; HttpOnly" {
 		t.Fatalf("expected Set-Cookie relayed, got %q", got)
 	}
-	if got := recorder.Header().Get("X-Remediation"); got != appsec.AppsecActionChallenge {
+	if got := recorder.Header().Get("X-Remediation"); got != appsec.ActionChallenge {
 		t.Fatalf("expected custom remediation header challenge, got %q", got)
 	}
 }
@@ -322,7 +322,7 @@ func TestApplyLapiFailureAction(t *testing.T) {
 				nextCalled = true
 			}),
 			log:        logger.New("ERROR", ""),
-			lapiClient: lapi.NewTestLapiFailureActionConnection(configuration.FailureActionPassthrough),
+			lapiClient: lapi.NewTestLapiFailureActionClient(configuration.FailureActionPassthrough),
 		}
 		b.applyLapiFailureAction(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), configuration.ReasonTECH, lapi.OriginPluginTechStreamFail)
 		if !nextCalled {
@@ -336,7 +336,7 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			}),
 			remediationStatusCode: http.StatusForbidden,
 			log:                   logger.New("ERROR", ""),
-			lapiClient:            lapi.NewTestLapiFailureActionConnection(configuration.FailureActionBan),
+			lapiClient:            lapi.NewTestLapiFailureActionClient(configuration.FailureActionBan),
 		}
 		recorder := httptest.NewRecorder()
 		b.applyLapiFailureAction(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)

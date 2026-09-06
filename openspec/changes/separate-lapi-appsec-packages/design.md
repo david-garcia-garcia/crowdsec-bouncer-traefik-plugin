@@ -19,15 +19,15 @@ See proposal.md — Why. Today `CrowdsecConnection` holds LAPI stream/cache/metr
 
 1. **`pkg/lapi` + `pkg/appsec`, no facade.** Alternative: keep `crowdsecconnection` as a re-export — rejected; the mixed name stays the call-site.
 
-2. **Type names `lapi.Connection` and `appsec.Client`.** Alternative: keep `CrowdsecConnection` inside `package lapi` — rejected; the identifier still claims AppSec.
+2. **Type names `lapi.Client` and `appsec.Client`.** Alternative: `Connection` on both — rejected; AppSec has no stream ticker, Bouncer fields are already `lapiClient`/`appsecClient`, and `captcha.Client`/`cache.Client` already use Client. Alternative: keep `CrowdsecConnection` inside `package lapi` — rejected; the identifier still claims AppSec.
 
-3. **Separate reclaim, not AppSec-inside-LAPI-New.** Alternative: `lapi.Connection` holds `*appsec.Client` constructed in `lapi.New` — rejected; one owner still has two jobs and AppSec stays in LAPI identity.
+3. **Separate reclaim, not AppSec-inside-LAPI-New.** Alternative: `lapi.Client` holds `*appsec.Client` constructed in `lapi.New` — rejected; one owner still has two jobs and AppSec stays in LAPI identity.
 
 4. **Copy `closeIdle` / `isReverseProxyError` into each package.** Alternative: `pkg/httpx` — rejected; not enough job to own a package.
 
 5. **`appsec.Prepare` after `lapi.Prepare`** so empty AppSec key can copy the resolved LAPI key. Alternative: plugin.go copies keys — rejected; that is AppSec's fallback job.
 
-6. **`crowdsecMode: appsec` skips LAPI Open** (`conn` nil). AppSec Open only when `crowdsecAppsecEnabled`. Alternative: always Open a dummy LAPI connection — rejected; no stream/cache/metrics to own.
+6. **`crowdsecMode: appsec` skips LAPI Open** (`lapiClient` nil). AppSec Open only when `crowdsecAppsecEnabled`. Alternative: always Open a dummy LAPI client — rejected; no stream/cache/metrics to own.
 
 7. **Reclaim prefixes `lapi:`, `lapi:stream:`, `appsec:`.** Alternative: keep `crowdsecconnection:` — rejected; the prefix would name a deleted package.
 

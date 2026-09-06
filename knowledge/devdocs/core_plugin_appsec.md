@@ -3,7 +3,7 @@
 ## Language
 
 **AppSec Client**:
-The reclaim value for one CrowdSec AppSec listener (`pkg/appsec`). Owns the HTTP round-trip, JSON parse, host/key/TLS/body limit. Not the LAPI Connection.
+The reclaim value for one CrowdSec AppSec listener (`pkg/appsec`). Owns the HTTP round-trip, JSON parse, host/key/TLS/body limit. Not the LAPI Client.
 _Avoid_: CrowdsecConnection, `AppsecQuery` on LAPI, LAPI captcha
 
 **Structured AppSec response**:

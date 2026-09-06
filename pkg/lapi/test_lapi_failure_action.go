@@ -4,9 +4,9 @@ import (
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
-// NewTestLapiFailureActionConnection returns a connection that only exposes LapiFailureAction.
-func NewTestLapiFailureActionConnection(action string) *Connection {
-	return &Connection{
+// NewTestLapiFailureActionClient returns a client that only exposes LapiFailureAction.
+func NewTestLapiFailureActionClient(action string) *Client {
+	return &Client{
 		lapiFailureAction: configuration.EffectiveFailureAction(action),
 	}
 }

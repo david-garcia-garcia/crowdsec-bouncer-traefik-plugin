@@ -16,15 +16,15 @@ const keyPrefix = "appsec:"
 
 // identity is the reclaim-key payload for one AppSec listener.
 type identity struct {
-	Scheme                    string `json:"scheme"`
-	Host                      string `json:"host"`
-	Path                      string `json:"path"`
-	Key                       string `json:"key"`
-	BodyLimit                 int64  `json:"bodyLimit"`
-	HTTPTimeoutSeconds        int64  `json:"httpTimeoutSeconds"`
-	TLSInsecureVerify         bool   `json:"tlsInsecureVerify"`
-	TLSCertificateAuthority   string `json:"tlsCa"`
-	TLSCertificateBouncer     string `json:"tlsCert"`
+	Scheme                  string `json:"scheme"`
+	Host                    string `json:"host"`
+	Path                    string `json:"path"`
+	Key                     string `json:"key"`
+	BodyLimit               int64  `json:"bodyLimit"`
+	HTTPTimeoutSeconds      int64  `json:"httpTimeoutSeconds"`
+	TLSInsecureVerify       bool   `json:"tlsInsecureVerify"`
+	TLSCertificateAuthority string `json:"tlsCa"`
+	TLSCertificateBouncer   string `json:"tlsCert"`
 }
 
 func identityFrom(cfg *configuration.Config) identity {

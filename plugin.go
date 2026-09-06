@@ -19,7 +19,7 @@ func CreateConfig() *configuration.Config {
 }
 
 // New is the Traefik Yaegi constructor. It reclaims LAPI and AppSec backends and returns a per-router Bouncer.
-// Stream/alone: one LAPI connection per LAPI URL+key (CrowdSec one stream cursor per
+// Stream/alone: one LAPI client per LAPI URL+key (CrowdSec one stream cursor per
 // hashed key + outbound IP). Live/none: reclaim by LAPI identity. AppSec: reclaim by listener URL+key.
 func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
 	config.LogLevel = strings.ToUpper(config.LogLevel)
@@ -45,7 +45,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		return nil, prepErr
 	}
 
-	var lapiClient *lapi.Connection
+	var lapiClient *lapi.Client
 	// Stream and alone poll GET /v1/decisions/stream. CrowdSec stores that
 	// cursor on the bouncer row selected by hashed X-Api-Key plus the IP LAPI
 	// sees (this process’s outbound address), not per middleware and not per
@@ -57,7 +57,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 			return nil, streamErr
 		}
 	} else if config.CrowdsecMode != configuration.AppsecMode {
-		// Live/none do not use stream_cursor. Two Connections on one key
+		// Live/none do not use stream_cursor. Two Clients on one key
 		// stay valid (?ip= lookups). Reclaim by LAPI identity, including intervals.
 		var openErr error
 		lapiClient, openErr = lapi.OpenLive(ctx, config, log, name, pluginVersion)

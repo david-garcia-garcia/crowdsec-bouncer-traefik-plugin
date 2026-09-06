@@ -15,7 +15,7 @@ import (
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
-// ReclaimGraceDuration is the wait after the last constructor ctx for a Connection slot.
+// ReclaimGraceDuration is the wait after the last constructor ctx for a Client slot.
 const ReclaimGraceDuration = 30 * time.Second
 
 // Operator-visible lifecycle and stream-health lines (stable for log grep).
@@ -40,8 +40,8 @@ type Decision struct {
 	Simulated bool   `json:"simulated"`
 }
 
-// Connection owns stream ticker, isolated cache, in-process Range membership, LAPI/CAPI HTTP, and metrics.
-type Connection struct {
+// Client owns stream ticker, isolated cache, in-process Range membership, LAPI/CAPI HTTP, and metrics.
+type Client struct {
 	mu       sync.Mutex
 	closed   bool
 	sleeping bool // last reclaim holder gone; tickers stopped until Wake or Close
@@ -65,11 +65,11 @@ type Connection struct {
 	decisionScopeHeaders   map[string]string // CrowdSec header scope → request header
 
 	httpClient      *http.Client
-	cacheClient      *cache.Client
-	rangeMembership  atomic.Value // *decisionscope.RangeMembership rebuilt from range-index
-	lastRangeIndex   atomic.Value // string of the blob last used to build membership
-	log              *slog.Logger
-	pluginVersion    string
+	cacheClient     *cache.Client
+	rangeMembership atomic.Value // *decisionscope.RangeMembership rebuilt from range-index
+	lastRangeIndex  atomic.Value // string of the blob last used to build membership
+	log             *slog.Logger
+	pluginVersion   string
 
 	isCrowdsecStreamStartup bool
 	isCrowdsecStreamHealthy bool
@@ -110,8 +110,8 @@ func Prepare(cfg *configuration.Config, _ *slog.Logger) error {
 	return nil
 }
 
-// New constructs a Connection and starts tickers. Call Prepare first. Close stops them.
-func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (*Connection, error) {
+// New constructs a Client and starts tickers. Call Prepare first. Close stops them.
+func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (*Client, error) {
 	var err error
 	crowdsecStreamRoute := ""
 	crowdsecHeader := ""
@@ -133,7 +133,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		}
 	}
 
-	conn := &Connection{
+	client := &Client{
 		crowdsecMode:            config.CrowdsecMode,
 		crowdsecScheme:          config.CrowdsecLapiScheme,
 		crowdsecHost:            config.CrowdsecLapiHost,
@@ -174,7 +174,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 	// IdentityHex still includes intervals, so two middlewares on one key
 	// used to get two prefixes and two incomplete caches while sharing one
 	// CrowdSec stream cursor. Warn-and-wire must read the same keys.
-	conn.cacheClient.New(
+	client.cacheClient.New(
 		log,
 		config.RedisCacheEnabled,
 		config.RedisCacheHost,
@@ -184,25 +184,25 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		CachePrefix(config),
 	)
 
-	if err := conn.startStream(config, log); err != nil {
+	if err := client.startStream(config, log); err != nil {
 		return nil, err
 	}
 
 	if config.MetricsUpdateIntervalSeconds > 0 {
-		conn.lastMetricsPush = time.Now()
-		go conn.handleMetricsTicker()
-		conn.metricsStop = startTicker("metrics", conn.metricsInterval, log, func() {
-			conn.handleMetricsTicker()
+		client.lastMetricsPush = time.Now()
+		go client.handleMetricsTicker()
+		client.metricsStop = startTicker("metrics", client.metricsInterval, log, func() {
+			client.handleMetricsTicker()
 		})
 	}
 
-	conn.logInfo(MsgConnectionStarted)
-	return conn, nil
+	client.logInfo(MsgConnectionStarted)
+	return client, nil
 }
 
 // Close stops tickers, idle HTTP connections, and the cache Redis pool. Safe to call more than once.
 // Remaining usage-metrics are POSTed to LAPI before HTTP is torn down.
-func (c *Connection) Close() {
+func (c *Client) Close() {
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
@@ -230,7 +230,7 @@ func (c *Connection) Close() {
 // Sleep stops stream and metrics tickers and keeps HTTP, cache, and the LAPI
 // cursor. Reclaim calls this when the last constructor ctx is gone. Not Close.
 // Remaining usage-metrics are POSTed asynchronously so the reclaim table lock is not held on LAPI.
-func (c *Connection) Sleep() {
+func (c *Client) Sleep() {
 	c.mu.Lock()
 	if c.closed || c.sleeping {
 		c.mu.Unlock()
@@ -248,7 +248,7 @@ func (c *Connection) Sleep() {
 
 // Wake starts stream and metrics tickers again after Sleep. startup=false: the
 // cache is still warm; CrowdSec still holds stream_cursor on the bouncer row.
-func (c *Connection) Wake() {
+func (c *Client) Wake() {
 	c.mu.Lock()
 	if c.closed || !c.sleeping {
 		c.mu.Unlock()
@@ -274,7 +274,7 @@ func (c *Connection) Wake() {
 }
 
 // logInfo writes an operator-visible lifecycle line with mode and LAPI host.
-func (c *Connection) logInfo(msg string) {
+func (c *Client) logInfo(msg string) {
 	if c.log == nil {
 		return
 	}
@@ -310,12 +310,12 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 }
 
 // Cache is this connection's isolated cache Client.
-func (c *Connection) Cache() *cache.Client {
+func (c *Client) Cache() *cache.Client {
 	return c.cacheClient
 }
 
 // RangeMembership is the current in-process Range lookup, or nil before the first hydrate.
-func (c *Connection) RangeMembership() *decisionscope.RangeMembership {
+func (c *Client) RangeMembership() *decisionscope.RangeMembership {
 	stored := c.rangeMembership.Load()
 	if stored == nil {
 		return nil
@@ -325,7 +325,7 @@ func (c *Connection) RangeMembership() *decisionscope.RangeMembership {
 }
 
 // hydrateRangeMembership rebuilds Range membership from the shared blob when the raw string changed.
-func (c *Connection) hydrateRangeMembership() {
+func (c *Client) hydrateRangeMembership() {
 	index, err := c.cacheClient.Get(decisionscope.RangeIndexKey)
 	if err != nil {
 		if err.Error() != cache.CacheMiss {
@@ -337,7 +337,7 @@ func (c *Connection) hydrateRangeMembership() {
 }
 
 // storeRangeMembership replaces the in-process trees when index differs from the last hydrate.
-func (c *Connection) storeRangeMembership(index string) {
+func (c *Client) storeRangeMembership(index string) {
 	previous, _ := c.lastRangeIndex.Load().(string)
 	if c.rangeMembership.Load() != nil && previous == index {
 		return
@@ -347,26 +347,26 @@ func (c *Connection) storeRangeMembership(index string) {
 }
 
 // Mode is the Crowdsec mode for this connection.
-func (c *Connection) Mode() string {
+func (c *Client) Mode() string {
 	return c.crowdsecMode
 }
 
 // StreamHealthy is true while stream polling is succeeding.
-func (c *Connection) StreamHealthy() bool {
+func (c *Client) StreamHealthy() bool {
 	return c.isCrowdsecStreamHealthy
 }
 
 // LapiFailureAction is the fallback when LAPI does not return a usable verdict.
-func (c *Connection) LapiFailureAction() string {
+func (c *Client) LapiFailureAction() string {
 	return c.lapiFailureAction
 }
 
 // RedisUnreachableBlock is the redis fail-closed flag for this connection.
-func (c *Connection) RedisUnreachableBlock() bool {
+func (c *Client) RedisUnreachableBlock() bool {
 	return c.redisUnreachableBlock
 }
 
 // StreamFetches is how many times this connection actually called the stream endpoint.
-func (c *Connection) StreamFetches() int64 {
+func (c *Client) StreamFetches() int64 {
 	return atomic.LoadInt64(&c.streamFetches)
 }

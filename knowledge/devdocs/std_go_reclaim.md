@@ -8,12 +8,12 @@ _Avoid_: `sync.Once`, process singleton, middleware-name key
 
 ## Overview
 
-Copy `pkg/reclaim` as-is. Call `reclaim.Open` with Traefik’s `New` ctx. Same-package values may implement `Sleep`/`Wake`/`Close`. A value defined in another package MUST be returned as `*reclaim.Wrapped` (funcs, not a type assert): Yaegi v0.16 panics on asserting a foreign concrete type to those interfaces. LAPI Connection and AppSec Client puts use `OpenWithGrace(..., ReclaimGraceDuration, ...)` (30s). Do not change table `DefaultGrace` (10s) to special-case one type.
+Copy `pkg/reclaim` as-is. Call `reclaim.Open` with Traefik’s `New` ctx. Same-package values may implement `Sleep`/`Wake`/`Close`. A value defined in another package MUST be returned as `*reclaim.Wrapped` (funcs, not a type assert): Yaegi v0.16 panics on asserting a foreign concrete type to those interfaces. LAPI Client and AppSec Client puts use `OpenWithGrace(..., ReclaimGraceDuration, ...)` (30s). Do not change table `DefaultGrace` (10s) to special-case one type.
 
 ## How to use
 
 - `reclaim.Open(ctx, key, logger, create)` on the process table. Last holder `Sleep()`s if the value has it; Open during grace `Wake()`s.
-- LAPI Connection and AppSec Client `create` returns `*reclaim.Wrapped` (`Sleep`/`Wake`/`Close` as funcs). Peek still returns the concrete `*lapi.Connection` or `*appsec.Client`.
+- LAPI Client and AppSec Client `create` returns `*reclaim.Wrapped` (`Sleep`/`Wake`/`Close` as funcs). Peek still returns the concrete `*lapi.Client` or `*appsec.Client`.
 - LAPI and AppSec puts use `OpenWithGrace(..., ReclaimGraceDuration, ...)` (30s). Do not change table `DefaultGrace` (10s) to special-case one type.
 - `create` runs only for a first put or after grace Close.
 - Tests: `reclaim.ResetForTest()` / `reclaim.ResetForTestWith(grace)` only.

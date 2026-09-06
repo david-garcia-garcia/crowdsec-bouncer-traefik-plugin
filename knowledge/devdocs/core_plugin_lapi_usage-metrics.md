@@ -31,7 +31,7 @@ lapiClient.IncDropped(cache.RemediationOrigin(stored), req.ipType, "ban")
 
 ## Key files
 
-- `pkg/lapi/connection_metrics.go`
+- `pkg/lapi/client_metrics.go`
 - `pkg/cache/remediation.go`
 - `pkg/ip/network.go` (`Family`, `FamilyOfIP`, `FamilyOfHostOrCIDR`)
 - `pkg/bouncer/bouncer.go`

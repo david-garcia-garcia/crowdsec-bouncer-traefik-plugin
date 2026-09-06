@@ -6,4 +6,4 @@
 
 ### Requirement: Exported API stays on the same package
 **Reason**: Callers MUST import `pkg/lapi` and `pkg/appsec`. The frozen `pkg/crowdsecconnection` API (including `AppsecQuery` on `CrowdsecConnection`) is the coupling this change removes.
-**Migration**: `LiveLookup` on `lapi.Connection`; `Query` on `appsec.Client`.
+**Migration**: `LiveLookup` on `lapi.Client`; `Query` on `appsec.Client`.

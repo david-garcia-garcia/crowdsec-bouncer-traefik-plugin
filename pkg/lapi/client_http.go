@@ -46,7 +46,7 @@ func isReverseProxyError(statusCode int) bool {
 		statusCode == http.StatusGatewayTimeout
 }
 
-func (c *Connection) getToken() error {
+func (c *Client) getToken() error {
 	loginURL := url.URL{
 		Scheme: c.crowdsecScheme,
 		Host:   c.crowdsecHost,
@@ -75,7 +75,7 @@ func (c *Connection) getToken() error {
 	return errors.New("getToken statusCode:" + strconv.Itoa(login.Code))
 }
 
-func (c *Connection) crowdsecQuery(stringURL string, data []byte) ([]byte, error) {
+func (c *Client) crowdsecQuery(stringURL string, data []byte) ([]byte, error) {
 	var req *http.Request
 	if len(data) > 0 {
 		req, _ = http.NewRequest(http.MethodPost, stringURL, bytes.NewBuffer(data))

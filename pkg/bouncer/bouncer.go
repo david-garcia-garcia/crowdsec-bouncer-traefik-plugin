@@ -39,13 +39,13 @@ type Bouncer struct {
 	serverPoolStrategy      *ip.PoolStrategy
 	captchaClient           *captcha.Client
 	log                     *slog.Logger
-	lapiClient              *lapi.Connection
+	lapiClient              *lapi.Client
 	appsecClient            *appsec.Client
 	decisionScopeHeaders    map[string]string // CrowdSec header scope → request header
 }
 
 // New returns a per-router handler bound to lapiClient and appsecClient.
-func New(next http.Handler, name string, config *configuration.Config, lapiClient *lapi.Connection, appsecClient *appsec.Client, log *slog.Logger) (http.Handler, error) {
+func New(next http.Handler, name string, config *configuration.Config, lapiClient *lapi.Client, appsecClient *appsec.Client, log *slog.Logger) (http.Handler, error) {
 	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(log, config.ClientTrustedIPs)
 
@@ -110,7 +110,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 }
 
 // LapiClient is the reclaimed LAPI backend this route uses.
-func (b *Bouncer) LapiClient() *lapi.Connection {
+func (b *Bouncer) LapiClient() *lapi.Client {
 	return b.lapiClient
 }
 
@@ -300,7 +300,7 @@ func (b *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req clientRequest)
 
 // applyAppsecServeHTTP queries AppSec and writes a remediation when the request must not reach origin.
 func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientRequest) bool {
-	pol := appsec.AppsecPolicy{
+	pol := appsec.Policy{
 		FailureAction: b.appsecFailureAction,
 	}
 	decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
@@ -313,14 +313,14 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientRequest
 		b.handleBanServeHTTP(rw, req, configuration.ReasonAPPSEC, lapi.OriginPluginAppsecFailure)
 		return true
 	}
-	if decision == nil || decision.Action == "" || decision.Action == appsec.AppsecActionAllow {
+	if decision == nil || decision.Action == "" || decision.Action == appsec.ActionAllow {
 		return false
 	}
 	switch decision.Action {
-	case appsec.AppsecActionBan:
+	case appsec.ActionBan:
 		b.handleBanServeHTTP(rw, req, configuration.ReasonAPPSEC, "appsec")
 		return true
-	case appsec.AppsecActionChallenge:
+	case appsec.ActionChallenge:
 		if decision.UserBodyContent == "" {
 			b.handleBanServeHTTP(rw, req, configuration.ReasonAPPSEC, "appsec")
 			return true
@@ -331,7 +331,7 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientRequest
 }
 
 // handleAppsecResponseServeHTTP writes a structured AppSec envelope (challenge HTML, cookies, headers) to the client.
-func (b *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req clientRequest, decision *appsec.AppsecResponse) {
+func (b *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req clientRequest, decision *appsec.Response) {
 	b.recordDropped("appsec", req.ipType, "")
 
 	// Copy AppSec-supplied headers, skipping hop-by-hop names and Set-Cookie (cookies have their own field).

@@ -25,14 +25,14 @@ const (
 
 // Structured AppSec JSON action values CrowdSec 1.8 puts in the envelope body.
 const (
-	AppsecActionAllow     = "allow"
-	AppsecActionBan       = "ban"
-	AppsecActionCaptcha   = "captcha"
-	AppsecActionChallenge = "challenge"
+	ActionAllow     = "allow"
+	ActionBan       = "ban"
+	ActionCaptcha   = "captcha"
+	ActionChallenge = "challenge"
 )
 
-// AppsecPolicy is per-route AppSec fallback when the listener does not return a usable verdict.
-type AppsecPolicy struct {
+// Policy is per-route AppSec fallback when the listener does not return a usable verdict.
+type Policy struct {
 	FailureAction string
 }
 
@@ -40,7 +40,7 @@ type AppsecPolicy struct {
 var ErrFailureCaptcha = errors.New("failureAction captcha")
 
 // resultForFailureAction maps a configured fallback to allow, captcha, or an error ban.
-func resultForFailureAction(action, errMsg string) (*AppsecResponse, error) {
+func resultForFailureAction(action, errMsg string) (*Response, error) {
 	switch configuration.EffectiveFailureAction(action) {
 	case configuration.FailureActionPassthrough:
 		return appsecAllow(), nil
@@ -57,11 +57,11 @@ func resultForFailureActionErr(action, errMsg string) error {
 	return err
 }
 
-// AppsecResponse is the structured AppSec JSON envelope CrowdSec 1.8 returns for a remediation.
+// Response is the structured AppSec JSON envelope CrowdSec 1.8 returns for a remediation.
 // Field tags match CrowdSec's snake_case wire names (http_status, user_body_content, …).
 //
 //nolint:tagliatelle
-type AppsecResponse struct {
+type Response struct {
 	Action          string              `json:"action"`
 	HTTPStatus      int                 `json:"http_status"`
 	UserBodyContent string              `json:"user_body_content,omitempty"`
@@ -70,8 +70,8 @@ type AppsecResponse struct {
 }
 
 // appsecAllow returns a pass-through decision so Query never uses (nil, nil).
-func appsecAllow() *AppsecResponse {
-	return &AppsecResponse{Action: AppsecActionAllow}
+func appsecAllow() *Response {
+	return &Response{Action: ActionAllow}
 }
 
 func isBodyUnreadable(httpReq *http.Request) bool {
@@ -89,7 +89,7 @@ func isMethodWithBody(method string) bool {
 
 // Query forwards the request to this AppSec HTTP client.
 // A structured JSON envelope is returned when AppSec supplies a non-empty action.
-func (c *Client) Query(ip string, httpReq *http.Request, pol AppsecPolicy) (*AppsecResponse, error) {
+func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response, error) {
 	req, err := c.newAppsecForwardRequest(ip, httpReq, pol)
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func (c *Client) Query(ip string, httpReq *http.Request, pol AppsecPolicy) (*App
 		c.log.Error("appsecQuery:unreachable")
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
-	defer c.drainAppsecResponse(res)
+	defer c.drainResponse(res)
 
 	if res.StatusCode == http.StatusInternalServerError {
 		c.log.Info("appsecQuery:failure")
@@ -115,7 +115,7 @@ func (c *Client) Query(ip string, httpReq *http.Request, pol AppsecPolicy) (*App
 }
 
 // newAppsecForwardRequest builds the AppSec listener request, copying client headers and identity.
-func (c *Client) newAppsecForwardRequest(ip string, httpReq *http.Request, pol AppsecPolicy) (*http.Request, error) {
+func (c *Client) newAppsecForwardRequest(ip string, httpReq *http.Request, pol Policy) (*http.Request, error) {
 	routeURL := url.URL{
 		Scheme: c.appsecScheme,
 		Host:   c.appsecHost,
@@ -141,7 +141,7 @@ func (c *Client) newAppsecForwardRequest(ip string, httpReq *http.Request, pol A
 }
 
 // newAppsecBodyRequest chooses GET (no/unreadable body) or POST (copied client body) toward AppSec.
-func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol AppsecPolicy) (*http.Request, error) {
+func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol Policy) (*http.Request, error) {
 	switch {
 	case isBodyUnreadable(httpReq):
 		if isMethodWithBody(httpReq.Method) && configuration.EffectiveFailureAction(pol.FailureAction) != configuration.FailureActionPassthrough {
@@ -166,8 +166,8 @@ func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol 
 	}
 }
 
-// drainAppsecResponse consumes leftover bytes so the AppSec HTTP connection can be reused.
-func (c *Client) drainAppsecResponse(res *http.Response) {
+// drainResponse consumes leftover bytes so the AppSec HTTP connection can be reused.
+func (c *Client) drainResponse(res *http.Response) {
 	if _, errDrain := io.Copy(io.Discard, res.Body); errDrain != nil {
 		c.log.Debug("appsecQuery:drainBody " + errDrain.Error())
 	}
@@ -193,8 +193,8 @@ func (c *Client) readCappedAppsecBody(res *http.Response) ([]byte, error) {
 }
 
 // interpretAppsecBody maps a listener status and JSON body to an allow, structured envelope, or error.
-func interpretAppsecBody(statusCode int, body []byte, log *slog.Logger) (*AppsecResponse, error) {
-	decision, parseErr := parseAppsecResponse(body)
+func interpretAppsecBody(statusCode int, body []byte, log *slog.Logger) (*Response, error) {
+	decision, parseErr := parseResponse(body)
 	if parseErr == nil && decision.Action != "" {
 		return decision, nil
 	}
@@ -207,13 +207,13 @@ func interpretAppsecBody(statusCode int, body []byte, log *slog.Logger) (*Appsec
 	return nil, fmt.Errorf("appsecQuery statusCode:%d", statusCode)
 }
 
-// parseAppsecResponse unmarshals a CrowdSec AppSec JSON envelope. Empty bodies are not structured.
-func parseAppsecResponse(body []byte) (*AppsecResponse, error) {
+// parseResponse unmarshals a CrowdSec AppSec JSON envelope. Empty bodies are not structured.
+func parseResponse(body []byte) (*Response, error) {
 	body = bytes.TrimSpace(body)
 	if len(body) == 0 {
 		return nil, errors.New("empty appsec response body")
 	}
-	var decision AppsecResponse
+	var decision Response
 	if err := json.Unmarshal(body, &decision); err != nil {
 		return nil, err
 	}

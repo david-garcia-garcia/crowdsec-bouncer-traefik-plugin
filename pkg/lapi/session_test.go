@@ -79,23 +79,23 @@ func TestSessionKey_DifferentHostsAreDistinct(t *testing.T) {
 	}
 }
 
-func TestConnection_ReclaimGrace(t *testing.T) {
+func TestClient_ReclaimGrace(t *testing.T) {
 	if ReclaimGraceDuration != 30*time.Second {
 		t.Fatalf("ReclaimGraceDuration: %v", ReclaimGraceDuration)
 	}
 }
 
-func TestConnection_LifecycleLogs(t *testing.T) {
+func TestClient_LifecycleLogs(t *testing.T) {
 	var logBuf bytes.Buffer
 	log := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	conn := &Connection{
+	client := &Client{
 		log:          log,
 		crowdsecMode: configuration.LiveMode,
 		crowdsecHost: "lapi.example:8080",
 	}
-	conn.Sleep()
-	conn.Wake()
-	conn.Close()
+	client.Sleep()
+	client.Wake()
+	client.Close()
 	logged := logBuf.String()
 	for _, msg := range []string{MsgConnectionSleeping, MsgConnectionWaking, MsgConnectionClosed} {
 		if !strings.Contains(logged, msg) {

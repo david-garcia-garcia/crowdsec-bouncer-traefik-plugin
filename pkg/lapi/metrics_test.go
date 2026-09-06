@@ -24,7 +24,7 @@ func TestMetricsOriginListsRewrite(t *testing.T) {
 }
 
 func TestReportMetricsPluginFailClosedOrigins(t *testing.T) {
-	conn, body := newUsageMetricsConn(t)
+	client, body := newUsageMetricsClient(t)
 	origins := []string{
 		OriginPluginTechGetRemoteFail,
 		OriginPluginTechTrustIPFail,
@@ -34,9 +34,9 @@ func TestReportMetricsPluginFailClosedOrigins(t *testing.T) {
 		OriginPluginAppsecFailure,
 	}
 	for _, origin := range origins {
-		conn.IncDropped(origin, "ipv4", "ban")
+		client.IncDropped(origin, "ipv4", "ban")
 	}
-	if err := conn.reportMetrics(); err != nil {
+	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
 	found := map[string]bool{}
@@ -57,11 +57,11 @@ func TestReportMetricsPluginFailClosedOrigins(t *testing.T) {
 }
 
 func TestIncProcessedReportsWithoutWindowMap(t *testing.T) {
-	conn, body := newUsageMetricsConn(t)
-	conn.IncProcessed("ipv4")
-	conn.IncProcessed("ipv4")
-	conn.IncProcessed("ipv6")
-	if err := conn.reportMetrics(); err != nil {
+	client, body := newUsageMetricsClient(t)
+	client.IncProcessed("ipv4")
+	client.IncProcessed("ipv4")
+	client.IncProcessed("ipv6")
+	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
 	got := map[string]float64{}
@@ -81,26 +81,26 @@ func TestIncProcessedReportsWithoutWindowMap(t *testing.T) {
 }
 
 func TestReportMetricsOfficialLabels(t *testing.T) {
-	conn, body := newUsageMetricsConn(t)
-	conn.IncDropped("lists:firehol_level1", "ipv4", "ban")
-	conn.IncProcessed("ipv4")
-	conn.rememberActiveDecision("ip:1.2.3.4", "crowdsec", "1.2.3.4")
-	if err := conn.reportMetrics(); err != nil {
+	client, body := newUsageMetricsClient(t)
+	client.IncDropped("lists:firehol_level1", "ipv4", "ban")
+	client.IncProcessed("ipv4")
+	client.rememberActiveDecision("ip:1.2.3.4", "crowdsec", "1.2.3.4")
+	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
 	assertOfficialUsageItems(t, usageMetricItems(t, *body))
 }
 
 func TestReportMetricsStartupTimestampStable(t *testing.T) {
-	conn, body := newUsageMetricsConn(t)
-	started := float64(conn.startedAt.Unix())
-	if err := conn.reportMetrics(); err != nil {
+	client, body := newUsageMetricsClient(t)
+	started := float64(client.startedAt.Unix())
+	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
 	if usageStartupTimestamp(t, *body) != started {
 		t.Fatalf("startup %v", usageStartupTimestamp(t, *body))
 	}
-	if err := conn.reportMetrics(); err != nil {
+	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
 	if usageStartupTimestamp(t, *body) != started {
@@ -108,7 +108,7 @@ func TestReportMetricsStartupTimestampStable(t *testing.T) {
 	}
 }
 
-func newUsageMetricsConn(t *testing.T) (*Connection, *[]byte) {
+func newUsageMetricsClient(t *testing.T) (*Client, *[]byte) {
 	t.Helper()
 	gotBody := new([]byte)
 	lapi := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -129,7 +129,7 @@ func newUsageMetricsConn(t *testing.T) (*Connection, *[]byte) {
 		t.Fatal(err)
 	}
 	started := time.Unix(1_700_000_000, 0).UTC()
-	conn := &Connection{
+	client := &Client{
 		crowdsecScheme:  lapiURL.Scheme,
 		crowdsecHost:    lapiURL.Host,
 		crowdsecPath:    "/",
@@ -143,7 +143,7 @@ func newUsageMetricsConn(t *testing.T) (*Connection, *[]byte) {
 		windowCounters:  make(map[usageMetricKey]int64),
 		activeDecisions: make(map[usageMetricKey]int64),
 	}
-	return conn, gotBody
+	return client, gotBody
 }
 
 func decodeUsageObject(t *testing.T, body []byte) map[string]interface{} {
@@ -236,10 +236,10 @@ func assertOfficialUsageItems(t *testing.T, items []interface{}) {
 }
 
 func TestSleepDrainsMetrics(t *testing.T) {
-	conn, body := newUsageMetricsConn(t)
-	conn.metricsInterval = 1
-	conn.IncProcessed("ipv4")
-	conn.Sleep()
+	client, body := newUsageMetricsClient(t)
+	client.metricsInterval = 1
+	client.IncProcessed("ipv4")
+	client.Sleep()
 	waitMetricsBody(t, body)
 	if processedValue(t, *body, "ipv4") != 1 {
 		t.Fatalf("Sleep must POST remaining processed, body=%s", *body)
@@ -247,10 +247,10 @@ func TestSleepDrainsMetrics(t *testing.T) {
 }
 
 func TestCloseDrainsMetrics(t *testing.T) {
-	conn, body := newUsageMetricsConn(t)
-	conn.metricsInterval = 1
-	conn.IncProcessed("ipv6")
-	conn.Close()
+	client, body := newUsageMetricsClient(t)
+	client.metricsInterval = 1
+	client.IncProcessed("ipv6")
+	client.Close()
 	if processedValue(t, *body, "ipv6") != 1 {
 		t.Fatalf("Close must POST remaining processed, body=%s", *body)
 	}
@@ -278,7 +278,7 @@ func TestReportMetricsRestoresOnFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	started := time.Unix(1_700_000_000, 0).UTC()
-	conn := &Connection{
+	client := &Client{
 		crowdsecScheme:  lapiURL.Scheme,
 		crowdsecHost:    lapiURL.Host,
 		crowdsecPath:    "/",
@@ -293,15 +293,15 @@ func TestReportMetricsRestoresOnFailure(t *testing.T) {
 		windowCounters:  make(map[usageMetricKey]int64),
 		activeDecisions: make(map[usageMetricKey]int64),
 	}
-	conn.IncProcessed("ipv4")
-	if err := conn.reportMetrics(); err == nil {
+	client.IncProcessed("ipv4")
+	if err := client.reportMetrics(); err == nil {
 		t.Fatal("failed POST must error")
 	}
-	if atomic.LoadInt64(&conn.processedIPv4) != 1 {
-		t.Fatalf("failed POST must restore processed, got %d", atomic.LoadInt64(&conn.processedIPv4))
+	if atomic.LoadInt64(&client.processedIPv4) != 1 {
+		t.Fatalf("failed POST must restore processed, got %d", atomic.LoadInt64(&client.processedIPv4))
 	}
 	fail = false
-	if err := conn.reportMetrics(); err != nil {
+	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
 	if processedValue(t, *gotBody, "ipv4") != 1 {

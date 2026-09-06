@@ -6,7 +6,7 @@
 #### Scenario: Bouncer queries AppSec on appsec.Client
 - **WHEN** `pkg/bouncer` compiles against this package
 - **THEN** `appsec.Client.Query` resolves
-- **AND** the call does not go through `lapi.Connection`
+- **AND** the call does not go through `lapi.Client`
 
 ### Requirement: AppSec is reclaimed by listener identity
 When `crowdsecAppsecEnabled` is true, `New` SHALL reclaim an `appsec.Client` with `reclaim.OpenWithGrace` and a 30s grace. The reclaim key SHALL be derived from AppSec scheme, host, path, key, TLS, body limit, and HTTP timeout. Middleware name, `next`, templates, trusted IPs, Enabled, and LAPI fields MUST NOT be in that key. The create func SHALL return `*reclaim.Wrapped`. `Close` SHALL release idle AppSec HTTP connections.
