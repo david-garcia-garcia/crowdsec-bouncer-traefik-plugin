@@ -1,0 +1,29 @@
+issueKey: 2026-09-06-upstream-323-grpc-stream-403
+
+jobName: 2026-09-06-upstream-323-grpc-stream-403
+
+issueHost: local
+
+issueRef: none
+
+prHost: github
+
+repoSlug: crowdsec-bouncer-traefik-plugin
+
+destBranch: master
+
+qualify: unset
+
+src: unset
+
+localTests: none
+
+requirement: requirement.md
+
+comments: none
+
+explore: none
+
+change: none
+
+pr: none
