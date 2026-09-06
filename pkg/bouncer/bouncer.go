@@ -291,6 +291,11 @@ func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientR
 	b.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", req.remoteIP, kind))
 	if b.captchaClient.Valid && kind == cache.CaptchaValue && req.Method != http.MethodHead {
 		if b.captchaClient.Check(req.remoteIP) {
+			// Duplicate captcha form POST after grace must 302, not reach origin.
+			if b.captchaClient.IsCaptchaFormPost(req.Request) {
+				b.captchaClient.WriteSolvedRedirect(rw, req.Request)
+				return
+			}
 			b.handleNextServeHTTP(rw, req)
 			return
 		}

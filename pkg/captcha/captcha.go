@@ -2,9 +2,13 @@
 package captcha
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
@@ -96,10 +100,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	if valid {
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
 		c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds)
-		if c.remediationCustomHeader != "" {
-			rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
-		}
-		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
+		c.WriteSolvedRedirect(rw, r)
 		return
 	}
 	rw.Header().Set("Content-Type", c.templateContentType)
@@ -123,6 +124,82 @@ func (c *Client) Check(remoteIP string) bool {
 	passed := value == cache.CaptchaDoneValue
 	c.log.Debug(fmt.Sprintf("captcha:Check ip:%s pass:%v", remoteIP, passed))
 	return passed
+}
+
+// WriteSolvedRedirect writes the 302 used after a successful captcha verify.
+func (c *Client) WriteSolvedRedirect(rw http.ResponseWriter, r *http.Request) {
+	if c.remediationCustomHeader != "" {
+		rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
+	}
+	http.Redirect(rw, r, r.URL.String(), http.StatusFound)
+}
+
+// IsCaptchaFormPost reports whether r is a POST that carries the configured provider response field.
+// When the field is absent, Body is restored so origin can still read the POST.
+func (c *Client) IsCaptchaFormPost(r *http.Request) bool {
+	if r == nil || r.Method != http.MethodPost || c.infoProvider == nil {
+		return false
+	}
+	field := c.infoProvider.response
+	if field == "" {
+		return false
+	}
+
+	// Already-parsed POST form: do not reread Body.
+	if r.PostForm != nil {
+		return r.PostForm.Get(field) != ""
+	}
+
+	raw, err := readAndRestoreBody(r)
+	if err != nil {
+		return false
+	}
+	return providerResponseValue(r.Header.Get("Content-Type"), raw, field) != ""
+}
+
+// readAndRestoreBody copies r.Body and puts a readable copy back on r.
+func readAndRestoreBody(r *http.Request) ([]byte, error) {
+	if r.Body == nil {
+		return nil, nil
+	}
+	raw, err := io.ReadAll(r.Body)
+	_ = r.Body.Close()
+	r.Body = io.NopCloser(bytes.NewReader(raw))
+	r.ContentLength = int64(len(raw))
+	return raw, err
+}
+
+// providerResponseValue returns the named form field from a urlencoded or multipart body.
+func providerResponseValue(contentType string, raw []byte, field string) string {
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	if err != nil || mediaType == "" {
+		mediaType = "application/x-www-form-urlencoded"
+	}
+	switch mediaType {
+	case "application/x-www-form-urlencoded":
+		values, parseErr := url.ParseQuery(string(raw))
+		if parseErr != nil {
+			return ""
+		}
+		return values.Get(field)
+	case "multipart/form-data":
+		boundary := params["boundary"]
+		if boundary == "" {
+			return ""
+		}
+		form, readErr := multipart.NewReader(bytes.NewReader(raw), boundary).ReadForm(10 << 20)
+		if readErr != nil {
+			return ""
+		}
+		defer func() { _ = form.RemoveAll() }()
+		values := form.Value[field]
+		if len(values) == 0 {
+			return ""
+		}
+		return values[0]
+	default:
+		return ""
+	}
 }
 
 type responseProvider struct {
