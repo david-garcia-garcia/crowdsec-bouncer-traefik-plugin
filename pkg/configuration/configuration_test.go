@@ -1,6 +1,8 @@
 package configuration
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -117,6 +119,41 @@ func Test_ValidateParams(t *testing.T) {
 	cfgEmptyAction := getMinimalConfig()
 	cfgEmptyAction.CrowdsecLapiFailureAction = ""
 	cfgEmptyAction.CrowdsecAppsecFailureAction = ""
+	cfgAppsecHTTPS := getMinimalConfig()
+	cfgAppsecHTTPS.CrowdsecLapiScheme = HTTP
+	cfgAppsecHTTPS.CrowdsecAppsecScheme = HTTPS
+	cfgAppsecHTTPS.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgAppsecDistinctScheme := getMinimalConfig()
+	cfgAppsecDistinctScheme.CrowdsecLapiScheme = HTTP
+	cfgAppsecDistinctScheme.CrowdsecAppsecScheme = HTTPS
+	cfgAppsecModeNoLapiKey := getMinimalConfig()
+	cfgAppsecModeNoLapiKey.CrowdsecMode = AppsecMode
+	cfgAppsecModeNoLapiKey.CrowdsecLapiKey = ""
+	cfgNoneMode := getMinimalConfig()
+	cfgNoneMode.CrowdsecMode = NoneMode
+	cfgAloneValid := getMinimalConfig()
+	cfgAloneValid.CrowdsecMode = AloneMode
+	cfgAloneValid.CrowdsecCapiMachineID = "machine"
+	cfgAloneValid.CrowdsecCapiPassword = "password"
+	cfgAloneMissingCaptchaKeys := getMinimalConfig()
+	cfgAloneMissingCaptchaKeys.CrowdsecMode = AloneMode
+	cfgAloneMissingCaptchaKeys.CrowdsecCapiMachineID = "machine"
+	cfgAloneMissingCaptchaKeys.CrowdsecCapiPassword = "password"
+	cfgAloneMissingCaptchaKeys.CrowdsecLapiFailureAction = FailureActionCaptcha
+	cfgAloneMissingCaptchaKeys.CaptchaProvider = HcaptchaProvider
+	cfgAloneBadLog := getMinimalConfig()
+	cfgAloneBadLog.CrowdsecMode = AloneMode
+	cfgAloneBadLog.CrowdsecCapiMachineID = "machine"
+	cfgAloneBadLog.CrowdsecCapiPassword = "password"
+	cfgAloneBadLog.LogLevel = "Warning"
+	cfgAppsecCaptchaNoProvider := getMinimalConfig()
+	cfgAppsecCaptchaNoProvider.CrowdsecAppsecFailureAction = FailureActionCaptcha
+	cfgRemediationLow := getMinimalConfig()
+	cfgRemediationLow.RemediationStatusCode = 99
+	cfgRemediationHigh := getMinimalConfig()
+	cfgRemediationHigh.RemediationStatusCode = 600
+	cfgUpdateMaxFailureNegOne := getMinimalConfig()
+	cfgUpdateMaxFailureNegOne.UpdateMaxFailure = -1
 	type args struct {
 		config *Config
 	}
@@ -142,6 +179,17 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Captcha LAPI action with provider", args: args{config: cfgCaptchaWithProvider}, wantErr: false},
 		{name: "Unknown AppSec failure action", args: args{config: cfgUnknownAction}, wantErr: true},
 		{name: "Empty failure actions use default ban", args: args{config: cfgEmptyAction}, wantErr: false},
+		{name: "AppSec HTTPS with invalid CA while LAPI HTTP", args: args{config: cfgAppsecHTTPS}, wantErr: true},
+		{name: "AppSec distinct HTTPS scheme validates URL", args: args{config: cfgAppsecDistinctScheme}, wantErr: false},
+		{name: "Appsec mode without LAPI key", args: args{config: cfgAppsecModeNoLapiKey}, wantErr: false},
+		{name: "None mode minimal config", args: args{config: cfgNoneMode}, wantErr: false},
+		{name: "Alone mode with CAPI credentials", args: args{config: cfgAloneValid}, wantErr: false},
+		{name: "Alone mode captcha without site/secret keys", args: args{config: cfgAloneMissingCaptchaKeys}, wantErr: true},
+		{name: "Alone mode invalid log level", args: args{config: cfgAloneBadLog}, wantErr: true},
+		{name: "AppSec captcha action without provider", args: args{config: cfgAppsecCaptchaNoProvider}, wantErr: true},
+		{name: "RemediationStatusCode below 100", args: args{config: cfgRemediationLow}, wantErr: true},
+		{name: "RemediationStatusCode 600 or above", args: args{config: cfgRemediationHigh}, wantErr: true},
+		{name: "UpdateMaxFailure -1 accepted", args: args{config: cfgUpdateMaxFailureNegOne}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -170,7 +218,7 @@ func Test_validateParamsTLS(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := validateParamsTLS(tt.config); (err != nil) != tt.wantErr {
+			if err := validateParamsTLS(tt.config, "CrowdsecLapi"); (err != nil) != tt.wantErr {
 				t.Errorf("validateParamsTLS() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -363,5 +411,106 @@ func Test_validateDecisionScopeHeaders(t *testing.T) {
 	cfg.DecisionScopeHeaders = map[string]string{"username": "  "}
 	if err := validateDecisionScopeHeaders(cfg); err == nil {
 		t.Fatal("empty header must be rejected")
+	}
+}
+
+func Test_validateCaptcha(t *testing.T) {
+	cfgCustomMissing := getMinimalConfig()
+	cfgCustomMissing.CaptchaProvider = CustomProvider
+	tests := []struct {
+		name    string
+		config  *Config
+		wantErr bool
+	}{
+		{name: "Valid hcaptcha provider", config: getMinimalConfig(), wantErr: false},
+		{name: "Custom provider missing fields", config: cfgCustomMissing, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validateCaptcha(tt.config); (err != nil) != tt.wantErr {
+				t.Errorf("validateCaptcha() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_validateURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		scheme  string
+		host    string
+		path    string
+		wantErr bool
+	}{
+		{name: "Valid URL", scheme: HTTP, host: "crowdsec:8080", path: "/", wantErr: false},
+		{name: "Invalid host with spaces", scheme: HTTP, host: "bad host", path: "/", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validateURL("Test", tt.scheme, tt.host, tt.path); (err != nil) != tt.wantErr {
+				t.Errorf("validateURL() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_GetTemplate(t *testing.T) {
+	t.Run("Empty path", func(t *testing.T) {
+		_, _, err := GetTemplate("")
+		if err == nil {
+			t.Fatal("expected error for empty path")
+		}
+	})
+	t.Run("Missing file", func(t *testing.T) {
+		_, _, err := GetTemplate(filepath.Join(t.TempDir(), "missing.html"))
+		if err == nil {
+			t.Fatal("expected error for missing file")
+		}
+	})
+	t.Run("Invalid template syntax", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "bad.html")
+		if err := os.WriteFile(path, []byte("{{"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		_, _, err := GetTemplate(path)
+		if err == nil {
+			t.Fatal("expected compile error")
+		}
+	})
+	t.Run("Valid template", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "ok.html")
+		if err := os.WriteFile(path, []byte("hello {{ .Name }}"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		tmpl, ct, err := GetTemplate(path)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if tmpl == nil || ct == "" {
+			t.Fatal("expected template and content type")
+		}
+	})
+}
+
+func Test_validateParamsTLS_appsec(t *testing.T) {
+	cfgValid := getMinimalConfig()
+	cfgValid.CrowdsecAppsecTLSCertificateAuthority = validPEM
+	cfgInvalid := getMinimalConfig()
+	cfgInvalid.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+
+	tests := []struct {
+		name    string
+		config  *Config
+		wantErr bool
+	}{
+		{name: "Valid AppSec CA PEM", config: cfgValid, wantErr: false},
+		{name: "Invalid AppSec CA PEM", config: cfgInvalid, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validateParamsTLS(tt.config, "CrowdsecAppsec"); (err != nil) != tt.wantErr {
+				t.Errorf("validateParamsTLS() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }

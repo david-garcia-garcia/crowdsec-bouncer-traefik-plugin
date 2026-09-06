@@ -277,8 +277,6 @@ func GetTemplate(path string) (*template.Template, string, error) {
 }
 
 // ValidateParams validate all the param gave by user.
-//
-//nolint:gocyclo,gocognit,nestif,funlen
 func ValidateParams(config *Config, log *slog.Logger) error {
 	if err := validateParamsRequired(config); err != nil {
 		return err
@@ -303,6 +301,10 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		return err
 	}
 
+	if err := validateCaptchaCredentialsAndTemplates(config); err != nil {
+		return err
+	}
+
 	if config.CrowdsecMode == AloneMode {
 		if _, err := GetVariable(config, "CrowdsecCapiMachineID"); err != nil {
 			return err
@@ -310,14 +312,25 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		if _, err := GetVariable(config, "CrowdsecCapiPassword"); err != nil {
 			return err
 		}
-		return nil
-	}
-
-	if config.CaptchaProvider != "" {
-		if _, err := GetVariable(config, "CaptchaSiteKey"); err != nil {
+	} else {
+		if err := validateLapiAndAppsecConnection(config); err != nil {
 			return err
 		}
-		if _, err := GetVariable(config, "CaptchaSecretKey"); err != nil {
+	}
+
+	return validateLogging(config)
+}
+
+func effectiveAppsecScheme(config *Config) string {
+	if config.CrowdsecAppsecScheme != "" {
+		return config.CrowdsecAppsecScheme
+	}
+	return config.CrowdsecLapiScheme
+}
+
+func validateCaptchaCredentialsAndTemplates(config *Config) error {
+	if config.CaptchaProvider != "" {
+		if err := validateCaptchaCredentials(config); err != nil {
 			return err
 		}
 		if config.CaptchaFilePath != "" {
@@ -331,20 +344,32 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 			return err
 		}
 	}
+	return nil
+}
 
+func validateCaptchaCredentials(config *Config) error {
+	if _, err := GetVariable(config, "CaptchaSiteKey"); err != nil {
+		return err
+	}
+	if _, err := GetVariable(config, "CaptchaSecretKey"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateLapiAndAppsecConnection(config *Config) error {
+	if err := validateLapiURLAndKeys(config); err != nil {
+		return err
+	}
+	return validateAppsecURLKeyAndTLS(config)
+}
+
+func validateLapiURLAndKeys(config *Config) error {
 	if err := validateURL("CrowdsecLapi", config.CrowdsecLapiScheme, config.CrowdsecLapiHost, config.CrowdsecLapiPath); err != nil {
 		return err
 	}
 
-	if err := validateURL("CrowdsecAppsec", config.CrowdsecLapiScheme, config.CrowdsecAppsecHost, config.CrowdsecAppsecPath); err != nil {
-		return err
-	}
-
 	lapiKey, err := GetVariable(config, "CrowdsecLapiKey")
-	if err != nil {
-		return err
-	}
-	appsecKey, err := GetVariable(config, "CrowdsecAppsecKey")
 	if err != nil {
 		return err
 	}
@@ -357,17 +382,34 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		return err
 	}
 
-	// We need to either have crowdsecLapiKey defined or the BouncerCert and Bouncerkey
 	if lapiKey == "" && (certBouncer == "" || certBouncerKey == "") && config.CrowdsecMode != AppsecMode {
 		return errors.New("CrowdsecLapiKey || (CrowdsecLapiTLSCertificateBouncer && CrowdsecLapiTLSCertificateBouncerKey): cannot be all empty")
-	} else if lapiKey != "" && (certBouncer == "" || certBouncerKey == "") {
+	}
+	if lapiKey != "" && (certBouncer == "" || certBouncerKey == "") {
 		lapiKey = strings.TrimSpace(lapiKey)
 		if err = validateParamsAPIKey(lapiKey, "CrowdsecLapiKey"); err != nil {
 			return err
 		}
 	}
 
-	// Validate CrowdsecAppsecKey if provided
+	if config.CrowdsecLapiScheme == HTTPS && !config.CrowdsecLapiTLSInsecureVerify {
+		if err = validateParamsTLS(config, "CrowdsecLapi"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateAppsecURLKeyAndTLS(config *Config) error {
+	appsecScheme := effectiveAppsecScheme(config)
+	if err := validateURL("CrowdsecAppsec", appsecScheme, config.CrowdsecAppsecHost, config.CrowdsecAppsecPath); err != nil {
+		return err
+	}
+
+	appsecKey, err := GetVariable(config, "CrowdsecAppsecKey")
+	if err != nil {
+		return err
+	}
 	if appsecKey != "" {
 		appsecKey = strings.TrimSpace(appsecKey)
 		if err = validateParamsAPIKey(appsecKey, "CrowdsecAppsecKey"); err != nil {
@@ -375,20 +417,20 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		}
 	}
 
-	// Case https to contact Crowdsec LAPI and certificate must be provided
-	if config.CrowdsecLapiScheme == HTTPS && !config.CrowdsecLapiTLSInsecureVerify {
-		if err = validateParamsTLS(config); err != nil {
+	if config.CrowdsecAppsecScheme == HTTPS && !config.CrowdsecAppsecTLSInsecureVerify {
+		if err = validateParamsTLS(config, "CrowdsecAppsec"); err != nil {
 			return err
 		}
 	}
+	return nil
+}
 
-	// Check logging configuration
-	// to upper allow of anycase of log level
+func validateLogging(config *Config) error {
 	if !contains([]string{LogDEBUG, LogINFO, LogWARN, LogERROR}, strings.ToUpper(config.LogLevel)) {
 		return fmt.Errorf("LogLevel should be one of (%s,%s,%s,%s)", LogDEBUG, LogINFO, LogWARN, LogERROR)
 	}
 	if config.LogFilePath != "" {
-		_, err = os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		_, err := os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		if err != nil {
 			return fmt.Errorf("LogFilePath is not writable %w", err)
 		}
@@ -435,8 +477,8 @@ func validateParamsAPIKey(key string, paramName string) error {
 	return nil
 }
 
-func validateParamsTLS(config *Config) error {
-	certAuth, err := GetVariable(config, "CrowdsecLapiTLSCertificateAuthority")
+func validateParamsTLS(config *Config, prefix string) error {
+	certAuth, err := GetVariable(config, prefix+"TLSCertificateAuthority")
 	if err != nil {
 		return err
 	}
