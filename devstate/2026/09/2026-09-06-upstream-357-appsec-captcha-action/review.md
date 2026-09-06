@@ -15,3 +15,9 @@ phase: propose
 findings: OpenSpec change appsec-captcha-action-tests folds onto core_plugin_appsec_bot-detection
 fixed: n/a
 skipped: n/a
+
+## implement (2026-09-06)
+phase: implement
+findings: captcha parse and relay tests landed; no product behavior change
+fixed: n/a
+skipped: n/a
