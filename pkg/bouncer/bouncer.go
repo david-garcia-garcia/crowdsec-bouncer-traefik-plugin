@@ -161,9 +161,12 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	// Mapped scope headers for this request. Missing headers are omitted.
 	scopes := decisionscope.RequestScopeValues(b.decisionScopeHeaders, req.Request)
 
-	// live, stream, and alone consult the cache first. live memos ?ip= answers;
-	// stream stores the LAPI snapshot; alone stores the CAPI snapshot. none always LiveLookup.
-	if b.crowdsecMode != configuration.NoneMode {
+	// none: no stream, no cache; LiveLookup every request.
+	// live: no stream; LiveLookup, then memo in cache.
+	// stream: LAPI stream ticker writes the cache; request path only reads it.
+	// alone: same as stream, but the ticker is CAPI (no local CrowdSec).
+	// appsec: no LAPI; skip to the pass path (AppSec if enabled).
+	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
 		value, origin, cacheErr := decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
 		switch {
 		case cacheErr != nil:
@@ -192,11 +195,16 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	if b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
 		if b.lapiClient.StreamHealthy() {
 			b.handleNextServeHTTP(rw, req)
-		} else {
-			b.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", req.remoteIP))
-			b.applyLapiFailureAction(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechStreamFail)
+			// No decision affecting this IP.
+			return
 		}
-	} else {
+		b.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", req.remoteIP))
+		b.applyLapiFailureAction(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechStreamFail)
+		// Stream/alone never query LAPI per request. Miss is allow or failure action.
+		return
+	}
+
+	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.NoneMode {
 		value, err := b.lapiClient.LiveLookup(req.remoteIP, scopes)
 		kind := cache.RemediationKind(value)
 		origin := cache.RemediationOrigin(value)
