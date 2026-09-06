@@ -4,8 +4,8 @@ findings: single HTTPTimeoutSeconds shared by LAPI and AppSec; no AppsecTimeoutS
 fixed: n/a
 skipped: n/a
 
-## propose (2026-09-06)
-phase: propose
-findings: fold core_plugin_appsec_client; CrowdsecAppsecTimeoutMilliseconds inherit
-fixed: n/a
+## implement (2026-09-06)
+phase: implement
+findings: CrowdsecAppsecTimeoutMilliseconds landed; local tests passed; CI queued
+fixed: AppSec HTTP timeout split from LAPI
 skipped: n/a
