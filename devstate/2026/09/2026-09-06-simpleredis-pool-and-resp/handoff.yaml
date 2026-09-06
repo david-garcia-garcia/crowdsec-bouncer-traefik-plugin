@@ -7,11 +7,11 @@ repoSlug: crowdsec-bouncer-traefik-plugin
 destBranch: master
 qualify: qualified
 src: 3ec9e79bc8206c4f48c16276d4ea671b1777d41bc60ac3b7d6be0d840bb129ef
-localTests: none
+localTests: passed
 requirement: requirement.md
 comments: none
-explore: none
-change: none
+explore: explore.md
+change: simpleredis-pool-resp-hardening
 pr:
   id: 37
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/37
