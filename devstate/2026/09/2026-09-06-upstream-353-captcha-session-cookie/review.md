@@ -27,3 +27,11 @@ phase: devdocsimpact
 findings: missing captcha packet; stale cache logical keys
 fixed: core_plugin_captcha.md; core_cache_client.md How-to/Gotchas
 skipped: n/a
+
+skipped: n/a
+
+## pullrequest (2026-09-06)
+phase: pullrequest
+findings: ready title set; CI green
+fixed: n/a
+skipped: n/a
