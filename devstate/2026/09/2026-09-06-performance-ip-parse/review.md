@@ -51,6 +51,16 @@ localTests: passed
 card: PR #24 summary 2026-09-06T05:59:32Z
 reviewedHead: 380f1b5
 
+## implement (2026-09-06, ipAddr)
+phase: implement
+findings: none
+fixed: request-path net.IP named ipAddr (Standards 1–5 done)
+skipped: none
+localTests: passed
+CI: e2e mock failed 34016526910; Main Process and docker e2e succeeded
+card: PR #24 summary 2026-09-06T06:30:50Z
+reviewedHead: fd4e520
+
 
 
 
