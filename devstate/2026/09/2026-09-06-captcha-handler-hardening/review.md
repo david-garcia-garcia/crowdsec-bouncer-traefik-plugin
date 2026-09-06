@@ -9,3 +9,9 @@ phase: explore
 findings: cache Set returns error; grace write failure → 200 re-render; template required at startup; remoteip from bouncer; retryable-error sentinel; unit-test plan
 fixed: n/a
 skipped: n/a
+
+## propose (2026-09-06)
+phase: propose
+findings: OpenSpec change captcha-handler-hardening — new core_plugin_captcha_handler, modified core_cache_client_isolated-store; validate --strict passed
+fixed: n/a
+skipped: n/a
