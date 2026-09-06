@@ -33,8 +33,8 @@ When the drop does not fire, an unreadable body is forwarded to AppSec as `http.
 ## Open questions
 
 - Q: Should a DELETE that intentionally carries a body over HTTP/3 still be dropped when unreadable?
-  Decision: assumed — no. Treat DELETE like GET/HEAD. quic-go cannot distinguish bodyless DELETE from an unreadable stream (`ContentLength = -1`). Bodyless DELETE is the REST and browser `fetch` norm. POST/PUT/PATCH remain the drop set.
-  By: explore
+  Decision: resolved — no. Treat DELETE like GET/HEAD. Implemented: DELETE removed from `isMethodWithBody`. POST/PUT/PATCH remain the drop set.
+  By: implement
 
 - Q: Fold onto which spec?
   Decision: resolved — modify `core_plugin_appsec_failure-action` only. Change `appsec-delete-unreadable-body` folds that leaf (FindSpecHost high).
