@@ -6,7 +6,7 @@ JobName: 2026-09-06-performance-ip-parse
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-06T05:24:21Z |
 | explore | [x] | [x] | 2026-09-06T05:26:11Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
