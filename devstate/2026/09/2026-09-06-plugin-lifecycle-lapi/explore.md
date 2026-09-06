@@ -44,6 +44,14 @@ Ran throwaway `go test -count=1 -v -run TestRepro_ .` on dest (deleted after; no
 
 Did not re-run Docker e2e (compose currently forces `/trusted` metrics=1). Unit path is the reclaim split the ticket names.
 
+## Human sketch (2026-09-06)
+
+- One Stream incarnation per LAPI key (first middleware owns knobs), not per middleware name.
+- Second middleware same key: warn in logs, wire to the existing Stream (first-wins extras).
+- Dynamic config change: stop the old Stream immediately (skip reclaim grace) so the new Stream does not overlap on the cursor.
+
+Keep reclaim grace when the snapshot is **unchanged** (Traefik reload reuse). Eager-stop only when replacing the session incarnation.
+
 ## Recommended shape (for propose, pending human)
 
 Stream **session** (the unique poller resource) = LAPI scheme+host+path + lapiKey, or CAPI machine+password in alone, plus LAPI client-cert identity when that is how the bouncer authenticates.
@@ -61,7 +69,11 @@ Spec `core_plugin_middleware_instance-reclaim`: keep “same session ⇒ one tic
 ## Open questions
 
 - Q: Fail `New` on same-session conflicting knobs, or reclaim the first connection and ignore extras?
-  Decision: assumed — fail `New` only for two **live** holders that disagree. Share when the snapshot matches. Silent ignore is how this bug was born. Reload/orphan/grace with a new snapshot: dispose the old incarnation and `create()` (so a wrong TLS cert can be fixed without restarting Traefik). Traefik `New` may return error; that middleware/router fails to build (`ext_traefik_plugins_yaegi-constructor`).
+  Decision: assumed — human prefers warn+wire (first-wins) over fail, with the owner middleware and ignored knobs in the log. Share the one Stream. Scopes mismatch is still the dangerous first-win (Country not in `scopes=`). Reload with a new snapshot and no other live holder: replace, do not warn-and-keep-old.
+  By: explore
+
+- Q: On config refresh, skip reclaim grace so old and new streams do not both poll?
+  Decision: assumed — yes when the session incarnation is **replaced** (new Redis host, new interval, …). `Close()` the old Stream before `startStream` on the new one. Keep 10s grace when the snapshot is unchanged so reload does not `startup=true` every time.
   By: explore
 
 - Q: Can an operator fix a wrong LAPI TLS cert (or any session snapshot knob) without restarting the Traefik process?
