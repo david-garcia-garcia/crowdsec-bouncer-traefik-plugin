@@ -27,3 +27,9 @@ phase: codereview
 findings: Standards 2 hard 2 judgement; Spec 1 extra; Security/Performance/Dead none
 fixed: captcha field rename; rand-fail log includes name and ip
 skipped: struct alignment; e2e helper extract; Cf-Ray research extra
+
+## devdocsimpact (2026-09-06)
+phase: devdocsimpact
+findings: language-gap and stale-usage on core_plugin_middleware
+fixed: Remediation TraceID Language, How-to, Key files, Gotcha
+skipped: n/a
