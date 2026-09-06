@@ -1,94 +1,93 @@
-Developer review: in progress — 2026-09-06T15:02:30Z
+Developer review: ready for review — 2026-09-06T15:15:00Z
 
 IssueKey: 2026-09-06-ip-xff-trust-gate
 JobName: 2026-09-06-ip-xff-trust-gate
 
 ## What this changes
-**Operators.** None.
+**Operators.** When using forwarded headers for client IP, list proxy addresses in `forwardedHeadersTrustedIps`; otherwise the plugin uses the socket peer only.
 
 **Admin users.** None.
 
-**Developers.** None — explore only; product changes not started.
+**Developers.** `GetRemoteIP` in `pkg/ip/checker.go` gates the XFF walk on a trusted `RemoteAddr`; empty trusted-hop pool ignores headers. Table-driven tests cover spoofing, empty pool, and malformed hops. Spec `core_plugin_ip_radix-lookup` and `knowledge/devdocs/core_plugin_ip.md` updated.
 
 **End users.** None.
 
 ## Motivation
-On `master`, `GetRemoteIP` honors `X-Forwarded-For` (or a custom header) without verifying `req.RemoteAddr` is a trusted proxy. A direct client can forge a hop chain and be identified as another IP for ban, captcha, and cache decisions. With the default empty trusted-hop pool, any present header wins over the socket peer. Unparseable-hop fail-closed behavior is untested. Without this change, client-IP spoofing remains possible at the plugin layer.
+On `master`, `GetRemoteIP` honors `X-Forwarded-For` without verifying `req.RemoteAddr` is a trusted proxy. A direct client can forge a hop chain and be identified as another IP for ban, captcha, and cache decisions. With the default empty trusted-hop pool, any present header wins over the socket peer. Without this change, client-IP spoofing remains possible at the plugin layer.
 
 ## Merge readiness
-Explore complete; propose is next. 6 phases remain.
+All eight workflow phases complete; CI green on reviewed head.
 
 Priority: P1 — production is unsafe today (forged client IP drives security decisions).
-Reviewed head: 51b5992
-Owner decision: Required. See Decision needed.
+Reviewed head: 47eebdb
+Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Explore only; no product delta yet |
-| CI proof | 1/6 | Branch pushed; CI not seen |
-| Local tests proof | N/A | Before implement |
-| Review resolution | N/A | No PR review comments |
+| Overall readiness | 6/6 | Ready for review |
+| CI proof | 6/6 | All 3 checks succeeded on 47eebdb |
+| Local tests proof | N/A | Remote CI covers proof |
+| Review resolution | 6/6 | No open PR comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-06-ip-xff-trust-gate pushed | git |
-| OpenSpec | none | openspec/ |
+| OpenSpec | ip-xff-trust-gate (archived) | openspec/changes/archive/2026-09-06-ip-xff-trust-gate/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/39 | GitHub |
-| CI | not seen | gh pr checks |
-| Local tests | none | handoff.yaml localTests |
+| CI | Main Process success; e2e (docker + pester) success; e2e (binary + mock LAPI) success | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041285139 |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+- [core_plugin_ip_radix-lookup](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-ip-xff-trust-gate/openspec/changes/archive/2026-09-06-ip-xff-trust-gate/proposal.md) — modified
 
 ## Follow-up issues
 None.
 
 ## How this fits together
-Local bug-hunt finding → branch `2026-09-06-ip-xff-trust-gate` → stub PR #39 → explore confirmed spoofing with repro.
+Bug-hunt finding → branch `2026-09-06-ip-xff-trust-gate` → PR #39 → RemoteAddr gate in `GetRemoteIP` → CI green.
 
 ## Decision needed
-| Question | Decision | By |
-| --- | --- | --- |
-| Does the RemoteAddr trusted-proxy check reuse the same Checker as hop-skipping or need a separate pool? | assumed — reuse `PoolStrategy.Checker` (same `ForwardedHeadersTrustedIPs` list); bouncer already passes one `serverPoolStrategy`. | explore |
-| Should empty trusted pool still walk headers when RemoteAddr is loopback or missing? | assumed — empty pool always ignores headers regardless of RemoteAddr; use RemoteAddr host only (fail closed on forwarded data). | explore |
+None.
 
 ## Before merge
-- [ ] [P1] Gate forwarded headers on trusted RemoteAddr in `GetRemoteIP`
-- [ ] [P1] Add unit tests for spoofing, empty pool, and malformed hops
-- [x] Prepare and explore complete
+None.
 
 ## Findings
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-ip-xff-trust-gate/devstate/2026/09/2026-09-06-ip-xff-trust-gate/codereview_standards.md) — 0 total, 0 pending, 0 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-ip-xff-trust-gate/devstate/2026/09/2026-09-06-ip-xff-trust-gate/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-ip-xff-trust-gate/devstate/2026/09/2026-09-06-ip-xff-trust-gate/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-ip-xff-trust-gate/devstate/2026/09/2026-09-06-ip-xff-trust-gate/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-ip-xff-trust-gate/devstate/2026/09/2026-09-06-ip-xff-trust-gate/codereview_dead.md) — 0 total, 0 pending, 0 completed
 
 ## Agent review details
 
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | No product delta yet |
+| Specs in this PR | 1 modified | core_plugin_ip_radix-lookup |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | No PR comments |
-| Reviewed head | 51b599243930a5c7b33fa671d2b2985d8ce14291 | Matches branch HEAD |
+| Reviewed head | 47eebdbecc493cd2404137e9486b5012b3f68d99 | Matches branch HEAD |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: Add RemoteAddr trusted-proxy gate in `GetRemoteIP` before header walk; reuse existing Checker.
+Best possible solution: Single RemoteAddr gate in GetRemoteIP reusing the existing trusted-hop Checker; no bouncer or config changes.
 
-Do we have a high-confidence way to reproduce? Yes — untrusted RemoteAddr returns forged header IP today.
+Do we have a high-confidence way to reproduce? Yes — spoofing repro confirmed before fix; unit tests lock behavior.
 
-Is this the best way to solve the issue? Yes — single owner for client IP, minimal surface in `pkg/ip`.
+Is this the best way to solve the issue? Yes — minimal surface, matches devdocs intent.
 
 ### Evidence
 What I checked:
-- Repro script: spoof returns `203.0.113.10` with untrusted RemoteAddr (local go run, 51b5992)
-- `pkg/ip/checker.go` header walk has no RemoteAddr gate (file read)
+- `go test ./pkg/ip/ ./pkg/bouncer/` passed locally (47eebdb)
+- CI Main Process + both e2e jobs succeeded (GitHub Actions run 34041285139 / 34041285102)
 
 ### Rank-up moves
 None.

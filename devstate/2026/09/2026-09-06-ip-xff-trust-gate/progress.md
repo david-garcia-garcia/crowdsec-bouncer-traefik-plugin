@@ -11,4 +11,4 @@ JobName: 2026-09-06-ip-xff-trust-gate
 | codereview | [x] | [x] | 2026-09-06T15:12:00Z |
 | devdocsimpact | [x] | [x] | 2026-09-06T15:13:00Z |
 | archive | [x] | [x] | 2026-09-06T15:14:00Z |
-| pullrequest | [x] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-06T15:15:00Z |
