@@ -87,7 +87,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		lapiClient.Cache(),
 		&http.Client{
 			Transport: &http.Transport{MaxIdleConns: 10, MaxIdleConnsPerHost: 10, IdleConnTimeout: 30 * time.Second},
-			Timeout:   time.Duration(config.HTTPTimeoutSeconds) * time.Second,
+			Timeout:   configuration.EffectiveCaptchaSiteverifyHTTPTimeout(config),
 		},
 		config.CaptchaProvider,
 		config.CaptchaCustomJsURL,

@@ -394,10 +394,10 @@ make run
   - string
   - default: `ban`, expected values are: `passthrough`, `ban`, `captcha`
   - What to do when AppSec does not return a usable verdict: HTTP 500, unreachable (dial or 502/503/504), or an unreadable HTTP/2 or HTTP/3 body on a method that would send a body. `ban` drops the request. `passthrough` lets 500/unreachable continue as allow, and sends a headers-only GET to AppSec when the body cannot be buffered. `captcha` uses the plugin captcha client (`captchaProvider` must be set). **BREAKING:** this key replaces `crowdsecAppsecFailureBlock`, `crowdsecAppsecUnreachableBlock`, and `crowdsecAppsecUnreadableBodyBlock`. Operators who had those bools set to `false` MUST set `crowdsecAppsecFailureAction: passthrough`.
-- CrowdsecAppsecTimeoutMilliseconds
+- CrowdsecAppsecHTTPTimeoutSeconds
   - int64
   - default: 0 (use `HTTPTimeoutSeconds`)
-  - Timeout in milliseconds for contacting Crowdsec AppSec. When `0` or omitted, AppSec uses `HTTPTimeoutSeconds`. Set `200` for a CrowdSec spec-style short hang when AppSec is unreachable (pair with `crowdsecAppsecFailureAction: passthrough`).
+  - Timeout in seconds for contacting Crowdsec AppSec. When `0` or omitted, AppSec uses `HTTPTimeoutSeconds`.
 - CrowdsecAppsecBodyLimit
   - int64
   - default: 10485760 (= 10MB)
@@ -485,7 +485,7 @@ make run
 - HTTPTimeoutSeconds
   - int64
   - default: 10
-  - Default timeout in seconds for contacting Crowdsec LAPI
+  - Default timeout in seconds for the other HTTP timeout knobs. `CrowdsecLapiHTTPTimeoutSeconds`, `CrowdsecAppsecHTTPTimeoutSeconds`, and `CaptchaSiteverifyHTTPTimeoutSeconds` use this value when they are `0` or omitted.
 - UpdateIntervalSeconds
   - int64
   - default: 60
@@ -498,6 +498,10 @@ make run
   - string
   - default: `ban`, expected values are: `passthrough`, `ban`, `captcha`
   - What to do when LAPI does not return a usable verdict: live/none HTTP or parse error, or a cache miss while stream/alone is unhealthy after `updateMaxFailure`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the existing pass path (AppSec still runs if enabled). `captcha` uses the plugin captcha client (`captchaProvider` must be set).
+- CrowdsecLapiHTTPTimeoutSeconds
+  - int64
+  - default: 0 (use `HTTPTimeoutSeconds`)
+  - Timeout in seconds for contacting Crowdsec LAPI. When `0` or omitted, LAPI uses `HTTPTimeoutSeconds`.
 - StreamStartupBlock
   - bool
   - default: true
@@ -546,6 +550,10 @@ make run
   - int64
   - default: 1800 (= 30 minutes)
   - Period after validation of a captcha before a new validation is required if Crowdsec decision is still valid
+- CaptchaSiteverifyHTTPTimeoutSeconds
+  - int64
+  - default: 0 (use `HTTPTimeoutSeconds`)
+  - Timeout in seconds for captcha provider siteverify HTTP. When `0` or omitted, siteverify uses `HTTPTimeoutSeconds`.
 - CaptchaFilePath
   - string
   - default: /captcha.html
@@ -642,13 +650,14 @@ http:
           defaultDecisionSeconds: 60
           remediationStatusCode: 403
           httpTimeoutSeconds: 10
+          crowdsecLapiHttpTimeoutSeconds: 0
           crowdsecMode: live
           crowdsecAppsecEnabled: false
           crowdsecAppsecScheme: ""
           crowdsecAppsecHost: crowdsec:7422
           crowdsecAppsecPath: "/"
           crowdsecAppsecFailureAction: ban
-          crowdsecAppsecTimeoutMilliseconds: 0
+          crowdsecAppsecHttpTimeoutSeconds: 0
           crowdsecAppsecBodyLimit: 10485760
           crowdsecLapiKey: privateKey-foo
           crowdsecLapiScheme: http

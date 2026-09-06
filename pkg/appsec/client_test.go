@@ -11,24 +11,24 @@ import (
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-func testAppsecConfig(host string, lapiSeconds, appsecMilliseconds int64) *configuration.Config {
+func testAppsecConfig(host string, fallbackSeconds, appsecSeconds int64) *configuration.Config {
 	cfg := configuration.New()
 	cfg.CrowdsecAppsecScheme = configuration.HTTP
 	cfg.CrowdsecAppsecHost = host
 	cfg.CrowdsecAppsecPath = "/"
 	cfg.CrowdsecAppsecKey = "test-key"
-	cfg.HTTPTimeoutSeconds = lapiSeconds
-	cfg.CrowdsecAppsecTimeoutMilliseconds = appsecMilliseconds
+	cfg.HTTPTimeoutSeconds = fallbackSeconds
+	cfg.CrowdsecAppsecHTTPTimeoutSeconds = appsecSeconds
 	return cfg
 }
 
 func TestIdentityHex_EffectiveTimeout(t *testing.T) {
 	inherit := testAppsecConfig("appsec.example:7422", 10, 0)
-	explicit := testAppsecConfig("appsec.example:7422", 30, 10000)
+	explicit := testAppsecConfig("appsec.example:7422", 30, 10)
 	if IdentityHex(inherit) != IdentityHex(explicit) {
-		t.Fatal("inherit 10s and explicit 10000ms must share AppSec identity")
+		t.Fatal("inherit 10s and explicit 10s must share AppSec identity")
 	}
-	short := testAppsecConfig("appsec.example:7422", 10, 200)
+	short := testAppsecConfig("appsec.example:7422", 10, 1)
 	if IdentityHex(inherit) == IdentityHex(short) {
 		t.Fatal("different effective AppSec timeouts must be different identities")
 	}
@@ -43,7 +43,7 @@ func TestNew_ShortTimeoutPassthroughOnHang(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := testAppsecConfig(appsecURL.Host, 10, 50)
+	cfg := testAppsecConfig(appsecURL.Host, 10, 1)
 	client, err := New(cfg, logger.New("ERROR", ""), "test")
 	if err != nil {
 		t.Fatal(err)
@@ -59,7 +59,7 @@ func TestNew_ShortTimeoutPassthroughOnHang(t *testing.T) {
 	if decision == nil || decision.Action != ActionAllow {
 		t.Fatalf("passthrough on timeout want allow, got %#v", decision)
 	}
-	if elapsed >= 2*time.Second {
+	if elapsed >= 5*time.Second {
 		t.Fatalf("AppSec timeout waited %v, want well under LAPI 10s", elapsed)
 	}
 }

@@ -21,7 +21,7 @@ type identity struct {
 	Path                    string `json:"path"`
 	Key                     string `json:"key"`
 	BodyLimit               int64  `json:"bodyLimit"`
-	HTTPTimeoutMilliseconds int64  `json:"httpTimeoutMilliseconds"`
+	HTTPTimeoutSeconds      int64  `json:"httpTimeoutSeconds"`
 	TLSInsecureVerify       bool   `json:"tlsInsecureVerify"`
 	TLSCertificateAuthority string `json:"tlsCa"`
 	TLSCertificateBouncer   string `json:"tlsCert"`
@@ -35,7 +35,7 @@ func identityFrom(cfg *configuration.Config) identity {
 		Path:                    cfg.CrowdsecAppsecPath,
 		Key:                     cfg.CrowdsecAppsecKey,
 		BodyLimit:               cfg.CrowdsecAppsecBodyLimit,
-		HTTPTimeoutMilliseconds: configuration.EffectiveAppsecTimeout(cfg).Milliseconds(),
+		HTTPTimeoutSeconds:      configuration.EffectiveAppsecHTTPTimeoutSeconds(cfg),
 		TLSInsecureVerify:       cfg.CrowdsecAppsecTLSInsecureVerify,
 		TLSCertificateAuthority: cfg.CrowdsecAppsecTLSCertificateAuthority,
 		TLSCertificateBouncer:   cfg.CrowdsecAppsecTLSCertificateBouncer,

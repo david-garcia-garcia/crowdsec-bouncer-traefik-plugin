@@ -71,6 +71,27 @@ func TestSessionKey_SameLapiKeyIgnoresMetricsIntervalInPrefix(t *testing.T) {
 	}
 }
 
+func TestIdentityHex_EffectiveLapiTimeout(t *testing.T) {
+	inherit := testStreamConfig("lapi.example:8080", 1)
+	inherit.HTTPTimeoutSeconds = 10
+	inherit.CrowdsecLapiHTTPTimeoutSeconds = 0
+	explicit := testStreamConfig("lapi.example:8080", 1)
+	explicit.HTTPTimeoutSeconds = 30
+	explicit.CrowdsecLapiHTTPTimeoutSeconds = 10
+	if IdentityHex(inherit) != IdentityHex(explicit) {
+		t.Fatal("inherit 10s and explicit 10s must share LAPI identity")
+	}
+	if SessionKey(inherit) != SessionKey(explicit) {
+		t.Fatal("inherit 10s and explicit 10s must share stream settings hash")
+	}
+	slow := testStreamConfig("lapi.example:8080", 1)
+	slow.HTTPTimeoutSeconds = 10
+	slow.CrowdsecLapiHTTPTimeoutSeconds = 30
+	if IdentityHex(inherit) == IdentityHex(slow) {
+		t.Fatal("different effective LAPI timeouts must be different identities")
+	}
+}
+
 func TestSessionKey_DifferentHostsAreDistinct(t *testing.T) {
 	a := testStreamConfig("lapi-a:8080", 1)
 	b := testStreamConfig("lapi-b:8080", 1)
