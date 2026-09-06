@@ -47,3 +47,10 @@ findings: language-gap Stream session; stale-usage OpenLive, CachePrefix, Redis 
 fixed: core_plugin_middleware.md; core_cache_client.md; core_cache_redis.md
 skipped: none
 
+## archive (2026-09-06)
+
+phase: archive
+findings: none
+fixed: folded three deltas into catalog; moved change to archive/2026-09-06-one-stream-per-lapi-session
+skipped: none
+

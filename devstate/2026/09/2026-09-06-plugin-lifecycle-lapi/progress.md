@@ -10,5 +10,5 @@ JobName: 2026-09-06-plugin-lifecycle-lapi
 | implement | [x] | [x] | 2026-09-06T10:51:23Z |
 | codereview | [x] | [x] | 2026-09-06T10:59:28Z |
 | devdocsimpact | [x] | [x] | 2026-09-06T11:04:45Z |
-| archive | [ ] | [ ] | |
-| pullrequest | [ ] | [ ] | |
+| archive | [x] | [x] | 2026-09-06T11:13:10Z |
+| pullrequest | [x] | [ ] | |
