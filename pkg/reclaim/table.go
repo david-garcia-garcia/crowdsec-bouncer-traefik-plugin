@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 )
@@ -30,12 +31,12 @@ const (
 //	                  SLEEP ------------+
 //	            Sleep() stops tickers
 //	                     |
-//	        grace elapsed / Reset / grace==0
+//	        grace elapsed / ResetForTest / grace==0
 //	                     v
 //	                   GONE    Close(), cancel(life), delete key
 //
 // drop and fire take the *slot pointer. If items[key] is a different slot
-// (Reset, or a later incarnation), they no-op. fire also no-ops unless
+// (ResetForTest, or a later incarnation), they no-op. fire also no-ops unless
 // graceGen still matches the armed generation (a reclaim or a later orphan
 // bumped it). That stops a queued AfterFunc from disposing a live slot.
 // Sleep/Wake run while t.mu is held so Sleep cannot land after a racing Wake.
@@ -172,7 +173,7 @@ func (t *Table) Open(ctx context.Context, key string, logger *slog.Logger, creat
 		return exist, nil
 	}
 
-	// First put for this key. Close the value when life is canceled (fire / Reset).
+	// First put for this key. Close the value when life is canceled (fire / ResetForTest).
 	e := &slot{
 		value:   v,
 		cancel:  cancel,
@@ -219,7 +220,7 @@ func (t *Table) watch(key string, id uint64, e *slot, ctx context.Context) {
 	t.drop(key, id, e)
 }
 
-// drop removes one holder from e and starts grace when none remain. A stale watcher (Reset or a newer slot) is ignored.
+// drop removes one holder from e and starts grace when none remain. A stale watcher (ResetForTest or a newer slot) is ignored.
 func (t *Table) drop(key string, id uint64, e *slot) {
 	t.mu.Lock()
 	cur, ok := t.items[key]
@@ -265,8 +266,7 @@ func (t *Table) fire(key string, e *slot, gen uint64) {
 	if cancel != nil {
 		cancel()
 	}
-	// Close after Sleep. fire is grace, Reset, or ReplaceSleeping discarding
-	// a sleeper so create() can store a new snapshot. Callers do not Close slots.
+	// Close after Sleep. fire is grace elapsed or ResetForTest. Callers do not Close slots.
 	disposeLog.Debug(MsgDispose, "key", key)
 	stopValue(stored)
 }
@@ -287,39 +287,34 @@ func (t *Table) Peek(key string) (value any, holders int, sleeping bool, ok bool
 	return e.value, len(e.holders), e.graceTimer != nil, true
 }
 
-// ReplaceSleeping disposes a zero-holder slot inside the table, then Open.
-// Live holders: same as Open (bind, no dispose). Callers never Close the slot.
-func (t *Table) ReplaceSleeping(ctx context.Context, key string, logger *slog.Logger, create func() (any, error)) (any, error) {
-	if t == nil {
-		return nil, fmt.Errorf("reclaim: open %q: nil table", key)
-	}
-	t.discardSleeping(key)
-	return t.Open(ctx, key, logger, create)
-}
-
-// discardSleeping Close()s a zero-holder incarnation. Live holders: no-op.
-func (t *Table) discardSleeping(key string) {
-	if t == nil {
-		return
+// PeekLivePrefix returns one live slot whose key starts with prefix, without binding.
+// Sleeping slots are ignored so a grace leftover cannot steal a new snapshot’s Open.
+// Several live matches: the lexicographically smallest key. Empty prefix: miss.
+func (t *Table) PeekLivePrefix(prefix string) (key string, value any, holders int, ok bool) {
+	if t == nil || prefix == "" {
+		return "", nil, 0, false
 	}
 	t.mu.Lock()
-	e, ok := t.items[key]
-	if !ok || len(e.holders) > 0 {
-		t.mu.Unlock()
-		return
+	defer t.mu.Unlock()
+	chosenKey := ""
+	var chosen *slot
+	for mappedKey, mapped := range t.items {
+		if !strings.HasPrefix(mappedKey, prefix) || len(mapped.holders) == 0 {
+			continue
+		}
+		if chosen == nil || mappedKey < chosenKey {
+			chosenKey = mappedKey
+			chosen = mapped
+		}
 	}
-	if e.graceTimer != nil {
-		e.graceTimer.Stop()
-		e.graceTimer = nil
+	if chosen == nil {
+		return "", nil, 0, false
 	}
-	e.graceGen++
-	gen := e.graceGen
-	t.mu.Unlock()
-	t.fire(key, e, gen)
+	return chosenKey, chosen.value, len(chosen.holders), true
 }
 
-// Reset stops grace timers and cancels every incarnation lifetime. Tests only.
-func (t *Table) Reset() {
+// ResetForTest stops grace timers and cancels every incarnation lifetime.
+func (t *Table) ResetForTest() {
 	if t == nil {
 		return
 	}

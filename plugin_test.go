@@ -109,8 +109,8 @@ func TestServeHTTP(t *testing.T) {
 }
 
 func TestNew_SameConnectionFields_ShareIncarnation(t *testing.T) {
-	reclaim.ResetWith(0)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
@@ -131,8 +131,8 @@ func TestNew_SameConnectionFields_ShareIncarnation(t *testing.T) {
 }
 
 func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
-	reclaim.ResetWith(0)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	var hitsA, hitsB int64
 	lapiA := liveLAPI(t, map[string]bool{"1.2.3.4": true}, &hitsA)
@@ -173,8 +173,8 @@ func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 }
 
 func TestNew_ReclaimWithinGrace(t *testing.T) {
-	reclaim.ResetWith(500 * time.Millisecond)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(500 * time.Millisecond)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
@@ -198,8 +198,8 @@ func TestNew_ReclaimWithinGrace(t *testing.T) {
 }
 
 func TestNew_DisposeAfterGrace(t *testing.T) {
-	reclaim.ResetWith(20 * time.Millisecond)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(20 * time.Millisecond)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
@@ -223,8 +223,8 @@ func TestNew_DisposeAfterGrace(t *testing.T) {
 }
 
 func TestNew_StreamVsLive_SideBySide(t *testing.T) {
-	reclaim.ResetWith(0)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	var streamHits, liveHits int64
 	streamSrv := liveLAPI(t, map[string]bool{"9.9.9.9": true}, &streamHits)
@@ -263,8 +263,8 @@ func TestNew_StreamVsLive_SideBySide(t *testing.T) {
 }
 
 func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
-	reclaim.ResetWith(0)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	var hits int64
 	srv := liveLAPI(t, map[string]bool{"8.8.8.8": true}, &hits)
@@ -313,8 +313,8 @@ func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
 }
 
 func TestNew_TwoStreamConnections_BothPoll(t *testing.T) {
-	reclaim.ResetWith(0)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	var hitsA, hitsB int64
 	a := liveLAPI(t, nil, &hitsA)
@@ -345,8 +345,8 @@ func TestNew_SameStreamKeyDifferentMetrics_SharesConnection(t *testing.T) {
 	// (hashed X-Api-Key + the IP LAPI sees). Two metrics intervals on one key
 	// must share one connection: a second ticker would steal stream deltas and
 	// POST a second metrics window for the same bouncer. Interval is first-wins.
-	reclaim.ResetWith(0)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	var hits int64
 	srv := liveLAPI(t, nil, &hits)
@@ -376,8 +376,8 @@ func TestNew_SameStreamKeyDifferentMetrics_SharesConnection(t *testing.T) {
 }
 
 func TestNew_StreamSnapshotChangeDuringGrace_ReplacesTicker(t *testing.T) {
-	reclaim.ResetWith(500 * time.Millisecond)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(500 * time.Millisecond)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	var hits int64
 	srv := liveLAPI(t, nil, &hits)

@@ -13,9 +13,9 @@ Copy `pkg/reclaim` as-is. Call `reclaim.Open` with Traefik’s `New` ctx. If the
 ## How to use
 
 - `reclaim.Open(ctx, key, logger, create)` on the process table. Last holder `Sleep()`s if the value has it; Open during grace `Wake()`s.
-- `create` runs only for a first put, after grace Close, or `ReplaceSleeping`.
-- Tests: `reclaim.Reset()` / `reclaim.ResetWith(grace)` only.
-- `Peek(key)` inspects holders/sleep without binding. `ReplaceSleeping` disposes a sleeper inside the table then Open. Callers do not Close slots.
+- `create` runs only for a first put or after grace Close.
+- Tests: `reclaim.ResetForTest()` / `reclaim.ResetForTestWith(grace)` only.
+- `Peek(key)` inspects holders/sleep without binding. `PeekLivePrefix(prefix)` returns one live slot under that stem. Callers do not Close slots.
 - Do not rewrite the table; keep it excluded from extra linters this repo enables that geoblock does not.
 
 ## Pattern snippet

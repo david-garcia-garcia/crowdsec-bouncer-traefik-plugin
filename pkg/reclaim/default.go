@@ -34,22 +34,22 @@ func Peek(key string) (value any, holders int, sleeping bool, ok bool) {
 	return Default().Peek(key)
 }
 
-// ReplaceSleeping is Default().ReplaceSleeping: discard a sleeper inside the table, then Open.
-func ReplaceSleeping(ctx context.Context, key string, logger *slog.Logger, create func() (any, error)) (any, error) {
-	return Default().ReplaceSleeping(ctx, key, logger, create)
+// PeekLivePrefix is Default().PeekLivePrefix: a live slot under prefix, no bind.
+func PeekLivePrefix(prefix string) (key string, value any, holders int, ok bool) {
+	return Default().PeekLivePrefix(prefix)
 }
 
-// Reset tears down the process table (cancels every lifetime) and installs a fresh one. Tests only.
-func Reset() {
-	ResetWith(DefaultGrace)
+// ResetForTest tears down the process table (cancels every lifetime) and installs a fresh one.
+func ResetForTest() {
+	ResetForTestWith(DefaultGrace)
 }
 
-// ResetWith replaces the process table after canceling the current one. Tests only.
-func ResetWith(grace time.Duration) {
+// ResetForTestWith replaces the process table after canceling the current one.
+func ResetForTestWith(grace time.Duration) {
 	defaultMu.Lock()
 	defer defaultMu.Unlock()
 	if defaultTable != nil {
-		defaultTable.Reset()
+		defaultTable.ResetForTest()
 	}
 	defaultTable = NewTable(grace)
 }

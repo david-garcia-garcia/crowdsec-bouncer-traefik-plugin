@@ -404,8 +404,8 @@ func TestTable_HashChangeProof(t *testing.T) {
 
 // TestDefault_OpenSharesIncarnation checks that package Open and Default().Open are the same table.
 func TestDefault_OpenSharesIncarnation(t *testing.T) {
-	Reset()
-	t.Cleanup(Reset)
+	ResetForTest()
+	t.Cleanup(ResetForTest)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	a, err := Open(ctx, "k", slog.Default(), func() (any, error) { return &box{n: 7}, nil })
@@ -523,8 +523,8 @@ func TestTable_LostCreateRaceCancelsLoser(t *testing.T) {
 	h.requireLevels(t)
 }
 
-// TestTable_ResetLogsDisposeAndKeepsNextIncarnation checks Reset logs dispose and stale watchers cannot drop a later Open.
-func TestTable_ResetLogsDisposeAndKeepsNextIncarnation(t *testing.T) {
+// TestTable_ResetForTestLogsDisposeAndKeepsNextIncarnation checks ResetForTest logs dispose and stale watchers cannot drop a later Open.
+func TestTable_ResetForTestLogsDisposeAndKeepsNextIncarnation(t *testing.T) {
 	h := &recHandler{}
 	tab := NewTable(20 * time.Millisecond)
 	var firstEnded, secondEnded atomic.Bool
@@ -535,10 +535,10 @@ func TestTable_ResetLogsDisposeAndKeepsNextIncarnation(t *testing.T) {
 		t.Fatalf("Open 1: %v", err)
 	}
 
-	tab.Reset()
+	tab.ResetForTest()
 	waitUntil(t, firstEnded.Load)
 	if countKeyMsg(h.events(), MsgDispose, "a") != 1 {
-		t.Fatalf("Reset must log dispose: %+v", h.events())
+		t.Fatalf("ResetForTest must log dispose: %+v", h.events())
 	}
 
 	ctx2, cancel2 := context.WithCancel(context.Background())
@@ -565,8 +565,8 @@ func TestTable_ResetLogsDisposeAndKeepsNextIncarnation(t *testing.T) {
 	h.requireLevels(t)
 }
 
-// TestTable_ResetStopsArmedTimer checks that Reset during grace stops the timer and still logs dispose.
-func TestTable_ResetStopsArmedTimer(t *testing.T) {
+// TestTable_ResetForTestStopsArmedTimer checks that ResetForTest during grace stops the timer and still logs dispose.
+func TestTable_ResetForTestStopsArmedTimer(t *testing.T) {
 	h := &recHandler{}
 	tab := NewTable(time.Second)
 	var ended atomic.Bool
@@ -578,7 +578,7 @@ func TestTable_ResetStopsArmedTimer(t *testing.T) {
 	}
 	cancel()
 	waitKeyMsg(t, h, MsgOrphan, "a")
-	tab.Reset()
+	tab.ResetForTest()
 	waitUntil(t, ended.Load)
 	if countKeyMsg(h.events(), MsgDispose, "a") != 1 {
 		t.Fatalf("events: %+v", h.events())
@@ -711,8 +711,8 @@ func TestTable_StaleFireWhileHeldNoops(t *testing.T) {
 	}
 }
 
-// TestTable_StaleFireAfterResetNoops checks that an old slot’s fire cannot drop a later incarnation.
-func TestTable_StaleFireAfterResetNoops(t *testing.T) {
+// TestTable_StaleFireAfterResetForTestNoops checks that an old slot’s fire cannot drop a later incarnation.
+func TestTable_StaleFireAfterResetForTestNoops(t *testing.T) {
 	h := &recHandler{}
 	tab := NewTable(20 * time.Millisecond)
 	var firstEnded, secondEnded atomic.Bool
@@ -725,7 +725,7 @@ func TestTable_StaleFireAfterResetNoops(t *testing.T) {
 	}
 	old := mustSlotA(t, tab)
 	oldGen := old.graceGen
-	tab.Reset()
+	tab.ResetForTest()
 	waitUntil(t, firstEnded.Load)
 
 	ctx2, cancel2 := context.WithCancel(context.Background())
@@ -741,7 +741,7 @@ func TestTable_StaleFireAfterResetNoops(t *testing.T) {
 		t.Fatal("old fire must not cancel the new incarnation")
 	}
 	if countKeyMsg(h.events(), MsgDispose, "a") != 1 {
-		t.Fatalf("only Reset dispose: %+v", h.events())
+		t.Fatalf("only ResetForTest dispose: %+v", h.events())
 	}
 }
 
@@ -878,10 +878,10 @@ func TestTable_ZeroGraceOpenRacesCancel(t *testing.T) {
 	}
 }
 
-// TestTable_ResetNil is a no-op on a nil table.
-func TestTable_ResetNil(t *testing.T) {
+// TestTable_ResetForTestNil is a no-op on a nil table.
+func TestTable_ResetForTestNil(t *testing.T) {
 	var tab *Table
-	tab.Reset()
+	tab.ResetForTest()
 }
 
 // levelGate records only lines at or above min.
@@ -942,66 +942,68 @@ func TestTable_PeekDuringGrace(t *testing.T) {
 	}
 }
 
-// TestTable_ReplaceSleepingClosesNow stops Close before grace would elapse then Open creates.
-func TestTable_ReplaceSleepingClosesNow(t *testing.T) {
+// TestTable_PeekLivePrefixFindsLiveIgnoresSleeper returns a live sibling and skips grace leftovers.
+func TestTable_PeekLivePrefixFindsLiveIgnoresSleeper(t *testing.T) {
 	h := &recHandler{}
-	grace := 200 * time.Millisecond
-	tab := NewTable(grace)
-	var ended atomic.Bool
-	ctx, cancel := context.WithCancel(context.Background())
-	if _, err := tab.Open(ctx, "a", slog.New(h), func() (any, error) {
-		return ending(1, &ended), nil
-	}); err != nil {
+	tab := NewTable(80 * time.Millisecond)
+	ctxSleep, cancelSleep := context.WithCancel(context.Background())
+	sleeper, err := tab.Open(ctxSleep, "sess:old", slog.New(h), func() (any, error) {
+		return &box{n: 1}, nil
+	})
+	if err != nil {
 		t.Fatal(err)
 	}
-	cancel()
-	waitKeyMsg(t, h, MsgOrphan, "a")
-	start := time.Now()
-	ctx2, cancel2 := context.WithCancel(context.Background())
-	defer cancel2()
-	second, err := tab.ReplaceSleeping(ctx2, "a", slog.New(h), func() (any, error) {
+	cancelSleep()
+	waitKeyMsg(t, h, MsgOrphan, "sess:old")
+
+	ctxLive, cancelLive := context.WithCancel(context.Background())
+	defer cancelLive()
+	live, err := tab.Open(ctxLive, "sess:new", slog.New(h), func() (any, error) {
 		return &box{n: 2}, nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ended.Load() {
-		t.Fatal("Close must run before ReplaceSleeping returns so create can put a new value")
+
+	foundKey, foundVal, holders, ok := tab.PeekLivePrefix("sess:")
+	if !ok || foundKey != "sess:new" || foundVal != live || holders != 1 {
+		t.Fatalf("live prefix: key=%q holders=%d ok=%v", foundKey, holders, ok)
 	}
-	if time.Since(start) >= grace*3/4 {
-		t.Fatalf("ReplaceSleeping waited for grace: %v", time.Since(start))
+	if foundVal == sleeper {
+		t.Fatal("PeekLivePrefix must ignore a sleeping leftover")
 	}
-	if second.(*box).n != 2 {
-		t.Fatalf("create must run after discard: %+v", second)
+
+	missKey, _, _, miss := tab.PeekLivePrefix("other:")
+	if miss || missKey != "" {
+		t.Fatalf("unrelated prefix must miss: key=%q ok=%v", missKey, miss)
+	}
+	emptyKey, _, _, emptyOK := tab.PeekLivePrefix("")
+	if emptyOK || emptyKey != "" {
+		t.Fatal("empty prefix must miss")
 	}
 }
 
-// TestTable_ReplaceSleepingWithLiveHoldersBinds keeps the incarnation for remaining holders.
-func TestTable_ReplaceSleepingWithLiveHoldersBinds(t *testing.T) {
+// TestTable_PeekLivePrefixPicksSmallestLiveKey is deterministic when two live keys share a prefix.
+func TestTable_PeekLivePrefixPicksSmallestLiveKey(t *testing.T) {
 	h := &recHandler{}
 	tab := NewTable(20 * time.Millisecond)
-	var ended atomic.Bool
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	first, err := tab.Open(ctx, "a", slog.New(h), func() (any, error) {
-		return ending(1, &ended), nil
-	})
-	if err != nil {
+	ctxZ, cancelZ := context.WithCancel(context.Background())
+	defer cancelZ()
+	ctxA, cancelA := context.WithCancel(context.Background())
+	defer cancelA()
+	if _, err := tab.Open(ctxZ, "sess:z", slog.New(h), func() (any, error) {
+		return &box{n: 1}, nil
+	}); err != nil {
 		t.Fatal(err)
 	}
-	ctx2, cancel2 := context.WithCancel(context.Background())
-	defer cancel2()
-	second, err := tab.ReplaceSleeping(ctx2, "a", slog.New(h), func() (any, error) {
+	if _, err := tab.Open(ctxA, "sess:a", slog.New(h), func() (any, error) {
 		return &box{n: 2}, nil
-	})
-	if err != nil {
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if ended.Load() {
-		t.Fatal("ReplaceSleeping must not dispose while a holder is live")
-	}
-	if second != first {
-		t.Fatal("live holders must bind the stored value")
+	foundKey, _, holders, ok := tab.PeekLivePrefix("sess:")
+	if !ok || foundKey != "sess:a" || holders != 1 {
+		t.Fatalf("want sess:a, got key=%q holders=%d ok=%v", foundKey, holders, ok)
 	}
 }
 

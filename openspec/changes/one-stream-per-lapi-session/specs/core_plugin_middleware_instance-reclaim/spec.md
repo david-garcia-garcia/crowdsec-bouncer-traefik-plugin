@@ -13,7 +13,7 @@ The plugin SHALL export `CreateConfig` and `New` from the package Traefik loads 
 - **AND** `New` receives a non-ignored context used as the reclaim holder
 
 ### Requirement: Stream session is LAPI URL plus bouncer key
-For `stream` and `alone`, `New` SHALL open reclaim with a key derived from the stream session: mode, LAPI scheme/host/path and lapiKey (CAPI machine+password in alone). Intervals, Redis, HTTP timeout, failure action, AppSec client, LAPI TLS extras, and `decisionScopeHeaders` MUST NOT be in that key. Middleware name, `next`, templates, trusted IPs, and Enabled MUST NOT be in that key. Live/none SHALL keep a reclaim key from the full connection identity (no stream cursor). Client address SHALL come from `pkg/ip.GetRemoteIP`.
+For `stream` and `alone`, the session prefix and cache prefix SHALL be derived from mode, LAPI scheme/host/path and lapiKey (CAPI machine+password in alone). Intervals, Redis, HTTP timeout, failure action, AppSec client, LAPI TLS extras, and `decisionScopeHeaders` MUST NOT be in that prefix. The reclaim `Open` key SHALL be that prefix plus a hash of those settings so a sleeping incarnation does not occupy a new snapshot’s slot. Middleware name, `next`, templates, trusted IPs, and Enabled MUST NOT be in that key. Live/none SHALL keep a reclaim key from the full connection identity (no stream cursor). Client address SHALL come from `pkg/ip.GetRemoteIP`. A second live `New` on the same session prefix with a different settings hash SHALL `PeekLivePrefix` and warn-and-wire to the live slot.
 
 #### Scenario: Same LAPI key two names share one stream
 - **WHEN** two `New` calls use stream mode, the same LAPI URL and key, and different middleware names, each with a live constructor context
@@ -31,8 +31,8 @@ For `stream` and `alone`, `New` SHALL open reclaim with a key derived from the s
 - **THEN** two connection incarnations exist
 - **AND** a decision present only on the first LAPI remediates only the first bouncer
 
-### Requirement: Snapshot change while sleeping replaces the incarnation
-When no live constructor context remains for a stream session and the slot is sleeping, a `New` with a **different** settings snapshot SHALL `ReplaceSleeping` (table internally `Close()`s, then create). A `New` with the **same** snapshot SHALL `Open` (Wake) without `startup=true`. Last holder SHALL `Sleep()` tickers before grace.
+### Requirement: Snapshot change while sleeping opens a new reclaim key
+When no live constructor context remains for a stream session and the previous slot is sleeping, a `New` with a **different** settings snapshot SHALL `Open` a new reclaim key (session prefix plus the new settings hash). The sleeper SHALL remain until grace `Close()`. A `New` with the **same** snapshot SHALL `Open` (Wake) without `startup=true`. Last holder SHALL `Sleep()` tickers before grace.
 
 #### Scenario: Reload within grace Wakes
 - **WHEN** every bound constructor context for a stream session is cancelled

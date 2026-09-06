@@ -54,11 +54,14 @@ func testStreamLAPI(t *testing.T) (*httptest.Server, *int64) {
 	return server, &hits
 }
 
-func TestSessionKey_SameLapiKeyIgnoresMetricsInterval(t *testing.T) {
+func TestSessionKey_SameLapiKeyIgnoresMetricsIntervalInPrefix(t *testing.T) {
 	fast := testStreamConfig("lapi.example:8080", 1)
 	slow := testStreamConfig("lapi.example:8080", 600)
-	if SessionKey(fast) != SessionKey(slow) {
-		t.Fatal("same LAPI URL+key must share a stream session even when metrics intervals differ")
+	if SessionPrefix(fast) != SessionPrefix(slow) {
+		t.Fatal("same LAPI URL+key must share a session prefix even when metrics intervals differ")
+	}
+	if SessionKey(fast) == SessionKey(slow) {
+		t.Fatal("settings hash must distinguish reclaim keys so a sleeper does not occupy a new snapshot")
 	}
 	if CachePrefix(fast) != CachePrefix(slow) {
 		t.Fatal("stream cache prefix must follow the session, not metrics interval")
@@ -77,8 +80,8 @@ func TestSessionKey_DifferentHostsAreDistinct(t *testing.T) {
 }
 
 func TestOpenStream_LiveMetricsMismatchWarnsAndShares(t *testing.T) {
-	reclaim.ResetWith(0)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	server, hits := testStreamLAPI(t)
 	parsed, err := url.Parse(server.URL)
@@ -123,8 +126,8 @@ func TestOpenStream_LiveMetricsMismatchWarnsAndShares(t *testing.T) {
 }
 
 func TestOpenStream_GraceSnapshotChangeStopsOldTickerFirst(t *testing.T) {
-	reclaim.ResetWith(500 * time.Millisecond)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(500 * time.Millisecond)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	server, _ := testStreamLAPI(t)
 	parsed, err := url.Parse(server.URL)

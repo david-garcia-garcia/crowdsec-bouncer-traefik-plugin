@@ -15,7 +15,10 @@ import (
 
 const streamSessionKeyPrefix = "crowdsecconnection:stream:"
 
-// streamSession is the reclaim key for stream and alone modes.
+// streamSession is the CrowdSec-row identity for stream and alone modes.
+// SessionPrefix / CachePrefix use only these fields. SessionKey appends a
+// hash of streamSettings so a sleeping incarnation does not occupy the slot a
+// reload with new knobs needs.
 //
 // CrowdSec LAPI does not give each HTTP client its own GET /v1/decisions/stream
 // cursor. The cursor lives on the bouncer database row selected by:
@@ -37,9 +40,9 @@ const streamSessionKeyPrefix = "crowdsecconnection:stream:"
 // “stream cache is broken” (one router bans, the sibling does not). Isolated
 // backends need a second bouncer key (or a different LAPI host), not a second
 // ticker. Cross-process in-memory with the same LAPI-visible IP already shares
-// that CrowdSec row; Redis is the multi-instance store. This key omits
-// intervals, Redis, TLS extras, AppSec, and decisionScopeHeaders so those
-// knobs cannot split the poller.
+// that CrowdSec row; Redis is the multi-instance store. PeekLivePrefix on
+// SessionPrefix finds a live sibling so those knobs cannot split the poller
+// while another middleware still holds.
 type streamSession struct {
 	Mode          string `json:"mode"`
 	LapiScheme    string `json:"lapiScheme"`
@@ -57,10 +60,10 @@ type streamSession struct {
 // New keeps intervals, Redis, TLS, AppSec client, and scopes=. Trusted IPs and
 // ban/captcha templates stay on the per-router Bouncer.
 //
-// A Traefik reload that changes this snapshot while the slot is sleeping
-// ReplaceSleeping: the table Close()s the sleeper internally (tickers already
-// off) then create()s a new HTTP client. Same snapshot: Open Wakes. Reclaim
-// grace is only how long the slept object stays peekable, not a second poller.
+// A Traefik reload that changes this snapshot uses a new SessionKey. The old
+// key is sleeping (tickers already off) until grace Close. Same snapshot: Open
+// Wakes that key. Reclaim grace is only how long the slept object stays
+// peekable, not a second poller.
 //
 // TLS extras are settings, not session, so a wrong LAPI client cert can be
 // replaced on reload without a process restart. Two live middlewares with
@@ -148,14 +151,19 @@ func hashJSON(payload any) string {
 	return hashBytes(encoded)
 }
 
-// SessionHex is the Redis/memory prefix and reclaim hash for one stream session.
+// SessionHex is the Redis/memory prefix for one stream session (LAPI URL+key).
 func SessionHex(cfg *configuration.Config) string {
 	return hashJSON(sessionFrom(cfg))
 }
 
-// SessionKey is the process reclaim table key for stream and alone.
+// SessionPrefix is the reclaim-key stem shared by every snapshot of one LAPI row.
+func SessionPrefix(cfg *configuration.Config) string {
+	return streamSessionKeyPrefix + SessionHex(cfg) + ":"
+}
+
+// SessionKey is the process reclaim table key: session prefix plus settings hash.
 func SessionKey(cfg *configuration.Config) string {
-	return streamSessionKeyPrefix + SessionHex(cfg)
+	return SessionPrefix(cfg) + hashJSON(settingsFrom(cfg))
 }
 
 // CachePrefix is the cache Client prefix: session hex for stream/alone so
@@ -165,16 +173,6 @@ func CachePrefix(cfg *configuration.Config) string {
 		return SessionHex(cfg)
 	}
 	return IdentityHex(cfg)
-}
-
-// settingsEqual is true when both snapshots marshal to the same JSON.
-func settingsEqual(owner, joiner streamSettings) bool {
-	ownerJSON, ownerErr := json.Marshal(owner)
-	joinerJSON, joinerErr := json.Marshal(joiner)
-	if ownerErr != nil || joinerErr != nil {
-		return false
-	}
-	return string(ownerJSON) == string(joinerJSON)
 }
 
 // settingsDiff lists JSON field names that differ, for the warn-and-wire log.
@@ -221,13 +219,15 @@ func warnWiredToOwner(log *slog.Logger, ownerName, joinerName string, owner, joi
 
 // OpenStream reclaims one CrowdsecConnection per stream session (LAPI URL+key).
 //
-// Peek the session without binding. streamOwner on the connection is who
-// created this incarnation (not the reclaim key). Same snapshot → Open
-// (Sleep/Wake across Traefik’s cancel-then-New gap). Live holders + different
-// snapshot → warn-and-wire. Sleeping + different snapshot → ReplaceSleeping
-// (table internally Close()s the sleeper; tickers already off).
+// SessionKey is session prefix plus this snapshot’s hash. PeekLivePrefix on
+// SessionPrefix finds another live middleware on the same CrowdSec row
+// (streamOwner is who created that incarnation). Same snapshot → Open that
+// key (Sleep/Wake across Traefik’s cancel-then-New gap). Live sibling with a
+// different snapshot → warn-and-wire Open of their key. Sleeping leftover
+// with a different snapshot is a different key: Open creates; the sleeper
+// dies on grace Close.
 func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*CrowdsecConnection, error) {
-	sessionKey := SessionKey(cfg)
+	joinerKey := SessionKey(cfg)
 	joinerSettings := settingsFrom(cfg)
 	create := func() (any, error) {
 		conn, err := New(cfg, log, pluginVersion)
@@ -239,25 +239,22 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 		return conn, nil
 	}
 
-	peeked, holderCount, sleeping, found := reclaim.Peek(sessionKey)
-	existing, _ := peeked.(*CrowdsecConnection)
-	if found && existing != nil && !settingsEqual(existing.streamSettings, joinerSettings) {
-		if holderCount > 0 {
+	bindKey := joinerKey
+	liveKey, liveVal, _, foundLive := reclaim.PeekLivePrefix(SessionPrefix(cfg))
+	if foundLive && liveKey != joinerKey {
+		existing, _ := liveVal.(*CrowdsecConnection)
+		if existing != nil {
 			ownerName := existing.streamOwner
 			if ownerName == "" {
 				ownerName = "(unknown)"
 			}
 			warnWiredToOwner(log, ownerName, middlewareName, existing.streamSettings, joinerSettings)
-		} else if sleeping {
-			stored, err := reclaim.ReplaceSleeping(ctx, sessionKey, log, create)
-			if err != nil {
-				return nil, err
-			}
-			return streamConn(middlewareName, stored)
 		}
+		bindKey = liveKey
 	}
 
-	stored, err := reclaim.Open(ctx, sessionKey, log, create)
+	_, holderCount, _, foundSleeper := reclaim.Peek(bindKey)
+	stored, err := reclaim.Open(ctx, bindKey, log, create)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +263,7 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 		return nil, err
 	}
 	// Sleeper belonged to another middleware that is gone. Take the name for later warnings.
-	if found && holderCount == 0 && sessionConn.streamOwner != middlewareName {
+	if foundSleeper && holderCount == 0 && sessionConn.streamOwner != middlewareName {
 		sessionConn.streamOwner = middlewareName
 	}
 	return sessionConn, nil

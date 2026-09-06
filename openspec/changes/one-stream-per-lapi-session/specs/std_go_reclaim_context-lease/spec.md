@@ -46,7 +46,7 @@ When every bound context for a key is Done, the table SHALL wait grace before ca
 - **AND** the incarnation is not disposed by `Peek`
 
 ### Requirement: Last holder Sleeps; Open during grace Wakes; grace Close()s
-When every bound context for a key is Done, if the value has `Sleep()` the table SHALL call it, then wait grace before `Close()`. An `Open` in that window MUST Wake (if the value has `Wake()`) without `create`. Callers MUST NOT Close or delete a slot; `ReplaceSleeping` MAY dispose a sleeper inside the table then `Open`.
+When every bound context for a key is Done, if the value has `Sleep()` the table SHALL call it, then wait grace before `Close()`. An `Open` in that window MUST Wake (if the value has `Wake()`) without `create`. Callers MUST NOT Close or delete a slot.
 
 #### Scenario: Sleep then Wake on reclaim
 - **WHEN** all contexts for a key are Done
@@ -57,11 +57,10 @@ When every bound context for a key is Done, if the value has `Sleep()` the table
 - **AND** `create` does not run
 - **AND** `Close` has not run
 
-### Requirement: ReplaceSleeping disposes a sleeper then Open
-`ReplaceSleeping(ctx, key, logger, create)` SHALL `Close()` a zero-holder incarnation inside the table, then behave as `Open`. If live holders remain, it MUST NOT dispose (same as `Open` bind).
+### Requirement: PeekLivePrefix reports a live slot under a key prefix
+`PeekLivePrefix(prefix)` SHALL return one stored value whose key starts with prefix and whose holder count is greater than zero. It MUST NOT add a holder, MUST NOT run `create`, and MUST ignore sleeping slots. When several live keys match, the lexicographically smallest key SHALL be returned. An empty prefix MUST miss.
 
-#### Scenario: ReplaceSleeping during sleep
-- **WHEN** a key is sleeping with zero holders
-- **AND** `ReplaceSleeping` is called
-- **THEN** the stored value’s `Close` runs before grace would have elapsed
-- **AND** `create` runs for the new incarnation
+#### Scenario: PeekLivePrefix during mixed live and sleep
+- **WHEN** one key under a prefix is sleeping and another is live
+- **THEN** `PeekLivePrefix` returns the live key
+- **AND** the sleeping incarnation is not disposed
