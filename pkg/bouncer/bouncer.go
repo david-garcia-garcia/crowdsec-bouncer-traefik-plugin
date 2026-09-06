@@ -350,7 +350,7 @@ func (b *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req *htt
 		return
 	}
 	if _, err := rw.Write([]byte(decision.UserBodyContent)); err != nil {
-		b.log.Warn("handleAppsecResponseServeHTTP could not write appsec response: " + err.Error())
+		b.log.Warn(fmt.Sprintf("handleAppsecResponseServeHTTP ip:%s could not write appsec response: %s", remoteIP, err.Error()))
 	}
 }
 
