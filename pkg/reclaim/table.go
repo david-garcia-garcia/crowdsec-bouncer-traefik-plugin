@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 	"time"
 )
@@ -313,27 +312,63 @@ func (t *Table) Peek(key string) (value any, holders int, sleeping bool, ok bool
 // PeekLivePrefix returns one live slot whose key starts with prefix, without binding.
 // Sleeping slots are ignored so a grace leftover cannot steal a new snapshot’s Open.
 // Several live matches: the lexicographically smallest key. Empty prefix: miss.
-func (t *Table) PeekLivePrefix(prefix string) (key string, value any, holders int, ok bool) {
-	if t == nil || prefix == "" {
+// Index-style loops: Yaegi v0.16 panics on `for k, v := range` over this map of slots.
+func (t *Table) PeekLivePrefix(prefix string) (string, interface{}, int, bool) {
+	if t == nil {
+		return "", nil, 0, false
+	}
+	if prefix == "" {
 		return "", nil, 0, false
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	chosenKey := ""
-	var chosen *slot
-	for mappedKey, mapped := range t.items {
-		if !strings.HasPrefix(mappedKey, prefix) || len(mapped.holders) == 0 {
-			continue
-		}
-		if chosen == nil || mappedKey < chosenKey {
-			chosenKey = mappedKey
-			chosen = mapped
-		}
-	}
-	if chosen == nil {
+	items := t.items
+	if len(items) == 0 {
 		return "", nil, 0, false
 	}
-	return chosenKey, chosen.value, len(chosen.holders), true
+	chosenKey := ""
+	var chosenValue interface{}
+	chosenHolders := 0
+	keys := make([]string, 0, len(items))
+	for mappedKey := range items {
+		keys = append(keys, mappedKey)
+	}
+	i := 0
+	for i < len(keys) {
+		mappedKey := keys[i]
+		i++
+		mapped := items[mappedKey]
+		if mapped == nil {
+			continue
+		}
+		holderCount := 0
+		if mapped.holders != nil {
+			holderCount = len(mapped.holders)
+		}
+		if holderCount == 0 {
+			continue
+		}
+		if !keyHasPrefix(mappedKey, prefix) {
+			continue
+		}
+		if chosenKey == "" || mappedKey < chosenKey {
+			chosenKey = mappedKey
+			chosenValue = mapped.value
+			chosenHolders = holderCount
+		}
+	}
+	if chosenKey == "" {
+		return "", nil, 0, false
+	}
+	return chosenKey, chosenValue, chosenHolders, true
+}
+
+// keyHasPrefix reports whether value starts with prefix (no strings.HasPrefix: Yaegi).
+func keyHasPrefix(value, prefix string) bool {
+	if len(value) < len(prefix) {
+		return false
+	}
+	return value[:len(prefix)] == prefix
 }
 
 // ResetForTest stops grace timers and cancels every incarnation lifetime.
