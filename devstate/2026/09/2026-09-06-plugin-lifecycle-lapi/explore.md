@@ -77,7 +77,7 @@ Spec `core_plugin_middleware_instance-reclaim`: keep “same session ⇒ one tic
   By: implement
 
 - Q: Can an operator fix a wrong LAPI TLS cert (or any session snapshot knob) without restarting the Traefik process?
-  Decision: resolved — yes. Reload cancels the previous constructor ctx; that is a new SessionKey, not a concurrent conflict. Fail only while another live middleware still holds (PeekLivePrefix warn-and-wire). Table `DefaultGrace` stays 10s. A CrowdsecConnection slot waits 30s via `ReclaimGrace()` when it is put. That is a dispose delay, not a process restart.
+  Decision: resolved — yes. Reload cancels the previous constructor ctx; that is a new SessionKey, not a concurrent conflict. Fail only while another live middleware still holds (PeekLivePrefix warn-and-wire). Table `DefaultGrace` stays 10s. A CrowdsecConnection slot waits 30s via `OpenWithGrace(..., ReclaimGraceDuration, ...)` when it is put. That is a dispose delay, not a process restart.
   By: implement
 
 - Q: Does the session key include LAPI TLS client certificate (keyless TLS bouncer) in addition to `lapiKey`?
