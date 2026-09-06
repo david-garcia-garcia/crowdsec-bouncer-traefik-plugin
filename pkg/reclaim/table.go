@@ -21,22 +21,17 @@ const (
 
 // Table stores one value per key while any bound context is live, plus a per-slot grace after the last holder.
 //
-//	                create()
-//	                   │
-//	                   v
-//	 Open/bind    ┌─────────┐     last holder gone
-//	─────────────►│  LIVE   │──────────────────────► Sleep()
-//	              └─────────┘                          │
-//	                   ▲                               v
-//	                   │ Open                     ┌─────────┐
-//	                   └──────── Wake() ──────────│  SLEEP  │
-//	                                              └─────────┘
-//	                                                   │
-//	                                  grace elapsed / grace 0 / ResetForTest
-//	                                                   v
-//	                                              ┌─────────┐
-//	                                              │  GONE   │ Close()
-//	                                              └─────────┘
+//	             create()
+//	                |
+//	                v
+//	Open/bind ---> LIVE --- last holder gone ---> Sleep()
+//	                ^                               |
+//	                | Open                          v
+//	                +--------- Wake() ------------ SLEEP
+//	                                                |
+//	                       grace elapsed / grace 0 / ResetForTest
+//	                                                v
+//	                                              GONE  Close()
 //
 // LIVE has one or more holders. SLEEP has zero holders and the value is kept.
 // GONE deleted the key. Sleep/Wake/Close are optional methods on the value;
