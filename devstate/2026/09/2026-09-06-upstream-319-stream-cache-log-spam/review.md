@@ -21,3 +21,9 @@ phase: implement
 findings: tests pin both tick messages at DEBUG; no product log-level change
 fixed: pkg/lapi/client_stream_log_test.go; middleware gotcha names the DEBUG ticks
 skipped: none
+
+## codereview (2026-09-06)
+phase: codereview
+findings: Standards 5 (3 hard renamed, 2 judgement skipped); Spec/Security/Performance/Dead none
+fixed: serverURL, newTestStreamTickClient, captureTestStreamTickLog
+skipped: reuse newTestRangeClient; extract shared table helper
