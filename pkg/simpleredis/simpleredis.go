@@ -25,10 +25,13 @@ const (
 )
 
 const (
-	maxIdleConns = 8
-	idleTimeout  = 30 * time.Second
-	dialTimeout  = 2 * time.Second
-	ioTimeout    = 1 * time.Second
+	maxIdleConns  = 8
+	maxOpenConns  = 8
+	maxBulkBytes  = 16 * 1024 * 1024
+	maxArrayCount = 4096
+	idleTimeout   = 30 * time.Second
+	dialTimeout   = 2 * time.Second
+	ioTimeout     = 1 * time.Second
 )
 
 var (
@@ -58,6 +61,7 @@ type SimpleRedis struct {
 
 	mu     sync.Mutex
 	idle   []*pooledConn
+	open   int
 	closed bool
 }
 
@@ -71,6 +75,9 @@ func (sr *SimpleRedis) Close() {
 	sr.closed = true
 	idle := sr.idle
 	sr.idle = nil
+	for range idle {
+		sr.open--
+	}
 	sr.mu.Unlock()
 	for _, conn := range idle {
 		conn.close()
@@ -135,8 +142,8 @@ func (sr *SimpleRedis) exec(args ...[]byte) ([][]byte, error) {
 	}
 	values, reusable, err := sr.do(conn, args)
 	sr.release(conn, reusable)
-	// Timeouts are not retried: a stalled peer will stall the next dial too.
-	if err == nil || reusable || !reused || err == errTimeout {
+	// Timeouts and session-fatal errors are not retried.
+	if err == nil || reusable || !reused || err == errTimeout || sessionFatal(err) {
 		return values, err
 	}
 	// Dead pooled conn: borrow again so Close cannot skip the closed check.
@@ -150,8 +157,6 @@ func (sr *SimpleRedis) exec(args ...[]byte) ([][]byte, error) {
 }
 
 func (sr *SimpleRedis) borrow() (*pooledConn, bool, error) {
-	var reused *pooledConn
-	var stale []*pooledConn
 	now := time.Now()
 
 	sr.mu.Lock()
@@ -159,43 +164,72 @@ func (sr *SimpleRedis) borrow() (*pooledConn, bool, error) {
 		sr.mu.Unlock()
 		return nil, false, errUnreachable
 	}
+
+	var stale []*pooledConn
 	for len(sr.idle) > 0 {
 		conn := sr.idle[len(sr.idle)-1]
 		sr.idle = sr.idle[:len(sr.idle)-1]
 		if now.Sub(conn.lastUsed) < idleTimeout {
-			reused = conn
-			break
+			sr.mu.Unlock()
+			for _, s := range stale {
+				s.close()
+				sr.mu.Lock()
+				sr.open--
+				sr.mu.Unlock()
+			}
+			return conn, true, nil
 		}
 		stale = append(stale, conn)
 	}
-	sr.mu.Unlock()
-
 	for _, conn := range stale {
 		conn.close()
-	}
-	if reused != nil {
-		return reused, true, nil
+		sr.open--
 	}
 
-	sr.mu.Lock()
-	closed := sr.closed
-	sr.mu.Unlock()
-	if closed {
+	if sr.open >= maxOpenConns {
+		sr.mu.Unlock()
 		return nil, false, errUnreachable
 	}
+	sr.open++
+	closed := sr.closed
+	sr.mu.Unlock()
+
+	if closed {
+		sr.mu.Lock()
+		sr.open--
+		sr.mu.Unlock()
+		return nil, false, errUnreachable
+	}
+
 	conn, err := sr.dial()
-	return conn, false, err
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
+	if sr.closed || err != nil {
+		sr.open--
+		if conn != nil {
+			conn.close()
+		}
+		if err != nil {
+			return nil, false, err
+		}
+		return nil, false, errUnreachable
+	}
+	return conn, false, nil
 }
 
 func (sr *SimpleRedis) release(conn *pooledConn, reusable bool) {
 	if !reusable {
 		conn.close()
+		sr.mu.Lock()
+		sr.open--
+		sr.mu.Unlock()
 		return
 	}
 	conn.lastUsed = time.Now()
 
 	sr.mu.Lock()
 	if sr.closed || len(sr.idle) >= maxIdleConns {
+		sr.open--
 		sr.mu.Unlock()
 		conn.close()
 		return
@@ -240,9 +274,13 @@ func (sr *SimpleRedis) do(conn *pooledConn, args [][]byte) ([][]byte, bool, erro
 	}
 	values, clean, err := readReply(conn.reader)
 	if err != nil && !clean {
+		if errors.Is(err, errIssue) {
+			return nil, false, err
+		}
 		return nil, false, ioError(err)
 	}
-	return values, true, err
+	reusable := err == nil || !sessionFatal(err)
+	return values, reusable, err
 }
 
 func writeCommand(writer *bufio.Writer, args [][]byte) error {
@@ -288,7 +326,7 @@ func readReply(reader *bufio.Reader) ([][]byte, bool, error) {
 		return [][]byte{data}, true, nil
 	case '*':
 		count, convErr := strconv.Atoi(string(line[1:]))
-		if convErr != nil || count < 0 {
+		if convErr != nil || count < 0 || count > maxArrayCount {
 			return nil, false, errIssue
 		}
 		values := make([][]byte, count)
@@ -323,6 +361,9 @@ func readBulk(reader *bufio.Reader, head []byte) ([]byte, error) {
 	if length < 0 {
 		return nil, errMiss
 	}
+	if length > maxBulkBytes {
+		return nil, errIssue
+	}
 	data := make([]byte, length+2)
 	if _, err = io.ReadFull(reader, data); err != nil {
 		return nil, err
@@ -343,12 +384,31 @@ func readLine(reader *bufio.Reader) ([]byte, error) {
 
 func replyError(message []byte) error {
 	text := string(message)
-	for _, prefix := range []string{"NOAUTH", "WRONGPASS", "NOPERM", "ERR Client sent AUTH"} {
+	for _, prefix := range []string{"NOAUTH", "WRONGPASS", "NOPERM", "LOADING", "READONLY", "ERR Client sent AUTH"} {
 		if strings.HasPrefix(text, prefix) {
+			if prefix == "LOADING" || prefix == "READONLY" {
+				return errors.New(text)
+			}
 			return errNoAuth
 		}
 	}
 	return errors.New(text)
+}
+
+func sessionFatal(err error) bool {
+	if err == errNoAuth {
+		return true
+	}
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	for _, prefix := range []string{"LOADING", "READONLY"} {
+		if strings.HasPrefix(msg, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func ioError(err error) error {
