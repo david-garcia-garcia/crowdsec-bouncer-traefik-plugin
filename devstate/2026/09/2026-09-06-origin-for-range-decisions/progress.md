@@ -6,7 +6,7 @@ JobName: 2026-09-06-origin-for-range-decisions
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-06T05:25:08Z |
 | explore | [x] | [x] | 2026-09-06T05:26:48Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
