@@ -199,10 +199,10 @@ func TestCrowdsecQueryAloneMode401RetriesPostBody(t *testing.T) {
 	lapiURL, _ := url.Parse(lapi.URL)
 	payload := []byte(`{"remediation_components":[{"name":"traefik","type":"middleware","version":"test","author":"test","metrics":[]}]}`)
 	client := &Client{
-		crowdsecScheme:  lapiURL.Scheme,
-		crowdsecHost:    lapiURL.Host,
-		crowdsecPath:    "/",
-		crowdsecHeader:  crowdsecCapiHeader,
+		crowdsecScheme:    lapiURL.Scheme,
+		crowdsecHost:      lapiURL.Host,
+		crowdsecPath:      "/",
+		crowdsecHeader:    crowdsecCapiHeader,
 		crowdsecKey:       "expired-token",
 		crowdsecMode:      configuration.AloneMode,
 		crowdsecMachineID: "machine",
