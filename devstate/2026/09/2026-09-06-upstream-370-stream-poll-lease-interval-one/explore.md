@@ -45,8 +45,8 @@ Measured this phase: read `pkg/lapi/client_stream.go`, `pkg/lapi/client_range_te
   By: explore
 
 - Q: Which spec host owns the lease-duration floor?
-  Decision: assumed — new `core_plugin_lapi_*` leaf for stream poll lease (not `core_plugin_lapi_connection`, which is package layout). Propose runs FindSpecHost and may fold if a closer leaf exists.
-  By: explore
+  Decision: resolved — FindSpecHost new `core_plugin_lapi_stream-lease`. Candidates: `core_plugin_lapi_connection` (layout, not TTL), `core_plugin_lapi_failure-action`, `core_plugin_middleware_instance-reclaim`, `core_cache_client_isolated-store`.
+  By: propose
 
 - Q: Must the test wait for TTL expiry, or is “key present + second call skips LAPI” enough?
   Decision: assumed — no sleep. After miss path, `Get("updated")` must succeed and a second `handleStreamCache` must not increment `streamFetches`. Expiry of a 1s TTL is not this ticket.
