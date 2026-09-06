@@ -86,7 +86,7 @@ type CrowdsecConnection struct {
 	lastMetricsPush         time.Time
 	startedAt               time.Time
 	metricsMu               sync.Mutex
-	reportMu                sync.Mutex // one usage-metrics POST at a time (ticker, Sleep drain, Close drain)
+	reportMu                sync.Mutex               // one usage-metrics POST at a time (ticker, Sleep drain, Close drain)
 	windowCounters          map[usageMetricKey]int64 // dropped counters for the current push window
 	processedIPv4           int64                    // processed ipv4; atomic on the request path
 	processedIPv6           int64
