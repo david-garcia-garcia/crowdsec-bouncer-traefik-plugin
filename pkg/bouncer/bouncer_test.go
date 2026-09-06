@@ -180,6 +180,67 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 	}
 }
 
+func TestHandleNextServeHTTPRelaysStructuredAppsecCaptcha(t *testing.T) {
+	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{
+			"action":"captcha",
+			"http_status":403,
+			"user_body_content":"<html>captcha</html>",
+			"user_cookies":["captcha=pending; Path=/; HttpOnly"],
+			"user_headers":{
+				"Content-Type":["text/html"],
+				"Cache-Control":["no-store"]
+			}
+		}`))
+	}, nil)
+	defer appsecServer.Close()
+
+	recorder := httptest.NewRecorder()
+	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected captcha status 403, got %d", recorder.Code)
+	}
+	if got := recorder.Body.String(); got != "<html>captcha</html>" {
+		t.Fatalf("expected appsec captcha body, got %q", got)
+	}
+	if got := recorder.Header().Get("Content-Type"); got != "text/html" {
+		t.Fatalf("expected Content-Type relayed, got %q", got)
+	}
+	if got := recorder.Header().Get("Set-Cookie"); got != "captcha=pending; Path=/; HttpOnly" {
+		t.Fatalf("expected Set-Cookie relayed, got %q", got)
+	}
+	if got := recorder.Header().Get("X-Remediation"); got != appsec.ActionCaptcha {
+		t.Fatalf("expected custom remediation header captcha, got %q", got)
+	}
+}
+
+func TestHandleNextServeHTTPEmptyCaptchaBodyRelaysStatus(t *testing.T) {
+	banTemplate, err := template.New("ban").Parse("<html>operator ban for {{.ClientIP}}</html>")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"action":"captcha","http_status":403}`))
+	}, banTemplate)
+	defer appsecServer.Close()
+
+	recorder := httptest.NewRecorder()
+	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected captcha status 403, got %d", recorder.Code)
+	}
+	if got := recorder.Body.String(); got != "" {
+		t.Fatalf("expected empty captcha body, got %q", got)
+	}
+	if got := recorder.Header().Get("X-Remediation"); got != appsec.ActionCaptcha {
+		t.Fatalf("expected custom remediation header captcha, got %q", got)
+	}
+}
+
 func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
 	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
