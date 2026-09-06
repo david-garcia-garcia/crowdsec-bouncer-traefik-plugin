@@ -11,4 +11,4 @@ JobName: 2026-09-06-upstream-354-captcha-duplicate-solve-405
 | codereview | [x] | [x] | 2026-09-06T15:23:59Z |
 | devdocsimpact | [x] | [x] | 2026-09-06T15:25:48Z |
 | archive | [x] | [x] | 2026-09-06T15:27:17Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-06T15:35:10Z |

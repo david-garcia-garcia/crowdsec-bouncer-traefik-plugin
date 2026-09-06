@@ -22,8 +22,8 @@ findings: Standards/Spec/Security/Dead none; Performance 1 hard unbounded ReadAl
 fixed: captchaFormMaxBytes 64KiB LimitReader (9373e6e)
 skipped: none
 
-## archive (2026-09-06)
-phase: archive
-findings: synced core_plugin_captcha_solved-form-post to baseline; archived change folder
-fixed: openspec/specs/core_plugin_captcha_solved-form-post + archive move
+## pullrequest (2026-09-06)
+phase: pullrequest
+findings: CI succeeded (e2e mock, e2e pester, Main Process); ready title set
+fixed: n/a
 skipped: none
