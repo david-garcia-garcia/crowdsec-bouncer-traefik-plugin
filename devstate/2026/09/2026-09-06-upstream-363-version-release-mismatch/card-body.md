@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-06T15:12:02Z
+Developer review: in progress — 2026-09-06T15:17:06Z
 
 ## What this changes
 **Operators.** None.
 
 **Admin users.** None.
 
-**Developers.** None versus `master`. Explore recorded test seams for LAPI usage-metrics `version`, LAPI/AppSec User-Agent, and `version.go` wiring; product tests are not landed yet.
+**Developers.** OpenSpec change `assert-plugin-version-reporting` folds version-reporting scenarios into `core_plugin_lapi_usage-metrics` and `core_plugin_appsec_client`. Tests are not landed yet.
 
 **End users.** None.
 
@@ -13,38 +13,39 @@ Developer review: in progress — 2026-09-06T15:12:02Z
 On `master`, `cscli bouncers list` can show a stale plugin version if a tag ships while `version.go` still names the previous release (upstream #322 and #363). This fork already bumps `version.go` before tagging, and the tree currently reports `v1.7.1`, but no test asserts usage-metrics `remediation_components[].version` or `User-Agent: Crowdsec-Bouncer-Traefik-Plugin/<version>`. Without those tests, a future manual release bypass can regress undetected.
 
 ## Merge readiness
-Explore complete; propose next. Product tests not yet in the diff.
+Propose complete; implement next. Product tests not yet in the apply.
 
 Priority: P3 — spec, docs, tests, or internal clarity — no current user or operator harm
-Reviewed head: 79a94a0
+Reviewed head: d7d2b7a
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI still running; no product tests landed |
-| CI proof | 3/6 | Checks in progress on [run 34041478270](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041478270) |
+| Overall readiness | 3/6 | E2E still running; tests not applied |
+| CI proof | 3/6 | Main Process succeeded; e2e in progress on [run 34041629723](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041629723) |
 | Local tests proof | N/A | Before implement; remote PR uses CI proof |
 | Review resolution | 6/6 | No open PR comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-06-upstream-363-version-release-mismatch pushed | git push 79a94a0 |
-| OpenSpec | none | handoff.yaml change: none |
+| Branch | 2026-09-06-upstream-363-version-release-mismatch pushed | git push d7d2b7a |
+| OpenSpec | assert-plugin-version-reporting | openspec/changes/assert-plugin-version-reporting |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/53 | GitHub #53 |
-| CI | build 34041478270 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041478270 | pull_request_read get_check_runs |
+| CI | build 34041629723 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041629723 | pull_request_read get_check_runs |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | comments: none |
 
 ## Specs
-None.
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-363-version-release-mismatch/openspec/changes/assert-plugin-version-reporting/proposal.md) — modified
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-363-version-release-mismatch/openspec/changes/assert-plugin-version-reporting/proposal.md) — modified
 
 ## Follow-up issues
 None.
 
 ## How this fits together
-Local add-tests ticket for upstream #322+#363 → explore chose httptest seams (LAPI JSON+User-Agent, AppSec User-Agent, root `New` wiring) → stub PR #53 → propose will write the OpenSpec change.
+Local add-tests ticket for upstream #322+#363 → OpenSpec change `assert-plugin-version-reporting` on stub PR #53 → implement will land httptests.
 
 ## Decision needed
 | Question | Decision | By |
@@ -68,27 +69,25 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | No spec.md versus `master` |
+| Specs in this PR | 0 added / 2 modified | Same list as Specs |
 | Open reviewer comments walked | 0 | No PR comments |
-| Reviewed head | 79a94a080ef52a348f8e6e70502a26cb40f7b293 | Card matches latest push |
+| Reviewed head | d7d2b7aff7532511c99b26a281ec8b8502688ec7 | Card matches latest push |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: add-tests on existing httptest harnesses, no product behavior change versus `master`.
+Best possible solution: fold scenarios into existing usage-metrics and AppSec specs; prove with httptest; no runtime change versus `master`.
 
-Do we have a high-confidence way to reproduce? No for the runtime stale-tag symptom (`version.go` already reads `v1.7.1`). Yes for the test gap: metrics tests inject `"test"` and never assert `version` or User-Agent.
+Do we have a high-confidence way to reproduce? No for the runtime stale-tag symptom (`version.go` already reads `v1.7.1`). Yes for the test gap.
 
-Is this the best way to solve the issue? Yes versus `master` — bound is add-tests; release workflows already own tagging.
+Is this the best way to solve the issue? Yes versus `master` — bound is add-tests.
 
 ### Evidence
 What I checked:
-- `version.go`, `plugin.go`, `pkg/lapi/client_metrics.go`, `pkg/lapi/client_http.go`, `pkg/appsec/query.go`, `pkg/appsec/test_client.go`
-- `pkg/lapi/metrics_test.go`, `plugin_test.go` (no User-Agent capture)
-- `openspec/specs/core_plugin_lapi_usage-metrics/spec.md` Envelope identity
-- `knowledge/research/ext_crowdsec_lapi_usage-metrics/notes.md` (User-Agent stamps bouncer row version)
-- CI check_runs on PR #53 (79a94a0)
+- `openspec/changes/assert-plugin-version-reporting/` (proposal, specs, design, tasks)
+- `openspec validate assert-plugin-version-reporting` valid, 4/4 artifacts
+- CI check_runs on PR #53 after d7d2b7a
 
 ### Rank-up moves
 None.
