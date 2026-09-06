@@ -17,6 +17,7 @@ skipped: none
 - assumed: nil parsed after GetRemoteIP → trustipfail
 - assumed: Remediation takes net.IP
 - assumed: ipType string threaded to recordDropped
+- assumed: clientRequest holds req + remoteIP + parsed + ipType; scopes/origin stay off it
 
 ## propose (2026-09-06)
 
@@ -30,7 +31,7 @@ change: parse-client-ip-once
 
 phase: implement
 findings: none
-fixed: parse-once wiring at GetRemoteIP / ServeHTTP / Range
+fixed: parse-once wiring at GetRemoteIP / ServeHTTP / Range; clientRequest (req, remoteIP, parsed, ipType)
 skipped: none
 localTests: passed
 
@@ -40,6 +41,15 @@ phase: codereview
 findings: P3 2 (1 done Family comment, 1 skipped Contains string API)
 fixed: Family comment (c45bad8)
 skipped: Checker.Contains deletion
+
+## implement (2026-09-06, clientRequest)
+phase: implement
+findings: none
+fixed: clientRequest (req, remoteIP, parsed, ipType) through ban/next/AppSec
+skipped: none
+localTests: passed
+card: PR #24 summary 2026-09-06T05:59:32Z
+reviewedHead: 380f1b5
 
 
 
