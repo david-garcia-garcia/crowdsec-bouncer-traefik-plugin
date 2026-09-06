@@ -34,5 +34,13 @@ fixed: parse-once wiring at GetRemoteIP / ServeHTTP / Range
 skipped: none
 localTests: passed
 
+## codereview (2026-09-06)
+
+phase: codereview
+findings: P3 2 (1 done Family comment, 1 skipped Contains string API)
+fixed: Family comment (c45bad8)
+skipped: Checker.Contains deletion
+
+
 
 
