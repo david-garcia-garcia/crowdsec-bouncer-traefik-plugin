@@ -56,7 +56,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 
 	// Live/none/appsec do not use stream_cursor. Two Connections on one key
 	// stay valid (?ip= lookups). Reclaim by full identity, including intervals.
-	conn, openErr := crowdsecconnection.OpenLive(ctx, config, log, pluginVersion)
+	conn, openErr := crowdsecconnection.OpenLive(ctx, config, log, name, pluginVersion)
 	if openErr != nil {
 		return nil, openErr
 	}

@@ -258,19 +258,19 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	if openErr != nil {
 		return nil, openErr
 	}
-	sessionConn, typedErr := streamConn(middlewareName, stored)
-	if typedErr != nil {
-		return nil, typedErr
+	conn, connErr := connectionFromStored(middlewareName, stored)
+	if connErr != nil {
+		return nil, connErr
 	}
 	// Sleeper belonged to another middleware that is gone. Take the name for later warnings.
-	if sleeper.OK && sleeper.Holders == 0 && sessionConn.streamOwner != middlewareName {
-		sessionConn.streamOwner = middlewareName
+	if sleeper.OK && sleeper.Holders == 0 && conn.streamOwner != middlewareName {
+		conn.streamOwner = middlewareName
 	}
-	return sessionConn, nil
+	return conn, nil
 }
 
 // OpenLive reclaims a CrowdsecConnection by full identity (live/none/appsec).
-func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, pluginVersion string) (*CrowdsecConnection, error) {
+func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*CrowdsecConnection, error) {
 	stored, openErr := reclaim.OpenWithGrace(ctx, Key(cfg), log, ReclaimGraceDuration, func() (any, error) {
 		conn, err := New(cfg, log, pluginVersion)
 		if err != nil {
@@ -281,9 +281,10 @@ func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, 
 	if openErr != nil {
 		return nil, openErr
 	}
-	return streamConn("live", stored)
+	return connectionFromStored(middlewareName, stored)
 }
 
+// wrappedConnection is the reclaim create() result: funcs, not a type assert (Yaegi).
 func wrappedConnection(conn *CrowdsecConnection) *reclaim.Wrapped {
 	return &reclaim.Wrapped{
 		Value: conn,
@@ -293,11 +294,10 @@ func wrappedConnection(conn *CrowdsecConnection) *reclaim.Wrapped {
 	}
 }
 
-// streamConn type-asserts the reclaim value to *CrowdsecConnection.
-func streamConn(middlewareName string, stored any) (*CrowdsecConnection, error) {
-	sessionConn, ok := stored.(*CrowdsecConnection)
+func connectionFromStored(middlewareName string, stored any) (*CrowdsecConnection, error) {
+	conn, ok := stored.(*CrowdsecConnection)
 	if !ok {
 		return nil, fmt.Errorf("%s: reclaim: want *crowdsecconnection.CrowdsecConnection, got %T", middlewareName, stored)
 	}
-	return sessionConn, nil
+	return conn, nil
 }

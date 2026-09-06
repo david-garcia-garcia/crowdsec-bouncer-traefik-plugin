@@ -121,6 +121,7 @@ type Wrapped struct {
 	Close func()
 }
 
+// unwrap pulls Sleep/Wake/Close off *Wrapped, or same-package sleeper/closer methods.
 func unwrap(created any) (value any, sleep, wake, closeFn func()) {
 	if wrapped, ok := created.(*Wrapped); ok {
 		value = wrapped.Value
@@ -134,6 +135,7 @@ func unwrap(created any) (value any, sleep, wake, closeFn func()) {
 	return created, sleep, wake, closeFn
 }
 
+// sleeperFuncs is Sleep/Wake when value implements sleeper (same package only).
 func sleeperFuncs(value any) (sleep, wake func()) {
 	if s, ok := value.(sleeper); ok {
 		return s.Sleep, s.Wake
@@ -141,6 +143,7 @@ func sleeperFuncs(value any) (sleep, wake func()) {
 	return nil, nil
 }
 
+// closerFunc is Close when value implements closer (same package only).
 func closerFunc(value any) func() {
 	if c, ok := value.(closer); ok {
 		return c.Close
