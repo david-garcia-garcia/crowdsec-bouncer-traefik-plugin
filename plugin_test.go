@@ -593,6 +593,39 @@ func TestNew_AloneMode_FailedConstructNoStrayHolders(t *testing.T) {
 	}
 }
 
+func TestNew_StreamMode_SuccessKeepsReclaimHolder(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
+
+	var hits int64
+	srv := liveLAPI(t, nil, &hits)
+	t.Cleanup(func() { srv.Close() })
+	u, _ := url.Parse(srv.URL)
+	cfg := cfgStreamAt(u.Host, 1)
+
+	ctx := context.Background()
+	h, err := New(ctx, testNextOK(), cfg, "stream-keep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(50 * time.Millisecond)
+
+	view := reclaim.Peek(lapi.SessionKey(cfg))
+	if !view.OK || view.Holders != 1 {
+		t.Fatalf("successful New must keep reclaim holder: ok=%v holders=%d", view.OK, view.Holders)
+	}
+
+	client := testRoute(t, h).LapiClient()
+	fetchesBefore := client.StreamFetches()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && client.StreamFetches() <= fetchesBefore {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if client.StreamFetches() <= fetchesBefore {
+		t.Fatal("stream ticker must keep running after successful New")
+	}
+}
+
 func TestNew_StreamMode_OpensStreamSession(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })

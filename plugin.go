@@ -22,7 +22,9 @@ func CreateConfig() *configuration.Config {
 // New is the Traefik Yaegi constructor. It reclaims LAPI and AppSec backends and returns a per-router Bouncer.
 // Stream/alone: one LAPI client per LAPI URL+key (CrowdSec one stream cursor per
 // hashed key + outbound IP). Live/none: reclaim by LAPI identity. AppSec: reclaim by listener URL+key.
-func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
+//
+//nolint:nonamedreturns // defer rollback reads named err; Yaegi mishandles closure-captured bool in defer.
+func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (handler http.Handler, err error) {
 	config.LogLevel = strings.ToUpper(config.LogLevel)
 	log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
 
@@ -33,26 +35,25 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		config.CaptchaFilePath = config.CaptchaHTMLFilePath
 	}
 
-	if validateErr := configuration.ValidateParams(config, log); validateErr != nil {
-		log.Error("New:validateParams " + validateErr.Error())
-		return nil, validateErr
+	if err = configuration.ValidateParams(config, log); err != nil {
+		log.Error("New:validateParams " + err.Error())
+		return nil, err
 	}
 
 	if config.CrowdsecMode == configuration.AppsecMode && !config.CrowdsecAppsecEnabled {
 		return nil, fmt.Errorf("crowdsecMode appsec requires crowdsecAppsecEnabled")
 	}
 
-	if prepErr := lapi.Prepare(config, log); prepErr != nil {
-		return nil, prepErr
+	if err = lapi.Prepare(config, log); err != nil {
+		return nil, err
 	}
-	if prepErr := appsec.Prepare(config, log); prepErr != nil {
-		return nil, prepErr
+	if err = appsec.Prepare(config, log); err != nil {
+		return nil, err
 	}
 
 	bindCtx, cancelBind := context.WithCancel(ctx)
-	failed := false
 	defer func() {
-		if failed {
+		if err != nil {
 			cancelBind()
 		}
 	}()
@@ -63,36 +64,25 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	// sees (this process’s outbound address), not per middleware and not per
 	// metrics interval. OpenStream keeps one ticker per URL+key in this process.
 	if config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode {
-		var streamErr error
-		lapiClient, streamErr = lapi.OpenStream(bindCtx, config, log, name, pluginVersion)
-		if streamErr != nil {
-			failed = true
-			return nil, streamErr
+		lapiClient, err = lapi.OpenStream(bindCtx, config, log, name, pluginVersion)
+		if err != nil {
+			return nil, err
 		}
 	} else if config.CrowdsecMode != configuration.AppsecMode {
 		// Live/none do not use stream_cursor. Two Clients on one key
 		// stay valid (?ip= lookups). Reclaim by LAPI identity, including intervals.
-		var openErr error
-		lapiClient, openErr = lapi.OpenLive(bindCtx, config, log, name, pluginVersion)
-		if openErr != nil {
-			failed = true
-			return nil, openErr
+		lapiClient, err = lapi.OpenLive(bindCtx, config, log, name, pluginVersion)
+		if err != nil {
+			return nil, err
 		}
 	}
 
 	var appsecClient *appsec.Client
 	if config.CrowdsecAppsecEnabled {
-		var appsecErr error
-		appsecClient, appsecErr = appsec.Open(bindCtx, config, log, name, pluginVersion)
-		if appsecErr != nil {
-			failed = true
-			return nil, appsecErr
+		appsecClient, err = appsec.Open(bindCtx, config, log, name, pluginVersion)
+		if err != nil {
+			return nil, err
 		}
 	}
-	handler, bouncerErr := bouncer.New(next, name, config, lapiClient, appsecClient, log)
-	if bouncerErr != nil {
-		failed = true
-		return nil, bouncerErr
-	}
-	return handler, nil
+	return bouncer.New(next, name, config, lapiClient, appsecClient, log)
 }
