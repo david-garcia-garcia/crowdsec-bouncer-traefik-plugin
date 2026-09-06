@@ -40,3 +40,9 @@ findings: none
 fixed: n/a
 skipped: n/a
 
+## pullrequest (2026-09-06T15:34:14Z)
+phase: pullrequest
+findings: none
+fixed: n/a
+skipped: n/a
+

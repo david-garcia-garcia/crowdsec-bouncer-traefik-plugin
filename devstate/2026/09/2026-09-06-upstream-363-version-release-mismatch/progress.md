@@ -11,4 +11,4 @@ JobName: 2026-09-06-upstream-363-version-release-mismatch
 | codereview | [x] | [x] | 2026-09-06T15:25:35Z |
 | devdocsimpact | [x] | [x] | 2026-09-06T15:27:58Z |
 | archive | [x] | [x] | 2026-09-06T15:27:58Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-06T15:34:14Z |
