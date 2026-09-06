@@ -1,5 +1,5 @@
 {
-  "commentId": "pending",
+  "commentId": "pr-body",
   "issueKey": "2026-09-06-upstream-385-delete-http3-unreadable-body",
   "markerValue": "2026-09-06-upstream-385-delete-http3-unreadable-body",
   "issueHost": "local"
