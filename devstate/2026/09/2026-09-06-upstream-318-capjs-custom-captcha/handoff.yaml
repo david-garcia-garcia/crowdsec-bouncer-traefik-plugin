@@ -1,0 +1,17 @@
+issueKey: 2026-09-06-upstream-318-capjs-custom-captcha
+jobName: 2026-09-06-upstream-318-capjs-custom-captcha
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 316ba6d8b68ef16daa49508b398b1cac7ac695e3caff0f598ce063616c1c6744
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr:
+  id: 52
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/52
