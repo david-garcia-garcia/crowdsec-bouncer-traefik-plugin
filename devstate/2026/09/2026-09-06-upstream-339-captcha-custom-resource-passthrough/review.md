@@ -9,3 +9,9 @@ phase: explore
 findings: path-exact pass-through; optional CaptchaCustomChallengeURL; HEAD assets pass; AppSec stays on pass path
 fixed: n/a
 skipped: live wicketkeeper reproduce
+
+## propose (2026-09-06)
+phase: propose
+findings: new spec core_plugin_captcha_custom-resource-passthrough
+fixed: n/a
+skipped: n/a
