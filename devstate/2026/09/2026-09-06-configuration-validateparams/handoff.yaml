@@ -1,17 +1,17 @@
-issueKey: 2026-09-06-configuration-validateparams
-jobName: 2026-09-06-configuration-validateparams
-issueHost: local
-issueRef: none
-prHost: github
-repoSlug: crowdsec-bouncer-traefik-plugin
-destBranch: master
-qualify: qualified
-src: e702158d2c4a46d56a8fd849dfc8f7fdc1a7bb8040e1920fd7214552229502ed
-localTests: none
-requirement: requirement.md
-comments: none
-explore: none
-change: none
-pr:
-  id: 32
-  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/32
+issueKey: 2026-09-06-configuration-validateparams
+jobName: 2026-09-06-configuration-validateparams
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: e702158d2c4a46d56a8fd849dfc8f7fdc1a7bb8040e1920fd7214552229502ed
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: configuration-validateparams
+pr:
+  id: 32
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/32
