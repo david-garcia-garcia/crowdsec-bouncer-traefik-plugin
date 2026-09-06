@@ -21,3 +21,9 @@ phase: codereview
 findings: Standards/Spec/Security/Dead none; Performance 1 hard unbounded ReadAll
 fixed: captchaFormMaxBytes 64KiB LimitReader (9373e6e)
 skipped: none
+
+## devdocsimpact (2026-09-06)
+phase: devdocsimpact
+findings: missing-packet Captcha remediation
+fixed: knowledge/devdocs/core_plugin_captcha.md
+skipped: none
