@@ -46,7 +46,7 @@ JobName: 2026-09-06-captcha-handler-hardening
 
 
 
-| archive | [ ] | [ ] | |
+| archive | [x] | [x] | 2026-09-06T15:08:05Z |
 
 
 

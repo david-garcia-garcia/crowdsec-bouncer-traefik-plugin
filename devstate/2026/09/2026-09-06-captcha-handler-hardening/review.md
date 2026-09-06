@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: missing-packet Captcha handler; stale-usage Isolated cache Client Set error return
 fixed: created core_plugin_captcha_handler.md; updated core_cache_client.md and index_core_plugin.md
 skipped: n/a
+
+## archive (2026-09-06)
+phase: archive
+findings: synced core_plugin_captcha_handler (new) and core_cache_client_isolated-store (fold); map regenerated; validators exit 0; moved to openspec/changes/archive/2026-09-06-captcha-handler-hardening/
+fixed: n/a
+skipped: n/a
