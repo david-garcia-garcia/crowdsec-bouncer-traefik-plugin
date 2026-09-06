@@ -21,3 +21,9 @@ phase: archive
 findings: catalog synced; change moved to archive/2026-09-06-split-appsec-timeout
 fixed: n/a
 skipped: n/a
+
+## pullrequest (2026-09-06)
+phase: pullrequest
+findings: CI succeeded on d256d34; title ready
+fixed: n/a
+skipped: n/a
