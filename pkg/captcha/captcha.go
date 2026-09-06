@@ -2,6 +2,7 @@
 package captcha
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -31,10 +32,11 @@ type Client struct {
 
 // Information for self-hosted provider.
 type infoProvider struct {
-	js       string
-	key      string
-	response string
-	validate string
+	js           string
+	key          string
+	response     string
+	validate     string
+	validateBody string
 }
 
 //nolint:gochecknoglobals
@@ -60,14 +62,14 @@ var infoProviders = map[string]*infoProvider{
 }
 
 // New Initialize captcha client.
-func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, validateBody, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
 	}
 	var info *infoProvider
 	if provider == configuration.CustomProvider {
-		info = &infoProvider{js: js, key: key, response: response, validate: validate}
+		info = &infoProvider{js: js, key: key, response: response, validate: validate, validateBody: validateBody}
 	} else {
 		info = infoProviders[provider]
 	}
@@ -129,6 +131,12 @@ type responseProvider struct {
 	Success bool `json:"success"`
 }
 
+// siteverifyRequest is the secret and token posted to a custom siteverify URL.
+type siteverifyRequest struct {
+	Secret   string `json:"secret"`
+	Response string `json:"response"`
+}
+
 // Validate Verify the captcha from provider API.
 func (c *Client) Validate(r *http.Request) (bool, error) {
 	if r.Method != http.MethodPost {
@@ -140,10 +148,7 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 		c.log.Debug("captcha:Validate no captcha response found in request")
 		return false, nil
 	}
-	var body = url.Values{}
-	body.Add("secret", c.secretKey)
-	body.Add("response", response)
-	res, err := c.httpClient.PostForm(c.infoProvider.validate, body)
+	res, err := c.postSiteverify(response)
 	if err != nil {
 		return false, err
 	}
@@ -163,4 +168,26 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	}
 	c.log.Debug(fmt.Sprintf("captcha:Validate success:%v", captchaResponse.Success))
 	return captchaResponse.Success, nil
+}
+
+// postSiteverify posts secret and response to the provider siteverify URL.
+func (c *Client) postSiteverify(response string) (*http.Response, error) {
+	// JSON custom providers post secret and response as application/json.
+	if c.infoProvider.validateBody == configuration.CaptchaValidateBodyJSON {
+		encoded, err := json.Marshal(siteverifyRequest{Secret: c.secretKey, Response: response})
+		if err != nil {
+			return nil, err
+		}
+		req, err := http.NewRequest(http.MethodPost, c.infoProvider.validate, bytes.NewBuffer(encoded))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		return c.httpClient.Do(req)
+	}
+	// Form and built-in providers post urlencoded secret and response.
+	body := url.Values{}
+	body.Add("secret", c.secretKey)
+	body.Add("response", response)
+	return c.httpClient.PostForm(c.infoProvider.validate, body)
 }

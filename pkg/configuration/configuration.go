@@ -39,6 +39,10 @@ const (
 	RecaptchaProvider = "recaptcha"
 	TurnstileProvider = "turnstile"
 	CustomProvider    = "custom"
+	// CaptchaValidateBodyForm posts siteverify as application/x-www-form-urlencoded.
+	CaptchaValidateBodyForm = "form"
+	// CaptchaValidateBodyJSON posts siteverify as application/json.
+	CaptchaValidateBodyJSON = "json"
 	// FailureActionPassthrough lets the request continue when LAPI or AppSec is down.
 	FailureActionPassthrough = "passthrough"
 	// FailureActionBan remediates as a ban when LAPI or AppSec is down.
@@ -116,11 +120,13 @@ type Config struct {
 	CaptchaCustomValidateURL                   string            `json:"captchaCustomValidateUrl,omitempty"`
 	CaptchaCustomKey                           string            `json:"captchaCustomKey,omitempty"`
 	CaptchaCustomResponse                      string            `json:"captchaCustomResponse,omitempty"`
-	CaptchaSiteKey                             string            `json:"captchaSiteKey,omitempty"`
-	CaptchaSiteKeyFile                         string            `json:"captchaSiteKeyFile,omitempty"`
-	CaptchaSecretKey                           string            `json:"captchaSecretKey,omitempty"`
-	CaptchaSecretKeyFile                       string            `json:"captchaSecretKeyFile,omitempty"`
-	CaptchaGracePeriodSeconds                  int64             `json:"captchaGracePeriodSeconds,omitempty"`
+	// CaptchaCustomValidateBody is form or json for custom siteverify; empty means form.
+	CaptchaCustomValidateBody string `json:"captchaCustomValidateBody,omitempty"`
+	CaptchaSiteKey            string `json:"captchaSiteKey,omitempty"`
+	CaptchaSiteKeyFile        string `json:"captchaSiteKeyFile,omitempty"`
+	CaptchaSecretKey          string `json:"captchaSecretKey,omitempty"`
+	CaptchaSecretKeyFile      string `json:"captchaSecretKeyFile,omitempty"`
+	CaptchaGracePeriodSeconds int64  `json:"captchaGracePeriodSeconds,omitempty"`
 }
 
 func contains(source []string, target string) bool {
@@ -188,6 +194,7 @@ func New() *Config {
 		CaptchaCustomValidateURL:        "",
 		CaptchaCustomKey:                "",
 		CaptchaCustomResponse:           "",
+		CaptchaCustomValidateBody:       "",
 		CaptchaSiteKey:                  "",
 		CaptchaSecretKey:                "",
 		CaptchaGracePeriodSeconds:       1800,
@@ -475,6 +482,9 @@ func validateCaptcha(config *Config) error {
 				config.CaptchaCustomJsURL,
 			)
 		}
+	}
+	if config.CaptchaCustomValidateBody != "" && !contains([]string{CaptchaValidateBodyForm, CaptchaValidateBodyJSON}, config.CaptchaCustomValidateBody) {
+		return errors.New("CaptchaCustomValidateBody: must be one of 'form' or 'json'")
 	}
 	return nil
 }
