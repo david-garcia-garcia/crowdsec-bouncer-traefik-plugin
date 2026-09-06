@@ -1,0 +1,15 @@
+issueKey: 2026-09-06-decisionscope-cache-keys
+jobName: 2026-09-06-decisionscope-cache-keys
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 319ce8f8ef9a4d22689ddf03578b65747d29bfc83d0cce64eef64e29428cbb90
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
