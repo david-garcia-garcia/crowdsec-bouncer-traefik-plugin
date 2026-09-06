@@ -69,3 +69,9 @@ phase: codereview
 findings: P3 1 hard trail comment; 2 judgement skipped
 fixed: aa21891 drop-path comment
 skipped: gofmt realign; GET assert on default-false sibling
+
+## pullrequest (2026-09-06 rethink)
+phase: pullrequest
+findings: dest master moved (#44); usage-doc conflict; Dead axis clean
+fixed: merge dae9590 kept UnreadableBodyBlock and empty captcha-body relay; CI Main Process 34051113189 + e2e 34051113164 succeeded; ready title; archive proposal URL
+skipped: none
