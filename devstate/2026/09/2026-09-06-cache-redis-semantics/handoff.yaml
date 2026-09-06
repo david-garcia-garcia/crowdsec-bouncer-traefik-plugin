@@ -1,0 +1,15 @@
+issueKey: 2026-09-06-cache-redis-semantics
+jobName: 2026-09-06-cache-redis-semantics
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 48ad28a2e244f4e12e7af62b581ac773f2c04ff6aeebc37409797a151c00570a
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
