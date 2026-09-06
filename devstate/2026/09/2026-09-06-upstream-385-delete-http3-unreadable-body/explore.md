@@ -37,8 +37,8 @@ When the drop does not fire, an unreadable body is forwarded to AppSec as `http.
   By: explore
 
 - Q: Fold onto which spec?
-  Decision: assumed — modify `core_plugin_appsec_failure-action` only. Add a scenario that HTTP/3 DELETE with `ContentLength < 0` is not dropped under ban; still query AppSec headers-only.
-  By: explore
+  Decision: resolved — modify `core_plugin_appsec_failure-action` only. Change `appsec-delete-unreadable-body` folds that leaf (FindSpecHost high).
+  By: propose
 
 - Q: Who already owns the client address AppSec should see?
   Decision: resolved — `pkg/ip.GetRemoteIP` in `Bouncer.ServeHTTP`; `appsec.Client.Query` already receives that `ip`. This ticket does not change identity.
