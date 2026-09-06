@@ -39,3 +39,8 @@ description: Where CrowdSec LAPI stores /v1/decisions/stream progress and which 
 priority: normal
 local: ext_crowdsec_lapi_usage-metrics/
 description: What CrowdSec LAPI accepts on POST /v1/usage-metrics and which labels official bouncers send.
+
+## AppSec unreadable body
+priority: normal
+local: ext_crowdsec_appsec_unreadable-body/
+description: How reference bouncers handle HTTP/2+ bodies without Content-Length (APPSEC_DROP_UNREADABLE_BODY / gRPC streams).
