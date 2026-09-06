@@ -56,6 +56,13 @@ findings: none
 fixed: none
 skipped: e2e mock captcha failed once then succeeded on retry
 
+## sync (2026-09-06)
+
+phase: sync
+findings: none
+fixed: merge origin/master; kept useRangeMembership bool and dest origin plus parsed IP
+skipped: none
+
 
 
 
