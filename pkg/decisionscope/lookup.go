@@ -64,12 +64,13 @@ func RequestScopeValues(headers map[string]string, req *http.Request) map[string
 // The first return is ban, captcha, or none; the second is the metrics origin of the winning cache value.
 // remoteIP is the cache key; ipAddr is the same address GetRemoteIP already parsed.
 func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, error) {
-	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, scopes))
+	ipKey := IPLookupCacheKey(remoteIP, ipAddr)
+	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, ipAddr, scopes))
 	if err != nil {
 		return "", "", err
 	}
 	// Merge Ip, Range, and header hits so a Country ban beats a Range captcha.
-	chosen := found[remoteIP]
+	chosen := found[ipKey]
 	chosen = PreferRemediation(chosen, membership.Remediation(ipAddr))
 	for scope, identifier := range scopes {
 		if identifier == "" {
@@ -80,15 +81,15 @@ func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr 
 	if IsActiveRemediation(chosen) {
 		return cache.RemediationKind(chosen), cache.RemediationOrigin(chosen), nil
 	}
-	if value, ok := found[remoteIP]; ok {
+	if value, ok := found[ipKey]; ok {
 		return cache.RemediationKind(value), cache.RemediationOrigin(value), nil
 	}
 	return "", "", errors.New(cache.CacheMiss)
 }
 
 // LookupCacheKeys is the GetMany key list for the request path: IP, then present header scopes. Range is not a cache key.
-func LookupCacheKeys(remoteIP string, scopes map[string]string) []string {
-	keys := []string{remoteIP}
+func LookupCacheKeys(remoteIP string, ipAddr net.IP, scopes map[string]string) []string {
+	keys := []string{IPLookupCacheKey(remoteIP, ipAddr)}
 	for scope, identifier := range scopes {
 		if identifier != "" {
 			keys = append(keys, HeaderScopeKey(scope, identifier))

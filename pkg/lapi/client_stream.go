@@ -124,7 +124,9 @@ func (c *Client) handleStreamCache() error {
 		}
 		c.deleteStreamDecision(decision)
 	}
-	decisionscope.ApplyRangeBatch(c.cacheClient, rangeUpserts, rangeRemovals)
+	if err := decisionscope.ApplyRangeBatch(c.cacheClient, rangeUpserts, rangeRemovals); err != nil {
+		c.log.Debug("handleStreamCache:range-index-apply-failed " + err.Error())
+	}
 	c.hydrateRangeMembership()
 	c.log.Debug("handleStreamCache:updated")
 	c.isCrowdsecStreamStartup = false

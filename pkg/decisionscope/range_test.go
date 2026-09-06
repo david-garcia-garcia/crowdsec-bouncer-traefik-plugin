@@ -15,7 +15,8 @@ func newTestDecisionCache() *cache.Client {
 }
 
 func remediationFromRangeIndex(client *cache.Client, remoteIP string) string {
-	return MembershipFromIndex(readRangeIndex(client)).Remediation(net.ParseIP(remoteIP))
+	index, _ := readRangeIndex(client)
+	return MembershipFromIndex(index).Remediation(net.ParseIP(remoteIP))
 }
 
 func TestAddRangeBanWins(t *testing.T) {
@@ -69,7 +70,8 @@ func TestLookupCachedRemediationBanWinsAcrossScopes(t *testing.T) {
 	client := newTestDecisionCache()
 	AddRange(client, "10.0.0.0/8", cache.CaptchaValue, 60)
 	client.Set(HeaderScopeKey(ScopeCountry, "FR"), cache.BannedValue, 60)
-	got, _, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), map[string]string{ScopeCountry: "FR"}, MembershipFromIndex(readRangeIndex(client)))
+	index, _ := readRangeIndex(client)
+	got, _, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), map[string]string{ScopeCountry: "FR"}, MembershipFromIndex(index))
 	if err != nil || got != cache.BannedValue {
 		t.Fatalf("range captcha + country ban got %q %v, want ban", got, err)
 	}
@@ -77,14 +79,18 @@ func TestLookupCachedRemediationBanWinsAcrossScopes(t *testing.T) {
 
 func TestApplyRangeBatchOneWrite(t *testing.T) {
 	client := newTestDecisionCache()
-	ApplyRangeBatch(client, map[string]string{
+	if err := ApplyRangeBatch(client, map[string]string{
 		"10.0.0.0/8":  cache.CaptchaValue,
 		"10.1.0.0/16": cache.BannedValue,
-	}, nil)
+	}, nil); err != nil {
+		t.Fatalf("batch upsert: %v", err)
+	}
 	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != cache.BannedValue {
 		t.Fatalf("batch upsert got %q, want ban", got)
 	}
-	ApplyRangeBatch(client, nil, []string{"10.1.0.0/16"})
+	if err := ApplyRangeBatch(client, nil, []string{"10.1.0.0/16"}); err != nil {
+		t.Fatalf("batch removal: %v", err)
+	}
 	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != cache.CaptchaValue {
 		t.Fatalf("after removal got %q, want captcha from remaining /8", got)
 	}
@@ -125,8 +131,10 @@ func TestLookupCachedRemediationOriginSuffix(t *testing.T) {
 func TestApplyRangeBatchRoundTripOriginSuffix(t *testing.T) {
 	client := newTestDecisionCache()
 	stored := cache.RemediationWithOrigin(cache.BannedValue, "crowdsec")
-	ApplyRangeBatch(client, map[string]string{"10.0.0.0/8": stored}, nil)
-	index := readRangeIndex(client)
+	if err := ApplyRangeBatch(client, map[string]string{"10.0.0.0/8": stored}, nil); err != nil {
+		t.Fatalf("round-trip apply: %v", err)
+	}
+	index, _ := readRangeIndex(client)
 	if index != "10.0.0.0/8="+stored {
 		t.Fatalf("blob %q", index)
 	}
@@ -145,6 +153,56 @@ func TestLookupCachedRemediationRangeOnlyOrigin(t *testing.T) {
 	}
 }
 
+func TestLookupCachedRemediationExpandedIPv6(t *testing.T) {
+	client := newTestDecisionCache()
+	storeKey := IPCacheKey("2001:db8::1/128")
+	client.Set(storeKey, cache.BannedValue, 60)
+	expanded := "2001:db8:0:0:0:0:0:1"
+	ipAddr := net.ParseIP(expanded)
+	got, _, err := LookupCachedRemediation(client, expanded, ipAddr, nil, nil)
+	if err != nil || got != cache.BannedValue {
+		t.Fatalf("expanded IPv6 got %q err %v, want ban", got, err)
+	}
+}
+
+func TestLookupCachedRemediationIPv4Mapped(t *testing.T) {
+	client := newTestDecisionCache()
+	storeKey := IPCacheKey("203.0.113.10/32")
+	client.Set(storeKey, cache.BannedValue, 60)
+	mapped := "::ffff:203.0.113.10"
+	ipAddr := net.ParseIP(mapped)
+	got, _, err := LookupCachedRemediation(client, mapped, ipAddr, nil, nil)
+	if err != nil || got != cache.BannedValue {
+		t.Fatalf("IPv4-mapped got %q err %v, want ban", got, err)
+	}
+}
+
+func TestApplyRangeBatchAbortOnUnreachableRead(t *testing.T) {
+	client := newTestDecisionCache()
+	AddRange(client, "10.0.0.0/8", cache.BannedValue, 60)
+
+	unreachable := &cache.Client{}
+	unreachable.New(logger.New("ERROR", ""), true, "127.0.0.1:1", nil, "", "", "p")
+	defer unreachable.Close()
+
+	err := ApplyRangeBatch(unreachable, map[string]string{"192.168.0.0/16": cache.BannedValue}, nil)
+	if err == nil || err.Error() != cache.CacheUnreachable {
+		t.Fatalf("want %s, got %v", cache.CacheUnreachable, err)
+	}
+	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != cache.BannedValue {
+		t.Fatalf("healthy index should be unchanged, got %q", got)
+	}
+}
+
+func TestApplyRangeBatchCacheMissStillApplies(t *testing.T) {
+	client := newTestDecisionCache()
+	if err := ApplyRangeBatch(client, map[string]string{"10.0.0.0/8": cache.BannedValue}, nil); err != nil {
+		t.Fatalf("miss apply: %v", err)
+	}
+	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != cache.BannedValue {
+		t.Fatalf("got %q, want ban", got)
+	}
+}
 func TestLookupCachedRemediationRangeLetterOnlyStillBans(t *testing.T) {
 	client := newTestDecisionCache()
 	membership := MembershipFromIndex("10.0.0.0/8=" + cache.BannedValue)
