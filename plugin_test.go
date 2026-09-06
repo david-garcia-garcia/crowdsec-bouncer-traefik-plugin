@@ -109,8 +109,8 @@ func TestServeHTTP(t *testing.T) {
 }
 
 func TestNew_SameConnectionFields_ShareIncarnation(t *testing.T) {
-	reclaim.ResetWith(0)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
@@ -131,8 +131,8 @@ func TestNew_SameConnectionFields_ShareIncarnation(t *testing.T) {
 }
 
 func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
-	reclaim.ResetWith(0)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	var hitsA, hitsB int64
 	lapiA := liveLAPI(t, map[string]bool{"1.2.3.4": true}, &hitsA)
@@ -173,8 +173,8 @@ func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 }
 
 func TestNew_ReclaimWithinGrace(t *testing.T) {
-	reclaim.ResetWith(500 * time.Millisecond)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(500 * time.Millisecond)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
@@ -198,33 +198,39 @@ func TestNew_ReclaimWithinGrace(t *testing.T) {
 }
 
 func TestNew_DisposeAfterGrace(t *testing.T) {
-	reclaim.ResetWith(20 * time.Millisecond)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(20 * time.Millisecond)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
 	t.Cleanup(func() { srv.Close() })
 	u, _ := url.Parse(srv.URL)
+	cfg := cfgLiveAt(u.Host)
 	ctx, cancel := context.WithCancel(context.Background())
-	first, err := New(ctx, testNextOK(), cfgLiveAt(u.Host), "dispose")
+	first, err := New(ctx, testNextOK(), cfg, "dispose")
 	if err != nil {
 		t.Fatal(err)
 	}
 	conn1 := testRoute(t, first).Connection()
 	cancel()
 	time.Sleep(150 * time.Millisecond)
+	view := reclaim.Peek(crowdsecconnection.Key(cfg))
+	if !view.OK || view.Holders != 0 || !view.Sleeping {
+		t.Fatalf("CrowdsecConnection must still be in its 30s grace after table 20ms: found=%v holders=%d sleeping=%v", view.OK, view.Holders, view.Sleeping)
+	}
+	time.Sleep(crowdsecconnection.ReclaimGraceDuration)
 	second, err := New(context.Background(), testNextOK(), cfgLiveAt(u.Host), "dispose")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if testRoute(t, second).Connection() == conn1 {
-		t.Fatal("after grace the previous CrowdsecConnection must be disposed")
+		t.Fatal("after CrowdsecConnection grace the previous incarnation must be disposed")
 	}
 }
 
 func TestNew_StreamVsLive_SideBySide(t *testing.T) {
-	reclaim.ResetWith(0)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	var streamHits, liveHits int64
 	streamSrv := liveLAPI(t, map[string]bool{"9.9.9.9": true}, &streamHits)
@@ -263,8 +269,8 @@ func TestNew_StreamVsLive_SideBySide(t *testing.T) {
 }
 
 func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
-	reclaim.ResetWith(0)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	var hits int64
 	srv := liveLAPI(t, map[string]bool{"8.8.8.8": true}, &hits)
@@ -313,8 +319,8 @@ func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
 }
 
 func TestNew_TwoStreamConnections_BothPoll(t *testing.T) {
-	reclaim.ResetWith(0)
-	t.Cleanup(func() { reclaim.ResetWith(reclaim.DefaultGrace) })
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
 
 	var hitsA, hitsB int64
 	a := liveLAPI(t, nil, &hitsA)
@@ -338,4 +344,93 @@ func TestNew_TwoStreamConnections_BothPoll(t *testing.T) {
 	if atomic.LoadInt64(&hitsA) < 1 || atomic.LoadInt64(&hitsB) < 1 {
 		t.Fatalf("LAPI hits A=%d B=%d", atomic.LoadInt64(&hitsA), atomic.LoadInt64(&hitsB))
 	}
+}
+
+func TestNew_SameStreamKeyDifferentMetrics_SharesConnection(t *testing.T) {
+	// CrowdSec stores both stream_cursor and usage-metrics on the bouncer row
+	// (hashed X-Api-Key + the IP LAPI sees). Two metrics intervals on one key
+	// must share one connection: a second ticker would steal stream deltas and
+	// POST a second metrics window for the same bouncer. Interval is first-wins.
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
+
+	var hits int64
+	srv := liveLAPI(t, nil, &hits)
+	t.Cleanup(func() { srv.Close() })
+	u, _ := url.Parse(srv.URL)
+
+	fast := cfgStreamAt(u.Host, 60)
+	fast.MetricsUpdateIntervalSeconds = 1
+	slow := cfgStreamAt(u.Host, 60)
+	slow.MetricsUpdateIntervalSeconds = 600
+
+	ctx := context.Background()
+	owner, err := New(ctx, testNextOK(), fast, "stream-fast")
+	if err != nil {
+		t.Fatal(err)
+	}
+	joiner, err := New(ctx, testNextOK(), slow, "stream-slow")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !testRoute(t, owner).SameConnection(testRoute(t, joiner)) {
+		t.Fatal("same LAPI key and different metrics interval must share one stream connection")
+	}
+	if atomic.LoadInt64(&hits) != 1 {
+		t.Fatalf("one ticker must poll once at startup, hits=%d", atomic.LoadInt64(&hits))
+	}
+}
+
+func TestNew_StreamSnapshotChangeDuringGrace_ReplacesTicker(t *testing.T) {
+	reclaim.ResetForTestWith(500 * time.Millisecond)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
+
+	var hits int64
+	srv := liveLAPI(t, nil, &hits)
+	t.Cleanup(func() { srv.Close() })
+	u, _ := url.Parse(srv.URL)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	firstCfg := cfgStreamAt(u.Host, 60)
+	firstCfg.MetricsUpdateIntervalSeconds = 1
+	first, err := New(ctx, testNextOK(), firstCfg, "stream-old")
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldConn := testRoute(t, first).Connection()
+	fetchesBeforeCancel := oldConn.StreamFetches()
+	cancel()
+	waitPluginStreamInGrace(t, firstCfg)
+
+	reloadCfg := cfgStreamAt(u.Host, 60)
+	reloadCfg.MetricsUpdateIntervalSeconds = 600
+	reloaded, err := New(context.Background(), testNextOK(), reloadCfg, "stream-new")
+	if err != nil {
+		t.Fatal(err)
+	}
+	newConn := testRoute(t, reloaded).Connection()
+	if newConn == oldConn {
+		t.Fatal("changed snapshot during grace must not reclaim the old ticker")
+	}
+	if oldConn.StreamFetches() != fetchesBeforeCancel {
+		t.Fatal("old ticker must be stopped before the new poller starts")
+	}
+	if newConn.StreamFetches() < 1 {
+		t.Fatal("new snapshot must poll LAPI")
+	}
+}
+
+func waitPluginStreamInGrace(t *testing.T, cfg *configuration.Config) {
+	t.Helper()
+	sessionKey := crowdsecconnection.SessionKey(cfg)
+	deadline := time.Now().Add(2 * time.Second)
+	var view reclaim.View
+	for time.Now().Before(deadline) {
+		view = reclaim.Peek(sessionKey)
+		if view.OK && view.Holders == 0 && view.Sleeping {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("stream session did not enter grace: found=%v holders=%d sleeping=%v", view.OK, view.Holders, view.Sleeping)
 }

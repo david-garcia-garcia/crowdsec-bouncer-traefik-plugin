@@ -15,6 +15,19 @@ import (
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
+// ReclaimGraceDuration is the wait after the last constructor ctx for a CrowdsecConnection slot.
+const ReclaimGraceDuration = 30 * time.Second
+
+// Operator-visible lifecycle and stream-health lines (stable for log grep).
+const (
+	MsgConnectionStarted  = "crowdsec connection started"
+	MsgConnectionSleeping = "crowdsec connection sleeping"
+	MsgConnectionWaking   = "crowdsec connection waking"
+	MsgConnectionClosed   = "crowdsec connection closed"
+	MsgStreamUnhealthy    = "crowdsec stream became unhealthy"
+	MsgStreamHealthy      = "crowdsec stream became healthy"
+)
+
 // Decision is the body returned from Crowdsec LAPI.
 type Decision struct {
 	ID        int    `json:"id"`
@@ -29,8 +42,9 @@ type Decision struct {
 
 // CrowdsecConnection owns stream ticker, isolated cache, in-process Range membership, LAPI/CAPI HTTP, metrics, and AppSec HTTP client.
 type CrowdsecConnection struct {
-	mu     sync.Mutex
-	closed bool
+	mu       sync.Mutex
+	closed   bool
+	sleeping bool // last reclaim holder gone; tickers stopped until Wake or Close
 
 	crowdsecScheme         string
 	crowdsecHost           string
@@ -41,6 +55,7 @@ type CrowdsecConnection struct {
 	crowdsecPassword       string
 	crowdsecScenarios      []string
 	updateInterval         int64
+	metricsInterval        int64
 	updateMaxFailure       int64
 	lapiFailureAction      string
 	defaultDecisionTimeout int64
@@ -69,8 +84,18 @@ type CrowdsecConnection struct {
 	streamStop              chan bool
 	metricsStop             chan bool
 	lastMetricsPush         time.Time
-	blockedRequests         int64
+	startedAt               time.Time
+	metricsMu               sync.Mutex
+	reportMu                sync.Mutex               // one usage-metrics POST at a time (ticker, Sleep drain, Close drain)
+	windowCounters          map[usageMetricKey]int64 // dropped counters for the current push window
+	processedIPv4           int64                    // processed ipv4; atomic on the request path
+	processedIPv6           int64
+	processedUnknown        int64 // processed when Family is empty
+	activeDecisions         map[usageMetricKey]int64
+	activeDecisionSlots     map[string]usageMetricKey
 	streamFetches           int64
+	streamOwner             string         // first middleware New that created this stream session
+	streamSettings          streamSettings // knobs that must not start a second poller; warn-and-wire if a joiner differs
 }
 
 // Prepare resolves secrets and CAPI/LAPI routing on cfg. Call before Key and New.
@@ -153,6 +178,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		crowdsecPassword:        config.CrowdsecCapiPassword,
 		crowdsecScenarios:       config.CrowdsecCapiScenarios,
 		updateInterval:          config.UpdateIntervalSeconds,
+		metricsInterval:         config.MetricsUpdateIntervalSeconds,
 		updateMaxFailure:        config.UpdateMaxFailure,
 		lapiFailureAction:       configuration.EffectiveFailureAction(config.CrowdsecLapiFailureAction),
 		defaultDecisionTimeout:  config.DefaultDecisionSeconds,
@@ -162,6 +188,10 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		crowdsecHeader:          crowdsecHeader,
 		log:                     log,
 		pluginVersion:           pluginVersion,
+		startedAt:               time.Now(),
+		windowCounters:          make(map[usageMetricKey]int64),
+		activeDecisions:         make(map[usageMetricKey]int64),
+		activeDecisionSlots:     make(map[string]usageMetricKey),
 		isCrowdsecStreamStartup: true,
 		isCrowdsecStreamHealthy: true,
 		httpClient: &http.Client{
@@ -187,6 +217,10 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 	if config.CrowdsecMode == configuration.AppsecMode {
 		return conn, nil
 	}
+	// Stream/alone prefix is SessionHex (LAPI URL+key), not IdentityHex.
+	// IdentityHex still includes intervals, so two middlewares on one key
+	// used to get two prefixes and two incomplete caches while sharing one
+	// CrowdSec stream cursor. Warn-and-wire must read the same keys.
 	conn.cacheClient.New(
 		log,
 		config.RedisCacheEnabled,
@@ -194,7 +228,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		config.RedisCacheReadHosts,
 		config.RedisCachePassword,
 		config.RedisCacheDatabase,
-		IdentityHex(config),
+		CachePrefix(config),
 	)
 
 	if err := conn.startStream(config, log); err != nil {
@@ -204,32 +238,95 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 	if config.MetricsUpdateIntervalSeconds > 0 {
 		conn.lastMetricsPush = time.Now()
 		go conn.handleMetricsTicker()
-		conn.metricsStop = startTicker("metrics", config.MetricsUpdateIntervalSeconds, log, func() {
+		conn.metricsStop = startTicker("metrics", conn.metricsInterval, log, func() {
 			conn.handleMetricsTicker()
 		})
 	}
 
-	conn.log.Debug("CrowdsecConnection initialized mode:" + config.CrowdsecMode)
+	conn.logInfo(MsgConnectionStarted)
 	return conn, nil
 }
 
 // Close stops tickers, idle HTTP connections, and the cache Redis pool. Safe to call more than once.
+// Remaining usage-metrics are POSTed to LAPI before HTTP is torn down.
 func (c *CrowdsecConnection) Close() {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if c.closed {
+		c.mu.Unlock()
 		return
 	}
 	c.closed = true
+	c.sleeping = false
 	stopTicker(c.streamStop)
 	stopTicker(c.metricsStop)
 	c.streamStop = nil
 	c.metricsStop = nil
+	c.mu.Unlock()
+
+	c.drainMetrics()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	closeIdle(c.httpClient)
 	closeIdle(c.httpAppsecClient)
 	if c.cacheClient != nil {
 		c.cacheClient.Close()
 	}
+	c.logInfo(MsgConnectionClosed)
+}
+
+// Sleep stops stream and metrics tickers and keeps HTTP, cache, and the LAPI
+// cursor. Reclaim calls this when the last constructor ctx is gone. Not Close.
+// Remaining usage-metrics are POSTed asynchronously so the reclaim table lock is not held on LAPI.
+func (c *CrowdsecConnection) Sleep() {
+	c.mu.Lock()
+	if c.closed || c.sleeping {
+		c.mu.Unlock()
+		return
+	}
+	c.sleeping = true
+	stopTicker(c.streamStop)
+	stopTicker(c.metricsStop)
+	c.streamStop = nil
+	c.metricsStop = nil
+	c.mu.Unlock()
+	c.logInfo(MsgConnectionSleeping)
+	go c.drainMetrics()
+}
+
+// Wake starts stream and metrics tickers again after Sleep. startup=false: the
+// cache is still warm; CrowdSec still holds stream_cursor on the bouncer row.
+func (c *CrowdsecConnection) Wake() {
+	c.mu.Lock()
+	if c.closed || !c.sleeping {
+		c.mu.Unlock()
+		return
+	}
+	c.sleeping = false
+	resumeStream := c.crowdsecMode == configuration.StreamMode || c.crowdsecMode == configuration.AloneMode
+	if resumeStream && c.streamStop == nil {
+		c.streamStop = startTicker("stream", c.updateInterval, c.log, func() {
+			c.handleStreamTicker()
+		})
+	}
+	if c.metricsInterval > 0 && c.metricsStop == nil {
+		c.metricsStop = startTicker("metrics", c.metricsInterval, c.log, func() {
+			c.handleMetricsTicker()
+		})
+	}
+	c.mu.Unlock()
+	c.logInfo(MsgConnectionWaking)
+	if resumeStream {
+		go c.handleStreamTicker()
+	}
+}
+
+// logInfo writes an operator-visible lifecycle line with mode and LAPI host.
+func (c *CrowdsecConnection) logInfo(msg string) {
+	if c.log == nil {
+		return
+	}
+	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost)
 }
 
 func stopTicker(stop chan bool) {
@@ -320,9 +417,4 @@ func (c *CrowdsecConnection) RedisUnreachableBlock() bool {
 // StreamFetches is how many times this connection actually called the stream endpoint.
 func (c *CrowdsecConnection) StreamFetches() int64 {
 	return atomic.LoadInt64(&c.streamFetches)
-}
-
-// IncBlocked increments the dropped-request metric.
-func (c *CrowdsecConnection) IncBlocked() {
-	atomic.AddInt64(&c.blockedRequests, 1)
 }

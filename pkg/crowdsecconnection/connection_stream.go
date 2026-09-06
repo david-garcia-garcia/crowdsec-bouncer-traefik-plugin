@@ -50,10 +50,14 @@ func (c *CrowdsecConnection) handleStreamTicker() {
 		c.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", c.updateFailure, c.isCrowdsecStreamHealthy, err.Error()))
 		if c.updateMaxFailure != -1 && c.updateFailure >= c.updateMaxFailure && c.isCrowdsecStreamHealthy {
 			c.isCrowdsecStreamHealthy = false
+			c.logInfo(MsgStreamUnhealthy)
 			c.log.Error(fmt.Sprintf("handleStreamTicker:error updateFailure:%d %s", c.updateFailure, err.Error()))
 		}
 		c.updateFailure++
 	} else {
+		if !c.isCrowdsecStreamHealthy {
+			c.logInfo(MsgStreamHealthy)
+		}
 		c.isCrowdsecStreamHealthy = true
 		c.updateFailure = 0
 	}
@@ -102,7 +106,9 @@ func (c *CrowdsecConnection) handleStreamCache() error {
 			value := decisionscope.RemediationValue(decision.Type)
 			cidr := strings.TrimSpace(decision.Value)
 			if value != "" && cidr != "" {
-				rangeUpserts[cidr] = value
+				origin := MetricsOrigin(decision.Origin, decision.Scenario)
+				rangeUpserts[cidr] = cache.RemediationWithOrigin(value, origin)
+				c.rememberActiveDecision("range:"+cidr, origin, cidr)
 			}
 			continue
 		}
@@ -112,6 +118,7 @@ func (c *CrowdsecConnection) handleStreamCache() error {
 		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
 			if cidr := strings.TrimSpace(decision.Value); cidr != "" {
 				rangeRemovals = append(rangeRemovals, cidr)
+				c.forgetActiveDecision("range:" + cidr)
 			}
 			continue
 		}
