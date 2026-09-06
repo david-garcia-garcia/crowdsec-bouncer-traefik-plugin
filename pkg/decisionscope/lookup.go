@@ -2,6 +2,7 @@ package decisionscope
 
 import (
 	"errors"
+	"net"
 	"net/http"
 	"sort"
 	"strings"
@@ -61,8 +62,9 @@ func RequestScopeValues(headers map[string]string, req *http.Request) map[string
 
 // LookupCachedRemediation merges Ip, Range, and present header-scope hits. Ban wins across those scopes.
 // Stream and alone Range hits come from membership, not from a range-index GetMany.
-// The returned remediation is the letter only; origin is the metrics origin of the winning Ip/header value (empty for Range-only).
-func LookupCachedRemediation(cacheClient *cache.Client, mode, remoteIP string, scopes map[string]string, membership *RangeMembership) (string, string, error) {
+// The returned remediation is the letter only; origin is the metrics origin of the winning Ip, header, or Range value.
+// ipAddr is the net.IP GetRemoteIP already yielded; remoteIP remains the cache key.
+func LookupCachedRemediation(cacheClient *cache.Client, mode, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, error) {
 	useRangeMembership := mode == configuration.StreamMode || mode == configuration.AloneMode
 	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, scopes))
 	if err != nil {
@@ -71,7 +73,7 @@ func LookupCachedRemediation(cacheClient *cache.Client, mode, remoteIP string, s
 	// Merge Ip, Range, and header hits so a Country ban beats a Range captcha.
 	chosen := found[remoteIP]
 	if useRangeMembership {
-		chosen = PreferRemediation(chosen, membership.Remediation(remoteIP))
+		chosen = PreferRemediation(chosen, membership.Remediation(ipAddr))
 	}
 	for scope, identifier := range scopes {
 		if identifier == "" {

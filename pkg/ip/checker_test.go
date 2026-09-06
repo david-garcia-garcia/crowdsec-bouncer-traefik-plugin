@@ -115,7 +115,7 @@ func TestGetRemoteIP(t *testing.T) {
 
 	t.Run("trusted hops skipped, client kept", func(t *testing.T) {
 		req := newTestTrustRequest("192.0.2.9:80", "X-Forwarded-For", "203.0.113.10, 10.0.0.1")
-		got, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
+		got, _, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
 		if err != nil || got != "203.0.113.10" {
 			t.Fatalf("GetRemoteIP = %q, %v want 203.0.113.10", got, err)
 		}
@@ -123,7 +123,7 @@ func TestGetRemoteIP(t *testing.T) {
 
 	t.Run("empty header uses RemoteAddr", func(t *testing.T) {
 		req := newTestTrustRequest("192.0.2.1:12345", "X-Forwarded-For", "")
-		got, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
+		got, _, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
 		if err != nil || got != "192.0.2.1" {
 			t.Fatalf("GetRemoteIP = %q, %v want 192.0.2.1", got, err)
 		}
@@ -131,7 +131,7 @@ func TestGetRemoteIP(t *testing.T) {
 
 	t.Run("all hops trusted uses RemoteAddr", func(t *testing.T) {
 		req := newTestTrustRequest("192.0.2.9:80", "X-Forwarded-For", "10.0.0.1")
-		got, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
+		got, _, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
 		if err != nil || got != "192.0.2.9" {
 			t.Fatalf("GetRemoteIP = %q, %v want 192.0.2.9", got, err)
 		}
@@ -139,7 +139,7 @@ func TestGetRemoteIP(t *testing.T) {
 
 	t.Run("empty header segments skipped", func(t *testing.T) {
 		req := newTestTrustRequest("192.0.2.9:80", "X-Forwarded-For", "203.0.113.10, , 10.0.0.1")
-		got, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
+		got, _, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
 		if err != nil || got != "203.0.113.10" {
 			t.Fatalf("GetRemoteIP = %q, %v want 203.0.113.10", got, err)
 		}
@@ -147,7 +147,7 @@ func TestGetRemoteIP(t *testing.T) {
 
 	t.Run("custom header name", func(t *testing.T) {
 		req := newTestTrustRequest("192.0.2.9:80", "X-Real-IP", "203.0.113.10, 10.0.0.1")
-		got, err := GetRemoteIP(req, strategy, "X-Real-IP")
+		got, _, err := GetRemoteIP(req, strategy, "X-Real-IP")
 		if err != nil || got != "203.0.113.10" {
 			t.Fatalf("GetRemoteIP custom header = %q, %v want 203.0.113.10", got, err)
 		}
@@ -155,7 +155,7 @@ func TestGetRemoteIP(t *testing.T) {
 
 	t.Run("RemoteAddr without port fails", func(t *testing.T) {
 		req := newTestTrustRequest("192.0.2.1", "X-Forwarded-For", "")
-		_, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
+		_, _, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
 		if err == nil {
 			t.Fatal("expected error for RemoteAddr without port")
 		}

@@ -102,8 +102,9 @@ func (c *CrowdsecConnection) handleStreamCache() error {
 			value := decisionscope.RemediationValue(decision.Type)
 			cidr := strings.TrimSpace(decision.Value)
 			if value != "" && cidr != "" {
-				rangeUpserts[cidr] = value
-				c.rememberActiveDecision("range:"+cidr, MetricsOrigin(decision.Origin, decision.Scenario), cidr)
+				origin := MetricsOrigin(decision.Origin, decision.Scenario)
+				rangeUpserts[cidr] = cache.RemediationWithOrigin(value, origin)
+				c.rememberActiveDecision("range:"+cidr, origin, cidr)
 			}
 			continue
 		}

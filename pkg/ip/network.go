@@ -23,13 +23,18 @@ func InNetwork(addr, network string) (bool, error) {
 	return ipAddr.Equal(other), nil
 }
 
-// Family is ipv4 or ipv6 for an address GetRemoteIP already returned. Empty if unparseable.
+// Family is ipv4 or ipv6 for a host string (decision values, tests). Empty if unparseable.
+// Request-path ip_type uses FamilyOfIP on the net.IP GetRemoteIP already yielded.
 func Family(addr string) string {
-	parsed := net.ParseIP(strings.TrimSpace(addr))
-	if parsed == nil {
+	return FamilyOfIP(net.ParseIP(strings.TrimSpace(addr)))
+}
+
+// FamilyOfIP is ipv4 or ipv6 for a net.IP. Empty if nil.
+func FamilyOfIP(ipAddr net.IP) string {
+	if ipAddr == nil {
 		return ""
 	}
-	if parsed.To4() != nil {
+	if ipAddr.To4() != nil {
 		return "ipv4"
 	}
 	return "ipv6"

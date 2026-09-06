@@ -12,7 +12,7 @@ _Avoid_: CrowdSec LAPI captcha remediation
 
 ## Overview
 
-`CrowdsecConnection.AppsecQuery` owns the AppSec HTTP round-trip and JSON parse. `Bouncer` owns writing the client response or the operator ban template. Client IP is `pkg/ip.GetRemoteIP` only.
+`CrowdsecConnection.AppsecQuery` owns the AppSec HTTP round-trip and JSON parse. `Bouncer` owns writing the client response or the operator ban template. Client IP is `pkg/ip.GetRemoteIP` only; AppSec handlers take `clientRequest` still named `req`.
 
 ## How to use
 
@@ -25,13 +25,14 @@ _Avoid_: CrowdSec LAPI captcha remediation
 ## Pattern snippet
 
 ```go
-decision, err := b.conn.AppsecQuery(remoteIP, req, pol)
+decision, err := b.conn.AppsecQuery(req.remoteIP, req.Request, pol)
 ```
 
 ## Key files
 
 - `pkg/crowdsecconnection/connection_appsec.go`
 - `pkg/bouncer/bouncer.go`
+- `pkg/bouncer/clientrequest.go`
 
 ## Gotchas
 

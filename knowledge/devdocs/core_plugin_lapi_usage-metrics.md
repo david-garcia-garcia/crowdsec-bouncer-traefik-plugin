@@ -16,24 +16,24 @@ Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. S
 
 ## How to use
 
-- Classify `ip_type` with `ip.Family` on the GetRemoteIP string. Do not parse `RemoteAddr`.
+- Classify `ip_type` with `ip.FamilyOfIP` on the `net.IP` GetRemoteIP already yielded (`req.ipType` on the request path). Do not parse `RemoteAddr`. Do not call `ip.Family` on the client string on the request path.
 - Build origin with `MetricsOrigin(decision.Origin, decision.Scenario)` before cache store and before `IncDropped`.
 - AppSec remediations use `origin=appsec`. Fail-closed drops use `plugin:tech_getremotefail`, `plugin:tech_trustipfail`, `plugin:tech_cachefail`, `plugin:tech_streamfail`, `plugin:lapi_failure`, or `plugin:appsec_failure`.
-- Persist origin on Ip/header cache via `cache.RemediationWithOrigin`. Range-index stays letter-only; range-only drops omit origin.
+- Persist origin on Ip/header and Range-index via `cache.RemediationWithOrigin`. Bare letter-only Range lines still match and MAY omit origin.
 - Stamp `utc_startup_timestamp` once in `New` (`startedAt`). `feature_flags` must marshal as `[]`, not `{}`.
 
 ## Pattern snippet
 
 ```go
-conn.IncProcessed(ip.Family(remoteIP))
-conn.IncDropped(cache.RemediationOrigin(stored), ip.Family(remoteIP), "ban")
+conn.IncProcessed(req.ipType)
+conn.IncDropped(cache.RemediationOrigin(stored), req.ipType, "ban")
 ```
 
 ## Key files
 
 - `pkg/crowdsecconnection/connection_metrics.go`
 - `pkg/cache/remediation.go`
-- `pkg/ip/network.go` (`Family`, `FamilyOfHostOrCIDR`)
+- `pkg/ip/network.go` (`Family`, `FamilyOfIP`, `FamilyOfHostOrCIDR`)
 - `pkg/bouncer/bouncer.go`
 
 ## Gotchas
