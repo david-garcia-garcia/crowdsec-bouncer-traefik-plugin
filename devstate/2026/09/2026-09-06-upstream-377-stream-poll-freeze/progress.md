@@ -7,7 +7,7 @@ JobName: 2026-09-06-upstream-377-stream-poll-freeze
 | prepare | [x] | [x] | 2026-09-06T15:05:53Z |
 | explore | [x] | [x] | 2026-09-06T15:13:03Z |
 | propose | [x] | [x] | 2026-09-06T15:17:14Z |
-| implement | [ ] | [ ] | |
+| implement | [x] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
