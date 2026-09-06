@@ -41,38 +41,34 @@ func MembershipFromIndex(index string) *RangeMembership {
 }
 
 // Remediation returns the stored string of the winning CIDR (ban over captcha), or empty.
-func (membership *RangeMembership) Remediation(remoteIP string) string {
-	if membership == nil {
-		return ""
-	}
-	parsed := net.ParseIP(remoteIP)
-	if parsed == nil {
+func (membership *RangeMembership) Remediation(ipAddr net.IP) string {
+	if membership == nil || ipAddr == nil {
 		return ""
 	}
 	if membership.ban != nil {
-		found, prefixLen, err := membership.ban.IsContained(parsed)
+		found, prefixLen, err := membership.ban.IsContained(ipAddr)
 		if err == nil && found {
-			return membership.storedMatchingPrefix(parsed, prefixLen, cache.BannedValue)
+			return membership.storedMatchingPrefix(ipAddr, prefixLen, cache.BannedValue)
 		}
 	}
 	if membership.captcha != nil {
-		found, prefixLen, err := membership.captcha.IsContained(parsed)
+		found, prefixLen, err := membership.captcha.IsContained(ipAddr)
 		if err == nil && found {
-			return membership.storedMatchingPrefix(parsed, prefixLen, cache.CaptchaValue)
+			return membership.storedMatchingPrefix(ipAddr, prefixLen, cache.CaptchaValue)
 		}
 	}
 	return ""
 }
 
 // storedMatchingPrefix returns the stored remediation of the CIDR that matches prefixLen, else any containing CIDR of that kind.
-func (membership *RangeMembership) storedMatchingPrefix(parsed net.IP, prefixLen int, kind string) string {
+func (membership *RangeMembership) storedMatchingPrefix(ipAddr net.IP, prefixLen int, kind string) string {
 	fallback := ""
 	for cidr, stored := range membership.storedByCIDR {
 		if cache.RemediationKind(stored) != kind {
 			continue
 		}
 		_, network, err := net.ParseCIDR(cidr)
-		if err != nil || network == nil || !network.Contains(parsed) {
+		if err != nil || network == nil || !network.Contains(ipAddr) {
 			continue
 		}
 		ones, _ := network.Mask.Size()
