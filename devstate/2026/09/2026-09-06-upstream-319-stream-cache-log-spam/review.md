@@ -39,3 +39,9 @@ phase: archive
 findings: folded Stream poll ticks stay at DEBUG onto core_plugin_lapi_connection
 fixed: archive/2026-09-06-prove-stream-cache-tick-debug; baseline spec append
 skipped: none
+
+## pullrequest (2026-09-06)
+phase: pullrequest
+findings: CI Main + both e2e succeeded; title ready; no comments
+fixed: PR #54 title and final card
+skipped: none
