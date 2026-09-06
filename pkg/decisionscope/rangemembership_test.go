@@ -12,31 +12,31 @@ func ipOf(addr string) net.IP {
 }
 
 func TestMembershipFromIndexBanWinsOverLongerCaptcha(t *testing.T) {
-	index := "10.0.0.0/8=" + cache.BannedValue + "\n10.1.0.0/16=" + cache.CaptchaValue
+	index := "10.0.0.0/8=" + BannedValue + "\n10.1.0.0/16=" + CaptchaValue
 	got := MembershipFromIndex(index).Remediation(ipOf("10.1.2.3"))
-	if got != cache.BannedValue {
+	if got != BannedValue {
 		t.Fatalf("got %q, want ban", got)
 	}
 }
 
 func TestMembershipFromIndexLongerBanWinsOverCaptcha(t *testing.T) {
-	index := "10.0.0.0/8=" + cache.CaptchaValue + "\n10.1.0.0/16=" + cache.BannedValue
+	index := "10.0.0.0/8=" + CaptchaValue + "\n10.1.0.0/16=" + BannedValue
 	got := MembershipFromIndex(index).Remediation(ipOf("10.1.2.3"))
-	if got != cache.BannedValue {
+	if got != BannedValue {
 		t.Fatalf("got %q, want ban", got)
 	}
 }
 
 func TestMembershipFromIndexCaptchaOnly(t *testing.T) {
-	index := "10.0.0.0/8=" + cache.CaptchaValue
+	index := "10.0.0.0/8=" + CaptchaValue
 	got := MembershipFromIndex(index).Remediation(ipOf("10.1.2.3"))
-	if got != cache.CaptchaValue {
+	if got != CaptchaValue {
 		t.Fatalf("got %q, want captcha", got)
 	}
 }
 
 func TestMembershipFromIndexMiss(t *testing.T) {
-	index := "10.0.0.0/8=" + cache.BannedValue
+	index := "10.0.0.0/8=" + BannedValue
 	if got := MembershipFromIndex(index).Remediation(ipOf("203.0.113.10")); got != "" {
 		t.Fatalf("outside range got %q", got)
 	}
@@ -52,16 +52,16 @@ func TestMembershipFromIndexEmpty(t *testing.T) {
 }
 
 func TestMembershipFromIndexSkipsInvalidCIDR(t *testing.T) {
-	index := "not-a-cidr=" + cache.BannedValue + "\n10.0.0.0/8=" + cache.CaptchaValue
+	index := "not-a-cidr=" + BannedValue + "\n10.0.0.0/8=" + CaptchaValue
 	got := MembershipFromIndex(index).Remediation(ipOf("10.1.2.3"))
-	if got != cache.CaptchaValue {
+	if got != CaptchaValue {
 		t.Fatalf("invalid line should be skipped, got %q", got)
 	}
 }
 
 func TestMembershipFromIndexIPv6(t *testing.T) {
-	index := "2001:db8::/32=" + cache.BannedValue
-	if got := MembershipFromIndex(index).Remediation(ipOf("2001:db8::1")); got != cache.BannedValue {
+	index := "2001:db8::/32=" + BannedValue
+	if got := MembershipFromIndex(index).Remediation(ipOf("2001:db8::1")); got != BannedValue {
 		t.Fatalf("ipv6 got %q, want ban", got)
 	}
 	if got := MembershipFromIndex(index).Remediation(ipOf("10.1.2.3")); got != "" {
@@ -70,7 +70,7 @@ func TestMembershipFromIndexIPv6(t *testing.T) {
 }
 
 func TestMembershipFromIndexReturnsOriginSuffix(t *testing.T) {
-	stored := cache.RemediationWithOrigin(cache.BannedValue, "crowdsec")
+	stored := cache.RemediationWithOrigin(BannedValue, "crowdsec")
 	got := MembershipFromIndex("10.0.0.0/8=" + stored).Remediation(ipOf("10.1.2.3"))
 	if got != stored {
 		t.Fatalf("got %q, want suffixed ban", got)
@@ -78,15 +78,15 @@ func TestMembershipFromIndexReturnsOriginSuffix(t *testing.T) {
 }
 
 func TestMembershipFromIndexLetterOnlyStillBans(t *testing.T) {
-	got := MembershipFromIndex("10.0.0.0/8=" + cache.BannedValue).Remediation(ipOf("10.1.2.3"))
-	if got != cache.BannedValue {
+	got := MembershipFromIndex("10.0.0.0/8=" + BannedValue).Remediation(ipOf("10.1.2.3"))
+	if got != BannedValue {
 		t.Fatalf("letter-only got %q, want ban", got)
 	}
 }
 
 func TestMembershipFromIndexOverlappingBansLongestPrefixOrigin(t *testing.T) {
-	wide := cache.RemediationWithOrigin(cache.BannedValue, "crowdsec")
-	narrow := cache.RemediationWithOrigin(cache.BannedValue, "cscli")
+	wide := cache.RemediationWithOrigin(BannedValue, "crowdsec")
+	narrow := cache.RemediationWithOrigin(BannedValue, "cscli")
 	index := "10.0.0.0/8=" + wide + "\n10.1.0.0/16=" + narrow
 	got := MembershipFromIndex(index).Remediation(ipOf("10.1.2.3"))
 	if got != narrow {

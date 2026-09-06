@@ -86,7 +86,7 @@ func (c *Client) queryLiveDecisions(rawQuery string) (string, time.Duration, err
 		return "", 0, err
 	}
 	if bytes.Equal(body, []byte("null")) {
-		return cache.NoBannedValue, 0, nil
+		return decisionscope.NoBannedValue, 0, nil
 	}
 	var items []Decision
 	err = json.Unmarshal(body, &items)
@@ -94,11 +94,11 @@ func (c *Client) queryLiveDecisions(rawQuery string) (string, time.Duration, err
 		return "", 0, fmt.Errorf("handleNoStreamCache:parseBody %w", err)
 	}
 	if len(items) == 0 {
-		return cache.NoBannedValue, 0, nil
+		return decisionscope.NoBannedValue, 0, nil
 	}
 	picked := strongestLiveDecision(items)
 	if picked == nil {
-		return cache.NoBannedValue, 0, nil
+		return decisionscope.NoBannedValue, 0, nil
 	}
 	parsedDuration, err := time.ParseDuration(picked.Duration)
 	if err != nil {
@@ -106,7 +106,7 @@ func (c *Client) queryLiveDecisions(rawQuery string) (string, time.Duration, err
 	}
 	value := decisionscope.RemediationValue(picked.Type)
 	if value == "" {
-		return cache.NoBannedValue, 0, nil
+		return decisionscope.NoBannedValue, 0, nil
 	}
 	return cache.RemediationWithOrigin(value, MetricsOrigin(picked.Origin, picked.Scenario)), parsedDuration, nil
 }
@@ -149,7 +149,7 @@ func (c *Client) cacheLiveScope(key, value string, parsedDuration time.Duration,
 		return
 	}
 	if !decisionscope.IsActiveRemediation(value) {
-		c.cacheClient.Set(key, cache.NoBannedValue, c.defaultDecisionTimeout)
+		c.cacheClient.Set(key, decisionscope.NoBannedValue, c.defaultDecisionTimeout)
 		return
 	}
 	c.cacheClient.Set(key, value, c.liveCacheTTL(parsedDuration))

@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
@@ -201,7 +201,7 @@ func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 	}
 
 	got, err := testRoute(t, hb).LapiClient().Cache().Get("1.2.3.4")
-	if err == nil && got == cache.BannedValue {
+	if err == nil && got == decisionscope.BannedValue {
 		t.Fatal("B's cache must not contain A's ban")
 	}
 }
