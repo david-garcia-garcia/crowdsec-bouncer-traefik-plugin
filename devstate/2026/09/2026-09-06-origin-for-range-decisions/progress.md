@@ -10,5 +10,5 @@ JobName: 2026-09-06-origin-for-range-decisions
 | implement | [x] | [x] | 2026-09-06T05:31:42Z |
 | codereview | [x] | [x] | 2026-09-06T05:38:31Z |
 | devdocsimpact | [x] | [x] | 2026-09-06T05:40:18Z |
-| archive | [x] | [ ] | |
-| pullrequest | [ ] | [ ] | |
+| archive | [x] | [x] | 2026-09-06T05:42:04Z |
+| pullrequest | [x] | [ ] | |

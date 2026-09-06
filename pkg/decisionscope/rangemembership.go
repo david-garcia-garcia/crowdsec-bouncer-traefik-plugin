@@ -10,8 +10,8 @@ import (
 
 // RangeMembership is in-process ban-then-captcha CIDR membership rebuilt from range-index.
 type RangeMembership struct {
-	ban          *iplookup.Helper // CIDRs whose remediation is ban
-	captcha      *iplookup.Helper // CIDRs whose remediation is captcha
+	ban          *iplookup.Helper  // CIDRs whose remediation is ban
+	captcha      *iplookup.Helper  // CIDRs whose remediation is captcha
 	storedByCIDR map[string]string // cidr -> stored letter or letter plus origin suffix
 }
 
