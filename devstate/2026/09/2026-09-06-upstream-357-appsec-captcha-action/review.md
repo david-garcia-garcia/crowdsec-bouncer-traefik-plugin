@@ -21,3 +21,9 @@ phase: implement
 findings: captcha parse and relay tests landed; no product behavior change
 fixed: n/a
 skipped: n/a
+
+## codereview (2026-09-06)
+phase: codereview
+findings: all five axes none
+fixed: n/a
+skipped: n/a
