@@ -13,7 +13,7 @@ Construct a new `Client` on each LAPI Client. Pass `lapi.CachePrefix(cfg)` as Re
 ## How to use
 
 - Memory: `Client.New(..., isRedis=false, ..., keyPrefix)` — prefix is ignored; each Client owns a map.
-- Redis: pass `lapi.CachePrefix(cfg)` as `keyPrefix` (stream/alone session hex, live/none `IdentityHex`). Logical keys are the client IP, `scope:value`, and `range-index`; the store writes `prefix:key`.
+- Redis: pass `lapi.CachePrefix(cfg)` as `keyPrefix` (stream/alone session hex, live/none `IdentityHex`). Logical keys are the client IP, `scope:value`, `range-index`, and captcha grace `{remoteIP}_captcha_{token}`; the store writes `prefix:key`.
 - Same reclaim key → same LAPI Client → same cache Client (share-by-identity, not a process dump).
 - `Client.Close()` drains Redis idle pools. Call it from `lapi.Client.Close()`. Memory clients are a no-op.
 
@@ -33,4 +33,4 @@ c.New(log, redisOn, writeHost, readHosts, pass, database, lapi.CachePrefix(cfg))
 ## Gotchas
 
 - No migration of existing Redis keys: two LAPI Clients that previously shared keys now isolate.
-- Real-stack restart cases still need distinct `X-Forwarded-For` per TTL, because an Ip key is still the client IP inside one LAPI Client. Header-scope and `range-index` keys are extra keys on the same cache Client.
+- Real-stack restart cases still need distinct `X-Forwarded-For` per TTL, because an Ip key is still the client IP inside one LAPI Client. Header-scope and `range-index` keys are extra keys on the same cache Client. Captcha grace is `{remoteIP}_captcha_{token}` on that Client, not `{ip}_captcha`.

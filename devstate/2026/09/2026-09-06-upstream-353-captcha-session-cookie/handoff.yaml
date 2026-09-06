@@ -1,0 +1,17 @@
+issueKey: 2026-09-06-upstream-353-captcha-session-cookie
+jobName: 2026-09-06-upstream-353-captcha-session-cookie
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:0df37d67ef19a528e5c4bf5ff8c9783b7f61be16911d790ad01e72f54bd60658
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: captcha-session-cookie
+pr:
+  id: 45
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/45

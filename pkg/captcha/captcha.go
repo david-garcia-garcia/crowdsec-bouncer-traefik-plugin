@@ -2,6 +2,8 @@
 package captcha
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -12,6 +14,11 @@ import (
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+)
+
+const (
+	sessionCookieName = "crowdsec_captcha"
+	sessionTokenBytes = 16
 )
 
 // Client Captcha client.
@@ -94,8 +101,17 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		return
 	}
 	if valid {
+		// Issue a per-session cookie and store grace under IP plus that token.
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
-		c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds)
+		var token string
+		token, err = newSessionToken()
+		if err != nil {
+			c.log.Info("captcha:ServeHTTP session token " + err.Error())
+			rw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		c.cacheClient.Set(sessionCacheKey(remoteIP, token), cache.CaptchaDoneValue, c.gracePeriodSeconds)
+		setSessionCookie(rw, r, token, c.gracePeriodSeconds)
 		if c.remediationCustomHeader != "" {
 			rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
 		}
@@ -117,12 +133,70 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	}
 }
 
-// Check Verify if the captcha is already done.
-func (c *Client) Check(remoteIP string) bool {
-	value, _ := c.cacheClient.Get(remoteIP + "_captcha")
+// Check reports whether this request already holds a live captcha session for remoteIP.
+func (c *Client) Check(r *http.Request, remoteIP string) bool {
+	// Read the session token from crowdsec_captcha; missing or malformed is unsolved.
+	token := sessionTokenFromRequest(r)
+	if token == "" {
+		c.log.Debug(fmt.Sprintf("captcha:Check ip:%s pass:false", remoteIP))
+		return false
+	}
+	// Look up grace for this IP plus token; leftover IP-only keys are not read.
+	value, _ := c.cacheClient.Get(sessionCacheKey(remoteIP, token))
 	passed := value == cache.CaptchaDoneValue
 	c.log.Debug(fmt.Sprintf("captcha:Check ip:%s pass:%v", remoteIP, passed))
 	return passed
+}
+
+// sessionCacheKey is the isolated-cache key for one solved captcha session.
+func sessionCacheKey(remoteIP, token string) string {
+	return remoteIP + "_captcha_" + token
+}
+
+// newSessionToken returns a hex token for the captcha session cookie.
+func newSessionToken() (string, error) {
+	raw := make([]byte, sessionTokenBytes)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(raw), nil
+}
+
+// sessionTokenFromRequest reads crowdsec_captcha when it is a hex token of the expected length.
+func sessionTokenFromRequest(r *http.Request) string {
+	// Nil request has no cookie.
+	if r == nil {
+		return ""
+	}
+	// Read crowdsec_captcha when present.
+	cookie, err := r.Cookie(sessionCookieName)
+	if err != nil || cookie == nil {
+		return ""
+	}
+	token := cookie.Value
+	// Reject tokens that are not the expected hex length.
+	if len(token) != hex.EncodedLen(sessionTokenBytes) {
+		return ""
+	}
+	// Reject non-hex values so they cannot become cache keys.
+	if _, err = hex.DecodeString(token); err != nil {
+		return ""
+	}
+	return token
+}
+
+// setSessionCookie writes the HttpOnly captcha session cookie onto rw.
+func setSessionCookie(rw http.ResponseWriter, r *http.Request, token string, gracePeriodSeconds int64) {
+	cookie := &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int(gracePeriodSeconds),
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r != nil && r.TLS != nil,
+	}
+	http.SetCookie(rw, cookie)
 }
 
 type responseProvider struct {
