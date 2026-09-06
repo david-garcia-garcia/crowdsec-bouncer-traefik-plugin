@@ -7,8 +7,8 @@ One cache blob at key `range-index` whose lines are `cidr=remediation`. Remediat
 _Avoid_: walking the blob on the request path, one cache key per CIDR, LAPI `?ip=` on the stream path
 
 **Range membership**:
-Two boolean CIDR sets (ban, captcha) on the reclaimed LAPI Client plus the stored remediation string per CIDR. Stream/alone request lookup asks this pair. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s stored suffix.
-_Avoid_: trusted-IP Checker, one LPM tree with a stored remediation, `sync.Once`, package globals
+Two boolean CIDR sets (ban, captcha) on the reclaimed LAPI Client plus the stored remediation string per CIDR. Request lookup always asks this pair. Nil or empty (live/none never hydrate) is a Range miss. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s stored suffix.
+_Avoid_: trusted-IP Checker, one LPM tree with a stored remediation, `sync.Once`, package globals, a Crowdsec-mode flag on lookup
 
 **Header-mapped scope**:
 A CrowdSec scope other than Ip/Range whose value comes from a request header named in `decisionScopeHeaders`. Country and AS are normalized; a missing header skips that scope.
@@ -25,16 +25,16 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 ## How to use
 
 - Pass `decisionScopeHeaders` from config into the LAPI Client (identity, stream `scopes=`, live `scope`+`value` queries). The bouncer reads `lapiClient.DecisionScopeHeaders()` for request headers. Do not store a second copy on Bouncer.
-- Resolve the client IP with `pkg/ip.GetRemoteIP`. Then `LookupCachedRemediation` with `useRangeMembership` true for stream/alone (and `lapiClient.RangeMembership()`). Pass `req.ipAddr` into Range membership. Matching uses the first letter; origin is for usage-metrics only. Do not put scopes on `clientRequest`.
+- Resolve the client IP with `pkg/ip.GetRemoteIP`. Then `LookupCachedRemediation` with `lapiClient.RangeMembership()`. Pass `req.ipAddr` into Range membership. Matching uses the first letter; origin is for usage-metrics only. Do not put scopes on `clientRequest`.
 - Stream Range items: collect the tick, then `ApplyRangeBatch` (one read, one write) with `RemediationWithOrigin`. Hydrate membership from the blob after apply and on a lease hit. Do not GET+SET per Range line.
-- Live/none: keep `?ip=` (LAPI expands Range). Add `scope`+`value` when a mapped header is present. Skip `range-index` and membership on none.
+- Live/none: keep `?ip=` (LAPI expands Range). Add `scope`+`value` when a mapped header is present. Do not hydrate membership. A cache miss still live-looks-up; do not treat that miss as a stream-health decision.
 - CAPI (alone) omits `scopes=`. Apply any streamed scope this bouncer is configured to match.
 
 ## Pattern snippet
 
 ```go
 scopes := decisionscope.RequestScopeValues(lapiClient.DecisionScopeHeaders(), req.Request)
-kind, origin, err := decisionscope.LookupCachedRemediation(cacheClient, useRangeMembership, req.remoteIP, req.ipAddr, scopes, lapiClient.RangeMembership())
+kind, origin, err := decisionscope.LookupCachedRemediation(cacheClient, req.remoteIP, req.ipAddr, scopes, lapiClient.RangeMembership())
 lapiClient.IncDropped(origin, req.ipType, "ban")
 ```
 
@@ -59,3 +59,4 @@ lapiClient.IncDropped(origin, req.ipType, "ban")
 - Redis followers skip LAPI on a lease hit. They still GET `range-index` on that tick and rebuild membership; without that hydrate they would miss every Range decision.
 - Trust the header the same way you trust `X-Forwarded-For`: only from a trusted hop (CDN or geoenrich in front of this middleware).
 - Ip/header/Range-index values MAY be `t`/`c` plus U+001F plus a metrics origin. Bare letters still match. Redis stays one `range-index` key.
+- After a cache miss, stream/alone use stream health; live/none call `LiveLookup`. Do not name that split after Range membership.
