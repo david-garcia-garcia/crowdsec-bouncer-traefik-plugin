@@ -5,7 +5,7 @@ CrowdsecConnection reports remediation-component usage metrics to CrowdSec LAPI 
 ## Requirements
 
 ### Requirement: Dropped items use official labels
-Each dropped request SHALL increment a `dropped` item with unit `request`. Labels SHALL include `ip_type` (`ipv4` or `ipv6`) from `pkg/ip.GetRemoteIP` (MUST NOT parse `RemoteAddr` again). When the drop applies a LAPI or AppSec remediation, labels SHALL include `remediation` (`ban` or `captcha`). `origin` SHALL be the decision origin, except CrowdSec `lists` origin SHALL be sent as `lists:` plus the decision scenario. AppSec remediations SHALL use `origin=appsec`. Failure-action, stream-unhealthy, and technical drops with no decision SHALL omit `origin`. The plugin MUST NOT send a `scenario` item label. The plugin MUST NOT send `labels.type=traefik_plugin`.
+Each dropped request SHALL increment a `dropped` item with unit `request`. Labels SHALL include `ip_type` (`ipv4` or `ipv6`) from `pkg/ip.GetRemoteIP` (MUST NOT parse `RemoteAddr` again). When the drop applies a LAPI or AppSec remediation, labels SHALL include `remediation` (`ban` or `captcha`). `origin` SHALL be the decision origin, except CrowdSec `lists` origin SHALL be sent as `lists:` plus the decision scenario. AppSec remediations SHALL use `origin=appsec`. Drops with no CrowdSec decision SHALL send a plugin origin so they appear as `cscli metrics show bouncers` origin rows: `plugin:tech_getremotefail` when GetRemoteIP fails; `plugin:tech_trustipfail` when the trusted-IP checker fails; `plugin:tech_cachefail` when a cache error is fail-closed; `plugin:tech_streamfail` when stream is unhealthy; `plugin:lapi_failure` for live LAPI errors; `plugin:appsec_failure` for AppSec failure-action. Those paths MUST NOT reuse `crowdsec`, `cscli`, `CAPI`, `appsec`, or `lists:`. Range-only cache hits with no stored origin MAY omit `origin`. The plugin MUST NOT send a `scenario` item label. The plugin MUST NOT send `labels.type=traefik_plugin`.
 
 #### Scenario: List decision drop
 - **WHEN** a request is banned by a decision whose origin is `lists` and scenario is `firehol_level1`
@@ -15,9 +15,29 @@ Each dropped request SHALL increment a `dropped` item with unit `request`. Label
 - **WHEN** AppSec remediates the request
 - **THEN** the `dropped` item has `origin=appsec`
 
-#### Scenario: Technical ban has no origin
-- **WHEN** the bouncer bans because GetRemoteIP or the trusted-IP checker failed
-- **THEN** the `dropped` item has `ip_type` when the address is known and omits `origin`
+#### Scenario: GetRemoteIP failure uses plugin origin
+- **WHEN** the bouncer bans because GetRemoteIP failed
+- **THEN** the `dropped` item has `origin=plugin:tech_getremotefail` and `ip_type` when the address is known
+
+#### Scenario: Trusted-IP checker failure uses plugin origin
+- **WHEN** the bouncer bans because the trusted-IP checker failed
+- **THEN** the `dropped` item has `origin=plugin:tech_trustipfail`
+
+#### Scenario: Cache fail-closed uses plugin origin
+- **WHEN** the bouncer bans because a cache error is fail-closed
+- **THEN** the `dropped` item has `origin=plugin:tech_cachefail`
+
+#### Scenario: Stream unhealthy uses plugin origin
+- **WHEN** stream is unhealthy and the failure action bans
+- **THEN** the `dropped` item has `origin=plugin:tech_streamfail`
+
+#### Scenario: Live LAPI failure uses plugin origin
+- **WHEN** live lookup fails and the failure action bans
+- **THEN** the `dropped` item has `origin=plugin:lapi_failure`
+
+#### Scenario: AppSec failure-action uses plugin origin
+- **WHEN** AppSec is unreachable and the failure action bans
+- **THEN** the `dropped` item has `origin=plugin:appsec_failure`
 
 ### Requirement: Processed counts every handled request
 Each request the bouncer handles (trusted-IP bypass, pass, and drop) SHALL increment `processed` with unit `request` and label `ip_type` only. Disabled middleware MUST NOT increment. `processed` MUST NOT send `origin`.

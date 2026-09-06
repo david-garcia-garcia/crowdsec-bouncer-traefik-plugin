@@ -71,7 +71,10 @@ type CrowdsecConnection struct {
 	lastMetricsPush         time.Time
 	startedAt               time.Time
 	metricsMu               sync.Mutex
-	windowCounters          map[usageMetricKey]int64
+	windowCounters          map[usageMetricKey]int64 // dropped counters for the current push window
+	processedIPv4           int64                    // processed ipv4; atomic on the request path
+	processedIPv6           int64
+	processedUnknown        int64 // processed when Family is empty
 	activeDecisions         map[usageMetricKey]int64
 	activeDecisionSlots     map[string]usageMetricKey
 	streamFetches           int64

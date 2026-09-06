@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
@@ -12,6 +13,17 @@ import (
 )
 
 const crowdsecLapiMetricsRoute = "v1/usage-metrics"
+
+// Origins for drops that are not a CrowdSec decision. cscli shows origin rows;
+// empty origin is totals-only. Do not reuse crowdsec / CAPI / appsec / lists:.
+const (
+	OriginPluginTechGetRemoteFail = "plugin:tech_getremotefail" // GetRemoteIP failed
+	OriginPluginTechTrustIPFail   = "plugin:tech_trustipfail"   // trusted-IP checker failed
+	OriginPluginTechCacheFail     = "plugin:tech_cachefail"     // cache error fail-closed
+	OriginPluginTechStreamFail    = "plugin:tech_streamfail"    // stream unhealthy
+	OriginPluginLapiFailure       = "plugin:lapi_failure"       // live LAPI lookup error
+	OriginPluginAppsecFailure     = "plugin:appsec_failure"     // AppSec failure-action
+)
 
 func (c *CrowdsecConnection) handleMetricsTicker() {
 	if err := c.reportMetrics(); err != nil {
@@ -41,8 +53,16 @@ func MetricsOrigin(origin, scenario string) string {
 }
 
 // IncProcessed counts a handled request (bypass, pass, or drop) by ip_type.
+// Lock-free: ServeHTTP calls this on every request.
 func (c *CrowdsecConnection) IncProcessed(ipType string) {
-	c.addWindow(usageMetricKey{name: "processed", unit: "request", ipType: ipType}, 1)
+	switch ipType {
+	case "ipv4":
+		atomic.AddInt64(&c.processedIPv4, 1)
+	case "ipv6":
+		atomic.AddInt64(&c.processedIPv6, 1)
+	default:
+		atomic.AddInt64(&c.processedUnknown, 1)
+	}
 }
 
 // IncDropped counts a remediating response. Empty origin/ipType/remediation labels are omitted on POST.
@@ -56,7 +76,7 @@ func (c *CrowdsecConnection) IncDropped(origin, ipType, remediation string) {
 	}, 1)
 }
 
-// addWindow adds delta to a dropped/processed counter for this push window.
+// addWindow adds delta to a dropped counter for this push window.
 func (c *CrowdsecConnection) addWindow(key usageMetricKey, delta int64) {
 	c.metricsMu.Lock()
 	defer c.metricsMu.Unlock()
@@ -119,7 +139,7 @@ func (c *CrowdsecConnection) reportMetrics() error {
 	windowSizeSeconds := int(now.Sub(c.lastMetricsPush).Seconds())
 
 	c.metricsMu.Lock()
-	items := make([]map[string]interface{}, 0, len(c.windowCounters)+len(c.activeDecisions))
+	items := make([]map[string]interface{}, 0, len(c.windowCounters)+len(c.activeDecisions)+3)
 	for key, value := range c.windowCounters {
 		items = append(items, usageMetricItem(key, value))
 	}
@@ -130,6 +150,10 @@ func (c *CrowdsecConnection) reportMetrics() error {
 	}
 	c.windowCounters = make(map[usageMetricKey]int64)
 	c.metricsMu.Unlock()
+
+	items = appendProcessedWindow(items, "ipv4", atomic.SwapInt64(&c.processedIPv4, 0))
+	items = appendProcessedWindow(items, "ipv6", atomic.SwapInt64(&c.processedIPv6, 0))
+	items = appendProcessedWindow(items, "", atomic.SwapInt64(&c.processedUnknown, 0))
 
 	c.log.Debug(fmt.Sprintf("reportMetrics: items=%d window_size=%ds", len(items), windowSizeSeconds))
 
@@ -176,6 +200,14 @@ func (c *CrowdsecConnection) reportMetrics() error {
 
 	c.lastMetricsPush = now
 	return nil
+}
+
+// appendProcessedWindow adds a processed item when the swapped window count is non-zero.
+func appendProcessedWindow(items []map[string]interface{}, ipType string, value int64) []map[string]interface{} {
+	if value == 0 {
+		return items
+	}
+	return append(items, usageMetricItem(usageMetricKey{name: "processed", unit: "request", ipType: ipType}, value))
 }
 
 // usageMetricItem is one JSON item in the usage-metrics window (empty labels omitted).

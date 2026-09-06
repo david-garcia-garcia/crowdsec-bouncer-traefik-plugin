@@ -127,13 +127,13 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	b.recordProcessed(remoteIP)
 	if err != nil {
 		b.log.Error(fmt.Sprintf("ServeHTTP:getRemoteIp ip:%s %s", remoteIP, err.Error()))
-		b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH, "")
+		b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH, crowdsecconnection.OriginPluginTechGetRemoteFail)
 		return
 	}
 	isTrusted, err := b.clientPoolStrategy.Checker.Contains(remoteIP)
 	if err != nil {
 		b.log.Error(fmt.Sprintf("ServeHTTP:checkerContains ip:%s %s", remoteIP, err.Error()))
-		b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH, "")
+		b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH, crowdsecconnection.OriginPluginTechTrustIPFail)
 		return
 	}
 	b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", remoteIP, isTrusted))
@@ -163,7 +163,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			}
 			if cacheErrString != cache.CacheMiss {
 				b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", remoteIP, cacheErrString))
-				b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH, "")
+				b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonTECH, crowdsecconnection.OriginPluginTechCacheFail)
 				return
 			}
 		case decisionscope.IsActiveRemediation(value):
@@ -181,7 +181,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			b.handleNextServeHTTP(rw, req, remoteIP)
 		} else {
 			b.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", remoteIP))
-			b.applyLapiFailureAction(rw, req, remoteIP, configuration.ReasonTECH)
+			b.applyLapiFailureAction(rw, req, remoteIP, configuration.ReasonTECH, crowdsecconnection.OriginPluginTechStreamFail)
 		}
 	} else {
 		value, err := b.conn.LiveLookup(remoteIP, scopes)
@@ -189,7 +189,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		origin := cache.RemediationOrigin(value)
 		if err != nil && !decisionscope.IsActiveRemediation(kind) {
 			b.log.Debug("ServeHTTP:LiveLookup " + err.Error())
-			b.applyLapiFailureAction(rw, req, remoteIP, configuration.ReasonLAPI)
+			b.applyLapiFailureAction(rw, req, remoteIP, configuration.ReasonLAPI, crowdsecconnection.OriginPluginLapiFailure)
 			return
 		}
 		if err != nil {
@@ -205,14 +205,14 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 // applyLapiFailureAction remediates a live LAPI error or stream-unhealthy cache miss.
-func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req *http.Request, remoteIP, banReason string) {
+func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req *http.Request, remoteIP, banReason, origin string) {
 	switch b.conn.LapiFailureAction() {
 	case configuration.FailureActionPassthrough:
 		b.handleNextServeHTTP(rw, req, remoteIP)
 	case configuration.FailureActionCaptcha:
-		b.handleRemediationServeHTTP(rw, req, remoteIP, cache.CaptchaValue, "")
+		b.handleRemediationServeHTTP(rw, req, remoteIP, cache.CaptchaValue, origin)
 	default:
-		b.handleBanServeHTTP(rw, req, remoteIP, banReason, "")
+		b.handleBanServeHTTP(rw, req, remoteIP, banReason, origin)
 	}
 }
 
@@ -288,12 +288,12 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req *http.Request
 	}
 	decision, err := b.conn.AppsecQuery(remoteIP, req, pol)
 	if errors.Is(err, crowdsecconnection.ErrFailureCaptcha) {
-		b.handleRemediationServeHTTP(rw, req, remoteIP, cache.CaptchaValue, "")
+		b.handleRemediationServeHTTP(rw, req, remoteIP, cache.CaptchaValue, crowdsecconnection.OriginPluginAppsecFailure)
 		return true
 	}
 	if err != nil {
 		b.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
-		b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC, "")
+		b.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC, crowdsecconnection.OriginPluginAppsecFailure)
 		return true
 	}
 	if decision == nil || decision.Action == "" || decision.Action == crowdsecconnection.AppsecActionAllow {

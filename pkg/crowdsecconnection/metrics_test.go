@@ -22,6 +22,63 @@ func TestMetricsOriginListsRewrite(t *testing.T) {
 	}
 }
 
+func TestReportMetricsPluginFailClosedOrigins(t *testing.T) {
+	conn, body := newUsageMetricsConn(t)
+	origins := []string{
+		OriginPluginTechGetRemoteFail,
+		OriginPluginTechTrustIPFail,
+		OriginPluginTechCacheFail,
+		OriginPluginTechStreamFail,
+		OriginPluginLapiFailure,
+		OriginPluginAppsecFailure,
+	}
+	for _, origin := range origins {
+		conn.IncDropped(origin, "ipv4", "ban")
+	}
+	if err := conn.reportMetrics(); err != nil {
+		t.Fatal(err)
+	}
+	found := map[string]bool{}
+	for _, raw := range usageMetricItems(t, *body) {
+		item := asObject(t, raw)
+		if item["name"] != "dropped" {
+			continue
+		}
+		labels := asObject(t, item["labels"])
+		origin, _ := labels["origin"].(string)
+		found[origin] = true
+	}
+	for _, origin := range origins {
+		if !found[origin] {
+			t.Fatalf("missing dropped origin %q in %#v", origin, found)
+		}
+	}
+}
+
+func TestIncProcessedReportsWithoutWindowMap(t *testing.T) {
+	conn, body := newUsageMetricsConn(t)
+	conn.IncProcessed("ipv4")
+	conn.IncProcessed("ipv4")
+	conn.IncProcessed("ipv6")
+	if err := conn.reportMetrics(); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]float64{}
+	for _, raw := range usageMetricItems(t, *body) {
+		item := asObject(t, raw)
+		if item["name"] != "processed" {
+			continue
+		}
+		labels := asObject(t, item["labels"])
+		ipType, _ := labels["ip_type"].(string)
+		value, _ := item["value"].(float64)
+		got[ipType] = value
+	}
+	if got["ipv4"] != 2 || got["ipv6"] != 1 {
+		t.Fatalf("processed %#v", got)
+	}
+}
+
 func TestReportMetricsOfficialLabels(t *testing.T) {
 	conn, body := newUsageMetricsConn(t)
 	conn.IncDropped("lists:firehol_level1", "ipv4", "ban")
