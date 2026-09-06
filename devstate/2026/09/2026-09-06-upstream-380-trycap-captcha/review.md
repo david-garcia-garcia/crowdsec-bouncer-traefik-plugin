@@ -16,4 +16,10 @@ findings: new spec core_plugin_captcha_trycap-provider; change trycap-captcha-pr
 fixed: proposal, design, tasks, spec delta
 skipped: none
 
+## implement (2026-09-06)
+phase: implement
+findings: trycap provider + JSON siteverify landed; CI green (Main + e2e)
+fixed: pkg/captcha, configuration, captcha.html, tests, README, examples/trycap-captcha
+skipped: none
+
 
