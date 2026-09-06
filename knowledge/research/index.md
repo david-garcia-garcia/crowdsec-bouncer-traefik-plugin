@@ -29,3 +29,8 @@ description: Official Redis Go client surface and toolchain constraints.
 priority: normal
 local: index_ext_traefik-geoblock.md
 description: Facts about the traefik-geoblock plugin this product may reuse.
+
+## traefik-modsecurity
+priority: normal
+local: index_ext_traefik-modsecurity.md
+description: Facts about the traefik-modsecurity plugin reference implementations this product may reuse.
