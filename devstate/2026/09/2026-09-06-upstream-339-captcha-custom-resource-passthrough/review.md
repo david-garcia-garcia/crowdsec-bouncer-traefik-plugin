@@ -27,3 +27,9 @@ phase: codereview
 findings: all five axes none
 fixed: n/a
 skipped: n/a
+
+## devdocsimpact (2026-09-06)
+phase: devdocsimpact
+findings: missing-packet Captcha Client; stale-usage middleware pointer
+fixed: core_plugin_captcha.md
+skipped: n/a
