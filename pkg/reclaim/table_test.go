@@ -69,7 +69,18 @@ func (s *sleepy) Wake() { s.wakes.Add(1) }
 // Close counts dispose.
 func (s *sleepy) Close() { s.closes.Add(1) }
 
-// recHandler records slog lines so tests can assert reclaim msg + key + level.
+// exactOnce panics if Close runs more than once (grace-dispose regression guard).
+type exactOnce struct {
+	closes atomic.Int32
+}
+
+// Close counts dispose and panics on a second call.
+func (e *exactOnce) Close() {
+	if e.closes.Add(1) != 1 {
+		panic("Close called more than once")
+	}
+}
+
 type recHandler struct {
 	mu   sync.Mutex
 	recs []slog.Record
@@ -1097,8 +1108,28 @@ func TestTable_GraceClosesAfterSleep(t *testing.T) {
 		t.Fatal(err)
 	}
 	cancel()
-	waitUntil(t, func() bool { return paused.closes.Load() >= 1 })
+	waitUntil(t, func() bool { return paused.closes.Load() == 1 })
+	if paused.closes.Load() != 1 {
+		t.Fatalf("Close must run exactly once, got %d", paused.closes.Load())
+	}
 	if paused.sleeps.Load() < 1 {
 		t.Fatal("Sleep must run before Close")
+	}
+}
+
+// TestTable_GraceDisposeCloseExactlyOnce panics if grace dispose calls Close twice.
+func TestTable_GraceDisposeCloseExactlyOnce(t *testing.T) {
+	tab := NewTable(15 * time.Millisecond)
+	once := &exactOnce{}
+	ctx, cancel := context.WithCancel(context.Background())
+	if _, err := tab.Open(ctx, "a", slog.Default(), func() (any, error) {
+		return once, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	waitUntil(t, func() bool { return once.closes.Load() == 1 })
+	if once.closes.Load() != 1 {
+		t.Fatalf("Close must run exactly once, got %d", once.closes.Load())
 	}
 }
