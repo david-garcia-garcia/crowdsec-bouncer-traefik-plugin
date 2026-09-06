@@ -6,8 +6,7 @@ import (
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-// validPEM is a minimal self-signed certificate accepted by AppendCertsFromPEM,
-// shared by the TLS tests below.
+// validPEM is a minimal self-signed certificate accepted by AppendCertsFromPEM.
 const validPEM = `-----BEGIN CERTIFICATE-----
 MIIBhTCCASugAwIBAgIQIRi6zePL6mKjOipn+dNuaTAKBggqhkjOPQQDAjASMRAw
 DgYDVQQKEwdBY21lIENvMB4XDTE3MTAyMDE5NDMwNloXDTE4MTAyMDE5NDMwNlow
@@ -258,60 +257,6 @@ func Test_validateParamsAPIKey(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := validateParamsAPIKey(tt.args.lapiKey, tt.args.paramName); (err != nil) != tt.wantErr {
 				t.Errorf("validateParamsAPIKey() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_GetTLSConfigCrowdsec(t *testing.T) {
-	log := logger.New("INFO", "")
-
-	httpCfg := getMinimalConfig()
-	httpCfg.CrowdsecLapiScheme = HTTP
-
-	httpsSystemCA := getMinimalConfig()
-	httpsSystemCA.CrowdsecLapiScheme = HTTPS
-
-	httpsCustomCA := getMinimalConfig()
-	httpsCustomCA.CrowdsecLapiScheme = HTTPS
-	httpsCustomCA.CrowdsecLapiTLSCertificateAuthority = validPEM
-
-	httpsInsecure := getMinimalConfig()
-	httpsInsecure.CrowdsecLapiScheme = HTTPS
-	httpsInsecure.CrowdsecLapiTLSInsecureVerify = true
-
-	httpsBadCA := getMinimalConfig()
-	httpsBadCA.CrowdsecLapiScheme = HTTPS
-	httpsBadCA.CrowdsecLapiTLSCertificateAuthority = "not a pem"
-
-	tests := []struct {
-		name             string
-		config           *Config
-		wantErr          bool
-		wantRootCAsNil   bool
-		wantInsecureSkip bool
-	}{
-		{name: "HTTP scheme returns empty tls.Config", config: httpCfg, wantRootCAsNil: true},
-		{name: "HTTPS without CA leaves RootCAs nil (system trust store)", config: httpsSystemCA, wantRootCAsNil: true},
-		{name: "HTTPS with custom CA populates RootCAs", config: httpsCustomCA, wantRootCAsNil: false},
-		{name: "HTTPS with insecure verify sets InsecureSkipVerify", config: httpsInsecure, wantRootCAsNil: true, wantInsecureSkip: true},
-		{name: "HTTPS with garbage CA is rejected", config: httpsBadCA, wantErr: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetTLSConfigCrowdsec(tt.config, log, false)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetTLSConfigCrowdsec() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if tt.wantErr {
-				return
-			}
-			if (got.RootCAs == nil) != tt.wantRootCAsNil {
-				t.Errorf("GetTLSConfigCrowdsec() RootCAs nil = %v, want nil = %v", got.RootCAs == nil, tt.wantRootCAsNil)
-			}
-			if got.InsecureSkipVerify != tt.wantInsecureSkip {
-				t.Errorf("GetTLSConfigCrowdsec() InsecureSkipVerify = %v, want %v", got.InsecureSkipVerify, tt.wantInsecureSkip)
 			}
 		})
 	}

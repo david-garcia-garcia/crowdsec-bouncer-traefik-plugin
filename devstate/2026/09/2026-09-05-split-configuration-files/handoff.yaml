@@ -1,0 +1,15 @@
+issueKey: 2026-09-05-split-configuration-files
+jobName: 2026-09-05-split-configuration-files
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: 4e9dfae5d9ad4a33e9e25a2f0c953a81ff747949644eb7fb2be568adb68a8c75
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: split-configuration-files
+pr: { id: 17, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/17 }

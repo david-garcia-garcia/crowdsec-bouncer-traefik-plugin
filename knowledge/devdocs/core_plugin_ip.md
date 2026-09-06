@@ -46,7 +46,7 @@ ok := checker.ContainsIP(req.ipAddr)
 - `pkg/iplookup/`
 - `pkg/bouncer/clientrequest.go`
 - `pkg/bouncer/bouncer.go`
-- `pkg/configuration/configuration.go` (`validateParamsIPs`)
+- `pkg/configuration/validate.go` (`validateParamsIPs`)
 
 ## Gotchas
 

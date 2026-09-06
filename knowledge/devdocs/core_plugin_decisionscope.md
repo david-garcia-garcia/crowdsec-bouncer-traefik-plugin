@@ -41,7 +41,7 @@ lapiClient.IncDropped(origin, req.ipType, "ban")
 ## Key files
 
 - `pkg/decisionscope/`
-- `pkg/configuration/configuration.go` (`DecisionScopeHeaders`)
+- `pkg/configuration/config.go` (`DecisionScopeHeaders`)
 - `pkg/bouncer/bouncer.go`
 - `pkg/bouncer/clientrequest.go`
 - `pkg/lapi/client.go`

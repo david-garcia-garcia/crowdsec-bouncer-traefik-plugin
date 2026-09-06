@@ -49,7 +49,7 @@ func Prepare(cfg *configuration.Config, log *slog.Logger) error {
 
 // New constructs an AppSec Client. Call Prepare first. Close releases idle HTTP.
 func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (*Client, error) {
-	tlsAppsecConfig, err := configuration.GetTLSConfigCrowdsec(config, log, true)
+	tlsAppsecConfig, err := getTLSConfigAppsec(config, log)
 	if err != nil {
 		log.Error("New:getTLSConfigCrowdsec fail to get tlsAppsecConfig " + err.Error())
 		return nil, err
