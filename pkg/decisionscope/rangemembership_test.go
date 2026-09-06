@@ -63,3 +63,28 @@ func TestMembershipFromIndexIPv6(t *testing.T) {
 		t.Fatalf("v4 against v6 range got %q", got)
 	}
 }
+
+func TestMembershipFromIndexReturnsOriginSuffix(t *testing.T) {
+	stored := cache.RemediationWithOrigin(cache.BannedValue, "crowdsec")
+	got := MembershipFromIndex("10.0.0.0/8=" + stored).Remediation("10.1.2.3")
+	if got != stored {
+		t.Fatalf("got %q, want suffixed ban", got)
+	}
+}
+
+func TestMembershipFromIndexLetterOnlyStillBans(t *testing.T) {
+	got := MembershipFromIndex("10.0.0.0/8=" + cache.BannedValue).Remediation("10.1.2.3")
+	if got != cache.BannedValue {
+		t.Fatalf("letter-only got %q, want ban", got)
+	}
+}
+
+func TestMembershipFromIndexOverlappingBansLongestPrefixOrigin(t *testing.T) {
+	wide := cache.RemediationWithOrigin(cache.BannedValue, "crowdsec")
+	narrow := cache.RemediationWithOrigin(cache.BannedValue, "cscli")
+	index := "10.0.0.0/8=" + wide + "\n10.1.0.0/16=" + narrow
+	got := MembershipFromIndex(index).Remediation("10.1.2.3")
+	if got != narrow {
+		t.Fatalf("got %q, want longest-prefix suffix", got)
+	}
+}

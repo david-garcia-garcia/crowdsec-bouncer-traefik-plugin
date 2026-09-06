@@ -19,7 +19,7 @@ Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. S
 - Classify `ip_type` with `ip.Family` on the GetRemoteIP string. Do not parse `RemoteAddr`.
 - Build origin with `MetricsOrigin(decision.Origin, decision.Scenario)` before cache store and before `IncDropped`.
 - AppSec remediations use `origin=appsec`. Fail-closed drops use `plugin:tech_getremotefail`, `plugin:tech_trustipfail`, `plugin:tech_cachefail`, `plugin:tech_streamfail`, `plugin:lapi_failure`, or `plugin:appsec_failure`.
-- Persist origin on Ip/header cache via `cache.RemediationWithOrigin`. Range-index stays letter-only; range-only drops omit origin.
+- Persist origin on Ip/header and Range-index via `cache.RemediationWithOrigin`. Bare letter-only Range lines still match and MAY omit origin.
 - Stamp `utc_startup_timestamp` once in `New` (`startedAt`). `feature_flags` must marshal as `[]`, not `{}`.
 
 ## Pattern snippet

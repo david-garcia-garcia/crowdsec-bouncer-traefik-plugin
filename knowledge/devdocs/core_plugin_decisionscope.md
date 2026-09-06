@@ -3,11 +3,11 @@
 ## Language
 
 **Range index**:
-One cache blob at key `range-index` whose lines are `cidr=remediation`. Redis-sharing instances share this document (prefixed by connection identity). Stream and alone rebuild in-process membership from it on the ticker and at stream start.
+One cache blob at key `range-index` whose lines are `cidr=remediation`. Remediation MAY be the letter only or the letter plus U+001F plus a metrics origin. Redis-sharing instances share this document (prefixed by connection identity). Stream and alone rebuild in-process membership from it on the ticker and at stream start.
 _Avoid_: walking the blob on the request path, one cache key per CIDR, LAPI `?ip=` on the stream path
 
 **Range membership**:
-Two boolean CIDR sets (ban, captcha) on the reclaimed CrowdsecConnection. Stream/alone request lookup asks this pair. Ban wins if several containing CIDRs hit.
+Two boolean CIDR sets (ban, captcha) on the reclaimed CrowdsecConnection plus the stored remediation string per CIDR. Stream/alone request lookup asks this pair. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s stored suffix.
 _Avoid_: trusted-IP Checker, one LPM tree with a stored remediation, `sync.Once`, package globals
 
 **Header-mapped scope**:
@@ -26,7 +26,7 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 
 - Pass `decisionScopeHeaders` from config into the connection (stream `scopes=` and live `scope`+`value` queries) and into the bouncer (request headers).
 - Resolve the client IP with `pkg/ip.GetRemoteIP`. Then `LookupCachedRemediation` with `conn.RangeMembership()` in stream/alone/live cache hits (kind, origin, err). Matching uses the first letter; origin is for usage-metrics only.
-- Stream Range items: collect the tick, then `ApplyRangeBatch` (one read, one write). Hydrate membership from the blob after apply and on a lease hit. Do not GET+SET per Range line.
+- Stream Range items: collect the tick, then `ApplyRangeBatch` (one read, one write) with `RemediationWithOrigin`. Hydrate membership from the blob after apply and on a lease hit. Do not GET+SET per Range line.
 - Live/none: keep `?ip=` (LAPI expands Range). Add `scope`+`value` when a mapped header is present. Skip `range-index` and membership on none.
 - CAPI (alone) omits `scopes=`. Apply any streamed scope this bouncer is configured to match.
 
@@ -56,4 +56,4 @@ conn.IncDropped(origin, ip.Family(remoteIP), "ban")
 - Ban wins across Ip, Range, and header hits. Do not return the first active Ip or Range captcha before considering a Country ban.
 - Redis followers skip LAPI on a lease hit. They still GET `range-index` on that tick and rebuild membership; without that hydrate they would miss every Range decision.
 - Trust the header the same way you trust `X-Forwarded-For`: only from a trusted hop (CDN or geoenrich in front of this middleware).
-- Ip/header cache values MAY be `t`/`c` plus U+001F plus a metrics origin. `range-index` stays `cidr=letter`. Bare letters still match.
+- Ip/header/Range-index values MAY be `t`/`c` plus U+001F plus a metrics origin. Bare letters still match. Redis stays one `range-index` key.

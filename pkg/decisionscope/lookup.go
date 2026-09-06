@@ -61,7 +61,7 @@ func RequestScopeValues(headers map[string]string, req *http.Request) map[string
 
 // LookupCachedRemediation merges Ip, Range, and present header-scope hits. Ban wins across those scopes.
 // Stream and alone Range hits come from membership, not from a range-index GetMany.
-// The returned remediation is the letter only; origin is the metrics origin of the winning Ip/header value (empty for Range-only).
+// The returned remediation is the letter only; origin is the metrics origin of the winning Ip, header, or Range value.
 func LookupCachedRemediation(cacheClient *cache.Client, mode, remoteIP string, scopes map[string]string, membership *RangeMembership) (string, string, error) {
 	useRangeMembership := mode == configuration.StreamMode || mode == configuration.AloneMode
 	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, scopes))
