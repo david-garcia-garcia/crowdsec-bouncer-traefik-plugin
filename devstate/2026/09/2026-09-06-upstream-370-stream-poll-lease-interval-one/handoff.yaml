@@ -1,0 +1,15 @@
+issueKey: 2026-09-06-upstream-370-stream-poll-lease-interval-one
+jobName: 2026-09-06-upstream-370-stream-poll-lease-interval-one
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:60e234e6ffe2a25c5e91a5c6d4e532110d32982353a57dc00f88c2ac4e94c13c
+comments: none
+localTests: none
+requirement: requirement.md
+explore: none
+change: none
+pr: none
