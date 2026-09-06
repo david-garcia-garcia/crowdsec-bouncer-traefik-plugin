@@ -12,7 +12,7 @@ _Avoid_: parsing `RemoteAddr` on the metrics path
 
 ## Overview
 
-Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. Stream/alone also `rememberActiveDecision` / `forgetActiveDecision` when storing or deleting Ip, header, and Range records. The connection ticker POSTs `v1/usage-metrics`. `IncProcessed` is lock-free (`atomic.AddInt64`); `IncDropped` takes `metricsMu` because drops already left the allow path.
+Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. Stream/alone also `rememberActiveDecision` / `forgetActiveDecision` when storing or deleting Ip, header, and Range records. The LAPI Client ticker POSTs `v1/usage-metrics`. `IncProcessed` is lock-free (`atomic.AddInt64`); `IncDropped` takes `metricsMu` because drops already left the allow path.
 
 ## How to use
 

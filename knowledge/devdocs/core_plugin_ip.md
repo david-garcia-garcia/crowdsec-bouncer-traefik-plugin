@@ -28,7 +28,7 @@ Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker st
 - Resolve the client address with `GetRemoteIP` (server/trusted-hop pool + custom header). Put that string, `ipAddr`, and `FamilyOfIP` on `clientRequest`. Keep the name `req`. Then `ContainsIP` on `req.ipAddr` for the client pool. Do not parse `RemoteAddr` again. Do not parse the chosen string again for trusted-client membership. Do not add scopes or origin to `clientRequest`.
 - On the request path, call `ContainsIP` on the parsed GetRemoteIP address. `Contains` remains for string callers. Do not walk a CIDR slice beside the helper.
 - Convert a bare IP to `/32` or `/128` before `AddCIDR`.
-- Range stream/alone membership reuses `Helper` as two boolean sets on the connection. Do not put Range in Checker.
+- Range stream/alone membership reuses `Helper` as two boolean sets on the LAPI Client. Do not put Range in Checker.
 - One-CIDR questions (`InNetwork`) live in `pkg/ip/network.go`, not in Checker.
 - Classify an already-parsed address with `FamilyOfIP` for usage-metrics `ip_type`. Keep `Family` / `FamilyOfHostOrCIDR` for decision values. Do not parse `RemoteAddr`.
 

@@ -24,11 +24,11 @@ Copy `pkg/reclaim` as-is. Call `reclaim.Open` with Traefik’s `New` ctx. Same-p
 
 ```go
 stored, err := reclaim.OpenWithGrace(ctx, key, log, 30*time.Second, func() (any, error) {
-	conn, err := newConnection()
+	client, err := newClient()
 	if err != nil {
 		return nil, err
 	}
-	return &reclaim.Wrapped{Value: conn, Sleep: conn.Sleep, Wake: conn.Wake, Close: conn.Close}, nil
+	return &reclaim.Wrapped{Value: client, Sleep: client.Sleep, Wake: client.Wake, Close: client.Close}, nil
 })
 ```
 

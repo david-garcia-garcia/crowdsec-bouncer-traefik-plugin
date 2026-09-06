@@ -9,3 +9,5 @@
 - updated knowledge/devdocs/core_plugin_lapi_usage-metrics.md
 - updated knowledge/devdocs/index_core_cache.md
 - updated knowledge/devdocs/std_go_reclaim.md
+- updated knowledge/devdocs/core_plugin_ip.md
+- updated knowledge/devdocs/core_plugin_lapi_usage-metrics.md
