@@ -1,6 +1,8 @@
 {
-  "commentId": "pending",
+  "commentId": "pr-body",
   "issueKey": "2026-09-06-reclaim-close-once",
   "markerValue": "2026-09-06-reclaim-close-once",
-  "issueHost": "local"
+  "issueHost": "local",
+  "prNumber": 36,
+  "prUrl": "https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/36"
 }
