@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-06T15:22:15Z
+Developer review: in progress — 2026-09-06T15:25:35Z
 
 ## What this changes
 **Operators.** None.
@@ -13,28 +13,28 @@ Developer review: in progress — 2026-09-06T15:22:15Z
 On `master`, `cscli bouncers list` can show a stale plugin version if a tag ships while `version.go` still names the previous release (upstream #322 and #363). This fork already bumps `version.go` before tagging, and the tree currently reports `v1.7.1`, but no test asserted usage-metrics `version` or User-Agent. Without those tests, a future manual release bypass can regress undetected.
 
 ## Merge readiness
-Implement landed httptests; CI on this head is still queued.
+Code review complete; hard symmetry rename applied. CI still queued.
 
 Priority: P3 — spec, docs, tests, or internal clarity — no current user or operator harm
-Reviewed head: a5ec681
+Reviewed head: 4b6a877
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI queued after implement push |
-| CI proof | 3/6 | Checks queued on [run 34042084304](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34042084304) |
+| Overall readiness | 3/6 | CI queued after review fix |
+| CI proof | 3/6 | Checks queued on [run 34042261577](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34042261577) |
 | Local tests proof | N/A | Remote PR uses CI proof |
 | Review resolution | 6/6 | No open PR comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-06-upstream-363-version-release-mismatch pushed | git push a5ec681 |
+| Branch | 2026-09-06-upstream-363-version-release-mismatch pushed | git push 4b6a877 |
 | OpenSpec | assert-plugin-version-reporting | openspec/changes/assert-plugin-version-reporting |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/53 | GitHub #53 |
-| CI | build 34042084304 queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34042084304 | pull_request_read get_check_runs |
-| Local tests | passed | `go test` pkg/lapi, pkg/appsec, and plugin New/ServeHTTP tests |
+| CI | build 34042261577 queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34042261577 | pull_request_read get_check_runs |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | comments: none |
 
 ## Specs
@@ -45,7 +45,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local add-tests ticket for upstream #322+#363 → httptests on PR #53 → CI queued on a5ec681.
+Local add-tests ticket for upstream #322+#363 → httptests on PR #53 → five-axis review on origin/master...HEAD.
 
 ## Decision needed
 | Question | Decision | By |
@@ -61,7 +61,11 @@ Local add-tests ticket for upstream #322+#363 → httptests on PR #53 → CI que
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-363-version-release-mismatch/devstate/2026/09/2026-09-06-upstream-363-version-release-mismatch/codereview_standards.md) — 2 total, 0 pending, 1 completed, 1 skipped
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-363-version-release-mismatch/devstate/2026/09/2026-09-06-upstream-363-version-release-mismatch/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-363-version-release-mismatch/devstate/2026/09/2026-09-06-upstream-363-version-release-mismatch/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-363-version-release-mismatch/devstate/2026/09/2026-09-06-upstream-363-version-release-mismatch/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-363-version-release-mismatch/devstate/2026/09/2026-09-06-upstream-363-version-release-mismatch/codereview_dead.md) — 0 total, 0 pending, 0 completed
 
 ## Agent review details
 
@@ -70,7 +74,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as Specs |
 | Open reviewer comments walked | 0 | No PR comments |
-| Reviewed head | a5ec681fe37a521aedd29a4cc79aeaba11244c43 | Card matches latest push |
+| Reviewed head | 4b6a8777c2f5c5437248eabf7fbe70a09e8c4d4e | Card matches latest push |
 
 ### Stored data model
 None.
@@ -78,16 +82,16 @@ None.
 ### Technical review
 Best possible solution: httptest on existing Client and `New` seams; no runtime change versus `master`.
 
-Do we have a high-confidence way to reproduce? Yes for the test gap — `TestReportMetricsPluginVersion`, `Test_appsecQuery_userAgentIncludesPluginVersion`, and `TestNew_LAPIUserAgentUsesVersionGo` passed locally.
+Do we have a high-confidence way to reproduce? Yes for the test gap — three httptests landed.
 
 Is this the best way to solve the issue? Yes versus `master` — bound is add-tests.
 
 ### Evidence
 What I checked:
-- `go test ./pkg/lapi` and `./pkg/appsec` passed
-- `go test . -run TestNew_|TestServeHTTP|TestBouncer_ServeHTTP` passed (30.3s)
-- Root `go test .` also hit Windows TempDir file-lock on `TestBouncerFileLogging*` (pre-existing log handle, not these tests)
-- CI check_runs queued on PR #53 after a5ec681
+- Five-axis review of `origin/master...HEAD` excluding `devstate/` and `.cursor/`
+- Hard Standards 1: renamed `want` → `wantUA`
+- Judgement Standards 2: skipped (Bound the ask)
+- Spec / Security / Performance / Dead: none
 
 ### Rank-up moves
 None.
