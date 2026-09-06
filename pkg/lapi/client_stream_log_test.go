@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
 // newTestStreamTickClient builds a stream Client that can poll a mock LAPI without starting tickers.
@@ -83,7 +84,7 @@ func TestHandleStreamCacheAlreadyUpdatedIsDebug(t *testing.T) {
 		t.Run(tc.level.String(), func(t *testing.T) {
 			logged := captureTestStreamTickLog(t, tc.level, func(log *slog.Logger) {
 				client := newTestStreamTickClient(t, log, "unused", nil)
-				client.cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, 60)
+				client.cacheClient.Set(cacheTimeoutKey, decisionscope.NoBannedValue, 60)
 				if err := client.handleStreamCache(); err != nil {
 					t.Fatalf("handleStreamCache: %v", err)
 				}
