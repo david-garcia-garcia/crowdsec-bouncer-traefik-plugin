@@ -15,3 +15,9 @@ phase: propose
 findings: new spec core_plugin_lapi_stream-lease; tests not applied
 fixed: OpenSpec change stream-poll-lease-interval-one apply-ready
 skipped: product code
+
+## implement (2026-09-06)
+phase: implement
+findings: localTests passed; e2e docker + pester failed (no test-results.xml)
+fixed: TestHandleStreamCacheIntervalOneStoresLease
+skipped: Redis backend test; TTL expiry sleep
