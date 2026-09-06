@@ -34,3 +34,8 @@ description: CrowdSec AppSec challenge-mode wire protocol a bouncer must impleme
 priority: normal
 local: ext_crowdsec_lapi_stream-cursor/
 description: Where CrowdSec LAPI stores /v1/decisions/stream progress and which bouncer row owns it.
+
+## LAPI usage-metrics
+priority: normal
+local: ext_crowdsec_lapi_usage-metrics/
+description: What CrowdSec LAPI accepts on POST /v1/usage-metrics and which labels official bouncers send.

@@ -3,11 +3,11 @@
 ## Language
 
 **Range index**:
-One cache blob at key `range-index` whose lines are `cidr=remediation`. Redis-sharing instances share this document (prefixed by connection identity). Stream and alone rebuild in-process membership from it on the ticker and at stream start.
+One cache blob at key `range-index` whose lines are `cidr=remediation`. Remediation MAY be the letter only or the letter plus U+001F plus a metrics origin. Redis-sharing instances share this document (prefixed by LAPI identity). Stream and alone rebuild in-process membership from it on the ticker and at stream start.
 _Avoid_: walking the blob on the request path, one cache key per CIDR, LAPI `?ip=` on the stream path
 
 **Range membership**:
-Two boolean CIDR sets (ban, captcha) on the reclaimed CrowdsecConnection. Stream/alone request lookup asks this pair. Ban wins if several containing CIDRs hit.
+Two boolean CIDR sets (ban, captcha) on the reclaimed LAPI Client plus the stored remediation string per CIDR. Stream/alone request lookup asks this pair. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s stored suffix.
 _Avoid_: trusted-IP Checker, one LPM tree with a stored remediation, `sync.Once`, package globals
 
 **Header-mapped scope**:
@@ -15,7 +15,7 @@ A CrowdSec scope other than Ip/Range whose value comes from a request header nam
 _Avoid_: GeoIP inside this plugin, client-set country as the real-stack proof
 
 **decisionScopeHeaders**:
-Public Traefik plugin map from CrowdSec scope name to header name. Empty means header scopes are off. Keys `Ip` and `Range` are rejected. The **normalized** map is on CrowdsecConnection reclaim identity (stream `scopes=` and ingest). The bouncer reads that map; it does not store a copy.
+Public Traefik plugin map from CrowdSec scope name to header name. Empty means header scopes are off. Keys `Ip` and `Range` are rejected. The **normalized** map is on `lapi.Client` (stream `scopes=`, ingest, live/none identity). The bouncer reads `DecisionScopeHeaders()`; it does not store a copy.
 _Avoid_: GeoIP inside this plugin, client-set country as the real-stack proof, a second copy on Bouncer
 
 ## Overview
@@ -24,17 +24,18 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 
 ## How to use
 
-- Pass `decisionScopeHeaders` from config into the connection (identity, stream `scopes=`, live `scope`+`value` queries). The bouncer reads `conn.DecisionScopeHeaders()` for request headers. Do not store a second copy on Bouncer.
-- Resolve the client IP with `pkg/ip.GetRemoteIP`. Then `LookupCachedRemediation` with `conn.RangeMembership()` in stream/alone/live cache hits.
-- Stream Range items: collect the tick, then `ApplyRangeBatch` (one read, one write). Hydrate membership from the blob after apply and on a lease hit. Do not GET+SET per Range line.
+- Pass `decisionScopeHeaders` from config into the LAPI Client (identity, stream `scopes=`, live `scope`+`value` queries). The bouncer reads `lapiClient.DecisionScopeHeaders()` for request headers. Do not store a second copy on Bouncer.
+- Resolve the client IP with `pkg/ip.GetRemoteIP`. Then `LookupCachedRemediation` with `useRangeMembership` true for stream/alone (and `lapiClient.RangeMembership()`). Pass `req.ipAddr` into Range membership. Matching uses the first letter; origin is for usage-metrics only. Do not put scopes on `clientRequest`.
+- Stream Range items: collect the tick, then `ApplyRangeBatch` (one read, one write) with `RemediationWithOrigin`. Hydrate membership from the blob after apply and on a lease hit. Do not GET+SET per Range line.
 - Live/none: keep `?ip=` (LAPI expands Range). Add `scope`+`value` when a mapped header is present. Skip `range-index` and membership on none.
 - CAPI (alone) omits `scopes=`. Apply any streamed scope this bouncer is configured to match.
 
 ## Pattern snippet
 
 ```go
-scopes := decisionscope.RequestScopeValues(conn.DecisionScopeHeaders(), req)
-value, err := decisionscope.LookupCachedRemediation(cacheClient, mode, remoteIP, scopes, conn.RangeMembership())
+scopes := decisionscope.RequestScopeValues(lapiClient.DecisionScopeHeaders(), req.Request)
+kind, origin, err := decisionscope.LookupCachedRemediation(cacheClient, useRangeMembership, req.remoteIP, req.ipAddr, scopes, lapiClient.RangeMembership())
+lapiClient.IncDropped(origin, req.ipType, "ban")
 ```
 
 ## Key files
@@ -42,11 +43,12 @@ value, err := decisionscope.LookupCachedRemediation(cacheClient, mode, remoteIP,
 - `pkg/decisionscope/`
 - `pkg/configuration/configuration.go` (`DecisionScopeHeaders`)
 - `pkg/bouncer/bouncer.go`
-- `pkg/crowdsecconnection/connection.go`
-- `pkg/crowdsecconnection/connection_decisions.go`
-- `pkg/crowdsecconnection/identity.go`
-- `pkg/crowdsecconnection/connection_stream.go`
-- `pkg/crowdsecconnection/connection_live.go`
+- `pkg/bouncer/clientrequest.go`
+- `pkg/lapi/client.go`
+- `pkg/lapi/identity.go`
+- `pkg/lapi/client_decisions.go`
+- `pkg/lapi/client_stream.go`
+- `pkg/lapi/client_live.go`
 
 ## Gotchas
 
@@ -56,3 +58,4 @@ value, err := decisionscope.LookupCachedRemediation(cacheClient, mode, remoteIP,
 - Ban wins across Ip, Range, and header hits. Do not return the first active Ip or Range captcha before considering a Country ban.
 - Redis followers skip LAPI on a lease hit. They still GET `range-index` on that tick and rebuild membership; without that hydrate they would miss every Range decision.
 - Trust the header the same way you trust `X-Forwarded-For`: only from a trusted hop (CDN or geoenrich in front of this middleware).
+- Ip/header/Range-index values MAY be `t`/`c` plus U+001F plus a metrics origin. Bare letters still match. Redis stays one `range-index` key.
