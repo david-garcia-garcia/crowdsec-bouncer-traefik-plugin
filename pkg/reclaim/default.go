@@ -30,12 +30,12 @@ func Open(ctx context.Context, key string, logger *slog.Logger, create func() (a
 }
 
 // Peek is Default().Peek: inspect a key without binding a constructor context.
-func Peek(key string) (value any, holders int, sleeping bool, ok bool) {
+func Peek(key string) (any, int, bool, bool) {
 	return Default().Peek(key)
 }
 
 // PeekLivePrefix is Default().PeekLivePrefix: a live slot under prefix, no bind.
-func PeekLivePrefix(prefix string) (key string, value any, holders int, ok bool) {
+func PeekLivePrefix(prefix string) (string, any, int, bool) {
 	return Default().PeekLivePrefix(prefix)
 }
 

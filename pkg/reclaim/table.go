@@ -296,17 +296,22 @@ func (t *Table) fire(key string, e *slot, gen uint64) {
 // Peek returns the stored value for key without adding a holder and without create.
 // holders is the live constructor-context count. sleeping is true when the last
 // holder is gone and the dispose timer is armed. ok is false when the key is absent.
-func (t *Table) Peek(key string) (value any, holders int, sleeping bool, ok bool) {
+func (t *Table) Peek(key string) (any, int, bool, bool) {
 	if t == nil {
 		return nil, 0, false, false
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	e, ok := t.items[key]
-	if !ok {
+	e, found := t.items[key]
+	if !found {
 		return nil, 0, false, false
 	}
-	return e.value, len(e.holders), e.graceTimer != nil, true
+	sleeping := e.graceTimer != nil
+	holderCount := 0
+	if e.holders != nil {
+		holderCount = len(e.holders)
+	}
+	return e.value, holderCount, sleeping, true
 }
 
 // PeekLivePrefix returns one live slot whose key starts with prefix, without binding.
