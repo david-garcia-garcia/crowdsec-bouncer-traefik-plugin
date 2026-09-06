@@ -45,3 +45,9 @@ phase: pullrequest
 findings: e2e mock still expected 403 on unreadable HTTP/2; fixed then CI green
 fixed: PR title ready; CI Main Process + both e2e succeeded
 skipped: none
+
+## explore (2026-09-06 rethink)
+phase: explore
+findings: human asked for CrowdsecAppsecUnreadableBodyBlock on this PR; current HEAD still always headers-only GET
+fixed: explore.md decisions (default false, independent of failure action, GET exemption); issues.md take small
+skipped: none
