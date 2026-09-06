@@ -10,5 +10,5 @@ JobName: 2026-09-06-upstream-339-captcha-custom-resource-passthrough
 | implement | [x] | [x] | 2026-09-06T15:20:22+00:00 |
 | codereview | [x] | [x] | 2026-09-06T15:23:01+00:00 |
 | devdocsimpact | [x] | [x] | 2026-09-06T15:24:32+00:00 |
-| archive | [x] | [ ] | |
+| archive | [x] | [x] | 2026-09-06T15:26:20+00:00 |
 | pullrequest | [ ] | [ ] | |
