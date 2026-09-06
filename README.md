@@ -519,7 +519,7 @@ make run
   - Used only in `alone` mode, scenarios for Crowdsec CAPI
 - CaptchaProvider
   - string
-  - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile` or `custom`
+  - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile`, `custom`, or `trycap`
 - CaptchaCustomJsURL
   - string
   - If CaptchaProvider is `custom`, URL used to load the challenge in the HTML (in case of hcaptcha: `https://hcaptcha.com/1/api.js`)
@@ -532,6 +532,9 @@ make run
 - CaptchaCustomResponse
   - string
   - If CaptchaProvider is `custom`, used to set the field in the POST body from the captcha.html to Traefik (in case of hcaptcha: `h-captcha-response`)
+- CaptchaTrycapInstanceUrl
+  - string
+  - If CaptchaProvider is `trycap`, public origin of the Cap Standalone instance (trycap.dev), for example `https://cap.example.com`. The plugin joins `{instance}/{siteKey}/` for the widget and `{instance}/{siteKey}/siteverify` for JSON verification. Do not put the site key in this URL.
 - CaptchaSiteKey
   - string
   - Site key for the captcha provider

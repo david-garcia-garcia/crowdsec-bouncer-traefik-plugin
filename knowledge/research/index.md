@@ -29,3 +29,8 @@ description: Official Redis Go client surface and toolchain constraints.
 priority: normal
 local: index_ext_traefik-geoblock.md
 description: Facts about the traefik-geoblock plugin this product may reuse.
+
+## cap
+priority: normal
+local: index_ext_cap.md
+description: Official Cap Standalone (trycap.dev) widget and siteverify behavior this product relies on.
