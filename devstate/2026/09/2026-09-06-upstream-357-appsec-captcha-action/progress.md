@@ -10,5 +10,5 @@ JobName: 2026-09-06-upstream-357-appsec-captcha-action
 | implement | [x] | [x] | 2026-09-06T15:29:55Z |
 | codereview | [x] | [x] | 2026-09-06T15:32:38Z |
 | devdocsimpact | [x] | [x] | 2026-09-06T15:34:35Z |
-| archive | [x] | [ ] | |
+| archive | [x] | [x] | 2026-09-06T15:37:35Z |
 | pullrequest | [ ] | [ ] | |

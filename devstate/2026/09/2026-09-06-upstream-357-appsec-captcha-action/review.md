@@ -28,8 +28,8 @@ findings: all five axes none
 fixed: n/a
 skipped: n/a
 
-## devdocsimpact (2026-09-06)
-phase: devdocsimpact
-findings: stale-usage on core_plugin_appsec empty-captcha relay
-fixed: How-to line produced
+## archive (2026-09-06)
+phase: archive
+findings: folded captcha scenarios into core_plugin_appsec_bot-detection; moved change to archive
+fixed: n/a
 skipped: n/a
