@@ -1,0 +1,15 @@
+issueKey: 2026-09-06-performance-ip-parse
+jobName: 2026-09-06-performance-ip-parse
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: 0d7410c27f317b8505dbea3b9b5394335070777ed16e24457d536f17be7407f4
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
