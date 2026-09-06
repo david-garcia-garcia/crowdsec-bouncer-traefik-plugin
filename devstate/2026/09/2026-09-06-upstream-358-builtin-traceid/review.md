@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: language-gap and stale-usage on core_plugin_middleware
 fixed: Remediation TraceID Language, How-to, Key files, Gotcha
 skipped: n/a
+
+## archive (2026-09-06)
+phase: archive
+findings: catalog spec core_plugin_middleware_remediation-traceid; change moved to archive/2026-09-06-add-remediation-traceid
+fixed: spec catalog sync + folder move
+skipped: n/a
