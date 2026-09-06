@@ -3,7 +3,7 @@
 ## Isolated cache Client
 priority: normal
 local: core_cache_client.md
-description: How each CrowdsecConnection gets its own memory map or Redis key prefix.
+description: How each LAPI Connection gets its own memory map or Redis key prefix.
 
 ## Redis cache client
 priority: normal

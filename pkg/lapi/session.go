@@ -1,4 +1,4 @@
-package crowdsecconnection
+package lapi
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
-const streamSessionKeyPrefix = "crowdsecconnection:stream:"
+const streamSessionKeyPrefix = "lapi:stream:"
 
 // streamSession is the CrowdSec-row identity for stream and alone modes.
 // SessionPrefix / CachePrefix use only these fields. SessionKey appends a
@@ -57,8 +57,8 @@ type streamSession struct {
 //
 // A second live middleware that disagrees is warn-and-wire: Traefik New must
 // not fail the joiner router, and we must not start a second poller. The first
-// New keeps intervals, Redis, TLS, AppSec client, and scopes=. Trusted IPs and
-// ban/captcha templates stay on the per-router Bouncer.
+// New keeps intervals, Redis, TLS, and scopes=. Trusted IPs, ban/captcha
+// templates, and AppSec stay off this LAPI session.
 //
 // A Traefik reload that changes this snapshot uses a new SessionKey. The old
 // key is sleeping (tickers already off) until grace Close. Same snapshot: Open
@@ -69,32 +69,24 @@ type streamSession struct {
 // replaced on reload without a process restart. Two live middlewares with
 // different certs still warn-and-wire (first wins) until the owner is gone.
 type streamSettings struct {
-	CapiScenarios                 []string          `json:"capiScenarios"`
-	UpdateIntervalSeconds         int64             `json:"updateIntervalSeconds"`
-	MetricsUpdateIntervalSeconds  int64             `json:"metricsUpdateIntervalSeconds"`
-	UpdateMaxFailure              int64             `json:"updateMaxFailure"`
-	LapiFailureAction             string            `json:"lapiFailureAction"`
-	StreamStartupBlock            bool              `json:"streamStartupBlock"`
-	DefaultDecisionSeconds        int64             `json:"defaultDecisionSeconds"`
-	HTTPTimeoutSeconds            int64             `json:"httpTimeoutSeconds"`
-	RedisCacheEnabled             bool              `json:"redisCacheEnabled"`
-	RedisCacheHost                string            `json:"redisCacheHost"`
-	RedisCacheReadHosts           []string          `json:"redisCacheReadHosts"`
-	RedisCachePassword            string            `json:"redisCachePassword"`
-	RedisCacheDatabase            string            `json:"redisCacheDatabase"`
-	RedisCacheUnreachableBlock    bool              `json:"redisCacheUnreachableBlock"`
-	AppsecScheme                  string            `json:"appsecScheme"`
-	AppsecHost                    string            `json:"appsecHost"`
-	AppsecPath                    string            `json:"appsecPath"`
-	AppsecKey                     string            `json:"appsecKey"`
-	AppsecBodyLimit               int64             `json:"appsecBodyLimit"`
-	AppsecTLSInsecureVerify       bool              `json:"appsecTlsInsecureVerify"`
-	AppsecTLSCertificateAuthority string            `json:"appsecTlsCa"`
-	AppsecTLSCertificateBouncer   string            `json:"appsecTlsCert"`
-	LapiTLSInsecureVerify         bool              `json:"lapiTlsInsecureVerify"`
-	LapiTLSCertificateAuthority   string            `json:"lapiTlsCa"`
-	LapiTLSCertificateBouncer     string            `json:"lapiTlsCert"`
-	DecisionScopeHeaders          map[string]string `json:"decisionScopeHeaders"`
+	CapiScenarios                []string          `json:"capiScenarios"`
+	UpdateIntervalSeconds        int64             `json:"updateIntervalSeconds"`
+	MetricsUpdateIntervalSeconds int64             `json:"metricsUpdateIntervalSeconds"`
+	UpdateMaxFailure             int64             `json:"updateMaxFailure"`
+	LapiFailureAction            string            `json:"lapiFailureAction"`
+	StreamStartupBlock           bool              `json:"streamStartupBlock"`
+	DefaultDecisionSeconds       int64             `json:"defaultDecisionSeconds"`
+	HTTPTimeoutSeconds           int64             `json:"httpTimeoutSeconds"`
+	RedisCacheEnabled            bool              `json:"redisCacheEnabled"`
+	RedisCacheHost               string            `json:"redisCacheHost"`
+	RedisCacheReadHosts          []string          `json:"redisCacheReadHosts"`
+	RedisCachePassword           string            `json:"redisCachePassword"`
+	RedisCacheDatabase           string            `json:"redisCacheDatabase"`
+	RedisCacheUnreachableBlock   bool              `json:"redisCacheUnreachableBlock"`
+	LapiTLSInsecureVerify        bool              `json:"lapiTlsInsecureVerify"`
+	LapiTLSCertificateAuthority  string            `json:"lapiTlsCa"`
+	LapiTLSCertificateBouncer    string            `json:"lapiTlsCert"`
+	DecisionScopeHeaders         map[string]string `json:"decisionScopeHeaders"`
 }
 
 // sessionFrom copies the CrowdSec-row fields off cfg. Call after Prepare.
@@ -113,32 +105,24 @@ func sessionFrom(cfg *configuration.Config) streamSession {
 // settingsFrom copies the first-wins knobs off cfg. Call after Prepare.
 func settingsFrom(cfg *configuration.Config) streamSettings {
 	return streamSettings{
-		CapiScenarios:                 cfg.CrowdsecCapiScenarios,
-		UpdateIntervalSeconds:         cfg.UpdateIntervalSeconds,
-		MetricsUpdateIntervalSeconds:  cfg.MetricsUpdateIntervalSeconds,
-		UpdateMaxFailure:              cfg.UpdateMaxFailure,
-		LapiFailureAction:             configuration.EffectiveFailureAction(cfg.CrowdsecLapiFailureAction),
-		StreamStartupBlock:            cfg.StreamStartupBlock,
-		DefaultDecisionSeconds:        cfg.DefaultDecisionSeconds,
-		HTTPTimeoutSeconds:            cfg.HTTPTimeoutSeconds,
-		RedisCacheEnabled:             cfg.RedisCacheEnabled,
-		RedisCacheHost:                cfg.RedisCacheHost,
-		RedisCacheReadHosts:           cfg.RedisCacheReadHosts,
-		RedisCachePassword:            cfg.RedisCachePassword,
-		RedisCacheDatabase:            cfg.RedisCacheDatabase,
-		RedisCacheUnreachableBlock:    cfg.RedisCacheUnreachableBlock,
-		AppsecScheme:                  cfg.CrowdsecAppsecScheme,
-		AppsecHost:                    cfg.CrowdsecAppsecHost,
-		AppsecPath:                    cfg.CrowdsecAppsecPath,
-		AppsecKey:                     cfg.CrowdsecAppsecKey,
-		AppsecBodyLimit:               cfg.CrowdsecAppsecBodyLimit,
-		AppsecTLSInsecureVerify:       cfg.CrowdsecAppsecTLSInsecureVerify,
-		AppsecTLSCertificateAuthority: cfg.CrowdsecAppsecTLSCertificateAuthority,
-		AppsecTLSCertificateBouncer:   cfg.CrowdsecAppsecTLSCertificateBouncer,
-		LapiTLSInsecureVerify:         cfg.CrowdsecLapiTLSInsecureVerify,
-		LapiTLSCertificateAuthority:   cfg.CrowdsecLapiTLSCertificateAuthority,
-		LapiTLSCertificateBouncer:     cfg.CrowdsecLapiTLSCertificateBouncer,
-		DecisionScopeHeaders:          decisionscope.NormalizeDecisionScopeHeaders(cfg.DecisionScopeHeaders),
+		CapiScenarios:                cfg.CrowdsecCapiScenarios,
+		UpdateIntervalSeconds:        cfg.UpdateIntervalSeconds,
+		MetricsUpdateIntervalSeconds: cfg.MetricsUpdateIntervalSeconds,
+		UpdateMaxFailure:             cfg.UpdateMaxFailure,
+		LapiFailureAction:            configuration.EffectiveFailureAction(cfg.CrowdsecLapiFailureAction),
+		StreamStartupBlock:           cfg.StreamStartupBlock,
+		DefaultDecisionSeconds:       cfg.DefaultDecisionSeconds,
+		HTTPTimeoutSeconds:           cfg.HTTPTimeoutSeconds,
+		RedisCacheEnabled:            cfg.RedisCacheEnabled,
+		RedisCacheHost:               cfg.RedisCacheHost,
+		RedisCacheReadHosts:          cfg.RedisCacheReadHosts,
+		RedisCachePassword:           cfg.RedisCachePassword,
+		RedisCacheDatabase:           cfg.RedisCacheDatabase,
+		RedisCacheUnreachableBlock:   cfg.RedisCacheUnreachableBlock,
+		LapiTLSInsecureVerify:        cfg.CrowdsecLapiTLSInsecureVerify,
+		LapiTLSCertificateAuthority:  cfg.CrowdsecLapiTLSCertificateAuthority,
+		LapiTLSCertificateBouncer:    cfg.CrowdsecLapiTLSCertificateBouncer,
+		DecisionScopeHeaders:         decisionscope.NormalizeDecisionScopeHeaders(cfg.DecisionScopeHeaders),
 	}
 }
 
@@ -217,7 +201,7 @@ func warnWiredToOwner(log *slog.Logger, ownerName, joinerName string, owner, joi
 	)
 }
 
-// OpenStream reclaims one CrowdsecConnection per stream session (LAPI URL+key).
+// OpenStream reclaims one Connection per stream session (LAPI URL+key).
 //
 // SessionKey is session prefix plus this snapshot’s hash. PeekLivePrefix on
 // SessionPrefix finds another live middleware on the same CrowdSec row
@@ -226,7 +210,7 @@ func warnWiredToOwner(log *slog.Logger, ownerName, joinerName string, owner, joi
 // different snapshot → warn-and-wire Open of their key. Sleeping leftover
 // with a different snapshot is a different key: Open creates; the sleeper
 // dies on grace Close.
-func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*CrowdsecConnection, error) {
+func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Connection, error) {
 	joinerKey := SessionKey(cfg)
 	joinerSettings := settingsFrom(cfg)
 	create := func() (any, error) {
@@ -242,7 +226,7 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	bindKey := joinerKey
 	live := reclaim.PeekLivePrefix(SessionPrefix(cfg))
 	if live.OK && live.Key != joinerKey {
-		existing, _ := live.Value.(*CrowdsecConnection)
+		existing, _ := live.Value.(*Connection)
 		if existing != nil {
 			ownerName := existing.streamOwner
 			if ownerName == "" {
@@ -269,8 +253,8 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	return conn, nil
 }
 
-// OpenLive reclaims a CrowdsecConnection by full identity (live/none/appsec).
-func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*CrowdsecConnection, error) {
+// OpenLive reclaims a Connection by full identity (live/none).
+func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Connection, error) {
 	stored, openErr := reclaim.OpenWithGrace(ctx, Key(cfg), log, ReclaimGraceDuration, func() (any, error) {
 		conn, err := New(cfg, log, pluginVersion)
 		if err != nil {
@@ -285,7 +269,7 @@ func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, 
 }
 
 // wrappedConnection is the reclaim create() result: funcs, not a type assert (Yaegi).
-func wrappedConnection(conn *CrowdsecConnection) *reclaim.Wrapped {
+func wrappedConnection(conn *Connection) *reclaim.Wrapped {
 	return &reclaim.Wrapped{
 		Value: conn,
 		Sleep: conn.Sleep,
@@ -294,10 +278,10 @@ func wrappedConnection(conn *CrowdsecConnection) *reclaim.Wrapped {
 	}
 }
 
-func connectionFromStored(middlewareName string, stored any) (*CrowdsecConnection, error) {
-	conn, ok := stored.(*CrowdsecConnection)
+func connectionFromStored(middlewareName string, stored any) (*Connection, error) {
+	conn, ok := stored.(*Connection)
 	if !ok {
-		return nil, fmt.Errorf("%s: reclaim: want *crowdsecconnection.CrowdsecConnection, got %T", middlewareName, stored)
+		return nil, fmt.Errorf("%s: reclaim: want *lapi.Connection, got %T", middlewareName, stored)
 	}
 	return conn, nil
 }

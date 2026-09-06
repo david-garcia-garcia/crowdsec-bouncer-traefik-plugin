@@ -1,4 +1,4 @@
-package crowdsecconnection
+package lapi
 
 import (
 	"encoding/json"
@@ -23,7 +23,7 @@ type Stream struct {
 }
 
 // startStream starts the stream ticker and initial poll for stream and alone modes.
-func (c *CrowdsecConnection) startStream(config *configuration.Config, log *slog.Logger) error {
+func (c *Connection) startStream(config *configuration.Config, log *slog.Logger) error {
 	if config.CrowdsecMode != configuration.StreamMode && config.CrowdsecMode != configuration.AloneMode {
 		return nil
 	}
@@ -45,7 +45,7 @@ func (c *CrowdsecConnection) startStream(config *configuration.Config, log *slog
 	return nil
 }
 
-func (c *CrowdsecConnection) handleStreamTicker() {
+func (c *Connection) handleStreamTicker() {
 	if err := c.handleStreamCache(); err != nil {
 		c.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", c.updateFailure, c.isCrowdsecStreamHealthy, err.Error()))
 		if c.updateMaxFailure != -1 && c.updateFailure >= c.updateMaxFailure && c.isCrowdsecStreamHealthy {
@@ -63,7 +63,7 @@ func (c *CrowdsecConnection) handleStreamTicker() {
 	}
 }
 
-func (c *CrowdsecConnection) handleStreamCache() error {
+func (c *Connection) handleStreamCache() error {
 	_, err := c.cacheClient.Get(cacheTimeoutKey)
 	if err == nil {
 		c.log.Debug("handleStreamCache:alreadyUpdated")

@@ -1,4 +1,4 @@
-package crowdsecconnection
+package lapi
 
 import (
 	"bytes"
@@ -46,7 +46,7 @@ func isReverseProxyError(statusCode int) bool {
 		statusCode == http.StatusGatewayTimeout
 }
 
-func (c *CrowdsecConnection) getToken() error {
+func (c *Connection) getToken() error {
 	loginURL := url.URL{
 		Scheme: c.crowdsecScheme,
 		Host:   c.crowdsecHost,
@@ -75,7 +75,7 @@ func (c *CrowdsecConnection) getToken() error {
 	return errors.New("getToken statusCode:" + strconv.Itoa(login.Code))
 }
 
-func (c *CrowdsecConnection) crowdsecQuery(stringURL string, data []byte) ([]byte, error) {
+func (c *Connection) crowdsecQuery(stringURL string, data []byte) ([]byte, error) {
 	var req *http.Request
 	if len(data) > 0 {
 		req, _ = http.NewRequest(http.MethodPost, stringURL, bytes.NewBuffer(data))

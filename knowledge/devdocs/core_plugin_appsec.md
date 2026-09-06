@@ -30,7 +30,7 @@ _Avoid_: CrowdSec LAPI captcha remediation
 ## Pattern snippet
 
 ```go
-decision, err := b.appsec.Query(req.remoteIP, req.Request, pol)
+decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
 ```
 
 ## Key files

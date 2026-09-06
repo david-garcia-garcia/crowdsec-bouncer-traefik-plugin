@@ -7,7 +7,7 @@ One cache blob at key `range-index` whose lines are `cidr=remediation`. Remediat
 _Avoid_: walking the blob on the request path, one cache key per CIDR, LAPI `?ip=` on the stream path
 
 **Range membership**:
-Two boolean CIDR sets (ban, captcha) on the reclaimed CrowdsecConnection plus the stored remediation string per CIDR. Stream/alone request lookup asks this pair. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s stored suffix.
+Two boolean CIDR sets (ban, captcha) on the reclaimed LAPI Connection plus the stored remediation string per CIDR. Stream/alone request lookup asks this pair. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s stored suffix.
 _Avoid_: trusted-IP Checker, one LPM tree with a stored remediation, `sync.Once`, package globals
 
 **Header-mapped scope**:
@@ -44,10 +44,10 @@ conn.IncDropped(origin, req.ipType, "ban")
 - `pkg/configuration/configuration.go` (`DecisionScopeHeaders`)
 - `pkg/bouncer/bouncer.go`
 - `pkg/bouncer/clientrequest.go`
-- `pkg/crowdsecconnection/connection.go`
-- `pkg/crowdsecconnection/connection_decisions.go`
-- `pkg/crowdsecconnection/connection_stream.go`
-- `pkg/crowdsecconnection/connection_live.go`
+- `pkg/lapi/connection.go`
+- `pkg/lapi/connection_decisions.go`
+- `pkg/lapi/connection_stream.go`
+- `pkg/lapi/connection_live.go`
 
 ## Gotchas
 

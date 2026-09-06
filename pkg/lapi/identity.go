@@ -1,4 +1,4 @@
-package crowdsecconnection
+package lapi
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
-const keyPrefix = "crowdsecconnection:"
+const keyPrefix = "lapi:"
 
 // identity is the live/none reclaim-key payload (full connection fields).
 // Stream/alone use streamSession instead: LAPI URL+key only, so intervals
@@ -38,14 +38,6 @@ type identity struct {
 	RedisCachePassword            string   `json:"redisCachePassword"`
 	RedisCacheDatabase            string   `json:"redisCacheDatabase"`
 	RedisCacheUnreachableBlock    bool     `json:"redisCacheUnreachableBlock"`
-	AppsecScheme                  string   `json:"appsecScheme"`
-	AppsecHost                    string   `json:"appsecHost"`
-	AppsecPath                    string   `json:"appsecPath"`
-	AppsecKey                     string   `json:"appsecKey"`
-	AppsecBodyLimit               int64    `json:"appsecBodyLimit"`
-	AppsecTLSInsecureVerify       bool     `json:"appsecTlsInsecureVerify"`
-	AppsecTLSCertificateAuthority string   `json:"appsecTlsCa"`
-	AppsecTLSCertificateBouncer   string   `json:"appsecTlsCert"`
 	LapiTLSInsecureVerify         bool     `json:"lapiTlsInsecureVerify"`
 	LapiTLSCertificateAuthority   string   `json:"lapiTlsCa"`
 	LapiTLSCertificateBouncer     string   `json:"lapiTlsCert"`
@@ -75,14 +67,6 @@ func identityFrom(cfg *configuration.Config) identity {
 		RedisCachePassword:            cfg.RedisCachePassword,
 		RedisCacheDatabase:            cfg.RedisCacheDatabase,
 		RedisCacheUnreachableBlock:    cfg.RedisCacheUnreachableBlock,
-		AppsecScheme:                  cfg.CrowdsecAppsecScheme,
-		AppsecHost:                    cfg.CrowdsecAppsecHost,
-		AppsecPath:                    cfg.CrowdsecAppsecPath,
-		AppsecKey:                     cfg.CrowdsecAppsecKey,
-		AppsecBodyLimit:               cfg.CrowdsecAppsecBodyLimit,
-		AppsecTLSInsecureVerify:       cfg.CrowdsecAppsecTLSInsecureVerify,
-		AppsecTLSCertificateAuthority: cfg.CrowdsecAppsecTLSCertificateAuthority,
-		AppsecTLSCertificateBouncer:   cfg.CrowdsecAppsecTLSCertificateBouncer,
 		LapiTLSInsecureVerify:         cfg.CrowdsecLapiTLSInsecureVerify,
 		LapiTLSCertificateAuthority:   cfg.CrowdsecLapiTLSCertificateAuthority,
 		LapiTLSCertificateBouncer:     cfg.CrowdsecLapiTLSCertificateBouncer,
@@ -105,7 +89,7 @@ func IdentityHex(cfg *configuration.Config) string {
 	return hashBytes(b)
 }
 
-// Key is the process reclaim table key for one CrowdsecConnection.
+// Key is the process reclaim table key for one Connection.
 func Key(cfg *configuration.Config) string {
 	return keyPrefix + IdentityHex(cfg)
 }

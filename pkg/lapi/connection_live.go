@@ -1,4 +1,4 @@
-package crowdsecconnection
+package lapi
 
 import (
 	"errors"
@@ -10,11 +10,11 @@ import (
 )
 
 // LiveLookup queries LAPI for one IP and mapped header scopes (none/live mode).
-func (c *CrowdsecConnection) LiveLookup(remoteIP string, scopes map[string]string) (string, error) {
+func (c *Connection) LiveLookup(remoteIP string, scopes map[string]string) (string, error) {
 	return c.handleNoStreamCache(remoteIP, scopes)
 }
 
-func (c *CrowdsecConnection) handleNoStreamCache(remoteIP string, scopes map[string]string) (string, error) {
+func (c *Connection) handleNoStreamCache(remoteIP string, scopes map[string]string) (string, error) {
 	isLiveMode := c.crowdsecMode == configuration.LiveMode
 	chosen, parsedDuration, err := c.queryLiveDecisions(fmt.Sprintf("ip=%v", remoteIP))
 	if err != nil {

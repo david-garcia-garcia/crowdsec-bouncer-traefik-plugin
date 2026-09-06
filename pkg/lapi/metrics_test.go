@@ -1,4 +1,4 @@
-package crowdsecconnection
+package lapi
 
 import (
 	"encoding/json"
@@ -108,7 +108,7 @@ func TestReportMetricsStartupTimestampStable(t *testing.T) {
 	}
 }
 
-func newUsageMetricsConn(t *testing.T) (*CrowdsecConnection, *[]byte) {
+func newUsageMetricsConn(t *testing.T) (*Connection, *[]byte) {
 	t.Helper()
 	gotBody := new([]byte)
 	lapi := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -129,7 +129,7 @@ func newUsageMetricsConn(t *testing.T) (*CrowdsecConnection, *[]byte) {
 		t.Fatal(err)
 	}
 	started := time.Unix(1_700_000_000, 0).UTC()
-	conn := &CrowdsecConnection{
+	conn := &Connection{
 		crowdsecScheme:  lapiURL.Scheme,
 		crowdsecHost:    lapiURL.Host,
 		crowdsecPath:    "/",
@@ -278,7 +278,7 @@ func TestReportMetricsRestoresOnFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	started := time.Unix(1_700_000_000, 0).UTC()
-	conn := &CrowdsecConnection{
+	conn := &Connection{
 		crowdsecScheme:  lapiURL.Scheme,
 		crowdsecHost:    lapiURL.Host,
 		crowdsecPath:    "/",

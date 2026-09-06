@@ -1,4 +1,4 @@
-package crowdsecconnection
+package lapi
 
 import (
 	"net"
@@ -9,11 +9,11 @@ import (
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-func newTestRangeConn(t *testing.T) (*CrowdsecConnection, *cache.Client) {
+func newTestRangeConn(t *testing.T) (*Connection, *cache.Client) {
 	t.Helper()
 	client := &cache.Client{}
 	client.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
-	return &CrowdsecConnection{cacheClient: client, log: logger.New("ERROR", "")}, client
+	return &Connection{cacheClient: client, log: logger.New("ERROR", "")}, client
 }
 
 func TestHydrateRangeMembershipFromBlob(t *testing.T) {

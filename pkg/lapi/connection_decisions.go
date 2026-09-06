@@ -1,4 +1,4 @@
-package crowdsecconnection
+package lapi
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 )
 
 // streamQuery is the LAPI/CAPI stream RawQuery. LAPI adds scopes= when this is not CAPI.
-func (c *CrowdsecConnection) streamQuery() string {
+func (c *Connection) streamQuery() string {
 	query := fmt.Sprintf("startup=%t", !c.isCrowdsecStreamHealthy || c.isCrowdsecStreamStartup)
 	if c.crowdsecStreamRoute != crowdsecLapiStreamRoute {
 		return query
@@ -21,7 +21,7 @@ func (c *CrowdsecConnection) streamQuery() string {
 }
 
 // storeStreamDecision writes one non-Range stream decision into the cache.
-func (c *CrowdsecConnection) storeStreamDecision(item Decision, duration int64) {
+func (c *Connection) storeStreamDecision(item Decision, duration int64) {
 	value := decisionscope.RemediationValue(item.Type)
 	if value == "" {
 		c.log.Debug("handleStreamCache:unknownType " + item.Type)
@@ -53,7 +53,7 @@ func (c *CrowdsecConnection) storeStreamDecision(item Decision, duration int64) 
 }
 
 // deleteStreamDecision drops one non-Range stream decision from the cache.
-func (c *CrowdsecConnection) deleteStreamDecision(item Decision) {
+func (c *Connection) deleteStreamDecision(item Decision) {
 	scope := decisionscope.NormalizeScope(item.Scope)
 	switch scope {
 	case decisionscope.ScopeIP, "":
@@ -74,7 +74,7 @@ func (c *CrowdsecConnection) deleteStreamDecision(item Decision) {
 }
 
 // queryLiveDecisions GETs LAPI decisions for rawQuery and returns the strongest remediation.
-func (c *CrowdsecConnection) queryLiveDecisions(rawQuery string) (string, time.Duration, error) {
+func (c *Connection) queryLiveDecisions(rawQuery string) (string, time.Duration, error) {
 	routeURL := url.URL{
 		Scheme:   c.crowdsecScheme,
 		Host:     c.crowdsecHost,
@@ -126,7 +126,7 @@ func strongestLiveDecision(items []Decision) *Decision {
 }
 
 // mergeLiveScope queries one header-mapped scope and keeps ban over the current live remediation.
-func (c *CrowdsecConnection) mergeLiveScope(chosen string, parsedDuration time.Duration, scope, identifier string, isLiveMode bool) (string, time.Duration) {
+func (c *Connection) mergeLiveScope(chosen string, parsedDuration time.Duration, scope, identifier string, isLiveMode bool) (string, time.Duration) {
 	if identifier == "" {
 		return chosen, parsedDuration
 	}
@@ -144,7 +144,7 @@ func (c *CrowdsecConnection) mergeLiveScope(chosen string, parsedDuration time.D
 }
 
 // cacheLiveScope stores a live/none header-scope result when live caching is on.
-func (c *CrowdsecConnection) cacheLiveScope(key, value string, parsedDuration time.Duration, isLiveMode bool) {
+func (c *Connection) cacheLiveScope(key, value string, parsedDuration time.Duration, isLiveMode bool) {
 	if !isLiveMode || c.defaultDecisionTimeout <= 0 {
 		return
 	}
@@ -156,7 +156,7 @@ func (c *CrowdsecConnection) cacheLiveScope(key, value string, parsedDuration ti
 }
 
 // liveCacheTTL is the live-mode cache TTL: min(decision duration, defaultDecisionTimeout).
-func (c *CrowdsecConnection) liveCacheTTL(parsedDuration time.Duration) int64 {
+func (c *Connection) liveCacheTTL(parsedDuration time.Duration) int64 {
 	durationSecond := int64(parsedDuration.Seconds())
 	if durationSecond <= 0 || c.defaultDecisionTimeout < durationSecond {
 		return c.defaultDecisionTimeout

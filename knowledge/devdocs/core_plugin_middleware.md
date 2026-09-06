@@ -15,7 +15,7 @@ The CrowdSec bouncer row this process polls: LAPI scheme, host, and path plus la
 _Avoid_: middleware name, IdentityHex, `scopes=`, AppSec host
 
 **Bouncer**:
-The per-router `http.Handler` Traefik gets back from `New`. Holds `next`, request policy (trusted IPs, ban/captcha, Enabled, AppSec-on-pass), a pointer to the reclaimed LAPI Connection, and a pointer to the reclaimed AppSec Client (nil when AppSec is off).
+The per-router `http.Handler` Traefik gets back from `New`. Holds `next`, request policy (trusted IPs, ban/captcha, Enabled, AppSec-on-pass), `lapiClient` (`*lapi.Connection`, nil in `crowdsecMode: appsec`), and `appsecClient` (`*appsec.Client`, nil when AppSec is off).
 _Avoid_: ForRoute, Plugin core, the reclaim value
 
 **Failure action**:
@@ -30,7 +30,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 
 - Keep `CreateConfig` / `New` on the module root (`plugin.go`).
 - Keep `pluginVersion` in root `version.go` (release workflow bumps it). Pass it into `lapi.New` and `appsec.New`.
-- Call `lapi.Prepare` then `appsec.Prepare`. Stream/alone: `lapi.OpenStream`. Live/none: `lapi.OpenLive`. `crowdsecMode: appsec`: skip LAPI Open. When `crowdsecAppsecEnabled`: `appsec.Open`. Return `bouncer.New(..., conn, appsecClient, ...)`.
+- Call `lapi.Prepare` then `appsec.Prepare`. Stream/alone: `lapi.OpenStream`. Live/none: `lapi.OpenLive`. `crowdsecMode: appsec`: skip LAPI Open. When `crowdsecAppsecEnabled`: `appsec.Open`. Return `bouncer.New(..., lapiClient, appsecClient, ...)`.
 - Put stream tickers, LAPI HTTP, cache, and Range membership on `lapi.Connection`. Put AppSec HTTP on `appsec.Client`. Put captcha and templates on Bouncer.
 - Resolve client IP with `pkg/ip.GetRemoteIP`. Fold `remoteIP`, parsed `net.IP`, and `ipType` into `clientRequest`. Keep the name `req`. Do not parse `RemoteAddr` on LAPI or AppSec. Do not put scopes or origin on that type.
 - Range and header-mapped CrowdSec scopes live in `pkg/decisionscope`. Do not geolocate in `New` or `ServeHTTP`.
@@ -41,12 +41,12 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 
 ```go
 if config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode {
-	conn, err := lapi.OpenStream(ctx, config, log, name, pluginVersion)
-	return bouncer.New(next, name, config, conn, appsecClient, log)
+	lapiClient, err := lapi.OpenStream(ctx, config, log, name, pluginVersion)
+	return bouncer.New(next, name, config, lapiClient, appsecClient, log)
 }
 if config.CrowdsecMode != configuration.AppsecMode {
-	conn, err := lapi.OpenLive(ctx, config, log, name, pluginVersion)
-	return bouncer.New(next, name, config, conn, appsecClient, log)
+	lapiClient, err := lapi.OpenLive(ctx, config, log, name, pluginVersion)
+	return bouncer.New(next, name, config, lapiClient, appsecClient, log)
 }
 return bouncer.New(next, name, config, nil, appsecClient, log)
 ```

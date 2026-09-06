@@ -1,4 +1,4 @@
-package crowdsecconnection
+package lapi
 
 import (
 	"bytes"
@@ -79,16 +79,16 @@ func TestSessionKey_DifferentHostsAreDistinct(t *testing.T) {
 	}
 }
 
-func TestCrowdsecConnection_ReclaimGrace(t *testing.T) {
+func TestConnection_ReclaimGrace(t *testing.T) {
 	if ReclaimGraceDuration != 30*time.Second {
 		t.Fatalf("ReclaimGraceDuration: %v", ReclaimGraceDuration)
 	}
 }
 
-func TestCrowdsecConnection_LifecycleLogs(t *testing.T) {
+func TestConnection_LifecycleLogs(t *testing.T) {
 	var logBuf bytes.Buffer
 	log := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	conn := &CrowdsecConnection{
+	conn := &Connection{
 		log:          log,
 		crowdsecMode: configuration.LiveMode,
 		crowdsecHost: "lapi.example:8080",

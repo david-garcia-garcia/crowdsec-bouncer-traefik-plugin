@@ -25,13 +25,13 @@ Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. S
 ## Pattern snippet
 
 ```go
-conn.IncProcessed(req.ipType)
-conn.IncDropped(cache.RemediationOrigin(stored), req.ipType, "ban")
+lapiClient.IncProcessed(req.ipType)
+lapiClient.IncDropped(cache.RemediationOrigin(stored), req.ipType, "ban")
 ```
 
 ## Key files
 
-- `pkg/crowdsecconnection/connection_metrics.go`
+- `pkg/lapi/connection_metrics.go`
 - `pkg/cache/remediation.go`
 - `pkg/ip/network.go` (`Family`, `FamilyOfIP`, `FamilyOfHostOrCIDR`)
 - `pkg/bouncer/bouncer.go`

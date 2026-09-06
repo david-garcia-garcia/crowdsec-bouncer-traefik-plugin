@@ -1,4 +1,4 @@
-package crowdsecconnection
+package lapi
 
 import (
 	"encoding/json"
@@ -25,14 +25,14 @@ const (
 	OriginPluginAppsecFailure     = "plugin:appsec_failure"     // AppSec failure-action
 )
 
-func (c *CrowdsecConnection) handleMetricsTicker() {
+func (c *Connection) handleMetricsTicker() {
 	if err := c.reportMetrics(); err != nil {
 		c.log.Error("handleMetricsTicker:reportMetrics " + err.Error())
 	}
 }
 
 // drainMetrics POSTs the current usage-metrics window to LAPI. No-op when metrics are disabled.
-func (c *CrowdsecConnection) drainMetrics() {
+func (c *Connection) drainMetrics() {
 	if c.metricsInterval <= 0 {
 		return
 	}
@@ -64,7 +64,7 @@ func MetricsOrigin(origin, scenario string) string {
 
 // IncProcessed counts a handled request (bypass, pass, or drop) by ip_type.
 // Lock-free: ServeHTTP calls this on every request.
-func (c *CrowdsecConnection) IncProcessed(ipType string) {
+func (c *Connection) IncProcessed(ipType string) {
 	switch ipType {
 	case "ipv4":
 		atomic.AddInt64(&c.processedIPv4, 1)
@@ -76,7 +76,7 @@ func (c *CrowdsecConnection) IncProcessed(ipType string) {
 }
 
 // IncDropped counts a remediating response. Empty origin/ipType/remediation labels are omitted on POST.
-func (c *CrowdsecConnection) IncDropped(origin, ipType, remediation string) {
+func (c *Connection) IncDropped(origin, ipType, remediation string) {
 	c.addWindow(usageMetricKey{
 		name:        "dropped",
 		unit:        "request",
@@ -87,7 +87,7 @@ func (c *CrowdsecConnection) IncDropped(origin, ipType, remediation string) {
 }
 
 // addWindow adds delta to a dropped counter for this push window.
-func (c *CrowdsecConnection) addWindow(key usageMetricKey, delta int64) {
+func (c *Connection) addWindow(key usageMetricKey, delta int64) {
 	c.metricsMu.Lock()
 	defer c.metricsMu.Unlock()
 	if c.windowCounters == nil {
@@ -97,7 +97,7 @@ func (c *CrowdsecConnection) addWindow(key usageMetricKey, delta int64) {
 }
 
 // rememberActiveDecision records one stream/alone decision for the active_decisions gauge.
-func (c *CrowdsecConnection) rememberActiveDecision(slot, origin, decisionValue string) {
+func (c *Connection) rememberActiveDecision(slot, origin, decisionValue string) {
 	if c.crowdsecMode != configuration.StreamMode && c.crowdsecMode != configuration.AloneMode {
 		return
 	}
@@ -126,7 +126,7 @@ func (c *CrowdsecConnection) rememberActiveDecision(slot, origin, decisionValue 
 }
 
 // forgetActiveDecision drops a previously counted stream/alone decision from the gauge.
-func (c *CrowdsecConnection) forgetActiveDecision(slot string) {
+func (c *Connection) forgetActiveDecision(slot string) {
 	c.metricsMu.Lock()
 	defer c.metricsMu.Unlock()
 	if c.activeDecisionSlots == nil {
@@ -145,7 +145,7 @@ func (c *CrowdsecConnection) forgetActiveDecision(slot string) {
 
 // reportMetrics POSTs the current window of usage-metrics items to LAPI.
 // Dropped and processed counters reset only after LAPI accepts the POST.
-func (c *CrowdsecConnection) reportMetrics() error {
+func (c *Connection) reportMetrics() error {
 	c.reportMu.Lock()
 	defer c.reportMu.Unlock()
 
@@ -223,7 +223,7 @@ func (c *CrowdsecConnection) reportMetrics() error {
 }
 
 // restoreMetricsWindow puts a failed POST’s counters back so the next drain or ticker can send them.
-func (c *CrowdsecConnection) restoreMetricsWindow(window map[usageMetricKey]int64, processedIPv4, processedIPv6, processedUnknown int64) {
+func (c *Connection) restoreMetricsWindow(window map[usageMetricKey]int64, processedIPv4, processedIPv6, processedUnknown int64) {
 	c.metricsMu.Lock()
 	if c.windowCounters == nil {
 		c.windowCounters = make(map[usageMetricKey]int64)
