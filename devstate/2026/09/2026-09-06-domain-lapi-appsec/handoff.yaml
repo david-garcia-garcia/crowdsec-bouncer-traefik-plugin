@@ -1,0 +1,15 @@
+issueKey: 2026-09-06-domain-lapi-appsec
+jobName: 2026-09-06-domain-lapi-appsec
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: eb3f009e5da70419ce5776d728a3053ce97aef80be233e6252c14e46781f8e3d
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
