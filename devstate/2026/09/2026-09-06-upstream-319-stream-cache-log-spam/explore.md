@@ -48,5 +48,5 @@ IssueKey: 2026-09-06-upstream-319-stream-cache-log-spam
   By: explore
 
 - Q: Spec host for the log-level invariant?
-  Decision: assumed — fold onto `core_plugin_lapi_connection`; confirm with FindSpecHost at propose.
-  By: explore
+  Decision: resolved — fold onto `core_plugin_lapi_connection` (FindSpecHost: fold, high; candidates: core_plugin_lapi_connection, core_plugin_lapi_failure-action, core_plugin_middleware_instance-reclaim, core_cache_client_isolated-store).
+  By: propose
