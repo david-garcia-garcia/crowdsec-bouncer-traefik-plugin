@@ -86,15 +86,15 @@ Each stream or alone connection SHALL rebuild in-process Range membership from `
 - **THEN** the request is forbidden, not captcha
 
 ### Requirement: Matching does not import Traefik config
-Cached request lookup SHALL take a caller boolean that says whether to consult Range membership. Callers that already know Crowdsec mode SHALL pass true for stream and alone, and false for live and none. The matching package MUST NOT import the Traefik plugin configuration package.
+Cached request lookup SHALL consult Range membership from the membership argument. Nil or empty membership SHALL be a Range miss. The matching package MUST NOT import the Traefik plugin configuration package. Callers MUST NOT pass a Crowdsec-mode flag; live and none leave membership empty because they never hydrate.
 
-#### Scenario: True consults Range membership
-- **WHEN** the caller passes true and Range membership holds a ban that contains the client IP
+#### Scenario: Non-empty membership remediates
+- **WHEN** Range membership holds a ban that contains the client IP
 - **THEN** the request is remediating from that membership
 
-#### Scenario: False skips Range membership
-- **WHEN** the caller passes false and Range membership holds a ban that contains the client IP
-- **THEN** Range matching does not remediate from that membership
+#### Scenario: Nil membership does not read the blob
+- **WHEN** membership is nil and `range-index` holds a Range ban that contains the client IP
+- **THEN** Range matching does not remediate from that blob
 
 ### Requirement: Remediation cache values may carry origin
 An Ip, header-scope, or Range-index cache value SHALL still start with the ban/captcha/none letter (`t` / `c` / `f`). It MAY append a unit-separator and the metrics origin. `range-index` stays one key whose lines are `cidr=` plus that value. `IsActiveRemediation`, `PreferRemediation`, Range index parsing, and request lookup SHALL use that letter. In-process Range membership SHALL return the stored string of the winning CIDR (ban over captcha; if several bans contain the IP, the longest-prefix matching ban). Lookup keys (client IP, `scope:value`, `range-index`) MUST NOT change. A value that is only the letter (today’s Redis) SHALL keep matching.

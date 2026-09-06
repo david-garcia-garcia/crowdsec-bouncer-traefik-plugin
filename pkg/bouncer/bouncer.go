@@ -21,27 +21,26 @@ import (
 
 // Bouncer is one Traefik router handler. It is not the reclaim value.
 type Bouncer struct {
-	next     http.Handler
-	name     string
-	template *template.Template
-
-	enabled                 bool
-	crowdsecMode            string
+	appsecClient            *appsec.Client
 	appsecEnabled           bool
 	appsecFailureAction     string
-	remediationStatusCode   int
-	remediationCustomHeader string
-	forwardedCustomHeader   string
 	banTemplate             *template.Template
 	banTemplateContentType  string
-	traceCustomHeader       string
-	clientPoolStrategy      *ip.PoolStrategy
-	serverPoolStrategy      *ip.PoolStrategy
 	captchaClient           *captcha.Client
-	log                     *slog.Logger
-	lapiClient              *lapi.Client
-	appsecClient            *appsec.Client
+	clientPoolStrategy      *ip.PoolStrategy
+	crowdsecMode            string
 	decisionScopeHeaders    map[string]string // CrowdSec header scope → request header
+	enabled                 bool
+	forwardedCustomHeader   string
+	lapiClient              *lapi.Client
+	log                     *slog.Logger
+	name                    string
+	next                    http.Handler
+	remediationCustomHeader string
+	remediationStatusCode   int
+	serverPoolStrategy      *ip.PoolStrategy
+	template                *template.Template
+	traceCustomHeader       string
 }
 
 // New returns a per-router handler bound to lapiClient and appsecClient.
@@ -56,26 +55,26 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 	}
 
 	routeHandler := &Bouncer{
-		next:                    next,
-		name:                    name,
-		template:                template.New("CrowdsecBouncer").Delims("[[", "]]"),
-		enabled:                 config.Enabled,
-		crowdsecMode:            config.CrowdsecMode,
+		appsecClient:            appsecClient,
 		appsecEnabled:           config.CrowdsecAppsecEnabled,
 		appsecFailureAction:     configuration.EffectiveFailureAction(config.CrowdsecAppsecFailureAction),
-		remediationCustomHeader: config.RemediationHeadersCustomName,
-		forwardedCustomHeader:   config.ForwardedHeadersCustomName,
-		remediationStatusCode:   config.RemediationStatusCode,
 		banTemplate:             banTemplate,
 		banTemplateContentType:  banTemplateContentType,
-		traceCustomHeader:       config.TraceHeadersCustomName,
-		log:                     log,
-		lapiClient:              lapiClient,
-		appsecClient:            appsecClient,
-		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
-		serverPoolStrategy:      &ip.PoolStrategy{Checker: serverChecker},
-		clientPoolStrategy:      &ip.PoolStrategy{Checker: clientChecker},
 		captchaClient:           &captcha.Client{},
+		clientPoolStrategy:      &ip.PoolStrategy{Checker: clientChecker},
+		crowdsecMode:            config.CrowdsecMode,
+		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
+		enabled:                 config.Enabled,
+		forwardedCustomHeader:   config.ForwardedHeadersCustomName,
+		lapiClient:              lapiClient,
+		log:                     log,
+		name:                    name,
+		next:                    next,
+		remediationCustomHeader: config.RemediationHeadersCustomName,
+		remediationStatusCode:   config.RemediationStatusCode,
+		serverPoolStrategy:      &ip.PoolStrategy{Checker: serverChecker},
+		template:                template.New("CrowdsecBouncer").Delims("[[", "]]"),
+		traceCustomHeader:       config.TraceHeadersCustomName,
 	}
 	if config.CrowdsecMode == configuration.AppsecMode {
 		routeHandler.log.Debug("Bouncer initialized name:" + name)
@@ -121,7 +120,15 @@ func (b *Bouncer) SameLapiClient(other *Bouncer) bool {
 
 // ServeHTTP is the per-router middleware handler.
 //
-//nolint:nestif
+// none: no stream, no cache; LiveLookup every request.
+// live: no stream; LiveLookup, then memo in cache.
+// stream: LAPI stream ticker writes the cache; request path only reads it.
+// alone: same as stream, but the ticker is CAPI (no local CrowdSec).
+// appsec: no LAPI; skip to the pass path (AppSec if enabled).
+//
+// ServeHTTP is a mode dispatcher; gocyclo/funlen fire on the flattened branches.
+//
+//nolint:gocyclo,funlen
 func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	if !b.enabled {
 		b.next.ServeHTTP(rw, httpReq)
@@ -131,9 +138,9 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	remoteIP, ipAddr, err := ip.GetRemoteIP(httpReq, b.serverPoolStrategy, b.forwardedCustomHeader)
 	req := clientRequest{
 		Request:  httpReq,
-		remoteIP: remoteIP,
 		ipAddr:   ipAddr,
 		ipType:   ip.FamilyOfIP(ipAddr),
+		remoteIP: remoteIP,
 	}
 	b.recordProcessed(req.ipType)
 	if err != nil {
@@ -150,6 +157,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", req.remoteIP, isTrusted))
 	if isTrusted {
 		b.next.ServeHTTP(rw, req.Request)
+		// Trusted clients skip LAPI and AppSec.
 		return
 	}
 
@@ -161,25 +169,24 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	// Mapped scope headers for this request. Missing headers are omitted.
 	scopes := decisionscope.RequestScopeValues(b.decisionScopeHeaders, req.Request)
 
-	// Stream and alone consult Range membership and skip live LAPI; live does not.
-	useRangeMembership := b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode
-
-	if b.crowdsecMode != configuration.NoneMode {
-		value, origin, cacheErr := decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), useRangeMembership, req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
+	// live, stream, and alone consult the cache.
+	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
+		value, origin, cacheErr := decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
 		switch {
 		case cacheErr != nil:
 			cacheErrString := cacheErr.Error()
 			b.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s cache:%s", req.remoteIP, cacheErrString))
-			if !b.lapiClient.RedisUnreachableBlock() && cacheErrString == cache.CacheUnreachable {
+			if cacheErrString == cache.CacheUnreachable && !b.lapiClient.RedisUnreachableBlock() {
 				b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s redisUnreachable=true", req.remoteIP))
 				b.handleNextServeHTTP(rw, req)
 				return
 			}
-			if cacheErrString != cache.CacheMiss {
-				b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", req.remoteIP, cacheErrString))
-				b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
-				return
+			if cacheErrString == cache.CacheMiss {
+				break
 			}
+			b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", req.remoteIP, cacheErrString))
+			b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
+			return
 		case decisionscope.IsActiveRemediation(value):
 			b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit remediation:%s", req.remoteIP, value))
 			b.handleRemediationServeHTTP(rw, req, value, origin)
@@ -190,24 +197,28 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		}
 	}
 
-	if useRangeMembership {
+	if b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
 		if b.lapiClient.StreamHealthy() {
 			b.handleNextServeHTTP(rw, req)
-		} else {
-			b.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", req.remoteIP))
-			b.applyLapiFailureAction(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechStreamFail)
+			// No decision affecting this IP.
+			return
 		}
-	} else {
+		b.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", req.remoteIP))
+		b.applyLapiFailureAction(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechStreamFail)
+		// Stream/alone never query LAPI per request. Miss is allow or failure action.
+		return
+	}
+
+	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.NoneMode {
 		value, err := b.lapiClient.LiveLookup(req.remoteIP, scopes)
 		kind := cache.RemediationKind(value)
 		origin := cache.RemediationOrigin(value)
-		if err != nil && !decisionscope.IsActiveRemediation(kind) {
-			b.log.Debug("ServeHTTP:LiveLookup " + err.Error())
-			b.applyLapiFailureAction(rw, req, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
-			return
-		}
 		if err != nil {
 			b.log.Debug("ServeHTTP:LiveLookup " + err.Error())
+			if !decisionscope.IsActiveRemediation(kind) {
+				b.applyLapiFailureAction(rw, req, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
+				return
+			}
 		}
 		if kind == cache.NoBannedValue {
 			b.handleNextServeHTTP(rw, req)
