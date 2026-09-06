@@ -3,6 +3,12 @@
 ### Requirement: Open creates once and binds a context
 `Open(ctx, key, logger, create)` SHALL create on first call for a key, bind `ctx` as a holder, and panic if `ctx` is nil. `Open` SHALL return an error if `logger` is nil. `create` SHALL take no arguments. If the value has `Close()`, or `create` returned `*Wrapped` with `Close` set, the table SHALL call that Close exactly once when the incarnation ends. A later `Open` for the same key (live or in grace) SHALL return the stored value (the inner value when `*Wrapped`) and MUST NOT run `create`. `create` in another package MUST return `*Wrapped` for Sleep/Wake/Close: Yaegi v0.16 panics on asserting a foreign concrete type to those interfaces.
 
+#### Scenario: Two holders one incarnation
+- **WHEN** `Open` creates a value for a key
+- **AND** a second `Open` attaches another live context
+- **THEN** both return the same value
+- **AND** `create` ran once
+
 #### Scenario: Grace dispose Close runs once
 - **WHEN** all contexts for a key are Done
 - **AND** grace elapses
@@ -20,3 +26,8 @@ When every bound context for a key is Done, if the value has `Sleep()` or `*Wrap
 - **AND** `Wake` ran
 - **AND** `create` does not run
 - **AND** `Close` has not run
+
+#### Scenario: Foreign type uses Wrapped
+- **WHEN** `create` in another package returns `*Wrapped` with Sleep/Wake/Close funcs
+- **THEN** the table calls those funcs on last holder / reclaim / dispose
+- **AND** `Open` and `Peek` return the inner `Value`
