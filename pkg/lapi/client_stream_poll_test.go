@@ -49,7 +49,7 @@ func TestHandleStreamTicker_SkipDoesNotClearFailure(t *testing.T) {
 	}
 	client.updateFailure = 5
 	client.isCrowdsecStreamHealthy = false
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		client.handleStreamTicker()
 	}
 	if got := atomic.LoadInt64(&hits); got != 1 {
