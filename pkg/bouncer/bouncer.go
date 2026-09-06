@@ -121,6 +121,12 @@ func (b *Bouncer) SameLapiClient(other *Bouncer) bool {
 
 // ServeHTTP is the per-router middleware handler.
 //
+// none: no stream, no cache; LiveLookup every request.
+// live: no stream; LiveLookup, then memo in cache.
+// stream: LAPI stream ticker writes the cache; request path only reads it.
+// alone: same as stream, but the ticker is CAPI (no local CrowdSec).
+// appsec: no LAPI; skip to the pass path (AppSec if enabled).
+//
 //nolint:nestif
 func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	if !b.enabled {
@@ -150,6 +156,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", req.remoteIP, isTrusted))
 	if isTrusted {
 		b.next.ServeHTTP(rw, req.Request)
+		// Trusted clients skip LAPI and AppSec.
 		return
 	}
 
@@ -161,27 +168,24 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	// Mapped scope headers for this request. Missing headers are omitted.
 	scopes := decisionscope.RequestScopeValues(b.decisionScopeHeaders, req.Request)
 
-	// none: no stream, no cache; LiveLookup every request.
-	// live: no stream; LiveLookup, then memo in cache.
-	// stream: LAPI stream ticker writes the cache; request path only reads it.
-	// alone: same as stream, but the ticker is CAPI (no local CrowdSec).
-	// appsec: no LAPI; skip to the pass path (AppSec if enabled).
+	// live, stream, and alone consult the cache.
 	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
 		value, origin, cacheErr := decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
 		switch {
 		case cacheErr != nil:
 			cacheErrString := cacheErr.Error()
 			b.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s cache:%s", req.remoteIP, cacheErrString))
-			if !b.lapiClient.RedisUnreachableBlock() && cacheErrString == cache.CacheUnreachable {
+			if cacheErrString == cache.CacheUnreachable && !b.lapiClient.RedisUnreachableBlock() {
 				b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s redisUnreachable=true", req.remoteIP))
 				b.handleNextServeHTTP(rw, req)
 				return
 			}
-			if cacheErrString != cache.CacheMiss {
-				b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", req.remoteIP, cacheErrString))
-				b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
-				return
+			if cacheErrString == cache.CacheMiss {
+				break
 			}
+			b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", req.remoteIP, cacheErrString))
+			b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
+			return
 		case decisionscope.IsActiveRemediation(value):
 			b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit remediation:%s", req.remoteIP, value))
 			b.handleRemediationServeHTTP(rw, req, value, origin)
@@ -208,13 +212,12 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		value, err := b.lapiClient.LiveLookup(req.remoteIP, scopes)
 		kind := cache.RemediationKind(value)
 		origin := cache.RemediationOrigin(value)
-		if err != nil && !decisionscope.IsActiveRemediation(kind) {
-			b.log.Debug("ServeHTTP:LiveLookup " + err.Error())
-			b.applyLapiFailureAction(rw, req, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
-			return
-		}
 		if err != nil {
 			b.log.Debug("ServeHTTP:LiveLookup " + err.Error())
+			if !decisionscope.IsActiveRemediation(kind) {
+				b.applyLapiFailureAction(rw, req, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
+				return
+			}
 		}
 		if kind == cache.NoBannedValue {
 			b.handleNextServeHTTP(rw, req)
