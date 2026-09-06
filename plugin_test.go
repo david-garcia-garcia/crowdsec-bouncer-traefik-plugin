@@ -92,6 +92,33 @@ func reqForIP(ip string) *http.Request {
 	return req
 }
 
+// TestNew_DoesNotMutateCallerConfig checks New leaves Traefik's Config pointer unchanged
+// (mixed-case LogLevel; ban HTML alias stays off the caller BanFilePath).
+func TestNew_DoesNotMutateCallerConfig(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
+
+	cfg := CreateConfig()
+	cfg.CrowdsecLapiKey = "test"
+	cfg.LogLevel = "info"
+	cfg.BanHTMLFilePath = "ban.html"
+	cfg.BanFilePath = ""
+	ctx := context.Background()
+	handler, err := New(ctx, testNextOK(), cfg, "snapshot-caller")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if handler == nil {
+		t.Fatal("New returned nil handler")
+	}
+	if cfg.LogLevel != "info" {
+		t.Fatalf("caller LogLevel = %q, want mixed-case info", cfg.LogLevel)
+	}
+	if cfg.BanFilePath != "" {
+		t.Fatalf("caller BanFilePath = %q, want empty (alias stays on snapshot)", cfg.BanFilePath)
+	}
+}
+
 func TestServeHTTP(t *testing.T) {
 	cfg := CreateConfig()
 	cfg.CrowdsecLapiKey = "test"

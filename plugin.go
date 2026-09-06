@@ -22,26 +22,29 @@ func CreateConfig() *configuration.Config {
 // Stream/alone: one LAPI client per LAPI URL+key (CrowdSec one stream cursor per
 // hashed key + outbound IP). Live/none: reclaim by LAPI identity. AppSec: reclaim by listener URL+key.
 func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
-	config.LogLevel = strings.ToUpper(config.LogLevel)
-	log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
+	// Snapshot Traefik's Config so Yaegi's pointer is not rewritten.
+	prepared := *config
+	prepared.LogLevel = strings.ToUpper(prepared.LogLevel)
+	log := logger.NewWithFormat(prepared.LogLevel, prepared.LogFilePath, prepared.LogFormat)
 
-	if config.BanFilePath == "" && config.BanHTMLFilePath != "" {
-		config.BanFilePath = config.BanHTMLFilePath
+	// Deprecated HTML path aliases apply on the snapshot only.
+	if prepared.BanFilePath == "" && prepared.BanHTMLFilePath != "" {
+		prepared.BanFilePath = prepared.BanHTMLFilePath
 	}
-	if config.CaptchaHTMLFilePath != "" {
-		config.CaptchaFilePath = config.CaptchaHTMLFilePath
+	if prepared.CaptchaHTMLFilePath != "" {
+		prepared.CaptchaFilePath = prepared.CaptchaHTMLFilePath
 	}
 
-	err := configuration.ValidateParams(config, log)
+	err := configuration.ValidateParams(&prepared, log)
 	if err != nil {
 		log.Error("New:validateParams " + err.Error())
 		return nil, err
 	}
 
-	if prepErr := lapi.Prepare(config, log); prepErr != nil {
+	if prepErr := lapi.Prepare(&prepared, log); prepErr != nil {
 		return nil, prepErr
 	}
-	if prepErr := appsec.Prepare(config, log); prepErr != nil {
+	if prepErr := appsec.Prepare(&prepared, log); prepErr != nil {
 		return nil, prepErr
 	}
 
@@ -50,29 +53,29 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	// cursor on the bouncer row selected by hashed X-Api-Key plus the IP LAPI
 	// sees (this process’s outbound address), not per middleware and not per
 	// metrics interval. OpenStream keeps one ticker per URL+key in this process.
-	if config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode {
+	if prepared.CrowdsecMode == configuration.StreamMode || prepared.CrowdsecMode == configuration.AloneMode {
 		var streamErr error
-		lapiClient, streamErr = lapi.OpenStream(ctx, config, log, name, pluginVersion)
+		lapiClient, streamErr = lapi.OpenStream(ctx, &prepared, log, name, pluginVersion)
 		if streamErr != nil {
 			return nil, streamErr
 		}
-	} else if config.CrowdsecMode != configuration.AppsecMode {
+	} else if prepared.CrowdsecMode != configuration.AppsecMode {
 		// Live/none do not use stream_cursor. Two Clients on one key
 		// stay valid (?ip= lookups). Reclaim by LAPI identity, including intervals.
 		var openErr error
-		lapiClient, openErr = lapi.OpenLive(ctx, config, log, name, pluginVersion)
+		lapiClient, openErr = lapi.OpenLive(ctx, &prepared, log, name, pluginVersion)
 		if openErr != nil {
 			return nil, openErr
 		}
 	}
 
 	var appsecClient *appsec.Client
-	if config.CrowdsecAppsecEnabled {
+	if prepared.CrowdsecAppsecEnabled {
 		var appsecErr error
-		appsecClient, appsecErr = appsec.Open(ctx, config, log, name, pluginVersion)
+		appsecClient, appsecErr = appsec.Open(ctx, &prepared, log, name, pluginVersion)
 		if appsecErr != nil {
 			return nil, appsecErr
 		}
 	}
-	return bouncer.New(next, name, config, lapiClient, appsecClient, log)
+	return bouncer.New(next, name, &prepared, lapiClient, appsecClient, log)
 }

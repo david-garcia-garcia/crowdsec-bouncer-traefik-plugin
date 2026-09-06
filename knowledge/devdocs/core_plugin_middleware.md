@@ -22,6 +22,10 @@ _Avoid_: ForRoute, Plugin core, the reclaim value
 The operator enum (`passthrough` | `ban` | `captcha`) this plugin applies when LAPI or AppSec does not return a usable verdict. LAPI action is on LAPI Client identity; AppSec action is per-router on Bouncer. Default is `ban`.
 _Avoid_: fail mode, FailMode, the three removed AppSec block bools, AppSec JSON `action: captcha`
 
+**Prepared snapshot**:
+A copy of Traefik’s `*configuration.Config` that `New` mutates (log level, path aliases, `lapi.Prepare`, `appsec.Prepare`). LAPI/AppSec reclaim and Bouncer construction use this copy.
+_Avoid_: Traefik’s live Config pointer, Prepared type
+
 ## Overview
 
 Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New` must use the constructor `ctx` as the reclaim holder. Do not change `.traefik.yml` `import`.
@@ -30,7 +34,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 
 - Keep `CreateConfig` / `New` on the module root (`plugin.go`).
 - Keep `pluginVersion` in root `version.go` (release workflow bumps it). Pass it into `lapi.New` and `appsec.New`.
-- Call `lapi.Prepare` then `appsec.Prepare`. Stream/alone: `lapi.OpenStream`. Live/none: `lapi.OpenLive`. `crowdsecMode: appsec`: skip LAPI Open. When `crowdsecAppsecEnabled`: `appsec.Open`. Return `bouncer.New(..., lapiClient, appsecClient, ...)`.
+- Copy Traefik’s `*configuration.Config` before any write. Call `lapi.Prepare` then `appsec.Prepare` on that snapshot. Stream/alone: `lapi.OpenStream`. Live/none: `lapi.OpenLive`. `crowdsecMode: appsec`: skip LAPI Open. When `crowdsecAppsecEnabled`: `appsec.Open`. Return `bouncer.New(..., &prepared, lapiClient, appsecClient, ...)`. Do not assign through Yaegi’s pointer.
 - Put stream tickers, LAPI HTTP, cache, and Range membership on `lapi.Client`. Put AppSec HTTP on `appsec.Client`. Put captcha and templates on Bouncer.
 - Resolve client IP with `pkg/ip.GetRemoteIP`. Fold `remoteIP`, parsed `net.IP`, and `ipType` into `clientRequest`. Keep the name `req`. Do not parse `RemoteAddr` on LAPI or AppSec. Do not put scopes or origin on that type.
 - Range and header-mapped CrowdSec scopes live in `pkg/decisionscope`. Do not geolocate in `New` or `ServeHTTP`.
@@ -40,15 +44,17 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 ## Pattern snippet
 
 ```go
-if config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode {
-	lapiClient, err := lapi.OpenStream(ctx, config, log, name, pluginVersion)
-	return bouncer.New(next, name, config, lapiClient, appsecClient, log)
+prepared := *config
+// LogLevel / path aliases / lapi.Prepare / appsec.Prepare mutate prepared only.
+if prepared.CrowdsecMode == configuration.StreamMode || prepared.CrowdsecMode == configuration.AloneMode {
+	lapiClient, err := lapi.OpenStream(ctx, &prepared, log, name, pluginVersion)
+	return bouncer.New(next, name, &prepared, lapiClient, appsecClient, log)
 }
-if config.CrowdsecMode != configuration.AppsecMode {
-	lapiClient, err := lapi.OpenLive(ctx, config, log, name, pluginVersion)
-	return bouncer.New(next, name, config, lapiClient, appsecClient, log)
+if prepared.CrowdsecMode != configuration.AppsecMode {
+	lapiClient, err := lapi.OpenLive(ctx, &prepared, log, name, pluginVersion)
+	return bouncer.New(next, name, &prepared, lapiClient, appsecClient, log)
 }
-return bouncer.New(next, name, config, nil, appsecClient, log)
+return bouncer.New(next, name, &prepared, nil, appsecClient, log)
 ```
 
 ## Key files
@@ -63,6 +69,7 @@ return bouncer.New(next, name, config, nil, appsecClient, log)
 ## Gotchas
 
 - Do not put middleware name, `next`, ban/captcha templates, trusted IPs, Enabled, or AppSec knobs in the LAPI reclaim key.
+- Do not write Traefik’s Config pointer in `New` (LogLevel, path aliases, `lapi.Prepare`, `appsec.Prepare`). Identity hashes the snapshot.
 - `crowdsecLapiFailureAction` is on LAPI Client identity (shared with `updateMaxFailure`). `crowdsecAppsecFailureAction` stays on Bouncer.
 - Stream/alone: CrowdSec stores one `GET /v1/decisions/stream` cursor per hashed API key plus the IP LAPI sees (this process’s outbound address). Reclaim `Open` key is session prefix plus settings hash. A second live middleware on the same LAPI URL+key is warn-and-wire via `PeekLivePrefix` (first New wins LAPI knobs, not AppSec). Last holder Sleeps tickers; reload with the same snapshot Wakes (`startup=false`); a new snapshot Opens a new key and the sleeper dies on grace. Isolated backends need a second bouncer key. Live/none split on LAPI identity (intervals included, AppSec excluded).
 - LAPI `Close()` stops tickers, idle LAPI HTTP, and the cache Redis pool. AppSec `Close()` releases idle AppSec HTTP. Do not use `sync.Once`.
