@@ -1,7 +1,4 @@
-Developer review: in progress — 2026-09-06T14:58:59Z
-
-IssueKey: 2026-09-06-reclaim-close-once
-JobName: 2026-09-06-reclaim-close-once
+Developer review: ready for review — 2026-09-06T15:08:00Z
 
 [sgsi-dev-ticket-status:2026-09-06-reclaim-close-once]
 
@@ -10,69 +7,56 @@ JobName: 2026-09-06-reclaim-close-once
 
 **Admin users.** None.
 
-**Developers.** None yet — prepare grounded a reclaim table double-Close bug; product fix not started.
+**Developers.** `pkg/reclaim` grace dispose now calls `Close` exactly once via the first-Open life watcher; `fire` cancels life only. Tests assert a single Close on grace dispose.
 
 **End users.** None.
 
 ## Motivation
-On `master`, the reclaim table grace-dispose path can invoke a slot `closeFn` twice (from `fire` and the `life` watcher), breaking the documented exactly-once Close contract. LAPI/AppSec closers tolerate repeats today, but a non-idempotent closer could leak or panic; tests only assert `closes >= 1`.
+On `master`, grace dispose (`drop` → grace → `fire`) invoked the slot `closeFn` from both `fire` and the `life` watcher, so `Close` could run twice and concurrently. That breaks the table's exactly-once dispose contract and is masked by tests that only assert `closes >= 1`. Non-idempotent closers could double-free or panic.
 
 ## Merge readiness
-Prepare complete; explore is next. 7 workflow items remain.
+Ready for review. 0 items remain.
 
-Priority: P2 — real internal correctness gap with a workaround (idempotent closers) and limited blast radius today.
-Reviewed head: 482e83f
+Priority: P3 — internal table contract and test clarity; no current operator or end-user harm.
+Reviewed head: bacdcfe
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | CI not measured; no product fix yet |
-| CI proof | 1/6 | Pushed; checks not seen |
-| Local tests proof | N/A | Before implement |
-| Review resolution | N/A | No PR comments inventoried |
+| Overall readiness | 6/6 | CI succeeded; local tests passed; five-axis review clean |
+| CI proof | 6/6 | Main Process, e2e (binary + mock LAPI), e2e (docker + pester) succeeded |
+| Local tests proof | 6/6 | `go test ./pkg/reclaim/...` passed |
+| Review resolution | 6/6 | No open PR comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-06-reclaim-close-once pushed | origin |
-| OpenSpec | none | handoff.yaml |
-| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/36 | GitHub |
-| CI | not seen | no measured checks |
-| Local tests | none | handoff.yaml |
-| PR comments | no comments | comments: none |
+| Branch | 2026-09-06-reclaim-close-once pushed | git push |
+| OpenSpec | reclaim-close-once (archived) | openspec/changes/archive/2026-09-06-reclaim-close-once/ |
+| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/36 | pr-host |
+| CI | Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041016077; e2e success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041016073 | pr-host CI |
+| Local tests | passed | handoff.yaml localTests |
+| PR comments | no comments | devstate/comments.md |
 
 ## Specs
+- [std_go_reclaim_context-lease](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-reclaim-close-once/openspec/changes/archive/2026-09-06-reclaim-close-once/proposal.md) — modified
+
+## Axis review
+- [Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-reclaim-close-once/devstate/2026/09/2026-09-06-reclaim-close-once/codereview_standards.md) — 0/0/0
+- [Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-reclaim-close-once/devstate/2026/09/2026-09-06-reclaim-close-once/codereview_spec.md) — 0/0/0
+- [Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-reclaim-close-once/devstate/2026/09/2026-09-06-reclaim-close-once/codereview_security.md) — 0/0/0
+- [Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-reclaim-close-once/devstate/2026/09/2026-09-06-reclaim-close-once/codereview_performance.md) — 0/0/0
+- [Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-reclaim-close-once/devstate/2026/09/2026-09-06-reclaim-close-once/codereview_dead.md) — 0/0/0
+
+## Decision needed
 None.
 
 ## Follow-up issues
 None.
 
-## How this fits together
-Local bug-hunt finding → branch `2026-09-06-reclaim-close-once` → stub PR #36 → CI pending → explore next.
-
-## Decision needed
-| Question | Decision | By |
-| --- | --- | --- |
-| Which single owner should call `closeFn` (`fire` vs `life` watcher) without breaking `ResetForTest` and race-loser paths? | assumed — explore will compare teardown paths and pick one owner | prepare |
-
 ## Before merge
-- [ ] Explore open questions on dispose ownership
-- [ ] Propose OpenSpec change
-- [ ] Implement exactly-once Close + strict test
-- [ ] Code review five axes
-- [ ] Devdocs impact
-- [ ] Archive change
-- [ ] Pull request final card + green CI
-- [x] Prepare: requirement, qualify, stub PR
+None.
 
 ## Findings
-None.
-
-## Axis review
-None.
-
-## Agent review details
-
-### Stored data model
 None.

@@ -1,5 +1,5 @@
-## prepare (2026-09-06)
-phase: prepare
+## pullrequest (2026-09-06)
+phase: pullrequest
 findings: none
-fixed: requirement grounded, qualify qualified, stub PR #36
+fixed: PR title and delivery card updated; CI measured success
 skipped: none
