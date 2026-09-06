@@ -8,7 +8,7 @@ JobName: 2026-09-06-lapi-client-correctness
 | explore | [x] | [x] | 2026-09-06T15:00:06+00:00 |
 | propose | [x] | [x] | 2026-09-06T15:05:00+02:00 |
 | implement | [x] | [x] | 2026-09-06T15:10:00+00:00 |
-| codereview | [ ] | [ ] | |
+| codereview | [x] | [x] | 2026-09-06T15:15:00+02:00 |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |

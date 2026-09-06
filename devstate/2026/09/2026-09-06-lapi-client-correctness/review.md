@@ -1,23 +1,7 @@
-## prepare (2026-09-06)
-phase: prepare
-findings: qualified, 6 LAPI defects scoped
-fixed: n/a
-skipped: n/a
+# Review log — 2026-09-06-lapi-client-correctness
 
-## explore (2026-09-06)
-phase: explore
-findings: 5 behavioral defects confirmed by code; nil-res panic not reproduced (Go || short-circuit); test gaps confirmed
-fixed: n/a
-skipped: n/a
+## Codereview phase (2026-09-06T15:15:00+02:00)
 
-## propose (2026-09-06)
-phase: propose
-findings: OpenSpec change lapi-client-correctness with 2 new specs + 1 fold; openspec validate --strict passed
-fixed: n/a
-skipped: n/a
+Five-axis review on `origin/master...HEAD` (exclude devstate/.cursor). Hard findings: Standards 1 (method comment), Spec 1 (scope error dropped active IP ban), Spec 2 (missing test). All fixed in 6fb6359. Security/Performance/Dead clean.
 
-## implement (2026-09-06)
-phase: implement
-findings: four product commits in pkg/lapi; local tests passed; openspec validate --strict passed; CI pending on 99a1ddb
-fixed: stream poll serialization, crowdsecQuery transport/401 retry, live scope error propagation, httptest coverage
-skipped: n/a
+Verdict: in progress (CI not seen on head 6fb6359).
