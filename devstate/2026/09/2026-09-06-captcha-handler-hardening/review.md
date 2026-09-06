@@ -27,3 +27,9 @@ phase: codereview
 findings: Standards 2 hard (test stub name, renderCaptcha comment), Dead 1 hard (test-only export); Spec/Security/Performance clean
 fixed: NewFailingSetClientForTest rename; renderCaptcha method comment
 skipped: duplicated CaptchaFilePath validation (intentional dual layer)
+
+## devdocsimpact (2026-09-06)
+phase: devdocsimpact
+findings: missing-packet Captcha handler; stale-usage Isolated cache Client Set error return
+fixed: created core_plugin_captcha_handler.md; updated core_cache_client.md and index_core_plugin.md
+skipped: n/a

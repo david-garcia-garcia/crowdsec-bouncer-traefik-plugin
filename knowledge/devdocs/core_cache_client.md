@@ -15,6 +15,7 @@ Construct a new `Client` on each LAPI Client. Pass `lapi.CachePrefix(cfg)` as Re
 - Memory: `Client.New(..., isRedis=false, ..., keyPrefix)` — prefix is ignored; each Client owns a map.
 - Redis: pass `lapi.CachePrefix(cfg)` as `keyPrefix` (stream/alone session hex, live/none `IdentityHex`). Logical keys are the client IP, `scope:value`, and `range-index`; the store writes `prefix:key`.
 - Same reclaim key → same LAPI Client → same cache Client (share-by-identity, not a process dump).
+- `Client.Set(key, value, ttlSeconds)` returns `error`. Redis writer failures propagate; in-memory `set` always returns nil. Callers that must gate on write success (captcha grace period) check the return; others may ignore it.
 - `Client.Close()` drains Redis idle pools. Call it from `lapi.Client.Close()`. Memory clients are a no-op.
 
 ## Pattern snippet
