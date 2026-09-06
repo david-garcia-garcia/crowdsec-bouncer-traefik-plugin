@@ -63,3 +63,9 @@ phase: implement
 findings: dest merge left cache.NoBannedValue in stream log test
 fixed: CrowdsecAppsecUnreadableBodyBlock default false; drop when true; GET exemption; merge typecheck
 skipped: none
+
+## codereview (2026-09-06 rethink)
+phase: codereview
+findings: P3 1 hard trail comment; 2 judgement skipped
+fixed: aa21891 drop-path comment
+skipped: gofmt realign; GET assert on default-false sibling
