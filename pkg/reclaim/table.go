@@ -314,18 +314,14 @@ func (t *Table) fire(key string, e *slot, gen uint64) {
 	}
 	cancel := e.cancel
 	disposeLog := e.logger
-	closeFn := e.closeFn
 	delete(t.items, key)
 	t.keys = dropStoredKey(t.keys, key)
 	t.mu.Unlock()
 	if cancel != nil {
 		cancel()
 	}
-	// Close after Sleep. fire is grace elapsed or ResetForTest. Callers do not Close slots.
+	// fire cancels life; the first-Open watcher alone calls closeFn when life ends.
 	disposeLog.Debug(MsgDispose, "key", key)
-	if closeFn != nil {
-		closeFn()
-	}
 }
 
 // View is a slot inspected without binding a constructor context.
