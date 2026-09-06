@@ -23,3 +23,9 @@ phase: implement
 findings: none
 fixed: none
 skipped: none
+
+## codereview (2026-09-06)
+phase: codereview
+findings: Standards 5 (2 hard, 3 judgement), Spec none, Security none, Performance none, Dead 1 hard
+fixed: plugin_test lapi.Client fatals; closeIdle httpClient; deleted (*lapi.Client).Mode
+skipped: AppsecClient accessors; appsec wrappedClient helpers; Test_appsecQuery rename (judgement)
