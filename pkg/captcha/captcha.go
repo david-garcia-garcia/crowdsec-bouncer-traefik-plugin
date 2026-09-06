@@ -84,11 +84,12 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 		return nil
 	}
 	var info *infoProvider
-	if provider == configuration.CustomProvider {
+	switch provider {
+	case configuration.CustomProvider:
 		info = &infoProvider{js: js, key: key, response: response, validate: validate}
-	} else if provider == configuration.TrycapProvider {
+	case configuration.TrycapProvider:
 		info = trycapInfoProvider(trycapInstanceURL, siteKey)
-	} else {
+	default:
 		info = infoProviders[provider]
 	}
 	c.infoProvider = info

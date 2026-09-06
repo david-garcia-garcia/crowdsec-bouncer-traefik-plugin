@@ -56,7 +56,7 @@ func TestValidateTrycapJSONSuccess(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := newTestCaptcha(t, configuration.TrycapProvider, server.URL, "sitekey", "sekrit", server.Client(), "")
+	client := newTestCaptcha(t, configuration.TrycapProvider, server.URL, "sitekey", "trycap-verify", server.Client(), "")
 	req := httptest.NewRequest(http.MethodPost, "http://bouncer.example/captcha", strings.NewReader("cap-token=tok123"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -77,7 +77,7 @@ func TestValidateTrycapJSONSuccess(t *testing.T) {
 	if err := json.Unmarshal([]byte(gotBody), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if payload["secret"] != "sekrit" || payload["response"] != "tok123" {
+	if payload["secret"] != "trycap-verify" || payload["response"] != "tok123" {
 		t.Fatalf("payload = %#v", payload)
 	}
 }
@@ -89,7 +89,7 @@ func TestValidateTrycapMissingTokenSkipsSiteverify(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := newTestCaptcha(t, configuration.TrycapProvider, server.URL, "sitekey", "sekrit", server.Client(), "")
+	client := newTestCaptcha(t, configuration.TrycapProvider, server.URL, "sitekey", "trycap-verify", server.Client(), "")
 	req := httptest.NewRequest(http.MethodPost, "http://bouncer.example/captcha", strings.NewReader("other=1"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -116,7 +116,7 @@ func TestValidateHcaptchaStillPostForm(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := newTestCaptcha(t, configuration.HcaptchaProvider, "", "site", "sekrit", server.Client(), "")
+	client := newTestCaptcha(t, configuration.HcaptchaProvider, "", "site", "hcaptcha-verify", server.Client(), "")
 	client.infoProvider.validate = server.URL
 	form := url.Values{}
 	form.Set("h-captcha-response", "tok")
@@ -137,13 +137,13 @@ func TestValidateHcaptchaStillPostForm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if values.Get("secret") != "sekrit" || values.Get("response") != "tok" {
+	if values.Get("secret") != "hcaptcha-verify" || values.Get("response") != "tok" {
 		t.Fatalf("form = %q", gotBody)
 	}
 }
 
 func TestServeHTTPTrycapRendersCapWidget(t *testing.T) {
-	client := newTestCaptcha(t, configuration.TrycapProvider, "https://cap.example.com", "abc", "sekrit", http.DefaultClient, "")
+	client := newTestCaptcha(t, configuration.TrycapProvider, "https://cap.example.com", "abc", "trycap-verify", http.DefaultClient, "")
 	req := httptest.NewRequest(http.MethodGet, "http://bouncer.example/foo", nil)
 	rw := httptest.NewRecorder()
 	client.ServeHTTP(rw, req, "1.2.3.4")
