@@ -29,7 +29,7 @@ func TestHydrateRangeMembershipEmptyBlob(t *testing.T) {
 	lapiClient, cacheClient := newTestRangeClient(t)
 	decisionscope.AddRange(cacheClient, "10.0.0.0/8", cache.BannedValue, 60)
 	lapiClient.hydrateRangeMembership()
-	cacheClient.Delete(decisionscope.RangeIndexKey)
+	_ = cacheClient.Delete(decisionscope.RangeIndexKey)
 	lapiClient.hydrateRangeMembership()
 	if got := lapiClient.RangeMembership().Remediation(net.ParseIP("10.1.2.3")); got != "" {
 		t.Fatalf("empty blob should miss, got %q", got)
@@ -53,7 +53,7 @@ func TestHydrateRangeMembershipKeepsLastOnUnreachable(t *testing.T) {
 
 func TestHandleStreamCacheLeaseHitHydrates(t *testing.T) {
 	lapiClient, cacheClient := newTestRangeClient(t)
-	cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, 60)
+	_ = cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, 60)
 	decisionscope.AddRange(cacheClient, "10.0.0.0/8", cache.BannedValue, 60)
 	if err := lapiClient.handleStreamCache(); err != nil {
 		t.Fatalf("lease hit: %v", err)

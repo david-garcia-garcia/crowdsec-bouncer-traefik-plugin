@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 
 	ttl_map "github.com/leprosus/golang-ttl-map"
@@ -66,12 +67,17 @@ func (lc *localCache) getMany(keys []string) (map[string]string, error) {
 	return out, nil
 }
 
-func (lc *localCache) set(key, value string, duration int64) {
+func (lc *localCache) set(key, value string, duration int64) error {
+	if duration <= 0 {
+		return nil
+	}
 	lc.heap().Set(key, value, duration)
+	return nil
 }
 
-func (lc *localCache) delete(key string) {
+func (lc *localCache) delete(key string) error {
 	lc.heap().Del(key)
+	return nil
 }
 
 // close is a no-op: the TTL map has no sockets or background goroutine.
@@ -86,11 +92,12 @@ func prefixed(prefix, key string) string {
 }
 
 type redisCache struct {
-	log     *slog.Logger
-	prefix  string
-	writer  *simpleredis.SimpleRedis
-	readers []*simpleredis.SimpleRedis
-	counter atomic.Uint64
+	log          *slog.Logger
+	prefix       string
+	writer       *simpleredis.SimpleRedis
+	readers      []*simpleredis.SimpleRedis
+	counter      atomic.Uint64
+	writtenLocal sync.Map // keys successfully Set on this instance; read-your-writes
 }
 
 func (rc *redisCache) nextReader() *simpleredis.SimpleRedis {
@@ -102,8 +109,27 @@ func (rc *redisCache) nextReader() *simpleredis.SimpleRedis {
 	return rc.readers[idx]
 }
 
+func (rc *redisCache) readerForKey(key string) *simpleredis.SimpleRedis {
+	if _, ok := rc.writtenLocal.Load(key); ok {
+		return rc.writer
+	}
+	return rc.nextReader()
+}
+
+func (rc *redisCache) readerForKeys(keys []string) *simpleredis.SimpleRedis {
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		if _, ok := rc.writtenLocal.Load(key); ok {
+			return rc.writer
+		}
+	}
+	return rc.nextReader()
+}
+
 func (rc *redisCache) get(key string) (string, error) {
-	value, err := rc.nextReader().Get(prefixed(rc.prefix, key))
+	value, err := rc.readerForKey(key).Get(prefixed(rc.prefix, key))
 	if err != nil {
 		switch err.Error() {
 		case simpleredis.RedisMiss:
@@ -134,7 +160,7 @@ func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
 	if len(prefixedNames) == 0 {
 		return map[string]string{}, nil
 	}
-	values, err := rc.nextReader().MGet(prefixedNames)
+	values, err := rc.readerForKeys(logical).MGet(prefixedNames)
 	if err != nil {
 		switch err.Error() {
 		case simpleredis.RedisUnreachable:
@@ -153,16 +179,25 @@ func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
 	return out, nil
 }
 
-func (rc *redisCache) set(key, value string, duration int64) {
+func (rc *redisCache) set(key, value string, duration int64) error {
+	if duration <= 0 {
+		return nil
+	}
 	if err := rc.writer.Set(prefixed(rc.prefix, key), []byte(value), duration); err != nil {
 		rc.log.Error("cache:setDecisionRedisCache" + err.Error())
+		return err
 	}
+	rc.writtenLocal.Store(key, struct{}{})
+	return nil
 }
 
-func (rc *redisCache) delete(key string) {
+func (rc *redisCache) delete(key string) error {
+	rc.writtenLocal.Delete(key)
 	if err := rc.writer.Del(prefixed(rc.prefix, key)); err != nil {
 		rc.log.Error("cache:deleteDecisionRedisCache " + err.Error())
+		return err
 	}
+	return nil
 }
 
 // close drains the writer and every reader idle pool.
@@ -176,10 +211,10 @@ func (rc *redisCache) close() {
 }
 
 type cacheInterface interface {
-	set(key, value string, duration int64)
+	set(key, value string, duration int64) error
 	get(key string) (string, error)
 	getMany(keys []string) (map[string]string, error)
-	delete(key string)
+	delete(key string) error
 	close()
 }
 
@@ -210,9 +245,9 @@ func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts
 }
 
 // Delete delete decision in cache.
-func (c *Client) Delete(key string) {
+func (c *Client) Delete(key string) error {
 	c.log.Debug(fmt.Sprintf("cache:Delete key:%v", key))
-	c.cache.delete(key)
+	return c.cache.delete(key)
 }
 
 // Get check in the cache if the IP has the banned / not banned value.
@@ -230,9 +265,10 @@ func (c *Client) GetMany(keys []string) (map[string]string, error) {
 }
 
 // Set update the cache with the IP as key and the value banned / not banned.
-func (c *Client) Set(key string, value string, duration int64) {
+// duration <= 0 is a no-op on all backends (nothing is stored).
+func (c *Client) Set(key string, value string, duration int64) error {
 	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
-	c.cache.set(key, value, duration)
+	return c.cache.set(key, value, duration)
 }
 
 // Close drains Redis idle pools. Memory clients have nothing to stop. Safe to call more than once.
