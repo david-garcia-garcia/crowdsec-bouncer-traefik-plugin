@@ -1,0 +1,14 @@
+# Progress
+IssueKey: 2026-09-06-plugin-lifecycle-lapi
+JobName: 2026-09-06-plugin-lifecycle-lapi
+
+| Phase | Work | Card | At |
+|-------|------|------|----|
+| prepare | [x] | [ ] | |
+| explore | [ ] | [ ] | |
+| propose | [ ] | [ ] | |
+| implement | [ ] | [ ] | |
+| codereview | [ ] | [ ] | |
+| devdocsimpact | [ ] | [ ] | |
+| archive | [ ] | [ ] | |
+| pullrequest | [ ] | [ ] | |
