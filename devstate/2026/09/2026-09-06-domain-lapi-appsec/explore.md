@@ -63,11 +63,11 @@ IssueKey: 2026-09-06-domain-lapi-appsec
   By: explore
 
 - Q: What is the LAPI reclaim type name inside `package lapi`?
-  Decision: resolved — `lapi.Connection`. Drop exported `CrowdsecConnection` (the name claims both products).
-  By: explore
+  Decision: resolved — `lapi.Client` (paired with `appsec.Client`). Drop exported `CrowdsecConnection`. Not `Connection`: Bouncer fields are already `lapiClient`/`appsecClient`, and `captcha.Client`/`cache.Client` use the same noun.
+  By: implement
 
 - Q: Is AppSec reclaimed separately, or constructed inside LAPI `New` as a field?
-	Decision: resolved — separate reclaim; Bouncer holds `lapiClient *lapi.Connection` and `appsecClient *appsec.Client` (nil when AppSec off). Constructing AppSec inside LAPI would keep the mixed owner. Field names are the paired Client suffix (not `conn` vs `appsec`).
+  Decision: resolved — separate reclaim; Bouncer holds `lapiClient *lapi.Client` and `appsecClient *appsec.Client` (nil when AppSec off). Constructing AppSec inside LAPI would keep the mixed owner.
   By: explore
 
 - Q: Live/none `IdentityHex` currently hashes AppSec host/key/TLS. Dropping those fields changes the live Redis cache prefix on upgrade.
