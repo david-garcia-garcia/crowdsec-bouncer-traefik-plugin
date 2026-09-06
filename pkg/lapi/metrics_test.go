@@ -91,6 +91,56 @@ func TestReportMetricsOfficialLabels(t *testing.T) {
 	assertOfficialUsageItems(t, usageMetricItems(t, *body))
 }
 
+// TestReportMetricsPluginVersion checks usage-metrics JSON version and LAPI User-Agent carry the Client plugin version.
+func TestReportMetricsPluginVersion(t *testing.T) {
+	const wantVersion = "v9.9.9-test"
+	gotUA := ""
+	gotBody := new([]byte)
+	lapi := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if req.URL.Path != "/v1/usage-metrics" {
+			t.Errorf("path %s", req.URL.Path)
+		}
+		gotUA = req.Header.Get("User-Agent")
+		raw, err := io.ReadAll(req.Body)
+		if err != nil {
+			t.Errorf("read body %v", err)
+			return
+		}
+		*gotBody = raw
+		rw.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(lapi.Close)
+	lapiURL, err := url.Parse(lapi.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := time.Unix(1_700_000_000, 0).UTC()
+	client := &Client{
+		crowdsecScheme:  lapiURL.Scheme,
+		crowdsecHost:    lapiURL.Host,
+		crowdsecPath:    "/",
+		crowdsecHeader:  crowdsecLapiHeader,
+		crowdsecMode:    configuration.StreamMode,
+		httpClient:      lapi.Client(),
+		log:             logger.New("ERROR", ""),
+		pluginVersion:   wantVersion,
+		lastMetricsPush: started,
+		startedAt:       started,
+		windowCounters:  make(map[usageMetricKey]int64),
+		activeDecisions: make(map[usageMetricKey]int64),
+	}
+	if err := client.reportMetrics(); err != nil {
+		t.Fatal(err)
+	}
+	if usageComponent(t, *gotBody)["version"] != wantVersion {
+		t.Fatalf("version %#v", usageComponent(t, *gotBody)["version"])
+	}
+	wantUA := "Crowdsec-Bouncer-Traefik-Plugin/" + wantVersion
+	if gotUA != wantUA {
+		t.Fatalf("User-Agent %q want %q", gotUA, wantUA)
+	}
+}
+
 func TestReportMetricsStartupTimestampStable(t *testing.T) {
 	client, body := newUsageMetricsClient(t)
 	started := float64(client.startedAt.Unix())
