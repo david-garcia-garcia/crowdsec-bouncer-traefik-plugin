@@ -1,0 +1,15 @@
+issueKey: 2026-09-06-origin-for-range-decisions
+jobName: 2026-09-06-origin-for-range-decisions
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: 0c03faec51caf0df327b26a3af84824cca1f1b31c38a8986e7d2d73365efeb97
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
