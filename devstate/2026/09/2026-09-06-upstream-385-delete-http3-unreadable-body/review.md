@@ -21,3 +21,9 @@ phase: implement
 findings: none
 fixed: DELETE removed from isMethodWithBody; DELETE HTTP/3 test added
 skipped: none
+
+## codereview (2026-09-06)
+phase: codereview
+findings: none
+fixed: n/a
+skipped: none
