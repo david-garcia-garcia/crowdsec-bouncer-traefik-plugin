@@ -18,3 +18,12 @@ skipped: none
 - assumed: Remediation takes net.IP
 - assumed: ipType string threaded to recordDropped
 
+## propose (2026-09-06)
+
+phase: propose
+findings: none
+fixed: none
+skipped: none
+change: parse-client-ip-once
+
+
