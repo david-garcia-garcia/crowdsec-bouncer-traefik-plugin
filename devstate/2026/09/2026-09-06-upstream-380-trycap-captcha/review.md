@@ -34,4 +34,10 @@ findings: none (core_plugin_captcha already documents trycap)
 fixed: none
 skipped: produce (no gaps)
 
+## archive (2026-09-06)
+phase: archive
+findings: FindSpecHost new core_plugin_captcha_trycap-provider; catalog synced; change archived
+fixed: openspec/specs/core_plugin_captcha_trycap-provider, map.md, archive/2026-09-06-trycap-captcha-provider
+skipped: none
+
 

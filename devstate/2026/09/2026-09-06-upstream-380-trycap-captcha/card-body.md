@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-06T15:50:10Z
+Developer review: in progress — 2026-09-06T15:52:09Z
 
 IssueKey: 2026-09-06-upstream-380-trycap-captcha
 JobName: 2026-09-06-upstream-380-trycap-captcha
@@ -10,7 +10,7 @@ JobName: 2026-09-06-upstream-380-trycap-captcha
 
 **Admin users.** None.
 
-**Developers.** `pkg/captcha` JSON siteverify for trycap, empty trycap `FrontendKey`, `CapApiEndpoint` template slot, unit tests in `pkg/captcha/captcha_test.go`, spec `core_plugin_captcha_trycap-provider`.
+**Developers.** `pkg/captcha` JSON siteverify for trycap, empty trycap `FrontendKey`, `CapApiEndpoint` template slot, unit tests in `pkg/captcha/captcha_test.go`, baseline spec `core_plugin_captcha_trycap-provider`.
 
 **End users.** When an operator enables trycap, blocked clients see a Cap Standalone checkbox instead of hcaptcha/recaptcha/turnstile.
 
@@ -18,10 +18,10 @@ JobName: 2026-09-06-upstream-380-trycap-captcha
 On `master`, operators who self-host TryCap Cap Standalone cannot select it as a built-in captcha provider. The plugin only verifies captchas via urlencoded `PostForm`, while Cap Standalone expects JSON `{"secret","response"}` at `/<site_key>/siteverify` with a `cap-token` field — so TryCap fails unless the operator runs an external adapter. Without this change, self-hosted TryCap remains unsupported despite upstream feature request #380.
 
 ## Merge readiness
-Usage packet `core_plugin_captcha` already matches the apply; no produce. CI on HEAD is still running.
+OpenSpec change archived. CI on HEAD is still running.
 
 Priority: P2 — real operator pain with a workaround (external adapter or misconfigured custom provider).
-Reviewed head: 112b9b8
+Reviewed head: 8bbe88c
 Owner decision: Required. See Decision needed.
 
 ## Review scores
@@ -36,20 +36,20 @@ Owner decision: Required. See Decision needed.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-06-upstream-380-trycap-captcha pushed | git / GitHub |
-| OpenSpec | trycap-captcha-provider | openspec/changes/trycap-captcha-provider/ |
+| OpenSpec | trycap-captcha-provider archived | openspec/changes/archive/2026-09-06-trycap-captcha-provider/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/40 | pr-host |
-| CI | build 34043535170 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34043535170 | pull_request_read get_check_runs |
+| CI | build 34043643455 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34043643455 | pull_request_read get_check_runs |
 | Local tests | passed | handoff.yaml localTests (`go test` pkg/captcha, configuration, bouncer) |
 | PR comments | no comments | comments.md absent |
 
 ## Specs
-- [core_plugin_captcha_trycap-provider](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-380-trycap-captcha/openspec/changes/trycap-captcha-provider/proposal.md) — added
+- [core_plugin_captcha_trycap-provider](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-380-trycap-captcha/openspec/changes/archive/2026-09-06-trycap-captcha-provider/proposal.md) — added
 
 ## Follow-up issues
 - [ ] [note] [large] custom provider JSON siteverify (upstream #318) — TryCap needs JSON; `custom` still PostForms. Not taken: out of scope for this change.
 
 ## How this fits together
-Local ticket (upstream #380) → branch `2026-09-06-upstream-380-trycap-captcha` → PR #40 → trycap provider landed → five-axis review applied → usage packet already current → CI running on 112b9b8.
+Local ticket (upstream #380) → branch `2026-09-06-upstream-380-trycap-captcha` → PR #40 → trycap provider landed → five-axis review applied → usage packet current → OpenSpec archived → CI running on 8bbe88c.
 
 ## Decision needed
 | Question | Decision | By |
@@ -63,9 +63,10 @@ Local ticket (upstream #380) → branch `2026-09-06-upstream-380-trycap-captcha`
 | Must CI e2e run a live `tiago2/cap` container? | assumed — no; unit tests prove verify | explore |
 
 ## Before merge
-- [ ] Wait for CI on reviewed head 112b9b8
+- [ ] Wait for CI on reviewed head 8bbe88c
 - [x] Add `trycap` provider, JSON siteverify, default-template Cap branch, and unit tests
 - [x] Five-axis review; empty trycap FrontendKey and infoProvider comment
+- [x] Archive OpenSpec change to `openspec/changes/archive/2026-09-06-trycap-captcha-provider/`
 
 ## Findings
 None.
@@ -84,7 +85,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 0 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 112b9b822b5996a176b584797de690ddad6a981c | Card must match the branch you measured |
+| Reviewed head | 8bbe88ca56b420aaedc44e2951298dc73ef7e3f9 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -98,9 +99,9 @@ Is this the best way to solve the issue? Yes — a built-in matches hcaptcha/rec
 
 ### Evidence
 What I checked:
-- Devdocs impact: Captcha Client packet already has trycap How-to, Language, and Gotchas; findings none
-- Five-axis review complete (see Axis review)
-- PR #40 CI: Main Process 34043535170 and e2e 34043535099 in progress
+- FindSpecHost: new `core_plugin_captcha_trycap-provider` (high); catalog spec + map.md written; validators OK
+- Change moved to `openspec/changes/archive/2026-09-06-trycap-captcha-provider/`
+- PR #40 CI: Main Process 34043643455 and e2e 34043643485 in progress
 
 ### Rank-up moves
 None.
