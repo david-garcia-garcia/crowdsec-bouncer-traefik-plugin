@@ -7,7 +7,7 @@ JobName: 2026-09-06-upstream-353-captcha-session-cookie
 | prepare | [x] | [x] | 2026-09-06T15:06:45Z |
 | explore | [x] | [x] | 2026-09-06T15:10:16Z |
 | propose | [x] | [x] | 2026-09-06T15:13:43Z |
-| implement | [ ] | [ ] | |
+| implement | [x] | [x] | 2026-09-06T15:30:34Z |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |

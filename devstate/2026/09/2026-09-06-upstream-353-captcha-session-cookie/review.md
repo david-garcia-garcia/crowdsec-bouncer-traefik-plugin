@@ -9,3 +9,9 @@ phase: propose
 findings: new spec core_plugin_captcha_session-cookie
 fixed: n/a
 skipped: UA+protocol session bind
+
+## implement (2026-09-06)
+phase: implement
+findings: captcha grace bound to IP+cookie; CI green
+fixed: govet shadow, revive unused-parameter
+skipped: UA+protocol session bind
