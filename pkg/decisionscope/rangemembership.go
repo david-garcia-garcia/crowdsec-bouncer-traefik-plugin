@@ -38,22 +38,18 @@ func MembershipFromIndex(index string) *RangeMembership {
 }
 
 // Remediation returns ban if the IP is in the ban set, else captcha if in the captcha set, else empty.
-func (membership *RangeMembership) Remediation(remoteIP string) string {
-	if membership == nil {
-		return ""
-	}
-	parsed := net.ParseIP(remoteIP)
-	if parsed == nil {
+func (membership *RangeMembership) Remediation(ipAddr net.IP) string {
+	if membership == nil || ipAddr == nil {
 		return ""
 	}
 	if membership.ban != nil {
-		found, _, err := membership.ban.IsContained(parsed)
+		found, _, err := membership.ban.IsContained(ipAddr)
 		if err == nil && found {
 			return cache.BannedValue
 		}
 	}
 	if membership.captcha != nil {
-		found, _, err := membership.captcha.IsContained(parsed)
+		found, _, err := membership.captcha.IsContained(ipAddr)
 		if err == nil && found {
 			return cache.CaptchaValue
 		}

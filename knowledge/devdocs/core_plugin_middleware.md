@@ -25,7 +25,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - Call `crowdsecconnection.Prepare` then `reclaim.Open(ctx, crowdsecconnection.Key(config), log, create)`.
 - Type-assert the stored value to `*crowdsecconnection.CrowdsecConnection` and return `bouncer.New(...)`.
 - Put stream tickers, LAPI HTTP, cache, and Range membership on CrowdsecConnection. Put captcha and templates on Bouncer.
-- Resolve client IP with `pkg/ip.GetRemoteIP`. Do not parse `RemoteAddr` on the connection.
+- Resolve client IP with `pkg/ip.GetRemoteIP`. Fold `remoteIP`, parsed `net.IP`, and `ipType` into `clientRequest`. Keep the name `req`. Do not parse `RemoteAddr` on the connection. Do not put scopes or origin on that type.
 - Range and header-mapped CrowdSec scopes live in `pkg/decisionscope`. Do not geolocate in `New` or `ServeHTTP`.
 - Live LAPI error and stream-unhealthy cache miss use `crowdsecLapiFailureAction`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled).
 - Watch logs `reclaim_put|bind|orphan|reclaim|dispose`.
@@ -45,6 +45,7 @@ return bouncer.New(next, name, config, conn, log)
 - `plugin.go`
 - `pkg/crowdsecconnection/`
 - `pkg/bouncer/bouncer.go`
+- `pkg/bouncer/clientrequest.go`
 - `.traefik.yml`
 
 ## Gotchas
