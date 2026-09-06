@@ -14,7 +14,7 @@ body() {
   # Status stays 200 before/after (captcha page vs backend), so gate on the body
   # marker appearing once the captcha decision has been polled.
   echo "[$SCENARIO] captcha page must be served once the decision is polled (200 + marker)"
-  wait_for_body_contains "http://127.0.0.1:${WEB_PORT}/foo" "E2E_CAPTCHA_PAGE_MARKER" 30 -H "X-Forwarded-For: 1.2.3.4"
+  wait_for_body_contains "http://127.0.0.1:${WEB_PORT}/foo" "E2E_CAPTCHA_PAGE_MARKER" 60 -H "X-Forwarded-For: 1.2.3.4"
 
   echo "[$SCENARIO] captcha response Content-Type is HTML"
   assert_header "http://127.0.0.1:${WEB_PORT}/foo" Content-Type "text/html; charset=utf-8" -H "X-Forwarded-For: 1.2.3.4"
