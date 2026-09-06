@@ -8,13 +8,14 @@ _Avoid_: `sync.Once`, process singleton, middleware-name key
 
 ## Overview
 
-Copy `pkg/reclaim` as-is. Call `reclaim.Open` with Traefik’s `New` ctx. If the value has `Close()`, the table calls it when the incarnation ends.
+Copy `pkg/reclaim` as-is. Call `reclaim.Open` with Traefik’s `New` ctx. If the value has `Sleep()`/`Wake()`, the table calls them on last holder / reclaim. If the value has `Close()`, the table calls it when grace elapses.
 
 ## How to use
 
-- `reclaim.Open(ctx, key, logger, create)` on the process table.
-- `create` runs only for a first put or after dispose.
+- `reclaim.Open(ctx, key, logger, create)` on the process table. Last holder `Sleep()`s if the value has it; Open during grace `Wake()`s.
+- `create` runs only for a first put, after grace Close, or `ReplaceSleeping`.
 - Tests: `reclaim.Reset()` / `reclaim.ResetWith(grace)` only.
+- `Peek(key)` inspects holders/sleep without binding. `ReplaceSleeping` disposes a sleeper inside the table then Open. Callers do not Close slots.
 - Do not rewrite the table; keep it excluded from extra linters this repo enables that geoblock does not.
 
 ## Pattern snippet

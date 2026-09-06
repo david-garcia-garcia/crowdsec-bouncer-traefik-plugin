@@ -3,7 +3,7 @@
 ## Language
 
 **CrowdsecConnection**:
-The reclaim value for one Crowdsec backend: stream/metrics tickers, LAPI/CAPI HTTP, AppSec client, an isolated cache, and in-process Range membership. Keyed by connection fields, not middleware name.
+The reclaim value for one Crowdsec backend: stream/metrics tickers, LAPI/CAPI HTTP, AppSec client, an isolated cache, and in-process Range membership. Stream/alone: keyed by LAPI URL+key (one CrowdSec stream cursor). Live/none: keyed by full connection fields. Not middleware name.
 _Avoid_: Bouncer, Plugin, process singleton, `sync.Once`
 
 **Bouncer**:
@@ -22,7 +22,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 
 - Keep `CreateConfig` / `New` on the module root (`plugin.go`).
 - Keep `pluginVersion` in root `version.go` (release workflow bumps it). Pass it into `crowdsecconnection.New`.
-- Call `crowdsecconnection.Prepare` then `reclaim.Open(ctx, crowdsecconnection.Key(config), log, create)`.
+- Call `crowdsecconnection.Prepare`. Stream/alone: `crowdsecconnection.OpenStream(ctx, config, log, name, pluginVersion)` (one ticker per LAPI URL+key). Live/none/appsec: `reclaim.Open(ctx, crowdsecconnection.Key(config), log, create)`.
 - Type-assert the stored value to `*crowdsecconnection.CrowdsecConnection` and return `bouncer.New(...)`.
 - Put stream tickers, LAPI HTTP, cache, and Range membership on CrowdsecConnection. Put captcha and templates on Bouncer.
 - Resolve client IP with `pkg/ip.GetRemoteIP`. Do not parse `RemoteAddr` on the connection.
@@ -33,6 +33,10 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 ## Pattern snippet
 
 ```go
+if config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode {
+	conn, err := crowdsecconnection.OpenStream(ctx, config, log, name, pluginVersion)
+	return bouncer.New(next, name, config, conn, log)
+}
 stored, err := reclaim.Open(ctx, crowdsecconnection.Key(config), log, func() (any, error) {
 	return crowdsecconnection.New(config, log, pluginVersion)
 })
@@ -51,5 +55,5 @@ return bouncer.New(next, name, config, conn, log)
 
 - Do not put middleware name, `next`, ban/captcha templates, trusted IPs, or Enabled in the reclaim key.
 - `crowdsecLapiFailureAction` is on CrowdsecConnection identity (shared with `updateMaxFailure`). `crowdsecAppsecFailureAction` stays on Bouncer.
-- Same connection fields share one ticker; different LAPI/mode/redis/interval are two Connections in one Traefik.
+- Stream/alone: CrowdSec stores one `GET /v1/decisions/stream` cursor per hashed API key plus the IP LAPI sees (this process’s outbound address). Same LAPI URL+key in one Traefik process shares one ticker. A second middleware with different intervals/Redis/TLS/scopes is warn-and-wire (first New wins those knobs). Last holder Sleeps tickers; reload with the same snapshot Wakes (`startup=false`). Isolated backends need a second bouncer key. Live/none still split on full identity (intervals included).
 - `Close()` stops tickers, idle LAPI/AppSec HTTP, and the cache Redis pool when no constructor ctx remains and grace elapses. Do not use `sync.Once`.
