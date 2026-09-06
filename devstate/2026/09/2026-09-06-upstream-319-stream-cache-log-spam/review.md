@@ -27,3 +27,9 @@ phase: codereview
 findings: Standards 5 (3 hard renamed, 2 judgement skipped); Spec/Security/Performance/Dead none
 fixed: serverURL, newTestStreamTickClient, captureTestStreamTickLog
 skipped: reuse newTestRangeClient; extract shared table helper
+
+## devdocsimpact (2026-09-06)
+phase: devdocsimpact
+findings: none (middleware gotcha already names DEBUG ticks)
+fixed: devdocs-impact.md
+skipped: none
