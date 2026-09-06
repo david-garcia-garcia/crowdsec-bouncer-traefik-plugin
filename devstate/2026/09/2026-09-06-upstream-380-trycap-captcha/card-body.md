@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-06T15:48:09Z
+Developer review: in progress — 2026-09-06T15:50:10Z
 
 IssueKey: 2026-09-06-upstream-380-trycap-captcha
 JobName: 2026-09-06-upstream-380-trycap-captcha
@@ -18,10 +18,10 @@ JobName: 2026-09-06-upstream-380-trycap-captcha
 On `master`, operators who self-host TryCap Cap Standalone cannot select it as a built-in captcha provider. The plugin only verifies captchas via urlencoded `PostForm`, while Cap Standalone expects JSON `{"secret","response"}` at `/<site_key>/siteverify` with a `cap-token` field — so TryCap fails unless the operator runs an external adapter. Without this change, self-hosted TryCap remains unsupported despite upstream feature request #380.
 
 ## Merge readiness
-Code review complete; no hard findings remain open. CI on the review-fix head is still running.
+Usage packet `core_plugin_captcha` already matches the apply; no produce. CI on HEAD is still running.
 
 Priority: P2 — real operator pain with a workaround (external adapter or misconfigured custom provider).
-Reviewed head: fe68537
+Reviewed head: 112b9b8
 Owner decision: Required. See Decision needed.
 
 ## Review scores
@@ -38,7 +38,7 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-06-upstream-380-trycap-captcha pushed | git / GitHub |
 | OpenSpec | trycap-captcha-provider | openspec/changes/trycap-captcha-provider/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/40 | pr-host |
-| CI | build 34043382839 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34043382839 | pull_request_read get_check_runs |
+| CI | build 34043535170 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34043535170 | pull_request_read get_check_runs |
 | Local tests | passed | handoff.yaml localTests (`go test` pkg/captcha, configuration, bouncer) |
 | PR comments | no comments | comments.md absent |
 
@@ -49,7 +49,7 @@ Owner decision: Required. See Decision needed.
 - [ ] [note] [large] custom provider JSON siteverify (upstream #318) — TryCap needs JSON; `custom` still PostForms. Not taken: out of scope for this change.
 
 ## How this fits together
-Local ticket (upstream #380) → branch `2026-09-06-upstream-380-trycap-captcha` → PR #40 → trycap provider landed → five-axis review applied two hard Standards fixes → CI running on fe68537.
+Local ticket (upstream #380) → branch `2026-09-06-upstream-380-trycap-captcha` → PR #40 → trycap provider landed → five-axis review applied → usage packet already current → CI running on 112b9b8.
 
 ## Decision needed
 | Question | Decision | By |
@@ -63,7 +63,7 @@ Local ticket (upstream #380) → branch `2026-09-06-upstream-380-trycap-captcha`
 | Must CI e2e run a live `tiago2/cap` container? | assumed — no; unit tests prove verify | explore |
 
 ## Before merge
-- [ ] Wait for CI on reviewed head fe68537
+- [ ] Wait for CI on reviewed head 112b9b8
 - [x] Add `trycap` provider, JSON siteverify, default-template Cap branch, and unit tests
 - [x] Five-axis review; empty trycap FrontendKey and infoProvider comment
 
@@ -84,7 +84,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 0 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | fe68537354e4d79fd925b6957bde7f45a8f7c91e | Card must match the branch you measured |
+| Reviewed head | 112b9b822b5996a176b584797de690ddad6a981c | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -98,9 +98,9 @@ Is this the best way to solve the issue? Yes — a built-in matches hcaptcha/rec
 
 ### Evidence
 What I checked:
-- Five-axis review: two hard Standards applied (empty trycap FrontendKey, infoProvider comment); four judgement skipped
-- Spec, Security, Performance, Dead: none
-- PR #40 CI after review-fix push: Main Process 34043382839 and e2e 34043382841 in progress
+- Devdocs impact: Captcha Client packet already has trycap How-to, Language, and Gotchas; findings none
+- Five-axis review complete (see Axis review)
+- PR #40 CI: Main Process 34043535170 and e2e 34043535099 in progress
 
 ### Rank-up moves
 None.

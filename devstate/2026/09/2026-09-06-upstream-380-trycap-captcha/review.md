@@ -28,4 +28,10 @@ findings: 2 hard Standards applied (empty trycap FrontendKey, infoProvider comme
 fixed: pkg/captcha FrontendKey and type comment
 skipped: jsonBody/base/verifyKey rename; examples template dedupe
 
+## devdocsimpact (2026-09-06)
+phase: devdocsimpact
+findings: none (core_plugin_captcha already documents trycap)
+fixed: none
+skipped: produce (no gaps)
+
 
