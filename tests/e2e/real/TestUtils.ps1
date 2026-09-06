@@ -437,3 +437,58 @@ function Remove-AllTestDecisions {
     }
     return $true
 }
+
+# cscli metrics show bouncers -o json is [bouncer][origin][name][unit] = value.
+# Empty origin holds processed. Human table hides empty origin from body rows.
+function Get-CscliBouncerMetrics {
+    $raw = docker exec crowdsec-test cscli metrics show bouncers -o json --color no 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($raw)) {
+        return $null
+    }
+    try {
+        return $raw | ConvertFrom-Json
+    }
+    catch {
+        Write-Host "⚠️ cscli metrics JSON parse failed: $raw" -ForegroundColor Yellow
+        return $null
+    }
+}
+
+function Get-CscliBouncerMetricValue {
+    param(
+        [AllowEmptyString()]
+        [string]$Origin,
+        [string]$Name,
+        [string]$Unit
+    )
+
+    $metrics = Get-CscliBouncerMetrics
+    if ($null -eq $metrics) {
+        return [int64]0
+    }
+
+    $total = [int64]0
+    foreach ($bouncer in $metrics.PSObject.Properties) {
+        $origins = $bouncer.Value
+        if ($null -eq $origins) {
+            continue
+        }
+        foreach ($originNode in $origins.PSObject.Properties) {
+            if ($originNode.Name -ne $Origin) {
+                continue
+            }
+            $names = $originNode.Value
+            $nameProp = $names.PSObject.Properties[$Name]
+            if ($null -eq $nameProp) {
+                continue
+            }
+            $units = $nameProp.Value
+            $unitProp = $units.PSObject.Properties[$Unit]
+            if ($null -ne $unitProp) {
+                $total += [int64]$unitProp.Value
+            }
+        }
+    }
+    return $total
+}
+
