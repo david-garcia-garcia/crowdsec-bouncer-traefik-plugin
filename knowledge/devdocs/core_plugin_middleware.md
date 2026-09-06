@@ -7,7 +7,7 @@ The reclaim value for one CrowdSec LAPI/CAPI decisions backend: stream/metrics t
 _Avoid_: CrowdsecConnection, AppSec client, Bouncer, Plugin, process singleton, `sync.Once`
 
 **AppSec Client**:
-The reclaim value for one CrowdSec AppSec listener: HTTP client, host, key, TLS, body limit. Keyed by AppSec URL+key+TLS. Not the LAPI Client.
+The reclaim value for one CrowdSec AppSec listener: HTTP client, host, key, TLS, body limit, HTTP timeout. Keyed by AppSec URL+key+TLS+effective timeout. Not the LAPI Client.
 _Avoid_: CrowdsecConnection, LAPI, `AppsecQuery` on the LAPI type
 
 **Stream session**:

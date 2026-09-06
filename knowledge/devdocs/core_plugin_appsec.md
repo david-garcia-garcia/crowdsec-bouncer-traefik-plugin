@@ -3,7 +3,7 @@
 ## Language
 
 **AppSec Client**:
-The reclaim value for one CrowdSec AppSec listener (`pkg/appsec`). Owns the HTTP round-trip, JSON parse, host/key/TLS/body limit. Not the LAPI Client.
+The reclaim value for one CrowdSec AppSec listener (`pkg/appsec`). Owns the HTTP round-trip, JSON parse, host/key/TLS/body limit, and HTTP timeout. Not the LAPI Client.
 _Avoid_: CrowdsecConnection, `AppsecQuery` on LAPI, LAPI captcha
 
 **Structured AppSec response**:
@@ -21,7 +21,8 @@ _Avoid_: CrowdSec LAPI captcha remediation
 ## How to use
 
 - Enable with existing `crowdsecAppsecEnabled`. Do not add a bot-detection plugin key.
-- Open with `appsec.Open` (reclaim by AppSec URL+key+TLS). Do not construct the AppSec client inside `lapi.New`.
+- Set `crowdsecAppsecTimeoutMilliseconds` when AppSec must fail faster than LAPI stream pulls. `0` or omit inherits `httpTimeoutSeconds`. Call `configuration.EffectiveAppsecTimeout` from AppSec `New` and identity; do not copy `HTTPTimeoutSeconds` into the AppSec client.
+- Open with `appsec.Open` (reclaim by AppSec URL+key+TLS+effective timeout). Do not construct the AppSec client inside `lapi.New`.
 - `action` allow or empty 200 → `next`. `ban` → `handleBanServeHTTP`. Any other non-allow action (challenge, AppSec captcha HTML) → relay. Empty `challenge` body → ban. AppSec `captcha` is not `pkg/captcha`.
 - AppSec HTTP 500, unreachable, and unreadable body use per-router `crowdsecAppsecFailureAction` (`passthrough` | `ban` | `captcha`), not the three removed block bools. `captcha` here is `pkg/captcha`, not AppSec JSON `action: captcha`.
 - Route `PathPrefix(/crowdsec-internal/challenge)` through the same middleware; service backend is the AppSec listener.
@@ -46,3 +47,4 @@ decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
 - Do not send `/crowdsec-internal/challenge/*` to origin.
 - `Query` `captcha` failure action is `ErrFailureCaptcha` → `pkg/captcha`. Do not treat that error as AppSec JSON `action: captcha`.
 - Empty `crowdsecAppsecKey` still falls back to `crowdsecLapiKey` in `appsec.Prepare`. Call `lapi.Prepare` first.
+- AppSec `http.Client.Timeout` is `EffectiveAppsecTimeout`, not raw `HTTPTimeoutSeconds`. Captcha siteverify still uses `HTTPTimeoutSeconds`.

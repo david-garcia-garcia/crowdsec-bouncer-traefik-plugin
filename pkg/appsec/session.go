@@ -21,12 +21,13 @@ type identity struct {
 	Path                    string `json:"path"`
 	Key                     string `json:"key"`
 	BodyLimit               int64  `json:"bodyLimit"`
-	HTTPTimeoutSeconds      int64  `json:"httpTimeoutSeconds"`
+	HTTPTimeoutMilliseconds int64  `json:"httpTimeoutMilliseconds"`
 	TLSInsecureVerify       bool   `json:"tlsInsecureVerify"`
 	TLSCertificateAuthority string `json:"tlsCa"`
 	TLSCertificateBouncer   string `json:"tlsCert"`
 }
 
+// identityFrom snapshots the AppSec listener fields that form the reclaim key.
 func identityFrom(cfg *configuration.Config) identity {
 	return identity{
 		Scheme:                  cfg.CrowdsecAppsecScheme,
@@ -34,7 +35,7 @@ func identityFrom(cfg *configuration.Config) identity {
 		Path:                    cfg.CrowdsecAppsecPath,
 		Key:                     cfg.CrowdsecAppsecKey,
 		BodyLimit:               cfg.CrowdsecAppsecBodyLimit,
-		HTTPTimeoutSeconds:      cfg.HTTPTimeoutSeconds,
+		HTTPTimeoutMilliseconds: configuration.EffectiveAppsecTimeout(cfg).Milliseconds(),
 		TLSInsecureVerify:       cfg.CrowdsecAppsecTLSInsecureVerify,
 		TLSCertificateAuthority: cfg.CrowdsecAppsecTLSCertificateAuthority,
 		TLSCertificateBouncer:   cfg.CrowdsecAppsecTLSCertificateBouncer,

@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
+	"time"
 
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
@@ -69,6 +70,7 @@ type Config struct {
 	CrowdsecAppsecTLSCertificateBouncerKeyFile string            `json:"crowdsecAppsecTlsCertificateBouncerKeyFile,omitempty"`
 	CrowdsecAppsecBodyLimit                    int64             `json:"crowdsecAppsecBodyLimit,omitempty"`
 	CrowdsecAppsecFailureAction                string            `json:"crowdsecAppsecFailureAction,omitempty"`
+	CrowdsecAppsecTimeoutMilliseconds          int64             `json:"crowdsecAppsecTimeoutMilliseconds,omitempty"`
 	CrowdsecLapiScheme                         string            `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost                           string            `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiPath                           string            `json:"crowdsecLapiPath,omitempty"`
@@ -152,6 +154,14 @@ func EffectiveFailureAction(action string) string {
 		return FailureActionBan
 	}
 	return action
+}
+
+// EffectiveAppsecTimeout is the AppSec HTTP client deadline: CrowdsecAppsecTimeoutMilliseconds when set, otherwise HTTPTimeoutSeconds.
+func EffectiveAppsecTimeout(config *Config) time.Duration {
+	if config.CrowdsecAppsecTimeoutMilliseconds > 0 {
+		return time.Duration(config.CrowdsecAppsecTimeoutMilliseconds) * time.Millisecond
+	}
+	return time.Duration(config.HTTPTimeoutSeconds) * time.Second
 }
 
 // New creates the default plugin configuration.
@@ -512,6 +522,9 @@ func validateParamsRequired(config *Config) error {
 	}
 	if config.UpdateMaxFailure < -1 {
 		return errors.New("UpdateMaxFailure: cannot be less than -1")
+	}
+	if config.CrowdsecAppsecTimeoutMilliseconds < 0 {
+		return errors.New("CrowdsecAppsecTimeoutMilliseconds: cannot be less than 0")
 	}
 	if err := validateFailureAction("CrowdsecLapiFailureAction", config.CrowdsecLapiFailureAction, config.CaptchaProvider); err != nil {
 		return err
