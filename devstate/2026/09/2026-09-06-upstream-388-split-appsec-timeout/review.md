@@ -4,8 +4,8 @@ findings: single HTTPTimeoutSeconds shared by LAPI and AppSec; no AppsecTimeoutS
 fixed: n/a
 skipped: n/a
 
-## explore (2026-09-06)
-phase: explore
-findings: one CrowdsecAppsecTimeoutMilliseconds knob; 0 inherits HTTPTimeoutSeconds; identity hashes effective duration
+## propose (2026-09-06)
+phase: propose
+findings: fold core_plugin_appsec_client; CrowdsecAppsecTimeoutMilliseconds inherit
 fixed: n/a
-skipped: captcha timeout split; LAPI millisecond config; e2e hanging AppSec; default 200ms
+skipped: n/a
