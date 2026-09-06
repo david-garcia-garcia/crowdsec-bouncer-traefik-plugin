@@ -13,7 +13,7 @@ import (
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-func testCaptchaClient(t *testing.T, validateURL, traceIDHeader string) *Client {
+func testCaptchaClient(t *testing.T, validateURL, remediationTraceIDHeader string) *Client {
 	t.Helper()
 	tpl, err := template.New("captcha").Parse("trace:{{ .TraceID }}")
 	if err != nil {
@@ -22,15 +22,15 @@ func testCaptchaClient(t *testing.T, validateURL, traceIDHeader string) *Client 
 	cacheClient := &cache.Client{}
 	cacheClient.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
 	return &Client{
-		Valid:               true,
-		siteKey:             "site",
-		secretKey:           "secret",
-		traceIDHeader:       traceIDHeader,
-		template:            tpl,
-		templateContentType: "text/html; charset=utf-8",
-		cacheClient:         cacheClient,
-		httpClient:          http.DefaultClient,
-		log:                 logger.New("ERROR", ""),
+		Valid:                    true,
+		siteKey:                  "site",
+		secretKey:                "secret",
+		remediationTraceIDHeader: remediationTraceIDHeader,
+		template:                 tpl,
+		templateContentType:      "text/html; charset=utf-8",
+		cacheClient:              cacheClient,
+		httpClient:               http.DefaultClient,
+		log:                      logger.New("ERROR", ""),
 		infoProvider: &infoProvider{
 			js:       "js",
 			key:      "k",
@@ -81,7 +81,7 @@ func TestNewStoresTraceIDHeader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.traceIDHeader != "X-Trace-ID" {
-		t.Errorf("traceIDHeader = %q", c.traceIDHeader)
+	if c.remediationTraceIDHeader != "X-Trace-ID" {
+		t.Errorf("remediationTraceIDHeader = %q", c.remediationTraceIDHeader)
 	}
 }

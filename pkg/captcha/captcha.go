@@ -16,18 +16,18 @@ import (
 
 // Client Captcha client.
 type Client struct {
-	Valid                   bool
-	siteKey                 string
-	secretKey               string
-	remediationCustomHeader string
-	traceIDHeader           string
-	gracePeriodSeconds      int64
-	templateContentType     string
-	template                *template.Template
-	cacheClient             *cache.Client
-	httpClient              *http.Client
-	log                     *slog.Logger
-	infoProvider            *infoProvider
+	Valid                    bool
+	siteKey                  string
+	secretKey                string
+	remediationCustomHeader  string
+	remediationTraceIDHeader string
+	gracePeriodSeconds       int64
+	templateContentType      string
+	template                 *template.Template
+	cacheClient              *cache.Client
+	httpClient               *http.Client
+	log                      *slog.Logger
+	infoProvider             *infoProvider
 }
 
 // Information for self-hosted provider.
@@ -61,7 +61,7 @@ var infoProviders = map[string]*infoProvider{
 }
 
 // New Initialize captcha client.
-func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, remediationCustomHeader, traceIDHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, remediationCustomHeader, remediationTraceIDHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
@@ -76,7 +76,7 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 	c.siteKey = siteKey
 	c.secretKey = secretKey
 	c.remediationCustomHeader = remediationCustomHeader
-	c.traceIDHeader = traceIDHeader
+	c.remediationTraceIDHeader = remediationTraceIDHeader
 	template, contentType, _ := configuration.GetTemplate(captchaTemplatePath)
 	c.template = template
 	c.templateContentType = contentType
@@ -108,8 +108,8 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP, tr
 	if c.remediationCustomHeader != "" {
 		rw.Header().Set(c.remediationCustomHeader, "captcha")
 	}
-	if c.traceIDHeader != "" && traceID != "" {
-		rw.Header().Set(c.traceIDHeader, traceID)
+	if c.remediationTraceIDHeader != "" && traceID != "" {
+		rw.Header().Set(c.remediationTraceIDHeader, traceID)
 	}
 	rw.WriteHeader(http.StatusOK)
 	err = c.template.Execute(rw, map[string]string{

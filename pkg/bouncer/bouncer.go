@@ -265,7 +265,7 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 	if b.remediationCustomHeader != "" {
 		rw.Header().Set(b.remediationCustomHeader, "ban")
 	}
-	traceID := b.newRemediationTraceID()
+	traceID := b.newRemediationTraceID(req.remoteIP)
 	if b.remediationTraceIDHeader != "" && traceID != "" {
 		rw.Header().Set(b.remediationTraceIDHeader, traceID)
 	}
@@ -303,7 +303,7 @@ func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientR
 			return
 		}
 		b.recordDropped(origin, req.ipType, "captcha")
-		b.captchaClient.ServeHTTP(rw, req.Request, req.remoteIP, b.newRemediationTraceID())
+		b.captchaClient.ServeHTTP(rw, req.Request, req.remoteIP, b.newRemediationTraceID(req.remoteIP))
 		return
 	}
 	b.handleBanServeHTTP(rw, req, configuration.ReasonLAPI, origin)
