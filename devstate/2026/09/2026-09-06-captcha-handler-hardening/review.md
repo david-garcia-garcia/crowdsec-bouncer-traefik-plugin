@@ -39,3 +39,9 @@ phase: archive
 findings: synced core_plugin_captcha_handler (new) and core_cache_client_isolated-store (fold); map regenerated; validators exit 0; moved to openspec/changes/archive/2026-09-06-captcha-handler-hardening/
 fixed: n/a
 skipped: n/a
+
+## pullrequest (2026-09-06)
+phase: pullrequest
+findings: master sync clean; PR title gitmoji-ready; Main Process CI failure; e2e jobs green; scoped local tests passed; full go test ./... fails pre-existing Windows bouncer_logging_test TempDir cleanup
+fixed: n/a
+skipped: n/a
