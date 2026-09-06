@@ -11,4 +11,4 @@ JobName: 2026-09-05-scope-headers-identity
 | codereview | [x] | [x] | 2026-09-05T16:37:10Z |
 | devdocsimpact | [x] | [x] | 2026-09-05T16:38:48Z |
 | archive | [x] | [x] | 2026-09-05T16:40:40Z |
-| pullrequest | [x] | [x] | 2026-09-05T20:54:21Z |
+| pullrequest | [x] | [x] | 2026-09-06T14:57:34Z |
