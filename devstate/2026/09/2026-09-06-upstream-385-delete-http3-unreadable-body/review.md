@@ -9,3 +9,9 @@ phase: explore
 findings: DELETE HTTP/3 under ban drops with appsecQuery:unreadableBody dropped
 fixed: n/a
 skipped: product change deferred to propose/implement
+
+## propose (2026-09-06)
+phase: propose
+findings: fold core_plugin_appsec_failure-action; change appsec-delete-unreadable-body
+fixed: n/a
+skipped: product apply deferred to implement
