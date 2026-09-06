@@ -104,7 +104,7 @@ func TestCheckerContainsCatchAllFamily(t *testing.T) {
 	})
 }
 
-// TestGetRemoteIP covers the forwarded-header walk and RemoteAddr fallback.
+// TestGetRemoteIP covers the forwarded-header walk, RemoteAddr gate, and fallback.
 func TestGetRemoteIP(t *testing.T) {
 	log := slog.Default()
 	hopChecker, err := NewChecker(log, []string{"10.0.0.1", "10.0.0.0/8"})
@@ -112,12 +112,34 @@ func TestGetRemoteIP(t *testing.T) {
 		t.Fatal(err)
 	}
 	strategy := &PoolStrategy{Checker: hopChecker}
+	trustedProxyAddr := "10.0.0.1:443"
 
 	t.Run("trusted hops skipped, client kept", func(t *testing.T) {
-		req := newTestTrustRequest("192.0.2.9:80", "X-Forwarded-For", "203.0.113.10, 10.0.0.1")
+		req := newTestTrustRequest(trustedProxyAddr, "X-Forwarded-For", "203.0.113.10, 10.0.0.1")
 		got, _, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
 		if err != nil || got != "203.0.113.10" {
 			t.Fatalf("GetRemoteIP = %q, %v want 203.0.113.10", got, err)
+		}
+	})
+
+	t.Run("untrusted RemoteAddr ignores forged header", func(t *testing.T) {
+		req := newTestTrustRequest("198.51.100.5:443", "X-Forwarded-For", "203.0.113.10, 10.0.0.1")
+		got, _, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
+		if err != nil || got != "198.51.100.5" {
+			t.Fatalf("GetRemoteIP = %q, %v want 198.51.100.5", got, err)
+		}
+	})
+
+	t.Run("empty trusted pool ignores header", func(t *testing.T) {
+		emptyChecker, err := NewChecker(log, []string{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		emptyStrategy := &PoolStrategy{Checker: emptyChecker}
+		req := newTestTrustRequest("198.51.100.5:443", "X-Forwarded-For", "203.0.113.10")
+		got, _, err := GetRemoteIP(req, emptyStrategy, "X-Forwarded-For")
+		if err != nil || got != "198.51.100.5" {
+			t.Fatalf("GetRemoteIP = %q, %v want 198.51.100.5", got, err)
 		}
 	})
 
@@ -138,7 +160,7 @@ func TestGetRemoteIP(t *testing.T) {
 	})
 
 	t.Run("empty header segments skipped", func(t *testing.T) {
-		req := newTestTrustRequest("192.0.2.9:80", "X-Forwarded-For", "203.0.113.10, , 10.0.0.1")
+		req := newTestTrustRequest(trustedProxyAddr, "X-Forwarded-For", "203.0.113.10, , 10.0.0.1")
 		got, _, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
 		if err != nil || got != "203.0.113.10" {
 			t.Fatalf("GetRemoteIP = %q, %v want 203.0.113.10", got, err)
@@ -146,10 +168,34 @@ func TestGetRemoteIP(t *testing.T) {
 	})
 
 	t.Run("custom header name", func(t *testing.T) {
-		req := newTestTrustRequest("192.0.2.9:80", "X-Real-IP", "203.0.113.10, 10.0.0.1")
+		req := newTestTrustRequest(trustedProxyAddr, "X-Real-IP", "203.0.113.10, 10.0.0.1")
 		got, _, err := GetRemoteIP(req, strategy, "X-Real-IP")
 		if err != nil || got != "203.0.113.10" {
 			t.Fatalf("GetRemoteIP custom header = %q, %v want 203.0.113.10", got, err)
+		}
+	})
+
+	t.Run("malformed hop between trusted and client fails closed", func(t *testing.T) {
+		req := newTestTrustRequest(trustedProxyAddr, "X-Forwarded-For", "203.0.113.10, not-an-ip, 10.0.0.1")
+		got, parsed, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
+		if err != nil || got != "not-an-ip" || parsed != nil {
+			t.Fatalf("GetRemoteIP = %q, parsed=%v, %v want not-an-ip, nil", got, parsed, err)
+		}
+	})
+
+	t.Run("malformed rightmost hop fails closed", func(t *testing.T) {
+		req := newTestTrustRequest(trustedProxyAddr, "X-Forwarded-For", "bad-hop")
+		got, parsed, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
+		if err != nil || got != "bad-hop" || parsed != nil {
+			t.Fatalf("GetRemoteIP = %q, parsed=%v, %v want bad-hop, nil", got, parsed, err)
+		}
+	})
+
+	t.Run("port suffixed hop fails closed", func(t *testing.T) {
+		req := newTestTrustRequest(trustedProxyAddr, "X-Forwarded-For", "203.0.113.10:443, 10.0.0.1")
+		got, parsed, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
+		if err != nil || got != "203.0.113.10:443" || parsed != nil {
+			t.Fatalf("GetRemoteIP = %q, parsed=%v, %v want 203.0.113.10:443, nil", got, parsed, err)
 		}
 	})
 
