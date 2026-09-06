@@ -1,0 +1,15 @@
+issueKey: 2026-09-06-upstream-363-version-release-mismatch
+jobName: 2026-09-06-upstream-363-version-release-mismatch
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:a1327220838edb60dbe96b5e327501bf91af376aac7b633247dce5512bfc75bf
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
