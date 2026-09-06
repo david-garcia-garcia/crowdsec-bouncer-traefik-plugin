@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: live spec synced; change moved to archive/2026-09-06-appsec-unreadable-body-headers-only
 skipped: none
+
+## pullrequest (2026-09-06)
+phase: pullrequest
+findings: e2e mock still expected 403 on unreadable HTTP/2; fixed then CI green
+fixed: PR title ready; CI Main Process + both e2e succeeded
+skipped: none
