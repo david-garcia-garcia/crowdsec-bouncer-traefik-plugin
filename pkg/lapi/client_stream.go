@@ -78,7 +78,7 @@ func (c *Client) handleStreamCache() error {
 	if leaseDuration < 1 {
 		leaseDuration = 1
 	}
-	c.cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, leaseDuration)
+	_ = c.cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, leaseDuration)
 	streamRouteURL := url.URL{
 		Scheme:   c.crowdsecScheme,
 		Host:     c.crowdsecHost,

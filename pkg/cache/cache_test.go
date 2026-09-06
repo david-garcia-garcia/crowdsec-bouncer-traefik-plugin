@@ -13,7 +13,7 @@ func Test_Get(t *testing.T) {
 	IPInCache := "10.0.0.10"
 	IPNotInCache := "10.0.0.20"
 	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
-	client.Set(IPInCache, BannedValue, 10)
+	_ = client.Set(IPInCache, BannedValue, 10)
 	type args struct {
 		clientIP string
 	}
@@ -69,7 +69,7 @@ func Test_Set(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client.Set(tt.args.clientIP, tt.args.value, tt.args.duration)
+			_ = client.Set(tt.args.clientIP, tt.args.value, tt.args.duration)
 			got, err := client.Get(tt.args.clientIP)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Set() error = %v, wantErr %v", err, tt.wantErr)
@@ -90,7 +90,7 @@ func Test_Delete(t *testing.T) {
 	IPInCache := "10.0.0.12"
 	IPNotInCache := "10.0.0.22"
 	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
-	client.Set(IPInCache, BannedValue, 10)
+	_ = client.Set(IPInCache, BannedValue, 10)
 	type args struct {
 		clientIP string
 	}
@@ -107,7 +107,7 @@ func Test_Delete(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client.Delete(tt.args.clientIP)
+			_ = client.Delete(tt.args.clientIP)
 			got, err := client.Get(tt.args.clientIP)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Delete() error = %v, wantErr %v", err, tt.wantErr)
@@ -204,7 +204,7 @@ func Test_memoryClientsDoNotShare(t *testing.T) {
 	b := &Client{}
 	a.New(logger.New("INFO", ""), false, "", nil, "", "", "")
 	b.New(logger.New("INFO", ""), false, "", nil, "", "", "")
-	a.Set("1.2.3.4", BannedValue, 10)
+	_ = a.Set("1.2.3.4", BannedValue, 10)
 	got, err := b.Get("1.2.3.4")
 	if err == nil || got != "" {
 		t.Fatalf("client B got %q err %v, want miss", got, err)
@@ -246,8 +246,8 @@ func Test_redisCacheUsesPrefix(t *testing.T) {
 
 func Test_GetMany(t *testing.T) {
 	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
-	client.Set("a", BannedValue, 10)
-	client.Set("b", CaptchaValue, 10)
+	_ = client.Set("a", BannedValue, 10)
+	_ = client.Set("b", CaptchaValue, 10)
 	got, err := client.GetMany([]string{"a", "missing", "b", ""})
 	if err != nil {
 		t.Fatalf("GetMany err %v", err)

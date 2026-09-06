@@ -37,10 +37,10 @@ func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, remov
 		index = removeCIDRFromIndex(index, strings.TrimSpace(cidr))
 	}
 	if index == "" {
-		cacheClient.Delete(RangeIndexKey)
+		_ = cacheClient.Delete(RangeIndexKey)
 		return
 	}
-	cacheClient.Set(RangeIndexKey, index, rangeIndexTTL)
+	_ = cacheClient.Set(RangeIndexKey, index, rangeIndexTTL)
 }
 
 // parseIndexLine splits one cidr=remediation line. A missing equals leaves remediation empty.

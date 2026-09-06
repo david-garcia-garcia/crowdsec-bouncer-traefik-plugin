@@ -25,12 +25,12 @@ func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string) 
 	}
 	if !decisionscope.IsActiveRemediation(chosen) {
 		if isLiveMode && c.defaultDecisionTimeout > 0 {
-			c.cacheClient.Set(remoteIP, cache.NoBannedValue, c.defaultDecisionTimeout)
+			_ = c.cacheClient.Set(remoteIP, cache.NoBannedValue, c.defaultDecisionTimeout)
 		}
 		return cache.NoBannedValue, nil
 	}
 	if isLiveMode && c.defaultDecisionTimeout > 0 {
-		c.cacheClient.Set(remoteIP, chosen, c.liveCacheTTL(parsedDuration))
+		_ = c.cacheClient.Set(remoteIP, chosen, c.liveCacheTTL(parsedDuration))
 	}
 	return chosen, errors.New("handleNoStreamCache:banned")
 }
