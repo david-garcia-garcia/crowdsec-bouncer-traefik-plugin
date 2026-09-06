@@ -73,8 +73,8 @@ Spec `core_plugin_middleware_instance-reclaim`: keep “same session ⇒ one tic
   By: explore
 
 - Q: On config refresh, skip reclaim grace so old and new streams do not both poll?
-  Decision: assumed — yes when the session incarnation is **replaced** (new Redis host, new interval, …). `Close()` the old Stream before `startStream` on the new one. Keep 10s grace when the snapshot is unchanged so reload does not `startup=true` every time.
-  By: explore
+  Decision: resolved — last holder Sleep()s tickers; Open during grace Wake()s (startup=false). Snapshot change on a sleeper is ReplaceSleeping (table-internal Close, then create). No public DropNow. Callers do not Close slots.
+  By: implement
 
 - Q: Can an operator fix a wrong LAPI TLS cert (or any session snapshot knob) without restarting the Traefik process?
   Decision: resolved — yes. Reload cancels the previous constructor ctx; that is a replace, not a concurrent conflict. Fail only while another live middleware still holds the old snapshot. Reclaim grace is 10s (`pkg/reclaim` `DefaultGrace`); that is a dispose delay, not a process restart.
@@ -85,8 +85,8 @@ Spec `core_plugin_middleware_instance-reclaim`: keep “same session ⇒ one tic
   By: explore
 
 - Q: Does the session key include LAPI TLS client certificate (keyless TLS bouncer) in addition to `lapiKey`?
-  Decision: assumed — yes. That cert is how LAPI selects the bouncer row when the key is empty.
-  By: explore
+  Decision: resolved — no. TLS extras are the settings snapshot. Peek + streamOwner detect another middleware. Sleeping + different snapshot → ReplaceSleeping. Two live middlewares with different certs warn-and-wire.
+  By: implement
 
 - Q: Live/none (and AppSec-only) two usage-metrics tickers on the same bouncer key — fail, share one reporter, or leave as today?
   Decision: assumed — leave live/none/appsec as today (two connections OK). Stream/alone metrics ticker rides the one session connection, so fail-on-conflict also prevents two stream metrics POSTs. Do not add a second uniqueness plane in this change.
