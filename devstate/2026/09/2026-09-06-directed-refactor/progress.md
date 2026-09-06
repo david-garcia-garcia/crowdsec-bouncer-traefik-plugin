@@ -5,10 +5,10 @@ JobName: 2026-09-06-directed-refactor
 | Phase | Work | Card | At |
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-06T13:42:11Z |
-| explore | [ ] | [ ] | |
+| explore | [x] | [ ] | |
 | propose | [ ] | [ ] | |
-| implement | [ ] | [ ] | |
+| implement | [x] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [ ] | |
