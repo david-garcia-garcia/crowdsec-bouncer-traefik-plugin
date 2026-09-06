@@ -11,3 +11,9 @@ phase: implement
 findings: none
 fixed: drop useRangeMembership; flatten ServeHTTP by crowdsecMode; sort Bouncer/clientRequest fields; gocyclo/funlen nolint on ServeHTTP
 skipped: OpenSpec propose/apply/archive; five-axis review (caller)
+
+## pullrequest (2026-09-06T14:44:19Z)
+phase: pullrequest
+findings: none
+fixed: none
+skipped: five-axis review (caller); OpenSpec propose/archive
