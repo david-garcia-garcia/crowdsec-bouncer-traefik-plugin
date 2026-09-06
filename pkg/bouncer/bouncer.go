@@ -290,7 +290,7 @@ func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientR
 	kind := cache.RemediationKind(remediation)
 	b.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", req.remoteIP, kind))
 	if b.captchaClient.Valid && kind == cache.CaptchaValue && req.Method != http.MethodHead {
-		if b.captchaClient.Check(req.remoteIP) {
+		if b.captchaClient.Check(req.Request, req.remoteIP) {
 			b.handleNextServeHTTP(rw, req)
 			return
 		}
