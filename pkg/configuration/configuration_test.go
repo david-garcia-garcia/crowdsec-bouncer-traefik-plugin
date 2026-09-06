@@ -112,6 +112,13 @@ func Test_ValidateParams(t *testing.T) {
 	cfgCaptchaWithProvider.CrowdsecLapiFailureAction = FailureActionCaptcha
 	cfgCaptchaWithProvider.CaptchaProvider = HcaptchaProvider
 	cfgCaptchaWithProvider.CaptchaFilePath = ""
+	cfgCustomNoChallenge := getMinimalConfig()
+	cfgCustomNoChallenge.CaptchaProvider = CustomProvider
+	cfgCustomNoChallenge.CaptchaFilePath = ""
+	cfgCustomNoChallenge.CaptchaCustomJsURL = "http://captcha.localhost:8000/fast.js"
+	cfgCustomNoChallenge.CaptchaCustomValidateURL = "http://wicketkeeper:8080/v0/siteverify"
+	cfgCustomNoChallenge.CaptchaCustomKey = "wicketkeeper"
+	cfgCustomNoChallenge.CaptchaCustomResponse = "wicketkeeper_solution"
 	cfgUnknownAction := getMinimalConfig()
 	cfgUnknownAction.CrowdsecAppsecFailureAction = "block"
 	cfgEmptyAction := getMinimalConfig()
@@ -140,6 +147,7 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Invalid log level Warning", args: args{config: cfg10}, wantErr: true},
 		{name: "Captcha LAPI action without provider", args: args{config: cfgCaptchaNoProvider}, wantErr: true},
 		{name: "Captcha LAPI action with provider", args: args{config: cfgCaptchaWithProvider}, wantErr: false},
+		{name: "Custom provider valid without challenge URL", args: args{config: cfgCustomNoChallenge}, wantErr: false},
 		{name: "Unknown AppSec failure action", args: args{config: cfgUnknownAction}, wantErr: true},
 		{name: "Empty failure actions use default ban", args: args{config: cfgEmptyAction}, wantErr: false},
 	}

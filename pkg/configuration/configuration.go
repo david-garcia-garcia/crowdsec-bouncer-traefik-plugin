@@ -113,6 +113,7 @@ type Config struct {
 	CaptchaFilePath                            string            `json:"captchaFilePath,omitempty"`
 	CaptchaProvider                            string            `json:"captchaProvider,omitempty"`
 	CaptchaCustomJsURL                         string            `json:"captchaCustomJsUrl,omitempty"`
+	CaptchaCustomChallengeURL                  string            `json:"captchaCustomChallengeUrl,omitempty"`
 	CaptchaCustomValidateURL                   string            `json:"captchaCustomValidateUrl,omitempty"`
 	CaptchaCustomKey                           string            `json:"captchaCustomKey,omitempty"`
 	CaptchaCustomResponse                      string            `json:"captchaCustomResponse,omitempty"`
@@ -185,6 +186,7 @@ func New() *Config {
 		HTTPTimeoutSeconds:              10,
 		CaptchaProvider:                 "",
 		CaptchaCustomJsURL:              "",
+		CaptchaCustomChallengeURL:       "",
 		CaptchaCustomValidateURL:        "",
 		CaptchaCustomKey:                "",
 		CaptchaCustomResponse:           "",

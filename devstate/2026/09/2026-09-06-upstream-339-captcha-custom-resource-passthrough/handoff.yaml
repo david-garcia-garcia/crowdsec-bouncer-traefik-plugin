@@ -1,0 +1,17 @@
+issueKey: 2026-09-06-upstream-339-captcha-custom-resource-passthrough
+jobName: 2026-09-06-upstream-339-captcha-custom-resource-passthrough
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:4b66432c6e755a26039654e86c5da7056ad7359c139d6611c7932353bb4436c2
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: captcha-custom-resource-passthrough
+pr:
+  id: 50
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/50
