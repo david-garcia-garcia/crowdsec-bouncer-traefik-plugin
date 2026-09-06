@@ -9,6 +9,6 @@ JobName: 2026-09-06-upstream-323-grpc-stream-403
 | propose | [x] | [x] | 2026-09-06T15:14:45.745Z |
 | implement | [x] | [x] | 2026-09-06T15:19:31.651Z |
 | codereview | [x] | [x] | 2026-09-06T15:23:14.398Z |
-| devdocsimpact | [ ] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-06T15:24:32.847Z |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |

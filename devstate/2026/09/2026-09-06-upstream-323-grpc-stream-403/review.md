@@ -27,3 +27,9 @@ phase: codereview
 findings: P3 1 (Standards test GET symmetry)
 fixed: fa9d177 streaming passthrough GET assert
 skipped: none
+
+## devdocsimpact (2026-09-06)
+phase: devdocsimpact
+findings: stale-usage already produced in implement
+fixed: none (packet already current)
+skipped: none
