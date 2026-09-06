@@ -2,6 +2,7 @@ package lapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -75,19 +76,32 @@ func (c *Client) getToken() error {
 	return errors.New("getToken statusCode:" + strconv.Itoa(login.Code))
 }
 
+// crowdsecQuery GETs or POSTs LAPI/CAPI. The request is bounded by httpClient.Timeout.
 func (c *Client) crowdsecQuery(stringURL string, data []byte) ([]byte, error) {
+	ctx := context.Background()
+	cancel := func() {}
+	if c.httpClient != nil && c.httpClient.Timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), c.httpClient.Timeout)
+	}
+	defer cancel()
 	var req *http.Request
 	if len(data) > 0 {
-		req, _ = http.NewRequest(http.MethodPost, stringURL, bytes.NewBuffer(data))
+		req, _ = http.NewRequestWithContext(ctx, http.MethodPost, stringURL, bytes.NewBuffer(data))
 	} else {
-		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
+		req, _ = http.NewRequestWithContext(ctx, http.MethodGet, stringURL, nil)
 	}
 	req.Header.Set(c.crowdsecHeader, c.crowdsecKey)
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+c.pluginVersion)
 
 	res, err := c.httpClient.Do(req)
-	if err != nil || isReverseProxyError(res.StatusCode) {
+	if err != nil {
 		return nil, fmt.Errorf("crowdsecQuery:unreachable url:%s %w", stringURL, err)
+	}
+	if res == nil {
+		return nil, fmt.Errorf("crowdsecQuery:unreachable url:%s empty response", stringURL)
+	}
+	if isReverseProxyError(res.StatusCode) {
+		return nil, fmt.Errorf("crowdsecQuery:unreachable url:%s statusCode:%d", stringURL, res.StatusCode)
 	}
 	defer func() {
 		if err = res.Body.Close(); err != nil {
