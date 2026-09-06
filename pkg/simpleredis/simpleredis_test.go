@@ -189,27 +189,56 @@ func TestConnectionIsReused(t *testing.T) {
 }
 
 func TestConcurrentCommandsStayWithinPool(t *testing.T) {
-	fake, addr := startFakeRedis(t, map[string]string{"hit": "t"})
+	block := make(chan struct{})
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+
+	var peak int
+	var mu sync.Mutex
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			peak++
+			mu.Unlock()
+			go func(c net.Conn) {
+				defer c.Close()
+				reader := bufio.NewReader(c)
+				if _, err := readCommand(reader); err != nil {
+					return
+				}
+				<-block
+				io.WriteString(c, "$1\r\nt\r\n")
+			}(conn)
+		}
+	}()
+
 	var redis SimpleRedis
-	redis.Init(addr, "", "")
+	redis.Init(listener.Addr().String(), "", "")
 
 	var wg sync.WaitGroup
-	for i := 0; i < 8; i++ {
+	for i := 0; i < 16; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for j := 0; j < 20; j++ {
-				if _, err := redis.Get("hit"); err != nil {
-					t.Errorf("Get: %v", err)
-					return
-				}
-			}
+			_, _ = redis.Get("hit")
 		}()
 	}
+	time.Sleep(100 * time.Millisecond)
+	close(block)
 	wg.Wait()
 
-	if got := fake.connections(); got > 8 {
-		t.Fatalf("8 goroutines opened %d connections, want at most 8", got)
+	mu.Lock()
+	got := peak
+	mu.Unlock()
+	if got > maxOpenConns {
+		t.Fatalf("16 concurrent Get opened peak %d connections, want at most %d", got, maxOpenConns)
 	}
 }
 
@@ -339,7 +368,9 @@ func TestStaleConnectionIsRetried(t *testing.T) {
 	redis.mu.Lock()
 	for _, conn := range redis.idle {
 		conn.close()
+		redis.open--
 	}
+	redis.idle = nil
 	redis.mu.Unlock()
 
 	got, err := redis.Get("hit")
@@ -351,6 +382,227 @@ func TestStaleConnectionIsRetried(t *testing.T) {
 	}
 	if fake.connections() != 2 {
 		t.Fatalf("opened %d connections, want 2", fake.connections())
+	}
+}
+
+func TestCloseDuringDialDoesNotAddConnection(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+
+	allowAccept := make(chan struct{})
+	connOut := make(chan net.Conn, 1)
+	go func() {
+		<-allowAccept
+		conn, err := listener.Accept()
+		if err == nil {
+			connOut <- conn
+		}
+	}()
+
+	var redis SimpleRedis
+	redis.Init(listener.Addr().String(), "", "")
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_, _ = redis.Get("hit")
+	}()
+	time.Sleep(50 * time.Millisecond)
+	redis.Close()
+	close(allowAccept)
+	select {
+	case conn := <-connOut:
+		conn.Close()
+	case <-time.After(time.Second):
+	}
+	wg.Wait()
+
+	if _, err := redis.Get("hit"); err == nil || err.Error() != RedisUnreachable {
+		t.Fatalf("Get after Close = %v, want %s", err, RedisUnreachable)
+	}
+	if len(connOut) > 0 {
+		// conn may have been accepted after Close; it must not stay in the pool.
+	}
+}
+
+func TestOversizedBulkIsRejected(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		reader := bufio.NewReader(conn)
+		if _, err := readCommand(reader); err != nil {
+			return
+		}
+		fmt.Fprintf(conn, "$%d\r\n", maxBulkBytes+1)
+	}()
+
+	var redis SimpleRedis
+	redis.Init(listener.Addr().String(), "", "")
+	if _, err := redis.Get("k"); err == nil || err.Error() != RedisIssue {
+		t.Fatalf("Get = %v, want %s", err, RedisIssue)
+	}
+}
+
+func TestOversizedArrayIsRejected(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		reader := bufio.NewReader(conn)
+		if _, err := readCommand(reader); err != nil {
+			return
+		}
+		fmt.Fprintf(conn, "*%d\r\n", maxArrayCount+1)
+	}()
+
+	var redis SimpleRedis
+	redis.Init(listener.Addr().String(), "", "")
+	if _, err := redis.MGet([]string{"a"}); err == nil || err.Error() != RedisIssue {
+		t.Fatalf("MGet = %v, want %s", err, RedisIssue)
+	}
+}
+
+func TestNoAuthOnReusedConnDoesNotRepool(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+
+	type connState struct {
+		gets int
+	}
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				state := &connState{}
+				reader := bufio.NewReader(c)
+				for {
+					args, err := readCommand(reader)
+					if err != nil {
+						return
+					}
+					if args[0] == "GET" {
+						state.gets++
+						if state.gets == 1 {
+							io.WriteString(c, "$1\r\nt\r\n")
+							continue
+						}
+						io.WriteString(c, "-NOAUTH Authentication required.\r\n")
+						continue
+					}
+					io.WriteString(c, "+OK\r\n")
+				}
+			}(conn)
+		}
+	}()
+
+	var redis SimpleRedis
+	redis.Init(listener.Addr().String(), "", "")
+	if _, err := redis.Get("hit"); err != nil {
+		t.Fatalf("first Get: %v", err)
+	}
+	if _, err := redis.Get("hit"); err == nil || err.Error() != RedisNoAuth {
+		t.Fatalf("second Get = %v, want %s", err, RedisNoAuth)
+	}
+	if _, err := redis.Get("hit"); err != nil {
+		t.Fatalf("third Get after NOAUTH: %v", err)
+	}
+}
+
+func TestDialAuthFailure(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		reader := bufio.NewReader(conn)
+		if _, err := readCommand(reader); err != nil {
+			return
+		}
+		io.WriteString(conn, "-WRONGPASS invalid password\r\n")
+	}()
+
+	var redis SimpleRedis
+	redis.Init(listener.Addr().String(), "bad", "")
+	if _, err := redis.Get("k"); err == nil || err.Error() != RedisNoAuth {
+		t.Fatalf("Get = %v, want %s", err, RedisNoAuth)
+	}
+}
+
+func TestSetDelMGetAfterClose(t *testing.T) {
+	fake, addr := startFakeRedis(t, map[string]string{})
+	var redis SimpleRedis
+	redis.Init(addr, "", "")
+	redis.Close()
+
+	if err := redis.Set("k", []byte("v"), 60); err == nil || err.Error() != RedisUnreachable {
+		t.Fatalf("Set after Close = %v, want %s", err, RedisUnreachable)
+	}
+	if err := redis.Del("k"); err == nil || err.Error() != RedisUnreachable {
+		t.Fatalf("Del after Close = %v, want %s", err, RedisUnreachable)
+	}
+	if _, err := redis.MGet([]string{"k"}); err == nil || err.Error() != RedisUnreachable {
+		t.Fatalf("MGet after Close = %v, want %s", err, RedisUnreachable)
+	}
+	if fake.connections() != 0 {
+		t.Fatalf("after Close opened %d connections, want 0", fake.connections())
+	}
+}
+
+func TestGetUnexpectedReplyShape(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		reader := bufio.NewReader(conn)
+		if _, err := readCommand(reader); err != nil {
+			return
+		}
+		io.WriteString(conn, "*2\r\n$1\r\na\r\n$1\r\nb\r\n")
+	}()
+
+	var redis SimpleRedis
+	redis.Init(listener.Addr().String(), "", "")
+	if _, err := redis.Get("k"); err == nil || err.Error() != RedisIssue {
+		t.Fatalf("Get = %v, want %s", err, RedisIssue)
 	}
 }
 
