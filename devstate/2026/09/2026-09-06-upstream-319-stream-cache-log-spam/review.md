@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: none (middleware gotcha already names DEBUG ticks)
 fixed: devdocs-impact.md
 skipped: none
+
+## archive (2026-09-06)
+phase: archive
+findings: folded Stream poll ticks stay at DEBUG onto core_plugin_lapi_connection
+fixed: archive/2026-09-06-prove-stream-cache-tick-debug; baseline spec append
+skipped: none

@@ -10,5 +10,5 @@ JobName: 2026-09-06-upstream-319-stream-cache-log-spam
 | implement | [x] | [x] | 2026-09-06T15:33:35.344Z |
 | codereview | [x] | [x] | 2026-09-06T15:36:05.957Z |
 | devdocsimpact | [x] | [x] | 2026-09-06T15:36:55.328Z |
-| archive | [ ] | [ ] | |
+| archive | [x] | [x] | 2026-09-06T15:38:39.459Z |
 | pullrequest | [ ] | [ ] | |
