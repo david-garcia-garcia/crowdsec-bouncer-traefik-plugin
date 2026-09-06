@@ -29,12 +29,12 @@ func Family(addr string) string {
 	return FamilyOfIP(net.ParseIP(strings.TrimSpace(addr)))
 }
 
-// FamilyOfIP is ipv4 or ipv6 for an already parsed address. Empty if nil.
-func FamilyOfIP(parsed net.IP) string {
-	if parsed == nil {
+// FamilyOfIP is ipv4 or ipv6 for a net.IP. Empty if nil.
+func FamilyOfIP(ipAddr net.IP) string {
+	if ipAddr == nil {
 		return ""
 	}
-	if parsed.To4() != nil {
+	if ipAddr.To4() != nil {
 		return "ipv4"
 	}
 	return "ipv6"

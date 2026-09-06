@@ -11,6 +11,6 @@ import (
 type clientRequest struct {
 	*http.Request
 	remoteIP string // cache, LAPI, AppSec, logs, ban template ClientIP
-	parsed   net.IP // same address, already parsed; nil when unparseable
-	ipType   string // FamilyOfIP(parsed): ipv4, ipv6, or empty
+	ipAddr   net.IP // same address as net.IP; nil when unparseable
+	ipType   string // FamilyOfIP(ipAddr): ipv4, ipv6, or empty
 }

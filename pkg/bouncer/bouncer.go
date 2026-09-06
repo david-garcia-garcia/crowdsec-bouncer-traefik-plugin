@@ -123,12 +123,12 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		return
 	}
 
-	remoteIP, parsed, err := ip.GetRemoteIP(httpReq, b.serverPoolStrategy, b.forwardedCustomHeader)
+	remoteIP, ipAddr, err := ip.GetRemoteIP(httpReq, b.serverPoolStrategy, b.forwardedCustomHeader)
 	req := clientRequest{
 		Request:  httpReq,
 		remoteIP: remoteIP,
-		parsed:   parsed,
-		ipType:   ip.FamilyOfIP(parsed),
+		ipAddr:   ipAddr,
+		ipType:   ip.FamilyOfIP(ipAddr),
 	}
 	b.recordProcessed(req.ipType)
 	if err != nil {
@@ -136,12 +136,12 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, crowdsecconnection.OriginPluginTechGetRemoteFail)
 		return
 	}
-	if req.parsed == nil {
+	if req.ipAddr == nil {
 		b.log.Error(fmt.Sprintf("ServeHTTP:parseClientIP ip:%s", req.remoteIP))
 		b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, crowdsecconnection.OriginPluginTechTrustIPFail)
 		return
 	}
-	isTrusted := b.clientPoolStrategy.Checker.ContainsIP(req.parsed)
+	isTrusted := b.clientPoolStrategy.Checker.ContainsIP(req.ipAddr)
 	b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", req.remoteIP, isTrusted))
 	if isTrusted {
 		b.next.ServeHTTP(rw, req.Request)
@@ -157,7 +157,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	scopes := decisionscope.RequestScopeValues(b.decisionScopeHeaders, req.Request)
 
 	if b.conn.Mode() != configuration.NoneMode {
-		value, origin, cacheErr := decisionscope.LookupCachedRemediation(b.conn.Cache(), b.conn.Mode(), req.remoteIP, req.parsed, scopes, b.conn.RangeMembership())
+		value, origin, cacheErr := decisionscope.LookupCachedRemediation(b.conn.Cache(), b.conn.Mode(), req.remoteIP, req.ipAddr, scopes, b.conn.RangeMembership())
 		switch {
 		case cacheErr != nil:
 			cacheErrString := cacheErr.Error()
