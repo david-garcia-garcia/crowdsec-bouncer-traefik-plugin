@@ -28,3 +28,15 @@ findings: P3 1 hard, 1 judgement
 fixed: rename want to wantUA
 skipped: extend newUsageMetricsClient (judgement)
 
+## devdocsimpact (2026-09-06T15:27:58Z)
+phase: devdocsimpact
+findings: none
+fixed: n/a
+skipped: n/a
+
+## archive (2026-09-06T15:27:58Z)
+phase: archive
+findings: none
+fixed: n/a
+skipped: n/a
+
