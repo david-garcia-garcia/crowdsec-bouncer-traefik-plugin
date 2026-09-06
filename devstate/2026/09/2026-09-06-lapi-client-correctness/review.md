@@ -5,3 +5,7 @@
 Five-axis review on `origin/master...HEAD` (exclude devstate/.cursor). Hard findings: Standards 1 (method comment), Spec 1 (scope error dropped active IP ban), Spec 2 (missing test). All fixed in 6fb6359. Security/Performance/Dead clean.
 
 Verdict: in progress (CI not seen on head 6fb6359).
+
+## Devdocsimpact phase (2026-09-06T15:13:07Z)
+
+Compared pkg/lapi units from pinned diff against knowledge/devdocs. Three findings (2 missing-packet, 1 stale-usage); all produced. Added `core_plugin_lapi_stream-poll.md`, `core_plugin_lapi_http-query.md`, index rows, middleware scope-error guidance. No Language gaps written (unattended; terms already covered by LAPI Client). Verdict: in progress (CI not seen on head e632995).

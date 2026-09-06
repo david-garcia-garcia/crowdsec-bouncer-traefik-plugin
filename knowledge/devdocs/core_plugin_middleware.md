@@ -34,7 +34,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - Put stream tickers, LAPI HTTP, cache, and Range membership on `lapi.Client`. Put AppSec HTTP on `appsec.Client`. Put captcha and templates on Bouncer.
 - Resolve client IP with `pkg/ip.GetRemoteIP`. Fold `remoteIP`, parsed `net.IP`, and `ipType` into `clientRequest`. Keep the name `req`. Do not parse `RemoteAddr` on LAPI or AppSec. Do not put scopes or origin on that type.
 - Range and header-mapped CrowdSec scopes live in `pkg/decisionscope`. Do not geolocate in `New` or `ServeHTTP`.
-- Live LAPI error and stream-unhealthy cache miss use `crowdsecLapiFailureAction`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled).
+- Live LAPI error (IP or header-scope query), and stream-unhealthy cache miss, use `crowdsecLapiFailureAction`. Header-scope LAPI failures propagate from `LiveLookup` like IP unreachable; active IP ban kind still remediates when scope query fails. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled).
 - Watch logs `reclaim_put|bind|orphan|reclaim|dispose`.
 
 ## Pattern snippet

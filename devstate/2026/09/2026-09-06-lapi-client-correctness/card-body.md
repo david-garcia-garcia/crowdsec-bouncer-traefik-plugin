@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-06T15:15:00Z
+Developer review: in progress — 2026-09-06T15:13:07Z
 
 ## What this changes
 **Operators.** Live mode now honors `crowdsecLapiFailureAction` when header-scope LAPI queries fail (not only IP lookup errors); stream health no longer races overlapping polls that could mask LAPI failures; active IP bans still apply when a scope query fails.
 
 **Admin users.** None.
 
-**Developers.** `pkg/lapi` adds `streamPollMu` for serialized stream polls, clears the `updated` lease on stream GET failure, hardens `crowdsecQuery` against nil transport responses with alone-mode POST body replay on 401, propagates scope errors from `mergeLiveScope`/`LiveLookup` while preserving active IP remediation on scope failure; new `client_correctness_test.go` covers health thresholds, JSON apply, transport errors, 401 retry, scope failures, and IP-ban preservation.
+**Developers.** `pkg/lapi` adds `streamPollMu` for serialized stream polls, clears the `updated` lease on stream GET failure, hardens `crowdsecQuery` against nil transport responses with alone-mode POST body replay on 401, propagates scope errors from `mergeLiveScope`/`LiveLookup` while preserving active IP remediation on scope failure; new `client_correctness_test.go` covers health thresholds, JSON apply, transport errors, 401 retry, scope failures, and IP-ban preservation. `knowledge/devdocs` adds `core_plugin_lapi_stream-poll` and `core_plugin_lapi_http-query` usage packets and updates middleware failure-action guidance.
 
 **End users.** None.
 
@@ -13,17 +13,17 @@ Developer review: in progress — 2026-09-06T15:15:00Z
 On `master`, `pkg/lapi` races concurrent stream polls that can mask LAPI failures, drops alone-mode POST bodies on 401 retry, and fail-opens live header-scope query errors — leaving bans unenforced. Transport handling is unsafe to maintain. Without this change those defects remain in production paths.
 
 ## Merge readiness
-Codereview complete; all hard findings fixed. 0 open axis items. CI pending on head 6fb6359.
+Devdocs impact complete; codereview complete; all hard findings fixed. 0 open axis items. CI pending on head e632995.
 
 Priority: P1 — scope fail-open and alone-mode POST retry make production enforcement unsafe today.
-Reviewed head: 6fb6359
+Reviewed head: e632995
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 3/6 | Local tests passed; CI pending |
-| CI proof | 1 | pushed; checks not seen on head 6fb6359 |
+| CI proof | 1 | pushed; checks not seen on head e632995 |
 | Local tests proof | 6/6 | go test ./pkg/lapi/ -count=1 passed after codereview fixes |
 | Review resolution | 6/6 | OPEN PR #30, no review comments |
 
@@ -33,26 +33,27 @@ Owner decision: None.
 | Branch | 2026-09-06-lapi-client-correctness pushed | git push origin |
 | OpenSpec | lapi-client-correctness | openspec validate --strict passed |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/30 | GitHub |
-| CI | not seen on head 6fb6359 | GitHub PR checks |
+| CI | not seen on head e632995 | GitHub PR checks |
 | Local tests | passed | go test ./pkg/lapi/ -count=1 |
 | PR comments | no comments | devstate/comments.md absent |
 
 ## Specs
 - [core_plugin_lapi_stream-poll](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-lapi-client-correctness/openspec/changes/lapi-client-correctness/proposal.md) — added
-- [core_plugin_lapi_http-query](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-lapi-client-correctness/openspec/changes/lapi-client-correctness/proposal.md) — added
-- [core_plugin_lapi_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-lapi-client-correctness/openspec/changes/lapi-client-correctness/proposal.md) — modified
+- [core_plugin_lapi_http-query](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-lapi-client-correctness/proposal.md) — added
+- [core_plugin_lapi_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-lapi-client-correctness/proposal.md) — modified
 
 ## Follow-up issues
 None.
 
 ## How this fits together
-Bug-hunt ticket → branch `2026-09-06-lapi-client-correctness` → PR #30 → OpenSpec `lapi-client-correctness` → pkg/lapi fixes + codereview hardening → local tests passed → CI pending on head.
+Bug-hunt ticket → branch `2026-09-06-lapi-client-correctness` → PR #30 → OpenSpec `lapi-client-correctness` → pkg/lapi fixes + devdocs packets → local tests passed → CI pending on head.
 
 ## Decision needed
 None.
 
 ## Before merge
-- [ ] [P2] Wait for CI green on head 6fb6359
+- [ ] [P2] Wait for CI green on head e632995
+- [x] Run devdocsimpact phase (stream-poll and http-query packets)
 - [x] Run codereview phase (five-axis review)
 - [x] Fix scope error IP-ban preservation and method comment
 - [x] Implement stream poll serialization and lease failure accounting
@@ -78,7 +79,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 2 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Inventory at prepare |
-| Reviewed head | 6fb6359 | Codereview head after fixes |
+| Reviewed head | e632995709282dabae729c0f5f8fac1e7905cf68 | Card matches branch head |
 
 ### Stored data model
 None.
@@ -88,13 +89,14 @@ Best possible solution: dedicated streamPollMu, lease clear on GET failure, crow
 
 Do we have a high-confidence way to reproduce? Yes — httptest suite calls handleStreamTicker, handleStreamCache, crowdsecQuery, and LiveLookup directly; go test ./pkg/lapi/ -count=1 passed after codereview fixes.
 
-Is this the best way to solve the issue? Yes — defects share crowdsecQuery and stream poll lifecycle; codereview caught spec gap on active IP ban + scope error path.
+Is this the best way to solve the issue? Yes — defects share crowdsecQuery and stream poll lifecycle; devdocs now cover stream poll and HTTP query usage.
 
 ### Evidence
 What I checked:
+- Devdocs impact on origin/master...HEAD (pkg/lapi units vs knowledge/devdocs catalog)
 - Five-axis codereview on origin/master...HEAD (exclude devstate/.cursor)
-- go test ./pkg/lapi/ -count=1 — passed (6fb6359)
-- GitHub PR #30 checks — not seen on head 6fb6359
+- go test ./pkg/lapi/ -count=1 — passed (e632995)
+- GitHub PR #30 checks — not seen on head e632995
 
 ### Rank-up moves
 None.
