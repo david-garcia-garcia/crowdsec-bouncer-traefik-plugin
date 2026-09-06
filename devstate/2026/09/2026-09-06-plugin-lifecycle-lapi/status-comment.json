@@ -1,5 +1,5 @@
 {
-  "commentId": "local",
+  "commentId": "pr-body",
   "issueKey": "2026-09-06-plugin-lifecycle-lapi",
   "markerValue": "[sgsi-dev-ticket-status:2026-09-06-plugin-lifecycle-lapi]",
   "issueHost": "local"
