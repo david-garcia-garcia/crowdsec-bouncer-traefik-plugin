@@ -11,4 +11,4 @@ JobName: 2026-09-06-performance-ip-parse
 | codereview | [x] | [x] | 2026-09-06T05:38:14Z |
 | devdocsimpact | [x] | [ ] | |
 | archive | [x] | [ ] | |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-06T06:33:49Z |
