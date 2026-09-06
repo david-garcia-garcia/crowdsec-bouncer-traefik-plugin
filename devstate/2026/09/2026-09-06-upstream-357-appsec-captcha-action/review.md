@@ -9,3 +9,9 @@ phase: explore
 findings: captcha is envelope relay not pkg/captcha; empty-body captcha stays relay; fold scenarios onto core_plugin_appsec_bot-detection
 fixed: n/a
 skipped: no new research or usage packet (existing knowledge sufficient)
+
+## propose (2026-09-06)
+phase: propose
+findings: OpenSpec change appsec-captcha-action-tests folds onto core_plugin_appsec_bot-detection
+fixed: n/a
+skipped: n/a
