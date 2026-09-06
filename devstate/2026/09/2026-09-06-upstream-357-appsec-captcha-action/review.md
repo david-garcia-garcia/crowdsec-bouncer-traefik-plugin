@@ -33,3 +33,9 @@ phase: archive
 findings: folded captcha scenarios into core_plugin_appsec_bot-detection; moved change to archive
 fixed: n/a
 skipped: n/a
+
+## pullrequest (2026-09-06)
+phase: pullrequest
+findings: title dropped WIP; CI green after e2e flake retry
+fixed: n/a
+skipped: n/a
