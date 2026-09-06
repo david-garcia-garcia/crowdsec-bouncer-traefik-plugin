@@ -22,8 +22,8 @@ findings: Standards/Spec/Security/Dead none; Performance 1 hard unbounded ReadAl
 fixed: captchaFormMaxBytes 64KiB LimitReader (9373e6e)
 skipped: none
 
-## devdocsimpact (2026-09-06)
-phase: devdocsimpact
-findings: missing-packet Captcha remediation
-fixed: knowledge/devdocs/core_plugin_captcha.md
+## archive (2026-09-06)
+phase: archive
+findings: synced core_plugin_captcha_solved-form-post to baseline; archived change folder
+fixed: openspec/specs/core_plugin_captcha_solved-form-post + archive move
 skipped: none
