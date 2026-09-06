@@ -5,7 +5,7 @@ JobName: 2026-09-06-upstream-353-captcha-session-cookie
 | Phase | Work | Card | At |
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-06T15:06:45Z |
-| explore | [x] | [ ] | |
+| explore | [x] | [x] | 2026-09-06T15:10:16Z |
 | propose | [ ] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |

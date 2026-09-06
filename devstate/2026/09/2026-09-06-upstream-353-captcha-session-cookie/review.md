@@ -1,5 +1,5 @@
-## prepare (2026-09-06)
-phase: prepare
-findings: IP-only captcha grace grounded; stub PR #45 opened
+## explore (2026-09-06)
+phase: explore
+findings: IP-only grace reproduced; bind to IP+cookie; skip UA/proto in v1
 fixed: n/a
-skipped: n/a
+skipped: UA+protocol session bind (issues.md)
