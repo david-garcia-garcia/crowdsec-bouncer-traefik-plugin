@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-06T15:32:38Z
+Developer review: in progress — 2026-09-06T15:34:35Z
 
 ## What this changes
 **Operators.** None.
 
 **Admin users.** None.
 
-**Developers.** Unit tests in `pkg/appsec/query_test.go` and `pkg/bouncer/bouncer_test.go` prove AppSec JSON `action: captcha` parse and relay (including the no-body 403 envelope). OpenSpec change `appsec-captcha-action-tests` adds those scenarios on `core_plugin_appsec_bot-detection`.
+**Developers.** Unit tests in `pkg/appsec/query_test.go` and `pkg/bouncer/bouncer_test.go` prove AppSec JSON `action: captcha` parse and relay (including the no-body 403 envelope). OpenSpec change `appsec-captcha-action-tests` adds those scenarios on `core_plugin_appsec_bot-detection`. Usage packet `core_plugin_appsec.md` now says empty captcha body still relays `http_status`.
 
 **End users.** None.
 
@@ -13,17 +13,17 @@ Developer review: in progress — 2026-09-06T15:32:38Z
 On `master`, AppSec JSON `action: captcha` is parsed and relayed but no test or spec scenario named that envelope. Upstream #357 reports missing captcha support; without these tests, a regression can restore that gap without CI catching it.
 
 ## Merge readiness
-Code review complete (all axes clean); devdocs impact is next. 3 workflow items remain.
+Devdocs impact complete; archive is next. 2 workflow items remain.
 
 Priority: P3 — tests and spec clarity; no current operator or end-user harm if behavior is already correct.
-Reviewed head: 0b19214
+Reviewed head: de3f9b9
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Axes clean; latest CI still running on the review-journal commit |
-| CI proof | 3/6 | In progress — [run 34042643717](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34042643717) |
+| Overall readiness | 3/6 | Usage packet updated; latest CI still queued |
+| CI proof | 3/6 | In progress — [run 34042747298](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34042747298) |
 | Local tests proof | N/A | Remote PR; CI covers |
 | Review resolution | 6/6 | No PR comments inventoried |
 
@@ -33,7 +33,7 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-06-upstream-357-appsec-captcha-action pushed | git push |
 | OpenSpec | appsec-captcha-action-tests | openspec/changes/appsec-captcha-action-tests/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/44 | pr-host |
-| CI | in progress [run 34042643717](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34042643717) | GitHub check runs |
+| CI | in progress [run 34042747298](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34042747298) | GitHub check runs |
 | Local tests | passed | `go test ./pkg/appsec/ ./pkg/bouncer/ -count=1` |
 | PR comments | no comments | comments.md absent |
 
@@ -44,7 +44,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local upstream #357 assessment → branch `2026-09-06-upstream-357-appsec-captcha-action` → stub PR #44 → tests landed → five-axis review clean → devdocs impact next.
+Local upstream #357 assessment → branch `2026-09-06-upstream-357-appsec-captcha-action` → stub PR #44 → tests + usage How-to → archive next.
 
 ## Decision needed
 | Question | Decision | By |
@@ -54,11 +54,11 @@ Local upstream #357 assessment → branch `2026-09-06-upstream-357-appsec-captch
 
 ## Before merge
 - [ ] [P3] Archive OpenSpec change, drop WIP on PR #44
+- [x] Usage How-to: empty captcha body still relays `http_status`
 - [x] Five-axis code review (all axes none)
-- [x] Add captcha JSON parse and bouncer relay tests (including empty-body envelope)
-- [x] Propose OpenSpec change `appsec-captcha-action-tests` on `core_plugin_appsec_bot-detection`
-- [x] Explore: empty-body captcha stays relay; lock envelope parse+relay not `pkg/captcha`
-- [x] Prepare: requirement, worktree, stub PR
+- [x] Add captcha JSON parse and bouncer relay tests
+- [x] Propose OpenSpec change `appsec-captcha-action-tests`
+- [x] Explore and prepare
 
 ## Findings
 None.
@@ -77,22 +77,22 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Same list as Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | No comments on stub PR |
-| Reviewed head | 0b1921474f0b14b9e4ad1f53c3ca379685a3dfa0 | Matches pushed review-journal commit |
+| Reviewed head | de3f9b953d019e757c9ced2a2718588041be636e | Matches pushed usage-doc commit |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: tests lock current envelope parse and relay next to the existing challenge fixtures, without changing product code.
+Best possible solution: tests lock current envelope parse and relay; usage How-to now names the empty-captcha vs empty-challenge split.
 
-Do we have a high-confidence way to reproduce? Yes — the three captcha tests passed locally and on the product CI run.
+Do we have a high-confidence way to reproduce? Yes — three captcha unit tests plus the How-to line.
 
 Is this the best way to solve the issue? Yes for add-tests scope.
 
 ### Evidence
 What I checked:
-- Five-axis review of `origin/master...HEAD` excluding `devstate/` and `.cursor/` — all `none.`
-- Product tests: `Test_appsecQuery_captchaJSON`, `TestHandleNextServeHTTPRelaysStructuredAppsecCaptcha`, `TestHandleNextServeHTTPEmptyCaptchaBodyRelaysStatus`
+- `devdocs-impact.md`: stale-usage produced on `core_plugin_appsec.md`
+- Five-axis review remaining `none.`
 
 ### Rank-up moves
 None.
