@@ -27,3 +27,9 @@ phase: pullrequest
 findings: CI succeeded on d256d34; title ready
 fixed: n/a
 skipped: n/a
+
+## codereview (2026-09-06T19:06:37Z)
+phase: codereview
+findings: Standards/Spec/Security/Performance/Dead none; Coverage 2 hard (LAPI client Timeout wiring, captcha siteverify Timeout wiring)
+fixed: none
+skipped: attended — waiting on which coverage items to apply
