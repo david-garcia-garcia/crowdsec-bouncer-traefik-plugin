@@ -142,6 +142,7 @@ func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol 
 	switch {
 	case isBodyUnreadable(httpReq):
 		if pol.UnreadableBodyBlock && isMethodWithBody(httpReq.Method) {
+			// Opt-in drop; independent of CrowdsecAppsecFailureAction.
 			return nil, errors.New("appsecQuery:unreadableBody dropped")
 		}
 		// HTTP/2+ streams have no finite body to copy; inspect headers only (issue #323).
