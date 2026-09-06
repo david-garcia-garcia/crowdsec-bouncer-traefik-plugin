@@ -1,0 +1,15 @@
+issueKey: 2026-09-06-upstream-358-builtin-traceid
+jobName: 2026-09-06-upstream-358-builtin-traceid
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:e2d1a74aa119aa934978b6a94a04c83bd1f2c0689259b0b6aea1a70ff4ad15ed
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
