@@ -15,3 +15,9 @@ phase: implement
 findings: captcha grace bound to IP+cookie; CI green
 fixed: govet shadow, revive unused-parameter
 skipped: UA+protocol session bind
+
+## codereview (2026-09-06)
+phase: codereview
+findings: Standards 3 (2 hard Leave a trail, 1 judgement name); Spec/Security/Performance/Dead none
+fixed: block intros on Check and sessionTokenFromRequest
+skipped: test local session rename (judgement)
