@@ -320,10 +320,11 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		if _, err := GetVariable(config, "CaptchaSecretKey"); err != nil {
 			return err
 		}
-		if config.CaptchaFilePath != "" {
-			if _, _, err := GetTemplate(config.CaptchaFilePath); err != nil {
-				return err
-			}
+		if config.CaptchaFilePath == "" {
+			return errors.New("CaptchaFilePath: required when CaptchaProvider is set")
+		}
+		if _, _, err := GetTemplate(config.CaptchaFilePath); err != nil {
+			return err
 		}
 	}
 	if config.BanFilePath != "" {
@@ -464,6 +465,9 @@ func validateParamsIPs(log *slog.Logger, listIP []string, key string) error {
 func validateCaptcha(config *Config) error {
 	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider}, config.CaptchaProvider) {
 		return fmt.Errorf("CaptchaProvider: must be one of '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider)
+	}
+	if config.CaptchaProvider != "" && config.CaptchaFilePath == "" {
+		return errors.New("CaptchaFilePath: required when CaptchaProvider is set")
 	}
 	if config.CaptchaProvider == CustomProvider {
 		if config.CaptchaCustomKey == "" || config.CaptchaCustomResponse == "" || config.CaptchaCustomValidateURL == "" || config.CaptchaCustomJsURL == "" {
