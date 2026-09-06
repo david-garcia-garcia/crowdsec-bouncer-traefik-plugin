@@ -438,15 +438,16 @@ function Remove-AllTestDecisions {
     return $true
 }
 
-# cscli metrics show bouncers -o json is [bouncer][origin][name][unit] = value.
-# Empty origin holds processed. Human table hides empty origin from body rows.
+# cscli metrics show bouncers -o json (CrowdSec 1.8) is
+# { bouncers: { "NAME@ip": { "<origin>": { "<name>": { "<unit>": n } } } } }.
+# Processed lives under origin "". ConvertFrom-Json to PSObject rejects that key.
 function Get-CscliBouncerMetrics {
     $raw = docker exec crowdsec-test cscli metrics show bouncers -o json --color no 2>$null
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($raw)) {
         return $null
     }
     try {
-        return $raw | ConvertFrom-Json
+        return $raw | ConvertFrom-Json -AsHashtable
     }
     catch {
         Write-Host "⚠️ cscli metrics JSON parse failed: $raw" -ForegroundColor Yellow
@@ -467,27 +468,26 @@ function Get-CscliBouncerMetricValue {
         return [int64]0
     }
 
+    $bouncers = $metrics['bouncers']
+    if ($null -eq $bouncers) {
+        return [int64]0
+    }
+
     $total = [int64]0
-    foreach ($bouncer in $metrics.PSObject.Properties) {
-        $origins = $bouncer.Value
-        if ($null -eq $origins) {
+    foreach ($bouncerName in @($bouncers.Keys)) {
+        $origins = $bouncers[$bouncerName]
+        if ($null -eq $origins -or -not $origins.ContainsKey($Origin)) {
             continue
         }
-        foreach ($originNode in $origins.PSObject.Properties) {
-            if ($originNode.Name -ne $Origin) {
-                continue
-            }
-            $names = $originNode.Value
-            $nameProp = $names.PSObject.Properties[$Name]
-            if ($null -eq $nameProp) {
-                continue
-            }
-            $units = $nameProp.Value
-            $unitProp = $units.PSObject.Properties[$Unit]
-            if ($null -ne $unitProp) {
-                $total += [int64]$unitProp.Value
-            }
+        $names = $origins[$Origin]
+        if ($null -eq $names -or -not $names.ContainsKey($Name)) {
+            continue
         }
+        $units = $names[$Name]
+        if ($null -eq $units -or -not $units.ContainsKey($Unit)) {
+            continue
+        }
+        $total += [int64]$units[$Unit]
     }
     return $total
 }
