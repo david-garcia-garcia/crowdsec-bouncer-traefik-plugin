@@ -10,9 +10,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/health"
 )
 
 // ReclaimGraceDuration is the wait after the last constructor ctx for a Client slot.
@@ -66,6 +67,7 @@ type Client struct {
 
 	httpClient      *http.Client
 	cacheClient     *cache.Client
+	failureTracker  *health.Tracker
 	rangeMembership atomic.Value // *decisionscope.RangeMembership rebuilt from range-index
 	lastRangeIndex  atomic.Value // string of the blob last used to build membership
 	log             *slog.Logger
@@ -168,7 +170,8 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 			},
 			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
 		},
-		cacheClient: &cache.Client{},
+		cacheClient:    &cache.Client{},
+		failureTracker: health.NewFromSeconds(config.LapiFailureBackoffTimeout, config.LapiFailureBackoffBucketWindow, config.LapiFailureBackoffBucketThreshold, log),
 	}
 	// Stream/alone prefix is SessionHex (LAPI URL+key), not IdentityHex.
 	// IdentityHex still includes intervals, so two middlewares on one key

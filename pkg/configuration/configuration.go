@@ -69,6 +69,12 @@ type Config struct {
 	CrowdsecAppsecTLSCertificateBouncerKeyFile string            `json:"crowdsecAppsecTlsCertificateBouncerKeyFile,omitempty"`
 	CrowdsecAppsecBodyLimit                    int64             `json:"crowdsecAppsecBodyLimit,omitempty"`
 	CrowdsecAppsecFailureAction                string            `json:"crowdsecAppsecFailureAction,omitempty"`
+	AppsecFailureBackoffTimeout                int64             `json:"appsecFailureBackoffTimeout,omitempty"`
+	AppsecFailureBackoffBucketWindow           int64             `json:"appsecFailureBackoffBucketWindow,omitempty"`
+	AppsecFailureBackoffBucketThreshold        int64             `json:"appsecFailureBackoffBucketThreshold,omitempty"`
+	LapiFailureBackoffTimeout                  int64             `json:"lapiFailureBackoffTimeout,omitempty"`
+	LapiFailureBackoffBucketWindow             int64             `json:"lapiFailureBackoffBucketWindow,omitempty"`
+	LapiFailureBackoffBucketThreshold          int64             `json:"lapiFailureBackoffBucketThreshold,omitempty"`
 	CrowdsecLapiScheme                         string            `json:"crowdsecLapiScheme,omitempty"`
 	CrowdsecLapiHost                           string            `json:"crowdsecLapiHost,omitempty"`
 	CrowdsecLapiPath                           string            `json:"crowdsecLapiPath,omitempty"`
@@ -146,6 +152,20 @@ func validateFailureAction(name, action, captchaProvider string) error {
 	return nil
 }
 
+// validateFailureBackoff accepts timeout and window >= 0 and threshold >= -1.
+func validateFailureBackoff(prefix string, timeout, window, threshold int64) error {
+	if timeout < 0 {
+		return errors.New(prefix + "Timeout: cannot be less than 0")
+	}
+	if window < 0 {
+		return errors.New(prefix + "BucketWindow: cannot be less than 0")
+	}
+	if threshold < -1 {
+		return errors.New(prefix + "BucketThreshold: cannot be less than -1")
+	}
+	return nil
+}
+
 // EffectiveFailureAction maps empty config to ban (plugin default).
 func EffectiveFailureAction(action string) string {
 	if action == "" {
@@ -157,54 +177,60 @@ func EffectiveFailureAction(action string) string {
 // New creates the default plugin configuration.
 func New() *Config {
 	return &Config{
-		Enabled:                         false,
-		LogLevel:                        LogINFO,
-		LogFormat:                       "common",
-		LogFilePath:                     "",
-		CrowdsecMode:                    LiveMode,
-		CrowdsecAppsecEnabled:           false,
-		CrowdsecAppsecBodyLimit:         10485760,
-		CrowdsecAppsecFailureAction:     FailureActionBan,
-		CrowdsecAppsecScheme:            "",
-		CrowdsecAppsecHost:              "crowdsec:7422",
-		CrowdsecAppsecPath:              "/",
-		CrowdsecAppsecKey:               "",
-		CrowdsecAppsecTLSInsecureVerify: false,
-		CrowdsecLapiScheme:              HTTP,
-		CrowdsecLapiHost:                "crowdsec:8080",
-		CrowdsecLapiPath:                "/",
-		CrowdsecLapiKey:                 "",
-		CrowdsecLapiTLSInsecureVerify:   false,
-		UpdateIntervalSeconds:           60,
-		MetricsUpdateIntervalSeconds:    600,
-		UpdateMaxFailure:                0,
-		CrowdsecLapiFailureAction:       FailureActionBan,
-		StreamStartupBlock:              true,
-		DefaultDecisionSeconds:          60,
-		RemediationStatusCode:           http.StatusForbidden,
-		HTTPTimeoutSeconds:              10,
-		CaptchaProvider:                 "",
-		CaptchaCustomJsURL:              "",
-		CaptchaCustomValidateURL:        "",
-		CaptchaCustomKey:                "",
-		CaptchaCustomResponse:           "",
-		CaptchaSiteKey:                  "",
-		CaptchaSecretKey:                "",
-		CaptchaGracePeriodSeconds:       1800,
-		CaptchaFilePath:                 "/captcha.html",
-		BanFilePath:                     "",
-		TraceHeadersCustomName:          "",
-		RemediationHeadersCustomName:    "",
-		ForwardedHeadersCustomName:      "X-Forwarded-For",
-		DecisionScopeHeaders:            map[string]string{},
-		ForwardedHeadersTrustedIPs:      []string{},
-		ClientTrustedIPs:                []string{},
-		RedisCacheEnabled:               false,
-		RedisCacheHost:                  "redis:6379",
-		RedisCacheReadHosts:             []string{},
-		RedisCachePassword:              "",
-		RedisCacheDatabase:              "",
-		RedisCacheUnreachableBlock:      true,
+		Enabled:                             false,
+		LogLevel:                            LogINFO,
+		LogFormat:                           "common",
+		LogFilePath:                         "",
+		CrowdsecMode:                        LiveMode,
+		CrowdsecAppsecEnabled:               false,
+		CrowdsecAppsecBodyLimit:             10485760,
+		CrowdsecAppsecFailureAction:         FailureActionBan,
+		AppsecFailureBackoffTimeout:         30,
+		AppsecFailureBackoffBucketWindow:    30,
+		AppsecFailureBackoffBucketThreshold: 5,
+		LapiFailureBackoffTimeout:           30,
+		LapiFailureBackoffBucketWindow:      30,
+		LapiFailureBackoffBucketThreshold:   5,
+		CrowdsecAppsecScheme:                "",
+		CrowdsecAppsecHost:                  "crowdsec:7422",
+		CrowdsecAppsecPath:                  "/",
+		CrowdsecAppsecKey:                   "",
+		CrowdsecAppsecTLSInsecureVerify:     false,
+		CrowdsecLapiScheme:                  HTTP,
+		CrowdsecLapiHost:                    "crowdsec:8080",
+		CrowdsecLapiPath:                    "/",
+		CrowdsecLapiKey:                     "",
+		CrowdsecLapiTLSInsecureVerify:       false,
+		UpdateIntervalSeconds:               60,
+		MetricsUpdateIntervalSeconds:        600,
+		UpdateMaxFailure:                    0,
+		CrowdsecLapiFailureAction:           FailureActionBan,
+		StreamStartupBlock:                  true,
+		DefaultDecisionSeconds:              60,
+		RemediationStatusCode:               http.StatusForbidden,
+		HTTPTimeoutSeconds:                  10,
+		CaptchaProvider:                     "",
+		CaptchaCustomJsURL:                  "",
+		CaptchaCustomValidateURL:            "",
+		CaptchaCustomKey:                    "",
+		CaptchaCustomResponse:               "",
+		CaptchaSiteKey:                      "",
+		CaptchaSecretKey:                    "",
+		CaptchaGracePeriodSeconds:           1800,
+		CaptchaFilePath:                     "/captcha.html",
+		BanFilePath:                         "",
+		TraceHeadersCustomName:              "",
+		RemediationHeadersCustomName:        "",
+		ForwardedHeadersCustomName:          "X-Forwarded-For",
+		DecisionScopeHeaders:                map[string]string{},
+		ForwardedHeadersTrustedIPs:          []string{},
+		ClientTrustedIPs:                    []string{},
+		RedisCacheEnabled:                   false,
+		RedisCacheHost:                      "redis:6379",
+		RedisCacheReadHosts:                 []string{},
+		RedisCachePassword:                  "",
+		RedisCacheDatabase:                  "",
+		RedisCacheUnreachableBlock:          true,
 	}
 }
 
@@ -512,6 +538,12 @@ func validateParamsRequired(config *Config) error {
 	}
 	if config.UpdateMaxFailure < -1 {
 		return errors.New("UpdateMaxFailure: cannot be less than -1")
+	}
+	if err := validateFailureBackoff("LapiFailureBackoff", config.LapiFailureBackoffTimeout, config.LapiFailureBackoffBucketWindow, config.LapiFailureBackoffBucketThreshold); err != nil {
+		return err
+	}
+	if err := validateFailureBackoff("AppsecFailureBackoff", config.AppsecFailureBackoffTimeout, config.AppsecFailureBackoffBucketWindow, config.AppsecFailureBackoffBucketThreshold); err != nil {
+		return err
 	}
 	if err := validateFailureAction("CrowdsecLapiFailureAction", config.CrowdsecLapiFailureAction, config.CaptchaProvider); err != nil {
 		return err

@@ -83,6 +83,7 @@ func (c *Client) queryLiveDecisions(rawQuery string) (string, time.Duration, err
 	}
 	body, err := c.crowdsecQuery(routeURL.String(), nil)
 	if err != nil {
+		c.recordLiveFailure()
 		return "", 0, err
 	}
 	if bytes.Equal(body, []byte("null")) {
@@ -91,6 +92,7 @@ func (c *Client) queryLiveDecisions(rawQuery string) (string, time.Duration, err
 	var items []Decision
 	err = json.Unmarshal(body, &items)
 	if err != nil {
+		c.recordLiveFailure()
 		return "", 0, fmt.Errorf("handleNoStreamCache:parseBody %w", err)
 	}
 	if len(items) == 0 {
@@ -102,6 +104,7 @@ func (c *Client) queryLiveDecisions(rawQuery string) (string, time.Duration, err
 	}
 	parsedDuration, err := time.ParseDuration(picked.Duration)
 	if err != nil {
+		c.recordLiveFailure()
 		return "", 0, fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
 	}
 	value := decisionscope.RemediationValue(picked.Type)

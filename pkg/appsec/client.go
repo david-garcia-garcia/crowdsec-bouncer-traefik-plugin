@@ -7,7 +7,8 @@ import (
 	"sync"
 	"time"
 
-	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/health"
 )
 
 // ReclaimGraceDuration is the wait after the last constructor ctx for an AppSec Client slot.
@@ -23,6 +24,7 @@ type Client struct {
 	appsecKey       string
 	appsecBodyLimit int64
 	httpClient      *http.Client
+	failureTracker  *health.Tracker
 	log             *slog.Logger
 	pluginVersion   string
 }
@@ -62,6 +64,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		appsecBodyLimit: config.CrowdsecAppsecBodyLimit,
 		log:             log,
 		pluginVersion:   pluginVersion,
+		failureTracker:  health.NewFromSeconds(config.AppsecFailureBackoffTimeout, config.AppsecFailureBackoffBucketWindow, config.AppsecFailureBackoffBucketThreshold, log),
 		httpClient: &http.Client{
 			Transport: &http.Transport{
 				MaxIdleConns:        10,
@@ -100,4 +103,16 @@ func isReverseProxyError(statusCode int) bool {
 	return statusCode == http.StatusBadGateway ||
 		statusCode == http.StatusServiceUnavailable ||
 		statusCode == http.StatusGatewayTimeout
+}
+
+// appsecBackoffUnhealthy reports whether AppSec HTTP should be skipped.
+func (c *Client) appsecBackoffUnhealthy() bool {
+	return c.failureTracker != nil && c.failureTracker.IsUnhealthy()
+}
+
+// recordAppsecFailure increments the AppSec Tracker after unreachable or HTTP 500.
+func (c *Client) recordAppsecFailure() {
+	if c.failureTracker != nil {
+		c.failureTracker.RecordFailure()
+	}
 }

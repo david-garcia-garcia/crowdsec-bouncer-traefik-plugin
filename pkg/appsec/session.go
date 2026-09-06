@@ -16,28 +16,34 @@ const keyPrefix = "appsec:"
 
 // identity is the reclaim-key payload for one AppSec listener.
 type identity struct {
-	Scheme                  string `json:"scheme"`
-	Host                    string `json:"host"`
-	Path                    string `json:"path"`
-	Key                     string `json:"key"`
-	BodyLimit               int64  `json:"bodyLimit"`
-	HTTPTimeoutSeconds      int64  `json:"httpTimeoutSeconds"`
-	TLSInsecureVerify       bool   `json:"tlsInsecureVerify"`
-	TLSCertificateAuthority string `json:"tlsCa"`
-	TLSCertificateBouncer   string `json:"tlsCert"`
+	Scheme                        string `json:"scheme"`
+	Host                          string `json:"host"`
+	Path                          string `json:"path"`
+	Key                           string `json:"key"`
+	BodyLimit                     int64  `json:"bodyLimit"`
+	HTTPTimeoutSeconds            int64  `json:"httpTimeoutSeconds"`
+	FailureBackoffTimeout         int64  `json:"appsecFailureBackoffTimeout"`
+	FailureBackoffBucketWindow    int64  `json:"appsecFailureBackoffBucketWindow"`
+	FailureBackoffBucketThreshold int64  `json:"appsecFailureBackoffBucketThreshold"`
+	TLSInsecureVerify             bool   `json:"tlsInsecureVerify"`
+	TLSCertificateAuthority       string `json:"tlsCa"`
+	TLSCertificateBouncer         string `json:"tlsCert"`
 }
 
 func identityFrom(cfg *configuration.Config) identity {
 	return identity{
-		Scheme:                  cfg.CrowdsecAppsecScheme,
-		Host:                    cfg.CrowdsecAppsecHost,
-		Path:                    cfg.CrowdsecAppsecPath,
-		Key:                     cfg.CrowdsecAppsecKey,
-		BodyLimit:               cfg.CrowdsecAppsecBodyLimit,
-		HTTPTimeoutSeconds:      cfg.HTTPTimeoutSeconds,
-		TLSInsecureVerify:       cfg.CrowdsecAppsecTLSInsecureVerify,
-		TLSCertificateAuthority: cfg.CrowdsecAppsecTLSCertificateAuthority,
-		TLSCertificateBouncer:   cfg.CrowdsecAppsecTLSCertificateBouncer,
+		Scheme:                        cfg.CrowdsecAppsecScheme,
+		Host:                          cfg.CrowdsecAppsecHost,
+		Path:                          cfg.CrowdsecAppsecPath,
+		Key:                           cfg.CrowdsecAppsecKey,
+		BodyLimit:                     cfg.CrowdsecAppsecBodyLimit,
+		HTTPTimeoutSeconds:            cfg.HTTPTimeoutSeconds,
+		FailureBackoffTimeout:         cfg.AppsecFailureBackoffTimeout,
+		FailureBackoffBucketWindow:    cfg.AppsecFailureBackoffBucketWindow,
+		FailureBackoffBucketThreshold: cfg.AppsecFailureBackoffBucketThreshold,
+		TLSInsecureVerify:             cfg.CrowdsecAppsecTLSInsecureVerify,
+		TLSCertificateAuthority:       cfg.CrowdsecAppsecTLSCertificateAuthority,
+		TLSCertificateBouncer:         cfg.CrowdsecAppsecTLSCertificateBouncer,
 	}
 }
 
