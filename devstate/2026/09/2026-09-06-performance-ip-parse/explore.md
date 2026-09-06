@@ -54,5 +54,5 @@ No third-party research: this is `net.ParseIP` / `To4` on an address this plugin
   By: explore
 
 - Q: How does `recordDropped` get `ip_type` without `Family(remoteIP)` and without a bag of request metadata?
-  Decision: assumed — compute `ipType` once in ServeHTTP from the parsed IP. Fold `req`, `remoteIP`, parsed `net.IP`, and `ipType` into `clientRequest`. Pass that type through handlers that call `recordDropped`. Scopes and origin stay off the type. `recordProcessed` / `recordDropped` still take `ipType string` from `client.ipType`.
+  Decision: assumed — compute `ipType` once in ServeHTTP from the parsed IP. Fold `remoteIP`, parsed `net.IP`, and `ipType` into `clientRequest`. Handlers keep the parameter name `req`. Scopes and origin stay off the type. `recordProcessed` / `recordDropped` still take `ipType string` from `req.ipType`.
   By: implement (chat)

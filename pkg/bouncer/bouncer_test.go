@@ -18,7 +18,7 @@ import (
 // testClientRequest is req plus the chosen client address for handler tests.
 func testClientRequest(req *http.Request, remoteIP string) clientRequest {
 	parsed := net.ParseIP(remoteIP)
-	return clientRequest{req: req, remoteIP: remoteIP, parsed: parsed, ipType: ip.FamilyOfIP(parsed)}
+	return clientRequest{Request: req, remoteIP: remoteIP, parsed: parsed, ipType: ip.FamilyOfIP(parsed)}
 }
 
 func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
