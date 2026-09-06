@@ -22,4 +22,10 @@ findings: trycap provider + JSON siteverify landed; CI green (Main + e2e)
 fixed: pkg/captcha, configuration, captcha.html, tests, README, examples/trycap-captcha
 skipped: none
 
+## codereview (2026-09-06)
+phase: codereview
+findings: 2 hard Standards applied (empty trycap FrontendKey, infoProvider comment); 4 judgement skipped; other axes none
+fixed: pkg/captcha FrontendKey and type comment
+skipped: jsonBody/base/verifyKey rename; examples template dedupe
+
 
