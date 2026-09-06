@@ -51,3 +51,9 @@ phase: explore
 findings: human asked for CrowdsecAppsecUnreadableBodyBlock on this PR; current HEAD still always headers-only GET
 fixed: explore.md decisions (default false, independent of failure action, GET exemption); issues.md take small
 skipped: none
+
+## propose (2026-09-06 rethink)
+phase: propose
+findings: fold core_plugin_appsec_failure-action; restore UnreadableBodyBlock default false
+fixed: OpenSpec change appsec-unreadable-body-block
+skipped: none
