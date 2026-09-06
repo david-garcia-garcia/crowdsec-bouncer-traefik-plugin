@@ -103,7 +103,8 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	if valid {
 		// Issue a per-session cookie and store grace under IP plus that token.
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
-		token, err := newSessionToken()
+		var token string
+		token, err = newSessionToken()
 		if err != nil {
 			c.log.Info("captcha:ServeHTTP session token " + err.Error())
 			rw.WriteHeader(http.StatusBadRequest)

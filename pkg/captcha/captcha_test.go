@@ -62,7 +62,7 @@ func TestCheckRequiresMatchingSessionCookie(t *testing.T) {
 
 // TestServeHTTPSetsSessionCookieAndDoesNotKeyIPAlone checks Set-Cookie on solve and that IP-only grace is not written.
 func TestServeHTTPSetsSessionCookieAndDoesNotKeyIPAlone(t *testing.T) {
-	validate := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+	validate := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(rw, `{"success":true}`)
 	}))
