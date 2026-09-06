@@ -11,4 +11,4 @@ JobName: 2026-09-06-upstream-385-delete-http3-unreadable-body
 | codereview | [x] | [x] | 2026-09-06T15:20:34Z |
 | devdocsimpact | [x] | [x] | 2026-09-06T15:22:02Z |
 | archive | [x] | [x] | 2026-09-06T15:24:55Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-06T15:31:15Z |

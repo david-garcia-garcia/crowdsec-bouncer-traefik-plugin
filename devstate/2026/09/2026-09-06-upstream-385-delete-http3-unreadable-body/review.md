@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: synced core_plugin_appsec_failure-action; moved to archive/2026-09-06-appsec-delete-unreadable-body
 skipped: none
+
+## pullrequest (2026-09-06)
+phase: pullrequest
+findings: none
+fixed: title dropped WIP; CI Main Process and both e2e jobs succeeded
+skipped: none
