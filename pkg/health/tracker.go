@@ -44,6 +44,7 @@ func NewFromSeconds(timeoutSeconds, windowSeconds, threshold int64, logger *slog
 	return New(time.Duration(timeoutSeconds)*time.Second, time.Duration(windowSeconds)*time.Second, int(threshold), logger)
 }
 
+// log returns the injected logger, or slog.Default when none was set.
 func (ht *Tracker) log() *slog.Logger {
 	if ht.logger != nil {
 		return ht.logger
