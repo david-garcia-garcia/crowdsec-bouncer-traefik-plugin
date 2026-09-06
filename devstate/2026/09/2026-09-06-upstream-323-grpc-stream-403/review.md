@@ -21,3 +21,9 @@ phase: implement
 findings: none
 fixed: headers-only GET for isBodyUnreadable; tests and README
 skipped: Windows root-package logging TempDir cleanup flake (unrelated)
+
+## codereview (2026-09-06)
+phase: codereview
+findings: P3 1 (Standards test GET symmetry)
+fixed: fa9d177 streaming passthrough GET assert
+skipped: none
