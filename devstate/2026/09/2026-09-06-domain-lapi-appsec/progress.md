@@ -6,7 +6,7 @@ JobName: 2026-09-06-domain-lapi-appsec
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-06T12:19:10Z |
 | explore | [x] | [x] | 2026-09-06T12:22:55Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [x] | 2026-09-06T12:39:22Z |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |

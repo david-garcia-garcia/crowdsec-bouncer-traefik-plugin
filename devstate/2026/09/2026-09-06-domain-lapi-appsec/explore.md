@@ -59,33 +59,33 @@ IssueKey: 2026-09-06-domain-lapi-appsec
 ## Open questions
 
 - Q: What is the AppSec package name?
-  Decision: assumed — `pkg/appsec` (CrowdSec product name). Not `waf`, not `crowdsecappsec`.
+  Decision: resolved — `pkg/appsec` (CrowdSec product name). Not `waf`, not `crowdsecappsec`.
   By: explore
 
 - Q: What is the LAPI reclaim type name inside `package lapi`?
-  Decision: assumed — `lapi.Connection`. Drop exported `CrowdsecConnection` (the name claims both products).
+  Decision: resolved — `lapi.Connection`. Drop exported `CrowdsecConnection` (the name claims both products).
   By: explore
 
 - Q: Is AppSec reclaimed separately, or constructed inside LAPI `New` as a field?
-  Decision: assumed — separate reclaim; Bouncer holds `*lapi.Connection` and `*appsec.Client` (nil when AppSec off). Constructing AppSec inside LAPI would keep the mixed owner.
+  Decision: resolved — separate reclaim; Bouncer holds `*lapi.Connection` and `*appsec.Client` (nil when AppSec off). Constructing AppSec inside LAPI would keep the mixed owner.
   By: explore
 
 - Q: Live/none `IdentityHex` currently hashes AppSec host/key/TLS. Dropping those fields changes the live Redis cache prefix on upgrade.
-  Decision: assumed — drop AppSec from LAPI identity. Accept a one-time live-mode cache miss/TTL refresh. Stream `SessionHex` is already LAPI URL+key only.
+  Decision: resolved — drop AppSec from LAPI identity. Accept a one-time live-mode cache miss/TTL refresh. Stream `SessionHex` is already LAPI URL+key only.
   By: explore
 
 - Q: Stream warn-and-wire first-wins currently includes AppSec knobs. After split, two routers on one LAPI stream can use different AppSec hosts.
-  Decision: assumed — drop AppSec from `streamSettings`. That is the point of two owners. Verdict protocol unchanged.
+  Decision: resolved — drop AppSec from `streamSettings`. That is the point of two owners. Verdict protocol unchanged.
   By: explore
 
 - Q: For `crowdsecMode: appsec`, does plugin still Open a LAPI connection?
-  Decision: assumed — no LAPI Open (today `New` already skips cache/stream/metrics). Bouncer stores `crowdsecMode` from config instead of `conn.Mode()`. AppSec Open still runs.
+  Decision: resolved — no LAPI Open (today `New` already skips cache/stream/metrics). Bouncer stores `crowdsecMode` from config instead of `conn.Mode()`. AppSec Open still runs.
   By: explore
 
 - Q: Keep `Prepare` copying empty `crowdsecAppsecKey` from `crowdsecLapiKey` (and empty AppSec scheme from LAPI scheme)?
-  Decision: assumed — keep. Official protocol often uses the same bouncer key; this plugin already has a distinct key with that fallback.
+  Decision: resolved — keep. Official protocol often uses the same bouncer key; this plugin already has a distinct key with that fallback.
   By: explore
 
 - Q: Reclaim table key prefix `crowdsecconnection:` / `crowdsecconnection:stream:`?
-  Decision: assumed — `lapi:` / `lapi:stream:` and `appsec:`. In-process only; a reload during grace will not Wake the old prefix (same as any identity change).
+  Decision: resolved — `lapi:` / `lapi:stream:` and `appsec:`. In-process only; a reload during grace will not Wake the old prefix (same as any identity change).
   By: explore

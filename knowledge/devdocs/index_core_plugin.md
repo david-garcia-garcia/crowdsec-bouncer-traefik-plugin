@@ -3,7 +3,7 @@
 ## Middleware New
 priority: normal
 local: core_plugin_middleware.md
-description: How Traefik New reclaims a CrowdsecConnection and returns a per-router Bouncer.
+description: How Traefik New reclaims a LAPI Connection and an AppSec Client and returns a per-router Bouncer.
 
 ## Decision scopes
 priority: normal
