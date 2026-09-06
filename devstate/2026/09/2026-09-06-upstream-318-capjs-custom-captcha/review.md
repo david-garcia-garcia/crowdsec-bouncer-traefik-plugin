@@ -27,3 +27,21 @@ phase: codereview
 findings: none
 fixed: n/a
 skipped: n/a
+
+## devdocsimpact (2026-09-06T15:25:31Z)
+phase: devdocsimpact
+findings: none
+fixed: n/a
+skipped: n/a
+
+## archive (2026-09-06T15:25:31Z)
+phase: archive
+findings: none
+fixed: synced core_plugin_captcha_custom-verify; archived custom-captcha-verify-body
+skipped: n/a
+
+## pullrequest (2026-09-06T15:40:00Z)
+phase: pullrequest
+findings: none
+fixed: n/a
+skipped: first e2e mock trusted-ips failure retriggered; second run succeeded

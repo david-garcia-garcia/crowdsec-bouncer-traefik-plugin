@@ -9,6 +9,6 @@ JobName: 2026-09-06-upstream-318-capjs-custom-captcha
 | propose | [x] | [x] | 2026-09-06T15:14:06Z |
 | implement | [x] | [x] | 2026-09-06T15:19:41Z |
 | codereview | [x] | [x] | 2026-09-06T15:22:43Z |
-| devdocsimpact | [x] | [ ] | |
-| archive | [x] | [ ] | |
-| pullrequest | [ ] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-06T15:25:31Z |
+| archive | [x] | [x] | 2026-09-06T15:25:31Z |
+| pullrequest | [x] | [x] | 2026-09-06T15:40:00Z |

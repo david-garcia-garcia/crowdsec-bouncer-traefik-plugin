@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-06T15:19:41Z
+Developer review: ready for review — 2026-09-06T15:40:00Z
 
 ## What this changes
 **Operators.** Set `captchaCustomValidateBody: json` (and `captchaCustomResponse: cap-token`) when `captchaProvider` is `custom` so CapJS Standalone `/siteverify` accepts the plugin's POST. Omit or `form` keeps today's urlencoded `secret`/`response`.
@@ -13,17 +13,17 @@ Developer review: in progress — 2026-09-06T15:19:41Z
 On `master`, custom captcha verification always sends urlencoded `secret` and `response` via `PostForm`. CapJS Standalone expects JSON `POST` to `/siteverify` with the same keys. Without this change, CapJS users stay blocked on custom captcha despite existing custom-provider config knobs.
 
 ## Merge readiness
-Implement landed; CI still queued. 4 items remain.
+Ready for review. CI succeeded on head 1505da6.
 
 Priority: P2 — real operator pain configuring CapJS custom captcha, with Wicketkeeper as workaround for urlencoded providers only.
-Reviewed head: 147e8bf
+Reviewed head: 1505da6
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Product apply landed; CI queued |
-| CI proof | 3/6 | Main Process queued on 147e8bf |
+| Overall readiness | 6/6 | CI succeeded; no open PR comments |
+| CI proof | 6/6 | Main Process and both e2e jobs succeeded |
 | Local tests proof | N/A | Remote PR; CI proof covers this |
 | Review resolution | N/A | No PR comments inventoried |
 
@@ -31,21 +31,21 @@ Owner decision: Required. See Decision needed.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-06-upstream-318-capjs-custom-captcha pushed | git / pr-host |
-| OpenSpec | custom-captcha-verify-body | openspec/changes/custom-captcha-verify-body/ |
+| OpenSpec | custom-captcha-verify-body (archived) | openspec/changes/archive/2026-09-06-custom-captcha-verify-body/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/52 | pr-host |
-| CI | Main Process 34041944785 queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041944785 | pr-host CI |
+| CI | Main Process 34042749247 success; e2e 34042749166 success | pr-host CI |
 | Local tests | passed | go test ./pkg/captcha ./pkg/configuration ./pkg/bouncer |
 | PR comments | no comments | devstate/comments.md absent |
 
 ## Specs
-- [core_plugin_captcha_custom-verify](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-318-capjs-custom-captcha/openspec/changes/custom-captcha-verify-body/proposal.md) — added
+- [core_plugin_captcha_custom-verify](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-318-capjs-custom-captcha/openspec/changes/archive/2026-09-06-custom-captcha-verify-body/proposal.md) — added
 
 ## Follow-up issues
 - [ ] [note] [large] Extra custom-captcha verify fields/headers — this change ships JSON vs form only.
 - [ ] [note] [large] Wicketkeeper example documents urlencoded `secret`/`response`; official `/v0/siteverify` is JSON `token`/`nonce`/`response`.
 
 ## How this fits together
-Local ticket upstream#318 → branch `2026-09-06-upstream-318-capjs-custom-captcha` → PR #52. Implement added `captchaCustomValidateBody`; code review next.
+Local ticket upstream#318 → PR #52. Custom captcha can POST JSON siteverify for CapJS; default form keeps Wicketkeeper-style setups.
 
 ## Decision needed
 | Question | Decision | By |
@@ -59,7 +59,11 @@ None.
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-318-capjs-custom-captcha/devstate/2026/09/2026-09-06-upstream-318-capjs-custom-captcha/codereview_standards.md) — 0 total, 0 pending, 0 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-318-capjs-custom-captcha/devstate/2026/09/2026-09-06-upstream-318-capjs-custom-captcha/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-318-capjs-custom-captcha/devstate/2026/09/2026-09-06-upstream-318-capjs-custom-captcha/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-318-capjs-custom-captcha/devstate/2026/09/2026-09-06-upstream-318-capjs-custom-captcha/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-318-capjs-custom-captcha/devstate/2026/09/2026-09-06-upstream-318-capjs-custom-captcha/codereview_dead.md) — 0 total, 0 pending, 0 completed
 
 ## Agent review details
 
@@ -68,7 +72,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 0 modified | Same list as Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 147e8bf266dee73b62719cecc4f9696f85505d60 | Card matches branch measured at implement close |
+| Reviewed head | 1505da688c6cf29666f5a33dcbf5be277817f09f | Card matches branch measured at pullrequest close |
 
 ### Stored data model
 None.
@@ -78,12 +82,13 @@ Best possible solution: custom-only `form`/`json` enum defaulting to form so Wic
 
 Do we have a high-confidence way to reproduce? Yes — `pkg/captcha` httptest asserts JSON vs urlencoded bodies.
 
-Is this the best way to solve the issue? Yes — matches explore and Cap Standalone docs.
+Is this the best way to solve the issue? Yes — matches Cap Standalone docs.
 
 ### Evidence
 What I checked:
-- `go test ./pkg/captcha/ ./pkg/configuration/ ./pkg/bouncer/` passed
-- `pkg/captcha/captcha.go` `postSiteverify` JSON vs PostForm
+- Main Process 34042749247 success
+- e2e 34042749166 success
+- Five axis files none.
 
 ### Rank-up moves
 None.
