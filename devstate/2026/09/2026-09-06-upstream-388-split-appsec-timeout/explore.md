@@ -17,34 +17,34 @@ One Traefik plugin config field, `HTTPTimeoutSeconds` (default 10), is multiplie
 
 Official CrowdSec bouncer spec already splits these: `lapi_timeout` vs `appsec_timeout` (AppSec default 200ms). Nginx has `APPSEC_*_TIMEOUT`. This plugin does not. README already describes `HTTPTimeoutSeconds` as LAPI-only; AppSec still uses it.
 
-AppSec reclaim identity (`pkg/appsec/session.go`) hashes `HTTPTimeoutSeconds`. Two routers that share AppSec URL+key+TLS but differ only in LAPI timeout already get two AppSec clients. Captcha timeout is out of scope.
+AppSec reclaim identity (`pkg/appsec/session.go`) hashes `HTTPTimeoutSeconds`. Two routers that share AppSec URL+key+TLS but differ only in LAPI timeout already get two AppSec clients. Captcha timeout is out of scope of the original ticket; the human later required a captcha knob too.
 
 ## Decisions
 
-- **One new AppSec knob, milliseconds, CrowdsecAppsec prefix.** Public field `CrowdsecAppsecTimeoutMilliseconds` (`json:"crowdsecAppsecTimeoutMilliseconds,omitempty"`), `int64`, same shape as the rest of `Config`. Zero / omit inherits `HTTPTimeoutSeconds * time.Second`. A positive value is that many milliseconds. Negative is invalid at `ValidateParams`. Owner of the inherit rule: `configuration.EffectiveAppsecTimeout(*Config) time.Duration`. `appsec.New` and AppSec identity both call it. Do not add `AppsecTimeoutSeconds`, a float seconds field, or a duration string — Traefik plugin config here is int64-with-unit-in-the-name; no floats or pointers exist on `Config`.
-- **Default stays inherit, not CrowdSec spec 200ms.** Ticket asked for default = `HTTPTimeoutSeconds` when unset. Changing AppSec to 200ms would shorten every existing AppSec deployment without an operator opt-in. README will say operators who want a short fail-open hang should set `crowdsecAppsecTimeoutMilliseconds: 200` (CrowdSec spec default) together with `crowdsecAppsecFailureAction: passthrough`.
-- **LAPI and captcha keep `HTTPTimeoutSeconds`.** Do not add LAPI millisecond config. Do not split captcha siteverify.
-- **Reclaim identity hashes the effective AppSec duration, not raw LAPI seconds.** Replace `identity.HTTPTimeoutSeconds` with the resolved millisecond count (or nanoseconds) that `EffectiveAppsecTimeout` produces. Same effective timeout → same AppSec client even when one router inherited 10s and another set `10000`. Different effective timeouts stay isolated. LAPI identity continues to hash `HTTPTimeoutSeconds` unchanged.
+- **Keep `HTTPTimeoutSeconds` as the public default.** Do not rename it. It remains the fallback for the three client knobs when those are `0` or omitted. README says it is the default for the other three knobs.
+- **Three inheriting second knobs.** Public fields `CrowdsecLapiHTTPTimeoutSeconds` (`crowdsecLapiHttpTimeoutSeconds`), `CrowdsecAppsecHTTPTimeoutSeconds` (`crowdsecAppsecHttpTimeoutSeconds`), and `CaptchaSiteverifyHTTPTimeoutSeconds` (`captchaSiteverifyHttpTimeoutSeconds`). Zero / omit inherits `HTTPTimeoutSeconds`. A positive value is that many seconds. Negative is invalid at `ValidateParams`. Owner of the inherit rule: `effectiveHTTPTimeoutSeconds` plus `EffectiveLapiHTTPTimeout`, `EffectiveAppsecHTTPTimeout`, and `EffectiveCaptchaSiteverifyHTTPTimeout`. Do not keep `CrowdsecAppsecTimeoutMilliseconds`.
+- **Default stays inherit, not CrowdSec spec 200ms.** Ticket asked for default = `HTTPTimeoutSeconds` when unset. Changing AppSec to 200ms would shorten every existing AppSec deployment without an operator opt-in. Seconds cannot represent 200ms; operators who want a short hang set `crowdsecAppsecHttpTimeoutSeconds: 1` with `crowdsecAppsecFailureAction: passthrough`.
+- **Reclaim identity hashes the effective duration, not the raw fallback.** AppSec identity stores effective AppSec seconds. LAPI identity and stream settings store effective LAPI seconds. Same effective timeout → same client even when one router inherited 10s and another set the override to 10. Captcha siteverify is per-bouncer, not a reclaim identity.
 - **Fail-open is already `CrowdsecAppsecFailureAction`.** Timeout is a transport error on `http.Client.Do`; `Query` already maps that to passthrough / ban / captcha. This change only makes the wait short. Do not add a second fail-open knob.
-- **Tests are unit, not e2e.** Prove inherit vs override in configuration; prove `appsec.New` Timeout with a hanging httptest server + passthrough returns allow in well under the LAPI timeout; prove identity keys match on equal effective duration. Real/mock e2e stacks keep `httpTimeoutSeconds: 30` and do not need a hanging AppSec appliance.
+- **Tests are unit, not e2e.** Prove inherit vs override in configuration for all three knobs; prove `appsec.New` Timeout with a hanging httptest server + passthrough returns allow in well under the fallback timeout; prove identity keys match on equal effective duration. Real/mock e2e stacks keep `httpTimeoutSeconds: 30` and do not need a hanging AppSec appliance.
 
 ## Open questions
 
 - Q: Public JSON name — ticket suggested `AppsecTimeoutSeconds`; existing AppSec keys are `CrowdsecAppsec*`; milliseconds vs float seconds?
-  Decision: assumed — `crowdsecAppsecTimeoutMilliseconds` int64; 0 inherits `HTTPTimeoutSeconds`. One knob, prefix + unit match `CrowdsecAppsecBodyLimit` / `HTTPTimeoutSeconds`.
-  By: explore
+  Decision: resolved — `crowdsecLapiHttpTimeoutSeconds`, `crowdsecAppsecHttpTimeoutSeconds`, `captchaSiteverifyHttpTimeoutSeconds`; `httpTimeoutSeconds` stays as the default. Seconds, not milliseconds.
+  By: implement
 
 - Q: Should the AppSec default be CrowdSec spec 200ms instead of inherit?
-  Decision: assumed — inherit for backward compatibility. Document 200ms as the recommended short value, do not change CreateConfig defaults.
-  By: explore
+  Decision: resolved — inherit for backward compatibility. Unit is seconds, so the short recommended hang is 1s, not 200ms.
+  By: implement
 
 - Q: What does AppSec reclaim identity hash after the split?
-  Decision: assumed — the effective AppSec timeout duration (milliseconds), not `HTTPTimeoutSeconds` and not both raw fields. LAPI identity unchanged.
-  By: explore
+  Decision: resolved — the effective AppSec timeout in seconds. LAPI identity hashes the effective LAPI timeout.
+  By: implement
 
 - Q: Split captcha siteverify timeout too?
-  Decision: assumed — no; ticket is AppSec vs LAPI. Captcha stays on `HTTPTimeoutSeconds`.
-  By: explore
+  Decision: resolved — yes; `CaptchaSiteverifyHTTPTimeoutSeconds` inherits `HTTPTimeoutSeconds`.
+  By: implement
 
 - Q: Add an e2e scenario with an unreachable AppSec listener?
   Decision: assumed — no; hanging AppSec plus elapsed-time assertion belongs in `pkg/appsec` unit tests. Existing e2e AppSec paths stay healthy-listener coverage.
