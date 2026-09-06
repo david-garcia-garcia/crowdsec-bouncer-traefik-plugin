@@ -16,13 +16,11 @@ import (
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-func newTestCaptcha(t *testing.T, provider, instanceURL, siteKey, secretKey string, httpClient *http.Client, templateBody string) *Client {
+func newTestCaptcha(t *testing.T, provider, instanceURL, siteKey, verifyKey string, httpClient *http.Client) *Client {
 	t.Helper()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "captcha.html")
-	if templateBody == "" {
-		templateBody = `{{ .CapApiEndpoint }}|{{ .FrontendJS }}|{{ .FrontendKey }}|{{ .SiteKey }}`
-	}
+	templateBody := `{{ .CapApiEndpoint }}|{{ .FrontendJS }}|{{ .FrontendKey }}|{{ .SiteKey }}`
 	if err := os.WriteFile(path, []byte(templateBody), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +31,7 @@ func newTestCaptcha(t *testing.T, provider, instanceURL, siteKey, secretKey stri
 		httpClient,
 		provider,
 		"", "", "", "",
-		siteKey, secretKey, instanceURL,
+		siteKey, verifyKey, instanceURL,
 		"",
 		path,
 		60,
@@ -56,7 +54,7 @@ func TestValidateTrycapJSONSuccess(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := newTestCaptcha(t, configuration.TrycapProvider, server.URL, "sitekey", "trycap-verify", server.Client(), "")
+	client := newTestCaptcha(t, configuration.TrycapProvider, server.URL, "sitekey", "trycap-verify", server.Client())
 	req := httptest.NewRequest(http.MethodPost, "http://bouncer.example/captcha", strings.NewReader("cap-token=tok123"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -89,7 +87,7 @@ func TestValidateTrycapMissingTokenSkipsSiteverify(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := newTestCaptcha(t, configuration.TrycapProvider, server.URL, "sitekey", "trycap-verify", server.Client(), "")
+	client := newTestCaptcha(t, configuration.TrycapProvider, server.URL, "sitekey", "trycap-verify", server.Client())
 	req := httptest.NewRequest(http.MethodPost, "http://bouncer.example/captcha", strings.NewReader("other=1"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -116,7 +114,7 @@ func TestValidateHcaptchaStillPostForm(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := newTestCaptcha(t, configuration.HcaptchaProvider, "", "site", "hcaptcha-verify", server.Client(), "")
+	client := newTestCaptcha(t, configuration.HcaptchaProvider, "", "site", "hcaptcha-verify", server.Client())
 	client.infoProvider.validate = server.URL
 	form := url.Values{}
 	form.Set("h-captcha-response", "tok")
@@ -143,7 +141,7 @@ func TestValidateHcaptchaStillPostForm(t *testing.T) {
 }
 
 func TestServeHTTPTrycapRendersCapWidget(t *testing.T) {
-	client := newTestCaptcha(t, configuration.TrycapProvider, "https://cap.example.com", "abc", "trycap-verify", http.DefaultClient, "")
+	client := newTestCaptcha(t, configuration.TrycapProvider, "https://cap.example.com", "abc", "trycap-verify", http.DefaultClient)
 	req := httptest.NewRequest(http.MethodGet, "http://bouncer.example/foo", nil)
 	rw := httptest.NewRecorder()
 	client.ServeHTTP(rw, req, "1.2.3.4")
