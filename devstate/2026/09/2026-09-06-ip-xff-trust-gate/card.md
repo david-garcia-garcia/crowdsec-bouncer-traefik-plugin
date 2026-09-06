@@ -19,7 +19,7 @@ On `master`, `GetRemoteIP` honors `X-Forwarded-For` (or a custom header) without
 Prepare complete; explore is next. 7 phases remain.
 
 Priority: P1 — production is unsafe today (forged client IP drives security decisions).
-Reviewed head: 5a83878
+Reviewed head: 03b7295
 Owner decision: None.
 
 ## Review scores
@@ -68,7 +68,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | No product diff yet |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | No PR comments |
-| Reviewed head | 5a83878c6d073b25397e1ae4c2c10ef407bcefdb | Start commit on branch |
+| Reviewed head | 03b7295e (bus commit) | Prepare artifacts on branch |
 
 ### Stored data model
 None.
