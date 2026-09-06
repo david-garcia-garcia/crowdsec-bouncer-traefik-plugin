@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: fold core_plugin_appsec_failure-action; moved to archive/2026-09-06-appsec-proxy-unavailable-tests
 skipped: n/a
+
+## pullrequest (2026-09-06)
+phase: pullrequest
+findings: none
+fixed: ready title; CI green on c499bea; final card with upstream URL
+skipped: n/a

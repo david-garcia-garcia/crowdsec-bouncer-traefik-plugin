@@ -11,4 +11,4 @@ JobName: 2026-09-06-upstream-337-appsec-proxy-unavailable
 | codereview | [x] | [x] | 2026-09-06T15:31:14Z |
 | devdocsimpact | [x] | [x] | 2026-09-06T15:33:20Z |
 | archive | [x] | [x] | 2026-09-06T15:35:37Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-06T16:03:00Z |
