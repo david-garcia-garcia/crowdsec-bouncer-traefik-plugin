@@ -1,54 +1,69 @@
 # Explore
 IssueKey: 2026-09-06-upstream-323-grpc-stream-403
 
-Measured: `go test ./pkg/appsec/ -run Test_appsecQuery_streamingDoesNotBlock|Test_appsecQuery_dropUnreadableBody|Test_appsecQuery_unreadableBodyGetNotDropped` passed (0.867s). Hang regression is gone. `Test_appsecQuery_dropUnreadableBody` still expects an error under `FailureActionBan` — that error is the ticket 403 (`pkg/bouncer/bouncer.go` `applyAppsecServeHTTP` → `handleBanServeHTTP`). Not a NetBird e2e; unit path matches the reported AppSec-enabled symptom.
+Measured (this branch, after headers-only apply): `go test ./pkg/appsec/ -count=1 -run Test_isBodyUnreadable|Test_appsecQuery_streamingDoesNotBlock|Test_appsecQuery_unreadableBodyQueriesHeadersOnlyUnderBan|Test_appsecQuery_unreadableBodyGetNotDropped` passed (0.960s). `newAppsecBodyRequest` always builds a headers-only GET when `isBodyUnreadable` (`pkg/appsec/query.go:132-135`). There is no `CrowdsecAppsecUnreadableBodyBlock` on `Config` (`pkg/configuration/configuration.go`). DestBranch (`origin/master`) still folds unreadable-body drop into `CrowdsecAppsecFailureAction` default `ban`.
+
+RETHINK (human, 2026-09-06): introduce public knob `CrowdsecAppsecUnreadableBodyBlock` on this same PR. Prior explore left that as `issues.md` note large; the human overrode Bound the ask.
 
 ## Concepts
 
 ```
-  HTTP/2 POST, Content-Length < 0, body open (gRPC ConnectStream)
+  HTTP/2+ POST, Content-Length < 0, body open (gRPC ConnectStream)
                          │
                          ▼
               isBodyUnreadable = true
                          │
-         ┌───────────────┴───────────────┐
-         │ DestBranch today              │  Ticket expected
-         │                               │
-         │ ban (default) → drop,         │  no CrowdSec decision
-         │   no AppSec call,             │  → pass to origin
-         │   bouncer 403                 │  (headers-only AppSec OK)
-         │ passthrough → GET headers     │
-         └───────────────────────────────┘
+         ┌───────────────┴───────────────────────────────┐
+         │ UnreadableBodyBlock false (default)           │
+         │   headers-only GET to AppSec                  │
+         │   original stream untouched                   │
+         │   FailureAction applies to that GET           │
+         │   500/unreachable only                        │
+         ├───────────────────────────────────────────────┤
+         │ UnreadableBodyBlock true                      │
+         │   method with body → drop                     │
+         │   appsecQuery:unreadableBody dropped          │
+         │   no AppSec call; bouncer 403 ReasonAPPSEC    │
+         │   GET/HEAD still headers-only GET             │
+         └───────────────────────────────────────────────┘
 ```
 
-`isBodyUnreadable` (`pkg/appsec/query.go`) already matches lua-cs-bouncer: HTTP/2+ with a body and `ContentLength < 0`. The hang from v1.6.0 `io.ReadAll` is fixed. The remaining bug is policy: `newAppsecBodyRequest` treats an unreadable **method-with-body** as an AppSec **failure** unless `CrowdsecAppsecFailureAction` is `passthrough`. Default is `ban` (`pkg/configuration/configuration.go` `New`). `resultForFailureActionErr` then becomes `appsecQuery:unreadableBody dropped`, and the bouncer remediates as 403 with `ReasonAPPSEC` — no LAPI decision, no AppSec listener call.
+`isBodyUnreadable` (`pkg/appsec/query.go`) matches lua-cs-bouncer: HTTP/2+ with a body and `ContentLength < 0`. Hang-on-`io.ReadAll` is already gone. This rethink does not change that detector.
 
-Prior fail-mode change (`2026-09-05-add-fail-mode`) folded `CrowdsecAppsecUnreadableBodyBlock` into `CrowdsecAppsecFailureAction` and kept default `ban` so dest does not silently fail-open on AppSec 500/unreachable. That lump is why default AppSec deployments still match #323.
-
-Upstream #332 (PR) intended headers-only by default (`CrowdsecAppsecDropUnreadableBody` false, lua `APPSEC_DROP_UNREADABLE_BODY`). Shipped master still defaults `CrowdsecAppsecUnreadableBodyBlock: true` for backward compatibility; reporters still had to set it false. Assessment “passthrough default after #332” is the PR intent, not the shipped Traefik default.
-
-lua-cs-bouncer (upstream collaborator write-up on #323): refuse to buffer HTTP/2+ with no Content-Length; default **false** → headers-only AppSec; **true** → drop. Official CrowdSec `appsec_failure_action` covers timeout/500/401, not “body cannot be copied.” Unreadable stream is not AppSec-down.
+lua `APPSEC_DROP_UNREADABLE_BODY` (default **false**) is independent of `appsec_failure_action`. Traefik upstream still ships `CrowdsecAppsecUnreadableBodyBlock: true`. This fork's fail-mode change removed the bool and lumped drop into default `ban`; that lump is the #323 403. Headers-only on this branch already matches lua default false. The missing piece is lua `true`: operators who want fail-closed on uninspectable gRPC bodies.
 
 Client IP stays `pkg/ip.GetRemoteIP` → `Query(ip, …)`. This change does not reconstruct identity.
 
 ## Decisions
 
-- Do not change `CrowdsecAppsecFailureAction` default (`ban`). Prior human/explore on fail-mode: do not flip fail-closed 500/unreachable to CrowdSec spec passthrough without an explicit yes. This ticket is the gRPC 403, not AppSec-down posture.
-- Split unreadable body out of failure-action drop. Always send headers-only GET to AppSec when `isBodyUnreadable` (same as today’s GET and as `passthrough`). `CrowdsecAppsecFailureAction` still applies to that GET’s 500/unreachable/`captcha`.
-- Do not re-add `CrowdsecAppsecUnreadableBodyBlock`. Bound the ask. Opt-in drop is a follow-up (`issues.md`).
+- Do not change `CrowdsecAppsecFailureAction` default (`ban`). This ticket is unreadable-body policy, not AppSec-down posture.
+- Re-add `CrowdsecAppsecUnreadableBodyBlock` (`json:"crowdsecAppsecUnreadableBodyBlock,omitempty"`). Default **false** in `configuration.New()` (lua default, #323 pass-through). Do not copy Traefik shipped default `true`.
+- The bool is independent of `CrowdsecAppsecFailureAction`. `true` drops a method-with-body unreadable stream even when failure action is `passthrough`. `false` headers-only GETs even when failure action is `ban`.
+- When the bool is true, GET/HEAD (no body expected) still send headers-only GET — lua GET exemption / Traefik `isMethodWithBody`. Restore that helper next to `isBodyUnreadable`.
+- Put the bool on `appsec.Policy` (per-router, same owner as `FailureAction`). Pass it into `newAppsecBodyRequest`. Do not store it on the reclaimed `appsec.Client`.
+- Drop path returns `appsecQuery:unreadableBody dropped` (same error DestBranch used). Bouncer already maps Query error (except captcha) to `handleBanServeHTTP` / `ReasonAPPSEC`.
+- Live spec `core_plugin_appsec_failure-action` currently forbids the bool and says unreadable body is always headers-only. Propose must retract those two claims and add the knob contract. FindSpecHost decides fold vs new leaf.
+- Do not re-add `crowdsecAppsecFailureBlock` or `crowdsecAppsecUnreachableBlock`.
 - Do not change LAPI lookup, AppSec-disabled path, or WebSocket handling.
-- Spec `core_plugin_appsec_failure-action` must drop the “unreadable body + ban → drop without origin” scenario and keep 500/unreachable as today.
 
 ## Open questions
 
 - Q: Exact upstream #332 default on maxlerebourg master — passthrough/headers-only or still drop?
-  Decision: resolved — PR #332 text defaulted drop-unreadable to false (headers-only). Shipped `configuration.New()` still sets `CrowdsecAppsecUnreadableBodyBlock: true`. Issue comments (bhz0u, Aterfax, mathieuHa, maxlerebourg) confirm operators must set the bool false; README was later aligned to `true`. Do not copy the shipped Traefik default; it leaves #323 open.
+  Decision: resolved — PR #332 text defaulted drop-unreadable to false (headers-only). Shipped `configuration.New()` still sets `CrowdsecAppsecUnreadableBodyBlock: true`. Issue comments (bhz0u, Aterfax, mathieuHa, maxlerebourg) confirm operators must set the bool false; README was later aligned to `true`. This fork defaults the restored bool to **false** so #323 stays closed.
   By: explore
 
 - Q: Is the fix a default-only flip of `CrowdsecAppsecFailureAction` to `passthrough`, or always headers-only GET for unreadable streaming POST regardless of `ban`?
-  Decision: resolved — always headers-only GET for `isBodyUnreadable`; keep `CrowdsecAppsecFailureAction` default `ban` for 500/unreachable. Unreadable body is not AppSec-down. Changing the enum default would fail-open AppSec 500 as a drive-by.
-  By: propose
+  Decision: resolved — default path is headers-only GET (`UnreadableBodyBlock` false). Failure action stays `ban` for 500/unreachable. Human RETHINK: operators may set `crowdsecAppsecUnreadableBodyBlock: true` to drop methods with an unreadable body.
+  By: explore
 
 - Q: Who already owns the client address for the AppSec query?
   Decision: resolved — `pkg/ip.GetRemoteIP` on `clientRequest.remoteIP`; `appsec.Client.Query` takes that IP. Reuse it. Do not parse `X-Real-Ip` in AppSec.
+  By: explore
+
+- Q: Should `crowdsecAppsecFailureAction: passthrough` override `crowdsecAppsecUnreadableBodyBlock: true`?
+  Decision: resolved — no. Independent knobs, matching lua `APPSEC_DROP_UNREADABLE_BODY` vs `appsec_failure_action`. Passthrough does not mean “never drop an unreadable stream.”
+  By: explore
+
+- Q: Default `CrowdsecAppsecUnreadableBodyBlock` true (Traefik shipped) or false (lua / this ticket)?
+  Decision: resolved — false. True would re-open #323 under default operator YAML. Official CrowdSec nginx docs default false and warn that WAF may not see the body; operators who want drop set true.
   By: explore
