@@ -42,7 +42,7 @@ func startFakeRedis(t *testing.T, store map[string]string, fail bool) (string, *
 }
 
 func (f *fakeRedisServer) serve(conn net.Conn) {
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	reader := bufio.NewReader(conn)
 	for {
 		args, err := readRedisCommand(reader)
@@ -51,28 +51,28 @@ func (f *fakeRedisServer) serve(conn net.Conn) {
 		}
 		f.mu.Lock()
 		if f.fail {
-			io.WriteString(conn, "-ERR fake\r\n")
+			_, _ = io.WriteString(conn, "-ERR fake\r\n")
 			f.mu.Unlock()
 			continue
 		}
 		switch args[0] {
 		case "AUTH", "SELECT":
-			io.WriteString(conn, "+OK\r\n")
+			_, _ = io.WriteString(conn, "+OK\r\n")
 		case "GET":
-			io.WriteString(conn, bulkString(f.store, args[1]))
+			_, _ = io.WriteString(conn, bulkString(f.store, args[1]))
 		case "MGET":
-			fmt.Fprintf(conn, "*%d\r\n", len(args)-1)
+			_, _ = fmt.Fprintf(conn, "*%d\r\n", len(args)-1)
 			for _, name := range args[1:] {
-				io.WriteString(conn, bulkString(f.store, name))
+				_, _ = io.WriteString(conn, bulkString(f.store, name))
 			}
 		case "SET":
 			f.store[args[1]] = args[2]
-			io.WriteString(conn, "+OK\r\n")
+			_, _ = io.WriteString(conn, "+OK\r\n")
 		case "DEL":
 			delete(f.store, args[1])
-			io.WriteString(conn, ":1\r\n")
+			_, _ = io.WriteString(conn, ":1\r\n")
 		default:
-			io.WriteString(conn, "+OK\r\n")
+			_, _ = io.WriteString(conn, "+OK\r\n")
 		}
 		f.mu.Unlock()
 	}
@@ -232,7 +232,10 @@ func Test_redisSetErrorDoesNotMarkWritten(t *testing.T) {
 	if err := client.Set("k", BannedValue, 10); err == nil {
 		t.Fatal("Set want error")
 	}
-	rc := client.cache.(*redisCache)
+	rc, ok := client.cache.(*redisCache)
+	if !ok {
+		t.Fatal("cache type want *redisCache")
+	}
 	if _, ok := rc.writtenLocal.Load("k"); ok {
 		t.Fatal("failed Set must not mark key for read-your-writes")
 	}
