@@ -161,11 +161,8 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	// Mapped scope headers for this request. Missing headers are omitted.
 	scopes := decisionscope.RequestScopeValues(b.decisionScopeHeaders, req.Request)
 
-	// Stream and alone consult Range membership and skip live LAPI; live does not.
-	useRangeMembership := b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode
-
 	if b.crowdsecMode != configuration.NoneMode {
-		value, origin, cacheErr := decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), useRangeMembership, req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
+		value, origin, cacheErr := decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
 		switch {
 		case cacheErr != nil:
 			cacheErrString := cacheErr.Error()
@@ -190,7 +187,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		}
 	}
 
-	if useRangeMembership {
+	if b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
 		if b.lapiClient.StreamHealthy() {
 			b.handleNextServeHTTP(rw, req)
 		} else {
