@@ -329,19 +329,16 @@ func TestHandleStreamTickerSerializesOverlappingPolls(t *testing.T) {
 	var maxInFlight int32
 	lapi := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		current := atomic.AddInt32(&inFlight, 1)
-		for {
-			seen := atomic.LoadInt32(&maxInFlight)
-			if current > seen {
-				atomic.CompareAndSwapInt32(&maxInFlight, seen, current)
+		seen := atomic.LoadInt32(&maxInFlight)
+		if current > seen {
+			atomic.CompareAndSwapInt32(&maxInFlight, seen, current)
+		}
+		if current == 1 {
+			select {
+			case started <- struct{}{}:
+			default:
 			}
-			if current == 1 {
-				select {
-				case started <- struct{}{}:
-				default:
-				}
-				<-release
-			}
-			break
+			<-release
 		}
 		atomic.AddInt32(&inFlight, -1)
 		rw.WriteHeader(http.StatusOK)
