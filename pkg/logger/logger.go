@@ -10,6 +10,9 @@ import (
 	"sync"
 )
 
+// sharedLogFiles holds process-lifetime log files keyed by cleaned path.
+//
+//nolint:gochecknoglobals // intentional process-wide cache for Traefik reload semantics
 var sharedLogFiles sync.Map
 
 // Custom log levels following slog best practices.
@@ -90,7 +93,9 @@ func logOutput(logFilePath string) *os.File {
 
 	path := filepath.Clean(logFilePath)
 	if existing, ok := sharedLogFiles.Load(path); ok {
-		return existing.(*os.File)
+		if file, isFile := existing.(*os.File); isFile {
+			return file
+		}
 	}
 
 	logFile, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
@@ -103,7 +108,10 @@ func logOutput(logFilePath string) *os.File {
 	if loaded {
 		_ = logFile.Close()
 	}
-	return actual.(*os.File)
+	if file, ok := actual.(*os.File); ok {
+		return file
+	}
+	return os.Stdout
 }
 
 // ResetSharedLogFilesForTest closes and clears process-lifetime log files. Test-only.

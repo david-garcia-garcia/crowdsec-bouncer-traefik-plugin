@@ -157,6 +157,7 @@ func TestNewWithFormatJSONCaseInsensitive(t *testing.T) {
 			testMessage := "json format case test"
 			logger.Info(testMessage)
 
+			// #nosec G304 -- logPath is a test-generated temporary file path
 			data, err := os.ReadFile(logPath)
 			if err != nil {
 				t.Fatalf("read log file: %v", err)
