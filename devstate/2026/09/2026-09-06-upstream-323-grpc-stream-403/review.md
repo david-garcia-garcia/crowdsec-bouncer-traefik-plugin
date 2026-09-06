@@ -57,3 +57,9 @@ phase: propose
 findings: fold core_plugin_appsec_failure-action; restore UnreadableBodyBlock default false
 fixed: OpenSpec change appsec-unreadable-body-block
 skipped: none
+
+## implement (2026-09-06 rethink)
+phase: implement
+findings: dest merge left cache.NoBannedValue in stream log test
+fixed: CrowdsecAppsecUnreadableBodyBlock default false; drop when true; GET exemption; merge typecheck
+skipped: none
