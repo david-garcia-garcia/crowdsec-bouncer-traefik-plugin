@@ -339,7 +339,9 @@ func (errReadCloser) Close() error                 { return nil }
 func Test_appsecQuery_failureActionOnReadError(t *testing.T) {
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusOK)
-		rw.(http.Flusher).Flush()
+		if flusher, ok := rw.(http.Flusher); ok {
+			flusher.Flush()
+		}
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
