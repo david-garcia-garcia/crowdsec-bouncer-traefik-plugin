@@ -68,3 +68,12 @@ fixed: merged origin/master (connection split, pkg/ip checker/network); no confl
 skipped: none
 CI: success
 mergeable: clean
+
+## sync (2026-09-06)
+
+phase: sync
+findings: none
+fixed: merged origin/master (LAPI/AppSec split); kept snapshot on prepared; ResetForTestWith
+skipped: none
+CI: success
+mergeable: clean
