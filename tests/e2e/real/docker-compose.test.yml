@@ -271,6 +271,9 @@ services:
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.crowdsecmode=stream"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.updateintervalseconds=5"
+      # Same metrics interval as bouncer-stream: interval is in reclaim identity.
+      # A mismatch creates two stream pollers on BOUNCER_KEY_TRAEFIK_TEST and they steal deltas.
+      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.metricsupdateintervalseconds=1"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.clienttrustedips=172.19.0.10/32"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
