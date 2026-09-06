@@ -38,12 +38,8 @@ func MembershipFromIndex(index string) *RangeMembership {
 }
 
 // Remediation returns ban if the IP is in the ban set, else captcha if in the captcha set, else empty.
-func (membership *RangeMembership) Remediation(remoteIP string) string {
-	if membership == nil {
-		return ""
-	}
-	parsed := net.ParseIP(remoteIP)
-	if parsed == nil {
+func (membership *RangeMembership) Remediation(parsed net.IP) string {
+	if membership == nil || parsed == nil {
 		return ""
 	}
 	if membership.ban != nil {

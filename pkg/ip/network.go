@@ -25,7 +25,11 @@ func InNetwork(addr, network string) (bool, error) {
 
 // Family is ipv4 or ipv6 for an address GetRemoteIP already returned. Empty if unparseable.
 func Family(addr string) string {
-	parsed := net.ParseIP(strings.TrimSpace(addr))
+	return FamilyOfIP(net.ParseIP(strings.TrimSpace(addr)))
+}
+
+// FamilyOfIP is ipv4 or ipv6 for an already parsed address. Empty if nil.
+func FamilyOfIP(parsed net.IP) string {
 	if parsed == nil {
 		return ""
 	}

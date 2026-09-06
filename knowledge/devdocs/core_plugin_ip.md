@@ -11,7 +11,7 @@ In-tree radix of CIDRs (`pkg/iplookup.Helper`). Insert at construction; `IsConta
 _Avoid_: range-index, per-CIDR cache key, `InNetwork` (one network)
 
 **GetRemoteIP**:
-The owner of the client address for a request. Walks the custom forwarded header most-recent-first against the trusted-hop pool, then the host of `RemoteAddr`.
+The owner of the client address for a request. Walks the custom forwarded header most-recent-first against the trusted-hop pool, then the host of `RemoteAddr`. Also yields that address as `net.IP` when parseable.
 _Avoid_: parsing `RemoteAddr` on the connection, a second X-Forwarded-For walk, Traefik ipstrategy as a second owner
 
 ## Overview
@@ -21,18 +21,18 @@ Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker st
 ## How to use
 
 - Build the Checker once in `bouncer.New` from config lists.
-- Resolve the client address with `GetRemoteIP` (server/trusted-hop pool + custom header). Then `Contains` on that string for the client pool. Do not parse `RemoteAddr` again.
-- Call `Contains` / `ContainsIP` on the request path. Do not walk a CIDR slice beside the helper.
+- Resolve the client address with `GetRemoteIP` (server/trusted-hop pool + custom header). Then `ContainsIP` on the parsed `net.IP` for the client pool. Do not parse `RemoteAddr` again. Do not parse the chosen string again for trusted-client membership.
+- Call `Contains` / `ContainsIP` on the request path. Do not walk a CIDR slice beside the helper. Prefer `ContainsIP` when ServeHTTP already has the parsed IP.
 - Convert a bare IP to `/32` or `/128` before `AddCIDR`.
 - Range stream/alone membership reuses `Helper` as two boolean sets on the connection. Do not put Range in Checker.
 - One-CIDR questions (`InNetwork`) live in `pkg/ip/network.go`, not in Checker.
-- Classify an already-resolved address with `Family` / `FamilyOfHostOrCIDR` for usage-metrics `ip_type`. Do not parse `RemoteAddr`.
+- Classify an already-parsed address with `FamilyOfIP` for usage-metrics `ip_type`. Keep `Family` / `FamilyOfHostOrCIDR` for decision values. Do not parse `RemoteAddr`.
 
 ## Pattern snippet
 
 ```go
 checker, err := ip.NewChecker(log, config.ClientTrustedIPs)
-ok, err := checker.Contains(remoteIP)
+ok := checker.ContainsIP(parsedIP)
 ```
 
 ## Key files
