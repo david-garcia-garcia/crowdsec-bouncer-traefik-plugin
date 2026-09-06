@@ -8,7 +8,7 @@ JobName: 2026-09-06-upstream-388-split-appsec-timeout
 | explore | [x] | [x] | 2026-09-06T15:10:25Z |
 | propose | [x] | [x] | 2026-09-06T15:13:37Z |
 | implement | [x] | [x] | 2026-09-06T15:18:53Z |
-| codereview | [x] | [ ] | 2026-09-06T15:21:55Z |
+| codereview | [x] | [x] | 2026-09-06T19:06:37Z |
 | devdocsimpact | [x] | [x] | 2026-09-06T15:23:11Z |
 | archive | [x] | [x] | 2026-09-06T15:24:37Z |
 | pullrequest | [x] | [x] | 2026-09-06T15:30:32Z |
