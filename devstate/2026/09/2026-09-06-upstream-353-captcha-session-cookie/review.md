@@ -21,3 +21,9 @@ phase: codereview
 findings: Standards 3 (2 hard Leave a trail, 1 judgement name); Spec/Security/Performance/Dead none
 fixed: block intros on Check and sessionTokenFromRequest
 skipped: test local session rename (judgement)
+
+## devdocsimpact (2026-09-06)
+phase: devdocsimpact
+findings: missing captcha packet; stale cache logical keys
+fixed: core_plugin_captcha.md; core_cache_client.md How-to/Gotchas
+skipped: n/a
