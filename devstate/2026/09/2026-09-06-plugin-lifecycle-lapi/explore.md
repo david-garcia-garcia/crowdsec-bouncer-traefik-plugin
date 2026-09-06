@@ -32,6 +32,7 @@ IssueKey: 2026-09-06-plugin-lifecycle-lapi
 - Do not first-win a second config onto a connection whose Redis prefix or `scopes=` already diverged — fail before bind, or share only when the session snapshot matches.
 - Isolated backends (including different header-scope maps) keep needing a **second bouncer key**. That is already the scopes e2e pattern.
 - Check session occupancy **before** `reclaim.Open`. `Open` always binds `ctx`; a fail-after-bind would leak a holder (`pkg/reclaim/table.go`).
+- Fail `New` only when another **live** constructor ctx already holds the session with a different snapshot (two middlewares both up). A Traefik reload that cancelled the previous holders (orphan/grace) MUST dispose and create with the new knobs — including a fixed TLS cert. Do not pin the first cert for the life of the process.
 
 ## Reproduction
 
@@ -60,7 +61,11 @@ Spec `core_plugin_middleware_instance-reclaim`: keep “same session ⇒ one tic
 ## Open questions
 
 - Q: Fail `New` on same-session conflicting knobs, or reclaim the first connection and ignore extras?
-  Decision: assumed — fail `New`. Silent ignore is how this bug was born. Share only when the settings snapshot matches. Traefik `New` may return error; that middleware/router fails to build (`ext_traefik_plugins_yaegi-constructor`).
+  Decision: assumed — fail `New` only for two **live** holders that disagree. Share when the snapshot matches. Silent ignore is how this bug was born. Reload/orphan/grace with a new snapshot: dispose the old incarnation and `create()` (so a wrong TLS cert can be fixed without restarting Traefik). Traefik `New` may return error; that middleware/router fails to build (`ext_traefik_plugins_yaegi-constructor`).
+  By: explore
+
+- Q: Can an operator fix a wrong LAPI TLS cert (or any session snapshot knob) without restarting the Traefik process?
+  Decision: resolved — yes. Reload cancels the previous constructor ctx; that is a replace, not a concurrent conflict. Fail only while another live middleware still holds the old snapshot. Reclaim grace is 10s (`pkg/reclaim` `DefaultGrace`); that is a dispose delay, not a process restart.
   By: explore
 
 - Q: Are different `decisionScopeHeaders` a different stream session or a conflict on one session (URL+key)?
