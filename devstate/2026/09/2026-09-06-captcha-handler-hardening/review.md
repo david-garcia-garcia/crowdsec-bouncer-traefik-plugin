@@ -21,3 +21,9 @@ phase: implement
 findings: cache Set error return; config template validation; captcha remoteip/retryable/grace-gate; captcha_test.go; localTests failed on pre-existing root logging tests
 fixed: captcha solve loop, nil template, bare 400 on provider errors, missing remoteip
 skipped: n/a
+
+## codereview (2026-09-06)
+phase: codereview
+findings: Standards 2 hard (test stub name, renderCaptcha comment), Dead 1 hard (test-only export); Spec/Security/Performance clean
+fixed: NewFailingSetClientForTest rename; renderCaptcha method comment
+skipped: duplicated CaptchaFilePath validation (intentional dual layer)
