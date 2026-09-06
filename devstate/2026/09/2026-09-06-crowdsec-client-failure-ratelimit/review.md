@@ -15,3 +15,9 @@ phase: propose
 findings: apply-ready crowdsec-client-failure-backoff; FindSpecHost new tracker/lapi-backoff/appsec-backoff, fold appsec_client
 fixed: openspec/changes/crowdsec-client-failure-backoff/, specs.md
 skipped: product code
+
+## implement (2026-09-06)
+phase: implement
+findings: pkg/health Tracker; LAPI LiveLookup skip; AppSec Query skip; defaults 30/30/5; CI in progress
+fixed: pkg/health, pkg/lapi, pkg/appsec, configuration knobs, README, usage packet core_plugin_health.md
+skipped: Windows go test ./... TestBouncerFileLogging TempDir lock (pre-existing; pkg tests passed)
