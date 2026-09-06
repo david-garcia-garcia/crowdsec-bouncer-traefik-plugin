@@ -1,0 +1,15 @@
+issueKey: 2026-09-06-appsec-query-hardening
+jobName: 2026-09-06-appsec-query-hardening
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: dab8d8246f7d0b346203536144b677fb15e4b89b6ecae72d1a93cc24eb851b90
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
