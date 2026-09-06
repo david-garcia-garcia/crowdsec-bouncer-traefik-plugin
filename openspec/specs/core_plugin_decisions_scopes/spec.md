@@ -5,11 +5,15 @@ Match CrowdSec decisions by Ip, Range, and any header-mapped scope so a request 
 ## Requirements
 
 ### Requirement: Client IP comes from GetRemoteIP
-The bouncer SHALL identify the client IP using the existing remote-IP owner (`pkg/ip.GetRemoteIP`). It MUST NOT parse `RemoteAddr` a second time for decision matching.
+The bouncer SHALL identify the client IP using the existing remote-IP owner (`pkg/ip.GetRemoteIP`). It MUST NOT parse `RemoteAddr` a second time for decision matching. Stream/alone Range membership SHALL classify the `net.IP` GetRemoteIP already yielded. Range lookup MUST NOT parse the client string.
 
 #### Scenario: Forwarded IP is the lookup address
 - **WHEN** Traefik forwards a trusted `X-Forwarded-For` for a banned IP
 - **THEN** Ip-scope matching uses that address
+
+#### Scenario: Range membership uses the parsed client IP
+- **WHEN** stream has a Range ban `10.0.0.0/8` and GetRemoteIP yielded `10.1.2.3` as `net.IP`
+- **THEN** Range matching uses that `net.IP` and MUST NOT parse the client string again
 
 ### Requirement: Range decisions match by CIDR containment
 When a decision scope is `Range` (any case), the bouncer SHALL treat `value` as a CIDR and remediate a request whose client IP is inside that network. Range membership SHALL be stored on one shared cache key `range-index` as `cidr=remediation` lines so Redis replicas that only read can still match. When several containing CIDRs hit, `ban` SHALL win over `captcha`. In stream and alone modes, the request path SHALL match Range from in-process membership rebuilt from that blob and MUST NOT read `range-index` on the request. live and none SHALL keep skipping `range-index` and expand Range via LAPI `?ip=`.
@@ -95,3 +99,33 @@ Each stream or alone connection SHALL rebuild in-process Range membership from `
 #### Scenario: Ban wins over a longer captcha prefix
 - **WHEN** stream has a Range ban `10.0.0.0/8` and a Range captcha `10.1.0.0/16` and the client IP is `10.1.2.3`
 - **THEN** the request is forbidden, not captcha
+
+### Requirement: Matching does not import Traefik config
+Cached request lookup SHALL take a caller boolean that says whether to consult Range membership. Callers that already know Crowdsec mode SHALL pass true for stream and alone, and false for live and none. The matching package MUST NOT import the Traefik plugin configuration package.
+
+#### Scenario: True consults Range membership
+- **WHEN** the caller passes true and Range membership holds a ban that contains the client IP
+- **THEN** the request is remediating from that membership
+
+#### Scenario: False skips Range membership
+- **WHEN** the caller passes false and Range membership holds a ban that contains the client IP
+- **THEN** Range matching does not remediate from that membership
+
+### Requirement: Remediation cache values may carry origin
+An Ip, header-scope, or Range-index cache value SHALL still start with the ban/captcha/none letter (`t` / `c` / `f`). It MAY append a unit-separator and the metrics origin. `range-index` stays one key whose lines are `cidr=` plus that value. `IsActiveRemediation`, `PreferRemediation`, Range index parsing, and request lookup SHALL use that letter. In-process Range membership SHALL return the stored string of the winning CIDR (ban over captcha; if several bans contain the IP, the longest-prefix matching ban). Lookup keys (client IP, `scope:value`, `range-index`) MUST NOT change. A value that is only the letter (today’s Redis) SHALL keep matching.
+
+#### Scenario: Suffixed ban still remediates
+- **WHEN** cache holds `t` plus a unit-separator and `crowdsec` for the client IP
+- **THEN** the request is banned
+
+#### Scenario: Bare letter still remediates
+- **WHEN** cache holds only `t` for the client IP
+- **THEN** the request is banned
+
+#### Scenario: Suffixed Range-index line still remediates
+- **WHEN** `range-index` holds `10.0.0.0/8=` plus `t` plus a unit-separator and `crowdsec` and the client IP is `10.1.2.3`
+- **THEN** the request is banned and lookup origin is `crowdsec`
+
+#### Scenario: Bare Range-index letter still remediates
+- **WHEN** `range-index` holds only `10.0.0.0/8=t` and the client IP is `10.1.2.3`
+- **THEN** the request is banned

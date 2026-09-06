@@ -437,3 +437,58 @@ function Remove-AllTestDecisions {
     }
     return $true
 }
+
+# cscli metrics show bouncers -o json (CrowdSec 1.8) is
+# { bouncers: { "NAME@ip": { "<origin>": { "<name>": { "<unit>": n } } } } }.
+# Processed lives under origin "". ConvertFrom-Json to PSObject rejects that key.
+function Get-CscliBouncerMetrics {
+    $raw = docker exec crowdsec-test cscli metrics show bouncers -o json --color no 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($raw)) {
+        return $null
+    }
+    try {
+        return $raw | ConvertFrom-Json -AsHashtable
+    }
+    catch {
+        Write-Host "⚠️ cscli metrics JSON parse failed: $raw" -ForegroundColor Yellow
+        return $null
+    }
+}
+
+function Get-CscliBouncerMetricValue {
+    param(
+        [AllowEmptyString()]
+        [string]$Origin,
+        [string]$Name,
+        [string]$Unit
+    )
+
+    $metrics = Get-CscliBouncerMetrics
+    if ($null -eq $metrics) {
+        return [int64]0
+    }
+
+    $bouncers = $metrics['bouncers']
+    if ($null -eq $bouncers) {
+        return [int64]0
+    }
+
+    $total = [int64]0
+    foreach ($bouncerName in @($bouncers.Keys)) {
+        $origins = $bouncers[$bouncerName]
+        if ($null -eq $origins -or -not $origins.ContainsKey($Origin)) {
+            continue
+        }
+        $names = $origins[$Origin]
+        if ($null -eq $names -or -not $names.ContainsKey($Name)) {
+            continue
+        }
+        $units = $names[$Name]
+        if ($null -eq $units -or -not $units.ContainsKey($Unit)) {
+            continue
+        }
+        $total += [int64]$units[$Unit]
+    }
+    return $total
+}
+

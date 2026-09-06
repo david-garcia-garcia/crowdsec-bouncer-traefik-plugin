@@ -11,27 +11,32 @@ In-tree radix of CIDRs (`pkg/iplookup.Helper`). Insert at construction; `IsConta
 _Avoid_: range-index, per-CIDR cache key, `InNetwork` (one network)
 
 **GetRemoteIP**:
-The owner of the client address for a request. Walks the custom forwarded header most-recent-first against the trusted-hop pool, then the host of `RemoteAddr`.
+The owner of the client address for a request. Walks the custom forwarded header most-recent-first against the trusted-hop pool, then the host of `RemoteAddr`. Also yields that address as `net.IP` when parseable.
 _Avoid_: parsing `RemoteAddr` on the connection, a second X-Forwarded-For walk, Traefik ipstrategy as a second owner
+
+**clientRequest**:
+The inbound request plus the client address GetRemoteIP already chose (`remoteIP` string, `ipAddr` net.IP, `ipType` for metrics). Handlers keep the parameter name `req`.
+_Avoid_: renaming `req` to `client`; a bag for scopes, origin, or captcha state; `context.Value`
 
 ## Overview
 
-Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker stores those CIDRs in `pkg/iplookup`. Stream/alone Range uses two Helpers on CrowdsecConnection (ban set, captcha set), not Checker. Use `ip.InNetwork` when the question is one CIDR (blob line parse). Do not parse `RemoteAddr` in the helper; classify `GetRemoteIP`.
+Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker stores those CIDRs in `pkg/iplookup`. Stream/alone Range uses two Helpers on the LAPI Client (ban set, captcha set), not Checker. Use `ip.InNetwork` when the question is one CIDR (blob line parse). Do not parse `RemoteAddr` in the helper; classify `GetRemoteIP`.
 
 ## How to use
 
 - Build the Checker once in `bouncer.New` from config lists.
-- Resolve the client address with `GetRemoteIP` (server/trusted-hop pool + custom header). Then `Contains` on that string for the client pool. Do not parse `RemoteAddr` again.
-- Call `Contains` / `ContainsIP` on the request path. Do not walk a CIDR slice beside the helper.
+- Resolve the client address with `GetRemoteIP` (server/trusted-hop pool + custom header). Put that string, `ipAddr`, and `FamilyOfIP` on `clientRequest`. Keep the name `req`. Then `ContainsIP` on `req.ipAddr` for the client pool. Do not parse `RemoteAddr` again. Do not parse the chosen string again for trusted-client membership. Do not add scopes or origin to `clientRequest`.
+- On the request path, call `ContainsIP` on the parsed GetRemoteIP address. `Contains` remains for string callers. Do not walk a CIDR slice beside the helper.
 - Convert a bare IP to `/32` or `/128` before `AddCIDR`.
-- Range stream/alone membership reuses `Helper` as two boolean sets on the connection. Do not put Range in Checker.
+- Range stream/alone membership reuses `Helper` as two boolean sets on the LAPI Client. Do not put Range in Checker.
 - One-CIDR questions (`InNetwork`) live in `pkg/ip/network.go`, not in Checker.
+- Classify an already-parsed address with `FamilyOfIP` for usage-metrics `ip_type`. Keep `Family` / `FamilyOfHostOrCIDR` for decision values. Do not parse `RemoteAddr`.
 
 ## Pattern snippet
 
 ```go
 checker, err := ip.NewChecker(log, config.ClientTrustedIPs)
-ok, err := checker.Contains(remoteIP)
+ok := checker.ContainsIP(req.ipAddr)
 ```
 
 ## Key files
@@ -39,6 +44,7 @@ ok, err := checker.Contains(remoteIP)
 - `pkg/ip/checker.go`
 - `pkg/ip/network.go`
 - `pkg/iplookup/`
+- `pkg/bouncer/clientrequest.go`
 - `pkg/bouncer/bouncer.go`
 - `pkg/configuration/configuration.go` (`validateParamsIPs`)
 
