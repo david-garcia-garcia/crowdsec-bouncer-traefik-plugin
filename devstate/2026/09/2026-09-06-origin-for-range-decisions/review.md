@@ -9,3 +9,9 @@ phase: explore
 findings: none
 fixed: none
 skipped: assumed longest-prefix origin when overlapping bans; live/none out of scope
+
+## propose (2026-09-06T05:29:01Z)
+phase: propose
+findings: none
+fixed: none
+skipped: code apply not started
