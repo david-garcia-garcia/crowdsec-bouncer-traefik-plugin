@@ -35,3 +35,9 @@ phase: devdocsimpact
 findings: 6 stale-usage
 fixed: cache/client, cache/redis, decisionscope, reclaim snippet, ip Range Helpers, usage-metrics ticker
 skipped: none
+
+## archive (2026-09-06)
+phase: archive
+findings: none
+fixed: synced two new catalog specs; folded five; deleted empty core_plugin_connection_source-files; moved change to archive
+skipped: none
