@@ -126,21 +126,20 @@ func strongestLiveDecision(items []Decision) *Decision {
 }
 
 // mergeLiveScope queries one header-mapped scope and keeps ban over the current live remediation.
-func (c *Client) mergeLiveScope(chosen string, parsedDuration time.Duration, scope, identifier string, isLiveMode bool) (string, time.Duration) {
+func (c *Client) mergeLiveScope(chosen string, parsedDuration time.Duration, scope, identifier string, isLiveMode bool) (string, time.Duration, error) {
 	if identifier == "" {
-		return chosen, parsedDuration
+		return chosen, parsedDuration, nil
 	}
 	headerChosen, headerDuration, headerErr := c.queryLiveDecisions("scope=" + url.QueryEscape(scope) + "&value=" + url.QueryEscape(identifier))
 	if headerErr != nil {
-		c.log.Debug("handleNoStreamCache:scopeQuery " + scope + " " + headerErr.Error())
-		return chosen, parsedDuration
+		return "", 0, headerErr
 	}
 	c.cacheLiveScope(decisionscope.HeaderScopeKey(scope, identifier), headerChosen, headerDuration, isLiveMode)
 	next := decisionscope.PreferRemediation(chosen, headerChosen)
 	if next != chosen {
-		return next, headerDuration
+		return next, headerDuration, nil
 	}
-	return chosen, parsedDuration
+	return chosen, parsedDuration, nil
 }
 
 // cacheLiveScope stores a live/none header-scope result when live caching is on.
