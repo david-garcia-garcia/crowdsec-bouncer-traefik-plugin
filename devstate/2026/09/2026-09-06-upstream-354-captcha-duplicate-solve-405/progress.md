@@ -6,7 +6,7 @@ JobName: 2026-09-06-upstream-354-captcha-duplicate-solve-405
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-06T15:06:06Z |
 | explore | [x] | [x] | 2026-09-06T15:11:50Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
