@@ -11,4 +11,4 @@ JobName: 2026-09-06-simpleredis-pool-and-resp
 | codereview | [x] | [x] | 2026-09-06T17:20:00Z |
 | devdocsimpact | [x] | [x] | 2026-09-06T17:21:00Z |
 | archive | [x] | [x] | 2026-09-06T17:22:00Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-06T15:07:00Z |

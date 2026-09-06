@@ -1,5 +1,5 @@
-## prepare (2026-09-06)
-phase: prepare
-findings: qualified; five simpleredis defects grounded in pkg/simpleredis
-fixed: n/a
-skipped: n/a
+## pullrequest (2026-09-06)
+phase: pullrequest
+findings: none
+fixed: PR title and delivery card published; CI green
+skipped: none
