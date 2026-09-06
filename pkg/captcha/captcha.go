@@ -35,7 +35,7 @@ type Client struct {
 	infoProvider            *infoProvider
 }
 
-// Information for self-hosted provider.
+// infoProvider is per-captchaProvider frontend JS, class-widget key, form field, verify URL, JSON siteverify flag, and Cap widget API endpoint.
 type infoProvider struct {
 	js          string
 	key         string
@@ -72,7 +72,7 @@ func trycapInfoProvider(instanceURL, siteKey string) *infoProvider {
 	base := strings.TrimRight(instanceURL, "/") + "/" + strings.Trim(siteKey, "/") + "/"
 	return &infoProvider{
 		js:          trycapWidgetJS,
-		key:         "cap-widget",
+		key:         "",
 		response:    "cap-token",
 		validate:    base + "siteverify",
 		jsonBody:    true,
