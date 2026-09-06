@@ -1,5 +1,5 @@
-## prepare (2026-09-06)
-phase: prepare
-findings: qualified (RemoteAddr gate + unparseable-hop tests; pkg/ip only)
+## explore (2026-09-06)
+phase: explore
+findings: spoofing reproduced; RemoteAddr gate decision in explore.md
 fixed: n/a
 skipped: n/a
