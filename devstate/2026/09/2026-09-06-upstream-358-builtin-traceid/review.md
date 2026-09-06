@@ -15,3 +15,9 @@ phase: propose
 findings: OpenSpec add-remediation-traceid apply-ready; spec core_plugin_middleware_remediation-traceid new
 fixed: n/a
 skipped: n/a
+
+## implement (2026-09-06)
+phase: implement
+findings: RemediationTraceIDCustomName wired on ban+captcha HTML; CI queued
+fixed: generation, response header, template TraceID, unit tests, mock e2e
+skipped: AppSec bodies, solved-captcha 302, hop reconstruction
