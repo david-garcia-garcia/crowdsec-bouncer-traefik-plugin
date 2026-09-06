@@ -27,3 +27,9 @@ phase: codereview
 findings: P1 0, P2 0
 fixed: n/a
 skipped: n/a
+
+## devdocsimpact (2026-09-06)
+phase: devdocsimpact
+findings: stale-usage 1
+fixed: core_plugin_appsec.md How-to + Gotcha for 502/503/504
+skipped: n/a
