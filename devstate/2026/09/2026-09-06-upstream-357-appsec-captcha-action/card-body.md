@@ -1,29 +1,29 @@
-Developer review: in progress — 2026-09-06T15:06:00Z
+Developer review: in progress — 2026-09-06T15:09:10Z
 
 ## What this changes
 **Operators.** None.
 
 **Admin users.** None.
 
-**Developers.** None yet — prepare grounded upstream #357 as present-fixed-unproven; bound action is add-tests for AppSec `action: captcha` parse and relay in `pkg/appsec` and `pkg/bouncer`.
+**Developers.** None.
 
 **End users.** None.
 
 ## Motivation
-On `master`, AppSec JSON `action: captcha` appears implemented (body parse plus envelope relay) but no test asserts it the way challenge is covered. Upstream #357 reports missing captcha support; without proof tests, regressions could restore the reported gap silently.
+On `master`, AppSec JSON `action: captcha` is parsed and relayed but no test proves it. Upstream #357 reports missing captcha support; without proof tests, a regression could restore that gap without CI catching it.
 
 ## Merge readiness
-Prepare complete; explore is next. 7 workflow items remain.
+Explore complete; propose is next. 6 workflow items remain.
 
-Priority: P3 — test and internal clarity; no current operator or end-user harm if behavior is already correct.
-Reviewed head: 4709586
-Owner decision: None.
+Priority: P3 — tests and spec clarity; no current operator or end-user harm if behavior is already correct.
+Reviewed head: 8e5de71
+Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Stub PR only; no product tests or CI yet |
-| CI proof | 1/6 | Pushed; CI not seen |
+| Overall readiness | 3/6 | Explore written; CI still running; no product tests yet |
+| CI proof | 3/6 | In progress — [run 34041376450](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041376450) |
 | Local tests proof | N/A | Before implement |
 | Review resolution | N/A | No PR comments inventoried |
 
@@ -32,10 +32,10 @@ Owner decision: None.
 | --- | --- | --- |
 | Branch | 2026-09-06-upstream-357-appsec-captcha-action pushed | git push |
 | OpenSpec | none | openspec/ |
-| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/44 | GitHub MCP Create |
-| CI | not seen | pr-host CI |
+| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/44 | pr-host |
+| CI | in progress [run 34041376450](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041376450) | GitHub check runs queued |
 | Local tests | none | handoff.yaml localTests |
-| PR comments | no comments | devstate/comments.md absent |
+| PR comments | no comments | comments.md absent |
 
 ## Specs
 None.
@@ -44,15 +44,18 @@ None.
 None.
 
 ## How this fits together
-Local upstream #357 assessment → branch `2026-09-06-upstream-357-appsec-captcha-action` → stub PR #44 → explore next for empty-body captcha envelope policy before test design.
+Local upstream #357 assessment → branch `2026-09-06-upstream-357-appsec-captcha-action` → stub PR #44 → explore locked add-tests on existing `core_plugin_appsec_bot-detection` → propose next.
 
 ## Decision needed
-None.
+| Question | Decision | By |
+| --- | --- | --- |
+| Should empty-body AppSec `action: captcha` ban like empty `challenge`, or relay status with no body? | assumed — keep current relay (`handleAppsecResponseServeHTTP`); tests assert `http_status` (403 in the upstream example) and empty body, not the operator ban page. | explore |
+| Fold captcha scenarios onto `core_plugin_appsec_bot-detection` or create a new spec? | assumed — MODIFIED on `core_plugin_appsec_bot-detection` (add parse + relay scenarios for `action: captcha`, including the no-body envelope). No new leaf. | explore |
 
 ## Before merge
-- [ ] [P3] Explore empty `user_body_content` policy for AppSec captcha vs challenge
-- [ ] [P3] Add captcha JSON parse and bouncer relay tests mirroring challenge coverage
-- [ ] [P3] Propose OpenSpec change and land tests
+- [ ] [P3] Propose OpenSpec change on `core_plugin_appsec_bot-detection` with captcha parse and relay scenarios
+- [ ] [P3] Add captcha JSON parse and bouncer relay tests (including empty-body envelope)
+- [x] Explore: empty-body captcha stays relay; lock envelope parse+relay not `pkg/captcha`
 - [x] Prepare: requirement, worktree, stub PR
 
 ## Findings
@@ -68,7 +71,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | No product diff yet |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | No comments on stub PR |
-| Reviewed head | 4709586 | Matches pushed branch |
+| Reviewed head | 8e5de71a797afa3711d24c26a93c150bf1282157 | Matches pushed explore commit |
 
 ### Stored data model
 None.
@@ -76,14 +79,16 @@ None.
 ### Technical review
 Best possible solution: not evaluated — no apply yet.
 
-Do we have a high-confidence way to reproduce? Yes — mirror existing challenge JSON tests with `action: captcha` fixtures in `pkg/appsec/query_test.go` and `pkg/bouncer/bouncer_test.go`.
+Do we have a high-confidence way to reproduce? Yes — mirror challenge fixtures in `pkg/appsec/query_test.go` and `pkg/bouncer/bouncer_test.go` with `{"action":"captcha",...}` and the no-body upstream example.
 
-Is this the best way to solve the issue? Yes for scope — assessment bound is add-tests only; feature code already on master per devdocs and relay path.
+Is this the best way to solve the issue? Yes for scope — add-tests only; product already parses and relays captcha HTML, distinct from `pkg/captcha`.
 
 ### Evidence
 What I checked:
-- `pkg/appsec/query.go`, `pkg/bouncer/bouncer.go`, `knowledge/devdocs/core_plugin_appsec.md` (8186c16 / master)
-- Local dump `devstate/bug-hunt/2026-09-06/upstream-issues/357*.md`
+- `pkg/appsec/query.go` `ActionCaptcha` + `parseResponse`; `pkg/bouncer/bouncer.go` `applyAppsecServeHTTP` fall-through (HEAD 8e5de71)
+- Existing challenge tests only: `Test_appsecQuery_challengeJSON`, `TestHandleNextServeHTTPRelaysStructuredAppsecChallenge`
+- `openspec/specs/core_plugin_appsec_bot-detection/spec.md` relay requirement already covers non-allow/non-ban actions
+- Research already answers protocol: `knowledge/research/ext_crowdsec_appsec_protocol/`, `knowledge/research/ext_crowdsec_appsec_bot-detection/`
 
 ### Rank-up moves
 None.
