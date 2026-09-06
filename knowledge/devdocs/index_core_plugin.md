@@ -20,6 +20,16 @@ priority: normal
 local: core_plugin_ip.md
 description: How this plugin stores trusted hop and client CIDRs and answers membership.
 
+## LAPI stream poll
+priority: normal
+local: core_plugin_lapi_stream-poll.md
+description: How one LAPI Client serializes stream/alone polls, health fields, and the updated lease.
+
+## LAPI HTTP query
+priority: normal
+local: core_plugin_lapi_http-query.md
+description: How crowdsecQuery performs LAPI/CAPI GET and POST with transport guards and alone-mode 401 retry.
+
 ## LAPI usage-metrics
 priority: normal
 local: core_plugin_lapi_usage-metrics.md

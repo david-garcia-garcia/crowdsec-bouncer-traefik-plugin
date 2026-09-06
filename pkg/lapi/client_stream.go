@@ -45,7 +45,10 @@ func (c *Client) startStream(config *configuration.Config, log *slog.Logger) err
 	return nil
 }
 
+// handleStreamTicker runs one serialized stream poll and updates stream health counters.
 func (c *Client) handleStreamTicker() {
+	c.streamPollMu.Lock()
+	defer c.streamPollMu.Unlock()
 	if err := c.handleStreamCache(); err != nil {
 		c.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", c.updateFailure, c.isCrowdsecStreamHealthy, err.Error()))
 		if c.updateMaxFailure != -1 && c.updateFailure >= c.updateMaxFailure && c.isCrowdsecStreamHealthy {
@@ -88,6 +91,7 @@ func (c *Client) handleStreamCache() error {
 	atomic.AddInt64(&c.streamFetches, 1)
 	body, err := c.crowdsecQuery(streamRouteURL.String(), nil)
 	if err != nil {
+		c.cacheClient.Delete(cacheTimeoutKey)
 		return err
 	}
 	var stream Stream

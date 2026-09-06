@@ -1,0 +1,17 @@
+issueKey: 2026-09-06-lapi-client-correctness
+jobName: 2026-09-06-lapi-client-correctness
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:b759059d882e40c775c397927019723dcb3f95f6766a15ea7e680df0ef8d39e9
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: lapi-client-correctness
+pr:
+  id: 30
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/30

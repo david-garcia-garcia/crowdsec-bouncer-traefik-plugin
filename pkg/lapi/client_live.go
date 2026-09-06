@@ -21,7 +21,14 @@ func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string) 
 		return "", err
 	}
 	for scope, identifier := range scopes {
-		chosen, parsedDuration = c.mergeLiveScope(chosen, parsedDuration, scope, identifier, isLiveMode)
+		var scopeErr error
+		chosen, parsedDuration, scopeErr = c.mergeLiveScope(chosen, parsedDuration, scope, identifier, isLiveMode)
+		if scopeErr != nil {
+			if decisionscope.IsActiveRemediation(chosen) {
+				return chosen, scopeErr
+			}
+			return "", scopeErr
+		}
 	}
 	if !decisionscope.IsActiveRemediation(chosen) {
 		if isLiveMode && c.defaultDecisionTimeout > 0 {
