@@ -22,6 +22,10 @@ _Avoid_: ForRoute, Plugin core, the reclaim value
 The operator enum (`passthrough` | `ban` | `captcha`) this plugin applies when LAPI or AppSec does not return a usable verdict. LAPI action is on LAPI Client identity; AppSec action is per-router on Bouncer. Default is `ban`.
 _Avoid_: fail mode, FailMode, the three removed AppSec block bools, AppSec JSON `action: captcha`
 
+**Remediation TraceID**:
+A 16-character lowercase hex identifier this plugin generates for one ban or captcha HTML response when `RemediationTraceIDCustomName` is set. The same value is the configured response header and template `{{ .TraceID }}`.
+_Avoid_: incoming `TraceHeadersCustomName` passthrough, Cloudflare Cf-Ray (including a colo suffix), hop reconstruction of `X-Request-ID`
+
 ## Overview
 
 Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New` must use the constructor `ctx` as the reclaim holder. Do not change `.traefik.yml` `import`.
@@ -31,7 +35,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - Keep `CreateConfig` / `New` on the module root (`plugin.go`).
 - Keep `pluginVersion` in root `version.go` (release workflow bumps it). Pass it into `lapi.New` and `appsec.New`.
 - Call `lapi.Prepare` then `appsec.Prepare`. Stream/alone: `lapi.OpenStream`. Live/none: `lapi.OpenLive`. `crowdsecMode: appsec`: skip LAPI Open. When `crowdsecAppsecEnabled`: `appsec.Open`. Return `bouncer.New(..., lapiClient, appsecClient, ...)`.
-- Put stream tickers, LAPI HTTP, cache, and Range membership on `lapi.Client`. Put AppSec HTTP on `appsec.Client`. Put captcha and templates on Bouncer.
+- Put stream tickers, LAPI HTTP, cache, and Range membership on `lapi.Client`. Put AppSec HTTP on `appsec.Client`. Put captcha and templates on Bouncer. When `RemediationTraceIDCustomName` is set, generate the Remediation TraceID on Bouncer and pass it into captcha `ServeHTTP`; do not copy hop headers.
 - Resolve client IP with `pkg/ip.GetRemoteIP`. Fold `remoteIP`, parsed `net.IP`, and `ipType` into `clientRequest`. Keep the name `req`. Do not parse `RemoteAddr` on LAPI or AppSec. Do not put scopes or origin on that type.
 - Range and header-mapped CrowdSec scopes live in `pkg/decisionscope`. Do not geolocate in `New` or `ServeHTTP`.
 - Live LAPI error and stream-unhealthy cache miss use `crowdsecLapiFailureAction`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled).
@@ -57,6 +61,7 @@ return bouncer.New(next, name, config, nil, appsecClient, log)
 - `pkg/lapi/`
 - `pkg/appsec/`
 - `pkg/bouncer/bouncer.go`
+- `pkg/bouncer/traceid.go`
 - `pkg/bouncer/clientrequest.go`
 - `.traefik.yml`
 
@@ -68,3 +73,4 @@ return bouncer.New(next, name, config, nil, appsecClient, log)
 - LAPI `Close()` stops tickers, idle LAPI HTTP, and the cache Redis pool. AppSec `Close()` releases idle AppSec HTTP. Do not use `sync.Once`.
 - Both puts use `OpenWithGrace` 30s (`ReclaimGraceDuration`). `reclaim.DefaultGrace` stays 10s.
 - Lifecycle INFO lines: `crowdsec connection started|sleeping|waking|closed`. Stream health transitions: `crowdsec stream became unhealthy|healthy` (not every poll).
+- Do not reconstruct `Cf-Ray` or `X-Request-ID` for `{{ .TraceID }}` when `RemediationTraceIDCustomName` is set. Incoming `TraceHeadersCustomName` passthrough runs only when that knob is empty.

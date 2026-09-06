@@ -1,0 +1,4 @@
+{
+  "marker": "E2E_BUILTIN_TRACEID_MARKER",
+  "body": "IP: {{ .ClientIP }}, reason: {{ .RemediationReason }}, trace: {{ .TraceID }}"
+}

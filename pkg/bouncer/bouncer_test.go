@@ -1,6 +1,7 @@
 package bouncer
 
 import (
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,8 @@ import (
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
+
+var errRandFail = errors.New("rand fail")
 
 // testClientRequest is req plus the chosen client address for handler tests.
 func testClientRequest(req *http.Request, remoteIP string) clientRequest {
@@ -95,6 +98,127 @@ func TestHandleBanServeHTTPContentType(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHandleBanServeHTTPBuiltinTraceID(t *testing.T) {
+	orig := readRandom
+	t.Cleanup(func() { readRandom = orig })
+	readRandom = func(b []byte) (int, error) {
+		for i := range b {
+			b[i] = byte(i + 1)
+		}
+		return len(b), nil
+	}
+	const wantID = "0102030405060708"
+	banTemplate, err := template.New("html").Delims("{{", "}}").Parse("trace:{{ .TraceID }}")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("header and body match generated id", func(t *testing.T) {
+		b := &Bouncer{
+			remediationStatusCode:    http.StatusForbidden,
+			remediationTraceIDHeader: "X-Trace-ID",
+			banTemplate:              banTemplate,
+			banTemplateContentType:   "text/html; charset=utf-8",
+		}
+		rw := httptest.NewRecorder()
+		req := &http.Request{Method: http.MethodGet, Header: make(http.Header)}
+		b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
+		if got := rw.Header().Get("X-Trace-Id"); got != wantID {
+			t.Errorf("header X-Trace-ID = %q, want %q", got, wantID)
+		}
+		if body := rw.Body.String(); body != "trace:"+wantID {
+			t.Errorf("body = %q, want %q", body, "trace:"+wantID)
+		}
+	})
+
+	t.Run("HEAD has header and empty body", func(t *testing.T) {
+		b := &Bouncer{
+			remediationStatusCode:    http.StatusForbidden,
+			remediationTraceIDHeader: "X-Trace-ID",
+			banTemplate:              banTemplate,
+			banTemplateContentType:   "text/html; charset=utf-8",
+		}
+		rw := httptest.NewRecorder()
+		req := &http.Request{Method: http.MethodHead}
+		b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
+		if got := rw.Header().Get("X-Trace-Id"); got != wantID {
+			t.Errorf("header X-Trace-ID = %q, want %q", got, wantID)
+		}
+		if rw.Body.Len() != 0 {
+			t.Errorf("HEAD body = %q, want empty", rw.Body.String())
+		}
+	})
+
+	t.Run("incoming passthrough when built-in empty", func(t *testing.T) {
+		b := &Bouncer{
+			remediationStatusCode:  http.StatusForbidden,
+			traceCustomHeader:      "X-Trace",
+			banTemplate:            banTemplate,
+			banTemplateContentType: "text/html; charset=utf-8",
+		}
+		rw := httptest.NewRecorder()
+		req := &http.Request{Method: http.MethodGet, Header: make(http.Header)}
+		req.Header.Set("X-Trace", "from-client")
+		b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
+		if got := rw.Header().Get("X-Trace-Id"); got != "" {
+			t.Errorf("unexpected generated header %q", got)
+		}
+		if body := rw.Body.String(); body != "trace:from-client" {
+			t.Errorf("body = %q, want trace:from-client", body)
+		}
+	})
+
+	t.Run("built-in wins when both knobs set", func(t *testing.T) {
+		b := &Bouncer{
+			remediationStatusCode:    http.StatusForbidden,
+			remediationTraceIDHeader: "X-Trace-ID",
+			traceCustomHeader:        "X-Trace",
+			banTemplate:              banTemplate,
+			banTemplateContentType:   "text/html; charset=utf-8",
+		}
+		rw := httptest.NewRecorder()
+		req := &http.Request{Method: http.MethodGet, Header: make(http.Header)}
+		req.Header.Set("X-Trace", "from-client")
+		b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
+		if got := rw.Header().Get("X-Trace-Id"); got != wantID {
+			t.Errorf("header X-Trace-ID = %q, want %q", got, wantID)
+		}
+		if body := rw.Body.String(); body != "trace:"+wantID {
+			t.Errorf("body = %q, want generated id", body)
+		}
+	})
+
+	t.Run("rand failure still bans without header", func(t *testing.T) {
+		readRandom = func([]byte) (int, error) { return 0, errRandFail }
+		t.Cleanup(func() {
+			readRandom = func(b []byte) (int, error) {
+				for i := range b {
+					b[i] = byte(i + 1)
+				}
+				return len(b), nil
+			}
+		})
+		b := &Bouncer{
+			remediationStatusCode:    http.StatusForbidden,
+			remediationTraceIDHeader: "X-Trace-ID",
+			banTemplate:              banTemplate,
+			banTemplateContentType:   "text/html; charset=utf-8",
+		}
+		rw := httptest.NewRecorder()
+		req := &http.Request{Method: http.MethodGet}
+		b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
+		if rw.Code != http.StatusForbidden {
+			t.Errorf("status = %d, want 403", rw.Code)
+		}
+		if got := rw.Header().Get("X-Trace-Id"); got != "" {
+			t.Errorf("header X-Trace-ID = %q, want empty", got)
+		}
+		if body := rw.Body.String(); body != "trace:" {
+			t.Errorf("body = %q, want empty TraceID", body)
+		}
+	})
 }
 
 func TestCaptchaMethodBasedLogic(t *testing.T) {

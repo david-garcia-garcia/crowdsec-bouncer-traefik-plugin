@@ -16,17 +16,18 @@ import (
 
 // Client Captcha client.
 type Client struct {
-	Valid                   bool
-	siteKey                 string
-	secretKey               string
-	remediationCustomHeader string
-	gracePeriodSeconds      int64
-	templateContentType     string
-	template                *template.Template
-	cacheClient             *cache.Client
-	httpClient              *http.Client
-	log                     *slog.Logger
-	infoProvider            *infoProvider
+	Valid                    bool
+	siteKey                  string
+	secretKey                string
+	remediationCustomHeader  string
+	remediationTraceIDHeader string
+	gracePeriodSeconds       int64
+	templateContentType      string
+	template                 *template.Template
+	cacheClient              *cache.Client
+	httpClient               *http.Client
+	log                      *slog.Logger
+	infoProvider             *infoProvider
 }
 
 // Information for self-hosted provider.
@@ -60,7 +61,7 @@ var infoProviders = map[string]*infoProvider{
 }
 
 // New Initialize captcha client.
-func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, remediationCustomHeader, remediationTraceIDHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
@@ -75,6 +76,7 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 	c.siteKey = siteKey
 	c.secretKey = secretKey
 	c.remediationCustomHeader = remediationCustomHeader
+	c.remediationTraceIDHeader = remediationTraceIDHeader
 	template, contentType, _ := configuration.GetTemplate(captchaTemplatePath)
 	c.template = template
 	c.templateContentType = contentType
@@ -86,7 +88,7 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 }
 
 // ServeHTTP Handle captcha html page or validation.
-func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP string) {
+func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP, traceID string) {
 	valid, err := c.Validate(r)
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP:validate " + err.Error())
@@ -106,11 +108,15 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	if c.remediationCustomHeader != "" {
 		rw.Header().Set(c.remediationCustomHeader, "captcha")
 	}
+	if c.remediationTraceIDHeader != "" && traceID != "" {
+		rw.Header().Set(c.remediationTraceIDHeader, traceID)
+	}
 	rw.WriteHeader(http.StatusOK)
 	err = c.template.Execute(rw, map[string]string{
 		"SiteKey":     c.siteKey,
 		"FrontendJS":  c.infoProvider.js,
 		"FrontendKey": c.infoProvider.key,
+		"TraceID":     traceID,
 	})
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP captchaTemplateServe " + err.Error())

@@ -96,6 +96,7 @@ type Config struct {
 	HTTPTimeoutSeconds                         int64             `json:"httpTimeoutSeconds,omitempty"`
 	TraceHeadersCustomName                     string            `json:"traceHeadersCustomName,omitempty"`
 	RemediationHeadersCustomName               string            `json:"remediationHeadersCustomName,omitempty"`
+	RemediationTraceIDCustomName               string            `json:"remediationTraceIdCustomName,omitempty"`
 	ForwardedHeadersCustomName                 string            `json:"forwardedHeadersCustomName,omitempty"`
 	DecisionScopeHeaders                       map[string]string `json:"decisionScopeHeaders,omitempty"`
 	ForwardedHeadersTrustedIPs                 []string          `json:"forwardedHeadersTrustedIps,omitempty"`
@@ -195,6 +196,7 @@ func New() *Config {
 		BanFilePath:                     "",
 		TraceHeadersCustomName:          "",
 		RemediationHeadersCustomName:    "",
+		RemediationTraceIDCustomName:    "",
 		ForwardedHeadersCustomName:      "X-Forwarded-For",
 		DecisionScopeHeaders:            map[string]string{},
 		ForwardedHeadersTrustedIPs:      []string{},
