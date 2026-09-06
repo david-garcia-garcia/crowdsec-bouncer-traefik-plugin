@@ -250,6 +250,42 @@ func TestCrowdsecQueryStreamMode401DoesNotRetry(t *testing.T) {
 	}
 }
 
+func TestLiveLookupScopeErrorPreservesActiveIPBan(t *testing.T) {
+	lapi := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		switch {
+		case strings.Contains(req.URL.RawQuery, "ip="):
+			rw.WriteHeader(http.StatusOK)
+			_, _ = rw.Write([]byte(`[{"duration":"1h","origin":"cscli","scope":"Ip","type":"ban","value":"1.2.3.4"}]`))
+		case strings.Contains(req.URL.RawQuery, "scope="):
+			rw.WriteHeader(http.StatusInternalServerError)
+		default:
+			t.Fatalf("unexpected query %s", req.URL.RawQuery)
+		}
+	}))
+	defer lapi.Close()
+	lapiURL, _ := url.Parse(lapi.URL)
+	cacheClient := &cache.Client{}
+	cacheClient.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
+	client := &Client{
+		crowdsecScheme: lapiURL.Scheme,
+		crowdsecHost:   lapiURL.Host,
+		crowdsecPath:   "/",
+		crowdsecHeader: crowdsecLapiHeader,
+		crowdsecKey:    "test-key",
+		crowdsecMode:   configuration.LiveMode,
+		httpClient:     lapi.Client(),
+		cacheClient:    cacheClient,
+		log:            logger.New("ERROR", ""),
+	}
+	value, err := client.LiveLookup("1.2.3.4", map[string]string{decisionscope.ScopeCountry: "FR"})
+	if err == nil {
+		t.Fatal("scope LAPI 500 must return error from LiveLookup when IP is banned")
+	}
+	if !decisionscope.IsActiveRemediation(value) {
+		t.Fatalf("active IP ban must survive scope error, got %q err=%v", value, err)
+	}
+}
+
 func TestLiveLookupScopeErrorPropagates(t *testing.T) {
 	lapi := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		switch {
@@ -270,6 +306,8 @@ func TestLiveLookupScopeErrorPropagates(t *testing.T) {
 		crowdsecScheme: lapiURL.Scheme,
 		crowdsecHost:   lapiURL.Host,
 		crowdsecPath:   "/",
+		crowdsecHeader: crowdsecLapiHeader,
+		crowdsecKey:    "test-key",
 		crowdsecMode:   configuration.LiveMode,
 		httpClient:     lapi.Client(),
 		cacheClient:    cacheClient,

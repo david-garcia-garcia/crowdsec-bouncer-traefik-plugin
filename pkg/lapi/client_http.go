@@ -86,6 +86,7 @@ func (c *Client) crowdsecQuery(stringURL string, data []byte) ([]byte, error) {
 	return c.crowdsecQueryWithMethod(stringURL, method, postBody)
 }
 
+// crowdsecQueryWithMethod performs one LAPI/CAPI round trip with an explicit method and optional POST body; alone-mode 401 renews the token and retries once with the same bytes.
 func (c *Client) crowdsecQueryWithMethod(stringURL, method string, postBody []byte) ([]byte, error) {
 	var body io.Reader
 	if len(postBody) > 0 {

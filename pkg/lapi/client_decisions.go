@@ -132,7 +132,7 @@ func (c *Client) mergeLiveScope(chosen string, parsedDuration time.Duration, sco
 	}
 	headerChosen, headerDuration, headerErr := c.queryLiveDecisions("scope=" + url.QueryEscape(scope) + "&value=" + url.QueryEscape(identifier))
 	if headerErr != nil {
-		return "", 0, headerErr
+		return chosen, parsedDuration, headerErr
 	}
 	c.cacheLiveScope(decisionscope.HeaderScopeKey(scope, identifier), headerChosen, headerDuration, isLiveMode)
 	next := decisionscope.PreferRemediation(chosen, headerChosen)
