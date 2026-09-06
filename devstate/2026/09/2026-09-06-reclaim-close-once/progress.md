@@ -8,7 +8,7 @@ JobName: 2026-09-06-reclaim-close-once
 | explore | [x] | [ ] | |
 | propose | [x] | [ ] | |
 | implement | [x] | [ ] | |
-| codereview | [ ] | [ ] | |
-| devdocsimpact | [ ] | [ ] | |
-| archive | [ ] | [ ] | |
+| codereview | [x] | [ ] | |
+| devdocsimpact | [x] | [ ] | |
+| archive | [x] | [ ] | |
 | pullrequest | [ ] | [ ] | |
