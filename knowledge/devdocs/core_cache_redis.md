@@ -37,7 +37,9 @@ values, err := r.MGet([]string{key, "range-index"})
 ## Gotchas
 
 - Do not copy `SimpleRedis` by value after `Init`.
-- After `Close()`, further Get/Set/Del/MGet return `redis:unreachable` and do not dial.
+- After `Close()`, further Get/Set/Del/MGet return `redis:unreachable` and do not dial; concurrent `Close()` during dial is serialized so no new socket stays live.
+- Each `SimpleRedis` caps total live TCP connections at 8; extra concurrent borrows fail fast with `redis:unreachable`.
+- RESP bulk/array headers above 16 MiB / 4096 elements return `redis:issue?` without allocating; session-fatal `-ERR` replies close the socket instead of repooling.
 - The mock e2e Redis stand-in must speak RESP arrays; inline GET is leftover compatibility.
 - Real-stack Redis-cache e2e uses Dragonfly, not Redis.
 - Pass a non-empty `keyPrefix` (LAPI identity hex) when two LAPI Clients share one Redis.
