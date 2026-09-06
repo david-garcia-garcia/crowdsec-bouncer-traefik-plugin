@@ -25,18 +25,20 @@ const (
 //	                     v
 //	Open (bind) -----> LIVE <---- Open same key before timer fires
 //	                     |              ^
-//	         last holder Done           | stop timer, keep value
+//	         last holder Done           | Wake(), stop timer
 //	                     v              |
-//	                  ORPHAN -----------+
+//	                  SLEEP ------------+
+//	            Sleep() stops tickers
 //	                     |
 //	        grace elapsed / Reset / grace==0
 //	                     v
-//	                   GONE    cancel(life), delete key
+//	                   GONE    Close(), cancel(life), delete key
 //
 // drop and fire take the *slot pointer. If items[key] is a different slot
 // (Reset, or a later incarnation), they no-op. fire also no-ops unless
 // graceGen still matches the armed generation (a reclaim or a later orphan
 // bumped it). That stops a queued AfterFunc from disposing a live slot.
+// Sleep/Wake run while t.mu is held so Sleep cannot land after a racing Wake.
 type Table struct {
 	mu    sync.Mutex
 	grace time.Duration
@@ -88,10 +90,31 @@ type closer interface {
 	Close()
 }
 
+// sleeper is an optional pause on a stored value. Last holder gone → Sleep;
+// Open during grace → Wake. Close still runs when grace elapses. Sleep is not Close.
+type sleeper interface {
+	Sleep()
+	Wake()
+}
+
 // stopValue calls Close if v has it. Used for a lost create and when life ends.
 func stopValue(v any) {
 	if c, ok := v.(closer); ok {
 		c.Close()
+	}
+}
+
+// sleepValue pauses tickers if v has Sleep. Called on last holder gone.
+func sleepValue(v any) {
+	if s, ok := v.(sleeper); ok {
+		s.Sleep()
+	}
+}
+
+// wakeValue resumes tickers if v has Wake. Called when Open reclaims a sleeper.
+func wakeValue(v any) {
+	if s, ok := v.(sleeper); ok {
+		s.Wake()
 	}
 }
 
@@ -108,12 +131,15 @@ func (t *Table) Open(ctx context.Context, key string, logger *slog.Logger, creat
 	}
 	requireContext(ctx)
 
-	// Reuse a live or in-grace incarnation.
+	// Reuse a live or sleeping incarnation.
 	t.mu.Lock()
 	if e, ok := t.items[key]; ok {
 		id, reclaimed := t.bindLocked(e)
 		e.logger = logger
 		v := e.value
+		if reclaimed {
+			wakeValue(v)
+		}
 		t.mu.Unlock()
 		t.logBind(logger, key, reclaimed)
 		go t.watch(key, id, e, ctx)
@@ -135,6 +161,9 @@ func (t *Table) Open(ctx context.Context, key string, logger *slog.Logger, creat
 		id, reclaimed := t.bindLocked(e)
 		e.logger = logger
 		exist := e.value
+		if reclaimed {
+			wakeValue(exist)
+		}
 		t.mu.Unlock()
 		cancel()
 		stopValue(v)
@@ -204,7 +233,8 @@ func (t *Table) drop(key string, id uint64, e *slot) {
 		return
 	}
 
-	// Last holder gone: arm grace or end immediately when grace is zero.
+	// Last holder gone: Sleep (tickers off) then arm grace. Close waits for fire.
+	sleepValue(e.value)
 	e.graceGen++
 	gen := e.graceGen
 	orphanLog := e.logger
@@ -229,12 +259,63 @@ func (t *Table) fire(key string, e *slot, gen uint64) {
 	}
 	cancel := e.cancel
 	disposeLog := e.logger
+	stored := e.value
 	delete(t.items, key)
 	t.mu.Unlock()
 	if cancel != nil {
 		cancel()
 	}
+	// Close after Sleep. fire is grace, Reset, or ReplaceSleeping discarding
+	// a sleeper so create() can store a new snapshot. Callers do not Close slots.
 	disposeLog.Debug(MsgDispose, "key", key)
+	stopValue(stored)
+}
+
+// Peek returns the stored value for key without adding a holder and without create.
+// holders is the live constructor-context count. sleeping is true when the last
+// holder is gone and the dispose timer is armed. ok is false when the key is absent.
+func (t *Table) Peek(key string) (value any, holders int, sleeping bool, ok bool) {
+	if t == nil {
+		return nil, 0, false, false
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	e, ok := t.items[key]
+	if !ok {
+		return nil, 0, false, false
+	}
+	return e.value, len(e.holders), e.graceTimer != nil, true
+}
+
+// ReplaceSleeping disposes a zero-holder slot inside the table, then Open.
+// Live holders: same as Open (bind, no dispose). Callers never Close the slot.
+func (t *Table) ReplaceSleeping(ctx context.Context, key string, logger *slog.Logger, create func() (any, error)) (any, error) {
+	if t == nil {
+		return nil, fmt.Errorf("reclaim: open %q: nil table", key)
+	}
+	t.discardSleeping(key)
+	return t.Open(ctx, key, logger, create)
+}
+
+// discardSleeping Close()s a zero-holder incarnation. Live holders: no-op.
+func (t *Table) discardSleeping(key string) {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	e, ok := t.items[key]
+	if !ok || len(e.holders) > 0 {
+		t.mu.Unlock()
+		return
+	}
+	if e.graceTimer != nil {
+		e.graceTimer.Stop()
+		e.graceTimer = nil
+	}
+	e.graceGen++
+	gen := e.graceGen
+	t.mu.Unlock()
+	t.fire(key, e, gen)
 }
 
 // Reset stops grace timers and cancels every incarnation lifetime. Tests only.

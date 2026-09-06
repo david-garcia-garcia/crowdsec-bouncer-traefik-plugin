@@ -41,12 +41,33 @@ type namedEnd struct {
 	ended *[]string
 }
 
-// Close records this name as stopped.
+// Close records this name as stopped once.
 func (n *namedEnd) Close() {
 	n.mu.Lock()
+	defer n.mu.Unlock()
+	for _, already := range *n.ended {
+		if already == n.name {
+			return
+		}
+	}
 	*n.ended = append(*n.ended, n.name)
-	n.mu.Unlock()
 }
+
+// sleepy records Sleep/Wake/Close for reclaim lifecycle tests.
+type sleepy struct {
+	sleeps atomic.Int32
+	wakes  atomic.Int32
+	closes atomic.Int32
+}
+
+// Sleep counts a pause.
+func (s *sleepy) Sleep() { s.sleeps.Add(1) }
+
+// Wake counts a resume.
+func (s *sleepy) Wake() { s.wakes.Add(1) }
+
+// Close counts dispose.
+func (s *sleepy) Close() { s.closes.Add(1) }
 
 // recHandler records slog lines so tests can assert reclaim msg + key + level.
 type recHandler struct {
@@ -896,4 +917,141 @@ func TestTable_OpenLoggerLevelGatesPutDispose(t *testing.T) {
 	cancel2()
 	waitKeyMsg(t, &debugH.recHandler, MsgPut, "b")
 	waitKeyMsg(t, &debugH.recHandler, MsgDispose, "b")
+}
+
+// TestTable_PeekDuringGrace does not bind and reports zero holders with grace armed.
+func TestTable_PeekDuringGrace(t *testing.T) {
+	h := &recHandler{}
+	tab := NewTable(80 * time.Millisecond)
+	var ended atomic.Bool
+	ctx, cancel := context.WithCancel(context.Background())
+	first, err := tab.Open(ctx, "a", slog.New(h), func() (any, error) {
+		return ending(1, &ended), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	waitKeyMsg(t, h, MsgOrphan, "a")
+	stored, holders, sleeping, ok := tab.Peek("a")
+	if !ok || stored != first || holders != 0 || !sleeping {
+		t.Fatalf("peek ok=%v holders=%d sleeping=%v stored=%v", ok, holders, sleeping, stored)
+	}
+	if ended.Load() {
+		t.Fatal("peek must not dispose")
+	}
+}
+
+// TestTable_ReplaceSleepingClosesNow stops Close before grace would elapse then Open creates.
+func TestTable_ReplaceSleepingClosesNow(t *testing.T) {
+	h := &recHandler{}
+	grace := 200 * time.Millisecond
+	tab := NewTable(grace)
+	var ended atomic.Bool
+	ctx, cancel := context.WithCancel(context.Background())
+	if _, err := tab.Open(ctx, "a", slog.New(h), func() (any, error) {
+		return ending(1, &ended), nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	waitKeyMsg(t, h, MsgOrphan, "a")
+	start := time.Now()
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	defer cancel2()
+	second, err := tab.ReplaceSleeping(ctx2, "a", slog.New(h), func() (any, error) {
+		return &box{n: 2}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ended.Load() {
+		t.Fatal("Close must run before ReplaceSleeping returns so create can put a new value")
+	}
+	if time.Since(start) >= grace*3/4 {
+		t.Fatalf("ReplaceSleeping waited for grace: %v", time.Since(start))
+	}
+	if second.(*box).n != 2 {
+		t.Fatalf("create must run after discard: %+v", second)
+	}
+}
+
+// TestTable_ReplaceSleepingWithLiveHoldersBinds keeps the incarnation for remaining holders.
+func TestTable_ReplaceSleepingWithLiveHoldersBinds(t *testing.T) {
+	h := &recHandler{}
+	tab := NewTable(20 * time.Millisecond)
+	var ended atomic.Bool
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	first, err := tab.Open(ctx, "a", slog.New(h), func() (any, error) {
+		return ending(1, &ended), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	defer cancel2()
+	second, err := tab.ReplaceSleeping(ctx2, "a", slog.New(h), func() (any, error) {
+		return &box{n: 2}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ended.Load() {
+		t.Fatal("ReplaceSleeping must not dispose while a holder is live")
+	}
+	if second != first {
+		t.Fatal("live holders must bind the stored value")
+	}
+}
+
+// TestTable_LastHolderSleepsThenReclaimWakes checks Sleep on orphan and Wake on Open during grace.
+func TestTable_LastHolderSleepsThenReclaimWakes(t *testing.T) {
+	h := &recHandler{}
+	tab := NewTable(80 * time.Millisecond)
+	paused := &sleepy{}
+	ctx, cancel := context.WithCancel(context.Background())
+	if _, err := tab.Open(ctx, "a", slog.New(h), func() (any, error) {
+		return paused, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	waitKeyMsg(t, h, MsgOrphan, "a")
+	waitUntil(t, func() bool { return paused.sleeps.Load() == 1 })
+	if paused.wakes.Load() != 0 || paused.closes.Load() != 0 {
+		t.Fatalf("sleep only: %+v", paused)
+	}
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	defer cancel2()
+	if _, err := tab.Open(ctx2, "a", slog.New(h), func() (any, error) {
+		return &sleepy{}, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, func() bool { return paused.wakes.Load() == 1 })
+	if paused.closes.Load() != 0 {
+		t.Fatal("reclaim must not Close")
+	}
+	if paused.sleeps.Load() != 1 {
+		t.Fatalf("sleeps=%d", paused.sleeps.Load())
+	}
+}
+
+// TestTable_GraceClosesAfterSleep checks Close runs when grace elapses after Sleep.
+func TestTable_GraceClosesAfterSleep(t *testing.T) {
+	h := &recHandler{}
+	tab := NewTable(20 * time.Millisecond)
+	paused := &sleepy{}
+	ctx, cancel := context.WithCancel(context.Background())
+	if _, err := tab.Open(ctx, "a", slog.New(h), func() (any, error) {
+		return paused, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	waitUntil(t, func() bool { return paused.closes.Load() >= 1 })
+	if paused.sleeps.Load() < 1 {
+		t.Fatal("Sleep must run before Close")
+	}
 }
