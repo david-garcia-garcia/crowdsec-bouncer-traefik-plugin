@@ -21,3 +21,9 @@ phase: implement
 findings: localTests passed; e2e docker + pester failed (no test-results.xml)
 fixed: TestHandleStreamCacheIntervalOneStoresLease
 skipped: Redis backend test; TTL expiry sleep
+
+## codereview (2026-09-06)
+phase: codereview
+findings: Standards 1 hard (hits dereference); other axes none
+fixed: atomic.LoadInt64(hits)
+skipped: none

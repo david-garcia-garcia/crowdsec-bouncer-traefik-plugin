@@ -1,4 +1,4 @@
-Developer review: needs changes — 2026-09-06T15:27:55Z
+Developer review: in progress — 2026-09-06T15:31:15Z
 
 [sgsi-dev-ticket-status:2026-09-06-upstream-370-stream-poll-lease-interval-one]
 
@@ -7,25 +7,25 @@ Developer review: needs changes — 2026-09-06T15:27:55Z
 
 **Admin users.** None.
 
-**Developers.** `pkg/lapi/client_stream_test.go` adds `TestHandleStreamCacheIntervalOneStoresLease`: with `updateInterval` 1, a stream miss stores cache key `updated` and a second poll does not call LAPI. Spec `core_plugin_lapi_stream-lease` is in the OpenSpec change (not archived yet).
+**Developers.** `pkg/lapi/client_stream_test.go` adds `TestHandleStreamCacheIntervalOneStoresLease` (interval 1 stores `updated`, second poll skips LAPI). Hit counter reads use `atomic.LoadInt64`. Spec `core_plugin_lapi_stream-lease` is in the OpenSpec change.
 
 **End users.** None.
 
 ## Motivation
-On `master`, no test proves that `updateIntervalSeconds: 1` stores stream poll lease key `updated`. Upstream #370 used TTL 0, which never stores, so every instance polls LAPI every tick. Without this test a regression can return silently.
+On `master`, no test proves that `updateIntervalSeconds: 1` stores stream poll lease key `updated`. Upstream #370 used TTL 0, which never stores. Without this test a regression polls LAPI every tick on multi-instance deploys.
 
 ## Merge readiness
-Implement landed the test; docker Pester CI failed before writing results. 5 workflow items remain.
+Code review complete (one hard finding fixed). New CI queued. 3 workflow items remain.
 
 Priority: P3 — test coverage; no current operator or end-user harm on the fork.
-Reviewed head: a7009c4
+Reviewed head: 28d59b6
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 2/6 | e2e docker + pester failed |
-| CI proof | 2/6 | Main Process and mock e2e succeeded; docker Pester failed |
+| Overall readiness | 3/6 | CI running after review fix |
+| CI proof | 3/6 | Checks queued on 28d59b6 |
 | Local tests proof | N/A | Remote CI is the proof axis |
 | Review resolution | N/A | No PR comments inventoried |
 
@@ -35,7 +35,7 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-06-upstream-370-stream-poll-lease-interval-one pushed | git push |
 | OpenSpec | stream-poll-lease-interval-one | openspec/changes/stream-poll-lease-interval-one/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/47 | pr-host List |
-| CI | build 34041797123 failure https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041797123 | e2e docker + pester: no test-results.xml |
+| CI | build 34042557959 queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34042557959 | pr-host CI |
 | Local tests | passed | go test ./pkg/lapi/ -count=1 |
 | PR comments | no comments | comments: none |
 
@@ -46,27 +46,30 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local assessment for upstream #370 → branch `2026-09-06-upstream-370-stream-poll-lease-interval-one` → PR #47 → unit test landed → docker Pester CI failed (no XML) while Main Process and mock e2e succeeded.
+Upstream #370 assessment → PR #47 → interval-1 lease test → five-axis review (Standards hard finding fixed) → archive next.
 
 ## Decision needed
 | Question | Decision | By |
 | --- | --- | --- |
-| Should tests cover Redis backend explicitly, or is in-memory cache enough to prove lease storage at interval 1? | assumed — in-memory only. The failure is TTL 0 so Set is a no-op; golang-ttl-map exhibits that. Redis SET EX 0 is out of scope. | explore |
-| Where does the interval-1 lease test live? | assumed — new pkg/lapi/client_stream_test.go next to handleStreamCache. Reuse testStreamLAPI. Do not extend TestHandleStreamCacheLeaseHitHydrates. | explore |
-| Must the test wait for TTL expiry, or is key present plus second call skips LAPI enough? | assumed — no sleep. After miss path, Get(updated) must succeed and a second handleStreamCache must not increment streamFetches. | explore |
+| Should tests cover Redis backend explicitly, or is in-memory cache enough to prove lease storage at interval 1? | assumed — in-memory only. | explore |
+| Where does the interval-1 lease test live? | assumed — pkg/lapi/client_stream_test.go. | explore |
+| Must the test wait for TTL expiry, or is key present plus second call skips LAPI enough? | assumed — no sleep. | explore |
 
 ## Before merge
-- [ ] [P3] Green CI: e2e (docker + pester) wrote no test-results.xml (https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041797123)
-- [x] Implement: TestHandleStreamCacheIntervalOneStoresLease; go test ./pkg/lapi/ passed
-- [x] Propose: change `stream-poll-lease-interval-one`, spec `core_plugin_lapi_stream-lease`
-- [x] Explore: miss→store at interval 1, in-memory, client_stream_test.go
-- [x] Prepare: requirement, ticket dump, stub PR
+- [ ] [P3] Green CI on head 28d59b6 (prior docker Pester run wrote no XML)
+- [x] Code review: atomic.LoadInt64 for hits; other axes none
+- [x] Implement: TestHandleStreamCacheIntervalOneStoresLease
+- [x] Propose: change `stream-poll-lease-interval-one`
 
 ## Findings
-- [[P3] e2e docker + pester](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041797123/job/101509787943) — FIX — annotation `no test-results.xml (Pester did not write results)`. Path: `.github/workflows/e2e.yml`. Unit-test change does not start the docker stack.
+None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-370-stream-poll-lease-interval-one/devstate/2026/09/2026-09-06-upstream-370-stream-poll-lease-interval-one/codereview_standards.md) — 1 total, 0 pending, 1 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-370-stream-poll-lease-interval-one/devstate/2026/09/2026-09-06-upstream-370-stream-poll-lease-interval-one/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-370-stream-poll-lease-interval-one/devstate/2026/09/2026-09-06-upstream-370-stream-poll-lease-interval-one/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-370-stream-poll-lease-interval-one/devstate/2026/09/2026-09-06-upstream-370-stream-poll-lease-interval-one/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-06-upstream-370-stream-poll-lease-interval-one/devstate/2026/09/2026-09-06-upstream-370-stream-poll-lease-interval-one/codereview_dead.md) — 0 total, 0 pending, 0 completed
 
 ## Agent review details
 
@@ -75,24 +78,24 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 0 modified | Same list as Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | a7009c4d45bb85fbe1f956fc79c0167e56c7b988 | Card must match the branch you measured |
+| Reviewed head | 28d59b6c90073c16f9d1220b875a1bf730267b7f | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: prove the existing lease floor with an in-memory miss→store test; do not change product behavior.
+Best possible solution: prove the existing lease floor with an in-memory miss→store test.
 
-Do we have a high-confidence way to reproduce? Yes — `go test ./pkg/lapi/ -count=1 -run TestHandleStreamCacheIntervalOneStoresLease` passed locally.
+Do we have a high-confidence way to reproduce? Yes — `go test ./pkg/lapi/ -count=1 -run TestHandleStreamCacheIntervalOneStoresLease` passed after the atomic.LoadInt64 fix.
 
 Is this the best way to solve the issue? Yes — add-tests matches `present-fixed-unproven`.
 
 ### Evidence
 What I checked:
-- `go test ./pkg/lapi/ -count=1` passed (local)
-- Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041797026
-- e2e mock success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041797123/job/101509788315
-- e2e docker + pester failure: no test-results.xml https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34041797123/job/101509787943
+- Five-axis review on origin/master...HEAD excluding devstate
+- Standards 1 hard: *hits → atomic.LoadInt64 (ca9fbea)
+- Spec/Security/Performance/Dead: none
+- Local `go test ./pkg/lapi/ -count=1` passed
 
 ### Rank-up moves
 None.
