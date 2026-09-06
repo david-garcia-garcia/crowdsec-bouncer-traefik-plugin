@@ -1,0 +1,5 @@
+host: local
+ref: none
+title: GetRemoteIP trusts X-Forwarded-For without a RemoteAddr trusted-proxy gate
+url: none
+number: none
