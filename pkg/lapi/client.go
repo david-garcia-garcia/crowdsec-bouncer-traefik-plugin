@@ -42,9 +42,10 @@ type Decision struct {
 
 // Client owns stream ticker, isolated cache, in-process Range membership, LAPI/CAPI HTTP, and metrics.
 type Client struct {
-	mu       sync.Mutex
-	closed   bool
-	sleeping bool // last reclaim holder gone; tickers stopped until Wake or Close
+	mu           sync.Mutex
+	streamPollMu sync.Mutex // serializes stream poll body and health field updates
+	closed       bool
+	sleeping     bool // last reclaim holder gone; tickers stopped until Wake or Close
 
 	crowdsecScheme         string
 	crowdsecHost           string
