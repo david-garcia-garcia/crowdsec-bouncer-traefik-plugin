@@ -249,6 +249,25 @@ func Test_appsecQuery_challengeJSON(t *testing.T) {
 	}
 }
 
+func Test_appsecQuery_captchaJSON(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusForbidden)
+		_, _ = rw.Write([]byte(`{"action":"captcha","http_status":403,"user_body_content":"<html>captcha</html>"}`))
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), Policy{})
+	if err != nil {
+		t.Fatalf("Query() returned error: %v", err)
+	}
+	if decision == nil || decision.Action != ActionCaptcha {
+		t.Fatalf("Query() want captcha, got %#v", decision)
+	}
+	if decision.HTTPStatus != http.StatusForbidden || decision.UserBodyContent != "<html>captcha</html>" {
+		t.Fatalf("Query() captcha fields: %#v", decision)
+	}
+}
+
 func Test_appsecQuery_emptyForbiddenErrors(t *testing.T) {
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusForbidden)
