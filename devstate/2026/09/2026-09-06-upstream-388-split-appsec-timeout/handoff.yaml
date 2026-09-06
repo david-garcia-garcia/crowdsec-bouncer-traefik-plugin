@@ -11,7 +11,7 @@ localTests: none
 requirement: requirement.md
 comments: none
 explore: explore.md
-change: none
+change: split-appsec-timeout
 pr:
   id: 41
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/41
