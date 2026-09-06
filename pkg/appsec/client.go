@@ -87,11 +87,11 @@ func (c *Client) Sleep() {}
 // Wake is a reclaim no-op: AppSec has no tickers.
 func (c *Client) Wake() {}
 
-func closeIdle(client *http.Client) {
-	if client == nil {
+func closeIdle(httpClient *http.Client) {
+	if httpClient == nil {
 		return
 	}
-	if t, ok := client.Transport.(*http.Transport); ok {
+	if t, ok := httpClient.Transport.(*http.Transport); ok {
 		t.CloseIdleConnections()
 	}
 }

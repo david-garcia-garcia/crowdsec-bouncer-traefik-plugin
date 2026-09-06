@@ -31,11 +31,11 @@ type Login struct {
 	Expire string `json:"expire"`
 }
 
-func closeIdle(client *http.Client) {
-	if client == nil {
+func closeIdle(httpClient *http.Client) {
+	if httpClient == nil {
 		return
 	}
-	if t, ok := client.Transport.(*http.Transport); ok {
+	if t, ok := httpClient.Transport.(*http.Transport); ok {
 		t.CloseIdleConnections()
 	}
 }

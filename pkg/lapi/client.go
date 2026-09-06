@@ -346,11 +346,6 @@ func (c *Client) storeRangeMembership(index string) {
 	c.lastRangeIndex.Store(index)
 }
 
-// Mode is the Crowdsec mode for this connection.
-func (c *Client) Mode() string {
-	return c.crowdsecMode
-}
-
 // StreamHealthy is true while stream polling is succeeding.
 func (c *Client) StreamHealthy() bool {
 	return c.isCrowdsecStreamHealthy

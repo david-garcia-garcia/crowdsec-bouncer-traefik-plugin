@@ -126,7 +126,7 @@ func TestNew_SameLapiClientFields_ShareIncarnation(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !testRoute(t, a).SameLapiClient(testRoute(t, b)) {
-		t.Fatal("same connection fields and different names must share one CrowdsecConnection")
+		t.Fatal("same LAPI fields and different names must share one lapi.Client")
 	}
 }
 
@@ -152,7 +152,7 @@ func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 		t.Fatal(err)
 	}
 	if testRoute(t, ha).SameLapiClient(testRoute(t, hb)) {
-		t.Fatal("different LAPI hosts must not share a CrowdsecConnection")
+		t.Fatal("different LAPI hosts must not share a lapi.Client")
 	}
 
 	ra := httptest.NewRecorder()
@@ -193,7 +193,7 @@ func TestNew_ReclaimWithinGrace(t *testing.T) {
 		t.Fatal(err)
 	}
 	if testRoute(t, second).LapiClient() != firstLapiClient {
-		t.Fatal("Open within grace must reclaim the same CrowdsecConnection")
+		t.Fatal("Open within grace must reclaim the same lapi.Client")
 	}
 }
 
@@ -216,7 +216,7 @@ func TestNew_DisposeAfterGrace(t *testing.T) {
 	time.Sleep(150 * time.Millisecond)
 	view := reclaim.Peek(lapi.Key(cfg))
 	if !view.OK || view.Holders != 0 || !view.Sleeping {
-		t.Fatalf("CrowdsecConnection must still be in its 30s grace after table 20ms: found=%v holders=%d sleeping=%v", view.OK, view.Holders, view.Sleeping)
+		t.Fatalf("lapi.Client must still be in its 30s grace after table 20ms: found=%v holders=%d sleeping=%v", view.OK, view.Holders, view.Sleeping)
 	}
 	time.Sleep(lapi.ReclaimGraceDuration)
 	second, err := New(context.Background(), testNextOK(), cfgLiveAt(u.Host), "dispose")
@@ -224,7 +224,7 @@ func TestNew_DisposeAfterGrace(t *testing.T) {
 		t.Fatal(err)
 	}
 	if testRoute(t, second).LapiClient() == firstLapiClient {
-		t.Fatal("after CrowdsecConnection grace the previous incarnation must be disposed")
+		t.Fatal("after lapi.Client grace the previous incarnation must be disposed")
 	}
 }
 
