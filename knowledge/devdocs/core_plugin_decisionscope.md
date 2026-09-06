@@ -25,7 +25,7 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 ## How to use
 
 - Pass `decisionScopeHeaders` from config into the connection (stream `scopes=` and live `scope`+`value` queries) and into the bouncer (request headers).
-- Resolve the client IP with `pkg/ip.GetRemoteIP`. Then `LookupCachedRemediation` with `conn.RangeMembership()` in stream/alone/live cache hits.
+- Resolve the client IP with `pkg/ip.GetRemoteIP`. Then `LookupCachedRemediation` with `conn.RangeMembership()` in stream/alone/live cache hits (kind, origin, err). Matching uses the first letter; origin is for usage-metrics only.
 - Stream Range items: collect the tick, then `ApplyRangeBatch` (one read, one write). Hydrate membership from the blob after apply and on a lease hit. Do not GET+SET per Range line.
 - Live/none: keep `?ip=` (LAPI expands Range). Add `scope`+`value` when a mapped header is present. Skip `range-index` and membership on none.
 - CAPI (alone) omits `scopes=`. Apply any streamed scope this bouncer is configured to match.
@@ -34,7 +34,8 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 
 ```go
 scopes := decisionscope.RequestScopeValues(headers, req)
-value, err := decisionscope.LookupCachedRemediation(cacheClient, mode, remoteIP, scopes, conn.RangeMembership())
+kind, origin, err := decisionscope.LookupCachedRemediation(cacheClient, mode, remoteIP, scopes, conn.RangeMembership())
+conn.IncDropped(origin, ip.Family(remoteIP), "ban")
 ```
 
 ## Key files
@@ -55,3 +56,4 @@ value, err := decisionscope.LookupCachedRemediation(cacheClient, mode, remoteIP,
 - Ban wins across Ip, Range, and header hits. Do not return the first active Ip or Range captcha before considering a Country ban.
 - Redis followers skip LAPI on a lease hit. They still GET `range-index` on that tick and rebuild membership; without that hydrate they would miss every Range decision.
 - Trust the header the same way you trust `X-Forwarded-For`: only from a trusted hop (CDN or geoenrich in front of this middleware).
+- Ip/header cache values MAY be `t`/`c` plus U+001F plus a metrics origin. `range-index` stays `cidr=letter`. Bare letters still match.

@@ -39,7 +39,7 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 			}
 			rw := httptest.NewRecorder()
 			req := &http.Request{Method: tt.method}
-			b.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST")
+			b.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST", "")
 			if rw.Code != http.StatusForbidden {
 				t.Errorf("Expected status code 403, got %d", rw.Code)
 			}
@@ -80,7 +80,7 @@ func TestHandleBanServeHTTPContentType(t *testing.T) {
 			}
 			rw := httptest.NewRecorder()
 			req := &http.Request{Method: http.MethodGet}
-			b.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST")
+			b.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST", "")
 			if got := rw.Header().Get("Content-Type"); got != tt.banTemplateContentType {
 				t.Errorf("Expected Content-Type %q, got %q", tt.banTemplateContentType, got)
 			}
@@ -315,7 +315,7 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			log:  logger.New("ERROR", ""),
 			conn: crowdsecconnection.NewTestLapiFailureActionConnection(configuration.FailureActionPassthrough),
 		}
-		b.applyLapiFailureAction(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10", configuration.ReasonTECH)
+		b.applyLapiFailureAction(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10", configuration.ReasonTECH, crowdsecconnection.OriginPluginTechStreamFail)
 		if !nextCalled {
 			t.Fatal("passthrough should use the pass path")
 		}
@@ -330,7 +330,7 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			conn:                  crowdsecconnection.NewTestLapiFailureActionConnection(configuration.FailureActionBan),
 		}
 		recorder := httptest.NewRecorder()
-		b.applyLapiFailureAction(recorder, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10", configuration.ReasonLAPI)
+		b.applyLapiFailureAction(recorder, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10", configuration.ReasonLAPI, crowdsecconnection.OriginPluginLapiFailure)
 		if recorder.Code != http.StatusForbidden {
 			t.Fatalf("ban want 403, got %d", recorder.Code)
 		}

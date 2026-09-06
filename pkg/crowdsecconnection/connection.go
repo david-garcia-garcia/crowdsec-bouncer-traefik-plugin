@@ -69,7 +69,14 @@ type CrowdsecConnection struct {
 	streamStop              chan bool
 	metricsStop             chan bool
 	lastMetricsPush         time.Time
-	blockedRequests         int64
+	startedAt               time.Time
+	metricsMu               sync.Mutex
+	windowCounters          map[usageMetricKey]int64 // dropped counters for the current push window
+	processedIPv4           int64                    // processed ipv4; atomic on the request path
+	processedIPv6           int64
+	processedUnknown        int64 // processed when Family is empty
+	activeDecisions         map[usageMetricKey]int64
+	activeDecisionSlots     map[string]usageMetricKey
 	streamFetches           int64
 }
 
@@ -162,6 +169,10 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		crowdsecHeader:          crowdsecHeader,
 		log:                     log,
 		pluginVersion:           pluginVersion,
+		startedAt:               time.Now(),
+		windowCounters:          make(map[usageMetricKey]int64),
+		activeDecisions:         make(map[usageMetricKey]int64),
+		activeDecisionSlots:     make(map[string]usageMetricKey),
 		isCrowdsecStreamStartup: true,
 		isCrowdsecStreamHealthy: true,
 		httpClient: &http.Client{
@@ -320,9 +331,4 @@ func (c *CrowdsecConnection) RedisUnreachableBlock() bool {
 // StreamFetches is how many times this connection actually called the stream endpoint.
 func (c *CrowdsecConnection) StreamFetches() int64 {
 	return atomic.LoadInt64(&c.streamFetches)
-}
-
-// IncBlocked increments the dropped-request metric.
-func (c *CrowdsecConnection) IncBlocked() {
-	atomic.AddInt64(&c.blockedRequests, 1)
 }

@@ -103,6 +103,7 @@ func (c *CrowdsecConnection) handleStreamCache() error {
 			cidr := strings.TrimSpace(decision.Value)
 			if value != "" && cidr != "" {
 				rangeUpserts[cidr] = value
+				c.rememberActiveDecision("range:"+cidr, MetricsOrigin(decision.Origin, decision.Scenario), cidr)
 			}
 			continue
 		}
@@ -112,6 +113,7 @@ func (c *CrowdsecConnection) handleStreamCache() error {
 		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
 			if cidr := strings.TrimSpace(decision.Value); cidr != "" {
 				rangeRemovals = append(rangeRemovals, cidr)
+				c.forgetActiveDecision("range:" + cidr)
 			}
 			continue
 		}

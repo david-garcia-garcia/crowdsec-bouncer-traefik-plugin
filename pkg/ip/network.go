@@ -22,3 +22,30 @@ func InNetwork(addr, network string) (bool, error) {
 	}
 	return ipAddr.Equal(other), nil
 }
+
+// Family is ipv4 or ipv6 for an address GetRemoteIP already returned. Empty if unparseable.
+func Family(addr string) string {
+	parsed := net.ParseIP(strings.TrimSpace(addr))
+	if parsed == nil {
+		return ""
+	}
+	if parsed.To4() != nil {
+		return "ipv4"
+	}
+	return "ipv6"
+}
+
+// FamilyOfHostOrCIDR classifies a decision value (host or network) for usage-metrics ip_type.
+func FamilyOfHostOrCIDR(value string) string {
+	if family := Family(value); family != "" {
+		return family
+	}
+	_, network, err := net.ParseCIDR(strings.TrimSpace(value))
+	if err != nil {
+		return ""
+	}
+	if network.IP.To4() != nil {
+		return "ipv4"
+	}
+	return "ipv6"
+}

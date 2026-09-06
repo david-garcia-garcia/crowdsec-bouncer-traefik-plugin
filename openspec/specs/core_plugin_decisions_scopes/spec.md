@@ -80,3 +80,14 @@ Each stream or alone connection SHALL rebuild in-process Range membership from `
 #### Scenario: Ban wins over a longer captcha prefix
 - **WHEN** stream has a Range ban `10.0.0.0/8` and a Range captcha `10.1.0.0/16` and the client IP is `10.1.2.3`
 - **THEN** the request is forbidden, not captcha
+
+### Requirement: Remediation cache values may carry origin
+An Ip or header-scope cache value SHALL still start with the ban/captcha/none letter (`t` / `c` / `f`). It MAY append a unit-separator and the metrics origin. `IsActiveRemediation`, `PreferRemediation`, Range index parsing, and request lookup SHALL use that letter. Lookup keys (client IP, `scope:value`, `range-index`) MUST NOT change. A value that is only the letter (today’s Redis) SHALL keep matching.
+
+#### Scenario: Suffixed ban still remediates
+- **WHEN** cache holds `t` plus a unit-separator and `crowdsec` for the client IP
+- **THEN** the request is banned
+
+#### Scenario: Bare letter still remediates
+- **WHEN** cache holds only `t` for the client IP
+- **THEN** the request is banned

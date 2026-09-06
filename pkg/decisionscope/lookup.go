@@ -10,9 +10,10 @@ import (
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
-// IsActiveRemediation reports whether value is ban or captcha.
+// IsActiveRemediation reports whether value is ban or captcha (origin suffix ignored).
 func IsActiveRemediation(value string) bool {
-	return value == cache.BannedValue || value == cache.CaptchaValue
+	kind := cache.RemediationKind(value)
+	return kind == cache.BannedValue || kind == cache.CaptchaValue
 }
 
 // RemediationValue maps a CrowdSec decision type to a cache remediation.
@@ -27,10 +28,15 @@ func RemediationValue(decisionType string) string {
 	}
 }
 
-// PreferRemediation keeps ban over captcha over empty.
+// PreferRemediation keeps ban over captcha over empty. Origin suffix is ignored for the winner's letter.
 func PreferRemediation(current, incoming string) string {
-	if current == cache.BannedValue || incoming == cache.BannedValue {
-		return cache.BannedValue
+	currentKind := cache.RemediationKind(current)
+	incomingKind := cache.RemediationKind(incoming)
+	if currentKind == cache.BannedValue {
+		return current
+	}
+	if incomingKind == cache.BannedValue {
+		return incoming
 	}
 	if IsActiveRemediation(current) {
 		return current
@@ -55,11 +61,12 @@ func RequestScopeValues(headers map[string]string, req *http.Request) map[string
 
 // LookupCachedRemediation merges Ip, Range, and present header-scope hits. Ban wins across those scopes.
 // Stream and alone Range hits come from membership, not from a range-index GetMany.
-func LookupCachedRemediation(cacheClient *cache.Client, mode, remoteIP string, scopes map[string]string, membership *RangeMembership) (string, error) {
+// The returned remediation is the letter only; origin is the metrics origin of the winning Ip/header value (empty for Range-only).
+func LookupCachedRemediation(cacheClient *cache.Client, mode, remoteIP string, scopes map[string]string, membership *RangeMembership) (string, string, error) {
 	useRangeMembership := mode == configuration.StreamMode || mode == configuration.AloneMode
 	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, scopes))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	// Merge Ip, Range, and header hits so a Country ban beats a Range captcha.
 	chosen := found[remoteIP]
@@ -73,12 +80,12 @@ func LookupCachedRemediation(cacheClient *cache.Client, mode, remoteIP string, s
 		chosen = PreferRemediation(chosen, found[HeaderScopeKey(scope, identifier)])
 	}
 	if IsActiveRemediation(chosen) {
-		return chosen, nil
+		return cache.RemediationKind(chosen), cache.RemediationOrigin(chosen), nil
 	}
 	if value, ok := found[remoteIP]; ok {
-		return value, nil
+		return cache.RemediationKind(value), cache.RemediationOrigin(value), nil
 	}
-	return "", errors.New(cache.CacheMiss)
+	return "", "", errors.New(cache.CacheMiss)
 }
 
 // LookupCacheKeys is the GetMany key list for the request path: IP, then present header scopes. Range is not a cache key.
