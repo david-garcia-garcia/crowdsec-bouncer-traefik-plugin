@@ -15,3 +15,9 @@ phase: implement
 findings: grace captcha form POST now 302; ordinary POST body restored; go test captcha+bouncer passed; CI queued
 fixed: pkg/captcha IsCaptchaFormPost+WriteSolvedRedirect; bouncer handleRemediationServeHTTP intercept
 skipped: usage packet (note large)
+
+## codereview (2026-09-06)
+phase: codereview
+findings: Standards/Spec/Security/Dead none; Performance 1 hard unbounded ReadAll
+fixed: captchaFormMaxBytes 64KiB LimitReader (9373e6e)
+skipped: none
