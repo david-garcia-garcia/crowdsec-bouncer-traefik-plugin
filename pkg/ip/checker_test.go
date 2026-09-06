@@ -114,98 +114,144 @@ func TestGetRemoteIP(t *testing.T) {
 	strategy := &PoolStrategy{Checker: hopChecker}
 	trustedProxyAddr := "10.0.0.1:443"
 
-	t.Run("trusted hops skipped, client kept", func(t *testing.T) {
-		req := newTestTrustRequest(trustedProxyAddr, "X-Forwarded-For", "203.0.113.10, 10.0.0.1")
-		got, _, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
-		if err != nil || got != "203.0.113.10" {
-			t.Fatalf("GetRemoteIP = %q, %v want 203.0.113.10", got, err)
-		}
-	})
+	emptyChecker, err := NewChecker(log, []string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	emptyStrategy := &PoolStrategy{Checker: emptyChecker}
 
-	t.Run("untrusted RemoteAddr ignores forged header", func(t *testing.T) {
-		req := newTestTrustRequest("198.51.100.5:443", "X-Forwarded-For", "203.0.113.10, 10.0.0.1")
-		got, _, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
-		if err != nil || got != "198.51.100.5" {
-			t.Fatalf("GetRemoteIP = %q, %v want 198.51.100.5", got, err)
-		}
-	})
+	tests := []struct {
+		name       string
+		remoteAddr string
+		headerName string
+		headerVal  string
+		strategy   *PoolStrategy
+		wantIP     string
+		wantParsed bool
+		wantErr    bool
+	}{
+		{
+			name:       "trusted hops skipped, client kept",
+			remoteAddr: trustedProxyAddr,
+			headerName: "X-Forwarded-For",
+			headerVal:  "203.0.113.10, 10.0.0.1",
+			strategy:   strategy,
+			wantIP:     "203.0.113.10",
+			wantParsed: true,
+		},
+		{
+			name:       "untrusted RemoteAddr ignores forged header",
+			remoteAddr: "198.51.100.5:443",
+			headerName: "X-Forwarded-For",
+			headerVal:  "203.0.113.10, 10.0.0.1",
+			strategy:   strategy,
+			wantIP:     "198.51.100.5",
+			wantParsed: true,
+		},
+		{
+			name:       "empty trusted pool ignores header",
+			remoteAddr: "198.51.100.5:443",
+			headerName: "X-Forwarded-For",
+			headerVal:  "203.0.113.10",
+			strategy:   emptyStrategy,
+			wantIP:     "198.51.100.5",
+			wantParsed: true,
+		},
+		{
+			name:       "empty header uses RemoteAddr",
+			remoteAddr: "192.0.2.1:12345",
+			headerName: "X-Forwarded-For",
+			strategy:   strategy,
+			wantIP:     "192.0.2.1",
+			wantParsed: true,
+		},
+		{
+			name:       "all hops trusted uses RemoteAddr",
+			remoteAddr: "192.0.2.9:80",
+			headerName: "X-Forwarded-For",
+			headerVal:  "10.0.0.1",
+			strategy:   strategy,
+			wantIP:     "192.0.2.9",
+			wantParsed: true,
+		},
+		{
+			name:       "empty header segments skipped",
+			remoteAddr: trustedProxyAddr,
+			headerName: "X-Forwarded-For",
+			headerVal:  "203.0.113.10, , 10.0.0.1",
+			strategy:   strategy,
+			wantIP:     "203.0.113.10",
+			wantParsed: true,
+		},
+		{
+			name:       "custom header name",
+			remoteAddr: trustedProxyAddr,
+			headerName: "X-Real-IP",
+			headerVal:  "203.0.113.10, 10.0.0.1",
+			strategy:   strategy,
+			wantIP:     "203.0.113.10",
+			wantParsed: true,
+		},
+		{
+			name:       "malformed hop between trusted and client fails closed",
+			remoteAddr: trustedProxyAddr,
+			headerName: "X-Forwarded-For",
+			headerVal:  "203.0.113.10, not-an-ip, 10.0.0.1",
+			strategy:   strategy,
+			wantIP:     "not-an-ip",
+			wantParsed: false,
+		},
+		{
+			name:       "malformed rightmost hop fails closed",
+			remoteAddr: trustedProxyAddr,
+			headerName: "X-Forwarded-For",
+			headerVal:  "bad-hop",
+			strategy:   strategy,
+			wantIP:     "bad-hop",
+			wantParsed: false,
+		},
+		{
+			name:       "port suffixed hop fails closed",
+			remoteAddr: trustedProxyAddr,
+			headerName: "X-Forwarded-For",
+			headerVal:  "203.0.113.10:443, 10.0.0.1",
+			strategy:   strategy,
+			wantIP:     "203.0.113.10:443",
+			wantParsed: false,
+		},
+		{
+			name:       "RemoteAddr without port fails",
+			remoteAddr: "192.0.2.1",
+			headerName: "X-Forwarded-For",
+			strategy:   strategy,
+			wantErr:    true,
+		},
+	}
 
-	t.Run("empty trusted pool ignores header", func(t *testing.T) {
-		emptyChecker, err := NewChecker(log, []string{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		emptyStrategy := &PoolStrategy{Checker: emptyChecker}
-		req := newTestTrustRequest("198.51.100.5:443", "X-Forwarded-For", "203.0.113.10")
-		got, _, err := GetRemoteIP(req, emptyStrategy, "X-Forwarded-For")
-		if err != nil || got != "198.51.100.5" {
-			t.Fatalf("GetRemoteIP = %q, %v want 198.51.100.5", got, err)
-		}
-	})
-
-	t.Run("empty header uses RemoteAddr", func(t *testing.T) {
-		req := newTestTrustRequest("192.0.2.1:12345", "X-Forwarded-For", "")
-		got, _, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
-		if err != nil || got != "192.0.2.1" {
-			t.Fatalf("GetRemoteIP = %q, %v want 192.0.2.1", got, err)
-		}
-	})
-
-	t.Run("all hops trusted uses RemoteAddr", func(t *testing.T) {
-		req := newTestTrustRequest("192.0.2.9:80", "X-Forwarded-For", "10.0.0.1")
-		got, _, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
-		if err != nil || got != "192.0.2.9" {
-			t.Fatalf("GetRemoteIP = %q, %v want 192.0.2.9", got, err)
-		}
-	})
-
-	t.Run("empty header segments skipped", func(t *testing.T) {
-		req := newTestTrustRequest(trustedProxyAddr, "X-Forwarded-For", "203.0.113.10, , 10.0.0.1")
-		got, _, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
-		if err != nil || got != "203.0.113.10" {
-			t.Fatalf("GetRemoteIP = %q, %v want 203.0.113.10", got, err)
-		}
-	})
-
-	t.Run("custom header name", func(t *testing.T) {
-		req := newTestTrustRequest(trustedProxyAddr, "X-Real-IP", "203.0.113.10, 10.0.0.1")
-		got, _, err := GetRemoteIP(req, strategy, "X-Real-IP")
-		if err != nil || got != "203.0.113.10" {
-			t.Fatalf("GetRemoteIP custom header = %q, %v want 203.0.113.10", got, err)
-		}
-	})
-
-	t.Run("malformed hop between trusted and client fails closed", func(t *testing.T) {
-		req := newTestTrustRequest(trustedProxyAddr, "X-Forwarded-For", "203.0.113.10, not-an-ip, 10.0.0.1")
-		got, parsed, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
-		if err != nil || got != "not-an-ip" || parsed != nil {
-			t.Fatalf("GetRemoteIP = %q, parsed=%v, %v want not-an-ip, nil", got, parsed, err)
-		}
-	})
-
-	t.Run("malformed rightmost hop fails closed", func(t *testing.T) {
-		req := newTestTrustRequest(trustedProxyAddr, "X-Forwarded-For", "bad-hop")
-		got, parsed, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
-		if err != nil || got != "bad-hop" || parsed != nil {
-			t.Fatalf("GetRemoteIP = %q, parsed=%v, %v want bad-hop, nil", got, parsed, err)
-		}
-	})
-
-	t.Run("port suffixed hop fails closed", func(t *testing.T) {
-		req := newTestTrustRequest(trustedProxyAddr, "X-Forwarded-For", "203.0.113.10:443, 10.0.0.1")
-		got, parsed, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
-		if err != nil || got != "203.0.113.10:443" || parsed != nil {
-			t.Fatalf("GetRemoteIP = %q, parsed=%v, %v want 203.0.113.10:443, nil", got, parsed, err)
-		}
-	})
-
-	t.Run("RemoteAddr without port fails", func(t *testing.T) {
-		req := newTestTrustRequest("192.0.2.1", "X-Forwarded-For", "")
-		_, _, err := GetRemoteIP(req, strategy, "X-Forwarded-For")
-		if err == nil {
-			t.Fatal("expected error for RemoteAddr without port")
-		}
-	})
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := newTestTrustRequest(tc.remoteAddr, tc.headerName, tc.headerVal)
+			got, parsed, err := GetRemoteIP(req, tc.strategy, tc.headerName)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("GetRemoteIP = %q, %v", got, err)
+			}
+			if got != tc.wantIP {
+				t.Fatalf("GetRemoteIP = %q want %q", got, tc.wantIP)
+			}
+			if tc.wantParsed && parsed == nil {
+				t.Fatalf("GetRemoteIP parsed = nil want non-nil for %q", got)
+			}
+			if !tc.wantParsed && parsed != nil {
+				t.Fatalf("GetRemoteIP parsed = %v want nil for %q", parsed, got)
+			}
+		})
+	}
 }
 
 // newTestTrustRequest builds a request with RemoteAddr and an optional forwarded header.
