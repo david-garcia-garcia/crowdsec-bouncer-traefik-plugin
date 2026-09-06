@@ -39,3 +39,9 @@ phase: pullrequest
 findings: title dropped WIP; CI green after e2e flake retry
 fixed: n/a
 skipped: n/a
+
+## merge origin/master (2026-09-06)
+phase: pullrequest
+findings: dirty vs master; usage How-to conflict resolved (empty captcha body relay + 502/503/504 unreachable); stream tick log test now uses decisionscope.NoBannedValue
+fixed: knowledge/devdocs/core_plugin_appsec.md; pkg/lapi/client_stream_log_test.go
+skipped: Windows plugin file-log TempDir cleanup failures (CI Linux passed)
