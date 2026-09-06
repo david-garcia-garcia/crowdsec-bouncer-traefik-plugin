@@ -81,6 +81,41 @@ func TestIsCaptchaFormPostWithoutFieldRestoresBody(t *testing.T) {
 	}
 }
 
+func TestIsCaptchaFormPostOverMaxRestoresBody(t *testing.T) {
+	client := newTestCaptchaClient(t, configuration.HcaptchaProvider, "")
+	payload := "blob=" + strings.Repeat("a", captchaFormMaxBytes+1)
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if client.IsCaptchaFormPost(req) {
+		t.Fatal("oversized POST must not be treated as a captcha form")
+	}
+	raw, err := io.ReadAll(req.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(raw) != payload {
+		t.Fatalf("origin body length want %d got %d", len(payload), len(raw))
+	}
+}
+
+func TestIsCaptchaFormPostUnknownLengthOverMaxRestoresBody(t *testing.T) {
+	client := newTestCaptchaClient(t, configuration.HcaptchaProvider, "")
+	payload := "blob=" + strings.Repeat("b", captchaFormMaxBytes+1)
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.ContentLength = -1
+	if client.IsCaptchaFormPost(req) {
+		t.Fatal("chunked oversized POST must not be treated as a captcha form")
+	}
+	raw, err := io.ReadAll(req.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(raw) != payload {
+		t.Fatalf("origin body length want %d got %d", len(payload), len(raw))
+	}
+}
+
 func TestWriteSolvedRedirect(t *testing.T) {
 	client := newTestCaptchaClient(t, configuration.HcaptchaProvider, "")
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/login?next=1", nil)

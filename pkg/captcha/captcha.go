@@ -150,23 +150,45 @@ func (c *Client) IsCaptchaFormPost(r *http.Request) bool {
 		return r.PostForm.Get(field) != ""
 	}
 
+	// Known-large origin POST: do not buffer it to look for a captcha token.
+	if r.ContentLength > captchaFormMaxBytes {
+		return false
+	}
+
 	raw, err := readAndRestoreBody(r)
 	if err != nil {
+		return false
+	}
+	if raw == nil {
 		return false
 	}
 	return providerResponseValue(r.Header.Get("Content-Type"), raw, field) != ""
 }
 
-// readAndRestoreBody copies r.Body and puts a readable copy back on r.
+// captchaFormMaxBytes is the largest POST parsed as a captcha form.
+// Provider tokens are small; larger bodies are origin forms and must not be fully buffered here.
+const captchaFormMaxBytes = 64 << 10
+
+// readAndRestoreBody copies r.Body up to captchaFormMaxBytes and puts a readable copy back on r.
 func readAndRestoreBody(r *http.Request) ([]byte, error) {
 	if r.Body == nil {
 		return nil, nil
 	}
-	raw, err := io.ReadAll(r.Body)
+	raw, err := io.ReadAll(io.LimitReader(r.Body, captchaFormMaxBytes+1))
+	if err != nil {
+		_ = r.Body.Close()
+		r.Body = io.NopCloser(bytes.NewReader(raw))
+		return nil, err
+	}
+	if len(raw) > captchaFormMaxBytes {
+		// Over the captcha-form cap: restore peeked bytes in front of the unread remainder.
+		r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(raw), r.Body))
+		return nil, nil
+	}
 	_ = r.Body.Close()
 	r.Body = io.NopCloser(bytes.NewReader(raw))
 	r.ContentLength = int64(len(raw))
-	return raw, err
+	return raw, nil
 }
 
 // providerResponseValue returns the named form field from a urlencoded or multipart body.
