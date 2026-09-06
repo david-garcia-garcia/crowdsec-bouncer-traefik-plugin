@@ -16,3 +16,9 @@ findings: none
 fixed: n/a
 skipped: n/a
 
+## implement (2026-09-06T15:22:15Z)
+phase: implement
+findings: none
+fixed: httptests for LAPI version, User-Agent, and version.go wiring
+skipped: n/a
+
