@@ -531,7 +531,10 @@ make run
   - If CaptchaProvider is `custom`, used to set class name of the div used by captcha provider (in case of hcaptcha: `h-captcha`)
 - CaptchaCustomResponse
   - string
-  - If CaptchaProvider is `custom`, used to set the field in the POST body from the captcha.html to Traefik (in case of hcaptcha: `h-captcha-response`)
+  - If CaptchaProvider is `custom`, used to set the field in the POST body from the captcha.html to Traefik (in case of hcaptcha: `h-captcha-response`; CapJS: `cap-token`)
+- CaptchaCustomValidateBody
+  - string
+  - If CaptchaProvider is `custom`, encoding of the plugin's siteverify POST: `form` (default, `application/x-www-form-urlencoded`) or `json` (`application/json`). Both send `secret` and `response`. Use `json` for CapJS Standalone.
 - CaptchaSiteKey
   - string
   - Site key for the captcha provider

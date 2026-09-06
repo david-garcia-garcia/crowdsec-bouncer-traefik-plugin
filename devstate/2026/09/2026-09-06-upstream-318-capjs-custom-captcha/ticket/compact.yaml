@@ -1,0 +1,5 @@
+host: local
+ref: none
+title: "[FEATURE] CapJS custom captcha"
+url: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/318
+number: 318

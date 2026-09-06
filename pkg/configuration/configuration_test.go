@@ -117,6 +117,22 @@ func Test_ValidateParams(t *testing.T) {
 	cfgEmptyAction := getMinimalConfig()
 	cfgEmptyAction.CrowdsecLapiFailureAction = ""
 	cfgEmptyAction.CrowdsecAppsecFailureAction = ""
+	cfgCustomJSON := getMinimalConfig()
+	cfgCustomJSON.CaptchaProvider = CustomProvider
+	cfgCustomJSON.CaptchaCustomJsURL = "http://js.example/widget.js"
+	cfgCustomJSON.CaptchaCustomValidateURL = "http://cap.example/site/siteverify"
+	cfgCustomJSON.CaptchaCustomKey = "cap-widget"
+	cfgCustomJSON.CaptchaCustomResponse = "cap-token"
+	cfgCustomJSON.CaptchaCustomValidateBody = CaptchaValidateBodyJSON
+	cfgCustomJSON.CaptchaFilePath = ""
+	cfgCustomUnknownBody := getMinimalConfig()
+	cfgCustomUnknownBody.CaptchaProvider = CustomProvider
+	cfgCustomUnknownBody.CaptchaCustomJsURL = "http://js.example/widget.js"
+	cfgCustomUnknownBody.CaptchaCustomValidateURL = "http://cap.example/site/siteverify"
+	cfgCustomUnknownBody.CaptchaCustomKey = "cap-widget"
+	cfgCustomUnknownBody.CaptchaCustomResponse = "cap-token"
+	cfgCustomUnknownBody.CaptchaCustomValidateBody = "urlencoded"
+	cfgCustomUnknownBody.CaptchaFilePath = ""
 	type args struct {
 		config *Config
 	}
@@ -142,6 +158,8 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Captcha LAPI action with provider", args: args{config: cfgCaptchaWithProvider}, wantErr: false},
 		{name: "Unknown AppSec failure action", args: args{config: cfgUnknownAction}, wantErr: true},
 		{name: "Empty failure actions use default ban", args: args{config: cfgEmptyAction}, wantErr: false},
+		{name: "Custom captcha json validate body", args: args{config: cfgCustomJSON}, wantErr: false},
+		{name: "Unknown custom captcha validate body", args: args{config: cfgCustomUnknownBody}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
