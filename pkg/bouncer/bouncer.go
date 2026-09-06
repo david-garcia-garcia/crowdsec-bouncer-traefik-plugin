@@ -43,15 +43,29 @@ type Bouncer struct {
 	traceCustomHeader       string
 }
 
+func needsAppsecCaptchaInit(config *configuration.Config) bool {
+	return configuration.EffectiveFailureAction(config.CrowdsecAppsecFailureAction) == configuration.FailureActionCaptcha &&
+		config.CaptchaProvider != ""
+}
+
 // New returns a per-router handler bound to lapiClient and appsecClient.
 func New(next http.Handler, name string, config *configuration.Config, lapiClient *lapi.Client, appsecClient *appsec.Client, log *slog.Logger) (http.Handler, error) {
-	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
-	clientChecker, _ := ip.NewChecker(log, config.ClientTrustedIPs)
+	serverChecker, err := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
+	if err != nil {
+		return nil, fmt.Errorf("forwarded headers trusted IPs: %w", err)
+	}
+	clientChecker, err := ip.NewChecker(log, config.ClientTrustedIPs)
+	if err != nil {
+		return nil, fmt.Errorf("client trusted IPs: %w", err)
+	}
 
 	var banTemplate *template.Template
 	var banTemplateContentType string
 	if config.BanFilePath != "" {
-		banTemplate, banTemplateContentType, _ = configuration.GetTemplate(config.BanFilePath)
+		banTemplate, banTemplateContentType, err = configuration.GetTemplate(config.BanFilePath)
+		if err != nil {
+			return nil, fmt.Errorf("ban template: %w", err)
+		}
 	}
 
 	routeHandler := &Bouncer{
@@ -76,13 +90,13 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		template:                template.New("CrowdsecBouncer").Delims("[[", "]]"),
 		traceCustomHeader:       config.TraceHeadersCustomName,
 	}
-	if config.CrowdsecMode == configuration.AppsecMode {
+	if config.CrowdsecMode == configuration.AppsecMode && !needsAppsecCaptchaInit(config) {
 		routeHandler.log.Debug("Bouncer initialized name:" + name)
 		return routeHandler, nil
 	}
 	config.CaptchaSiteKey, _ = configuration.GetVariable(config, "CaptchaSiteKey")
 	config.CaptchaSecretKey, _ = configuration.GetVariable(config, "CaptchaSecretKey")
-	err := routeHandler.captchaClient.New(
+	err = routeHandler.captchaClient.New(
 		log,
 		lapiClient.Cache(),
 		&http.Client{

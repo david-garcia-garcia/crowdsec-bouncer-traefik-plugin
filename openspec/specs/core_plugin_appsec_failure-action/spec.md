@@ -16,7 +16,7 @@ Public config `crowdsecAppsecFailureAction` SHALL be one of `passthrough`, `ban`
 - **THEN** each route applies its own AppSec fallback
 
 ### Requirement: One action covers 500, unreachable, and unreadable body
-`CrowdsecAppsecFailureAction` SHALL apply to: AppSec HTTP 500; transport failure or HTTP 502/503/504; and an unreadable HTTP/2 or HTTP/3 body on a method that would have sent a body. `ban` SHALL drop the request. `passthrough` on 500 or unreachable SHALL continue as allow (then `next`). `passthrough` on unreadable body SHALL keep today’s headers-only GET to AppSec. `captcha` SHALL use the configured captcha client (`pkg/captcha`), not AppSec JSON `action: captcha`.
+`CrowdsecAppsecFailureAction` SHALL apply to: AppSec HTTP 500; transport failure or HTTP 502/503/504; and an unreadable HTTP/2 or HTTP/3 body on a method that would have sent a body. `ban` SHALL drop the request. `passthrough` on 500 or unreachable SHALL continue as allow (then `next`). `passthrough` on unreadable body SHALL keep today’s headers-only GET to AppSec. `captcha` SHALL use the configured captcha client (`pkg/captcha`), not AppSec JSON `action: captcha`. When `crowdsecMode` is `appsec` and `crowdsecAppsecFailureAction` is `captcha` with a configured captcha provider, `Bouncer.New` SHALL initialize the captcha client so `ErrFailureCaptcha` serves captcha instead of banning.
 
 #### Scenario: Unreachable passthrough
 - **WHEN** AppSec is unreachable and `crowdsecAppsecFailureAction` is `passthrough`
@@ -33,6 +33,10 @@ Public config `crowdsecAppsecFailureAction` SHALL be one of `passthrough`, `ban`
 #### Scenario: Unreadable body ban
 - **WHEN** the request body cannot be buffered, the method has a body, and `crowdsecAppsecFailureAction` is `ban`
 - **THEN** the request is dropped without calling origin
+
+#### Scenario: Appsec failure captcha serves captcha client
+- **WHEN** `crowdsecMode` is `appsec`, `crowdsecAppsecFailureAction` is `captcha`, a captcha provider is configured, and AppSec returns HTTP 500
+- **THEN** the bouncer serves the LAPI-style captcha flow (not a ban)
 
 ### Requirement: Structured AppSec verdicts are not failure actions
 HTTP 200 and parseable AppSec JSON `action` values (`allow`, `ban`, `challenge`, AppSec `captcha` HTML) SHALL keep existing bot-detection behavior. `CrowdsecAppsecFailureAction` MUST NOT rewrite those envelopes. Legacy empty/non-JSON non-200 (other than 500/502/503/504) SHALL still ban.
