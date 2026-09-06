@@ -11,8 +11,9 @@ Minimal API requirement:
 
 - the JS file URL to load the captcha on the served `captcha.html`
 - the HTML className to tell to the JS where to display the challenge
-- the verify URL endpoint to send the field `response` from the captcha with `content-type: application/x-www-form-urlencoded`
-- the name of the field when you POST the resolved captcha to Traefik
+- the verify URL endpoint to send `secret` and `response`
+- the encoding of that verify POST: `form` (default, `application/x-www-form-urlencoded`, Wicketkeeper-style) or `json` (`application/json`, CapJS Standalone `/siteverify`)
+- the name of the field when you POST the resolved captcha to Traefik (`captchaCustomResponse`; CapJS default is `cap-token`)
 
 - the JS file need to respect the `data-callback` on the div that contains the captcha if you use our template, but you can customize it by your side
 
@@ -30,6 +31,9 @@ Minimal API requirement:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomValidateURL=http://wicketkeeper:8080/v0/siteverify"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomKey=wicketkeeper"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomResponse=wicketkeeper_solution"
+      # Omit captchaCustomValidateBody or set form for urlencoded secret+response (default)
+      # For CapJS Standalone: captchaCustomValidateBody=json, captchaCustomResponse=cap-token,
+      # captchaCustomValidateURL=http://cap:3000/<site_key>/siteverify
       # Define captcha HTML file path
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"
 ```
