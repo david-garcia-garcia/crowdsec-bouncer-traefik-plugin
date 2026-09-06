@@ -67,7 +67,7 @@ IssueKey: 2026-09-06-domain-lapi-appsec
   By: explore
 
 - Q: Is AppSec reclaimed separately, or constructed inside LAPI `New` as a field?
-  Decision: resolved — separate reclaim; Bouncer holds `*lapi.Connection` and `*appsec.Client` (nil when AppSec off). Constructing AppSec inside LAPI would keep the mixed owner.
+	Decision: resolved — separate reclaim; Bouncer holds `lapiClient *lapi.Connection` and `appsecClient *appsec.Client` (nil when AppSec off). Constructing AppSec inside LAPI would keep the mixed owner. Field names are the paired Client suffix (not `conn` vs `appsec`).
   By: explore
 
 - Q: Live/none `IdentityHex` currently hashes AppSec host/key/TLS. Dropping those fields changes the live Redis cache prefix on upgrade.
