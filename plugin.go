@@ -49,20 +49,20 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	// sees (this process’s outbound address), not per middleware and not per
 	// metrics interval. OpenStream keeps one ticker per URL+key in this process.
 	if config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode {
-		conn, err := crowdsecconnection.OpenStream(ctx, config, log, name, pluginVersion)
-		if err != nil {
-			return nil, err
+		conn, streamErr := crowdsecconnection.OpenStream(ctx, config, log, name, pluginVersion)
+		if streamErr != nil {
+			return nil, streamErr
 		}
 		return bouncer.New(next, name, config, conn, log)
 	}
 
 	// Live/none/appsec do not use stream_cursor. Two Connections on one key
 	// stay valid (?ip= lookups). Reclaim by full identity, including intervals.
-	stored, err := reclaim.Open(ctx, crowdsecconnection.Key(config), log, func() (any, error) {
+	stored, openErr := reclaim.Open(ctx, crowdsecconnection.Key(config), log, func() (any, error) {
 		return crowdsecconnection.New(config, log, pluginVersion)
 	})
-	if err != nil {
-		return nil, err
+	if openErr != nil {
+		return nil, openErr
 	}
 	conn, ok := stored.(*crowdsecconnection.CrowdsecConnection)
 	if !ok {

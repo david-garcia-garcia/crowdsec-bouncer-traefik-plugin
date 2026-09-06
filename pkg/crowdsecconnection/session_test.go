@@ -79,6 +79,35 @@ func TestSessionKey_DifferentHostsAreDistinct(t *testing.T) {
 	}
 }
 
+func TestCrowdsecConnection_ReclaimGrace(t *testing.T) {
+	if ReclaimGraceDuration != 30*time.Second {
+		t.Fatalf("ReclaimGraceDuration: %v", ReclaimGraceDuration)
+	}
+	conn := &CrowdsecConnection{}
+	if conn.ReclaimGrace() != ReclaimGraceDuration {
+		t.Fatalf("ReclaimGrace: %v", conn.ReclaimGrace())
+	}
+}
+
+func TestCrowdsecConnection_LifecycleLogs(t *testing.T) {
+	var logBuf bytes.Buffer
+	log := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	conn := &CrowdsecConnection{
+		log:          log,
+		crowdsecMode: configuration.LiveMode,
+		crowdsecHost: "lapi.example:8080",
+	}
+	conn.Sleep()
+	conn.Wake()
+	conn.Close()
+	logged := logBuf.String()
+	for _, msg := range []string{MsgConnectionSleeping, MsgConnectionWaking, MsgConnectionClosed} {
+		if !strings.Contains(logged, msg) {
+			t.Fatalf("missing %q in %s", msg, logged)
+		}
+	}
+}
+
 func TestOpenStream_LiveMetricsMismatchWarnsAndShares(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })

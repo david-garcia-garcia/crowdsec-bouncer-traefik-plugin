@@ -10,6 +10,7 @@ import (
 )
 
 const (
+	// DefaultGrace is the wait after the last holder when the value has no ReclaimGrace.
 	DefaultGrace = 10 * time.Second
 
 	MsgPut     = "reclaim_put"
@@ -19,22 +20,28 @@ const (
 	MsgDispose = "reclaim_dispose"
 )
 
-// Table stores one value per key and keeps it while any bound context is live or grace has not elapsed.
+// Table stores one value per key while any bound context is live, plus a per-slot grace after the last holder.
 //
-//	              Open (first create)
-//	                     |
-//	                     v
-//	Open (bind) -----> LIVE <---- Open same key before timer fires
-//	                     |              ^
-//	         last holder Done           | Wake(), stop timer
-//	                     v              |
-//	                  SLEEP ------------+
-//	            Sleep() stops tickers
-//	                     |
-//	        grace elapsed / ResetForTest / grace==0
-//	                     v
-//	                   GONE    Close(), cancel(life), delete key
+//	                    create()
+//	                       │
+//	                       v
+//	     Open/bind    ┌─────────┐     last holder gone
+//	    ─────────────►│  LIVE   │──────────────────────► Sleep()
+//	                  └─────────┘                          │
+//	                       ▲                               v
+//	                       │ Open                     ┌─────────┐
+//	                       └──────── Wake() ──────────│  SLEEP  │
+//	                                                  └─────────┘
+//	                                                       │
+//	                                      grace elapsed / grace 0 / ResetForTest
+//	                                                       v
+//	                                                  ┌─────────┐
+//	                                                  │  GONE   │ Close()
+//	                                                  └─────────┘
 //
+// LIVE has one or more holders. SLEEP has zero holders and the value is kept.
+// GONE deleted the key. Sleep/Wake/Close are optional methods on the value;
+// the table does not know what the value does there.
 // drop and fire take the *slot pointer. If items[key] is a different slot
 // (ResetForTest, or a later incarnation), they no-op. fire also no-ops unless
 // graceGen still matches the armed generation (a reclaim or a later orphan
@@ -52,6 +59,7 @@ type slot struct {
 	cancel     context.CancelFunc
 	holders    map[uint64]struct{}
 	nextID     uint64
+	grace      time.Duration
 	graceTimer *time.Timer
 	graceGen   uint64
 	logger     *slog.Logger
@@ -98,6 +106,11 @@ type sleeper interface {
 	Wake()
 }
 
+// gracer is an optional wait after the last holder, instead of the table default.
+type gracer interface {
+	ReclaimGrace() time.Duration
+}
+
 // stopValue calls Close if v has it. Used for a lost create and when life ends.
 func stopValue(v any) {
 	if c, ok := v.(closer); ok {
@@ -105,18 +118,27 @@ func stopValue(v any) {
 	}
 }
 
-// sleepValue pauses tickers if v has Sleep. Called on last holder gone.
+// sleepValue calls Sleep if v has it. Called on last holder gone.
 func sleepValue(v any) {
 	if s, ok := v.(sleeper); ok {
 		s.Sleep()
 	}
 }
 
-// wakeValue resumes tickers if v has Wake. Called when Open reclaims a sleeper.
+// wakeValue calls Wake if v has it. Called when Open reclaims a sleeper.
 func wakeValue(v any) {
 	if s, ok := v.(sleeper); ok {
 		s.Wake()
 	}
+}
+
+// graceFor returns the wait after the last holder for this value.
+// A value with ReclaimGrace sets the slot wait at put; otherwise the table grace is used.
+func graceFor(v any, tableGrace time.Duration) time.Duration {
+	if g, ok := v.(gracer); ok {
+		return g.ReclaimGrace()
+	}
+	return tableGrace
 }
 
 // Open returns the stored value for key, creating it once, and tracks ctx until it is done.
@@ -178,6 +200,7 @@ func (t *Table) Open(ctx context.Context, key string, logger *slog.Logger, creat
 		value:   v,
 		cancel:  cancel,
 		holders: map[uint64]struct{}{},
+		grace:   graceFor(v, t.grace),
 		logger:  logger,
 	}
 	t.items[key] = e
@@ -239,8 +262,8 @@ func (t *Table) drop(key string, id uint64, e *slot) {
 	e.graceGen++
 	gen := e.graceGen
 	orphanLog := e.logger
-	if t.grace > 0 {
-		e.graceTimer = time.AfterFunc(t.grace, func() { t.fire(key, e, gen) })
+	if e.grace > 0 {
+		e.graceTimer = time.AfterFunc(e.grace, func() { t.fire(key, e, gen) })
 		t.mu.Unlock()
 		orphanLog.Debug(MsgOrphan, "key", key)
 		return

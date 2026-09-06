@@ -15,6 +15,19 @@ import (
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
+// ReclaimGraceDuration is the wait after the last constructor ctx for a CrowdsecConnection slot.
+const ReclaimGraceDuration = 30 * time.Second
+
+// Operator-visible lifecycle and stream-health lines (stable for log grep).
+const (
+	MsgConnectionStarted  = "crowdsec connection started"
+	MsgConnectionSleeping = "crowdsec connection sleeping"
+	MsgConnectionWaking   = "crowdsec connection waking"
+	MsgConnectionClosed   = "crowdsec connection closed"
+	MsgStreamUnhealthy    = "crowdsec stream became unhealthy"
+	MsgStreamHealthy      = "crowdsec stream became healthy"
+)
+
 // Decision is the body returned from Crowdsec LAPI.
 type Decision struct {
 	ID        int    `json:"id"`
@@ -73,6 +86,7 @@ type CrowdsecConnection struct {
 	lastMetricsPush         time.Time
 	startedAt               time.Time
 	metricsMu               sync.Mutex
+	reportMu                sync.Mutex // one usage-metrics POST at a time (ticker, Sleep drain, Close drain)
 	windowCounters          map[usageMetricKey]int64 // dropped counters for the current push window
 	processedIPv4           int64                    // processed ipv4; atomic on the request path
 	processedIPv6           int64
@@ -229,15 +243,16 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		})
 	}
 
-	conn.log.Debug("CrowdsecConnection initialized mode:" + config.CrowdsecMode)
+	conn.logInfo(MsgConnectionStarted)
 	return conn, nil
 }
 
 // Close stops tickers, idle HTTP connections, and the cache Redis pool. Safe to call more than once.
+// Remaining usage-metrics are POSTed to LAPI before HTTP is torn down.
 func (c *CrowdsecConnection) Close() {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if c.closed {
+		c.mu.Unlock()
 		return
 	}
 	c.closed = true
@@ -246,19 +261,27 @@ func (c *CrowdsecConnection) Close() {
 	stopTicker(c.metricsStop)
 	c.streamStop = nil
 	c.metricsStop = nil
+	c.mu.Unlock()
+
+	c.drainMetrics()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	closeIdle(c.httpClient)
 	closeIdle(c.httpAppsecClient)
 	if c.cacheClient != nil {
 		c.cacheClient.Close()
 	}
+	c.logInfo(MsgConnectionClosed)
 }
 
 // Sleep stops stream and metrics tickers and keeps HTTP, cache, and the LAPI
 // cursor. Reclaim calls this when the last constructor ctx is gone. Not Close.
+// Remaining usage-metrics are POSTed asynchronously so the reclaim table lock is not held on LAPI.
 func (c *CrowdsecConnection) Sleep() {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if c.closed || c.sleeping {
+		c.mu.Unlock()
 		return
 	}
 	c.sleeping = true
@@ -266,6 +289,9 @@ func (c *CrowdsecConnection) Sleep() {
 	stopTicker(c.metricsStop)
 	c.streamStop = nil
 	c.metricsStop = nil
+	c.mu.Unlock()
+	c.logInfo(MsgConnectionSleeping)
+	go c.drainMetrics()
 }
 
 // Wake starts stream and metrics tickers again after Sleep. startup=false: the
@@ -289,9 +315,23 @@ func (c *CrowdsecConnection) Wake() {
 		})
 	}
 	c.mu.Unlock()
+	c.logInfo(MsgConnectionWaking)
 	if resumeStream {
 		go c.handleStreamTicker()
 	}
+}
+
+// ReclaimGrace is the reclaim-slot wait after the last holder. It is not the table DefaultGrace.
+func (c *CrowdsecConnection) ReclaimGrace() time.Duration {
+	return ReclaimGraceDuration
+}
+
+// logInfo writes an operator-visible lifecycle line with mode and LAPI host.
+func (c *CrowdsecConnection) logInfo(msg string) {
+	if c.log == nil {
+		return
+	}
+	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost)
 }
 
 func stopTicker(stop chan bool) {

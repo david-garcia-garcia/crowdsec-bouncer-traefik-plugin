@@ -205,20 +205,26 @@ func TestNew_DisposeAfterGrace(t *testing.T) {
 	srv := liveLAPI(t, nil, &zero)
 	t.Cleanup(func() { srv.Close() })
 	u, _ := url.Parse(srv.URL)
+	cfg := cfgLiveAt(u.Host)
 	ctx, cancel := context.WithCancel(context.Background())
-	first, err := New(ctx, testNextOK(), cfgLiveAt(u.Host), "dispose")
+	first, err := New(ctx, testNextOK(), cfg, "dispose")
 	if err != nil {
 		t.Fatal(err)
 	}
 	conn1 := testRoute(t, first).Connection()
 	cancel()
 	time.Sleep(150 * time.Millisecond)
+	_, holders, sleeping, found := reclaim.Peek(crowdsecconnection.Key(cfg))
+	if !found || holders != 0 || !sleeping {
+		t.Fatal("CrowdsecConnection must still be in its 30s grace after table 20ms")
+	}
+	time.Sleep(crowdsecconnection.ReclaimGraceDuration)
 	second, err := New(context.Background(), testNextOK(), cfgLiveAt(u.Host), "dispose")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if testRoute(t, second).Connection() == conn1 {
-		t.Fatal("after grace the previous CrowdsecConnection must be disposed")
+		t.Fatal("after CrowdsecConnection grace the previous incarnation must be disposed")
 	}
 }
 

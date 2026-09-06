@@ -29,6 +29,17 @@ func (b *box) Close() {
 	}
 }
 
+// graceBox uses ReclaimGrace instead of the table wait.
+type graceBox struct {
+	box
+	wait time.Duration
+}
+
+// ReclaimGrace is the slot wait after the last holder.
+func (g *graceBox) ReclaimGrace() time.Duration {
+	return g.wait
+}
+
 // ending is a box that sets done when Close runs.
 func ending(n int, done *atomic.Bool) *box {
 	return &box{n: n, ended: done}
@@ -316,6 +327,51 @@ func TestTable_NegativeGraceUsesDefault(t *testing.T) {
 	if tab.grace != DefaultGrace {
 		t.Fatalf("grace: %v", tab.grace)
 	}
+	if DefaultGrace != 10*time.Second {
+		t.Fatalf("DefaultGrace: %v", DefaultGrace)
+	}
+}
+
+// TestTable_ValueGraceShorterThanTable checks that ReclaimGrace disposes before the table wait.
+func TestTable_ValueGraceShorterThanTable(t *testing.T) {
+	tab := NewTable(time.Second)
+	var ended atomic.Bool
+	ctx, cancel := context.WithCancel(context.Background())
+	if _, err := tab.Open(ctx, "a", slog.Default(), func() (any, error) {
+		return &graceBox{box: box{ended: &ended}, wait: 30 * time.Millisecond}, nil
+	}); err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	cancel()
+	deadline := time.Now().Add(200 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if ended.Load() {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("ReclaimGrace must dispose before the table wait")
+}
+
+// TestTable_ValueGraceLongerThanTable checks that ReclaimGrace keeps the slot past the table wait.
+func TestTable_ValueGraceLongerThanTable(t *testing.T) {
+	tab := NewTable(20 * time.Millisecond)
+	var ended atomic.Bool
+	ctx, cancel := context.WithCancel(context.Background())
+	if _, err := tab.Open(ctx, "a", slog.Default(), func() (any, error) {
+		return &graceBox{box: box{ended: &ended}, wait: 200 * time.Millisecond}, nil
+	}); err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	cancel()
+	deadline := time.Now().Add(80 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if ended.Load() {
+			t.Fatal("table wait must not dispose a longer ReclaimGrace")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	waitUntil(t, ended.Load)
 }
 
 // TestTable_ZeroGraceEndsImmediately checks that zero grace cancels as soon as the last holder is gone.

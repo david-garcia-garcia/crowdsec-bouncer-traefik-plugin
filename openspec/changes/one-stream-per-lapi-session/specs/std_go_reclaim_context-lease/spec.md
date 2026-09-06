@@ -29,13 +29,19 @@ The package SHALL expose one process-wide table (`Default` / package `Open`). In
 - **AND** `create` ran once
 
 ### Requirement: Cancel then open within grace does not dispose
-When every bound context for a key is Done, the table SHALL wait grace before canceling the lifetime. An `Open` in that window MUST reclaim without `create`. Zero grace SHALL dispose as soon as the last holder is gone. Negative grace SHALL become 10 seconds.
+When every bound context for a key is Done, the table SHALL wait grace before canceling the lifetime. An `Open` in that window MUST reclaim without `create`. Zero grace SHALL dispose as soon as the last holder is gone. Negative table grace SHALL become 10 seconds. When the stored value has `ReclaimGrace()`, that duration SHALL be the wait for that slot. Values without it SHALL use the table grace. The table-wide default MUST NOT be changed to special-case one stored type.
 
 #### Scenario: Reclaim before grace
 - **WHEN** all contexts for a key are Done
 - **AND** a new `Open` for that key occurs before grace ends
 - **THEN** the stored value is returned
 - **AND** `create` does not run
+
+#### Scenario: Value ReclaimGrace overrides table
+- **WHEN** the stored value implements `ReclaimGrace` of 30 milliseconds
+- **AND** the table grace is 1 second
+- **AND** all contexts for that key are Done
+- **THEN** the incarnation is disposed before the table grace elapses
 
 ### Requirement: Peek reports holders and sleep without binding
 `Peek(key)` SHALL return the stored value, the live holder count, whether the slot is sleeping (grace armed), and whether the key exists. It MUST NOT add a holder and MUST NOT run `create`.

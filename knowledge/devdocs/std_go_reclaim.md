@@ -8,11 +8,12 @@ _Avoid_: `sync.Once`, process singleton, middleware-name key
 
 ## Overview
 
-Copy `pkg/reclaim` as-is. Call `reclaim.Open` with Traefik’s `New` ctx. If the value has `Sleep()`/`Wake()`, the table calls them on last holder / reclaim. If the value has `Close()`, the table calls it when grace elapses.
+Copy `pkg/reclaim` as-is. Call `reclaim.Open` with Traefik’s `New` ctx. If the value has `Sleep()`/`Wake()`, the table calls them on last holder / reclaim. If the value has `ReclaimGrace()`, that is the slot wait (set at put). If the value has `Close()`, the table calls it when grace elapses.
 
 ## How to use
 
 - `reclaim.Open(ctx, key, logger, create)` on the process table. Last holder `Sleep()`s if the value has it; Open during grace `Wake()`s.
+- If the value has `ReclaimGrace()`, that duration is the slot wait, set when the value is put. Otherwise the table grace applies (`DefaultGrace` 10s).
 - `create` runs only for a first put or after grace Close.
 - Tests: `reclaim.ResetForTest()` / `reclaim.ResetForTestWith(grace)` only.
 - `Peek(key)` inspects holders/sleep without binding. `PeekLivePrefix(prefix)` returns one live slot under that stem. Callers do not Close slots.
@@ -36,4 +37,5 @@ stored, err := reclaim.Open(ctx, key, log, func() (any, error) {
 
 - Logger is required.
 - Watch `reclaim_put|bind|orphan|reclaim|dispose`.
-- Zero grace disposes as soon as the last holder’s ctx is done.
+- Zero table grace disposes as soon as the last holder’s ctx is done.
+- `DefaultGrace` is 10s for values without `ReclaimGrace()`. Do not change that table-wide default to special-case one stored type; put `ReclaimGrace()` on the value so the slot wait is set when it is put.

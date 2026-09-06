@@ -47,7 +47,13 @@ When no live constructor context remains for a stream session and the previous s
 - **AND** two `handleStreamCache` loops MUST NOT run on that session at once
 
 ### Requirement: Unreclaimed connection is closed after grace
-When no live constructor context remains for a connection key and grace elapses with no replace, the connection SHALL stop its tickers and release idle HTTP connections (`Close`).
+When no live constructor context remains for a connection key and grace elapses with no replace, the connection SHALL stop its tickers and release idle HTTP connections (`Close`). A `CrowdsecConnection` SHALL wait 30 seconds (`ReclaimGrace`) for that slot. Table `DefaultGrace` SHALL remain 10 seconds for values that do not implement `ReclaimGrace`.
+
+#### Scenario: Connection grace is not the table default
+- **WHEN** the process table is constructed with a 20 millisecond grace
+- **AND** the last holder of a CrowdsecConnection is cancelled
+- **THEN** the incarnation is still sleeping after 20 milliseconds
+- **AND** it is disposed after 30 seconds
 
 ### Requirement: Bouncer does not own the stream
 The per-router bouncer SHALL handle request policy (trusted IPs, ban/captcha pages, whether AppSec runs on pass) and MUST NOT start a process-wide stream ticker.

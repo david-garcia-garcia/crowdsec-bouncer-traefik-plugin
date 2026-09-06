@@ -254,13 +254,13 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	}
 
 	_, holderCount, _, foundSleeper := reclaim.Peek(bindKey)
-	stored, err := reclaim.Open(ctx, bindKey, log, create)
-	if err != nil {
-		return nil, err
+	stored, openErr := reclaim.Open(ctx, bindKey, log, create)
+	if openErr != nil {
+		return nil, openErr
 	}
-	sessionConn, err := streamConn(middlewareName, stored)
-	if err != nil {
-		return nil, err
+	sessionConn, typedErr := streamConn(middlewareName, stored)
+	if typedErr != nil {
+		return nil, typedErr
 	}
 	// Sleeper belonged to another middleware that is gone. Take the name for later warnings.
 	if foundSleeper && holderCount == 0 && sessionConn.streamOwner != middlewareName {

@@ -31,6 +31,16 @@ func (c *CrowdsecConnection) handleMetricsTicker() {
 	}
 }
 
+// drainMetrics POSTs the current usage-metrics window to LAPI. No-op when metrics are disabled.
+func (c *CrowdsecConnection) drainMetrics() {
+	if c.metricsInterval <= 0 {
+		return
+	}
+	if err := c.reportMetrics(); err != nil {
+		c.log.Error("drainMetrics:reportMetrics " + err.Error())
+	}
+}
+
 // usageMetricKey is one LAPI usage-metrics item identity: name, unit, and optional labels.
 type usageMetricKey struct {
 	name        string
@@ -133,14 +143,20 @@ func (c *CrowdsecConnection) forgetActiveDecision(slot string) {
 	}
 }
 
-// reportMetrics POSTs the current window of usage-metrics items to LAPI and resets dropped/processed counters.
+// reportMetrics POSTs the current window of usage-metrics items to LAPI.
+// Dropped and processed counters reset only after LAPI accepts the POST.
 func (c *CrowdsecConnection) reportMetrics() error {
+	c.reportMu.Lock()
+	defer c.reportMu.Unlock()
+
 	now := time.Now()
 	windowSizeSeconds := int(now.Sub(c.lastMetricsPush).Seconds())
 
 	c.metricsMu.Lock()
-	items := make([]map[string]interface{}, 0, len(c.windowCounters)+len(c.activeDecisions)+3)
-	for key, value := range c.windowCounters {
+	window := c.windowCounters
+	c.windowCounters = make(map[usageMetricKey]int64)
+	items := make([]map[string]interface{}, 0, len(window)+len(c.activeDecisions)+3)
+	for key, value := range window {
 		items = append(items, usageMetricItem(key, value))
 	}
 	for key, value := range c.activeDecisions {
@@ -148,12 +164,14 @@ func (c *CrowdsecConnection) reportMetrics() error {
 			items = append(items, usageMetricItem(key, value))
 		}
 	}
-	c.windowCounters = make(map[usageMetricKey]int64)
 	c.metricsMu.Unlock()
 
-	items = appendProcessedWindow(items, "ipv4", atomic.SwapInt64(&c.processedIPv4, 0))
-	items = appendProcessedWindow(items, "ipv6", atomic.SwapInt64(&c.processedIPv6, 0))
-	items = appendProcessedWindow(items, "", atomic.SwapInt64(&c.processedUnknown, 0))
+	processedIPv4 := atomic.SwapInt64(&c.processedIPv4, 0)
+	processedIPv6 := atomic.SwapInt64(&c.processedIPv6, 0)
+	processedUnknown := atomic.SwapInt64(&c.processedUnknown, 0)
+	items = appendProcessedWindow(items, "ipv4", processedIPv4)
+	items = appendProcessedWindow(items, "ipv6", processedIPv6)
+	items = appendProcessedWindow(items, "", processedUnknown)
 
 	c.log.Debug(fmt.Sprintf("reportMetrics: items=%d window_size=%ds", len(items), windowSizeSeconds))
 
@@ -184,6 +202,7 @@ func (c *CrowdsecConnection) reportMetrics() error {
 
 	data, err := json.Marshal(metrics)
 	if err != nil {
+		c.restoreMetricsWindow(window, processedIPv4, processedIPv6, processedUnknown)
 		return fmt.Errorf("reportMetrics:marshal %w", err)
 	}
 
@@ -195,11 +214,27 @@ func (c *CrowdsecConnection) reportMetrics() error {
 
 	_, err = c.crowdsecQuery(metricsURL.String(), data)
 	if err != nil {
+		c.restoreMetricsWindow(window, processedIPv4, processedIPv6, processedUnknown)
 		return fmt.Errorf("reportMetrics:query %w", err)
 	}
 
 	c.lastMetricsPush = now
 	return nil
+}
+
+// restoreMetricsWindow puts a failed POST’s counters back so the next drain or ticker can send them.
+func (c *CrowdsecConnection) restoreMetricsWindow(window map[usageMetricKey]int64, processedIPv4, processedIPv6, processedUnknown int64) {
+	c.metricsMu.Lock()
+	if c.windowCounters == nil {
+		c.windowCounters = make(map[usageMetricKey]int64)
+	}
+	for key, value := range window {
+		c.windowCounters[key] += value
+	}
+	c.metricsMu.Unlock()
+	atomic.AddInt64(&c.processedIPv4, processedIPv4)
+	atomic.AddInt64(&c.processedIPv6, processedIPv6)
+	atomic.AddInt64(&c.processedUnknown, processedUnknown)
 }
 
 // appendProcessedWindow adds a processed item when the swapped window count is non-zero.
