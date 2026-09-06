@@ -73,20 +73,20 @@ Spec `core_plugin_middleware_instance-reclaim`: keep “same session ⇒ one tic
   By: explore
 
 - Q: On config refresh, skip reclaim grace so old and new streams do not both poll?
-  Decision: resolved — last holder Sleep()s tickers; Open during grace Wake()s (startup=false). Snapshot change on a sleeper is ReplaceSleeping (table-internal Close, then create). No public DropNow. Callers do not Close slots.
+  Decision: resolved — last holder Sleep()s tickers; Open on the same SessionKey during grace Wake()s (startup=false). Snapshot change is a new SessionKey (session prefix + settings hash); the old sleeper dies on grace Close. No ReplaceSleeping. Callers do not Close slots.
   By: implement
 
 - Q: Can an operator fix a wrong LAPI TLS cert (or any session snapshot knob) without restarting the Traefik process?
-  Decision: resolved — yes. Reload cancels the previous constructor ctx; that is a replace, not a concurrent conflict. Fail only while another live middleware still holds the old snapshot. Reclaim grace is 10s (`pkg/reclaim` `DefaultGrace`); that is a dispose delay, not a process restart.
-  By: explore
+  Decision: resolved — yes. Reload cancels the previous constructor ctx; that is a new SessionKey, not a concurrent conflict. Fail only while another live middleware still holds (PeekLivePrefix warn-and-wire). Reclaim grace is 10s (`pkg/reclaim` `DefaultGrace`); that is a dispose delay, not a process restart.
+  By: implement
+
+- Q: Does the session key include LAPI TLS client certificate (keyless TLS bouncer) in addition to `lapiKey`?
+  Decision: resolved — no. TLS extras are the settings snapshot (in SessionKey’s hash, not SessionPrefix). PeekLivePrefix + streamOwner detect another live middleware. Sleeping + different snapshot → Open a new key. Two live middlewares with different certs warn-and-wire.
+  By: implement
 
 - Q: Are different `decisionScopeHeaders` a different stream session or a conflict on one session (URL+key)?
   Decision: assumed — conflict on one session. LAPI cursor is the bouncer row, not `scopes=`. Second key remains the isolation mechanism. Do not land PR #18’s “scopes in identity ⇒ two pollers” as the product fix.
   By: explore
-
-- Q: Does the session key include LAPI TLS client certificate (keyless TLS bouncer) in addition to `lapiKey`?
-  Decision: resolved — no. TLS extras are the settings snapshot. Peek + streamOwner detect another middleware. Sleeping + different snapshot → ReplaceSleeping. Two live middlewares with different certs warn-and-wire.
-  By: implement
 
 - Q: Live/none (and AppSec-only) two usage-metrics tickers on the same bouncer key — fail, share one reporter, or leave as today?
   Decision: assumed — leave live/none/appsec as today (two connections OK). Stream/alone metrics ticker rides the one session connection, so fail-on-conflict also prevents two stream metrics POSTs. Do not add a second uniqueness plane in this change.
@@ -103,3 +103,7 @@ Spec `core_plugin_middleware_instance-reclaim`: keep “same session ⇒ one tic
 - Q: Do two Traefik processes with in-memory cache and the same LAPI key steal deltas?
   Decision: assumed — out of this change. Same key + same LAPI-visible client IP already share one bouncer row (pre-existing). Distinct source IPs get distinct rows (`ext_crowdsec_lapi_stream-cursor`). Shared Redis + `"updated"` lease is the multi-instance store. In-process uniqueness does not create or fix the NAT-to-one-IP case.
   By: explore
+
+- Q: Reclaim key session-only (ReplaceSleeping on snapshot change) or session prefix plus settings hash with PeekLivePrefix?
+  Decision: resolved — human chose SessionKey = SessionPrefix + settings hash. PeekLivePrefix finds a live sibling on the CrowdSec row. Drop ReplaceSleeping / discardSleeping.
+  By: implement
