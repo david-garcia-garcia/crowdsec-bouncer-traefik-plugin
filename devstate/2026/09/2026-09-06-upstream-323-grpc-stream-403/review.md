@@ -15,3 +15,9 @@ phase: propose
 findings: fold core_plugin_appsec_failure-action; unreadable body is headers-only GET
 fixed: OpenSpec change appsec-unreadable-body-headers-only (proposal, spec, design, tasks)
 skipped: none
+
+## implement (2026-09-06)
+phase: implement
+findings: none
+fixed: headers-only GET for isBodyUnreadable; tests and README
+skipped: Windows root-package logging TempDir cleanup flake (unrelated)
