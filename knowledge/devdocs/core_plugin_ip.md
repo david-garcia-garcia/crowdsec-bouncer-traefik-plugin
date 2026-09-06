@@ -14,6 +14,10 @@ _Avoid_: range-index, per-CIDR cache key, `InNetwork` (one network)
 The owner of the client address for a request. Walks the custom forwarded header most-recent-first against the trusted-hop pool, then the host of `RemoteAddr`. Also yields that address as `net.IP` when parseable.
 _Avoid_: parsing `RemoteAddr` on the connection, a second X-Forwarded-For walk, Traefik ipstrategy as a second owner
 
+**clientRequest**:
+The inbound `http.Request` plus the client address GetRemoteIP already chose (`remoteIP` string, parsed `net.IP`, `ipType` for metrics). Ban, next, and AppSec handlers take this type.
+_Avoid_: a bag for scopes, origin, or captcha state; embedding `http.Request`; `context.Value`
+
 ## Overview
 
 Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker stores those CIDRs in `pkg/iplookup`. Stream/alone Range uses two Helpers on CrowdsecConnection (ban set, captcha set), not Checker. Use `ip.InNetwork` when the question is one CIDR (blob line parse). Do not parse `RemoteAddr` in the helper; classify `GetRemoteIP`.
@@ -21,7 +25,7 @@ Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker st
 ## How to use
 
 - Build the Checker once in `bouncer.New` from config lists.
-- Resolve the client address with `GetRemoteIP` (server/trusted-hop pool + custom header). Then `ContainsIP` on the parsed `net.IP` for the client pool. Do not parse `RemoteAddr` again. Do not parse the chosen string again for trusted-client membership.
+- Resolve the client address with `GetRemoteIP` (server/trusted-hop pool + custom header). Put `req`, that string, the parsed `net.IP`, and `FamilyOfIP` on `clientRequest`. Then `ContainsIP` on `client.parsed` for the client pool. Do not parse `RemoteAddr` again. Do not parse the chosen string again for trusted-client membership. Do not add scopes or origin to `clientRequest`.
 - On the request path, call `ContainsIP` on the parsed GetRemoteIP address. `Contains` remains for string callers. Do not walk a CIDR slice beside the helper.
 - Convert a bare IP to `/32` or `/128` before `AddCIDR`.
 - Range stream/alone membership reuses `Helper` as two boolean sets on the connection. Do not put Range in Checker.
@@ -32,7 +36,7 @@ Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker st
 
 ```go
 checker, err := ip.NewChecker(log, config.ClientTrustedIPs)
-ok := checker.ContainsIP(parsedIP)
+ok := checker.ContainsIP(client.parsed)
 ```
 
 ## Key files
@@ -40,6 +44,7 @@ ok := checker.ContainsIP(parsedIP)
 - `pkg/ip/checker.go`
 - `pkg/ip/network.go`
 - `pkg/iplookup/`
+- `pkg/bouncer/clientrequest.go`
 - `pkg/bouncer/bouncer.go`
 - `pkg/configuration/configuration.go` (`validateParamsIPs`)
 

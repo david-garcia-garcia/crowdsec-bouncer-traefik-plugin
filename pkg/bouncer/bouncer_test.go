@@ -1,6 +1,7 @@
 package bouncer
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -10,8 +11,15 @@ import (
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
+
+// testClientRequest is req plus the chosen client address for handler tests.
+func testClientRequest(req *http.Request, remoteIP string) clientRequest {
+	parsed := net.ParseIP(remoteIP)
+	return clientRequest{req: req, remoteIP: remoteIP, parsed: parsed, ipType: ip.FamilyOfIP(parsed)}
+}
 
 func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 	html := "<html>You are banned</html>"
@@ -39,7 +47,7 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 			}
 			rw := httptest.NewRecorder()
 			req := &http.Request{Method: tt.method}
-			b.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST", "", "ipv4")
+			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
 			if rw.Code != http.StatusForbidden {
 				t.Errorf("Expected status code 403, got %d", rw.Code)
 			}
@@ -80,7 +88,7 @@ func TestHandleBanServeHTTPContentType(t *testing.T) {
 			}
 			rw := httptest.NewRecorder()
 			req := &http.Request{Method: http.MethodGet}
-			b.handleBanServeHTTP(rw, req, "0.0.0.0", "TEST", "", "ipv4")
+			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
 			if got := rw.Header().Get("Content-Type"); got != tt.banTemplateContentType {
 				t.Errorf("Expected Content-Type %q, got %q", tt.banTemplateContentType, got)
 			}
@@ -152,7 +160,7 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 	defer appsec.Close()
 
 	recorder := httptest.NewRecorder()
-	b.handleNextServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10", "ipv4")
+	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected challenge status 200, got %d", recorder.Code)
@@ -178,7 +186,7 @@ func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
 	defer appsec.Close()
 
 	recorder := httptest.NewRecorder()
-	b.handleNextServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10", "ipv4")
+	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("expected fallback ban status 403, got %d", recorder.Code)
@@ -200,7 +208,7 @@ func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
 	defer appsec.Close()
 
 	recorder := httptest.NewRecorder()
-	b.handleNextServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10", "ipv4")
+	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d", recorder.Code)
@@ -222,7 +230,7 @@ func TestHandleNextServeHTTPChallengeFallsBackToBanContentType(t *testing.T) {
 	defer appsec.Close()
 
 	recorder := httptest.NewRecorder()
-	b.handleNextServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10", "ipv4")
+	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected challenge status 200, got %d", recorder.Code)
@@ -240,7 +248,7 @@ func TestHandleNextServeHTTPOutOfRangeStatusDoesNotPanic(t *testing.T) {
 	defer appsec.Close()
 
 	recorder := httptest.NewRecorder()
-	b.handleNextServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10", "ipv4")
+	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("expected clamped status 403, got %d", recorder.Code)
@@ -255,7 +263,7 @@ func TestHandleNextServeHTTPEmptyChallengeBodyBans(t *testing.T) {
 	defer appsec.Close()
 
 	recorder := httptest.NewRecorder()
-	b.handleNextServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10", "ipv4")
+	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("expected ban for empty challenge body, got %d", recorder.Code)
@@ -273,7 +281,7 @@ func TestHandleNextServeHTTPZeroStatusIs200(t *testing.T) {
 	defer appsec.Close()
 
 	recorder := httptest.NewRecorder()
-	b.handleNextServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10", "ipv4")
+	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected missing http_status to be 200, got %d", recorder.Code)
@@ -299,7 +307,7 @@ func TestHandleNextServeHTTPAllowCallsNext(t *testing.T) {
 		log:           logger.New("ERROR", ""),
 		conn:          crowdsecconnection.NewTestAppsecConnection(appsecURL, appsec.Client(), logger.New("ERROR", "")),
 	}
-	b.handleNextServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10", "ipv4")
+	b.handleNextServeHTTP(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 	if !nextCalled {
 		t.Fatal("next handler should be called for allow")
 	}
@@ -315,7 +323,7 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			log:  logger.New("ERROR", ""),
 			conn: crowdsecconnection.NewTestLapiFailureActionConnection(configuration.FailureActionPassthrough),
 		}
-		b.applyLapiFailureAction(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10", configuration.ReasonTECH, crowdsecconnection.OriginPluginTechStreamFail, "ipv4")
+		b.applyLapiFailureAction(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), configuration.ReasonTECH, crowdsecconnection.OriginPluginTechStreamFail)
 		if !nextCalled {
 			t.Fatal("passthrough should use the pass path")
 		}
@@ -330,7 +338,7 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			conn:                  crowdsecconnection.NewTestLapiFailureActionConnection(configuration.FailureActionBan),
 		}
 		recorder := httptest.NewRecorder()
-		b.applyLapiFailureAction(recorder, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10", configuration.ReasonLAPI, crowdsecconnection.OriginPluginLapiFailure, "ipv4")
+		b.applyLapiFailureAction(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), configuration.ReasonLAPI, crowdsecconnection.OriginPluginLapiFailure)
 		if recorder.Code != http.StatusForbidden {
 			t.Fatalf("ban want 403, got %d", recorder.Code)
 		}
@@ -357,7 +365,7 @@ func TestHandleNextServeHTTPAppsecFailureAction(t *testing.T) {
 			log:                 logger.New("ERROR", ""),
 			conn:                crowdsecconnection.NewTestAppsecConnection(appsecURL, appsec.Client(), logger.New("ERROR", "")),
 		}
-		b.handleNextServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10", "ipv4")
+		b.handleNextServeHTTP(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 		if !nextCalled {
 			t.Fatal("passthrough on AppSec 500 should call next")
 		}
@@ -369,7 +377,7 @@ func TestHandleNextServeHTTPAppsecFailureAction(t *testing.T) {
 		defer appsec.Close()
 		b.appsecFailureAction = configuration.FailureActionBan
 		recorder := httptest.NewRecorder()
-		b.handleNextServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10", "ipv4")
+		b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 		if recorder.Code != http.StatusForbidden {
 			t.Fatalf("ban on AppSec 500 want 403, got %d", recorder.Code)
 		}

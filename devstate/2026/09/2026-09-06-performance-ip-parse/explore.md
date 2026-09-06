@@ -31,7 +31,7 @@ No third-party research: this is `net.ParseIP` / `To4` on an address this plugin
 - Parse at GetRemoteIP / the XFF walk (keep the winning hop’s `net.IP`), not a second parse-only block that leaves Contains + Range on strings.
 - Trusted-client: `ContainsIP` when parsed is non-nil. When GetRemoteIP succeeds and parsed is nil, keep today’s Contains error outcome (`plugin:tech_trustipfail`). Do not treat nil as “not trusted, continue.”
 - Range: `Remediation` takes `net.IP`; `LookupCachedRemediation` passes that IP into membership. Cache keys stay the string.
-- Metrics: `ip_type` from that `net.IP` (`To4() != nil` → ipv4, else ipv6, empty if nil). Pass the `ip_type` string into `recordProcessed` / `recordDropped` and the handlers that call `recordDropped`. Do not thread `net.IP` through `handleBanServeHTTP` / `handleNextServeHTTP`. Do not call `ip.Family(remoteIP)` on the request path.
+- Metrics: `ip_type` from that `net.IP` (`To4() != nil` → ipv4, else ipv6, empty if nil). Put `req`, `remoteIP`, parsed `net.IP`, and `ipType` on `clientRequest`. Pass that type through ban/next/AppSec. Do not put scopes or origin on it. Do not call `ip.Family(remoteIP)` on the request path.
 - `Family` / `FamilyOfHostOrCIDR` stay for decision values and tests.
 - Spec delta is parse-once wiring on existing `core_plugin_ip_radix-lookup` (and lookup/Range if the string signature is specified). `core_plugin_lapi_usage-metrics` behavior unchanged; owner of the parse moves. Usage packets listed above update in apply.
 
@@ -53,6 +53,6 @@ No third-party research: this is `net.ParseIP` / `To4` on an address this plugin
   Decision: assumed — change `Remediation` to take `net.IP`. Update existing string tests to `net.ParseIP` then `Remediation`. No new test suite. `LookupCachedRemediation` takes the parsed IP for the membership call; the `remoteIP` string argument stays for cache keys.
   By: explore
 
-- Q: How does `recordDropped` get `ip_type` without `Family(remoteIP)` and without threading `net.IP` through ban/next?
-  Decision: assumed — compute `ipType` once in ServeHTTP from the parsed IP. Change `recordProcessed` / `recordDropped` to take `ipType string`. Thread that string (not `net.IP`) through handlers that call `recordDropped`.
-  By: explore
+- Q: How does `recordDropped` get `ip_type` without `Family(remoteIP)` and without a bag of request metadata?
+  Decision: assumed — compute `ipType` once in ServeHTTP from the parsed IP. Fold `req`, `remoteIP`, parsed `net.IP`, and `ipType` into `clientRequest`. Pass that type through handlers that call `recordDropped`. Scopes and origin stay off the type. `recordProcessed` / `recordDropped` still take `ipType string` from `client.ipType`.
+  By: implement (chat)

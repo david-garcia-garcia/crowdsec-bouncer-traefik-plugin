@@ -16,7 +16,7 @@ Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. S
 
 ## How to use
 
-- Classify `ip_type` with `ip.FamilyOfIP` on the `net.IP` GetRemoteIP already yielded. Do not parse `RemoteAddr`. Do not call `ip.Family` on the client string on the request path.
+- Classify `ip_type` with `ip.FamilyOfIP` on the `net.IP` GetRemoteIP already yielded (`client.ipType` on the request path). Do not parse `RemoteAddr`. Do not call `ip.Family` on the client string on the request path.
 - Build origin with `MetricsOrigin(decision.Origin, decision.Scenario)` before cache store and before `IncDropped`.
 - AppSec remediations use `origin=appsec`. Fail-closed drops use `plugin:tech_getremotefail`, `plugin:tech_trustipfail`, `plugin:tech_cachefail`, `plugin:tech_streamfail`, `plugin:lapi_failure`, or `plugin:appsec_failure`.
 - Persist origin on Ip/header cache via `cache.RemediationWithOrigin`. Range-index stays letter-only; range-only drops omit origin.
@@ -25,8 +25,8 @@ Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. S
 ## Pattern snippet
 
 ```go
-conn.IncProcessed(ip.FamilyOfIP(parsedIP))
-conn.IncDropped(cache.RemediationOrigin(stored), ip.FamilyOfIP(parsedIP), "ban")
+conn.IncProcessed(client.ipType)
+conn.IncDropped(cache.RemediationOrigin(stored), client.ipType, "ban")
 ```
 
 ## Key files
