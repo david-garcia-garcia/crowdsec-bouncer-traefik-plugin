@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: stale-usage 1
 fixed: core_plugin_appsec.md How-to + Gotcha for 502/503/504
 skipped: n/a
+
+## archive (2026-09-06)
+phase: archive
+findings: none
+fixed: fold core_plugin_appsec_failure-action; moved to archive/2026-09-06-appsec-proxy-unavailable-tests
+skipped: n/a
