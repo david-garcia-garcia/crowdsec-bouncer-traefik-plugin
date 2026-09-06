@@ -39,3 +39,9 @@ phase: archive
 findings: catalog spec core_plugin_middleware_remediation-traceid; change moved to archive/2026-09-06-add-remediation-traceid
 fixed: spec catalog sync + folder move
 skipped: n/a
+
+## pullrequest (2026-09-06)
+phase: pullrequest
+findings: PR #49 title ready; CI succeeded after lint fix
+fixed: gochecknoglobals nolint; canonical Header.Get in tests
+skipped: n/a
