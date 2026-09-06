@@ -15,3 +15,9 @@ phase: codereview
 findings: all five axes none
 fixed: n/a
 skipped: n/a
+
+## devdocsimpact (2026-09-06)
+phase: devdocsimpact
+findings: none — AppSec Client and middleware packets already current
+fixed: n/a
+skipped: n/a
