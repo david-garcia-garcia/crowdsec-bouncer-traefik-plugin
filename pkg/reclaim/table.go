@@ -50,6 +50,7 @@ type Table struct {
 	mu    sync.Mutex
 	grace time.Duration
 	items map[string]*slot
+	keys  []string // put order; Yaegi v0.16 panics ranging map[string]*slot values
 }
 
 // slot is one incarnation: the value, the cancel for its lifetime, and the holders that still need it.
@@ -72,6 +73,7 @@ func NewTable(grace time.Duration) *Table {
 	return &Table{
 		grace: grace,
 		items: map[string]*slot{},
+		keys:  []string{},
 	}
 }
 
@@ -203,6 +205,7 @@ func (t *Table) Open(ctx context.Context, key string, logger *slog.Logger, creat
 		logger:  logger,
 	}
 	t.items[key] = e
+	t.keys = append(t.keys, key)
 	id, _ := t.bindLocked(e)
 	t.mu.Unlock()
 	go func() {
@@ -284,6 +287,7 @@ func (t *Table) fire(key string, e *slot, gen uint64) {
 	disposeLog := e.logger
 	stored := e.value
 	delete(t.items, key)
+	t.keys = dropStoredKey(t.keys, key)
 	t.mu.Unlock()
 	if cancel != nil {
 		cancel()
@@ -296,7 +300,7 @@ func (t *Table) fire(key string, e *slot, gen uint64) {
 // Peek returns the stored value for key without adding a holder and without create.
 // holders is the live constructor-context count. sleeping is true when the last
 // holder is gone and the dispose timer is armed. ok is false when the key is absent.
-func (t *Table) Peek(key string) (any, int, bool, bool) {
+func (t *Table) Peek(key string) (interface{}, int, bool, bool) {
 	if t == nil {
 		return nil, 0, false, false
 	}
@@ -306,18 +310,21 @@ func (t *Table) Peek(key string) (any, int, bool, bool) {
 	if !found {
 		return nil, 0, false, false
 	}
-	sleeping := e.graceTimer != nil
-	holderCount := 0
+	n := 0
 	if e.holders != nil {
-		holderCount = len(e.holders)
+		n = len(e.holders)
 	}
-	return e.value, holderCount, sleeping, true
+	sleeping := false
+	if e.graceTimer != nil {
+		sleeping = true
+	}
+	return e.value, n, sleeping, true
 }
 
 // PeekLivePrefix returns one live slot whose key starts with prefix, without binding.
 // Sleeping slots are ignored so a grace leftover cannot steal a new snapshot’s Open.
 // Several live matches: the lexicographically smallest key. Empty prefix: miss.
-// Index-style loops: Yaegi v0.16 panics on `for k, v := range` over this map of slots.
+// Index-style loops: Yaegi v0.16 panics on ranging map values of *slot.
 func (t *Table) PeekLivePrefix(prefix string) (string, interface{}, int, bool) {
 	if t == nil {
 		return "", nil, 0, false
@@ -327,22 +334,14 @@ func (t *Table) PeekLivePrefix(prefix string) (string, interface{}, int, bool) {
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	items := t.items
-	if len(items) == 0 {
-		return "", nil, 0, false
-	}
 	chosenKey := ""
 	var chosenValue interface{}
 	chosenHolders := 0
-	keys := make([]string, 0, len(items))
-	for mappedKey := range items {
-		keys = append(keys, mappedKey)
-	}
 	i := 0
-	for i < len(keys) {
-		mappedKey := keys[i]
-		i++
-		mapped := items[mappedKey]
+	for i < len(t.keys) {
+		mappedKey := t.keys[i]
+		i = i + 1
+		mapped := t.items[mappedKey]
 		if mapped == nil {
 			continue
 		}
@@ -376,6 +375,19 @@ func keyHasPrefix(value, prefix string) bool {
 	return value[:len(prefix)] == prefix
 }
 
+// dropStoredKey removes key from put-order, keeping the remaining keys in place.
+func dropStoredKey(keys []string, key string) []string {
+	out := make([]string, 0, len(keys))
+	i := 0
+	for i < len(keys) {
+		if keys[i] != key {
+			out = append(out, keys[i])
+		}
+		i = i + 1
+	}
+	return out
+}
+
 // ResetForTest stops grace timers and cancels every incarnation lifetime.
 func (t *Table) ResetForTest() {
 	if t == nil {
@@ -384,8 +396,20 @@ func (t *Table) ResetForTest() {
 	t.mu.Lock()
 	items := t.items
 	t.items = map[string]*slot{}
+	t.keys = []string{}
 	t.mu.Unlock()
-	for key, e := range items {
+	itemKeys := make([]string, 0)
+	for key := range items {
+		itemKeys = append(itemKeys, key)
+	}
+	i := 0
+	for i < len(itemKeys) {
+		key := itemKeys[i]
+		i = i + 1
+		e := items[key]
+		if e == nil {
+			continue
+		}
 		if e.graceTimer != nil {
 			e.graceTimer.Stop()
 			e.graceTimer = nil
