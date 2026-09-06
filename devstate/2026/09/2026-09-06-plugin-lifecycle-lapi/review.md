@@ -32,3 +32,10 @@ phase: implement
 findings: Yaegi Peek 4-value return and closer/sleeper type-assert; /trusted 600s first-win broke usage-metrics e2e
 fixed: *reclaim.Wrapped; Peek View; OpenWithGrace 30s; /trusted metrics=1; Main+mock+pester green on 64315e3
 skipped: assumed warn-and-wire vs fail New; PR #18
+
+## codereview (2026-09-06)
+
+phase: codereview
+findings: Standards 8 (5 hard naming/comments, 3 judgement); Spec none; Security none; Performance none; Dead 1 hard (Open leftover)
+fixed: connectionFromStored; connErr; OpenLive middlewareName; helper comments (122e06b)
+skipped: judgement names/test helper extract; Open kept as specified public API

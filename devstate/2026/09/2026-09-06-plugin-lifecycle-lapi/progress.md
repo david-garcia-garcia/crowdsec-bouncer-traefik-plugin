@@ -8,7 +8,7 @@ JobName: 2026-09-06-plugin-lifecycle-lapi
 | explore | [x] | [x] | 2026-09-06T05:30:38Z |
 | propose | [x] | [x] | 2026-09-06T10:51:23Z |
 | implement | [x] | [x] | 2026-09-06T10:51:23Z |
-| codereview | [ ] | [ ] | |
+| codereview | [x] | [x] | 2026-09-06T10:59:28Z |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
