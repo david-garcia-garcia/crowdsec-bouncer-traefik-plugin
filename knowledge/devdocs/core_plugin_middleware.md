@@ -68,3 +68,4 @@ return bouncer.New(next, name, config, nil, appsecClient, log)
 - LAPI `Close()` stops tickers, idle LAPI HTTP, and the cache Redis pool. AppSec `Close()` releases idle AppSec HTTP. Do not use `sync.Once`.
 - Both puts use `OpenWithGrace` 30s (`ReclaimGraceDuration`). `reclaim.DefaultGrace` stays 10s.
 - Lifecycle INFO lines: `crowdsec connection started|sleeping|waking|closed`. Stream health transitions: `crowdsec stream became unhealthy|healthy` (not every poll).
+- One in-flight `GET /v1/decisions/stream` per LAPI Client. Extra ticker/`Wake` work TryLock-skips; a skip is not healthy and must not reset `updateFailure`. Keep `go work()` on the ticker so a hung poll cannot freeze metrics. Bound each LAPI call with `HTTPTimeoutSeconds`.

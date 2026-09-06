@@ -45,7 +45,13 @@ func (c *Client) startStream(config *configuration.Config, log *slog.Logger) err
 	return nil
 }
 
+// handleStreamTicker runs one stream poll. A second call while a poll is in
+// flight returns immediately and does not count as success.
 func (c *Client) handleStreamTicker() {
+	if !c.streamPollMu.TryLock() {
+		return
+	}
+	defer c.streamPollMu.Unlock()
 	if err := c.handleStreamCache(); err != nil {
 		c.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", c.updateFailure, c.isCrowdsecStreamHealthy, err.Error()))
 		if c.updateMaxFailure != -1 && c.updateFailure >= c.updateMaxFailure && c.isCrowdsecStreamHealthy {
@@ -63,6 +69,7 @@ func (c *Client) handleStreamTicker() {
 	}
 }
 
+// handleStreamCache leases the poll interval and applies LAPI stream decisions.
 func (c *Client) handleStreamCache() error {
 	_, err := c.cacheClient.Get(cacheTimeoutKey)
 	if err == nil {
