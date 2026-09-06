@@ -1,0 +1,33 @@
+issueKey: 2026-09-06-upstream-323-grpc-stream-403
+
+jobName: 2026-09-06-upstream-323-grpc-stream-403
+
+issueHost: local
+
+issueRef: none
+
+prHost: github
+
+repoSlug: crowdsec-bouncer-traefik-plugin
+
+destBranch: master
+
+qualify: qualified-with-gaps
+
+src: 1d9ea6571db865a7cc6bb042ddf936d87f1cb49cf10a138e3da46ee112d68e52
+
+localTests: passed
+
+requirement: requirement.md
+
+comments: none
+
+explore: explore.md
+
+change: appsec-unreadable-body-block
+
+pr:
+
+  id: 51
+
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/51

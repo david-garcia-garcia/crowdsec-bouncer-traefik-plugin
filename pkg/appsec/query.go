@@ -31,9 +31,10 @@ const (
 	ActionChallenge = "challenge"
 )
 
-// Policy is per-route AppSec fallback when the listener does not return a usable verdict.
+// Policy is per-route AppSec fallback and unreadable-body drop.
 type Policy struct {
-	FailureAction string
+	FailureAction       string
+	UnreadableBodyBlock bool
 }
 
 // ErrFailureCaptcha tells the bouncer to run pkg/captcha instead of ban or next.
@@ -49,12 +50,6 @@ func resultForFailureAction(action, errMsg string) (*Response, error) {
 	default:
 		return nil, errors.New(errMsg)
 	}
-}
-
-// resultForFailureActionErr is resultForFailureAction when only an error is needed (request build).
-func resultForFailureActionErr(action, errMsg string) error {
-	_, err := resultForFailureAction(action, errMsg)
-	return err
 }
 
 // Response is the structured AppSec JSON envelope CrowdSec 1.8 returns for a remediation.
@@ -74,10 +69,12 @@ func appsecAllow() *Response {
 	return &Response{Action: ActionAllow}
 }
 
+// isBodyUnreadable is true for HTTP/2+ requests with a body and no Content-Length (gRPC streams).
 func isBodyUnreadable(httpReq *http.Request) bool {
 	return httpReq.Body != nil && httpReq.Body != http.NoBody && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
 }
 
+// isMethodWithBody is true for methods that may carry a request body toward AppSec.
 func isMethodWithBody(method string) bool {
 	switch method {
 	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
@@ -144,9 +141,11 @@ func (c *Client) newAppsecForwardRequest(ip string, httpReq *http.Request, pol P
 func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol Policy) (*http.Request, error) {
 	switch {
 	case isBodyUnreadable(httpReq):
-		if isMethodWithBody(httpReq.Method) && configuration.EffectiveFailureAction(pol.FailureAction) != configuration.FailureActionPassthrough {
-			return nil, resultForFailureActionErr(pol.FailureAction, "appsecQuery:unreadableBody dropped")
+		if pol.UnreadableBodyBlock && isMethodWithBody(httpReq.Method) {
+			// Opt-in drop; independent of CrowdsecAppsecFailureAction.
+			return nil, errors.New("appsecQuery:unreadableBody dropped")
 		}
+		// HTTP/2+ streams have no finite body to copy; inspect headers only (issue #323).
 		req, _ := http.NewRequest(http.MethodGet, target, nil)
 		return req, nil
 	case c.appsecBodyLimit > 0 && httpReq.Body != nil:
