@@ -6,6 +6,8 @@ import (
 )
 
 // readRandom fills b with cryptographic random bytes. Tests in this package may replace it.
+//
+//nolint:gochecknoglobals
 var readRandom = rand.Read
 
 // newRemediationTraceID returns a 16-character lowercase hex ID when the built-in knob is set.

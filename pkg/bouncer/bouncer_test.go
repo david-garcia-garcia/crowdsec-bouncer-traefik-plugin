@@ -125,7 +125,7 @@ func TestHandleBanServeHTTPBuiltinTraceID(t *testing.T) {
 		rw := httptest.NewRecorder()
 		req := &http.Request{Method: http.MethodGet, Header: make(http.Header)}
 		b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
-		if got := rw.Header().Get("X-Trace-ID"); got != wantID {
+		if got := rw.Header().Get("X-Trace-Id"); got != wantID {
 			t.Errorf("header X-Trace-ID = %q, want %q", got, wantID)
 		}
 		if body := rw.Body.String(); body != "trace:"+wantID {
@@ -143,7 +143,7 @@ func TestHandleBanServeHTTPBuiltinTraceID(t *testing.T) {
 		rw := httptest.NewRecorder()
 		req := &http.Request{Method: http.MethodHead}
 		b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
-		if got := rw.Header().Get("X-Trace-ID"); got != wantID {
+		if got := rw.Header().Get("X-Trace-Id"); got != wantID {
 			t.Errorf("header X-Trace-ID = %q, want %q", got, wantID)
 		}
 		if rw.Body.Len() != 0 {
@@ -162,7 +162,7 @@ func TestHandleBanServeHTTPBuiltinTraceID(t *testing.T) {
 		req := &http.Request{Method: http.MethodGet, Header: make(http.Header)}
 		req.Header.Set("X-Trace", "from-client")
 		b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
-		if got := rw.Header().Get("X-Trace-ID"); got != "" {
+		if got := rw.Header().Get("X-Trace-Id"); got != "" {
 			t.Errorf("unexpected generated header %q", got)
 		}
 		if body := rw.Body.String(); body != "trace:from-client" {
@@ -182,7 +182,7 @@ func TestHandleBanServeHTTPBuiltinTraceID(t *testing.T) {
 		req := &http.Request{Method: http.MethodGet, Header: make(http.Header)}
 		req.Header.Set("X-Trace", "from-client")
 		b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
-		if got := rw.Header().Get("X-Trace-ID"); got != wantID {
+		if got := rw.Header().Get("X-Trace-Id"); got != wantID {
 			t.Errorf("header X-Trace-ID = %q, want %q", got, wantID)
 		}
 		if body := rw.Body.String(); body != "trace:"+wantID {
@@ -212,7 +212,7 @@ func TestHandleBanServeHTTPBuiltinTraceID(t *testing.T) {
 		if rw.Code != http.StatusForbidden {
 			t.Errorf("status = %d, want 403", rw.Code)
 		}
-		if got := rw.Header().Get("X-Trace-ID"); got != "" {
+		if got := rw.Header().Get("X-Trace-Id"); got != "" {
 			t.Errorf("header X-Trace-ID = %q, want empty", got)
 		}
 		if body := rw.Body.String(); body != "trace:" {

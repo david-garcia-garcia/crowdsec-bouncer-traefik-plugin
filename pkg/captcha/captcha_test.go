@@ -48,7 +48,7 @@ func TestServeHTTPCaptchaHTMLTraceID(t *testing.T) {
 	if rw.Code != http.StatusOK {
 		t.Errorf("status = %d, want 200", rw.Code)
 	}
-	if got := rw.Header().Get("X-Trace-ID"); got != "0102030405060708" {
+	if got := rw.Header().Get("X-Trace-Id"); got != "0102030405060708" {
 		t.Errorf("header X-Trace-ID = %q, want generated id", got)
 	}
 	if body := rw.Body.String(); body != "trace:0102030405060708" {
@@ -70,7 +70,7 @@ func TestServeHTTPSolvedCaptchaOmitsTraceID(t *testing.T) {
 	if rw.Code != http.StatusFound {
 		t.Errorf("status = %d, want 302", rw.Code)
 	}
-	if got := rw.Header().Get("X-Trace-ID"); got != "" {
+	if got := rw.Header().Get("X-Trace-Id"); got != "" {
 		t.Errorf("solved redirect X-Trace-ID = %q, want empty", got)
 	}
 }
