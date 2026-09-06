@@ -40,3 +40,9 @@ findings: synced 3 new specs + fold appsec_client identity; kept User-Agent requ
 fixed: openspec/specs/core_plugin_health_tracker, lapi_failure-backoff, appsec_failure-backoff; archive folder; research domains traefik-modsecurity
 skipped: none
 
+## pullrequest (2026-09-06)
+phase: pullrequest
+findings: CI succeeded (Main Process, e2e binary, e2e docker); drop WIP title
+fixed: PR #55 ready title and delivery card
+skipped: none
+
