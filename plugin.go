@@ -3,7 +3,6 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -11,7 +10,6 @@ import (
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/crowdsecconnection"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
 // CreateConfig creates the default plugin configuration.
@@ -58,15 +56,9 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 
 	// Live/none/appsec do not use stream_cursor. Two Connections on one key
 	// stay valid (?ip= lookups). Reclaim by full identity, including intervals.
-	stored, openErr := reclaim.Open(ctx, crowdsecconnection.Key(config), log, func() (any, error) {
-		return crowdsecconnection.New(config, log, pluginVersion)
-	})
+	conn, openErr := crowdsecconnection.OpenLive(ctx, config, log, pluginVersion)
 	if openErr != nil {
 		return nil, openErr
-	}
-	conn, ok := stored.(*crowdsecconnection.CrowdsecConnection)
-	if !ok {
-		return nil, fmt.Errorf("%s: reclaim: want *crowdsecconnection.CrowdsecConnection, got %T", name, stored)
 	}
 	return bouncer.New(next, name, config, conn, log)
 }

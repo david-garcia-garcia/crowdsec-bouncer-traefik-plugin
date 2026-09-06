@@ -83,10 +83,6 @@ func TestCrowdsecConnection_ReclaimGrace(t *testing.T) {
 	if ReclaimGraceDuration != 30*time.Second {
 		t.Fatalf("ReclaimGraceDuration: %v", ReclaimGraceDuration)
 	}
-	conn := &CrowdsecConnection{}
-	if conn.ReclaimGrace() != ReclaimGraceDuration {
-		t.Fatalf("ReclaimGrace: %v", conn.ReclaimGrace())
-	}
 }
 
 func TestCrowdsecConnection_LifecycleLogs(t *testing.T) {

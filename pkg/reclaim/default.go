@@ -29,6 +29,11 @@ func Open(ctx context.Context, key string, logger *slog.Logger, create func() (a
 	return Default().Open(ctx, key, logger, create)
 }
 
+// OpenWithGrace is Default().OpenWithGrace.
+func OpenWithGrace(ctx context.Context, key string, logger *slog.Logger, grace time.Duration, create func() (any, error)) (any, error) {
+	return Default().OpenWithGrace(ctx, key, logger, grace, create)
+}
+
 // Peek is Default().Peek: inspect a key without binding a constructor context.
 func Peek(key string) (any, int, bool, bool) {
 	return Default().Peek(key)

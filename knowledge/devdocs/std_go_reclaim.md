@@ -13,7 +13,7 @@ Copy `pkg/reclaim` as-is. Call `reclaim.Open` with Traefik’s `New` ctx. If the
 ## How to use
 
 - `reclaim.Open(ctx, key, logger, create)` on the process table. Last holder `Sleep()`s if the value has it; Open during grace `Wake()`s.
-- If the value has `ReclaimGrace()`, that duration is the slot wait, set when the value is put. Otherwise the table grace applies (`DefaultGrace` 10s).
+- CrowdsecConnection puts use `OpenWithGrace(..., ReclaimGraceDuration, ...)` (30s). Do not change table `DefaultGrace` (10s) to special-case one type.
 - `create` runs only for a first put or after grace Close.
 - Tests: `reclaim.ResetForTest()` / `reclaim.ResetForTestWith(grace)` only.
 - `Peek(key)` inspects holders/sleep without binding. `PeekLivePrefix(prefix)` returns one live slot under that stem. Callers do not Close slots.

@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	// DefaultGrace is the wait after the last holder when the value has no ReclaimGrace.
+	// DefaultGrace is the wait after the last holder when Open is used without OpenWithGrace.
 	DefaultGrace = 10 * time.Second
 
 	MsgPut     = "reclaim_put"
@@ -107,11 +107,6 @@ type sleeper interface {
 	Wake()
 }
 
-// gracer is an optional wait after the last holder, instead of the table default.
-type gracer interface {
-	ReclaimGrace() time.Duration
-}
-
 // stopValue calls Close if v has it. Used for a lost create and when life ends.
 func stopValue(v any) {
 	if c, ok := v.(closer); ok {
@@ -133,20 +128,21 @@ func wakeValue(v any) {
 	}
 }
 
-// graceFor returns the wait after the last holder for this value.
-// A value with ReclaimGrace sets the slot wait at put; otherwise the table grace is used.
-func graceFor(v any, tableGrace time.Duration) time.Duration {
-	if g, ok := v.(gracer); ok {
-		return g.ReclaimGrace()
-	}
-	return tableGrace
-}
-
 // Open returns the stored value for key, creating it once, and tracks ctx until it is done.
+// Slot wait after the last holder is the table grace. Use OpenWithGrace to set a different wait.
 // create takes no arguments: Yaegi cannot call func(context.Context) (any, error) (it assigns life onto the value).
 // logger is required; it is the only logger for this Open and is stored on the slot for orphan and dispose.
 // If the value has Close(), the table calls it when this incarnation ends.
 func (t *Table) Open(ctx context.Context, key string, logger *slog.Logger, create func() (any, error)) (any, error) {
+	wait := time.Duration(0)
+	if t != nil {
+		wait = t.grace
+	}
+	return t.OpenWithGrace(ctx, key, logger, wait, create)
+}
+
+// OpenWithGrace is Open with an explicit wait after the last holder for this put.
+func (t *Table) OpenWithGrace(ctx context.Context, key string, logger *slog.Logger, grace time.Duration, create func() (any, error)) (any, error) {
 	if t == nil {
 		return nil, fmt.Errorf("reclaim: open %q: nil table", key)
 	}
@@ -201,7 +197,7 @@ func (t *Table) Open(ctx context.Context, key string, logger *slog.Logger, creat
 		value:   v,
 		cancel:  cancel,
 		holders: map[uint64]struct{}{},
-		grace:   graceFor(v, t.grace),
+		grace:   grace,
 		logger:  logger,
 	}
 	t.items[key] = e

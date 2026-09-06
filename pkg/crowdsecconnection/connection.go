@@ -321,11 +321,6 @@ func (c *CrowdsecConnection) Wake() {
 	}
 }
 
-// ReclaimGrace is the reclaim-slot wait after the last holder. It is not the table DefaultGrace.
-func (c *CrowdsecConnection) ReclaimGrace() time.Duration {
-	return ReclaimGraceDuration
-}
-
 // logInfo writes an operator-visible lifecycle line with mode and LAPI host.
 func (c *CrowdsecConnection) logInfo(msg string) {
 	if c.log == nil {

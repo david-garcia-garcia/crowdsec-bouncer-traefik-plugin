@@ -29,17 +29,6 @@ func (b *box) Close() {
 	}
 }
 
-// graceBox uses ReclaimGrace instead of the table wait.
-type graceBox struct {
-	box
-	wait time.Duration
-}
-
-// ReclaimGrace is the slot wait after the last holder.
-func (g *graceBox) ReclaimGrace() time.Duration {
-	return g.wait
-}
-
 // ending is a box that sets done when Close runs.
 func ending(n int, done *atomic.Bool) *box {
 	return &box{n: n, ended: done}
@@ -337,8 +326,8 @@ func TestTable_ValueGraceShorterThanTable(t *testing.T) {
 	tab := NewTable(time.Second)
 	var ended atomic.Bool
 	ctx, cancel := context.WithCancel(context.Background())
-	if _, err := tab.Open(ctx, "a", slog.Default(), func() (any, error) {
-		return &graceBox{box: box{ended: &ended}, wait: 30 * time.Millisecond}, nil
+	if _, err := tab.OpenWithGrace(ctx, "a", slog.Default(), 30*time.Millisecond, func() (any, error) {
+		return ending(1, &ended), nil
 	}); err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -350,7 +339,7 @@ func TestTable_ValueGraceShorterThanTable(t *testing.T) {
 		}
 		time.Sleep(time.Millisecond)
 	}
-	t.Fatal("ReclaimGrace must dispose before the table wait")
+	t.Fatal("OpenWithGrace must dispose before the table wait")
 }
 
 // TestTable_ValueGraceLongerThanTable checks that ReclaimGrace keeps the slot past the table wait.
@@ -358,8 +347,8 @@ func TestTable_ValueGraceLongerThanTable(t *testing.T) {
 	tab := NewTable(20 * time.Millisecond)
 	var ended atomic.Bool
 	ctx, cancel := context.WithCancel(context.Background())
-	if _, err := tab.Open(ctx, "a", slog.Default(), func() (any, error) {
-		return &graceBox{box: box{ended: &ended}, wait: 200 * time.Millisecond}, nil
+	if _, err := tab.OpenWithGrace(ctx, "a", slog.Default(), 200*time.Millisecond, func() (any, error) {
+		return ending(1, &ended), nil
 	}); err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -367,7 +356,7 @@ func TestTable_ValueGraceLongerThanTable(t *testing.T) {
 	deadline := time.Now().Add(80 * time.Millisecond)
 	for time.Now().Before(deadline) {
 		if ended.Load() {
-			t.Fatal("table wait must not dispose a longer ReclaimGrace")
+			t.Fatal("table wait must not dispose a longer OpenWithGrace")
 		}
 		time.Sleep(time.Millisecond)
 	}

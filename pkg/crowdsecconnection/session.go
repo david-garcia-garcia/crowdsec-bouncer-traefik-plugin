@@ -254,7 +254,7 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	}
 
 	_, holderCount, _, foundSleeper := reclaim.Peek(bindKey)
-	stored, openErr := reclaim.Open(ctx, bindKey, log, create)
+	stored, openErr := reclaim.OpenWithGrace(ctx, bindKey, log, ReclaimGraceDuration, create)
 	if openErr != nil {
 		return nil, openErr
 	}
@@ -267,6 +267,17 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 		sessionConn.streamOwner = middlewareName
 	}
 	return sessionConn, nil
+}
+
+// OpenLive reclaims a CrowdsecConnection by full identity (live/none/appsec).
+func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, pluginVersion string) (*CrowdsecConnection, error) {
+	stored, openErr := reclaim.OpenWithGrace(ctx, Key(cfg), log, ReclaimGraceDuration, func() (any, error) {
+		return New(cfg, log, pluginVersion)
+	})
+	if openErr != nil {
+		return nil, openErr
+	}
+	return streamConn("live", stored)
 }
 
 // streamConn type-asserts the reclaim value to *CrowdsecConnection.
