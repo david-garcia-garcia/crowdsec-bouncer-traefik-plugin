@@ -15,3 +15,9 @@ phase: propose
 findings: fold core_plugin_appsec_failure-action; change appsec-delete-unreadable-body
 fixed: n/a
 skipped: product apply deferred to implement
+
+## implement (2026-09-06)
+phase: implement
+findings: none
+fixed: DELETE removed from isMethodWithBody; DELETE HTTP/3 test added
+skipped: none
