@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: stale-usage already produced in implement
 fixed: none (packet already current)
 skipped: none
+
+## archive (2026-09-06)
+phase: archive
+findings: none
+fixed: live spec synced; change moved to archive/2026-09-06-appsec-unreadable-body-headers-only
+skipped: none
