@@ -27,3 +27,14 @@ The stream poller lease key SHALL live in that connection’s isolated cache spa
 - **WHEN** two stream-mode connections exist in one process for different LAPI hosts
 - **THEN** each performs its own stream fetch against its own LAPI
 - **AND** neither treats the other’s lease as its own
+
+### Requirement: Set returns write errors
+`cache.Client.Set` SHALL return an error when the underlying Redis writer fails. In-memory cache `Set` SHALL return nil. Callers that ignore the return value SHALL behave as today except that errors are no longer swallowed inside the cache layer.
+
+#### Scenario: Redis set failure is observable
+- **WHEN** Redis is enabled and the writer returns an error on SET
+- **THEN** `Client.Set` returns a non-nil error
+
+#### Scenario: Memory set always succeeds
+- **WHEN** Redis is disabled and `Client.Set` is called
+- **THEN** `Client.Set` returns nil

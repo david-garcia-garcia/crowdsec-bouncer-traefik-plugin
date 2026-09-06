@@ -3,7 +3,9 @@ package captcha
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -13,6 +15,9 @@ import (
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
+
+// ErrRetryableVerify marks provider transport or JSON failures that should re-show captcha.
+var ErrRetryableVerify = errors.New("captcha: retryable verify failure")
 
 // Client Captcha client.
 type Client struct {
@@ -75,8 +80,11 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 	c.siteKey = siteKey
 	c.secretKey = secretKey
 	c.remediationCustomHeader = remediationCustomHeader
-	template, contentType, _ := configuration.GetTemplate(captchaTemplatePath)
-	c.template = template
+	tmpl, contentType, err := configuration.GetTemplate(captchaTemplatePath)
+	if err != nil {
+		return err
+	}
+	c.template = tmpl
 	c.templateContentType = contentType
 	c.gracePeriodSeconds = gracePeriodSeconds
 	c.log = log
@@ -87,27 +95,41 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 
 // ServeHTTP Handle captcha html page or validation.
 func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP string) {
-	valid, err := c.Validate(r)
+	valid, err := c.Validate(r, remoteIP)
 	if err != nil {
+		if errors.Is(err, ErrRetryableVerify) {
+			c.log.Info("captcha:ServeHTTP:validate " + err.Error())
+			c.renderCaptcha(rw)
+			return
+		}
 		c.log.Info("captcha:ServeHTTP:validate " + err.Error())
 		rw.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	if valid {
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
-		c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds)
+		if err := c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds); err != nil {
+			c.log.Error("captcha:ServeHTTP grace cache write failed: " + err.Error())
+			c.renderCaptcha(rw)
+			return
+		}
 		if c.remediationCustomHeader != "" {
 			rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
 		}
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
 	}
+	c.renderCaptcha(rw)
+}
+
+// renderCaptcha writes the captcha HTML page with HTTP 200.
+func (c *Client) renderCaptcha(rw http.ResponseWriter) {
 	rw.Header().Set("Content-Type", c.templateContentType)
 	if c.remediationCustomHeader != "" {
 		rw.Header().Set(c.remediationCustomHeader, "captcha")
 	}
 	rw.WriteHeader(http.StatusOK)
-	err = c.template.Execute(rw, map[string]string{
+	err := c.template.Execute(rw, map[string]string{
 		"SiteKey":     c.siteKey,
 		"FrontendJS":  c.infoProvider.js,
 		"FrontendKey": c.infoProvider.key,
@@ -130,7 +152,7 @@ type responseProvider struct {
 }
 
 // Validate Verify the captcha from provider API.
-func (c *Client) Validate(r *http.Request) (bool, error) {
+func (c *Client) Validate(r *http.Request, remoteIP string) (bool, error) {
 	if r.Method != http.MethodPost {
 		c.log.Debug("captcha:Validate invalid method: " + r.Method)
 		return false, nil
@@ -143,9 +165,12 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	var body = url.Values{}
 	body.Add("secret", c.secretKey)
 	body.Add("response", response)
+	if remoteIP != "" {
+		body.Add("remoteip", remoteIP)
+	}
 	res, err := c.httpClient.PostForm(c.infoProvider.validate, body)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("%w: %w", ErrRetryableVerify, err)
 	}
 	defer func() {
 		if err = res.Body.Close(); err != nil {
@@ -154,12 +179,12 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	}()
 	if !strings.Contains(res.Header.Get("Content-Type"), "application/json") {
 		c.log.Debug("captcha:Validate responseType:noJson")
-		return false, nil
+		return false, fmt.Errorf("%w: non-JSON content type", ErrRetryableVerify)
 	}
 	var captchaResponse responseProvider
 	err = json.NewDecoder(res.Body).Decode(&captchaResponse)
-	if err != nil {
-		return false, err
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false, fmt.Errorf("%w: %w", ErrRetryableVerify, err)
 	}
 	c.log.Debug(fmt.Sprintf("captcha:Validate success:%v", captchaResponse.Success))
 	return captchaResponse.Success, nil

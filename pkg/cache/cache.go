@@ -66,8 +66,9 @@ func (lc *localCache) getMany(keys []string) (map[string]string, error) {
 	return out, nil
 }
 
-func (lc *localCache) set(key, value string, duration int64) {
+func (lc *localCache) set(key, value string, duration int64) error {
 	lc.heap().Set(key, value, duration)
+	return nil
 }
 
 func (lc *localCache) delete(key string) {
@@ -153,10 +154,12 @@ func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
 	return out, nil
 }
 
-func (rc *redisCache) set(key, value string, duration int64) {
+func (rc *redisCache) set(key, value string, duration int64) error {
 	if err := rc.writer.Set(prefixed(rc.prefix, key), []byte(value), duration); err != nil {
 		rc.log.Error("cache:setDecisionRedisCache" + err.Error())
+		return err
 	}
+	return nil
 }
 
 func (rc *redisCache) delete(key string) {
@@ -176,7 +179,7 @@ func (rc *redisCache) close() {
 }
 
 type cacheInterface interface {
-	set(key, value string, duration int64)
+	set(key, value string, duration int64) error
 	get(key string) (string, error)
 	getMany(keys []string) (map[string]string, error)
 	delete(key string)
@@ -230,10 +233,38 @@ func (c *Client) GetMany(keys []string) (map[string]string, error) {
 }
 
 // Set update the cache with the IP as key and the value banned / not banned.
-func (c *Client) Set(key string, value string, duration int64) {
+func (c *Client) Set(key string, value string, duration int64) error {
 	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
-	c.cache.set(key, value, duration)
+	return c.cache.set(key, value, duration)
 }
+
+// NewFailingSetClientForTest returns a memory client whose Set always returns setErr.
+func NewFailingSetClientForTest(log *slog.Logger, setErr error) *Client {
+	return &Client{
+		cache: &failingSetCache{err: setErr},
+		log:   log,
+	}
+}
+
+type failingSetCache struct {
+	err error
+}
+
+func (f *failingSetCache) set(_, _ string, _ int64) error {
+	return f.err
+}
+
+func (f *failingSetCache) get(_ string) (string, error) {
+	return "", errors.New(CacheMiss)
+}
+
+func (f *failingSetCache) getMany(_ []string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
+func (f *failingSetCache) delete(_ string) {}
+
+func (f *failingSetCache) close() {}
 
 // Close drains Redis idle pools. Memory clients have nothing to stop. Safe to call more than once.
 func (c *Client) Close() {

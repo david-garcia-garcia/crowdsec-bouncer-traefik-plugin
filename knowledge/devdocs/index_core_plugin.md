@@ -25,3 +25,8 @@ priority: normal
 local: core_plugin_lapi_usage-metrics.md
 description: How this plugin POSTs CrowdSec usage-metrics with origin and ip_type labels.
 
+## Captcha handler
+priority: normal
+local: core_plugin_captcha_handler.md
+description: How this plugin renders captcha, siteverify, and grace-period cache after a solve.
+

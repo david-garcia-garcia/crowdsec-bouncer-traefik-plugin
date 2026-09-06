@@ -1,6 +1,8 @@
 package configuration
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -24,6 +26,16 @@ func getMinimalConfig() *Config {
 	cfg := New()
 	cfg.CrowdsecLapiKey = "test"
 	return cfg
+}
+
+func writeCaptchaTemplate(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "captcha.html")
+	if err := os.WriteFile(path, []byte("<html>{{ .SiteKey }}</html>"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func Test_contains(t *testing.T) {
@@ -112,6 +124,19 @@ func Test_ValidateParams(t *testing.T) {
 	cfgCaptchaWithProvider.CrowdsecLapiFailureAction = FailureActionCaptcha
 	cfgCaptchaWithProvider.CaptchaProvider = HcaptchaProvider
 	cfgCaptchaWithProvider.CaptchaFilePath = ""
+	cfgCaptchaWithProvider.CaptchaSiteKey = "site"
+	cfgCaptchaWithProvider.CaptchaSecretKey = "secret"
+	cfgCaptchaWithValidTemplate := getMinimalConfig()
+	cfgCaptchaWithValidTemplate.CrowdsecLapiFailureAction = FailureActionCaptcha
+	cfgCaptchaWithValidTemplate.CaptchaProvider = HcaptchaProvider
+	cfgCaptchaWithValidTemplate.CaptchaSiteKey = "site"
+	cfgCaptchaWithValidTemplate.CaptchaSecretKey = "secret"
+	cfgCaptchaWithValidTemplate.CaptchaFilePath = writeCaptchaTemplate(t)
+	cfgCaptchaUnreadableTemplate := getMinimalConfig()
+	cfgCaptchaUnreadableTemplate.CaptchaProvider = HcaptchaProvider
+	cfgCaptchaUnreadableTemplate.CaptchaSiteKey = "site"
+	cfgCaptchaUnreadableTemplate.CaptchaSecretKey = "secret"
+	cfgCaptchaUnreadableTemplate.CaptchaFilePath = filepath.Join(t.TempDir(), "missing-captcha.html")
 	cfgUnknownAction := getMinimalConfig()
 	cfgUnknownAction.CrowdsecAppsecFailureAction = "block"
 	cfgEmptyAction := getMinimalConfig()
@@ -139,7 +164,9 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Valid log level lowercase info", args: args{config: cfg9}, wantErr: false},
 		{name: "Invalid log level Warning", args: args{config: cfg10}, wantErr: true},
 		{name: "Captcha LAPI action without provider", args: args{config: cfgCaptchaNoProvider}, wantErr: true},
-		{name: "Captcha LAPI action with provider", args: args{config: cfgCaptchaWithProvider}, wantErr: false},
+		{name: "Captcha LAPI action with provider without template path", args: args{config: cfgCaptchaWithProvider}, wantErr: true},
+		{name: "Captcha LAPI action with provider and valid template", args: args{config: cfgCaptchaWithValidTemplate}, wantErr: false},
+		{name: "Captcha provider with unreadable template", args: args{config: cfgCaptchaUnreadableTemplate}, wantErr: true},
 		{name: "Unknown AppSec failure action", args: args{config: cfgUnknownAction}, wantErr: true},
 		{name: "Empty failure actions use default ban", args: args{config: cfgEmptyAction}, wantErr: false},
 	}

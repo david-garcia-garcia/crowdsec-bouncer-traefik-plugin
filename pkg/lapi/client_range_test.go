@@ -53,7 +53,9 @@ func TestHydrateRangeMembershipKeepsLastOnUnreachable(t *testing.T) {
 
 func TestHandleStreamCacheLeaseHitHydrates(t *testing.T) {
 	lapiClient, cacheClient := newTestRangeClient(t)
-	cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, 60)
+	if err := cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, 60); err != nil {
+		t.Fatalf("Set() error = %v", err)
+	}
 	decisionscope.AddRange(cacheClient, "10.0.0.0/8", cache.BannedValue, 60)
 	if err := lapiClient.handleStreamCache(); err != nil {
 		t.Fatalf("lease hit: %v", err)
