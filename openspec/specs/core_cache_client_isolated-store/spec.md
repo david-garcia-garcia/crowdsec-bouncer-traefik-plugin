@@ -1,6 +1,6 @@
 ## Purpose
 
-Each Crowdsec connection’s cache Client has an isolated key space so two configs in one process cannot read or write each other’s remediations, captcha grace, or stream lease.
+Each Crowdsec connection’s cache Client has an isolated key space so two **sessions** in one process cannot read or write each other’s remediations, captcha grace, or stream lease. Stream/alone middlewares that share a LAPI session share one Client (one prefix).
 
 ## Requirements
 
@@ -12,18 +12,18 @@ When redis is disabled, a cache Client SHALL store keys in a map owned by that C
 - **AND** Client B is a different Client in the same process
 - **THEN** Client B’s get of `1.2.3.4` is a miss
 
-### Requirement: Redis keys are prefixed with connection identity
-When redis is enabled, every GET/SET/DEL key the cache sends SHALL be prefixed with the connection identity used as the reclaim key (or an equivalent unique prefix for that Client). Two Clients that share a Redis host MUST NOT observe each other’s decisions, captcha grace keys, or the stream lease key.
+### Requirement: Redis keys are prefixed with session identity for stream
+When redis is enabled, every GET/SET/DEL key the cache sends SHALL be prefixed. For stream/alone the prefix SHALL be the stream session hex (LAPI URL+key), not leftover extras (intervals, Redis host is the Client’s target, not the prefix). For live/none the prefix SHALL remain the full connection identity. Two Clients that share a Redis host and different prefixes MUST NOT observe each other’s decisions, captcha grace keys, or the stream lease key.
 
 #### Scenario: Same Redis host two prefixes
-- **WHEN** two Clients share one Redis-protocol host and different connection identities
+- **WHEN** two Clients share one Redis-protocol host and different prefixes
 - **AND** the first sets a banned IP
 - **THEN** the second’s get of that IP is a miss
 
-### Requirement: Stream lease is per connection
-The stream poller lease key SHALL live in that connection’s isolated cache space. Two stream connections MUST NOT skip a poll because the other wrote the lease.
+### Requirement: Stream lease is per stream session
+The stream poller lease key SHALL live in that connection’s isolated cache space. Two stream **sessions** (different LAPI URL or key) MUST NOT skip a poll because the other wrote the lease. Two stream middlewares on the **same** session share one lease and one poller.
 
-#### Scenario: Two stream connections both poll
-- **WHEN** two stream-mode connections exist in one process
+#### Scenario: Two stream sessions both poll
+- **WHEN** two stream-mode connections exist in one process for different LAPI hosts
 - **THEN** each performs its own stream fetch against its own LAPI
 - **AND** neither treats the other’s lease as its own

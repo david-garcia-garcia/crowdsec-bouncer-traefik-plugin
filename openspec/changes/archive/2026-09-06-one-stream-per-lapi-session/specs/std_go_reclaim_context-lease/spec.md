@@ -52,8 +52,6 @@ When every bound context for a key is Done, the table SHALL wait grace before ca
 - **AND** the incarnation is not disposed by `Peek`
 
 ### Requirement: Last holder Sleeps; Open during grace Wakes; grace Close()s
-
-### Requirement: Last holder Sleeps; Open during grace Wakes; grace Close()s
 When every bound context for a key is Done, if the value has `Sleep()` or `*Wrapped.Sleep` is set the table SHALL call it, then wait grace before `Close()`. An `Open` in that window MUST Wake (if the value has `Wake()` or `*Wrapped.Wake` is set) without `create`. Callers MUST NOT Close or delete a slot.
 
 #### Scenario: Sleep then Wake on reclaim
