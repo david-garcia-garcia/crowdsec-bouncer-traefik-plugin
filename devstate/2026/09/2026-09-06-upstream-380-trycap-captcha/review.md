@@ -40,4 +40,10 @@ findings: FindSpecHost new core_plugin_captcha_trycap-provider; catalog synced; 
 fixed: openspec/specs/core_plugin_captcha_trycap-provider, map.md, archive/2026-09-06-trycap-captcha-provider
 skipped: none
 
+## pullrequest (2026-09-06)
+phase: pullrequest
+findings: PR #40 reused; WIP title dropped; CI succeeded
+fixed: title ✨ feat(captcha): add Cap Standalone trycap provider
+skipped: comments.md (none)
+
 

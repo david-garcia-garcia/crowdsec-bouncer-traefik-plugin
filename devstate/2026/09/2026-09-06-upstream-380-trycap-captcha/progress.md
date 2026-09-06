@@ -11,4 +11,4 @@ JobName: 2026-09-06-upstream-380-trycap-captcha
 | codereview | [x] | [x] | 2026-09-06T15:48:09Z |
 | devdocsimpact | [x] | [x] | 2026-09-06T15:50:10Z |
 | archive | [x] | [x] | 2026-09-06T15:52:09Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-06T15:57:03Z |

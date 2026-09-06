@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-06T15:52:09Z
+Developer review: ready for review — 2026-09-06T15:57:03Z
 
 IssueKey: 2026-09-06-upstream-380-trycap-captcha
 JobName: 2026-09-06-upstream-380-trycap-captcha
@@ -18,17 +18,17 @@ JobName: 2026-09-06-upstream-380-trycap-captcha
 On `master`, operators who self-host TryCap Cap Standalone cannot select it as a built-in captcha provider. The plugin only verifies captchas via urlencoded `PostForm`, while Cap Standalone expects JSON `{"secret","response"}` at `/<site_key>/siteverify` with a `cap-token` field — so TryCap fails unless the operator runs an external adapter. Without this change, self-hosted TryCap remains unsupported despite upstream feature request #380.
 
 ## Merge readiness
-OpenSpec change archived. CI on HEAD is still running.
+Ready for review. 0 items remain.
 
 Priority: P2 — real operator pain with a workaround (external adapter or misconfigured custom provider).
-Reviewed head: 8bbe88c
+Reviewed head: c5d7fd7
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI in progress on reviewed head |
-| CI proof | 3/6 | Main Process and both e2e jobs in progress |
+| Overall readiness | 6/6 | CI succeeded; no open PR comments |
+| CI proof | 6/6 | Main Process and both e2e jobs succeeded |
 | Local tests proof | N/A | Remote PR; CI covers |
 | Review resolution | 6/6 | No PR comments |
 
@@ -38,7 +38,7 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-06-upstream-380-trycap-captcha pushed | git / GitHub |
 | OpenSpec | trycap-captcha-provider archived | openspec/changes/archive/2026-09-06-trycap-captcha-provider/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/40 | pr-host |
-| CI | build 34043643455 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34043643455 | pull_request_read get_check_runs |
+| CI | build 34043726387 success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34043726387 | pull_request_read get_check_runs |
 | Local tests | passed | handoff.yaml localTests (`go test` pkg/captcha, configuration, bouncer) |
 | PR comments | no comments | comments.md absent |
 
@@ -49,7 +49,7 @@ Owner decision: Required. See Decision needed.
 - [ ] [note] [large] custom provider JSON siteverify (upstream #318) — TryCap needs JSON; `custom` still PostForms. Not taken: out of scope for this change.
 
 ## How this fits together
-Local ticket (upstream #380) → branch `2026-09-06-upstream-380-trycap-captcha` → PR #40 → trycap provider landed → five-axis review applied → usage packet current → OpenSpec archived → CI running on 8bbe88c.
+Local ticket (upstream #380) → branch `2026-09-06-upstream-380-trycap-captcha` → PR #40 → trycap provider landed → five-axis review applied → usage packet current → OpenSpec archived → CI green.
 
 ## Decision needed
 | Question | Decision | By |
@@ -63,10 +63,7 @@ Local ticket (upstream #380) → branch `2026-09-06-upstream-380-trycap-captcha`
 | Must CI e2e run a live `tiago2/cap` container? | assumed — no; unit tests prove verify | explore |
 
 ## Before merge
-- [ ] Wait for CI on reviewed head 8bbe88c
-- [x] Add `trycap` provider, JSON siteverify, default-template Cap branch, and unit tests
-- [x] Five-axis review; empty trycap FrontendKey and infoProvider comment
-- [x] Archive OpenSpec change to `openspec/changes/archive/2026-09-06-trycap-captcha-provider/`
+None.
 
 ## Findings
 None.
@@ -85,7 +82,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 0 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 8bbe88ca56b420aaedc44e2951298dc73ef7e3f9 | Card must match the branch you measured |
+| Reviewed head | c5d7fd7f57ac1e5283248881e6c1eb38421bfc83 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -99,9 +96,9 @@ Is this the best way to solve the issue? Yes — a built-in matches hcaptcha/rec
 
 ### Evidence
 What I checked:
-- FindSpecHost: new `core_plugin_captcha_trycap-provider` (high); catalog spec + map.md written; validators OK
-- Change moved to `openspec/changes/archive/2026-09-06-trycap-captcha-provider/`
-- PR #40 CI: Main Process 34043643455 and e2e 34043643485 in progress
+- One OPEN PR #40 titled `✨ feat(captcha): add Cap Standalone trycap provider`
+- CI on c5d7fd7: Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34043726387 ; e2e success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/34043726381
+- OpenSpec archived at `openspec/changes/archive/2026-09-06-trycap-captcha-provider/`
 
 ### Rank-up moves
 None.
