@@ -22,7 +22,7 @@ func CreateConfig() *configuration.Config {
 // New is the Traefik Yaegi constructor. It reclaims LAPI and AppSec backends and returns a per-router Bouncer.
 // Stream/alone: one LAPI client per LAPI URL+key (CrowdSec one stream cursor per
 // hashed key + outbound IP). Live/none: reclaim by LAPI identity. AppSec: reclaim by listener URL+key.
-func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (handler http.Handler, err error) {
+func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (http.Handler, error) {
 	config.LogLevel = strings.ToUpper(config.LogLevel)
 	log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
 
@@ -33,9 +33,9 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		config.CaptchaFilePath = config.CaptchaHTMLFilePath
 	}
 
-	if err = configuration.ValidateParams(config, log); err != nil {
-		log.Error("New:validateParams " + err.Error())
-		return nil, err
+	if validateErr := configuration.ValidateParams(config, log); validateErr != nil {
+		log.Error("New:validateParams " + validateErr.Error())
+		return nil, validateErr
 	}
 
 	if config.CrowdsecMode == configuration.AppsecMode && !config.CrowdsecAppsecEnabled {
@@ -50,8 +50,9 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	}
 
 	bindCtx, cancelBind := context.WithCancel(ctx)
+	failed := false
 	defer func() {
-		if err != nil {
+		if failed {
 			cancelBind()
 		}
 	}()
@@ -65,6 +66,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		var streamErr error
 		lapiClient, streamErr = lapi.OpenStream(bindCtx, config, log, name, pluginVersion)
 		if streamErr != nil {
+			failed = true
 			return nil, streamErr
 		}
 	} else if config.CrowdsecMode != configuration.AppsecMode {
@@ -73,6 +75,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		var openErr error
 		lapiClient, openErr = lapi.OpenLive(bindCtx, config, log, name, pluginVersion)
 		if openErr != nil {
+			failed = true
 			return nil, openErr
 		}
 	}
@@ -82,8 +85,14 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		var appsecErr error
 		appsecClient, appsecErr = appsec.Open(bindCtx, config, log, name, pluginVersion)
 		if appsecErr != nil {
+			failed = true
 			return nil, appsecErr
 		}
 	}
-	return bouncer.New(next, name, config, lapiClient, appsecClient, log)
+	handler, bouncerErr := bouncer.New(next, name, config, lapiClient, appsecClient, log)
+	if bouncerErr != nil {
+		failed = true
+		return nil, bouncerErr
+	}
+	return handler, nil
 }
