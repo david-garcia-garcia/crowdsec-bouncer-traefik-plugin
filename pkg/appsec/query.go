@@ -78,9 +78,11 @@ func isBodyUnreadable(httpReq *http.Request) bool {
 	return httpReq.Body != nil && httpReq.Body != http.NoBody && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
 }
 
+// isMethodWithBody is true for methods whose unreadable HTTP/2 or HTTP/3 body is dropped unless failure action is passthrough.
+// DELETE is excluded: a bodyless HTTP/3 DELETE looks unreadable (quic-go ContentLength -1) the same way GET does.
 func isMethodWithBody(method string) bool {
 	switch method {
-	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+	case http.MethodPost, http.MethodPut, http.MethodPatch:
 		return true
 	default:
 		return false

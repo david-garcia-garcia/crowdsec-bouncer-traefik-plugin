@@ -46,3 +46,4 @@ decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
 - Do not send `/crowdsec-internal/challenge/*` to origin.
 - `Query` `captcha` failure action is `ErrFailureCaptcha` → `pkg/captcha`. Do not treat that error as AppSec JSON `action: captcha`.
 - Empty `crowdsecAppsecKey` still falls back to `crowdsecLapiKey` in `appsec.Prepare`. Call `lapi.Prepare` first.
+- HTTP/3 DELETE with no `Content-Length` looks unreadable (`ContentLength < 0`) the same way GET does. `Query` does not drop it; AppSec gets a headers-only GET. POST/PUT/PATCH still drop under `ban`.
