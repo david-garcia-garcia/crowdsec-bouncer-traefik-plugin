@@ -8,7 +8,7 @@ JobName: 2026-09-06-upstream-358-builtin-traceid
 | explore | [x] | [x] | 2026-09-06T15:11:55Z |
 | propose | [x] | [x] | 2026-09-06T15:15:33Z |
 | implement | [x] | [x] | 2026-09-06T15:22:48Z |
-| codereview | [ ] | [ ] | |
+| codereview | [x] | [x] | 2026-09-06T15:26:34Z |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
