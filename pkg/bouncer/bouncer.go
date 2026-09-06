@@ -161,6 +161,8 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	// Mapped scope headers for this request. Missing headers are omitted.
 	scopes := decisionscope.RequestScopeValues(b.decisionScopeHeaders, req.Request)
 
+	// live, stream, and alone consult the cache first. live memos ?ip= answers;
+	// stream stores the LAPI snapshot; alone stores the CAPI snapshot. none always LiveLookup.
 	if b.crowdsecMode != configuration.NoneMode {
 		value, origin, cacheErr := decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
 		switch {
