@@ -1,6 +1,7 @@
 package decisionscope
 
 import (
+	"net"
 	"net/http"
 	"testing"
 )
@@ -95,6 +96,20 @@ func TestIPCacheKey(t *testing.T) {
 	}
 	if got := IPCacheKey("10.0.0.1/32"); got != "10.0.0.1" {
 		t.Fatalf("/32: %q", got)
+	}
+	if got := IPCacheKey("2001:db8::1/128"); got != "2001:db8::1" {
+		t.Fatalf("/128: %q", got)
+	}
+}
+
+func TestIpLookupCacheKey(t *testing.T) {
+	expanded := "2001:db8:0:0:0:0:0:1"
+	if got := IpLookupCacheKey(expanded, net.ParseIP(expanded)); got != "2001:db8::1" {
+		t.Fatalf("expanded IPv6: %q", got)
+	}
+	mapped := "::ffff:203.0.113.10"
+	if got := IpLookupCacheKey(mapped, net.ParseIP(mapped)); got != "203.0.113.10" {
+		t.Fatalf("IPv4-mapped: %q", got)
 	}
 }
 

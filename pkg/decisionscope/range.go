@@ -21,11 +21,14 @@ func RemoveRange(cacheClient *cache.Client, cidr string) {
 }
 
 // ApplyRangeBatch upserts and removes Range lines with one cache read and one write.
-func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, removals []string) {
+func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, removals []string) error {
 	if len(upserts) == 0 && len(removals) == 0 {
-		return
+		return nil
 	}
-	index := readRangeIndex(cacheClient)
+	index, err := readRangeIndex(cacheClient)
+	if err != nil {
+		return err
+	}
 	for cidr, remediation := range upserts {
 		network := strings.TrimSpace(cidr)
 		if network == "" || !IsActiveRemediation(remediation) {
@@ -38,9 +41,10 @@ func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, remov
 	}
 	if index == "" {
 		cacheClient.Delete(RangeIndexKey)
-		return
+		return nil
 	}
 	cacheClient.Set(RangeIndexKey, index, rangeIndexTTL)
+	return nil
 }
 
 // parseIndexLine splits one cidr=remediation line. A missing equals leaves remediation empty.
@@ -82,13 +86,16 @@ func upsertIndexCIDR(index, cidr, remediation string) string {
 	return strings.Join(kept, "\n")
 }
 
-// readRangeIndex returns the cached range-index blob, or empty on miss or error.
-func readRangeIndex(cacheClient *cache.Client) string {
+// readRangeIndex returns the cached range-index blob. CacheMiss yields empty with no error.
+func readRangeIndex(cacheClient *cache.Client) (string, error) {
 	index, err := cacheClient.Get(RangeIndexKey)
 	if err != nil {
-		return ""
+		if err.Error() == cache.CacheMiss {
+			return "", nil
+		}
+		return "", err
 	}
-	return index
+	return index, nil
 }
 
 // removeCIDRFromIndex drops every line whose CIDR equals cidr.
