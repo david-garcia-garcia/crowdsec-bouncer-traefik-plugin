@@ -13,7 +13,7 @@ The plugin SHALL export `CreateConfig` and `New` from the package Traefik loads 
 - **AND** `New` receives a non-ignored context used as the reclaim holder
 
 ### Requirement: Stream session is LAPI URL plus bouncer key
-For `stream` and `alone`, the session prefix and cache prefix SHALL be derived from mode, LAPI scheme/host/path and lapiKey (CAPI machine+password in alone). Intervals, Redis, HTTP timeout, LAPI failure action, LAPI TLS extras, and `decisionScopeHeaders` MUST NOT be in that prefix. AppSec host, key, TLS, and body limit MUST NOT be in the LAPI session prefix, LAPI settings hash, or live/none LAPI identity. The LAPI reclaim `Open` key SHALL be that prefix plus a hash of those LAPI settings so a sleeping incarnation does not occupy a new snapshot’s slot. Middleware name, `next`, templates, trusted IPs, and Enabled MUST NOT be in that key. Live/none SHALL keep a reclaim key from LAPI connection identity (no stream cursor, no AppSec fields). Client address SHALL come from `pkg/ip.GetRemoteIP`. A second live `New` on the same session prefix with a different LAPI settings hash SHALL `PeekLivePrefix` and warn-and-wire to the live LAPI slot.
+For `stream` and `alone`, the session prefix and cache prefix SHALL be derived from mode, LAPI scheme/host/path and lapiKey (CAPI machine+password in alone). Intervals, Redis, HTTP timeout, LAPI failure action, LAPI TLS extras, and `decisionScopeHeaders` MUST NOT be in that prefix. AppSec host, key, TLS, and body limit MUST NOT be in the LAPI session prefix, LAPI settings hash, or live/none LAPI identity. The LAPI reclaim `Open` key SHALL be that prefix plus a hash of those LAPI settings so a sleeping incarnation does not occupy a new snapshot’s slot. Middleware name, `next`, templates, trusted IPs, and Enabled MUST NOT be in that key. Live/none SHALL keep a reclaim key from LAPI connection identity including the **normalized** `decisionScopeHeaders` map (no stream cursor, no AppSec fields). Empty and omitted `decisionScopeHeaders` SHALL hash as the same live/none identity. Client address SHALL come from `pkg/ip.GetRemoteIP`. A second live `New` on the same session prefix with a different LAPI settings hash SHALL `PeekLivePrefix` and warn-and-wire to the live LAPI slot.
 
 #### Scenario: Same LAPI key two names share one stream
 - **WHEN** two `New` calls use stream mode, the same LAPI URL and key, and different middleware names, each with a live constructor context
@@ -35,6 +35,11 @@ For `stream` and `alone`, the session prefix and cache prefix SHALL be derived f
 - **WHEN** two live stream `New` calls use the same LAPI URL and key and different AppSec hosts, with AppSec enabled
 - **THEN** both bouncers use the same LAPI connection
 - **AND** each bouncer uses its own AppSec client incarnation
+
+#### Scenario: Different decisionScopeHeaders maps are isolated
+- **WHEN** two live-mode `New` calls use the same LAPI host and different `decisionScopeHeaders` maps, each with a live constructor context
+- **THEN** two LAPI client incarnations exist
+- **AND** the bouncers MUST NOT `SameLapiClient`
 
 ### Requirement: Snapshot change while sleeping opens a new reclaim key
 When no live constructor context remains for a stream session and the previous slot is sleeping, a `New` with a **different** settings snapshot SHALL `Open` a new reclaim key (session prefix plus the new settings hash). The sleeper SHALL remain until grace `Close()`. A `New` with the **same** snapshot SHALL `Open` (Wake) without `startup=true`. Last holder SHALL `Sleep()` tickers before grace.

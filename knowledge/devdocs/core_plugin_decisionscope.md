@@ -15,8 +15,8 @@ A CrowdSec scope other than Ip/Range whose value comes from a request header nam
 _Avoid_: GeoIP inside this plugin, client-set country as the real-stack proof
 
 **decisionScopeHeaders**:
-Public Traefik plugin map from CrowdSec scope name to header name. Empty means header scopes are off. Keys `Ip` and `Range` are rejected.
-_Avoid_: putting Country on the reclaim key, parsing `RemoteAddr` for country
+Public Traefik plugin map from CrowdSec scope name to header name. Empty means header scopes are off. Keys `Ip` and `Range` are rejected. The **normalized** map is on `lapi.Client` (stream `scopes=`, ingest, live/none identity). The bouncer reads `DecisionScopeHeaders()`; it does not store a copy.
+_Avoid_: GeoIP inside this plugin, client-set country as the real-stack proof, a second copy on Bouncer
 
 ## Overview
 
@@ -24,7 +24,7 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 
 ## How to use
 
-- Pass `decisionScopeHeaders` from config into the LAPI Client (stream `scopes=` and live `scope`+`value` queries) and into the bouncer (request headers).
+- Pass `decisionScopeHeaders` from config into the LAPI Client (identity, stream `scopes=`, live `scope`+`value` queries). The bouncer reads `lapiClient.DecisionScopeHeaders()` for request headers. Do not store a second copy on Bouncer.
 - Resolve the client IP with `pkg/ip.GetRemoteIP`. Then `LookupCachedRemediation` with `lapiClient.RangeMembership()`. Pass `req.ipAddr` into Range membership. Matching uses the first letter; origin is for usage-metrics only. Do not put scopes on `clientRequest`.
 - Stream Range items: collect the tick, then `ApplyRangeBatch` (one read, one write) with `RemediationWithOrigin`. Hydrate membership from the blob after apply and on a lease hit. Do not GET+SET per Range line.
 - Live/none: keep `?ip=` (LAPI expands Range). Add `scope`+`value` when a mapped header is present. Do not hydrate membership. A cache miss still live-looks-up; do not treat that miss as a stream-health decision.
@@ -33,7 +33,7 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 ## Pattern snippet
 
 ```go
-scopes := decisionscope.RequestScopeValues(headers, req)
+scopes := decisionscope.RequestScopeValues(lapiClient.DecisionScopeHeaders(), req.Request)
 kind, origin, err := decisionscope.LookupCachedRemediation(cacheClient, req.remoteIP, req.ipAddr, scopes, lapiClient.RangeMembership())
 lapiClient.IncDropped(origin, req.ipType, "ban")
 ```
@@ -45,6 +45,7 @@ lapiClient.IncDropped(origin, req.ipType, "ban")
 - `pkg/bouncer/bouncer.go`
 - `pkg/bouncer/clientrequest.go`
 - `pkg/lapi/client.go`
+- `pkg/lapi/identity.go`
 - `pkg/lapi/client_decisions.go`
 - `pkg/lapi/client_stream.go`
 - `pkg/lapi/client_live.go`

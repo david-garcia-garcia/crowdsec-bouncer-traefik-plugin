@@ -346,6 +346,11 @@ func (c *Client) storeRangeMembership(index string) {
 	c.lastRangeIndex.Store(index)
 }
 
+// DecisionScopeHeaders is the normalized CrowdSec scope → request header map this client streams and matches.
+func (c *Client) DecisionScopeHeaders() map[string]string {
+	return c.decisionScopeHeaders
+}
+
 // StreamHealthy is true while stream polling is succeeding.
 func (c *Client) StreamHealthy() bool {
 	return c.isCrowdsecStreamHealthy

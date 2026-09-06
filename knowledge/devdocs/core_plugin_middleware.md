@@ -3,7 +3,7 @@
 ## Language
 
 **LAPI Client**:
-The reclaim value for one CrowdSec LAPI/CAPI decisions backend: stream/metrics tickers, LAPI HTTP, isolated cache, and in-process Range membership. Stream/alone: keyed by stream session plus settings hash. Live/none: keyed by LAPI fields (not AppSec). Not middleware name.
+The reclaim value for one CrowdSec LAPI/CAPI decisions backend: stream/metrics tickers, LAPI HTTP, isolated cache, and in-process Range membership. Stream/alone: keyed by stream session plus settings hash. Live/none: keyed by LAPI fields including the normalized `decisionScopeHeaders` map (not AppSec). Not middleware name.
 _Avoid_: CrowdsecConnection, AppSec client, Bouncer, Plugin, process singleton, `sync.Once`
 
 **AppSec Client**:
@@ -15,7 +15,7 @@ The CrowdSec bouncer row this process polls: LAPI scheme, host, and path plus la
 _Avoid_: middleware name, IdentityHex, `scopes=`, AppSec host
 
 **Bouncer**:
-The per-router `http.Handler` Traefik gets back from `New`. Holds `next`, request policy (trusted IPs, ban/captcha, Enabled, AppSec-on-pass), `lapiClient` (`*lapi.Client`, nil in `crowdsecMode: appsec`), and `appsecClient` (`*appsec.Client`, nil when AppSec is off).
+The per-router `http.Handler` Traefik gets back from `New`. Holds `next`, request policy (trusted IPs, ban/captcha, Enabled, AppSec-on-pass), `lapiClient` (`*lapi.Client`, nil in `crowdsecMode: appsec`), and `appsecClient` (`*appsec.Client`, nil when AppSec is off). Header-mapped scopes are read from `lapiClient.DecisionScopeHeaders()`, not stored again.
 _Avoid_: ForRoute, Plugin core, the reclaim value
 
 **Failure action**:
@@ -62,9 +62,9 @@ return bouncer.New(next, name, config, nil, appsecClient, log)
 
 ## Gotchas
 
-- Do not put middleware name, `next`, ban/captcha templates, trusted IPs, Enabled, or AppSec knobs in the LAPI reclaim key.
+- Do not put middleware name, `next`, ban/captcha templates, trusted IPs, Enabled, or AppSec knobs in the LAPI reclaim key. Live/none identity includes the normalized `decisionScopeHeaders` map; stream session prefix does not.
 - `crowdsecLapiFailureAction` is on LAPI Client identity (shared with `updateMaxFailure`). `crowdsecAppsecFailureAction` stays on Bouncer.
-- Stream/alone: CrowdSec stores one `GET /v1/decisions/stream` cursor per hashed API key plus the IP LAPI sees (this process’s outbound address). Reclaim `Open` key is session prefix plus settings hash. A second live middleware on the same LAPI URL+key is warn-and-wire via `PeekLivePrefix` (first New wins LAPI knobs, not AppSec). Last holder Sleeps tickers; reload with the same snapshot Wakes (`startup=false`); a new snapshot Opens a new key and the sleeper dies on grace. Isolated backends need a second bouncer key. Live/none split on LAPI identity (intervals included, AppSec excluded).
+- Stream/alone: CrowdSec stores one `GET /v1/decisions/stream` cursor per hashed API key plus the IP LAPI sees (this process’s outbound address). Reclaim `Open` key is session prefix plus settings hash. A second live middleware on the same LAPI URL+key is warn-and-wire via `PeekLivePrefix` (first New wins LAPI knobs, not AppSec). Last holder Sleeps tickers; reload with the same snapshot Wakes (`startup=false`); a new snapshot Opens a new key and the sleeper dies on grace. Isolated backends need a second bouncer key. Live/none split on LAPI identity (intervals and the normalized header map included, AppSec excluded).
 - LAPI `Close()` stops tickers, idle LAPI HTTP, and the cache Redis pool. AppSec `Close()` releases idle AppSec HTTP. Do not use `sync.Once`.
 - Both puts use `OpenWithGrace` 30s (`ReclaimGraceDuration`). `reclaim.DefaultGrace` stays 10s.
 - Lifecycle INFO lines: `crowdsec connection started|sleeping|waking|closed`. Stream health transitions: `crowdsec stream became unhealthy|healthy` (not every poll).

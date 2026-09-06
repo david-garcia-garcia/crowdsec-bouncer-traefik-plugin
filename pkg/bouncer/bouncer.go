@@ -29,7 +29,6 @@ type Bouncer struct {
 	captchaClient           *captcha.Client
 	clientPoolStrategy      *ip.PoolStrategy
 	crowdsecMode            string
-	decisionScopeHeaders    map[string]string // CrowdSec header scope → request header
 	enabled                 bool
 	forwardedCustomHeader   string
 	lapiClient              *lapi.Client
@@ -63,7 +62,6 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		captchaClient:           &captcha.Client{},
 		clientPoolStrategy:      &ip.PoolStrategy{Checker: clientChecker},
 		crowdsecMode:            config.CrowdsecMode,
-		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
 		enabled:                 config.Enabled,
 		forwardedCustomHeader:   config.ForwardedHeadersCustomName,
 		lapiClient:              lapiClient,
@@ -167,7 +165,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	}
 
 	// Mapped scope headers for this request. Missing headers are omitted.
-	scopes := decisionscope.RequestScopeValues(b.decisionScopeHeaders, req.Request)
+	scopes := decisionscope.RequestScopeValues(b.lapiClient.DecisionScopeHeaders(), req.Request)
 
 	// live, stream, and alone consult the cache.
 	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {

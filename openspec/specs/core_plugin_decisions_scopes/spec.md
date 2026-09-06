@@ -85,6 +85,14 @@ Each stream or alone connection SHALL rebuild in-process Range membership from `
 - **WHEN** stream has a Range ban `10.0.0.0/8` and a Range captcha `10.1.0.0/16` and the client IP is `10.1.2.3`
 - **THEN** the request is forbidden, not captcha
 
+### Requirement: Header map lives on the LAPI client
+`lapi.Client` SHALL own the normalized `decisionScopeHeaders` map used for stream `scopes=` and ingest. The per-router bouncer MUST NOT store a second copy. Request header lookup SHALL use that client map (`RequestScopeValues` on `DecisionScopeHeaders()`). AppSec failure action SHALL remain per-router on the bouncer.
+
+#### Scenario: Bouncer reads the client map
+- **WHEN** a request arrives on a route whose LAPI client has `decisionScopeHeaders.Country` mapped to `CF-IPCountry`
+- **THEN** Country matching reads `CF-IPCountry` from the request using the client’s map
+- **AND** the bouncer has no separate stored copy of that map
+
 ### Requirement: Matching does not import Traefik config
 Cached request lookup SHALL consult Range membership from the membership argument. Nil or empty membership SHALL be a Range miss. The matching package MUST NOT import the Traefik plugin configuration package. Callers MUST NOT pass a Crowdsec-mode flag; live and none leave membership empty because they never hydrate.
 

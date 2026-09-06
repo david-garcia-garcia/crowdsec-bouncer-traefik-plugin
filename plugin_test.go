@@ -130,6 +130,62 @@ func TestNew_SameLapiClientFields_ShareIncarnation(t *testing.T) {
 	}
 }
 
+func TestNew_DifferentDecisionScopeHeaders_IsolatedConnection(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
+
+	var zero int64
+	srv := liveLAPI(t, nil, &zero)
+	t.Cleanup(func() { srv.Close() })
+	u, _ := url.Parse(srv.URL)
+	ctx := context.Background()
+
+	cfgCountry := cfgLiveAt(u.Host)
+	cfgCountry.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	cfgUser := cfgLiveAt(u.Host)
+	cfgUser.DecisionScopeHeaders = map[string]string{"username": "X-User"}
+
+	countryRoute, err := New(ctx, testNextOK(), cfgCountry, "map-country")
+	if err != nil {
+		t.Fatal(err)
+	}
+	userRoute, err := New(ctx, testNextOK(), cfgUser, "map-user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if testRoute(t, countryRoute).SameLapiClient(testRoute(t, userRoute)) {
+		t.Fatal("different decisionScopeHeaders must not share a lapi.Client")
+	}
+}
+
+func TestNew_SameDecisionScopeHeaders_ShareConnection(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
+
+	var zero int64
+	srv := liveLAPI(t, nil, &zero)
+	t.Cleanup(func() { srv.Close() })
+	u, _ := url.Parse(srv.URL)
+	ctx := context.Background()
+
+	cfgA := cfgLiveAt(u.Host)
+	cfgA.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	cfgB := cfgLiveAt(u.Host)
+	cfgB.DecisionScopeHeaders = map[string]string{"country": "CF-IPCountry"}
+
+	a, err := New(ctx, testNextOK(), cfgA, "map-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := New(ctx, testNextOK(), cfgB, "map-b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !testRoute(t, a).SameLapiClient(testRoute(t, b)) {
+		t.Fatal("normalized decisionScopeHeaders must share one lapi.Client")
+	}
+}
+
 func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
