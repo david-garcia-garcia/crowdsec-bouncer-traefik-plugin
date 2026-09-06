@@ -21,3 +21,9 @@ phase: implement
 findings: CaptchaCustomChallengeURL + captcha-kind path pass-through
 fixed: apply 5889ccb
 skipped: Windows logging TempDir cleanup on go test ./...
+
+## codereview (2026-09-06)
+phase: codereview
+findings: all five axes none
+fixed: n/a
+skipped: n/a
