@@ -25,3 +25,8 @@ priority: normal
 local: core_plugin_lapi_usage-metrics.md
 description: How this plugin POSTs CrowdSec usage-metrics with origin and ip_type labels.
 
+## Plugin-native captcha
+priority: normal
+local: core_plugin_captcha.md
+description: How this plugin binds captcha grace to GetRemoteIP plus cookie crowdsec_captcha.
+
