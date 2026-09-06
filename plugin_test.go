@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
@@ -82,6 +83,45 @@ func cfgStreamAt(host string, interval int64) *configuration.Config {
 	c.CrowdsecMode = configuration.StreamMode
 	c.UpdateIntervalSeconds = interval
 	c.StreamStartupBlock = true
+	return c
+}
+
+func cfgAppsecAt(host string) *configuration.Config {
+	c := getTestConfig()
+	c.Enabled = true
+	c.CrowdsecMode = configuration.AppsecMode
+	c.CrowdsecAppsecEnabled = true
+	c.CrowdsecAppsecHost = host
+	c.CrowdsecAppsecScheme = "http"
+	c.CrowdsecAppsecPath = "/"
+	c.CrowdsecAppsecKey = "appsec-key"
+	c.MetricsUpdateIntervalSeconds = 0
+	c.ForwardedHeadersTrustedIPs = []string{"127.0.0.1/32"}
+	c.ForwardedHeadersCustomName = "X-Forwarded-For"
+	return c
+}
+
+func cfgAloneAt() *configuration.Config {
+	c := getTestConfig()
+	c.Enabled = true
+	c.CrowdsecMode = configuration.AloneMode
+	c.CrowdsecCapiMachineID = "test-machine"
+	c.CrowdsecCapiPassword = "test-password"
+	c.StreamStartupBlock = false
+	c.MetricsUpdateIntervalSeconds = 0
+	c.UpdateIntervalSeconds = 7200
+	c.ForwardedHeadersTrustedIPs = []string{"127.0.0.1/32"}
+	c.ForwardedHeadersCustomName = "X-Forwarded-For"
+	return c
+}
+
+func cfgLiveWithAppsecAt(lapiHost, appsecHost string) *configuration.Config {
+	c := cfgLiveAt(lapiHost)
+	c.CrowdsecAppsecEnabled = true
+	c.CrowdsecAppsecHost = appsecHost
+	c.CrowdsecAppsecScheme = "http"
+	c.CrowdsecAppsecPath = "/"
+	c.CrowdsecAppsecKey = "appsec-key"
 	return c
 }
 
@@ -433,4 +473,145 @@ func waitPluginStreamInGrace(t *testing.T, cfg *configuration.Config) {
 		time.Sleep(time.Millisecond)
 	}
 	t.Fatalf("stream session did not enter grace: found=%v holders=%d sleeping=%v", view.OK, view.Holders, view.Sleeping)
+}
+
+func TestNew_AppsecModeWithoutEnabled_Rejects(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
+
+	cfg := getTestConfig()
+	cfg.Enabled = true
+	cfg.CrowdsecMode = configuration.AppsecMode
+	cfg.CrowdsecAppsecEnabled = false
+
+	_, err := New(context.Background(), testNextOK(), cfg, "appsec-disabled")
+	if err == nil {
+		t.Fatal("appsec mode without AppSec enabled must fail New")
+	}
+}
+
+func TestNew_AppsecModeEnabled_SkipsLAPI(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
+
+	appsecSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(appsecSrv.Close)
+	u, _ := url.Parse(appsecSrv.URL)
+
+	h, err := New(context.Background(), testNextOK(), cfgAppsecAt(u.Host), "appsec-only")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if testRoute(t, h).LapiClient() != nil {
+		t.Fatal("appsec-only mode must not open LAPI")
+	}
+	view := reclaim.Peek(appsec.Key(cfgAppsecAt(u.Host)))
+	if !view.OK || view.Holders != 1 {
+		t.Fatalf("appsec reclaim holder: ok=%v holders=%d", view.OK, view.Holders)
+	}
+}
+
+func TestNew_LiveWithAppSecEnabled_DistinctReclaimKeys(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
+
+	var hits int64
+	lapiSrv := liveLAPI(t, nil, &hits)
+	appsecSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(lapiSrv.Close)
+	t.Cleanup(appsecSrv.Close)
+	lapiURL, _ := url.Parse(lapiSrv.URL)
+	appsecURL, _ := url.Parse(appsecSrv.URL)
+	cfg := cfgLiveWithAppsecAt(lapiURL.Host, appsecURL.Host)
+
+	_, err := New(context.Background(), testNextOK(), cfg, "live-appsec")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lapiView := reclaim.Peek(lapi.Key(cfg))
+	appsecView := reclaim.Peek(appsec.Key(cfg))
+	if !lapiView.OK || lapiView.Holders != 1 {
+		t.Fatalf("LAPI holder: ok=%v holders=%d", lapiView.OK, lapiView.Holders)
+	}
+	if !appsecView.OK || appsecView.Holders != 1 {
+		t.Fatalf("AppSec holder: ok=%v holders=%d", appsecView.OK, appsecView.Holders)
+	}
+	if lapi.Key(cfg) == appsec.Key(cfg) {
+		t.Fatal("LAPI and AppSec reclaim keys must differ")
+	}
+}
+
+func TestNew_AppsecOpenFailsAfterLAPI_RollsBackLAPIHolder(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
+
+	var hits int64
+	srv := liveLAPI(t, nil, &hits)
+	t.Cleanup(srv.Close)
+	u, _ := url.Parse(srv.URL)
+	cfg := cfgLiveAt(u.Host)
+	cfg.CrowdsecAppsecEnabled = true
+	cfg.CrowdsecAppsecHost = "appsec.example.com"
+	cfg.CrowdsecAppsecScheme = "https"
+	cfg.CrowdsecAppsecTLSCertificateBouncer = "not-a-cert"
+	cfg.CrowdsecAppsecTLSCertificateBouncerKey = "not-a-key"
+
+	_, err := New(context.Background(), testNextOK(), cfg, "rollback")
+	if err == nil {
+		t.Fatal("expected appsec open error")
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	var view reclaim.View
+	for time.Now().Before(deadline) {
+		view = reclaim.Peek(lapi.Key(cfg))
+		if !view.OK || view.Holders == 0 {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if view.OK && view.Holders > 0 {
+		t.Fatalf("LAPI holder must be released after appsec failure: holders=%d", view.Holders)
+	}
+}
+
+func TestNew_AloneMode_FailedConstructNoStrayHolders(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
+
+	cfg := cfgAloneAt()
+	_, err := New(context.Background(), testNextOK(), cfg, "alone-fail")
+	if err == nil {
+		t.Fatal("alone New without CAPI stub expected error")
+	}
+	view := reclaim.Peek(lapi.SessionKey(cfg))
+	if view.OK && view.Holders > 0 {
+		t.Fatalf("alone failure must not leave reclaim holders: holders=%d", view.Holders)
+	}
+}
+
+func TestNew_StreamMode_OpensStreamSession(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
+
+	var hits int64
+	srv := liveLAPI(t, nil, &hits)
+	t.Cleanup(srv.Close)
+	u, _ := url.Parse(srv.URL)
+	cfg := cfgStreamAt(u.Host, 60)
+
+	h, err := New(context.Background(), testNextOK(), cfg, "stream-session")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if testRoute(t, h).LapiClient().StreamFetches() < 1 {
+		t.Fatal("stream mode must poll LAPI at startup")
+	}
+	view := reclaim.Peek(lapi.SessionKey(cfg))
+	if !view.OK || view.Holders != 1 {
+		t.Fatalf("stream session holder: ok=%v holders=%d", view.OK, view.Holders)
+	}
 }
