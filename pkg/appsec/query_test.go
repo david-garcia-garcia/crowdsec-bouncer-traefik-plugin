@@ -121,6 +121,13 @@ func newUnreadableGetRequest(done <-chan struct{}) *http.Request {
 	return req
 }
 
+func newUnreadableDeleteRequest(done <-chan struct{}) *http.Request {
+	req, _ := http.NewRequest(http.MethodDelete, "http://localhost/", blockingBody{done: done})
+	req.ProtoMajor = 3
+	req.ContentLength = -1
+	return req
+}
+
 func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusOK)
@@ -142,6 +149,30 @@ func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Query() blocked on an HTTP/3 GET request body (issue #351 regression)")
+	}
+}
+
+func Test_appsecQuery_unreadableBodyDeleteNotDropped(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	client := newQueryClient(appsecURL, appsecServer.Client())
+	done := make(chan struct{})
+	defer close(done)
+	finished := make(chan error, 1)
+	go func() {
+		_, err := client.Query("1.2.3.4", newUnreadableDeleteRequest(done), Policy{FailureAction: configuration.FailureActionBan})
+		finished <- err
+	}()
+	select {
+	case err := <-finished:
+		if err != nil {
+			t.Errorf("Query() on an HTTP/3 DELETE without content-length returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Query() blocked on an HTTP/3 DELETE request body (issue #385 regression)")
 	}
 }
 
