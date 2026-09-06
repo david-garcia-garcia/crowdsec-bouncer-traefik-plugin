@@ -8,7 +8,7 @@ JobName: 2026-09-06-crowdsec-client-failure-ratelimit
 | explore | [x] | [x] | 2026-09-06T16:19:10Z |
 | propose | [x] | [x] | 2026-09-06T16:24:16Z |
 | implement | [x] | [x] | 2026-09-06T16:36:39Z |
-| codereview | [x] | [ ] | |
-| devdocsimpact | [ ] | [ ] | |
-| archive | [ ] | [ ] | |
+| codereview | [x] | [x] | 2026-09-06T16:40:50Z |
+| devdocsimpact | [x] | [x] | 2026-09-06T16:43:57Z |
+| archive | [x] | [ ] | |
 | pullrequest | [ ] | [ ] | |
