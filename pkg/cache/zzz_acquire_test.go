@@ -16,10 +16,10 @@ import (
 
 // leaseRedis is an in-process RESP stand-in that records verbs and implements SET-if-absent for EVAL/EVALSHA.
 type leaseRedis struct {
-	mu      sync.Mutex
-	keys    map[string]string
-	verbs   []string
-	ln      net.Listener
+	mu    sync.Mutex
+	keys  map[string]string
+	verbs []string
+	ln    net.Listener
 }
 
 func startLeaseRedis(t *testing.T) *leaseRedis {
@@ -127,7 +127,7 @@ func readRESPArray(reader *bufio.Reader) ([]string, error) {
 		return nil, io.ErrUnexpectedEOF
 	}
 	argv := make([]string, 0, count)
-	for i := 0; i < count; i++ {
+	for range count {
 		bulkHeader, bulkErr := reader.ReadString('\n')
 		if bulkErr != nil {
 			return nil, bulkErr
@@ -162,7 +162,7 @@ func Test_memoryAcquireSerializesMissAndSet(t *testing.T) {
 	release.Add(1)
 	var done sync.WaitGroup
 	done.Add(goroutines)
-	for i := 0; i < goroutines; i++ {
+	for range goroutines {
 		go func() {
 			defer done.Done()
 			started.Done()

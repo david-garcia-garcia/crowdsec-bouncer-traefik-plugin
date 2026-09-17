@@ -5,16 +5,16 @@ import (
 	"testing"
 
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
 // testLiveConfig is a live-mode config aimed at a mock LAPI host.
-func testLiveConfig(host string, updateInterval int64) *configuration.Config {
+func testLiveConfig(updateInterval int64) *configuration.Config {
 	return &configuration.Config{
 		CrowdsecMode:                  configuration.LiveMode,
 		CrowdsecLapiScheme:            "http",
-		CrowdsecLapiHost:              host,
+		CrowdsecLapiHost:              "lapi.example:8080",
 		CrowdsecLapiPath:              "/",
 		CrowdsecLapiKey:               "test-key",
 		CrowdsecLapiTLSInsecureVerify: true,
@@ -78,8 +78,8 @@ func TestOpenDecisionStore_DifferentRedisHostsIsolate(t *testing.T) {
 }
 
 func TestCachePrefix_LiveIsSessionHexNotIdentityHex(t *testing.T) {
-	cfg := testLiveConfig("lapi.example:8080", 1)
-	other := testLiveConfig("lapi.example:8080", 60)
+	cfg := testLiveConfig(1)
+	other := testLiveConfig(60)
 	if CachePrefix(cfg) != SessionHex(cfg) {
 		t.Fatal("live cache prefix must be SessionHex")
 	}
@@ -100,8 +100,8 @@ func TestOpenDecisionStore_LiveIntervalSplitSharesStore(t *testing.T) {
 
 	ctx := context.Background()
 	log := logger.New("ERROR", "")
-	fast := testLiveConfig("lapi.example:8080", 1)
-	slow := testLiveConfig("lapi.example:8080", 60)
+	fast := testLiveConfig(1)
+	slow := testLiveConfig(60)
 	first, err := OpenDecisionStore(ctx, fast, log)
 	if err != nil {
 		t.Fatal(err)
@@ -148,8 +148,8 @@ func TestOpenLive_TwoClientsShareOneStore(t *testing.T) {
 
 	ctx := context.Background()
 	log := logger.New("ERROR", "")
-	fast := testLiveConfig("lapi.example:8080", 1)
-	slow := testLiveConfig("lapi.example:8080", 60)
+	fast := testLiveConfig(1)
+	slow := testLiveConfig(60)
 	first, err := OpenLive(ctx, fast, log, "fast", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -177,8 +177,8 @@ func TestClientClose_LeavesSiblingCacheLive(t *testing.T) {
 
 	ctx := context.Background()
 	log := logger.New("ERROR", "")
-	fast := testLiveConfig("lapi.example:8080", 1)
-	slow := testLiveConfig("lapi.example:8080", 60)
+	fast := testLiveConfig(1)
+	slow := testLiveConfig(60)
 	first, err := OpenLive(ctx, fast, log, "fast", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -202,8 +202,8 @@ func TestClientClose_LeavesSiblingRedisPoolLive(t *testing.T) {
 	redisServer := startTestLeaseRedis(t)
 	ctx := context.Background()
 	log := logger.New("ERROR", "")
-	fast := testLiveConfig("lapi.example:8080", 1)
-	slow := testLiveConfig("lapi.example:8080", 60)
+	fast := testLiveConfig(1)
+	slow := testLiveConfig(60)
 	fast.RedisCacheEnabled = true
 	fast.RedisCacheHost = redisServer.addr()
 	slow.RedisCacheEnabled = true

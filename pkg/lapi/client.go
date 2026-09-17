@@ -59,7 +59,7 @@ type Client struct {
 	decisionStore   *DecisionStore
 	cacheClient     *cache.Client // alias of store.Cache(); tests may set this without a store
 	rangeMembership atomic.Value  // *decisionscope.RangeMembership rebuilt from range-index
-	lastRangeIndex  atomic.Value // string of the blob last used to build membership
+	lastRangeIndex  atomic.Value  // string of the blob last used to build membership
 	log             *slog.Logger
 	pluginVersion   string
 

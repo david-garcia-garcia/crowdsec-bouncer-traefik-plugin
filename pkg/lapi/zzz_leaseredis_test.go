@@ -108,7 +108,7 @@ func readTestRESPArray(reader *bufio.Reader) ([]string, error) {
 		return nil, io.ErrUnexpectedEOF
 	}
 	argv := make([]string, 0, count)
-	for i := 0; i < count; i++ {
+	for range count {
 		bulkHeader, bulkErr := reader.ReadString('\n')
 		if bulkErr != nil {
 			return nil, bulkErr

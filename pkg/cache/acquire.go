@@ -9,15 +9,12 @@ import (
 )
 
 // acquireLeaseScript sets KEYS[1] only when absent (SET EX). Returns 1 on win, 0 on miss.
-// Lua 5.1-safe for Dragonfly: numeric for, no unpack. Digest is computed once at init.
+// Lua 5.1-safe for Dragonfly: numeric for, no unpack. Digest is ScriptSHA1Hex of this body at each Eval.
 const acquireLeaseScript = `if redis.call('EXISTS', KEYS[1]) == 0 then
 redis.call('SET', KEYS[1], ARGV[1], 'EX', tonumber(ARGV[2]))
 return 1
 end
 return 0`
-
-// acquireLeaseDigest is Redis sha1hex of acquireLeaseScript. Not atomic.Pointer (Yaegi v0.16).
-var acquireLeaseDigest = simpleredis.ScriptSHA1Hex(acquireLeaseScript)
 
 // Acquire tries to own key for duration seconds. Redis uses one Eval (EVALSHA, then EVAL on NOSCRIPT).
 // Memory locks around miss+Set. No poller logic. No SetNX wrapper. Caller owns the TTL floor.
@@ -55,7 +52,7 @@ func (rc *redisCache) acquire(ctx context.Context, key, value string, duration i
 	values, err := rc.writer.Eval(
 		ctx,
 		acquireLeaseScript,
-		acquireLeaseDigest,
+		simpleredis.ScriptSHA1Hex(acquireLeaseScript),
 		[]string{prefixed(rc.prefix, key)},
 		[]string{value, strconv.FormatInt(duration, 10)},
 	)
