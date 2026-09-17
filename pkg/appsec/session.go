@@ -15,29 +15,23 @@ import (
 const keyPrefix = "appsec:"
 
 // identity is the reclaim-key payload for one AppSec listener.
+// HTTP timeout and AppSec TLS are omitted so a reload of those knobs
+// reuses the Client. Per-router failure action is not included either.
 type identity struct {
-	Scheme                  string `json:"scheme"`
-	Host                    string `json:"host"`
-	Path                    string `json:"path"`
-	Key                     string `json:"key"`
-	BodyLimit               int64  `json:"bodyLimit"`
-	HTTPTimeoutSeconds      int64  `json:"httpTimeoutSeconds"`
-	TLSInsecureVerify       bool   `json:"tlsInsecureVerify"`
-	TLSCertificateAuthority string `json:"tlsCa"`
-	TLSCertificateBouncer   string `json:"tlsCert"`
+	Scheme    string `json:"scheme"`
+	Host      string `json:"host"`
+	Path      string `json:"path"`
+	Key       string `json:"key"`
+	BodyLimit int64  `json:"bodyLimit"`
 }
 
 func identityFrom(cfg *configuration.Config) identity {
 	return identity{
-		Scheme:                  cfg.CrowdsecAppsecScheme,
-		Host:                    cfg.CrowdsecAppsecHost,
-		Path:                    cfg.CrowdsecAppsecPath,
-		Key:                     cfg.CrowdsecAppsecKey,
-		BodyLimit:               cfg.CrowdsecAppsecBodyLimit,
-		HTTPTimeoutSeconds:      cfg.HTTPTimeoutSeconds,
-		TLSInsecureVerify:       cfg.CrowdsecAppsecTLSInsecureVerify,
-		TLSCertificateAuthority: cfg.CrowdsecAppsecTLSCertificateAuthority,
-		TLSCertificateBouncer:   cfg.CrowdsecAppsecTLSCertificateBouncer,
+		Scheme:    cfg.CrowdsecAppsecScheme,
+		Host:      cfg.CrowdsecAppsecHost,
+		Path:      cfg.CrowdsecAppsecPath,
+		Key:       cfg.CrowdsecAppsecKey,
+		BodyLimit: cfg.CrowdsecAppsecBodyLimit,
 	}
 }
 
@@ -76,6 +70,10 @@ func Open(ctx context.Context, cfg *configuration.Config, log *slog.Logger, midd
 	client, ok := stored.(*Client)
 	if !ok {
 		return nil, fmt.Errorf("%s: reclaim: want *appsec.Client, got %T", middlewareName, stored)
+	}
+	_, adoptErr := client.AdoptTransport(cfg)
+	if adoptErr != nil {
+		return nil, adoptErr
 	}
 	return client, nil
 }
