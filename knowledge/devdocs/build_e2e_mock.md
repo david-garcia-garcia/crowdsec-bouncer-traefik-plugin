@@ -40,3 +40,4 @@ make e2e_mock
 
 - Identify the client with `X-Forwarded-For`. Do not parse `RemoteAddr`.
 - Two LAPIs must disagree on a decision so a cache leak would fail the scenario.
+- Captcha solve uses `captchaProvider: custom` and mocklapi `POST /siteverify` (`{"success":true}`). POST `dummy-captcha-response`; do not call a real provider. The gate cookie is `crowdsec_captcha_gate`.

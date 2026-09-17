@@ -2,10 +2,8 @@
 package lapi
 
 import (
-	"crypto/tls"
 	"errors"
 	"log/slog"
-	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,9 +12,6 @@ import (
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
-
-// ReclaimGraceDuration is the wait after the last constructor ctx for a Client slot.
-const ReclaimGraceDuration = 30 * time.Second
 
 // Operator-visible lifecycle and stream-health lines (stable for log grep).
 const (
@@ -40,34 +35,31 @@ type Decision struct {
 	Simulated bool   `json:"simulated"`
 }
 
-// Client owns stream ticker, isolated cache, in-process Range membership, LAPI/CAPI HTTP, and metrics.
+// Client owns stream ticker, a reclaimed DecisionStore, in-process Range membership, LAPI/CAPI HTTP, and metrics.
 type Client struct {
 	mu       sync.Mutex
 	closed   bool
 	sleeping bool // last reclaim holder gone; tickers stopped until Wake or Close
 
-	crowdsecScheme         string
-	crowdsecHost           string
-	crowdsecPath           string
-	crowdsecKey            string
-	crowdsecMode           string
-	crowdsecMachineID      string
-	crowdsecPassword       string
-	crowdsecScenarios      []string
-	updateInterval         int64
-	metricsInterval        int64
-	updateMaxFailure       int64
-	lapiFailureAction      string
-	defaultDecisionTimeout int64
-	crowdsecStreamRoute    string
-	crowdsecHeader         string
-	redisUnreachableBlock  bool
-	decisionScopeHeaders   map[string]string // CrowdSec header scope → request header
+	crowdsecScheme       string
+	crowdsecHost         string
+	crowdsecPath         string
+	crowdsecMode         string
+	crowdsecMachineID    string
+	crowdsecPassword     string
+	crowdsecScenarios    []string
+	updateInterval       int64
+	metricsInterval      int64
+	updateMaxFailure     int64
+	crowdsecStreamRoute  string
+	decisionScopeHeaders map[string]string // CrowdSec header scope → request header
+	sessionKey           string            // reclaim SessionKey (stream/alone) or Key (live/none)
 
-	httpClient      *http.Client
-	cacheClient     *cache.Client
-	rangeMembership atomic.Value // *decisionscope.RangeMembership rebuilt from range-index
-	lastRangeIndex  atomic.Value // string of the blob last used to build membership
+	transport       atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
+	decisionStore   *DecisionStore
+	cacheClient     *cache.Client // alias of store.Cache(); tests may set this without a store
+	rangeMembership atomic.Value  // *decisionscope.RangeMembership rebuilt from range-index
+	lastRangeIndex  atomic.Value  // string of the blob last used to build membership
 	log             *slog.Logger
 	pluginVersion   string
 
@@ -76,16 +68,7 @@ type Client struct {
 	updateFailure           int64
 	streamStop              chan bool
 	metricsStop             chan bool
-	lastMetricsPush         time.Time
-	startedAt               time.Time
-	metricsMu               sync.Mutex
-	reportMu                sync.Mutex               // one usage-metrics POST at a time (ticker, Sleep drain, Close drain)
-	windowCounters          map[usageMetricKey]int64 // dropped counters for the current push window
-	processedIPv4           int64                    // processed ipv4; atomic on the request path
-	processedIPv6           int64
-	processedUnknown        int64 // processed when Family is empty
-	activeDecisions         map[usageMetricKey]int64
-	activeDecisionSlots     map[string]usageMetricKey
+	metricsReporter         *MetricsReporter
 	streamFetches           int64
 	streamOwner             string         // first middleware New that created this stream session
 	streamSettings          streamSettings // knobs that must not start a second poller; warn-and-wire if a joiner differs
@@ -110,27 +93,24 @@ func Prepare(cfg *configuration.Config, _ *slog.Logger) error {
 	return nil
 }
 
-// New constructs a Client and starts tickers. Call Prepare first. Close stops them.
-func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (*Client, error) {
-	var err error
-	crowdsecStreamRoute := ""
-	crowdsecHeader := ""
-	var tlsConfig *tls.Config
+// New constructs a Client and starts tickers. store is the reclaimed DecisionStore for this cursor.
+// Call Prepare first. Close stops tickers and HTTP only; it does not Close the shared store.
+func New(config *configuration.Config, log *slog.Logger, pluginVersion string, store *DecisionStore) (*Client, error) {
+	crowdsecStreamRoute := crowdsecLapiStreamRoute
 	if config.CrowdsecMode == configuration.AloneMode {
 		crowdsecStreamRoute = crowdsecCapiStreamRoute
-		crowdsecHeader = crowdsecCapiHeader
-	} else {
-		crowdsecStreamRoute = crowdsecLapiStreamRoute
-		crowdsecHeader = crowdsecLapiHeader
-		tlsConfig, err = configuration.GetTLSConfigCrowdsec(config, log, false)
-		if err != nil {
-			log.Error("New:getTLSConfigCrowdsec fail to get tlsConfig " + err.Error())
-			return nil, err
-		}
-		if config.CrowdsecLapiKey == "" && len(tlsConfig.Certificates) == 0 {
-			log.Error("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup")
-			return nil, errors.New("CrowdsecLapiKey is missing")
-		}
+	}
+	next, err := newTransport(config, log)
+	if err != nil {
+		log.Error("New:getTLSConfigCrowdsec fail to get tlsConfig " + err.Error())
+		return nil, err
+	}
+	if config.CrowdsecMode != configuration.AloneMode && config.CrowdsecLapiKey == "" && next.clientCertCount() == 0 {
+		log.Error("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup")
+		return nil, errors.New("CrowdsecLapiKey is missing")
+	}
+	if store == nil || store.Cache() == nil {
+		return nil, errors.New("decision store is required")
 	}
 
 	client := &Client{
@@ -138,70 +118,44 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		crowdsecScheme:          config.CrowdsecLapiScheme,
 		crowdsecHost:            config.CrowdsecLapiHost,
 		crowdsecPath:            config.CrowdsecLapiPath,
-		crowdsecKey:             config.CrowdsecLapiKey,
 		crowdsecMachineID:       config.CrowdsecCapiMachineID,
 		crowdsecPassword:        config.CrowdsecCapiPassword,
 		crowdsecScenarios:       config.CrowdsecCapiScenarios,
 		updateInterval:          config.UpdateIntervalSeconds,
 		metricsInterval:         config.MetricsUpdateIntervalSeconds,
 		updateMaxFailure:        config.UpdateMaxFailure,
-		lapiFailureAction:       configuration.EffectiveFailureAction(config.CrowdsecLapiFailureAction),
-		defaultDecisionTimeout:  config.DefaultDecisionSeconds,
-		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
 		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
 		crowdsecStreamRoute:     crowdsecStreamRoute,
-		crowdsecHeader:          crowdsecHeader,
+		sessionKey:              reclaimSessionKey(config),
 		log:                     log,
 		pluginVersion:           pluginVersion,
-		startedAt:               time.Now(),
-		windowCounters:          make(map[usageMetricKey]int64),
-		activeDecisions:         make(map[usageMetricKey]int64),
-		activeDecisionSlots:     make(map[string]usageMetricKey),
 		isCrowdsecStreamStartup: true,
 		isCrowdsecStreamHealthy: true,
-		httpClient: &http.Client{
-			Transport: &http.Transport{
-				MaxIdleConns:        10,
-				MaxIdleConnsPerHost: 10,
-				IdleConnTimeout:     30 * time.Second,
-				TLSClientConfig:     tlsConfig,
-			},
-			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
-		},
-		cacheClient: &cache.Client{},
+		decisionStore:           store,
+		cacheClient:             store.Cache(),
 	}
-	// Stream/alone prefix is SessionHex (LAPI URL+key), not IdentityHex.
-	// IdentityHex still includes intervals, so two middlewares on one key
-	// used to get two prefixes and two incomplete caches while sharing one
-	// CrowdSec stream cursor. Warn-and-wire must read the same keys.
-	client.cacheClient.New(
-		log,
-		config.RedisCacheEnabled,
-		config.RedisCacheHost,
-		config.RedisCacheReadHosts,
-		config.RedisCachePassword,
-		config.RedisCacheDatabase,
-		CachePrefix(config),
-	)
+	client.metricsReporter = newMetricsReporter(client, time.Now())
+	client.transport.Store(next)
 
 	if err := client.startStream(config, log); err != nil {
 		return nil, err
 	}
 
 	if config.MetricsUpdateIntervalSeconds > 0 {
-		client.lastMetricsPush = time.Now()
+		client.metricsReporter.lastMetricsPush = time.Now()
 		go client.handleMetricsTicker()
 		client.metricsStop = startTicker("metrics", client.metricsInterval, log, func() {
 			client.handleMetricsTicker()
 		})
 	}
 
-	client.logInfo(MsgConnectionStarted)
+	client.logInfo(MsgConnectionStarted, "started")
 	return client, nil
 }
 
-// Close stops tickers, idle HTTP connections, and the cache Redis pool. Safe to call more than once.
+// Close stops tickers and idle LAPI HTTP. Safe to call more than once.
 // Remaining usage-metrics are POSTed to LAPI before HTTP is torn down.
+// Does not Close the shared DecisionStore; only the store's reclaim Close hook does.
 func (c *Client) Close() {
 	c.mu.Lock()
 	if c.closed {
@@ -220,11 +174,10 @@ func (c *Client) Close() {
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	closeIdle(c.httpClient)
-	if c.cacheClient != nil {
-		c.cacheClient.Close()
+	if current := c.currentTransport(); current != nil {
+		closeIdle(current.httpClient)
 	}
-	c.logInfo(MsgConnectionClosed)
+	c.logInfo(MsgConnectionClosed, "closed")
 }
 
 // Sleep stops stream and metrics tickers and keeps HTTP, cache, and the LAPI
@@ -242,7 +195,7 @@ func (c *Client) Sleep() {
 	c.streamStop = nil
 	c.metricsStop = nil
 	c.mu.Unlock()
-	c.logInfo(MsgConnectionSleeping)
+	c.logInfo(MsgConnectionSleeping, "sleeping")
 	go c.drainMetrics()
 }
 
@@ -267,18 +220,18 @@ func (c *Client) Wake() {
 		})
 	}
 	c.mu.Unlock()
-	c.logInfo(MsgConnectionWaking)
+	c.logInfo(MsgConnectionWaking, "waking")
 	if resumeStream {
 		go c.handleStreamTicker()
 	}
 }
 
-// logInfo writes an operator-visible lifecycle line with mode and LAPI host.
-func (c *Client) logInfo(msg string) {
+// logInfo writes an operator-visible line with mode, host, reclaim key, and reason.
+func (c *Client) logInfo(msg, reason string) {
 	if c.log == nil {
 		return
 	}
-	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost)
+	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
 }
 
 func stopTicker(stop chan bool) {
@@ -309,8 +262,11 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 	return stop
 }
 
-// Cache is this connection's isolated cache Client.
+// Cache is the shared DecisionStore cache, or the test-assigned cacheClient.
 func (c *Client) Cache() *cache.Client {
+	if c.decisionStore != nil {
+		return c.decisionStore.Cache()
+	}
 	return c.cacheClient
 }
 
@@ -326,7 +282,7 @@ func (c *Client) RangeMembership() *decisionscope.RangeMembership {
 
 // hydrateRangeMembership rebuilds Range membership from the shared blob when the raw string changed.
 func (c *Client) hydrateRangeMembership() {
-	index, err := c.cacheClient.Get(decisionscope.RangeIndexKey)
+	index, err := c.Cache().Get(decisionscope.RangeIndexKey)
 	if err != nil {
 		if err.Error() != cache.CacheMiss {
 			return
@@ -349,16 +305,6 @@ func (c *Client) storeRangeMembership(index string) {
 // StreamHealthy is true while stream polling is succeeding.
 func (c *Client) StreamHealthy() bool {
 	return c.isCrowdsecStreamHealthy
-}
-
-// LapiFailureAction is the fallback when LAPI does not return a usable verdict.
-func (c *Client) LapiFailureAction() string {
-	return c.lapiFailureAction
-}
-
-// RedisUnreachableBlock is the redis fail-closed flag for this connection.
-func (c *Client) RedisUnreachableBlock() bool {
-	return c.redisUnreachableBlock
 }
 
 // StreamFetches is how many times this connection actually called the stream endpoint.

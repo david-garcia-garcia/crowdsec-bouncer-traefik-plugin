@@ -1,11 +1,11 @@
 # core / cache
 
-## Isolated cache Client
+## DecisionStore cache
 priority: normal
 local: core_cache_client.md
-description: How each LAPI Client gets its own memory map or Redis key prefix.
+description: How LAPI Clients share one DecisionStore keyed by CrowdSec cursor plus Redis params.
 
 ## Redis cache client
 priority: normal
 local: core_cache_redis.md
-description: How this plugin talks to a Redis-protocol cache (in-tree SimpleRedis).
+description: How this plugin talks to a Redis-protocol cache (vendored utilities SimpleRedis).

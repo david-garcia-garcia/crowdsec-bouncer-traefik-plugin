@@ -1,0 +1,33 @@
+issueKey: 2026-09-06-upstream-319-stream-cache-log-spam
+
+jobName: 2026-09-06-upstream-319-stream-cache-log-spam
+
+issueHost: local
+
+issueRef: none
+
+prHost: github
+
+repoSlug: crowdsec-bouncer-traefik-plugin
+
+destBranch: master
+
+qualify: qualified-with-gaps
+
+src: a272f91c005c1d100470e429c7b3b616b3dec8dbde5ebe8fa78748ec3c1a7116
+
+localTests: passed
+
+requirement: requirement.md
+
+comments: none
+
+explore: explore.md
+
+change: prove-stream-cache-tick-debug
+
+pr:
+
+  id: 54
+
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/54

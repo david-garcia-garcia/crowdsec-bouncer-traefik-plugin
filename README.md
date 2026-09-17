@@ -538,6 +538,16 @@ make run
 - CaptchaSecretKey
   - string
   - Site secret key for the captcha provider
+- CaptchaGateSecret
+  - string
+  - HMAC secret for the stateless captcha grace cookie (`crowdsec_captcha_gate`). Required when `CaptchaProvider` is set. Not the same as `CaptchaSecretKey`.
+- CaptchaGateSecretFile
+  - string
+  - File path for `CaptchaGateSecret` (preferred over inline secret when both are set).
+- CaptchaGateBindIp
+  - bool
+  - default: true
+  - When true, the gate cookie binds to the client IP from `GetRemoteIP`. When false, grace is cookie-only (HMAC + expiry).
 - CaptchaGracePeriodSeconds
   - int64
   - default: 1800 (= 30 minutes)
@@ -697,6 +707,7 @@ http:
           captchaProvider: hcaptcha
           captchaSiteKey: FIXME
           captchaSecretKey: FIXME
+          captchaGateSecret: FIXME
           captchaGracePeriodSeconds: 1800
           captchaHTMLFilePath: /captcha.html
           banHTMLFilePath: /ban.html
@@ -706,7 +717,7 @@ http:
 
 #### Fill variable with value of file
 
-`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority`, `CrowdsecAppsecTlsCertificateAuthority`, `CrowdsecCapiMachineId`, `CrowdsecCapiPassword`, `CrowdsecLapiKey`, `CrowdsecAppsecKey`, `CaptchaSiteKey`, `CaptchaSecretKey` and `RedisCachePassword` can be provided with the content as raw or through a file path that Traefik can read.  
+`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority`, `CrowdsecAppsecTlsCertificateAuthority`, `CrowdsecCapiMachineId`, `CrowdsecCapiPassword`, `CrowdsecLapiKey`, `CrowdsecAppsecKey`, `CaptchaSiteKey`, `CaptchaSecretKey`, `CaptchaGateSecret` and `RedisCachePassword` can be provided with the content as raw or through a file path that Traefik can read.  
 The file variable will be used as preference if both content and file are provided for the same variable.
 
 Format is:
@@ -846,7 +857,7 @@ The source code of the plugin should be organized as follows:
             └── maxlerebourg
                 └── crowdsec-bouncer-traefik-plugin
                     ├── bouncer.go
-                    ├── bouncer_test.go
+                    ├── zzz_bouncer_test.go
                     ├── go.mod
                     ├── LICENSE
                     ├── Makefile

@@ -11,7 +11,7 @@ func RemediationKind(stored string) string {
 	}
 	kind := stored[:1]
 	switch kind {
-	case BannedValue, NoBannedValue, CaptchaValue, CaptchaDoneValue:
+	case "t", "f", "c", "d":
 		return kind
 	default:
 		return stored

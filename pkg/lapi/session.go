@@ -16,7 +16,7 @@ import (
 const streamSessionKeyPrefix = "lapi:stream:"
 
 // streamSession is the CrowdSec-row identity for stream and alone modes.
-// SessionPrefix / CachePrefix use only these fields. SessionKey appends a
+// SessionPrefix and SessionHex use only these fields. SessionKey appends a
 // hash of streamSettings so a sleeping incarnation does not occupy the slot a
 // reload with new knobs needs.
 //
@@ -53,39 +53,29 @@ type streamSession struct {
 	CapiPassword  string `json:"capiPassword"`
 }
 
-// streamSettings is every former reclaim-hash field that is not streamSession.
+// streamSettings is the first-wins LAPI snapshot hashed into SessionKey.
 //
 // A second live middleware that disagrees is warn-and-wire: Traefik New must
 // not fail the joiner router, and we must not start a second poller. The first
-// New keeps intervals, Redis, TLS, and scopes=. Trusted IPs, ban/captcha
-// templates, and AppSec stay off this LAPI session.
+// New keeps intervals, Redis, updateMaxFailure, CAPI scenarios, and scopes=.
+// Per-router policy, StreamStartupBlock, HTTP timeout, and LAPI TLS stay off
+// this hash so a reload of those knobs reuses the Client. Trusted IPs,
+// ban/captcha templates, and AppSec stay off this LAPI session.
 //
 // A Traefik reload that changes this snapshot uses a new SessionKey. The old
 // key is sleeping (tickers already off) until grace Close. Same snapshot: Open
 // Wakes that key. Reclaim grace is only how long the slept object stays
 // peekable, not a second poller.
-//
-// TLS extras are settings, not session, so a wrong LAPI client cert can be
-// replaced on reload without a process restart. Two live middlewares with
-// different certs still warn-and-wire (first wins) until the owner is gone.
 type streamSettings struct {
 	CapiScenarios                []string          `json:"capiScenarios"`
 	UpdateIntervalSeconds        int64             `json:"updateIntervalSeconds"`
 	MetricsUpdateIntervalSeconds int64             `json:"metricsUpdateIntervalSeconds"`
 	UpdateMaxFailure             int64             `json:"updateMaxFailure"`
-	LapiFailureAction            string            `json:"lapiFailureAction"`
-	StreamStartupBlock           bool              `json:"streamStartupBlock"`
-	DefaultDecisionSeconds       int64             `json:"defaultDecisionSeconds"`
-	HTTPTimeoutSeconds           int64             `json:"httpTimeoutSeconds"`
 	RedisCacheEnabled            bool              `json:"redisCacheEnabled"`
 	RedisCacheHost               string            `json:"redisCacheHost"`
 	RedisCacheReadHosts          []string          `json:"redisCacheReadHosts"`
 	RedisCachePassword           string            `json:"redisCachePassword"`
 	RedisCacheDatabase           string            `json:"redisCacheDatabase"`
-	RedisCacheUnreachableBlock   bool              `json:"redisCacheUnreachableBlock"`
-	LapiTLSInsecureVerify        bool              `json:"lapiTlsInsecureVerify"`
-	LapiTLSCertificateAuthority  string            `json:"lapiTlsCa"`
-	LapiTLSCertificateBouncer    string            `json:"lapiTlsCert"`
 	DecisionScopeHeaders         map[string]string `json:"decisionScopeHeaders"`
 }
 
@@ -109,19 +99,11 @@ func settingsFrom(cfg *configuration.Config) streamSettings {
 		UpdateIntervalSeconds:        cfg.UpdateIntervalSeconds,
 		MetricsUpdateIntervalSeconds: cfg.MetricsUpdateIntervalSeconds,
 		UpdateMaxFailure:             cfg.UpdateMaxFailure,
-		LapiFailureAction:            configuration.EffectiveFailureAction(cfg.CrowdsecLapiFailureAction),
-		StreamStartupBlock:           cfg.StreamStartupBlock,
-		DefaultDecisionSeconds:       cfg.DefaultDecisionSeconds,
-		HTTPTimeoutSeconds:           cfg.HTTPTimeoutSeconds,
 		RedisCacheEnabled:            cfg.RedisCacheEnabled,
 		RedisCacheHost:               cfg.RedisCacheHost,
 		RedisCacheReadHosts:          cfg.RedisCacheReadHosts,
 		RedisCachePassword:           cfg.RedisCachePassword,
 		RedisCacheDatabase:           cfg.RedisCacheDatabase,
-		RedisCacheUnreachableBlock:   cfg.RedisCacheUnreachableBlock,
-		LapiTLSInsecureVerify:        cfg.CrowdsecLapiTLSInsecureVerify,
-		LapiTLSCertificateAuthority:  cfg.CrowdsecLapiTLSCertificateAuthority,
-		LapiTLSCertificateBouncer:    cfg.CrowdsecLapiTLSCertificateBouncer,
 		DecisionScopeHeaders:         decisionscope.NormalizeDecisionScopeHeaders(cfg.DecisionScopeHeaders),
 	}
 }
@@ -150,13 +132,12 @@ func SessionKey(cfg *configuration.Config) string {
 	return SessionPrefix(cfg) + hashJSON(settingsFrom(cfg))
 }
 
-// CachePrefix is the cache Client prefix: session hex for stream/alone so
-// warn-and-wire shares keys; full IdentityHex for live/none.
-func CachePrefix(cfg *configuration.Config) string {
+// reclaimSessionKey is SessionKey for stream/alone and Key for live/none.
+func reclaimSessionKey(cfg *configuration.Config) string {
 	if cfg.CrowdsecMode == configuration.StreamMode || cfg.CrowdsecMode == configuration.AloneMode {
-		return SessionHex(cfg)
+		return SessionKey(cfg)
 	}
-	return IdentityHex(cfg)
+	return Key(cfg)
 }
 
 // settingsDiff lists JSON field names that differ, for the warn-and-wire log.
@@ -211,16 +192,20 @@ func warnWiredToOwner(log *slog.Logger, ownerName, joinerName string, owner, joi
 // with a different snapshot is a different key: Open creates; the sleeper
 // dies on grace Close.
 func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
+	store, storeErr := OpenDecisionStore(ctx, cfg, log)
+	if storeErr != nil {
+		return nil, storeErr
+	}
 	joinerKey := SessionKey(cfg)
 	joinerSettings := settingsFrom(cfg)
-	create := func() (any, error) {
-		client, err := New(cfg, log, pluginVersion)
+	create := func() (any, reclaim.Hooks, error) {
+		client, err := New(cfg, log, pluginVersion, store)
 		if err != nil {
-			return nil, err
+			return nil, reclaim.Hooks{}, err
 		}
 		client.streamOwner = middlewareName
 		client.streamSettings = joinerSettings
-		return wrappedClient(client), nil
+		return client, clientHooks(client), nil
 	}
 
 	bindKey := joinerKey
@@ -238,7 +223,7 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	}
 
 	sleeper := reclaim.Peek(bindKey)
-	stored, openErr := reclaim.OpenWithGrace(ctx, bindKey, log, ReclaimGraceDuration, create)
+	stored, openErr := reclaim.OpenWithHooks(ctx, bindKey, log, create)
 	if openErr != nil {
 		return nil, openErr
 	}
@@ -250,32 +235,65 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	if sleeper.OK && sleeper.Holders == 0 && client.streamOwner != middlewareName {
 		client.streamOwner = middlewareName
 	}
+	client.sessionKey = bindKey
+	replaced, adoptErr := client.AdoptTransport(cfg)
+	if adoptErr != nil {
+		return nil, adoptErr
+	}
+	if live.OK && live.Key != joinerKey {
+		log.Info("lapi session joiner ignored",
+			"sessionKey", bindKey,
+			"ownerMiddleware", client.streamOwner,
+			"joiningMiddleware", middlewareName,
+			"ignoredSettings", strings.Join(settingsDiff(client.streamSettings, joinerSettings), ","),
+		)
+	} else if replaced {
+		log.Info("lapi session joiner adopted",
+			"sessionKey", bindKey,
+			"joiningMiddleware", middlewareName,
+		)
+	}
 	return client, nil
 }
 
 // OpenLive reclaims a Client by full identity (live/none).
 func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
-	stored, openErr := reclaim.OpenWithGrace(ctx, Key(cfg), log, ReclaimGraceDuration, func() (any, error) {
-		client, err := New(cfg, log, pluginVersion)
+	store, storeErr := OpenDecisionStore(ctx, cfg, log)
+	if storeErr != nil {
+		return nil, storeErr
+	}
+	bindKey := Key(cfg)
+	stored, openErr := reclaim.OpenWithHooks(ctx, bindKey, log, func() (any, reclaim.Hooks, error) {
+		client, err := New(cfg, log, pluginVersion, store)
 		if err != nil {
-			return nil, err
+			return nil, reclaim.Hooks{}, err
 		}
-		return wrappedClient(client), nil
+		return client, clientHooks(client), nil
 	})
 	if openErr != nil {
 		return nil, openErr
 	}
-	return clientFromStored(middlewareName, stored)
+	client, clientErr := clientFromStored(middlewareName, stored)
+	if clientErr != nil {
+		return nil, clientErr
+	}
+	client.sessionKey = bindKey
+	replaced, adoptErr := client.AdoptTransport(cfg)
+	if adoptErr != nil {
+		return nil, adoptErr
+	}
+	if replaced {
+		log.Info("lapi session joiner adopted",
+			"sessionKey", bindKey,
+			"joiningMiddleware", middlewareName,
+		)
+	}
+	return client, nil
 }
 
-// wrappedClient is the reclaim create() result: funcs, not a type assert (Yaegi).
-func wrappedClient(client *Client) *reclaim.Wrapped {
-	return &reclaim.Wrapped{
-		Value: client,
-		Sleep: client.Sleep,
-		Wake:  client.Wake,
-		Close: client.Close,
-	}
+// clientHooks is Sleep/Wake/Close as funcs: Yaegi panics on asserting a foreign concrete type.
+func clientHooks(client *Client) reclaim.Hooks {
+	return reclaim.Hooks{Sleep: client.Sleep, Wake: client.Wake, Close: client.Close}
 }
 
 func clientFromStored(middlewareName string, stored any) (*Client, error) {

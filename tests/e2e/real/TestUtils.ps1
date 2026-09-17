@@ -146,6 +146,66 @@ function Remove-TestScopeDecision {
     return $true
 }
 
+# GET/POST without following redirects. Used for captcha solve (302 + Set-Cookie).
+function Invoke-HttpNoRedirect {
+    param(
+        [string]$Uri,
+        [string]$Method,
+        [hashtable]$Headers,
+        [string]$Body,
+        [int]$TimeoutSec
+    )
+
+    $handler = [System.Net.Http.HttpClientHandler]::new()
+    $handler.AllowAutoRedirect = $false
+    $handler.UseCookies = $false
+    $client = [System.Net.Http.HttpClient]::new($handler)
+    $client.Timeout = [TimeSpan]::FromSeconds($TimeoutSec)
+    try {
+        $httpMethod = [System.Net.Http.HttpMethod]::new($Method)
+        $request = [System.Net.Http.HttpRequestMessage]::new($httpMethod, $Uri)
+        foreach ($headerName in $Headers.Keys) {
+            if ($headerName -eq "Content-Type") {
+                continue
+            }
+            [void]$request.Headers.TryAddWithoutValidation($headerName, [string]$Headers[$headerName])
+        }
+        if ($null -ne $Body) {
+            $request.Content = [System.Net.Http.StringContent]::new(
+                $Body,
+                [System.Text.Encoding]::UTF8,
+                "application/x-www-form-urlencoded"
+            )
+        }
+        $response = $client.Send($request)
+        $content = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+        $headerMap = @{}
+        foreach ($header in $response.Headers) {
+            $headerMap[$header.Key] = ($header.Value -join ", ")
+        }
+        if ($null -ne $response.Content -and $null -ne $response.Content.Headers) {
+            foreach ($header in $response.Content.Headers) {
+                $headerMap[$header.Key] = ($header.Value -join ", ")
+            }
+        }
+        $contentType = ""
+        if ($headerMap.ContainsKey("Content-Type")) {
+            $contentType = [string]$headerMap["Content-Type"]
+        }
+        return @{
+            StatusCode  = [int]$response.StatusCode
+            Content     = $content
+            ContentType = $contentType
+            Headers     = $headerMap
+            Success     = ([int]$response.StatusCode -ge 200 -and [int]$response.StatusCode -lt 300)
+        }
+    }
+    finally {
+        $client.Dispose()
+        $handler.Dispose()
+    }
+}
+
 # Helper function to test HTTP request
 function Test-HttpRequest {
     param(
@@ -155,7 +215,11 @@ function Test-HttpRequest {
         [string]$ExpectedContent = $null,
         [int]$TimeoutSec = 10,
         [string]$TraefikUrl = "http://localhost:8000",
-        [hashtable]$ExtraHeaders = @{}
+        [hashtable]$ExtraHeaders = @{},
+        [string]$Method = "GET",
+        [string]$Body = $null,
+        [int]$MaximumRedirection = 5,
+        [Microsoft.PowerShell.Commands.WebRequestSession]$Session = $null
     )
     
     $headers = @{
@@ -165,9 +229,43 @@ function Test-HttpRequest {
     foreach ($headerName in $ExtraHeaders.Keys) {
         $headers[$headerName] = $ExtraHeaders[$headerName]
     }
+
+    # Invoke-WebRequest follows 302 or throws on MaximumRedirection 0; the
+    # captcha solve must keep the 302 + Set-Cookie, so that path uses HttpClient.
+    if ($MaximumRedirection -eq 0) {
+        try {
+            return Invoke-HttpNoRedirect -Uri "$TraefikUrl$Endpoint" -Method $Method -Headers $headers -Body $Body -TimeoutSec $TimeoutSec
+        }
+        catch {
+            return @{
+                StatusCode  = 0
+                Content     = ""
+                ContentType = ""
+                Headers     = @{}
+                Success     = $false
+                Error       = $_.Exception.Message
+            }
+        }
+    }
+
+    $invoke = @{
+        Uri                 = "$TraefikUrl$Endpoint"
+        Headers             = $headers
+        TimeoutSec          = $TimeoutSec
+        UseBasicParsing     = $true
+        SkipHttpErrorCheck  = $true
+        Method              = $Method
+        MaximumRedirection  = $MaximumRedirection
+    }
+    if ($null -ne $Body) {
+        $invoke.Body = $Body
+    }
+    if ($null -ne $Session) {
+        $invoke.WebSession = $Session
+    }
     
     try {
-        $response = Invoke-WebRequest -Uri "$TraefikUrl$Endpoint" -Headers $headers -TimeoutSec $TimeoutSec -UseBasicParsing -SkipHttpErrorCheck
+        $response = Invoke-WebRequest @invoke
         $contentType = $response.Headers["Content-Type"]
         if ($contentType -is [System.Array]) {
             $contentType = $contentType[0]

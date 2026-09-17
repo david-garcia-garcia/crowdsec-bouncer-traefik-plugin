@@ -18,4 +18,4 @@ description: How Traefik constructs this bouncer and reclaims one Crowdsec backe
 ## go
 priority: normal
 local: index_std_go.md
-description: House Go patterns this plugin owns (reclaim table).
+description: House style for Go sources in this repository.
