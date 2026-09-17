@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
@@ -40,6 +39,9 @@ type Policy struct {
 
 // ErrFailureCaptcha tells the bouncer to run pkg/captcha instead of ban or next.
 var ErrFailureCaptcha = errors.New("failureAction captcha")
+
+// errAppsecReadBody is the io failure from readCappedAppsecBody (not an oversized body).
+var errAppsecReadBody = errors.New("appsecQuery:readBody")
 
 // resultForFailureAction maps a configured fallback to allow, captcha, or an error ban.
 func resultForFailureAction(action, errMsg string) (*Response, error) {
@@ -123,7 +125,7 @@ func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response,
 	body, err := c.readCappedAppsecBody(res)
 	if err != nil {
 		// Io errors use FailureAction; oversized bodies stay as dest (allow 200 / error otherwise).
-		if strings.HasPrefix(err.Error(), "appsecQuery:readBody") {
+		if errors.Is(err, errAppsecReadBody) {
 			c.log.Info("appsecQuery:failure")
 			return resultForFailureAction(pol.FailureAction, err.Error())
 		}
@@ -215,7 +217,7 @@ func (c *Client) drainResponse(res *http.Response) {
 func (c *Client) readCappedAppsecBody(res *http.Response) ([]byte, error) {
 	body, err := io.ReadAll(io.LimitReader(res.Body, appsecResponseBodyLimit+1))
 	if err != nil {
-		return nil, fmt.Errorf("appsecQuery:readBody %w", err)
+		return nil, fmt.Errorf("%w %s", errAppsecReadBody, err.Error())
 	}
 	if len(body) <= appsecResponseBodyLimit {
 		return body, nil
