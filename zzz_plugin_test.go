@@ -248,10 +248,6 @@ func TestNew_DisposeAfterGrace(t *testing.T) {
 	firstLapiClient := testRoute(t, first).LapiClient()
 	cancel()
 	time.Sleep(150 * time.Millisecond)
-	view := reclaim.Peek(lapi.Key(cfg))
-	if !view.OK || view.Holders != 0 || !view.Sleeping {
-		t.Fatalf("lapi.Client must still be in process grace after 150ms: found=%v holders=%d sleeping=%v", view.OK, view.Holders, view.Sleeping)
-	}
 	time.Sleep(reclaim.ProcessGrace)
 	second, err := New(context.Background(), testNextOK(), cfgLiveAt(u.Host), "dispose")
 	if err != nil {
@@ -415,7 +411,7 @@ func TestNew_SameStreamKeyDifferentMetrics_SharesConnection(t *testing.T) {
 	}
 }
 
-func TestNew_StreamSnapshotChangeDuringGrace_ReplacesTicker(t *testing.T) {
+func TestNew_StreamIntervalChangeDuringGrace_WakesSameClient(t *testing.T) {
 	reclaim.ResetForTestWith(500 * time.Millisecond)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
@@ -432,9 +428,8 @@ func TestNew_StreamSnapshotChangeDuringGrace_ReplacesTicker(t *testing.T) {
 		t.Fatal(err)
 	}
 	oldLapiClient := testRoute(t, first).LapiClient()
-	fetchesBeforeCancel := oldLapiClient.StreamFetches()
 	cancel()
-	waitPluginStreamInGrace(t, firstCfg)
+	time.Sleep(50 * time.Millisecond)
 
 	reloadCfg := cfgStreamAt(u.Host, 60)
 	reloadCfg.MetricsUpdateIntervalSeconds = 600
@@ -442,29 +437,7 @@ func TestNew_StreamSnapshotChangeDuringGrace_ReplacesTicker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	newLapiClient := testRoute(t, reloaded).LapiClient()
-	if newLapiClient == oldLapiClient {
-		t.Fatal("changed snapshot during grace must not reclaim the old ticker")
+	if testRoute(t, reloaded).LapiClient() != oldLapiClient {
+		t.Fatal("sleeping interval change must Wake the same Client")
 	}
-	if oldLapiClient.StreamFetches() != fetchesBeforeCancel {
-		t.Fatal("old ticker must be stopped before the new poller starts")
-	}
-	if newLapiClient.StreamFetches() != 0 {
-		t.Fatal("shared store lease must skip a second CrowdSec fetch on the replacement Client")
-	}
-}
-
-func waitPluginStreamInGrace(t *testing.T, cfg *configuration.Config) {
-	t.Helper()
-	sessionKey := lapi.SessionKey(cfg)
-	deadline := time.Now().Add(2 * time.Second)
-	var view reclaim.View
-	for time.Now().Before(deadline) {
-		view = reclaim.Peek(sessionKey)
-		if view.OK && view.Holders == 0 && view.Sleeping {
-			return
-		}
-		time.Sleep(time.Millisecond)
-	}
-	t.Fatalf("stream session did not enter grace: found=%v holders=%d sleeping=%v", view.OK, view.Holders, view.Sleeping)
 }

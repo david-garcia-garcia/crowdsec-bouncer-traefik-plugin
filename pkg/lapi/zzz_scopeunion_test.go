@@ -1,0 +1,137 @@
+package lapi
+
+import (
+	"context"
+	"log/slog"
+	"net/url"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
+)
+
+func TestOpenStream_LiveRoutersUnionCountryAndUsername(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	server, _ := testStreamLAPI(t)
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := slog.Default()
+	countryCfg := testStreamConfig(parsed.Host, 1)
+	countryCfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	userCfg := testStreamConfig(parsed.Host, 1)
+	userCfg.DecisionScopeHeaders = map[string]string{"username": "X-User"}
+	countryCtx, countryCancel := context.WithCancel(context.Background())
+	t.Cleanup(countryCancel)
+	userCtx, userCancel := context.WithCancel(context.Background())
+	t.Cleanup(userCancel)
+
+	countryClient, err := OpenStream(countryCtx, countryCfg, log, "country", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	userClient, err := OpenStream(userCtx, userCfg, log, "user", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if countryClient != userClient {
+		t.Fatal("header-map mismatch must share one Client")
+	}
+	query := countryClient.streamQuery()
+	if !strings.Contains(query, "country") || !strings.Contains(query, "username") {
+		t.Fatalf("union scopes: %s", query)
+	}
+	countryClient.storeStreamDecision(Decision{Type: "ban", Scope: "Country", Value: "FR", Origin: "CAPI"}, 60)
+	countryClient.storeStreamDecision(Decision{Type: "ban", Scope: "username", Value: "alice", Origin: "CAPI"}, 60)
+	if _, getErr := countryClient.Cache().Get(decisionscope.HeaderScopeKey(decisionscope.ScopeCountry, "FR")); getErr != nil {
+		t.Fatalf("Country decision must store: %v", getErr)
+	}
+	if _, getErr := countryClient.Cache().Get(decisionscope.HeaderScopeKey("username", "alice")); getErr != nil {
+		t.Fatalf("username decision must store: %v", getErr)
+	}
+
+	userCancel()
+	waitScopeUnregistered(t, countryClient, "username")
+	afterDrop := countryClient.streamQuery()
+	if !strings.Contains(afterDrop, "country") {
+		t.Fatalf("Country must remain: %s", afterDrop)
+	}
+	if strings.Contains(afterDrop, "username") {
+		t.Fatalf("username must drop: %s", afterDrop)
+	}
+	if _, getErr := countryClient.Cache().Get(decisionscope.HeaderScopeKey(decisionscope.ScopeCountry, "FR")); getErr != nil {
+		t.Fatalf("unregister must not sweep Country key: %v", getErr)
+	}
+}
+
+func TestOpenStream_LateCountryJoinUsesStartupFalse(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	server, _ := testStreamLAPI(t)
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := slog.Default()
+	firstCfg := testStreamConfig(parsed.Host, 1)
+	first, err := OpenStream(context.Background(), firstCfg, log, "first", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.isCrowdsecStreamStartup {
+		t.Fatal("first poll must clear startup")
+	}
+	lateCfg := testStreamConfig(parsed.Host, 1)
+	lateCfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	late, err := OpenStream(context.Background(), lateCfg, log, "late", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != late {
+		t.Fatal("late Country join must share the Client")
+	}
+	query := late.streamQuery()
+	if !strings.Contains(query, "startup=false") {
+		t.Fatalf("late join must not send startup=true: %s", query)
+	}
+	if !strings.Contains(query, "country") {
+		t.Fatalf("late join must add country: %s", query)
+	}
+}
+
+func TestOpenStream_EmptyUnionOmitsCountry(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	server, _ := testStreamLAPI(t)
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := OpenStream(context.Background(), testStreamConfig(parsed.Host, 1), slog.Default(), "empty", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := client.streamQuery()
+	if strings.Contains(query, "country") {
+		t.Fatalf("empty union must omit country: %s", query)
+	}
+}
+
+func waitScopeUnregistered(t *testing.T, client *Client, scope string) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, ok := client.snapshotLiveHeaderScopes()[scope]; !ok {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("scope %s still registered", scope)
+}

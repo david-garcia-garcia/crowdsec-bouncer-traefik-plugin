@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"sort"
-	"strings"
 
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
@@ -17,8 +15,8 @@ const streamSessionKeyPrefix = "lapi:stream:"
 
 // streamSession is the CrowdSec-row identity for stream and alone modes.
 // SessionPrefix and SessionHex use only these fields. SessionKey appends a
-// hash of streamSettings so a sleeping incarnation does not occupy the slot a
-// reload with new knobs needs.
+// hash of Redis store parameters so two Clients that share a cursor still
+// isolate by Redis host (same payload family as StoreKey).
 //
 // CrowdSec LAPI does not give each HTTP client its own GET /v1/decisions/stream
 // cursor. The cursor lives on the bouncer database row selected by:
@@ -28,21 +26,20 @@ const streamSessionKeyPrefix = "lapi:stream:"
 //     the visitor behind Traefik.
 //
 // scopes= on the query string is a filter of the same cursor, not a second
-// cursor. Middleware name, metricsUpdateIntervalSeconds, Redis host, TLS
-// extras, and decisionScopeHeaders are also not how LAPI picks the row.
-// Usage-metrics POST uses that same authenticated row (`generated_by` =
-// bouncer name, not payload name). Two metrics tickers on one key would be
-// two windows for one CrowdSec bouncer; sharing the connection is required.
+// cursor. Intervals, CAPI scenarios, updateMaxFailure, and decisionScopeHeaders
+// are also not how LAPI picks the row. Usage-metrics POST uses that same
+// authenticated row (`generated_by` = bouncer name, not payload name).
 //
 // Two in-process tickers that share scheme+host+path+key therefore share one
 // CrowdSec row. Sequential startup=false polls steal deltas: each connection
-// writes only the decisions that appeared in its own body. That looks like
-// “stream cache is broken” (one router bans, the sibling does not). Isolated
-// backends need a second bouncer key (or a different LAPI host), not a second
-// ticker. Cross-process in-memory with the same LAPI-visible IP already shares
-// that CrowdSec row; Redis is the multi-instance store. PeekLivePrefix on
-// SessionPrefix finds a live sibling so those knobs cannot split the poller
-// while another middleware still holds.
+// writes only the decisions that appeared in its own body. Isolated backends
+// need a second bouncer key (or a different LAPI host), not a second ticker.
+// Cross-process in-memory with the same LAPI-visible IP already shares that
+// CrowdSec row; Redis is the multi-instance store.
+//
+// Upgrade: SessionHex and store Redis params stay. Existing Redis keys stay
+// reachable. Changing the Client Open string only renames the in-process table
+// key. No Redis key migration.
 type streamSession struct {
 	Mode          string `json:"mode"`
 	LapiScheme    string `json:"lapiScheme"`
@@ -51,32 +48,6 @@ type streamSession struct {
 	LapiKey       string `json:"lapiKey"`
 	CapiMachineID string `json:"capiMachineId"`
 	CapiPassword  string `json:"capiPassword"`
-}
-
-// streamSettings is the first-wins LAPI snapshot hashed into SessionKey.
-//
-// A second live middleware that disagrees is warn-and-wire: Traefik New must
-// not fail the joiner router, and we must not start a second poller. The first
-// New keeps intervals, Redis, updateMaxFailure, CAPI scenarios, and scopes=.
-// Per-router policy, StreamStartupBlock, HTTP timeout, and LAPI TLS stay off
-// this hash so a reload of those knobs reuses the Client. Trusted IPs,
-// ban/captcha templates, and AppSec stay off this LAPI session.
-//
-// A Traefik reload that changes this snapshot uses a new SessionKey. The old
-// key is sleeping (tickers already off) until grace Close. Same snapshot: Open
-// Wakes that key. Reclaim grace is only how long the slept object stays
-// peekable, not a second poller.
-type streamSettings struct {
-	CapiScenarios                []string          `json:"capiScenarios"`
-	UpdateIntervalSeconds        int64             `json:"updateIntervalSeconds"`
-	MetricsUpdateIntervalSeconds int64             `json:"metricsUpdateIntervalSeconds"`
-	UpdateMaxFailure             int64             `json:"updateMaxFailure"`
-	RedisCacheEnabled            bool              `json:"redisCacheEnabled"`
-	RedisCacheHost               string            `json:"redisCacheHost"`
-	RedisCacheReadHosts          []string          `json:"redisCacheReadHosts"`
-	RedisCachePassword           string            `json:"redisCachePassword"`
-	RedisCacheDatabase           string            `json:"redisCacheDatabase"`
-	DecisionScopeHeaders         map[string]string `json:"decisionScopeHeaders"`
 }
 
 // sessionFrom copies the CrowdSec-row fields off cfg. Call after Prepare.
@@ -89,22 +60,6 @@ func sessionFrom(cfg *configuration.Config) streamSession {
 		LapiKey:       cfg.CrowdsecLapiKey,
 		CapiMachineID: cfg.CrowdsecCapiMachineID,
 		CapiPassword:  cfg.CrowdsecCapiPassword,
-	}
-}
-
-// settingsFrom copies the first-wins knobs off cfg. Call after Prepare.
-func settingsFrom(cfg *configuration.Config) streamSettings {
-	return streamSettings{
-		CapiScenarios:                cfg.CrowdsecCapiScenarios,
-		UpdateIntervalSeconds:        cfg.UpdateIntervalSeconds,
-		MetricsUpdateIntervalSeconds: cfg.MetricsUpdateIntervalSeconds,
-		UpdateMaxFailure:             cfg.UpdateMaxFailure,
-		RedisCacheEnabled:            cfg.RedisCacheEnabled,
-		RedisCacheHost:               cfg.RedisCacheHost,
-		RedisCacheReadHosts:          cfg.RedisCacheReadHosts,
-		RedisCachePassword:           cfg.RedisCachePassword,
-		RedisCacheDatabase:           cfg.RedisCacheDatabase,
-		DecisionScopeHeaders:         decisionscope.NormalizeDecisionScopeHeaders(cfg.DecisionScopeHeaders),
 	}
 }
 
@@ -122,14 +77,14 @@ func SessionHex(cfg *configuration.Config) string {
 	return hashJSON(sessionFrom(cfg))
 }
 
-// SessionPrefix is the reclaim-key stem shared by every snapshot of one LAPI row.
+// SessionPrefix is the reclaim-key stem shared by every Redis snapshot of one LAPI row.
 func SessionPrefix(cfg *configuration.Config) string {
 	return streamSessionKeyPrefix + SessionHex(cfg) + ":"
 }
 
-// SessionKey is the process reclaim table key: session prefix plus settings hash.
+// SessionKey is the stream/alone Open key: session prefix plus Redis store-params hash.
 func SessionKey(cfg *configuration.Config) string {
-	return SessionPrefix(cfg) + hashJSON(settingsFrom(cfg))
+	return SessionPrefix(cfg) + hashJSON(storeParamsFrom(cfg))
 }
 
 // reclaimSessionKey is SessionKey for stream/alone and Key for live/none.
@@ -140,90 +95,27 @@ func reclaimSessionKey(cfg *configuration.Config) string {
 	return Key(cfg)
 }
 
-// settingsDiff lists JSON field names that differ, for the warn-and-wire log.
-func settingsDiff(owner, joiner streamSettings) []string {
-	ownerFields := jsonObject(owner)
-	joinerFields := jsonObject(joiner)
-	names := map[string]struct{}{}
-	for name := range ownerFields {
-		names[name] = struct{}{}
-	}
-	for name := range joinerFields {
-		names[name] = struct{}{}
-	}
-	var diff []string
-	for name := range names {
-		if fmt.Sprint(ownerFields[name]) != fmt.Sprint(joinerFields[name]) {
-			diff = append(diff, name)
-		}
-	}
-	sort.Strings(diff)
-	return diff
-}
-
-// jsonObject is a map of JSON keys so settingsDiff can name ignored knobs.
-func jsonObject(snapshot streamSettings) map[string]interface{} {
-	encoded, err := json.Marshal(snapshot)
-	if err != nil {
-		return map[string]interface{}{}
-	}
-	fields := map[string]interface{}{}
-	_ = json.Unmarshal(encoded, &fields)
-	return fields
-}
-
-// warnWiredToOwner logs that this New will share the owner’s ticker and knobs.
-func warnWiredToOwner(log *slog.Logger, ownerName, joinerName string, owner, joiner streamSettings) {
-	fields := settingsDiff(owner, joiner)
-	log.Warn("stream session already running for this LAPI URL+key (CrowdSec one cursor per bouncer row = hashed key + Traefik outbound IP); wiring this middleware to the existing stream instead of starting a second poller that would steal deltas",
-		"ownerMiddleware", ownerName,
-		"joiningMiddleware", joinerName,
-		"ignoredSettings", strings.Join(fields, ","),
-	)
-}
-
-// OpenStream reclaims one Client per stream session (LAPI URL+key).
+// OpenStream reclaims one Client per cursor plus Redis (LAPI URL+key).
 //
-// SessionKey is session prefix plus this snapshot’s hash. PeekLivePrefix on
-// SessionPrefix finds another live middleware on the same CrowdSec row
-// (streamOwner is who created that incarnation). Same snapshot → Open that
-// key (Sleep/Wake across Traefik’s cancel-then-New gap). Live sibling with a
-// different snapshot → warn-and-wire Open of their key. Sleeping leftover
-// with a different snapshot is a different key: Open creates; the sleeper
-// dies on grace Close.
+// SessionKey is session prefix plus this Redis snapshot’s hash. Same Redis
+// snapshot → Open that key (Sleep/Wake across Traefik’s cancel-then-New gap),
+// even when intervals, CAPI scenarios, updateMaxFailure, or header maps differ.
+// A different Redis host is a different key. Interval / CAPI / updateMaxFailure
+// mismatch on a live sibling is silent first-wins (create already wrote those
+// scalars). After bind, this constructor registers its header scopes.
 func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
 	store, storeErr := OpenDecisionStore(ctx, cfg, log)
 	if storeErr != nil {
 		return nil, storeErr
 	}
-	joinerKey := SessionKey(cfg)
-	joinerSettings := settingsFrom(cfg)
-	create := func() (any, reclaim.Hooks, error) {
+	bindKey := SessionKey(cfg)
+	stored, openErr := reclaim.OpenWithHooks(ctx, bindKey, log, func() (any, reclaim.Hooks, error) {
 		client, err := New(cfg, log, pluginVersion, store)
 		if err != nil {
 			return nil, reclaim.Hooks{}, err
 		}
-		client.streamOwner = middlewareName
-		client.streamSettings = joinerSettings
 		return client, clientHooks(client), nil
-	}
-
-	bindKey := joinerKey
-	live := reclaim.PeekLivePrefix(SessionPrefix(cfg))
-	if live.OK && live.Key != joinerKey {
-		existing, _ := live.Value.(*Client)
-		if existing != nil {
-			ownerName := existing.streamOwner
-			if ownerName == "" {
-				ownerName = "(unknown)"
-			}
-			warnWiredToOwner(log, ownerName, middlewareName, existing.streamSettings, joinerSettings)
-		}
-		bindKey = live.Key
-	}
-
-	sleeper := reclaim.Peek(bindKey)
-	stored, openErr := reclaim.OpenWithHooks(ctx, bindKey, log, create)
+	})
 	if openErr != nil {
 		return nil, openErr
 	}
@@ -231,23 +123,13 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	if clientErr != nil {
 		return nil, clientErr
 	}
-	// Sleeper belonged to another middleware that is gone. Take the name for later warnings.
-	if sleeper.OK && sleeper.Holders == 0 && client.streamOwner != middlewareName {
-		client.streamOwner = middlewareName
-	}
 	client.sessionKey = bindKey
 	replaced, adoptErr := client.AdoptTransport(cfg)
 	if adoptErr != nil {
 		return nil, adoptErr
 	}
-	if live.OK && live.Key != joinerKey {
-		log.Info("lapi session joiner ignored",
-			"sessionKey", bindKey,
-			"ownerMiddleware", client.streamOwner,
-			"joiningMiddleware", middlewareName,
-			"ignoredSettings", strings.Join(settingsDiff(client.streamSettings, joinerSettings), ","),
-		)
-	} else if replaced {
+	client.registerLiveHeaderScopes(ctx, decisionscope.NormalizeDecisionScopeHeaders(cfg.DecisionScopeHeaders))
+	if replaced {
 		log.Info("lapi session joiner adopted",
 			"sessionKey", bindKey,
 			"joiningMiddleware", middlewareName,
@@ -256,7 +138,7 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	return client, nil
 }
 
-// OpenLive reclaims a Client by full identity (live/none).
+// OpenLive reclaims a Client by cursor plus Redis (live/none).
 func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
 	store, storeErr := OpenDecisionStore(ctx, cfg, log)
 	if storeErr != nil {

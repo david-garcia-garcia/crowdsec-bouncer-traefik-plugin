@@ -2,6 +2,7 @@
 package lapi
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"sync"
@@ -52,8 +53,9 @@ type Client struct {
 	metricsInterval      int64
 	updateMaxFailure     int64
 	crowdsecStreamRoute  string
-	decisionScopeHeaders map[string]string // CrowdSec header scope → request header
+	decisionScopeHeaders map[string]string // write-once first-create residue; not the live union
 	sessionKey           string            // reclaim SessionKey (stream/alone) or Key (live/none)
+	liveHeaderScopes     liveHeaderScopes  // live constructor ctx → normalized header scopes
 
 	transport       atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
 	decisionStore   *DecisionStore
@@ -69,9 +71,7 @@ type Client struct {
 	streamStop              chan bool
 	metricsStop             chan bool
 	metricsReporter         *MetricsReporter
-	streamFetches           int64
-	streamOwner             string         // first middleware New that created this stream session
-	streamSettings          streamSettings // knobs that must not start a second poller; warn-and-wire if a joiner differs
+	streamFetches int64
 }
 
 // Prepare resolves secrets and CAPI/LAPI routing on cfg. Call before Key and New.
@@ -310,4 +310,26 @@ func (c *Client) StreamHealthy() bool {
 // StreamFetches is how many times this connection actually called the stream endpoint.
 func (c *Client) StreamFetches() int64 {
 	return atomic.LoadInt64(&c.streamFetches)
+}
+
+// registerLiveHeaderScopes records this New ctx’s headers and drops them when ctx is Done.
+func (c *Client) registerLiveHeaderScopes(ctx context.Context, headers map[string]string) {
+	c.mu.Lock()
+	c.liveHeaderScopes.register(ctx, headers)
+	c.mu.Unlock()
+	context.AfterFunc(ctx, func() {
+		c.mu.Lock()
+		c.liveHeaderScopes.unregister(ctx)
+		c.mu.Unlock()
+	})
+}
+
+// snapshotLiveHeaderScopes is the live-router union, or first-create residue when none are registered yet.
+func (c *Client) snapshotLiveHeaderScopes() map[string]string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.liveHeaderScopes.holders) == 0 {
+		return c.decisionScopeHeaders
+	}
+	return c.liveHeaderScopes.union()
 }
