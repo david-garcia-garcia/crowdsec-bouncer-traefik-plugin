@@ -34,7 +34,7 @@ linters-settings:
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis
+          - github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec
@@ -47,7 +47,7 @@ linters-settings:
           - $test
         allow:
           - $gostd
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis
+          - github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
@@ -93,7 +93,6 @@ issues:
   exclude:
     - "G402: TLS InsecureSkipVerify may be true."
   exclude-files:
-    - pkg/simpleredis/
     - pkg/reclaim/
   exclude-rules:
     - path: (.+)_test.go

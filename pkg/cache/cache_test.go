@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
-	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis"
+	simpleredis "github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis"
 )
 
 func Test_Get(t *testing.T) {
