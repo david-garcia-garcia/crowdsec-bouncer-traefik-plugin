@@ -1,108 +1,125 @@
-Developer review: in progress — 2026-09-17T19:01:53Z
+Developer review: needs changes — 2026-09-17T20:29:58Z
 
 ## What this changes
-**Operators.** None.
+**Operators.** `crowdsecAppsecBodyLimit` `0` now forwards the full readable body (README: unlimited; omitted default stays 10485760). `crowdsecAppsecFailureAction` also covers an io error reading the AppSec response body. DELETE is not an unreadable-body drop.
 
 **Admin users.** None.
 
-**Developers.** Prepare only: requirement grounded and stub PR opened. No apply versus `master`.
+**Developers.** `appsec.Client.Query` drains every live AppSec response including 502/503/504; treats body-limit `0` as unlimited (skip `LimitReader`); routes AppSec response-body io errors through `FailureAction` via package-local sentinel (`errors.Is`); rebuilds outbound `ContentLength` and `Content-Length` from the forwarded bytes (omits client `Content-Length` and `Transfer-Encoding`); removes DELETE from `isMethodWithBody`. Tests store into `transport` via `currentTransport()`. Baseline specs `core_plugin_appsec_client` and `core_plugin_appsec_failure-action` now hold those requirements; the OpenSpec change is archived. Usage packet `core_plugin_appsec` names `query.go` and the `errors.Is` classification (not a Language term for the sentinel).
 
-**End users.** None.
+**End users.** An HTTP/3 DELETE is no longer banned for a body it never sends. An unhealthy AppSec listener no longer leaks keep-alive. Unlimited body inspection actually forwards the body.
 
 ## Motivation
-On `master`, `appsec.Client.Query` has five contained defects on the path that copies a request to the AppSec listener. When that listener answers 502, 503, or 504, `Query` returns before `drainResponse`, so the keep-alive slot cannot be reused — exactly while AppSec is unhealthy. Setting `crowdsecAppsecBodyLimit` to `0` (the value that should mean “inspect everything”) falls through to a GET with no body. A failed read of the AppSec response skips `FailureAction`, so a configured `ban` or `captcha` is not applied for that class. Copied client headers keep a stale `Content-Length` when the forwarded body is a different length. An HTTP/3 DELETE with `ContentLength < 0` is treated as an unreadable body and dropped or banned, even though DELETE was never going to send one.
+On `master`, `Query` still has the five dest defects first recorded in stale PRs #35 and #43. This PR re-implements those defects on current `master` so #35 and #43 can close when this lands. When AppSec answers 502, 503, or 504, the body is not drained, so the keep-alive slot cannot be reused — exactly while AppSec is unhealthy. `crowdsecAppsecBodyLimit` `0` falls through to a GET with no body. A failed read of the AppSec response skips `FailureAction`. Copied client headers leave a stale `Content-Length`. An HTTP/3 DELETE with `ContentLength < 0` is treated as an unreadable-body drop.
 
-If this does not land, an unhealthy AppSec listener also leaks connections to it, operators who choose unlimited inspection send nothing, and DELETE clients over HTTP/3 can be banned for a body they never had. PRs #35 and #43 already named these holes and are not mergeable on today’s hot-swappable transport.
+Leaving `master` as-is keeps leaking connections during AppSec outages, silently disables body inspection at the unlimited setting, fail-closes on read errors contrary to `passthrough`/`captcha`, and 403s bodyless HTTP/3 DELETE.
 
 ```mermaid
 flowchart TD
-  Q[Query]
-  Q -->|502 503 504| Leak[return before drain]
-  Q -->|bodyLimit 0| NoBody[GET without body]
-  Q -->|read body fail| Skip[skip FailureAction]
-  Q -->|copy headers| Stale[stale Content-Length]
-  Q -->|HTTP/3 DELETE| Drop[unreadable-body drop]
+  Do[Client.Do AppSec] --> Err{transport err?}
+  Err -->|yes| FA1[FailureAction no body]
+  Err -->|no| RP{502 503 504?}
+  RP -->|yes| Skip[return before drainResponse]
+  RP -->|no| Drain[drainResponse]
+  Drain --> Read[readCappedAppsecBody]
+  Read -->|io err| Raw[raw error skips FailureAction]
+  Read -->|ok| JSON[interpret envelope]
 ```
 
 ## Merge readiness
-Prepare grounded (`qualified`). Explore is next. 3 items remain.
+Ready title is on PR #70. Main Process failed dest nestif on CaptchaProvider, not this apply. 1 item remains.
 
-Priority: P2 — common-path AppSec query defects with a contained fix; connection leak and wrong DELETE/body-limit behaviour while AppSec is in use
-Reviewed head: 04eb063
-Owner decision: None.
+Priority: P2 — real operator and end-user pain (connection leaks, wrong WAF body, HTTP/3 DELETE 403) with a contained Query fix
+Reviewed head: a299878
+Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI still in progress; no apply yet |
-| CI proof | 3/6 | in progress Main Process https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35262351108 ; e2e (binary + mock LAPI) https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35262350970/job/105340935578 ; e2e (docker + pester) https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35262350970/job/105340935071 |
-| Local tests proof | N/A | `localTests: none` (before implement; remote PR) |
-| Review resolution | 6/6 | OPEN PR #70; no review comments |
+| Overall readiness | 2/6 | Main Process failed; both e2e succeeded |
+| CI proof | 2/6 | Main Process failure https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35270440632/job/105368096478 |
+| Local tests proof | N/A | `prHost` remote; CI proof covers |
+| Review resolution | 6/6 | no comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-17-appsec-query-hardening pushed | `git` / origin |
-| OpenSpec | none | `openspec/` |
-| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/70 | pr-host List/Create |
-| CI | build 35262351108 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35262351108 ; build 35262350970 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35262350970 | pr-host CI |
-| Local tests | none | handoff.yaml localTests |
-| PR comments | no comments | no comments.md |
+| Branch | 2026-09-17-appsec-query-hardening pushed | git |
+| OpenSpec | appsec-query-hardening | openspec/changes/archive/2026-09-17-appsec-query-hardening/ |
+| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/70 | pr-host |
+| CI | Main Process failure https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35270440632/job/105368096478 ; e2e (docker + pester) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35270440552/job/105368460721 ; e2e (binary + mock LAPI) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35270440552/job/105368460406 | GitHub MCP get_check_runs |
+| Local tests | passed | handoff.yaml localTests |
+| PR comments | no comments | comments: none |
 
 ## Specs
-None.
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-appsec-query-hardening/openspec/changes/archive/2026-09-17-appsec-query-hardening/proposal.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-appsec-query-hardening/openspec/changes/archive/2026-09-17-appsec-query-hardening/proposal.md) — modified
 
 ## Follow-up issues
-None.
+- [Dest nestif on CaptchaProvider validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-appsec-query-hardening/knowledge/debt/2026-09-17-configuration-captcha-nestif.md) — dest Main Process lint fails nestif on CaptchaProvider validation.
 
 ## How this fits together
-Local caller spec → branch `2026-09-17-appsec-query-hardening` from `master` → stub PR #70. Explore next.
+Local ticket `2026-09-17-appsec-query-hardening` → branch of the same name → PR #70 (ready title; requirement originated in #35 and #43) → OpenSpec change archived; Main Process failed dest nestif on `a299878`.
 
 ## Decision needed
-None.
+| Question | Decision | By |
+| --- | --- | --- |
+| Should the header copy also strip hop-by-hop names (Connection, Upgrade, …) like PR #35? | assumed — no. This ticket asks to rebuild Content-Length. Skip only body-size headers (Content-Length, Transfer-Encoding). Do not add a hop-by-hop filter. | explore |
+| Do oversized AppSec response bodies (responseBodyTooLarge) go through FailureAction? | assumed — no. Only io.ReadAll errors on the AppSec body. Oversized 200 allow and oversized non-200 error stay as dest today. | explore |
+| Should readable-body forward be gated on isMethodWithBody (PR #35 readForwardBody)? | assumed — no. Only delete DELETE from the unreadable-body set. Keep today’s Body != nil copy for any method when a body is readable (including limit 0). | explore |
+| Any new public knob (including restoring crowdsecAppsecUnreadableBodyBlock)? | assumed — none. 0 already means unlimited on the existing key. Do not reintroduce the removed bool. | explore |
+| Does this run take gRPC / streaming body policy (PR #51)? | assumed — no. Out of scope. A DELETE must not be dropped for a body it never sends, regardless of #51. | explore |
 
 ## Before merge
-- [ ] Explore then apply the five `query.go` defects on the current `atomic.Value` transport
-- [ ] One test that fails before each fix; update AppSec spec leaves and the AppSec devdoc for unreadable-body methods and a zero body limit
-- [ ] Cite PRs #35 and #43 on the ready PR body
+- [ ] [P2] Green Main Process (dest nestif on `pkg/configuration/configuration.go` CaptchaProvider — not in this apply)
+- [x] Cite #35 and #43 on the ready PR body (Motivation)
+- [x] Apply the five Query defects on current #64 transport
+- [x] Local `go test ./pkg/...` and `go test .` passed
+- [x] Standards sentinel applied; usage packet records `errors.Is` classification
+- [x] Archive: FindSpecHost fold into existing AppSec leaves; catalog validate 0; change moved to archive
+- [x] Ready title (drop 🚧)
 
 ## Findings
-- [P2] 502/503/504 return before `drainResponse` — (general). Path: `pkg/appsec/query.go`.
-- [P2] `appsecBodyLimit == 0` forwards a GET without a body — (general). Path: `pkg/appsec/query.go`.
-- [P2] AppSec body read failure skips `FailureAction` — (general). Path: `pkg/appsec/query.go`.
-- [P2] Outbound `Content-Length` is copied, not rebuilt — (general). Path: `pkg/appsec/query.go`.
-- [P2] HTTP/3 DELETE is treated as a method that had a body — (general). Path: `pkg/appsec/query.go`.
+None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-appsec-query-hardening/devstate/2026/09/2026-09-17-appsec-query-hardening/codereview_standards.md) — 1 total, 0 pending, 1 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-appsec-query-hardening/devstate/2026/09/2026-09-17-appsec-query-hardening/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-appsec-query-hardening/devstate/2026/09/2026-09-17-appsec-query-hardening/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-appsec-query-hardening/devstate/2026/09/2026-09-17-appsec-query-hardening/codereview_performance.md) — 1 total, 0 pending, 0 completed, 1 skipped
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-appsec-query-hardening/devstate/2026/09/2026-09-17-appsec-query-hardening/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-appsec-query-hardening/devstate/2026/09/2026-09-17-appsec-query-hardening/codereview_coverage.md) — 0 total, 0 pending, 0 completed
 
 ## Agent review details
 
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 04eb0632cdc1e94445a1dc1f4aa5b77f382b746d | Card must match the branch you measured |
+| Reviewed head | a299878ef1f8c6cdcba7f5643c9e12ba96f783cf | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution versus `master`: drain every AppSec response that arrived; treat body-limit `0` as unlimited; route read failures through `FailureAction`; rebuild `Content-Length` from bytes sent; take DELETE out of `isMethodWithBody`. Keep #64 transport. Do not rebase #35/#43.
+Best possible solution versus `master`: drain every AppSec response that arrived; treat body-limit `0` as unlimited (skip LimitReader); route read failures through FailureAction keeping `appsecQuery:readBody` via package-local sentinel; rebuild Content-Length from bytes sent; take DELETE out of `isMethodWithBody`. Keep #64 transport. Do not rebase #35/#43.
 
-Do we have a high-confidence way to reproduce? Yes — `Query` early-return vs `defer drainResponse`; `appsecBodyLimit > 0` guard; `readCappedAppsecBody` raw error; header `Add`; DELETE in `isMethodWithBody`. Keep-alive reuse test covers 200/403/500 only.
+Do we have a high-confidence way to reproduce? Yes — five tests failed on dest then passed after the apply (`go test ./pkg/appsec/`).
 
-Is this the best way to solve the issue? Not applied yet. Re-implement on today’s transport; do not restore removed fields or `crowdsecAppsecUnreadableBodyBlock`.
+Is this the best way to solve the issue? Yes — re-implement the five dest defects from #35 and #43 on current transport; classify read-body io with `errors.Is` instead of a string prefix; usage packet records that classification without a Language term for the internal sentinel. Dest nestif was not taken. Unlimited `0` stays unbounded as specified. Archive folded into the two existing AppSec leaves.
 
 ### Evidence
 What I checked:
-- dest `origin/master` `a57c8485a7ef8af3ec1eee986dd45ddff4cc926c` has empty product diff on this branch
-- `pkg/appsec/query.go` matches the five ticket claims
-- `NewTestClient` stores `transport`, not an `httpClient` field
-- `crowdsecAppsecUnreadableBodyBlock` is already removed on dest
-- OPEN comment set empty
-- CI: Main Process and both e2e jobs in progress (runs 35262351108, 35262350970)
+- Pin `origin/master...HEAD` excluding `devstate/` and `.cursor/`; reviewed head `a299878ef1f8c6cdcba7f5643c9e12ba96f783cf`
+- One OPEN PR #70; title set to ready gitmoji form
+- `comments.md` absent; `comments: none`
+- Main Process failure nestif `if config.CaptchaProvider != ""` complexity 6 https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35270440632/job/105368096478
+- e2e (docker + pester) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35270440552/job/105368460721
+- e2e (binary + mock LAPI) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35270440552/job/105368460406
+- `handoff.yaml` `localTests: passed`
+- Axis files: Standards 1 done; Performance 1 skipped; Spec/Security/Dead/Coverage none
+- PR comments empty (comments: none)
 
 ### Rank-up moves
 None.

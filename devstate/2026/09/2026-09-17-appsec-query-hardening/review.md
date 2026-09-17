@@ -39,3 +39,9 @@ phase: archive
 findings: FindSpecHost fold core_plugin_appsec_client and core_plugin_appsec_failure-action; catalog validate 0; change moved
 fixed: baseline AppSec spec leaves synced; archive folder 2026-09-17-appsec-query-hardening; PR #70 summary
 skipped: Task FindSpecHost subagent (no Task tool); validate-output commit (map.md hash unchanged); pullrequest
+
+## pullrequest (2026-09-17)
+phase: pullrequest
+findings: reused PR #70; ready title 🐛; comments none; Main Process failed dest nestif CaptchaProvider; both e2e success
+fixed: title drop 🚧; card cites #35 and #43; PR #70 summary
+skipped: dest nestif (note large); second PR

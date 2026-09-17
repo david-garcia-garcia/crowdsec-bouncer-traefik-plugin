@@ -11,4 +11,4 @@ JobName: 2026-09-17-appsec-query-hardening
 | codereview | [x] | [x] | 2026-09-17T20:11:18Z |
 | devdocsimpact | [x] | [x] | 2026-09-17T20:16:34Z |
 | archive | [x] | [x] | 2026-09-17T20:22:23Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-17T20:32:27Z |
