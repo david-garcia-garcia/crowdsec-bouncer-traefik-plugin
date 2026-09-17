@@ -7,3 +7,8 @@
 - updated knowledge/devdocs/core_cache_client.md
 - updated knowledge/research/ext_traefik-middleware-utilities_packages/notes.md
 - deleted knowledge/debt/2026-09-17-cursor-only-reclaim-key.md
+- updated knowledge/devdocs/core_plugin_middleware.md
+- updated knowledge/devdocs/core_plugin_lapi_connection.md
+- updated knowledge/devdocs/core_plugin_decisionscope.md
+- updated knowledge/devdocs/build_e2e_real.md
+- updated knowledge/devdocs/core_plugin_lapi_scope-union.md

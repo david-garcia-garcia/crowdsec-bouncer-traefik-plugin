@@ -1,5 +1,11 @@
 # LAPI live-router scope union
 
+## Language
+
+**Live-router scope union**:
+The Client-owned merge of every live constructor’s normalized `decisionScopeHeaders` map. Stream `scopes=` and the stream store filter snapshot this union. Write-once `decisionScopeHeaders` is first-create residue when no holder is registered yet.
+_Avoid_: PeekLivePrefix sibling, mutating the write-once map, package global, first-wins settings hash
+
 ## Overview
 
 How a shared stream `lapi.Client` builds `scopes=` and the stream store filter from every live constructor that bound it. Spec: `core_plugin_lapi_scope-union`. Write-once `decisionScopeHeaders` stays the first-create residue; it is not the live union.
