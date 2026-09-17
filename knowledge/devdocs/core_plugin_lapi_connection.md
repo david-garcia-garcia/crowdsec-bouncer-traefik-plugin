@@ -8,7 +8,7 @@ _Avoid_: `atomic.Pointer[T]`, a write-once Client `httpClient` field, CrowdsecCo
 
 ## Overview
 
-`package lapi` keeps construct/close in `client.go` and LAPI/CAPI HTTP in `client_http.go`. HTTP+auth lives as unexported `transport`. After `OpenStream` / `OpenLive` bind, `AdoptTransport` last-wins TLS/timeout on the same Client.
+`package lapi` keeps construct/close in `client.go` and LAPI/CAPI HTTP in `client_http.go`. HTTP+auth lives as unexported `transport`. After `OpenStream` / `OpenLive` bind, `AdoptTransport` last-wins TLS/timeout on the same Client. Specs: `core_plugin_lapi_connection` (concurrent `AdoptTransport` last-write). Open key: `core_plugin_lapi_reclaim-key.md`.
 
 ## How to use
 
