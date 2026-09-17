@@ -3,7 +3,7 @@
 ## Middleware New
 priority: normal
 local: core_plugin_middleware.md
-description: How Traefik New reclaims a LAPI Client and an AppSec Client and returns a per-router Bouncer (`core_plugin_middleware_bouncer`, `core_plugin_lapi_reclaim-key`).
+description: How Traefik New reclaims a LAPI Client and an AppSec Client and returns a per-router Bouncer (`core_plugin_middleware_bouncer`).
 
 ## Decision scopes
 priority: normal
@@ -25,10 +25,15 @@ priority: normal
 local: core_plugin_lapi_usage-metrics.md
 description: How this plugin POSTs CrowdSec usage-metrics with origin and ip_type labels.
 
+## LAPI reclaim key
+priority: normal
+local: core_plugin_lapi_reclaim-key.md
+description: How this plugin keys a reclaimed LAPI Client (session prefix plus first-wins settings hash).
+
 ## LAPI connection
 priority: normal
 local: core_plugin_lapi_connection.md
-description: How this plugin stores replaceable LAPI HTTP+auth on the Client (`core_plugin_lapi_connection`, `core_plugin_lapi_reclaim-key`).
+description: How this plugin stores replaceable LAPI HTTP+auth on the Client (`core_plugin_lapi_connection`).
 
 ## Captcha gate cookie
 priority: normal

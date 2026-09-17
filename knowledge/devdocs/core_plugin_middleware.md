@@ -24,7 +24,7 @@ _Avoid_: fail mode, FailMode, the three removed AppSec block bools, AppSec JSON 
 
 ## Overview
 
-Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New` must use the constructor `ctx` as the reclaim holder. Do not change `.traefik.yml` `import`. Specs: `core_plugin_lapi_reclaim-key` (Open key), `core_plugin_middleware_bouncer` (Yaegi `New` / Bouncer).
+Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New` must use the constructor `ctx` as the reclaim holder. Do not change `.traefik.yml` `import`. Specs: `core_plugin_middleware_bouncer` (Yaegi `New` / Bouncer). Open key: `core_plugin_lapi_reclaim-key.md`.
 
 ## How to use
 
