@@ -27,3 +27,9 @@ phase: codereview
 findings: Standards 1 judgement, Coverage 1 judgement; Spec/Security/Performance/Dead none
 fixed: none (no hard/missing/wrong)
 skipped: Standards 1 Mysterious Name `replaced`; Coverage 1 Redis fail-closed ServeHTTP fixture
+
+## devdocsimpact (2026-09-17)
+phase: devdocsimpact
+findings: stale-usage 1, missing-packet 1
+fixed: produced LAPI connection packet and Middleware How-to/Gotcha
+skipped: none
