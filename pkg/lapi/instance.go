@@ -16,7 +16,7 @@ func ResolveCacheInstanceIdentity(cfg *configuration.Config, log *slog.Logger) {
 	if cfg.RedisCacheEffectiveInstanceID != "" {
 		return
 	}
-	configured := strings.TrimSpace(cfg.RedisCacheInstanceId)
+	configured := strings.TrimSpace(cfg.RedisCacheInstanceID)
 	if configured != "" {
 		cfg.RedisCacheEffectiveInstanceID = configured
 		return

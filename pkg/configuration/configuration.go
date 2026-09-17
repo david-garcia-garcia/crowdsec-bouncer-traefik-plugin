@@ -108,7 +108,7 @@ type Config struct {
 	RedisCachePasswordFile                     string            `json:"redisCachePasswordFile,omitempty"`
 	RedisCacheDatabase                         string            `json:"redisCacheDatabase,omitempty"`
 	RedisCacheUnreachableBlock                 bool              `json:"redisCacheUnreachableBlock,omitempty"`
-	RedisCacheInstanceId                       string            `json:"redisCacheInstanceId,omitempty"`
+	RedisCacheInstanceID                       string            `json:"redisCacheInstanceId,omitempty"`
 	RedisCacheEffectiveInstanceID              string            `json:"-"`
 	BanHTMLFilePath                            string            `json:"banHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
 	BanFilePath                                string            `json:"banFilePath,omitempty"`
@@ -621,8 +621,8 @@ func validateRedisCacheInstanceID(config *Config) error {
 	if !config.RedisCacheEnabled {
 		return nil
 	}
-	trimmed := strings.TrimSpace(config.RedisCacheInstanceId)
-	config.RedisCacheInstanceId = trimmed
+	trimmed := strings.TrimSpace(config.RedisCacheInstanceID)
+	config.RedisCacheInstanceID = trimmed
 	if trimmed == "" {
 		return nil
 	}

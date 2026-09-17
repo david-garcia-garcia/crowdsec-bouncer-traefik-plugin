@@ -121,16 +121,16 @@ func Test_ValidateParams(t *testing.T) {
 	cfgEmptyAction.CrowdsecAppsecFailureAction = ""
 	cfgRedisInstanceValid := getMinimalConfig()
 	cfgRedisInstanceValid.RedisCacheEnabled = true
-	cfgRedisInstanceValid.RedisCacheInstanceId = "pod-7"
+	cfgRedisInstanceValid.RedisCacheInstanceID = "pod-7"
 	cfgRedisInstanceTrim := getMinimalConfig()
 	cfgRedisInstanceTrim.RedisCacheEnabled = true
-	cfgRedisInstanceTrim.RedisCacheInstanceId = "  my.pod_1  "
+	cfgRedisInstanceTrim.RedisCacheInstanceID = "  my.pod_1  "
 	cfgRedisInstanceLong := getMinimalConfig()
 	cfgRedisInstanceLong.RedisCacheEnabled = true
-	cfgRedisInstanceLong.RedisCacheInstanceId = strings.Repeat("a", 129)
+	cfgRedisInstanceLong.RedisCacheInstanceID = strings.Repeat("a", 129)
 	cfgRedisInstanceBad := getMinimalConfig()
 	cfgRedisInstanceBad.RedisCacheEnabled = true
-	cfgRedisInstanceBad.RedisCacheInstanceId = "pod/a"
+	cfgRedisInstanceBad.RedisCacheInstanceID = "pod/a"
 	type args struct {
 		config *Config
 	}
