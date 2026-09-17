@@ -21,6 +21,7 @@ type storeParams struct {
 	RedisCacheDatabase  string   `json:"redisCacheDatabase"`
 }
 
+// storeParamsFrom copies Redis store fields off cfg. Call after Prepare (password is resolved there).
 func storeParamsFrom(cfg *configuration.Config) storeParams {
 	return storeParams{
 		RedisCacheEnabled:   cfg.RedisCacheEnabled,
@@ -56,14 +57,6 @@ func (s *DecisionStore) Close() {
 		return
 	}
 	s.cache.Close()
-}
-
-// AcquireLease tries to own the stream updated key for duration seconds.
-func (s *DecisionStore) AcquireLease(ctx context.Context, value string, duration int64) (bool, error) {
-	if s == nil || s.cache == nil {
-		return false, fmt.Errorf("%s", cache.CacheUnreachable)
-	}
-	return s.cache.Acquire(ctx, cacheTimeoutKey, value, duration)
 }
 
 // OpenDecisionStore reclaims one store per cursor plus Redis params on the Traefik New context.

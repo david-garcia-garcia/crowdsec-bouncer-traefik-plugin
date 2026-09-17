@@ -3,7 +3,9 @@ package lapi
 import (
 	"context"
 	"testing"
+	"time"
 
+	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
@@ -41,13 +43,13 @@ func TestStoreKey_IgnoresPollerKnobsAndHeaders(t *testing.T) {
 }
 
 func TestStoreKey_DifferentRedisHostsIsolate(t *testing.T) {
-	a := testStreamConfig("lapi.example:8080", 1)
-	a.RedisCacheEnabled = true
-	a.RedisCacheHost = "redis-a:6379"
-	b := testStreamConfig("lapi.example:8080", 1)
-	b.RedisCacheEnabled = true
-	b.RedisCacheHost = "redis-b:6379"
-	if StoreKey(a) == StoreKey(b) {
+	redisA := testStreamConfig("lapi.example:8080", 1)
+	redisA.RedisCacheEnabled = true
+	redisA.RedisCacheHost = "redis-a:6379"
+	redisB := testStreamConfig("lapi.example:8080", 1)
+	redisB.RedisCacheEnabled = true
+	redisB.RedisCacheHost = "redis-b:6379"
+	if StoreKey(redisA) == StoreKey(redisB) {
 		t.Fatal("different redis hosts must be different stores")
 	}
 }
@@ -58,17 +60,17 @@ func TestOpenDecisionStore_DifferentRedisHostsIsolate(t *testing.T) {
 
 	ctx := context.Background()
 	log := logger.New("ERROR", "")
-	a := testStreamConfig("lapi.example:8080", 1)
-	b := testStreamConfig("lapi.example:8080", 1)
-	a.RedisCacheEnabled = true
-	a.RedisCacheHost = "127.0.0.1:1"
-	b.RedisCacheEnabled = true
-	b.RedisCacheHost = "127.0.0.1:2"
-	first, err := OpenDecisionStore(ctx, a, log)
+	redisA := testStreamConfig("lapi.example:8080", 1)
+	redisB := testStreamConfig("lapi.example:8080", 1)
+	redisA.RedisCacheEnabled = true
+	redisA.RedisCacheHost = "127.0.0.1:1"
+	redisB.RedisCacheEnabled = true
+	redisB.RedisCacheHost = "127.0.0.1:2"
+	first, err := OpenDecisionStore(ctx, redisA, log)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenDecisionStore(ctx, b, log)
+	second, err := OpenDecisionStore(ctx, redisB, log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,17 +79,39 @@ func TestOpenDecisionStore_DifferentRedisHostsIsolate(t *testing.T) {
 	}
 }
 
-func TestCachePrefix_LiveIsSessionHexNotIdentityHex(t *testing.T) {
+func TestOpenDecisionStore_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	redisServer := startTestLeaseRedis(t)
+	ctx := context.Background()
+	log := logger.New("ERROR", "")
 	cfg := testLiveConfig(1)
 	other := testLiveConfig(60)
-	if CachePrefix(cfg) != SessionHex(cfg) {
-		t.Fatal("live cache prefix must be SessionHex")
+	cfg.RedisCacheEnabled = true
+	cfg.RedisCacheHost = redisServer.addr()
+	store, err := OpenDecisionStore(ctx, cfg, log)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if CachePrefix(cfg) == IdentityHex(cfg) {
-		t.Fatal("live cache prefix must not be IdentityHex")
+	store.Cache().Set("1.2.3.4", "t", 10)
+
+	sessionClient := &cache.Client{}
+	sessionClient.New(log, true, redisServer.addr(), nil, "", "", SessionHex(cfg))
+	got, getErr := sessionClient.Get("1.2.3.4")
+	if getErr != nil || got != "t" {
+		t.Fatalf("SessionHex prefix Get %q err %v", got, getErr)
 	}
-	if CachePrefix(cfg) != CachePrefix(other) {
-		t.Fatal("live cache prefix must ignore updateIntervalSeconds")
+
+	identityClient := &cache.Client{}
+	identityClient.New(log, true, redisServer.addr(), nil, "", "", IdentityHex(cfg))
+	_, identErr := identityClient.Get("1.2.3.4")
+	if identErr == nil || identErr.Error() != cache.CacheMiss {
+		t.Fatalf("IdentityHex prefix Get err %v, want miss", identErr)
+	}
+
+	if SessionHex(cfg) != SessionHex(other) {
+		t.Fatal("live SessionHex must ignore updateIntervalSeconds")
 	}
 	if IdentityHex(cfg) == IdentityHex(other) {
 		t.Fatal("live Client identity must still include updateIntervalSeconds")
@@ -126,14 +150,14 @@ func TestOpenDecisionStore_HeaderMismatchStillShares(t *testing.T) {
 
 	ctx := context.Background()
 	log := logger.New("ERROR", "")
-	a := testStreamConfig("lapi.example:8080", 1)
-	b := testStreamConfig("lapi.example:8080", 1)
-	b.DecisionScopeHeaders = map[string]string{"username": "X-User"}
-	first, err := OpenDecisionStore(ctx, a, log)
+	base := testStreamConfig("lapi.example:8080", 1)
+	withHeaders := testStreamConfig("lapi.example:8080", 1)
+	withHeaders.DecisionScopeHeaders = map[string]string{"username": "X-User"}
+	first, err := OpenDecisionStore(ctx, base, log)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenDecisionStore(ctx, b, log)
+	second, err := OpenDecisionStore(ctx, withHeaders, log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,5 +245,32 @@ func TestClientClose_LeavesSiblingRedisPoolLive(t *testing.T) {
 	got, getErr := second.Cache().Get("1.2.3.4")
 	if getErr != nil || got != "t" {
 		t.Fatalf("after sibling Close Redis Get %q err %v", got, getErr)
+	}
+}
+
+func TestOpenDecisionStore_LastHolderGraceClosesRedisPool(t *testing.T) {
+	reclaim.ResetForTestWith(20 * time.Millisecond)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	redisServer := startTestLeaseRedis(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	log := logger.New("ERROR", "")
+	cfg := testLiveConfig(1)
+	cfg.RedisCacheEnabled = true
+	cfg.RedisCacheHost = redisServer.addr()
+	store, err := OpenDecisionStore(ctx, cfg, log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.Cache().Set("1.2.3.4", "t", 10)
+	got, getErr := store.Cache().Get("1.2.3.4")
+	if getErr != nil || got != "t" {
+		t.Fatalf("before cancel Get %q err %v", got, getErr)
+	}
+	cancel()
+	time.Sleep(80 * time.Millisecond)
+	_, closedErr := store.Cache().Get("1.2.3.4")
+	if closedErr == nil || closedErr.Error() != cache.CacheUnreachable {
+		t.Fatalf("after last-holder grace Get err %v, want unreachable", closedErr)
 	}
 }

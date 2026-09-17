@@ -16,7 +16,7 @@ import (
 const streamSessionKeyPrefix = "lapi:stream:"
 
 // streamSession is the CrowdSec-row identity for stream and alone modes.
-// SessionPrefix / CachePrefix use only these fields. SessionKey appends a
+// SessionPrefix and SessionHex use only these fields. SessionKey appends a
 // hash of streamSettings so a sleeping incarnation does not occupy the slot a
 // reload with new knobs needs.
 //
@@ -138,12 +138,6 @@ func reclaimSessionKey(cfg *configuration.Config) string {
 		return SessionKey(cfg)
 	}
 	return Key(cfg)
-}
-
-// CachePrefix is SessionHex for every mode so live interval splits share Redis keys.
-// Live IdentityHex stays the Client reclaim suffix only.
-func CachePrefix(cfg *configuration.Config) string {
-	return SessionHex(cfg)
 }
 
 // settingsDiff lists JSON field names that differ, for the warn-and-wire log.
