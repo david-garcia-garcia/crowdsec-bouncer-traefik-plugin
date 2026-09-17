@@ -106,8 +106,8 @@ else
   By: explore
 
 - Q: Which spec leaf owns `handleRemediationServeHTTP` routing?
-  Decision: assumed — new `core_plugin_middleware_captcha-routing` (propose runs FindSpecHost; do not use the change kebab as the 4th part). Fold nothing into `core_plugin_middleware_captcha-gate` except leaving first-solve 302 there. Do not recreate `core_plugin_captcha_*` (wrong family).
-  By: explore
+  Decision: resolved — new `core_plugin_middleware_captcha-routing` (FindSpecHost: new, high). Candidates: `core_plugin_middleware_captcha-gate`, `core_plugin_middleware_bouncer`, `core_plugin_middleware_config-validation`, misnamed `core_plugin_captcha_*`. Do not fold. Do not recreate the `captcha` component. 4th part is `captcha-routing`, not the change kebab.
+  By: propose
 
 - Q: Wire `#50` template `ChallengeURL` into default/example HTML?
   Decision: resolved — no. Out of scope. Operators keep a hardcoded challenge URL in their template if the widget needs one.

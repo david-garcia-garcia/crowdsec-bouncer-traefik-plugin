@@ -11,7 +11,7 @@ comments: none
 localTests: none
 requirement: requirement.md
 explore: explore.md
-change:
+change: captcha-request-routing
 pr:
   id: 68
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/68
