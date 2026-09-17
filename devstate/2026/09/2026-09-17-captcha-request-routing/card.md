@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-17T20:18:16Z
+Developer review: ready for review — 2026-09-17T20:23:57Z
 
 ## What this changes
 **Operators.** Optional `captchaCustomChallengeUrl` names a second exact browser path for custom-provider widgets. Empty keeps `CaptchaCustomJsURL` path only.
@@ -26,27 +26,27 @@ flowchart TD
 ```
 
 ## Merge readiness
-Archive synced the routing leaf into the live catalog. CI on this head is in progress. 0 items remain.
+Ready for review. WIP title dropped. CI on this head succeeded. 0 items remain.
 
 Priority: P2 — real end-user pain on duplicate captcha submit and custom challenge assets, limited blast radius
-Reviewed head: 814bea8
+Reviewed head: 04dbda8
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI on this head is in progress |
-| CI proof | 3/6 | Main Process, e2e binary, and e2e docker in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35269961472 |
+| Overall readiness | 6/6 | Checklist empty; CI succeeded |
+| CI proof | 6/6 | Main Process, e2e binary, and e2e docker succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35270123812 |
 | Local tests proof | N/A | `localTests: passed` (remote PR; CI proof covers remote) |
 | Review resolution | 6/6 | OPEN PR #68; no review comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-17-captcha-request-routing pushed | `git` / origin `814bea8` |
+| Branch | 2026-09-17-captcha-request-routing pushed | `git` / origin `04dbda8` |
 | OpenSpec | captcha-request-routing | `openspec/changes/archive/2026-09-17-captcha-request-routing/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/68 | pr-host List |
-| CI | build 35269961472 Main Process in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35269961472 ; e2e binary and e2e docker in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35269961477 | pr-host CI |
+| CI | build 35270123812 Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35270123812 ; e2e binary and e2e docker success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35270123738 | pr-host CI |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | no comments.md |
 
@@ -57,7 +57,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local ticket → branch `2026-09-17-captcha-request-routing` → PR #68 → catalog archive of `captcha-request-routing`. This body cites #48 and #50 so those PRs can close when this lands.
+Local ticket → branch `2026-09-17-captcha-request-routing` → PR #68 → ready title and green CI. This body cites #48 and #50 so those PRs can close when this lands.
 
 ## Decision needed
 | Question | Decision | By |
@@ -89,7 +89,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 0 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 814bea81faac1c848fb6ab9794cd3a5762977cb5 | Card must match the branch you measured |
+| Reviewed head | 04dbda8b99335cebf70d2c1bbab4f434bea45d30 | Card must match the branch you measured |
 
 ### Stored data model
 - Changed: Traefik plugin Config / `captchaCustomChallengeUrl` — string — sample `` (empty, JsURL-path only) or `https://widget.example/v0/challenge`. Upgrade: old configs still valid.
@@ -103,11 +103,10 @@ Is this the best way to solve the issue? Yes versus `master` — owners stay on 
 
 ### Evidence
 What I checked:
-- FindSpecHost archive re-run: `{ deltaId: core_plugin_middleware_captcha-routing, new, spec-id: core_plugin_middleware_captcha-routing, confidence: high }`
-- live spec bootstrapped at `openspec/specs/core_plugin_middleware_captcha-routing/spec.md`
-- validate-spec-map `--write` 0, verify 0, validate-artifact-names 0
-- change folder moved to `openspec/changes/archive/2026-09-17-captcha-request-routing/`; live `openspec/changes/captcha-request-routing/` gone
-- CI on `814bea8`: Main Process in progress run 35269961472; e2e binary + e2e docker in progress run 35269961477
+- One OPEN PR #68 reused; title `🐛 fix(captcha): 302 solved form POST, pass custom challenge assets, treat HEAD as GET`
+- comments.md absent; comments pointer none
+- CI on `04dbda8`: Main Process success run 35270123812; e2e binary + e2e docker success run 35270123738
+- live spec `openspec/specs/core_plugin_middleware_captcha-routing/spec.md`; change archived at `openspec/changes/archive/2026-09-17-captcha-request-routing/`
 - product delta stays in `pkg/bouncer`, `pkg/captcha`, `pkg/configuration` (no `pkg/lapi` or `pkg/reclaim`)
 - OPEN comment set empty
 - Cites #48 and #50

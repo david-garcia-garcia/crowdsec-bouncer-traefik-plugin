@@ -39,3 +39,9 @@ phase: archive
 findings: FindSpecHost new high core_plugin_middleware_captcha-routing; catalog validators 0; CI on archive head in progress
 fixed: live spec synced; change moved to archive/2026-09-17-captcha-request-routing; PR #68 summary
 skipped: Task FindSpecHost subagent (no Task tool); leftover captcha-remediation-routing folder; pkg/lapi; pkg/reclaim
+
+## pullrequest (2026-09-17)
+phase: pullrequest
+findings: reused OPEN PR #68; ready title; no comments.md; CI Main Process + e2e binary + e2e docker succeeded
+fixed: drop WIP; PR #68 summary cites #48 and #50
+skipped: second PR; comment replies (none)
