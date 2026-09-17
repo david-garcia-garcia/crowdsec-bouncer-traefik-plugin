@@ -9,3 +9,9 @@ phase: explore
 findings: 10 open questions (6 assumed, 4 resolved, 0 blocked); Check-true form POST, custom-resource exact-path passthrough, HEAD-on-captcha-path; optional captchaCustomChallengeUrl; no apply
 fixed: explore.md; handoff explore pointer
 skipped: research write; template ChallengeURL; pkg/lapi and pkg/reclaim
+
+## propose (2026-09-17)
+phase: propose
+findings: change captcha-request-routing apply-ready; new core_plugin_middleware_captcha-routing (FindSpecHost new, high; no fold); Main Process nestif fail on dest configuration.go:336
+fixed: OpenSpec artifacts; specs.md; handoff change pointer; PR #68 summary
+skipped: product apply; comments.md (none); research write
