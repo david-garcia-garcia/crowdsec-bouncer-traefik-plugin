@@ -11,4 +11,4 @@ JobName: 2026-09-17-lapi-transport-router-policy
 | codereview | [x] | [x] | 2026-09-17T15:06:14Z |
 | devdocsimpact | [x] | [x] | 2026-09-17T15:11:43Z |
 | archive | [x] | [x] | 2026-09-17T15:17:14Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-17T15:23:08Z |

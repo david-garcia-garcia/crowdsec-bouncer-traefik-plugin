@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: folded three deltas into catalog; archived openspec/changes/archive/2026-09-17-lapi-transport-router-policy/
 skipped: Task subagent unavailable in archive runner — FindSpecHost re-verified on-thread (three folds)
+
+## pullrequest (2026-09-17)
+phase: pullrequest
+findings: none
+fixed: reused PR #62; dropped WIP; title ✨ feat(lapi): reuse Client across policy and TLS-only router reloads; CI Main + E2E success
+skipped: comments.md absent — publish walk skipped
