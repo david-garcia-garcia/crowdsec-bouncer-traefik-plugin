@@ -25,4 +25,4 @@
 ## 5. Verify
 
 - [x] 5.1 `go test ./pkg/captcha/ ./pkg/bouncer/ ./pkg/configuration/`
-- [ ] 5.2 PR body cites #48 and #50
+- [x] 5.2 PR body cites #48 and #50
