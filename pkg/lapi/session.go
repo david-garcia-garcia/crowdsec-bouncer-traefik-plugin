@@ -53,39 +53,29 @@ type streamSession struct {
 	CapiPassword  string `json:"capiPassword"`
 }
 
-// streamSettings is every former reclaim-hash field that is not streamSession.
+// streamSettings is the first-wins LAPI snapshot hashed into SessionKey.
 //
 // A second live middleware that disagrees is warn-and-wire: Traefik New must
 // not fail the joiner router, and we must not start a second poller. The first
-// New keeps intervals, Redis, TLS, and scopes=. Trusted IPs, ban/captcha
-// templates, and AppSec stay off this LAPI session.
+// New keeps intervals, Redis, updateMaxFailure, CAPI scenarios, and scopes=.
+// Per-router policy, StreamStartupBlock, HTTP timeout, and LAPI TLS stay off
+// this hash so a reload of those knobs reuses the Client. Trusted IPs,
+// ban/captcha templates, and AppSec stay off this LAPI session.
 //
 // A Traefik reload that changes this snapshot uses a new SessionKey. The old
 // key is sleeping (tickers already off) until grace Close. Same snapshot: Open
 // Wakes that key. Reclaim grace is only how long the slept object stays
 // peekable, not a second poller.
-//
-// TLS extras are settings, not session, so a wrong LAPI client cert can be
-// replaced on reload without a process restart. Two live middlewares with
-// different certs still warn-and-wire (first wins) until the owner is gone.
 type streamSettings struct {
 	CapiScenarios                []string          `json:"capiScenarios"`
 	UpdateIntervalSeconds        int64             `json:"updateIntervalSeconds"`
 	MetricsUpdateIntervalSeconds int64             `json:"metricsUpdateIntervalSeconds"`
 	UpdateMaxFailure             int64             `json:"updateMaxFailure"`
-	LapiFailureAction            string            `json:"lapiFailureAction"`
-	StreamStartupBlock           bool              `json:"streamStartupBlock"`
-	DefaultDecisionSeconds       int64             `json:"defaultDecisionSeconds"`
-	HTTPTimeoutSeconds           int64             `json:"httpTimeoutSeconds"`
 	RedisCacheEnabled            bool              `json:"redisCacheEnabled"`
 	RedisCacheHost               string            `json:"redisCacheHost"`
 	RedisCacheReadHosts          []string          `json:"redisCacheReadHosts"`
 	RedisCachePassword           string            `json:"redisCachePassword"`
 	RedisCacheDatabase           string            `json:"redisCacheDatabase"`
-	RedisCacheUnreachableBlock   bool              `json:"redisCacheUnreachableBlock"`
-	LapiTLSInsecureVerify        bool              `json:"lapiTlsInsecureVerify"`
-	LapiTLSCertificateAuthority  string            `json:"lapiTlsCa"`
-	LapiTLSCertificateBouncer    string            `json:"lapiTlsCert"`
 	DecisionScopeHeaders         map[string]string `json:"decisionScopeHeaders"`
 }
 
@@ -109,19 +99,11 @@ func settingsFrom(cfg *configuration.Config) streamSettings {
 		UpdateIntervalSeconds:        cfg.UpdateIntervalSeconds,
 		MetricsUpdateIntervalSeconds: cfg.MetricsUpdateIntervalSeconds,
 		UpdateMaxFailure:             cfg.UpdateMaxFailure,
-		LapiFailureAction:            configuration.EffectiveFailureAction(cfg.CrowdsecLapiFailureAction),
-		StreamStartupBlock:           cfg.StreamStartupBlock,
-		DefaultDecisionSeconds:       cfg.DefaultDecisionSeconds,
-		HTTPTimeoutSeconds:           cfg.HTTPTimeoutSeconds,
 		RedisCacheEnabled:            cfg.RedisCacheEnabled,
 		RedisCacheHost:               cfg.RedisCacheHost,
 		RedisCacheReadHosts:          cfg.RedisCacheReadHosts,
 		RedisCachePassword:           cfg.RedisCachePassword,
 		RedisCacheDatabase:           cfg.RedisCacheDatabase,
-		RedisCacheUnreachableBlock:   cfg.RedisCacheUnreachableBlock,
-		LapiTLSInsecureVerify:        cfg.CrowdsecLapiTLSInsecureVerify,
-		LapiTLSCertificateAuthority:  cfg.CrowdsecLapiTLSCertificateAuthority,
-		LapiTLSCertificateBouncer:    cfg.CrowdsecLapiTLSCertificateBouncer,
 		DecisionScopeHeaders:         decisionscope.NormalizeDecisionScopeHeaders(cfg.DecisionScopeHeaders),
 	}
 }

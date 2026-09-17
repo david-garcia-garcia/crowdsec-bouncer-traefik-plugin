@@ -79,6 +79,26 @@ func TestSessionKey_DifferentHostsAreDistinct(t *testing.T) {
 	}
 }
 
+func TestSessionKey_PolicyAndTLSDoNotChangeKey(t *testing.T) {
+	base := testStreamConfig("lapi.example:8080", 1)
+	policy := testStreamConfig("lapi.example:8080", 1)
+	policy.CrowdsecLapiFailureAction = configuration.FailureActionPassthrough
+	policy.RedisCacheUnreachableBlock = true
+	policy.DefaultDecisionSeconds = 5
+	policy.StreamStartupBlock = false
+	tlsOnly := testStreamConfig("lapi.example:8080", 1)
+	tlsOnly.HTTPTimeoutSeconds = 30
+	tlsOnly.CrowdsecLapiTLSInsecureVerify = false
+	tlsOnly.CrowdsecLapiTLSCertificateAuthority = "ca"
+	tlsOnly.CrowdsecLapiTLSCertificateBouncer = "cert"
+	if SessionKey(base) != SessionKey(policy) || IdentityHex(base) != IdentityHex(policy) {
+		t.Fatal("policy knobs must not change stream or live reclaim keys")
+	}
+	if SessionKey(base) != SessionKey(tlsOnly) || IdentityHex(base) != IdentityHex(tlsOnly) {
+		t.Fatal("HTTP timeout and LAPI TLS must not change stream or live reclaim keys")
+	}
+}
+
 func TestClient_ReclaimGrace(t *testing.T) {
 	if reclaim.ProcessGrace != 30*time.Second {
 		t.Fatalf("ProcessGrace: %v", reclaim.ProcessGrace)
