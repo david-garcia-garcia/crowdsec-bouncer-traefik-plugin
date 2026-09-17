@@ -21,3 +21,9 @@ phase: implement
 findings: applied captcha-kind routing; localTests passed; CI Main Process + e2e binary + e2e docker succeeded; no comments.md
 fixed: handleRemediationServeHTTP routing; captcha owners; optional captchaCustomChallengeUrl; nestif extract; PR #68 summary cites #48 and #50
 skipped: code review; archive; pkg/lapi; pkg/reclaim; README / example ChallengeURL wiring
+
+## codereview (2026-09-17)
+phase: codereview
+findings: six axes none; no hard/missing/wrong
+fixed: axis files; PR #68 summary
+skipped: judgement none; product apply; devdocs impact
