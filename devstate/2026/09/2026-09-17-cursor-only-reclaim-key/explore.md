@@ -67,8 +67,8 @@ this process (Traefik New per router)
   By: propose
 
 - Q: Does live/none `Key` drop the same remaining fields as stream (ticket names `identity.go`; store already uses SessionHex + Redis)?
-  Decision: assumed — yes. Live Open key is `lapi:` + SessionHex + Redis `storeParams` hash (same remaining drop as stream). Intervals no longer split live Clients that already share a store.
-  By: propose
+  Decision: resolved — live/none `Key` keeps `MetricsUpdateIntervalSeconds` on the identity payload so none routers that disagree get sibling Clients and their own write-once ticker. Still drop CAPI scenarios, `updateMaxFailure`, `UpdateIntervalSeconds`, and the other remaining fields already dropped. Stream Open key stays cursor+Redis (no intervals). DecisionStore key stays without intervals. Sharing one none Client cannot both honor write-once `metricsInterval` and publish `/appsec` `metrics=1` within 20s.
+  By: implement
 
 - Q: Exact Client key string versus `StoreKey` (`lapi:stream:` vs `decisionstore:` prefix)?
   Decision: assumed — keep `lapi:stream:<SessionHex>:<storeParamsHash>` and `lapi:<SessionHex>:<storeParamsHash>`. Do not copy the `decisionstore:` prefix. Same hash payload family as the store; different type prefix on the shared table.
