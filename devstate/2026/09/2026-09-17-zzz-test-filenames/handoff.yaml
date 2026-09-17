@@ -1,0 +1,15 @@
+issueKey: 2026-09-17-zzz-test-filenames
+jobName: 2026-09-17-zzz-test-filenames
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: main
+qualify: qualified-with-gaps
+src: e0f7b63d87d7a775cb59df87257fe55ae7ea4a93773b10d5be66a0877e28da75
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
