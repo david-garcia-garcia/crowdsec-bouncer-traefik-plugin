@@ -13,3 +13,9 @@ Change: `redis-instance-prefix`
 ## Added / modified spec ids
 
 - **Modified (delta):** `core_cache_client_isolated-store`
+
+## Archive (2026-09-17)
+
+- Delta `core_cache_client_isolated-store` → folded into `openspec/specs/core_cache_client_isolated-store/spec.md` (high confidence).
+- Change moved to `openspec/changes/archive/2026-09-17-redis-instance-prefix/`.
+- `validate-spec-map.mjs` and `validate-artifact-names.mjs` exit 0.

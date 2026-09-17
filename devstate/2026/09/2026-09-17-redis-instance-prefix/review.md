@@ -63,3 +63,14 @@ fixed: core_cache_client.md, core_cache_redis.md Language
 
 skipped: n/a
 
+
+## archive (2026-09-17)
+
+phase: archive
+
+findings: none
+
+fixed: synced core_cache_client_isolated-store; moved change to archive/2026-09-17-redis-instance-prefix
+
+skipped: n/a
+

@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-17T14:30:00Z
+Developer review: in progress — 2026-09-17T14:32:00Z
 
 ## What this changes
 **Operators.** Optional Traefik key `redisCacheInstanceId` scopes Redis cache keys per bouncer instance when `redisCacheEnabled` (empty after trim → hostname; set pod name via downward API for stable keys across restarts).
 
 **Admin users.** None.
 
-**Developers.** `lapi.CachePrefix` appends `:{instanceId}` when Redis is on; usage docs in `core_cache_redis.md` and `core_cache_client.md` now match (Language term **Effective bouncer instance identity**, LAPI cursor vs Redis roles).
+**Developers.** `lapi.CachePrefix` appends `:{instanceId}` when Redis is on; OpenSpec change archived; live spec `core_cache_client_isolated-store` merged instance-prefix requirements.
 
 **End users.** None.
 
@@ -27,18 +27,18 @@ sequenceDiagram
 If we do not merge instance-scoped prefixes, operators who centralize Redis for durability still get wrong stream sharing across replicas.
 
 ## Merge readiness
-Devdocs impact closed with three usage findings produced; OpenSpec archive is next. 2 workflow items remain.
+OpenSpec archive and catalog sync complete; pullrequest phase remains. 1 workflow item left.
 
 Priority: P2 — multi-pod stream/cache corruption with a workaround (disable Redis or isolate Redis per pod).
 
-Reviewed head: pending commit
+Reviewed head: 4acf6c0
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Devdocs aligned; CI not re-measured on this head |
-| CI proof | 3/6 | Prior run on 1b59bfe mixed (e2e binary success; main process failed earlier) |
+| Overall readiness | 3/6 | Archive done; CI not green on latest head yet |
+| CI proof | 3/6 | Checks re-running after 38df826; prior mixed conclusions |
 | Local tests proof | 6/6 | `go test ./pkg/lapi/ ./pkg/cache/ ./pkg/configuration/` passed |
 | Review resolution | N/A | No PR comments inventoried |
 
@@ -46,23 +46,23 @@ Owner decision: None.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-17-redis-instance-prefix pushed | git |
-| OpenSpec | redis-instance-prefix (tasks 11/11) | tasks.md |
+| OpenSpec | redis-instance-prefix archived | `openspec/changes/archive/2026-09-17-redis-instance-prefix/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/60 | handoff.yaml |
-| CI | in progress / mixed on recent heads | PR check runs |
+| CI | not seen on archive head | PR check runs |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | PR #60 |
 
 ## Specs
-- [proposal.md](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-redis-instance-prefix/openspec/changes/redis-instance-prefix/proposal.md)
-- [design.md](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-redis-instance-prefix/openspec/changes/redis-instance-prefix/design.md)
-- [tasks.md](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-redis-instance-prefix/openspec/changes/redis-instance-prefix/tasks.md)
-- [core_cache_client_isolated-store delta](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-redis-instance-prefix/openspec/changes/redis-instance-prefix/specs/core_cache_client_isolated-store/spec.md)
+- [proposal (archive)](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-redis-instance-prefix/openspec/changes/archive/2026-09-17-redis-instance-prefix/proposal.md)
+- [design (archive)](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-redis-instance-prefix/openspec/changes/archive/2026-09-17-redis-instance-prefix/design.md)
+- [tasks (archive)](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-redis-instance-prefix/openspec/changes/archive/2026-09-17-redis-instance-prefix/tasks.md)
+- [core_cache_client_isolated-store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-redis-instance-prefix/openspec/specs/core_cache_client_isolated-store/spec.md)
 
 ## Follow-up issues
 None.
 
 ## How this fits together
-Local ticket → branch `2026-09-17-redis-instance-prefix` → stub PR #60 → explore → propose → implement → codereview → devdocs impact (closed) → archive → pullrequest.
+Local ticket → branch `2026-09-17-redis-instance-prefix` → stub PR #60 → explore → propose → implement → codereview → devdocs impact → archive (closed) → pullrequest.
 
 ## Decision needed
 None.
@@ -73,6 +73,7 @@ None.
 - [x] [P2] Implement `CachePrefix` instance dimension; keep `redisCacheEnabled`
 - [x] [P2] Six-axis code review (hostname-fail test added)
 - [x] [P3] Devdocs impact: isolated cache + redis Language/usage
+- [x] [P2] Archive OpenSpec delta into `core_cache_client_isolated-store`
 - [x] Prepare: requirement, worktree, stub PR
 
 ## Findings
@@ -91,9 +92,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Devdocs impact findings | 3 produced, 0 open | `devdocs-impact.md` |
-| Specs in this PR | 1 modified capability delta | `core_cache_client_isolated-store` (pre-archive) |
-| Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | No comments on stub PR |
+| OpenSpec archive | `2026-09-17-redis-instance-prefix` | change folder moved; catalog validators OK |
+| Spec fold | `core_cache_client_isolated-store` | delta synced to live spec |
+| Devdocs impact findings | 3 produced, 0 open | prior phase |
 
 ### Stored data model
 | Store | Field | Type | Sample |
