@@ -1,0 +1,4 @@
+host: local
+ref: none
+title: "Plan: separar en pkg/lapi lo que sobrevive de lo que se reconstruye"
+note: Human-pasted plan from caller spec (prepare).

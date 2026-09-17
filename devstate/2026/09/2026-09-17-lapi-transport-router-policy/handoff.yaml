@@ -1,0 +1,15 @@
+issueKey: 2026-09-17-lapi-transport-router-policy
+jobName: 2026-09-17-lapi-transport-router-policy
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:4548515afc9c6d25edafc348f319f96bbe69894894aba45be325f681741e2c81
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
