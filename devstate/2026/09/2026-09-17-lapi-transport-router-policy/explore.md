@@ -96,20 +96,20 @@ Live spec `openspec/specs/core_plugin_middleware_instance-reclaim/spec.md` requi
 ## Open questions
 
 - Q: Where exactly should `AdoptTransport` run relative to reclaim `Open` / warn-and-wire?
-  Decision: assumed — call from `OpenStream` after `clientFromStored` on every successful return path (create, bind, wake); on live joiner wired to owner’s key, adopt joiner transport if transport fields differ; log adopted vs ignored field names at INFO.
-  By: explore
+  Decision: resolved — call from `OpenStream` after `clientFromStored` on every successful return path (create, bind, wake); on live joiner wired to owner’s key, adopt joiner transport if transport fields differ; log adopted vs ignored field names at INFO.
+  By: propose
 
 - Q: Should live/none `identity` / `OpenLive` drop failure action, TTL, TLS, and Redis unreachable from `IdentityHex` in the same change?
-  Decision: assumed — stream/alone resync is the ticket driver; narrow live/none identity only if propose tasks stay small; otherwise follow-up note. Minimum deliverable is stream `SessionKey` + `OpenStream` behavior and tests named in the ticket.
-  By: explore
+  Decision: resolved — out of this change; stream `SessionKey` + `OpenStream` + ticket tests are the minimum; live/none identity narrowing stays a follow-up if needed.
+  By: propose
 
 - Q: Spec `core_plugin_middleware_instance-reclaim` contradicts per-router policy and last-wins transport — fold or new leaf?
-  Decision: assumed — defer to **FindSpecHost in propose**; explore records the tension only; implement must update the chosen spec leaf(s) when propose names them.
-  By: explore
+  Decision: resolved — fold into three existing leaves (`core_plugin_middleware_instance-reclaim`, `core_plugin_lapi_failure-action`, `core_plugin_lapi_connection`); no new spec id; see change `proposal.md` FindSpecHost table.
+  By: propose
 
 - Q: CAPI `crowdsecKey` auto-mutation (`client_http.go:71`) — transport or cursor identity?
-  Decision: assumed — move with transport (ticket Part 2); cursor identity stays lapiKey / machine credentials on `Client` fields used for session prefix only.
-  By: explore
+  Decision: resolved — move with `LapiTransport` (Part 2); session prefix identity keeps lapiKey / machine credentials on write-once `Client` fields.
+  By: propose
 
 - Q: Devdocs say failure action lives on LAPI Client — update when?
   Decision: assumed — **devdocsimpact** after implement; explore does not write packets.
@@ -120,8 +120,8 @@ Live spec `openspec/specs/core_plugin_middleware_instance-reclaim/spec.md` requi
   By: explore
 
 - Q: Reload changing only TLS while another router holds the live slot — transport winner?
-  Decision: assumed — last `AdoptTransport` from a joiner or reload wins (ticket Part 2); INFO logs field diff; contradicts current spec first-wins until spec is updated in propose/implement.
-  By: explore
+  Decision: resolved — last `AdoptTransport` from a joiner or reload wins; INFO logs field diff; spec delta updates instance-reclaim + connection requirements accordingly.
+  By: propose
 
 - Q: Does changing only `lapiFailureAction` today force a new `*lapi.Client` and stream resync?
   Decision: resolved — yes for **sleeping-then-new-open** path: different `SessionKey` → new reclaim entry → `New` → `isCrowdsecStreamStartup=true`. Live joiner with different failure action today **warn-and-wires** to owner (same pointer, joiner action ignored). Measured: ephemeral `TestFailureActionAloneChangesSessionKey` (explore-only, not committed) + `settingsFrom` includes `LapiFailureAction`; `TestOpenStream_GraceSnapshotChangeStopsOldTickerFirst` proves settings-only delta after grace creates distinct clients.
