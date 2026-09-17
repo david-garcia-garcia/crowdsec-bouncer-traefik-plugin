@@ -45,8 +45,8 @@
   By: explore
 
 - Q: Does `pkg/cache.Client` grow Eval/SetNX, or does the lease live only on a new store type?
-  Decision: resolved — DecisionStore holds `cache.Client` and `AcquireLease`. `cache.Client.Acquire` reaches SimpleRedis `Eval` (writer + prefix) or the memory mutex. No SetNX wrapper.
-  By: implement
+  Decision: resolved — DecisionStore holds `cache.Client`. Stream lease is `cache.Client.Acquire` (SimpleRedis `Eval` or memory mutex). No `AcquireLease` wrapper. No SetNX wrapper.
+  By: codereview
 
 - Q: Who already owns identity facts this work might set (visitor address, CrowdSec cursor, store location, Host/tenant)?
   Decision: resolved — visitor address is `pkg/ip.GetRemoteIP` (`core_plugin_ip`); do not parse `RemoteAddr`. CrowdSec cursor owner is LAPI’s bouncer row (hashed key + outbound IP LAPI sees); this process reuses `SessionHex` / `streamSession`, not a reconstructed hop. Store location owner is the Redis connection fields on config. Host/tenant: none.
@@ -61,8 +61,8 @@
   By: implement
 
 - Q: What Redis/memory prefix do stream and live Clients use when they share a store?
-  Decision: resolved — the store’s prefix is `SessionHex` for every mode. `CachePrefix` is `SessionHex`. Live `IdentityHex` stays the Client reclaim suffix only.
-  By: implement
+  Decision: resolved — the store’s prefix is `SessionHex` for every mode. `CachePrefix` was deleted; assert via `SessionHex`. Live `IdentityHex` stays the Client reclaim suffix only.
+  By: codereview
 
 - Q: Does DecisionStore need Sleep/Wake hooks?
   Decision: resolved — Close only. The store has no ticker. Client Sleep already keeps cache warm. Last New-ctx holder of the store key grace-then-Close. Sisters use Close-only hooks for non-ticker cores.
