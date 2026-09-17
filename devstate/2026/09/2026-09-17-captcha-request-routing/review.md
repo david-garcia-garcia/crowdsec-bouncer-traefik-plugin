@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: 1 language-gap produced; Captcha gate cookie none
 fixed: Language on core_plugin_middleware_captcha-routing; PR #68 summary
 skipped: archive; populate; fuzzy Language
+
+## archive (2026-09-17)
+phase: archive
+findings: FindSpecHost new high core_plugin_middleware_captcha-routing; catalog validators 0; CI on archive head in progress
+fixed: live spec synced; change moved to archive/2026-09-17-captcha-request-routing; PR #68 summary
+skipped: Task FindSpecHost subagent (no Task tool); leftover captcha-remediation-routing folder; pkg/lapi; pkg/reclaim

@@ -10,5 +10,5 @@ JobName: 2026-09-17-captcha-request-routing
 | implement | [x] | [x] | 2026-09-17T19:42:25Z |
 | codereview | [x] | [x] | 2026-09-17T19:51:20Z |
 | devdocsimpact | [x] | [x] | 2026-09-17T20:04:45Z |
-| archive | [x] | [ ] | |
+| archive | [x] | [x] | 2026-09-17T20:18:54Z |
 | pullrequest | [ ] | [ ] | |
