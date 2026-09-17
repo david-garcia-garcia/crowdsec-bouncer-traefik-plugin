@@ -63,8 +63,8 @@ func TestSessionKey_SameLapiKeyIgnoresMetricsIntervalInPrefix(t *testing.T) {
 	if SessionKey(fast) == SessionKey(slow) {
 		t.Fatal("settings hash must distinguish reclaim keys so a sleeper does not occupy a new snapshot")
 	}
-	if CachePrefix(fast) != CachePrefix(slow) {
-		t.Fatal("stream cache prefix must follow the session, not metrics interval")
+	if SessionHex(fast) != SessionHex(slow) {
+		t.Fatal("stream session hex must follow LAPI URL+key, not metrics interval")
 	}
 	if IdentityHex(fast) == IdentityHex(slow) {
 		t.Fatal("live/none identity must still include metrics interval")

@@ -42,7 +42,7 @@ Decision **scopes** supported by the plugin are `Ip`, `Range` (CIDR), and any ot
 - Any other key (`username`, `session`, …): trimmed header string, compared as-is to the decision value. The key must match the scope LAPI stored (`username` is not `user`).
 - `Ip` and `Range` cannot be mapped. IP comes from the client address; Range is CIDR containment.
 
-Range uses one shared cache key (`range-index`) of `cidr=remediation` lines. A request that misses an exact IP walks that list. Live/none skip `range-index` and expand Range via LAPI `?ip=`. Lookup is one `GetMany` for the IP, header-scope keys, and `range-index` (Redis `MGET`).
+Range uses one shared cache key (`range-index`) of `cidr=remediation` lines. A request that misses an exact IP walks that list. Live/none skip `range-index` and expand Range via LAPI `?ip=`. Lookup is one in-memory `GetMany` for the IP, header-scope keys, and `range-index`.
 
 ```yaml
 decisionScopeHeaders:
@@ -73,7 +73,7 @@ There are 5 operating modes (CrowdsecMode) for this plugin:
 
 The `streaming mode` is recommended for performance, decisions are updated every 60 sec by default and that's the only communication between Traefik and Crowdsec. Every request that happens hits the cache for quick decisions.
 
-The cache can be local to Traefik in memory or using a separate Redis instance.
+The cache is an in-process TTL map on each LAPI connection. **Breaking change:** `redisCache*` configuration was removed. Shared Redis could not align with CrowdSec's per-row stream cursor (hashed bouncer key plus the outbound IP LAPI sees); replicas that shared a stream lease skipped LAPI and missed stream deltas ([crowdsecurity/crowdsec#3726](https://github.com/crowdsecurity/crowdsec/issues/3726)). Each Traefik replica polls LAPI and caches locally. In-process warn-and-wire (one stream ticker per LAPI URL+key in a process) is unchanged.
 
 Below are Mermaid diagrams detailling how each mode work:
 
@@ -453,31 +453,6 @@ make run
   - []string
   - default: []
   - List of IPs of trusted Proxies that are in front of traefik (ex: Cloudflare)
-- RedisCacheEnabled
-  - bool
-  - default: false
-  - enable Redis cache instead of in-memory cache
-- RedisCacheHost
-  - string
-  - default: "redis:6379"
-  - hostname and port for the Redis write host (primary)
-- RedisCacheReadHosts
-  - []string
-  - default: []
-  - List of Redis replica hostnames (host:port) to use for read operations. Reads are distributed round-robin across replicas. Falls back to RedisCacheHost when empty.
-  - Note: when set, reads are not retried against RedisCacheHost (the primary) if the replicas are unreachable. With RedisCacheUnreachableBlock at its default (true), a replica outage will therefore block/delay requests even though the primary is healthy.
-- RedisCachePassword
-  - string
-  - default: ""
-  - Password for the Redis service
-- RedisCacheDatabase
-  - string
-  - default: ""
-  - Database selection for the Redis service
-- RedisCacheUnreachableBlock
-  - bool
-  - default: true
-  - Block request when Redis is unreachable (if Redis is unreachable, 1-second delay is added to each request)
 - HTTPTimeoutSeconds
   - int64
   - default: 10
@@ -677,14 +652,6 @@ http:
             # AS: CF-ASN             # key AS (any case) → ASN matcher
             # username: X-User       # any other key → trimmed exact match
           remediationHeadersCustomName: cs-remediation
-          redisCacheEnabled: false
-          redisCacheHost: "redis-primary:6379"
-          redisCacheReadHosts:
-            - "redis-replica-1:6379"
-            - "redis-replica-2:6379"
-          redisCachePassword: password
-          redisCacheDatabase: "5"
-          redisCacheUnreachableBlock: true
           crowdsecLapiTLSCertificateAuthority: |-
             -----BEGIN CERTIFICATE-----
             MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
@@ -717,7 +684,7 @@ http:
 
 #### Fill variable with value of file
 
-`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority`, `CrowdsecAppsecTlsCertificateAuthority`, `CrowdsecCapiMachineId`, `CrowdsecCapiPassword`, `CrowdsecLapiKey`, `CrowdsecAppsecKey`, `CaptchaSiteKey`, `CaptchaSecretKey`, `CaptchaGateSecret` and `RedisCachePassword` can be provided with the content as raw or through a file path that Traefik can read.  
+`CrowdsecLapiTlsCertificateBouncerKey`, `CrowdsecLapiTlsCertificateBouncer`, `CrowdsecLapiTlsCertificateAuthority`, `CrowdsecAppsecTlsCertificateAuthority`, `CrowdsecCapiMachineId`, `CrowdsecCapiPassword`, `CrowdsecLapiKey`, `CrowdsecAppsecKey`, `CaptchaSiteKey`, `CaptchaSecretKey`, and `CaptchaGateSecret` can be provided with the content as raw or through a file path that Traefik can read.  
 The file variable will be used as preference if both content and file are provided for the same variable.
 
 Format is:
@@ -819,15 +786,13 @@ make e2e_pester
 
 #### 1. Behind another proxy service (ex: clouflare) [examples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/behind-proxy/README.md)
 
-#### 2. With Redis as an external shared cache [examples/redis-cache/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/redis-cache/README.md)
+#### 2. Using Trusted IP (ex: LAN OR VPN) that won't get filtered by crowdsec [examples/trusted-ips/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/trusted-ips/README.md)
 
-#### 3. Using Trusted IP (ex: LAN OR VPN) that won't get filtered by crowdsec [examples/trusted-ips/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/trusted-ips/README.md)
+#### 3. Using Crowdsec and Traefik installed as binary in a single VM [examples/binary-vm/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/binary-vm/README.md)
 
-#### 4. Using Crowdsec and Traefik installed as binary in a single VM [examples/binary-vm/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/binary-vm/README.md)
+#### 4. Using https communication and tls authentication with Crowdsec [examples/tls-auth/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/tls-auth/README.md)
 
-#### 5. Using https communication and tls authentication with Crowdsec [examples/tls-auth/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/tls-auth/README.md)
-
-#### 6. Using Crowdsec and Traefik in Kubernetes [examples/kubernetes/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/kubernetes/README.md)
+#### 5. Using Crowdsec and Traefik in Kubernetes [examples/kubernetes/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/kubernetes/README.md)
 
 #### 7. Using Traefik in standalone mode without Crowdsec [examples/standalone-mode/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/standalone-mode/README.md)
 

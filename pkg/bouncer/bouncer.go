@@ -178,11 +178,6 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		case cacheErr != nil:
 			cacheErrString := cacheErr.Error()
 			b.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s cache:%s", req.remoteIP, cacheErrString))
-			if cacheErrString == cache.CacheUnreachable && !b.lapiClient.RedisUnreachableBlock() {
-				b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s redisUnreachable=true", req.remoteIP))
-				b.handleNextServeHTTP(rw, req)
-				return
-			}
 			if cacheErrString == cache.CacheMiss {
 				break
 			}

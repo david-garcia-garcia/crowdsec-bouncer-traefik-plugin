@@ -195,8 +195,6 @@ try {
             }).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8080/api/rawdata" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/whoami" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
-            (Wait-ForHttpStatus -Url "http://localhost:8000/redis-cache" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
-            (Wait-ForHttpStatus -Url "http://localhost:8000/hold-redis" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/scope-none" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/scope-stream" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/appsec" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success

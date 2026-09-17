@@ -57,9 +57,8 @@ type Client struct {
 	lapiFailureAction      string
 	defaultDecisionTimeout int64
 	crowdsecStreamRoute    string
-	crowdsecHeader         string
-	redisUnreachableBlock  bool
-	decisionScopeHeaders   map[string]string // CrowdSec header scope → request header
+	crowdsecHeader       string
+	decisionScopeHeaders map[string]string // CrowdSec header scope → request header
 
 	httpClient      *http.Client
 	cacheClient     *cache.Client
@@ -103,7 +102,6 @@ func Prepare(cfg *configuration.Config, _ *slog.Logger) error {
 			cfg.CrowdsecLapiKey = apiKey
 		}
 	}
-	cfg.RedisCachePassword, _ = configuration.GetVariable(cfg, "RedisCachePassword")
 	return nil
 }
 
@@ -143,9 +141,8 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		metricsInterval:         config.MetricsUpdateIntervalSeconds,
 		updateMaxFailure:        config.UpdateMaxFailure,
 		lapiFailureAction:       configuration.EffectiveFailureAction(config.CrowdsecLapiFailureAction),
-		defaultDecisionTimeout:  config.DefaultDecisionSeconds,
-		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
-		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
+		defaultDecisionTimeout: config.DefaultDecisionSeconds,
+		decisionScopeHeaders:   decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		crowdsecHeader:          crowdsecHeader,
 		log:                     log,
@@ -171,15 +168,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 	// IdentityHex still includes intervals, so two middlewares on one key
 	// used to get two prefixes and two incomplete caches while sharing one
 	// CrowdSec stream cursor. Warn-and-wire must read the same keys.
-	client.cacheClient.New(
-		log,
-		config.RedisCacheEnabled,
-		config.RedisCacheHost,
-		config.RedisCacheReadHosts,
-		config.RedisCachePassword,
-		config.RedisCacheDatabase,
-		CachePrefix(config),
-	)
+	client.cacheClient.New(log)
 
 	if err := client.startStream(config, log); err != nil {
 		return nil, err
@@ -197,7 +186,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 	return client, nil
 }
 
-// Close stops tickers, idle HTTP connections, and the cache Redis pool. Safe to call more than once.
+// Close stops tickers, idle HTTP connections, and the in-memory cache. Safe to call more than once.
 // Remaining usage-metrics are POSTed to LAPI before HTTP is torn down.
 func (c *Client) Close() {
 	c.mu.Lock()
@@ -351,11 +340,6 @@ func (c *Client) StreamHealthy() bool {
 // LapiFailureAction is the fallback when LAPI does not return a usable verdict.
 func (c *Client) LapiFailureAction() string {
 	return c.lapiFailureAction
-}
-
-// RedisUnreachableBlock is the redis fail-closed flag for this connection.
-func (c *Client) RedisUnreachableBlock() bool {
-	return c.redisUnreachableBlock
 }
 
 // StreamFetches is how many times this connection actually called the stream endpoint.

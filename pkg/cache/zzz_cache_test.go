@@ -1,14 +1,8 @@
-// Package cache implements utility routines for manipulating cache.
-// It supports currently local file and redis cache.
 package cache
 
 import (
-	"bytes"
-	"net"
 	"testing"
-	"time"
 
-	simpleredis "github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
@@ -127,86 +121,11 @@ func Test_Delete(t *testing.T) {
 	}
 }
 
-// indexOfReader returns the position of r inside rc.readers, or -1 when r is the writer (the no-readers fallback).
-func indexOfReader(rc *redisCache, r *simpleredis.SimpleRedis) int {
-	if r == rc.writer {
-		return -1
-	}
-	for i := range rc.readers {
-		if r == rc.readers[i] {
-			return i
-		}
-	}
-	return -2
-}
-
-func Test_nextReader(t *testing.T) {
-	// The counter starts at 0, so the first Add(1) yields index 1, then 2, 0, 1, ... over n readers.
-	tests := []struct {
-		name    string
-		readers int
-		want    []int
-	}{
-		{name: "round-robin over three readers", readers: 3, want: []int{1, 2, 0, 1, 2, 0, 1}},
-		{name: "single reader always selected", readers: 1, want: []int{0, 0, 0, 0, 0}},
-		{name: "no readers fall back to writer", readers: 0, want: []int{-1, -1, -1}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rc := &redisCache{log: logger.New("INFO", "")}
-			rc.writer = &simpleredis.SimpleRedis{}
-			rc.readers = make([]*simpleredis.SimpleRedis, tt.readers)
-			for i := range rc.readers {
-				rc.readers[i] = &simpleredis.SimpleRedis{}
-			}
-			for call, want := range tt.want {
-				if got := indexOfReader(rc, rc.nextReader()); got != want {
-					t.Errorf("call %d: nextReader() -> reader[%d], want reader[%d]", call, got, want)
-				}
-			}
-		})
-	}
-}
-
-// Test_NewKeepsRedisReadersByPointer fails if Client.New copies a pooled SimpleRedis by value or aliases reader pointers (upstream crowdsec-bouncer-traefik-plugin#381).
-func Test_NewKeepsRedisReadersByPointer(t *testing.T) {
-	client := &Client{}
-	client.New(logger.New("INFO", ""), true, "127.0.0.1:1", []string{"127.0.0.1:2", "127.0.0.1:3"}, "", "", "p")
-	defer client.Close()
-	rc, ok := client.cache.(*redisCache)
-	if !ok {
-		t.Fatalf("cache type %T, want *redisCache", client.cache)
-	}
-	if rc.writer == nil {
-		t.Fatal("writer is nil")
-	}
-	if len(rc.readers) != 2 {
-		t.Fatalf("len(readers)=%d, want 2", len(rc.readers))
-	}
-	if rc.readers[0] == nil || rc.readers[1] == nil {
-		t.Fatal("a reader pointer is nil")
-	}
-	if rc.readers[0] == rc.readers[1] {
-		t.Fatal("both read hosts share one SimpleRedis pointer")
-	}
-	if rc.readers[0] == rc.writer || rc.readers[1] == rc.writer {
-		t.Fatal("a reader aliases the writer")
-	}
-	// First Add(1)%2 is 1, then 0, then 1.
-	want := []int{1, 0, 1, 0}
-	for call, idx := range want {
-		got := indexOfReader(rc, rc.nextReader())
-		if got != idx {
-			t.Errorf("call %d: nextReader() -> reader[%d], want reader[%d] (same pointer as New stored)", call, got, idx)
-		}
-	}
-}
-
 func Test_memoryClientsDoNotShare(t *testing.T) {
 	a := &Client{}
 	b := &Client{}
-	a.New(logger.New("INFO", ""), false, "", nil, "", "", "")
-	b.New(logger.New("INFO", ""), false, "", nil, "", "", "")
+	a.New(logger.New("INFO", ""))
+	b.New(logger.New("INFO", ""))
 	a.Set("1.2.3.4", "t", 10)
 	got, err := b.Get("1.2.3.4")
 	if err == nil || got != "" {
@@ -219,32 +138,13 @@ func Test_memoryClientsDoNotShare(t *testing.T) {
 	b.Close()
 }
 
-func Test_ClientCloseRedis(_ *testing.T) {
+func Test_ClientCloseMemory(_ *testing.T) {
 	client := &Client{}
-	client.New(logger.New("INFO", ""), true, "127.0.0.1:1", []string{"127.0.0.1:1"}, "", "", "p")
+	client.New(logger.New("INFO", ""))
 	client.Close()
 	client.Close()
 	var empty *Client
 	empty.Close()
-}
-
-func Test_prefixed(t *testing.T) {
-	if got := prefixed("", "ip"); got != "ip" {
-		t.Fatalf("empty prefix: got %q", got)
-	}
-	if got := prefixed("ab", "ip"); got != "ab:ip" {
-		t.Fatalf("prefix: got %q", got)
-	}
-	if got := prefixed("a", "updated"); got != "a:updated" {
-		t.Fatalf("lease key: got %q", got)
-	}
-}
-
-func Test_redisCacheUsesPrefix(t *testing.T) {
-	rc := &redisCache{prefix: "conn1"}
-	if got := prefixed(rc.prefix, "1.2.3.4"); got != "conn1:1.2.3.4" {
-		t.Fatalf("got %q", got)
-	}
 }
 
 func Test_GetMany(t *testing.T) {
@@ -263,71 +163,5 @@ func Test_GetMany(t *testing.T) {
 	}
 	if _, ok := got[""]; ok {
 		t.Fatal("empty key must be omitted")
-	}
-}
-
-func Test_redisClientConfigTimeouts(t *testing.T) {
-	cfg := redisClientConfig("127.0.0.1:1", "", "", logger.New("INFO", ""))
-	if cfg.DialTimeout != 2*time.Second {
-		t.Fatalf("DialTimeout %v, want 2s", cfg.DialTimeout)
-	}
-	if cfg.CommandTimeout != time.Second {
-		t.Fatalf("CommandTimeout %v, want 1s", cfg.CommandTimeout)
-	}
-}
-
-func serveRedisMiss(t *testing.T) string {
-	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = ln.Close() })
-	go func() {
-		for {
-			conn, acceptErr := ln.Accept()
-			if acceptErr != nil {
-				return
-			}
-			go func(c net.Conn) {
-				defer func() { _ = c.Close() }()
-				buf := make([]byte, 4096)
-				for {
-					n, readErr := c.Read(buf)
-					if n > 0 {
-						if bytes.Contains(buf[:n], []byte("GET")) {
-							_, _ = c.Write([]byte("$-1\r\n"))
-						} else {
-							_, _ = c.Write([]byte("+OK\r\n"))
-						}
-					}
-					if readErr != nil {
-						return
-					}
-				}
-			}(conn)
-		}
-	}()
-	return ln.Addr().String()
-}
-
-func Test_redisGetMissMapsCacheMiss(t *testing.T) {
-	host := serveRedisMiss(t)
-	client := &Client{}
-	client.New(logger.New("INFO", ""), true, host, nil, "", "", "p")
-	defer client.Close()
-	got, err := client.Get("missing-key")
-	if got != "" || err == nil || err.Error() != CacheMiss {
-		t.Fatalf("Get miss got %q err %v, want cache:miss", got, err)
-	}
-}
-
-func Test_GetManyUnreachable(t *testing.T) {
-	client := &Client{}
-	client.New(logger.New("INFO", ""), true, "127.0.0.1:1", nil, "", "", "p")
-	defer client.Close()
-	_, err := client.GetMany([]string{"k"})
-	if err == nil || err.Error() != CacheUnreachable {
-		t.Fatalf("GetMany unreachable got %v, want %s", err, CacheUnreachable)
 	}
 }

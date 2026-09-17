@@ -16,7 +16,7 @@ import (
 const streamSessionKeyPrefix = "lapi:stream:"
 
 // streamSession is the CrowdSec-row identity for stream and alone modes.
-// SessionPrefix / CachePrefix use only these fields. SessionKey appends a
+// SessionPrefix uses only these fields. SessionKey appends a
 // hash of streamSettings so a sleeping incarnation does not occupy the slot a
 // reload with new knobs needs.
 //
@@ -28,8 +28,8 @@ const streamSessionKeyPrefix = "lapi:stream:"
 //     the visitor behind Traefik.
 //
 // scopes= on the query string is a filter of the same cursor, not a second
-// cursor. Middleware name, metricsUpdateIntervalSeconds, Redis host, TLS
-// extras, and decisionScopeHeaders are also not how LAPI picks the row.
+// cursor. Middleware name, metricsUpdateIntervalSeconds, TLS extras, and
+// decisionScopeHeaders are also not how LAPI picks the row.
 // Usage-metrics POST uses that same authenticated row (`generated_by` =
 // bouncer name, not payload name). Two metrics tickers on one key would be
 // two windows for one CrowdSec bouncer; sharing the connection is required.
@@ -39,10 +39,12 @@ const streamSessionKeyPrefix = "lapi:stream:"
 // writes only the decisions that appeared in its own body. That looks like
 // “stream cache is broken” (one router bans, the sibling does not). Isolated
 // backends need a second bouncer key (or a different LAPI host), not a second
-// ticker. Cross-process in-memory with the same LAPI-visible IP already shares
-// that CrowdSec row; Redis is the multi-instance store. PeekLivePrefix on
-// SessionPrefix finds a live sibling so those knobs cannot split the poller
-// while another middleware still holds.
+// ticker. Cross-process replicas with the same LAPI-visible outbound IP already
+// share that CrowdSec row; a shared remote cache for stream lease `updated`
+// made replicas skip LAPI while CrowdSec keeps a per-row cursor (hashed key +
+// outbound IP — see crowdsecurity/crowdsec#3726). Cache is memory-only per
+// LAPI Client. PeekLivePrefix on SessionPrefix finds a live sibling so those
+// knobs cannot split the poller while another middleware still holds.
 type streamSession struct {
 	Mode          string `json:"mode"`
 	LapiScheme    string `json:"lapiScheme"`
@@ -57,7 +59,7 @@ type streamSession struct {
 //
 // A second live middleware that disagrees is warn-and-wire: Traefik New must
 // not fail the joiner router, and we must not start a second poller. The first
-// New keeps intervals, Redis, TLS, and scopes=. Trusted IPs, ban/captcha
+// New keeps intervals, TLS, and scopes=. Trusted IPs, ban/captcha
 // templates, and AppSec stay off this LAPI session.
 //
 // A Traefik reload that changes this snapshot uses a new SessionKey. The old
@@ -76,14 +78,8 @@ type streamSettings struct {
 	LapiFailureAction            string            `json:"lapiFailureAction"`
 	StreamStartupBlock           bool              `json:"streamStartupBlock"`
 	DefaultDecisionSeconds       int64             `json:"defaultDecisionSeconds"`
-	HTTPTimeoutSeconds           int64             `json:"httpTimeoutSeconds"`
-	RedisCacheEnabled            bool              `json:"redisCacheEnabled"`
-	RedisCacheHost               string            `json:"redisCacheHost"`
-	RedisCacheReadHosts          []string          `json:"redisCacheReadHosts"`
-	RedisCachePassword           string            `json:"redisCachePassword"`
-	RedisCacheDatabase           string            `json:"redisCacheDatabase"`
-	RedisCacheUnreachableBlock   bool              `json:"redisCacheUnreachableBlock"`
-	LapiTLSInsecureVerify        bool              `json:"lapiTlsInsecureVerify"`
+	HTTPTimeoutSeconds          int64             `json:"httpTimeoutSeconds"`
+	LapiTLSInsecureVerify       bool              `json:"lapiTlsInsecureVerify"`
 	LapiTLSCertificateAuthority  string            `json:"lapiTlsCa"`
 	LapiTLSCertificateBouncer    string            `json:"lapiTlsCert"`
 	DecisionScopeHeaders         map[string]string `json:"decisionScopeHeaders"`
@@ -112,14 +108,8 @@ func settingsFrom(cfg *configuration.Config) streamSettings {
 		LapiFailureAction:            configuration.EffectiveFailureAction(cfg.CrowdsecLapiFailureAction),
 		StreamStartupBlock:           cfg.StreamStartupBlock,
 		DefaultDecisionSeconds:       cfg.DefaultDecisionSeconds,
-		HTTPTimeoutSeconds:           cfg.HTTPTimeoutSeconds,
-		RedisCacheEnabled:            cfg.RedisCacheEnabled,
-		RedisCacheHost:               cfg.RedisCacheHost,
-		RedisCacheReadHosts:          cfg.RedisCacheReadHosts,
-		RedisCachePassword:           cfg.RedisCachePassword,
-		RedisCacheDatabase:           cfg.RedisCacheDatabase,
-		RedisCacheUnreachableBlock:   cfg.RedisCacheUnreachableBlock,
-		LapiTLSInsecureVerify:        cfg.CrowdsecLapiTLSInsecureVerify,
+		HTTPTimeoutSeconds:          cfg.HTTPTimeoutSeconds,
+		LapiTLSInsecureVerify:       cfg.CrowdsecLapiTLSInsecureVerify,
 		LapiTLSCertificateAuthority:  cfg.CrowdsecLapiTLSCertificateAuthority,
 		LapiTLSCertificateBouncer:    cfg.CrowdsecLapiTLSCertificateBouncer,
 		DecisionScopeHeaders:         decisionscope.NormalizeDecisionScopeHeaders(cfg.DecisionScopeHeaders),
@@ -135,7 +125,7 @@ func hashJSON(payload any) string {
 	return hashBytes(encoded)
 }
 
-// SessionHex is the Redis/memory prefix for one stream session (LAPI URL+key).
+// SessionHex hashes one stream session (LAPI URL+key) for reclaim keys.
 func SessionHex(cfg *configuration.Config) string {
 	return hashJSON(sessionFrom(cfg))
 }
@@ -148,15 +138,6 @@ func SessionPrefix(cfg *configuration.Config) string {
 // SessionKey is the process reclaim table key: session prefix plus settings hash.
 func SessionKey(cfg *configuration.Config) string {
 	return SessionPrefix(cfg) + hashJSON(settingsFrom(cfg))
-}
-
-// CachePrefix is the cache Client prefix: session hex for stream/alone so
-// warn-and-wire shares keys; full IdentityHex for live/none.
-func CachePrefix(cfg *configuration.Config) string {
-	if cfg.CrowdsecMode == configuration.StreamMode || cfg.CrowdsecMode == configuration.AloneMode {
-		return SessionHex(cfg)
-	}
-	return IdentityHex(cfg)
 }
 
 // settingsDiff lists JSON field names that differ, for the warn-and-wire log.

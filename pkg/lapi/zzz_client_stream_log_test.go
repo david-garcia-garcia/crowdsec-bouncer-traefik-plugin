@@ -16,7 +16,7 @@ import (
 func newTestStreamTickClient(t *testing.T, log *slog.Logger, host string, httpClient *http.Client) *Client {
 	t.Helper()
 	cacheClient := &cache.Client{}
-	cacheClient.New(log, false, "", nil, "", "", "")
+	cacheClient.New(log)
 	return &Client{
 		cacheClient:             cacheClient,
 		log:                     log,

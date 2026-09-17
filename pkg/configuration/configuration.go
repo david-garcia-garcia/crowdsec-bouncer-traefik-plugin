@@ -100,13 +100,6 @@ type Config struct {
 	DecisionScopeHeaders                       map[string]string `json:"decisionScopeHeaders,omitempty"`
 	ForwardedHeadersTrustedIPs                 []string          `json:"forwardedHeadersTrustedIps,omitempty"`
 	ClientTrustedIPs                           []string          `json:"clientTrustedIps,omitempty"`
-	RedisCacheEnabled                          bool              `json:"redisCacheEnabled,omitempty"`
-	RedisCacheHost                             string            `json:"redisCacheHost,omitempty"`
-	RedisCacheReadHosts                        []string          `json:"redisCacheReadHosts,omitempty"`
-	RedisCachePassword                         string            `json:"redisCachePassword,omitempty"`
-	RedisCachePasswordFile                     string            `json:"redisCachePasswordFile,omitempty"`
-	RedisCacheDatabase                         string            `json:"redisCacheDatabase,omitempty"`
-	RedisCacheUnreachableBlock                 bool              `json:"redisCacheUnreachableBlock,omitempty"`
 	BanHTMLFilePath                            string            `json:"banHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
 	BanFilePath                                string            `json:"banFilePath,omitempty"`
 	CaptchaHTMLFilePath                        string            `json:"captchaHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
@@ -203,12 +196,6 @@ func New() *Config {
 		DecisionScopeHeaders:            map[string]string{},
 		ForwardedHeadersTrustedIPs:      []string{},
 		ClientTrustedIPs:                []string{},
-		RedisCacheEnabled:               false,
-		RedisCacheHost:                  "redis:6379",
-		RedisCacheReadHosts:             []string{},
-		RedisCachePassword:              "",
-		RedisCacheDatabase:              "",
-		RedisCacheUnreachableBlock:      true,
 	}
 }
 
@@ -300,10 +287,6 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		return err
 	}
 	if err := validateParamsIPs(log, config.ClientTrustedIPs, "ClientTrustedIPs"); err != nil {
-		return err
-	}
-
-	if _, err := GetVariable(config, "RedisCachePassword"); err != nil {
 		return err
 	}
 

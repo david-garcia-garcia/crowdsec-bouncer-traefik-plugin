@@ -19,7 +19,7 @@ func Test_liveLookup_lapiErrorIsNotABan(t *testing.T) {
 	defer lapi.Close()
 	lapiURL, _ := url.Parse(lapi.URL)
 	cacheClient := &cache.Client{}
-	cacheClient.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
+	cacheClient.New(logger.New("ERROR", ""))
 	client := &Client{
 		crowdsecScheme: lapiURL.Scheme,
 		crowdsecHost:   lapiURL.Host,

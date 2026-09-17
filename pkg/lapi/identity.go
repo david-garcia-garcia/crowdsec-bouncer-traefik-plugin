@@ -31,14 +31,8 @@ type identity struct {
 	LapiFailureAction            string   `json:"lapiFailureAction"`
 	StreamStartupBlock           bool     `json:"streamStartupBlock"`
 	DefaultDecisionSeconds       int64    `json:"defaultDecisionSeconds"`
-	HTTPTimeoutSeconds           int64    `json:"httpTimeoutSeconds"`
-	RedisCacheEnabled            bool     `json:"redisCacheEnabled"`
-	RedisCacheHost               string   `json:"redisCacheHost"`
-	RedisCacheReadHosts          []string `json:"redisCacheReadHosts"`
-	RedisCachePassword           string   `json:"redisCachePassword"`
-	RedisCacheDatabase           string   `json:"redisCacheDatabase"`
-	RedisCacheUnreachableBlock   bool     `json:"redisCacheUnreachableBlock"`
-	LapiTLSInsecureVerify        bool     `json:"lapiTlsInsecureVerify"`
+	HTTPTimeoutSeconds          int64  `json:"httpTimeoutSeconds"`
+	LapiTLSInsecureVerify       bool   `json:"lapiTlsInsecureVerify"`
 	LapiTLSCertificateAuthority  string   `json:"lapiTlsCa"`
 	LapiTLSCertificateBouncer    string   `json:"lapiTlsCert"`
 }
@@ -60,14 +54,8 @@ func identityFrom(cfg *configuration.Config) identity {
 		LapiFailureAction:            configuration.EffectiveFailureAction(cfg.CrowdsecLapiFailureAction),
 		StreamStartupBlock:           cfg.StreamStartupBlock,
 		DefaultDecisionSeconds:       cfg.DefaultDecisionSeconds,
-		HTTPTimeoutSeconds:           cfg.HTTPTimeoutSeconds,
-		RedisCacheEnabled:            cfg.RedisCacheEnabled,
-		RedisCacheHost:               cfg.RedisCacheHost,
-		RedisCacheReadHosts:          cfg.RedisCacheReadHosts,
-		RedisCachePassword:           cfg.RedisCachePassword,
-		RedisCacheDatabase:           cfg.RedisCacheDatabase,
-		RedisCacheUnreachableBlock:   cfg.RedisCacheUnreachableBlock,
-		LapiTLSInsecureVerify:        cfg.CrowdsecLapiTLSInsecureVerify,
+		HTTPTimeoutSeconds:          cfg.HTTPTimeoutSeconds,
+		LapiTLSInsecureVerify:       cfg.CrowdsecLapiTLSInsecureVerify,
 		LapiTLSCertificateAuthority:  cfg.CrowdsecLapiTLSCertificateAuthority,
 		LapiTLSCertificateBouncer:    cfg.CrowdsecLapiTLSCertificateBouncer,
 	}
@@ -80,7 +68,7 @@ func hashBytes(payload []byte) string {
 	return strconv.FormatUint(hasher.Sum64(), 16)
 }
 
-// IdentityHex is the Redis key prefix for live/none and the hash suffix of Key.
+// IdentityHex is the reclaim hash for live/none and the hash suffix of Key.
 func IdentityHex(cfg *configuration.Config) string {
 	b, err := json.Marshal(identityFrom(cfg))
 	if err != nil {

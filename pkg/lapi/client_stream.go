@@ -14,6 +14,10 @@ import (
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
+// cacheTimeoutKey is the in-memory stream poll lease on this LAPI Client only.
+// It must not live in a shared remote store: CrowdSec's stream cursor is per
+// bouncer row (hashed API key + outbound IP LAPI sees); shared lease keys made
+// replicas skip LAPI and miss deltas (crowdsecurity/crowdsec#3726).
 const cacheTimeoutKey = "updated"
 
 // Stream is the body returned from Crowdsec Stream LAPI.

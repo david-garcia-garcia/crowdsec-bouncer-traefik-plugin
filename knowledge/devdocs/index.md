@@ -3,7 +3,7 @@
 ## cache
 priority: normal
 local: index_core_cache.md
-description: How this plugin stores Crowdsec remediations (memory or Redis-protocol).
+description: How this plugin stores Crowdsec remediations in-process (TTL map per LAPI Client).
 
 ## e2e
 priority: normal

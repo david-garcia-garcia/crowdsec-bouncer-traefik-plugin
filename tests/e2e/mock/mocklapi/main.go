@@ -3,7 +3,7 @@
 // decision lookups, the stream poll and the usage-metrics push — and lets the
 // test drive decisions through /admin instead of `cscli`. It also serves the
 // stub upstream that Traefik proxies allowed requests to, a dummy captcha
-// siteverify, and a hardcoded Redis stand-in for exercising the redis cache path.
+// siteverify.
 //
 // It is NOT a Crowdsec/AppSec conformance harness — the real WAF engine (OWASP
 // CRS, virtual patching) is out of scope. The AppSec endpoint here emulates a
@@ -12,14 +12,12 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"flag"
 	"io"
 	"log"
 	"net"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 )
@@ -69,116 +67,6 @@ func list(m map[string]Decision) []Decision {
 	return out
 }
 
-// --- Redis mock (RESP arrays as spoken by utilities/simpleredis, plus inline GET) ---
-
-// serveRedis is a hardcoded stand-in. When verdicts is true it plays a replica
-// that holds decisions: GET/MGET of 1.2.3.4 → "f" (clean), 1.2.3.5 → "t" (banned);
-// any other key is a miss ($-1). When verdicts is false it plays the primary
-// and answers every GET/MGET with a miss, so a scenario can prove reads are served
-// from the replica and not the primary. SET, DEL, AUTH, SELECT get +OK.
-func serveRedis(addr string, verdicts bool) {
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer ln.Close()
-
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			continue
-		}
-		go func(conn net.Conn) {
-			defer conn.Close()
-			rd := bufio.NewReader(conn)
-			for {
-				cmd, args, err := readRedisCommand(rd)
-				if err != nil {
-					return
-				}
-				_, _ = conn.Write(redisMockReply(cmd, args, verdicts))
-			}
-		}(conn)
-	}
-}
-
-// readRedisCommand reads one RESP array command or one inline space-separated line.
-func readRedisCommand(rd *bufio.Reader) (string, []string, error) {
-	line, err := rd.ReadString('\n')
-	if err != nil {
-		return "", nil, err
-	}
-	line = strings.TrimRight(line, "\r\n")
-	// RESP array: *<n> then n bulk strings ($len + payload).
-	if strings.HasPrefix(line, "*") {
-		count, convErr := strconv.Atoi(line[1:])
-		if convErr != nil || count < 1 {
-			return "", nil, io.ErrUnexpectedEOF
-		}
-		parts := make([]string, 0, count)
-		for i := 0; i < count; i++ {
-			head, headErr := rd.ReadString('\n')
-			if headErr != nil {
-				return "", nil, headErr
-			}
-			head = strings.TrimRight(head, "\r\n")
-			if !strings.HasPrefix(head, "$") {
-				return "", nil, io.ErrUnexpectedEOF
-			}
-			length, lenErr := strconv.Atoi(head[1:])
-			if lenErr != nil || length < 0 {
-				return "", nil, io.ErrUnexpectedEOF
-			}
-			buf := make([]byte, length+2)
-			if _, readErr := io.ReadFull(rd, buf); readErr != nil {
-				return "", nil, readErr
-			}
-			parts = append(parts, string(buf[:length]))
-		}
-		return strings.ToUpper(parts[0]), parts[1:], nil
-	}
-	// Inline command: space-separated tokens on one line (legacy GET).
-	fields := strings.Fields(line)
-	if len(fields) == 0 {
-		return "", nil, io.ErrUnexpectedEOF
-	}
-	return strings.ToUpper(fields[0]), fields[1:], nil
-}
-
-// redisGetReply is one RESP bulk for a GET/MGET slot.
-func redisGetReply(key string, verdicts bool) []byte {
-	if verdicts && strings.Contains(key, "1.2.3.4") {
-		return []byte("$1\r\nf\r\n")
-	}
-	if verdicts && strings.Contains(key, "1.2.3.5") {
-		return []byte("$1\r\nt\r\n")
-	}
-	return []byte("$-1\r\n")
-}
-
-// redisMockReply returns the RESP bytes for one mock command.
-func redisMockReply(cmd string, args []string, verdicts bool) []byte {
-	switch cmd {
-	case "GET":
-		key := ""
-		if len(args) > 0 {
-			key = args[0]
-		}
-		return redisGetReply(key, verdicts)
-	case "MGET":
-		var b strings.Builder
-		b.WriteString("*")
-		b.WriteString(strconv.Itoa(len(args)))
-		b.WriteString("\r\n")
-		for _, key := range args {
-			b.Write(redisGetReply(key, verdicts))
-		}
-		return []byte(b.String())
-	default:
-		return []byte("+OK\r\n")
-	}
-}
-
 func main() {
 	lapiAddr := flag.String("lapi-addr", "127.0.0.1:8090", "address for the LAPI mock")
 	// The stub upstream Traefik proxies allowed requests to — the binary-suite
@@ -186,12 +74,6 @@ func main() {
 	backendAddr := flag.String("backend-addr", "127.0.0.1:8091", "address for the stub upstream service")
 	// AppSec WAF stand-in (the real engine listens on :7422). Not a CRS engine.
 	appsecAddr := flag.String("appsec-addr", "127.0.0.1:8092", "address for the AppSec mock")
-	// Redis stand-ins on plain TCP ports, enough to exercise the plugin's redis
-	// cache path. The primary answers every GET with a miss; the replica serves
-	// the hardcoded verdicts, so a scenario pointing redisCacheReadHosts at the
-	// replica proves reads are offloaded to replicas.
-	redisAddr := flag.String("redis-addr", "127.0.0.1:8093", "address for the Redis primary mock (writes; GET always misses)")
-	redisReadAddr := flag.String("redis-read-addr", "127.0.0.1:8094", "address for the Redis replica mock (serves cached verdicts)")
 	// Optional TLS for the LAPI: when both are set the LAPI is served over HTTPS
 	// (cert signed by the scenario's throwaway CA) so the suite can exercise the
 	// bouncer's system-trust-store path. Backend and AppSec stay plaintext.
@@ -242,9 +124,6 @@ func main() {
 				}
 			})))
 		}()
-
-		go serveRedis(*redisAddr, false)
-		go serveRedis(*redisReadAddr, true)
 	}
 
 	mux := http.NewServeMux()
@@ -343,9 +222,9 @@ func main() {
 	})
 
 	if *lapiTLSCert != "" && *lapiTLSKey != "" {
-		log.Printf("mocklapi: LAPI on %s (TLS), backend on %s, appsec on %s, redis on %s (read %s)", *lapiAddr, *backendAddr, *appsecAddr, *redisAddr, *redisReadAddr)
+		log.Printf("mocklapi: LAPI on %s (TLS), backend on %s, appsec on %s", *lapiAddr, *backendAddr, *appsecAddr)
 		log.Fatal(http.ListenAndServeTLS(*lapiAddr, *lapiTLSCert, *lapiTLSKey, mux))
 	}
-	log.Printf("mocklapi: LAPI on %s, backend on %s, appsec on %s, redis on %s (read %s)", *lapiAddr, *backendAddr, *appsecAddr, *redisAddr, *redisReadAddr)
+	log.Printf("mocklapi: LAPI on %s, backend on %s, appsec on %s", *lapiAddr, *backendAddr, *appsecAddr)
 	log.Fatal(http.ListenAndServe(*lapiAddr, mux))
 }
