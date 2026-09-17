@@ -375,6 +375,40 @@ func TestHandleNextServeHTTPAllowCallsNext(t *testing.T) {
 	}
 }
 
+func TestTwoBouncersDistinctLapiFailureActions(t *testing.T) {
+	shared := &lapi.Client{}
+	passthroughCalled := false
+	passthrough := &Bouncer{
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			passthroughCalled = true
+		}),
+		log:               logger.New("ERROR", ""),
+		lapiClient:        shared,
+		lapiFailureAction: configuration.FailureActionPassthrough,
+	}
+	ban := &Bouncer{
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			t.Error("ban bouncer must not call next")
+		}),
+		remediationStatusCode: http.StatusForbidden,
+		log:                   logger.New("ERROR", ""),
+		lapiClient:            shared,
+		lapiFailureAction:     configuration.FailureActionBan,
+	}
+	if !passthrough.SameLapiClient(ban) {
+		t.Fatal("both bouncers must share one Client")
+	}
+	passthrough.applyLapiFailureAction(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), configuration.ReasonTECH, lapi.OriginPluginTechStreamFail)
+	if !passthroughCalled {
+		t.Fatal("passthrough bouncer must use the pass path")
+	}
+	recorder := httptest.NewRecorder()
+	ban.applyLapiFailureAction(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("ban want 403, got %d", recorder.Code)
+	}
+}
+
 func TestApplyLapiFailureAction(t *testing.T) {
 	t.Run("passthrough calls next", func(t *testing.T) {
 		nextCalled := false
@@ -382,8 +416,8 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 				nextCalled = true
 			}),
-			log:        logger.New("ERROR", ""),
-			lapiClient: lapi.NewTestLapiFailureActionClient(configuration.FailureActionPassthrough),
+			log:               logger.New("ERROR", ""),
+			lapiFailureAction: configuration.FailureActionPassthrough,
 		}
 		b.applyLapiFailureAction(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), configuration.ReasonTECH, lapi.OriginPluginTechStreamFail)
 		if !nextCalled {
@@ -397,7 +431,7 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			}),
 			remediationStatusCode: http.StatusForbidden,
 			log:                   logger.New("ERROR", ""),
-			lapiClient:            lapi.NewTestLapiFailureActionClient(configuration.FailureActionBan),
+			lapiFailureAction:     configuration.FailureActionBan,
 		}
 		recorder := httptest.NewRecorder()
 		b.applyLapiFailureAction(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)

@@ -1,16 +1,4 @@
-## Purpose
-
-Traefik plugin `New` binds a Crowdsec connection incarnation through reclaim and returns a per-router bouncer so one Traefik process can run two independent Crowdsec **sessions** (different LAPI URL or bouncer key) at once. Stream/alone on the same session share one ticker.
-
-## Requirements
-
-### Requirement: Yaegi constructors stay on the module-root package
-The plugin SHALL export `CreateConfig` and `New` from the package Traefik loads for `.traefik.yml` `import` (the module root). `New` SHALL take Traefik’s constructor context and MUST NOT ignore it.
-
-#### Scenario: Catalog import still constructs
-- **WHEN** Traefik loads `github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin`
-- **THEN** `CreateConfig` and `New` exist on that package
-- **AND** `New` receives a non-ignored context used as the reclaim holder
+## MODIFIED Requirements
 
 ### Requirement: Stream session is LAPI URL plus bouncer key
 For `stream` and `alone`, the session prefix and cache prefix SHALL be derived from mode, LAPI scheme/host/path and lapiKey (CAPI machine+password in alone). Intervals, Redis host/auth/db, HTTP timeout, LAPI failure action, LAPI TLS extras, `StreamStartupBlock`, live-cache TTL, Redis fail-closed, and `decisionScopeHeaders` MUST NOT be in that prefix. AppSec host, key, TLS, and body limit MUST NOT be in the LAPI session prefix, LAPI settings hash, or live/none LAPI identity. The LAPI reclaim `Open` key SHALL be that prefix plus a hash of the remaining first-wins LAPI settings (intervals, Redis host/auth/db/enabled, `updateMaxFailure`, CAPI scenarios, `decisionScopeHeaders`). That hash MUST NOT include LAPI failure action, Redis fail-closed, live-cache TTL, `StreamStartupBlock`, HTTP timeout, or the three LAPI TLS fields. Middleware name, `next`, templates, trusted IPs, and Enabled MUST NOT be in that key. Live/none SHALL keep a reclaim key from LAPI connection identity that drops the same per-router and transport fields (no stream cursor, no AppSec fields). Client address SHALL come from `pkg/ip.GetRemoteIP`. A second live `New` on the same session prefix with a different remaining LAPI settings hash SHALL `PeekLivePrefix` and warn-and-wire to the live LAPI slot (first `New` wins those knobs; INFO `ignored`). A second live `New` that differs only on dropped fields SHALL reuse the same reclaim key and the same Client.
@@ -50,30 +38,6 @@ For `stream` and `alone`, the session prefix and cache prefix SHALL be derived f
 - **AND** that Client uses the later `New` transport
 - **AND** an INFO line marks the joiner as `adopted`
 
-### Requirement: Snapshot change while sleeping opens a new reclaim key
-When no live constructor context remains for a stream session and the previous slot is sleeping, a `New` with a **different** settings snapshot SHALL `Open` a new reclaim key (session prefix plus the new settings hash). The sleeper SHALL remain until grace `Close()`. A `New` with the **same** snapshot SHALL `Open` (Wake) without `startup=true`. Last holder SHALL `Sleep()` tickers before grace.
-
-#### Scenario: Reload within grace Wakes
-- **WHEN** every bound constructor context for a stream session is cancelled
-- **AND** a `New` with the same session and same settings snapshot runs before grace ends
-- **THEN** the same connection incarnation is returned
-- **AND** stream polling resumes with `startup=false`
-
-#### Scenario: Redis host change does not overlap pollers
-- **WHEN** the last holder of a stream session is cancelled
-- **AND** a `New` for that session with a different `redisCacheHost` runs before grace ends
-- **THEN** the previous ticker was already Sleep’d
-- **AND** two `handleStreamCache` loops MUST NOT run on that session at once
-
-### Requirement: Unreclaimed connection is closed after grace
-When no live constructor context remains for a LAPI connection key and grace elapses with no replace, the connection SHALL stop its tickers and release idle LAPI HTTP connections (`Close`). An `lapi.Client` SHALL wait 30 seconds (process table grace `ProcessGrace`). An `appsec.Client` SHALL use the same table. Open SHALL pass `reclaim.Hooks` for Sleep/Wake/Close.
-
-#### Scenario: Connection grace is the process table wait
-- **WHEN** the process table grace is 30 seconds
-- **AND** the last holder of an `lapi.Client` is cancelled
-- **THEN** the incarnation is still sleeping after 20 milliseconds
-- **AND** it is disposed after 30 seconds
-
 ### Requirement: Bouncer does not own the stream
 The per-router bouncer SHALL handle request policy (trusted IPs, ban/captcha pages, whether AppSec runs on pass, LAPI failure action, Redis fail-closed, and live-cache TTL) and MUST NOT start a process-wide stream ticker. The bouncer SHALL hold a `*lapi.Client` (nil when `crowdsecMode` is `appsec`) and a `*appsec.Client` (nil when AppSec is off). Two bouncers on one Client MAY apply distinct LAPI failure actions and Redis fail-closed values. Two live routers on one Client that disagree on live-cache TTL last-write that TTL into the shared live cache.
 
@@ -97,6 +61,8 @@ The per-router bouncer SHALL handle request policy (trusted IPs, ban/captcha pag
 - **WHEN** two live middlewares reclaim the same `lapi.Client` and set different `defaultDecisionSeconds`
 - **THEN** each lookup uses the TTL that bouncer passed
 - **AND** the shared live cache keeps the last written TTL for that key
+
+## ADDED Requirements
 
 ### Requirement: Last New wins LAPI transport
 After `OpenStream` or `OpenLive` binds a Client, that `New` SHALL replace the Client’s LAPI HTTP+auth transport with the constructor config (last `New` wins). Concurrent replaces SHALL last-write the stored transport and idle-close the value they replaced. Remaining write-once Client scalars MUST NOT become mutable.

@@ -33,6 +33,9 @@ type Bouncer struct {
 	enabled                 bool
 	forwardedCustomHeader   string
 	lapiClient              *lapi.Client
+	lapiFailureAction       string // per-router LAPI fallback (not on Client identity)
+	redisUnreachableBlock   bool   // per-router Redis fail-closed
+	defaultDecisionSeconds  int64  // per-router live-cache TTL passed into LiveLookup
 	log                     *slog.Logger
 	name                    string
 	next                    http.Handler
@@ -67,6 +70,9 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		enabled:                 config.Enabled,
 		forwardedCustomHeader:   config.ForwardedHeadersCustomName,
 		lapiClient:              lapiClient,
+		lapiFailureAction:       configuration.EffectiveFailureAction(config.CrowdsecLapiFailureAction),
+		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
+		defaultDecisionSeconds:  config.DefaultDecisionSeconds,
 		log:                     log,
 		name:                    name,
 		next:                    next,
@@ -178,7 +184,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		case cacheErr != nil:
 			cacheErrString := cacheErr.Error()
 			b.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s cache:%s", req.remoteIP, cacheErrString))
-			if cacheErrString == cache.CacheUnreachable && !b.lapiClient.RedisUnreachableBlock() {
+			if cacheErrString == cache.CacheUnreachable && !b.redisUnreachableBlock {
 				b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s redisUnreachable=true", req.remoteIP))
 				b.handleNextServeHTTP(rw, req)
 				return
@@ -212,7 +218,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	}
 
 	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.NoneMode {
-		value, err := b.lapiClient.LiveLookup(req.remoteIP, scopes)
+		value, err := b.lapiClient.LiveLookup(req.remoteIP, scopes, b.defaultDecisionSeconds)
 		kind := cache.RemediationKind(value)
 		origin := cache.RemediationOrigin(value)
 		if err != nil {
@@ -233,7 +239,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 
 // applyLapiFailureAction remediates a live LAPI error or stream-unhealthy cache miss.
 func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req clientRequest, banReason, origin string) {
-	switch b.lapiClient.LapiFailureAction() {
+	switch b.lapiFailureAction {
 	case configuration.FailureActionPassthrough:
 		b.handleNextServeHTTP(rw, req)
 	case configuration.FailureActionCaptcha:

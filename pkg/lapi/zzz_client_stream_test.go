@@ -20,9 +20,7 @@ func TestHandleStreamCacheIntervalOneStoresLease(t *testing.T) {
 	lapiClient.crowdsecHost = parsed.Host
 	lapiClient.crowdsecPath = "/"
 	lapiClient.crowdsecStreamRoute = crowdsecLapiStreamRoute
-	lapiClient.crowdsecHeader = crowdsecLapiHeader
-	lapiClient.crowdsecKey = "test-key"
-	lapiClient.httpClient = server.Client()
+	attachTestTransport(lapiClient, server.Client(), "test-key")
 
 	if err := lapiClient.handleStreamCache(); err != nil {
 		t.Fatalf("interval-1 miss: %v", err)

@@ -35,6 +35,11 @@ func testStreamConfig(host string, metricsInterval int64) *configuration.Config 
 	}
 }
 
+// attachTestTransport stores LAPI HTTP+auth on client for same-package tests.
+func attachTestTransport(client *Client, httpClient *http.Client, key string) {
+	client.transport.Store(&transport{httpClient: httpClient, header: crowdsecLapiHeader, key: key})
+}
+
 // testStreamLAPI counts GET /v1/decisions/stream hits and returns empty deltas.
 func testStreamLAPI(t *testing.T) (*httptest.Server, *int64) {
 	t.Helper()
@@ -79,6 +84,26 @@ func TestSessionKey_DifferentHostsAreDistinct(t *testing.T) {
 	}
 }
 
+func TestSessionKey_PolicyAndTLSDoNotChangeKey(t *testing.T) {
+	base := testStreamConfig("lapi.example:8080", 1)
+	policy := testStreamConfig("lapi.example:8080", 1)
+	policy.CrowdsecLapiFailureAction = configuration.FailureActionPassthrough
+	policy.RedisCacheUnreachableBlock = true
+	policy.DefaultDecisionSeconds = 5
+	policy.StreamStartupBlock = false
+	tlsOnly := testStreamConfig("lapi.example:8080", 1)
+	tlsOnly.HTTPTimeoutSeconds = 30
+	tlsOnly.CrowdsecLapiTLSInsecureVerify = false
+	tlsOnly.CrowdsecLapiTLSCertificateAuthority = "ca"
+	tlsOnly.CrowdsecLapiTLSCertificateBouncer = "cert"
+	if SessionKey(base) != SessionKey(policy) || IdentityHex(base) != IdentityHex(policy) {
+		t.Fatal("policy knobs must not change stream or live reclaim keys")
+	}
+	if SessionKey(base) != SessionKey(tlsOnly) || IdentityHex(base) != IdentityHex(tlsOnly) {
+		t.Fatal("HTTP timeout and LAPI TLS must not change stream or live reclaim keys")
+	}
+}
+
 func TestClient_ReclaimGrace(t *testing.T) {
 	if reclaim.ProcessGrace != 30*time.Second {
 		t.Fatalf("ProcessGrace: %v", reclaim.ProcessGrace)
@@ -92,6 +117,7 @@ func TestClient_LifecycleLogs(t *testing.T) {
 		log:          log,
 		crowdsecMode: configuration.LiveMode,
 		crowdsecHost: "lapi.example:8080",
+		sessionKey:   "lapi:test-key",
 	}
 	client.Sleep()
 	client.Wake()
@@ -100,6 +126,11 @@ func TestClient_LifecycleLogs(t *testing.T) {
 	for _, msg := range []string{MsgConnectionSleeping, MsgConnectionWaking, MsgConnectionClosed} {
 		if !strings.Contains(logged, msg) {
 			t.Fatalf("missing %q in %s", msg, logged)
+		}
+	}
+	for _, field := range []string{`"sessionKey":"lapi:test-key"`, `"reason":"sleeping"`, `"reason":"waking"`, `"reason":"closed"`} {
+		if !strings.Contains(logged, field) {
+			t.Fatalf("missing %q in %s", field, logged)
 		}
 	}
 }
@@ -148,6 +179,9 @@ func TestOpenStream_LiveMetricsMismatchWarnsAndShares(t *testing.T) {
 	if !strings.Contains(logged, "one cursor per bouncer row") {
 		t.Fatalf("warn must mention CrowdSec cursor: %s", logged)
 	}
+	if !strings.Contains(logged, "lapi session joiner ignored") {
+		t.Fatalf("INFO must mark joiner ignored: %s", logged)
+	}
 }
 
 func TestOpenStream_GraceSnapshotChangeStopsOldTickerFirst(t *testing.T) {
@@ -181,6 +215,87 @@ func TestOpenStream_GraceSnapshotChangeStopsOldTickerFirst(t *testing.T) {
 	}
 	if second.StreamFetches() < 1 {
 		t.Fatal("new snapshot must start its own stream poll")
+	}
+}
+
+func TestOpenStream_FailureActionOnlyKeepsClient(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	server, hits := testStreamLAPI(t)
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := slog.Default()
+	ctx := context.Background()
+	firstCfg := testStreamConfig(parsed.Host, 1)
+	firstCfg.CrowdsecLapiFailureAction = configuration.FailureActionBan
+	secondCfg := testStreamConfig(parsed.Host, 1)
+	secondCfg.CrowdsecLapiFailureAction = configuration.FailureActionPassthrough
+
+	first, err := OpenStream(ctx, firstCfg, log, "first", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fetches := first.StreamFetches()
+	hitsBefore := atomic.LoadInt64(hits)
+	second, err := OpenStream(ctx, secondCfg, log, "second", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second {
+		t.Fatal("failure-action-only New must reuse the Client")
+	}
+	if second.StreamFetches() != fetches {
+		t.Fatal("failure-action-only New must not start another stream fetch")
+	}
+	if atomic.LoadInt64(hits) != hitsBefore {
+		t.Fatal("failure-action-only New must not hit LAPI again")
+	}
+}
+
+func TestOpenStream_TLSOnlyAdoptsTransport(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	server, _ := testStreamLAPI(t)
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var logBuf bytes.Buffer
+	log := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	ctx := context.Background()
+	firstCfg := testStreamConfig(parsed.Host, 1)
+	firstCfg.HTTPTimeoutSeconds = 10
+	secondCfg := testStreamConfig(parsed.Host, 1)
+	secondCfg.HTTPTimeoutSeconds = 30
+
+	first, err := OpenStream(ctx, firstCfg, log, "first", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := OpenStream(ctx, secondCfg, log, "second", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second {
+		t.Fatal("TLS/timeout-only New must reuse the Client")
+	}
+	current := second.currentTransport()
+	if current == nil || current.httpTimeoutSeconds != 30 {
+		t.Fatalf("adopted timeout: %+v", current)
+	}
+	if current.httpClient.Timeout != 30*time.Second {
+		t.Fatalf("HTTP timeout %v", current.httpClient.Timeout)
+	}
+	logged := logBuf.String()
+	if !strings.Contains(logged, "lapi transport replaced") {
+		t.Fatalf("INFO must name transport replace: %s", logged)
+	}
+	if !strings.Contains(logged, "lapi session joiner adopted") {
+		t.Fatalf("INFO must mark joiner adopted: %s", logged)
 	}
 }
 

@@ -126,7 +126,7 @@ func strongestLiveDecision(items []Decision) *Decision {
 }
 
 // mergeLiveScope queries one header-mapped scope and keeps ban over the current live remediation.
-func (c *Client) mergeLiveScope(chosen string, parsedDuration time.Duration, scope, identifier string, isLiveMode bool) (string, time.Duration) {
+func (c *Client) mergeLiveScope(chosen string, parsedDuration time.Duration, scope, identifier string, isLiveMode bool, defaultDecisionSeconds int64) (string, time.Duration) {
 	if identifier == "" {
 		return chosen, parsedDuration
 	}
@@ -135,7 +135,7 @@ func (c *Client) mergeLiveScope(chosen string, parsedDuration time.Duration, sco
 		c.log.Debug("handleNoStreamCache:scopeQuery " + scope + " " + headerErr.Error())
 		return chosen, parsedDuration
 	}
-	c.cacheLiveScope(decisionscope.HeaderScopeKey(scope, identifier), headerChosen, headerDuration, isLiveMode)
+	c.cacheLiveScope(decisionscope.HeaderScopeKey(scope, identifier), headerChosen, headerDuration, isLiveMode, defaultDecisionSeconds)
 	next := decisionscope.PreferRemediation(chosen, headerChosen)
 	if next != chosen {
 		return next, headerDuration
@@ -144,22 +144,22 @@ func (c *Client) mergeLiveScope(chosen string, parsedDuration time.Duration, sco
 }
 
 // cacheLiveScope stores a live/none header-scope result when live caching is on.
-func (c *Client) cacheLiveScope(key, value string, parsedDuration time.Duration, isLiveMode bool) {
-	if !isLiveMode || c.defaultDecisionTimeout <= 0 {
+func (c *Client) cacheLiveScope(key, value string, parsedDuration time.Duration, isLiveMode bool, defaultDecisionSeconds int64) {
+	if !isLiveMode || defaultDecisionSeconds <= 0 {
 		return
 	}
 	if !decisionscope.IsActiveRemediation(value) {
-		c.cacheClient.Set(key, decisionscope.NoBannedValue, c.defaultDecisionTimeout)
+		c.cacheClient.Set(key, decisionscope.NoBannedValue, defaultDecisionSeconds)
 		return
 	}
-	c.cacheClient.Set(key, value, c.liveCacheTTL(parsedDuration))
+	c.cacheClient.Set(key, value, liveCacheTTL(parsedDuration, defaultDecisionSeconds))
 }
 
-// liveCacheTTL is the live-mode cache TTL: min(decision duration, defaultDecisionTimeout).
-func (c *Client) liveCacheTTL(parsedDuration time.Duration) int64 {
+// liveCacheTTL is the live-mode cache TTL: min(decision duration, defaultDecisionSeconds).
+func liveCacheTTL(parsedDuration time.Duration, defaultDecisionSeconds int64) int64 {
 	durationSecond := int64(parsedDuration.Seconds())
-	if durationSecond <= 0 || c.defaultDecisionTimeout < durationSecond {
-		return c.defaultDecisionTimeout
+	if durationSecond <= 0 || defaultDecisionSeconds < durationSecond {
+		return defaultDecisionSeconds
 	}
 	return durationSecond
 }
