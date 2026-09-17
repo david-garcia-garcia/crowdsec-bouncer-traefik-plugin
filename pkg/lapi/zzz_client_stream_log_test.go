@@ -28,7 +28,7 @@ func newTestStreamTickClient(t *testing.T, log *slog.Logger, host string, httpCl
 		pluginVersion:           "test",
 		isCrowdsecStreamStartup: true,
 	}
-	attachTestTransport(client, httpClient, crowdsecLapiHeader, "test-key")
+	attachTestTransport(client, httpClient, "test-key")
 	return client
 }
 

@@ -41,19 +41,19 @@ type Client struct {
 	closed   bool
 	sleeping bool // last reclaim holder gone; tickers stopped until Wake or Close
 
-	crowdsecScheme         string
-	crowdsecHost           string
-	crowdsecPath           string
-	crowdsecMode           string
-	crowdsecMachineID      string
-	crowdsecPassword       string
-	crowdsecScenarios      []string
-	updateInterval         int64
-	metricsInterval        int64
-	updateMaxFailure       int64
-	crowdsecStreamRoute    string
-	decisionScopeHeaders   map[string]string // CrowdSec header scope → request header
-	sessionKey             string            // reclaim SessionKey (stream/alone) or Key (live/none)
+	crowdsecScheme       string
+	crowdsecHost         string
+	crowdsecPath         string
+	crowdsecMode         string
+	crowdsecMachineID    string
+	crowdsecPassword     string
+	crowdsecScenarios    []string
+	updateInterval       int64
+	metricsInterval      int64
+	updateMaxFailure     int64
+	crowdsecStreamRoute  string
+	decisionScopeHeaders map[string]string // CrowdSec header scope → request header
+	sessionKey           string            // reclaim SessionKey (stream/alone) or Key (live/none)
 
 	transport       atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
 	cacheClient     *cache.Client

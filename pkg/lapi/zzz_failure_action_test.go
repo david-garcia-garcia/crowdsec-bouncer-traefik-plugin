@@ -29,7 +29,7 @@ func Test_liveLookup_lapiErrorIsNotABan(t *testing.T) {
 		cacheClient:    cacheClient,
 		log:            logger.New("ERROR", ""),
 	}
-	attachTestTransport(client, lapi.Client(), crowdsecLapiHeader, "")
+	attachTestTransport(client, lapi.Client(), "")
 	value, err := client.LiveLookup("1.2.3.4", nil, 0)
 	if err == nil {
 		t.Fatal("live LAPI 500 expected an error")
@@ -55,7 +55,7 @@ func TestLiveLookup_PerRouterTTLLastWrites(t *testing.T) {
 		cacheClient:    cacheClient,
 		log:            logger.New("ERROR", ""),
 	}
-	attachTestTransport(client, lapi.Client(), crowdsecLapiHeader, "")
+	attachTestTransport(client, lapi.Client(), "")
 	if _, err := client.LiveLookup("1.2.3.4", nil, 60); err != nil {
 		t.Fatal(err)
 	}

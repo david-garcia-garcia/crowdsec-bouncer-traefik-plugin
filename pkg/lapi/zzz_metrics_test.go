@@ -127,7 +127,7 @@ func TestReportMetricsPluginVersion(t *testing.T) {
 		windowCounters:  make(map[usageMetricKey]int64),
 		activeDecisions: make(map[usageMetricKey]int64),
 	}
-	attachTestTransport(client, lapi.Client(), crowdsecLapiHeader, "")
+	attachTestTransport(client, lapi.Client(), "")
 	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func newUsageMetricsClient(t *testing.T) (*Client, *[]byte) {
 		windowCounters:  make(map[usageMetricKey]int64),
 		activeDecisions: make(map[usageMetricKey]int64),
 	}
-	attachTestTransport(client, lapi.Client(), crowdsecLapiHeader, "")
+	attachTestTransport(client, lapi.Client(), "")
 	return client, gotBody
 }
 
@@ -339,7 +339,7 @@ func TestReportMetricsRestoresOnFailure(t *testing.T) {
 		windowCounters:  make(map[usageMetricKey]int64),
 		activeDecisions: make(map[usageMetricKey]int64),
 	}
-	attachTestTransport(client, lapi.Client(), crowdsecLapiHeader, "")
+	attachTestTransport(client, lapi.Client(), "")
 	client.IncProcessed("ipv4")
 	if err := client.reportMetrics(); err == nil {
 		t.Fatal("failed POST must error")
