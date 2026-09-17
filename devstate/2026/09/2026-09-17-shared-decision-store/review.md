@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: 2 produced (missing-packet Stream lease, stale-usage Redis CachePrefix); 0 skipped
 fixed: created core_plugin_lapi_stream-lease.md; SessionHex keyPrefix + acquire.go on Redis usage
 skipped: none
+
+## archive (2026-09-17T17:43:34Z)
+phase: archive
+findings: none
+fixed: catalog sync (decision-store new; isolated-store / stream-lease / reclaim-key / utilities-client fold) + move to openspec/changes/archive/2026-09-17-shared-decision-store/
+skipped: FindSpecHost Task tool unavailable on archive worker; ran find-spec-host.md on this thread
