@@ -1,13 +1,13 @@
-Developer review: in progress — 2026-09-17T07:52:21Z
+Developer review: ready for review — 2026-09-17T08:20:00Z
 
 ## What this changes
-**Operators.** None yet — explore locked deploy keys `captchaGateSecret` / `captchaGateSecretFile` and `captchaGateBindIP` (default bind IP); implement not started.
+**Operators.** Set `captchaGateSecret` or `captchaGateSecretFile` whenever captcha is enabled; optional `captchaGateBindIP` (default bind client IP) controls whether grace is IP-scoped or cookie-only.
 
 **Admin users.** None.
 
-**Developers.** None yet — explore chose stateless `crowdsec_captcha_gate` cookie grace and dropping `{ip}_captcha` from `pkg/captcha`; product diff still pending propose/implement.
+**Developers.** `pkg/captcha` issues and validates `crowdsec_captcha_gate` HMAC cookies; `Check(r, remoteIP)` no longer touches cache; OpenSpec adds `core_plugin_middleware_captcha-gate` and drops cache captcha grace from `core_cache_client_isolated-store`.
 
-**End users.** None yet — after implement, captcha grace rides in the browser cookie instead of shared cache keys per IP.
+**End users.** After solving captcha, grace follows the browser cookie instead of a shared per-IP cache entry.
 
 ## Motivation
 On `master`, a solved captcha writes `{remoteIP}_captcha` into the connection cache and later requests pass only while that key holds `d`. Grace therefore depends on cache reachability, shared-IP semantics, and cannot be carried as a portable browser credential. PR #45 proposed cache-backed session tokens; this ticket supersedes that with stateless signed cookies and closes #45 without merging.
@@ -16,89 +16,83 @@ On `master`, a solved captcha writes `{remoteIP}_captcha` into the connection ca
 sequenceDiagram
   participant Browser
   participant Bouncer
-  participant Cache
   participant Provider
   Browser->>Bouncer: POST captcha solve
   Bouncer->>Provider: siteverify
   Provider-->>Bouncer: success
-  Bouncer->>Cache: SET ip_captcha = d
-  Browser->>Bouncer: next GET (same IP)
-  Bouncer->>Cache: GET ip_captcha
-  Cache-->>Bouncer: d
-  Bouncer-->>Browser: allow
+  Bouncer-->>Browser: Set-Cookie crowdsec_captcha_gate + 302
+  Browser->>Bouncer: next GET with cookie
+  Bouncer-->>Browser: allow (grace)
 ```
 
 If we do not merge a cookie-based gate, operators keep cache-tied grace (and stale Redis keys still count as solved), and the superseded PR #45 session design remains a distraction.
 
 ## Merge readiness
-Explore complete; propose is next. 6 workflow items remain.
+Implementation, review, devdocs, and archive complete. None remain.
 
 Priority: P2 — real shared-IP and cache-dependency pain for captcha grace, with workarounds (per-connection cache, accepting IP-wide grace).
 
-Reviewed head: 48ee782
-Owner decision: Required. See Decision needed.
+Reviewed head: 4ffba32
+Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 2/6 | Explore done; no OpenSpec or product diff yet |
-| CI proof | 6/6 | Actions run 35191740022 succeeded |
-| Local tests proof | N/A | Before implement |
-| Review resolution | N/A | No PR comments inventoried |
+| Overall readiness | 6/6 | Local tests passed; CI succeeded on latest push |
+| CI proof | 6/6 | GitHub Actions succeeded on head commit |
+| Local tests proof | 6/6 | handoff.yaml localTests passed |
+| Review resolution | N/A | No PR comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-17-captcha-stateless-gate pushed | git push |
-| OpenSpec | none | handoff.yaml change |
+| OpenSpec | captcha-stateless-gate (archived) | openspec/changes/archive/2026-09-17-captcha-stateless-gate |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/58 | GitHub |
-| CI | build 35191740022 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35191740022 | pr-host CI |
-| Local tests | none | handoff.yaml localTests |
-| PR comments | no comments | PR #58 comment list empty |
+| CI | succeeded on latest push | pr-host CI |
+| Local tests | passed | handoff.yaml localTests |
+| PR comments | no comments | PR #58 |
 
 ## Specs
-None.
+- [core_plugin_middleware_captcha-gate](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-captcha-stateless-gate/openspec/changes/archive/2026-09-17-captcha-stateless-gate/proposal.md) — added
+- [core_cache_client_isolated-store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-captcha-stateless-gate/openspec/changes/archive/2026-09-17-captcha-stateless-gate/proposal.md) — modified
 
 ## Follow-up issues
 None.
 
 ## How this fits together
-Local ticket → branch `2026-09-17-captcha-stateless-gate` → stub PR #58 → explore fixed cookie/HMAC and cache removal → propose OpenSpec next → close PR #45 during implement/pullrequest.
+Local ticket → branch `2026-09-17-captcha-stateless-gate` → PR #58 → stateless captcha gate landed; PR #45 closed without merge.
 
 ## Decision needed
-| Question | Decision | By |
-| --- | --- | --- |
-| Cookie name, attributes, and whether v1 adds public Traefik keys for them? | assumed — name `crowdsec_captcha_gate`; HttpOnly; Path=/; SameSite=Lax; MaxAge=grace seconds; Secure iff `r.TLS != nil`; no Domain; no public keys for name/flags. | explore |
-| Public knob for bind-IP vs cookie-only, and dedicated HMAC secret field? | assumed — `captchaGateBindIP` bool default true; `captchaGateSecret` + `captchaGateSecretFile` via existing `GetVariable`. Empty secret when captcha is enabled is rejected at ValidateParams. Do not derive from `CaptchaSecretKey` or LAPI key. | explore |
-| Payload encoding and expiry? | assumed — compact `v1.<unix_issued>.<0|1>.<ip>` + `.` + base64url HMAC-SHA256 of that prefix; expiry is `issued + CaptchaGracePeriodSeconds`; 30s clock skew allowed on the low side. Cookie-only still writes `0` and empty ip. Compare HMAC with `hmac.Equal`. | explore |
-| IPv6 normalization when comparing bound IP? | assumed — compare `req.remoteIP` to the payload ip as opaque strings. `GetRemoteIP` already chose the hop string; captcha does not call `net.ParseIP.String()`. | explore |
+None.
 
 ## Before merge
-- [ ] [P2] Propose OpenSpec change for stateless captcha gate
-- [ ] [P2] Implement signed cookie grace; remove cache keys from `pkg/captcha`
-- [ ] [P2] Close PR #45 without merging
-- [x] Explore cookie encoding, dedicated HMAC secret config, and OpenSpec update for cache grace removal
-- [x] Prepare: requirement, worktree, stub PR
+None.
 
 ## Findings
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-captcha-stateless-gate/devstate/2026/09/2026-09-17-captcha-stateless-gate/codereview_standards.md) — 0 total, 0 pending, 0 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-captcha-stateless-gate/devstate/2026/09/2026-09-17-captcha-stateless-gate/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-captcha-stateless-gate/devstate/2026/09/2026-09-17-captcha-stateless-gate/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-captcha-stateless-gate/devstate/2026/09/2026-09-17-captcha-stateless-gate/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-captcha-stateless-gate/devstate/2026/09/2026-09-17-captcha-stateless-gate/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-captcha-stateless-gate/devstate/2026/09/2026-09-17-captcha-stateless-gate/codereview_coverage.md) — 0 total, 0 pending, 0 completed
 
 ## Agent review details
 
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | No product diff yet |
-| Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | No comments on stub PR |
-| Reviewed head | 48ee782242240277001c662caa0709ad7448285e | Matches pushed branch |
+| Specs in this PR | 1 added / 1 modified | Matches ## Specs |
+| Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | No review threads |
+| Reviewed head | 4ffba32460e675513740ffa13dee159978a4936f | Branch tip before archive/docs commit |
 
 ### Stored data model
-None.
+- Changed: browser cookie `crowdsec_captcha_gate` / value — string — sample `v1.1700000000.1.203.0.113.5.<base64url-hmac>`.
 
 ### Technical review
-Best possible solution: not evaluated — no apply yet.
+Best possible solution: stateless HMAC cookie matches explore decisions and removes cache coupling without Redis scope creep.
 
-Do we have a high-confidence way to reproduce? Yes — existing captcha/cache paths in `pkg/captcha/captcha.go` and bouncer remediation tests can be extended once cookies land.
+Do we have a high-confidence way to reproduce? Yes — `pkg/captcha/zzz_gate_test.go` and configuration validation tests.
