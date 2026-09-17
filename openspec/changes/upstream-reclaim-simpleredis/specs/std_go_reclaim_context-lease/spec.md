@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Process table is a singleton
-The package SHALL expose one process-wide table (`Default` / package `Open`). That table SHALL be constructed with `ReclaimGraceDuration` (30 seconds). Independent keys MUST NOT share an incarnation. Callers SHALL type-assert the value `Open` returns.
+The package SHALL expose one process-wide table (`Default` / package `Open`). That table SHALL be constructed with `ProcessGrace` (30 seconds). Independent keys MUST NOT share an incarnation. Callers SHALL type-assert the value `Open` returns.
 
 #### Scenario: Two keys stay independent
 - **WHEN** key A and key B are both opened

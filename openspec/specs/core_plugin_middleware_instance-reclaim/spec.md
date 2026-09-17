@@ -52,10 +52,10 @@ When no live constructor context remains for a stream session and the previous s
 - **AND** two `handleStreamCache` loops MUST NOT run on that session at once
 
 ### Requirement: Unreclaimed connection is closed after grace
-When no live constructor context remains for a LAPI connection key and grace elapses with no replace, the connection SHALL stop its tickers and release idle LAPI HTTP connections (`Close`). An `lapi.Client` SHALL wait 30 seconds via `OpenWithGrace(..., ReclaimGraceDuration, ...)`. An `appsec.Client` SHALL use the same 30s grace. Table `DefaultGrace` SHALL remain 10 seconds. Values opened with `Open` SHALL use the table grace.
+When no live constructor context remains for a LAPI connection key and grace elapses with no replace, the connection SHALL stop its tickers and release idle LAPI HTTP connections (`Close`). An `lapi.Client` SHALL wait 30 seconds (process table grace `ProcessGrace`). An `appsec.Client` SHALL use the same table. Open SHALL pass `reclaim.Hooks` for Sleep/Wake/Close.
 
-#### Scenario: Connection grace is not the table default
-- **WHEN** the process table is constructed with a 20 millisecond grace
+#### Scenario: Connection grace is the process table wait
+- **WHEN** the process table grace is 30 seconds
 - **AND** the last holder of an `lapi.Client` is cancelled
 - **THEN** the incarnation is still sleeping after 20 milliseconds
 - **AND** it is disposed after 30 seconds

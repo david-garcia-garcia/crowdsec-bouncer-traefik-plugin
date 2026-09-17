@@ -69,7 +69,7 @@ func list(m map[string]Decision) []Decision {
 	return out
 }
 
-// --- Redis mock (RESP arrays as spoken by pkg/simpleredis, plus inline GET) ---
+// --- Redis mock (RESP arrays as spoken by utilities/simpleredis, plus inline GET) ---
 
 // serveRedis is a hardcoded stand-in. When verdicts is true it plays a replica
 // that holds decisions: GET/MGET of 1.2.3.4 → "f" (clean), 1.2.3.5 → "t" (banned);
