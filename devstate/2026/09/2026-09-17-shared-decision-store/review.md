@@ -27,3 +27,9 @@ phase: codereview
 findings: P3 7
 fixed: Standards 3 (rename placeholders, storeParamsFrom comment, ApplyRangeBatch Cache()); Dead 2 (CachePrefix, AcquireLease); Coverage 2 (live SessionHex prefix GET, last-holder grace Close)
 skipped: none
+
+## devdocsimpact (2026-09-17T17:38:37Z)
+phase: devdocsimpact
+findings: 2 produced (missing-packet Stream lease, stale-usage Redis CachePrefix); 0 skipped
+fixed: created core_plugin_lapi_stream-lease.md; SessionHex keyPrefix + acquire.go on Redis usage
+skipped: none
