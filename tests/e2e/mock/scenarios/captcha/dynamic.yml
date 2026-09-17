@@ -29,5 +29,6 @@ http:
           # contacting a real API key.
           captchaSiteKey: "1x00000000000000000000AA"
           captchaSecretKey: "1x0000000000000000000000000000000AA"
+          captchaGateSecret: "e2e-mock-captcha-gate-secret"
           captchaHtmlFilePath: "@@SCENARIO_DIR@@/captcha.html"
           captchaGracePeriodSeconds: "10"

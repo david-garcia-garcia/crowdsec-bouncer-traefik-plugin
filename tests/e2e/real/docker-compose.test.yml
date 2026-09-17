@@ -114,6 +114,7 @@ services:
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaProvider=hcaptcha"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaSiteKey=test-site-key"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaSecretKey=test-secret-key"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaGateSecret=test-gate-secret"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
