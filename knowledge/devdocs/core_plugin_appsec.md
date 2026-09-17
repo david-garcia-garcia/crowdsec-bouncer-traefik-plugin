@@ -39,6 +39,7 @@ decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
 ## Key files
 
 - `pkg/appsec/`
+- `pkg/appsec/query.go`
 - `pkg/appsec/client_http.go`
 - `pkg/appsec/session.go`
 - `pkg/bouncer/bouncer.go`
@@ -53,5 +54,6 @@ decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
 - Empty `crowdsecAppsecKey` still falls back to `crowdsecLapiKey` in `appsec.Prepare`. Call `lapi.Prepare` first.
 - HTTP 502, 503, and 504 from the AppSec listener are unreachable (same `crowdsecAppsecFailureAction` as a transport failure), not a generic non-200 ban. Drain those bodies so keep-alive can reuse the slot.
 - DELETE is not an unreadable-body drop. Do not gate the readable-body copy on `isMethodWithBody`.
+- Classify AppSec response-body io failures with `errors.Is` on the package-local sentinel. Do not match the `appsecQuery:readBody` prefix. Oversized AppSec bodies stay a different error and skip FailureAction.
 - Do not pass `0` into `io.LimitReader` (`N <= 0` is immediate EOF).
 - Do not put AppSec TLS or `HTTPTimeoutSeconds` in the AppSec reclaim key. Last `New` `AdoptTransport`s those knobs. Concurrent adopt last-writes and idle-closes the replaced `*http.Client`.
