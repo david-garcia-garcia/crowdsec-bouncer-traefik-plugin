@@ -1,5 +1,13 @@
 # Research domains
 
-## std
+## ext
+- traefik
+- crowdsec
+- simpleredis
+- traefik-middleware-utilities
+- dragonfly
+- redis
+- traefik-geoblock
 
+## std
 - go

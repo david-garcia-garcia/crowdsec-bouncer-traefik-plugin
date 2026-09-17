@@ -3,17 +3,20 @@
 package cache
 
 import (
+	"bytes"
+	"net"
 	"testing"
+	"time"
 
+	simpleredis "github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
-	simpleredis "github.com/maxlerebourg/simpleredis"
 )
 
 func Test_Get(t *testing.T) {
 	IPInCache := "10.0.0.10"
 	IPNotInCache := "10.0.0.20"
 	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
-	client.Set(IPInCache, BannedValue, 10)
+	client.Set(IPInCache, "t", 10)
 	type args struct {
 		clientIP string
 	}
@@ -24,7 +27,7 @@ func Test_Get(t *testing.T) {
 		wantErr  bool
 		valueErr string
 	}{
-		{name: "Fetch Known valid IP", args: args{clientIP: IPInCache}, want: BannedValue, wantErr: false, valueErr: ""},
+		{name: "Fetch Known valid IP", args: args{clientIP: IPInCache}, want: "t", wantErr: false, valueErr: ""},
 		{name: "Fetch Unknown valid IP", args: args{clientIP: IPNotInCache}, want: "", wantErr: true, valueErr: CacheMiss},
 		{name: "Fetch invalid value", args: args{clientIP: "test"}, want: "", wantErr: true, valueErr: CacheMiss},
 		{name: "Fetch empty value", args: args{clientIP: ""}, want: "", wantErr: true, valueErr: CacheMiss},
@@ -63,9 +66,9 @@ func Test_Set(t *testing.T) {
 		wantErr  bool
 		valueErr string
 	}{
-		{name: "Set valid IP in local cache for 0 sec", args: args{clientIP: IPInCache, value: BannedValue, duration: 0}, want: "", wantErr: true, valueErr: CacheMiss},
-		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: BannedValue, duration: 10}, want: BannedValue, wantErr: false, valueErr: ""},
-		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: NoBannedValue, duration: 10}, want: NoBannedValue, wantErr: false, valueErr: ""},
+		{name: "Set valid IP in local cache for 0 sec", args: args{clientIP: IPInCache, value: "t", duration: 0}, want: "", wantErr: true, valueErr: CacheMiss},
+		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: "t", duration: 10}, want: "t", wantErr: false, valueErr: ""},
+		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: "f", duration: 10}, want: "f", wantErr: false, valueErr: ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -90,7 +93,7 @@ func Test_Delete(t *testing.T) {
 	IPInCache := "10.0.0.12"
 	IPNotInCache := "10.0.0.22"
 	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
-	client.Set(IPInCache, BannedValue, 10)
+	client.Set(IPInCache, "t", 10)
 	type args struct {
 		clientIP string
 	}
@@ -126,11 +129,11 @@ func Test_Delete(t *testing.T) {
 
 // indexOfReader returns the position of r inside rc.readers, or -1 when r is the writer (the no-readers fallback).
 func indexOfReader(rc *redisCache, r *simpleredis.SimpleRedis) int {
-	if r == &rc.writer {
+	if r == rc.writer {
 		return -1
 	}
 	for i := range rc.readers {
-		if r == &rc.readers[i] {
+		if r == rc.readers[i] {
 			return i
 		}
 	}
@@ -151,12 +154,180 @@ func Test_nextReader(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rc := &redisCache{log: logger.New("INFO", "")}
-			rc.readers = make([]simpleredis.SimpleRedis, tt.readers)
+			rc.writer = &simpleredis.SimpleRedis{}
+			rc.readers = make([]*simpleredis.SimpleRedis, tt.readers)
+			for i := range rc.readers {
+				rc.readers[i] = &simpleredis.SimpleRedis{}
+			}
 			for call, want := range tt.want {
 				if got := indexOfReader(rc, rc.nextReader()); got != want {
 					t.Errorf("call %d: nextReader() -> reader[%d], want reader[%d]", call, got, want)
 				}
 			}
 		})
+	}
+}
+
+// Test_NewKeepsRedisReadersByPointer fails if Client.New copies a pooled SimpleRedis by value or aliases reader pointers (upstream crowdsec-bouncer-traefik-plugin#381).
+func Test_NewKeepsRedisReadersByPointer(t *testing.T) {
+	client := &Client{}
+	client.New(logger.New("INFO", ""), true, "127.0.0.1:1", []string{"127.0.0.1:2", "127.0.0.1:3"}, "", "", "p")
+	defer client.Close()
+	rc, ok := client.cache.(*redisCache)
+	if !ok {
+		t.Fatalf("cache type %T, want *redisCache", client.cache)
+	}
+	if rc.writer == nil {
+		t.Fatal("writer is nil")
+	}
+	if len(rc.readers) != 2 {
+		t.Fatalf("len(readers)=%d, want 2", len(rc.readers))
+	}
+	if rc.readers[0] == nil || rc.readers[1] == nil {
+		t.Fatal("a reader pointer is nil")
+	}
+	if rc.readers[0] == rc.readers[1] {
+		t.Fatal("both read hosts share one SimpleRedis pointer")
+	}
+	if rc.readers[0] == rc.writer || rc.readers[1] == rc.writer {
+		t.Fatal("a reader aliases the writer")
+	}
+	// First Add(1)%2 is 1, then 0, then 1.
+	want := []int{1, 0, 1, 0}
+	for call, idx := range want {
+		got := indexOfReader(rc, rc.nextReader())
+		if got != idx {
+			t.Errorf("call %d: nextReader() -> reader[%d], want reader[%d] (same pointer as New stored)", call, got, idx)
+		}
+	}
+}
+
+func Test_memoryClientsDoNotShare(t *testing.T) {
+	a := &Client{}
+	b := &Client{}
+	a.New(logger.New("INFO", ""), false, "", nil, "", "", "")
+	b.New(logger.New("INFO", ""), false, "", nil, "", "", "")
+	a.Set("1.2.3.4", "t", 10)
+	got, err := b.Get("1.2.3.4")
+	if err == nil || got != "" {
+		t.Fatalf("client B got %q err %v, want miss", got, err)
+	}
+	if err.Error() != CacheMiss {
+		t.Fatalf("client B err %v, want %s", err, CacheMiss)
+	}
+	a.Close()
+	b.Close()
+}
+
+func Test_ClientCloseRedis(_ *testing.T) {
+	client := &Client{}
+	client.New(logger.New("INFO", ""), true, "127.0.0.1:1", []string{"127.0.0.1:1"}, "", "", "p")
+	client.Close()
+	client.Close()
+	var empty *Client
+	empty.Close()
+}
+
+func Test_prefixed(t *testing.T) {
+	if got := prefixed("", "ip"); got != "ip" {
+		t.Fatalf("empty prefix: got %q", got)
+	}
+	if got := prefixed("ab", "ip"); got != "ab:ip" {
+		t.Fatalf("prefix: got %q", got)
+	}
+	if got := prefixed("a", "updated"); got != "a:updated" {
+		t.Fatalf("lease key: got %q", got)
+	}
+}
+
+func Test_redisCacheUsesPrefix(t *testing.T) {
+	rc := &redisCache{prefix: "conn1"}
+	if got := prefixed(rc.prefix, "1.2.3.4"); got != "conn1:1.2.3.4" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func Test_GetMany(t *testing.T) {
+	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
+	client.Set("a", "t", 10)
+	client.Set("b", "c", 10)
+	got, err := client.GetMany([]string{"a", "missing", "b", ""})
+	if err != nil {
+		t.Fatalf("GetMany err %v", err)
+	}
+	if got["a"] != "t" || got["b"] != "c" {
+		t.Fatalf("GetMany got %+v", got)
+	}
+	if _, ok := got["missing"]; ok {
+		t.Fatal("missing key must be omitted")
+	}
+	if _, ok := got[""]; ok {
+		t.Fatal("empty key must be omitted")
+	}
+}
+
+func Test_redisClientConfigTimeouts(t *testing.T) {
+	cfg := redisClientConfig("127.0.0.1:1", "", "", logger.New("INFO", ""))
+	if cfg.DialTimeout != 2*time.Second {
+		t.Fatalf("DialTimeout %v, want 2s", cfg.DialTimeout)
+	}
+	if cfg.CommandTimeout != time.Second {
+		t.Fatalf("CommandTimeout %v, want 1s", cfg.CommandTimeout)
+	}
+}
+
+func serveRedisMiss(t *testing.T) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	go func() {
+		for {
+			conn, acceptErr := ln.Accept()
+			if acceptErr != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer func() { _ = c.Close() }()
+				buf := make([]byte, 4096)
+				for {
+					n, readErr := c.Read(buf)
+					if n > 0 {
+						if bytes.Contains(buf[:n], []byte("GET")) {
+							_, _ = c.Write([]byte("$-1\r\n"))
+						} else {
+							_, _ = c.Write([]byte("+OK\r\n"))
+						}
+					}
+					if readErr != nil {
+						return
+					}
+				}
+			}(conn)
+		}
+	}()
+	return ln.Addr().String()
+}
+
+func Test_redisGetMissMapsCacheMiss(t *testing.T) {
+	host := serveRedisMiss(t)
+	client := &Client{}
+	client.New(logger.New("INFO", ""), true, host, nil, "", "", "p")
+	defer client.Close()
+	got, err := client.Get("missing-key")
+	if got != "" || err == nil || err.Error() != CacheMiss {
+		t.Fatalf("Get miss got %q err %v, want cache:miss", got, err)
+	}
+}
+
+func Test_GetManyUnreachable(t *testing.T) {
+	client := &Client{}
+	client.New(logger.New("INFO", ""), true, "127.0.0.1:1", nil, "", "", "p")
+	defer client.Close()
+	_, err := client.GetMany([]string{"k"})
+	if err == nil || err.Error() != CacheUnreachable {
+		t.Fatalf("GetMany unreachable got %v, want %s", err, CacheUnreachable)
 	}
 }

@@ -3,8 +3,35 @@
 Generated. Root, domain, and component families only. Leaves omitted.
 Allowlist of root + domain: `openspec/specs/domains.md`.
 
+## build
+
+### ci
+
+- github
+
+### e2e
+
+- mock
+- pester
+
+## core
+
+### cache
+
+- client
+- redis
+
+### plugin
+
+- appsec
+- decisions
+- ip
+- lapi
+- middleware
+
 ## std
 
 ### go
 
+- reclaim
 - test

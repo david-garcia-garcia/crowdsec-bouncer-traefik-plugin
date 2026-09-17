@@ -1,2 +1,11 @@
+# Knowledge/devdocs domain allowlist
+
+## build
+- e2e
+
+## core
+- cache
+- plugin
+
 ## std
 - go

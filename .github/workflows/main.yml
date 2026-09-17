@@ -26,7 +26,7 @@ jobs:
       CGO_ENABLED: 0
     defaults:
       run:
-        working-directory: ${{ github.workspace }}/go/src/github.com/${{ github.repository }}
+        working-directory: ${{ github.workspace }}/go/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
 
     steps:
 
@@ -40,7 +40,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v7
         with:
-          path: go/src/github.com/${{ github.repository }}
+          path: go/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
           fetch-depth: 0
 
       # https://github.com/marketplace/actions/cache
@@ -71,8 +71,11 @@ jobs:
           go mod vendor
           # git diff --exit-code ./vendor/
 
-      - name: Lint and Tests
-        run: make
+      - name: Lint
+        run: make lint
+
+      - name: Tests
+        run: make test
 
       - name: Run tests with Yaegi
         run: make yaegi_test

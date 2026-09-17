@@ -19,7 +19,7 @@ The Crowdsec utility will provide the community blocklist which contains highly 
 
 When used with Crowdsec it will leverage the local API which will analyze Traefik logs and take decisions on the requests made by users/bots. Malicious actors will be banned based on patterns used against your website.
 
-Appsec feature is supported from plugin version 1.2.0 and Crowdsec 1.6.0.
+Appsec feature is supported from plugin version 1.2.0 and Crowdsec 1.6.0. CrowdSec 1.8 AppSec **bot-detection** (challenge HTML, `__crowdsec_challenge` cookie, `/crowdsec-internal/challenge/*`) is supported by this plugin: enable AppSec as usual and route that path prefix through the **same** CrowdSec middleware as the protected app so the callback is not sent to origin. There is no extra plugin option. See [CrowdSec bot detection](https://docs.crowdsec.net/docs/next/appsec/bot_detection/intro.md).
 
 The AppSec Component offers:
 
@@ -32,6 +32,26 @@ More information on appsec in the [Crowdsec Documentation](https://doc.crowdsec.
 Remediation offered by [Crowdsec](https://docs.crowdsec.net/u/bouncers/intro) and supported by the plugin can be either `ban` or `captcha`.  
 For the `ban` remediation the user will be blocked in Traefik (HTTP 403).  
 For the `captcha` remediation, the user will be redirected to a page to complete a captcha challenge.
+
+Decision **scopes** supported by the plugin are `Ip`, `Range` (CIDR), and any other CrowdSec scope listed in `decisionScopeHeaders`.
+
+`decisionScopeHeaders` maps a CrowdSec **scope name** (the map key) to a request **header name** (the map value). The key selects how the header is interpreted, not the header name:
+
+- `Country` (any case: `country`, `Country`): ISO 3166-1 alpha-2, case-insensitive. Cloudflare `XX` and `T1` do not match. Example headers: `CF-IPCountry`, or `X-IPCountry` from a geoenrich middleware.
+- `AS` (any case: `as`, `AS`): decimal ASN. A leading `AS` / `as` on the header or the decision is ignored. Example header: `CF-ASN`.
+- Any other key (`username`, `session`, …): trimmed header string, compared as-is to the decision value. The key must match the scope LAPI stored (`username` is not `user`).
+- `Ip` and `Range` cannot be mapped. IP comes from the client address; Range is CIDR containment.
+
+Range uses one shared cache key (`range-index`) of `cidr=remediation` lines. A request that misses an exact IP walks that list. Live/none skip `range-index` and expand Range via LAPI `?ip=`. Lookup is one `GetMany` for the IP, header-scope keys, and `range-index` (Redis `MGET`).
+
+```yaml
+decisionScopeHeaders:
+  Country: X-IPCountry
+  AS: CF-ASN
+  username: X-User
+```
+
+The plugin does not resolve GeoIP or invent header values. Every `decisionScopeHeaders` scope is taken from the request as-is (CDN, reverse proxy, or a Traefik middleware such as [traefik-geoblock](https://github.com/david-garcia-garcia/traefik-geoblock)). If the client can set that header, they can change matching — use only values you trust when the header is not client-controlled. A worked chain is in [examples/geoenrich-decisions](examples/geoenrich-decisions/README.md).
 
 On successfull completion, he will be cleaned for a specified period of time before a new resolution challenge is expected if Crowdsec still has a decision to verify the user behavior. See the example captcha for more informations and configuration intructions.  
 The following captcha providers are supported now:
@@ -350,7 +370,7 @@ make run
 - CrowdsecAppsecEnabled
   - bool
   - default: false
-  - Enable Crowdsec Appsec Server (WAF).
+  - Enable Crowdsec Appsec Server (WAF). CrowdSec 1.8 bot-detection needs this set, plus a Traefik router `PathPrefix(/crowdsec-internal/challenge)` using this same middleware.
 - CrowdsecAppsecHost
   - string
   - default: "crowdsec:7422"
@@ -370,22 +390,14 @@ make run
   - string
   - default: "/"
   - Crowdsec Appsec Server available on this path. Will be appended to CrowdsecAppsecHost. Need to finish with "/".
-- CrowdsecAppsecFailureBlock
-  - bool
-  - default: true
-  - Block request when Crowdsec Appsec Server have a [status 500](https://docs.crowdsec.net/docs/next/appsec/protocol#response-code).
-- CrowdsecAppsecUnreachableBlock
-  - bool
-  - default: true
-  - Block request when Crowdsec Appsec Server is unreachable.
+- CrowdsecAppsecFailureAction
+  - string
+  - default: `ban`, expected values are: `passthrough`, `ban`, `captcha`
+  - What to do when AppSec does not return a usable verdict: HTTP 500, unreachable (dial or 502/503/504), or an unreadable HTTP/2 or HTTP/3 body on a method that would send a body. `ban` drops the request. `passthrough` lets 500/unreachable continue as allow, and sends a headers-only GET to AppSec when the body cannot be buffered. `captcha` uses the plugin captcha client (`captchaProvider` must be set). **BREAKING:** this key replaces `crowdsecAppsecFailureBlock`, `crowdsecAppsecUnreachableBlock`, and `crowdsecAppsecUnreadableBodyBlock`. Operators who had those bools set to `false` MUST set `crowdsecAppsecFailureAction: passthrough`.
 - CrowdsecAppsecBodyLimit
   - int64
   - default: 10485760 (= 10MB)
   - Transmit only the first number of bytes to Crowdsec Appsec Server.
-- CrowdsecAppsecUnreadableBodyBlock
-  - bool
-  - default: true
-  - Behaviour when the request body cannot be buffered for inspection (HTTP/2 or HTTP/3 request without a `Content-Length`, typically a bidirectional gRPC stream). When `false` the request is forwarded to the Appsec Server with headers only (the body is left to stream through untouched). When `true` the request is blocked outright. Mirrors the reference bouncers' `APPSEC_DROP_UNREADABLE_BODY` option.
 - CrowdsecAppsecKey
   - string
   - default: value of `CrowdsecLapiKey`
@@ -433,6 +445,10 @@ make run
   - string
   - default: "X-Forwarded-For"
   - Name of the header where the real IP of the client should be retrieved
+- DecisionScopeHeaders
+  - map[string]string
+  - default: {}
+  - Maps a CrowdSec **scope name** (key) to a request header (value). The key chooses the matcher: `Country` (any case) is ISO 3166-1 alpha-2 and ignores `XX`/`T1`; `AS` (any case) is decimal digits and strips a leading `AS`; any other key is a trimmed exact match. Do not map `Ip` or `Range`. Empty disables header scopes. This plugin does not geolocate. See the `decisionScopeHeaders` example above.
 - ForwardedHeadersTrustedIPs
   - []string
   - default: []
@@ -474,6 +490,10 @@ make run
   - int64
   - default: 0
   - Used only in `stream` and `alone` mode, the maximum number of time we can not reach Crowdsec before blocking traffic (set -1 to never block)
+- CrowdsecLapiFailureAction
+  - string
+  - default: `ban`, expected values are: `passthrough`, `ban`, `captcha`
+  - What to do when LAPI does not return a usable verdict: live/none HTTP or parse error, or a cache miss while stream/alone is unhealthy after `updateMaxFailure`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the existing pass path (AppSec still runs if enabled). `captcha` uses the plugin captcha client (`captchaProvider` must be set).
 - StreamStartupBlock
   - bool
   - default: true
@@ -613,6 +633,7 @@ http:
           LogFilePath: ""
           updateIntervalSeconds: 60
           updateMaxFailure: 0
+          crowdsecLapiFailureAction: ban
           streamStartupBlock: true
           defaultDecisionSeconds: 60
           remediationStatusCode: 403
@@ -622,10 +643,8 @@ http:
           crowdsecAppsecScheme: ""
           crowdsecAppsecHost: crowdsec:7422
           crowdsecAppsecPath: "/"
-          crowdsecAppsecFailureBlock: true
-          crowdsecAppsecUnreachableBlock: true
+          crowdsecAppsecFailureAction: ban
           crowdsecAppsecBodyLimit: 10485760
-          crowdsecAppsecUnreadableBodyBlock: false
           crowdsecLapiKey: privateKey-foo
           crowdsecLapiScheme: http
           crowdsecLapiHost: crowdsec:8080
@@ -643,6 +662,10 @@ http:
           clientTrustedIPs:
             - 192.168.1.0/24
           forwardedHeadersCustomName: X-Custom-Header
+          decisionScopeHeaders: {}
+            # Country: X-IPCountry    # key Country (any case) → ISO country matcher (CDN or geoenrich)
+            # AS: CF-ASN             # key AS (any case) → ASN matcher
+            # username: X-User       # any other key → trimmed exact match
           remediationHeadersCustomName: cs-remediation
           redisCacheEnabled: false
           redisCacheHost: "redis-primary:6379"
@@ -765,6 +788,22 @@ docker exec crowdsec cscli decisions add --ip 10.0.0.10 -d 10m -t captcha # this
 docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha
 ```
 
+### Testing
+
+Mock e2e (Traefik binary + mock LAPI, no Crowdsec):
+
+```bash
+make e2e_mock
+```
+
+Real-stack e2e (Docker Traefik + Crowdsec, Pester):
+
+```bash
+./tests/e2e/real/Test-Integration.ps1
+# or
+make e2e_pester
+```
+
 ### Examples
 
 #### 1. Behind another proxy service (ex: clouflare) [examples/behind-proxy/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/behind-proxy/README.md)
@@ -788,6 +827,8 @@ docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha
 #### 10. Using Traefik with Custom Ban HTML Page [examples/custom-ban-page/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/custom-ban-page/README.md)
 
 #### 11. Using Traefik with Custom Captcha Whiketkeeper[examples/custom-captcha/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/custom-captcha/README.md)
+
+#### 12. Using a geoenrich plugin for CrowdSec Country decisions [examples/geoenrich-decisions/README.md](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/main/examples/geoenrich-decisions/README.md)
 
 ### Local Mode
 

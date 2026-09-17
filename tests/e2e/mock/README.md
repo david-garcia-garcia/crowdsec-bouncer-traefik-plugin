@@ -5,10 +5,7 @@ the local source tree, and replaces Crowdsec with a small **HTTP mock**
 ([`mocklapi/`](mocklapi/main.go), a stdlib-only Go command). No Docker, no real
 Crowdsec.
 
-It is what **CI runs** (`make e2e_mock`). A separate, local-only **Docker
-suite** (real Traefik + Crowdsec, under `tests/e2e/scenarios`) is kept for
-high-fidelity debugging against a real Crowdsec but is not exercised in CI; it
-ships in its own PR (#333).
+It is what **CI runs** for plugin-only coverage (`make e2e_mock`). A separate **Pester real-stack** suite (`tests/e2e/real/`, Docker Traefik + Crowdsec) runs in CI as `e2e (docker + pester)`.
 
 ## Scope — what this suite tests
 

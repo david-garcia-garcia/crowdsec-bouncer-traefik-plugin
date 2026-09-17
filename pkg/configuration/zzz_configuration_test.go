@@ -106,6 +106,17 @@ func Test_ValidateParams(t *testing.T) {
 	cfg9.LogLevel = "info"
 	cfg10 := getMinimalConfig()
 	cfg10.LogLevel = "Warning"
+	cfgCaptchaNoProvider := getMinimalConfig()
+	cfgCaptchaNoProvider.CrowdsecLapiFailureAction = FailureActionCaptcha
+	cfgCaptchaWithProvider := getMinimalConfig()
+	cfgCaptchaWithProvider.CrowdsecLapiFailureAction = FailureActionCaptcha
+	cfgCaptchaWithProvider.CaptchaProvider = HcaptchaProvider
+	cfgCaptchaWithProvider.CaptchaFilePath = ""
+	cfgUnknownAction := getMinimalConfig()
+	cfgUnknownAction.CrowdsecAppsecFailureAction = "block"
+	cfgEmptyAction := getMinimalConfig()
+	cfgEmptyAction.CrowdsecLapiFailureAction = ""
+	cfgEmptyAction.CrowdsecAppsecFailureAction = ""
 	type args struct {
 		config *Config
 	}
@@ -127,6 +138,10 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Valid log level uppercase INFO", args: args{config: cfg8}, wantErr: false},
 		{name: "Valid log level lowercase info", args: args{config: cfg9}, wantErr: false},
 		{name: "Invalid log level Warning", args: args{config: cfg10}, wantErr: true},
+		{name: "Captcha LAPI action without provider", args: args{config: cfgCaptchaNoProvider}, wantErr: true},
+		{name: "Captcha LAPI action with provider", args: args{config: cfgCaptchaWithProvider}, wantErr: false},
+		{name: "Unknown AppSec failure action", args: args{config: cfgUnknownAction}, wantErr: true},
+		{name: "Empty failure actions use default ban", args: args{config: cfgEmptyAction}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -324,5 +339,29 @@ func Test_getContentTypeFromPath(t *testing.T) {
 				t.Errorf("GetContentTypeFromPath(%q) = %q, want %q", tt.path, got, tt.expected)
 			}
 		})
+	}
+}
+
+func Test_validateDecisionScopeHeaders(t *testing.T) {
+	cfg := getMinimalConfig()
+	cfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	if err := validateDecisionScopeHeaders(cfg); err != nil {
+		t.Fatalf("valid Country map: %v", err)
+	}
+	cfg.DecisionScopeHeaders = map[string]string{"Ip": "X-Real-IP"}
+	if err := validateDecisionScopeHeaders(cfg); err == nil {
+		t.Fatal("Ip key must be rejected")
+	}
+	cfg.DecisionScopeHeaders = map[string]string{"RANGE": "X-Range"}
+	if err := validateDecisionScopeHeaders(cfg); err == nil {
+		t.Fatal("Range key must be rejected")
+	}
+	cfg.DecisionScopeHeaders = map[string]string{"": "X-Empty"}
+	if err := validateDecisionScopeHeaders(cfg); err == nil {
+		t.Fatal("empty scope must be rejected")
+	}
+	cfg.DecisionScopeHeaders = map[string]string{"username": "  "}
+	if err := validateDecisionScopeHeaders(cfg); err == nil {
+		t.Fatal("empty header must be rejected")
 	}
 }

@@ -14,7 +14,7 @@ _Avoid_: appending `zzz_` after `_test.go`; a trailing `zzz_` is not a test file
 
 ```
 pkg/cache/zzz_cache_test.go
-zzz_bouncer_test.go
+pkg/bouncer/zzz_bouncer_test.go
 ```
 
 ## Key files

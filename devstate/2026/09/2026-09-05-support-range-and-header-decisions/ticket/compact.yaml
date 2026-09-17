@@ -1,0 +1,10 @@
+host: local
+ref: none
+title: Repurpose upstream PR 383 (header-mapped CrowdSec scopes + IP-Range) onto MASTER
+url: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/383
+related:
+  - https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/271
+  - https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/368
+  - https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/383
+  - https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/3
+number: none
