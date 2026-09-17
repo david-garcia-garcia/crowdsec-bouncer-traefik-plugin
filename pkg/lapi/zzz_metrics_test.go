@@ -189,9 +189,9 @@ func newUsageMetricsClient(t *testing.T) (*Client, *[]byte) {
 }
 
 // attachTestMetricsReporter constructs the reporter beside a Client literal and binds crowdsecQuery.
-func attachTestMetricsReporter(client *Client, started time.Time) {
-	client.metricsReporter = newMetricsReporter(client, started)
-	client.metricsReporter.lastMetricsPush = started
+func attachTestMetricsReporter(client *Client, startedAt time.Time) {
+	client.metricsReporter = newMetricsReporter(client, startedAt)
+	client.metricsReporter.lastMetricsPush = startedAt
 }
 
 func decodeUsageObject(t *testing.T, body []byte) map[string]interface{} {
