@@ -21,3 +21,9 @@ phase: implement
 findings: mixed vendor SimpleRedis + source-sync reclaim Peek
 fixed: process table ProcessGrace; logging tests isolated from TempDir lock
 skipped: none
+
+## codereview (2026-09-17)
+phase: codereview
+findings: Standards 3, Spec 0, Security 0, Performance 0, Dead 3, Coverage 4
+fixed: OpenTyped deleted; ReclaimGraceDuration removed; OpenWithHooks/Redis miss tests
+skipped: AppSec helper extract; invalid-reader skip test
