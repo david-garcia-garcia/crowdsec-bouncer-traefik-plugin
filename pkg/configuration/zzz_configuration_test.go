@@ -111,6 +111,7 @@ func Test_ValidateParams(t *testing.T) {
 	cfgCaptchaWithProvider := getMinimalConfig()
 	cfgCaptchaWithProvider.CrowdsecLapiFailureAction = FailureActionCaptcha
 	cfgCaptchaWithProvider.CaptchaProvider = HcaptchaProvider
+	cfgCaptchaWithProvider.CaptchaGateSecret = "gate-secret"
 	cfgCaptchaWithProvider.CaptchaFilePath = ""
 	cfgUnknownAction := getMinimalConfig()
 	cfgUnknownAction.CrowdsecAppsecFailureAction = "block"

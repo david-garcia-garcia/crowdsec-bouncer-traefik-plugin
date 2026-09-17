@@ -9,14 +9,9 @@ import (
 	"net/url"
 	"strings"
 	"text/template"
+	"time"
 
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-)
-
-const (
-	// CaptchaDoneValue is the cache payload for a solved captcha still in grace.
-	CaptchaDoneValue = "d"
 )
 
 // Client Captcha client.
@@ -24,11 +19,12 @@ type Client struct {
 	Valid                   bool
 	siteKey                 string
 	secretKey               string
+	gateSecret              []byte
+	gateBindIP              bool
 	remediationCustomHeader string
 	gracePeriodSeconds      int64
 	templateContentType     string
 	template                *template.Template
-	cacheClient             *cache.Client
 	httpClient              *http.Client
 	log                     *slog.Logger
 	infoProvider            *infoProvider
@@ -65,7 +61,7 @@ var infoProviders = map[string]*infoProvider{
 }
 
 // New Initialize captcha client.
-func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, gateSecret string, gateBindIP bool, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
@@ -79,6 +75,8 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 	c.infoProvider = info
 	c.siteKey = siteKey
 	c.secretKey = secretKey
+	c.gateSecret = []byte(gateSecret)
+	c.gateBindIP = gateBindIP
 	c.remediationCustomHeader = remediationCustomHeader
 	template, contentType, _ := configuration.GetTemplate(captchaTemplatePath)
 	c.template = template
@@ -86,7 +84,6 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 	c.gracePeriodSeconds = gracePeriodSeconds
 	c.log = log
 	c.httpClient = httpClient
-	c.cacheClient = cacheClient
 	return nil
 }
 
@@ -100,7 +97,8 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	}
 	if valid {
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
-		c.cacheClient.Set(remoteIP+"_captcha", CaptchaDoneValue, c.gracePeriodSeconds)
+		value := mintGateValue(c.gateSecret, c.gateBindIP, remoteIP, time.Now())
+		setGateCookie(rw, r, value, c.gracePeriodSeconds)
 		if c.remediationCustomHeader != "" {
 			rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
 		}
@@ -122,10 +120,9 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	}
 }
 
-// Check Verify if the captcha is already done.
-func (c *Client) Check(remoteIP string) bool {
-	value, _ := c.cacheClient.Get(remoteIP + "_captcha")
-	passed := value == CaptchaDoneValue
+// Check Verify if the captcha is already done via gate cookie.
+func (c *Client) Check(r *http.Request, remoteIP string) bool {
+	passed := validateGateValue(c.gateSecret, c.gateBindIP, remoteIP, gateCookieValue(r), time.Now(), c.gracePeriodSeconds)
 	c.log.Debug(fmt.Sprintf("captcha:Check ip:%s pass:%v", remoteIP, passed))
 	return passed
 }
@@ -150,14 +147,11 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	body.Add("response", response)
 	res, err := c.httpClient.PostForm(c.infoProvider.validate, body)
 	if err != nil {
+		c.log.Error("captcha:Validate " + err.Error())
 		return false, err
 	}
-	defer func() {
-		if err = res.Body.Close(); err != nil {
-			c.log.Error("captcha:Validate " + err.Error())
-		}
-	}()
-	if !strings.Contains(res.Header.Get("Content-Type"), "application/json") {
+	defer res.Body.Close()
+	if !strings.HasPrefix(res.Header.Get("Content-Type"), "application/json") {
 		c.log.Debug("captcha:Validate responseType:noJson")
 		return false, nil
 	}
