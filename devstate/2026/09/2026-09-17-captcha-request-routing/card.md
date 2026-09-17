@@ -1,11 +1,11 @@
-Developer review: ready for review — 2026-09-17T19:41:26Z
+Developer review: ready for review — 2026-09-17T20:04:45Z
 
 ## What this changes
 **Operators.** Optional `captchaCustomChallengeUrl` names a second exact browser path for custom-provider widgets. Empty keeps `CaptchaCustomJsURL` path only.
 
 **Admin users.** None.
 
-**Developers.** `handleRemediationServeHTTP` now routes captcha-kind as custom-resource pass → Check-true form POST 302 → Check-true origin → `captcha.ServeHTTP` (HEAD included). Past-captcha is `Check(req, remoteIP)` and the HMAC cookie only. New leaf `core_plugin_middleware_captcha-routing`. Cites #48 and #50.
+**Developers.** `handleRemediationServeHTTP` routes captcha-kind as custom-resource pass → Check-true form POST 302 → Check-true origin → `captcha.ServeHTTP` (HEAD included). Past-captcha is `Check(req, remoteIP)` and the HMAC cookie only. New leaf and usage packet `core_plugin_middleware_captcha-routing` (Language + How-to). Cites #48 and #50.
 
 **End users.** A second-tab captcha submit 302s instead of POSTing origin. Same-route custom widget assets load under captcha. Captcha-kind HEAD previews the challenge, not the ban page.
 
@@ -26,28 +26,28 @@ flowchart TD
 ```
 
 ## Merge readiness
-Implement is on the branch. CI succeeded. 0 items remain.
+Devdocs impact produced the missing Language terms. CI succeeded. 0 items remain.
 
 Priority: P2 — real end-user pain on duplicate captcha submit and custom challenge assets, limited blast radius
-Reviewed head: 41c1957
+Reviewed head: 17235c2
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 6/6 | CI succeeded; no open PR comments |
-| CI proof | 6/6 | Main Process, e2e binary, and e2e docker succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35265876359 |
+| CI proof | 6/6 | Main Process, e2e binary, and e2e docker succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35268212314 |
 | Local tests proof | N/A | `localTests: passed` (remote PR; CI proof covers remote) |
 | Review resolution | 6/6 | OPEN PR #68; no review comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-17-captcha-request-routing pushed | `git` / origin `41c1957` |
+| Branch | 2026-09-17-captcha-request-routing pushed | `git` / origin `17235c2` |
 | OpenSpec | captcha-request-routing | `openspec/changes/captcha-request-routing/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/68 | pr-host List |
-| CI | build 35265876359 Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35265876359 ; e2e binary and e2e docker success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35265876367 | pr-host CI |
-| Local tests | passed | handoff.yaml localTests (`go test ./pkg/...`; `go test .`) |
+| CI | build 35268212314 Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35268212314 ; e2e binary and e2e docker success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35268212324 | pr-host CI |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | no comments.md |
 
 ## Specs
@@ -57,7 +57,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local ticket → branch `2026-09-17-captcha-request-routing` → PR #68 → change `captcha-request-routing` applied. This body cites #48 and #50 so those PRs can close when this lands.
+Local ticket → branch `2026-09-17-captcha-request-routing` → PR #68 → usage-doc impact for change `captcha-request-routing`. This body cites #48 and #50 so those PRs can close when this lands.
 
 ## Decision needed
 | Question | Decision | By |
@@ -75,7 +75,12 @@ None.
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-captcha-request-routing/devstate/2026/09/2026-09-17-captcha-request-routing/codereview_standards.md) — 0 total, 0 pending, 0 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-captcha-request-routing/devstate/2026/09/2026-09-17-captcha-request-routing/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-captcha-request-routing/devstate/2026/09/2026-09-17-captcha-request-routing/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-captcha-request-routing/devstate/2026/09/2026-09-17-captcha-request-routing/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-captcha-request-routing/devstate/2026/09/2026-09-17-captcha-request-routing/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-captcha-request-routing/devstate/2026/09/2026-09-17-captcha-request-routing/codereview_coverage.md) — 0 total, 0 pending, 0 completed
 
 ## Agent review details
 
@@ -84,7 +89,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 0 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 41c195797e6c3b1f76d4f58694064b7e23045a9b | Card must match the branch you measured |
+| Reviewed head | 17235c2719ba02c5791dd1f9f3599aa32064131e | Card must match the branch you measured |
 
 ### Stored data model
 - Changed: Traefik plugin Config / `captchaCustomChallengeUrl` — string — sample `` (empty, JsURL-path only) or `https://widget.example/v0/challenge`. Upgrade: old configs still valid.
@@ -98,10 +103,10 @@ Is this the best way to solve the issue? Yes versus `master` — owners stay on 
 
 ### Evidence
 What I checked:
-- `go test ./pkg/...` passed
-- `go test .` passed (Yaegi interpreter, 50.649s)
-- golangci-lint run passed on the worktree
-- CI: Main Process success run 35265876359; e2e binary + e2e docker success run 35265876367
+- Devdocs impact on `origin/master...HEAD` excluding `devstate/` and `.cursor/` — units Captcha request routing + Captcha gate cookie
+- language-gap produced on `core_plugin_middleware_captcha-routing` (Language terms now on disk)
+- Captcha gate cookie packet unchanged (no stale-usage, no wrong-fold)
+- CI on `17235c2`: Main Process success run 35268212314; e2e binary + e2e docker success run 35268212324
 - product delta stays in `pkg/bouncer`, `pkg/captcha`, `pkg/configuration` (no `pkg/lapi` or `pkg/reclaim`)
 - OPEN comment set empty
 - Cites #48 and #50

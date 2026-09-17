@@ -27,3 +27,9 @@ phase: codereview
 findings: six axes none; no hard/missing/wrong
 fixed: axis files; PR #68 summary
 skipped: judgement none; product apply; devdocs impact
+
+## devdocsimpact (2026-09-17)
+phase: devdocsimpact
+findings: 1 language-gap produced; Captcha gate cookie none
+fixed: Language on core_plugin_middleware_captcha-routing; PR #68 summary
+skipped: archive; populate; fuzzy Language
