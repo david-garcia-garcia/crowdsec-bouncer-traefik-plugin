@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: stale-usage 1, missing-packet 1
 fixed: produced LAPI connection packet and Middleware How-to/Gotcha
 skipped: none
+
+## archive (2026-09-17)
+phase: archive
+findings: none
+fixed: folded three deltas into catalog; archived openspec/changes/archive/2026-09-17-lapi-transport-router-policy/
+skipped: Task subagent unavailable in archive runner — FindSpecHost re-verified on-thread (three folds)
