@@ -21,3 +21,9 @@ phase: implement
 findings: P1 0, P2 0
 fixed: gofmt + unparam on attachTestTransport after Main Process failure
 skipped: none
+
+## codereview (2026-09-17)
+phase: codereview
+findings: Standards 1 judgement, Coverage 1 judgement; Spec/Security/Performance/Dead none
+fixed: none (no hard/missing/wrong)
+skipped: Standards 1 Mysterious Name `replaced`; Coverage 1 Redis fail-closed ServeHTTP fixture
