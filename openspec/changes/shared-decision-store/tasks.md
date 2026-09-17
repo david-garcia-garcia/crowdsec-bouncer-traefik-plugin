@@ -5,10 +5,10 @@
 
 ## 2. DecisionStore
 
-- [ ] 2.1 Add `DecisionStore` in `pkg/lapi/decisionstore.go`: owns `cache.Client`, reclaim key `decisionstore:` + SessionHex + `:` + Redis-params hash, prefix `SessionHex` for every mode, Close hook = `cache.Client.Close()` only
-- [ ] 2.2 Open the store with `reclaim.OpenWithHooks` on the same Traefik `New` ctx from `OpenStream` / `OpenLive` / `New`. `Client` holds the store; `Cache()` returns `store.Cache()`
-- [ ] 2.3 Stop `Client.Close` / `Sleep` from calling `cache.Client.Close()`. Do not turn write-once Client scalars into mutable fields
-- [ ] 2.4 Point Client-literal tests at a store or helper. Keep Range hydrate from shared `range-index`
+- [x] 2.1 Add `DecisionStore` in `pkg/lapi/decisionstore.go`: owns `cache.Client`, reclaim key `decisionstore:` + SessionHex + `:` + Redis-params hash, prefix `SessionHex` for every mode, Close hook = `cache.Client.Close()` only
+- [x] 2.2 Open the store with `reclaim.OpenWithHooks` on the same Traefik `New` ctx from `OpenStream` / `OpenLive` / `New`. `Client` holds the store; `Cache()` returns `store.Cache()`
+- [x] 2.3 Stop `Client.Close` / `Sleep` from calling `cache.Client.Close()`. Do not turn write-once Client scalars into mutable fields
+- [x] 2.4 Point Client-literal tests at a store or helper. Keep Range hydrate from shared `range-index`
 
 ## 3. Stream lease
 

@@ -1,0 +1,94 @@
+package lapi
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+
+	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
+)
+
+const decisionStoreKeyPrefix = "decisionstore:"
+
+// storeParams is the Redis location hashed into the DecisionStore reclaim key.
+type storeParams struct {
+	RedisCacheEnabled   bool     `json:"redisCacheEnabled"`
+	RedisCacheHost      string   `json:"redisCacheHost"`
+	RedisCacheReadHosts []string `json:"redisCacheReadHosts"`
+	RedisCachePassword  string   `json:"redisCachePassword"`
+	RedisCacheDatabase  string   `json:"redisCacheDatabase"`
+}
+
+func storeParamsFrom(cfg *configuration.Config) storeParams {
+	return storeParams{
+		RedisCacheEnabled:   cfg.RedisCacheEnabled,
+		RedisCacheHost:      cfg.RedisCacheHost,
+		RedisCacheReadHosts: cfg.RedisCacheReadHosts,
+		RedisCachePassword:  cfg.RedisCachePassword,
+		RedisCacheDatabase:  cfg.RedisCacheDatabase,
+	}
+}
+
+// StoreKey is the reclaim table key: CrowdSec cursor SessionHex plus Redis store parameters.
+func StoreKey(cfg *configuration.Config) string {
+	return decisionStoreKeyPrefix + SessionHex(cfg) + ":" + hashJSON(storeParamsFrom(cfg))
+}
+
+// DecisionStore is a reclaim value that owns one cache.Client (memory TTL or Redis-protocol prefix).
+type DecisionStore struct {
+	cache *cache.Client
+}
+
+// Cache is the map or Redis pool this store owns.
+func (s *DecisionStore) Cache() *cache.Client {
+	if s == nil {
+		return nil
+	}
+	return s.cache
+}
+
+// Close drains the cache Redis pool. Memory is a no-op.
+// Safe to call more than once: cache.Client.Close is nil-safe and SimpleRedis.Close CAS-gates.
+func (s *DecisionStore) Close() {
+	if s == nil || s.cache == nil {
+		return
+	}
+	s.cache.Close()
+}
+
+// AcquireLease tries to own the stream updated key for duration seconds.
+func (s *DecisionStore) AcquireLease(ctx context.Context, value string, duration int64) (bool, error) {
+	if s == nil || s.cache == nil {
+		return false, fmt.Errorf("%s", cache.CacheUnreachable)
+	}
+	return s.cache.Acquire(ctx, cacheTimeoutKey, value, duration)
+}
+
+// OpenDecisionStore reclaims one store per cursor plus Redis params on the Traefik New context.
+func OpenDecisionStore(ctx context.Context, cfg *configuration.Config, log *slog.Logger) (*DecisionStore, error) {
+	stored, err := reclaim.OpenWithHooks(ctx, StoreKey(cfg), log, func() (any, reclaim.Hooks, error) {
+		cacheClient := &cache.Client{}
+		// Prefix is SessionHex for every mode so live interval splits share remediations.
+		cacheClient.New(
+			log,
+			cfg.RedisCacheEnabled,
+			cfg.RedisCacheHost,
+			cfg.RedisCacheReadHosts,
+			cfg.RedisCachePassword,
+			cfg.RedisCacheDatabase,
+			SessionHex(cfg),
+		)
+		store := &DecisionStore{cache: cacheClient}
+		return store, reclaim.Hooks{Close: store.Close}, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	store, ok := stored.(*DecisionStore)
+	if !ok {
+		return nil, fmt.Errorf("reclaim: want *lapi.DecisionStore, got %T", stored)
+	}
+	return store, nil
+}
