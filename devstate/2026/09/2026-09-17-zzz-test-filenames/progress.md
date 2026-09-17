@@ -9,6 +9,6 @@ JobName: 2026-09-17-zzz-test-filenames
 | propose | [x] | [x] | 2026-09-17T04:28:10Z |
 | implement | [x] | [x] | 2026-09-17T04:29:55Z |
 | codereview | [x] | [x] | 2026-09-17T04:31:56Z |
-| devdocsimpact | [x] | [ ] | |
-| archive | [ ] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-17T04:32:47Z |
+| archive | [x] | [ ] | |
 | pullrequest | [ ] | [ ] | |

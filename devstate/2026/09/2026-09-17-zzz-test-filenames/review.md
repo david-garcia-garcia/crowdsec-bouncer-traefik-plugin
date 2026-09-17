@@ -28,3 +28,9 @@ phase: codereview
 findings: Spec 1 extra; other axes none
 fixed: n/a
 skipped: research + domains.md judged required by workflow, not product extra
+
+## devdocsimpact (2026-09-17)
+phase: devdocsimpact
+findings: missing-packet zzz_ test file
+fixed: created knowledge/devdocs/std_go_test_zzz-prefix.md
+skipped: n/a
