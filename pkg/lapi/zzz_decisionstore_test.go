@@ -194,3 +194,32 @@ func TestClientClose_LeavesSiblingCacheLive(t *testing.T) {
 		t.Fatalf("after sibling Close Get %q err %v", got, getErr)
 	}
 }
+
+func TestClientClose_LeavesSiblingRedisPoolLive(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	redisServer := startTestLeaseRedis(t)
+	ctx := context.Background()
+	log := logger.New("ERROR", "")
+	fast := testLiveConfig("lapi.example:8080", 1)
+	slow := testLiveConfig("lapi.example:8080", 60)
+	fast.RedisCacheEnabled = true
+	fast.RedisCacheHost = redisServer.addr()
+	slow.RedisCacheEnabled = true
+	slow.RedisCacheHost = redisServer.addr()
+	first, err := OpenLive(ctx, fast, log, "fast", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := OpenLive(ctx, slow, log, "slow", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first.Cache().Set("1.2.3.4", "t", 10)
+	first.Close()
+	got, getErr := second.Cache().Get("1.2.3.4")
+	if getErr != nil || got != "t" {
+		t.Fatalf("after sibling Close Redis Get %q err %v", got, getErr)
+	}
+}

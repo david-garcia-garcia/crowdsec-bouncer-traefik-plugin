@@ -12,13 +12,13 @@
 
 ## 3. Stream lease
 
-- [ ] 3.1 Replace `handleStreamCache` Get-then-Set with DecisionStore acquire. Keep 1s TTL floor
-- [ ] 3.2 Cover two memory pollers one fetch and two Redis pollers one fetch
+- [x] 3.1 Replace `handleStreamCache` Get-then-Set with DecisionStore acquire. Keep 1s TTL floor
+- [x] 3.2 Cover two memory pollers one fetch and two Redis pollers one fetch
 
 ## 4. Share and isolate
 
-- [ ] 4.1 Cover two live Clients (same LAPI + Redis, different `updateIntervalSeconds`) sharing one store
-- [ ] 4.2 Cover different Redis hosts isolated; `decisionScopeHeaders` mismatch still shares; live prefix is SessionHex not IdentityHex; one Client Close leaves the sibling cache live
+- [x] 4.1 Cover two live Clients (same LAPI + Redis, different `updateIntervalSeconds`) sharing one store
+- [x] 4.2 Cover different Redis hosts isolated; `decisionScopeHeaders` mismatch still shares; live prefix is SessionHex not IdentityHex; one Client Close leaves the sibling cache live
 
 ## 5. Spec naming and docs
 
