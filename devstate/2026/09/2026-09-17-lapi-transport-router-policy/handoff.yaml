@@ -1,0 +1,17 @@
+issueKey: 2026-09-17-lapi-transport-router-policy
+jobName: 2026-09-17-lapi-transport-router-policy
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:55973bd527b9629252a108ec0e2188a495677594c9bfe6c510018b9c31aaf6ea
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr:
+  id: 62
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/62
