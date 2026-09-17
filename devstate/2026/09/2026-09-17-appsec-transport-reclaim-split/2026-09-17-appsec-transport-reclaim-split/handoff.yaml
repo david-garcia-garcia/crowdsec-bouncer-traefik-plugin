@@ -1,0 +1,17 @@
+issueKey: 2026-09-17-appsec-transport-reclaim-split
+jobName: 2026-09-17-appsec-transport-reclaim-split
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:6039b78419d3f39452cba67f53164b3dc26b830cf99c4e7cd07d9711f954533b
+localTests: none
+requirement: requirement.md
+comments: none
+explore:
+change:
+pr:
+  id: 64
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/64
