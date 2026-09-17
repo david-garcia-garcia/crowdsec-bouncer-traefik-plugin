@@ -8,7 +8,7 @@ destBranch: master
 qualify: qualified-with-gaps
 src: sha256:3f3608e424367ee39f2d476bea1d1f6f13a22cdfef61e70ed1d08f52beb7c0e7
 comments: none
-localTests: none
+localTests: passed
 requirement: requirement.md
 explore: explore.md
 change: captcha-request-routing
