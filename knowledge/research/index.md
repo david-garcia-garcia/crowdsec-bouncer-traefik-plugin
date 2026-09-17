@@ -29,3 +29,8 @@ description: Official Redis Go client surface and toolchain constraints.
 priority: normal
 local: index_ext_traefik-geoblock.md
 description: Facts about the traefik-geoblock plugin this product may reuse.
+
+## traefik-middleware-utilities
+priority: normal
+local: index_ext_traefik-middleware-utilities.md
+description: reclaim and simpleredis packages in david-garcia-garcia/traefik-middleware-utilities.

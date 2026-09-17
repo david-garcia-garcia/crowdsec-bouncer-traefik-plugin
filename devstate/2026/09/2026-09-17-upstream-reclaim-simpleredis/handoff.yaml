@@ -1,0 +1,15 @@
+issueKey: 2026-09-17-upstream-reclaim-simpleredis
+jobName: 2026-09-17-upstream-reclaim-simpleredis
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:8157b606608b97560856f14cbd89be0a53ae0b0c2b90c8e8cf0c4ea93852e021
+comments: none
+localTests: none
+requirement: requirement.md
+explore: none
+change: none
+pr: none
