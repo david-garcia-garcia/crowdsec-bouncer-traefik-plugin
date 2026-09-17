@@ -150,7 +150,9 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 		c.log.Error("captcha:Validate " + err.Error())
 		return false, err
 	}
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 	if !strings.HasPrefix(res.Header.Get("Content-Type"), "application/json") {
 		c.log.Debug("captcha:Validate responseType:noJson")
 		return false, nil

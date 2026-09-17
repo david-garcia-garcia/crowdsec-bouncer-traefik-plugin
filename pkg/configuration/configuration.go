@@ -122,7 +122,7 @@ type Config struct {
 	CaptchaSecretKeyFile                       string            `json:"captchaSecretKeyFile,omitempty"`
 	CaptchaGateSecret                          string            `json:"captchaGateSecret,omitempty"`
 	CaptchaGateSecretFile                      string            `json:"captchaGateSecretFile,omitempty"`
-	CaptchaGateBindIP                          bool              `json:"captchaGateBindIP,omitempty"`
+	CaptchaGateBindIP                          bool              `json:"captchaGateBindIp,omitempty"`
 	CaptchaGracePeriodSeconds                  int64             `json:"captchaGracePeriodSeconds,omitempty"`
 }
 

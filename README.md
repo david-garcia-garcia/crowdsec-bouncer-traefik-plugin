@@ -544,7 +544,7 @@ make run
 - CaptchaGateSecretFile
   - string
   - File path for `CaptchaGateSecret` (preferred over inline secret when both are set).
-- CaptchaGateBindIP
+- CaptchaGateBindIp
   - bool
   - default: true
   - When true, the gate cookie binds to the client IP from `GetRemoteIP`. When false, grace is cookie-only (HMAC + expiry).
