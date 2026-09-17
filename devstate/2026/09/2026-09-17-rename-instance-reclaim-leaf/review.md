@@ -27,3 +27,9 @@ phase: codereview
 findings: P3 1
 fixed: Standards 1 Name for the scope — Visitor address → Client address (`2d046f7`)
 skipped: none
+
+## devdocsimpact (2026-09-17T16:16:29Z)
+phase: devdocsimpact
+findings: missing-packet 1
+fixed: produced `knowledge/devdocs/core_plugin_lapi_reclaim-key.md` and index heading
+skipped: none (Bouncer / connection / failure-action were none; no vague packet rename)
