@@ -11,4 +11,4 @@ JobName: 2026-09-17-rename-instance-reclaim-leaf
 | codereview | [x] | [x] | 2026-09-17T16:11:36Z |
 | devdocsimpact | [x] | [x] | 2026-09-17T16:16:29Z |
 | archive | [x] | [x] | 2026-09-17T16:21:38Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-17T16:30:11Z |

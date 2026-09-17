@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: catalog already matched; change moved to `openspec/changes/archive/2026-09-17-rename-instance-reclaim-leaf/`
 skipped: Task tool unavailable; FindSpecHost Search+Verdict on archive thread
+
+## pullrequest (2026-09-17T16:30:11Z)
+phase: pullrequest
+findings: none
+fixed: reused PR #63; dropped WIP; title 📝 docs(specs): split instance-reclaim into reclaim-key and bouncer; merged origin/master; CI succeeded on 2567e98
+skipped: comments.md absent
