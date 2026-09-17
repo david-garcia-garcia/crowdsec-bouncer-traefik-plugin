@@ -31,7 +31,7 @@ OpenSpec archive and catalog sync complete; pullrequest phase remains. 1 workflo
 
 Priority: P2 — multi-pod stream/cache corruption with a workaround (disable Redis or isolate Redis per pod).
 
-Reviewed head: 4acf6c0
+Reviewed head: b0b0608
 Owner decision: None.
 
 ## Review scores
