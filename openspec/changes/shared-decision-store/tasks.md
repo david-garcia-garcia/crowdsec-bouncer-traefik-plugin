@@ -22,16 +22,16 @@
 
 ## 5. Spec naming and docs
 
-- [ ] 5.1 Name `RedisCacheReadHosts` on the reclaim-key usage packet; keep `decisionScopeHeaders` off live/none identity
-- [ ] 5.2 Remap `knowledge/devdocs/core_cache_client.md` Language/usage off isolated-per-Client
-- [ ] 5.3 Update the utilities research sentence that says this cache does not need EVAL
+- [x] 5.1 Name `RedisCacheReadHosts` on the reclaim-key usage packet; keep `decisionScopeHeaders` off live/none identity
+- [x] 5.2 Remap `knowledge/devdocs/core_cache_client.md` Language/usage off isolated-per-Client
+- [x] 5.3 Update the utilities research sentence that says this cache does not need EVAL
 
 ## 6. Debt close
 
-- [ ] 6.1 Delete `knowledge/debt/2026-09-17-shared-decision-store.md`
-- [ ] 6.2 Mark the matching `issues.md` row `[x]` with `Taken:`. Leave `knowledge/debt/2026-09-17-cursor-only-reclaim-key.md`
+- [x] 6.1 Delete `knowledge/debt/2026-09-17-shared-decision-store.md`
+- [x] 6.2 Mark the matching `issues.md` row `[x]` with `Taken:`. Leave `knowledge/debt/2026-09-17-cursor-only-reclaim-key.md`
 
 ## 7. Verify
 
-- [ ] 7.1 `go test` for `pkg/cache` and `pkg/lapi` (not AppSec, not MetricsReporter rewrite)
-- [ ] 7.2 Grep live product paths (not `openspec/changes/archive/`, not `devstate/`) for `atomic.Pointer` and for `Client.Close` still calling `cache.Client.Close`
+- [x] 7.1 `go test` for `pkg/cache` and `pkg/lapi` (not AppSec, not MetricsReporter rewrite)
+- [x] 7.2 Grep live product paths (not `openspec/changes/archive/`, not `devstate/`) for `atomic.Pointer` and for `Client.Close` still calling `cache.Client.Close`
