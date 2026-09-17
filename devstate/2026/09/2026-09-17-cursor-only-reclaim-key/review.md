@@ -46,3 +46,9 @@ findings: 5 deltas synced (1 new / 4 fold); validators exit 0; CI in progress on
 fixed: catalog sync; archive move; PR 67 summary card
 skipped: Task FindSpecHost (no Task tool; ran on worker thread); pullrequest
 
+## pullrequest (2026-09-17)
+phase: pullrequest
+findings: reused PR 67; dropped WIP; CI succeeded on 56005fa; comments.md none
+fixed: gitmoji title; PR 67 summary card
+skipped: comments.md replies (file absent)
+

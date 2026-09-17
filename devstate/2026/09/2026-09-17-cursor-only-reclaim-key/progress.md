@@ -11,4 +11,4 @@ JobName: 2026-09-17-cursor-only-reclaim-key
 | codereview | [x] | [x] | 2026-09-17T19:41:02Z |
 | devdocsimpact | [x] | [x] | 2026-09-17T19:49:26Z |
 | archive | [x] | [x] | 2026-09-17T19:55:29Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-17T20:05:17Z |
