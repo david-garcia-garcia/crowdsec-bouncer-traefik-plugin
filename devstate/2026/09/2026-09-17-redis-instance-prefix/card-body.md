@@ -1,4 +1,4 @@
-Developer review: ready for review — 2026-09-17T12:25:54Z
+Developer review: in progress — 2026-09-17T12:25:54Z
 
 ## What this changes
 **Operators.** Optional Traefik key `redisCacheInstanceId` scopes Redis cache keys per bouncer instance when `redisCacheEnabled` (empty after trim → hostname; set pod name via downward API for stable keys across restarts).
@@ -31,14 +31,14 @@ Six-axis review complete with no open hard findings; devdocs impact is next. 3 w
 
 Priority: P2 — multi-pod stream/cache corruption with a workaround (disable Redis or isolate Redis per pod).
 
-Reviewed head: pending push
+Reviewed head: a5fa4fe
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | Green CI, local tests, axis review closed |
-| CI proof | 6/6 | All checks succeeded on b346bf4 (re-run after codereview push) |
+| Overall readiness | 3/6 | Axis review closed; CI not seen on a5fa4fe |
+| CI proof | 1/6 | Pushed a5fa4fe; checks not seen yet on new head |
 | Local tests proof | 6/6 | `go test ./pkg/lapi/ ./pkg/cache/ ./pkg/configuration/` passed |
 | Review resolution | N/A | No PR comments inventoried |
 
@@ -48,7 +48,7 @@ Owner decision: None.
 | Branch | 2026-09-17-redis-instance-prefix pushed | git |
 | OpenSpec | redis-instance-prefix (tasks 11/11) | tasks.md |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/60 | handoff.yaml |
-| CI | success | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35220332721 |
+| CI | not seen on a5fa4fe | prior success on b346bf4 |
 | Local tests | passed | handoff.yaml localTests + codereview run |
 | PR comments | no comments | PR #60 |
 
@@ -92,7 +92,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 modified capability delta | `core_cache_client_isolated-store` |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | No comments on stub PR |
-| Reviewed head | pending push | After codereview fix |
+| Reviewed head | a5fa4fe | After codereview fix |
 
 ### Stored data model
 | Store | Field | Type | Sample |
