@@ -54,11 +54,15 @@ Public config `decisionScopeHeaders` SHALL map a CrowdSec scope name to a reques
 - **THEN** the request is allowed unless another scope matches
 
 ### Requirement: Stream asks LAPI for mapped scopes
-The LAPI stream request SHALL include `scopes=ip,range` plus every mapped header scope. The CAPI (alone) stream SHALL NOT add a `scopes` query parameter. Live and none SHALL keep `v1/decisions?ip=<clientIP>` and SHALL add `scope` and `value` when a mapped header is present and usable.
+The LAPI stream request SHALL include `scopes=ip,range` plus every header scope in the Client live-router union owned by `core_plugin_lapi_scope-union`. This leaf MUST NOT compute `scopes=` from the first constructor’s write-once `decisionScopeHeaders` alone. The CAPI (alone) stream SHALL NOT add a `scopes` query parameter. Live and none SHALL keep `v1/decisions?ip=<clientIP>` and SHALL add `scope` and `value` when a mapped header is present and usable.
 
 #### Scenario: Unmapped Country is not streamed
-- **WHEN** `decisionScopeHeaders` is empty
+- **WHEN** every live holder’s `decisionScopeHeaders` is empty
 - **THEN** the stream query does not include `country`
+
+#### Scenario: Union includes a joiner’s Country map
+- **WHEN** the first live stream router has an empty header map and a later live router on the same Client maps `Country`
+- **THEN** a later stream query includes `country`
 
 ### Requirement: Ip decisions stay exact-address keys
 An `Ip` decision SHALL be cached and looked up by the client IP. If the decision value is a `/32` or `/128` CIDR, the bouncer SHALL store the host address.
