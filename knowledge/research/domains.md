@@ -4,6 +4,7 @@
 - traefik
 - crowdsec
 - simpleredis
+- traefik-middleware-utilities
 - dragonfly
 - redis
 - traefik-geoblock

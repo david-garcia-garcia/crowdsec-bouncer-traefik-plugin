@@ -213,14 +213,14 @@ func warnWiredToOwner(log *slog.Logger, ownerName, joinerName string, owner, joi
 func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
 	joinerKey := SessionKey(cfg)
 	joinerSettings := settingsFrom(cfg)
-	create := func() (any, error) {
+	create := func() (any, reclaim.Hooks, error) {
 		client, err := New(cfg, log, pluginVersion)
 		if err != nil {
-			return nil, err
+			return nil, reclaim.Hooks{}, err
 		}
 		client.streamOwner = middlewareName
 		client.streamSettings = joinerSettings
-		return wrappedClient(client), nil
+		return client, clientHooks(client), nil
 	}
 
 	bindKey := joinerKey
@@ -238,7 +238,7 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	}
 
 	sleeper := reclaim.Peek(bindKey)
-	stored, openErr := reclaim.OpenWithGrace(ctx, bindKey, log, ReclaimGraceDuration, create)
+	stored, openErr := reclaim.OpenWithHooks(ctx, bindKey, log, create)
 	if openErr != nil {
 		return nil, openErr
 	}
@@ -255,12 +255,12 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 
 // OpenLive reclaims a Client by full identity (live/none).
 func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
-	stored, openErr := reclaim.OpenWithGrace(ctx, Key(cfg), log, ReclaimGraceDuration, func() (any, error) {
+	stored, openErr := reclaim.OpenWithHooks(ctx, Key(cfg), log, func() (any, reclaim.Hooks, error) {
 		client, err := New(cfg, log, pluginVersion)
 		if err != nil {
-			return nil, err
+			return nil, reclaim.Hooks{}, err
 		}
-		return wrappedClient(client), nil
+		return client, clientHooks(client), nil
 	})
 	if openErr != nil {
 		return nil, openErr
@@ -268,14 +268,9 @@ func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, 
 	return clientFromStored(middlewareName, stored)
 }
 
-// wrappedClient is the reclaim create() result: funcs, not a type assert (Yaegi).
-func wrappedClient(client *Client) *reclaim.Wrapped {
-	return &reclaim.Wrapped{
-		Value: client,
-		Sleep: client.Sleep,
-		Wake:  client.Wake,
-		Close: client.Close,
-	}
+// clientHooks is Sleep/Wake/Close as funcs: Yaegi panics on asserting a foreign concrete type.
+func clientHooks(client *Client) reclaim.Hooks {
+	return reclaim.Hooks{Sleep: client.Sleep, Wake: client.Wake, Close: client.Close}
 }
 
 func clientFromStored(middlewareName string, stored any) (*Client, error) {

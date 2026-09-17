@@ -3,13 +3,15 @@
 package cache
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"sync/atomic"
+	"time"
 
+	simpleredis "github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis"
 	ttl_map "github.com/leprosus/golang-ttl-map"
-	simpleredis "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/simpleredis"
 )
 
 const (
@@ -95,16 +97,15 @@ func (rc *redisCache) nextReader() *simpleredis.SimpleRedis {
 }
 
 func (rc *redisCache) get(key string) (string, error) {
-	value, err := rc.nextReader().Get(prefixed(rc.prefix, key))
+	value, err := rc.nextReader().Get(context.Background(), prefixed(rc.prefix, key))
 	if err != nil {
-		switch err.Error() {
-		case simpleredis.RedisMiss:
+		if simpleredis.IsMiss(err) {
 			return "", errors.New(CacheMiss)
-		case simpleredis.RedisUnreachable:
-			return "", errors.New(CacheUnreachable)
-		default:
-			return "", err
 		}
+		if simpleredis.IsUnreachable(err) {
+			return "", errors.New(CacheUnreachable)
+		}
+		return "", err
 	}
 	valueString := string(value)
 	if len(valueString) > 0 {
@@ -126,14 +127,12 @@ func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
 	if len(prefixedNames) == 0 {
 		return map[string]string{}, nil
 	}
-	values, err := rc.nextReader().MGet(prefixedNames)
+	values, err := rc.nextReader().MGet(context.Background(), prefixedNames)
 	if err != nil {
-		switch err.Error() {
-		case simpleredis.RedisUnreachable:
+		if simpleredis.IsUnreachable(err) {
 			return nil, errors.New(CacheUnreachable)
-		default:
-			return nil, err
 		}
+		return nil, err
 	}
 	out := make(map[string]string)
 	for i, key := range logical {
@@ -146,13 +145,13 @@ func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
 }
 
 func (rc *redisCache) set(key, value string, duration int64) {
-	if err := rc.writer.Set(prefixed(rc.prefix, key), []byte(value), duration); err != nil {
+	if err := rc.writer.Set(context.Background(), prefixed(rc.prefix, key), []byte(value), duration); err != nil {
 		rc.log.Error("cache:setDecisionRedisCache" + err.Error())
 	}
 }
 
 func (rc *redisCache) delete(key string) {
-	if err := rc.writer.Del(prefixed(rc.prefix, key)); err != nil {
+	if err := rc.writer.Del(context.Background(), prefixed(rc.prefix, key)); err != nil {
 		rc.log.Error("cache:deleteDecisionRedisCache " + err.Error())
 	}
 }
@@ -186,13 +185,20 @@ func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts
 	c.log = log
 	if isRedis {
 		rc := &redisCache{log: log, prefix: keyPrefix}
-		// Hold each client by pointer after Init so the pool mutex is not copied.
-		rc.writer = &simpleredis.SimpleRedis{}
-		rc.writer.Init(writeHost, pass, database)
+		// Hold each client by pointer after New so the pool mutex is not copied.
+		writer, err := simpleredis.New(redisClientConfig(writeHost, pass, database, log))
+		if err != nil {
+			log.Error("cache:New writer " + err.Error())
+			return
+		}
+		rc.writer = writer
 		for _, h := range readHosts {
-			r := &simpleredis.SimpleRedis{}
-			r.Init(h, pass, database)
-			rc.readers = append(rc.readers, r)
+			reader, readerErr := simpleredis.New(redisClientConfig(h, pass, database, log))
+			if readerErr != nil {
+				log.Error("cache:New reader " + readerErr.Error())
+				continue
+			}
+			rc.readers = append(rc.readers, reader)
 		}
 		c.cache = rc
 	} else {
@@ -225,6 +231,21 @@ func (c *Client) GetMany(keys []string) (map[string]string, error) {
 func (c *Client) Set(key string, value string, duration int64) {
 	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
 	c.cache.set(key, value, duration)
+}
+
+// redisClientConfig keeps this plugin’s dial 2s and command 1s (not utilities zero-Config defaults).
+func redisClientConfig(host, pass, database string, log *slog.Logger) simpleredis.Config {
+	return simpleredis.Config{
+		Host:           host,
+		Pass:           pass,
+		Database:       database,
+		DialTimeout:    2 * time.Second,
+		CommandTimeout: time.Second,
+		IdleTimeout:    30 * time.Second,
+		PoolSize:       8,
+		MaxIdleConns:   8,
+		Logger:         log,
+	}
 }
 
 // Close drains Redis idle pools. Memory clients have nothing to stop. Safe to call more than once.

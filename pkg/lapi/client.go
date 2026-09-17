@@ -15,9 +15,6 @@ import (
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
-// ReclaimGraceDuration is the wait after the last constructor ctx for a Client slot.
-const ReclaimGraceDuration = 30 * time.Second
-
 // Operator-visible lifecycle and stream-health lines (stable for log grep).
 const (
 	MsgConnectionStarted  = "crowdsec connection started"

@@ -80,8 +80,8 @@ func TestSessionKey_DifferentHostsAreDistinct(t *testing.T) {
 }
 
 func TestClient_ReclaimGrace(t *testing.T) {
-	if ReclaimGraceDuration != 30*time.Second {
-		t.Fatalf("ReclaimGraceDuration: %v", ReclaimGraceDuration)
+	if reclaim.ProcessGrace != 30*time.Second {
+		t.Fatalf("ProcessGrace: %v", reclaim.ProcessGrace)
 	}
 }
 
@@ -106,7 +106,7 @@ func TestClient_LifecycleLogs(t *testing.T) {
 
 func TestOpenStream_LiveMetricsMismatchWarnsAndShares(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
+	t.Cleanup(func() { reclaim.ResetForTest() })
 
 	server, hits := testStreamLAPI(t)
 	parsed, err := url.Parse(server.URL)
@@ -152,7 +152,7 @@ func TestOpenStream_LiveMetricsMismatchWarnsAndShares(t *testing.T) {
 
 func TestOpenStream_GraceSnapshotChangeStopsOldTickerFirst(t *testing.T) {
 	reclaim.ResetForTestWith(500 * time.Millisecond)
-	t.Cleanup(func() { reclaim.ResetForTestWith(reclaim.DefaultGrace) })
+	t.Cleanup(func() { reclaim.ResetForTest() })
 
 	server, _ := testStreamLAPI(t)
 	parsed, err := url.Parse(server.URL)

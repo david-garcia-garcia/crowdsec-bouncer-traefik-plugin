@@ -63,12 +63,12 @@ func Key(cfg *configuration.Config) string {
 
 // Open reclaims an AppSec Client by listener identity.
 func Open(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
-	stored, openErr := reclaim.OpenWithGrace(ctx, Key(cfg), log, ReclaimGraceDuration, func() (any, error) {
+	stored, openErr := reclaim.OpenWithHooks(ctx, Key(cfg), log, func() (any, reclaim.Hooks, error) {
 		client, err := New(cfg, log, pluginVersion)
 		if err != nil {
-			return nil, err
+			return nil, reclaim.Hooks{}, err
 		}
-		return &reclaim.Wrapped{Value: client, Sleep: client.Sleep, Wake: client.Wake, Close: client.Close}, nil
+		return client, reclaim.Hooks{Sleep: client.Sleep, Wake: client.Wake, Close: client.Close}, nil
 	})
 	if openErr != nil {
 		return nil, openErr
