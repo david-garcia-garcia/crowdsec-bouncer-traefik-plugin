@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: stale-usage AppSec Client produced; FailureAction none; no Language term for the internal sentinel
 fixed: usage packet Key files + Gotchas for errors.Is classification; PR #70 summary
 skipped: Language for errAppsecReadBody (internal sentinel)
+
+## archive (2026-09-17)
+phase: archive
+findings: FindSpecHost fold core_plugin_appsec_client and core_plugin_appsec_failure-action; catalog validate 0; change moved
+fixed: baseline AppSec spec leaves synced; archive folder 2026-09-17-appsec-query-hardening; PR #70 summary
+skipped: Task FindSpecHost subagent (no Task tool); validate-output commit (map.md hash unchanged); pullrequest
