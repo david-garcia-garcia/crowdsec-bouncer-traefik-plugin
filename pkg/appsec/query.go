@@ -9,6 +9,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
@@ -78,9 +80,10 @@ func isBodyUnreadable(httpReq *http.Request) bool {
 	return httpReq.Body != nil && httpReq.Body != http.NoBody && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
 }
 
+// isMethodWithBody reports whether an unreadable body on this method is a drop candidate.
 func isMethodWithBody(method string) bool {
 	switch method {
-	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+	case http.MethodPost, http.MethodPut, http.MethodPatch:
 		return true
 	default:
 		return false
@@ -101,11 +104,16 @@ func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response,
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
 	res, err := current.httpClient.Do(req)
-	if err != nil || isReverseProxyError(res.StatusCode) {
+	if err != nil {
 		c.log.Error("appsecQuery:unreachable")
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
+	// Drain every live response, including 502/503/504, so keep-alive can reuse the slot.
 	defer c.drainResponse(res)
+	if isReverseProxyError(res.StatusCode) {
+		c.log.Error("appsecQuery:unreachable")
+		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
+	}
 
 	if res.StatusCode == http.StatusInternalServerError {
 		c.log.Info("appsecQuery:failure")
@@ -114,6 +122,11 @@ func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response,
 
 	body, err := c.readCappedAppsecBody(res)
 	if err != nil {
+		// Io errors use FailureAction; oversized bodies stay as dest (allow 200 / error otherwise).
+		if strings.HasPrefix(err.Error(), "appsecQuery:readBody") {
+			c.log.Info("appsecQuery:failure")
+			return resultForFailureAction(pol.FailureAction, err.Error())
+		}
 		return nil, err
 	}
 	return interpretAppsecBody(res.StatusCode, body, c.log)
@@ -130,10 +143,17 @@ func (c *Client) newAppsecForwardRequest(ip string, httpReq *http.Request, pol P
 	if err != nil {
 		return nil, err
 	}
+	// Omit client body-size headers; rebuild length from the bytes actually forwarded.
 	for key, headers := range httpReq.Header {
+		if key == "Content-Length" || key == "Transfer-Encoding" {
+			continue
+		}
 		for _, value := range headers {
 			req.Header.Add(key, value)
 		}
+	}
+	if req.Method == http.MethodPost {
+		req.Header.Set("Content-Length", strconv.FormatInt(req.ContentLength, 10))
 	}
 	current := c.currentTransport()
 	appsecKey := ""
@@ -159,16 +179,21 @@ func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol 
 		}
 		req, _ := http.NewRequest(http.MethodGet, target, nil)
 		return req, nil
-	case c.appsecBodyLimit > 0 && httpReq.Body != nil:
+	case httpReq.Body != nil:
+		// Readable body: cap with LimitReader only when the operator set a positive limit.
 		var bodyBuffer bytes.Buffer
-		limitedReader := io.LimitReader(httpReq.Body, c.appsecBodyLimit)
-		teeReader := io.TeeReader(limitedReader, &bodyBuffer)
+		bodyReader := io.Reader(httpReq.Body)
+		if c.appsecBodyLimit > 0 {
+			bodyReader = io.LimitReader(httpReq.Body, c.appsecBodyLimit)
+		}
+		teeReader := io.TeeReader(bodyReader, &bodyBuffer)
 		bodyBytes, err := io.ReadAll(teeReader)
 		if err != nil {
 			return nil, fmt.Errorf("appsecQuery:GetBody %w", err)
 		}
 		httpReq.Body = io.NopCloser(io.MultiReader(&bodyBuffer, httpReq.Body))
 		req, _ := http.NewRequest(http.MethodPost, target, bytes.NewBuffer(bodyBytes))
+		req.ContentLength = int64(len(bodyBytes))
 		return req, nil
 	default:
 		req, _ := http.NewRequest(http.MethodGet, target, nil)
