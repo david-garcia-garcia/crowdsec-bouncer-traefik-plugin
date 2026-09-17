@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-17T12:25:54Z
+Developer review: in progress — 2026-09-17T14:30:00Z
 
 ## What this changes
 **Operators.** Optional Traefik key `redisCacheInstanceId` scopes Redis cache keys per bouncer instance when `redisCacheEnabled` (empty after trim → hostname; set pod name via downward API for stable keys across restarts).
 
 **Admin users.** None.
 
-**Developers.** `lapi.CachePrefix` appends `:{instanceId}` when Redis is on (`RedisCacheInstanceID` + `ResolveCacheInstanceIdentity` in Prepare); reclaim `SessionKey` unchanged; `core_cache_redis.md` documents LAPI cursor (key + outbound IP) vs Redis per-instance store.
+**Developers.** `lapi.CachePrefix` appends `:{instanceId}` when Redis is on; usage docs in `core_cache_redis.md` and `core_cache_client.md` now match (Language term **Effective bouncer instance identity**, LAPI cursor vs Redis roles).
 
 **End users.** None.
 
@@ -27,18 +27,18 @@ sequenceDiagram
 If we do not merge instance-scoped prefixes, operators who centralize Redis for durability still get wrong stream sharing across replicas.
 
 ## Merge readiness
-Six-axis review complete with no open hard findings; devdocs impact is next. 3 workflow items remain.
+Devdocs impact closed with three usage findings produced; OpenSpec archive is next. 2 workflow items remain.
 
 Priority: P2 — multi-pod stream/cache corruption with a workaround (disable Redis or isolate Redis per pod).
 
-Reviewed head: a5fa4fe
+Reviewed head: pending commit
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Axis review closed; CI not seen on a5fa4fe |
-| CI proof | 1/6 | Pushed a5fa4fe; checks not seen yet on new head |
+| Overall readiness | 3/6 | Devdocs aligned; CI not re-measured on this head |
+| CI proof | 3/6 | Prior run on 1b59bfe mixed (e2e binary success; main process failed earlier) |
 | Local tests proof | 6/6 | `go test ./pkg/lapi/ ./pkg/cache/ ./pkg/configuration/` passed |
 | Review resolution | N/A | No PR comments inventoried |
 
@@ -48,8 +48,8 @@ Owner decision: None.
 | Branch | 2026-09-17-redis-instance-prefix pushed | git |
 | OpenSpec | redis-instance-prefix (tasks 11/11) | tasks.md |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/60 | handoff.yaml |
-| CI | not seen on a5fa4fe | prior success on b346bf4 |
-| Local tests | passed | handoff.yaml localTests + codereview run |
+| CI | in progress / mixed on recent heads | PR check runs |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | PR #60 |
 
 ## Specs
@@ -62,7 +62,7 @@ Owner decision: None.
 None.
 
 ## How this fits together
-Local ticket → branch `2026-09-17-redis-instance-prefix` → stub PR #60 → explore → propose → implement `CachePrefix` + `redisCacheInstanceId` → codereview → devdocs impact → archive → pullrequest.
+Local ticket → branch `2026-09-17-redis-instance-prefix` → stub PR #60 → explore → propose → implement → codereview → devdocs impact (closed) → archive → pullrequest.
 
 ## Decision needed
 None.
@@ -72,6 +72,7 @@ None.
 - [x] [P2] Propose OpenSpec + devdocs (Redis as per-instance store, not stream bus)
 - [x] [P2] Implement `CachePrefix` instance dimension; keep `redisCacheEnabled`
 - [x] [P2] Six-axis code review (hostname-fail test added)
+- [x] [P3] Devdocs impact: isolated cache + redis Language/usage
 - [x] Prepare: requirement, worktree, stub PR
 
 ## Findings
@@ -90,9 +91,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 1 modified capability delta | `core_cache_client_isolated-store` |
+| Devdocs impact findings | 3 produced, 0 open | `devdocs-impact.md` |
+| Specs in this PR | 1 modified capability delta | `core_cache_client_isolated-store` (pre-archive) |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | No comments on stub PR |
-| Reviewed head | a5fa4fe | After codereview fix |
 
 ### Stored data model
 | Store | Field | Type | Sample |

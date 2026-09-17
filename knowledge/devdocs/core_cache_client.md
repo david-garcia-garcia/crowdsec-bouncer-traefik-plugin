@@ -3,7 +3,7 @@
 ## Language
 
 **Isolated cache**:
-One `pkg/cache.Client` store per LAPI Client. Memory is a private TTL map on that Client. Redis keys are prefixed with `CachePrefix`: stream/alone use the LAPI URL+key session hex so warn-and-wire shares remediations; live/none use `IdentityHex`.
+One `pkg/cache.Client` store per LAPI Client. Memory is a private TTL map on that Client. Redis keys are prefixed with `CachePrefix`: `{SessionHex or IdentityHex base}` in memory-only mode; when Redis is enabled, the same base plus `:` and the effective bouncer instance identity so replicas do not share remediations or the stream lease key.
 _Avoid_: process `ttl_map`, shared `var cache`, bare client-IP Redis keys
 
 ## Overview
@@ -13,7 +13,7 @@ Construct a new `Client` on each LAPI Client. Pass `lapi.CachePrefix(cfg)` as Re
 ## How to use
 
 - Memory: `Client.New(..., isRedis=false, ..., keyPrefix)` — prefix is ignored; each Client owns a map.
-- Redis: pass `lapi.CachePrefix(cfg)` as `keyPrefix` (stream/alone session hex, live/none `IdentityHex`). Logical keys are the client IP, `scope:value`, and `range-index`; the store writes `prefix:key`. Payloads are opaque strings. Ban/captcha/none codes live on `pkg/decisionscope`. Captcha grace is the gate cookie (`core_plugin_middleware_captcha-gate.md`), not cache keys.
+- Redis: pass `lapi.CachePrefix(cfg)` as `keyPrefix` after `lapi.Prepare` has resolved instance identity. Logical keys are the client IP, `scope:value`, and `range-index`; the store writes `prefix:key`. Same LAPI session and same effective instance identity on one process → one prefix (warn-and-wire). Different instance identities on shared Redis → isolated remediations and `updated` lease. Payloads are opaque strings. Ban/captcha/none codes live on `pkg/decisionscope`. Captcha grace is the gate cookie (`core_plugin_middleware_captcha-gate.md`), not cache keys.
 - Same reclaim key → same LAPI Client → same cache Client (share-by-identity, not a process dump).
 - `Client.Close()` drains Redis idle pools. Call it from `lapi.Client.Close()`. Memory clients are a no-op.
 
@@ -28,6 +28,7 @@ c.New(log, redisOn, writeHost, readHosts, pass, database, lapi.CachePrefix(cfg))
 
 - `pkg/cache/cache.go`
 - `pkg/lapi/identity.go`
+- `pkg/lapi/instance.go`
 - `pkg/lapi/session.go`
 
 ## Gotchas

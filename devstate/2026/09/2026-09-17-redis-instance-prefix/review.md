@@ -52,3 +52,14 @@ fixed: TestResolveCacheInstanceIdentity_HostnameFailure; readProcessHostname sea
 
 skipped: standards duplicate trim (Prepare vs Validate ordering)
 
+
+## devdocsimpact (2026-09-17)
+
+phase: devdocsimpact
+
+findings: stale isolated cache usage; language gap on effective instance identity; redis usage verified
+
+fixed: core_cache_client.md, core_cache_redis.md Language
+
+skipped: n/a
+

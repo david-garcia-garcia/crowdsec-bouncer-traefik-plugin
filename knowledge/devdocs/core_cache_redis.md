@@ -10,6 +10,10 @@ _Avoid_: `pkg/simpleredis`, published `github.com/maxlerebourg/simpleredis`
 `pkg/cache` `redisCache` when `redisCacheEnabled` is true: one writer plus optional read hosts, each a `*simpleredis.SimpleRedis`.
 _Avoid_: local TTL map, mock `serveRedis`
 
+**Effective bouncer instance identity**:
+The suffix after the LAPI identity hex in Redis `CachePrefix`: optional Traefik `redisCacheInstanceId` after trim, else `os.Hostname()`, else the literal `unknown-instance` with one Warn. Resolved once per config in `lapi.ResolveCacheInstanceIdentity` during `Prepare`.
+_Avoid_: reclaim `SessionKey`, LAPI stream cursor, random per-start id
+
 ## Overview
 
 Use the utilities SimpleRedis module for Redis-protocol GET/SET/DEL/MGET. Construct with `simpleredis.New` (dial 2s, command 1s). Hold each client by pointer so the pool mutex is not copied. Do not import the published maxlerebourg module.
