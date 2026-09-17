@@ -11,7 +11,7 @@ localTests: none
 requirement: requirement.md
 comments: none
 explore: explore.md
-change:
+change: extract-metrics-reporter
 pr:
   id: 65
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/65

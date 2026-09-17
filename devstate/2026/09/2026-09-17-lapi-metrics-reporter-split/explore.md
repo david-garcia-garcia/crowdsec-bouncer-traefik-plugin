@@ -48,8 +48,8 @@ No active OpenSpec change (`openspec list --json` → empty). Fold into `core_pl
   By: explore
 
 - Q: How does the reporter reach `crowdsecQuery` / `currentTransport()` without editing `pkg/lapi/client_http.go` and without a write-once `*http.Client`?
-  Decision: assumed — unexported query func on `MetricsReporter`, bound to `c.crowdsecQuery` at construct. Snapshot write-once URL and envelope scalars then. Do not reshape transport. Do not store HTTP.
-  By: explore
+  Decision: assumed — unexported query func on `MetricsReporter`, bound to `c.crowdsecQuery` at construct. Snapshot write-once URL and envelope scalars then. `startedAt` lives on the reporter only (no Client duplicate). Do not reshape transport. Do not store HTTP.
+  By: propose
 
 - Q: Do `IncProcessed` / `IncDropped` stay on `Client`?
   Decision: assumed — yes, thin forwards. Bouncer call sites are outside the file fence. Same for `rememberActiveDecision` / `forgetActiveDecision` (stream and decisions files).
