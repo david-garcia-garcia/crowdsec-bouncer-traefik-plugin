@@ -2,10 +2,8 @@
 package lapi
 
 import (
-	"crypto/tls"
 	"errors"
 	"log/slog"
-	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -46,7 +44,6 @@ type Client struct {
 	crowdsecScheme         string
 	crowdsecHost           string
 	crowdsecPath           string
-	crowdsecKey            string
 	crowdsecMode           string
 	crowdsecMachineID      string
 	crowdsecPassword       string
@@ -57,11 +54,11 @@ type Client struct {
 	lapiFailureAction      string
 	defaultDecisionTimeout int64
 	crowdsecStreamRoute    string
-	crowdsecHeader         string
 	redisUnreachableBlock  bool
 	decisionScopeHeaders   map[string]string // CrowdSec header scope → request header
+	sessionKey             string            // reclaim SessionKey (stream/alone) or Key (live/none)
 
-	httpClient      *http.Client
+	transport       atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
 	cacheClient     *cache.Client
 	rangeMembership atomic.Value // *decisionscope.RangeMembership rebuilt from range-index
 	lastRangeIndex  atomic.Value // string of the blob last used to build membership
@@ -109,25 +106,18 @@ func Prepare(cfg *configuration.Config, _ *slog.Logger) error {
 
 // New constructs a Client and starts tickers. Call Prepare first. Close stops them.
 func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (*Client, error) {
-	var err error
-	crowdsecStreamRoute := ""
-	crowdsecHeader := ""
-	var tlsConfig *tls.Config
+	crowdsecStreamRoute := crowdsecLapiStreamRoute
 	if config.CrowdsecMode == configuration.AloneMode {
 		crowdsecStreamRoute = crowdsecCapiStreamRoute
-		crowdsecHeader = crowdsecCapiHeader
-	} else {
-		crowdsecStreamRoute = crowdsecLapiStreamRoute
-		crowdsecHeader = crowdsecLapiHeader
-		tlsConfig, err = configuration.GetTLSConfigCrowdsec(config, log, false)
-		if err != nil {
-			log.Error("New:getTLSConfigCrowdsec fail to get tlsConfig " + err.Error())
-			return nil, err
-		}
-		if config.CrowdsecLapiKey == "" && len(tlsConfig.Certificates) == 0 {
-			log.Error("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup")
-			return nil, errors.New("CrowdsecLapiKey is missing")
-		}
+	}
+	next, err := newTransport(config, log)
+	if err != nil {
+		log.Error("New:getTLSConfigCrowdsec fail to get tlsConfig " + err.Error())
+		return nil, err
+	}
+	if config.CrowdsecMode != configuration.AloneMode && config.CrowdsecLapiKey == "" && next.clientCertCount() == 0 {
+		log.Error("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup")
+		return nil, errors.New("CrowdsecLapiKey is missing")
 	}
 
 	client := &Client{
@@ -135,7 +125,6 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		crowdsecScheme:          config.CrowdsecLapiScheme,
 		crowdsecHost:            config.CrowdsecLapiHost,
 		crowdsecPath:            config.CrowdsecLapiPath,
-		crowdsecKey:             config.CrowdsecLapiKey,
 		crowdsecMachineID:       config.CrowdsecCapiMachineID,
 		crowdsecPassword:        config.CrowdsecCapiPassword,
 		crowdsecScenarios:       config.CrowdsecCapiScenarios,
@@ -147,7 +136,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
 		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
 		crowdsecStreamRoute:     crowdsecStreamRoute,
-		crowdsecHeader:          crowdsecHeader,
+		sessionKey:              reclaimSessionKey(config),
 		log:                     log,
 		pluginVersion:           pluginVersion,
 		startedAt:               time.Now(),
@@ -156,17 +145,9 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		activeDecisionSlots:     make(map[string]usageMetricKey),
 		isCrowdsecStreamStartup: true,
 		isCrowdsecStreamHealthy: true,
-		httpClient: &http.Client{
-			Transport: &http.Transport{
-				MaxIdleConns:        10,
-				MaxIdleConnsPerHost: 10,
-				IdleConnTimeout:     30 * time.Second,
-				TLSClientConfig:     tlsConfig,
-			},
-			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
-		},
-		cacheClient: &cache.Client{},
+		cacheClient:             &cache.Client{},
 	}
+	client.transport.Store(next)
 	// Stream/alone prefix is SessionHex (LAPI URL+key), not IdentityHex.
 	// IdentityHex still includes intervals, so two middlewares on one key
 	// used to get two prefixes and two incomplete caches while sharing one
@@ -217,7 +198,9 @@ func (c *Client) Close() {
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	closeIdle(c.httpClient)
+	if current := c.currentTransport(); current != nil {
+		closeIdle(current.httpClient)
+	}
 	if c.cacheClient != nil {
 		c.cacheClient.Close()
 	}

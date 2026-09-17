@@ -35,6 +35,14 @@ func testStreamConfig(host string, metricsInterval int64) *configuration.Config 
 	}
 }
 
+// attachTestTransport stores HTTP+auth on client for same-package tests.
+func attachTestTransport(client *Client, httpClient *http.Client, header, key string) {
+	if header == "" {
+		header = crowdsecLapiHeader
+	}
+	client.transport.Store(&transport{httpClient: httpClient, header: header, key: key})
+}
+
 // testStreamLAPI counts GET /v1/decisions/stream hits and returns empty deltas.
 func testStreamLAPI(t *testing.T) (*httptest.Server, *int64) {
 	t.Helper()

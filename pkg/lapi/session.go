@@ -132,6 +132,14 @@ func SessionKey(cfg *configuration.Config) string {
 	return SessionPrefix(cfg) + hashJSON(settingsFrom(cfg))
 }
 
+// reclaimSessionKey is SessionKey for stream/alone and Key for live/none.
+func reclaimSessionKey(cfg *configuration.Config) string {
+	if cfg.CrowdsecMode == configuration.StreamMode || cfg.CrowdsecMode == configuration.AloneMode {
+		return SessionKey(cfg)
+	}
+	return Key(cfg)
+}
+
 // CachePrefix is the cache Client prefix: session hex for stream/alone so
 // warn-and-wire shares keys; full IdentityHex for live/none.
 func CachePrefix(cfg *configuration.Config) string {
@@ -232,12 +240,31 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	if sleeper.OK && sleeper.Holders == 0 && client.streamOwner != middlewareName {
 		client.streamOwner = middlewareName
 	}
+	client.sessionKey = bindKey
+	replaced, adoptErr := client.AdoptTransport(cfg)
+	if adoptErr != nil {
+		return nil, adoptErr
+	}
+	if live.OK && live.Key != joinerKey {
+		log.Info("lapi session joiner ignored",
+			"sessionKey", bindKey,
+			"ownerMiddleware", client.streamOwner,
+			"joiningMiddleware", middlewareName,
+			"ignoredSettings", strings.Join(settingsDiff(client.streamSettings, joinerSettings), ","),
+		)
+	} else if replaced {
+		log.Info("lapi session joiner adopted",
+			"sessionKey", bindKey,
+			"joiningMiddleware", middlewareName,
+		)
+	}
 	return client, nil
 }
 
 // OpenLive reclaims a Client by full identity (live/none).
 func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
-	stored, openErr := reclaim.OpenWithHooks(ctx, Key(cfg), log, func() (any, reclaim.Hooks, error) {
+	bindKey := Key(cfg)
+	stored, openErr := reclaim.OpenWithHooks(ctx, bindKey, log, func() (any, reclaim.Hooks, error) {
 		client, err := New(cfg, log, pluginVersion)
 		if err != nil {
 			return nil, reclaim.Hooks{}, err
@@ -247,7 +274,22 @@ func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, 
 	if openErr != nil {
 		return nil, openErr
 	}
-	return clientFromStored(middlewareName, stored)
+	client, clientErr := clientFromStored(middlewareName, stored)
+	if clientErr != nil {
+		return nil, clientErr
+	}
+	client.sessionKey = bindKey
+	replaced, adoptErr := client.AdoptTransport(cfg)
+	if adoptErr != nil {
+		return nil, adoptErr
+	}
+	if replaced {
+		log.Info("lapi session joiner adopted",
+			"sessionKey", bindKey,
+			"joiningMiddleware", middlewareName,
+		)
+	}
+	return client, nil
 }
 
 // clientHooks is Sleep/Wake/Close as funcs: Yaegi panics on asserting a foreign concrete type.

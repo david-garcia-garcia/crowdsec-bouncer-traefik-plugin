@@ -17,20 +17,19 @@ func newTestStreamTickClient(t *testing.T, log *slog.Logger, host string, httpCl
 	t.Helper()
 	cacheClient := &cache.Client{}
 	cacheClient.New(log, false, "", nil, "", "", "")
-	return &Client{
+	client := &Client{
 		cacheClient:             cacheClient,
 		log:                     log,
 		crowdsecScheme:          "http",
 		crowdsecHost:            host,
 		crowdsecPath:            "/",
 		crowdsecStreamRoute:     crowdsecLapiStreamRoute,
-		crowdsecHeader:          crowdsecLapiHeader,
-		crowdsecKey:             "test-key",
 		updateInterval:          60,
-		httpClient:              httpClient,
 		pluginVersion:           "test",
 		isCrowdsecStreamStartup: true,
 	}
+	attachTestTransport(client, httpClient, crowdsecLapiHeader, "test-key")
+	return client
 }
 
 // captureTestStreamTickLog runs fn with a JSON slog handler at level and returns the buffer.
