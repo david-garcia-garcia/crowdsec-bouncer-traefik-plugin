@@ -328,7 +328,7 @@ func (c *Client) registerLiveHeaderScopes(ctx context.Context, headers map[strin
 func (c *Client) snapshotLiveHeaderScopes() map[string]string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if len(c.liveHeaderScopes.holders) == 0 {
+	if len(c.liveHeaderScopes.headerScopesByCtx) == 0 {
 		return c.decisionScopeHeaders
 	}
 	return c.liveHeaderScopes.union()

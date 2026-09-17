@@ -2,7 +2,10 @@ package lapi
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -102,6 +105,35 @@ func TestOpenStream_LateCountryJoinUsesStartupFalse(t *testing.T) {
 	}
 	if !strings.Contains(query, "country") {
 		t.Fatalf("late join must add country: %s", query)
+	}
+}
+
+func TestOpenStream_FirstCountryPollIncludesCountryBeforeRegister(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	var firstQuery string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if strings.Contains(req.URL.Path, "stream") && firstQuery == "" {
+			firstQuery = req.URL.RawQuery
+		}
+		_ = json.NewEncoder(w).Encode(map[string][]Decision{
+			"new":     {},
+			"deleted": {},
+		})
+	}))
+	t.Cleanup(server.Close)
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	countryCfg := testStreamConfig(parsed.Host, 1)
+	countryCfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	if _, err := OpenStream(context.Background(), countryCfg, slog.Default(), "country", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(firstQuery, "country") {
+		t.Fatalf("create-time first poll must include country from write-once headers: %s", firstQuery)
 	}
 }
 

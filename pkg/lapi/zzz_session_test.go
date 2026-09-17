@@ -61,12 +61,14 @@ func testStreamLAPI(t *testing.T) (*httptest.Server, *int64) {
 
 func TestSessionKey_SameLapiKeySharesCursorAndRedisHash(t *testing.T) {
 	fast := testStreamConfig("lapi.example:8080", 1)
-	slow := testStreamConfig("lapi.example:8080", 600)
+	fast.UpdateIntervalSeconds = 30
+	slow := testStreamConfig("lapi.example:8080", 1)
+	slow.UpdateIntervalSeconds = 120
 	if SessionPrefix(fast) != SessionPrefix(slow) {
-		t.Fatal("same LAPI URL+key must share a session prefix even when metrics intervals differ")
+		t.Fatal("same LAPI URL+key must share a session prefix even when update intervals differ")
 	}
 	if SessionKey(fast) != SessionKey(slow) {
-		t.Fatal("intervals must not split the stream Open key")
+		t.Fatal("updateIntervalSeconds must not split the stream Open key")
 	}
 	if SessionHex(fast) != SessionHex(slow) {
 		t.Fatal("stream cache prefix must follow the session, not metrics interval")
@@ -177,11 +179,15 @@ func TestOpenStream_LiveMetricsMismatchSharesSilently(t *testing.T) {
 	log := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	ctx := context.Background()
 
-	owner, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "owner-mw", "test")
+	ownerCfg := testStreamConfig(parsed.Host, 1)
+	ownerCfg.UpdateIntervalSeconds = 30
+	owner, err := OpenStream(ctx, ownerCfg, log, "owner-mw", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	joiner, err := OpenStream(ctx, testStreamConfig(parsed.Host, 600), log, "joiner-mw", "test")
+	joinerCfg := testStreamConfig(parsed.Host, 1)
+	joinerCfg.UpdateIntervalSeconds = 120
+	joiner, err := OpenStream(ctx, joinerCfg, log, "joiner-mw", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,14 +217,17 @@ func TestOpenStream_SleepingIntervalChangeWakesSameSlot(t *testing.T) {
 	}
 	log := slog.Default()
 	ctx, cancel := context.WithCancel(context.Background())
-	first, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "first", "test")
+	firstCfg := testStreamConfig(parsed.Host, 1)
+	firstCfg.UpdateIntervalSeconds = 30
+	first, err := OpenStream(ctx, firstCfg, log, "first", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	cancel()
 	waitClientSleeping(t, first)
 
-	secondCfg := testStreamConfig(parsed.Host, 600)
+	secondCfg := testStreamConfig(parsed.Host, 1)
+	secondCfg.UpdateIntervalSeconds = 120
 	second, err := OpenStream(context.Background(), secondCfg, log, "reload", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -280,26 +289,26 @@ func TestOpenStream_DifferentRedisIsolatesClientAndStore(t *testing.T) {
 	}
 	log := slog.Default()
 	ctx := context.Background()
-	aCfg := testStreamConfig(parsed.Host, 1)
-	aCfg.RedisCacheHost = "redis-a:6379"
-	bCfg := testStreamConfig(parsed.Host, 1)
-	bCfg.RedisCacheHost = "redis-b:6379"
-	a, err := OpenStream(ctx, aCfg, log, "a", "test")
+	redisACfg := testStreamConfig(parsed.Host, 1)
+	redisACfg.RedisCacheHost = "redis-a:6379"
+	redisBCfg := testStreamConfig(parsed.Host, 1)
+	redisBCfg.RedisCacheHost = "redis-b:6379"
+	redisAClient, err := OpenStream(ctx, redisACfg, log, "redis-a", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := OpenStream(ctx, bCfg, log, "b", "test")
+	redisBClient, err := OpenStream(ctx, redisBCfg, log, "redis-b", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a == b {
+	if redisAClient == redisBClient {
 		t.Fatal("different Redis must isolate the Client")
 	}
-	if a.Cache() == b.Cache() {
+	if redisAClient.Cache() == redisBClient.Cache() {
 		t.Fatal("different Redis must isolate the store")
 	}
-	a.Cache().Set("1.2.3.4", "t", 60)
-	if _, getErr := b.Cache().Get("1.2.3.4"); getErr == nil {
+	redisAClient.Cache().Set("1.2.3.4", "t", 60)
+	if _, getErr := redisBClient.Cache().Get("1.2.3.4"); getErr == nil {
 		t.Fatal("ban in store A must miss in store B")
 	}
 }
@@ -315,19 +324,19 @@ func TestOpenStream_HeaderMapMismatchSharesClient(t *testing.T) {
 	}
 	log := slog.Default()
 	ctx := context.Background()
-	aCfg := testStreamConfig(parsed.Host, 1)
-	aCfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
-	bCfg := testStreamConfig(parsed.Host, 1)
-	bCfg.DecisionScopeHeaders = map[string]string{"username": "X-User"}
-	a, err := OpenStream(ctx, aCfg, log, "a", "test")
+	countryCfg := testStreamConfig(parsed.Host, 1)
+	countryCfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	userCfg := testStreamConfig(parsed.Host, 1)
+	userCfg.DecisionScopeHeaders = map[string]string{"username": "X-User"}
+	countryClient, err := OpenStream(ctx, countryCfg, log, "country", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := OpenStream(ctx, bCfg, log, "b", "test")
+	userClient, err := OpenStream(ctx, userCfg, log, "user", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a != b {
+	if countryClient != userClient {
 		t.Fatal("header-map mismatch must share one Client")
 	}
 }
@@ -426,5 +435,5 @@ func waitClientSleeping(t *testing.T, client *Client) {
 		}
 		time.Sleep(time.Millisecond)
 	}
-	t.Fatal("stream session did not enter grace")
+	t.Fatal("Client never Sleep'd")
 }
