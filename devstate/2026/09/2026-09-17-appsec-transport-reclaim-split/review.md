@@ -31,3 +31,22 @@ phase: codereview
 findings: P? 1 coverage hard
 fixed: TestOpen_TimeoutOnlyClosesPreviousIdle (`dd9e678`)
 skipped: none
+
+## devdocsimpact (2026-09-17)
+phase: devdocsimpact
+findings: 2 stale-usage
+fixed: core_plugin_appsec.md and core_plugin_middleware.md
+skipped: none
+
+## archive (2026-09-17)
+phase: archive
+findings: none
+fixed: folded core_plugin_appsec_client; moved to archive/2026-09-17-appsec-transport-reclaim-split
+skipped: n/a
+
+## pullrequest (2026-09-17)
+phase: pullrequest
+findings: none
+fixed: n/a
+skipped: n/a
+ci: Main Process, e2e binary, e2e docker succeeded on d7d4d0f

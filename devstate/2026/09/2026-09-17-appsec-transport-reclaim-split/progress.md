@@ -9,6 +9,6 @@ JobName: 2026-09-17-appsec-transport-reclaim-split
 | propose | [x] | [x] | 2026-09-17T15:50:06Z |
 | implement | [x] | [x] | 2026-09-17T15:54:21Z |
 | codereview | [x] | [x] | 2026-09-17T16:00:19Z |
-| devdocsimpact | [x] | [ ] | |
-| archive | [x] | [ ] | |
-| pullrequest | [ ] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-17T16:07:39Z |
+| archive | [x] | [x] | 2026-09-17T16:07:39Z |
+| pullrequest | [x] | [x] | 2026-09-17T16:07:39Z |
