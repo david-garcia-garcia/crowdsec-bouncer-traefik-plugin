@@ -4,3 +4,4 @@
 - created knowledge/debt/2026-09-17-cursor-only-reclaim-key.md
 - created knowledge/debt/2026-09-17-appsec-captcha-split.md
 - created knowledge/debt/2026-09-17-metrics-reporter-split.md
+- updated knowledge/devdocs/core_plugin_middleware.md
