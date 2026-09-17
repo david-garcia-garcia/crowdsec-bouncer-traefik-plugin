@@ -25,6 +25,11 @@ priority: normal
 local: core_plugin_lapi_usage-metrics.md
 description: How this plugin POSTs CrowdSec usage-metrics with origin and ip_type labels.
 
+## LAPI connection
+priority: normal
+local: core_plugin_lapi_connection.md
+description: How this plugin stores replaceable LAPI HTTP+auth on the Client.
+
 ## Captcha gate cookie
 priority: normal
 local: core_plugin_middleware_captcha-gate.md
