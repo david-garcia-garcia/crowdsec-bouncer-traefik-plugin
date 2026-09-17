@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
+	"unicode/utf8"
 
 	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
@@ -107,6 +108,8 @@ type Config struct {
 	RedisCachePasswordFile                     string            `json:"redisCachePasswordFile,omitempty"`
 	RedisCacheDatabase                         string            `json:"redisCacheDatabase,omitempty"`
 	RedisCacheUnreachableBlock                 bool              `json:"redisCacheUnreachableBlock,omitempty"`
+	RedisCacheInstanceId                       string            `json:"redisCacheInstanceId,omitempty"`
+	RedisCacheEffectiveInstanceID              string            `json:"-"`
 	BanHTMLFilePath                            string            `json:"banHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
 	BanFilePath                                string            `json:"banFilePath,omitempty"`
 	CaptchaHTMLFilePath                        string            `json:"captchaHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
@@ -304,6 +307,9 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 	}
 
 	if _, err := GetVariable(config, "RedisCachePassword"); err != nil {
+		return err
+	}
+	if err := validateRedisCacheInstanceID(config); err != nil {
 		return err
 	}
 
@@ -607,4 +613,24 @@ func GetTLSConfigCrowdsec(config *Config, log *slog.Logger, isAppsec bool) (*tls
 	}
 	prefix = "CrowdsecLapi"
 	return getTLSConfig(config, log, prefix, config.CrowdsecLapiScheme, config.CrowdsecLapiTLSInsecureVerify)
+}
+
+var redisCacheInstanceIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+func validateRedisCacheInstanceID(config *Config) error {
+	if !config.RedisCacheEnabled {
+		return nil
+	}
+	trimmed := strings.TrimSpace(config.RedisCacheInstanceId)
+	config.RedisCacheInstanceId = trimmed
+	if trimmed == "" {
+		return nil
+	}
+	if utf8.RuneCountInString(trimmed) > 128 {
+		return errors.New("RedisCacheInstanceId: must be at most 128 characters")
+	}
+	if !redisCacheInstanceIDPattern.MatchString(trimmed) {
+		return errors.New("RedisCacheInstanceId: must match [A-Za-z0-9._-]+ when set")
+	}
+	return nil
 }

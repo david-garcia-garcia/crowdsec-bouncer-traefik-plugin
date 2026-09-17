@@ -151,12 +151,19 @@ func SessionKey(cfg *configuration.Config) string {
 }
 
 // CachePrefix is the cache Client prefix: session hex for stream/alone so
-// warn-and-wire shares keys; full IdentityHex for live/none.
+// warn-and-wire shares keys; full IdentityHex for live/none. When Redis is
+// enabled, appends :effectiveInstanceId so replicas do not share remediations
+// or the stream lease key (LAPI cursor stays per bouncer row, not Redis).
 func CachePrefix(cfg *configuration.Config) string {
-	if cfg.CrowdsecMode == configuration.StreamMode || cfg.CrowdsecMode == configuration.AloneMode {
-		return SessionHex(cfg)
+	base := cachePrefixBase(cfg)
+	if !cfg.RedisCacheEnabled {
+		return base
 	}
-	return IdentityHex(cfg)
+	instanceID := cfg.RedisCacheEffectiveInstanceID
+	if instanceID == "" {
+		instanceID = unknownCacheInstanceID
+	}
+	return base + ":" + instanceID
 }
 
 // settingsDiff lists JSON field names that differ, for the warn-and-wire log.

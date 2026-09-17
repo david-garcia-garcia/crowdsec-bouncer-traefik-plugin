@@ -89,7 +89,7 @@ type Client struct {
 }
 
 // Prepare resolves secrets and CAPI/LAPI routing on cfg. Call before Key and New.
-func Prepare(cfg *configuration.Config, _ *slog.Logger) error {
+func Prepare(cfg *configuration.Config, log *slog.Logger) error {
 	if cfg.CrowdsecMode == configuration.AloneMode {
 		cfg.CrowdsecCapiMachineID, _ = configuration.GetVariable(cfg, "CrowdsecCapiMachineID")
 		cfg.CrowdsecCapiPassword, _ = configuration.GetVariable(cfg, "CrowdsecCapiPassword")
@@ -104,6 +104,9 @@ func Prepare(cfg *configuration.Config, _ *slog.Logger) error {
 		}
 	}
 	cfg.RedisCachePassword, _ = configuration.GetVariable(cfg, "RedisCachePassword")
+	if cfg.RedisCacheEnabled {
+		ResolveCacheInstanceIdentity(cfg, log)
+	}
 	return nil
 }
 

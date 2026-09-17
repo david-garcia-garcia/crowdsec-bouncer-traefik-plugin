@@ -1,6 +1,7 @@
 package configuration
 
 import (
+	"strings"
 	"testing"
 
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -118,6 +119,18 @@ func Test_ValidateParams(t *testing.T) {
 	cfgEmptyAction := getMinimalConfig()
 	cfgEmptyAction.CrowdsecLapiFailureAction = ""
 	cfgEmptyAction.CrowdsecAppsecFailureAction = ""
+	cfgRedisInstanceValid := getMinimalConfig()
+	cfgRedisInstanceValid.RedisCacheEnabled = true
+	cfgRedisInstanceValid.RedisCacheInstanceId = "pod-7"
+	cfgRedisInstanceTrim := getMinimalConfig()
+	cfgRedisInstanceTrim.RedisCacheEnabled = true
+	cfgRedisInstanceTrim.RedisCacheInstanceId = "  my.pod_1  "
+	cfgRedisInstanceLong := getMinimalConfig()
+	cfgRedisInstanceLong.RedisCacheEnabled = true
+	cfgRedisInstanceLong.RedisCacheInstanceId = strings.Repeat("a", 129)
+	cfgRedisInstanceBad := getMinimalConfig()
+	cfgRedisInstanceBad.RedisCacheEnabled = true
+	cfgRedisInstanceBad.RedisCacheInstanceId = "pod/a"
 	type args struct {
 		config *Config
 	}
@@ -143,6 +156,10 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Captcha LAPI action with provider", args: args{config: cfgCaptchaWithProvider}, wantErr: false},
 		{name: "Unknown AppSec failure action", args: args{config: cfgUnknownAction}, wantErr: true},
 		{name: "Empty failure actions use default ban", args: args{config: cfgEmptyAction}, wantErr: false},
+		{name: "Redis instance id valid", args: args{config: cfgRedisInstanceValid}, wantErr: false},
+		{name: "Redis instance id trimmed", args: args{config: cfgRedisInstanceTrim}, wantErr: false},
+		{name: "Redis instance id too long", args: args{config: cfgRedisInstanceLong}, wantErr: true},
+		{name: "Redis instance id bad charset", args: args{config: cfgRedisInstanceBad}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
