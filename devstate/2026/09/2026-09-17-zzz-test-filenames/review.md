@@ -22,3 +22,9 @@ phase: implement
 findings: five test files prefixed; local go test failed on Windows TempDir cleanup
 fixed: git mv to zzz_*_test.go; README tree line
 skipped: logger file-handle leak (DestBranch Windows, out of scope)
+
+## codereview (2026-09-17)
+phase: codereview
+findings: Spec 1 extra; other axes none
+fixed: n/a
+skipped: research + domains.md judged required by workflow, not product extra
