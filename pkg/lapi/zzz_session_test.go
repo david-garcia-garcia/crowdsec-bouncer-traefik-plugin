@@ -71,12 +71,6 @@ func TestSessionKey_SameLapiKeySharesCursorAndRedisHash(t *testing.T) {
 	if SessionHex(fast) != SessionHex(slow) {
 		t.Fatal("stream cache prefix must follow the session, not metrics interval")
 	}
-	if IdentityHex(fast) != IdentityHex(slow) {
-		t.Fatal("live/none IdentityHex must omit metrics interval")
-	}
-	if Key(fast) != Key(slow) {
-		t.Fatal("live Open key must omit metrics interval")
-	}
 	if !strings.HasPrefix(SessionKey(fast), "lapi:stream:") {
 		t.Fatal("stream Open key must keep lapi:stream: prefix")
 	}
@@ -85,6 +79,28 @@ func TestSessionKey_SameLapiKeySharesCursorAndRedisHash(t *testing.T) {
 	}
 	if strings.HasPrefix(SessionKey(fast), "decisionstore:") || SessionKey(fast) == StoreKey(fast) {
 		t.Fatal("Client Open key must not reuse StoreKey")
+	}
+}
+
+func testNoneConfig(host string, metricsInterval int64) *configuration.Config {
+	cfg := testStreamConfig(host, metricsInterval)
+	cfg.CrowdsecMode = configuration.NoneMode
+	return cfg
+}
+
+func TestKey_NoneMetricsIntervalSplitsClientKeepsStore(t *testing.T) {
+	fast := testNoneConfig("lapi.example:8080", 1)
+	slow := testNoneConfig("lapi.example:8080", 600)
+	if Key(fast) == Key(slow) {
+		t.Fatal("none Key must include MetricsUpdateIntervalSeconds")
+	}
+	if StoreKey(fast) != StoreKey(slow) {
+		t.Fatal("none StoreKey must omit MetricsUpdateIntervalSeconds")
+	}
+	streamFast := testStreamConfig("lapi.example:8080", 1)
+	streamSlow := testStreamConfig("lapi.example:8080", 600)
+	if SessionKey(streamFast) != SessionKey(streamSlow) {
+		t.Fatal("stream SessionKey must still omit metrics interval")
 	}
 }
 

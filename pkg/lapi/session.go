@@ -138,7 +138,7 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	return client, nil
 }
 
-// OpenLive reclaims a Client by cursor plus Redis (live/none).
+// OpenLive reclaims a Client by cursor plus Redis and metrics interval (live/none).
 func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
 	store, storeErr := OpenDecisionStore(ctx, cfg, log)
 	if storeErr != nil {
