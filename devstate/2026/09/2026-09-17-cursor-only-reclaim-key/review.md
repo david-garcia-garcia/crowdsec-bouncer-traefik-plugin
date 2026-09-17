@@ -22,3 +22,9 @@ findings: apply landed; Peek gone; OpenTyped not taken; debt deleted; Main Proce
 fixed: cursor+Redis key; scope union; utilities reclaim shim; nestif after Sync
 skipped: code review; archive; OpenTyped
 
+## implement (2026-09-17 re-entry)
+phase: implement
+findings: live/none Key keeps MetricsUpdateIntervalSeconds; stream and StoreKey still omit it; e2e docker+pester succeeded
+fixed: identity payload metrics interval; none Key unit test; change artifacts; explore Q
+skipped: code review; AdoptMetricsInterval; second metrics ticker
+
