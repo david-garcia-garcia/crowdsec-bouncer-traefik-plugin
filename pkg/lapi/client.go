@@ -168,7 +168,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		})
 	}
 
-	client.logInfo(MsgConnectionStarted)
+	client.logInfo(MsgConnectionStarted, "started")
 	return client, nil
 }
 
@@ -198,7 +198,7 @@ func (c *Client) Close() {
 	if c.cacheClient != nil {
 		c.cacheClient.Close()
 	}
-	c.logInfo(MsgConnectionClosed)
+	c.logInfo(MsgConnectionClosed, "closed")
 }
 
 // Sleep stops stream and metrics tickers and keeps HTTP, cache, and the LAPI
@@ -216,7 +216,7 @@ func (c *Client) Sleep() {
 	c.streamStop = nil
 	c.metricsStop = nil
 	c.mu.Unlock()
-	c.logInfo(MsgConnectionSleeping)
+	c.logInfo(MsgConnectionSleeping, "sleeping")
 	go c.drainMetrics()
 }
 
@@ -241,18 +241,18 @@ func (c *Client) Wake() {
 		})
 	}
 	c.mu.Unlock()
-	c.logInfo(MsgConnectionWaking)
+	c.logInfo(MsgConnectionWaking, "waking")
 	if resumeStream {
 		go c.handleStreamTicker()
 	}
 }
 
-// logInfo writes an operator-visible lifecycle line with mode and LAPI host.
-func (c *Client) logInfo(msg string) {
+// logInfo writes an operator-visible line with mode, host, reclaim key, and reason.
+func (c *Client) logInfo(msg, reason string) {
 	if c.log == nil {
 		return
 	}
-	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost)
+	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
 }
 
 func stopTicker(stop chan bool) {
