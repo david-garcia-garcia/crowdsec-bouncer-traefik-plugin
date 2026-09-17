@@ -34,3 +34,9 @@ phase: devdocsimpact
 findings: missing-packet zzz_ test file
 fixed: created knowledge/devdocs/std_go_test_zzz-prefix.md
 skipped: n/a
+
+## archive (2026-09-17)
+phase: archive
+findings: new spec std_go_test_zzz-prefix synced; change archived
+fixed: openspec/specs/std_go_test_zzz-prefix/spec.md
+skipped: n/a
