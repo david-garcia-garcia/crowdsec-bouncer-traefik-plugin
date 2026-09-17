@@ -40,9 +40,6 @@ run_local:
 run_behindproxy:
 	docker compose -f examples/behind-proxy/docker-compose.yml up -d --remove-orphans
 
-run_cacheredis:
-	docker compose -f examples/redis-cache/docker-compose.yml up -d --remove-orphans
-
 run_trustedips:
 	docker compose -f examples/trusted-ips/docker-compose.yml up -d --remove-orphans
 
@@ -88,9 +85,6 @@ restart:
 restart_behindproxy:
 	docker compose -f examples/behind-proxy/docker-compose.yml restart
 
-restart_cacheredis:
-	docker compose -f examples/redis-cache/docker-compose.yml restart
-
 restart_trustedips:
 	docker compose -f examples/trusted-ips/docker-compose.yml restart
 
@@ -120,7 +114,6 @@ show_dev_logs:
 
 clean_all_docker:
 	docker compose -f examples/behind-proxy/docker-compose.yml down --remove-orphans
-	docker compose -f examples/redis-cache/docker-compose.yml down --remove-orphans
 	docker compose -f examples/trusted-ips/docker-compose.yml down --remove-orphans
 	docker compose -f examples/tls-auth/docker-compose.yml down --remove-orphans
 	docker compose -f examples/appsec-enabled/docker-compose.yml down --remove-orphans

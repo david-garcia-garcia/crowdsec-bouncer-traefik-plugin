@@ -57,8 +57,8 @@ type Client struct {
 	lapiFailureAction      string
 	defaultDecisionTimeout int64
 	crowdsecStreamRoute    string
-	crowdsecHeader       string
-	decisionScopeHeaders map[string]string // CrowdSec header scope → request header
+	crowdsecHeader         string
+	decisionScopeHeaders   map[string]string // CrowdSec header scope → request header
 
 	httpClient      *http.Client
 	cacheClient     *cache.Client
@@ -141,8 +141,8 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		metricsInterval:         config.MetricsUpdateIntervalSeconds,
 		updateMaxFailure:        config.UpdateMaxFailure,
 		lapiFailureAction:       configuration.EffectiveFailureAction(config.CrowdsecLapiFailureAction),
-		defaultDecisionTimeout: config.DefaultDecisionSeconds,
-		decisionScopeHeaders:   decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
+		defaultDecisionTimeout:  config.DefaultDecisionSeconds,
+		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		crowdsecHeader:          crowdsecHeader,
 		log:                     log,

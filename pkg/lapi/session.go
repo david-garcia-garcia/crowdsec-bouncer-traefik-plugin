@@ -78,8 +78,8 @@ type streamSettings struct {
 	LapiFailureAction            string            `json:"lapiFailureAction"`
 	StreamStartupBlock           bool              `json:"streamStartupBlock"`
 	DefaultDecisionSeconds       int64             `json:"defaultDecisionSeconds"`
-	HTTPTimeoutSeconds          int64             `json:"httpTimeoutSeconds"`
-	LapiTLSInsecureVerify       bool              `json:"lapiTlsInsecureVerify"`
+	HTTPTimeoutSeconds           int64             `json:"httpTimeoutSeconds"`
+	LapiTLSInsecureVerify        bool              `json:"lapiTlsInsecureVerify"`
 	LapiTLSCertificateAuthority  string            `json:"lapiTlsCa"`
 	LapiTLSCertificateBouncer    string            `json:"lapiTlsCert"`
 	DecisionScopeHeaders         map[string]string `json:"decisionScopeHeaders"`
@@ -108,8 +108,8 @@ func settingsFrom(cfg *configuration.Config) streamSettings {
 		LapiFailureAction:            configuration.EffectiveFailureAction(cfg.CrowdsecLapiFailureAction),
 		StreamStartupBlock:           cfg.StreamStartupBlock,
 		DefaultDecisionSeconds:       cfg.DefaultDecisionSeconds,
-		HTTPTimeoutSeconds:          cfg.HTTPTimeoutSeconds,
-		LapiTLSInsecureVerify:       cfg.CrowdsecLapiTLSInsecureVerify,
+		HTTPTimeoutSeconds:           cfg.HTTPTimeoutSeconds,
+		LapiTLSInsecureVerify:        cfg.CrowdsecLapiTLSInsecureVerify,
 		LapiTLSCertificateAuthority:  cfg.CrowdsecLapiTLSCertificateAuthority,
 		LapiTLSCertificateBouncer:    cfg.CrowdsecLapiTLSCertificateBouncer,
 		DecisionScopeHeaders:         decisionscope.NormalizeDecisionScopeHeaders(cfg.DecisionScopeHeaders),
