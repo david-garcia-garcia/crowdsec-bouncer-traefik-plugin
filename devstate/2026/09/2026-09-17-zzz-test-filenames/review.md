@@ -40,3 +40,9 @@ phase: archive
 findings: new spec std_go_test_zzz-prefix synced; change archived
 fixed: openspec/specs/std_go_test_zzz-prefix/spec.md
 skipped: n/a
+
+## pullrequest (2026-09-17)
+phase: pullrequest
+findings: Main Process failed (yaegi pkg/cache); e2e succeeded
+fixed: PR title gitmoji ready
+skipped: CI not green — run not done

@@ -11,4 +11,4 @@ JobName: 2026-09-17-zzz-test-filenames
 | codereview | [x] | [x] | 2026-09-17T04:31:56Z |
 | devdocsimpact | [x] | [x] | 2026-09-17T04:32:47Z |
 | archive | [x] | [x] | 2026-09-17T04:33:52Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-17T04:36:25Z |
