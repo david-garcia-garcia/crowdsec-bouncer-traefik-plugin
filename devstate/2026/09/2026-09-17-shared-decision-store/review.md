@@ -15,3 +15,9 @@ phase: propose
 findings: none
 fixed: none
 skipped: none
+
+## implement (2026-09-17T17:22:28Z)
+phase: implement
+findings: none
+fixed: DecisionStore reclaim; atomic stream lease (Redis Eval + memory mutex); Client Close no longer closes the shared cache; isolated-store usage remapped; shared-store debt deleted
+skipped: core_plugin_reclaim packet (assumed no)
