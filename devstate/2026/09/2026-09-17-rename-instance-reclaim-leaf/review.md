@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: missing-packet 1
 fixed: produced `knowledge/devdocs/core_plugin_lapi_reclaim-key.md` and index heading
 skipped: none (Bouncer / connection / failure-action were none; no vague packet rename)
+
+## archive (2026-09-17T16:21:38Z)
+phase: archive
+findings: none
+fixed: catalog already matched; change moved to `openspec/changes/archive/2026-09-17-rename-instance-reclaim-leaf/`
+skipped: Task tool unavailable; FindSpecHost Search+Verdict on archive thread
