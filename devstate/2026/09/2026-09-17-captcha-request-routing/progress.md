@@ -5,7 +5,7 @@ JobName: 2026-09-17-captcha-request-routing
 | Phase | Work | Card | At |
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-17T18:39:12Z |
-| explore | [x] | [ ] | |
+| explore | [x] | [x] | 2026-09-17T18:45:33Z |
 | propose | [ ] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
