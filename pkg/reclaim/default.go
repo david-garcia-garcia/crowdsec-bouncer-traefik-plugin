@@ -7,31 +7,32 @@ import (
 	"time"
 )
 
+// ProcessGrace is this plugin’s process-table wait after the last holder (LAPI and AppSec).
+const ProcessGrace = 30 * time.Second
+
 var (
 	defaultMu    sync.Mutex
 	defaultTable *Table
 )
 
-// Default returns the process-wide table, creating it on first use.
+// Default returns the process-wide table, creating it on first use with ProcessGrace.
 func Default() *Table {
 	defaultMu.Lock()
 	defer defaultMu.Unlock()
 	if defaultTable == nil {
-		defaultTable = NewTable(DefaultGrace)
+		defaultTable = New(Config{Grace: ProcessGrace})
 	}
 	return defaultTable
 }
 
 // Open is Default().Open: create-once for key on the process table and bind ctx.
-// logger is required. If the value has Close(), the table calls it when the incarnation ends.
-// If the value has Sleep/Wake, last holder Sleeps and a reclaim Wakes.
-func Open(ctx context.Context, key string, logger *slog.Logger, create func() (any, error)) (any, error) {
-	return Default().Open(ctx, key, logger, create)
+func Open(ctx context.Context, key string, logger *slog.Logger, create func() (any, error), hooks Hooks) (any, error) {
+	return Default().Open(ctx, key, logger, create, hooks)
 }
 
-// OpenWithGrace is Default().OpenWithGrace.
-func OpenWithGrace(ctx context.Context, key string, logger *slog.Logger, grace time.Duration, create func() (any, error)) (any, error) {
-	return Default().OpenWithGrace(ctx, key, logger, grace, create)
+// OpenWithHooks is Default().OpenWithHooks.
+func OpenWithHooks(ctx context.Context, key string, logger *slog.Logger, create func() (any, Hooks, error)) (any, error) {
+	return Default().OpenWithHooks(ctx, key, logger, create)
 }
 
 // Peek is Default().Peek: inspect a key without binding a constructor context.
@@ -44,17 +45,17 @@ func PeekLivePrefix(prefix string) View {
 	return Default().PeekLivePrefix(prefix)
 }
 
-// ResetForTest tears down the process table (cancels every lifetime) and installs a fresh one.
+// ResetForTest tears down the process table and installs a fresh one with ProcessGrace.
 func ResetForTest() {
-	ResetForTestWith(DefaultGrace)
+	ResetForTestWith(ProcessGrace)
 }
 
-// ResetForTestWith replaces the process table after canceling the current one.
+// ResetForTestWith replaces the process table after Reset of the current one.
 func ResetForTestWith(grace time.Duration) {
 	defaultMu.Lock()
 	defer defaultMu.Unlock()
 	if defaultTable != nil {
-		defaultTable.ResetForTest()
+		defaultTable.Reset()
 	}
-	defaultTable = NewTable(grace)
+	defaultTable = New(Config{Grace: grace})
 }
