@@ -1,0 +1,15 @@
+issueKey: 2026-09-17-lapi-metrics-reporter-split
+jobName: 2026-09-17-lapi-metrics-reporter-split
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:d82835329e24374c25361ed35e3f41f37a910ba1407a82e362621d028279883f
+localTests: none
+requirement: requirement.md
+comments: none
+explore:
+change:
+pr:
