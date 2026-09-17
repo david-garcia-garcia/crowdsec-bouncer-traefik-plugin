@@ -18,7 +18,7 @@ Use the utilities SimpleRedis module for Redis-protocol GET/SET/DEL/MGET. Constr
 
 - `Client.New(..., isRedis=true, writeHost, readHosts, pass, database, keyPrefix)` builds the writer and each reader via `simpleredis.New`. `keyPrefix` is `SessionHex` for every mode so two LAPI Clients that share a DecisionStore also share keys.
 - Request lookup uses `GetMany` (Redis `MGET`, one `nextReader()`): the client IP, optional `range-index`, and each present header-scope key. Prefix each logical key. Missing keys are omitted from the result map.
-- Cache keys for remediations are the client IP, `scope:value` for header-mapped scopes, and one `range-index` blob, namespaced by `CachePrefix` when Redis is on.
+- Cache keys for remediations are the client IP, `scope:value` for header-mapped scopes, and one `range-index` blob, namespaced by the store’s `SessionHex` `keyPrefix` when Redis is on.
 - Commands pass `context.Background()` (the cache API has no request context).
 - `SimpleRedis.Close()` drains idle sockets and refuses to pool again. Safe to call more than once (CAS). `cache.Client.Close()` closes the writer and every reader. Only the DecisionStore reclaim Close hook calls that.
 - Stream lease acquire is `cache.Client.Acquire`: one `Eval` (`EVALSHA` then `EVAL` on NOSCRIPT) on the writer plus prefix. Do not Get-then-Set. Do not add a SetNX wrapper.
@@ -36,6 +36,7 @@ values, err := client.MGet(context.Background(), []string{key, "range-index"})
 ## Key files
 
 - `pkg/cache/cache.go`
+- `pkg/cache/acquire.go`
 - `vendor/github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis/`
 
 ## Gotchas

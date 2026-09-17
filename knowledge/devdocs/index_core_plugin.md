@@ -30,6 +30,11 @@ priority: normal
 local: core_plugin_lapi_reclaim-key.md
 description: How this plugin keys a reclaimed LAPI Client (session prefix plus first-wins settings hash).
 
+## Stream lease
+priority: normal
+local: core_plugin_lapi_stream-lease.md
+description: The `updated` cache key that grants one CrowdSec stream GET on a shared DecisionStore.
+
 ## LAPI connection
 priority: normal
 local: core_plugin_lapi_connection.md
