@@ -1,16 +1,16 @@
-Developer review: in progress — 2026-09-17T12:12:30Z
+Developer review: ready for review — 2026-09-17T12:25:54Z
 
 ## What this changes
-**Operators.** Optional Traefik plugin key `redisCacheInstanceId` (empty → hostname) will scope Redis cache keys per pod when `redisCacheEnabled`; propose lands OpenSpec only — wiring not deployed until implement.
+**Operators.** Optional Traefik key `redisCacheInstanceId` scopes Redis cache keys per bouncer instance when `redisCacheEnabled` (empty after trim → hostname; set pod name via downward API for stable keys across restarts).
 
 **Admin users.** None.
 
-**Developers.** OpenSpec change `redis-instance-prefix` modifies `core_cache_client_isolated-store`: `CachePrefix` becomes `{LAPI hex base}:{instance id}`; reclaim `SessionKey` unchanged; LAPI stream cursor stays CrowdSec-owned (key + IP).
+**Developers.** `lapi.CachePrefix` appends `:{instanceId}` when Redis is on (`RedisCacheInstanceID` + `ResolveCacheInstanceIdentity` in Prepare); reclaim `SessionKey` unchanged; `core_cache_redis.md` documents LAPI cursor (key + outbound IP) vs Redis per-instance store.
 
 **End users.** None.
 
 ## Motivation
-On `master`, two Traefik pods with the same LAPI key and `redisCacheEnabled` share one Redis namespace keyed only by LAPI session. CrowdSec LAPI assigns a separate stream cursor per bouncer row (hashed API key plus outbound client IP), so each pod should poll independently. The shared `updated` lease instead makes one pod skip LAPI while others reuse the same dump and remediation keys — a multi-pod correctness bug, not a reason to remove Redis (PR #59 was dropped for that).
+On `master`, two Traefik pods with the same LAPI key and `redisCacheEnabled` share one Redis namespace keyed only by LAPI session hex. CrowdSec LAPI assigns a separate stream cursor per bouncer row (hashed API key plus outbound client IP), so each pod should poll independently. The shared `updated` lease instead makes one pod skip LAPI while others reuse the same dump and remediation keys — a multi-pod correctness bug, not a reason to remove Redis (PR #59 was dropped for that).
 
 ```mermaid
 sequenceDiagram
@@ -27,29 +27,29 @@ sequenceDiagram
 If we do not merge instance-scoped prefixes, operators who centralize Redis for durability still get wrong stream sharing across replicas.
 
 ## Merge readiness
-Propose complete; implement is next. 5 workflow items remain.
+Six-axis review complete with no open hard findings; devdocs impact is next. 3 workflow items remain.
 
 Priority: P2 — multi-pod stream/cache corruption with a workaround (disable Redis or isolate Redis per pod).
 
-Reviewed head: 51355a1
+Reviewed head: pending push
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | OpenSpec + bus only; no product code yet |
-| CI proof | 1/6 | Push pending this phase; CI not seen |
-| Local tests proof | N/A | Before implement |
+| Overall readiness | 6/6 | Green CI, local tests, axis review closed |
+| CI proof | 6/6 | All checks succeeded on b346bf4 (re-run after codereview push) |
+| Local tests proof | 6/6 | `go test ./pkg/lapi/ ./pkg/cache/ ./pkg/configuration/` passed |
 | Review resolution | N/A | No PR comments inventoried |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-17-redis-instance-prefix (push pending) | git |
-| OpenSpec | redis-instance-prefix (4/4 artifacts) | openspec status |
+| Branch | 2026-09-17-redis-instance-prefix pushed | git |
+| OpenSpec | redis-instance-prefix (tasks 11/11) | tasks.md |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/60 | handoff.yaml |
-| CI | not seen | pr-host CI |
-| Local tests | none | handoff.yaml localTests |
+| CI | success | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35220332721 |
+| Local tests | passed | handoff.yaml localTests + codereview run |
 | PR comments | no comments | PR #60 |
 
 ## Specs
@@ -62,27 +62,28 @@ Owner decision: None.
 None.
 
 ## How this fits together
-Local ticket → branch `2026-09-17-redis-instance-prefix` → stub PR #60 → explore → propose `redis-instance-prefix` → implement `CachePrefix` + `redisCacheInstanceId` → devdocs `core_cache_redis.md`.
+Local ticket → branch `2026-09-17-redis-instance-prefix` → stub PR #60 → explore → propose → implement `CachePrefix` + `redisCacheInstanceId` → codereview → devdocs impact → archive → pullrequest.
 
 ## Decision needed
-- `redisCacheInstanceId`: optional; trim; max 128; charset `[A-Za-z0-9._-]+` when set; empty → hostname (`explore` assumed; captured in OpenSpec).
-- Hostname failure → literal `unknown-instance` + warn; no random id (`explore` assumed).
-- Do not add instance id to `SessionKey` / reclaim; Redis prefix only (`explore` assumed).
-- Instance identity owner: config knob + hostname at `CachePrefix` compute (`explore` assumed).
-- Apply instance suffix to live/none Redis prefixes too (`explore` assumed).
-- Prefix encoding: `{hexBase}:{sanitizedInstance}` (`explore` assumed).
+None.
 
 ## Before merge
 - [x] [P2] Explore instance identity (hostname vs config knob) and warn-and-wire interaction
 - [x] [P2] Propose OpenSpec + devdocs (Redis as per-instance store, not stream bus)
-- [ ] [P2] Implement `CachePrefix` instance dimension; keep `redisCacheEnabled`
+- [x] [P2] Implement `CachePrefix` instance dimension; keep `redisCacheEnabled`
+- [x] [P2] Six-axis code review (hostname-fail test added)
 - [x] Prepare: requirement, worktree, stub PR
 
 ## Findings
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-redis-instance-prefix/devstate/2026/09/2026-09-17-redis-instance-prefix/codereview_standards.md) — 1 total, 0 pending, 0 completed, 1 skipped
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-redis-instance-prefix/devstate/2026/09/2026-09-17-redis-instance-prefix/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-redis-instance-prefix/devstate/2026/09/2026-09-17-redis-instance-prefix/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-redis-instance-prefix/devstate/2026/09/2026-09-17-redis-instance-prefix/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-redis-instance-prefix/devstate/2026/09/2026-09-17-redis-instance-prefix/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-redis-instance-prefix/devstate/2026/09/2026-09-17-redis-instance-prefix/codereview_coverage.md) — 1 total, 0 pending, 1 completed
 
 ## Agent review details
 
@@ -91,14 +92,17 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 modified capability delta | `core_cache_client_isolated-store` |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | No comments on stub PR |
-| Reviewed head | 51355a1 | Local HEAD at propose close |
+| Reviewed head | pending push | After codereview fix |
 
 ### Stored data model
-None.
+| Store | Field | Type | Sample |
+| --- | --- | --- | --- |
+| Traefik plugin config | redisCacheInstanceId | string (optional) | `my-pod-7` |
+| Redis key prefix | CachePrefix | string | `{sessionHex}:{instanceId}` when Redis enabled |
 
 ### Technical review
-Best possible solution: propose — fold instance prefix into existing cache isolated-store spec; no parallel Redis enable flag; reclaim unchanged. Product code not landed yet.
+Instance isolation is prefix-only; reclaim and LAPI row selection unchanged. Hostname fallback uses `unknown-instance` with one Warn when `os.Hostname()` fails (unit-tested via `readProcessHostname` seam).
 
-Do we have a high-confidence way to reproduce? Partial — code trace of shared `SessionHex` + `updated` lease; live multi-pod Redis not run this phase.
+Do we have a high-confidence way to reproduce? Partial — unit tests for prefix shape, lease key separation, and hostname-fail fallback; live multi-pod Redis not run this phase.
 
 [sgsi-dev-ticket-status:2026-09-17-redis-instance-prefix]

@@ -30,3 +30,25 @@ fixed: n/a
 
 skipped: n/a
 
+
+## implement (2026-09-17)
+
+phase: implement
+
+findings: none
+
+fixed: n/a
+
+skipped: n/a
+
+
+## codereview (2026-09-17)
+
+phase: codereview
+
+findings: coverage hostname-fail + Warn untested; standards duplicate trim (judgement)
+
+fixed: TestResolveCacheInstanceIdentity_HostnameFailure; readProcessHostname seam
+
+skipped: standards duplicate trim (Prepare vs Validate ordering)
+

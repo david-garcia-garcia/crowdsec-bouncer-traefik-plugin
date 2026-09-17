@@ -1,7 +1,10 @@
 package lapi
 
 import (
+	"bytes"
+	"errors"
 	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
@@ -57,6 +60,26 @@ func TestResolveCacheInstanceIdentity_Hostname(t *testing.T) {
 	ResolveCacheInstanceIdentity(cfg, slog.Default())
 	if cfg.RedisCacheEffectiveInstanceID == "" {
 		t.Fatal("expected hostname or fallback")
+	}
+}
+
+func TestResolveCacheInstanceIdentity_HostnameFailure(t *testing.T) {
+	orig := readProcessHostname
+	t.Cleanup(func() { readProcessHostname = orig })
+	readProcessHostname = func() (string, error) { return "", errors.New("no hostname") }
+
+	var buf bytes.Buffer
+	log := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn}))
+
+	cfg := testStreamConfig("lapi.example:8080", 1)
+	cfg.RedisCacheEnabled = true
+	ResolveCacheInstanceIdentity(cfg, log)
+	if cfg.RedisCacheEffectiveInstanceID != unknownCacheInstanceID {
+		t.Fatalf("effective = %q, want %q", cfg.RedisCacheEffectiveInstanceID, unknownCacheInstanceID)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "unknown-instance") || !strings.Contains(out, "no hostname") {
+		t.Fatalf("expected warn with error, got %q", out)
 	}
 }
 

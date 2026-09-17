@@ -10,6 +10,8 @@ import (
 
 const unknownCacheInstanceID = "unknown-instance"
 
+var readProcessHostname = os.Hostname
+
 // ResolveCacheInstanceIdentity sets RedisCacheEffectiveInstanceID once per cfg.
 // Call from Prepare when Redis is enabled.
 func ResolveCacheInstanceIdentity(cfg *configuration.Config, log *slog.Logger) {
@@ -21,7 +23,7 @@ func ResolveCacheInstanceIdentity(cfg *configuration.Config, log *slog.Logger) {
 		cfg.RedisCacheEffectiveInstanceID = configured
 		return
 	}
-	host, err := os.Hostname()
+	host, err := readProcessHostname()
 	if err != nil {
 		if log != nil {
 			log.Warn("redis cache instance id: hostname unavailable, using unknown-instance", "error", err)
