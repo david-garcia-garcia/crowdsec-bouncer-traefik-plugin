@@ -27,3 +27,9 @@ phase: codereview
 findings: Standards 1 done (sentinel errAppsecReadBody); Performance 1 skipped (limit 0 unlimited); Spec/Security/Dead/Coverage none
 fixed: Query matches errAppsecReadBody with errors.Is
 skipped: Performance bound (specified unlimited); dest nestif
+
+## devdocsimpact (2026-09-17)
+phase: devdocsimpact
+findings: stale-usage AppSec Client produced; FailureAction none; no Language term for the internal sentinel
+fixed: usage packet Key files + Gotchas for errors.Is classification; PR #70 summary
+skipped: Language for errAppsecReadBody (internal sentinel)
