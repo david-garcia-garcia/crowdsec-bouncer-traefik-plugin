@@ -34,3 +34,9 @@ findings: Standards 4 done; Spec/Security/Performance none; Dead 1 skipped (Iden
 fixed: headerScopesByCtx; test names; Sleep trail; UpdateIntervalSeconds proofs; first Country poll
 skipped: IdentityHex delete (live spec still names the export)
 
+## devdocsimpact (2026-09-17)
+phase: devdocsimpact
+findings: 5 produced, 0 skipped (4 stale-usage, 1 language-gap)
+fixed: middleware / connection / decisionscope / e2e usage; scope-union Language
+skipped: none
+
