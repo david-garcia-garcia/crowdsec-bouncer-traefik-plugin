@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
 // getTestConfig returns a minimal valid configuration for testing.
@@ -58,6 +58,24 @@ func getTestConfig() *configuration.Config {
 		UpdateMaxFailure:                     0,
 		MetricsUpdateIntervalSeconds:         0,
 	}
+}
+
+func newTestLogFile(t *testing.T) string {
+	t.Helper()
+	reclaim.ResetForTestWith(0)
+	f, err := os.CreateTemp("", "bouncer-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp: %v", err)
+	}
+	path := f.Name()
+	if closeErr := f.Close(); closeErr != nil {
+		t.Fatalf("close temp log: %v", closeErr)
+	}
+	t.Cleanup(func() {
+		reclaim.ResetForTest()
+		_ = os.Remove(path)
+	})
+	return path
 }
 
 // Helper function to create and execute a bouncer request for testing
@@ -199,18 +217,16 @@ func TestBouncerFileLoggingLevels(t *testing.T) {
 			forbiddenLevels: []string{},
 		},
 		{
-			name:            "INFO level should show no logs (bouncer doesn't generate INFO during normal operation)",
+			name:            "INFO level should show INFO and not DEBUG",
 			logLevel:        "INFO",
-			expectedLevels:  []string{}, // No logs expected for normal operation
+			expectedLevels:  []string{"INFO"},
 			forbiddenLevels: []string{"DEBUG"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary directory for log file
-			tmpDir := t.TempDir()
-			logFile := filepath.Join(tmpDir, "bouncer.log")
+			logFile := newTestLogFile(t)
 
 			// Get test config and override specific fields
 			config := getTestConfig()
@@ -243,9 +259,7 @@ func TestBouncerFileLoggingLevels(t *testing.T) {
 }
 
 func TestBouncerFileLoggingCommonFormat(t *testing.T) {
-	// Create temporary directory for log file
-	tmpDir := t.TempDir()
-	logFile := filepath.Join(tmpDir, "bouncer-common.log")
+	logFile := newTestLogFile(t)
 
 	// Get test config and override specific fields
 	config := getTestConfig()
