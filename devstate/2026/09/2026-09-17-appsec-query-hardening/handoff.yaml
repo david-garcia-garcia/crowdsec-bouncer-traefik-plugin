@@ -8,7 +8,7 @@ destBranch: master
 qualify: qualified
 src: sha256:d757b3f3f2238480609b238e3ec3c3fc509f588d35a0da4af842c79b8831e1af
 comments: none
-localTests: none
+localTests: passed
 requirement: requirement.md
 explore: explore.md
 change: appsec-query-hardening

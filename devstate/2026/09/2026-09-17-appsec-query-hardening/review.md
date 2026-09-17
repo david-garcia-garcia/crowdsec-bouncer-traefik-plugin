@@ -15,3 +15,9 @@ phase: propose
 findings: fold core_plugin_appsec_client (drain, zero limit, Content-Length) and core_plugin_appsec_failure-action (read-body FA; DELETE out of unreadable set); OpenSpec valid 4/4
 fixed: change appsec-query-hardening; specs.md; PR #70 summary
 skipped: no Open question Decision changed; no new spec leaf; no product apply
+
+## implement (2026-09-17)
+phase: implement
+findings: five Query defects applied; localTests passed; Main Process lint failed dest nestif configuration.go:336; e2e both success
+fixed: drain 502/503/504; limit 0 unlimited; read-body FA; rebuild Content-Length; DELETE out of isMethodWithBody; PR #70 summary
+skipped: dest nestif (note large); hop-by-hop filter; oversized FA; #51; no Open question Decision changed
