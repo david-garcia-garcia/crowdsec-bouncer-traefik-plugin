@@ -65,19 +65,10 @@ type Client struct {
 	isCrowdsecStreamStartup bool
 	isCrowdsecStreamHealthy bool
 	updateFailure           int64
-	streamStop              chan bool
-	metricsStop             chan bool
-	lastMetricsPush         time.Time
-	startedAt               time.Time
-	metricsMu               sync.Mutex
-	reportMu                sync.Mutex               // one usage-metrics POST at a time (ticker, Sleep drain, Close drain)
-	windowCounters          map[usageMetricKey]int64 // dropped counters for the current push window
-	processedIPv4           int64                    // processed ipv4; atomic on the request path
-	processedIPv6           int64
-	processedUnknown        int64 // processed when Family is empty
-	activeDecisions         map[usageMetricKey]int64
-	activeDecisionSlots     map[string]usageMetricKey
-	streamFetches           int64
+	streamStop      chan bool
+	metricsStop     chan bool
+	metricsReporter *MetricsReporter
+	streamFetches   int64
 	streamOwner             string         // first middleware New that created this stream session
 	streamSettings          streamSettings // knobs that must not start a second poller; warn-and-wire if a joiner differs
 }
@@ -133,14 +124,11 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		sessionKey:              reclaimSessionKey(config),
 		log:                     log,
 		pluginVersion:           pluginVersion,
-		startedAt:               time.Now(),
-		windowCounters:          make(map[usageMetricKey]int64),
-		activeDecisions:         make(map[usageMetricKey]int64),
-		activeDecisionSlots:     make(map[string]usageMetricKey),
 		isCrowdsecStreamStartup: true,
 		isCrowdsecStreamHealthy: true,
 		cacheClient:             &cache.Client{},
 	}
+	client.metricsReporter = newMetricsReporter(client, time.Now())
 	client.transport.Store(next)
 	// Stream/alone prefix is SessionHex (LAPI URL+key), not IdentityHex.
 	// IdentityHex still includes intervals, so two middlewares on one key
@@ -161,7 +149,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 	}
 
 	if config.MetricsUpdateIntervalSeconds > 0 {
-		client.lastMetricsPush = time.Now()
+		client.metricsReporter.lastMetricsPush = time.Now()
 		go client.handleMetricsTicker()
 		client.metricsStop = startTicker("metrics", client.metricsInterval, log, func() {
 			client.handleMetricsTicker()

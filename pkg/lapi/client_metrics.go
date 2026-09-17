@@ -3,8 +3,10 @@ package lapi
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -25,6 +27,50 @@ const (
 	OriginPluginAppsecFailure     = "plugin:appsec_failure"     // AppSec failure-action
 )
 
+// crowdsecQueryFunc POSTs through the Client's current LAPI transport.
+type crowdsecQueryFunc func(stringURL string, data []byte) ([]byte, error)
+
+// MetricsReporter owns the usage-metrics window and POST/restore path.
+// Client holds one pointer for the cursor reclaim lifetime; tickers stay on Client.
+type MetricsReporter struct {
+	scheme        string
+	host          string
+	path          string
+	pluginVersion string
+	startedAt     time.Time
+	crowdsecMode  string
+	query         crowdsecQueryFunc
+	log           *slog.Logger
+
+	lastMetricsPush     time.Time
+	metricsMu           sync.Mutex
+	reportMu            sync.Mutex               // one usage-metrics POST at a time (ticker, Sleep drain, Close drain)
+	windowCounters      map[usageMetricKey]int64 // dropped counters for the current push window
+	processedIPv4       int64                    // processed ipv4; atomic on the request path
+	processedIPv6       int64
+	processedUnknown    int64 // processed when Family is empty
+	activeDecisions     map[usageMetricKey]int64
+	activeDecisionSlots map[string]usageMetricKey
+}
+
+// newMetricsReporter snapshots write-once URL and envelope scalars and binds query to crowdsecQuery.
+func newMetricsReporter(client *Client, startedAt time.Time) *MetricsReporter {
+	return &MetricsReporter{
+		scheme:              client.crowdsecScheme,
+		host:                client.crowdsecHost,
+		path:                client.crowdsecPath,
+		pluginVersion:       client.pluginVersion,
+		startedAt:           startedAt,
+		crowdsecMode:        client.crowdsecMode,
+		query:               client.crowdsecQuery,
+		log:                 client.log,
+		windowCounters:      make(map[usageMetricKey]int64),
+		activeDecisions:     make(map[usageMetricKey]int64),
+		activeDecisionSlots: make(map[string]usageMetricKey),
+	}
+}
+
+// handleMetricsTicker POSTs the current usage-metrics window from the Client ticker.
 func (c *Client) handleMetricsTicker() {
 	if err := c.reportMetrics(); err != nil {
 		c.log.Error("handleMetricsTicker:reportMetrics " + err.Error())
@@ -65,19 +111,36 @@ func MetricsOrigin(origin, scenario string) string {
 // IncProcessed counts a handled request (bypass, pass, or drop) by ip_type.
 // Lock-free: ServeHTTP calls this on every request.
 func (c *Client) IncProcessed(ipType string) {
+	// New always sets the reporter; Client literals in other packages do not.
+	if c.metricsReporter == nil {
+		return
+	}
+	c.metricsReporter.IncProcessed(ipType)
+}
+
+// IncProcessed counts a handled request (bypass, pass, or drop) by ip_type.
+func (r *MetricsReporter) IncProcessed(ipType string) {
 	switch ipType {
 	case "ipv4":
-		atomic.AddInt64(&c.processedIPv4, 1)
+		atomic.AddInt64(&r.processedIPv4, 1)
 	case "ipv6":
-		atomic.AddInt64(&c.processedIPv6, 1)
+		atomic.AddInt64(&r.processedIPv6, 1)
 	default:
-		atomic.AddInt64(&c.processedUnknown, 1)
+		atomic.AddInt64(&r.processedUnknown, 1)
 	}
 }
 
 // IncDropped counts a remediating response. Empty origin/ipType/remediation labels are omitted on POST.
 func (c *Client) IncDropped(origin, ipType, remediation string) {
-	c.addWindow(usageMetricKey{
+	if c.metricsReporter == nil {
+		return
+	}
+	c.metricsReporter.IncDropped(origin, ipType, remediation)
+}
+
+// IncDropped counts a remediating response. Empty origin/ipType/remediation labels are omitted on POST.
+func (r *MetricsReporter) IncDropped(origin, ipType, remediation string) {
+	r.addWindow(usageMetricKey{
 		name:        "dropped",
 		unit:        "request",
 		origin:      origin,
@@ -87,18 +150,26 @@ func (c *Client) IncDropped(origin, ipType, remediation string) {
 }
 
 // addWindow adds delta to a dropped counter for this push window.
-func (c *Client) addWindow(key usageMetricKey, delta int64) {
-	c.metricsMu.Lock()
-	defer c.metricsMu.Unlock()
-	if c.windowCounters == nil {
-		c.windowCounters = make(map[usageMetricKey]int64)
+func (r *MetricsReporter) addWindow(key usageMetricKey, delta int64) {
+	r.metricsMu.Lock()
+	defer r.metricsMu.Unlock()
+	if r.windowCounters == nil {
+		r.windowCounters = make(map[usageMetricKey]int64)
 	}
-	c.windowCounters[key] += delta
+	r.windowCounters[key] += delta
 }
 
 // rememberActiveDecision records one stream/alone decision for the active_decisions gauge.
 func (c *Client) rememberActiveDecision(slot, origin, decisionValue string) {
-	if c.crowdsecMode != configuration.StreamMode && c.crowdsecMode != configuration.AloneMode {
+	if c.metricsReporter == nil {
+		return
+	}
+	c.metricsReporter.rememberActiveDecision(slot, origin, decisionValue)
+}
+
+// rememberActiveDecision records one stream/alone decision for the active_decisions gauge.
+func (r *MetricsReporter) rememberActiveDecision(slot, origin, decisionValue string) {
+	if r.crowdsecMode != configuration.StreamMode && r.crowdsecMode != configuration.AloneMode {
 		return
 	}
 	key := usageMetricKey{
@@ -107,78 +178,96 @@ func (c *Client) rememberActiveDecision(slot, origin, decisionValue string) {
 		origin: origin,
 		ipType: ip.FamilyOfHostOrCIDR(decisionValue),
 	}
-	c.metricsMu.Lock()
-	defer c.metricsMu.Unlock()
-	if c.activeDecisionSlots == nil {
-		c.activeDecisionSlots = make(map[string]usageMetricKey)
+	r.metricsMu.Lock()
+	defer r.metricsMu.Unlock()
+	if r.activeDecisionSlots == nil {
+		r.activeDecisionSlots = make(map[string]usageMetricKey)
 	}
-	if c.activeDecisions == nil {
-		c.activeDecisions = make(map[usageMetricKey]int64)
+	if r.activeDecisions == nil {
+		r.activeDecisions = make(map[usageMetricKey]int64)
 	}
-	if previous, ok := c.activeDecisionSlots[slot]; ok {
-		c.activeDecisions[previous]--
-		if c.activeDecisions[previous] <= 0 {
-			delete(c.activeDecisions, previous)
+	if previous, ok := r.activeDecisionSlots[slot]; ok {
+		r.activeDecisions[previous]--
+		if r.activeDecisions[previous] <= 0 {
+			delete(r.activeDecisions, previous)
 		}
 	}
-	c.activeDecisionSlots[slot] = key
-	c.activeDecisions[key]++
+	r.activeDecisionSlots[slot] = key
+	r.activeDecisions[key]++
 }
 
 // forgetActiveDecision drops a previously counted stream/alone decision from the gauge.
 func (c *Client) forgetActiveDecision(slot string) {
-	c.metricsMu.Lock()
-	defer c.metricsMu.Unlock()
-	if c.activeDecisionSlots == nil {
+	if c.metricsReporter == nil {
 		return
 	}
-	previous, ok := c.activeDecisionSlots[slot]
+	c.metricsReporter.forgetActiveDecision(slot)
+}
+
+// forgetActiveDecision drops a previously counted stream/alone decision from the gauge.
+func (r *MetricsReporter) forgetActiveDecision(slot string) {
+	r.metricsMu.Lock()
+	defer r.metricsMu.Unlock()
+	if r.activeDecisionSlots == nil {
+		return
+	}
+	previous, ok := r.activeDecisionSlots[slot]
 	if !ok {
 		return
 	}
-	delete(c.activeDecisionSlots, slot)
-	c.activeDecisions[previous]--
-	if c.activeDecisions[previous] <= 0 {
-		delete(c.activeDecisions, previous)
+	delete(r.activeDecisionSlots, slot)
+	r.activeDecisions[previous]--
+	if r.activeDecisions[previous] <= 0 {
+		delete(r.activeDecisions, previous)
 	}
 }
 
 // reportMetrics POSTs the current window of usage-metrics items to LAPI.
 // Dropped and processed counters reset only after LAPI accepts the POST.
 func (c *Client) reportMetrics() error {
-	c.reportMu.Lock()
-	defer c.reportMu.Unlock()
+	if c.metricsReporter == nil {
+		return nil
+	}
+	return c.metricsReporter.reportMetrics()
+}
+
+// reportMetrics POSTs the current window of usage-metrics items to LAPI.
+// Dropped and processed counters reset only after LAPI accepts the POST.
+func (r *MetricsReporter) reportMetrics() error {
+	r.reportMu.Lock()
+	defer r.reportMu.Unlock()
 
 	now := time.Now()
-	windowSizeSeconds := int(now.Sub(c.lastMetricsPush).Seconds())
+	windowSizeSeconds := int(now.Sub(r.lastMetricsPush).Seconds())
 
-	c.metricsMu.Lock()
-	window := c.windowCounters
-	c.windowCounters = make(map[usageMetricKey]int64)
-	items := make([]map[string]interface{}, 0, len(window)+len(c.activeDecisions)+3)
+	// Snapshot dropped and gauge items, then swap processed atomics.
+	r.metricsMu.Lock()
+	window := r.windowCounters
+	r.windowCounters = make(map[usageMetricKey]int64)
+	items := make([]map[string]interface{}, 0, len(window)+len(r.activeDecisions)+3)
 	for key, value := range window {
 		items = append(items, usageMetricItem(key, value))
 	}
-	for key, value := range c.activeDecisions {
+	for key, value := range r.activeDecisions {
 		if value > 0 {
 			items = append(items, usageMetricItem(key, value))
 		}
 	}
-	c.metricsMu.Unlock()
+	r.metricsMu.Unlock()
 
-	processedIPv4 := atomic.SwapInt64(&c.processedIPv4, 0)
-	processedIPv6 := atomic.SwapInt64(&c.processedIPv6, 0)
-	processedUnknown := atomic.SwapInt64(&c.processedUnknown, 0)
+	processedIPv4 := atomic.SwapInt64(&r.processedIPv4, 0)
+	processedIPv6 := atomic.SwapInt64(&r.processedIPv6, 0)
+	processedUnknown := atomic.SwapInt64(&r.processedUnknown, 0)
 	items = appendProcessedWindow(items, "ipv4", processedIPv4)
 	items = appendProcessedWindow(items, "ipv6", processedIPv6)
 	items = appendProcessedWindow(items, "", processedUnknown)
 
-	c.log.Debug(fmt.Sprintf("reportMetrics: items=%d window_size=%ds", len(items), windowSizeSeconds))
+	r.log.Debug(fmt.Sprintf("reportMetrics: items=%d window_size=%ds", len(items), windowSizeSeconds))
 
 	metrics := map[string]interface{}{
 		"remediation_components": []map[string]interface{}{
 			{
-				"version": c.pluginVersion,
+				"version": r.pluginVersion,
 				"type":    "bouncer",
 				"name":    "traefik_plugin",
 				"metrics": []map[string]interface{}{
@@ -190,7 +279,7 @@ func (c *Client) reportMetrics() error {
 						},
 					},
 				},
-				"utc_startup_timestamp": c.startedAt.Unix(),
+				"utc_startup_timestamp": r.startedAt.Unix(),
 				"feature_flags":         []string{},
 				"os": map[string]string{
 					"name":    "unknown",
@@ -202,39 +291,39 @@ func (c *Client) reportMetrics() error {
 
 	data, err := json.Marshal(metrics)
 	if err != nil {
-		c.restoreMetricsWindow(window, processedIPv4, processedIPv6, processedUnknown)
+		r.restoreMetricsWindow(window, processedIPv4, processedIPv6, processedUnknown)
 		return fmt.Errorf("reportMetrics:marshal %w", err)
 	}
 
 	metricsURL := url.URL{
-		Scheme: c.crowdsecScheme,
-		Host:   c.crowdsecHost,
-		Path:   c.crowdsecPath + crowdsecLapiMetricsRoute,
+		Scheme: r.scheme,
+		Host:   r.host,
+		Path:   r.path + crowdsecLapiMetricsRoute,
 	}
 
-	_, err = c.crowdsecQuery(metricsURL.String(), data)
+	_, err = r.query(metricsURL.String(), data)
 	if err != nil {
-		c.restoreMetricsWindow(window, processedIPv4, processedIPv6, processedUnknown)
+		r.restoreMetricsWindow(window, processedIPv4, processedIPv6, processedUnknown)
 		return fmt.Errorf("reportMetrics:query %w", err)
 	}
 
-	c.lastMetricsPush = now
+	r.lastMetricsPush = now
 	return nil
 }
 
 // restoreMetricsWindow puts a failed POST’s counters back so the next drain or ticker can send them.
-func (c *Client) restoreMetricsWindow(window map[usageMetricKey]int64, processedIPv4, processedIPv6, processedUnknown int64) {
-	c.metricsMu.Lock()
-	if c.windowCounters == nil {
-		c.windowCounters = make(map[usageMetricKey]int64)
+func (r *MetricsReporter) restoreMetricsWindow(window map[usageMetricKey]int64, processedIPv4, processedIPv6, processedUnknown int64) {
+	r.metricsMu.Lock()
+	if r.windowCounters == nil {
+		r.windowCounters = make(map[usageMetricKey]int64)
 	}
 	for key, value := range window {
-		c.windowCounters[key] += value
+		r.windowCounters[key] += value
 	}
-	c.metricsMu.Unlock()
-	atomic.AddInt64(&c.processedIPv4, processedIPv4)
-	atomic.AddInt64(&c.processedIPv6, processedIPv6)
-	atomic.AddInt64(&c.processedUnknown, processedUnknown)
+	r.metricsMu.Unlock()
+	atomic.AddInt64(&r.processedIPv4, processedIPv4)
+	atomic.AddInt64(&r.processedIPv6, processedIPv6)
+	atomic.AddInt64(&r.processedUnknown, processedUnknown)
 }
 
 // appendProcessedWindow adds a processed item when the swapped window count is non-zero.
