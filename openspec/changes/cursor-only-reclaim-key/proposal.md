@@ -4,8 +4,8 @@ On DestBranch, stream (and live/none) reclaim still keys by a first-wins setting
 
 ## What Changes
 
-- Stream Open key becomes cursor + Redis (`lapi:stream:` + SessionHex + `storeParams` hash). Live/none Open key drops the same remaining fields (`lapi:` + SessionHex + same Redis hash). Distinct table prefixes stay (`lapi:stream:`, `lapi:`, `decisionstore:`, `appsec:`).
-- Delete `Peek`, `PeekLivePrefix`, and `View`. After one cursor+Redis key, `Open` of that key Wakes the sleeper. No replacement inspect API. Interval / CAPI / `updateMaxFailure` mismatch on a live sibling is silent first-wins.
+- Stream Open key becomes cursor + Redis (`lapi:stream:` + SessionHex + `storeParams` hash). Live/none Open key is `lapi:` + SessionHex + a hash of the identity payload (Redis store params plus `MetricsUpdateIntervalSeconds`). Still drop CAPI scenarios, `updateMaxFailure`, and `UpdateIntervalSeconds` from that payload. Distinct table prefixes stay (`lapi:stream:`, `lapi:`, `decisionstore:`, `appsec:`).
+- Delete `Peek`, `PeekLivePrefix`, and `View`. After one cursor+Redis key, `Open` of that key Wakes the sleeper. No replacement inspect API. Stream interval / CAPI / `updateMaxFailure` mismatch on a live sibling is silent first-wins. Live/none metrics-interval mismatch is a sibling Client (write-once ticker).
 - Requested `scopes=` and the store header-scope filter read a Client-owned live-router union. Leave write-once `decisionScopeHeaders` as first-create residue. No auto-`startup=true` when the union grows. No sweep when it shrinks.
 - Import utilities `reclaim` v1.0.3 and delete the local `table.go` fork. Keep the local shim only (`Default`, `ProcessGrace` 30s, `Open` / `OpenWithHooks`, `ResetForTest` / `ResetForTestWith`). Do not take `OpenTyped` (it does not remove hooks-as-funcs). AppSec stays on `OpenWithHooks` + type assert; AppSec reclaim key is unchanged.
 - Document upgrade: SessionHex and store Redis params stay; existing Redis keys stay reachable; only the in-process Client Open string changes. Implement deletes `knowledge/debt/2026-09-17-cursor-only-reclaim-key.md`.
@@ -19,7 +19,7 @@ On DestBranch, stream (and live/none) reclaim still keys by a first-wins setting
 
 ### Modified Capabilities
 
-- `core_plugin_lapi_reclaim-key`: Client Open key is cursor + Redis, not first-wins settings hash. No `PeekLivePrefix` / warn-and-wire. Sleeping interval/CAPI/scopes change Wakes the same slot; sleeping Redis-host change stays a new key.
+- `core_plugin_lapi_reclaim-key`: Stream Client Open key is cursor + Redis, not first-wins settings hash. Live/none Key also hashes `MetricsUpdateIntervalSeconds` so none routers keep their own write-once ticker. No `PeekLivePrefix` / warn-and-wire. Sleeping stream interval/CAPI/scopes change Wakes the same slot; sleeping Redis-host change stays a new key.
 - `std_go_reclaim_context-lease`: Import utilities `reclaim`; delete Peek / View; keep the local shim. Hooks stay function values. Do not take `OpenTyped`.
 - `core_cache_client_decision-store`: First-wins `scopes=` and warn-and-wire no longer stay on the Client key. Store filter follows the Client union. Store key and SessionHex prefix stay.
 - `core_plugin_decisions_scopes`: Stream `scopes=` is the live-router union, not the first constructor’s map. CAPI still omits `scopes=`. Live/none still pass scopes per `LiveLookup`.

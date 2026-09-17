@@ -3,7 +3,7 @@
 ## Language
 
 **Reclaim key**:
-The Open key this plugin passes to reclaim for one `lapi.Client`. Stream/alone `SessionKey` is `lapi:stream:` plus `SessionHex` plus a hash of Redis store parameters. Live/none `Key` is `lapi:` plus the same `SessionHex` plus the same Redis hash. `IdentityHex` stays exported; it is not the live Open suffix.
+The Open key this plugin passes to reclaim for one `lapi.Client`. Stream/alone `SessionKey` is `lapi:stream:` plus `SessionHex` plus a hash of Redis store parameters. Live/none `Key` is `lapi:` plus the same `SessionHex` plus a hash of the identity payload (Redis store params and `MetricsUpdateIntervalSeconds`). `IdentityHex` stays exported; it is not the live Open suffix.
 _Avoid_: middleware name, IdentityHex as the stream or live Open key, Bouncer, CrowdsecConnection, AppSec host, StoreKey as the Client string
 
 ## Overview
@@ -13,9 +13,9 @@ How this plugin keys a reclaimed `lapi.Client`. Spec: `core_plugin_lapi_reclaim-
 ## How to use
 
 - Stream/alone: derive `SessionPrefix` from mode, LAPI scheme/host/path, and lapiKey (CAPI machine+password in alone). `SessionKey` is that prefix plus `hash(storeParamsFrom)`. Call `lapi.OpenStream`.
-- Live/none: use `lapi.Key` (`lapi:` + `SessionHex` + Redis store-params hash). Call `lapi.OpenLive`.
-- A second live `New` for the same cursor plus Redis `Open`s that same key. Interval, CAPI scenario, `updateMaxFailure`, and header-map mismatch is silent first-wins for those create-time scalars. A different Redis host Opens a different Client and DecisionStore.
-- When the previous slot is sleeping, the same Redis snapshot `Open`s (Wake, `startup=false`) even if intervals differ. A different Redis host Opens a new key; the sleeper stays until grace Close. Last holder `Sleep`s tickers before grace.
+- Live/none: use `lapi.Key` (`lapi:` + `SessionHex` + identity hash including Redis and `MetricsUpdateIntervalSeconds`). Call `lapi.OpenLive`.
+- A second stream `New` for the same cursor plus Redis `Open`s that same key. Stream interval, CAPI scenario, `updateMaxFailure`, and header-map mismatch is silent first-wins for those create-time scalars. A second none/live `New` that differs only on `MetricsUpdateIntervalSeconds` Opens a sibling Client and keeps the same DecisionStore. A different Redis host Opens a different Client and DecisionStore.
+- When the previous stream slot is sleeping, the same Redis snapshot `Open`s (Wake, `startup=false`) even if intervals differ. A different Redis host Opens a new key; the sleeper stays until grace Close. Last holder `Sleep`s tickers before grace.
 - Pass `reclaim.Hooks` for Sleep/Wake/Close. An unreclaimed `lapi.Client` waits `ProcessGrace` 30s.
 
 ## Pattern snippet
@@ -34,8 +34,8 @@ lapiClient, err := lapi.OpenStream(ctx, cfg, log, name, pluginVersion)
 
 ## Gotchas
 
-- Do not put middleware name, `next`, templates, trusted IPs, Enabled, AppSec host/key/TLS/body limit, LAPI failure action, Redis fail-closed, live-cache TTL, `StreamStartupBlock`, HTTP timeout, intervals, CAPI scenarios, `updateMaxFailure`, `decisionScopeHeaders`, or the three LAPI TLS fields in the Client Open key.
-- Redis host/auth/db/enabled and `RedisCacheReadHosts` stay on the Client key (same payload family as `StoreKey`). Do not reuse the `decisionstore:` prefix.
+- Do not put middleware name, `next`, templates, trusted IPs, Enabled, AppSec host/key/TLS/body limit, LAPI failure action, Redis fail-closed, live-cache TTL, `StreamStartupBlock`, HTTP timeout, CAPI scenarios, `updateMaxFailure`, `decisionScopeHeaders`, or the three LAPI TLS fields in the Client Open key. Stream `SessionKey` also omits intervals. Live/none `Key` keeps `MetricsUpdateIntervalSeconds` so write-once tickers stay per Client.
+- Redis host/auth/db/enabled and `RedisCacheReadHosts` stay on the Client key (same Redis family as `StoreKey`). Do not reuse the `decisionstore:` prefix. Do not put intervals on `StoreKey`.
 - DecisionStore reclaim key is `decisionstore:` + `SessionHex` + Redis params only (`core_cache_client.md`).
 - Isolated CrowdSec backends need a second bouncer key (or a different LAPI host), not a second ticker on the same row.
 - Upgrade: SessionHex and store Redis params stay. Existing Redis keys stay reachable. Only the in-process Client Open string changes. No Redis key migration.

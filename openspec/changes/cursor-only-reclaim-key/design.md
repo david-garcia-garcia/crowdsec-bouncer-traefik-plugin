@@ -6,7 +6,7 @@ See proposal.md Why. DestBranch: `SessionKey` is `lapi:stream:` + SessionHex + h
 
 **Goals:**
 
-- One Client Open key per cursor + Redis (stream and live/none)
+- One stream Client Open key per cursor + Redis; live/none Key also splits on `MetricsUpdateIntervalSeconds`
 - Delete Peek / View; import utilities `reclaim`; keep the local shim
 - Live-router `scopes=` union on the Client; store filter follows that union
 - Document that Redis keys stay on SessionHex
@@ -24,7 +24,7 @@ See proposal.md Why. DestBranch: `SessionKey` is `lapi:stream:` + SessionHex + h
 
 1. **Stream Open key** = `lapi:stream:` + `SessionHex(cfg)` + `:` + hash(`storeParamsFrom`). Same hasher as `StoreKey`. Alternative: drop Redis from the Client key — rejected; that would share one Client across Redis hosts. Alternative: reuse `StoreKey` as the Client key string — rejected; one process table, several value types.
 
-2. **Live/none Open key** = `lapi:` + `SessionHex(cfg)` + `:` + hash(`storeParamsFrom`). Drop intervals, CAPI scenarios, `updateMaxFailure` from `identity`. Keep `IdentityHex` exported if callers still name it; it is no longer the Open suffix. Alternative: keep `IdentityHex` as the live Open suffix — rejected; ticket names live identity and store already uses SessionHex + Redis.
+2. **Live/none Open key** = `lapi:` + `SessionHex(cfg)` + `:` + hash(`identityFrom`). Keep `MetricsUpdateIntervalSeconds` on the identity payload so none routers that disagree get sibling Clients and their own write-once ticker. Still drop CAPI scenarios, `updateMaxFailure`, and `UpdateIntervalSeconds`. Keep `IdentityHex` exported if callers still name it; it is not the Open suffix. Alternative: drop the metrics interval like stream — rejected; sharing one none Client cannot both honor write-once `metricsInterval` and publish `/appsec` `metrics=1` within 20s. Alternative: mutate write-once `metricsInterval` or start a second ticker — forbidden (`core_plugin_lapi_usage-metrics`). Alternative: keep `IdentityHex` as the live Open suffix — rejected; store already uses SessionHex + Redis.
 
 3. **No Peek.** `Open` of the cursor+Redis key Wakes the sleeper. `PeekLivePrefix` would warn-and-wire a different-Redis joiner onto the first live slot. Tests use pointer equality on the `Open` return or `ResetForTest`. Alternative: keep Peek only to log `ignored` — rejected; Bound the ask.
 
@@ -42,7 +42,7 @@ See proposal.md Why. DestBranch: `SessionKey` is `lapi:stream:` + SessionHex + h
 
 - [Late-joining header scope misses decisions already past the cursor] → Document the miss window. Do not auto-startup.
 - [Stale header-scope cache keys after unregister] → TTL / store incarnation. Bound the ask.
-- [Silent first-wins on intervals / CAPI / `updateMaxFailure`] → Same as create-already-wrote. Out of scope to union them.
+- [Silent first-wins on stream intervals / CAPI / `updateMaxFailure`] → Same as create-already-wrote. Out of scope to union them. Live/none metrics interval is on the Key instead (sibling Clients).
 - [Sleeping Redis-host change still two keys] → Intended; store isolation stays. Sleeping interval change now Wakes the same slot (spec rewrite).
 - [Yaegi Hooks] → Leave function values. `OpenTyped` does not help.
 
