@@ -27,3 +27,15 @@ phase: codereview
 findings: Standards 3, Spec 0, Security 0, Performance 0, Dead 3, Coverage 4
 fixed: OpenTyped deleted; ReclaimGraceDuration removed; OpenWithHooks/Redis miss tests
 skipped: AppSec helper extract; invalid-reader skip test
+
+## devdocsimpact (2026-09-17)
+phase: devdocsimpact
+findings: none
+fixed: none (usage already current)
+skipped: none
+
+## archive (2026-09-17)
+phase: archive
+findings: FindSpecHost new utilities-client; three folds
+fixed: moved openspec/changes/archive/2026-09-17-upstream-reclaim-simpleredis
+skipped: none
