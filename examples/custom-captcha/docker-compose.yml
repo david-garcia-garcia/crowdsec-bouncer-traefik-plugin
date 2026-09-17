@@ -54,6 +54,7 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomKey=wicketkeeper"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomResponse=wicketkeeper_solution"
       # Define captcha grade period seconds
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGateSecret=${CAPTCHA_GATE_SECRET:-change-me-gate-secret}"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=20"
       # Define captcha HTML file path
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"

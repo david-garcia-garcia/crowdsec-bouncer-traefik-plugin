@@ -14,10 +14,11 @@ BeforeAll {
     $script:HttpTimeoutSeconds = [int]($env:HTTP_TIMEOUT_SECONDS ?? 30)
     
     # Test IP addresses - using Docker network IPs that the bouncer actually sees
-    $script:TestIPs = @{
-        BannedIP  = "172.19.0.1"
-        CaptchaIP = "172.19.0.2" 
-        CleanIP   = "172.19.0.3"
+        $script:TestIPs = @{
+        BannedIP       = "172.19.0.1"
+        CaptchaIP      = "172.19.0.2"
+        CleanIP        = "172.19.0.3"
+        CaptchaOtherIP = "172.19.0.4"
     }
     
     # Wait for CrowdSec LAPI to be ready
@@ -120,6 +121,46 @@ Describe "CrowdSec Bouncer Captcha Remediation Tests" {
                 Write-Host "  Ban header value: $remediationHeader" -ForegroundColor Green
                 Write-Host "  Status code: $($result.LogEntry.DownstreamStatus)" -ForegroundColor Green
             }
+        }
+
+        It "Should issue a gate cookie on dummy solve and pass the next GET" {
+            Add-TestDecision -IP $script:TestIPs.CaptchaIP -Type "captcha"
+            Add-TestDecision -IP $script:TestIPs.CaptchaOtherIP -Type "captcha"
+
+            $formHeaders = @{ "Content-Type" = "application/x-www-form-urlencoded" }
+
+            $page = Test-HttpRequest -Endpoint "/captcha" -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl
+            $page.StatusCode | Should -Be 200
+            $page.Content | Should -Match "captcha|challenge"
+
+            $emptyPost = Test-HttpRequest -Endpoint "/captcha" -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl `
+                -Method POST
+            $emptyPost.StatusCode | Should -Be 200
+            $emptyPost.Content | Should -Match "captcha|challenge"
+
+            $solve = Test-HttpRequest -Endpoint "/captcha?dummy-captcha-response=ok" -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl `
+                -Method POST -Body "dummy-captcha-response=ok" -ExtraHeaders $formHeaders `
+                -MaximumRedirection 0
+            $solve.StatusCode | Should -Be 302 -Because "solve status=$($solve.StatusCode) error=$($solve.Error) content=$($solve.Content)"
+            $setCookie = [string]$solve.Headers["Set-Cookie"]
+            $setCookie | Should -Match "crowdsec_captcha_gate=" -Because "headers=$($solve.Headers | Out-String)"
+            $cookiePair = ($setCookie -split ';')[0].Trim()
+            $cookieHeaders = @{ Cookie = $cookiePair }
+
+            $passed = Test-HttpRequest -Endpoint "/captcha" -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl `
+                -ExtraHeaders $cookieHeaders
+            $passed.StatusCode | Should -Be 200
+            $passed.Content | Should -Match "Hostname:"
+            $passed.Content | Should -Not -Match "E2E captcha challenge"
+
+            $noCookie = Test-HttpRequest -Endpoint "/captcha" -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl
+            $noCookie.StatusCode | Should -Be 200
+            $noCookie.Content | Should -Match "captcha|challenge"
+
+            $otherIP = Test-HttpRequest -Endpoint "/captcha" -IP $script:TestIPs.CaptchaOtherIP -TraefikUrl $script:TraefikUrl `
+                -ExtraHeaders $cookieHeaders
+            $otherIP.StatusCode | Should -Be 200
+            $otherIP.Content | Should -Match "captcha|challenge"
         }
     }
 }

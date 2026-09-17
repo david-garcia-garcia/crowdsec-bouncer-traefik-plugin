@@ -2,8 +2,8 @@
 // suite. It answers only the few LAPI routes the plugin calls — live/none
 // decision lookups, the stream poll and the usage-metrics push — and lets the
 // test drive decisions through /admin instead of `cscli`. It also serves the
-// stub upstream that Traefik proxies allowed requests to, and a hardcoded Redis
-// stand-in for exercising the redis cache path.
+// stub upstream that Traefik proxies allowed requests to, a dummy captcha
+// siteverify, and a hardcoded Redis stand-in for exercising the redis cache path.
 //
 // It is NOT a Crowdsec/AppSec conformance harness — the real WAF engine (OWASP
 // CRS, virtual patching) is out of scope. The AppSec endpoint here emulates a
@@ -251,6 +251,17 @@ func main() {
 
 	// Readiness probe for the test harness (empty body, 200).
 	mux.HandleFunc("/health", func(http.ResponseWriter, *http.Request) {})
+
+	// Dummy captcha siteverify: always {"success":true} so the captcha scenario
+	// can POST a form field and get a gate cookie without a real provider.
+	mux.HandleFunc("/siteverify", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, map[string]bool{"success": true})
+	})
+	// Empty script for captchaCustomJsUrl (custom provider requires the key).
+	mux.HandleFunc("/dummy.js", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/javascript")
+		_, _ = w.Write([]byte("// e2e dummy captcha\n"))
+	})
 
 	// live / none mode: ?ip= matches an Ip decision or a covering Range.
 	// ?scope=&value= is an exact match (Country, AS, username, …).

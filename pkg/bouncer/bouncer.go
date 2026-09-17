@@ -82,9 +82,9 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 	}
 	config.CaptchaSiteKey, _ = configuration.GetVariable(config, "CaptchaSiteKey")
 	config.CaptchaSecretKey, _ = configuration.GetVariable(config, "CaptchaSecretKey")
+	captchaGateSecret, _ := configuration.GetVariable(config, "CaptchaGateSecret")
 	err := routeHandler.captchaClient.New(
 		log,
-		lapiClient.Cache(),
 		&http.Client{
 			Transport: &http.Transport{MaxIdleConns: 10, MaxIdleConnsPerHost: 10, IdleConnTimeout: 30 * time.Second},
 			Timeout:   time.Duration(config.HTTPTimeoutSeconds) * time.Second,
@@ -96,6 +96,8 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		config.CaptchaCustomValidateURL,
 		config.CaptchaSiteKey,
 		config.CaptchaSecretKey,
+		captchaGateSecret,
+		config.CaptchaGateBindIP,
 		config.RemediationHeadersCustomName,
 		config.CaptchaFilePath,
 		config.CaptchaGracePeriodSeconds,
@@ -290,7 +292,7 @@ func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientR
 	kind := cache.RemediationKind(remediation)
 	b.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", req.remoteIP, kind))
 	if b.captchaClient.Valid && kind == decisionscope.CaptchaValue && req.Method != http.MethodHead {
-		if b.captchaClient.Check(req.remoteIP) {
+		if b.captchaClient.Check(req.Request, req.remoteIP) {
 			b.handleNextServeHTTP(rw, req)
 			return
 		}
