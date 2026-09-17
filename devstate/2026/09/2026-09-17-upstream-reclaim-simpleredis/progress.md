@@ -7,7 +7,7 @@ JobName: 2026-09-17-upstream-reclaim-simpleredis
 | prepare | [x] | [x] | 2026-09-17T06:24:30Z |
 | explore | [x] | [x] | 2026-09-17T04:26:12Z |
 | propose | [x] | [x] | 2026-09-17T04:28:21Z |
-| implement | [x] | [ ] | |
+| implement | [x] | [x] | 2026-09-17T04:37:42Z |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |

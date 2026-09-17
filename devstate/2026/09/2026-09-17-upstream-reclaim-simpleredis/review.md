@@ -15,3 +15,9 @@ phase: propose
 findings: change upstream-reclaim-simpleredis apply-ready
 fixed: proposal/design/tasks; spec rename utilities-client
 skipped: none
+
+## implement (2026-09-17)
+phase: implement
+findings: mixed vendor SimpleRedis + source-sync reclaim Peek
+fixed: process table ProcessGrace; logging tests isolated from TempDir lock
+skipped: none
