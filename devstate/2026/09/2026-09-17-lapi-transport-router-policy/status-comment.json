@@ -1,5 +1,5 @@
 {
-  "commentId": "local",
+  "commentId": "pr-body",
   "issueKey": "2026-09-17-lapi-transport-router-policy",
   "markerValue": "[sgsi-dev-ticket-status:2026-09-17-lapi-transport-router-policy]",
   "issueHost": "local"

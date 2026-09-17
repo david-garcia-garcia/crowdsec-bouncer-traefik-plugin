@@ -4,7 +4,7 @@ JobName: 2026-09-17-lapi-transport-router-policy
 
 | Phase | Work | Card | At |
 |-------|------|------|----|
-| prepare | [ ] | [ ] | |
+| prepare | [x] | [x] | 2026-09-17T14:00:44+00:00 |
 | explore | [ ] | [ ] | |
 | propose | [ ] | [ ] | |
 | implement | [ ] | [ ] | |
