@@ -27,3 +27,9 @@ phase: codereview
 findings: Standards 2 (1 done hard started vs startedAt, 1 skipped judgement adopted→nextConfig); Spec none; Security none; Performance none; Dead none; Test coverage none
 fixed: renamed attachTestMetricsReporter param to startedAt (6f2d972)
 skipped: judgement adopted→nextConfig
+
+## devdocsimpact (2026-09-17)
+phase: devdocsimpact
+findings: stale-usage LAPI usage-metrics produced; LAPI connection none
+fixed: MetricsReporter Language + ticker/startedAt/query usage on knowledge/devdocs/core_plugin_lapi_usage-metrics.md
+skipped: none
