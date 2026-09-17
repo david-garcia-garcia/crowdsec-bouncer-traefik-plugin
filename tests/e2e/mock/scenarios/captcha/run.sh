@@ -13,11 +13,13 @@ body() {
   local url="http://127.0.0.1:${WEB_PORT}/foo"
   local solve_headers="$WORKDIR/solve.headers"
 
-  echo "[$SCENARIO] adding captcha decision for 1.2.3.4"
+  echo "[$SCENARIO] adding captcha decisions for 1.2.3.4 (solve) and 9.8.7.6 (bind-IP)"
   lapi_add_decision 1.2.3.4 captcha 5m
+  lapi_add_decision 9.8.7.6 captcha 5m
 
   echo "[$SCENARIO] captcha page must be served once the decision is polled (200 + marker)"
   wait_for_body_contains "$url" "E2E_CAPTCHA_PAGE_MARKER" 60 -H "X-Forwarded-For: 1.2.3.4"
+  wait_for_body_contains "$url" "E2E_CAPTCHA_PAGE_MARKER" 60 -H "X-Forwarded-For: 9.8.7.6"
 
   echo "[$SCENARIO] captcha response Content-Type is HTML"
   assert_header "$url" Content-Type "text/html; charset=utf-8" -H "X-Forwarded-For: 1.2.3.4"
@@ -58,8 +60,8 @@ body() {
   echo "[$SCENARIO] GET without cookie still serves the captcha page"
   assert_body_contains "$url" "E2E_CAPTCHA_PAGE_MARKER" -H "X-Forwarded-For: 1.2.3.4"
 
-  echo "[$SCENARIO] GET with gate cookie and another IP is still challenged (bind-IP)"
-  assert_body_contains "$url" "E2E_CAPTCHA_PAGE_MARKER" -H "Cookie: $cookie" -H "X-Forwarded-For: 5.6.7.8"
+  echo "[$SCENARIO] GET with gate cookie and another captcha IP is still challenged (bind-IP)"
+  assert_body_contains "$url" "E2E_CAPTCHA_PAGE_MARKER" -H "Cookie: $cookie" -H "X-Forwarded-For: 9.8.7.6"
 }
 
 run_scenario "$SCENARIO" "$HERE" body
