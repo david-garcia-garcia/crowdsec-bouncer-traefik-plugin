@@ -1,7 +1,7 @@
 ## 1. Cache acquire
 
-- [ ] 1.1 Add a narrow acquire on `pkg/cache.Client` (Redis `Eval` on writer+prefix; memory mutex around miss+Set). No poller logic. No SetNX. No `atomic.Pointer[T]`
-- [ ] 1.2 Cover Redis Eval-not-Get-then-Set and two-goroutine memory exactly-one-winner
+- [x] 1.1 Add a narrow acquire on `pkg/cache.Client` (Redis `Eval` on writer+prefix; memory mutex around miss+Set). No poller logic. No SetNX. No `atomic.Pointer[T]`
+- [x] 1.2 Cover Redis Eval-not-Get-then-Set and two-goroutine memory exactly-one-winner
 
 ## 2. DecisionStore
 

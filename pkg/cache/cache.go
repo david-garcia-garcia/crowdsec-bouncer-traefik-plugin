@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -21,8 +22,9 @@ const (
 	CacheUnreachable = "cache:unreachable"
 )
 
-// localCache is the per-Client in-memory TTL store.
+// localCache is the per-store in-memory TTL map.
 type localCache struct {
+	mu    sync.Mutex // acquire serializes miss+Set; vendored Heap Get and Set lock separately
 	store *ttl_map.Heap
 }
 
@@ -171,6 +173,7 @@ type cacheInterface interface {
 	get(key string) (string, error)
 	getMany(keys []string) (map[string]string, error)
 	delete(key string)
+	acquire(ctx context.Context, key, value string, duration int64) (bool, error)
 	close()
 }
 
