@@ -8,7 +8,7 @@ JobName: 2026-09-17-captcha-request-routing
 | explore | [x] | [x] | 2026-09-17T18:45:33Z |
 | propose | [x] | [x] | 2026-09-17T19:24:40Z |
 | implement | [x] | [x] | 2026-09-17T19:42:25Z |
-| codereview | [ ] | [ ] | |
+| codereview | [x] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
