@@ -805,7 +805,7 @@ The source code of the plugin should be organized as follows:
             └── maxlerebourg
                 └── crowdsec-bouncer-traefik-plugin
                     ├── bouncer.go
-                    ├── bouncer_test.go
+                    ├── zzz_bouncer_test.go
                     ├── go.mod
                     ├── LICENSE
                     ├── Makefile
