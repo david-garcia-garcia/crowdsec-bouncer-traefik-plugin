@@ -47,8 +47,8 @@ Out of scope stays out: shared `DecisionStore` / cache reclaim, cursor-only key 
   By: explore
 
 - Q: Fold parts 1–2 into `core_plugin_middleware_instance-reclaim` vs a new per-router-policy leaf?
-  Decision: assumed — FindSpecHost in propose folds the settings-hash / last-wins TLS delta into `core_plugin_middleware_instance-reclaim`, the owner move into existing `core_plugin_lapi_failure-action` (that spec today forbids two routers disagreeing), and the HTTP extract into `core_plugin_lapi_connection`. No new leaf.
-  By: explore
+  Decision: resolved — FindSpecHost fold (high) settings-hash drop + last-wins TLS + Bouncer Redis-fail-closed/live-TTL into `core_plugin_middleware_instance-reclaim`; fold failure-action owner into `core_plugin_lapi_failure-action`; fold HTTP extract into `core_plugin_lapi_connection`. No new leaf.
+  By: propose
 
 - Q: Must live/none `IdentityHex` drop the same fields this PR?
   Decision: assumed — yes. `identity.go` replicates the cluster. Dropping only stream `streamSettings` would still split live/none Clients and `CachePrefix` on a policy- or TLS-only reload.
