@@ -64,15 +64,15 @@ this process (Traefik New per router)
 
 - Q: How to hold a live-router `scopes=` union without mutating write-once `decisionScopeHeaders`?
   Decision: assumed — new Client-owned registry (scope names from each live `New`’s normalized headers), keyed by that constructor ctx; register after bind; unregister on ctx Done; `streamQuery` and `storeStreamDecision` snapshot the union under the existing Client mutex. Leave the write-once map as first-create residue. Not `atomic.Pointer[T]`. Not a package global.
-  By: explore
+  By: propose
 
 - Q: Does live/none `Key` drop the same remaining fields as stream (ticket names `identity.go`; store already uses SessionHex + Redis)?
   Decision: assumed — yes. Live Open key is `lapi:` + SessionHex + Redis `storeParams` hash (same remaining drop as stream). Intervals no longer split live Clients that already share a store.
-  By: explore
+  By: propose
 
 - Q: Exact Client key string versus `StoreKey` (`lapi:stream:` vs `decisionstore:` prefix)?
   Decision: assumed — keep `lapi:stream:<SessionHex>:<storeParamsHash>` and `lapi:<SessionHex>:<storeParamsHash>`. Do not copy the `decisionstore:` prefix. Same hash payload family as the store; different type prefix on the shared table.
-  By: explore
+  By: propose
 
 - Q: Does Redis stay on the Client key (store alignment) or drop with the CrowdSec-row settings?
   Decision: resolved — Redis stays. Ticket tension: dropping it would share one Client across Redis hosts. Store already isolates by Redis. Sleeping Redis-host change remains a new key (spec “does not overlap pollers” still holds). Sleeping interval/CAPI/scopes change Wakes the same slot.
@@ -88,11 +88,11 @@ this process (Traefik New per router)
 
 - Q: When the live-router union grows after the CrowdSec cursor has advanced, do we send `startup=true` so the new scopes are backfilled?
   Decision: assumed — no. LAPI `scopes=` is a filter of `id_gt`; a newly added scope misses decisions already past the cursor until a later incarnation `startup=true`. Out of scope to auto-startup. Document the miss window.
-  By: explore
+  By: propose
 
 - Q: When the union shrinks, do we sweep stale header-scope cache keys?
   Decision: assumed — no. Bound the ask. Stale Country/AS keys expire with TTL or die with the store incarnation. Do not sweep on unregister.
-  By: explore
+  By: propose
 
 - Q: After Peek is gone, is any other utilities `reclaim` v1.0.3 surface missing (would force a fork)?
   Decision: resolved — no. Needed surface is `New` / `Table` / `Open` / `OpenWithHooks` / Hooks / AfterFunc grace. `Default` / `ProcessGrace` / test Reset stay in the local shim. Missing Peek is expected, not a blocker.
