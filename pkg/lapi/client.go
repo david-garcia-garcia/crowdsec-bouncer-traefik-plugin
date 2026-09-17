@@ -71,7 +71,7 @@ type Client struct {
 	streamStop              chan bool
 	metricsStop             chan bool
 	metricsReporter         *MetricsReporter
-	streamFetches int64
+	streamFetches           int64
 }
 
 // Prepare resolves secrets and CAPI/LAPI routing on cfg. Call before Key and New.
