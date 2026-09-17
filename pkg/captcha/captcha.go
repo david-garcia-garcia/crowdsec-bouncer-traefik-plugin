@@ -30,6 +30,7 @@ type Client struct {
 	httpClient              *http.Client
 	log                     *slog.Logger
 	infoProvider            *infoProvider
+	customResourcePaths     []string
 }
 
 // Information for self-hosted provider.
@@ -63,7 +64,7 @@ var infoProviders = map[string]*infoProvider{
 }
 
 // New Initialize captcha client.
-func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, gateSecret string, gateBindIP bool, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, challengeURL, key, response, validate, siteKey, secretKey, gateSecret string, gateBindIP bool, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
@@ -71,6 +72,7 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ke
 	var info *infoProvider
 	if provider == configuration.CustomProvider {
 		info = &infoProvider{js: js, key: key, response: response, validate: validate}
+		c.storeCustomResourcePaths(js, challengeURL)
 	} else {
 		info = infoProviders[provider]
 	}
@@ -127,6 +129,64 @@ func (c *Client) Check(r *http.Request, remoteIP string) bool {
 	passed := validateGateValue(c.gateSecret, c.gateBindIP, remoteIP, gateCookieValue(r), time.Now(), c.gracePeriodSeconds)
 	c.log.Debug(fmt.Sprintf("captcha:Check ip:%s pass:%v", remoteIP, passed))
 	return passed
+}
+
+// IsCustomResourceRequest reports whether the request path is an exact configured widget asset.
+func (c *Client) IsCustomResourceRequest(r *http.Request) bool {
+	if r == nil || r.URL == nil {
+		return false
+	}
+	requestPath := r.URL.Path
+	for _, resourcePath := range c.customResourcePaths {
+		if requestPath == resourcePath {
+			return true
+		}
+	}
+	return false
+}
+
+// IsCaptchaFormPost reports whether this POST carries a non-empty provider response field.
+func (c *Client) IsCaptchaFormPost(r *http.Request) bool {
+	if r == nil || r.Method != http.MethodPost || c.infoProvider == nil {
+		return false
+	}
+	return captchaResponseFromRequest(r, c.infoProvider.response) != ""
+}
+
+// WriteSolvedRedirect issues 302 to the same URL without reminting the gate cookie.
+func (c *Client) WriteSolvedRedirect(rw http.ResponseWriter, r *http.Request) {
+	if c.remediationCustomHeader != "" {
+		rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
+	}
+	http.Redirect(rw, r, r.URL.String(), http.StatusFound)
+}
+
+// storeCustomResourcePaths keeps exact browser asset paths for custom-provider passthrough.
+func (c *Client) storeCustomResourcePaths(jsURL, challengeURL string) {
+	c.customResourcePaths = nil
+	for _, rawURL := range []string{jsURL, challengeURL} {
+		resourcePath := exactResourcePath(rawURL)
+		if resourcePath == "" {
+			continue
+		}
+		c.customResourcePaths = append(c.customResourcePaths, resourcePath)
+	}
+}
+
+// exactResourcePath returns a configured URL path when it is usable as an exact match.
+func exactResourcePath(rawURL string) string {
+	if rawURL == "" {
+		return ""
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	resourcePath := parsed.Path
+	if resourcePath == "" || !strings.HasPrefix(resourcePath, "/") {
+		return ""
+	}
+	return resourcePath
 }
 
 type responseProvider struct {

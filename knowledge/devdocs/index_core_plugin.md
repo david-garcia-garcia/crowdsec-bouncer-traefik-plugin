@@ -45,3 +45,8 @@ priority: normal
 local: core_plugin_middleware_captcha-gate.md
 description: How captcha grace is stored in a signed HttpOnly cookie instead of the connection cache.
 
+## Captcha request routing
+priority: normal
+local: core_plugin_middleware_captcha-routing.md
+description: How handleRemediationServeHTTP routes captcha-kind requests after the gate cookie.
+

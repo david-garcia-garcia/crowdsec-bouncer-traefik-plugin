@@ -97,6 +97,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		},
 		config.CaptchaProvider,
 		config.CaptchaCustomJsURL,
+		config.CaptchaCustomChallengeURL,
 		config.CaptchaCustomKey,
 		config.CaptchaCustomResponse,
 		config.CaptchaCustomValidateURL,
@@ -297,16 +298,29 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientRequest, remediation, origin string) {
 	kind := cache.RemediationKind(remediation)
 	b.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", req.remoteIP, kind))
-	if b.captchaClient.Valid && kind == decisionscope.CaptchaValue && req.Method != http.MethodHead {
-		if b.captchaClient.Check(req.Request, req.remoteIP) {
-			b.handleNextServeHTTP(rw, req)
-			return
-		}
-		b.recordDropped(origin, req.ipType, "captcha")
-		b.captchaClient.ServeHTTP(rw, req.Request, req.remoteIP)
+	if !b.captchaClient.Valid || kind != decisionscope.CaptchaValue {
+		b.handleBanServeHTTP(rw, req, configuration.ReasonLAPI, origin)
 		return
 	}
-	b.handleBanServeHTTP(rw, req, configuration.ReasonLAPI, origin)
+
+	// Same-origin widget assets must load while the visitor is still unsolved.
+	if b.captchaClient.IsCustomResourceRequest(req.Request) {
+		b.handleNextServeHTTP(rw, req)
+		return
+	}
+
+	// A valid gate cookie plus a captcha-form POST is a second-tab submit, not origin traffic.
+	if b.captchaClient.Check(req.Request, req.remoteIP) {
+		if b.captchaClient.IsCaptchaFormPost(req.Request) {
+			b.captchaClient.WriteSolvedRedirect(rw, req.Request)
+			return
+		}
+		b.handleNextServeHTTP(rw, req)
+		return
+	}
+
+	b.recordDropped(origin, req.ipType, "captcha")
+	b.captchaClient.ServeHTTP(rw, req.Request, req.remoteIP)
 }
 
 // handleNextServeHTTP runs AppSec if enabled, then the next handler.

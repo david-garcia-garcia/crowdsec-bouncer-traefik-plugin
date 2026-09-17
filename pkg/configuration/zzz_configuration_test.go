@@ -418,6 +418,13 @@ func Test_validateDecisionScopeHeaders(t *testing.T) {
 func Test_validateCaptcha(t *testing.T) {
 	cfgCustomMissing := getMinimalConfig()
 	cfgCustomMissing.CaptchaProvider = CustomProvider
+	cfgCustomFourFields := getMinimalConfig()
+	cfgCustomFourFields.CaptchaProvider = CustomProvider
+	cfgCustomFourFields.CaptchaCustomKey = "wicketkeeper"
+	cfgCustomFourFields.CaptchaCustomResponse = "wicketkeeper_solution"
+	cfgCustomFourFields.CaptchaCustomValidateURL = "http://wicketkeeper:8080/v0/siteverify"
+	cfgCustomFourFields.CaptchaCustomJsURL = "http://wicketkeeper:8080/fast.js"
+	cfgCustomFourFields.CaptchaCustomChallengeURL = ""
 	tests := []struct {
 		name    string
 		config  *Config
@@ -425,6 +432,7 @@ func Test_validateCaptcha(t *testing.T) {
 	}{
 		{name: "Valid hcaptcha provider", config: getMinimalConfig(), wantErr: false},
 		{name: "Custom provider missing fields", config: cfgCustomMissing, wantErr: true},
+		{name: "Custom provider four fields empty challenge URL", config: cfgCustomFourFields, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

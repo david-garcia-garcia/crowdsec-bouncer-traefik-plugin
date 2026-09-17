@@ -116,6 +116,7 @@ type Config struct {
 	CaptchaCustomValidateURL                   string            `json:"captchaCustomValidateUrl,omitempty"`
 	CaptchaCustomKey                           string            `json:"captchaCustomKey,omitempty"`
 	CaptchaCustomResponse                      string            `json:"captchaCustomResponse,omitempty"`
+	CaptchaCustomChallengeURL                  string            `json:"captchaCustomChallengeUrl,omitempty"`
 	CaptchaSiteKey                             string            `json:"captchaSiteKey,omitempty"`
 	CaptchaSiteKeyFile                         string            `json:"captchaSiteKeyFile,omitempty"`
 	CaptchaSecretKey                           string            `json:"captchaSecretKey,omitempty"`
@@ -191,6 +192,7 @@ func New() *Config {
 		CaptchaCustomValidateURL:        "",
 		CaptchaCustomKey:                "",
 		CaptchaCustomResponse:           "",
+		CaptchaCustomChallengeURL:       "",
 		CaptchaSiteKey:                  "",
 		CaptchaSecretKey:                "",
 		CaptchaGateBindIP:               true,
