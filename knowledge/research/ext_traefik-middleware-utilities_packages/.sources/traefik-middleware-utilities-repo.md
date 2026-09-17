@@ -6,6 +6,16 @@ authority: source
 ---
 
 Module path `github.com/david-garcia-garcia/traefik-middleware-utilities`.
+Tag `v1.0.3` is this commit.
+
 Top-level packages `reclaim/` and `simpleredis/` (not `pkg/`).
-`reclaim/table.go` defines `Open` with a separate `Hooks` argument.
-`simpleredis/simpleredis.go` documents pooled RESP client with exported error sentinels.
+
+`reclaim/table.go`: `New(Config) *Table`; `Open(ctx, key, logger, create, Hooks)`; `OpenWithHooks`; `Reset()`. Grace is `Config.Grace` only. No `Default`, `Peek`, `PeekLivePrefix`, `OpenWithGrace`, `Wrapped`.
+
+`reclaim/opentyped.go`: `OpenTyped[T]` function; Yaegi must keep the instantiation as a call expression.
+
+`simpleredis/simpleredis.go`: `New(Config) (*SimpleRedis, error)`; exported `Err*` sentinels and `IsMiss` / `IsUnreachable`.
+
+`simpleredis/commands.go`: `Get`/`MGet`/`Set`/`Del` (and Incr/Expire/…) take `context.Context`.
+
+`simpleredis/config.go`: Host/Pass/Database plus pool and timeout knobs frozen at New.
