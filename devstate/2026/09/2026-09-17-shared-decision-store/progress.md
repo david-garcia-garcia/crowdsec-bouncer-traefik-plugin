@@ -10,5 +10,5 @@ JobName: 2026-09-17-shared-decision-store
 | implement | [x] | [x] | 2026-09-17T17:22:28Z |
 | codereview | [x] | [x] | 2026-09-17T17:32:55Z |
 | devdocsimpact | [x] | [x] | 2026-09-17T17:38:37Z |
-| archive | [ ] | [ ] | |
+| archive | [x] | [ ] | |
 | pullrequest | [ ] | [ ] | |

@@ -8,6 +8,13 @@ verdicts:
   - { deltaId: reclaim-key-readhosts, fold, core_plugin_lapi_reclaim-key, confidence: high, candidates: [core_plugin_lapi_reclaim-key] }
   - { deltaId: cache-acquire-eval, fold, core_cache_redis_utilities-client, confidence: high, candidates: [core_cache_redis_utilities-client] }
 
+archive FindSpecHost (delta folder ids; Task unavailable on archive worker — ran find-spec-host.md on this thread):
+  - { deltaId: core_cache_client_decision-store, new, core_cache_client_decision-store, confidence: high, candidates: [core_cache_client_isolated-store, core_plugin_lapi_reclaim-key, std_go_reclaim_context-lease] }
+  - { deltaId: core_cache_client_isolated-store, fold, core_cache_client_isolated-store, confidence: high, candidates: [core_cache_client_isolated-store, core_cache_client_decision-store] }
+  - { deltaId: core_plugin_lapi_stream-lease, fold, core_plugin_lapi_stream-lease, confidence: high, candidates: [core_plugin_lapi_stream-lease, core_cache_client_isolated-store] }
+  - { deltaId: core_plugin_lapi_reclaim-key, fold, core_plugin_lapi_reclaim-key, confidence: high, candidates: [core_plugin_lapi_reclaim-key] }
+  - { deltaId: core_cache_redis_utilities-client, fold, core_cache_redis_utilities-client, confidence: high, candidates: [core_cache_redis_utilities-client] }
+
 - added core_cache_client_decision-store (new; Removed unit rename from isolated-store)
 - modified core_cache_client_isolated-store (fold; REMOVED)
 - modified core_plugin_lapi_stream-lease (fold)
