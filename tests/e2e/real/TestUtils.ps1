@@ -155,7 +155,11 @@ function Test-HttpRequest {
         [string]$ExpectedContent = $null,
         [int]$TimeoutSec = 10,
         [string]$TraefikUrl = "http://localhost:8000",
-        [hashtable]$ExtraHeaders = @{}
+        [hashtable]$ExtraHeaders = @{},
+        [string]$Method = "GET",
+        [string]$Body = $null,
+        [int]$MaximumRedirection = 5,
+        [Microsoft.PowerShell.Commands.WebRequestSession]$Session = $null
     )
     
     $headers = @{
@@ -165,9 +169,25 @@ function Test-HttpRequest {
     foreach ($headerName in $ExtraHeaders.Keys) {
         $headers[$headerName] = $ExtraHeaders[$headerName]
     }
+
+    $invoke = @{
+        Uri                 = "$TraefikUrl$Endpoint"
+        Headers             = $headers
+        TimeoutSec          = $TimeoutSec
+        UseBasicParsing     = $true
+        SkipHttpErrorCheck  = $true
+        Method              = $Method
+        MaximumRedirection  = $MaximumRedirection
+    }
+    if ($null -ne $Body) {
+        $invoke.Body = $Body
+    }
+    if ($null -ne $Session) {
+        $invoke.WebSession = $Session
+    }
     
     try {
-        $response = Invoke-WebRequest -Uri "$TraefikUrl$Endpoint" -Headers $headers -TimeoutSec $TimeoutSec -UseBasicParsing -SkipHttpErrorCheck
+        $response = Invoke-WebRequest @invoke
         $contentType = $response.Headers["Content-Type"]
         if ($contentType -is [System.Array]) {
             $contentType = $contentType[0]
