@@ -21,3 +21,9 @@ phase: implement
 findings: five Query defects applied; localTests passed; Main Process lint failed dest nestif configuration.go:336; e2e both success
 fixed: drain 502/503/504; limit 0 unlimited; read-body FA; rebuild Content-Length; DELETE out of isMethodWithBody; PR #70 summary
 skipped: dest nestif (note large); hop-by-hop filter; oversized FA; #51; no Open question Decision changed
+
+## codereview (2026-09-17)
+phase: codereview
+findings: Standards 1 done (sentinel errAppsecReadBody); Performance 1 skipped (limit 0 unlimited); Spec/Security/Dead/Coverage none
+fixed: Query matches errAppsecReadBody with errors.Is
+skipped: Performance bound (specified unlimited); dest nestif
