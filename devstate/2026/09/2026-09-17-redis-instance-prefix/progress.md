@@ -6,7 +6,7 @@ JobName: 2026-09-17-redis-instance-prefix
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-17T12:07:19Z |
 | explore | [x] | [x] | 2026-09-17T12:08:46Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [ ] | 2026-09-17T12:11:05Z |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
