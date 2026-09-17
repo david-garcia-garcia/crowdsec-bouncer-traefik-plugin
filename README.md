@@ -453,6 +453,7 @@ make run
   - []string
   - default: []
   - List of IPs of trusted Proxies that are in front of traefik (ex: Cloudflare)
+  - The forwarded header is only honored when the connecting peer is itself one of these IPs. While this list is empty, forwarded headers are ignored entirely and the plugin remediates the address that opened the connection, because a header from an untrusted peer can be set by the client. If traefik sits behind a load balancer or a CDN, list it here, otherwise every visitor behind that proxy is remediated as the proxy.
 - RedisCacheEnabled
   - bool
   - default: false
