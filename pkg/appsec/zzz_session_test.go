@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,18 @@ import (
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
+
+type idleCloseSpy struct {
+	closed int
+}
+
+func (s *idleCloseSpy) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, http.ErrNotSupported
+}
+
+func (s *idleCloseSpy) CloseIdleConnections() {
+	s.closed++
+}
 
 func testAppsecConfig(host string) *configuration.Config {
 	return &configuration.Config{
@@ -144,5 +157,43 @@ func TestOpen_BodyLimitSplitsClient(t *testing.T) {
 	}
 	if first == second {
 		t.Fatal("body-limit change must open a new Client")
+	}
+}
+
+func TestOpen_TimeoutOnlyClosesPreviousIdle(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	ctx := context.Background()
+	firstCfg := testAppsecConfig("127.0.0.1:1")
+	firstCfg.HTTPTimeoutSeconds = 10
+	first, err := Open(ctx, firstCfg, slog.Default(), "first", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	current := first.currentTransport()
+	if current == nil {
+		t.Fatal("missing transport")
+	}
+	spy := &idleCloseSpy{}
+	first.transport.Store(&transport{
+		httpClient:                    &http.Client{Transport: spy, Timeout: current.httpClient.Timeout},
+		key:                           current.key,
+		httpTimeoutSeconds:            current.httpTimeoutSeconds,
+		appsecTLSInsecureVerify:       current.appsecTLSInsecureVerify,
+		appsecTLSCertificateAuthority: current.appsecTLSCertificateAuthority,
+		appsecTLSCertificateBouncer:   current.appsecTLSCertificateBouncer,
+	})
+	secondCfg := testAppsecConfig("127.0.0.1:1")
+	secondCfg.HTTPTimeoutSeconds = 30
+	second, err := Open(ctx, secondCfg, slog.Default(), "second", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second {
+		t.Fatal("timeout-only New must reuse the Client")
+	}
+	if spy.closed != 1 {
+		t.Fatalf("closeIdle on replaced client: %d", spy.closed)
 	}
 }

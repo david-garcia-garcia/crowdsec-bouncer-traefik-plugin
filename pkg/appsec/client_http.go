@@ -55,12 +55,16 @@ func (t *transport) fieldsDiffer(other *transport) bool {
 		t.appsecTLSCertificateBouncer != other.appsecTLSCertificateBouncer
 }
 
+type idleCloser interface {
+	CloseIdleConnections()
+}
+
 func closeIdle(httpClient *http.Client) {
 	if httpClient == nil {
 		return
 	}
-	if t, ok := httpClient.Transport.(*http.Transport); ok {
-		t.CloseIdleConnections()
+	if closer, ok := httpClient.Transport.(idleCloser); ok {
+		closer.CloseIdleConnections()
 	}
 }
 
