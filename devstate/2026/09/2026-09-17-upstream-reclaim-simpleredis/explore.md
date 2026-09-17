@@ -68,8 +68,8 @@ Replace the ad-hoc copies, do not keep a silent second fork of simpleredis, and 
   By: explore
 
 - Q: Live spec `core_cache_redis_in-tree-client` forbids tracking an outside simpleredis repo and requires the in-tree import path.
-  Decision: assumed — this change updates that spec so the Redis client is the vendored utilities module (still not `maxlerebourg/simpleredis`). Spec id stays; a rename of the leaf is a follow-up note, not a silent rename.
-  By: explore
+  Decision: resolved — this change updates the Redis-client rules onto `core_cache_redis_utilities-client` and deletes the old leaf (it names `pkg/simpleredis`). Still not `maxlerebourg/simpleredis`.
+  By: propose
 
 - Q: Which utilities version do we pin if tags move during the run?
   Decision: assumed — `v1.0.3`. Do not follow `master`.
