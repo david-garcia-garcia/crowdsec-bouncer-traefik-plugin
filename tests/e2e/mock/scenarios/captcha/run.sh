@@ -34,16 +34,20 @@ body() {
   assert_body_contains "$url" "E2E_CAPTCHA_PAGE_MARKER" -X POST -H "X-Forwarded-For: 1.2.3.4"
 
   echo "[$SCENARIO] POST dummy-captcha-response issues 302 and crowdsec_captcha_gate"
-  local solve_status
-  solve_status=$(curl -sS -D "$solve_headers" -o /dev/null -w '%{http_code}' \
+  local solve_status solve_body="$WORKDIR/solve.body"
+  # Token in query and body: Yaegi FormValue often misses the POST body.
+  solve_status=$(curl -sS -D "$solve_headers" -o "$solve_body" -w '%{http_code}' \
     -c "$jar" -X POST --data-urlencode "dummy-captcha-response=ok" \
-    -H "X-Forwarded-For: 1.2.3.4" "$url")
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -H "X-Forwarded-For: 1.2.3.4" \
+    "${url}?dummy-captcha-response=ok")
   if [[ "$solve_status" != "302" ]]; then
     echo "[$SCENARIO] solve expected 302, got $solve_status" >&2
     cat "$solve_headers" >&2 || true
+    cat "$solve_body" >&2 || true
     return 1
   fi
-  if ! tr -d '\r' <"$solve_headers" | grep -qi '^set-cookie: crowdsec_captcha_gate='; then
+  if ! tr -d '\r' <"$solve_headers" | grep -qi 'set-cookie:.*crowdsec_captcha_gate='; then
     echo "[$SCENARIO] solve missing Set-Cookie crowdsec_captcha_gate" >&2
     cat "$solve_headers" >&2 || true
     return 1

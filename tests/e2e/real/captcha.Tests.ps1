@@ -138,12 +138,12 @@ Describe "CrowdSec Bouncer Captcha Remediation Tests" {
             $emptyPost.StatusCode | Should -Be 200
             $emptyPost.Content | Should -Match "captcha|challenge"
 
-            $solve = Test-HttpRequest -Endpoint "/captcha" -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl `
+            $solve = Test-HttpRequest -Endpoint "/captcha?dummy-captcha-response=ok" -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl `
                 -Method POST -Body "dummy-captcha-response=ok" -ExtraHeaders $formHeaders `
                 -MaximumRedirection 0
-            $solve.StatusCode | Should -Be 302
+            $solve.StatusCode | Should -Be 302 -Because "solve status=$($solve.StatusCode) error=$($solve.Error) content=$($solve.Content)"
             $setCookie = [string]$solve.Headers["Set-Cookie"]
-            $setCookie | Should -Match "crowdsec_captcha_gate="
+            $setCookie | Should -Match "crowdsec_captcha_gate=" -Because "headers=$($solve.Headers | Out-String)"
             $cookiePair = ($setCookie -split ';')[0].Trim()
             $cookieHeaders = @{ Cookie = $cookiePair }
 

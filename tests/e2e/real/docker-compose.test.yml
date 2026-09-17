@@ -94,11 +94,12 @@ services:
 
   # Always-pass siteverify so Pester can POST a dummy form and assert the gate cookie.
   dummy-captcha:
-    image: nginx:1.27-alpine
+    image: python:3.12-alpine
     container_name: "dummy-captcha-test"
     restart: unless-stopped
+    command: ["python", "/dummy-captcha.py"]
     volumes:
-      - "./dummy-captcha.conf:/etc/nginx/conf.d/default.conf:ro"
+      - "./dummy-captcha.py:/dummy-captcha.py:ro"
 
   # Test service - captcha enabled
   captcha:

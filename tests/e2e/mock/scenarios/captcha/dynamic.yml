@@ -33,6 +33,7 @@ http:
           captchaSiteKey: "e2e-dummy-site"
           captchaSecretKey: "e2e-dummy-secret"
           captchaGateSecret: "e2e-mock-captcha-gate-secret"
-          captchaGateBindIp: "true"
+          captchaGateBindIp: true
+          logLevel: DEBUG
           captchaHtmlFilePath: "@@SCENARIO_DIR@@/captcha.html"
           captchaGracePeriodSeconds: "10"

@@ -85,3 +85,53 @@ func Test_ServeHTTP_dummyProviderSolveIssuesGateCookie(t *testing.T) {
 		t.Fatal("Check other IP should fail when bind-IP is on")
 	}
 }
+
+// Test_ServeHTTP_queryTokenSolvesWithoutBody covers Traefik Yaegi leaving POST form empty.
+func Test_ServeHTTP_queryTokenSolvesWithoutBody(t *testing.T) {
+	siteverify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true}`))
+	}))
+	t.Cleanup(siteverify.Close)
+
+	templatePath := filepath.Join(t.TempDir(), "captcha.html")
+	if err := os.WriteFile(templatePath, []byte("E2E_CAPTCHA_PAGE_MARKER"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	client := &Client{}
+	if err := client.New(
+		slog.Default(),
+		siteverify.Client(),
+		"custom",
+		siteverify.URL+"/dummy.js",
+		"dummy-captcha",
+		"dummy-captcha-response",
+		siteverify.URL+"/siteverify",
+		"e2e-dummy-site",
+		"e2e-dummy-secret",
+		"e2e-gate-secret",
+		true,
+		"",
+		templatePath,
+		3600,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	solveReq := httptest.NewRequest(http.MethodPost, "/foo?dummy-captcha-response=ok", nil)
+	solveRW := httptest.NewRecorder()
+	client.ServeHTTP(solveRW, solveReq, "1.2.3.4")
+	if solveRW.Code != http.StatusFound {
+		t.Fatalf("query-token solve want 302, got %d", solveRW.Code)
+	}
+}
+
+func Test_captchaResponseFromRequest_rawBodyWithoutContentType(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/foo", strings.NewReader("dummy-captcha-response=ok"))
+	// No Content-Type: ParseForm skips the body; the raw ParseQuery path must still win.
+	got := captchaResponseFromRequest(req, "dummy-captcha-response")
+	if got != "ok" {
+		t.Fatalf("got %q, want ok", got)
+	}
+}
