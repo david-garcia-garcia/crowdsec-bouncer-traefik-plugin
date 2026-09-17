@@ -34,3 +34,8 @@ description: Facts about the traefik-geoblock plugin this product may reuse.
 priority: normal
 local: index_ext_traefik-middleware-utilities.md
 description: reclaim and simpleredis packages in david-garcia-garcia/traefik-middleware-utilities.
+
+## go
+priority: normal
+local: index_std_go.md
+description: Official Go toolchain behavior this product relies on.

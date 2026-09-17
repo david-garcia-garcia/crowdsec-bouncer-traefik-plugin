@@ -8,3 +8,6 @@
 - dragonfly
 - redis
 - traefik-geoblock
+
+## std
+- go
