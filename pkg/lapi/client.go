@@ -65,10 +65,10 @@ type Client struct {
 	isCrowdsecStreamStartup bool
 	isCrowdsecStreamHealthy bool
 	updateFailure           int64
-	streamStop      chan bool
-	metricsStop     chan bool
-	metricsReporter *MetricsReporter
-	streamFetches   int64
+	streamStop              chan bool
+	metricsStop             chan bool
+	metricsReporter         *MetricsReporter
+	streamFetches           int64
 	streamOwner             string         // first middleware New that created this stream session
 	streamSettings          streamSettings // knobs that must not start a second poller; warn-and-wire if a joiner differs
 }
