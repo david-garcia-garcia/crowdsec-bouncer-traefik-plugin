@@ -116,18 +116,15 @@ func TestReportMetricsPluginVersion(t *testing.T) {
 	}
 	started := time.Unix(1_700_000_000, 0).UTC()
 	client := &Client{
-		crowdsecScheme:  lapiURL.Scheme,
-		crowdsecHost:    lapiURL.Host,
-		crowdsecPath:    "/",
-		crowdsecMode:    configuration.StreamMode,
-		log:             logger.New("ERROR", ""),
-		pluginVersion:   wantVersion,
-		lastMetricsPush: started,
-		startedAt:       started,
-		windowCounters:  make(map[usageMetricKey]int64),
-		activeDecisions: make(map[usageMetricKey]int64),
+		crowdsecScheme: lapiURL.Scheme,
+		crowdsecHost:   lapiURL.Host,
+		crowdsecPath:   "/",
+		crowdsecMode:   configuration.StreamMode,
+		log:            logger.New("ERROR", ""),
+		pluginVersion:  wantVersion,
 	}
 	attachTestTransport(client, lapi.Client(), "")
+	attachTestMetricsReporter(client, started)
 	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +139,7 @@ func TestReportMetricsPluginVersion(t *testing.T) {
 
 func TestReportMetricsStartupTimestampStable(t *testing.T) {
 	client, body := newUsageMetricsClient(t)
-	started := float64(client.startedAt.Unix())
+	started := float64(client.metricsReporter.startedAt.Unix())
 	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
@@ -179,19 +176,22 @@ func newUsageMetricsClient(t *testing.T) (*Client, *[]byte) {
 	}
 	started := time.Unix(1_700_000_000, 0).UTC()
 	client := &Client{
-		crowdsecScheme:  lapiURL.Scheme,
-		crowdsecHost:    lapiURL.Host,
-		crowdsecPath:    "/",
-		crowdsecMode:    configuration.StreamMode,
-		log:             logger.New("ERROR", ""),
-		pluginVersion:   "test",
-		lastMetricsPush: started,
-		startedAt:       started,
-		windowCounters:  make(map[usageMetricKey]int64),
-		activeDecisions: make(map[usageMetricKey]int64),
+		crowdsecScheme: lapiURL.Scheme,
+		crowdsecHost:   lapiURL.Host,
+		crowdsecPath:   "/",
+		crowdsecMode:   configuration.StreamMode,
+		log:            logger.New("ERROR", ""),
+		pluginVersion:  "test",
 	}
 	attachTestTransport(client, lapi.Client(), "")
+	attachTestMetricsReporter(client, started)
 	return client, gotBody
+}
+
+// attachTestMetricsReporter constructs the reporter beside a Client literal and binds crowdsecQuery.
+func attachTestMetricsReporter(client *Client, startedAt time.Time) {
+	client.metricsReporter = newMetricsReporter(client, startedAt)
+	client.metricsReporter.lastMetricsPush = startedAt
 }
 
 func decodeUsageObject(t *testing.T, body []byte) map[string]interface{} {
@@ -333,19 +333,16 @@ func TestReportMetricsRestoresOnFailure(t *testing.T) {
 		crowdsecMode:    configuration.StreamMode,
 		log:             logger.New("ERROR", ""),
 		pluginVersion:   "test",
-		lastMetricsPush: started,
-		startedAt:       started,
 		metricsInterval: 1,
-		windowCounters:  make(map[usageMetricKey]int64),
-		activeDecisions: make(map[usageMetricKey]int64),
 	}
 	attachTestTransport(client, lapi.Client(), "")
+	attachTestMetricsReporter(client, started)
 	client.IncProcessed("ipv4")
 	if err := client.reportMetrics(); err == nil {
 		t.Fatal("failed POST must error")
 	}
-	if atomic.LoadInt64(&client.processedIPv4) != 1 {
-		t.Fatalf("failed POST must restore processed, got %d", atomic.LoadInt64(&client.processedIPv4))
+	if atomic.LoadInt64(&client.metricsReporter.processedIPv4) != 1 {
+		t.Fatalf("failed POST must restore processed, got %d", atomic.LoadInt64(&client.metricsReporter.processedIPv4))
 	}
 	fail = false
 	if err := client.reportMetrics(); err != nil {
@@ -353,6 +350,69 @@ func TestReportMetricsRestoresOnFailure(t *testing.T) {
 	}
 	if processedValue(t, *gotBody, "ipv4") != 1 {
 		t.Fatalf("retry must send restored processed, body=%s", *gotBody)
+	}
+}
+
+// TestReportMetricsWindowSurvivesAdoptTransport checks unsent counts POST through the replaced transport.
+func TestReportMetricsWindowSurvivesAdoptTransport(t *testing.T) {
+	gotKey := ""
+	gotBody := new([]byte)
+	lapi := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if req.URL.Path != "/v1/usage-metrics" {
+			t.Errorf("path %s", req.URL.Path)
+		}
+		gotKey = req.Header.Get("X-Api-Key")
+		raw, err := io.ReadAll(req.Body)
+		if err != nil {
+			t.Errorf("read body %v", err)
+			return
+		}
+		*gotBody = raw
+		rw.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(lapi.Close)
+	lapiURL, err := url.Parse(lapi.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := time.Unix(1_700_000_000, 0).UTC()
+	client := &Client{
+		crowdsecScheme: lapiURL.Scheme,
+		crowdsecHost:   lapiURL.Host,
+		crowdsecPath:   "/",
+		crowdsecMode:   configuration.StreamMode,
+		log:            logger.New("ERROR", ""),
+		pluginVersion:  "test",
+	}
+	attachTestTransport(client, lapi.Client(), "first-key")
+	attachTestMetricsReporter(client, started)
+	client.IncProcessed("ipv4")
+	client.IncDropped("crowdsec", "ipv4", "ban")
+	adopted := testStreamConfig(lapiURL.Host, 0)
+	adopted.CrowdsecLapiScheme = lapiURL.Scheme
+	adopted.CrowdsecLapiKey = "second-key"
+	adopted.HTTPTimeoutSeconds = 11
+	if _, err := client.AdoptTransport(adopted); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.reportMetrics(); err != nil {
+		t.Fatal(err)
+	}
+	if gotKey != "second-key" {
+		t.Fatalf("POST must use adopted transport key, got %q", gotKey)
+	}
+	if processedValue(t, *gotBody, "ipv4") != 1 {
+		t.Fatalf("unsent processed must survive AdoptTransport, body=%s", *gotBody)
+	}
+	foundDropped := false
+	for _, raw := range usageMetricItems(t, *gotBody) {
+		item := asObject(t, raw)
+		if item["name"] == "dropped" {
+			foundDropped = true
+		}
+	}
+	if !foundDropped {
+		t.Fatalf("unsent dropped must survive AdoptTransport, body=%s", *gotBody)
 	}
 }
 
