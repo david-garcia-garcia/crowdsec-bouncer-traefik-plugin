@@ -252,7 +252,7 @@ func TestNew_DisposeAfterGrace(t *testing.T) {
 	if !view.OK || view.Holders != 0 || !view.Sleeping {
 		t.Fatalf("lapi.Client must still be in process grace after 150ms: found=%v holders=%d sleeping=%v", view.OK, view.Holders, view.Sleeping)
 	}
-	time.Sleep(lapi.ReclaimGraceDuration)
+	time.Sleep(reclaim.ProcessGrace)
 	second, err := New(context.Background(), testNextOK(), cfgLiveAt(u.Host), "dispose")
 	if err != nil {
 		t.Fatal(err)

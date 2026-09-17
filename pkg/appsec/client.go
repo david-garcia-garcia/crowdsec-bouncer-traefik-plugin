@@ -10,9 +10,6 @@ import (
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
-// ReclaimGraceDuration is the wait after the last constructor ctx for an AppSec Client slot.
-const ReclaimGraceDuration = 30 * time.Second
-
 // Client owns the AppSec HTTP round-trip for one listener identity.
 type Client struct {
 	mu sync.Mutex

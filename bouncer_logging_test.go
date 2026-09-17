@@ -60,6 +60,8 @@ func getTestConfig() *configuration.Config {
 	}
 }
 
+// newTestLogFile creates an isolated temp log path and resets reclaim with zero grace
+// so file-logging tests do not inherit process-table grace from t.TempDir or prior cases.
 func newTestLogFile(t *testing.T) string {
 	t.Helper()
 	reclaim.ResetForTestWith(0)

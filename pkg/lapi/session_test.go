@@ -80,8 +80,8 @@ func TestSessionKey_DifferentHostsAreDistinct(t *testing.T) {
 }
 
 func TestClient_ReclaimGrace(t *testing.T) {
-	if ReclaimGraceDuration != 30*time.Second {
-		t.Fatalf("ReclaimGraceDuration: %v", ReclaimGraceDuration)
+	if reclaim.ProcessGrace != 30*time.Second {
+		t.Fatalf("ProcessGrace: %v", reclaim.ProcessGrace)
 	}
 }
 

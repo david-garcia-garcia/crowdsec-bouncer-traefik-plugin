@@ -3,10 +3,13 @@
 package cache
 
 import (
+	"bytes"
+	"net"
 	"testing"
+	"time"
 
-	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	simpleredis "github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis"
+	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 func Test_Get(t *testing.T) {
@@ -260,6 +263,62 @@ func Test_GetMany(t *testing.T) {
 	}
 	if _, ok := got[""]; ok {
 		t.Fatal("empty key must be omitted")
+	}
+}
+
+func Test_redisClientConfigTimeouts(t *testing.T) {
+	cfg := redisClientConfig("127.0.0.1:1", "", "", logger.New("INFO", ""))
+	if cfg.DialTimeout != 2*time.Second {
+		t.Fatalf("DialTimeout %v, want 2s", cfg.DialTimeout)
+	}
+	if cfg.CommandTimeout != time.Second {
+		t.Fatalf("CommandTimeout %v, want 1s", cfg.CommandTimeout)
+	}
+}
+
+func serveRedisMiss(t *testing.T) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	go func() {
+		for {
+			conn, acceptErr := ln.Accept()
+			if acceptErr != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				buf := make([]byte, 4096)
+				for {
+					n, readErr := c.Read(buf)
+					if n > 0 {
+						if bytes.Contains(buf[:n], []byte("GET")) {
+							_, _ = c.Write([]byte("$-1\r\n"))
+						} else {
+							_, _ = c.Write([]byte("+OK\r\n"))
+						}
+					}
+					if readErr != nil {
+						return
+					}
+				}
+			}(conn)
+		}
+	}()
+	return ln.Addr().String()
+}
+
+func Test_redisGetMissMapsCacheMiss(t *testing.T) {
+	host := serveRedisMiss(t)
+	client := &Client{}
+	client.New(logger.New("INFO", ""), true, host, nil, "", "", "p")
+	defer client.Close()
+	got, err := client.Get("missing-key")
+	if got != "" || err == nil || err.Error() != CacheMiss {
+		t.Fatalf("Get miss got %q err %v, want cache:miss", got, err)
 	}
 }
 

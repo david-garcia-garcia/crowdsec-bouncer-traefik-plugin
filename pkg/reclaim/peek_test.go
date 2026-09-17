@@ -45,3 +45,26 @@ func TestTable_PeekDuringSleep(t *testing.T) {
 		t.Fatalf("Peek during sleep: %+v", view)
 	}
 }
+
+func TestTable_OpenWithHooksReclaimsDuringGrace(t *testing.T) {
+	tab := New(Config{Grace: 200 * time.Millisecond})
+	creates := 0
+	create := func() (any, Hooks, error) {
+		creates++
+		return "v", Hooks{}, nil
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	first, err := tab.OpenWithHooks(ctx, "k", slog.Default(), create)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	time.Sleep(20 * time.Millisecond)
+	second, err := tab.OpenWithHooks(context.Background(), "k", slog.Default(), create)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second || creates != 1 {
+		t.Fatalf("grace reclaim: first=%v second=%v creates=%d", first, second, creates)
+	}
+}
