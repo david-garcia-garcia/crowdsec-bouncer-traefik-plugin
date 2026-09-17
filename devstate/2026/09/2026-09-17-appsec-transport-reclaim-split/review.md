@@ -25,3 +25,9 @@ findings: none
 fixed: AppSec transport adopt; debt closed
 skipped: n/a
 localTests: passed
+
+## codereview (2026-09-17)
+phase: codereview
+findings: P? 1 coverage hard
+fixed: TestOpen_TimeoutOnlyClosesPreviousIdle (`dd9e678`)
+skipped: none
