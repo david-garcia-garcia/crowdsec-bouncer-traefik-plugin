@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: stale-usage LAPI usage-metrics produced; LAPI connection none
 fixed: MetricsReporter Language + ticker/startedAt/query usage on knowledge/devdocs/core_plugin_lapi_usage-metrics.md
 skipped: none
+
+## archive (2026-09-17)
+phase: archive
+findings: FindSpecHost fold core_plugin_lapi_usage-metrics; live spec already folded; validators 0/0/0; moved to openspec/changes/archive/2026-09-17-extract-metrics-reporter
+fixed: n/a
+skipped: Task tool unavailable; FindSpecHost ran on this thread
