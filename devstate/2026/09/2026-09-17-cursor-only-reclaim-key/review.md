@@ -40,3 +40,9 @@ findings: 5 produced, 0 skipped (4 stale-usage, 1 language-gap)
 fixed: middleware / connection / decisionscope / e2e usage; scope-union Language
 skipped: none
 
+## archive (2026-09-17)
+phase: archive
+findings: 5 deltas synced (1 new / 4 fold); validators exit 0; CI in progress on 565d946
+fixed: catalog sync; archive move; PR 67 summary card
+skipped: Task FindSpecHost (no Task tool; ran on worker thread); pullrequest
+

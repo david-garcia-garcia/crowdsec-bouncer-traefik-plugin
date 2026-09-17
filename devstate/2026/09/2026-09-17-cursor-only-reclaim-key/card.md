@@ -1,4 +1,4 @@
-Developer review: ready for review — 2026-09-17T19:25:29Z
+Developer review: in progress — 2026-09-17T19:54:24Z
 
 IssueKey: 2026-09-17-cursor-only-reclaim-key
 JobName: 2026-09-17-cursor-only-reclaim-key
@@ -8,7 +8,7 @@ JobName: 2026-09-17-cursor-only-reclaim-key
 
 **Admin users.** None.
 
-**Developers.** Stream Open key is cursor plus Redis (`lapi:stream:` + SessionHex + store-params hash). Live/none `Key` is `lapi:` + SessionHex + identity hash that keeps `MetricsUpdateIntervalSeconds` and still drops CAPI scenarios / `updateMaxFailure` / `UpdateIntervalSeconds`. Live routers union `scopes=` on the Client. `Peek` / `PeekLivePrefix` / `View` are gone. `pkg/reclaim` is a utilities v1.0.3 shim (`OpenTyped` not taken). Debt file deleted.
+**Developers.** Stream Open key is cursor plus Redis (`lapi:stream:` + SessionHex + store-params hash). Live/none `Key` is `lapi:` + SessionHex + identity hash that keeps `MetricsUpdateIntervalSeconds` and still drops CAPI scenarios / `updateMaxFailure` / `UpdateIntervalSeconds`. Live routers union `scopes=` on the Client. `Peek` / `PeekLivePrefix` / `View` are gone. `pkg/reclaim` is a utilities v1.0.3 shim (`OpenTyped` not taken). Debt file deleted. Catalog specs synced; change folder is `openspec/changes/archive/2026-09-17-cursor-only-reclaim-key/`.
 
 **End users.** A joiner router’s header scopes now enter the shared stream poll instead of being first-wins ignored.
 
@@ -31,42 +31,42 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Apply landed and CI succeeded. 0 items remain.
+Archive synced; CI on this head is still running. 0 items remain.
 
 Priority: P2 — real operator pain (joiner header scopes never enter the poll) with a workaround (identical remaining settings on every router)
-Reviewed head: f9c041c
+Reviewed head: 565d946
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | CI succeeded and comments.md is empty |
-| CI proof | 6/6 | Main Process, e2e binary+mock, and e2e docker+pester succeeded |
-| Local tests proof | N/A | `prHost` remote; local `go test ./...` passed |
+| Overall readiness | 3/6 | CI on 565d946 is in progress |
+| CI proof | 3/6 | Main Process, e2e binary+mock, and e2e docker+pester in progress |
+| Local tests proof | N/A | `prHost` remote; localTests passed |
 | Review resolution | 6/6 | comments.md none |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-17-cursor-only-reclaim-key pushed | git |
-| OpenSpec | cursor-only-reclaim-key | openspec/changes/cursor-only-reclaim-key/ |
+| OpenSpec | cursor-only-reclaim-key archived | openspec/changes/archive/2026-09-17-cursor-only-reclaim-key/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/67 | pr-host |
-| CI | build 35264215572 success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35264215572/job/105347192927 | pr-host CI; e2e docker+pester success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35264215571/job/105347192915 ; e2e binary+mock success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35264215571/job/105347193096 |
+| CI | build 35267579819 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35267579819/job/105358483923 | pr-host CI; e2e docker+pester in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35267579736/job/105358483636 ; e2e binary+mock in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35267579736/job/105358483897 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | comments: none |
 
 ## Specs
-- [core_plugin_lapi_scope-union](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/openspec/changes/cursor-only-reclaim-key/proposal.md) — added
-- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/openspec/changes/cursor-only-reclaim-key/proposal.md) — modified
-- [core_cache_client_decision-store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/openspec/changes/cursor-only-reclaim-key/proposal.md) — modified
-- [core_plugin_decisions_scopes](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/openspec/changes/cursor-only-reclaim-key/proposal.md) — modified
-- [std_go_reclaim_context-lease](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/openspec/changes/cursor-only-reclaim-key/proposal.md) — modified
+- [core_plugin_lapi_scope-union](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/openspec/changes/archive/2026-09-17-cursor-only-reclaim-key/proposal.md) — added
+- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/openspec/changes/archive/2026-09-17-cursor-only-reclaim-key/proposal.md) — modified
+- [core_cache_client_decision-store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/openspec/changes/archive/2026-09-17-cursor-only-reclaim-key/proposal.md) — modified
+- [core_plugin_decisions_scopes](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/openspec/changes/archive/2026-09-17-cursor-only-reclaim-key/proposal.md) — modified
+- [std_go_reclaim_context-lease](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/openspec/changes/archive/2026-09-17-cursor-only-reclaim-key/proposal.md) — modified
 
 ## Follow-up issues
 None.
 
 ## How this fits together
-Ticket 2026-09-17-cursor-only-reclaim-key is branch `2026-09-17-cursor-only-reclaim-key` on PR 67. Apply is pushed at f9c041c; Main Process and both e2e jobs succeeded.
+Ticket 2026-09-17-cursor-only-reclaim-key is branch `2026-09-17-cursor-only-reclaim-key` on PR 67. Archive is pushed at 565d946; CI on that head is in progress.
 
 ## Decision needed
 | Question | Decision | By |
@@ -84,7 +84,12 @@ None.
 - [[P2] e2e pester AppSec CRS](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35264215571/job/105347192915) — FIX — First apply dropped `MetricsUpdateIntervalSeconds` from live/none `Key`; none `/appsec` `metrics=1` shared the default 600s ticker. Identity payload keeps the interval; stream and `StoreKey` still omit it. Path: `pkg/lapi/identity.go`. Reply none.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/devstate/2026/09/2026-09-17-cursor-only-reclaim-key/codereview_standards.md) — 4 total, 0 pending, 4 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/devstate/2026/09/2026-09-17-cursor-only-reclaim-key/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/devstate/2026/09/2026-09-17-cursor-only-reclaim-key/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/devstate/2026/09/2026-09-17-cursor-only-reclaim-key/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/devstate/2026/09/2026-09-17-cursor-only-reclaim-key/codereview_dead.md) — 1 total, 0 pending, 0 completed, 1 skipped
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/devstate/2026/09/2026-09-17-cursor-only-reclaim-key/codereview_coverage.md) — 2 total, 0 pending, 2 completed
 
 ## Agent review details
 
@@ -93,7 +98,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | comments.md none |
-| Reviewed head | f9c041c17377e246c7ce9c8491ad6fe1ce8ba4b9 | Card matches measured branch |
+| Reviewed head | 565d946ad89052612aba4c02819d4ed498cafae1 | Card matches measured branch |
 
 ### Stored data model
 None.
@@ -108,9 +113,9 @@ Is this the best way to solve the issue? Yes versus DestBranch: Open of the curs
 ### Evidence
 What I checked:
 - Local `go test ./...` passed (handoff.yaml `localTests: passed`)
-- Main Process success on f9c041c (build 35264215572)
-- e2e docker+pester success (build 35264215571 job 105347192915)
-- e2e binary+mock success (build 35264215571 job 105347193096)
+- Archive validators exit 0 (`validate-spec-map --write`, verify, `validate-artifact-names`)
+- Live change folder gone; archive at `openspec/changes/archive/2026-09-17-cursor-only-reclaim-key/`
+- CI on 565d946 in progress (builds 35267579819 / 35267579736)
 - Live/none `Key` hashes `identity` including `MetricsUpdateIntervalSeconds`; `SessionKey` and `StoreKey` omit it (`pkg/lapi/identity.go`, `pkg/lapi/session.go`, `pkg/lapi/decisionstore.go`)
 - Grep: no `Peek` / `PeekLivePrefix` / `View` in live Go; utilities `reclaim` imported only from the shim
 - `OpenTyped` not taken (`reclaim/opentyped.go` still takes hooks-as-funcs)
