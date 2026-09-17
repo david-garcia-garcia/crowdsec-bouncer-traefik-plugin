@@ -95,7 +95,12 @@ func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response,
 		return nil, err
 	}
 
-	res, err := c.httpClient.Do(req)
+	current := c.currentTransport()
+	if current == nil || current.httpClient == nil {
+		c.log.Error("appsecQuery:unreachable")
+		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
+	}
+	res, err := current.httpClient.Do(req)
 	if err != nil || isReverseProxyError(res.StatusCode) {
 		c.log.Error("appsecQuery:unreachable")
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
@@ -130,7 +135,12 @@ func (c *Client) newAppsecForwardRequest(ip string, httpReq *http.Request, pol P
 			req.Header.Add(key, value)
 		}
 	}
-	req.Header.Set(crowdsecAppsecHeader, c.appsecKey)
+	current := c.currentTransport()
+	appsecKey := ""
+	if current != nil {
+		appsecKey = current.key
+	}
+	req.Header.Set(crowdsecAppsecHeader, appsecKey)
 	req.Header.Set(crowdsecAppsecIPHeader, ip)
 	req.Header.Set(crowdsecAppsecVerbHeader, httpReq.Method)
 	req.Header.Set(crowdsecAppsecHostHeader, httpReq.Host)

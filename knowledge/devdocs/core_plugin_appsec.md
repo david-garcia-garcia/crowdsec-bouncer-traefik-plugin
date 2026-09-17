@@ -3,8 +3,8 @@
 ## Language
 
 **AppSec Client**:
-The reclaim value for one CrowdSec AppSec listener (`pkg/appsec`). Owns the HTTP round-trip, JSON parse, host/key/TLS/body limit. Not the LAPI Client.
-_Avoid_: CrowdsecConnection, `AppsecQuery` on LAPI, LAPI captcha
+The reclaim value for one CrowdSec AppSec listener (`pkg/appsec`). Owns JSON parse, host/path/body limit, and replaceable HTTP+auth (`transport` on `atomic.Value`). Not the LAPI Client.
+_Avoid_: CrowdsecConnection, `AppsecQuery` on LAPI, LAPI captcha, `atomic.Pointer[T]`
 
 **Structured AppSec response**:
 JSON CrowdSec 1.8 AppSec returns to the bouncer (`action`, `http_status`, `user_body_content`, `user_cookies`, `user_headers`). Listener HTTP 403 carries a remediation envelope; listener 200 is allow.
@@ -21,7 +21,7 @@ _Avoid_: CrowdSec LAPI captcha remediation
 ## How to use
 
 - Enable with existing `crowdsecAppsecEnabled`. Do not add a bot-detection plugin key.
-- Open with `appsec.Open` (reclaim by AppSec URL+key+TLS). Do not construct the AppSec client inside `lapi.New`.
+- Open with `appsec.Open` (reclaim by AppSec URL+key+body limit). `Open` calls `AdoptTransport` so last `New` wins TLS/timeout. Do not construct the AppSec client inside `lapi.New`. Do not use `atomic.Pointer[T]`.
 - `action` allow or empty 200 → `next`. `ban` → `handleBanServeHTTP`. Any other non-allow action (challenge, AppSec captcha HTML) → relay. Empty `challenge` body → ban. Empty `captcha` body still relays `http_status` (not the operator ban page). AppSec `captcha` is not `pkg/captcha`.
 - AppSec HTTP 500, unreachable (transport failure or listener HTTP 502/503/504), and unreadable body use per-router `crowdsecAppsecFailureAction` (`passthrough` | `ban` | `captcha`), not the three removed block bools. `captcha` here is `pkg/captcha`, not AppSec JSON `action: captcha`.
 - Route `PathPrefix(/crowdsec-internal/challenge)` through the same middleware; service backend is the AppSec listener.
@@ -36,6 +36,8 @@ decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
 ## Key files
 
 - `pkg/appsec/`
+- `pkg/appsec/client_http.go`
+- `pkg/appsec/session.go`
 - `pkg/bouncer/bouncer.go`
 - `pkg/bouncer/clientrequest.go`
 
@@ -47,3 +49,4 @@ decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
 - `Query` `captcha` failure action is `ErrFailureCaptcha` → `pkg/captcha`. Do not treat that error as AppSec JSON `action: captcha`.
 - Empty `crowdsecAppsecKey` still falls back to `crowdsecLapiKey` in `appsec.Prepare`. Call `lapi.Prepare` first.
 - HTTP 502, 503, and 504 from the AppSec listener are unreachable (same `crowdsecAppsecFailureAction` as a transport failure), not a generic non-200 ban.
+- Do not put AppSec TLS or `HTTPTimeoutSeconds` in the AppSec reclaim key. Last `New` `AdoptTransport`s those knobs. Concurrent adopt last-writes and idle-closes the replaced `*http.Client`.
