@@ -146,7 +146,7 @@ func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 }
 
 func Test_appsecQuery_reusesConnection(t *testing.T) {
-	for _, status := range []int{http.StatusOK, http.StatusForbidden, http.StatusInternalServerError} {
+	for _, status := range []int{http.StatusOK, http.StatusForbidden, http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			var mu sync.Mutex
 			conns := map[string]bool{}
@@ -296,6 +296,118 @@ func Test_appsecQuery_oversizedOKResponsePasses(t *testing.T) {
 	}
 	if decision == nil || decision.Action != ActionAllow {
 		t.Fatalf("Query() want allow for oversized 200, got %#v", decision)
+	}
+}
+
+// Test_appsecQuery_zeroBodyLimitForwardsPost proves limit 0 POSTs the full body and restores it for origin.
+func Test_appsecQuery_zeroBodyLimitForwardsPost(t *testing.T) {
+	const payload = "hello-appsec-body"
+	var gotMethod string
+	var gotBody string
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write([]byte(`{"action":"allow"}`))
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	client := newQueryClient(appsecURL, appsecServer.Client())
+	client.appsecBodyLimit = 0
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/", strings.NewReader(payload))
+	_, err := client.Query("1.2.3.4", req, Policy{})
+	if err != nil {
+		t.Fatalf("Query() returned error: %v", err)
+	}
+	if gotMethod != http.MethodPost {
+		t.Fatalf("AppSec method %q want POST", gotMethod)
+	}
+	if gotBody != payload {
+		t.Fatalf("AppSec body %q want %q", gotBody, payload)
+	}
+	restored, err := io.ReadAll(req.Body)
+	if err != nil {
+		t.Fatalf("origin body: %v", err)
+	}
+	if string(restored) != payload {
+		t.Fatalf("origin body %q want %q", restored, payload)
+	}
+}
+
+// captureRoundTripper records the outbound AppSec request length headers.
+type captureRoundTripper struct {
+	contentLength       int64
+	contentLengthHeader string
+	transferEncoding    string
+}
+
+// RoundTrip records length headers then allows the query.
+func (rt *captureRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	rt.contentLength = req.ContentLength
+	rt.contentLengthHeader = req.Header.Get("Content-Length")
+	rt.transferEncoding = req.Header.Get("Transfer-Encoding")
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"action":"allow"}`)),
+		Header:     make(http.Header),
+		Request:    req,
+	}, nil
+}
+
+// Test_appsecQuery_rebuildsContentLengthFromForwardedBytes proves outbound length matches the copied bytes.
+func Test_appsecQuery_rebuildsContentLengthFromForwardedBytes(t *testing.T) {
+	const forwarded = "abcd"
+	capture := &captureRoundTripper{}
+	client := NewTestClient(&url.URL{Scheme: "http", Host: "appsec.example"}, &http.Client{Transport: capture}, logger.New("INFO", ""))
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/", strings.NewReader(forwarded))
+	req.Header.Set("Content-Length", "999")
+	req.Header.Set("Transfer-Encoding", "chunked")
+	_, err := client.Query("1.2.3.4", req, Policy{})
+	if err != nil {
+		t.Fatalf("Query() returned error: %v", err)
+	}
+	if capture.contentLength != int64(len(forwarded)) {
+		t.Fatalf("ContentLength field %d want %d", capture.contentLength, len(forwarded))
+	}
+	if capture.contentLengthHeader != "4" {
+		t.Fatalf("Content-Length header %q want %q", capture.contentLengthHeader, "4")
+	}
+	if capture.transferEncoding != "" {
+		t.Fatalf("Transfer-Encoding header %q want empty", capture.transferEncoding)
+	}
+}
+
+// newUnreadableDeleteRequest is an HTTP/2 DELETE whose body cannot be buffered.
+func newUnreadableDeleteRequest(done <-chan struct{}) *http.Request {
+	req, _ := http.NewRequest(http.MethodDelete, "http://localhost/", blockingBody{done: done})
+	req.ProtoMajor = 2
+	req.ContentLength = -1
+	return req
+}
+
+// Test_appsecQuery_unreadableBodyDeleteNotDropped proves an unreadable DELETE is not a drop.
+func Test_appsecQuery_unreadableBodyDeleteNotDropped(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	client := newQueryClient(appsecURL, appsecServer.Client())
+	done := make(chan struct{})
+	defer close(done)
+	finished := make(chan error, 1)
+	go func() {
+		_, err := client.Query("1.2.3.4", newUnreadableDeleteRequest(done), Policy{FailureAction: configuration.FailureActionBan})
+		finished <- err
+	}()
+	select {
+	case err := <-finished:
+		if err != nil {
+			t.Errorf("Query() on an HTTP/2 DELETE without content-length returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Query() blocked on an HTTP/2 DELETE request body")
 	}
 }
 
