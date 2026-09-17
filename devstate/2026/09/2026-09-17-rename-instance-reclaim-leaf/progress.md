@@ -6,7 +6,7 @@ JobName: 2026-09-17-rename-instance-reclaim-leaf
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-17T15:43:03Z |
 | explore | [x] | [x] | 2026-09-17T15:48:08Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
