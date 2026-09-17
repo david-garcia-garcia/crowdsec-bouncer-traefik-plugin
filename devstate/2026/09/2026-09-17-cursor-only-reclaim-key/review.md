@@ -16,3 +16,9 @@ findings: change cursor-only-reclaim-key; 1 added / 4 modified; 5 assumed 0 bloc
 fixed: OpenSpec apply-ready; PR #67 summary card
 skipped: implement; comments.md none; OpenTyped; AppSec key; captcha
 
+## implement (2026-09-17)
+phase: implement
+findings: apply landed; Peek gone; OpenTyped not taken; debt deleted; Main Process succeeded; e2e pester failed
+fixed: cursor+Redis key; scope union; utilities reclaim shim; nestif after Sync
+skipped: code review; archive; OpenTyped
+
