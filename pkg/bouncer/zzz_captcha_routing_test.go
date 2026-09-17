@@ -52,16 +52,13 @@ func testCaptchaClient(t *testing.T, jsURL, challengeURL, validateURL string, ht
 	return client
 }
 
-func testCaptchaRoutingBouncer(t *testing.T, client *captcha.Client, next http.Handler) (*Bouncer, *bool) {
+func testCaptchaRoutingBouncer(t *testing.T, client *captcha.Client) (*Bouncer, *bool) {
 	t.Helper()
 	originCalled := false
-	if next == nil {
-		next = http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-			originCalled = true
-		})
-	}
 	return &Bouncer{
-		next:                    next,
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			originCalled = true
+		}),
 		captchaClient:           client,
 		log:                     logger.New("ERROR", ""),
 		remediationStatusCode:   http.StatusForbidden,
@@ -100,7 +97,7 @@ func TestHandleRemediationServeHTTP_solvedFormPostRedirects(t *testing.T) {
 
 	client := testCaptchaClient(t, "/fast.js", "", siteverify.URL+"/siteverify", siteverify.Client())
 	cookieValue := solveTestGateCookie(t, client, "192.0.2.10")
-	b, originCalled := testCaptchaRoutingBouncer(t, client, nil)
+	b, originCalled := testCaptchaRoutingBouncer(t, client)
 
 	form := url.Values{}
 	form.Set("dummy-captcha-response", "again")
@@ -130,7 +127,7 @@ func TestHandleRemediationServeHTTP_ordinaryPostAfterSolveReachesOrigin(t *testi
 
 	client := testCaptchaClient(t, "/fast.js", "", siteverify.URL+"/siteverify", siteverify.Client())
 	cookieValue := solveTestGateCookie(t, client, "192.0.2.10")
-	b, originCalled := testCaptchaRoutingBouncer(t, client, nil)
+	b, originCalled := testCaptchaRoutingBouncer(t, client)
 
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/protected", strings.NewReader("comment=hi"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -155,7 +152,7 @@ func TestHandleRemediationServeHTTP_queryTokenGetIsNotFormPost(t *testing.T) {
 
 	client := testCaptchaClient(t, "/fast.js", "", siteverify.URL+"/siteverify", siteverify.Client())
 	cookieValue := solveTestGateCookie(t, client, "192.0.2.10")
-	b, originCalled := testCaptchaRoutingBouncer(t, client, nil)
+	b, originCalled := testCaptchaRoutingBouncer(t, client)
 
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected?dummy-captcha-response=token", nil)
 	req.AddCookie(&http.Cookie{Name: "crowdsec_captcha_gate", Value: cookieValue})
@@ -167,7 +164,7 @@ func TestHandleRemediationServeHTTP_queryTokenGetIsNotFormPost(t *testing.T) {
 
 func TestHandleRemediationServeHTTP_customResourcePassthrough(t *testing.T) {
 	client := testCaptchaClient(t, "https://widget.example/assets/fast.js", "https://widget.example/v0/challenge", "", nil)
-	b, originCalled := testCaptchaRoutingBouncer(t, client, nil)
+	b, originCalled := testCaptchaRoutingBouncer(t, client)
 
 	jsReq := httptest.NewRequest(http.MethodGet, "http://app.example/assets/fast.js", nil)
 	b.handleRemediationServeHTTP(httptest.NewRecorder(), testClientRequest(jsReq, "192.0.2.10"), decisionscope.CaptchaValue, "cscli")
@@ -203,7 +200,7 @@ func TestHandleRemediationServeHTTP_customResourcePassthrough(t *testing.T) {
 
 func TestHandleRemediationServeHTTP_banDoesNotPassthroughCustomResource(t *testing.T) {
 	client := testCaptchaClient(t, "/fast.js", "/v0/challenge", "", nil)
-	b, originCalled := testCaptchaRoutingBouncer(t, client, nil)
+	b, originCalled := testCaptchaRoutingBouncer(t, client)
 	req := httptest.NewRequest(http.MethodGet, "http://app.example/fast.js", nil)
 	rw := httptest.NewRecorder()
 	b.handleRemediationServeHTTP(rw, testClientRequest(req, "192.0.2.10"), decisionscope.BannedValue, "cscli")
@@ -217,7 +214,7 @@ func TestHandleRemediationServeHTTP_banDoesNotPassthroughCustomResource(t *testi
 
 func TestHandleRemediationServeHTTP_captchaHEADIsNotBan(t *testing.T) {
 	client := testCaptchaClient(t, "/fast.js", "", "", nil)
-	b, originCalled := testCaptchaRoutingBouncer(t, client, nil)
+	b, originCalled := testCaptchaRoutingBouncer(t, client)
 
 	headReq := httptest.NewRequest(http.MethodHead, "http://example.com/protected", nil)
 	rw := httptest.NewRecorder()
@@ -241,7 +238,7 @@ func TestHandleRemediationServeHTTP_captchaHEADIsNotBan(t *testing.T) {
 
 func TestHandleRemediationServeHTTP_customResourceHEADReachesOrigin(t *testing.T) {
 	client := testCaptchaClient(t, "/fast.js", "", "", nil)
-	b, originCalled := testCaptchaRoutingBouncer(t, client, nil)
+	b, originCalled := testCaptchaRoutingBouncer(t, client)
 	req := httptest.NewRequest(http.MethodHead, "http://app.example/fast.js", nil)
 	b.handleRemediationServeHTTP(httptest.NewRecorder(), testClientRequest(req, "192.0.2.10"), decisionscope.CaptchaValue, "cscli")
 	if !*originCalled {
@@ -251,7 +248,7 @@ func TestHandleRemediationServeHTTP_customResourceHEADReachesOrigin(t *testing.T
 
 func TestHandleRemediationServeHTTP_staleCacheGraceDoesNotPass(t *testing.T) {
 	client := testCaptchaClient(t, "/fast.js", "", "", nil)
-	b, originCalled := testCaptchaRoutingBouncer(t, client, nil)
+	b, originCalled := testCaptchaRoutingBouncer(t, client)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	rw := httptest.NewRecorder()
 	b.handleRemediationServeHTTP(rw, testClientRequest(req, "192.0.2.10"), decisionscope.CaptchaValue, "cscli")

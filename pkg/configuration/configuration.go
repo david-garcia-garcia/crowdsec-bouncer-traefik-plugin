@@ -334,28 +334,39 @@ func effectiveAppsecScheme(config *Config) string {
 	return config.CrowdsecLapiScheme
 }
 
+// validateCaptchaCredentialsAndTemplates checks captcha credentials and optional HTML templates.
 func validateCaptchaCredentialsAndTemplates(config *Config) error {
-	if config.CaptchaProvider != "" {
-		if err := validateCaptchaCredentials(config); err != nil {
-			return err
-		}
-		gateSecret, err := GetVariable(config, "CaptchaGateSecret")
-		if err != nil {
-			return err
-		}
-		if gateSecret == "" {
-			return errors.New("CaptchaGateSecret: cannot be empty when CaptchaProvider is set")
-		}
-		if config.CaptchaFilePath != "" {
-			if _, _, err := GetTemplate(config.CaptchaFilePath); err != nil {
-				return err
-			}
-		}
+	if err := validateConfiguredCaptcha(config); err != nil {
+		return err
 	}
 	if config.BanFilePath != "" {
 		if _, _, err := GetTemplate(config.BanFilePath); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// validateConfiguredCaptcha checks site/secret keys, gate secret, and captcha template when a provider is set.
+func validateConfiguredCaptcha(config *Config) error {
+	if config.CaptchaProvider == "" {
+		return nil
+	}
+	if err := validateCaptchaCredentials(config); err != nil {
+		return err
+	}
+	gateSecret, err := GetVariable(config, "CaptchaGateSecret")
+	if err != nil {
+		return err
+	}
+	if gateSecret == "" {
+		return errors.New("CaptchaGateSecret: cannot be empty when CaptchaProvider is set")
+	}
+	if config.CaptchaFilePath == "" {
+		return nil
+	}
+	if _, _, err := GetTemplate(config.CaptchaFilePath); err != nil {
+		return err
 	}
 	return nil
 }
