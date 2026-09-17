@@ -9,6 +9,6 @@ JobName: 2026-09-17-lapi-metrics-reporter-split
 | propose | [x] | [x] | 2026-09-17T15:55:22Z |
 | implement | [x] | [x] | 2026-09-17T16:11:46Z |
 | codereview | [x] | [x] | 2026-09-17T16:21:52Z |
-| devdocsimpact | [ ] | [ ] | |
+| devdocsimpact | [x] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
