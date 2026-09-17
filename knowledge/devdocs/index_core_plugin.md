@@ -28,7 +28,12 @@ description: How this plugin POSTs CrowdSec usage-metrics with origin and ip_typ
 ## LAPI reclaim key
 priority: normal
 local: core_plugin_lapi_reclaim-key.md
-description: How this plugin keys a reclaimed LAPI Client (session prefix plus first-wins settings hash).
+description: How this plugin keys a reclaimed LAPI Client (cursor SessionHex plus Redis store params).
+
+## LAPI scope union
+priority: normal
+local: core_plugin_lapi_scope-union.md
+description: How a shared stream Client unions live routers' header-scope maps for scopes= and the store filter.
 
 ## Stream lease
 priority: normal

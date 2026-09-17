@@ -8,7 +8,7 @@ destBranch: master
 qualify: qualified-with-gaps
 src: sha256:10369daa99517e845d0e61aab331f327398c3995fe891067d100b7938a5509db
 comments: none
-localTests: none
+localTests: passed
 requirement: requirement.md
 explore: explore.md
 change: cursor-only-reclaim-key
