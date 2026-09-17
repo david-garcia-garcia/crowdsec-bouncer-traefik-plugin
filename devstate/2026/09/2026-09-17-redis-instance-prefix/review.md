@@ -74,3 +74,14 @@ fixed: synced core_cache_client_isolated-store; moved change to archive/2026-09-
 
 skipped: n/a
 
+
+## pullrequest (2026-09-17)
+
+phase: pullrequest
+
+findings: Main CI lint gochecknoglobals on readProcessHostname at aabd3f0
+
+fixed: nolint test seam (3ea11e3); gitmoji PR title; delivery card on green CI
+
+skipped: n/a
+

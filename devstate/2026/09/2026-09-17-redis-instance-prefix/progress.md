@@ -11,4 +11,4 @@ JobName: 2026-09-17-redis-instance-prefix
 | codereview | [x] | [x] | 2026-09-17T12:25:54Z |
 | devdocsimpact | [x] | [x] | 2026-09-17T14:30:00Z |
 | archive | [x] | [x] | 2026-09-17T14:32:00Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-17T12:41:05Z |
