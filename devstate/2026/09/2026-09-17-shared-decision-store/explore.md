@@ -37,16 +37,16 @@
 ## Open questions
 
 - Q: What exact fields go into the DecisionStore reclaim key?
-  Decision: assumed — cursor identity is `streamSession` (mode, LAPI scheme/host/path, lapiKey, CAPI machine+password). Store parameters are Redis enabled/host/readHosts/password/database. Reclaim table key is `decisionstore:` + SessionHex + `:` + hash of those Redis fields. Redis/memory prefix is `SessionHex` of that cursor, not a separate key field. Exclude poller knobs (`updateIntervalSeconds`, `metricsUpdateIntervalSeconds`, `updateMaxFailure`, `decisionScopeHeaders`) and dropped Client fields (TLS, failure action, `StreamStartupBlock`, live-cache TTL, middleware name).
-  By: propose
+  Decision: resolved — cursor identity is `streamSession` (mode, LAPI scheme/host/path, lapiKey, CAPI machine+password). Store parameters are Redis enabled/host/readHosts/password/database. Reclaim table key is `decisionstore:` + SessionHex + `:` + hash of those Redis fields. Prefix is `SessionHex`. Poller knobs and dropped Client fields stay off the store key.
+  By: implement
 
 - Q: What is the memory-backend atomic-acquire algorithm?
   Decision: resolved — mutex on the DecisionStore (or the memory path of `cache.Client`) around miss+Set of `updated`. Vendored `ttl_map.Heap` Get and Set are separately locked; there is no compare-and-set. Do not use `atomic.Pointer[T]`.
   By: explore
 
 - Q: Does `pkg/cache.Client` grow Eval/SetNX, or does the lease live only on a new store type?
-  Decision: assumed — new DecisionStore type holds `cache.Client` and owns the lease API. `cache.Client` grows a narrow acquire that reaches SimpleRedis `Eval` (writer + prefix) or the memory mutex. Poller/stream logic stays off `cache.Client`. SimpleRedis `Set` is SET EX only (no NX); ticket wants EVAL, not a new SetNX wrapper.
-  By: propose
+  Decision: resolved — DecisionStore holds `cache.Client` and `AcquireLease`. `cache.Client.Acquire` reaches SimpleRedis `Eval` (writer + prefix) or the memory mutex. No SetNX wrapper.
+  By: implement
 
 - Q: Who already owns identity facts this work might set (visitor address, CrowdSec cursor, store location, Host/tenant)?
   Decision: resolved — visitor address is `pkg/ip.GetRemoteIP` (`core_plugin_ip`); do not parse `RemoteAddr`. CrowdSec cursor owner is LAPI’s bouncer row (hashed key + outbound IP LAPI sees); this process reuses `SessionHex` / `streamSession`, not a reconstructed hop. Store location owner is the Redis connection fields on config. Host/tenant: none.
@@ -57,29 +57,29 @@
   By: explore
 
 - Q: May `lapi.Client.Close` still call `cache.Client.Close` after the store is shared?
-  Decision: assumed — no. Only the store’s reclaim Close hook calls `cache.Client.Close()`. Client Close/Sleep stop tickers and HTTP only. `Cache()` still returns the shared `cache.Client` for Get/Set.
-  By: propose
+  Decision: resolved — no. Only the store’s reclaim Close hook calls `cache.Client.Close()`. `SimpleRedis.Close` is CAS-idempotent (`closed.CompareAndSwap`); `cache.Client.Close` is nil-safe. Safe to call more than once. Client Close/Sleep stop tickers and HTTP only.
+  By: implement
 
 - Q: What Redis/memory prefix do stream and live Clients use when they share a store?
-  Decision: assumed — the store’s prefix is `SessionHex` (cursor identity) for every mode on that store key. Do not keep live `IdentityHex` as the prefix; intervals would isolate live from stream.
-  By: propose
+  Decision: resolved — the store’s prefix is `SessionHex` for every mode. `CachePrefix` is `SessionHex`. Live `IdentityHex` stays the Client reclaim suffix only.
+  By: implement
 
 - Q: Does DecisionStore need Sleep/Wake hooks?
   Decision: resolved — Close only. The store has no ticker. Client Sleep already keeps cache warm. Last New-ctx holder of the store key grace-then-Close. Sisters use Close-only hooks for non-ticker cores.
   By: explore
 
 - Q: Does `decisionScopeHeaders` belong on the DecisionStore key?
-  Decision: assumed — no. It is a stream poller filter (`scopes=`), already first-wins on the Client settings hash. Live passes scopes per call. Putting it on the store key would block sharing remediations across header-map mismatches; leaving it off matches “cursor plus store parameters.”
-  By: propose
+  Decision: resolved — no. It stays off the store key (stream `scopes=` is Client first-wins). Live/none identity still omits it. Header-map mismatch shares remediations.
+  By: implement
 
 - Q: Should explore/propose add a `core_plugin_reclaim` usage packet?
   Decision: assumed — no. `std_go_reclaim` and `core_plugin_middleware` already document New-ctx reclaim. A third packet would fold the same unit. Isolated-cache usage is updated when the store is shared, not replaced by a reclaim glossary.
   By: propose
 
 - Q: When is the utilities research line “this plugin’s cache does not need EVAL” updated?
-  Decision: assumed — same change that lands `Eval`, in `knowledge/research/ext_traefik-middleware-utilities_packages/notes.md`. Do not rewrite that folder in explore.
-  By: propose
+  Decision: resolved — same change that landed `Eval`, in `knowledge/research/ext_traefik-middleware-utilities_packages/notes.md`.
+  By: implement
 
 - Q: What happens to `core_cache_client_isolated-store` / `core_cache_client.md` when two Clients share a map?
-  Decision: assumed — this change removes the isolated-per-Client unit for a shared store key. Rename spec `core_cache_client_isolated-store` → `core_cache_client_decision-store` (FindSpecHost removed unit). Update usage `core_cache_client.md` in the same change. Different store keys still isolate. Do not keep a process-wide package map.
-  By: propose
+  Decision: resolved — usage `core_cache_client.md` remapped to DecisionStore. Spec rename `core_cache_client_isolated-store` → `core_cache_client_decision-store` is in the OpenSpec change (archive sync later). Different store keys still isolate.
+  By: implement
