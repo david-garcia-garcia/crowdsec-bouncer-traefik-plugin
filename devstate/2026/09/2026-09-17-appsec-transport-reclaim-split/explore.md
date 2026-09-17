@@ -88,5 +88,5 @@ Client IP is already owned: `pkg/ip.GetRemoteIP` → `bouncer` `clientRequest` (
   By: explore
 
 - Q: Will a sibling merge move `origin/master` before implement or pullrequest?
-  Decision: assumed — run Sync (fetch + merge `origin/master`, do not rebase a pushed branch) before implement and before pullrequest; re-verify after merge.
-  By: explore
+  Decision: resolved — Sync before implement: `origin/master` still `e6cc9ab`, already merged. Repeat Sync before pullrequest.
+  By: implement
