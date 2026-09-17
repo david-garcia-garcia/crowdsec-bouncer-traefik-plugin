@@ -382,8 +382,8 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 				nextCalled = true
 			}),
-			log:        logger.New("ERROR", ""),
-			lapiClient: lapi.NewTestLapiFailureActionClient(configuration.FailureActionPassthrough),
+			log:               logger.New("ERROR", ""),
+			lapiFailureAction: configuration.FailureActionPassthrough,
 		}
 		b.applyLapiFailureAction(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), configuration.ReasonTECH, lapi.OriginPluginTechStreamFail)
 		if !nextCalled {
@@ -397,7 +397,7 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			}),
 			remediationStatusCode: http.StatusForbidden,
 			log:                   logger.New("ERROR", ""),
-			lapiClient:            lapi.NewTestLapiFailureActionClient(configuration.FailureActionBan),
+			lapiFailureAction:     configuration.FailureActionBan,
 		}
 		recorder := httptest.NewRecorder()
 		b.applyLapiFailureAction(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)

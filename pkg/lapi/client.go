@@ -51,10 +51,7 @@ type Client struct {
 	updateInterval         int64
 	metricsInterval        int64
 	updateMaxFailure       int64
-	lapiFailureAction      string
-	defaultDecisionTimeout int64
 	crowdsecStreamRoute    string
-	redisUnreachableBlock  bool
 	decisionScopeHeaders   map[string]string // CrowdSec header scope → request header
 	sessionKey             string            // reclaim SessionKey (stream/alone) or Key (live/none)
 
@@ -131,9 +128,6 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		updateInterval:          config.UpdateIntervalSeconds,
 		metricsInterval:         config.MetricsUpdateIntervalSeconds,
 		updateMaxFailure:        config.UpdateMaxFailure,
-		lapiFailureAction:       configuration.EffectiveFailureAction(config.CrowdsecLapiFailureAction),
-		defaultDecisionTimeout:  config.DefaultDecisionSeconds,
-		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
 		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		sessionKey:              reclaimSessionKey(config),
@@ -329,16 +323,6 @@ func (c *Client) storeRangeMembership(index string) {
 // StreamHealthy is true while stream polling is succeeding.
 func (c *Client) StreamHealthy() bool {
 	return c.isCrowdsecStreamHealthy
-}
-
-// LapiFailureAction is the fallback when LAPI does not return a usable verdict.
-func (c *Client) LapiFailureAction() string {
-	return c.lapiFailureAction
-}
-
-// RedisUnreachableBlock is the redis fail-closed flag for this connection.
-func (c *Client) RedisUnreachableBlock() bool {
-	return c.redisUnreachableBlock
 }
 
 // StreamFetches is how many times this connection actually called the stream endpoint.

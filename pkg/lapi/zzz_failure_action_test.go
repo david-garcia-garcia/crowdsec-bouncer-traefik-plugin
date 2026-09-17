@@ -29,7 +29,7 @@ func Test_liveLookup_lapiErrorIsNotABan(t *testing.T) {
 		log:            logger.New("ERROR", ""),
 	}
 	attachTestTransport(client, lapi.Client(), crowdsecLapiHeader, "")
-	value, err := client.LiveLookup("1.2.3.4", nil)
+	value, err := client.LiveLookup("1.2.3.4", nil, 0)
 	if err == nil {
 		t.Fatal("live LAPI 500 expected an error")
 	}
