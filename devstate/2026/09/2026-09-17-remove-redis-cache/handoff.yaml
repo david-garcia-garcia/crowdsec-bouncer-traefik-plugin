@@ -1,0 +1,15 @@
+issueKey: 2026-09-17-remove-redis-cache
+jobName: 2026-09-17-remove-redis-cache
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:8faeada6f18fdfe1027ee3bb5e7c2e31033b3546caed2e13488ffa0b5ede688e
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
