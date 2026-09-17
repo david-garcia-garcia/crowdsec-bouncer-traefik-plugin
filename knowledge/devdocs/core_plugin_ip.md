@@ -11,7 +11,7 @@ In-tree radix of CIDRs (`pkg/iplookup.Helper`). Insert at construction; `IsConta
 _Avoid_: range-index, per-CIDR cache key, `InNetwork` (one network)
 
 **GetRemoteIP**:
-The owner of the client address for a request. Walks the custom forwarded header most-recent-first against the trusted-hop pool, then the host of `RemoteAddr`. Also yields that address as `net.IP` when parseable.
+The owner of the client address for a request. Requires the host from `req.RemoteAddr` to be in the trusted-hop pool before honoring forwarded headers; when the pool is empty or the peer is untrusted, returns `RemoteAddr` only. Otherwise walks the custom forwarded header most-recent-first against the trusted-hop pool, then the host of `RemoteAddr` when every hop is trusted or the header is empty. Also yields that address as `net.IP` when parseable.
 _Avoid_: parsing `RemoteAddr` on the connection, a second X-Forwarded-For walk, Traefik ipstrategy as a second owner
 
 **clientRequest**:
