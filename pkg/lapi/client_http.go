@@ -2,14 +2,17 @@ package lapi
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
@@ -31,6 +34,74 @@ type Login struct {
 	Expire string `json:"expire"`
 }
 
+// transport is LAPI HTTP plus the request header name and CAPI/LAPI key.
+// Stored on Client as atomic.Value: Yaegi v0.16 cannot take atomic.Pointer[T]
+// from another package as a struct field.
+type transport struct {
+	httpClient                  *http.Client
+	header                      string
+	key                         string
+	httpTimeoutSeconds          int64
+	lapiTLSInsecureVerify       bool
+	lapiTLSCertificateAuthority string
+	lapiTLSCertificateBouncer   string
+}
+
+// newTransport builds HTTP+auth from cfg. Alone uses the CAPI header and no LAPI TLS.
+func newTransport(config *configuration.Config, log *slog.Logger) (*transport, error) {
+	header := crowdsecLapiHeader
+	var tlsConfig *tls.Config
+	if config.CrowdsecMode == configuration.AloneMode {
+		header = crowdsecCapiHeader
+	} else {
+		var err error
+		tlsConfig, err = configuration.GetTLSConfigCrowdsec(config, log, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &transport{
+		httpClient: &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConns:        10,
+				MaxIdleConnsPerHost: 10,
+				IdleConnTimeout:     30 * time.Second,
+				TLSClientConfig:     tlsConfig,
+			},
+			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
+		},
+		header:                      header,
+		key:                         config.CrowdsecLapiKey,
+		httpTimeoutSeconds:          config.HTTPTimeoutSeconds,
+		lapiTLSInsecureVerify:       config.CrowdsecLapiTLSInsecureVerify,
+		lapiTLSCertificateAuthority: config.CrowdsecLapiTLSCertificateAuthority,
+		lapiTLSCertificateBouncer:   config.CrowdsecLapiTLSCertificateBouncer,
+	}, nil
+}
+
+// clientCertCount is how many client certificates the HTTP TLS config holds.
+func (t *transport) clientCertCount() int {
+	if t == nil || t.httpClient == nil {
+		return 0
+	}
+	httpTransport, ok := t.httpClient.Transport.(*http.Transport)
+	if !ok || httpTransport.TLSClientConfig == nil {
+		return 0
+	}
+	return len(httpTransport.TLSClientConfig.Certificates)
+}
+
+// fieldsDiffer reports whether timeout or LAPI TLS extras changed.
+func (t *transport) fieldsDiffer(other *transport) bool {
+	if t == nil || other == nil {
+		return t != other
+	}
+	return t.httpTimeoutSeconds != other.httpTimeoutSeconds ||
+		t.lapiTLSInsecureVerify != other.lapiTLSInsecureVerify ||
+		t.lapiTLSCertificateAuthority != other.lapiTLSCertificateAuthority ||
+		t.lapiTLSCertificateBouncer != other.lapiTLSCertificateBouncer
+}
+
 func closeIdle(httpClient *http.Client) {
 	if httpClient == nil {
 		return
@@ -44,6 +115,45 @@ func isReverseProxyError(statusCode int) bool {
 	return statusCode == http.StatusBadGateway ||
 		statusCode == http.StatusServiceUnavailable ||
 		statusCode == http.StatusGatewayTimeout
+}
+
+// currentTransport is the stored HTTP+auth snapshot, or nil before the first Store.
+func (c *Client) currentTransport() *transport {
+	stored := c.transport.Load()
+	if stored == nil {
+		return nil
+	}
+	loaded, _ := stored.(*transport)
+	return loaded
+}
+
+// AdoptTransport replaces LAPI HTTP+auth with cfg and idle-closes the previous client.
+// Last Store wins. Returns whether timeout or TLS extras changed.
+func (c *Client) AdoptTransport(cfg *configuration.Config) (bool, error) {
+	next, err := newTransport(cfg, c.log)
+	if err != nil {
+		return false, err
+	}
+	// Preserve a CAPI token already written on the live transport when the
+	// new cfg still has an empty LAPI key (alone mode after getToken).
+	if previous := c.currentTransport(); previous != nil && next.key == "" && previous.key != "" {
+		next.key = previous.key
+	}
+	replaced := next.fieldsDiffer(c.currentTransport())
+	previous, _ := c.transport.Swap(next).(*transport)
+	if previous != nil {
+		closeIdle(previous.httpClient)
+	}
+	if replaced && c.log != nil {
+		c.log.Info("lapi transport replaced",
+			"sessionKey", c.sessionKey,
+			"httpTimeoutSeconds", next.httpTimeoutSeconds,
+			"lapiTlsInsecureVerify", next.lapiTLSInsecureVerify,
+			"lapiTlsCa", next.lapiTLSCertificateAuthority != "",
+			"lapiTlsCert", next.lapiTLSCertificateBouncer != "",
+		)
+	}
+	return replaced, nil
 }
 
 func (c *Client) getToken() error {
@@ -68,7 +178,14 @@ func (c *Client) getToken() error {
 		return fmt.Errorf("getToken:parsingBody %w", err)
 	}
 	if login.Code == http.StatusOK && len(login.Token) > 0 {
-		c.crowdsecKey = login.Token
+		// Write the token on the stored transport, not a write-once Client field.
+		current := c.currentTransport()
+		if current == nil {
+			return errors.New("getToken: missing transport")
+		}
+		updated := *current
+		updated.key = login.Token
+		c.transport.Store(&updated)
 		return nil
 	}
 	c.log.Warn("getToken statusCode:" + strconv.Itoa(login.Code))
@@ -76,16 +193,20 @@ func (c *Client) getToken() error {
 }
 
 func (c *Client) crowdsecQuery(stringURL string, data []byte) ([]byte, error) {
+	current := c.currentTransport()
+	if current == nil || current.httpClient == nil {
+		return nil, errors.New("crowdsecQuery: missing transport")
+	}
 	var req *http.Request
 	if len(data) > 0 {
 		req, _ = http.NewRequest(http.MethodPost, stringURL, bytes.NewBuffer(data))
 	} else {
 		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
 	}
-	req.Header.Set(c.crowdsecHeader, c.crowdsecKey)
+	req.Header.Set(current.header, current.key)
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+c.pluginVersion)
 
-	res, err := c.httpClient.Do(req)
+	res, err := current.httpClient.Do(req)
 	if err != nil || isReverseProxyError(res.StatusCode) {
 		return nil, fmt.Errorf("crowdsecQuery:unreachable url:%s %w", stringURL, err)
 	}

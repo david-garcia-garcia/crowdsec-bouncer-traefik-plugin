@@ -48,9 +48,14 @@ When stream or alone mode is unhealthy, cache hits SHALL still apply. A cache mi
 - **WHEN** the stream is unhealthy and cache has an active ban for the client IP
 - **THEN** that ban still applies regardless of `crowdsecLapiFailureAction`
 
-### Requirement: CrowdsecLapiFailureAction is on the connection identity
-Routers that share one LAPI backend SHALL share `crowdsecLapiFailureAction` (it is part of the LAPI reclaim identity with `UpdateMaxFailure`). Two routers MUST NOT disagree on LAPI fallback against one `lapi.Client`.
+### Requirement: CrowdsecLapiFailureAction is per-router on Bouncer
+Routers that share one LAPI Client SHALL each apply their own `crowdsecLapiFailureAction`. The action MUST NOT be part of LAPI reclaim identity. Two routers MAY disagree on LAPI fallback against one `lapi.Client`. The Client MUST NOT expose a failure-action accessor.
 
-#### Scenario: Same LAPI action is shared
-- **WHEN** two middlewares reclaim the same `lapi.Client`
-- **THEN** both use the same `crowdsecLapiFailureAction`
+#### Scenario: Two routers disagree on LAPI action
+- **WHEN** two middlewares reclaim the same `lapi.Client` and set different `crowdsecLapiFailureAction` values
+- **THEN** each router applies its own action on a live LAPI error or stream-unhealthy cache miss
+
+#### Scenario: Failure action is not on Client identity
+- **WHEN** two live `New` calls share LAPI URL and key and differ only on `crowdsecLapiFailureAction`
+- **THEN** they reclaim the same Client
+- **AND** the Client has no failure-action getter

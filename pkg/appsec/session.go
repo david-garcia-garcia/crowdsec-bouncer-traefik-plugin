@@ -15,29 +15,23 @@ import (
 const keyPrefix = "appsec:"
 
 // identity is the reclaim-key payload for one AppSec listener.
+// HTTP timeout and AppSec TLS are omitted so a reload of those knobs
+// reuses the Client. Per-router failure action is not included either.
 type identity struct {
-	Scheme                  string `json:"scheme"`
-	Host                    string `json:"host"`
-	Path                    string `json:"path"`
-	Key                     string `json:"key"`
-	BodyLimit               int64  `json:"bodyLimit"`
-	HTTPTimeoutSeconds      int64  `json:"httpTimeoutSeconds"`
-	TLSInsecureVerify       bool   `json:"tlsInsecureVerify"`
-	TLSCertificateAuthority string `json:"tlsCa"`
-	TLSCertificateBouncer   string `json:"tlsCert"`
+	Scheme    string `json:"scheme"`
+	Host      string `json:"host"`
+	Path      string `json:"path"`
+	Key       string `json:"key"`
+	BodyLimit int64  `json:"bodyLimit"`
 }
 
 func identityFrom(cfg *configuration.Config) identity {
 	return identity{
-		Scheme:                  cfg.CrowdsecAppsecScheme,
-		Host:                    cfg.CrowdsecAppsecHost,
-		Path:                    cfg.CrowdsecAppsecPath,
-		Key:                     cfg.CrowdsecAppsecKey,
-		BodyLimit:               cfg.CrowdsecAppsecBodyLimit,
-		HTTPTimeoutSeconds:      cfg.HTTPTimeoutSeconds,
-		TLSInsecureVerify:       cfg.CrowdsecAppsecTLSInsecureVerify,
-		TLSCertificateAuthority: cfg.CrowdsecAppsecTLSCertificateAuthority,
-		TLSCertificateBouncer:   cfg.CrowdsecAppsecTLSCertificateBouncer,
+		Scheme:    cfg.CrowdsecAppsecScheme,
+		Host:      cfg.CrowdsecAppsecHost,
+		Path:      cfg.CrowdsecAppsecPath,
+		Key:       cfg.CrowdsecAppsecKey,
+		BodyLimit: cfg.CrowdsecAppsecBodyLimit,
 	}
 }
 
@@ -63,12 +57,12 @@ func Key(cfg *configuration.Config) string {
 
 // Open reclaims an AppSec Client by listener identity.
 func Open(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
-	stored, openErr := reclaim.OpenWithGrace(ctx, Key(cfg), log, ReclaimGraceDuration, func() (any, error) {
+	stored, openErr := reclaim.OpenWithHooks(ctx, Key(cfg), log, func() (any, reclaim.Hooks, error) {
 		client, err := New(cfg, log, pluginVersion)
 		if err != nil {
-			return nil, err
+			return nil, reclaim.Hooks{}, err
 		}
-		return &reclaim.Wrapped{Value: client, Sleep: client.Sleep, Wake: client.Wake, Close: client.Close}, nil
+		return client, reclaim.Hooks{Sleep: client.Sleep, Wake: client.Wake, Close: client.Close}, nil
 	})
 	if openErr != nil {
 		return nil, openErr
@@ -76,6 +70,10 @@ func Open(ctx context.Context, cfg *configuration.Config, log *slog.Logger, midd
 	client, ok := stored.(*Client)
 	if !ok {
 		return nil, fmt.Errorf("%s: reclaim: want *appsec.Client, got %T", middlewareName, stored)
+	}
+	_, adoptErr := client.AdoptTransport(cfg)
+	if adoptErr != nil {
+		return nil, adoptErr
 	}
 	return client, nil
 }

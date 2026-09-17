@@ -120,6 +120,9 @@ type Config struct {
 	CaptchaSiteKeyFile                         string            `json:"captchaSiteKeyFile,omitempty"`
 	CaptchaSecretKey                           string            `json:"captchaSecretKey,omitempty"`
 	CaptchaSecretKeyFile                       string            `json:"captchaSecretKeyFile,omitempty"`
+	CaptchaGateSecret                          string            `json:"captchaGateSecret,omitempty"`
+	CaptchaGateSecretFile                      string            `json:"captchaGateSecretFile,omitempty"`
+	CaptchaGateBindIP                          bool              `json:"captchaGateBindIp,omitempty"`
 	CaptchaGracePeriodSeconds                  int64             `json:"captchaGracePeriodSeconds,omitempty"`
 }
 
@@ -190,6 +193,7 @@ func New() *Config {
 		CaptchaCustomResponse:           "",
 		CaptchaSiteKey:                  "",
 		CaptchaSecretKey:                "",
+		CaptchaGateBindIP:               true,
 		CaptchaGracePeriodSeconds:       1800,
 		CaptchaFilePath:                 "/captcha.html",
 		BanFilePath:                     "",
@@ -319,6 +323,13 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		}
 		if _, err := GetVariable(config, "CaptchaSecretKey"); err != nil {
 			return err
+		}
+		gateSecret, err := GetVariable(config, "CaptchaGateSecret")
+		if err != nil {
+			return err
+		}
+		if gateSecret == "" {
+			return errors.New("CaptchaGateSecret: cannot be empty when CaptchaProvider is set")
 		}
 		if config.CaptchaFilePath != "" {
 			if _, _, err := GetTemplate(config.CaptchaFilePath); err != nil {

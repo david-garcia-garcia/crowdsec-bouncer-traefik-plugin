@@ -35,3 +35,4 @@ Allowlist of root + domain: `openspec/specs/domains.md`.
 
 - logger
 - reclaim
+- test

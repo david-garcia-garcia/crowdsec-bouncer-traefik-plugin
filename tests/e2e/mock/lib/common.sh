@@ -123,7 +123,7 @@ assert_status() {
   local got
   got=$(curl -s -o /dev/null -w '%{http_code}' "$@" "$url")
   if [[ "$got" != "$expected" ]]; then
-    echo "assert_status: $url expected $expected, got $got" >&2
+    echo "assert_status: $url expected $expected, got $got" | tee "$WORKDIR/failure.txt" >&2
     return 1
   fi
 }
@@ -137,7 +137,7 @@ assert_header() {
   got=$(curl -s -D - -o /dev/null "$@" "$url" | tr -d '\r' \
     | awk -v h="${header,,}" -F': ' 'tolower($1) == h { print $2; exit }')
   if [[ "$got" != "$expected" ]]; then
-    echo "assert_header: $url header $header expected \"$expected\", got \"$got\"" >&2
+    echo "assert_header: $url header $header expected \"$expected\", got \"$got\"" | tee "$WORKDIR/failure.txt" >&2
     return 1
   fi
 }
@@ -150,8 +150,10 @@ assert_body_contains() {
   local body
   body=$(curl -s "$@" "$url")
   if ! grep -q "$needle" <<<"$body"; then
-    echo "assert_body_contains: $url expected to contain \"$needle\", got:" >&2
-    echo "$body" >&2
+    {
+      echo "assert_body_contains: $url expected to contain \"$needle\", got:"
+      echo "$body"
+    } | tee "$WORKDIR/failure.txt" >&2
     return 1
   fi
 }
@@ -271,6 +273,12 @@ stop_stack() {
 }
 
 dump_diagnostics() {
+  echo "=== failure.txt ==="
+  cat "$WORKDIR/failure.txt" 2>/dev/null || true
+  echo "=== solve.headers ==="
+  cat "$WORKDIR/solve.headers" 2>/dev/null || true
+  echo "=== solve.body ==="
+  cat "$WORKDIR/solve.body" 2>/dev/null || true
   echo "=== traefik.log ==="
   cat "$WORKDIR/traefik.log" 2>/dev/null || true
   echo "=== mock.log ==="
