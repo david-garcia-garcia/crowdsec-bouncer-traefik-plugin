@@ -10,6 +10,7 @@ import (
 
 const unknownCacheInstanceID = "unknown-instance"
 
+//nolint:gochecknoglobals // test seam for hostname failure in ResolveCacheInstanceIdentity
 var readProcessHostname = os.Hostname
 
 // ResolveCacheInstanceIdentity sets RedisCacheEffectiveInstanceID once per cfg.
