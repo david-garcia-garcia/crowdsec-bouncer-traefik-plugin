@@ -50,3 +50,4 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 - Bot-detection cases need Crowdsec `v1.8.0`, collection `crowdsecurity/appsec-bot-challenge`, `acquis.d` on 7423, and a Traefik `PathPrefix(/crowdsec-internal/challenge)` through the same AppSec middleware. A stale `crowdsec-config-test` volume from 1.7.8 can hide the new acquisition — recreate the volume after the image bump.
 - The test LAPI key `40796d93c2958f9e58345514e67740e5` is a fixture, not a production secret.
 - The file-provider stream bouncer uses a second fixture key (`BOUNCER_KEY_TRAEFIK_SCOPES`). Do not share one LAPI stream key with the docker-label `/stream` middleware or the polls race.
+- Captcha solve uses `captchaProvider: custom` and compose service `dummy-captcha` (`POST /siteverify` always `{"success":true}`). Pester POSTs `dummy-captcha-response` and asserts `crowdsec_captcha_gate`. Do not call hCaptcha/Turnstile.

@@ -1,6 +1,7 @@
 package lapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -50,13 +51,13 @@ func (c *Client) handleStreamTicker() {
 		c.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", c.updateFailure, c.isCrowdsecStreamHealthy, err.Error()))
 		if c.updateMaxFailure != -1 && c.updateFailure >= c.updateMaxFailure && c.isCrowdsecStreamHealthy {
 			c.isCrowdsecStreamHealthy = false
-			c.logInfo(MsgStreamUnhealthy)
+			c.logInfo(MsgStreamUnhealthy, "unhealthy")
 			c.log.Error(fmt.Sprintf("handleStreamTicker:error updateFailure:%d %s", c.updateFailure, err.Error()))
 		}
 		c.updateFailure++
 	} else {
 		if !c.isCrowdsecStreamHealthy {
-			c.logInfo(MsgStreamHealthy)
+			c.logInfo(MsgStreamHealthy, "healthy")
 		}
 		c.isCrowdsecStreamHealthy = true
 		c.updateFailure = 0
@@ -64,21 +65,21 @@ func (c *Client) handleStreamTicker() {
 }
 
 func (c *Client) handleStreamCache() error {
-	_, err := c.cacheClient.Get(cacheTimeoutKey)
-	if err == nil {
+	leaseDuration := c.updateInterval - 1
+	if leaseDuration < 1 {
+		leaseDuration = 1
+	}
+	// One acquire: Redis Eval or memory mutex. Do not Get-then-Set.
+	won, err := c.Cache().Acquire(context.Background(), cacheTimeoutKey, decisionscope.NoBannedValue, leaseDuration)
+	if err != nil {
+		return err
+	}
+	if !won {
 		c.log.Debug("handleStreamCache:alreadyUpdated")
 		c.hydrateRangeMembership()
 		c.isCrowdsecStreamStartup = false
 		return nil
 	}
-	if err.Error() != cache.CacheMiss {
-		return err
-	}
-	leaseDuration := c.updateInterval - 1
-	if leaseDuration < 1 {
-		leaseDuration = 1
-	}
-	c.cacheClient.Set(cacheTimeoutKey, cache.NoBannedValue, leaseDuration)
 	streamRouteURL := url.URL{
 		Scheme:   c.crowdsecScheme,
 		Host:     c.crowdsecHost,
@@ -124,7 +125,7 @@ func (c *Client) handleStreamCache() error {
 		}
 		c.deleteStreamDecision(decision)
 	}
-	decisionscope.ApplyRangeBatch(c.cacheClient, rangeUpserts, rangeRemovals)
+	decisionscope.ApplyRangeBatch(c.Cache(), rangeUpserts, rangeRemovals)
 	c.hydrateRangeMembership()
 	c.log.Debug("handleStreamCache:updated")
 	c.isCrowdsecStreamStartup = false

@@ -2,15 +2,17 @@
 package captcha
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
 	"text/template"
+	"time"
 
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
@@ -19,11 +21,12 @@ type Client struct {
 	Valid                   bool
 	siteKey                 string
 	secretKey               string
+	gateSecret              []byte
+	gateBindIP              bool
 	remediationCustomHeader string
 	gracePeriodSeconds      int64
 	templateContentType     string
 	template                *template.Template
-	cacheClient             *cache.Client
 	httpClient              *http.Client
 	log                     *slog.Logger
 	infoProvider            *infoProvider
@@ -60,7 +63,7 @@ var infoProviders = map[string]*infoProvider{
 }
 
 // New Initialize captcha client.
-func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, key, response, validate, siteKey, secretKey, gateSecret string, gateBindIP bool, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
@@ -74,6 +77,8 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 	c.infoProvider = info
 	c.siteKey = siteKey
 	c.secretKey = secretKey
+	c.gateSecret = []byte(gateSecret)
+	c.gateBindIP = gateBindIP
 	c.remediationCustomHeader = remediationCustomHeader
 	template, contentType, _ := configuration.GetTemplate(captchaTemplatePath)
 	c.template = template
@@ -81,7 +86,6 @@ func (c *Client) New(log *slog.Logger, cacheClient *cache.Client, httpClient *ht
 	c.gracePeriodSeconds = gracePeriodSeconds
 	c.log = log
 	c.httpClient = httpClient
-	c.cacheClient = cacheClient
 	return nil
 }
 
@@ -95,7 +99,8 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	}
 	if valid {
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
-		c.cacheClient.Set(remoteIP+"_captcha", cache.CaptchaDoneValue, c.gracePeriodSeconds)
+		value := mintGateValue(c.gateSecret, c.gateBindIP, remoteIP, time.Now())
+		setGateCookie(rw, r, value, c.gracePeriodSeconds)
 		if c.remediationCustomHeader != "" {
 			rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
 		}
@@ -117,10 +122,9 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	}
 }
 
-// Check Verify if the captcha is already done.
-func (c *Client) Check(remoteIP string) bool {
-	value, _ := c.cacheClient.Get(remoteIP + "_captcha")
-	passed := value == cache.CaptchaDoneValue
+// Check Verify if the captcha is already done via gate cookie.
+func (c *Client) Check(r *http.Request, remoteIP string) bool {
+	passed := validateGateValue(c.gateSecret, c.gateBindIP, remoteIP, gateCookieValue(r), time.Now(), c.gracePeriodSeconds)
 	c.log.Debug(fmt.Sprintf("captcha:Check ip:%s pass:%v", remoteIP, passed))
 	return passed
 }
@@ -129,13 +133,46 @@ type responseProvider struct {
 	Success bool `json:"success"`
 }
 
+// captchaResponseFromRequest reads the provider token from query, POST form, or
+// raw urlencoded body. Traefik's Yaegi request wrapper often leaves Form empty
+// after FormValue, so the body is parsed directly when ParseForm yields nothing.
+func captchaResponseFromRequest(r *http.Request, field string) string {
+	if field == "" {
+		return ""
+	}
+	if token := r.URL.Query().Get(field); token != "" {
+		return token
+	}
+
+	var raw []byte
+	if r.Body != nil {
+		raw, _ = io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		r.Body = io.NopCloser(bytes.NewReader(raw))
+	}
+
+	if err := r.ParseForm(); err == nil {
+		if token := r.PostForm.Get(field); token != "" {
+			return token
+		}
+		if token := r.Form.Get(field); token != "" {
+			return token
+		}
+	}
+
+	values, err := url.ParseQuery(string(raw))
+	if err != nil {
+		return ""
+	}
+	return values.Get(field)
+}
+
 // Validate Verify the captcha from provider API.
 func (c *Client) Validate(r *http.Request) (bool, error) {
 	if r.Method != http.MethodPost {
 		c.log.Debug("captcha:Validate invalid method: " + r.Method)
 		return false, nil
 	}
-	var response = r.FormValue(c.infoProvider.response)
+	response := captchaResponseFromRequest(r, c.infoProvider.response)
 	if response == "" {
 		c.log.Debug("captcha:Validate no captcha response found in request")
 		return false, nil
@@ -145,14 +182,13 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	body.Add("response", response)
 	res, err := c.httpClient.PostForm(c.infoProvider.validate, body)
 	if err != nil {
+		c.log.Error("captcha:Validate " + err.Error())
 		return false, err
 	}
 	defer func() {
-		if err = res.Body.Close(); err != nil {
-			c.log.Error("captcha:Validate " + err.Error())
-		}
+		_ = res.Body.Close()
 	}()
-	if !strings.Contains(res.Header.Get("Content-Type"), "application/json") {
+	if !strings.HasPrefix(res.Header.Get("Content-Type"), "application/json") {
 		c.log.Debug("captcha:Validate responseType:noJson")
 		return false, nil
 	}

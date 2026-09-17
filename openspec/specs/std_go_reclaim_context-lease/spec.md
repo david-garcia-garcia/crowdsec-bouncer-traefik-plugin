@@ -12,7 +12,7 @@ The table source SHALL import only Go standard-library packages. It MUST store `
 - **THEN** every import path is a Go standard-library package
 
 ### Requirement: Process table is a singleton
-The package SHALL expose one process-wide table (`Default` / package `Open`). Independent keys MUST NOT share an incarnation. Callers SHALL type-assert the value `Open` returns.
+The package SHALL expose one process-wide table (`Default` / package `Open`). That table SHALL be constructed with `ProcessGrace` (30 seconds). Independent keys MUST NOT share an incarnation. Callers SHALL type-assert the value `Open` returns.
 
 #### Scenario: Two keys stay independent
 - **WHEN** key A and key B are both opened
@@ -20,7 +20,7 @@ The package SHALL expose one process-wide table (`Default` / package `Open`). In
 - **AND** disposing A does not dispose B
 
 ### Requirement: Open creates once and binds a context
-`Open(ctx, key, logger, create)` SHALL create on first call for a key, bind `ctx` as a holder, and panic if `ctx` is nil. `Open` SHALL return an error if `logger` is nil. `create` SHALL take no arguments. If the value has `Close()`, or `create` returned `*Wrapped` with `Close` set, the table SHALL call that Close when the incarnation ends. A later `Open` for the same key (live or in grace) SHALL return the stored value (the inner value when `*Wrapped`) and MUST NOT run `create`. `create` in another package MUST return `*Wrapped` for Sleep/Wake/Close: Yaegi v0.16 panics on asserting a foreign concrete type to those interfaces.
+`Open(ctx, key, logger, create, hooks)` SHALL create on first call for a key, bind `ctx` as a holder, and panic if `ctx` is nil. `Open` SHALL return an error if `logger` is nil. `create` SHALL take no arguments. Hooks SHALL be `reclaim.Hooks` stored at put (`Sleep` / `Wake` / `Close`). A later `Open` for the same key (live or in grace) SHALL return the stored value and MUST NOT run `create`. Callers in another package MUST pass Hooks as funcs: Yaegi v0.16 panics on asserting a foreign concrete type to closer/sleeper. The package MUST NOT export `*Wrapped` or `OpenWithGrace`.
 
 #### Scenario: Two holders one incarnation
 - **WHEN** `Open` creates a value for a key
@@ -29,19 +29,13 @@ The package SHALL expose one process-wide table (`Default` / package `Open`). In
 - **AND** `create` ran once
 
 ### Requirement: Cancel then open within grace does not dispose
-When every bound context for a key is Done, the table SHALL wait grace before canceling the lifetime. An `Open` in that window MUST reclaim without `create`. Zero grace SHALL dispose as soon as the last holder is gone. Negative table grace SHALL become 10 seconds. `OpenWithGrace` SHALL set the wait for that put. Values opened with `Open` SHALL use the table grace. The table-wide default MUST NOT be changed to special-case one stored type.
+When every bound context for a key is Done, the table SHALL wait the table grace before canceling the lifetime. An `Open` in that window MUST reclaim without `create`. Zero grace SHALL dispose as soon as the last holder is gone. Negative table grace SHALL become 10 seconds. Values opened with `Open` SHALL use the table grace. There is no per-put grace override.
 
 #### Scenario: Reclaim before grace
 - **WHEN** all contexts for a key are Done
 - **AND** a new `Open` for that key occurs before grace ends
 - **THEN** the stored value is returned
 - **AND** `create` does not run
-
-#### Scenario: OpenWithGrace overrides table
-- **WHEN** `OpenWithGrace` is called with 30 milliseconds
-- **AND** the table grace is 1 second
-- **AND** all contexts for that key are Done
-- **THEN** the incarnation is disposed before the table grace elapses
 
 ### Requirement: Peek reports holders and sleep without binding
 `Peek(key)` SHALL return a `View` with the stored value, the live holder count, whether the slot is sleeping (grace armed), and whether the key exists. It MUST NOT add a holder and MUST NOT run `create`.
@@ -52,21 +46,21 @@ When every bound context for a key is Done, the table SHALL wait grace before ca
 - **AND** the incarnation is not disposed by `Peek`
 
 ### Requirement: Last holder Sleeps; Open during grace Wakes; grace Close()s
-When every bound context for a key is Done, if the value has `Sleep()` or `*Wrapped.Sleep` is set the table SHALL call it, then wait grace before `Close()`. An `Open` in that window MUST Wake (if the value has `Wake()` or `*Wrapped.Wake` is set) without `create`. Callers MUST NOT Close or delete a slot.
+When every bound context for a key is Done, if `hooks.Sleep` is set the table SHALL call it, then wait grace before `hooks.Close`. An `Open` in that window MUST Wake (`hooks.Wake`) without `create`. Callers MUST NOT Close or delete a slot.
 
 #### Scenario: Sleep then Wake on reclaim
 - **WHEN** all contexts for a key are Done
-- **AND** the value implements Sleep/Wake or `create` returned `*Wrapped` with those funcs
+- **AND** the put stored Sleep/Wake hooks
 - **AND** a new `Open` for that key occurs before grace ends
 - **THEN** `Sleep` ran once
 - **AND** `Wake` ran
 - **AND** `create` does not run
 - **AND** `Close` has not run
 
-#### Scenario: Foreign type uses Wrapped
-- **WHEN** `create` in another package returns `*Wrapped` with Sleep/Wake/Close funcs
+#### Scenario: Foreign type uses Hooks
+- **WHEN** `create` in another package returns a value and the Open call passes Sleep/Wake/Close funcs
 - **THEN** the table calls those funcs on last holder / reclaim / dispose
-- **AND** `Open` and `Peek` return the inner `Value`
+- **AND** `Open` and `Peek` return that value
 
 ### Requirement: PeekLivePrefix reports a live slot under a key prefix
 `PeekLivePrefix(prefix)` SHALL return a `View` for one stored value whose key starts with prefix and whose holder count is greater than zero. It MUST NOT add a holder, MUST NOT run `create`, and MUST ignore sleeping slots. When several live keys match, the lexicographically smallest key SHALL be returned. An empty prefix MUST miss.
