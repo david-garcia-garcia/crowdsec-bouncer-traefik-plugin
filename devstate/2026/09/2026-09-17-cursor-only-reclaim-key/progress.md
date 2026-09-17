@@ -8,7 +8,7 @@ JobName: 2026-09-17-cursor-only-reclaim-key
 | explore | [x] | [x] | 2026-09-17T18:06:13Z |
 | propose | [x] | [x] | 2026-09-17T18:45:17Z |
 | implement | [x] | [x] | 2026-09-17T19:25:29Z |
-| codereview | [ ] | [ ] | |
+| codereview | [x] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
