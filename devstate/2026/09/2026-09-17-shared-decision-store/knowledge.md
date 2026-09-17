@@ -6,3 +6,6 @@
 - updated knowledge/devdocs/core_plugin_lapi_reclaim-key.md
 - updated knowledge/devdocs/core_plugin_middleware.md
 - updated knowledge/research/ext_traefik-middleware-utilities_packages/notes.md
+- created knowledge/devdocs/core_plugin_lapi_stream-lease.md
+- updated knowledge/devdocs/index_core_plugin.md
+- updated knowledge/devdocs/core_cache_redis.md
