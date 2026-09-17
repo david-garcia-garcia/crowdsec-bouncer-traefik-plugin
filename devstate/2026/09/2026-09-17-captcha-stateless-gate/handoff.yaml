@@ -1,0 +1,15 @@
+issueKey: 2026-09-17-captcha-stateless-gate
+jobName: 2026-09-17-captcha-stateless-gate
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:605133b597ae16cb485c9366516f94dc3d54abd14606cc1d6977443afc28f1f7
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
