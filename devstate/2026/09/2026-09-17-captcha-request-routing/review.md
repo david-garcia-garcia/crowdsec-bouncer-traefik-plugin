@@ -15,3 +15,9 @@ phase: propose
 findings: change captcha-request-routing apply-ready; new core_plugin_middleware_captcha-routing (FindSpecHost new, high; no fold); Main Process nestif fail on dest configuration.go:336
 fixed: OpenSpec artifacts; specs.md; handoff change pointer; PR #68 summary
 skipped: product apply; comments.md (none); research write
+
+## implement (2026-09-17)
+phase: implement
+findings: applied captcha-kind routing; localTests passed; CI Main Process + e2e binary + e2e docker succeeded; no comments.md
+fixed: handleRemediationServeHTTP routing; captcha owners; optional captchaCustomChallengeUrl; nestif extract; PR #68 summary cites #48 and #50
+skipped: code review; archive; pkg/lapi; pkg/reclaim; README / example ChallengeURL wiring

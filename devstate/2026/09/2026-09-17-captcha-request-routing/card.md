@@ -1,13 +1,13 @@
-Developer review: needs changes — 2026-09-17T19:23:15Z
+Developer review: ready for review — 2026-09-17T19:41:26Z
 
 ## What this changes
-**Operators.** None.
+**Operators.** Optional `captchaCustomChallengeUrl` names a second exact browser path for custom-provider widgets. Empty keeps `CaptchaCustomJsURL` path only.
 
 **Admin users.** None.
 
-**Developers.** Apply-ready OpenSpec change `captcha-request-routing` adds `core_plugin_middleware_captcha-routing` (solved-form POST 302, exact-path custom-resource passthrough, HEAD on the captcha path). No apply versus `master`.
+**Developers.** `handleRemediationServeHTTP` now routes captcha-kind as custom-resource pass → Check-true form POST 302 → Check-true origin → `captcha.ServeHTTP` (HEAD included). Past-captcha is `Check(req, remoteIP)` and the HMAC cookie only. New leaf `core_plugin_middleware_captcha-routing`. Cites #48 and #50.
 
-**End users.** None.
+**End users.** A second-tab captcha submit 302s instead of POSTing origin. Same-route custom widget assets load under captcha. Captcha-kind HEAD previews the challenge, not the ban page.
 
 ## Motivation
 On `master`, `handleRemediationServeHTTP` still forwards a captcha-form POST after the gate cookie already allows the visitor. A second tab that submits the solved form hits origin as POST; GET-only origins answer 405. The same function remediates same-route custom challenge assets, so the widget never loads, and it drops captcha-kind HEAD to ban.
@@ -26,28 +26,28 @@ flowchart TD
 ```
 
 ## Merge readiness
-Propose is apply-ready. Main Process failed. Implement has not started. 3 items remain.
+Implement is on the branch. CI succeeded. 0 items remain.
 
 Priority: P2 — real end-user pain on duplicate captcha submit and custom challenge assets, limited blast radius
-Reviewed head: 80d1993
+Reviewed head: 41c1957
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 2/6 | Main Process failed |
-| CI proof | 2/6 | Main Process failed https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35263798205 |
-| Local tests proof | N/A | `localTests: none` (before implement; remote PR) |
+| Overall readiness | 6/6 | CI succeeded; no open PR comments |
+| CI proof | 6/6 | Main Process, e2e binary, and e2e docker succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35265876359 |
+| Local tests proof | N/A | `localTests: passed` (remote PR; CI proof covers remote) |
 | Review resolution | 6/6 | OPEN PR #68; no review comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-17-captcha-request-routing pushed | `git` / origin `80d1993` |
+| Branch | 2026-09-17-captcha-request-routing pushed | `git` / origin `41c1957` |
 | OpenSpec | captcha-request-routing | `openspec/changes/captcha-request-routing/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/68 | pr-host List |
-| CI | build 35263798205 Main Process failure https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35263798205 ; e2e binary success and e2e docker in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35263798158 | pr-host CI |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 35265876359 Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35265876359 ; e2e binary and e2e docker success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35265876367 | pr-host CI |
+| Local tests | passed | handoff.yaml localTests (`go test ./pkg/...`; `go test .`) |
 | PR comments | no comments | no comments.md |
 
 ## Specs
@@ -57,7 +57,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local ticket → branch `2026-09-17-captcha-request-routing` → stub PR #68 → propose wrote change `captcha-request-routing`. Implement next.
+Local ticket → branch `2026-09-17-captcha-request-routing` → PR #68 → change `captcha-request-routing` applied. This body cites #48 and #50 so those PRs can close when this lands.
 
 ## Decision needed
 | Question | Decision | By |
@@ -69,16 +69,10 @@ Local ticket → branch `2026-09-17-captcha-request-routing` → stub PR #68 →
 | Should custom-resource passthrough skip AppSec? | assumed — no. Use `handleNextServeHTTP`. | explore |
 
 ## Before merge
-- [x] Propose routing spec leaf and apply-ready OpenSpec change
-- [ ] [P2] Implement captcha-kind routing (form POST 302, custom-resource passthrough, HEAD) with tests that fail before the fix
-- [ ] Cite PRs #48 and #50 on the ready PR body
-- [ ] [P2] Green Main Process (lint nestif on dest `validateCaptchaCredentialsAndTemplates`)
+None.
 
 ## Findings
-- [P2] Check-true captcha-form POST reaches origin — (general). Path: `pkg/bouncer/bouncer.go`.
-- [P2] Custom challenge assets have no passthrough — (general). Path: `pkg/bouncer/bouncer.go`.
-- [P2] HEAD is excluded from the captcha path and falls to ban — (general). Path: `pkg/bouncer/bouncer.go`.
-- [P2] Main Process lint failed nestif complexity 6 on dest `if config.CaptchaProvider != ""` — (general). Path: `pkg/configuration/configuration.go:336`. Propose delta is OpenSpec only.
+None.
 
 ## Axis review
 None.
@@ -90,25 +84,28 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 0 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 80d19939a4fb2e49b52bd1c92ffee49265bde0f7 | Card must match the branch you measured |
+| Reviewed head | 41c195797e6c3b1f76d4f58694064b7e23045a9b | Card must match the branch you measured |
 
 ### Stored data model
-None.
+- Changed: Traefik plugin Config / `captchaCustomChallengeUrl` — string — sample `` (empty, JsURL-path only) or `https://widget.example/v0/challenge`. Upgrade: old configs still valid.
 
 ### Technical review
-Best possible solution: new `core_plugin_middleware_captcha-routing` leaf; keep cookie `Check` and first-solve 302 on captcha-gate; exact-path passthrough so it is not a ban bypass.
+Best possible solution: captcha-kind routing on `handleRemediationServeHTTP` with cookie-only `Check`, exact-path custom-resource match, and no cache grace or stream-lease touch.
 
-Do we have a high-confidence way to reproduce? Yes — dest `handleRemediationServeHTTP` Check-true POST, missing resource match, and `Method != HEAD`.
+Do we have a high-confidence way to reproduce? Yes — handler tests for Check-true form POST 302, ordinary POST to origin, custom JS/challenge pass, ban no-pass, prefix/ValidateURL miss, captcha HEAD not ban.
 
-Is this the best way to solve the issue? Yes versus `master` — re-implement on today's gate cookie; do not rebase #48/#50; no cache grace; no `Cache().Acquire`.
+Is this the best way to solve the issue? Yes versus `master` — owners stay on `captcha.Client`; passthrough is not a ban bypass; Yaegi-safe (no `atomic.Pointer[T]`).
 
 ### Evidence
 What I checked:
-- `openspec validate captcha-request-routing --strict` passed
-- FindSpecHost: new `core_plugin_middleware_captcha-routing` (high); no fold
-- product delta `origin/master...HEAD` excluding `devstate/`: OpenSpec change only
-- CI: Main Process failure run 35263798205; e2e binary success / docker in progress run 35263798158
+- `go test ./pkg/...` passed
+- `go test .` passed (Yaegi interpreter, 50.649s)
+- golangci-lint run passed on the worktree
+- CI: Main Process success run 35265876359; e2e binary + e2e docker success run 35265876367
+- product delta stays in `pkg/bouncer`, `pkg/captcha`, `pkg/configuration` (no `pkg/lapi` or `pkg/reclaim`)
 - OPEN comment set empty
+- Cites #48 and #50
 
 ### Rank-up moves
-None.
+- Document `captchaCustomChallengeUrl` on the README captcha key list.
+- Set the optional key on `examples/custom-captcha` so the hardcoded `/v0/challenge` path passes.
