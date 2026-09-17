@@ -65,7 +65,8 @@ func getTestConfig() *configuration.Config {
 func newTestLogFile(t *testing.T) string {
 	t.Helper()
 	reclaim.ResetForTestWith(0)
-	f, err := os.CreateTemp("", "bouncer-log-*.log")
+	// slog keeps the file open; t.TempDir cleanup fails on Windows (usetesting wants TempDir).
+	f, err := os.CreateTemp("", "bouncer-log-*.log") //nolint:usetesting
 	if err != nil {
 		t.Fatalf("CreateTemp: %v", err)
 	}

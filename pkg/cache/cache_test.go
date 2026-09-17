@@ -290,7 +290,7 @@ func serveRedisMiss(t *testing.T) string {
 				return
 			}
 			go func(c net.Conn) {
-				defer c.Close()
+				defer func() { _ = c.Close() }()
 				buf := make([]byte, 4096)
 				for {
 					n, readErr := c.Read(buf)
