@@ -10,3 +10,9 @@ findings: cursor+Redis Client key; delete Peek; Client-owned scope union; leave 
 fixed: explore.md; PR #67 summary card
 skipped: research write (existing packets answer); usage rewrite (DestBranch still current)
 
+## propose (2026-09-17)
+phase: propose
+findings: change cursor-only-reclaim-key; 1 added / 4 modified; 5 assumed 0 blocked; Main Process failed on f07b5ed
+fixed: OpenSpec apply-ready; PR #67 summary card
+skipped: implement; comments.md none; OpenTyped; AppSec key; captcha
+
