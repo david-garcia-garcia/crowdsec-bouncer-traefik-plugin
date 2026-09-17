@@ -24,11 +24,15 @@ http:
           crowdsecLapiKey: "@@APIKEY@@"
           forwardedHeadersTrustedIps:
             - "127.0.0.1/32"
-          captchaProvider: turnstile
-          # Cloudflare Turnstile public test keys: render a valid widget without
-          # contacting a real API key.
-          captchaSiteKey: "1x00000000000000000000AA"
-          captchaSecretKey: "1x0000000000000000000000000000000AA"
+          # custom + mocklapi /siteverify: always-pass JSON, no real bot check.
+          captchaProvider: custom
+          captchaCustomJsUrl: "http://@@LAPI_HOST@@/dummy.js"
+          captchaCustomValidateUrl: "http://@@LAPI_HOST@@/siteverify"
+          captchaCustomKey: dummy-captcha
+          captchaCustomResponse: dummy-captcha-response
+          captchaSiteKey: "e2e-dummy-site"
+          captchaSecretKey: "e2e-dummy-secret"
           captchaGateSecret: "e2e-mock-captcha-gate-secret"
+          captchaGateBindIp: "true"
           captchaHtmlFilePath: "@@SCENARIO_DIR@@/captcha.html"
           captchaGracePeriodSeconds: "10"
