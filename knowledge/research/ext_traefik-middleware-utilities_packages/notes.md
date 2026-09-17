@@ -20,7 +20,7 @@
 ## simpleredis API (upstream v1.0.3)
 
 - Construct with `simpleredis.New(Config{Host, Pass, Database, Logger, …}) (*SimpleRedis, error)`. There is no `Init` and no empty-struct-then-Init. New does not dial.
-- Commands take `context.Context`: `Get(ctx, name)`, `MGet(ctx, names)`, `Set(ctx, name, data, duration)`, `Del(ctx, name)`. Extra commands (INCR, EVAL, MSetEX, …) exist; this plugin’s cache does not need them.
+- Commands take `context.Context`: `Get(ctx, name)`, `MGet(ctx, names)`, `Set(ctx, name, data, duration)`, `Del(ctx, name)`, `Eval(ctx, script, digest, keys, args)`. This plugin’s stream lease uses `Eval` (`EVALSHA` then `EVAL` on NOSCRIPT). It does not use INCR or MSetEX.
 - Same legacy error strings (`redis:unreachable`, `redis:miss`, …) plus exported sentinels `ErrUnreachable` / `ErrMiss` and helpers `IsMiss` / `IsUnreachable`.
 - After `Close`, further commands return unreachable and do not dial (same contract as in-tree).
 - Defaults differ from this plugin’s hardcoded timeouts (upstream dial 200ms / command 900ms vs in-tree dial 2s / I/O 1s). Zero Config uses those package defaults.

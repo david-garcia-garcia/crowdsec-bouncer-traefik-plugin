@@ -68,7 +68,7 @@ func TestSessionKey_SameLapiKeyIgnoresMetricsIntervalInPrefix(t *testing.T) {
 	if SessionKey(fast) == SessionKey(slow) {
 		t.Fatal("settings hash must distinguish reclaim keys so a sleeper does not occupy a new snapshot")
 	}
-	if CachePrefix(fast) != CachePrefix(slow) {
+	if SessionHex(fast) != SessionHex(slow) {
 		t.Fatal("stream cache prefix must follow the session, not metrics interval")
 	}
 	if IdentityHex(fast) == IdentityHex(slow) {
@@ -213,8 +213,8 @@ func TestOpenStream_GraceSnapshotChangeStopsOldTickerFirst(t *testing.T) {
 	if first.StreamFetches() != fetchesBeforeCancel {
 		t.Fatal("old ticker must be stopped before the new poller starts")
 	}
-	if second.StreamFetches() < 1 {
-		t.Fatal("new snapshot must start its own stream poll")
+	if second.StreamFetches() != 0 {
+		t.Fatal("shared store lease must skip a second CrowdSec fetch on the replacement Client")
 	}
 }
 

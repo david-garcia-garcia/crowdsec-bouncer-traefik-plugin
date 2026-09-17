@@ -449,8 +449,8 @@ func TestNew_StreamSnapshotChangeDuringGrace_ReplacesTicker(t *testing.T) {
 	if oldLapiClient.StreamFetches() != fetchesBeforeCancel {
 		t.Fatal("old ticker must be stopped before the new poller starts")
 	}
-	if newLapiClient.StreamFetches() < 1 {
-		t.Fatal("new snapshot must poll LAPI")
+	if newLapiClient.StreamFetches() != 0 {
+		t.Fatal("shared store lease must skip a second CrowdSec fetch on the replacement Client")
 	}
 }
 

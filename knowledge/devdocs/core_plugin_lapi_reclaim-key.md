@@ -30,10 +30,12 @@ lapiClient, err := lapi.OpenStream(ctx, cfg, log, name, pluginVersion)
 - `pkg/lapi/session.go`
 - `pkg/lapi/identity.go`
 - `pkg/lapi/client.go`
+- `pkg/lapi/decisionstore.go`
 
 ## Gotchas
 
 - Do not put middleware name, `next`, templates, trusted IPs, Enabled, AppSec host/key/TLS/body limit, LAPI failure action, Redis fail-closed, live-cache TTL, `StreamStartupBlock`, HTTP timeout, or the three LAPI TLS fields in the reclaim key.
-- Remaining first-wins hash fields are intervals, Redis host/auth/db/enabled, `updateMaxFailure`, CAPI scenarios, and `decisionScopeHeaders`.
+- Remaining first-wins hash fields are intervals, Redis host/auth/db/enabled, `RedisCacheReadHosts`, `updateMaxFailure`, CAPI scenarios, and `decisionScopeHeaders`. Live/none `identity` includes `RedisCacheReadHosts` with the other Redis connection fields and MUST NOT include `decisionScopeHeaders` (stream `scopes=` is poller-owned; live passes scopes per `LiveLookup`).
+- DecisionStore reclaim key is `decisionstore:` + `SessionHex` + Redis params only (`core_cache_client.md`). Do not put `decisionScopeHeaders` or intervals on that key.
 - Isolated CrowdSec backends need a second bouncer key (or a different LAPI host), not a second ticker on the same row.
 - Do not parse `RemoteAddr` for client address. Do not fold Open-key composition into `core_plugin_lapi_connection` (that leaf is replaceable transport).

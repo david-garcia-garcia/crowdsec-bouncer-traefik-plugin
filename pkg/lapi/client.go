@@ -35,7 +35,7 @@ type Decision struct {
 	Simulated bool   `json:"simulated"`
 }
 
-// Client owns stream ticker, isolated cache, in-process Range membership, LAPI/CAPI HTTP, and metrics.
+// Client owns stream ticker, a reclaimed DecisionStore, in-process Range membership, LAPI/CAPI HTTP, and metrics.
 type Client struct {
 	mu       sync.Mutex
 	closed   bool
@@ -56,9 +56,10 @@ type Client struct {
 	sessionKey           string            // reclaim SessionKey (stream/alone) or Key (live/none)
 
 	transport       atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
-	cacheClient     *cache.Client
-	rangeMembership atomic.Value // *decisionscope.RangeMembership rebuilt from range-index
-	lastRangeIndex  atomic.Value // string of the blob last used to build membership
+	decisionStore   *DecisionStore
+	cacheClient     *cache.Client // alias of store.Cache(); tests may set this without a store
+	rangeMembership atomic.Value  // *decisionscope.RangeMembership rebuilt from range-index
+	lastRangeIndex  atomic.Value  // string of the blob last used to build membership
 	log             *slog.Logger
 	pluginVersion   string
 
@@ -92,8 +93,9 @@ func Prepare(cfg *configuration.Config, _ *slog.Logger) error {
 	return nil
 }
 
-// New constructs a Client and starts tickers. Call Prepare first. Close stops them.
-func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (*Client, error) {
+// New constructs a Client and starts tickers. store is the reclaimed DecisionStore for this cursor.
+// Call Prepare first. Close stops tickers and HTTP only; it does not Close the shared store.
+func New(config *configuration.Config, log *slog.Logger, pluginVersion string, store *DecisionStore) (*Client, error) {
 	crowdsecStreamRoute := crowdsecLapiStreamRoute
 	if config.CrowdsecMode == configuration.AloneMode {
 		crowdsecStreamRoute = crowdsecCapiStreamRoute
@@ -106,6 +108,9 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 	if config.CrowdsecMode != configuration.AloneMode && config.CrowdsecLapiKey == "" && next.clientCertCount() == 0 {
 		log.Error("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup")
 		return nil, errors.New("CrowdsecLapiKey is missing")
+	}
+	if store == nil || store.Cache() == nil {
+		return nil, errors.New("decision store is required")
 	}
 
 	client := &Client{
@@ -126,23 +131,11 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		pluginVersion:           pluginVersion,
 		isCrowdsecStreamStartup: true,
 		isCrowdsecStreamHealthy: true,
-		cacheClient:             &cache.Client{},
+		decisionStore:           store,
+		cacheClient:             store.Cache(),
 	}
 	client.metricsReporter = newMetricsReporter(client, time.Now())
 	client.transport.Store(next)
-	// Stream/alone prefix is SessionHex (LAPI URL+key), not IdentityHex.
-	// IdentityHex still includes intervals, so two middlewares on one key
-	// used to get two prefixes and two incomplete caches while sharing one
-	// CrowdSec stream cursor. Warn-and-wire must read the same keys.
-	client.cacheClient.New(
-		log,
-		config.RedisCacheEnabled,
-		config.RedisCacheHost,
-		config.RedisCacheReadHosts,
-		config.RedisCachePassword,
-		config.RedisCacheDatabase,
-		CachePrefix(config),
-	)
 
 	if err := client.startStream(config, log); err != nil {
 		return nil, err
@@ -160,8 +153,9 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 	return client, nil
 }
 
-// Close stops tickers, idle HTTP connections, and the cache Redis pool. Safe to call more than once.
+// Close stops tickers and idle LAPI HTTP. Safe to call more than once.
 // Remaining usage-metrics are POSTed to LAPI before HTTP is torn down.
+// Does not Close the shared DecisionStore; only the store's reclaim Close hook does.
 func (c *Client) Close() {
 	c.mu.Lock()
 	if c.closed {
@@ -182,9 +176,6 @@ func (c *Client) Close() {
 	defer c.mu.Unlock()
 	if current := c.currentTransport(); current != nil {
 		closeIdle(current.httpClient)
-	}
-	if c.cacheClient != nil {
-		c.cacheClient.Close()
 	}
 	c.logInfo(MsgConnectionClosed, "closed")
 }
@@ -271,8 +262,11 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 	return stop
 }
 
-// Cache is this connection's isolated cache Client.
+// Cache is the shared DecisionStore cache, or the test-assigned cacheClient.
 func (c *Client) Cache() *cache.Client {
+	if c.decisionStore != nil {
+		return c.decisionStore.Cache()
+	}
 	return c.cacheClient
 }
 
@@ -288,7 +282,7 @@ func (c *Client) RangeMembership() *decisionscope.RangeMembership {
 
 // hydrateRangeMembership rebuilds Range membership from the shared blob when the raw string changed.
 func (c *Client) hydrateRangeMembership() {
-	index, err := c.cacheClient.Get(decisionscope.RangeIndexKey)
+	index, err := c.Cache().Get(decisionscope.RangeIndexKey)
 	if err != nil {
 		if err.Error() != cache.CacheMiss {
 			return

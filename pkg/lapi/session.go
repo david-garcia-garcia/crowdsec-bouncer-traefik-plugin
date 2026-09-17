@@ -16,7 +16,7 @@ import (
 const streamSessionKeyPrefix = "lapi:stream:"
 
 // streamSession is the CrowdSec-row identity for stream and alone modes.
-// SessionPrefix / CachePrefix use only these fields. SessionKey appends a
+// SessionPrefix and SessionHex use only these fields. SessionKey appends a
 // hash of streamSettings so a sleeping incarnation does not occupy the slot a
 // reload with new knobs needs.
 //
@@ -140,15 +140,6 @@ func reclaimSessionKey(cfg *configuration.Config) string {
 	return Key(cfg)
 }
 
-// CachePrefix is the cache Client prefix: session hex for stream/alone so
-// warn-and-wire shares keys; full IdentityHex for live/none.
-func CachePrefix(cfg *configuration.Config) string {
-	if cfg.CrowdsecMode == configuration.StreamMode || cfg.CrowdsecMode == configuration.AloneMode {
-		return SessionHex(cfg)
-	}
-	return IdentityHex(cfg)
-}
-
 // settingsDiff lists JSON field names that differ, for the warn-and-wire log.
 func settingsDiff(owner, joiner streamSettings) []string {
 	ownerFields := jsonObject(owner)
@@ -201,10 +192,14 @@ func warnWiredToOwner(log *slog.Logger, ownerName, joinerName string, owner, joi
 // with a different snapshot is a different key: Open creates; the sleeper
 // dies on grace Close.
 func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
+	store, storeErr := OpenDecisionStore(ctx, cfg, log)
+	if storeErr != nil {
+		return nil, storeErr
+	}
 	joinerKey := SessionKey(cfg)
 	joinerSettings := settingsFrom(cfg)
 	create := func() (any, reclaim.Hooks, error) {
-		client, err := New(cfg, log, pluginVersion)
+		client, err := New(cfg, log, pluginVersion, store)
 		if err != nil {
 			return nil, reclaim.Hooks{}, err
 		}
@@ -263,9 +258,13 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 
 // OpenLive reclaims a Client by full identity (live/none).
 func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
+	store, storeErr := OpenDecisionStore(ctx, cfg, log)
+	if storeErr != nil {
+		return nil, storeErr
+	}
 	bindKey := Key(cfg)
 	stored, openErr := reclaim.OpenWithHooks(ctx, bindKey, log, func() (any, reclaim.Hooks, error) {
-		client, err := New(cfg, log, pluginVersion)
+		client, err := New(cfg, log, pluginVersion, store)
 		if err != nil {
 			return nil, reclaim.Hooks{}, err
 		}
