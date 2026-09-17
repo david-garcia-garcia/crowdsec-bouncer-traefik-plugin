@@ -51,37 +51,37 @@ Out of scope stays out: shared `DecisionStore` / cache reclaim, cursor-only key 
   By: propose
 
 - Q: Must live/none `IdentityHex` drop the same fields this PR?
-  Decision: assumed — yes. `identity.go` replicates the cluster. Dropping only stream `streamSettings` would still split live/none Clients and `CachePrefix` on a policy- or TLS-only reload.
-  By: explore
+  Decision: resolved — yes. Dropped from both `streamSettings` and `identity`.
+  By: implement
 
 - Q: What is the transport type name and file?
-  Decision: assumed — unexported `transport` in `pkg/lapi/client_http.go` (HTTP + header + CAPI token already live there). Field on `Client` is `atomic.Value`. Call site after Open: `AdoptTransport`.
-  By: explore
+  Decision: resolved — unexported `transport` in `pkg/lapi/client_http.go`. Field on `Client` is `atomic.Value`. `AdoptTransport` after `OpenStream` / `OpenLive` bind.
+  By: implement
 
 - Q: Where does `StreamStartupBlock` live after it leaves the hash?
-  Decision: assumed — write-once on `Client` at `startStream` only. First incarnation keeps it. Not on `Bouncer`. Not mutable after construct.
-  By: explore
+  Decision: resolved — write-once at `startStream` only. First incarnation keeps it. Not on `Bouncer`. Not a Client field.
+  By: implement
 
 - Q: Two live routers, same session, different TLS — first-wins or last `AdoptTransport`?
-  Decision: assumed — last `New` wins transport (ticket). Same reclaim key after the hash drop, so `PeekLivePrefix` mismatch does not fire. INFO `adopted`. Intervals / Redis / scopes still first-wins `ignored`.
-  By: explore
+  Decision: resolved — last `New` wins transport. Same reclaim key; INFO `adopted`. Remaining settings still first-wins `ignored`.
+  By: implement
 
 - Q: `LiveLookup` TTL parameter shape?
-  Decision: assumed — add `defaultDecisionSeconds int64` to `LiveLookup`; `Bouncer` passes `config.DefaultDecisionSeconds`. Do not keep a Client field for it.
-  By: explore
+  Decision: resolved — `LiveLookup(..., defaultDecisionSeconds int64)`; Bouncer passes `config.DefaultDecisionSeconds`. No Client field.
+  By: implement
 
 - Q: Can the transport field be `atomic.Pointer[T]`?
-  Decision: assumed — no. Yaegi v0.16 cannot take a generic instantiation from another package as a struct field. Use `atomic.Value` like `rangeMembership`.
-  By: explore
+  Decision: resolved — no. Field is `atomic.Value`.
+  By: implement
 
 - Q: What `logInfo` session key and `reason` values?
-  Decision: assumed — stream/alone log `SessionKey`; live/none log `Key`. Existing lifecycle `reason` values stay `started|sleeping|waking|closed`. New INFO lines name transport replace and joiner `ignored` vs `adopted`. Reclaim table lines stay DEBUG.
-  By: explore
+  Decision: resolved — stream/alone log `SessionKey`; live/none log `Key`. Lifecycle reasons `started|sleeping|waking|closed`. INFO names transport replace and joiner `ignored` vs `adopted`. Reclaim table lines stay DEBUG.
+  By: implement
 
 - Q: Two concurrent `AdoptTransport` on one Client?
-  Decision: assumed — last `Store` wins; `closeIdle` the value replaced. Do not add a mutex around remaining write-once scalars. Do not make `httpClient` a plain mutable pointer beside the `atomic.Value`.
-  By: explore
+  Decision: resolved — last `Swap` wins; `closeIdle` the replaced `*http.Client`. No extra mutex. No plain `httpClient` field.
+  By: implement
 
 - Q: When do usage docs change Language **Failure action**?
-  Decision: assumed — not in explore. DestBranch text is still true. Implement / `sbs-dev-devdocsimpact` update `knowledge/devdocs/core_plugin_middleware.md` when the owner moves.
-  By: explore
+  Decision: resolved — implement updated `knowledge/devdocs/core_plugin_middleware.md` after the owner moved onto Bouncer (Language, How to use, identity gotcha).
+  By: implement
