@@ -84,8 +84,8 @@ Client IP is already owned: `pkg/ip.GetRemoteIP` → `bouncer` `clientRequest` (
   By: explore
 
 - Q: Should AppSec emit LAPI-style INFO on transport replace (`sessionKey`, adopted)?
-  Decision: assumed — yes, INFO `appsec transport replaced` with reclaim `Key` when timeout/TLS extras change. No `ignored` joiner path: AppSec has one `Key`, no `PeekLivePrefix`.
-  By: explore
+  Decision: resolved — INFO `appsec transport replaced` with reclaim `Key` when timeout/TLS extras change. No `ignored` joiner path.
+  By: implement
 
 - Q: Will a sibling merge move `origin/master` before implement or pullrequest?
   Decision: resolved — Sync before implement: `origin/master` still `e6cc9ab`, already merged. Repeat Sync before pullrequest.
