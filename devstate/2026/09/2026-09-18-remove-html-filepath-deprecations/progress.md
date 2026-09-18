@@ -4,7 +4,7 @@ JobName: 2026-09-18-remove-html-filepath-deprecations
 
 | Phase | Work | Card | At |
 |-------|------|------|----|
-| prepare | [ ] | [ ] | |
+| prepare | [x] | [x] | 2026-09-18T17:13:59Z |
 | explore | [ ] | [ ] | |
 | propose | [ ] | [ ] | |
 | implement | [ ] | [ ] | |
