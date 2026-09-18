@@ -9,6 +9,6 @@ JobName: 2026-09-18-capi-login-json-escape
 | propose | [x] | [x] | 2026-09-18T14:26:42Z |
 | implement | [x] | [x] | 2026-09-18T14:51:24Z |
 | codereview | [x] | [x] | 2026-09-18T15:04:25Z |
-| devdocsimpact | [ ] | [ ] | |
+| devdocsimpact | [x] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
