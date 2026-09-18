@@ -4,7 +4,7 @@ JobName: 2026-09-18-range-index-same-network-match
 
 | Phase | Work | Card | At |
 |-------|------|------|----|
-| prepare | [x] | [ ] | |
+| prepare | [x] | [x] | 2026-09-18T16:47:36Z |
 | explore | [ ] | [ ] | |
 | propose | [ ] | [ ] | |
 | implement | [ ] | [ ] | |
