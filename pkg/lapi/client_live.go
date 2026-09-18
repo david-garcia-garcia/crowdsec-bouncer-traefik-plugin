@@ -22,6 +22,8 @@ func (c *Client) LiveLookup(remoteIP string, scopes map[string]string, defaultDe
 	return c.handleNoStreamCache(remoteIP, scopes, defaultDecisionSeconds)
 }
 
+// handleNoStreamCache queries LAPI for the client address and each mapped header, writes the
+// IP query result to the client-address cache key, and returns the PreferRemediation merge.
 func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, defaultDecisionSeconds int64) (string, error) {
 	isLiveMode := c.crowdsecMode == configuration.LiveMode
 	chosen, parsedDuration, err := c.queryLiveDecisions(fmt.Sprintf("ip=%v", remoteIP))
