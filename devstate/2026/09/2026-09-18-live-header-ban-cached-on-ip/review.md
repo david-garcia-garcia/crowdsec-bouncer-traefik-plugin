@@ -39,3 +39,9 @@ phase: archive
 findings: FindSpecHost fold core_plugin_decisions_scopes (high, already journaled); validators 0/0/0
 fixed: ADDED requirement synced to catalog; change moved to openspec/changes/archive/2026-09-18-write-ip-query-result-to-ip-cache-key; PR #82 summary Set
 skipped: no Task subagent in this session (verdict already on specs.md)
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: one OPEN PR #82 reused; title ready; CI 4/4 succeeded
+fixed: title `🐛 [rank 10/10] fix(lapi): stop caching header-scope bans on the client IP slot`; final card Set on PR #82 summary
+skipped: no comments.md publish; no second PR

@@ -11,4 +11,4 @@ JobName: 2026-09-18-live-header-ban-cached-on-ip
 | codereview | [x] | [x] | 2026-09-18T14:47:11Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T14:52:42Z |
 | archive | [x] | [x] | 2026-09-18T14:56:24Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-18T15:04:22Z |
