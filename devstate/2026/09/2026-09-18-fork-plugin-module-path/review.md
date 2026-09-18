@@ -45,3 +45,9 @@ phase: pullrequest
 findings: Main Process Yaegi exit 2 on 52f4fa43 (build 35381200216)
 fixed: reused PR 101; ready title 💥 feat(plugin): retarget Traefik module identity to this fork
 skipped: no comments.md; gh not on PATH — used GitHub MCP get_check_runs
+
+## pullrequest-ci (2026-09-18)
+phase: pullrequest-ci
+findings: none
+fixed: 3086a1ae moved TestForkModulePathMatchesManifest to pkg/configuration so yaegi test . does not interpret it; Main Process and Race 35382090253 and e2e 35382090475 succeeded
+skipped: none; no comments.md
