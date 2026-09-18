@@ -9,7 +9,7 @@ JobName: 2026-09-18-range-index-same-network-match
 | propose | [x] | [x] | 2026-09-18T16:56:27Z |
 | implement | [x] | [x] | 2026-09-18T17:06:03Z |
 | codereview | [x] | [x] | 2026-09-18T17:11:33Z |
-| devdocsimpact | [x] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-18T17:15:15Z |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
 

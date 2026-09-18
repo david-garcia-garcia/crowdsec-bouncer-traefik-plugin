@@ -27,3 +27,9 @@ phase: codereview
 findings: coverage hard 2
 fixed: TestRemoveRangeParseableVsUnparseableKeepsLine; TestAddRangeSameNetworkPersistsIncomingSpelling (bb343d7)
 skipped: none
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: none
+fixed: none
+skipped: none
