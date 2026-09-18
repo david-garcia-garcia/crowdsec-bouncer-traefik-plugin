@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: folded core_cache_client_decision-store; moved change to archive/2026-09-18-cache-miss-sentinels
 skipped: none
+
+## pullrequest (2026-09-18T18:21:12Z)
+phase: pullrequest
+findings: none
+fixed: dropped WIP title; CI succeeded on 5be2622
+skipped: none
