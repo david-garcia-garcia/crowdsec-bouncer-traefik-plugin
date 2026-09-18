@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: language-gap IPv6 zone ID produced
 fixed: Language term on knowledge/devdocs/core_plugin_ip.md
 skipped: none
+
+## archive (2026-09-18)
+phase: archive
+findings: fold core_plugin_ip_radix-lookup; Task tool unavailable so FindSpecHost ran in-process
+fixed: catalog requirement synced; change moved to archive/2026-09-18-ipv6-zone-id-trusted-hop
+skipped: pullrequest; Task subagent (not in this nest)
