@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: folded core_plugin_middleware_config-validation into catalog; moved change to openspec/changes/archive/2026-09-18-appsec-validate-when-enabled/
 skipped: Task unavailable in archive subagent; FindSpecHost ran on this thread
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: reused OPEN PR #97; ready title; waited CI on f0ea972 (four checks success)
+skipped: no comments.md; no second PR; gh not on PATH — used GitHub MCP check runs

@@ -1,11 +1,11 @@
-Developer review: ready for review — 2026-09-18T16:39:03Z
+Developer review: ready for review — 2026-09-18T16:54:58Z
 
 ## What this changes
 **Operators.** Leftover invalid AppSec CA or a missing `crowdsecAppsecKeyFile` no longer fail `ValidateParams` when `crowdsecAppsecEnabled` is false. Alone with AppSec on and those same leftovers now fails closed at startup.
 
 **Admin users.** None.
 
-**Developers.** `ValidateParams` calls `validateAppsecURLKeyAndTLS` only when `CrowdsecAppsecEnabled` is true, in every mode. Alone still skips LAPI URL, key, and TLS after CAPI credentials. The `validateLapiAndAppsecConnection` wrapper is gone.
+**Developers.** `ValidateParams` calls `validateAppsecURLKeyAndTLS` only when `CrowdsecAppsecEnabled` is true, in every mode. Alone still skips LAPI URL, key, and TLS after CAPI credentials. The `validateLapiAndAppsecConnection` wrapper is gone. Catalog spec `core_plugin_middleware_config-validation` now owns the enabled-gate requirements.
 
 **End users.** None.
 
@@ -29,10 +29,10 @@ flowchart TD
 ```
 
 ## Merge readiness
-Six-axis review of `origin/master...HEAD` found no hard, missing, or wrong items. 0 items remain.
+OPEN PR #97 title is ready; checklist empty; CI on this head succeeded. 0 items remain.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: ed3dabc
+Reviewed head: f0ea972
 Owner decision: Required. See Decision needed.
 
 ## Review scores
@@ -46,21 +46,21 @@ Owner decision: Required. See Decision needed.
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-18-appsec-validate-when-enabled pushed | `git` `origin/2026-09-18-appsec-validate-when-enabled` at `ed3dabc` |
-| OpenSpec | appsec-validate-when-enabled | `openspec/changes/appsec-validate-when-enabled/` |
+| Branch | 2026-09-18-appsec-validate-when-enabled pushed | `git` `origin/2026-09-18-appsec-validate-when-enabled` at `f0ea972` |
+| OpenSpec | appsec-validate-when-enabled | `openspec/changes/archive/2026-09-18-appsec-validate-when-enabled/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/97 | pr-host List |
-| CI | Race detector success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35369184861/job/105678833486 ; Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35369184861/job/105678833773 ; e2e (binary + mock LAPI) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35369185015/job/105678834349 ; e2e (docker + pester) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35369185015/job/105678834174 | pr-host CI |
+| CI | Race detector success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35370658141/job/105683568617 ; Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35370658141/job/105683568865 ; e2e (binary + mock LAPI) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35370658161/job/105683982473 ; e2e (docker + pester) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35370658161/job/105683982050 | pr-host CI |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | no `comments.md` |
 
 ## Specs
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-appsec-validate-when-enabled/openspec/changes/appsec-validate-when-enabled/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-appsec-validate-when-enabled/openspec/changes/archive/2026-09-18-appsec-validate-when-enabled/proposal.md) — modified
 
 ## Follow-up issues
 None.
 
 ## How this fits together
-Local ticket `2026-09-18-appsec-validate-when-enabled` on branch `2026-09-18-appsec-validate-when-enabled` as PR #97. Codereview wrote six clean axis files; CI on `ed3dabc` succeeded.
+Local ticket `2026-09-18-appsec-validate-when-enabled` on branch `2026-09-18-appsec-validate-when-enabled` as PR #97. Pullrequest reused that stub, dropped WIP, and CI on `f0ea972` succeeded.
 
 ## Decision needed
 | Question | Decision | By |
@@ -93,7 +93,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | ed3dabced3da5c18cd7650091741883d7656d9b8 | Card must match the branch you measured |
+| Reviewed head | f0ea9721084dcc75306f9f1e401416a2cb4c201c | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -107,10 +107,11 @@ Is this the best way to solve the issue? Yes versus DestBranch — reuse the exi
 
 ### Evidence
 What I checked:
-- Pin `origin/master` (`aebb1f85`) three-dot product diff excluding `devstate/` and `.cursor/`
-- Six axis files under the run root: all `none.` (Task unavailable to this nested executor; checklists applied in-process)
-- OPEN PR #97; comment inventory empty (pr-host List)
-- CI on head `ed3dabc`: four checks success (pr-host check runs)
+- Pin `origin/master` (`86ac9266`) three-dot product diff excluding `devstate/` and `.cursor/`
+- Sync: `origin/master` already merged; worktree clean except untracked `.tmp-pr-bodies/`
+- OPEN PR #97 reused; title set to ready gitmoji form (pr-host Update)
+- Comment inventory empty; no `comments.md` (file on disk)
+- CI on head `f0ea972`: four checks success (pr-host check runs)
 
 ### Rank-up moves
 None.
