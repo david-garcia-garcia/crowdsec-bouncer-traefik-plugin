@@ -48,16 +48,16 @@ Client address stays `pkg/ip.GetRemoteIP`. This ticket does not reconstruct iden
   By: propose
 
 - Q: Does `storedByCIDR` remain after the endpoint holds the string?
-  Decision: assumed — drop it. Request lookup no longer walks it. Hydrate writes the string onto the node at insert.
-  By: explore
+  Decision: resolved — dropped. Hydrate writes the string onto the node at insert.
+  By: implement
 
 - Q: Does a prefixLen vs stored-key `ones` mismatch (IPv4-mapped `/96` vs remapped IPv4 `0`) still need `storedMatchingPrefix`?
-  Decision: assumed — no. Insert stores the remediation on the same endpoint `contains` reports. Existing `TestHunt_MembershipIPv4MappedCIDRDoesNotPanic` (`::ffff:0:0/96=t` → `192.0.2.1` ban) stays the lock.
-  By: explore
+  Decision: resolved — no. Insert stores the remediation on the same endpoint `contains` reports. `TestHunt_MembershipIPv4MappedCIDRDoesNotPanic` still locks `::ffff:0:0/96=t` → `192.0.2.1` ban.
+  By: implement
 
 - Q: When two blob keys occupy the same remapped endpoint (`0.0.0.0/0` and `::ffff:0:0/96` on v4 `/0`), which stored string wins?
-  Decision: assumed — last successful insert of that kind wins (blob order). Same-kind collision is origin only; different kinds stay on different trees. Today's map walk is unordered when `ones != prefixLen`.
-  By: explore
+  Decision: resolved — last successful insert of that kind wins (blob order). Locked by `TestMembershipFromIndexMappedLastInsertWins`.
+  By: implement
 
 - Q: Must the range-index blob format change?
   Decision: resolved — no. Ticket forbids it unless request-path lookup would be wrong. Payload is an in-process node field rebuilt from existing `cidr=remediation` lines.
