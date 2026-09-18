@@ -145,6 +145,7 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 			}
 			continue
 		}
+		// Sub-second CrowdSec durations become 0; stream write TTL is not clamped.
 		c.storeStreamDecision(decision, int64(duration.Seconds()))
 	}
 	// A range apply that could not read the shared index is a poll that did not finish. Returning
