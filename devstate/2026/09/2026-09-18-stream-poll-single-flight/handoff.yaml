@@ -10,6 +10,8 @@ src: sha256:81909025ea88ce3eefa3242b28a3d53d2d236493728b2786656121b815ccac40
 localTests: none
 requirement: requirement.md
 comments: none
-explore: none
-change: none
-pr: none
+explore: explore.md
+change: stream-poll-single-flight
+pr:
+  id: 72
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/72
