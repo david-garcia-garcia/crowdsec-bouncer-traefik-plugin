@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: none
 skipped: none; change at openspec/changes/archive/2026-09-18-retarget-plugin-module-path; Race 35380694830 succeeded; Main 35380694830 and e2e 35380694724 in progress
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: Main Process Yaegi exit 2 on 52f4fa43 (build 35381200216)
+fixed: reused PR 101; ready title 💥 feat(plugin): retarget Traefik module identity to this fork
+skipped: no comments.md; gh not on PATH — used GitHub MCP get_check_runs

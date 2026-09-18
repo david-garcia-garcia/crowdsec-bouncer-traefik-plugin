@@ -11,4 +11,4 @@ JobName: 2026-09-18-fork-plugin-module-path
 | codereview | [x] | [x] | 2026-09-18T18:18:20Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T18:27:34Z |
 | archive | [x] | [x] | 2026-09-18T18:36:16Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-18T18:44:00Z |
