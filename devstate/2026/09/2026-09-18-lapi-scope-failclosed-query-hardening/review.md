@@ -34,3 +34,10 @@ findings: three — one missing-packet (LAPI query round trip) and two stale-usa
 fixed: all three produced; new packet `knowledge/devdocs/core_plugin_lapi_query-round-trip.md` plus its `index_core_plugin.md` row, and usage updates on `core_plugin_lapi_stream-lease.md` and `core_plugin_lapi_connection.md`
 skipped: no `core_plugin_lapi_failure-action` packet (README owns the operator key; the implementer rule folds into the connection packet) and no new Language term for the fail-closed verdict (`core_plugin_decisionscope.md` already owns remediation vocabulary)
 verdict: in progress
+## archive (2026-09-18)
+phase: archive
+findings: `openspec validate --specs --strict` reports 26 passed 1 failed, and the one failure is `core_cache_client_isolated-store`, a stub with a Purpose and no Requirements that fails the same way on `origin/master` at `0e7dbf0`
+fixed: three deltas synced into `openspec/specs/` per the propose verdicts — MODIFIED plus ADDED folded into `core_plugin_lapi_failure-action`, ADDED folded into `core_plugin_lapi_stream-lease`, new `core_plugin_lapi_query-round-trip` created; `validate-spec-map.mjs --write`, `validate-spec-map.mjs`, and `validate-artifact-names.mjs` all exit 0; change moved to `openspec/changes/archive/2026-09-18-lapi-scope-failclosed-query-hardening`
+skipped: FindSpecHost was not re-run as a Task sub-agent — the three verdicts were already measured and journaled in `specs.md` at propose, and this session cannot spawn a sub-agent; the librarian scripts were invoked from the main checkout because `.cursor/skills/` is untracked and therefore absent from this worktree
+issues: two notes written — `knowledge/debt/2026-09-18-empty-isolated-store-spec.md` and `knowledge/debt/2026-09-18-alone-401-holds-its-connection.md`
+verdict: in progress
