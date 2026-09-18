@@ -27,3 +27,9 @@ phase: codereview
 findings: Standards 3 (1 hard, 2 judgement); Spec/Security/Performance/Dead/Coverage none
 fixed: Name for the scope `h` → `handler` (0ce9264); PR 85 code-review card
 skipped: Mysterious Name `au`; Duplicated Code sibling tests; Task spawn unavailable in nested session (in-process axes)
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: stale-usage 1
+fixed: core_plugin_middleware How-to and Gotchas; PR 85 delivery card
+skipped: no Language term invented; no new packet; no comments.md
