@@ -27,3 +27,9 @@ phase: codereview
 findings: P1 0, P2 0; Standards 1 hard (name)
 fixed: rangeIndexCIDR param renamed to cidr
 skipped: none
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: stale-usage Trusted-IP HostCIDR
+fixed: How-to names HostCIDR
+skipped: none
