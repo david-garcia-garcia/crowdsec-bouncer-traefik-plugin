@@ -18,6 +18,10 @@ _Avoid_: native IPv6 CIDR, a mapped prefix `ParseCIDR` already rewrote to native
 The owner of the client address for a request. Unless `ForwardedHeadersInsecure` is true, requires the host from `req.RemoteAddr` to be in the trusted-hop pool before honoring forwarded headers; when the pool is empty or the peer is untrusted, returns `RemoteAddr` only. Otherwise walks the custom forwarded header most-recent-first against the trusted-hop pool, then the host of `RemoteAddr` when every hop is trusted or the header is empty. When the flag is true, skips the checker and returns the whole trimmed header (no hop walk), or the `RemoteAddr` host when that header is absent, empty, or whitespace-only. Also yields that address as `net.IP` when parseable.
 _Avoid_: parsing `RemoteAddr` on the connection, a second X-Forwarded-For walk, Traefik ipstrategy as a second owner
 
+**IPv6 zone ID**:
+An RFC 4007 scoped-address suffix on an IPv6 literal (`%eth0`, `%12`).
+_Avoid_: zone index as a second address; IPv4 `%` suffix as a zone
+
 **clientRequest**:
 The inbound request plus the client address GetRemoteIP already chose (`remoteIP` string, `ipAddr` net.IP, `ipType` for metrics). Handlers keep the parameter name `req`.
 _Avoid_: renaming `req` to `client`; a bag for scopes, origin, or captcha state; `context.Value`
@@ -61,3 +65,4 @@ ok := checker.ContainsIP(req.ipAddr)
 - An IPv4-mapped CIDR (`To4()` non-nil and mask `bits==128`, such as `::ffff:0:0/96`) remaps to IPv4 prefix `ones-96` on the v4 root. Do not walk `ones` from bit 0 on the v6 root. Membership matches `net.IPNet.Contains` (IPv4 and IPv4-mapped hit; native IPv6 miss). `AddCIDR` does not reject a parseable mapped CIDR.
 - On the default path, `ForwardedHeadersTrustedIPs` does double duty: it gates whether `GetRemoteIP` reads the header at all, and it skips hops inside the header. A catch-all pool passes the gate and then makes every hop trusted, so `getIP` returns the empty string and the address falls back to `RemoteAddr` — the named header is silently ignored.
 - `ForwardedHeadersInsecure` is the defer-to-Traefik mode: it skips the socket-peer gate and hop walk. `bouncer.New` then defaults the header to `X-Real-Ip` when `ForwardedHeadersCustomName` is still `X-Forwarded-For`. Safe only when the Traefik entrypoint already sanitizes that header. It is still wrong behind an upstream that does not set `X-Real-Ip`, such as Cloudflare, where the header ends up holding the edge address.
+- `parseIP` (shared by `Contains`, `GetRemoteIP`, `getIP`, and `InNetwork`) strips an IPv6 RFC 4007 zone (`%eth0`, `%12`) when the prefix contains `:`, then calls `net.ParseIP`. The public string stays as received; the yielded `net.IP` is zone-free. A hop that still has brackets (`[fe80::1%eth0]`) stays unparseable. IPv4 with `%` stays unparseable. `NewChecker` pool entries and `Family` / `FamilyOfHostOrCIDR` still use `net.ParseIP` on the raw string (a zoned pool entry fails construction).

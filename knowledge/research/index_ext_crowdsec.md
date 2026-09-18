@@ -44,3 +44,8 @@ description: Where CrowdSec LAPI stores /v1/decisions/stream progress and which 
 priority: normal
 local: ext_crowdsec_lapi_usage-metrics/
 description: What CrowdSec LAPI accepts on POST /v1/usage-metrics and which labels official bouncers send.
+
+## CAPI watchers login
+priority: normal
+local: ext_crowdsec_capi_watchers-login/
+description: What CrowdSec CAPI accepts on POST /watchers/login and which fields the official client sends.

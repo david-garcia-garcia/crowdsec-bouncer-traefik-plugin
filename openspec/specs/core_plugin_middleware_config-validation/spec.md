@@ -49,6 +49,17 @@ The configuration package SHALL include unit tests covering: custom captcha prov
 - **WHEN** `crowdsecAppsecFailureAction` is `captcha` and `captchaProvider` is empty
 - **THEN** `ValidateParams` returns an error
 
+### Requirement: Enabled AppSec requires a listener host
+When `crowdsecAppsecEnabled` is true, `ValidateParams` SHALL reject an empty `crowdsecAppsecHost` and any AppSec URL that `http.NewRequest` accepts only because the host is missing. When `crowdsecAppsecEnabled` is false, `ValidateParams` MUST NOT fail solely because `crowdsecAppsecHost` is empty. Shared LAPI URL validation MUST keep accepting an empty host the same way it does today.
+
+#### Scenario: Enabled AppSec with empty host is rejected
+- **WHEN** `crowdsecAppsecEnabled` is true and `crowdsecAppsecHost` is empty
+- **THEN** `ValidateParams` returns an error
+
+#### Scenario: Disabled AppSec with empty host is accepted
+- **WHEN** `crowdsecAppsecEnabled` is false, `crowdsecAppsecHost` is empty, and the rest of the config is valid
+- **THEN** `ValidateParams` returns nil
+
 ### Requirement: Reject empty captcha site and secret after lookup
 When `captchaProvider` is set, `ValidateParams` SHALL resolve `CaptchaSiteKey` and `CaptchaSecretKey` with the same file-then-field lookup used for `CaptchaGateSecret`. After a successful lookup it SHALL reject an empty trimmed string for each field independently, site first. The trigger is a non-empty provider, not a captcha failure action. Error text SHALL be `CaptchaSiteKey: cannot be empty when CaptchaProvider is set` and `CaptchaSecretKey: cannot be empty when CaptchaProvider is set`. A `ValidateParams` failure from this rule SHALL cause `New` to return a nil handler and that error without opening LAPI.
 
