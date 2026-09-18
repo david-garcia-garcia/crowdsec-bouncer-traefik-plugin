@@ -53,24 +53,24 @@ This work does not reconstruct client address, user, tenant, Host, or trust hop.
 
 - Q: Do none and appsec modes share the same enabled gate even though the required test list names live/stream/alone?
   Decision: assumed — yes, all modes. Do not add empty-host (#89) cases. A leftover-CA success under `crowdsecMode: appsec` with AppSec off is allowed if cheap; the existing warn test stays.
-  By: explore
+  By: propose
 
 - Q: Should AppSec CA parse use `effectiveAppsecScheme` (inherit LAPI `https`) instead of explicit `CrowdsecAppsecScheme == https`?
   Decision: assumed — keep today’s explicit-scheme trigger. Changing inherit-https CA parse would rewrite live/stream validation and is out of scope.
-  By: explore
+  By: propose
 
 - Q: When AppSec is enabled and the key is empty, should `ValidateParams` fail?
   Decision: assumed — no. Keep the helper’s empty-key pass; `appsec.Prepare` still copies the LAPI key. This ticket only adds the enabled gate around the existing helper.
-  By: explore
+  By: propose
 
 - Q: Should leftover `CrowdsecAppsecFailureAction` / body-limit checks also skip when AppSec is off (Redis leftover-password analog)?
   Decision: assumed — leave them. Failure-action behavior is out of scope. Dest still always `GetVariable`s `RedisCachePassword`; do not change Redis in this ticket.
-  By: explore
+  By: propose
 
 - Q: Does this change `appsec.Prepare`, reclaim, or `New` process lifetime?
   Decision: assumed — no. `ValidateParams` is the constructor gate. Runtime AppSec client, reclaim, and failure-action stay out.
-  By: explore
+  By: propose
 
 - Q: Should leftover AppSec fields warn when the knob is false?
   Decision: assumed — no. Ticket is skip validation, not a new warn. Bound the ask.
-  By: explore
+  By: propose

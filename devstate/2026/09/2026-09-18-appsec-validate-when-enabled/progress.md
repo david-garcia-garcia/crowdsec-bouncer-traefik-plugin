@@ -6,7 +6,7 @@ JobName: 2026-09-18-appsec-validate-when-enabled
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-18T16:11:19Z |
 | explore | [x] | [x] | 2026-09-18T16:14:53Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
