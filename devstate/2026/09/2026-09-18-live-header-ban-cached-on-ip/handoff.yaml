@@ -1,0 +1,15 @@
+issueKey: 2026-09-18-live-header-ban-cached-on-ip
+jobName: 2026-09-18-live-header-ban-cached-on-ip
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:17e467dce5e9a43590c65edf1a57a309b82b5d0a621d9c46ae63960bb0bbb35b
+comments: none
+localTests: none
+requirement: requirement.md
+explore: none
+change: none
+pr: none
