@@ -17,5 +17,5 @@
 
 ## 4. Verify
 
-- [ ] 4.1 `go test ./pkg/lapi -count=1 -run 'TestGetToken_|TestCrowdsecQuery_'`
-- [ ] 4.2 `go test ./pkg/... -count=1` and `go vet ./...`
+- [x] 4.1 `go test ./pkg/lapi -count=1 -run 'TestGetToken_|TestCrowdsecQuery_'`
+- [x] 4.2 `go test ./pkg/... -count=1` and `go vet ./...`
