@@ -504,8 +504,8 @@ http:
           captchaSecretKey: FIXME
           captchaGateSecret: FIXME
           captchaGracePeriodSeconds: 1800
-          captchaHTMLFilePath: /captcha.html
-          banHTMLFilePath: /ban.html
+          captchaFilePath: /captcha.html
+          banFilePath: /ban.html
           traceHeadersCustomName: X-Request-ID
           metricsUpdateIntervalSeconds: 600
 ```
