@@ -127,21 +127,24 @@ func strongestLiveDecision(items []Decision) *Decision {
 }
 
 // mergeLiveScope queries one header-mapped scope and keeps ban over the current live remediation.
-func (c *Client) mergeLiveScope(chosen string, parsedDuration time.Duration, scope, identifier string, isLiveMode bool, defaultDecisionSeconds int64) (string, time.Duration) {
+// A query failure is returned alongside the caller's unchanged verdict so the caller can fail
+// closed instead of reading it as "this scope has no decision". It is logged at WARN because an
+// operator must see a scope path that stopped answering.
+func (c *Client) mergeLiveScope(chosen string, parsedDuration time.Duration, scope, identifier string, isLiveMode bool, defaultDecisionSeconds int64) (string, time.Duration, error) {
 	if identifier == "" {
-		return chosen, parsedDuration
+		return chosen, parsedDuration, nil
 	}
 	headerChosen, headerDuration, headerErr := c.queryLiveDecisions("scope=" + url.QueryEscape(scope) + "&value=" + url.QueryEscape(identifier))
 	if headerErr != nil {
-		c.log.Debug("handleNoStreamCache:scopeQuery " + scope + " " + headerErr.Error())
-		return chosen, parsedDuration
+		c.log.Warn("handleNoStreamCache:scopeQuery " + scope + " " + headerErr.Error())
+		return chosen, parsedDuration, headerErr
 	}
 	c.cacheLiveScope(decisionscope.HeaderScopeKey(scope, identifier), headerChosen, headerDuration, isLiveMode, defaultDecisionSeconds)
 	next := decisionscope.PreferRemediation(chosen, headerChosen)
 	if next != chosen {
-		return next, headerDuration
+		return next, headerDuration, nil
 	}
-	return chosen, parsedDuration
+	return chosen, parsedDuration, nil
 }
 
 // cacheLiveScope stores a live/none header-scope result when live caching is on.

@@ -18,6 +18,8 @@ Acquire `updated` in one DecisionStore operation before a stream poll. Redis use
 - Memory: mutex around miss+Set (vendored `ttl_map` Get and Set are separately locked).
 - Do not Get-then-Set. Do not add a SetNX wrapper. Do not put poller or LAPI query logic on `cache.Client`.
 - Two concurrent acquirers on one store: exactly one winner may GET `/v1/decisions/stream`.
+- Release the lease when the poll you won then fails: `c.Cache().Delete(cacheTimeoutKey)` before returning the error. Keep the fetch+apply body in one function (`fetchAndApplyStreamDecisions`) so GET, decode, and apply all release through the same line.
+- A poll that succeeds keeps the key. Do not delete on the success arm — later ticks inside the interval must still skip LAPI.
 
 ## Pattern snippet
 
@@ -26,6 +28,10 @@ won, err := c.Cache().Acquire(context.Background(), cacheTimeoutKey, decisionsco
 if !won {
 	c.hydrateRangeMembership()
 	return nil
+}
+if pollErr := c.fetchAndApplyStreamDecisions(); pollErr != nil {
+	c.Cache().Delete(cacheTimeoutKey)
+	return pollErr
 }
 ```
 
@@ -40,3 +46,6 @@ if !won {
 - Do not turn write-once Client scalars into mutable lease fields.
 - `cache.Client.Acquire` is the cache API (`core_cache_redis.md`). Isolation of the `updated` key is the DecisionStore (`core_cache_client.md`).
 - The lease is not the intra-instance poll lock. Overlapping `handleStreamTicker` on one Client is `core_plugin_lapi_stream-single-flight.md`.
+- Do not release on the loser branch. The loser never owned the key, and deleting it there hands every tick a free GET.
+- Release is one store-agnostic `cache.Client.Delete`. Redis and memory behave the same; do not add a poller-side branch on the store kind.
+- A failed poll releases the lease but does not clear the startup flag. `isCrowdsecStreamStartup` drops to `0` only on a poll that finished.
