@@ -7,7 +7,7 @@ repoSlug: crowdsec-bouncer-traefik-plugin
 destBranch: master
 qualify: qualified
 src: sha256:f4f27c51a2cd43739df1400172c472d87f07284bc05510725cb751c2e4dba5f4
-localTests: none
+localTests: passed
 requirement: requirement.md
 comments: none
 explore: explore.md
