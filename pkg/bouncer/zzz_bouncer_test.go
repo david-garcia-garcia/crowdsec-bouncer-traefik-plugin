@@ -9,7 +9,9 @@ import (
 	"text/template"
 
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -29,6 +31,51 @@ func TestClientRequestRemoteIPIsCanonical(t *testing.T) {
 	got := testClientRequest(req, "2001:0db8:0000:0000:0000:0000:0000:0001")
 	if got.remoteIP != "2001:db8::1" {
 		t.Fatalf("remoteIP=%q", got.remoteIP)
+	}
+}
+
+// TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan fails if ServeHTTP keeps the raw
+// header on remoteIP: lookup keys on that string and misses the canonical slot.
+func TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan(t *testing.T) {
+	log := logger.New("ERROR", "")
+	lapiClient, cacheClient := lapi.NewTestClient(log)
+	t.Cleanup(cacheClient.Close)
+	cacheClient.Set("2001:db8::1", decisionscope.BannedValue, 60)
+	clientChecker, err := ip.NewChecker(log, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	banTemplate, err := template.New("ban").Parse("banned")
+	if err != nil {
+		t.Fatal(err)
+	}
+	passed := false
+	b := &Bouncer{
+		enabled:                  true,
+		crowdsecMode:             configuration.StreamMode,
+		forwardedHeadersInsecure: true,
+		forwardedCustomHeader:    "X-Forwarded-For",
+		lapiClient:               lapiClient,
+		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
+		captchaClient:            &captcha.Client{},
+		log:                      log,
+		remediationStatusCode:    http.StatusForbidden,
+		banTemplate:              banTemplate,
+		banTemplateContentType:   "text/html; charset=utf-8",
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			passed = true
+		}),
+	}
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
+	req.RemoteAddr = "127.0.0.1:1"
+	req.Header.Set("X-Forwarded-For", "2001:0db8:0000:0000:0000:0000:0000:0001")
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, req)
+	if passed {
+		t.Fatal("origin must not run; the expanded header must hit the canonical Ip ban")
+	}
+	if rw.Code != http.StatusForbidden {
+		t.Fatalf("status=%d", rw.Code)
 	}
 }
 
