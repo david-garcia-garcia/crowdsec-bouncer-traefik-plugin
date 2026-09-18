@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-18T17:59:20Z
+Developer review: in progress — 2026-09-18T18:02:35Z
 
 ## What this changes
 **Operators.** None.
@@ -31,17 +31,17 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Prepare complete; product apply has not started. 2 items remain.
+Explore written; product apply has not started. 2 items remain.
 
 Priority: P2 — INFO allow still formats debug strings on every stream request
-Reviewed head: 49afe8c
-Owner decision: None.
+Reviewed head: f4cd3d6
+Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 3/6 | Stub PR is open; CI is in progress; no product apply yet |
-| CI proof | 3/6 | in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377412223 |
+| CI proof | 3/6 | in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377630557 |
 | Local tests proof | N/A | Remote PR; CI proof covers remote |
 | Review resolution | 6/6 | OPEN PR #108; no reviewer comments |
 
@@ -50,8 +50,8 @@ Owner decision: None.
 | --- | --- | --- |
 | Branch | 2026-09-18-lazy-debug-log pushed | `git` / pr-host |
 | OpenSpec | none | `openspec/` |
-| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/108 | pr-host Create |
-| CI | e2e (docker + pester) in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377412198/job/105705267137 ; e2e (binary + mock LAPI) queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377412198/job/105705267061 ; Race detector queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377412223/job/105705266941 ; Main Process queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377412223/job/105705266693 | pr-host CI |
+| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/108 | pr-host List |
+| CI | e2e (docker + pester) in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377630465/job/105706225954 ; e2e (binary + mock LAPI) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377630465/job/105706225554 ; Race detector success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377630557/job/105705997660 ; Main Process in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377630557/job/105705997215 | pr-host CI |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | no `comments.md` |
 
@@ -62,10 +62,16 @@ None.
 None.
 
 ## How this fits together
-Local ticket `2026-09-18-lazy-debug-log` runs on branch `2026-09-18-lazy-debug-log` as PR #108. Prepare qualified-with-gaps; explore has not started.
+Local ticket `2026-09-18-lazy-debug-log` runs on branch `2026-09-18-lazy-debug-log` as PR #108. Explore is written; propose is next.
 
 ## Decision needed
-None.
+| Question | Decision | By |
+| --- | --- | --- |
+| slog attributes or `Enabled` before `Sprintf` on the hot path? | assumed — slog attributes. Same fields, recognizable message stems, no `ctx`, no format string on INFO. | explore |
+| Must Set/Delete change in the same apply (ticket names them; desired says Get/GetMany at minimum)? | assumed — yes. They share the Debug `Sprintf` pattern on `cache.Client`. Leave `cache.New`. | explore |
+| Which other ServeHTTP Debug lines change for Symmetry? | assumed — every Debug `Sprintf`/`+` in `ServeHTTP`. Leave `handleRemediationServeHTTP` and AppSec Debug. Leave Error/Warn. | explore |
+| Re-measure ticket ns (INFO 524 / DEBUG 2015) before proposing? | assumed — no. Call sites match. Implement adds tests that INFO does not emit Debug; do not require a committed benchmark. | explore |
+| Write a stdlib slog research folder? | assumed — no. Evaluation-before-Enabled is stdlib; ticket already states it. | explore |
 
 ## Before merge
 - [ ] [P2] On `ServeHTTP` and cache Get/GetMany (at minimum), do not evaluate `fmt.Sprintf` unless Debug is enabled; keep the fields.
@@ -84,7 +90,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 49afe8c408a83160f27b81fb2fcaff9aa5f8ba61 | Card must match the branch you measured |
+| Reviewed head | f4cd3d6c2b6d3dd411c6dc1639f26ac2a70932b1 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -92,9 +98,9 @@ None.
 ### Technical review
 Best possible solution: Not applied yet. DestBranch still `Sprintf`s before `Debug` on the stream allow path.
 
-Do we have a high-confidence way to reproduce? Yes — read `pkg/bouncer/bouncer.go` and `pkg/cache/cache.go`; `Sprintf` runs before `Debug`. Ticket ns numbers were not re-measured this prepare.
+Do we have a high-confidence way to reproduce? Yes — read `pkg/bouncer/bouncer.go` and `pkg/cache/cache.go`; `Sprintf` runs before `Debug`. Ticket ns numbers were not re-measured.
 
-Is this the best way to solve the issue? Yes versus DestBranch: slog attributes or `Enabled` before `Sprintf` so INFO does not format those strings. Do not replace slog or change default `logLevel`.
+Is this the best way to solve the issue? Yes versus DestBranch: slog attributes so INFO does not format those strings. Do not replace slog or change default `logLevel`.
 
 ### Evidence
 What I checked:
@@ -103,8 +109,9 @@ What I checked:
 - `cache.Client` Get/GetMany/Set/Delete `Sprintf` then Debug (`pkg/cache/cache.go`)
 - Logger is stdlib `*slog.Logger` with default INFO (`pkg/logger/logger.go`)
 - Stream/live/alone cache consult uses `GetMany` (`pkg/decisionscope/lookup.go`)
+- Explore written (`devstate/explore.md`); slog attributes + Set/Delete + ServeHTTP Debug siblings assumed
 - OPEN PR #108; comment inventory empty (pr-host)
-- CI on this head: in progress / queued (pr-host check runs)
+- CI on this head: two success, two in progress (pr-host check runs)
 
 ### Rank-up moves
 None.
