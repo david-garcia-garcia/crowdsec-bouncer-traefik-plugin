@@ -69,6 +69,10 @@ func TestCheckerContains(t *testing.T) {
 			t.Fatal("expected error for 192.168.1.0/33")
 		}
 	})
+}
+
+func TestCheckerContainsZonedAddress(t *testing.T) {
+	log := slog.Default()
 
 	t.Run("zoned IPv6 is in link-local pool", func(t *testing.T) {
 		checker, err := NewChecker(log, []string{"fe80::/10"})
@@ -150,34 +154,45 @@ func runGetRemoteIPCases(t *testing.T, tests []getRemoteIPCase) {
 				req.Header.Set(tc.headerName, tc.headerVal)
 			}
 			got, parsed, err := GetRemoteIP(req, tc.strategy, tc.headerName, tc.insecure)
-			if tc.wantErr {
-				if err == nil {
-					t.Fatal("expected error")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("GetRemoteIP = %q, %v", got, err)
-			}
-			if got != tc.wantIP {
-				t.Fatalf("GetRemoteIP = %q want %q", got, tc.wantIP)
-			}
-			if tc.wantParsed && parsed == nil {
-				t.Fatalf("GetRemoteIP parsed = nil want non-nil for %q", got)
-			}
-			if !tc.wantParsed && parsed != nil {
-				t.Fatalf("GetRemoteIP parsed = %v want nil for %q", parsed, got)
-			}
-			if tc.wantParsedIP != "" {
-				want := net.ParseIP(tc.wantParsedIP)
-				if want == nil {
-					t.Fatalf("invalid wantParsedIP %q", tc.wantParsedIP)
-				}
-				if parsed == nil || !parsed.Equal(want) {
-					t.Fatalf("GetRemoteIP parsed = %v want %v", parsed, want)
-				}
-			}
+			assertGetRemoteIPResult(t, tc, got, parsed, err)
 		})
+	}
+}
+
+func assertGetRemoteIPResult(t *testing.T, tc getRemoteIPCase, got string, parsed net.IP, err error) {
+	t.Helper()
+	if tc.wantErr {
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		return
+	}
+	if err != nil {
+		t.Fatalf("GetRemoteIP = %q, %v", got, err)
+	}
+	if got != tc.wantIP {
+		t.Fatalf("GetRemoteIP = %q want %q", got, tc.wantIP)
+	}
+	if tc.wantParsed && parsed == nil {
+		t.Fatalf("GetRemoteIP parsed = nil want non-nil for %q", got)
+	}
+	if !tc.wantParsed && parsed != nil {
+		t.Fatalf("GetRemoteIP parsed = %v want nil for %q", parsed, got)
+	}
+	assertGetRemoteIPParsed(t, tc.wantParsedIP, parsed)
+}
+
+func assertGetRemoteIPParsed(t *testing.T, wantParsedIP string, parsed net.IP) {
+	t.Helper()
+	if wantParsedIP == "" {
+		return
+	}
+	want := net.ParseIP(wantParsedIP)
+	if want == nil {
+		t.Fatalf("invalid wantParsedIP %q", wantParsedIP)
+	}
+	if parsed == nil || !parsed.Equal(want) {
+		t.Fatalf("GetRemoteIP parsed = %v want %v", parsed, want)
 	}
 }
 
