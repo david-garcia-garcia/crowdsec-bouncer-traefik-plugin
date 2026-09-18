@@ -114,6 +114,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		config.CaptchaCustomKey,
 		config.CaptchaCustomResponse,
 		config.CaptchaCustomValidateURL,
+		config.CaptchaCustomValidateBody,
 		config.CaptchaSiteKey,
 		config.CaptchaSecretKey,
 		captchaGateSecret,
