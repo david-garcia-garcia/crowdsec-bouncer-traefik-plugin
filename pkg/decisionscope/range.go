@@ -21,20 +21,21 @@ func RemoveRange(cacheClient *cache.Client, cidr string) {
 }
 
 // ApplyRangeBatch upserts and removes Range lines with one cache read and one write.
+// Removals run first so a CIDR present in both maps remains the replacement.
 func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, removals []string) {
 	if len(upserts) == 0 && len(removals) == 0 {
 		return
 	}
 	index := readRangeIndex(cacheClient)
+	for _, cidr := range removals {
+		index = removeCIDRFromIndex(index, strings.TrimSpace(cidr))
+	}
 	for cidr, remediation := range upserts {
 		network := strings.TrimSpace(cidr)
 		if network == "" || !IsActiveRemediation(remediation) {
 			continue
 		}
 		index = upsertIndexCIDR(index, network, remediation)
-	}
-	for _, cidr := range removals {
-		index = removeCIDRFromIndex(index, strings.TrimSpace(cidr))
 	}
 	if index == "" {
 		cacheClient.Delete(RangeIndexKey)
