@@ -323,8 +323,11 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		return err
 	}
 
-	if _, err := GetVariable(config, "RedisCachePassword"); err != nil {
-		return err
+	// Redis password file is unused when Redis is off; skip Stat/read so leftovers do not fail startup.
+	if config.RedisCacheEnabled {
+		if _, err := GetVariable(config, "RedisCachePassword"); err != nil {
+			return err
+		}
 	}
 
 	if err := validateCaptchaCredentialsAndTemplates(config); err != nil {
