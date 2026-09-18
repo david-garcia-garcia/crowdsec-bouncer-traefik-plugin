@@ -11,4 +11,4 @@ JobName: 2026-09-18-lapi-session-test-log-race
 | codereview | [x] | [x] | 2026-09-18T12:32:41Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T12:32:41Z |
 | archive | [x] | [x] | 2026-09-18T12:32:41Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-18T12:40:05Z |
