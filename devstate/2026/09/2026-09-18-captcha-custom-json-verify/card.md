@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-18T17:55:25Z
+Developer review: in progress — 2026-09-18T18:06:32Z
 
 ## What this changes
 **Operators.** None.
 
 **Admin users.** None.
 
-**Developers.** None.
+**Developers.** OpenSpec change `captcha-custom-validate-body` folds custom siteverify request encoding onto `core_plugin_middleware_captcha-siteverify` and `CaptchaCustomValidateBody` tokens onto `core_plugin_middleware_config-validation`. No product apply yet.
 
 **End users.** None.
 
@@ -29,17 +29,17 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Prepare stub only; no product apply yet. 6 items remain.
+Propose apply-ready; no product apply yet. 5 items remain.
 
 Priority: P2 — CapJS custom siteverify fails on dest while form providers still work
-Reviewed head: 0700e91
+Reviewed head: 4b299f4
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI still in progress; no product apply |
-| CI proof | 3/6 | in progress — [Race detector succeeded](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377076525/job/105704161130); [Main Process](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377076525/job/105704161384), [e2e mock](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377076520/job/105704161566), [e2e docker](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377076520/job/105704161735) running |
+| Overall readiness | 3/6 | CI in progress on the propose head; no product apply |
+| CI proof | 3/6 | in progress — [Main Process](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378176157/job/105707774311), [e2e mock](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378176171/job/105707825784) running; [Race detector](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378176157/job/105707774547), [e2e docker](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378176171/job/105707825999) queued |
 | Local tests proof | N/A | `localTests: none` before implement |
 | Review resolution | 6/6 | OPEN PR #105; no review comments |
 
@@ -47,26 +47,28 @@ Owner decision: None.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-18-captcha-custom-json-verify pushed | `git` / origin |
-| OpenSpec | none | `openspec/` |
-| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/105 | pr-host Create |
-| CI | Race detector success; Main Process and both e2e in progress | GitHub check runs on 0700e91 |
+| OpenSpec | captcha-custom-validate-body | `openspec/changes/captcha-custom-validate-body/` |
+| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/105 | pr-host List |
+| CI | in progress on 4b299f4 | GitHub check runs 35378176157 / 35378176171 |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | no comments.md; Comment-List empty |
 
 ## Specs
-None.
+- [core_plugin_middleware_captcha-siteverify](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-captcha-custom-json-verify/openspec/changes/captcha-custom-validate-body/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-captcha-custom-json-verify/openspec/changes/captcha-custom-validate-body/proposal.md) — modified
 
 ## Follow-up issues
 None.
 
 ## How this fits together
-Local ticket → branch `2026-09-18-captcha-custom-json-verify` from `origin/master` → stub PR #105 → CI started on the empty start commit.
+Local ticket → branch `2026-09-18-captcha-custom-json-verify` from `origin/master` → stub PR #105 → OpenSpec `captcha-custom-validate-body` apply-ready → CI running on 4b299f4.
 
 ## Decision needed
 None.
 
 ## Before merge
-- [ ] Add `captchaCustomValidateBody` (`""`/`form` vs `json`) for custom only, with tests and a CapJS README example
+- [ ] Implement `captchaCustomValidateBody` (`""`/`form` vs `json`) for custom only, with tests and a CapJS README example
+- [x] OpenSpec change `captcha-custom-validate-body` apply-ready
 - [x] Stub PR #105 opened
 
 ## Findings
@@ -80,15 +82,15 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 0700e91ef7b014cea6b32e803807d686cf3123bb | Card must match the branch you measured |
+| Reviewed head | 4b299f41a33849388ce317dfda41dee1a897637c | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: not applied yet versus dest `PostForm`-only `Validate`.
+Best possible solution: custom-only `captchaCustomValidateBody` (`""`/`form` keep dest `PostForm`; `json` POSTs official Cap JSON) versus dest `PostForm`-only `Validate`.
 
 Do we have a high-confidence way to reproduce? Yes, dest `Validate` always `PostForm`; CapJS documents JSON siteverify.
 
@@ -97,9 +99,9 @@ Is this the best way to solve the issue? Yes — a custom-only encoding knob kee
 ### Evidence
 What I checked:
 - dest `Validate(r)` posts urlencoded `secret`+`response` only (`pkg/captcha/captcha.go`, `origin/master` 46a81d0)
-- no `CaptchaCustomValidateBody` (`pkg/configuration/configuration.go`)
-- Wicketkeeper example documents urlencoded siteverify (`examples/custom-captcha/README.md`)
-- PR #105 Comment-List empty; one OPEN PR for this head
+- OpenSpec change `captcha-custom-validate-body` apply-ready (`openspec validate` passed, 4b299f4)
+- FindSpecHost fold: `core_plugin_middleware_captcha-siteverify`, `core_plugin_middleware_config-validation`
+- PR #105 Comment-List empty; CI pending on 4b299f4
 
 ### Rank-up moves
 None.

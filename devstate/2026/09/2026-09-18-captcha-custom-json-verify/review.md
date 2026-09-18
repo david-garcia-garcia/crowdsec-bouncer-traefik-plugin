@@ -13,3 +13,11 @@ fixed: Cap Standalone siteverify research; explore.md decisions (built-in+json =
 skipped: product apply; propose
 qualify: qualified-with-gaps
 pr: 105
+
+## propose (2026-09-18)
+phase: propose
+findings: none
+fixed: OpenSpec captcha-custom-validate-body apply-ready; fold captcha-siteverify + config-validation
+skipped: product apply; implement
+qualify: qualified-with-gaps
+pr: 105
