@@ -9,6 +9,6 @@ JobName: 2026-09-18-captcha-html-path-clobbers-file-path
 | propose | [x] | [x] | 2026-09-18T14:27:01Z |
 | implement | [x] | [x] | 2026-09-18T14:45:41.444Z |
 | codereview | [x] | [x] | 2026-09-18T14:49:57.507Z |
-| devdocsimpact | [ ] | [ ] | |
+| devdocsimpact | [x] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |

@@ -23,7 +23,7 @@ The operator enum (`passthrough` | `ban` | `captcha`) this plugin applies when L
 _Avoid_: fail mode, FailMode, the three removed AppSec block bools, AppSec JSON `action: captcha`, LAPI Client identity
 
 **Prepared config**:
-`New`'s own shallow copy of the `*configuration.Config` Traefik owns (`prepared`). Everything downstream of `New` reads and writes that copy: normalised `logLevel`, the `Prepare` secret resolution, alone-mode LAPI rewrite. Its slice and map fields still alias the caller's.
+`New`'s own shallow copy of the `*configuration.Config` Traefik owns (`prepared`). Everything downstream of `New` reads and writes that copy: normalised `logLevel`, the deprecated HTML-path copy, the `Prepare` secret resolution, alone-mode LAPI rewrite. Its slice and map fields still alias the caller's.
 _Avoid_: writing through Traefik's pointer, deep copy, mutating `DecisionScopeHeaders` or the trusted-IP slices in place
 
 **Bind context**:
@@ -43,6 +43,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - Keep `CreateConfig` / `New` on the module root (`plugin.go`).
 - Keep `pluginVersion` in root `version.go` (release workflow bumps it). Pass it into `lapi.New` and `appsec.New`.
 - Snapshot first: `prepared := *config`, then work on `&prepared` for the rest of `New`. Never write through Traefik's pointer.
+- After the snapshot, copy `BanHTMLFilePath` onto `BanFilePath` and `CaptchaHTMLFilePath` onto `CaptchaFilePath` only when the current field is empty. Do it on `prepared` before `ValidateParams`. When both captcha keys are set, keep `CaptchaFilePath`. Do not treat the `/captcha.html` default as empty.
 - Derive `bindCtx, releaseHolders := context.WithCancel(ctx)` before the first `Open`, and release it from a `defer` that fires only when the named `err` is non-nil. `err` is named for that reason (`//nolint:nonamedreturns`); a closure-captured bool is the form the ticket rejected.
 - Call `lapi.Prepare` then `appsec.Prepare`. Stream/alone: `lapi.OpenStream` (registers this bind ctx on the live-router scope union). Live/none: `lapi.OpenLive`. `crowdsecMode: appsec`: skip LAPI Open. When `crowdsecAppsecEnabled`: `appsec.Open` (`AdoptTransport` inside). Return `bouncer.New(..., lapiClient, appsecClient, ...)`. Open key: `core_plugin_lapi_reclaim-key.md`. Stream `scopes=`: `core_plugin_lapi_scope-union.md`.
 - `bouncer.New`'s appsec-mode early return is conditional: appsec mode still initialises the captcha client when the effective `crowdsecAppsecFailureAction` is `captcha`, because `handleRemediationServeHTTP` bans on an invalid captcha client.
@@ -81,6 +82,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 ## Key files
 
 - `plugin.go`
+- `pkg/configuration/configuration.go`
 - `pkg/lapi/`
 - `pkg/lapi/client_http.go`
 - `pkg/lapi/client_live.go`
@@ -91,6 +93,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 
 ## Gotchas
 
+- `CreateConfig` returns `configuration.New()`, which sets `CaptchaFilePath` to `/captcha.html` and `BanFilePath` to `""`. Traefik mapstructure overlay does not set `ZeroFields`, so a missing `captchaFilePath` keeps that default (`knowledge/research/ext_traefik_plugins_config-overlay/`). Copy the deprecated HTML path only when the current field is empty; do not special-case `/captcha.html`.
 - The reclaim table has no Release: a holder goes away only when the context it bound is Done (`std_go_reclaim.md`). That is why `New` opens on `bindCtx` — with Traefik's own long-lived ctx, a constructor that failed after `OpenStream` left the stream ticker polling LAPI for the process lifetime.
 - Do not release `bindCtx` on the success path, and do not parent it on `context.Background()`: the first disposes the incarnation the handler is about to use, the second survives a Traefik shutdown.
 - `crowdsecMode: appsec` with `crowdsecAppsecEnabled: false` is accepted and warned at `WARN` from `ValidateParams` (`warnUnenforcedAppsecMode`). Do not turn that into an error and do not imply `crowdsecAppsecEnabled` on — `crowdsecAppsecHost` defaults to `crowdsec:7422` and `crowdsecAppsecFailureAction` to `ban`, so implying it bans every request on that router.
