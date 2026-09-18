@@ -9,3 +9,9 @@ phase: explore
 findings: miss-as-error reproduced on LookupCachedRemediation (7 allocs / 184 B) and Client.Get (3 allocs / 64 B)
 fixed: none
 skipped: full ServeHTTP stream-allow bench (no bouncer harness); lazy slog on Get/GetMany
+
+## propose (2026-09-18T18:03:39Z)
+phase: propose
+findings: none
+fixed: none
+skipped: none

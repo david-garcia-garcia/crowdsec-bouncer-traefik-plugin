@@ -6,7 +6,7 @@ JobName: 2026-09-18-cache-miss-sentinel
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-18T17:58:40Z |
 | explore | [x] | [x] | 2026-09-18T18:01:41Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [x] | 2026-09-18T18:03:39Z |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
