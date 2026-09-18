@@ -8,7 +8,7 @@ _Avoid_: `sync.Once`, process singleton, middleware-name key
 
 ## Overview
 
-`pkg/reclaim` is a thin shim over traefik-middleware-utilities `reclaim` (`Default`, `ProcessGrace` 30s, `Open` / `OpenWithHooks`, `ResetForTest` / `ResetForTestWith`). Call `reclaim.Open` / `OpenWithHooks` with Traefik’s `New` ctx. Pass `reclaim.Hooks` as funcs (Yaegi v0.16 panics on asserting a foreign concrete type). Do not take `OpenTyped` (it still takes `func() (any, Hooks, error)`). Do not use `*Wrapped` or `OpenWithGrace`. Do not export or call `Peek` / `PeekLivePrefix` / `View`.
+`pkg/reclaim` is a thin shim over traefik-middleware-utilities `reclaim` (`Default`, `ProcessGrace` 30s, `Open` / `OpenWithHooks`, `ResetForTest` / `ResetForTestWith`). Call `reclaim.Open` / `OpenWithHooks` with a context that ends when the caller no longer wants the value — in `plugin.go` that is a `context.WithCancel` child of Traefik’s `New` ctx, not the ctx itself, because the table has no Release and a constructor that fails later has to hand the holder back somehow. Pass `reclaim.Hooks` as funcs (Yaegi v0.16 panics on asserting a foreign concrete type). Do not take `OpenTyped` (it still takes `func() (any, Hooks, error)`). Do not use `*Wrapped` or `OpenWithGrace`. Do not export or call `Peek` / `PeekLivePrefix` / `View`.
 
 ## How to use
 
@@ -40,6 +40,7 @@ stored, err := reclaim.OpenWithHooks(ctx, key, log, func() (any, reclaim.Hooks, 
 - Logger is required.
 - Watch `reclaim_put|bind|orphan|reclaim|dispose`.
 - Zero table grace disposes as soon as the last holder’s ctx is done.
+- There is no Release and no unbind. The only way to give a holder back is to end the context that bound it, which is why callers that can fail after an `Open` bind a cancellable child of their own (`core_plugin_middleware.md` bind context).
 - `DefaultGrace` (10s) is the utilities negative-grace fallback. This plugin’s process table uses `ProcessGrace` (30s).
 - Yaegi v0.16 panics on asserting a foreign concrete type to closer/sleeper. Pass Hooks funcs.
 - Callers in another package import this shim, not `github.com/david-garcia-garcia/traefik-middleware-utilities/reclaim`.
