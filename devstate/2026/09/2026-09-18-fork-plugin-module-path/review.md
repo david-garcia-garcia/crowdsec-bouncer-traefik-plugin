@@ -15,3 +15,9 @@ phase: propose
 findings: none
 fixed: none
 skipped: no Task subagent; FindSpecHost on main thread; OpenSpec artifacts committed as retarget-plugin-module-path
+
+## implement (2026-09-18)
+phase: implement
+findings: Main gofmt failure on pkg/cache/zzz_cache_test.go after import rewrite
+fixed: gofmt import order; all retarget-plugin-module-path tasks [x]
+skipped: none; local tests passed; CI Main/Race 35377386877 and e2e 35377387005 succeeded

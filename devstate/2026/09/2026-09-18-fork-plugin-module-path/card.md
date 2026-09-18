@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-18T17:48:18Z
+Developer review: ready for review — 2026-09-18T18:04:56Z
 
 ## What this changes
-**Operators.** None.
+**Operators.** In-tree compose, e2e, Kubernetes values, and binary-vm now load this tree as `localPlugins.bouncer` at `github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin` (bind-mount or a documented copy to `plugins-local/src/<module>`). Catalog `version=` pins of this module are gone. Hosts that already load upstream `experimental.plugins.bouncer` must register this fork under a different alias (`localPlugins.crowdsec` + `plugin.crowdsec`). `.traefik.yml` `displayName` is `CrowdSec Bouncer Traefik Plugin (david-garcia-garcia)`.
 
 **Admin users.** None.
 
-**Developers.** OpenSpec change `retarget-plugin-module-path` specifies retargeting `go.mod`, `.traefik.yml` `import`, Main/race GOPATH, and in-tree loads to `github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin`, with catalog-form examples flipped to `localPlugins`.
+**Developers.** `go.mod` `module`, every in-tree import of this module, `.traefik.yml` `import`, and Main/race GOPATH checkout are `github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin`. Live specs name that path. Usage `core_plugin_middleware.md` now says keep `import` matching `go.mod`.
 
 **End users.** None.
 
@@ -27,28 +27,28 @@ flowchart TD
 ```
 
 ## Merge readiness
-Propose artifacts are apply-ready; product identity is still DestBranch. 2 items remain.
+Apply landed on `b412e52`; Main, race, and both e2e jobs succeeded. 0 items remain.
 
 Priority: P2 — operators cannot load this fork beside upstream without replacing it
-Reviewed head: adba0bf
+Reviewed head: b412e52
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | OpenSpec landed; apply not started; CI still running |
-| CI proof | 3/6 | Main Process, Race detector, and both e2e jobs in progress |
-| Local tests proof | N/A | Before implement (`localTests: none`) |
+| Overall readiness | 6/6 | CI succeeded; no open reviewer comments |
+| CI proof | 6/6 | Main, Race, and both e2e jobs succeeded |
+| Local tests proof | N/A | `prHost` remote; CI proof covers remote |
 | Review resolution | 6/6 | OPEN PR, no reviewer comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-18-fork-plugin-module-path pushed | `git` `adba0bf` on `origin` |
+| Branch | 2026-09-18-fork-plugin-module-path pushed | `git` `b412e52` on `origin` |
 | OpenSpec | retarget-plugin-module-path | `openspec/changes/retarget-plugin-module-path/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/101 | pr-host List |
-| CI | build 35376447167 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35376447167 ; e2e 35376446968 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35376446968 | pr-host CI |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 35377386877 success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377386877 ; e2e 35377387005 success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377387005 | pr-host CI |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | no comments.md |
 
 ## Specs
@@ -61,7 +61,7 @@ Owner decision: Required. See Decision needed.
 - [ ] [Retarget renovate depNameTemplate off maxlerebourg](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-fork-plugin-module-path/knowledge/debt/2026-09-18-renovate-depname-maxlerebourg.md) — renovate.json still templates maxlerebourg/crowdsec-bouncer-traefik-plugin; ticket left it out of scope.
 
 ## How this fits together
-Local spec → branch `2026-09-18-fork-plugin-module-path` → stub PR 101 → OpenSpec change `retarget-plugin-module-path` → CI on `adba0bf`.
+Local spec → branch `2026-09-18-fork-plugin-module-path` → stub PR 101 → apply `retarget-plugin-module-path` → CI on `b412e52` succeeded.
 
 ## Decision needed
 | Question | Decision | By |
@@ -73,8 +73,8 @@ Local spec → branch `2026-09-18-fork-plugin-module-path` → stub PR 101 → O
 | Should core_plugin_middleware_bouncer be renamed because “bouncer” is also the Traefik alias? | assumed — no. Update the import WHEN only | explore |
 
 ## Before merge
-- [ ] Apply `retarget-plugin-module-path` (module / manifest / CI GOPATH / localPlugins examples)
-- [ ] [P2] Document a different operator key when upstream `plugins.bouncer` is kept
+- [x] Apply `retarget-plugin-module-path` (module / manifest / CI GOPATH / localPlugins examples)
+- [x] [P2] Document a different operator key when upstream `plugins.bouncer` is kept
 
 ## Findings
 None.
@@ -89,25 +89,26 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 3 modified | Same list as ## Specs; do not paste diff --stat |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | adba0bf208e7052802921c0137e20d400193c52b | Card must match the branch you measured |
+| Reviewed head | b412e525eeed317cbf6f1e98fdc276b46c439941 | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: specify `go.mod` as the identity owner, flip in-tree loads to localPlugins (catalog GET 404s; forks are not listed), keep alias `bouncer`; apply is not on DestBranch...HEAD yet.
+Best possible solution: `go.mod` is the identity owner; in-tree loads use localPlugins at that path because catalog GET of this module 404s and forks are not listed; alias `bouncer` stays in-tree.
 
-Do we have a high-confidence way to reproduce? Yes, `go.mod` `module` and `.traefik.yml` `import` are the old path on `origin/master`.
+Do we have a high-confidence way to reproduce? Yes — `origin/master` still has the old `go.mod` module and `.traefik.yml` `import`; this branch retargets both.
 
 Is this the best way to solve the issue? Yes versus DestBranch — retarget plus localPlugins, not a catalog pin of this unpublished module.
 
 ### Evidence
 What I checked:
 - Dest HEAD `46a81d0` (`origin/master`)
-- Reviewed HEAD `adba0bf` (OpenSpec change only)
-- `openspec validate retarget-plugin-module-path --strict` passed
+- Reviewed HEAD `b412e525eeed317cbf6f1e98fdc276b46c439941`
+- Local `go build ./...`, `go vet ./...`, `go test ./pkg/...`, `go test .` passed
+- CI Main/Race 35377386877 success; e2e 35377387005 success
+- First Main on `5629849` failed gofmt on `pkg/cache/zzz_cache_test.go`; fixed on `b412e52`
 - PR 101; comment inventory empty
-- CI runs 35376447167 and 35376446968 in progress
 - qualify `qualified-with-gaps`
 
 ### Rank-up moves
