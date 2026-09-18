@@ -10,5 +10,5 @@ JobName: 2026-09-18-appsec-empty-host-accepted
 | implement | [x] | [x] | 2026-09-18T14:47:38.9898822Z |
 | codereview | [x] | [x] | 2026-09-18T14:55:08.1775673Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T14:59:44.2594512Z |
-| archive | [ ] | [ ] | |
+| archive | [x] | [ ] | |
 | pullrequest | [ ] | [ ] | |
