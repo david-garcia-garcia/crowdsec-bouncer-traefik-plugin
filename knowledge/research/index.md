@@ -59,3 +59,8 @@ description: Official Google reCAPTCHA siteverify behavior this product relies o
 priority: normal
 local: index_ext_cloudflare.md
 description: Official Cloudflare Turnstile siteverify behavior this product relies on.
+
+## capjs
+priority: normal
+local: index_ext_capjs.md
+description: Official Cap Standalone (trycap.dev / CapJS) siteverify behavior this product relies on.

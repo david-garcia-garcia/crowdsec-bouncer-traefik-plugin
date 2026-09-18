@@ -11,10 +11,11 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strings"
 	"text/template"
 	"time"
 
-	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
 // Client Captcha client.
@@ -31,8 +32,10 @@ type Client struct {
 	httpClient              *http.Client
 	log                     *slog.Logger
 	infoProvider            *infoProvider
-	challengeURL            string
-	customResourcePaths     []string
+	// challengeURL and validateBody are custom-only; built-ins leave them empty.
+	challengeURL        string
+	validateBody        string
+	customResourcePaths []string
 }
 
 // Information for self-hosted provider.
@@ -66,7 +69,7 @@ var infoProviders = map[string]*infoProvider{
 }
 
 // New Initialize captcha client.
-func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, challengeURL, key, response, validate, siteKey, secretKey, gateSecret string, gateBindIP bool, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, challengeURL, key, response, validate, validateBody, siteKey, secretKey, gateSecret string, gateBindIP bool, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
@@ -75,6 +78,7 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 	if provider == configuration.CustomProvider {
 		info = &infoProvider{js: js, key: key, response: response, validate: validate}
 		c.challengeURL = challengeURL
+		c.validateBody = strings.TrimSpace(validateBody)
 		c.storeCustomResourcePaths(js, challengeURL)
 	} else {
 		info = infoProviders[provider]
@@ -262,6 +266,14 @@ type responseProvider struct {
 	Success bool `json:"success"`
 }
 
+// siteverifyRequest is the JSON body custom+json POSTs to the provider validate URL.
+// RemoteIP is omitempty so an empty Validate address does not invent the field.
+type siteverifyRequest struct {
+	Secret   string `json:"secret"`
+	Response string `json:"response"`
+	RemoteIP string `json:"remoteip,omitempty"`
+}
+
 // captchaResponseFromRequest reads the provider token from query, POST form, or
 // raw urlencoded body. Traefik's Yaegi request wrapper often leaves Form empty
 // after FormValue, so the body is parsed directly when ParseForm yields nothing.
@@ -300,6 +312,31 @@ func captchaResponseFromRequest(r *http.Request, field string) string {
 	return values.Get(field)
 }
 
+// postSiteverify POSTs secret and response to the provider validate URL.
+// Custom+json sends application/json; form/omit and built-ins keep PostForm.
+// remoteip is added on both encodings only when remoteIP is non-empty.
+func (c *Client) postSiteverify(response, remoteIP string) (*http.Response, error) {
+	if c.validateBody == configuration.CaptchaCustomValidateBodyJSON {
+		payload, err := json.Marshal(siteverifyRequest{Secret: c.secretKey, Response: response, RemoteIP: remoteIP})
+		if err != nil {
+			return nil, err
+		}
+		req, err := http.NewRequest(http.MethodPost, c.infoProvider.validate, bytes.NewReader(payload))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		return c.httpClient.Do(req)
+	}
+	body := url.Values{}
+	body.Add("secret", c.secretKey)
+	body.Add("response", response)
+	if remoteIP != "" {
+		body.Add("remoteip", remoteIP)
+	}
+	return c.httpClient.PostForm(c.infoProvider.validate, body)
+}
+
 // Validate Verify the captcha from provider API.
 func (c *Client) Validate(r *http.Request, remoteIP string) (bool, error) {
 	if r.Method != http.MethodPost {
@@ -311,11 +348,7 @@ func (c *Client) Validate(r *http.Request, remoteIP string) (bool, error) {
 		c.log.Debug("captcha:Validate no captcha response found in request")
 		return false, nil
 	}
-	var body = url.Values{}
-	body.Add("secret", c.secretKey)
-	body.Add("response", response)
-	body.Add("remoteip", remoteIP)
-	res, err := c.httpClient.PostForm(c.infoProvider.validate, body)
+	res, err := c.postSiteverify(response, remoteIP)
 	if err != nil {
 		c.log.Error("captcha:Validate " + err.Error())
 		return false, err

@@ -12,6 +12,7 @@
 - hcaptcha
 - recaptcha
 - cloudflare
+- capjs
 
 ## std
 - go

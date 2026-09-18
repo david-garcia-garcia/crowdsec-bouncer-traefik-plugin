@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
-	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
-	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
+	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
+	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // CreateConfig creates the default plugin configuration.

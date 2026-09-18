@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
 func testNextOK() http.Handler {

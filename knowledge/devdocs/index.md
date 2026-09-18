@@ -10,6 +10,11 @@ priority: normal
 local: index_build_e2e.md
 description: How this repo runs Traefik plugin end-to-end coverage.
 
+## ci
+priority: normal
+local: index_build_ci.md
+description: How this repo's GitHub Actions jobs lay out the Go workspace for Yaegi and tests.
+
 ## plugin
 priority: normal
 local: index_core_plugin.md
