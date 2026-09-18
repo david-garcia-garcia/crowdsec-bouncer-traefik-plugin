@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: folded core_plugin_middleware_config-validation; moved change to openspec/changes/archive/2026-09-18-alone-mode-appsec-validation/
 skipped: Task subagent unavailable (cursor tools: AwaitShell, Delete, EditNotebook, FetchMcpResource, GenerateImage, ReadLints, SwitchMode, TodoWrite, WebFetch, WebSearch); FindSpecHost ran on archive thread
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: dropped WIP title on PR 80; waited CI success on 4e18715 (Main 35361106893, E2E 35361106925)
+skipped: no comments.md replies

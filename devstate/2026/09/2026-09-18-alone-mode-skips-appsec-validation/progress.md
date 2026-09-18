@@ -11,4 +11,4 @@ JobName: 2026-09-18-alone-mode-skips-appsec-validation
 | codereview | [x] | [x] | 2026-09-18T15:05:13Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T15:08:37Z |
 | archive | [x] | [x] | 2026-09-18T15:13:17Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-18T15:21:13Z |
