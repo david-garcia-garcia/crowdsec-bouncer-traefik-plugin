@@ -4,3 +4,7 @@
 - created knowledge/devdocs/core_plugin_appsec_backend-backoff.md
 - updated knowledge/devdocs/index_core_plugin.md
 - updated knowledge/devdocs/core_plugin_middleware_config-validation.md
+- updated knowledge/devdocs/core_plugin_lapi_connection.md
+- updated knowledge/devdocs/core_plugin_lapi_reclaim-key.md
+- updated knowledge/devdocs/core_plugin_appsec.md
+- updated knowledge/devdocs/core_plugin_middleware.md
