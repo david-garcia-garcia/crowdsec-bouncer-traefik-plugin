@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-improve-readme
+jobName: 2026-09-18-improve-readme
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:434aeaf1969be2e108af14a524f859592bdc63c7f9d30042f8262b66801bd0ea
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr:
+  id: 75
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/75

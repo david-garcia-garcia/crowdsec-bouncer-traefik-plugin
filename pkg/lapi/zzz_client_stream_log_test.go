@@ -1,7 +1,6 @@
 package lapi
 
 import (
-	"bytes"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -32,12 +31,12 @@ func newTestStreamTickClient(t *testing.T, log *slog.Logger, host string, httpCl
 	return client
 }
 
-// captureTestStreamTickLog runs fn with a JSON slog handler at level and returns the buffer.
+// captureTestStreamTickLog runs fn with a JSON slog handler at level and returns what it logged.
 func captureTestStreamTickLog(t *testing.T, level slog.Level, fn func(*slog.Logger)) string {
 	t.Helper()
-	var buf bytes.Buffer
-	fn(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: level})))
-	return buf.String()
+	log, sink := newTestLogSink(level)
+	fn(log)
+	return sink.String()
 }
 
 // TestHandleStreamCacheUpdatedIsDebug proves a successful LAPI fetch logs at DEBUG, not INFO.
