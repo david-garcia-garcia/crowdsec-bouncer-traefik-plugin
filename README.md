@@ -444,7 +444,15 @@ make run
 - ForwardedHeadersCustomName
   - string
   - default: "X-Forwarded-For"
-  - Name of the header where the real IP of the client should be retrieved
+  - Name of the header where the real IP of the client should be retrieved.
+  - The named header is only read when the socket peer is inside `ForwardedHeadersTrustedIPs`, and a non-empty list is still checked per request.
+  - That same list also skips hops inside the header value, right-to-left; the first value that is not in the list wins.
+  - `X-Real-Ip` is trustworthy only when the proxy in front actually sets it. Traefik's entrypoint deletes `X-Forwarded-*` and `X-Real-Ip` from untrusted peers and only writes `X-Real-Ip` when absent, filling it with the socket peer. Cloudflare sends `CF-Connecting-IP` and `X-Forwarded-For` but not `X-Real-Ip`, so Traefik would fill in the Cloudflare edge address and every visitor would be remediated as Cloudflare. `X-Real-Ip` is the right choice with an nginx or HAProxy front end that sets it explicitly.
+- ForwardedHeadersInsecure
+  - bool
+  - default: false
+  - When true, the plugin skips the socket-peer gate, treats the named header as a single client address with no hop walk, and defaults the header to `X-Real-Ip` when `ForwardedHeadersCustomName` is still `X-Forwarded-For`.
+  - This is safe only when the Traefik entrypoint in front has `forwardedHeaders.trustedIPs` set and is not running with `forwardedHeaders.insecure: true`. Otherwise any client can choose which IP this plugin bans, captchas and caches.
 - DecisionScopeHeaders
   - map[string]string
   - default: {}
@@ -454,6 +462,9 @@ make run
   - default: []
   - List of IPs of trusted Proxies that are in front of traefik (ex: Cloudflare)
   - The forwarded header is only honored when the connecting peer is itself one of these IPs. While this list is empty, forwarded headers are ignored entirely and the plugin remediates the address that opened the connection, because a header from an untrusted peer can be set by the client. If traefik sits behind a load balancer or a CDN, list it here, otherwise every visitor behind that proxy is remediated as the proxy.
+  - Without `ForwardedHeadersInsecure` there is no way to trust every peer. A catch-all `0.0.0.0/0` plus `::/0` passes the peer check but then treats the header value as a trusted hop and falls back to the connecting address with no warning. Example: pool `0.0.0.0/0` plus `::/0`, peer `203.0.113.7`, `X-Real-Ip: 198.51.100.9` resolves to `203.0.113.7`.
+  - `0.0.0.0/0` covers IPv4 only and `::/0` covers IPv6 only, so an IPv4-only catch-all leaves an IPv6 peer untrusted.
+  - Listing the private ranges `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` is the alternative to enumerating proxy addresses when Traefik sits behind a private-network ingress. It needs the peer to be inside a listed range and the real client not to be. Verified working: pool `172.16.0.0/12`, peer `172.18.0.5`, `X-Real-Ip: 198.51.100.9` resolves to `198.51.100.9`. Verified failure: pool `10.0.0.0/8`, peer `10.1.2.3`, `X-Real-Ip: 10.9.9.9` resolves to `10.1.2.3`, so internal clients inside a listed range are mis-resolved.
 - RedisCacheEnabled
   - bool
   - default: false

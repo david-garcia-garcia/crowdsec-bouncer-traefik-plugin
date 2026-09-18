@@ -515,3 +515,28 @@ func Test_validateParamsTLS_appsec(t *testing.T) {
 		})
 	}
 }
+
+func TestForwardedHeadersInsecure(t *testing.T) {
+	log := logger.New("INFO", "")
+	t.Run("defaults to false", func(t *testing.T) {
+		if New().ForwardedHeadersInsecure {
+			t.Fatal("ForwardedHeadersInsecure default = true want false")
+		}
+	})
+	t.Run("flag plus populated trusted list is accepted", func(t *testing.T) {
+		cfg := getMinimalConfig()
+		cfg.ForwardedHeadersInsecure = true
+		cfg.ForwardedHeadersTrustedIPs = []string{"10.0.0.0/8"}
+		if err := ValidateParams(cfg, log); err != nil {
+			t.Fatalf("ValidateParams = %v want nil", err)
+		}
+	})
+	t.Run("flag plus invalid CIDR still fails", func(t *testing.T) {
+		cfg := getMinimalConfig()
+		cfg.ForwardedHeadersInsecure = true
+		cfg.ForwardedHeadersTrustedIPs = []string{"not-a-cidr"}
+		if err := ValidateParams(cfg, log); err == nil {
+			t.Fatal("ValidateParams = nil want error")
+		}
+	})
+}

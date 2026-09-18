@@ -104,32 +104,73 @@ func TestCheckerContainsCatchAllFamily(t *testing.T) {
 	})
 }
 
-// TestGetRemoteIP covers the forwarded-header walk, RemoteAddr gate, and fallback.
-func TestGetRemoteIP(t *testing.T) {
+type getRemoteIPCase struct {
+	name        string
+	remoteAddr  string
+	headerName  string
+	headerVal   string
+	forceHeader bool
+	strategy    *PoolStrategy
+	insecure    bool
+	wantIP      string
+	wantParsed  bool
+	wantErr     bool
+}
+
+func runGetRemoteIPCases(t *testing.T, tests []getRemoteIPCase) {
+	t.Helper()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := newTestTrustRequest(tc.remoteAddr, tc.headerName, tc.headerVal)
+			if tc.forceHeader {
+				req.Header.Set(tc.headerName, tc.headerVal)
+			}
+			got, parsed, err := GetRemoteIP(req, tc.strategy, tc.headerName, tc.insecure)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("GetRemoteIP = %q, %v", got, err)
+			}
+			if got != tc.wantIP {
+				t.Fatalf("GetRemoteIP = %q want %q", got, tc.wantIP)
+			}
+			if tc.wantParsed && parsed == nil {
+				t.Fatalf("GetRemoteIP parsed = nil want non-nil for %q", got)
+			}
+			if !tc.wantParsed && parsed != nil {
+				t.Fatalf("GetRemoteIP parsed = %v want nil for %q", parsed, got)
+			}
+		})
+	}
+}
+
+func newTestGetRemoteIPStrategies(t *testing.T) (*PoolStrategy, *PoolStrategy, *PoolStrategy, string) {
+	t.Helper()
 	log := slog.Default()
 	hopChecker, err := NewChecker(log, []string{"10.0.0.1", "10.0.0.0/8"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	strategy := &PoolStrategy{Checker: hopChecker}
-	trustedProxyAddr := "10.0.0.1:443"
-
 	emptyChecker, err := NewChecker(log, []string{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	emptyStrategy := &PoolStrategy{Checker: emptyChecker}
+	catchallChecker, err := NewChecker(log, []string{"0.0.0.0/0", "::/0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &PoolStrategy{Checker: hopChecker}, &PoolStrategy{Checker: emptyChecker}, &PoolStrategy{Checker: catchallChecker}, "10.0.0.1:443"
+}
 
-	tests := []struct {
-		name       string
-		remoteAddr string
-		headerName string
-		headerVal  string
-		strategy   *PoolStrategy
-		wantIP     string
-		wantParsed bool
-		wantErr    bool
-	}{
+// TestGetRemoteIP covers the forwarded-header walk, RemoteAddr gate, and fallback.
+func TestGetRemoteIP(t *testing.T) {
+	strategy, emptyStrategy, catchallStrategy, trustedProxyAddr := newTestGetRemoteIPStrategies(t)
+
+	runGetRemoteIPCases(t, []getRemoteIPCase{
 		{
 			name:       "trusted hops skipped, client kept",
 			remoteAddr: trustedProxyAddr,
@@ -226,32 +267,131 @@ func TestGetRemoteIP(t *testing.T) {
 			strategy:   strategy,
 			wantErr:    true,
 		},
-	}
+		{
+			name:       "catch-all pool ignores header",
+			remoteAddr: "203.0.113.7:443",
+			headerName: "X-Real-Ip",
+			headerVal:  "198.51.100.9",
+			strategy:   catchallStrategy,
+			wantIP:     "203.0.113.7",
+			wantParsed: true,
+		},
+	})
+}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			req := newTestTrustRequest(tc.remoteAddr, tc.headerName, tc.headerVal)
-			got, parsed, err := GetRemoteIP(req, tc.strategy, tc.headerName)
-			if tc.wantErr {
-				if err == nil {
-					t.Fatal("expected error")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("GetRemoteIP = %q, %v", got, err)
-			}
-			if got != tc.wantIP {
-				t.Fatalf("GetRemoteIP = %q want %q", got, tc.wantIP)
-			}
-			if tc.wantParsed && parsed == nil {
-				t.Fatalf("GetRemoteIP parsed = nil want non-nil for %q", got)
-			}
-			if !tc.wantParsed && parsed != nil {
-				t.Fatalf("GetRemoteIP parsed = %v want nil for %q", parsed, got)
-			}
-		})
-	}
+func TestGetRemoteIPInsecure(t *testing.T) {
+	strategy, emptyStrategy, catchallStrategy, _ := newTestGetRemoteIPStrategies(t)
+
+	runGetRemoteIPCases(t, []getRemoteIPCase{
+		{
+			name:       "insecure absent header uses RemoteAddr",
+			remoteAddr: "203.0.113.7:443",
+			headerName: "X-Real-Ip",
+			strategy:   emptyStrategy,
+			insecure:   true,
+			wantIP:     "203.0.113.7",
+			wantParsed: true,
+		},
+		{
+			name:        "insecure empty header uses RemoteAddr",
+			remoteAddr:  "203.0.113.7:443",
+			headerName:  "X-Real-Ip",
+			forceHeader: true,
+			strategy:    emptyStrategy,
+			insecure:    true,
+			wantIP:      "203.0.113.7",
+			wantParsed:  true,
+		},
+		{
+			name:       "insecure whitespace header uses RemoteAddr",
+			remoteAddr: "203.0.113.7:443",
+			headerName: "X-Real-Ip",
+			headerVal:  "   ",
+			strategy:   emptyStrategy,
+			insecure:   true,
+			wantIP:     "203.0.113.7",
+			wantParsed: true,
+		},
+		{
+			name:       "insecure header wins for untrusted peer and empty pool",
+			remoteAddr: "203.0.113.7:443",
+			headerName: "X-Real-Ip",
+			headerVal:  "198.51.100.9",
+			strategy:   emptyStrategy,
+			insecure:   true,
+			wantIP:     "198.51.100.9",
+			wantParsed: true,
+		},
+		{
+			name:       "insecure header wins when pool does not contain peer",
+			remoteAddr: "203.0.113.7:443",
+			headerName: "X-Real-Ip",
+			headerVal:  "198.51.100.9",
+			strategy:   strategy,
+			insecure:   true,
+			wantIP:     "198.51.100.9",
+			wantParsed: true,
+		},
+		{
+			name:       "insecure header wins despite catch-all pool",
+			remoteAddr: "203.0.113.7:443",
+			headerName: "X-Real-Ip",
+			headerVal:  "198.51.100.9",
+			strategy:   catchallStrategy,
+			insecure:   true,
+			wantIP:     "198.51.100.9",
+			wantParsed: true,
+		},
+		{
+			name:       "insecure comma list fails closed",
+			remoteAddr: "203.0.113.7:443",
+			headerName: "X-Forwarded-For",
+			headerVal:  "203.0.113.10, 10.0.0.1",
+			strategy:   emptyStrategy,
+			insecure:   true,
+			wantIP:     "203.0.113.10, 10.0.0.1",
+			wantParsed: false,
+		},
+		{
+			name:       "insecure garbage fails closed",
+			remoteAddr: "203.0.113.7:443",
+			headerName: "X-Real-Ip",
+			headerVal:  "not-an-ip",
+			strategy:   emptyStrategy,
+			insecure:   true,
+			wantIP:     "not-an-ip",
+			wantParsed: false,
+		},
+		{
+			name:       "insecure port-suffixed value fails closed",
+			remoteAddr: "203.0.113.7:443",
+			headerName: "X-Real-Ip",
+			headerVal:  "203.0.113.10:443",
+			strategy:   emptyStrategy,
+			insecure:   true,
+			wantIP:     "203.0.113.10:443",
+			wantParsed: false,
+		},
+		{
+			name:       "insecure bracketed IPv6 fails closed",
+			remoteAddr: "203.0.113.7:443",
+			headerName: "X-Real-Ip",
+			headerVal:  "[2001:db8::1]",
+			strategy:   emptyStrategy,
+			insecure:   true,
+			wantIP:     "[2001:db8::1]",
+			wantParsed: false,
+		},
+		{
+			name:       "insecure RemoteAddr without port fails",
+			remoteAddr: "192.0.2.1",
+			headerName: "X-Real-Ip",
+			headerVal:  "198.51.100.9",
+			strategy:   emptyStrategy,
+			insecure:   true,
+			wantErr:    true,
+		},
+	})
 }
 
 // newTestTrustRequest builds a request with RemoteAddr and an optional forwarded header.

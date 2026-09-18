@@ -30,6 +30,6 @@
 - Plugin imports use `github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim` and `.../pkg/simpleredis` (`plugin_test.go`, `pkg/lapi/session.go`, `pkg/cache/cache.go`).
 - Yaegi local/catalog load sees GOPATH + this module’s `vendor/` (`vendor/github.com/leprosus/golang-ttl-map`). A `go.mod` require of utilities must be vendored the same way. Do not patch `vendor/` of a module CI re-vendors.
 - Live spec `openspec/specs/core_cache_redis_in-tree-client/spec.md` forbids importing published `github.com/maxlerebourg/simpleredis` and states `pkg/simpleredis` must not be required to match an outside simpleredis repo — tension with “replace with upstream utilities” unless spec and import paths are updated deliberately.
-- Product reclaim needs `Peek` / `PeekLivePrefix` / `View` (`pkg/lapi/session.go` OpenStream warn-and-wire) and a process table. Those APIs are not on upstream `reclaim`. A sidecar wrapper in another package cannot read the table map.
+- Product reclaim imports utilities `reclaim` through the local shim (`Default`, `ProcessGrace`, `Open` / `OpenWithHooks`, test Reset). Peek / View are gone. Callers do not import utilities `reclaim` directly.
 
 Sources: `.sources/traefik-middleware-utilities-repo.md`, `.sources/core_cache_redis_in-tree-client-spec.md`.
