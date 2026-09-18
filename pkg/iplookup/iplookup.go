@@ -13,6 +13,7 @@ import (
 type radixNode struct {
 	isEndpoint bool       // true if this node is the end of a stored CIDR
 	prefixLen  int        // prefix length when isEndpoint is true
+	stored     string     // remediation on this endpoint; empty for boolean inserts
 	left       *radixNode // bit 0
 	right      *radixNode // bit 1
 }
@@ -41,7 +42,8 @@ func (tree *ipRadixTree) familyRoot(isIPv4 bool) *radixNode {
 }
 
 // insert stores one CIDR. IPv4 is walked from bit 96 of the IPv4-mapped form.
-func (tree *ipRadixTree) insert(cidr *net.IPNet) {
+// stored is the remediation on that endpoint; empty keeps the node boolean.
+func (tree *ipRadixTree) insert(cidr *net.IPNet, stored string) {
 	ip := cidr.IP
 	ones, bits := cidr.Mask.Size()
 	prefixLen := ones
@@ -86,10 +88,11 @@ func (tree *ipRadixTree) insert(cidr *net.IPNet) {
 
 	current.isEndpoint = true
 	current.prefixLen = prefixLen
+	current.stored = stored
 }
 
-// contains reports whether ip sits in any stored CIDR and the longest matching prefix.
-func (tree *ipRadixTree) contains(ip net.IP) (bool, int) {
+// contains reports whether ip sits in any stored CIDR, the longest matching prefix, and that endpoint's stored string.
+func (tree *ipRadixTree) contains(ip net.IP) (bool, int, string) {
 	isIPv4 := ip.To4() != nil
 	var bitStart, maxPrefixLen int
 
@@ -106,12 +109,14 @@ func (tree *ipRadixTree) contains(ip net.IP) (bool, int) {
 	current := tree.familyRoot(isIPv4)
 	longestMatch := 0
 	found := false
+	stored := ""
 
 	// Record each endpoint on the path so the last (longest) prefix wins.
 	for i := 0; i < maxPrefixLen && current != nil; i++ {
 		if current.isEndpoint {
 			found = true
 			longestMatch = current.prefixLen
+			stored = current.stored
 		}
 
 		actualBitPos := bitStart + i
@@ -131,12 +136,14 @@ func (tree *ipRadixTree) contains(ip net.IP) (bool, int) {
 	if current != nil && current.isEndpoint {
 		found = true
 		longestMatch = current.prefixLen
+		stored = current.stored
 	}
 
-	return found, longestMatch
+	return found, longestMatch, stored
 }
 
 // Helper is a CIDR set with prefix-bounded membership lookup.
+// Range hydrate may store a remediation on each endpoint; trusted-IP insert leaves it empty.
 type Helper struct {
 	tree  *ipRadixTree
 	count int
@@ -149,18 +156,28 @@ func NewEmptyHelper() *Helper {
 	}
 }
 
-// AddCIDR parses cidr and inserts it. Duplicate inserts still increment Count.
+// AddCIDR parses cidr and inserts it as a boolean set member. Duplicate inserts still increment Count.
 func (helper *Helper) AddCIDR(cidr string) error {
+	return helper.addCIDRStored(cidr, "")
+}
+
+// AddCIDRRemediation parses cidr and stores remediation on that endpoint.
+func (helper *Helper) AddCIDRRemediation(cidr, remediation string) error {
+	return helper.addCIDRStored(cidr, remediation)
+}
+
+// addCIDRStored parses cidr and inserts it with stored on the endpoint.
+func (helper *Helper) addCIDRStored(cidr, stored string) error {
 	_, block, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return fmt.Errorf("parse error on CIDR %q: %w", cidr, err)
 	}
-	helper.tree.insert(block)
+	helper.tree.insert(block, stored)
 	helper.count++
 	return nil
 }
 
-// Count returns how many successful AddCIDR calls have been made.
+// Count returns how many successful CIDR inserts have been made.
 func (helper *Helper) Count() int {
 	return helper.count
 }
@@ -184,6 +201,15 @@ func (helper *Helper) IsContained(ipAddr net.IP) (bool, int, error) {
 	if ipAddr == nil {
 		return false, 0, errors.New("IP address is nil")
 	}
-	found, prefixLen := helper.tree.contains(ipAddr)
+	found, prefixLen, _ := helper.tree.contains(ipAddr)
 	return found, prefixLen, nil
+}
+
+// ContainedRemediation returns the stored string of the longest matching prefix.
+func (helper *Helper) ContainedRemediation(ipAddr net.IP) (string, bool, error) {
+	if ipAddr == nil {
+		return "", false, errors.New("IP address is nil")
+	}
+	found, _, stored := helper.tree.contains(ipAddr)
+	return stored, found, nil
 }

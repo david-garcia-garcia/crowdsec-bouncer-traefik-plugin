@@ -100,3 +100,13 @@ func TestHunt_MembershipIPv4MappedCIDRDoesNotPanic(t *testing.T) {
 		t.Fatalf("got %q, want ban", got)
 	}
 }
+
+func TestMembershipFromIndexMappedLastInsertWins(t *testing.T) {
+	first := cache.RemediationWithOrigin(BannedValue, "crowdsec")
+	last := cache.RemediationWithOrigin(BannedValue, "cscli")
+	index := "0.0.0.0/0=" + first + "\n::ffff:0:0/96=" + last
+	got := MembershipFromIndex(index).Remediation(ipOf("192.0.2.1"))
+	if got != last {
+		t.Fatalf("got %q, want last remapped insert", got)
+	}
+}

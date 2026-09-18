@@ -361,3 +361,21 @@ func TestHunt_IPv4MappedSlash96DoesNotPanic(t *testing.T) {
 		t.Fatalf("IsContained(192.0.2.10) prefix = %d, want 24", prefixLen)
 	}
 }
+
+func TestContainedRemediationLongestPrefix(t *testing.T) {
+	helper := NewEmptyHelper()
+	if err := helper.AddCIDRRemediation("10.0.0.0/8", "wide"); err != nil {
+		t.Fatalf("wide: %v", err)
+	}
+	if err := helper.AddCIDRRemediation("10.1.0.0/16", "narrow"); err != nil {
+		t.Fatalf("narrow: %v", err)
+	}
+	stored, found, err := helper.ContainedRemediation(net.ParseIP("10.1.2.3"))
+	if err != nil || !found || stored != "narrow" {
+		t.Fatalf("got %q found %v err %v, want longest-prefix stored", stored, found, err)
+	}
+	stored, found, err = helper.ContainedRemediation(net.ParseIP("203.0.113.10"))
+	if err != nil || found || stored != "" {
+		t.Fatalf("miss got %q found %v err %v", stored, found, err)
+	}
+}
