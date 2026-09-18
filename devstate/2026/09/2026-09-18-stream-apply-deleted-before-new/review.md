@@ -9,3 +9,9 @@ phase: explore
 findings: dest New-then-Deleted plus ApplyRangeBatch upsert-then-remove drops same-window IP and Range replacements; hunt tests not on dest
 fixed: usage packet core_plugin_lapi_stream-apply.md; four assumed open questions
 skipped: product apply; official bouncer clone still in flight
+
+## propose (2026-09-18)
+phase: propose
+findings: FindSpecHost new core_plugin_lapi_stream-apply; official deleted-first resolved from research
+fixed: OpenSpec change stream-apply-deleted-before-new (proposal, spec, design, tasks)
+skipped: product apply
