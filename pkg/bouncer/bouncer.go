@@ -178,7 +178,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	// Lookup, live memo, and captcha bind share this spelling. GetRemoteIP still returned the raw text.
 	req.remoteIP = req.ipAddr.String()
 	isTrusted := b.clientPoolStrategy.Checker.ContainsIP(req.ipAddr)
-	b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", req.remoteIP, isTrusted))
+	b.log.Debug("ServeHTTP", "ip", req.remoteIP, "isTrusted", isTrusted)
 	if isTrusted {
 		b.next.ServeHTTP(rw, req.Request)
 		// Trusted clients skip LAPI and AppSec.
@@ -199,7 +199,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		switch {
 		case cacheErr != nil:
 			cacheErrString := cacheErr.Error()
-			b.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s cache:%s", req.remoteIP, cacheErrString))
+			b.log.Debug("ServeHTTP:Get", "ip", req.remoteIP, "cache", cacheErrString)
 			if cacheErrString == cache.CacheUnreachable && !b.redisUnreachableBlock {
 				b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s redisUnreachable=true", req.remoteIP))
 				b.handleNextServeHTTP(rw, req)
@@ -212,7 +212,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
 			return
 		case decisionscope.IsActiveRemediation(value):
-			b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit remediation:%s", req.remoteIP, value))
+			b.log.Debug("ServeHTTP", "ip", req.remoteIP, "cache", "hit", "remediation", value)
 			b.handleRemediationServeHTTP(rw, req, value, origin)
 			return
 		case value == decisionscope.NoBannedValue:
@@ -227,7 +227,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			// No decision affecting this IP.
 			return
 		}
-		b.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", req.remoteIP))
+		b.log.Debug("ServeHTTP", "isCrowdsecStreamHealthy", false, "ip", req.remoteIP)
 		b.applyLapiFailureAction(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechStreamFail)
 		// Stream/alone never query LAPI per request. Miss is allow or failure action.
 		return
@@ -238,7 +238,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		kind := cache.RemediationKind(value)
 		origin := cache.RemediationOrigin(value)
 		if err != nil {
-			b.log.Debug("ServeHTTP:LiveLookup " + err.Error())
+			b.log.Debug("ServeHTTP:LiveLookup", "error", err.Error())
 			if !decisionscope.IsActiveRemediation(kind) {
 				b.applyLapiFailureAction(rw, req, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
 				return
@@ -248,7 +248,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			b.handleNextServeHTTP(rw, req)
 			return
 		}
-		b.log.Debug(fmt.Sprintf("ServeHTTP:LiveLookup ip:%s isBanned:%v", req.remoteIP, kind))
+		b.log.Debug("ServeHTTP:LiveLookup", "ip", req.remoteIP, "isBanned", kind)
 		b.handleRemediationServeHTTP(rw, req, kind, origin)
 	}
 }

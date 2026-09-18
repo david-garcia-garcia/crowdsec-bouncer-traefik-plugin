@@ -212,27 +212,27 @@ func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts
 
 // Delete delete decision in cache.
 func (c *Client) Delete(key string) {
-	c.log.Debug(fmt.Sprintf("cache:Delete key:%v", key))
+	c.log.Debug("cache:Delete", "key", key)
 	c.cache.delete(key)
 }
 
 // Get check in the cache if the IP has the banned / not banned value.
 // Otherwise return with an error to add the IP in cache if we are on.
 func (c *Client) Get(key string) (string, error) {
-	c.log.Debug(fmt.Sprintf("cache:Get key:%v", key))
+	c.log.Debug("cache:Get", "key", key)
 	return c.cache.get(key)
 }
 
 // GetMany returns the values for the given keys. Missing keys are omitted.
 // Redis issues one MGET on a single reader. Unreachable returns CacheUnreachable.
 func (c *Client) GetMany(keys []string) (map[string]string, error) {
-	c.log.Debug(fmt.Sprintf("cache:GetMany keys:%v", keys))
+	c.log.Debug("cache:GetMany", "keys", keys)
 	return c.cache.getMany(keys)
 }
 
 // Set update the cache with the IP as key and the value banned / not banned.
 func (c *Client) Set(key string, value string, duration int64) {
-	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
+	c.log.Debug("cache:Set", "key", key, "value", value, "duration", duration)
 	c.cache.set(key, value, duration)
 }
 
