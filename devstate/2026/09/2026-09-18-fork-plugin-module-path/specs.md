@@ -15,3 +15,13 @@ verdicts:
 - modified core_plugin_middleware_bouncer
 - modified build_ci_github_module-path
 - modified build_ci_github_race-detector
+
+FindSpecHost (archive, Task unavailable — main-thread Search+Verdict):
+
+```
+verdicts:
+  - { deltaId: core_plugin_middleware_bouncer, fold, core_plugin_middleware_bouncer, high, candidates: [core_plugin_middleware_bouncer] }
+  - { deltaId: build_ci_github_module-path, fold, build_ci_github_module-path, high, candidates: [build_ci_github_module-path, build_ci_github_race-detector] }
+  - { deltaId: build_ci_github_race-detector, fold, build_ci_github_race-detector, high, candidates: [build_ci_github_race-detector, build_ci_github_module-path] }
+  - { deltaId: core_plugin_middleware_local-plugin, new, core_plugin_middleware_local-plugin, high, candidates: [core_plugin_middleware_bouncer, core_plugin_middleware_config-validation, build_e2e_pester_crowdsec-stack] }
+```
