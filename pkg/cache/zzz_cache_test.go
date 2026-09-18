@@ -339,6 +339,7 @@ func Test_GetManyUnreachable(t *testing.T) {
 	}
 }
 
+// sentinelFor maps table valueErr text (CacheMiss / CacheUnreachable) to ErrMiss / ErrUnreachable for errors.Is.
 func sentinelFor(text string) error {
 	switch text {
 	case CacheMiss:
