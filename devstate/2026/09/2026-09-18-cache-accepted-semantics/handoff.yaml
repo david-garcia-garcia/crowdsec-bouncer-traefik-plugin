@@ -1,0 +1,15 @@
+issueKey: 2026-09-18-cache-accepted-semantics
+jobName: 2026-09-18-cache-accepted-semantics
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify:
+src:
+comments: none
+localTests: none
+requirement: requirement.md
+explore:
+change:
+pr:
