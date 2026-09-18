@@ -27,3 +27,9 @@ phase: codereview
 findings: P3 1 coverage (job unproven); Main Yaegi exit 2 on 7c109b6 (build 35378563314)
 fixed: 5889a22 added zzz_module_path_test.go TestForkModulePathMatchesManifest
 skipped: none; Race and e2e 35378563305 succeeded
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: missing-packet Local plugin; missing-packet GitHub Actions GOPATH
+fixed: created core_plugin_middleware_local-plugin.md and build_ci_github.md (plus indexes)
+skipped: none; Race 35380038170 succeeded; Main 35380038170 and e2e 35380038178 in progress

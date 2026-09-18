@@ -9,6 +9,6 @@ JobName: 2026-09-18-fork-plugin-module-path
 | propose | [x] | [x] | 2026-09-18T17:49:08Z |
 | implement | [x] | [x] | 2026-09-18T18:05:58Z |
 | codereview | [x] | [x] | 2026-09-18T18:18:20Z |
-| devdocsimpact | [x] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-18T18:27:34Z |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
