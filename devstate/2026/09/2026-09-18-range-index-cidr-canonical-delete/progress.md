@@ -9,6 +9,6 @@ JobName: 2026-09-18-range-index-cidr-canonical-delete
 | propose | [x] | [x] | 2026-09-18T14:26:31Z |
 | implement | [x] | [x] | 2026-09-18T14:41:53Z |
 | codereview | [x] | [x] | 2026-09-18T14:57:18Z |
-| devdocsimpact | [ ] | [ ] | |
+| devdocsimpact | [x] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
