@@ -27,3 +27,9 @@ phase: codereview
 findings: Standards 1 judgement (Duplicated Code: hunt test vs table row)
 fixed: none
 skipped: Standards 1 judgement — hunt name is the ticket proof and the table row is the spec scenario
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: 1 missing-packet (Config validation)
+fixed: produced knowledge/devdocs/core_plugin_middleware_config-validation.md
+skipped: none
