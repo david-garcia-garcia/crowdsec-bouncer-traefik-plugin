@@ -506,6 +506,7 @@ make run
   - string
   - default: `ban`, expected values are: `passthrough`, `ban`, `captcha`
   - What to do when LAPI does not return a usable verdict: live/none HTTP or parse error, or a cache miss while stream/alone is unhealthy after `updateMaxFailure`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the existing pass path (AppSec still runs if enabled). `captcha` uses the plugin captcha client (`captchaProvider` must be set).
+  - **Behavior change:** in `live` and `none` mode this action now also covers a failed `decisionScopeHeaders` query. Previously a LAPI that answered the IP query but errored on a header-scope query (`Country`, `username`, …) was read as "no decision on that scope" and the request was allowed, logged only at `DEBUG`. Such a failure is now a LAPI failure and honours this key, so with the default `ban` those requests are blocked instead of allowed, and the failure is logged at `WARN`. An active ban still wins over a scope-query failure and is never downgraded by it. Set `crowdsecLapiFailureAction: passthrough` to keep allowing requests when a header-scope query fails.
 - StreamStartupBlock
   - bool
   - default: true

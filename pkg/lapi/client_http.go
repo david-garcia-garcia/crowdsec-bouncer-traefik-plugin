@@ -168,7 +168,8 @@ func (c *Client) getToken() error {
 		c.crowdsecPassword,
 		strings.Join(c.crowdsecScenarios, `","`),
 	))
-	body, err := c.crowdsecQuery(loginURL.String(), loginData)
+	// The login request must never renew a token: a 401 here would recurse into getToken forever.
+	body, err := c.sendQuery(loginURL.String(), loginData, false)
 	if err != nil {
 		return err
 	}
@@ -192,7 +193,25 @@ func (c *Client) getToken() error {
 	return errors.New("getToken statusCode:" + strconv.Itoa(login.Code))
 }
 
+// drainResponse consumes leftover bytes so the LAPI HTTP connection can be reused.
+func (c *Client) drainResponse(res *http.Response) {
+	if _, errDrain := io.Copy(io.Discard, res.Body); errDrain != nil {
+		c.log.Debug("crowdsecQuery:drainBody " + errDrain.Error())
+	}
+	if errClose := res.Body.Close(); errClose != nil {
+		c.log.Error("crowdsecQuery:closeBody " + errClose.Error())
+	}
+}
+
+// crowdsecQuery sends one LAPI/CAPI request, renewing the alone-mode CAPI token once on a 401.
 func (c *Client) crowdsecQuery(stringURL string, data []byte) ([]byte, error) {
+	return c.sendQuery(stringURL, data, true)
+}
+
+// sendQuery sends one LAPI/CAPI request. On an alone-mode 401 with mayRenewToken set, it renews the
+// CAPI token and replays the same method and the same body once, with that permission cleared, so a
+// second 401 returns the status error instead of recursing.
+func (c *Client) sendQuery(stringURL string, data []byte, mayRenewToken bool) ([]byte, error) {
 	current := c.currentTransport()
 	if current == nil || current.httpClient == nil {
 		return nil, errors.New("crowdsecQuery: missing transport")
@@ -207,19 +226,19 @@ func (c *Client) crowdsecQuery(stringURL string, data []byte) ([]byte, error) {
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+c.pluginVersion)
 
 	res, err := current.httpClient.Do(req)
-	if err != nil || isReverseProxyError(res.StatusCode) {
+	if err != nil {
 		return nil, fmt.Errorf("crowdsecQuery:unreachable url:%s %w", stringURL, err)
 	}
-	defer func() {
-		if err = res.Body.Close(); err != nil {
-			c.log.Error("crowdsecQuery:closeBody " + err.Error())
-		}
-	}()
-	if res.StatusCode == http.StatusUnauthorized && c.crowdsecMode == configuration.AloneMode {
+	// Drain every live response, including 502/503/504, so keep-alive can reuse the slot.
+	defer c.drainResponse(res)
+	if isReverseProxyError(res.StatusCode) {
+		return nil, fmt.Errorf("crowdsecQuery:unreachable url:%s statusCode:%d", stringURL, res.StatusCode)
+	}
+	if res.StatusCode == http.StatusUnauthorized && c.crowdsecMode == configuration.AloneMode && mayRenewToken {
 		if errToken := c.getToken(); errToken != nil {
 			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, errToken)
 		}
-		return c.crowdsecQuery(stringURL, nil)
+		return c.sendQuery(stringURL, data, false)
 	}
 
 	statusStr := strconv.Itoa(res.StatusCode)
