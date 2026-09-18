@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: stale-usage 3
 fixed: Middleware New, Real-stack e2e, Mock LAPI e2e usage
 skipped: no Language write (no invented umbrella term)
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: folded custom-ban WHEN into build_e2e_pester_crowdsec-stack; moved change to openspec/changes/archive/2026-09-18-remove-html-filepath-deprecations
+skipped: FindSpecHost Task (tool unavailable in worker; ran on this thread)
