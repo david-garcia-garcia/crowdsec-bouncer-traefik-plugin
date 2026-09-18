@@ -175,7 +175,9 @@ func Test_ApplyRangeBatchKeepsCIDRsWhenTheReplicaLags(t *testing.T) {
 	cacheClient, writer := laggingReplicaCache(t)
 	writer.set("p:"+RangeIndexKey, "10.0.0.0/8="+BannedValue)
 
-	ApplyRangeBatch(cacheClient, map[string]string{"192.168.0.0/16": BannedValue}, nil)
+	if err := ApplyRangeBatch(cacheClient, map[string]string{"192.168.0.0/16": BannedValue}, nil); err != nil {
+		t.Fatalf("ApplyRangeBatch: %v", err)
+	}
 
 	index := writer.get("p:" + RangeIndexKey)
 	if !strings.Contains(index, "10.0.0.0/8") {
