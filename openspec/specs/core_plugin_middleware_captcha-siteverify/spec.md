@@ -1,6 +1,6 @@
 ## Purpose
 
-Owns how a captcha provider siteverify response is classified as JSON and whether a successful solve issues the gate cookie and redirect. Cookie format stays on `core_plugin_middleware_captcha-gate`. Routing after the cookie stays on `core_plugin_middleware_captcha-routing`.
+Owns how a captcha provider siteverify request is posted (including `remoteip` from the already-resolved client address), how the response is classified as JSON, and whether a successful solve issues the gate cookie and redirect. Transport and JSON-decode failures re-render the challenge at 200. Cookie format stays on `core_plugin_middleware_captcha-gate`. Routing after the cookie stays on `core_plugin_middleware_captcha-routing`.
 
 ## Requirements
 
