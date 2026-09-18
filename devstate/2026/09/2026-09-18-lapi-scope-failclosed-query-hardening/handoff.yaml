@@ -11,7 +11,7 @@ localTests: none
 requirement: requirement.md
 comments: none
 explore: explore.md
-change: none
+change: lapi-scope-failclosed-query-hardening
 pr:
   id: 73
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/73
