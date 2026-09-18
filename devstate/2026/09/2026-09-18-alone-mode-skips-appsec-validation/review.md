@@ -15,3 +15,9 @@ phase: propose
 findings: none
 fixed: none
 skipped: no research write; no new usage packet — fold onto core_plugin_middleware_config-validation
+
+## implement (2026-09-18)
+phase: implement
+findings: none
+fixed: nestif on ValidateParams alone branch — extracted validateAloneCapiAndAppsec
+skipped: no research write; no new usage packet; no new spec folder
