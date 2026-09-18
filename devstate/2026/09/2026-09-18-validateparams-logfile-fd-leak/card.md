@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-18T14:56:35Z
+Developer review: ready for review — 2026-09-18T15:12:47Z
 
 ## What this changes
-**Operators.** None.
+**Operators.** A successful start with `logFilePath` set no longer keeps a leftover check handle on that file.
 
 **Admin users.** None.
 
-**Developers.** None.
+**Developers.** `validateLogging` closes the writability-check `OpenFile` after success; `TestHunt_ValidateParams_closesLogFileAfterWritabilityCheck` proves the handle is gone and an unwritable path still fails.
 
 **End users.** None.
 
@@ -28,38 +28,38 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Explore is done; product apply has not started. 3 items remain.
+Apply is on the branch and CI succeeded. 0 items remain.
 
 Priority: P2 — real operator and test pain (file-in-use plus extra descriptor) when `logFilePath` is set, limited blast radius.
-Reviewed head: 9e08331
+Reviewed head: 44e1cfc
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI queued on the explore head; no apply yet |
-| CI proof | 3/6 | Main Process and Race detector queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35359309660 |
-| Local tests proof | N/A | Before implement (`localTests: none`) |
+| Overall readiness | 6/6 | Apply landed; required checks succeeded; no open review comments |
+| CI proof | 6/6 | Main Process, Race detector, e2e (binary + mock LAPI), and e2e (docker + pester) succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35360397039 |
+| Local tests proof | N/A | `prHost` remote (CI proof covers remote); handoff `localTests: passed` |
 | Review resolution | 6/6 | OPEN PR, no review comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-18-validateparams-logfile-fd-leak pushed | git |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | close-validateparams-logfile-check-handle | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/95 | pr-host List |
-| CI | build 35359309660 queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35359309660 | GitHub check runs |
-| Local tests | none | handoff.yaml localTests |
+| CI | Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35360397039/job/105649943411 ; Race detector success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35360397039/job/105649943547 ; e2e (binary + mock LAPI) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35360397038/job/105650020216 ; e2e (docker + pester) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35360397038/job/105650020676 | GitHub check runs |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | no comments.md |
 
 ## Specs
-None.
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-validateparams-logfile-fd-leak/openspec/changes/close-validateparams-logfile-check-handle/proposal.md) — modified
 
 ## Follow-up issues
 None.
 
 ## How this fits together
-Local dump → branch `2026-09-18-validateparams-logfile-fd-leak` → stub PR #95 → explore.md on `9e08331`. Product fix is not in this head.
+Local dump → branch `2026-09-18-validateparams-logfile-fd-leak` → stub PR #95 → apply `44e1cfc` → CI succeeded.
 
 ## Decision needed
 | Question | Decision | By |
@@ -68,9 +68,9 @@ Local dump → branch `2026-09-18-validateparams-logfile-fd-leak` → stub PR #9
 | What if `Close` fails after a successful open? | assumed — ignore the `Close` error; writability is already proven. Same discard as the logger `LoadOrStore` loser close. | explore |
 
 ## Before merge
-- [ ] Close the writability-check file after a successful open so ValidateParams does not keep an extra descriptor
-- [ ] Add `TestHunt_ValidateParams_closesLogFileAfterWritabilityCheck` in `pkg/configuration/zzz_configuration_test.go`
-- [ ] Do not take logger-file-reclaim unless that close fix requires it
+- [x] Close the writability-check file after a successful open so ValidateParams does not keep an extra descriptor
+- [x] Add `TestHunt_ValidateParams_closesLogFileAfterWritabilityCheck` in `pkg/configuration/zzz_configuration_test.go`
+- [x] Do not take logger-file-reclaim (close landed without it)
 
 ## Findings
 None.
@@ -83,9 +83,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 9e08331b04c537412fe7c865ac4d9f499822b7ce | Card must match the branch you measured |
+| Reviewed head | 44e1cfcd2ad057195a3d5646029b51f5dca5fd60 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -93,18 +93,16 @@ None.
 ### Technical review
 Best possible solution: close the writability-check `OpenFile` after success; keep the independent hard-fail check. Dest still discards the handle.
 
-Do we have a high-confidence way to reproduce? Yes — measured on this Windows host: `ValidateParams` then `Remove` fails file-in-use; `NewWithFormat` + `ValidateParams` + `ResetSharedLogFilesForTest` then `Remove` still fails (extra handle is the check open).
+Do we have a high-confidence way to reproduce? Yes — measured on this Windows host: dest `ValidateParams` then `Remove` fails file-in-use; after apply the hunt test `Remove`s the temp path.
 
 Is this the best way to solve the issue? Yes vs dest — close is smaller than reuse and keeps the constructor fail when the logger already fell back to stdout.
 
 ### Evidence
 What I checked:
-- `validateLogging` opens `LogFilePath` and assigns the file to `_` (`pkg/configuration/configuration.go`, `origin/master` 84a9045)
-- `plugin.New` opens the same path via `logger.NewWithFormat` before `ValidateParams` (`plugin.go`)
-- Throwaway probe (OS temp): control open-without-close Remove FAIL; close then Remove OK; ValidateParams then Remove FAIL; logger+ValidateParams+ResetShared then Remove FAIL
-- Existing `go test ./pkg/configuration/ ./pkg/logger/` pass (they do not assert this close)
-- Hunt test not on dest
-- PR #95; CI run 35359309660 queued on head 9e08331
+- `validateLogging` closes `checkFile` after a successful `OpenFile` (`pkg/configuration/configuration.go`, `44e1cfc`)
+- Hunt test `TestHunt_ValidateParams_closesLogFileAfterWritabilityCheck` in `pkg/configuration/zzz_configuration_test.go`
+- Local `go test ./pkg/configuration/` and `go test ./...` passed
+- PR #95; Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35360397039/job/105649943411 ; Race detector success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35360397039/job/105649943547 ; e2e (binary + mock LAPI) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35360397038/job/105650020216 ; e2e (docker + pester) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35360397038/job/105650020676
 
 ### Rank-up moves
 None.
