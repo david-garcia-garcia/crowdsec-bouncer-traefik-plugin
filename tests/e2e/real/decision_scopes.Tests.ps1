@@ -2,53 +2,46 @@
 
 # Range and header-mapped CrowdSec scopes against a live LAPI.
 
-function Add-IpSpellingDecision {
-    param(
-        [string]$Stored,
-        [string]$Reason
-    )
-    try {
-        Add-TestDecision -IP $Stored -Type "ban" -Reason $Reason
-        return
-    }
-    catch {
-        $ipErr = $_.Exception.Message
-    }
-    try {
-        Add-TestScopeDecision -Scope "Ip" -Value $Stored -Type "ban" -Reason $Reason
-        return
-    }
-    catch {
-        $msg = "cscli --ip: $ipErr --scope Ip: $($_.Exception.Message)"
-        Write-Host "::error::$msg"
-        throw $msg
-    }
-}
-
-function Assert-IpSpellingBan {
-    param(
-        [string]$Endpoint,
-        [string]$Stored,
-        [string]$Request,
-        [int]$TimeoutSeconds = 15
-    )
-    $addError = $null
-    try {
-        Add-IpSpellingDecision -Stored $Stored -Reason "Ip spelling $Stored"
-    }
-    catch {
-        $addError = $_.Exception.Message
-    }
-    [string]$addError | Should -BeNullOrEmpty -Because "cscli must accept stored $Stored : $addError"
-    $result = Wait-ForCondition -Description "LAPI/bouncer to ban stored $Stored as $Request on $Endpoint" -TimeoutSeconds $TimeoutSeconds -RetryIntervalSeconds 2 -Condition {
-        $response = Test-HttpRequest -Endpoint $Endpoint -IP $Request -TraefikUrl $script:TraefikUrl
-        return ($response.StatusCode -in @(403, 429))
-    }
-    $result.Success | Should -Be $true -Because "stored $Stored must ban request $Request on $Endpoint (last wait $($result.TimeTaken)s; $($result.Error))"
-}
-
 BeforeAll {
     . "$PSScriptRoot/TestUtils.ps1"
+
+    function script:Add-IpSpellingDecision {
+        param(
+            [string]$Stored,
+            [string]$Reason
+        )
+        try {
+            Add-TestDecision -IP $Stored -Type "ban" -Reason $Reason
+            return
+        }
+        catch {
+            $ipErr = $_.Exception.Message
+        }
+        try {
+            Add-TestScopeDecision -Scope "Ip" -Value $Stored -Type "ban" -Reason $Reason
+            return
+        }
+        catch {
+            $msg = "cscli --ip: $ipErr --scope Ip: $($_.Exception.Message)"
+            Write-Host "::error::$msg"
+            throw $msg
+        }
+    }
+
+    function script:Assert-IpSpellingBan {
+        param(
+            [string]$Endpoint,
+            [string]$Stored,
+            [string]$Request,
+            [int]$TimeoutSeconds = 15
+        )
+        Add-IpSpellingDecision -Stored $Stored -Reason "Ip-spelling-$Stored"
+        $result = Wait-ForCondition -Description "LAPI/bouncer to ban stored $Stored as $Request on $Endpoint" -TimeoutSeconds $TimeoutSeconds -RetryIntervalSeconds 2 -Condition {
+            $response = Test-HttpRequest -Endpoint $Endpoint -IP $Request -TraefikUrl $script:TraefikUrl
+            return ($response.StatusCode -in @(403, 429))
+        }
+        $result.Success | Should -Be $true -Because "stored $Stored must ban request $Request on $Endpoint (last wait $($result.TimeTaken)s; $($result.Error))"
+    }
 
     $script:TraefikUrl = "http://localhost:8000"
     $script:CrowdSecApiUrl = "http://localhost:8081"
