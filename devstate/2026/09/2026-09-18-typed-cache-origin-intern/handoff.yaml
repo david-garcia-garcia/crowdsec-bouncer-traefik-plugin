@@ -8,7 +8,7 @@ destBranch: master
 qualify: qualified-with-gaps
 src: sha256:cc163140b41baf0fac2ff0e2560bdb71ec6fe8f76e658a33fe64f0df303f7c44
 comments: none
-localTests: none
+localTests: passed
 requirement: requirement.md
 explore: explore.md
 change: typed-cache-origin-intern
