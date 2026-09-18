@@ -461,7 +461,7 @@ func TestNew_CaptchaFilePathWinsOverDeprecatedHTMLPath(t *testing.T) {
 	cfg.CaptchaFilePath = currentPath
 	cfg.CaptchaHTMLFilePath = deprecatedPath
 
-	h, err := New(context.Background(), testNextOK(), cfg, "captcha-path-wins")
+	handler, err := New(context.Background(), testNextOK(), cfg, "captcha-path-wins")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -470,7 +470,7 @@ func TestNew_CaptchaFilePathWinsOverDeprecatedHTMLPath(t *testing.T) {
 	}
 
 	rw := httptest.NewRecorder()
-	h.ServeHTTP(rw, reqForIP("203.0.113.7"))
+	handler.ServeHTTP(rw, reqForIP("203.0.113.7"))
 	body := rw.Body.String()
 	if !strings.Contains(body, "CURRENT_CAPTCHA_PAGE") {
 		t.Fatalf("current captcha path not served, body: %s", body)
@@ -497,7 +497,7 @@ func TestNew_EmptyCaptchaFilePathFillsFromDeprecatedHTMLPath(t *testing.T) {
 	cfg.CaptchaFilePath = ""
 	cfg.CaptchaHTMLFilePath = deprecatedPath
 
-	h, err := New(context.Background(), testNextOK(), cfg, "captcha-path-fill")
+	handler, err := New(context.Background(), testNextOK(), cfg, "captcha-path-fill")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -506,7 +506,7 @@ func TestNew_EmptyCaptchaFilePathFillsFromDeprecatedHTMLPath(t *testing.T) {
 	}
 
 	rw := httptest.NewRecorder()
-	h.ServeHTTP(rw, reqForIP("203.0.113.7"))
+	handler.ServeHTTP(rw, reqForIP("203.0.113.7"))
 	body := rw.Body.String()
 	if !strings.Contains(body, "DEPRECATED_CAPTCHA_PAGE") {
 		t.Fatalf("deprecated captcha path not served after empty-guard fill, body: %s", body)
