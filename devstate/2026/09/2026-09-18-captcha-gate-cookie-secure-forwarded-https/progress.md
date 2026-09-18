@@ -10,5 +10,5 @@ JobName: 2026-09-18-captcha-gate-cookie-secure-forwarded-https
 | implement | [x] | [x] | 2026-09-18T14:44:08Z |
 | codereview | [x] | [x] | 2026-09-18T14:51:41Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T14:55:01Z |
-| archive | [ ] | [ ] | |
+| archive | [x] | [ ] | |
 | pullrequest | [ ] | [ ] | |
