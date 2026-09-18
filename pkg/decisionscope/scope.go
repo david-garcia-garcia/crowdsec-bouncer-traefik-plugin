@@ -119,15 +119,31 @@ func NormalizeDecisionScopeHeaders(in map[string]string) map[string]string {
 }
 
 // IPCacheKey is the cache key for an Ip-scoped decision value (bare IP or /32 / /128).
+// CrowdSec stores a decision value exactly as it was submitted, so the same address reaches this
+// bouncer as an expanded, upper-case, or IPv4-mapped spelling. Every spelling that parses as an
+// address collapses to net.IP.String(); a value that parses as neither is keyed verbatim.
 func IPCacheKey(value string) string {
 	trimmed := strings.TrimSpace(value)
 	ipAddr, ipNet, err := net.ParseCIDR(trimmed)
-	if err != nil {
+	if err == nil {
+		ones, bits := ipNet.Mask.Size()
+		if ones == bits {
+			return ipAddr.String()
+		}
 		return trimmed
 	}
-	ones, bits := ipNet.Mask.Size()
-	if ones == bits {
-		return ipAddr.String()
+	if bare := net.ParseIP(trimmed); bare != nil {
+		return bare.String()
 	}
 	return trimmed
+}
+
+// IPLookupCacheKey is the request-path spelling of IPCacheKey. It reuses the address pkg/ip already
+// parsed for this request rather than parsing remoteIP a second time. The two SHALL agree: a key
+// the store and the request path spell differently is a decision that can never be enforced.
+func IPLookupCacheKey(remoteIP string, ipAddr net.IP) string {
+	if ipAddr != nil {
+		return ipAddr.String()
+	}
+	return strings.TrimSpace(remoteIP)
 }
