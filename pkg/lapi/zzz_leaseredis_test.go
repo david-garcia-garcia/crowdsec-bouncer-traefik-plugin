@@ -12,9 +12,18 @@ import (
 
 // testLeaseRedis is an in-process RESP stand-in for Eval acquire plus GET/SET.
 type testLeaseRedis struct {
-	mu   sync.Mutex
-	keys map[string]string
-	ln   net.Listener
+	mu        sync.Mutex
+	keys      map[string]string
+	ln        net.Listener
+	refuseGet bool
+}
+
+// refuseNextGets makes later GET close the socket with no reply, so GetConsistent sees unreachable.
+// The stored map is left alone so a test can still assert the shared index was not rewritten.
+func (s *testLeaseRedis) refuseNextGets() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.refuseGet = true
 }
 
 func startTestLeaseRedis(t *testing.T) *testLeaseRedis {
@@ -41,6 +50,14 @@ func (s *testLeaseRedis) addr() string {
 	return s.ln.Addr().String()
 }
 
+// value is the writer-side view of a stored key, for assertions a dead reader cannot make.
+func (s *testLeaseRedis) value(key string) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	stored, ok := s.keys[key]
+	return stored, ok
+}
+
 func (s *testLeaseRedis) serve(conn net.Conn) {
 	defer func() { _ = conn.Close() }()
 	reader := bufio.NewReader(conn)
@@ -54,6 +71,10 @@ func (s *testLeaseRedis) serve(conn net.Conn) {
 		}
 		verb := strings.ToUpper(argv[0])
 		s.mu.Lock()
+		if verb == "GET" && s.refuseGet {
+			s.mu.Unlock()
+			return
+		}
 		reply := s.replyLocked(verb, argv)
 		s.mu.Unlock()
 		if _, writeErr := conn.Write(reply); writeErr != nil {
@@ -79,6 +100,15 @@ func (s *testLeaseRedis) replyLocked(verb string, argv []string) []byte {
 		}
 		s.keys[argv[1]] = argv[2]
 		return []byte("+OK\r\n")
+	case "DEL":
+		if len(argv) < 2 {
+			return []byte("-ERR wrong number of arguments\r\n")
+		}
+		if _, exists := s.keys[argv[1]]; !exists {
+			return []byte(":0\r\n")
+		}
+		delete(s.keys, argv[1])
+		return []byte(":1\r\n")
 	case "EVAL", "EVALSHA":
 		if len(argv) < 6 {
 			return []byte("-ERR wrong number of arguments\r\n")

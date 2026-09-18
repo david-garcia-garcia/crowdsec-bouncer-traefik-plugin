@@ -12,20 +12,26 @@ func AddRange(cacheClient *cache.Client, cidr, remediation string, _ int64) {
 	if network == "" || !IsActiveRemediation(remediation) {
 		return
 	}
-	ApplyRangeBatch(cacheClient, map[string]string{network: remediation}, nil)
+	_ = ApplyRangeBatch(cacheClient, map[string]string{network: remediation}, nil)
 }
 
 // RemoveRange drops a Range decision from the shared index.
 func RemoveRange(cacheClient *cache.Client, cidr string) {
-	ApplyRangeBatch(cacheClient, nil, []string{strings.TrimSpace(cidr)})
+	_ = ApplyRangeBatch(cacheClient, nil, []string{strings.TrimSpace(cidr)})
 }
 
 // ApplyRangeBatch upserts and removes Range lines with one cache read and one write.
-func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, removals []string) {
+// The index is shared by every bouncer on this cache, so a read that did not answer is not an
+// empty index: writing the batch onto an empty base would drop every Range decision this poll
+// did not carry. A read failure returns the error and leaves the stored index alone.
+func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, removals []string) error {
 	if len(upserts) == 0 && len(removals) == 0 {
-		return
+		return nil
 	}
-	index := readRangeIndex(cacheClient)
+	index, err := readRangeIndex(cacheClient)
+	if err != nil {
+		return err
+	}
 	for cidr, remediation := range upserts {
 		network := strings.TrimSpace(cidr)
 		if network == "" || !IsActiveRemediation(remediation) {
@@ -38,9 +44,10 @@ func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, remov
 	}
 	if index == "" {
 		cacheClient.Delete(RangeIndexKey)
-		return
+		return nil
 	}
 	cacheClient.Set(RangeIndexKey, index, rangeIndexTTL)
+	return nil
 }
 
 // parseIndexLine splits one cidr=remediation line. A missing equals leaves remediation empty.
@@ -82,16 +89,19 @@ func upsertIndexCIDR(index, cidr, remediation string) string {
 	return strings.Join(kept, "\n")
 }
 
-// readRangeIndex returns the cached range-index blob, or empty on miss or error.
-// ApplyRangeBatch rewrites what this returns, so the read has to be of the authoritative copy: a
-// stale one rebuilds the shared index from an old base and writes that truncated blob back, which
-// drops Range CIDRs for every instance until the next startup=true resync.
-func readRangeIndex(cacheClient *cache.Client) string {
+// readRangeIndex returns the cached range-index blob from the authoritative copy. ApplyRangeBatch
+// rewrites what this returns, so a replica-lagged read would rebuild the shared index from an old
+// base and write that truncated blob back. A miss is an empty index and no error; every other
+// failure is returned, because the caller cannot tell "no Range decisions" from "no answer".
+func readRangeIndex(cacheClient *cache.Client) (string, error) {
 	index, err := cacheClient.GetConsistent(RangeIndexKey)
 	if err != nil {
-		return ""
+		if err.Error() == cache.CacheMiss {
+			return "", nil
+		}
+		return "", err
 	}
-	return index
+	return index, nil
 }
 
 // removeCIDRFromIndex drops every line whose CIDR equals cidr.

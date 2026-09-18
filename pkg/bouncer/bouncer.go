@@ -91,7 +91,11 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		template:                 template.New("CrowdsecBouncer").Delims("[[", "]]"),
 		traceCustomHeader:        config.TraceHeadersCustomName,
 	}
-	if config.CrowdsecMode == configuration.AppsecMode {
+	// Appsec mode has no LAPI decisions to remediate, but crowdsecAppsecFailureAction: captcha
+	// still serves a challenge through this client (core_plugin_appsec_failure-action), and
+	// handleRemediationServeHTTP bans whenever that client is not valid.
+	if config.CrowdsecMode == configuration.AppsecMode &&
+		routeHandler.appsecFailureAction != configuration.FailureActionCaptcha {
 		routeHandler.log.Debug("Bouncer initialized name:" + name)
 		return routeHandler, nil
 	}

@@ -1,6 +1,6 @@
 ## Purpose
 
-Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New` uses the constructor context as the reclaim holder and returns a per-router Bouncer that holds request policy and MUST NOT start a process-wide stream ticker.
+Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New` binds its reclaim holders to a context derived from the constructor context, works on a snapshot of the config Traefik owns, and returns a per-router Bouncer that holds request policy and MUST NOT start a process-wide stream ticker.
 
 ## Requirements
 
@@ -24,9 +24,30 @@ The per-router bouncer SHALL handle request policy (trusted IPs, ban/captcha pag
 - **WHEN** `crowdsecMode` is `appsec` and `crowdsecAppsecEnabled` is true
 - **THEN** `New` does not reclaim an `lapi.Client`
 - **AND** `New` reclaims an `appsec.Client`
-- **AND** the bouncer still uses the constructor ctx as the AppSec reclaim holder
+- **AND** the bouncer still holds that AppSec incarnation through a reclaim context derived from the constructor ctx
 
 #### Scenario: Per-router live TTL last-writes the shared cache
 - **WHEN** two live middlewares reclaim the same `lapi.Client` and set different `defaultDecisionSeconds`
 - **THEN** each lookup uses the TTL that bouncer passed
 - **AND** the shared live cache keeps the last written TTL for that key
+
+### Requirement: A failed New releases the holders it already opened
+`New` SHALL bind every reclaim `Open` it makes (decision store, LAPI client, AppSec client) to one context derived from the constructor context, and SHALL release that context on every path where it returns an error. A constructor that fails after an earlier `Open` succeeded MUST NOT leave that incarnation held: with zero table grace its `Close` hook SHALL run, and a stream ticker it started MUST NOT keep polling LAPI. The derived context SHALL stay a child of the constructor context, so cancelling Traefik's context still releases the holders of a `New` that succeeded. The success path MUST NOT release it.
+
+#### Scenario: AppSec Open fails after a stream client was opened
+- **WHEN** `crowdsecMode` is `stream`, the LAPI stream client opens, and `appsec.Open` then fails
+- **THEN** `New` returns that error
+- **AND** the LAPI incarnation is no longer held
+- **AND** its stream ticker stops polling LAPI
+
+#### Scenario: A successful New keeps its holder
+- **WHEN** `New` returns a handler
+- **THEN** the incarnations it opened are still held
+- **AND** cancelling the constructor context releases them
+
+### Requirement: New does not mutate the caller's Config
+`New` SHALL snapshot the `*configuration.Config` Traefik passes before it normalises or resolves anything, and SHALL pass that snapshot to `lapi.Prepare`, `appsec.Prepare`, the reclaim `Open` calls, and `bouncer.New`. After `New` returns, the caller's struct MUST NOT carry a normalised `logLevel`, a resolved `crowdsecLapiKey` or `redisCachePassword`, a resolved `crowdsecAppsecKey`, or alone-mode's rewritten `crowdsecLapiHost` and forced `updateIntervalSeconds`. The snapshot is a shallow copy: `Config`'s slice and map fields stay shared with the caller, and the copy site SHALL say so.
+
+#### Scenario: Resolved secrets stay out of the caller's struct
+- **WHEN** `New` succeeds with a `crowdsecLapiKey` that resolves from a file and a lower-case `logLevel`
+- **THEN** the caller's `*Config` still holds the unresolved key and the original `logLevel`

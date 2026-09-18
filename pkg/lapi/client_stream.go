@@ -146,7 +146,12 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 		}
 		c.deleteStreamDecision(decision)
 	}
-	decisionscope.ApplyRangeBatch(c.Cache(), rangeUpserts, rangeRemovals)
+	// A range apply that could not read the shared index is a poll that did not finish. Returning
+	// the error releases the lease, so the next tick retries; because the tick failed,
+	// isCrowdsecStreamStartup is left set and that retry asks for the full set again.
+	if err := decisionscope.ApplyRangeBatch(c.Cache(), rangeUpserts, rangeRemovals); err != nil {
+		return fmt.Errorf("handleStreamCache:rangeIndex %w", err)
+	}
 	c.hydrateRangeMembership()
 	return nil
 }
