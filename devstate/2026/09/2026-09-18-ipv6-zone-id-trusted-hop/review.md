@@ -39,3 +39,9 @@ phase: archive
 findings: fold core_plugin_ip_radix-lookup; Task tool unavailable so FindSpecHost ran in-process
 fixed: catalog requirement synced; change moved to archive/2026-09-18-ipv6-zone-id-trusted-hop
 skipped: pullrequest; Task subagent (not in this nest)
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: reused PR 83; title ready; Main Process gocognit failed
+fixed: title drop 🚧; delivery card on PR summary
+skipped: comments.md absent (no reply walk)
