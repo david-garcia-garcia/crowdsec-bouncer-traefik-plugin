@@ -339,7 +339,14 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 			return err
 		}
 	} else {
-		if err := validateLapiAndAppsecConnection(config); err != nil {
+		if err := validateLapiURLAndKeys(config); err != nil {
+			return err
+		}
+	}
+
+	// AppSec URL, key file, and HTTPS CA only when this router will open AppSec.
+	if config.CrowdsecAppsecEnabled {
+		if err := validateAppsecURLKeyAndTLS(config); err != nil {
 			return err
 		}
 	}
@@ -433,13 +440,6 @@ func validateCaptchaCredentials(config *Config) error {
 		return errors.New("CaptchaSecretKey: cannot be empty when CaptchaProvider is set")
 	}
 	return nil
-}
-
-func validateLapiAndAppsecConnection(config *Config) error {
-	if err := validateLapiURLAndKeys(config); err != nil {
-		return err
-	}
-	return validateAppsecURLKeyAndTLS(config)
 }
 
 func validateLapiURLAndKeys(config *Config) error {
