@@ -59,3 +59,4 @@ lapiClient.IncDropped(origin, req.ipType, "ban")
 - Trust the header the same way you trust `X-Forwarded-For`: only from a trusted hop (CDN or geoenrich in front of this middleware).
 - Ip/header/Range-index values MAY be `t`/`c` plus U+001F plus a metrics origin. Bare letters still match. Redis stays one `range-index` key.
 - After a cache miss, stream/alone use stream health; live/none call `LiveLookup`. Do not name that split after Range membership.
+- A parseable Range host is stored and matched as `/32` or `/128` (`pkg/ip.HostCIDR`). Unparseable lines are still skipped. Delete of the original LAPI spelling still drops that line.

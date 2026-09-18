@@ -1,10 +1,24 @@
 package decisionscope
 
 import (
+	"net"
 	"strings"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
+
+// rangeIndexCIDR maps a parseable host to /32 or /128 so the index key is a CIDR.
+func rangeIndexCIDR(value string) string {
+	network := strings.TrimSpace(value)
+	if network == "" {
+		return ""
+	}
+	if ipAddr := net.ParseIP(network); ipAddr != nil {
+		return ip.HostCIDR(ipAddr)
+	}
+	return network
+}
 
 // AddRange upserts a Range decision on the shared index as cidr=remediation.
 func AddRange(cacheClient *cache.Client, cidr, remediation string, _ int64) {
@@ -26,15 +40,25 @@ func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, remov
 		return
 	}
 	index := readRangeIndex(cacheClient)
+	// Bare hosts enter the blob as /32 or /128 so membership can ParseCIDR.
 	for cidr, remediation := range upserts {
-		network := strings.TrimSpace(cidr)
+		network := rangeIndexCIDR(cidr)
 		if network == "" || !IsActiveRemediation(remediation) {
 			continue
 		}
 		index = upsertIndexCIDR(index, network, remediation)
 	}
 	for _, cidr := range removals {
-		index = removeCIDRFromIndex(index, strings.TrimSpace(cidr))
+		// Drop the host-prefix key and the original spelling so a delete of
+		// the LAPI value still clears a pre-rewrite Redis line.
+		trimmed := strings.TrimSpace(cidr)
+		network := rangeIndexCIDR(trimmed)
+		if network != "" {
+			index = removeCIDRFromIndex(index, network)
+		}
+		if trimmed != "" && trimmed != network {
+			index = removeCIDRFromIndex(index, trimmed)
+		}
 	}
 	if index == "" {
 		cacheClient.Delete(RangeIndexKey)

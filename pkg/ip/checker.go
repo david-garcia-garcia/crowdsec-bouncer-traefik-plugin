@@ -26,7 +26,7 @@ func NewChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
 		ipMask := strings.TrimSpace(ipMaskRaw)
 		// Bare addresses enter the tree as a host prefix.
 		if ipAddr := net.ParseIP(ipMask); ipAddr != nil {
-			if err := trustedCIDRs.AddCIDR(hostCIDR(ipAddr)); err != nil {
+			if err := trustedCIDRs.AddCIDR(HostCIDR(ipAddr)); err != nil {
 				return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipMask, err)
 			}
 			log.Debug(fmt.Sprintf("IP %v is trusted", ipAddr))
@@ -72,8 +72,8 @@ func (ip *Checker) ContainsIP(addr net.IP) bool {
 	return found
 }
 
-// hostCIDR formats a bare address as a host prefix for the lookup helper.
-func hostCIDR(addr net.IP) string {
+// HostCIDR formats a bare address as a host prefix for the lookup helper.
+func HostCIDR(addr net.IP) string {
 	if v4 := addr.To4(); v4 != nil {
 		return v4.String() + "/32"
 	}
