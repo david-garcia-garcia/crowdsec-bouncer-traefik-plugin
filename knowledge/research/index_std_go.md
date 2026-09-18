@@ -17,3 +17,8 @@ description: When net/http.Client.Do can reuse a persistent TCP connection.
 priority: normal
 local: std_go_net-http_request-content-length/
 description: How the Go HTTP client chooses outbound Content-Length from the field versus the header.
+
+## IPv6 zone ID parse
+priority: normal
+local: std_go_net_ipv6-zone/
+description: How Go net.ParseIP, SplitHostPort, and TCPAddr treat RFC 4007 IPv6 zone IDs.
