@@ -8,7 +8,7 @@ JobName: 2026-09-18-stream-apply-deleted-before-new
 | explore | [x] | [x] | 2026-09-18T14:19:48Z |
 | propose | [x] | [x] | 2026-09-18T14:22:08Z |
 | implement | [x] | [x] | 2026-09-18T14:25:28Z |
-| codereview | [ ] | [ ] | |
+| codereview | [x] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
