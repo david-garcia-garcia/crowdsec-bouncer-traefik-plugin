@@ -8,12 +8,16 @@ _Avoid_: retry loop, recursive `crowdsecQuery`, bodyless replay
 
 ## Overview
 
-`crowdsecQuery(url, data)` is the caller-facing entry. `sendQuery(url, data, mayRenewToken)` is the exchange. `mayRenewToken` is the one-shot permission to renew the alone-mode CAPI token: the caller-facing entry passes `true`, the replay and the CAPI login pass `false`. Spec: `core_plugin_lapi_query-round-trip`. The transport it runs on is `core_plugin_lapi_connection.md`.
+`crowdsecQuery(url, data)` is the caller-facing entry. `sendQuery(url, data, mayRenewToken)` is the exchange. `mayRenewToken` is the one-shot permission to renew the alone-mode CAPI token: the caller-facing entry passes `true`, the replay and the CAPI login pass `false`. `getToken` marshals the stored Client credentials as the CAPI watchers-login body. Spec: `core_plugin_lapi_query-round-trip`. The transport it runs on is `core_plugin_lapi_connection.md`.
 
 ## How to use
 
 - Call `crowdsecQuery(url, data)` from a LAPI/CAPI caller. Reach for `sendQuery` only where renewal must be forbidden.
 - Pass `false` from `getToken`. The login request must never renew, or a persistent `401` recurses without bound.
+- Marshal stored `c.crowdsecMachineID`, `c.crowdsecPassword`, and `c.crowdsecScenarios` as JSON `machine_id`, `password`, and `scenarios`. Do not interpolate those strings into a JSON template.
+- Keep the request DTO unexported and next to `Login`. Do not reuse `Login` for the POST body (`Login` is the watchers-login response).
+- Encode the scenario slice as-is: unset is JSON `null`, empty is `[]`. Do not emit one empty string.
+- If marshal fails, return `fmt.Errorf("getToken:marshal %w", err)` and do not POST a fallback body.
 - Replay the original method and the original body on the alone-mode `401`: `sendQuery(stringURL, data, false)`. Do not replay with a `nil` body — a POST must stay a POST.
 - `defer c.drainResponse(res)` immediately after the transport-error check, above every status branch. Drain with `io.Copy(io.Discard, res.Body)`, then `Close`. Closing without draining keeps the connection out of the idle pool.
 - Check `isReverseProxyError(res.StatusCode)` below that defer, not beside the transport error. Do not add a `nil` response guard there: the branch is reachable only when `err == nil`.
@@ -21,6 +25,18 @@ _Avoid_: retry loop, recursive `crowdsecQuery`, bodyless replay
 - Keep `crowdsecQuery:` as the message prefix. It is the operator-facing name of the exchange, not the Go identifier.
 
 ## Pattern snippet
+
+```go
+loginData, err := json.Marshal(loginRequest{
+	MachineID: c.crowdsecMachineID,
+	Password:  c.crowdsecPassword,
+	Scenarios: c.crowdsecScenarios,
+})
+if err != nil {
+	return fmt.Errorf("getToken:marshal %w", err)
+}
+body, err := c.sendQuery(loginURL.String(), loginData, false)
+```
 
 ```go
 res, err := current.httpClient.Do(req)
@@ -50,3 +66,5 @@ if res.StatusCode == http.StatusUnauthorized && c.crowdsecMode == configuration.
 - A non-2xx that is not `502/503/504` is drained by the same defer before its status error returns. Draining is not only for the reverse-proxy branch.
 - The `401` response is released by the defer, so it is still held while `getToken` and the replay run: up to three sockets during one renewal.
 - One replay, ever. `mayRenewToken` is what bounds it — not a counter, not a context.
+- A quote, backslash, or newline in a stored credential makes an interpolated login body invalid JSON. After marshal, a decoder must yield those same Client strings.
+- `json.Marshal` may HTML-escape `&<>`. A decoder still yields the original string; do not treat that escaping as a wrong body.

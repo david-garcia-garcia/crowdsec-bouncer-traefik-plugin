@@ -3,6 +3,7 @@ package configuration
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -113,8 +114,30 @@ func Test_ValidateParams(t *testing.T) {
 	cfgCaptchaWithProvider := getMinimalConfig()
 	cfgCaptchaWithProvider.CrowdsecLapiFailureAction = FailureActionCaptcha
 	cfgCaptchaWithProvider.CaptchaProvider = HcaptchaProvider
+	cfgCaptchaWithProvider.CaptchaSiteKey = "site"
+	cfgCaptchaWithProvider.CaptchaSecretKey = "secret"
 	cfgCaptchaWithProvider.CaptchaGateSecret = "gate-secret"
 	cfgCaptchaWithProvider.CaptchaFilePath = ""
+	cfgEmptyKeysDefaultBan := getMinimalConfig()
+	cfgEmptyKeysDefaultBan.CaptchaProvider = HcaptchaProvider
+	cfgEmptyKeysDefaultBan.CaptchaGateSecret = "gate-secret"
+	cfgEmptyKeysDefaultBan.CaptchaFilePath = ""
+	cfgOnlySiteEmpty := getMinimalConfig()
+	cfgOnlySiteEmpty.CaptchaProvider = HcaptchaProvider
+	cfgOnlySiteEmpty.CaptchaSecretKey = "secret"
+	cfgOnlySiteEmpty.CaptchaGateSecret = "gate-secret"
+	cfgOnlySiteEmpty.CaptchaFilePath = ""
+	cfgOnlySecretEmpty := getMinimalConfig()
+	cfgOnlySecretEmpty.CaptchaProvider = HcaptchaProvider
+	cfgOnlySecretEmpty.CaptchaSiteKey = "site"
+	cfgOnlySecretEmpty.CaptchaGateSecret = "gate-secret"
+	cfgOnlySecretEmpty.CaptchaFilePath = ""
+	cfgWhitespaceSite := getMinimalConfig()
+	cfgWhitespaceSite.CaptchaProvider = HcaptchaProvider
+	cfgWhitespaceSite.CaptchaSiteKey = "   "
+	cfgWhitespaceSite.CaptchaSecretKey = "secret"
+	cfgWhitespaceSite.CaptchaGateSecret = "gate-secret"
+	cfgWhitespaceSite.CaptchaFilePath = ""
 	cfgUnknownAction := getMinimalConfig()
 	cfgUnknownAction.CrowdsecAppsecFailureAction = "block"
 	cfgEmptyAction := getMinimalConfig()
@@ -125,8 +148,50 @@ func Test_ValidateParams(t *testing.T) {
 	cfgAppsecHTTPS.CrowdsecAppsecScheme = HTTPS
 	cfgAppsecHTTPS.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
 	cfgAppsecDistinctScheme := getMinimalConfig()
+	cfgAppsecDistinctScheme.CrowdsecAppsecEnabled = true
 	cfgAppsecDistinctScheme.CrowdsecLapiScheme = HTTP
 	cfgAppsecDistinctScheme.CrowdsecAppsecScheme = HTTPS
+	missingAppsecKeyFile := "../../tests/.missing-appsec-key"
+	cfgAloneAppsecOnInvalidCA := getMinimalConfig()
+	cfgAloneAppsecOnInvalidCA.CrowdsecMode = AloneMode
+	cfgAloneAppsecOnInvalidCA.CrowdsecCapiMachineID = "machine"
+	cfgAloneAppsecOnInvalidCA.CrowdsecCapiPassword = "password"
+	cfgAloneAppsecOnInvalidCA.CrowdsecAppsecEnabled = true
+	cfgAloneAppsecOnInvalidCA.CrowdsecAppsecScheme = HTTPS
+	cfgAloneAppsecOnInvalidCA.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgAloneAppsecOnMissingKey := getMinimalConfig()
+	cfgAloneAppsecOnMissingKey.CrowdsecMode = AloneMode
+	cfgAloneAppsecOnMissingKey.CrowdsecCapiMachineID = "machine"
+	cfgAloneAppsecOnMissingKey.CrowdsecCapiPassword = "password"
+	cfgAloneAppsecOnMissingKey.CrowdsecAppsecEnabled = true
+	cfgAloneAppsecOnMissingKey.CrowdsecAppsecKeyFile = missingAppsecKeyFile
+	cfgAloneAppsecOffLeftover := getMinimalConfig()
+	cfgAloneAppsecOffLeftover.CrowdsecMode = AloneMode
+	cfgAloneAppsecOffLeftover.CrowdsecCapiMachineID = "machine"
+	cfgAloneAppsecOffLeftover.CrowdsecCapiPassword = "password"
+	cfgAloneAppsecOffLeftover.CrowdsecAppsecEnabled = false
+	cfgAloneAppsecOffLeftover.CrowdsecAppsecScheme = HTTPS
+	cfgAloneAppsecOffLeftover.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgAloneAppsecOffLeftover.CrowdsecAppsecKeyFile = missingAppsecKeyFile
+	cfgLiveAppsecOnInvalidCA := getMinimalConfig()
+	cfgLiveAppsecOnInvalidCA.CrowdsecAppsecEnabled = true
+	cfgLiveAppsecOnInvalidCA.CrowdsecLapiScheme = HTTP
+	cfgLiveAppsecOnInvalidCA.CrowdsecAppsecScheme = HTTPS
+	cfgLiveAppsecOnInvalidCA.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgLiveAppsecOnMissingKey := getMinimalConfig()
+	cfgLiveAppsecOnMissingKey.CrowdsecAppsecEnabled = true
+	cfgLiveAppsecOnMissingKey.CrowdsecAppsecKeyFile = missingAppsecKeyFile
+	cfgLiveAppsecOffLeftover := getMinimalConfig()
+	cfgLiveAppsecOffLeftover.CrowdsecAppsecEnabled = false
+	cfgLiveAppsecOffLeftover.CrowdsecAppsecScheme = HTTPS
+	cfgLiveAppsecOffLeftover.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgLiveAppsecOffLeftover.CrowdsecAppsecKeyFile = missingAppsecKeyFile
+	cfgAppsecModeOffLeftover := getMinimalConfig()
+	cfgAppsecModeOffLeftover.CrowdsecMode = AppsecMode
+	cfgAppsecModeOffLeftover.CrowdsecLapiKey = ""
+	cfgAppsecModeOffLeftover.CrowdsecAppsecEnabled = false
+	cfgAppsecModeOffLeftover.CrowdsecAppsecScheme = HTTPS
+	cfgAppsecModeOffLeftover.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
 	cfgAppsecModeNoLapiKey := getMinimalConfig()
 	cfgAppsecModeNoLapiKey.CrowdsecMode = AppsecMode
 	cfgAppsecModeNoLapiKey.CrowdsecLapiKey = ""
@@ -142,6 +207,8 @@ func Test_ValidateParams(t *testing.T) {
 	cfgAloneMissingCaptchaKeys.CrowdsecCapiPassword = "password"
 	cfgAloneMissingCaptchaKeys.CrowdsecLapiFailureAction = FailureActionCaptcha
 	cfgAloneMissingCaptchaKeys.CaptchaProvider = HcaptchaProvider
+	cfgAloneMissingCaptchaKeys.CaptchaGateSecret = "gate-secret"
+	cfgAloneMissingCaptchaKeys.CaptchaFilePath = ""
 	cfgAloneBadLog := getMinimalConfig()
 	cfgAloneBadLog.CrowdsecMode = AloneMode
 	cfgAloneBadLog.CrowdsecCapiMachineID = "machine"
@@ -159,9 +226,10 @@ func Test_ValidateParams(t *testing.T) {
 		config *Config
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name            string
+		args            args
+		wantErr         bool
+		wantErrContains string
 	}{
 		{name: "Validate minimal config", args: args{config: getMinimalConfig()}, wantErr: false},
 		{name: "Validate a non trimed crowdsec lapi key", args: args{config: cfg1}, wantErr: false},
@@ -178,14 +246,25 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Invalid log level Warning", args: args{config: cfg10}, wantErr: true},
 		{name: "Captcha LAPI action without provider", args: args{config: cfgCaptchaNoProvider}, wantErr: true},
 		{name: "Captcha LAPI action with provider", args: args{config: cfgCaptchaWithProvider}, wantErr: false},
+		{name: "Provider set with empty site and secret", args: args{config: cfgEmptyKeysDefaultBan}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},
+		{name: "Provider set with only site empty", args: args{config: cfgOnlySiteEmpty}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},
+		{name: "Provider set with only secret empty", args: args{config: cfgOnlySecretEmpty}, wantErr: true, wantErrContains: "CaptchaSecretKey: cannot be empty when CaptchaProvider is set"},
+		{name: "Provider set with whitespace-only site", args: args{config: cfgWhitespaceSite}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},
 		{name: "Unknown AppSec failure action", args: args{config: cfgUnknownAction}, wantErr: true},
 		{name: "Empty failure actions use default ban", args: args{config: cfgEmptyAction}, wantErr: false},
-		{name: "AppSec HTTPS with invalid CA while LAPI HTTP", args: args{config: cfgAppsecHTTPS}, wantErr: true},
+		{name: "AppSec HTTPS with invalid CA while LAPI HTTP", args: args{config: cfgAppsecHTTPS}, wantErr: false},
 		{name: "AppSec distinct HTTPS scheme validates URL", args: args{config: cfgAppsecDistinctScheme}, wantErr: false},
+		{name: "Alone AppSec on with invalid CA", args: args{config: cfgAloneAppsecOnInvalidCA}, wantErr: true},
+		{name: "Alone AppSec on with missing key file", args: args{config: cfgAloneAppsecOnMissingKey}, wantErr: true, wantErrContains: "CrowdsecAppsecKey"},
+		{name: "Alone AppSec off leftover CA and key file", args: args{config: cfgAloneAppsecOffLeftover}, wantErr: false},
+		{name: "Live AppSec on with invalid CA", args: args{config: cfgLiveAppsecOnInvalidCA}, wantErr: true},
+		{name: "Live AppSec on with missing key file", args: args{config: cfgLiveAppsecOnMissingKey}, wantErr: true, wantErrContains: "CrowdsecAppsecKey"},
+		{name: "Live AppSec off leftover CA and key file", args: args{config: cfgLiveAppsecOffLeftover}, wantErr: false},
+		{name: "Appsec mode off leftover invalid CA", args: args{config: cfgAppsecModeOffLeftover}, wantErr: false},
 		{name: "Appsec mode without LAPI key", args: args{config: cfgAppsecModeNoLapiKey}, wantErr: false},
 		{name: "None mode minimal config", args: args{config: cfgNoneMode}, wantErr: false},
 		{name: "Alone mode with CAPI credentials", args: args{config: cfgAloneValid}, wantErr: false},
-		{name: "Alone mode captcha without site/secret keys", args: args{config: cfgAloneMissingCaptchaKeys}, wantErr: true},
+		{name: "Alone mode captcha without site/secret keys", args: args{config: cfgAloneMissingCaptchaKeys}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},
 		{name: "Alone mode invalid log level", args: args{config: cfgAloneBadLog}, wantErr: true},
 		{name: "AppSec captcha action without provider", args: args{config: cfgAppsecCaptchaNoProvider}, wantErr: true},
 		{name: "RemediationStatusCode below 100", args: args{config: cfgRemediationLow}, wantErr: true},
@@ -194,8 +273,12 @@ func Test_ValidateParams(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := ValidateParams(tt.args.config, log); (err != nil) != tt.wantErr {
+			err := ValidateParams(tt.args.config, log)
+			if (err != nil) != tt.wantErr {
 				t.Errorf("validateParams() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErrContains != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErrContains)) {
+				t.Errorf("validateParams() error = %v, want containing %q", err, tt.wantErrContains)
 			}
 		})
 	}
@@ -514,6 +597,8 @@ func Test_validateEnabledCaptchaSettings_customChallengeURL(t *testing.T) {
 	newCustomConfig := func(challengeURL string) *Config {
 		cfg := getMinimalConfig()
 		cfg.CaptchaProvider = CustomProvider
+		cfg.CaptchaSiteKey = "site"
+		cfg.CaptchaSecretKey = "secret"
 		cfg.CaptchaGateSecret = "gate-secret"
 		cfg.CaptchaFilePath = ""
 		cfg.CaptchaCustomChallengeURL = challengeURL
@@ -542,6 +627,8 @@ func Test_validateEnabledCaptchaSettings_customChallengeURL(t *testing.T) {
 	// A built-in provider ignores the key, so a stale value must not block startup.
 	builtin := getMinimalConfig()
 	builtin.CaptchaProvider = HcaptchaProvider
+	builtin.CaptchaSiteKey = "site"
+	builtin.CaptchaSecretKey = "secret"
 	builtin.CaptchaGateSecret = "gate-secret"
 	builtin.CaptchaFilePath = ""
 	builtin.CaptchaCustomChallengeURL = "v0/challenge"
@@ -629,6 +716,28 @@ func Test_validateParamsTLS_appsec(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestValidateParams_EmptyAppsecHost pins enabled AppSec rejecting a missing
+// listener host while disabled AppSec still accepts an empty host.
+func TestValidateParams_EmptyAppsecHost(t *testing.T) {
+	log := logger.New("INFO", "")
+	t.Run("enabled rejects empty host", func(t *testing.T) {
+		cfg := getMinimalConfig()
+		cfg.CrowdsecAppsecEnabled = true
+		cfg.CrowdsecAppsecHost = ""
+		if err := ValidateParams(cfg, log); err == nil {
+			t.Fatal("ValidateParams = nil want error")
+		}
+	})
+	t.Run("disabled accepts empty host", func(t *testing.T) {
+		cfg := getMinimalConfig()
+		cfg.CrowdsecAppsecEnabled = false
+		cfg.CrowdsecAppsecHost = ""
+		if err := ValidateParams(cfg, log); err != nil {
+			t.Fatalf("ValidateParams = %v want nil", err)
+		}
+	})
 }
 
 func TestForwardedHeadersInsecure(t *testing.T) {
