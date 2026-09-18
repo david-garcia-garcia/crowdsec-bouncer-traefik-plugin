@@ -26,7 +26,7 @@ func newTestStreamTickClient(t *testing.T, log *slog.Logger, host string, httpCl
 		crowdsecStreamRoute:     crowdsecLapiStreamRoute,
 		updateInterval:          60,
 		pluginVersion:           "test",
-		isCrowdsecStreamStartup: true,
+		isCrowdsecStreamStartup: 1,
 	}
 	attachTestTransport(client, httpClient, "test-key")
 	return client

@@ -1,0 +1,15 @@
+issueKey: 2026-09-18-forwarded-headers-insecure
+jobName: 2026-09-18-forwarded-headers-insecure
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:7db11a57af1a26903b7b5c6da7956662be7c7dd0c80468e3a5c927018a97b3eb
+comments: none
+localTests: passed
+requirement: requirement.md
+explore: explore.md
+change: forwarded-headers-insecure
+pr: none

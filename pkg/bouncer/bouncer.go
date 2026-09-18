@@ -21,35 +21,43 @@ import (
 
 // Bouncer is one Traefik router handler. It is not the reclaim value.
 type Bouncer struct {
-	appsecClient            *appsec.Client
-	appsecEnabled           bool
-	appsecFailureAction     string
-	banTemplate             *template.Template
-	banTemplateContentType  string
-	captchaClient           *captcha.Client
-	clientPoolStrategy      *ip.PoolStrategy
-	crowdsecMode            string
-	decisionScopeHeaders    map[string]string // CrowdSec header scope → request header
-	enabled                 bool
-	forwardedCustomHeader   string
-	lapiClient              *lapi.Client
-	lapiFailureAction       string // per-router LAPI fallback (not on Client identity)
-	redisUnreachableBlock   bool   // per-router Redis fail-closed
-	defaultDecisionSeconds  int64  // per-router live-cache TTL passed into LiveLookup
-	log                     *slog.Logger
-	name                    string
-	next                    http.Handler
-	remediationCustomHeader string
-	remediationStatusCode   int
-	serverPoolStrategy      *ip.PoolStrategy
-	template                *template.Template
-	traceCustomHeader       string
+	appsecClient             *appsec.Client
+	appsecEnabled            bool
+	appsecFailureAction      string
+	banTemplate              *template.Template
+	banTemplateContentType   string
+	captchaClient            *captcha.Client
+	clientPoolStrategy       *ip.PoolStrategy
+	crowdsecMode             string
+	decisionScopeHeaders     map[string]string // CrowdSec header scope → request header
+	enabled                  bool
+	forwardedCustomHeader    string
+	forwardedHeadersInsecure bool
+	lapiClient               *lapi.Client
+	lapiFailureAction        string // per-router LAPI fallback (not on Client identity)
+	redisUnreachableBlock    bool   // per-router Redis fail-closed
+	defaultDecisionSeconds   int64  // per-router live-cache TTL passed into LiveLookup
+	log                      *slog.Logger
+	name                     string
+	next                     http.Handler
+	remediationCustomHeader  string
+	remediationStatusCode    int
+	serverPoolStrategy       *ip.PoolStrategy
+	template                 *template.Template
+	traceCustomHeader        string
 }
 
 // New returns a per-router handler bound to lapiClient and appsecClient.
 func New(next http.Handler, name string, config *configuration.Config, lapiClient *lapi.Client, appsecClient *appsec.Client, log *slog.Logger) (http.Handler, error) {
 	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(log, config.ClientTrustedIPs)
+	forwardedCustomHeader := config.ForwardedHeadersCustomName
+	if config.ForwardedHeadersInsecure && forwardedCustomHeader == "X-Forwarded-For" {
+		forwardedCustomHeader = "X-Real-Ip"
+	}
+	if config.ForwardedHeadersInsecure {
+		log.Info("ForwardedHeadersInsecure enabled, using header " + forwardedCustomHeader)
+	}
 
 	var banTemplate *template.Template
 	var banTemplateContentType string
@@ -58,29 +66,30 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 	}
 
 	routeHandler := &Bouncer{
-		appsecClient:            appsecClient,
-		appsecEnabled:           config.CrowdsecAppsecEnabled,
-		appsecFailureAction:     configuration.EffectiveFailureAction(config.CrowdsecAppsecFailureAction),
-		banTemplate:             banTemplate,
-		banTemplateContentType:  banTemplateContentType,
-		captchaClient:           &captcha.Client{},
-		clientPoolStrategy:      &ip.PoolStrategy{Checker: clientChecker},
-		crowdsecMode:            config.CrowdsecMode,
-		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
-		enabled:                 config.Enabled,
-		forwardedCustomHeader:   config.ForwardedHeadersCustomName,
-		lapiClient:              lapiClient,
-		lapiFailureAction:       configuration.EffectiveFailureAction(config.CrowdsecLapiFailureAction),
-		redisUnreachableBlock:   config.RedisCacheUnreachableBlock,
-		defaultDecisionSeconds:  config.DefaultDecisionSeconds,
-		log:                     log,
-		name:                    name,
-		next:                    next,
-		remediationCustomHeader: config.RemediationHeadersCustomName,
-		remediationStatusCode:   config.RemediationStatusCode,
-		serverPoolStrategy:      &ip.PoolStrategy{Checker: serverChecker},
-		template:                template.New("CrowdsecBouncer").Delims("[[", "]]"),
-		traceCustomHeader:       config.TraceHeadersCustomName,
+		appsecClient:             appsecClient,
+		appsecEnabled:            config.CrowdsecAppsecEnabled,
+		appsecFailureAction:      configuration.EffectiveFailureAction(config.CrowdsecAppsecFailureAction),
+		banTemplate:              banTemplate,
+		banTemplateContentType:   banTemplateContentType,
+		captchaClient:            &captcha.Client{},
+		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
+		crowdsecMode:             config.CrowdsecMode,
+		decisionScopeHeaders:     decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
+		enabled:                  config.Enabled,
+		forwardedCustomHeader:    forwardedCustomHeader,
+		forwardedHeadersInsecure: config.ForwardedHeadersInsecure,
+		lapiClient:               lapiClient,
+		lapiFailureAction:        configuration.EffectiveFailureAction(config.CrowdsecLapiFailureAction),
+		redisUnreachableBlock:    config.RedisCacheUnreachableBlock,
+		defaultDecisionSeconds:   config.DefaultDecisionSeconds,
+		log:                      log,
+		name:                     name,
+		next:                     next,
+		remediationCustomHeader:  config.RemediationHeadersCustomName,
+		remediationStatusCode:    config.RemediationStatusCode,
+		serverPoolStrategy:       &ip.PoolStrategy{Checker: serverChecker},
+		template:                 template.New("CrowdsecBouncer").Delims("[[", "]]"),
+		traceCustomHeader:        config.TraceHeadersCustomName,
 	}
 	if config.CrowdsecMode == configuration.AppsecMode {
 		routeHandler.log.Debug("Bouncer initialized name:" + name)
@@ -144,7 +153,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		return
 	}
 
-	remoteIP, ipAddr, err := ip.GetRemoteIP(httpReq, b.serverPoolStrategy, b.forwardedCustomHeader)
+	remoteIP, ipAddr, err := ip.GetRemoteIP(httpReq, b.serverPoolStrategy, b.forwardedCustomHeader, b.forwardedHeadersInsecure)
 	req := clientRequest{
 		Request:  httpReq,
 		ipAddr:   ipAddr,

@@ -2,6 +2,7 @@
 package lapi
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"sync"
@@ -52,8 +53,9 @@ type Client struct {
 	metricsInterval      int64
 	updateMaxFailure     int64
 	crowdsecStreamRoute  string
-	decisionScopeHeaders map[string]string // CrowdSec header scope → request header
+	decisionScopeHeaders map[string]string // write-once first-create residue; not the live union
 	sessionKey           string            // reclaim SessionKey (stream/alone) or Key (live/none)
+	liveHeaderScopes     liveHeaderScopes  // live constructor ctx → normalized header scopes
 
 	transport       atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
 	decisionStore   *DecisionStore
@@ -63,15 +65,15 @@ type Client struct {
 	log             *slog.Logger
 	pluginVersion   string
 
-	isCrowdsecStreamStartup bool
-	isCrowdsecStreamHealthy bool
+	// int64 0/1 published with atomic.LoadInt64/StoreInt64 (Yaegi v0.16: not atomic.Bool / atomic.Int64 / atomic.Pointer[T]).
+	isCrowdsecStreamStartup int64
+	isCrowdsecStreamHealthy int64
 	updateFailure           int64
+	streamPollInFlight      int64
 	streamStop              chan bool
 	metricsStop             chan bool
 	metricsReporter         *MetricsReporter
 	streamFetches           int64
-	streamOwner             string         // first middleware New that created this stream session
-	streamSettings          streamSettings // knobs that must not start a second poller; warn-and-wire if a joiner differs
 }
 
 // Prepare resolves secrets and CAPI/LAPI routing on cfg. Call before Key and New.
@@ -129,8 +131,8 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		sessionKey:              reclaimSessionKey(config),
 		log:                     log,
 		pluginVersion:           pluginVersion,
-		isCrowdsecStreamStartup: true,
-		isCrowdsecStreamHealthy: true,
+		isCrowdsecStreamStartup: 1,
+		isCrowdsecStreamHealthy: 1,
 		decisionStore:           store,
 		cacheClient:             store.Cache(),
 	}
@@ -252,7 +254,7 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 		for {
 			select {
 			case <-ticker.C:
-				go work()
+				work()
 			case <-stop:
 				ticker.Stop()
 				return
@@ -304,10 +306,32 @@ func (c *Client) storeRangeMembership(index string) {
 
 // StreamHealthy is true while stream polling is succeeding.
 func (c *Client) StreamHealthy() bool {
-	return c.isCrowdsecStreamHealthy
+	return atomic.LoadInt64(&c.isCrowdsecStreamHealthy) != 0
 }
 
 // StreamFetches is how many times this connection actually called the stream endpoint.
 func (c *Client) StreamFetches() int64 {
 	return atomic.LoadInt64(&c.streamFetches)
+}
+
+// registerLiveHeaderScopes records this New ctx’s headers and drops them when ctx is Done.
+func (c *Client) registerLiveHeaderScopes(ctx context.Context, headers map[string]string) {
+	c.mu.Lock()
+	c.liveHeaderScopes.register(ctx, headers)
+	c.mu.Unlock()
+	context.AfterFunc(ctx, func() {
+		c.mu.Lock()
+		c.liveHeaderScopes.unregister(ctx)
+		c.mu.Unlock()
+	})
+}
+
+// snapshotLiveHeaderScopes is the live-router union, or first-create residue when none are registered yet.
+func (c *Client) snapshotLiveHeaderScopes() map[string]string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.liveHeaderScopes.headerScopesByCtx) == 0 {
+		return c.decisionScopeHeaders
+	}
+	return c.liveHeaderScopes.union()
 }

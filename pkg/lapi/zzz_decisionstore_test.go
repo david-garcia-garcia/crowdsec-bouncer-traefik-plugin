@@ -113,8 +113,8 @@ func TestOpenDecisionStore_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.
 	if SessionHex(cfg) != SessionHex(other) {
 		t.Fatal("live SessionHex must ignore updateIntervalSeconds")
 	}
-	if IdentityHex(cfg) == IdentityHex(other) {
-		t.Fatal("live Client identity must still include updateIntervalSeconds")
+	if IdentityHex(testLiveConfig(1)) != IdentityHex(testLiveConfig(60)) {
+		t.Fatal("live IdentityHex must omit updateIntervalSeconds")
 	}
 }
 
@@ -182,8 +182,8 @@ func TestOpenLive_TwoClientsShareOneStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first == second {
-		t.Fatal("different live intervals must be two Clients")
+	if first != second {
+		t.Fatal("different live intervals must share one Client")
 	}
 	if first.Cache() != second.Cache() {
 		t.Fatal("those Clients must share one cache incarnation")

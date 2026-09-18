@@ -47,20 +47,27 @@ func (c *Client) startStream(config *configuration.Config, log *slog.Logger) err
 }
 
 func (c *Client) handleStreamTicker() {
+	if !atomic.CompareAndSwapInt64(&c.streamPollInFlight, 0, 1) {
+		return
+	}
+	defer atomic.StoreInt64(&c.streamPollInFlight, 0)
+
 	if err := c.handleStreamCache(); err != nil {
-		c.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", c.updateFailure, c.isCrowdsecStreamHealthy, err.Error()))
-		if c.updateMaxFailure != -1 && c.updateFailure >= c.updateMaxFailure && c.isCrowdsecStreamHealthy {
-			c.isCrowdsecStreamHealthy = false
+		updateFailure := atomic.LoadInt64(&c.updateFailure)
+		healthy := atomic.LoadInt64(&c.isCrowdsecStreamHealthy) != 0
+		c.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", updateFailure, healthy, err.Error()))
+		if c.updateMaxFailure != -1 && updateFailure >= c.updateMaxFailure && healthy {
+			atomic.StoreInt64(&c.isCrowdsecStreamHealthy, 0)
 			c.logInfo(MsgStreamUnhealthy, "unhealthy")
-			c.log.Error(fmt.Sprintf("handleStreamTicker:error updateFailure:%d %s", c.updateFailure, err.Error()))
+			c.log.Error(fmt.Sprintf("handleStreamTicker:error updateFailure:%d %s", updateFailure, err.Error()))
 		}
-		c.updateFailure++
+		atomic.AddInt64(&c.updateFailure, 1)
 	} else {
-		if !c.isCrowdsecStreamHealthy {
+		if atomic.LoadInt64(&c.isCrowdsecStreamHealthy) == 0 {
 			c.logInfo(MsgStreamHealthy, "healthy")
 		}
-		c.isCrowdsecStreamHealthy = true
-		c.updateFailure = 0
+		atomic.StoreInt64(&c.isCrowdsecStreamHealthy, 1)
+		atomic.StoreInt64(&c.updateFailure, 0)
 	}
 }
 
@@ -77,7 +84,7 @@ func (c *Client) handleStreamCache() error {
 	if !won {
 		c.log.Debug("handleStreamCache:alreadyUpdated")
 		c.hydrateRangeMembership()
-		c.isCrowdsecStreamStartup = false
+		atomic.StoreInt64(&c.isCrowdsecStreamStartup, 0)
 		return nil
 	}
 	streamRouteURL := url.URL{
@@ -128,6 +135,6 @@ func (c *Client) handleStreamCache() error {
 	decisionscope.ApplyRangeBatch(c.Cache(), rangeUpserts, rangeRemovals)
 	c.hydrateRangeMembership()
 	c.log.Debug("handleStreamCache:updated")
-	c.isCrowdsecStreamStartup = false
+	atomic.StoreInt64(&c.isCrowdsecStreamStartup, 0)
 	return nil
 }

@@ -97,6 +97,7 @@ type Config struct {
 	TraceHeadersCustomName                     string            `json:"traceHeadersCustomName,omitempty"`
 	RemediationHeadersCustomName               string            `json:"remediationHeadersCustomName,omitempty"`
 	ForwardedHeadersCustomName                 string            `json:"forwardedHeadersCustomName,omitempty"`
+	ForwardedHeadersInsecure                   bool              `json:"forwardedHeadersInsecure,omitempty"`
 	DecisionScopeHeaders                       map[string]string `json:"decisionScopeHeaders,omitempty"`
 	ForwardedHeadersTrustedIPs                 []string          `json:"forwardedHeadersTrustedIps,omitempty"`
 	ClientTrustedIPs                           []string          `json:"clientTrustedIps,omitempty"`
@@ -202,6 +203,7 @@ func New() *Config {
 		TraceHeadersCustomName:          "",
 		RemediationHeadersCustomName:    "",
 		ForwardedHeadersCustomName:      "X-Forwarded-For",
+		ForwardedHeadersInsecure:        false,
 		DecisionScopeHeaders:            map[string]string{},
 		ForwardedHeadersTrustedIPs:      []string{},
 		ClientTrustedIPs:                []string{},
@@ -336,7 +338,7 @@ func effectiveAppsecScheme(config *Config) string {
 
 // validateCaptchaCredentialsAndTemplates checks captcha credentials and optional HTML templates.
 func validateCaptchaCredentialsAndTemplates(config *Config) error {
-	if err := validateConfiguredCaptcha(config); err != nil {
+	if err := validateEnabledCaptchaSettings(config); err != nil {
 		return err
 	}
 	if config.BanFilePath != "" {
@@ -347,8 +349,8 @@ func validateCaptchaCredentialsAndTemplates(config *Config) error {
 	return nil
 }
 
-// validateConfiguredCaptcha checks site/secret keys, gate secret, and captcha template when a provider is set.
-func validateConfiguredCaptcha(config *Config) error {
+// validateEnabledCaptchaSettings checks provider credentials and templates when a provider is set.
+func validateEnabledCaptchaSettings(config *Config) error {
 	if config.CaptchaProvider == "" {
 		return nil
 	}

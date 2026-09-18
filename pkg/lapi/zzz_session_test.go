@@ -59,20 +59,50 @@ func testStreamLAPI(t *testing.T) (*httptest.Server, *int64) {
 	return server, &hits
 }
 
-func TestSessionKey_SameLapiKeyIgnoresMetricsIntervalInPrefix(t *testing.T) {
+func TestSessionKey_SameLapiKeySharesCursorAndRedisHash(t *testing.T) {
 	fast := testStreamConfig("lapi.example:8080", 1)
-	slow := testStreamConfig("lapi.example:8080", 600)
+	fast.UpdateIntervalSeconds = 30
+	slow := testStreamConfig("lapi.example:8080", 1)
+	slow.UpdateIntervalSeconds = 120
 	if SessionPrefix(fast) != SessionPrefix(slow) {
-		t.Fatal("same LAPI URL+key must share a session prefix even when metrics intervals differ")
+		t.Fatal("same LAPI URL+key must share a session prefix even when update intervals differ")
 	}
-	if SessionKey(fast) == SessionKey(slow) {
-		t.Fatal("settings hash must distinguish reclaim keys so a sleeper does not occupy a new snapshot")
+	if SessionKey(fast) != SessionKey(slow) {
+		t.Fatal("updateIntervalSeconds must not split the stream Open key")
 	}
 	if SessionHex(fast) != SessionHex(slow) {
 		t.Fatal("stream cache prefix must follow the session, not metrics interval")
 	}
-	if IdentityHex(fast) == IdentityHex(slow) {
-		t.Fatal("live/none identity must still include metrics interval")
+	if !strings.HasPrefix(SessionKey(fast), "lapi:stream:") {
+		t.Fatal("stream Open key must keep lapi:stream: prefix")
+	}
+	if !strings.HasPrefix(Key(fast), "lapi:") || strings.HasPrefix(Key(fast), "lapi:stream:") {
+		t.Fatal("live Open key must be lapi: plus SessionHex, not StoreKey")
+	}
+	if strings.HasPrefix(SessionKey(fast), "decisionstore:") || SessionKey(fast) == StoreKey(fast) {
+		t.Fatal("Client Open key must not reuse StoreKey")
+	}
+}
+
+func testNoneConfig(host string, metricsInterval int64) *configuration.Config {
+	cfg := testStreamConfig(host, metricsInterval)
+	cfg.CrowdsecMode = configuration.NoneMode
+	return cfg
+}
+
+func TestKey_NoneMetricsIntervalSplitsClientKeepsStore(t *testing.T) {
+	fast := testNoneConfig("lapi.example:8080", 1)
+	slow := testNoneConfig("lapi.example:8080", 600)
+	if Key(fast) == Key(slow) {
+		t.Fatal("none Key must include MetricsUpdateIntervalSeconds")
+	}
+	if StoreKey(fast) != StoreKey(slow) {
+		t.Fatal("none StoreKey must omit MetricsUpdateIntervalSeconds")
+	}
+	streamFast := testStreamConfig("lapi.example:8080", 1)
+	streamSlow := testStreamConfig("lapi.example:8080", 600)
+	if SessionKey(streamFast) != SessionKey(streamSlow) {
+		t.Fatal("stream SessionKey must still omit metrics interval")
 	}
 }
 
@@ -135,7 +165,7 @@ func TestClient_LifecycleLogs(t *testing.T) {
 	}
 }
 
-func TestOpenStream_LiveMetricsMismatchWarnsAndShares(t *testing.T) {
+func TestOpenStream_LiveMetricsMismatchSharesSilently(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
@@ -149,19 +179,20 @@ func TestOpenStream_LiveMetricsMismatchWarnsAndShares(t *testing.T) {
 	log := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	ctx := context.Background()
 
-	owner, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "owner-mw", "test")
+	ownerCfg := testStreamConfig(parsed.Host, 1)
+	ownerCfg.UpdateIntervalSeconds = 30
+	owner, err := OpenStream(ctx, ownerCfg, log, "owner-mw", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	joiner, err := OpenStream(ctx, testStreamConfig(parsed.Host, 600), log, "joiner-mw", "test")
+	joinerCfg := testStreamConfig(parsed.Host, 1)
+	joinerCfg.UpdateIntervalSeconds = 120
+	joiner, err := OpenStream(ctx, joinerCfg, log, "joiner-mw", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if owner != joiner {
-		t.Fatal("second live middleware on the same LAPI key must wire to the owner connection")
-	}
-	if owner.streamOwner != "owner-mw" {
-		t.Fatalf("owner name: %q", owner.streamOwner)
+		t.Fatal("interval mismatch must share one Client")
 	}
 	if owner.StreamFetches() < 1 {
 		t.Fatal("owner must have polled once")
@@ -170,21 +201,12 @@ func TestOpenStream_LiveMetricsMismatchWarnsAndShares(t *testing.T) {
 		t.Fatalf("one ticker must poll once at startup, hits=%d", atomic.LoadInt64(hits))
 	}
 	logged := logBuf.String()
-	if !strings.Contains(logged, "owner-mw") || !strings.Contains(logged, "joiner-mw") {
-		t.Fatalf("warn must name both middlewares: %s", logged)
-	}
-	if !strings.Contains(logged, "metricsUpdateIntervalSeconds") {
-		t.Fatalf("warn must name ignored knobs: %s", logged)
-	}
-	if !strings.Contains(logged, "one cursor per bouncer row") {
-		t.Fatalf("warn must mention CrowdSec cursor: %s", logged)
-	}
-	if !strings.Contains(logged, "lapi session joiner ignored") {
-		t.Fatalf("INFO must mark joiner ignored: %s", logged)
+	if strings.Contains(logged, "lapi session joiner ignored") || strings.Contains(logged, "wiring this middleware") {
+		t.Fatalf("interval mismatch must not warn-and-wire: %s", logged)
 	}
 }
 
-func TestOpenStream_GraceSnapshotChangeStopsOldTickerFirst(t *testing.T) {
+func TestOpenStream_SleepingIntervalChangeWakesSameSlot(t *testing.T) {
 	reclaim.ResetForTestWith(500 * time.Millisecond)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
@@ -195,26 +217,127 @@ func TestOpenStream_GraceSnapshotChangeStopsOldTickerFirst(t *testing.T) {
 	}
 	log := slog.Default()
 	ctx, cancel := context.WithCancel(context.Background())
-	first, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "first", "test")
+	firstCfg := testStreamConfig(parsed.Host, 1)
+	firstCfg.UpdateIntervalSeconds = 30
+	first, err := OpenStream(ctx, firstCfg, log, "first", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	waitClientSleeping(t, first)
+
+	secondCfg := testStreamConfig(parsed.Host, 1)
+	secondCfg.UpdateIntervalSeconds = 120
+	second, err := OpenStream(context.Background(), secondCfg, log, "reload", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second {
+		t.Fatal("sleeping interval change must Wake the same Client")
+	}
+	if atomic.LoadInt64(&first.isCrowdsecStreamStartup) != 0 {
+		t.Fatal("Wake must resume with startup=false")
+	}
+}
+
+func TestOpenStream_SleepingRedisHostDoesNotOverlapPollers(t *testing.T) {
+	reclaim.ResetForTestWith(500 * time.Millisecond)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	server, _ := testStreamLAPI(t)
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := slog.Default()
+	firstCfg := testStreamConfig(parsed.Host, 1)
+	firstCfg.RedisCacheHost = "redis-a:6379"
+	ctx, cancel := context.WithCancel(context.Background())
+	first, err := OpenStream(ctx, firstCfg, log, "first", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	fetchesBeforeCancel := first.StreamFetches()
 	cancel()
-	waitStreamSessionInGrace(t, testStreamConfig(parsed.Host, 1))
+	waitClientSleeping(t, first)
 
-	second, err := OpenStream(context.Background(), testStreamConfig(parsed.Host, 600), log, "reload", "test")
+	secondCfg := testStreamConfig(parsed.Host, 1)
+	secondCfg.RedisCacheHost = "redis-b:6379"
+	second, err := OpenStream(context.Background(), secondCfg, log, "reload", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if first == second {
-		t.Fatal("changed snapshot during grace must replace the connection")
+		t.Fatal("sleeping Redis host change must Open a new Client")
 	}
 	if first.StreamFetches() != fetchesBeforeCancel {
-		t.Fatal("old ticker must be stopped before the new poller starts")
+		t.Fatal("old ticker must stay Sleep’d")
 	}
-	if second.StreamFetches() != 0 {
-		t.Fatal("shared store lease must skip a second CrowdSec fetch on the replacement Client")
+	if first.decisionStore == second.decisionStore {
+		t.Fatal("different Redis must isolate the DecisionStore")
+	}
+}
+
+func TestOpenStream_DifferentRedisIsolatesClientAndStore(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	server, _ := testStreamLAPI(t)
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := slog.Default()
+	ctx := context.Background()
+	redisACfg := testStreamConfig(parsed.Host, 1)
+	redisACfg.RedisCacheHost = "redis-a:6379"
+	redisBCfg := testStreamConfig(parsed.Host, 1)
+	redisBCfg.RedisCacheHost = "redis-b:6379"
+	redisAClient, err := OpenStream(ctx, redisACfg, log, "redis-a", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	redisBClient, err := OpenStream(ctx, redisBCfg, log, "redis-b", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if redisAClient == redisBClient {
+		t.Fatal("different Redis must isolate the Client")
+	}
+	if redisAClient.Cache() == redisBClient.Cache() {
+		t.Fatal("different Redis must isolate the store")
+	}
+	redisAClient.Cache().Set("1.2.3.4", "t", 60)
+	if _, getErr := redisBClient.Cache().Get("1.2.3.4"); getErr == nil {
+		t.Fatal("ban in store A must miss in store B")
+	}
+}
+
+func TestOpenStream_HeaderMapMismatchSharesClient(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	server, _ := testStreamLAPI(t)
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := slog.Default()
+	ctx := context.Background()
+	countryCfg := testStreamConfig(parsed.Host, 1)
+	countryCfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	userCfg := testStreamConfig(parsed.Host, 1)
+	userCfg.DecisionScopeHeaders = map[string]string{"username": "X-User"}
+	countryClient, err := OpenStream(ctx, countryCfg, log, "country", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	userClient, err := OpenStream(ctx, userCfg, log, "user", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if countryClient != userClient {
+		t.Fatal("header-map mismatch must share one Client")
 	}
 }
 
@@ -299,17 +422,18 @@ func TestOpenStream_TLSOnlyAdoptsTransport(t *testing.T) {
 	}
 }
 
-// waitStreamSessionInGrace fails if the session never reaches zero holders with grace armed.
-func waitStreamSessionInGrace(t *testing.T, cfg *configuration.Config) {
+// waitClientSleeping fails if the Client never Sleeps after its last holder is gone.
+func waitClientSleeping(t *testing.T, client *Client) {
 	t.Helper()
-	sessionKey := SessionKey(cfg)
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		view := reclaim.Peek(sessionKey)
-		if view.OK && view.Holders == 0 && view.Sleeping {
+		client.mu.Lock()
+		sleeping := client.sleeping
+		client.mu.Unlock()
+		if sleeping {
 			return
 		}
 		time.Sleep(time.Millisecond)
 	}
-	t.Fatal("stream session did not enter grace")
+	t.Fatal("Client never Sleep'd")
 }
