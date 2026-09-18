@@ -11,4 +11,4 @@ JobName: 2026-09-18-pack-decision-origin
 | codereview | [x] | [x] | 2026-09-18T17:46:00Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T17:51:10Z |
 | archive | [x] | [x] | 2026-09-18T17:56:52Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-18T18:05:57Z |

@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-18T17:56:03Z
+Developer review: ready for review — 2026-09-18T18:05:14Z
 
 ## What this changes
 **Operators.** None.
@@ -27,27 +27,27 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Change archived and catalog synced; CI on the reviewed head is still in progress. 1 item remains.
+CI succeeded on the reviewed head; no open PR comments. 0 items remain.
 
 Priority: P2 — operator RSS pain at large stream memory, with more RAM as the workaround
-Reviewed head: 320726b
+Reviewed head: 3bad8c7
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI still in progress on the reviewed head |
-| CI proof | 3/6 | in progress — [35377186914](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377186914) |
+| Overall readiness | 6/6 | CI succeeded and the comment checklist is empty |
+| CI proof | 6/6 | succeeded — [35377341157](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377341157) |
 | Local tests proof | N/A | remote PR; CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-18-pack-decision-origin pushed | `git push` `320726b` |
+| Branch | 2026-09-18-pack-decision-origin pushed | `git` `3bad8c7` |
 | OpenSpec | pack-decision-origin | `openspec/changes/archive/2026-09-18-pack-decision-origin/` |
-| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/99 | pr-host |
-| CI | build 35377186914 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377186914 | GitHub check runs |
+| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/99 | pr-host List |
+| CI | build 35377341157 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377341157 | GitHub check runs (Main Process, Race detector, both e2e jobs) |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | comments: none |
 
@@ -61,7 +61,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local ticket `2026-09-18-pack-decision-origin` is this branch and [PR 99](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/99); the change is archived and CI is running on `320726b`.
+Local ticket `2026-09-18-pack-decision-origin` is this branch and [PR 99](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/99); the change is archived and CI succeeded on `3bad8c7`.
 
 ## Decision needed
 | Question | Decision | By |
@@ -71,9 +71,7 @@ Local ticket `2026-09-18-pack-decision-origin` is this branch and [PR 99](https:
 | Do Range `range-index` blob lines pack the same way as per-IP ttl_map values? | assumed — yes on the memory path; Redis may still persist the full suffix | explore |
 
 ## Before merge
-- [ ] Wait for CI on `320726b` to finish
-- [x] Change archived to `openspec/changes/archive/2026-09-18-pack-decision-origin/` (`320726b`)
-- [x] Usage packets produced for the four impact findings (`86f4c1b`)
+None.
 
 ## Findings
 None.
@@ -93,7 +91,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 3 modified | Same list as ## Specs; do not paste diff --stat |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 320726b5e1bca6fa0044aa0ef81f130752a6f8a4 | Card must match the branch you measured |
+| Reviewed head | 3bad8c7d301e9638c07120ca028226560f6773be | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -107,10 +105,11 @@ Is this the best way to solve the issue? Yes, one session-scoped table on Decisi
 
 ### Evidence
 What I checked:
-- Archived change folder `openspec/changes/archive/2026-09-18-pack-decision-origin/` and catalog sync (`git`, `320726b`)
-- FindSpecHost verdicts: new `core_cache_client_origin-dictionary`; fold decision-store, decisions_scopes, usage-metrics
-- Pinned apply diff `origin/master...HEAD` excluding `devstate/` and `.cursor/` (git, `320726b`)
-- PR 99 check runs in progress (GitHub MCP `get_check_runs`, run `35377186914`)
+- PR 99 reused; title set to `⚡️ perf(cache): pack stream remediations with interned origin ids` (GitHub MCP `update_pull_request`)
+- comments.md absent; comments: none
+- Sync `origin/master` already up to date (`46a81d0`)
+- All four check runs succeeded: Main Process, Race detector, e2e (binary + mock LAPI), e2e (docker + pester) (GitHub MCP `get_check_runs`, runs `35377341157` and `35377341190`)
+- Axis files on disk this Set (Standards 11/0/11, Spec 1/0/1, Security 0, Performance 0, Dead 1/0/1, Coverage 4/0/3 + 1 skipped)
 
 ### Rank-up moves
 - Add an ipv6 compact-slot `ip_type` assertion (coverage judgement, skipped)

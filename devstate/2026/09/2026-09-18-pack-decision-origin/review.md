@@ -39,3 +39,9 @@ phase: archive
 findings: FindSpecHost new origin-dictionary; fold decision-store, decisions_scopes, usage-metrics
 fixed: catalog sync + move to openspec/changes/archive/2026-09-18-pack-decision-origin/ (320726b)
 skipped: none
+
+## pullrequest (2026-09-18T18:05:14Z)
+phase: pullrequest
+findings: none
+fixed: dropped stub title; CI succeeded on 3bad8c7 (35377341157, 35377341190)
+skipped: comments none
