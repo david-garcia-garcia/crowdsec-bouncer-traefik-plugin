@@ -21,3 +21,9 @@ phase: implement
 findings: parseIP now strips IPv6 zone; Contains/GetRemoteIP regressions; localTests passed; CI in progress
 fixed: zone strip in pkg/ip/checker.go parseIP; TestCheckerContains and TestGetRemoteIP cases
 skipped: no Task subagent; no new spec folder; note large radix-lookup rename left; #77 not taken
+
+## codereview (2026-09-18)
+phase: codereview
+findings: Coverage 1 hard (IPv4 with % untested); other axes clean
+fixed: Contains and hop regressions in d6596a2
+skipped: Task tool unavailable at this nest; six axis files written in-process
