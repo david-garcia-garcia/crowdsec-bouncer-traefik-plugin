@@ -8,7 +8,7 @@ JobName: 2026-09-18-redis-password-file-checked-when-disabled
 | explore | [x] | [x] | 2026-09-18T14:19:28Z |
 | propose | [x] | [x] | 2026-09-18T14:24:38Z |
 | implement | [x] | [x] | 2026-09-18T14:38:32Z |
-| codereview | [ ] | [ ] | |
+| codereview | [x] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
