@@ -1,0 +1,15 @@
+issueKey: 2026-09-18-captcha-html-path-clobbers-file-path
+jobName: 2026-09-18-captcha-html-path-clobbers-file-path
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:f245602ae10bd3b69165d36e6260b1af36bdc130fa8063bc48011db0f90b8d95
+localTests: none
+requirement: requirement.md
+comments: none
+pr:
+  id: 85
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/85
