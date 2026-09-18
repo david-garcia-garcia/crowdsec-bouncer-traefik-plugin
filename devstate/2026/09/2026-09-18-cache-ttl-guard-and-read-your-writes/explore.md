@@ -136,11 +136,10 @@ window instead of silently dropping keys and serving stale. Overflow fails safe,
 - Q: Will the two call-site swaps (`range.go`, `client.go`) collide with PR #77
   (`2026-09-18-ip-cache-key-canonicalization`), which is editing `pkg/lapi` and the decision-scope
   paths?
-  Decision: assumed — low risk, and not avoidable without leaving the defect. This change edits one
-  line in `readRangeIndex` and one in `hydrateRangeMembership`, neither of which constructs a key.
-  #77 changes how IP keys are *spelled*; `RangeIndexKey` is a constant. If git cannot auto-merge,
-  it is a one-line resolution.
-  By: explore
+  Decision: resolved — #77 landed as squash `2fedec6`. Merge conflicted only `readRangeIndex`.
+  Kept both: `GetConsistent` (this ticket) and miss-vs-error `(string, error)` (#77). A dead replica
+  is no longer the unread-index fixture; #77's tests now refuse GET on the writer after seed.
+  By: implement
 
 - Q: Is the swallowed cache error at any call site changing behaviour, which would be the one piece
   of evidence that could reopen the out-of-scope third deliverable?
