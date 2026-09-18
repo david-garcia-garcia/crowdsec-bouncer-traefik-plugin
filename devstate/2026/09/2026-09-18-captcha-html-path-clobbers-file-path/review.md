@@ -15,3 +15,9 @@ phase: propose
 findings: none
 fixed: OpenSpec change captcha-html-path-clobbers-file-path; fold core_plugin_middleware_bouncer; PR 85 propose card
 skipped: no comments.md; alias not implemented
+
+## implement (2026-09-18)
+phase: implement
+findings: none
+fixed: captcha alias empty-guard; TestNew_CaptchaFilePathWinsOverDeprecatedHTMLPath; e2e keys retargeted; localTests passed; CI 35356824920 and 35356824938 succeeded; PR 85 implement card
+skipped: no comments.md; no new spec folder; no issues.md rows
