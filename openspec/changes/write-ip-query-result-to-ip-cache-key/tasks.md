@@ -6,9 +6,9 @@
 
 ## 2. Regression
 
-- [ ] 2.1 Add `TestLiveLookup_IPSlotKeepsIPQueryResult` next to `TestLiveLookup_ScopeBanWins`: after a clean IP plus Country ban `FR`, the IP key is `NoBannedValue`, the Country header key is the ban, and `LookupCachedRemediation` for the same IP plus Country `DE` does not inherit the `FR` ban
-- [ ] 2.2 Keep `TestLiveLookup_ScopeBanWins` and `TestLiveLookup_ScopeErrorFailsClosed` green (first-call return and no negative IP-key write on scope error)
+- [x] 2.1 Add `TestLiveLookup_IPSlotKeepsIPQueryResult` next to `TestLiveLookup_ScopeBanWins`: after a clean IP plus Country ban `FR`, the IP key is `NoBannedValue`, the Country header key is the ban, and `LookupCachedRemediation` for the same IP plus Country `DE` does not inherit the `FR` ban
+- [x] 2.2 Keep `TestLiveLookup_ScopeBanWins` and `TestLiveLookup_ScopeErrorFailsClosed` green (first-call return and no negative IP-key write on scope error)
 
 ## 3. Verify
 
-- [ ] 3.1 `go build ./...`, `go vet ./...`, `go test ./pkg/lapi/ ./pkg/decisionscope/ -count=1`, `golangci-lint run ./pkg/lapi/ ./pkg/decisionscope/`
+- [x] 3.1 `go build ./...`, `go vet ./...`, `go test ./pkg/lapi/ ./pkg/decisionscope/ -count=1`, `golangci-lint run ./pkg/lapi/ ./pkg/decisionscope/`
