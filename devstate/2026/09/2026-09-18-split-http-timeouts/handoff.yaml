@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-split-http-timeouts
+jobName: 2026-09-18-split-http-timeouts
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:273a2c49db9494d10d79e2a2007929e0a3a69abf54df332e3411a6b08899a1e8
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr:
+  id: 104
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/104
