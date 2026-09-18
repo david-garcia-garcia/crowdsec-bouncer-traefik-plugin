@@ -332,14 +332,7 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 	}
 
 	if config.CrowdsecMode == AloneMode {
-		if _, err := GetVariable(config, "CrowdsecCapiMachineID"); err != nil {
-			return err
-		}
-		if _, err := GetVariable(config, "CrowdsecCapiPassword"); err != nil {
-			return err
-		}
-		// Alone MAY skip LAPI URL/key/TLS after CAPI credentials. AppSec URL, key-file, and HTTPS CA still run.
-		if err := validateAppsecURLKeyAndTLS(config); err != nil {
+		if err := validateAloneCapiAndAppsec(config); err != nil {
 			return err
 		}
 	} else {
@@ -427,6 +420,18 @@ func validateCaptchaCredentials(config *Config) error {
 		return err
 	}
 	return nil
+}
+
+// validateAloneCapiAndAppsec checks CAPI machine id and password, then AppSec URL, key-file, and HTTPS CA.
+// It does not check LAPI URL, LAPI key, or LAPI TLS.
+func validateAloneCapiAndAppsec(config *Config) error {
+	if _, err := GetVariable(config, "CrowdsecCapiMachineID"); err != nil {
+		return err
+	}
+	if _, err := GetVariable(config, "CrowdsecCapiPassword"); err != nil {
+		return err
+	}
+	return validateAppsecURLKeyAndTLS(config)
 }
 
 func validateLapiAndAppsecConnection(config *Config) error {
