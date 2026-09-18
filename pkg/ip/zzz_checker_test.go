@@ -80,6 +80,17 @@ func TestCheckerContains(t *testing.T) {
 			t.Fatalf("Contains fe80::1%%eth0 = %v, %v want true", ok, err)
 		}
 	})
+
+	t.Run("IPv4 with percent stays unparseable", func(t *testing.T) {
+		checker, err := NewChecker(log, []string{"192.0.2.0/24"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ok, err := checker.Contains("192.0.2.1%eth0")
+		if err == nil {
+			t.Fatalf("Contains 192.0.2.1%%eth0 = %v, nil want parse error", ok)
+		}
+	})
 }
 
 func TestCheckerContainsCatchAllFamily(t *testing.T) {
@@ -338,6 +349,15 @@ func TestGetRemoteIP(t *testing.T) {
 			headerVal:  "[fe80::1%eth0]",
 			strategy:   strategy,
 			wantIP:     "[fe80::1%eth0]",
+			wantParsed: false,
+		},
+		{
+			name:       "IPv4 hop with percent stays fail-closed",
+			remoteAddr: trustedProxyAddr,
+			headerName: "X-Forwarded-For",
+			headerVal:  "192.0.2.1%eth0",
+			strategy:   strategy,
+			wantIP:     "192.0.2.1%eth0",
 			wantParsed: false,
 		},
 	})
