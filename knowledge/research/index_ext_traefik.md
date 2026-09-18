@@ -15,3 +15,8 @@ priority: normal
 local: ext_traefik_plugins_useunsafe/
 description: What the useUnsafe manifest flag unlocks in the Yaegi plugin host, and the matching operator opt-in a Traefik installation must also set.
 
+## Entrypoint X-Forwarded-Proto
+priority: normal
+local: ext_traefik_forwardedheaders_x-forwarded-proto/
+description: How Traefik's entrypoint XForwarded sanitizes X-Forwarded-Proto before plugin middleware runs.
+
