@@ -6,7 +6,7 @@ JobName: 2026-09-18-captcha-empty-keys-accepted
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-18T14:15:06Z |
 | explore | [x] | [x] | 2026-09-18T14:19:52Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [x] | 2026-09-18T14:24:48Z |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
