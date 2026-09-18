@@ -39,7 +39,7 @@ function Assert-IpSpellingBan {
     catch {
         $addError = $_.Exception.Message
     }
-    $addError | Should -BeNullOrEmpty -Because "cscli must accept stored $Stored : $addError"
+    [string]$addError | Should -BeNullOrEmpty -Because "cscli must accept stored $Stored : $addError"
     $result = Wait-ForCondition -Description "LAPI/bouncer to ban stored $Stored as $Request on $Endpoint" -TimeoutSeconds $TimeoutSeconds -RetryIntervalSeconds 2 -Condition {
         $response = Test-HttpRequest -Endpoint $Endpoint -IP $Request -TraefikUrl $script:TraefikUrl
         return ($response.StatusCode -in @(403, 429))
@@ -167,33 +167,6 @@ Describe "CrowdSec Range and header-mapped scopes" {
                 return ($response.StatusCode -in @(403, 429))
             }
             $result.Success | Should -Be $true -Because "Stream scopes= must include Country"
-        }
-    }
-
-    Context "Ip spelling canary" -Tag "scopes" {
-        BeforeEach {
-            Remove-AllTestDecisions
-        }
-
-        It "Should accept IPv4, compressed IPv6, expanded IPv6, upper-case IPv6, and IPv4-mapped via cscli" {
-            $probes = @(
-                "10.59.0.90"
-                "2001:db8::b1:9"
-                "2001:0db8:0000:0000:0000:0000:00b1:0009"
-                "2001:DB8::B1:9"
-                "::ffff:10.59.0.90"
-            )
-            $failed = @()
-            foreach ($ip in $probes) {
-                try {
-                    Add-TestDecision -IP $ip -Type "ban" -Reason "canary $ip"
-                }
-                catch {
-                    $failed += "${ip}: $($_.Exception.Message)"
-                    Write-Host "::error::canary add $ip $($_.Exception.Message)"
-                }
-            }
-            ($failed -join " | ") | Should -BeNullOrEmpty -Because ($failed -join " | ")
         }
     }
 
