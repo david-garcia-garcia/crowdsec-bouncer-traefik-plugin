@@ -42,8 +42,8 @@ IssueKey: 2026-09-18-range-index-same-network-match
   By: explore
 
 - Q: What is the helper named and where does it live?
-  Decision: assumed — one unexported `indexCIDRsSameNetwork(existing, cidr string) bool` in `pkg/decisionscope/range.go` next to the two loops. Not `indexNetworkID`.
-  By: explore
+  Decision: resolved — one unexported `indexCIDRsSameNetwork(existing, cidr string) bool` in `pkg/decisionscope/range.go` next to the two loops. Not `indexNetworkID`.
+  By: propose
 
 - Q: Which spec leaf takes the same-network requirement?
   Decision: resolved — fold onto `core_plugin_decisions_scopes`. Do not open a new family and do not rename `core_plugin_decisionscope` / `core_plugin_decisions_scopes`.
@@ -54,8 +54,8 @@ IssueKey: 2026-09-18-range-index-same-network-match
   By: explore
 
 - Q: Which extra tests beyond `AddRange(10.1.2.0/8)` then `RemoveRange(10.0.0.0/8)`?
-  Decision: assumed — one unparseable identical-text remove next to the required case to lock the fallback. No IPv4-mapped, collapse, persist-rewrite, or hydrate tests. Unread-base apply tests stay as they are.
-  By: explore
+  Decision: resolved — one unparseable identical-text remove next to the required case to lock the fallback. No IPv4-mapped, collapse, persist-rewrite, or hydrate tests. Unread-base apply tests stay as they are.
+  By: propose
 
 - Q: Does explore write the usage gotcha now?
   Decision: assumed — no. Current packet usage is enough to call `ApplyRangeBatch`. Documenting same-network identity before the apply would state a contract the tree does not yet keep. Propose the spec delta; usage gotcha on apply or `sbs-dev-devdocsimpact`.
