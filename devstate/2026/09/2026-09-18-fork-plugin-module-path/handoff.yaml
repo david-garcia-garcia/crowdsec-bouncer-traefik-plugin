@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-fork-plugin-module-path
+jobName: 2026-09-18-fork-plugin-module-path
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:2763ccc7151dfda8b732abca229e0ee6c5ea44d09c954c9ee60eca7608a9aea9
+comments: none
+localTests: none
+requirement: requirement.md
+explore:
+change:
+pr:
+  id: 101
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/101
