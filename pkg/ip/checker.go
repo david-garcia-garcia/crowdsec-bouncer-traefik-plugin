@@ -81,7 +81,13 @@ func hostCIDR(addr net.IP) string {
 }
 
 // parseIP parses a dotted or compact address string into net.IP.
+// An IPv6 zone (last % after a colon) is stripped first so membership and the
+// yielded net.IP use the zone-free address. Brackets and IPv4 with % stay errors.
 func parseIP(addr string) (net.IP, error) {
+	// Cut RFC 4007 zone so net.ParseIP sees only the address.
+	if zoneSep := strings.LastIndex(addr, "%"); zoneSep >= 0 && strings.Contains(addr[:zoneSep], ":") {
+		addr = addr[:zoneSep]
+	}
 	userIP := net.ParseIP(addr)
 	if userIP == nil {
 		return nil, fmt.Errorf("parseIP:parseAddress %s", addr)

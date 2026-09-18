@@ -415,12 +415,22 @@ func validateEnabledCaptchaSettings(config *Config) error {
 	return nil
 }
 
+// validateCaptchaCredentials resolves site and secret keys and rejects an empty
+// trimmed value for each field independently, site first. Lookup errors stay.
 func validateCaptchaCredentials(config *Config) error {
-	if _, err := GetVariable(config, "CaptchaSiteKey"); err != nil {
+	siteKey, err := GetVariable(config, "CaptchaSiteKey")
+	if err != nil {
 		return err
 	}
-	if _, err := GetVariable(config, "CaptchaSecretKey"); err != nil {
+	if siteKey == "" {
+		return errors.New("CaptchaSiteKey: cannot be empty when CaptchaProvider is set")
+	}
+	secretKey, err := GetVariable(config, "CaptchaSecretKey")
+	if err != nil {
 		return err
+	}
+	if secretKey == "" {
+		return errors.New("CaptchaSecretKey: cannot be empty when CaptchaProvider is set")
 	}
 	return nil
 }
@@ -468,9 +478,16 @@ func validateLapiURLAndKeys(config *Config) error {
 	return nil
 }
 
+// validateAppsecURLKeyAndTLS checks the AppSec listener URL, optional key, and HTTPS CA.
 func validateAppsecURLKeyAndTLS(config *Config) error {
 	appsecScheme := effectiveAppsecScheme(config)
 	if err := validateURL("CrowdsecAppsec", appsecScheme, config.CrowdsecAppsecHost, config.CrowdsecAppsecPath); err != nil {
+		return err
+	}
+
+	// Enabled AppSec needs a listener host. validateURL only asks NewRequest to
+	// accept scheme://host/path, so an empty host (http:///) still returns nil.
+	if err := rejectMissingEnabledAppsecHost(config, appsecScheme); err != nil {
 		return err
 	}
 
@@ -489,6 +506,22 @@ func validateAppsecURLKeyAndTLS(config *Config) error {
 		if err = validateParamsTLS(config, "CrowdsecAppsec"); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// rejectMissingEnabledAppsecHost fails when AppSec is on and the listener host is missing.
+func rejectMissingEnabledAppsecHost(config *Config, appsecScheme string) error {
+	if !config.CrowdsecAppsecEnabled {
+		return nil
+	}
+	appsecURL := url.URL{Scheme: appsecScheme, Host: config.CrowdsecAppsecHost, Path: config.CrowdsecAppsecPath}
+	appsecReq, err := http.NewRequest(http.MethodGet, appsecURL.String(), nil)
+	if err != nil {
+		return fmt.Errorf("CrowdsecLapiScheme://CrowdsecAppsecHost: '%v://%v%v' must be a valid URL", appsecScheme, config.CrowdsecAppsecHost, config.CrowdsecAppsecPath)
+	}
+	if config.CrowdsecAppsecHost == "" || appsecReq.URL.Host == "" {
+		return errors.New("CrowdsecAppsecHost: cannot be empty when CrowdsecAppsecEnabled is true")
 	}
 	return nil
 }

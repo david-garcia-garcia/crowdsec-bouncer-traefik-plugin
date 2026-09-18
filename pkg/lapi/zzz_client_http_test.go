@@ -1,6 +1,7 @@
 package lapi
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -216,6 +217,128 @@ func TestGetToken_TwoXXEmptyTokenKeepsStatusCodeError(t *testing.T) {
 	}
 	if stored.key != "stale-token" {
 		t.Fatalf("stored transport key %q, want stale-token", stored.key)
+	}
+}
+
+// testLoginBodyStub records the last watchers-login POST body.
+type testLoginBodyStub struct {
+	mu   sync.Mutex
+	body []byte
+}
+
+// lastBody is a copy of the last recorded login POST body.
+func (s *testLoginBodyStub) lastBody() []byte {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	copied := make([]byte, len(s.body))
+	copy(copied, s.body)
+	return copied
+}
+
+// handler records the request body and answers with a successful CAPI login token.
+func (s *testLoginBodyStub) handler(t *testing.T) http.HandlerFunc {
+	t.Helper()
+	return func(rw http.ResponseWriter, req *http.Request) {
+		body, readErr := io.ReadAll(req.Body)
+		if readErr != nil {
+			t.Errorf("login stub read: %v", readErr)
+		}
+		s.mu.Lock()
+		s.body = body
+		s.mu.Unlock()
+		if _, err := rw.Write([]byte(`{"code":200,"token":"fresh","expire":"later"}`)); err != nil {
+			t.Errorf("login stub write: %v", err)
+		}
+	}
+}
+
+// assertPostedLoginBodyMatches proves postedBody is JSON whose three login fields equal the credentials.
+func assertPostedLoginBodyMatches(t *testing.T, postedBody []byte, machineID, password string, scenarios []string) {
+	t.Helper()
+	var posted map[string]json.RawMessage
+	if err := json.Unmarshal(postedBody, &posted); err != nil {
+		t.Fatalf("login body is not valid JSON: %v\n%s", err, postedBody)
+	}
+	if len(posted) != 3 {
+		t.Fatalf("login body fields=%d (%v), want 3", len(posted), posted)
+	}
+	var postedMachineID, postedPassword string
+	if err := json.Unmarshal(posted["machine_id"], &postedMachineID); err != nil {
+		t.Fatalf("machine_id: %v", err)
+	}
+	if err := json.Unmarshal(posted["password"], &postedPassword); err != nil {
+		t.Fatalf("password: %v", err)
+	}
+	if postedMachineID != machineID {
+		t.Fatalf("machine_id %q, want %q", postedMachineID, machineID)
+	}
+	if postedPassword != password {
+		t.Fatalf("password %q, want %q", postedPassword, password)
+	}
+	if scenarios == nil {
+		if string(posted["scenarios"]) != "null" {
+			t.Fatalf("scenarios %s, want null", posted["scenarios"])
+		}
+		return
+	}
+	var postedScenarios []string
+	if err := json.Unmarshal(posted["scenarios"], &postedScenarios); err != nil {
+		t.Fatalf("scenarios: %v", err)
+	}
+	if len(postedScenarios) != len(scenarios) {
+		t.Fatalf("scenarios %q, want %q", postedScenarios, scenarios)
+	}
+	for i := range scenarios {
+		if postedScenarios[i] != scenarios[i] {
+			t.Fatalf("scenarios %q, want %q", postedScenarios, scenarios)
+		}
+	}
+}
+
+// TestGetToken_LoginBodyIsValidJSON proves the CAPI login POST is JSON that decodes back to the
+// stored Client credentials, including quote, backslash, newline, and empty or nil scenario lists.
+func TestGetToken_LoginBodyIsValidJSON(t *testing.T) {
+	const metacharacters = "a\"b\\c\nd"
+	cases := []struct {
+		name      string
+		machineID string
+		password  string
+		scenarios []string
+	}{
+		{
+			name:      "metacharacters",
+			machineID: metacharacters,
+			password:  metacharacters,
+			scenarios: []string{metacharacters},
+		},
+		{
+			name:      "empty-scenarios",
+			machineID: "machine",
+			password:  "password",
+			scenarios: []string{},
+		},
+		{
+			name:      "nil-scenarios",
+			machineID: "machine",
+			password:  "password",
+			scenarios: nil,
+		},
+	}
+	for _, loginCase := range cases {
+		t.Run(loginCase.name, func(t *testing.T) {
+			loginStub := &testLoginBodyStub{}
+			server := httptest.NewServer(loginStub.handler(t))
+			defer server.Close()
+			client := newTestQueryClient(t, server, configuration.AloneMode)
+			client.crowdsecMachineID = loginCase.machineID
+			client.crowdsecPassword = loginCase.password
+			client.crowdsecScenarios = loginCase.scenarios
+
+			if err := client.getToken(); err != nil {
+				t.Fatalf("getToken: %v", err)
+			}
+			assertPostedLoginBodyMatches(t, loginStub.lastBody(), loginCase.machineID, loginCase.password, loginCase.scenarios)
+		})
 	}
 }
 

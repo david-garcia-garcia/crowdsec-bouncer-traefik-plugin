@@ -1,6 +1,7 @@
 package decisionscope
 
 import (
+	"net"
 	"net/http"
 	"testing"
 )
@@ -89,12 +90,49 @@ func TestNormalizeDecisionScopeHeaders(t *testing.T) {
 	}
 }
 
+// TestIPCacheKey covers the spellings CrowdSec was measured to hand back verbatim on the stream:
+// expanded, upper-case, and IPv4-mapped forms all have to land on one key.
 func TestIPCacheKey(t *testing.T) {
-	if got := IPCacheKey("1.2.3.4"); got != "1.2.3.4" {
-		t.Fatalf("bare IP: %q", got)
+	tests := []struct {
+		in, want string
+	}{
+		{"1.2.3.4", "1.2.3.4"},
+		{"10.0.0.1/32", "10.0.0.1"},
+		{"2001:db8::1/128", "2001:db8::1"},
+		{"2001:0db8:0000:0000:0000:0000:0000:0001", "2001:db8::1"},
+		{"2001:DB8::2", "2001:db8::2"},
+		{"::ffff:192.0.2.4", "192.0.2.4"},
+		{" 1.2.3.4 ", "1.2.3.4"},
+		{"10.0.0.0/8", "10.0.0.0/8"},
+		{"not-an-address", "not-an-address"},
 	}
-	if got := IPCacheKey("10.0.0.1/32"); got != "10.0.0.1" {
-		t.Fatalf("/32: %q", got)
+	for _, tt := range tests {
+		if got := IPCacheKey(tt.in); got != tt.want {
+			t.Errorf("IPCacheKey(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+// TestCanonicalRemoteIPAgreesWithStore is the request-path invariant after canonicalize-at-origin:
+// ServeHTTP sets remoteIP to ipAddr.String(), and that string is the lookup key. It must match
+// IPCacheKey of every spelling of the same address (unparseable values never reach lookup).
+func TestCanonicalRemoteIPAgreesWithStore(t *testing.T) {
+	addresses := []string{
+		"1.2.3.4",
+		"2001:db8::1",
+		"2001:0db8:0000:0000:0000:0000:0000:0001",
+		"2001:DB8::2",
+		"::ffff:192.0.2.4",
+	}
+	for _, address := range addresses {
+		ipAddr := net.ParseIP(address)
+		if ipAddr == nil {
+			t.Fatalf("parse %q", address)
+		}
+		lookup := ipAddr.String()
+		if store := IPCacheKey(address); lookup != store {
+			t.Errorf("%q: lookup key %q, store key %q", address, lookup, store)
+		}
 	}
 }
 
