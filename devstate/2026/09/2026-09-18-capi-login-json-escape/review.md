@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: folded CAPI login-body JSON into core_plugin_lapi_query-round-trip; moved change to openspec/changes/archive/2026-09-18-capi-login-json-escape/
 skipped: Task launcher unavailable (cursor Task not in this session); FindSpecHost ran in-process. Validators invoked from caller-repo scripts with worktree repoRoot.
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: reused PR 90; title ready; four required checks succeeded on 7416e26
+skipped: comments.md absent; gh not on PATH (CI measured via pull_request_read get_check_runs)
