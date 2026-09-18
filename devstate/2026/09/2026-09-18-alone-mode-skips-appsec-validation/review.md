@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: 1 missing-packet (Config validation)
 fixed: produced knowledge/devdocs/core_plugin_middleware_config-validation.md
 skipped: none
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: folded core_plugin_middleware_config-validation; moved change to openspec/changes/archive/2026-09-18-alone-mode-appsec-validation/
+skipped: Task subagent unavailable (cursor tools: AwaitShell, Delete, EditNotebook, FetchMcpResource, GenerateImage, ReadLints, SwitchMode, TodoWrite, WebFetch, WebSearch); FindSpecHost ran on archive thread
