@@ -27,3 +27,9 @@ phase: codereview
 findings: Standards 11 hard, Spec 1 wrong, Dead 1 hard, Coverage 3 hard + 1 judgement; Security none; Performance none
 fixed: packed accessor names and comments, drop-only origin resolve, leftover-origin delete, packed drop / empty intern / overflow-label tests (f7bd466)
 skipped: coverage ipv6 compact-slot judgement
+
+## devdocsimpact (2026-09-18T17:51:10Z)
+phase: devdocsimpact
+findings: missing-packet Origin dictionary; stale-usage DecisionStore cache; stale-usage Decision scopes; language-gap LAPI usage-metrics
+fixed: created core_cache_client_origin-dictionary; updated DecisionStore, Decision scopes, and usage-metrics packets (86f4c1b)
+skipped: none
