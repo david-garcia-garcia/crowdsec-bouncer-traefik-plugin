@@ -27,3 +27,9 @@ phase: codereview
 findings: Coverage 1 hard (IPv4 with % untested); other axes clean
 fixed: Contains and hop regressions in d6596a2
 skipped: Task tool unavailable at this nest; six axis files written in-process
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: language-gap IPv6 zone ID produced
+fixed: Language term on knowledge/devdocs/core_plugin_ip.md
+skipped: none
