@@ -32,7 +32,7 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 - Resolve the client IP with `pkg/ip.GetRemoteIP`. Then `LookupCachedRemediation` with `lapiClient.RangeMembership()`. Pass `req.ipAddr` into Range membership; it is also what `IPLookupCacheKey` derives the Ip slot from. Matching uses the first letter; origin is for usage-metrics only. Do not put scopes on `clientRequest`.
 - Writing an Ip slot from anywhere (stream store, stream delete, live memo) goes through `IPCacheKey`. Changing one side of that pair on its own is a permanent cache miss, not a partial fix.
 - Stream Range items: collect the tick, then `ApplyRangeBatch` (one read, one write) with `RemediationWithOrigin`. It returns an error when it could not read the shared blob; propagate it so the poll counts as failed. Hydrate membership from the blob after apply and on a lease hit. Do not GET+SET per Range line.
-- Live/none: keep `?ip=` (LAPI expands Range). Add `scope`+`value` when a mapped header is present. Do not hydrate membership. A cache miss still live-looks-up; do not treat that miss as a stream-health decision.
+- Live/none: keep `?ip=` (LAPI expands Range). Add `scope`+`value` when a mapped header is present. Do not hydrate membership. The live client-address cache key stores the `?ip=` result only; header remediations stay on `HeaderScopeKey`. A cache miss still live-looks-up; do not treat that miss as a stream-health decision.
 - CAPI (alone) omits `scopes=`. Apply any streamed scope this bouncer is configured to match.
 
 ## Pattern snippet
