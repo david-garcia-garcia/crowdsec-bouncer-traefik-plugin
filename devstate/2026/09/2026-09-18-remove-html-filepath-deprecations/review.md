@@ -15,3 +15,9 @@ phase: propose
 findings: FindSpecHost fold build_e2e_pester_crowdsec-stack; no Config-surface alias SHALL
 fixed: none
 skipped: no Task subagent used; propose written in-process
+
+## implement (2026-09-18)
+phase: implement
+findings: leftover custom-ban `banhtmlfilepath` label broke e2e (docker + pester) after field delete
+fixed: retargeted that label to `banFilePath`; fields and New copies deleted; live leftovers retargeted
+skipped: no Task subagent used; apply written in-process
