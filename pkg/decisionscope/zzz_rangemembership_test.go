@@ -4,7 +4,7 @@ import (
 	"net"
 	"testing"
 
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 )
 
 func ipOf(addr string) net.IP {

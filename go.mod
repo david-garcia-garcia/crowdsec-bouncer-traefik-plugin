@@ -1,4 +1,4 @@
-module github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+module github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
 
 go 1.22.12
 

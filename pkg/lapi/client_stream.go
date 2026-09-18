@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
-	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
 const cacheTimeoutKey = "updated"
@@ -145,6 +145,7 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 			}
 			continue
 		}
+		// Sub-second CrowdSec durations become 0; stream write TTL is not clamped.
 		c.storeStreamDecision(decision, int64(duration.Seconds()))
 	}
 	// A range apply that could not read the shared index is a poll that did not finish. Returning
