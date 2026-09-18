@@ -31,10 +31,10 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Prepare complete; product apply has not started. 4 items remain.
+Prepare complete; product apply has not started. 2 items remain.
 
 Priority: P2 — INFO allow still formats debug strings on every stream request
-Reviewed head: 4d0a00b
+Reviewed head: 49afe8c
 Owner decision: None.
 
 ## Review scores
@@ -84,7 +84,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 4d0a00bc56b0266cf398211d7912f3ea223e8ee3 | Card must match the branch you measured |
+| Reviewed head | 49afe8c408a83160f27b81fb2fcaff9aa5f8ba61 | Card must match the branch you measured |
 
 ### Stored data model
 None.
