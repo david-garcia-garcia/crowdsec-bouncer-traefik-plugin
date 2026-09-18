@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-18T18:08:13Z
+Developer review: in progress — 2026-09-18T18:10:59Z
 
 ## What this changes
 **Operators.** None.
@@ -31,17 +31,17 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Apply is on the branch; CI on this head is queued. 1 item remains.
+Six-axis review is clean; CI on this head is still in progress. 1 item remains.
 
 Priority: P2 — INFO allow still formats debug strings on every stream request
-Reviewed head: f322514
+Reviewed head: 890416b
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Apply landed; CI on this head is queued |
-| CI proof | 3/6 | queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378373311 |
+| Overall readiness | 3/6 | Apply and axis review landed; CI on this head is in progress |
+| CI proof | 3/6 | in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378467186 |
 | Local tests proof | N/A | Remote PR; CI proof covers remote |
 | Review resolution | 6/6 | OPEN PR #108; no reviewer comments |
 
@@ -51,7 +51,7 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-18-lazy-debug-log pushed | `git` / pr-host |
 | OpenSpec | lazy-debug-hot-path | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/108 | pr-host List |
-| CI | Main Process queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378373311/job/105708408788 ; Race detector queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378373311/job/105708408948 | pr-host CI |
+| CI | e2e (docker + pester) in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378467223/job/105708757123 ; e2e (binary + mock LAPI) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378467223/job/105708754958 ; Race detector in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378467186/job/105708710664 ; Main Process in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378467186/job/105708710423 | pr-host CI |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | no `comments.md` |
 
@@ -62,7 +62,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local ticket `2026-09-18-lazy-debug-log` runs on branch `2026-09-18-lazy-debug-log` as PR #108. Apply is pushed; code review is next.
+Local ticket `2026-09-18-lazy-debug-log` runs on branch `2026-09-18-lazy-debug-log` as PR #108. Six-axis review is clean; devdocs impact is next.
 
 ## Decision needed
 | Question | Decision | By |
@@ -81,7 +81,12 @@ Local ticket `2026-09-18-lazy-debug-log` runs on branch `2026-09-18-lazy-debug-l
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-lazy-debug-log/devstate/2026/09/2026-09-18-lazy-debug-log/codereview_standards.md) — 0 total, 0 pending, 0 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-lazy-debug-log/devstate/2026/09/2026-09-18-lazy-debug-log/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-lazy-debug-log/devstate/2026/09/2026-09-18-lazy-debug-log/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-lazy-debug-log/devstate/2026/09/2026-09-18-lazy-debug-log/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-lazy-debug-log/devstate/2026/09/2026-09-18-lazy-debug-log/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-lazy-debug-log/devstate/2026/09/2026-09-18-lazy-debug-log/codereview_coverage.md) — 0 total, 0 pending, 0 completed
 
 ## Agent review details
 
@@ -90,7 +95,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 0 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | f322514bf6a7c9929e8a1fb4c31dece87f52f5da | Card must match the branch you measured |
+| Reviewed head | 890416b8843fa9862ac3c2ebd0d3e92702847e1c | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -98,16 +103,17 @@ None.
 ### Technical review
 Best possible solution: DestBranch `Sprintf`s before `Debug`. This head passes existing values as slog attributes on the request path.
 
-Do we have a high-confidence way to reproduce? Yes — DestBranch call sites `Sprintf` then `Debug`. Local `go test ./pkg/cache/ ./pkg/bouncer/ ./pkg/logger/ -count=1` passed.
+Do we have a high-confidence way to reproduce? Yes — DestBranch call sites `Sprintf` then `Debug`. Local tests passed. Six-axis review: none.
 
-Is this the best way to solve the issue? Yes versus DestBranch: slog attributes so INFO does not format those strings. Do not replace slog or change default `logLevel`.
+Is this the best way to solve the issue? Yes versus DestBranch: slog attributes so INFO does not format those strings.
 
 ### Evidence
 What I checked:
 - Product delta `origin/master...HEAD` is OpenSpec `lazy-debug-hot-path` plus `pkg/bouncer` / `pkg/cache` Debug attributes and hunt tests
+- Axis files all `none.`
 - Local tests passed (`go test ./pkg/cache/ ./pkg/bouncer/ ./pkg/logger/ -count=1`)
 - OPEN PR #108; comment inventory empty (pr-host)
-- CI on this head: Main Process and Race detector queued (pr-host check runs)
+- CI on this head: one success, three in progress (pr-host check runs)
 
 ### Rank-up moves
 None.

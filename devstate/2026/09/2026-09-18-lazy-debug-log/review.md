@@ -21,3 +21,9 @@ phase: implement
 findings: none
 fixed: ServeHTTP and cache Get/GetMany/Set/Delete Debug use slog attributes
 skipped: none
+
+## codereview (2026-09-18)
+phase: codereview
+findings: P1 0, P2 0
+fixed: none
+skipped: none
