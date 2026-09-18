@@ -27,3 +27,9 @@ phase: codereview
 findings: none
 fixed: none
 skipped: Task launcher unavailable (cursor Task not in this session); six-axis review ran in-process. No hard/missing/wrong.
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: 1 stale-usage (LAPI query round trip)
+fixed: produced query-round-trip How-to/Gotcha for getToken marshal-not-interpolate
+skipped: none
