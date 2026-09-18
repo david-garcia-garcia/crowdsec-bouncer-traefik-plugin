@@ -5,11 +5,12 @@ Defines a keyed reclaim table that stores one value per key as `any`, survives c
 ## Requirements
 
 ### Requirement: Table file depends only on the Go standard library
-The table source SHALL import only Go standard-library packages. It MUST store `any`. It MUST NOT be a generic `Table[T]` used as `otherpkg.Table[*T]`.
+The process table implementation SHALL come from utilities `reclaim` (`github.com/david-garcia-garcia/traefik-middleware-utilities/reclaim` at the `go.mod` pin). This package SHALL keep only a local shim: `Default`, `ProcessGrace` (30 seconds), `Open` / `OpenWithHooks`, and `ResetForTest` / `ResetForTestWith`. It MUST NOT keep a local `table.go` fork. It MUST NOT export `Peek`, `PeekLivePrefix`, or `View`. It MUST NOT take `OpenTyped` (that helper still takes `func() (any, Hooks, error)` and does not remove hooks-as-function-values). Callers in another package MUST import this shim, not utilities `reclaim` directly. The stored value MUST be `any`. The table MUST NOT be a generic `Table[T]` used as `otherpkg.Table[*T]`.
 
-#### Scenario: Stdlib-only imports
-- **WHEN** the table file is listed for imports
-- **THEN** every import path is a Go standard-library package
+#### Scenario: Shim re-exports Open without Peek
+- **WHEN** the local reclaim package is listed for exports
+- **THEN** `Default`, `ProcessGrace`, `Open`, `OpenWithHooks`, `ResetForTest`, and `ResetForTestWith` resolve
+- **AND** `Peek`, `PeekLivePrefix`, and `View` do not exist
 
 ### Requirement: Process table is a singleton
 The package SHALL expose one process-wide table (`Default` / package `Open`). That table SHALL be constructed with `ProcessGrace` (30 seconds). Independent keys MUST NOT share an incarnation. Callers SHALL type-assert the value `Open` returns.
@@ -37,14 +38,6 @@ When every bound context for a key is Done, the table SHALL wait the table grace
 - **THEN** the stored value is returned
 - **AND** `create` does not run
 
-### Requirement: Peek reports holders and sleep without binding
-`Peek(key)` SHALL return a `View` with the stored value, the live holder count, whether the slot is sleeping (grace armed), and whether the key exists. It MUST NOT add a holder and MUST NOT run `create`.
-
-#### Scenario: Peek during sleep
-- **WHEN** the last holder for a key is Done and grace has not elapsed
-- **THEN** `Peek` reports the value, zero holders, and sleeping
-- **AND** the incarnation is not disposed by `Peek`
-
 ### Requirement: Last holder Sleeps; Open during grace Wakes; grace Close()s
 When every bound context for a key is Done, if `hooks.Sleep` is set the table SHALL call it, then wait grace before `hooks.Close`. An `Open` in that window MUST Wake (`hooks.Wake`) without `create`. Callers MUST NOT Close or delete a slot.
 
@@ -60,12 +53,4 @@ When every bound context for a key is Done, if `hooks.Sleep` is set the table SH
 #### Scenario: Foreign type uses Hooks
 - **WHEN** `create` in another package returns a value and the Open call passes Sleep/Wake/Close funcs
 - **THEN** the table calls those funcs on last holder / reclaim / dispose
-- **AND** `Open` and `Peek` return that value
-
-### Requirement: PeekLivePrefix reports a live slot under a key prefix
-`PeekLivePrefix(prefix)` SHALL return a `View` for one stored value whose key starts with prefix and whose holder count is greater than zero. It MUST NOT add a holder, MUST NOT run `create`, and MUST ignore sleeping slots. When several live keys match, the lexicographically smallest key SHALL be returned. An empty prefix MUST miss.
-
-#### Scenario: PeekLivePrefix during mixed live and sleep
-- **WHEN** one key under a prefix is sleeping and another is live
-- **THEN** `PeekLivePrefix` returns the live key
-- **AND** the sleeping incarnation is not disposed
+- **AND** `Open` returns that value

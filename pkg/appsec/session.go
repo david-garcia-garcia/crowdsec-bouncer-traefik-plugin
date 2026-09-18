@@ -57,6 +57,7 @@ func Key(cfg *configuration.Config) string {
 
 // Open reclaims an AppSec Client by listener identity.
 func Open(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
+	// OpenWithHooks + type assert: OpenTyped still takes func() (any, Hooks, error).
 	stored, openErr := reclaim.OpenWithHooks(ctx, Key(cfg), log, func() (any, reclaim.Hooks, error) {
 		client, err := New(cfg, log, pluginVersion)
 		if err != nil {

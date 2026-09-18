@@ -16,7 +16,7 @@ Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx
 - Memory: the store owns a private TTL map. Prefix is ignored.
 - Redis: prefix is `SessionHex` (cursor), not live `IdentityHex`. Logical keys are the client IP, `scope:value`, and `range-index`; the store writes `prefix:key`. Payloads are opaque strings. Ban/captcha/none codes live on `pkg/decisionscope`. Captcha grace is the gate cookie (`core_plugin_middleware_captcha-gate.md`), not cache keys.
 - Same store key → same cache Client. Different Redis hosts (or enabled/password/database/read hosts) isolate.
-- `decisionScopeHeaders` and poller intervals stay off the store key. First-wins `scopes=` stays on the Client reclaim key.
+- `decisionScopeHeaders` and poller intervals stay off the store key. Stream `scopes=` and the store header-scope filter are the live-router union (`core_plugin_lapi_scope-union.md`).
 - `cache.Client.Acquire` is the stream lease (Redis Eval or memory mutex). Do not Get-then-Set `updated`.
 - `cache.Client.Close()` drains Redis idle pools. Call it only from the store’s reclaim Close hook. Memory clients are a no-op. Safe to call more than once (`SimpleRedis.Close` CAS).
 
@@ -37,6 +37,6 @@ _ = lapiClient.Cache()
 
 ## Gotchas
 
-- No migration of existing Redis keys: live/none prefixes move from `IdentityHex` to `SessionHex`.
+- SessionHex and store Redis params stay. Existing Redis keys stay reachable. Changing the Client Open string does not migrate Redis keys.
 - Real-stack restart cases still need distinct `X-Forwarded-For` per TTL, because an Ip key is still the client IP inside one store. Header-scope and `range-index` keys are extra keys on the same cache Client.
 - `lapi.Client.Close` / `Sleep` must not Close the shared store.

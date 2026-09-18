@@ -17,7 +17,7 @@ _Avoid_: `atomic.Pointer[T]`, a write-once Client `httpClient` field, CrowdsecCo
 - Write the CAPI token on the stored transport (`getToken`). Do not keep a write-once Client key field beside it.
 - Pass `defaultDecisionSeconds` into `LiveLookup`. Do not store that TTL on Client.
 - Keep `StreamStartupBlock` write-once at `startStream`. First incarnation keeps it. Do not put it on Bouncer. Do not mutate it after construct.
-- `logInfo` includes reclaim `sessionKey` (stream/alone `SessionKey`, live/none `Key`) and `reason` (`started|sleeping|waking|closed`). Name transport replace and a live joiner `ignored` vs `adopted` at INFO.
+- `logInfo` includes reclaim `sessionKey` (stream/alone `SessionKey`, live/none `Key`) and `reason` (`started|sleeping|waking|closed`). Name transport replace and a live joiner `adopted` at INFO. Do not log `ignored` or warn-and-wire.
 
 ## Pattern snippet
 
@@ -37,5 +37,5 @@ value, err := client.LiveLookup(remoteIP, scopes, defaultDecisionSeconds)
 ## Gotchas
 
 - Concurrent `AdoptTransport` last-writes the stored transport and idle-closes the value it replaced. No extra mutex around write-once Client scalars.
-- Remaining hash fields (intervals, Redis host/auth/db, `updateMaxFailure`, CAPI scenarios, `decisionScopeHeaders`) still first-wins via `PeekLivePrefix`.
+- Redis host/auth/db stay on the Client Open key (`core_plugin_lapi_reclaim-key.md`). Stream intervals, CAPI scenarios, `updateMaxFailure`, and `decisionScopeHeaders` are not on that key (silent first-wins). Live/none `Key` keeps `MetricsUpdateIntervalSeconds`. Do not call `PeekLivePrefix`.
 - `reclaim_put`, `reclaim_reclaim`, and `reclaim_dispose` stay DEBUG.
