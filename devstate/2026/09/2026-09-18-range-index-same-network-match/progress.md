@@ -10,7 +10,7 @@ JobName: 2026-09-18-range-index-same-network-match
 | implement | [x] | [x] | 2026-09-18T17:06:03Z |
 | codereview | [x] | [x] | 2026-09-18T17:11:33Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T17:15:15Z |
-| archive | [x] | [ ] | |
+| archive | [x] | [x] | 2026-09-18T17:20:13Z |
 | pullrequest | [ ] | [ ] | |
 
 Verdict: in progress
