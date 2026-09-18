@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: none
 fixed: none
 skipped: usage gotcha already on core_cache_client.md from implement
+
+## archive (2026-09-18T18:13:10Z)
+phase: archive
+findings: none
+fixed: folded core_cache_client_decision-store; moved change to archive/2026-09-18-cache-miss-sentinels
+skipped: none
