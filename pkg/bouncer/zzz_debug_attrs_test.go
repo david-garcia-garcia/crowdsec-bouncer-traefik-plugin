@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 )
 
 // testStreamAllowBouncer is a stream bouncer whose cache says none for 203.0.113.10.
