@@ -48,5 +48,5 @@ Consumed: `knowledge/devdocs/index.md`, `index_core_cache.md` / `core_cache_redi
   By: explore
 
 - Q: Does propose add a spec leaf or a README line for this gate?
-  Decision: assumed — fold one requirement onto existing `core_plugin_middleware_config-validation`. Do not edit README.
-  By: explore
+  Decision: resolved — fold one requirement onto existing `core_plugin_middleware_config-validation`. Do not edit README.
+  By: propose
