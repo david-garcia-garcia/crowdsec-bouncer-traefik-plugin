@@ -73,8 +73,8 @@ This change only deletes the alias blocks before `ValidateParams`. It does not a
   By: explore
 
 - Q: Which spec leaf owns the Config-field deletion versus the e2e WHEN rename?
-  Decision: assumed — propose runs FindSpecHost. Live `build_e2e_pester_crowdsec-stack` must rename the custom-ban WHEN key. `core_plugin_middleware_bouncer` does not name the Deprecated fields today; do not add an alias SHALL. Fold or new only if propose finds a Config-surface leaf that should say the old keys are gone.
-  By: explore
+  Decision: resolved — FindSpecHost fold `build_e2e_pester_crowdsec-stack` (high) for the custom-ban WHEN rename. No Config-surface leaf names the Deprecated fields; do not add an alias SHALL and do not create a new leaf for field deletion.
+  By: propose
 
 - Q: How do we prove current keys still compile and serve without a new alias test?
   Decision: resolved — no `_test.go` references the Deprecated fields. After YAML retarget, existing real-stack custom-ban and mock captcha e2e are the serve proof. Do not add `TestNew_CaptchaFilePathWinsOverDeprecatedHTMLPath` or any empty-guard alias test. Do not touch template-load defaults (out of scope; empty `captchaFilePath` panic stays the existing debt).
