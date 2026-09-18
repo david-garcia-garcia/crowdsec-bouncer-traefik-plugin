@@ -27,3 +27,9 @@ phase: codereview
 findings: none
 fixed: none
 skipped: Task unavailable to nested executor (cursor namespace has no Task); six axis files written in-process from checklists; no hard/missing/wrong to apply
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: 1 stale-usage (Config validation)
+fixed: produced enabled-gate Language + usage on core_plugin_middleware_config-validation.md
+skipped: none
