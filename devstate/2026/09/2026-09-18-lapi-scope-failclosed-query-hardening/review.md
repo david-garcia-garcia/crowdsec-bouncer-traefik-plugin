@@ -22,3 +22,9 @@ findings: every new test failed first on dest `0e7dbf0` and passes on the branch
 fixed: five deliverables landed in `pkg/lapi` plus the `CrowdsecLapiFailureAction` behavior-change note in `README.md`; all 15 tasks in `openspec/changes/lapi-scope-failclosed-query-hardening/tasks.md` checked
 skipped: nothing; `origin/master` was still `0e7dbf0` at merge time so task 4.3 was a no-op fast-forward check, not a merge commit
 gates: `go build ./...` pass; `go vet ./...` pass; `go test ./pkg/... -count=1` pass; `go test . -count=1` pass (50.7s); `golangci-lint run ./...` pass; `docker run --rm -v ${PWD}:/src -w /src -e CGO_ENABLED=1 golang:1.22.12 go test -race -count=1 ./pkg/...` pass
+## codereview (2026-09-18)
+phase: codereview
+findings: Standards 3 (all judgement), Spec none, Security 1 (judgement), Performance 1 (judgement), Dead none, Test coverage 1 (judgement); no hard, missing, or wrong item
+fixed: nothing to apply — no hard finding inside the diff
+skipped: the six axes ran in-process, not as six Task sub-agents, for the same reason recorded under prepare (this session is itself a sub-agent and cannot spawn one); every axis checklist was read in full and its file written to the run root
+verdict: in progress

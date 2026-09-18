@@ -8,7 +8,7 @@ JobName: 2026-09-18-lapi-scope-failclosed-query-hardening
 | explore | [x] | [x] | 2026-09-18T10:31:55Z |
 | propose | [x] | [x] | 2026-09-18T10:35:55Z |
 | implement | [x] | [ ] | 2026-09-18T10:54:35Z |
-| codereview | [ ] | [ ] | |
+| codereview | [x] | [ ] | 2026-09-18T11:01:11Z |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
