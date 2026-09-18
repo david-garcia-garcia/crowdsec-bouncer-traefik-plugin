@@ -25,3 +25,9 @@ findings: none
 fixed: canonicalize remoteIP after parse; deleted IPLookupCacheKey; live memo Set(remoteIP); real e2e Ip spelling
 skipped: local e2e_pester (no crowdsec-test)
 localTests: passed
+
+## codereview (2026-09-18)
+phase: codereview
+findings: coverage 1 hard
+fixed: TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan (92275b5)
+skipped: none
