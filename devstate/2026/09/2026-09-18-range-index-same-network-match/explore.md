@@ -58,8 +58,8 @@ IssueKey: 2026-09-18-range-index-same-network-match
   By: propose
 
 - Q: Does explore write the usage gotcha now?
-  Decision: assumed — no. Current packet usage is enough to call `ApplyRangeBatch`. Documenting same-network identity before the apply would state a contract the tree does not yet keep. Propose the spec delta; usage gotcha on apply or `sbs-dev-devdocsimpact`.
-  By: explore
+  Decision: resolved — no during explore; implement writes the Gotchas bullet now that the tree keeps the contract.
+  By: implement
 
 - Q: Does the helper remap IPv4-mapped CIDRs so `10.0.0.0/8` matches `::ffff:10.0.0.0/104`?
   Decision: resolved — no. Out of scope. `IP.Equal` may treat mapped and v4 addresses as equal, but `Mask.Size()` ones/bits differ; leave that as a miss.
