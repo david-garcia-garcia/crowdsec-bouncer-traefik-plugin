@@ -48,6 +48,8 @@ services:
       # Choose captcha provider
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaProvider=custom"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomJsURL=http://captcha.localhost:8000/fast.js"
+      # The widget fetches this from the browser, so it is rendered in captcha.html and passed through to the origin
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomChallengeURL=http://captcha.localhost:8000/v0/challenge"
       # Inside Traefik container the plugin must be able to reach wicketkeeper service so we can go through a Traefik localhost
       # domain which would resolve traefik itself and the port for the dashboard
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomValidateURL=http://wicketkeeper:8080/v0/siteverify"
