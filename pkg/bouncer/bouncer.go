@@ -304,6 +304,10 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 }
 
 // handleRemediationServeHTTP applies captcha or ban for a cached or live verdict.
+//
+// Captcha routing covers every method, HEAD included: a HEAD from a client carrying a
+// captcha remediation gets the captcha challenge page, never the ban page. Only ban kind
+// reaches handleBanServeHTTP from here.
 func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientRequest, remediation, origin string) {
 	kind := cache.RemediationKind(remediation)
 	b.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", req.remoteIP, kind))

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
@@ -30,6 +32,7 @@ type Client struct {
 	httpClient              *http.Client
 	log                     *slog.Logger
 	infoProvider            *infoProvider
+	challengeURL            string
 	customResourcePaths     []string
 }
 
@@ -72,6 +75,7 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 	var info *infoProvider
 	if provider == configuration.CustomProvider {
 		info = &infoProvider{js: js, key: key, response: response, validate: validate}
+		c.challengeURL = challengeURL
 		c.storeCustomResourcePaths(js, challengeURL)
 	} else {
 		info = infoProviders[provider]
@@ -115,9 +119,10 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	}
 	rw.WriteHeader(http.StatusOK)
 	err = c.template.Execute(rw, map[string]string{
-		"SiteKey":     c.siteKey,
-		"FrontendJS":  c.infoProvider.js,
-		"FrontendKey": c.infoProvider.key,
+		"SiteKey":      c.siteKey,
+		"FrontendJS":   c.infoProvider.js,
+		"FrontendKey":  c.infoProvider.key,
+		"ChallengeURL": c.challengeURL,
 	})
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP captchaTemplateServe " + err.Error())
@@ -145,12 +150,91 @@ func (c *Client) IsCustomResourceRequest(r *http.Request) bool {
 	return false
 }
 
+// captchaFormMaxBytes is the largest POST body inspected for a provider token.
+// Provider tokens are small, so a bigger body is origin traffic and is left alone.
+const captchaFormMaxBytes = 64 << 10
+
 // IsCaptchaFormPost reports whether this POST carries a non-empty provider response field.
+// Its caller may still forward the request, so it never consumes the body: a POST that
+// turns out not to be a captcha form reaches origin intact. Validate uses
+// captchaResponseFromRequest instead, which is free to consume the body.
 func (c *Client) IsCaptchaFormPost(r *http.Request) bool {
-	if r == nil || r.Method != http.MethodPost || c.infoProvider == nil {
+	if r == nil || r.Method != http.MethodPost || c.infoProvider == nil || c.infoProvider.response == "" {
 		return false
 	}
-	return captchaResponseFromRequest(r, c.infoProvider.response) != ""
+	field := c.infoProvider.response
+	// Something upstream already parsed the form; rereading Body would find nothing.
+	if r.PostForm != nil {
+		return r.PostForm.Get(field) != ""
+	}
+	// A declared body over the cap is origin traffic; do not buffer it to hunt for a token.
+	if r.ContentLength > captchaFormMaxBytes {
+		return false
+	}
+	body, withinCap := peekCaptchaFormBody(r)
+	if !withinCap {
+		return false
+	}
+	return formFieldValue(r.Header.Get("Content-Type"), body, field) != ""
+}
+
+// peekCaptchaFormBody reads up to captchaFormMaxBytes and always leaves r.Body readable.
+// It reports the buffered body, and false when the body exceeds the cap or could not be
+// read — which also covers a request whose Content-Length is unknown and whose body turns
+// out to be large.
+func peekCaptchaFormBody(r *http.Request) ([]byte, bool) {
+	if r.Body == nil {
+		return nil, false
+	}
+	peeked, err := io.ReadAll(io.LimitReader(r.Body, captchaFormMaxBytes+1))
+	if err != nil || len(peeked) > captchaFormMaxBytes {
+		r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(peeked), r.Body))
+		return nil, false
+	}
+	_ = r.Body.Close()
+	r.Body = io.NopCloser(bytes.NewReader(peeked))
+	r.ContentLength = int64(len(peeked))
+	return peeked, true
+}
+
+// formFieldValue returns one field of an already-buffered urlencoded or multipart body.
+// A body with no usable Content-Type is read as urlencoded, which is what the bundled
+// captcha form sends.
+func formFieldValue(contentType string, body []byte, field string) string {
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		mediaType = "application/x-www-form-urlencoded"
+	}
+	switch mediaType {
+	case "application/x-www-form-urlencoded":
+		values, parseErr := url.ParseQuery(string(body))
+		if parseErr != nil {
+			return ""
+		}
+		return values.Get(field)
+	case "multipart/form-data":
+		return multipartFieldValue(params["boundary"], body, field)
+	default:
+		return ""
+	}
+}
+
+// multipartFieldValue reads one form value out of a buffered multipart body.
+func multipartFieldValue(boundary string, body []byte, field string) string {
+	if boundary == "" {
+		return ""
+	}
+	// The body is already capped, so this parse never spills to a temporary file.
+	form, err := multipart.NewReader(bytes.NewReader(body), boundary).ReadForm(captchaFormMaxBytes)
+	if err != nil {
+		return ""
+	}
+	defer func() { _ = form.RemoveAll() }()
+	values := form.Value[field]
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
 }
 
 // WriteSolvedRedirect issues 302 to the same URL without reminting the gate cookie.
@@ -165,28 +249,12 @@ func (c *Client) WriteSolvedRedirect(rw http.ResponseWriter, r *http.Request) {
 func (c *Client) storeCustomResourcePaths(jsURL, challengeURL string) {
 	c.customResourcePaths = nil
 	for _, rawURL := range []string{jsURL, challengeURL} {
-		resourcePath := exactResourcePath(rawURL)
+		resourcePath := configuration.CustomCaptchaResourcePath(rawURL)
 		if resourcePath == "" {
 			continue
 		}
 		c.customResourcePaths = append(c.customResourcePaths, resourcePath)
 	}
-}
-
-// exactResourcePath returns a configured URL path when it is usable as an exact match.
-func exactResourcePath(rawURL string) string {
-	if rawURL == "" {
-		return ""
-	}
-	parsed, err := url.Parse(rawURL)
-	if err != nil {
-		return ""
-	}
-	resourcePath := parsed.Path
-	if resourcePath == "" || !strings.HasPrefix(resourcePath, "/") {
-		return ""
-	}
-	return resourcePath
 }
 
 type responseProvider struct {
@@ -196,6 +264,11 @@ type responseProvider struct {
 // captchaResponseFromRequest reads the provider token from query, POST form, or
 // raw urlencoded body. Traefik's Yaegi request wrapper often leaves Form empty
 // after FormValue, so the body is parsed directly when ParseForm yields nothing.
+//
+// This is the first-verify reader, used only by Validate on a request the plugin
+// answers itself. It parses the form and truncates a body over 1MiB, which is safe
+// only because that request is never forwarded. Routing decisions on a request that
+// may still reach origin use IsCaptchaFormPost.
 func captchaResponseFromRequest(r *http.Request, field string) string {
 	if field == "" {
 		return ""
