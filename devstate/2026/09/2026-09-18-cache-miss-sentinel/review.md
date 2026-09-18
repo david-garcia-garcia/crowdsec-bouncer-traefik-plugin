@@ -15,3 +15,9 @@ phase: propose
 findings: none
 fixed: none
 skipped: none
+
+## implement (2026-09-18T18:07:20Z)
+phase: implement
+findings: none
+fixed: ErrMiss/ErrUnreachable returned from get/getMany/lookup; callers use errors.Is
+skipped: none
