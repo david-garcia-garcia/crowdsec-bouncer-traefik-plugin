@@ -11,8 +11,12 @@ _Avoid_: a `scenario` item label, `labels.type=traefik_plugin`, and reusing `cro
 _Avoid_: parsing `RemoteAddr` on the metrics path
 
 **MetricsReporter**:
-The owner of one Client's usage-metrics window (dropped counters, processed atomics, active_decisions gauge, last successful push) and the POST/restore path. Client holds one pointer for the reclaim lifetime; tickers stay on Client.
-_Avoid_: a second reclaim key, a reporter-owned `*http.Client`, a second metrics ticker
+The owner of one Client's usage-metrics window (dropped counters, processed atomics, active_decisions gauge, last successful push) and the POST/restore path. Client holds one pointer for the reclaim lifetime; tickers stay on Client. The reporter resolves origin names through the DecisionStore table and MUST NOT keep a second intern table.
+_Avoid_: a second reclaim key, a reporter-owned `*http.Client`, a second metrics ticker, a reporter-owned origin dictionary
+
+**Compact active-decision slot**:
+A per-record `activeDecisionSlots` value that stores the DecisionStore origin id plus family byte (`4` / `6` from `FamilyOfHostOrCIDR`) instead of a five-string `usageMetricKey`. Overflow or empty origin keeps enough leftover text to POST today's labels.
+_Avoid_: dropping `activeDecisionSlots`, intern on the reporter
 
 ## Overview
 
@@ -23,7 +27,8 @@ Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. S
 - Classify `ip_type` with `ip.FamilyOfIP` on the `net.IP` GetRemoteIP already yielded (`req.ipType` on the request path). Do not parse `RemoteAddr`. Do not call `ip.Family` on the client string on the request path.
 - Build origin with `MetricsOrigin(decision.Origin, decision.Scenario)` before cache store and before `IncDropped`.
 - AppSec remediations use `origin=appsec`. Fail-closed drops use `plugin:tech_getremotefail`, `plugin:tech_trustipfail`, `plugin:tech_cachefail`, `plugin:tech_streamfail`, `plugin:lapi_failure`, or `plugin:appsec_failure`.
-- Persist origin on Ip/header and Range-index via `cache.RemediationWithOrigin`. Bare letter-only Range lines still match and MAY omit origin.
+- Persist origin on stream/alone memory via `DecisionStore.RemediationStored` (packed word when interned). Redis, live/none, and overflow stay `RemediationWithOrigin`. Bare letter-only Range lines still match and MAY omit origin.
+- Compact `activeDecisionSlots` with `rememberActiveDecision` (intern then store id + family). Forget still keys the slot string. POST resolves id → `MetricsOrigin` and family → `ipv4`/`ipv6`.
 - Construct one `MetricsReporter` in `New` (`newMetricsReporter`). Bind `query` to `crowdsecQuery`. Do not store `*http.Client` on the reporter.
 - Stamp `utc_startup_timestamp` once on the reporter at construct. Do not use `time.Now()` at each push. `feature_flags` must marshal as `[]`, not `{}`.
 - Keep `IncProcessed` / `IncDropped` / `rememberActiveDecision` / `forgetActiveDecision` as `Client` methods (thin forwards). A Client literal without a reporter no-ops those methods.
@@ -41,7 +46,9 @@ lapiClient.IncDropped(cache.RemediationOrigin(stored), req.ipType, "ban")
 
 - `pkg/lapi/client_metrics.go`
 - `pkg/lapi/client.go` (`metricsReporter` field and ticker wiring)
+- `pkg/lapi/decisionstore.go`
 - `pkg/cache/remediation.go`
+- `pkg/cache/stored.go`
 - `pkg/ip/network.go` (`Family`, `FamilyOfIP`, `FamilyOfHostOrCIDR`)
 - `pkg/bouncer/bouncer.go`
 
