@@ -338,6 +338,10 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		if _, err := GetVariable(config, "CrowdsecCapiPassword"); err != nil {
 			return err
 		}
+		// Alone MAY skip LAPI URL/key/TLS after CAPI credentials. AppSec URL, key-file, and HTTPS CA still run.
+		if err := validateAppsecURLKeyAndTLS(config); err != nil {
+			return err
+		}
 	} else {
 		if err := validateLapiAndAppsecConnection(config); err != nil {
 			return err
