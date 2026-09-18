@@ -5,6 +5,11 @@ priority: normal
 local: core_plugin_middleware.md
 description: How Traefik New reclaims a LAPI Client and an AppSec Client and returns a per-router Bouncer (`core_plugin_middleware_bouncer`).
 
+## Local plugin
+priority: normal
+local: core_plugin_middleware_local-plugin.md
+description: How this unpublished fork is loaded by Traefik (import equals go.mod, localPlugins, no catalog version).
+
 ## Config validation
 priority: normal
 local: core_plugin_middleware_config-validation.md

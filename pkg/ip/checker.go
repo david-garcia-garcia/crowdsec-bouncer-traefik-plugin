@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/iplookup"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/iplookup"
 )
 
 // Checker allows to check that addresses are in a trusted IPs.

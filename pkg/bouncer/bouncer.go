@@ -10,13 +10,13 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec"
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
-	captcha "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
-	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
-	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
+	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	captcha "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
+	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 )
 
 // Bouncer is one Traefik router handler. It is not the reclaim value.
