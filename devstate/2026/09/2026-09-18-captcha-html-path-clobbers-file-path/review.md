@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: stale-usage 1
 fixed: core_plugin_middleware How-to and Gotchas; PR 85 delivery card
 skipped: no Language term invented; no new packet; no comments.md
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: FindSpecHost fold core_plugin_middleware_bouncer (in-process; Task unavailable); sync ADDED SHALL; catalog validators exit 0; moved to openspec/changes/archive/2026-09-18-captcha-html-path-clobbers-file-path/; PR 85 archive card
+skipped: pullrequest not started; CI on 5148ce9 still queued
