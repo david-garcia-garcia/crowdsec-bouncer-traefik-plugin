@@ -1,6 +1,7 @@
 package lapi
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
@@ -52,6 +53,42 @@ func TestForgetActiveDecisionClearsCompactSlot(t *testing.T) {
 		if item["name"] == "active_decisions" {
 			t.Fatalf("forget must omit active_decisions, item %#v", item)
 		}
+	}
+}
+
+func TestOriginOverflowActiveDecisionKeepsOriginLabel(t *testing.T) {
+	store := newTestMemoryDecisionStore()
+	client, body := newUsageMetricsClient(t)
+	client.decisionStore = store
+	client.crowdsecMode = configuration.StreamMode
+	client.metricsReporter.origins = store
+	for i := range maxInternedOrigins {
+		if _, ok := store.InternOrigin("origin-" + strconv.Itoa(i)); !ok {
+			t.Fatalf("fill intern %d", i)
+		}
+	}
+	client.rememberActiveDecision("ip:1.2.3.4", "overflow-origin", "1.2.3.4")
+	slot := client.metricsReporter.activeDecisionSlots["ip:1.2.3.4"]
+	if slot.originID != 0 || slot.originText != "overflow-origin" {
+		t.Fatalf("overflow slot %#v", slot)
+	}
+	if err := client.reportMetrics(); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, raw := range usageMetricItems(t, body.bytes()) {
+		item := asObject(t, raw)
+		if item["name"] != "active_decisions" {
+			continue
+		}
+		labels := asObject(t, item["labels"])
+		if labels["origin"] != "overflow-origin" {
+			t.Fatalf("active labels %#v", labels)
+		}
+		found = true
+	}
+	if !found {
+		t.Fatal("overflow active_decisions must keep origin label")
 	}
 }
 

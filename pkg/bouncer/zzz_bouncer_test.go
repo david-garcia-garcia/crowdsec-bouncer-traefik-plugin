@@ -123,6 +123,57 @@ func TestServeHTTP_PackedMemoryBanRemediates(t *testing.T) {
 	}
 }
 
+func TestServeHTTP_PackedMemoryBanResolvesDroppedOrigin(t *testing.T) {
+	log := logger.New("ERROR", "")
+	lapiClient, cacheClient := lapi.NewTestClient(log)
+	t.Cleanup(cacheClient.Close)
+	id, interned := lapiClient.InternOrigin("crowdsec")
+	if !interned {
+		t.Fatal("intern")
+	}
+	packed := cache.Packed(decisionscope.BannedValue, id)
+	cacheClient.SetRemediation("203.0.113.10", packed, 60)
+	clientChecker, err := ip.NewChecker(log, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	banTemplate, err := template.New("ban").Parse("banned")
+	if err != nil {
+		t.Fatal(err)
+	}
+	passed := false
+	b := &Bouncer{
+		enabled:                  true,
+		crowdsecMode:             configuration.StreamMode,
+		forwardedHeadersInsecure: true,
+		forwardedCustomHeader:    "X-Forwarded-For",
+		lapiClient:               lapiClient,
+		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
+		captchaClient:            &captcha.Client{},
+		log:                      log,
+		remediationStatusCode:    http.StatusForbidden,
+		banTemplate:              banTemplate,
+		banTemplateContentType:   "text/html; charset=utf-8",
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			passed = true
+		}),
+	}
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
+	req.RemoteAddr = "127.0.0.1:1"
+	req.Header.Set("X-Forwarded-For", "203.0.113.10")
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, req)
+	if passed {
+		t.Fatal("packed memory ban must remediate")
+	}
+	if rw.Code != http.StatusForbidden {
+		t.Fatalf("status=%d", rw.Code)
+	}
+	if got := b.resolveStoredOrigin(packed.IndexForm()); got != "crowdsec" {
+		t.Fatalf("packed drop origin %q", got)
+	}
+}
+
 func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 	html := "<html>You are banned</html>"
 	banTemplate, _ := template.New("html").Delims("{{", "}}").Parse(html)

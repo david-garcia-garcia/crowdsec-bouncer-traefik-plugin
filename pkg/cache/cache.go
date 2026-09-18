@@ -41,13 +41,13 @@ func (lc *localCache) get(key string) (string, error) {
 		return "", errors.New(CacheMiss)
 	}
 	// Packed remediations are uint32; string Get returns the kind letter only.
-	switch typed := value.(type) {
+	switch valueTyped := value.(type) {
 	case string:
-		if len(typed) > 0 {
-			return typed, nil
+		if len(valueTyped) > 0 {
+			return valueTyped, nil
 		}
 	case uint32:
-		kind := storedFromWord(typed).Kind()
+		kind := storedFromWord(valueTyped).Kind()
 		if kind != "" {
 			return kind, nil
 		}
@@ -77,21 +77,23 @@ func (lc *localCache) set(key, value string, duration int64) {
 	lc.heap().Set(key, value, duration)
 }
 
-func (lc *localCache) setValue(key string, value interface{}, duration int64) {
-	lc.heap().Set(key, value, duration)
+// setPackedWord writes a packed kind-plus-origin-id word into ttl_map.
+func (lc *localCache) setPackedWord(key string, word uint32, duration int64) {
+	lc.heap().Set(key, word, duration)
 }
 
+// getStored returns a packed or leftover Stored for a memory key.
 func (lc *localCache) getStored(key string) (Stored, bool) {
 	value, isCached := lc.heap().Get(key)
 	if !isCached {
 		return Stored{}, false
 	}
-	switch typed := value.(type) {
+	switch valueTyped := value.(type) {
 	case uint32:
-		return storedFromWord(typed), true
+		return storedFromWord(valueTyped), true
 	case string:
-		if len(typed) > 0 {
-			return ParseStored(typed), true
+		if len(valueTyped) > 0 {
+			return ParseStored(valueTyped), true
 		}
 	}
 	return Stored{}, false
@@ -282,7 +284,7 @@ func (c *Client) SetRemediation(key string, stored Stored, duration int64) {
 	if word, packed := stored.PackedWord(); packed {
 		lc, ok := c.cache.(*localCache)
 		if ok {
-			lc.setValue(key, word, duration)
+			lc.setPackedWord(key, word, duration)
 			return
 		}
 	}
@@ -293,12 +295,12 @@ func (c *Client) SetRemediation(key string, stored Stored, duration int64) {
 func (c *Client) GetManyStored(keys []string) (map[string]Stored, error) {
 	c.log.Debug(fmt.Sprintf("cache:GetManyStored keys:%v", keys))
 	if !c.MemoryBackend() {
-		raw, err := c.GetMany(keys)
+		leftovers, err := c.GetMany(keys)
 		if err != nil {
 			return nil, err
 		}
-		out := make(map[string]Stored, len(raw))
-		for key, value := range raw {
+		out := make(map[string]Stored, len(leftovers))
+		for key, value := range leftovers {
 			out[key] = Leftover(value)
 		}
 		return out, nil

@@ -18,6 +18,31 @@ func newTestMemoryDecisionStore() *DecisionStore {
 	return &DecisionStore{cache: cacheClient, log: log, origins: newOriginDictionary(log)}
 }
 
+func TestInternOriginEmptyIsNotInterned(t *testing.T) {
+	store := newTestMemoryDecisionStore()
+	id, interned := store.InternOrigin("")
+	if interned || id != 0 {
+		t.Fatalf("empty intern id %d interned %v", id, interned)
+	}
+	if _, ok := store.InternOrigin("crowdsec"); !ok {
+		t.Fatal("crowdsec intern")
+	}
+	if store.OriginName(1) != "crowdsec" {
+		t.Fatal("empty must not consume id 1")
+	}
+}
+
+func TestRemediationStoredEmptyOriginStaysLetterOnly(t *testing.T) {
+	store := newTestMemoryDecisionStore()
+	stored := store.RemediationStored(decisionscope.BannedValue, "")
+	if _, packed := stored.PackedWord(); packed {
+		t.Fatal("empty origin must not pack")
+	}
+	if stored.IndexForm() != decisionscope.BannedValue {
+		t.Fatalf("letter-only %q", stored.IndexForm())
+	}
+}
+
 func TestInternOriginReusesId(t *testing.T) {
 	store := newTestMemoryDecisionStore()
 	first, ok := store.InternOrigin("crowdsec")

@@ -8,15 +8,15 @@ import (
 
 func TestPackedWordRoundTrip(t *testing.T) {
 	stored := Packed("t", 7)
-	word, ok := stored.PackedWord()
-	if !ok || stored.Kind() != "t" {
+	word, packed := stored.PackedWord()
+	if !packed || stored.Kind() != "t" {
 		t.Fatalf("packed %#v", stored)
 	}
 	id, packed := storedFromWord(word).PackedOriginID()
 	if !packed || id != 7 {
 		t.Fatalf("id %d packed %v", id, packed)
 	}
-	if stored.LeftoverOrigin() != "" {
+	if RemediationOrigin(stored.IndexForm()) != "" {
 		t.Fatal("packed must not expose a leftover suffix")
 	}
 }
@@ -46,7 +46,7 @@ func TestLeftoverSetStillGetManyStored(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got["203.0.113.10"].LeftoverOrigin() != "crowdsec" {
+	if RemediationOrigin(got["203.0.113.10"].IndexForm()) != "crowdsec" {
 		t.Fatalf("leftover %#v", got["203.0.113.10"])
 	}
 }

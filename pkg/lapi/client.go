@@ -272,6 +272,14 @@ func (c *Client) Cache() *cache.Client {
 	return c.cacheClient
 }
 
+// InternOrigin assigns or reuses a uint16 id for a MetricsOrigin name on this Client's store.
+func (c *Client) InternOrigin(name string) (uint16, bool) {
+	if c == nil || c.decisionStore == nil {
+		return 0, false
+	}
+	return c.decisionStore.InternOrigin(name)
+}
+
 // OriginName is the DecisionStore intern string for id, or empty when this Client has no store.
 func (c *Client) OriginName(id uint16) string {
 	if c == nil || c.decisionStore == nil {

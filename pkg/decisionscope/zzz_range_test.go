@@ -131,9 +131,9 @@ func TestLookupCachedRemediationStreamUsesMembershipNotBlob(t *testing.T) {
 func TestLookupCachedRemediationOriginSuffix(t *testing.T) {
 	client := newTestDecisionCache()
 	client.Set("203.0.113.10", cache.RemediationWithOrigin(BannedValue, "crowdsec"), 60)
-	got, stored, err := LookupCachedRemediation(client, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
-	if err != nil || got != BannedValue || cache.RemediationOrigin(stored) != "crowdsec" {
-		t.Fatalf("got %q stored %q err %v", got, stored, err)
+	kind, stored, err := LookupCachedRemediation(client, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
+	if err != nil || kind != BannedValue || cache.RemediationOrigin(stored) != "crowdsec" {
+		t.Fatalf("kind %q stored %q err %v", kind, stored, err)
 	}
 }
 
@@ -154,19 +154,19 @@ func TestApplyRangeBatchRoundTripOriginSuffix(t *testing.T) {
 
 func TestLookupCachedRemediationRangeOnlyOrigin(t *testing.T) {
 	client := newTestDecisionCache()
-	stored := cache.RemediationWithOrigin(BannedValue, "crowdsec")
-	membership := MembershipFromIndex("10.0.0.0/8=" + stored)
-	got, stored, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, membership)
-	if err != nil || got != BannedValue || cache.RemediationOrigin(stored) != "crowdsec" {
-		t.Fatalf("got %q stored %q err %v", got, stored, err)
+	leftover := cache.RemediationWithOrigin(BannedValue, "crowdsec")
+	membership := MembershipFromIndex("10.0.0.0/8=" + leftover)
+	kind, stored, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, membership)
+	if err != nil || kind != BannedValue || cache.RemediationOrigin(stored) != "crowdsec" {
+		t.Fatalf("kind %q stored %q err %v", kind, stored, err)
 	}
 }
 
 func TestLookupCachedRemediationRangeLetterOnlyStillBans(t *testing.T) {
 	client := newTestDecisionCache()
 	membership := MembershipFromIndex("10.0.0.0/8=" + BannedValue)
-	got, stored, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, membership)
-	if err != nil || got != BannedValue || cache.RemediationOrigin(stored) != "" {
-		t.Fatalf("letter-only got %q stored %q err %v", got, stored, err)
+	kind, stored, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, membership)
+	if err != nil || kind != BannedValue || cache.RemediationOrigin(stored) != "" {
+		t.Fatalf("letter-only kind %q stored %q err %v", kind, stored, err)
 	}
 }

@@ -25,8 +25,8 @@ func TestLookupPackedMemoryBanDoesNotReturnOriginName(t *testing.T) {
 
 func TestLookupPackedRangeMembershipRemediates(t *testing.T) {
 	client := newTestDecisionCache()
-	packed := cache.Packed(BannedValue, 2)
-	if err := ApplyRangeBatch(client, map[string]string{"10.0.0.0/8": packed.IndexForm()}, nil); err != nil {
+	packedStored := cache.Packed(BannedValue, 2)
+	if err := ApplyRangeBatch(client, map[string]string{"10.0.0.0/8": packedStored.IndexForm()}, nil); err != nil {
 		t.Fatal(err)
 	}
 	index, _ := readRangeIndex(client)
@@ -38,8 +38,8 @@ func TestLookupPackedRangeMembershipRemediates(t *testing.T) {
 	if err != nil || kind != BannedValue {
 		t.Fatalf("kind %q err %v", kind, err)
 	}
-	id, ok := cache.ParsePackedOriginID(stored)
-	if !ok || id != 2 {
-		t.Fatalf("range stored %q id %d ok %v", stored, id, ok)
+	id, packed := cache.ParsePackedOriginID(stored)
+	if !packed || id != 2 {
+		t.Fatalf("range stored %q id %d packed %v", stored, id, packed)
 	}
 }

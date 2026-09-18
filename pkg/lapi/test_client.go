@@ -10,5 +10,6 @@ import (
 func NewTestClient(log *slog.Logger) (*Client, *cache.Client) {
 	cacheClient := &cache.Client{}
 	cacheClient.New(log, false, "", nil, "", "", "")
-	return &Client{cacheClient: cacheClient, log: log}, cacheClient
+	store := &DecisionStore{cache: cacheClient, log: log, origins: newOriginDictionary(log)}
+	return &Client{cacheClient: cacheClient, decisionStore: store, log: log}, cacheClient
 }

@@ -212,9 +212,8 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
 			return
 		case decisionscope.IsActiveRemediation(kind):
-			origin := b.resolveStoredOrigin(stored)
 			b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit remediation:%s", req.remoteIP, kind))
-			b.handleRemediationServeHTTP(rw, req, kind, origin)
+			b.handleRemediationServeHTTP(rw, req, kind, stored)
 			return
 		case kind == decisionscope.NoBannedValue:
 			b.handleNextServeHTTP(rw, req)
@@ -276,7 +275,7 @@ func (b *Bouncer) recordProcessed(ipType string) {
 // recordDropped counts a remediating response on the connection usage-metrics window.
 func (b *Bouncer) recordDropped(origin, ipType, remediation string) {
 	if b.lapiClient != nil {
-		b.lapiClient.IncDropped(origin, ipType, remediation)
+		b.lapiClient.IncDropped(b.resolveStoredOrigin(origin), ipType, remediation)
 	}
 }
 
@@ -286,10 +285,16 @@ func (b *Bouncer) resolveStoredOrigin(stored string) string {
 		return origin
 	}
 	id, packed := cache.ParsePackedOriginID(stored)
-	if !packed || b.lapiClient == nil {
+	if packed {
+		if b.lapiClient == nil {
+			return ""
+		}
+		return b.lapiClient.OriginName(id)
+	}
+	if len(stored) <= 1 {
 		return ""
 	}
-	return b.lapiClient.OriginName(id)
+	return stored
 }
 
 // handleBanServeHTTP writes the operator ban template for this client.

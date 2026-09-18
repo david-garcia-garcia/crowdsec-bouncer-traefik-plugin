@@ -57,14 +57,6 @@ func (s Stored) Kind() string {
 	return RemediationKind(s.text)
 }
 
-// LeftoverOrigin is the U+001F suffix when this Stored is not packed.
-func (s Stored) LeftoverOrigin() string {
-	if s.word != 0 {
-		return ""
-	}
-	return RemediationOrigin(s.text)
-}
-
 // IndexForm is the range-index / leftover string encoding of this Stored.
 func (s Stored) IndexForm() string {
 	if s.word != 0 {
@@ -80,9 +72,9 @@ func ParseStored(raw string) Stored {
 	if raw == "" {
 		return Stored{}
 	}
-	kind, rest, ok := strings.Cut(raw, packedIndexSep)
+	kind, originIDText, ok := strings.Cut(raw, packedIndexSep)
 	if ok && len(kind) == 1 {
-		id, err := strconv.ParseUint(rest, 10, 16)
+		id, err := strconv.ParseUint(originIDText, 10, 16)
 		if err == nil {
 			return Packed(kind, uint16(id))
 		}
