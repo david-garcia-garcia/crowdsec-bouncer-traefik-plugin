@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-ip-cache-key-canonicalization
+jobName: 2026-09-18-ip-cache-key-canonicalization
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: ticket/source.md@2026-09-18
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: ip-cache-key-canonicalization
+pr:
+  id: 77
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/77
