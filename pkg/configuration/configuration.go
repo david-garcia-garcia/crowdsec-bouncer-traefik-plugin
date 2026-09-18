@@ -493,15 +493,18 @@ func validateAppsecURLKeyAndTLS(config *Config) error {
 	return nil
 }
 
+// validateLogging rejects an unknown log level and an unwritable LogFilePath.
 func validateLogging(config *Config) error {
 	if !contains([]string{LogDEBUG, LogINFO, LogWARN, LogERROR}, strings.ToUpper(config.LogLevel)) {
 		return fmt.Errorf("LogLevel should be one of (%s,%s,%s,%s)", LogDEBUG, LogINFO, LogWARN, LogERROR)
 	}
 	if config.LogFilePath != "" {
-		_, err := os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		// Prove the path is writable, then close so ValidateParams does not keep the check descriptor.
+		checkFile, err := os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		if err != nil {
 			return fmt.Errorf("LogFilePath is not writable %w", err)
 		}
+		_ = checkFile.Close()
 	}
 	return nil
 }
