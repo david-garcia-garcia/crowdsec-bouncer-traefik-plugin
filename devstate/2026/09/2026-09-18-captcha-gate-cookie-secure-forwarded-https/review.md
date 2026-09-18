@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: FindSpecHost fold core_plugin_middleware_captcha-gate; catalog already matched the MODIFIED Secure clause; validators exit 0; moved openspec/changes/archive/2026-09-18-captcha-gate-cookie-secure-forwarded-https/
 skipped: Task sub-agent unavailable; FindSpecHost run inline; map.md --write no family delta
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: reused OPEN PR 88; ready title; CI succeeded on 77fa65f (Main Process, Race detector, e2e binary, e2e docker)
+skipped: no comments.md; no second PR
