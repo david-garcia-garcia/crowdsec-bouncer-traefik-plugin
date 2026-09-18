@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-18T18:20:00Z
+Developer review: ready for review — 2026-09-18T18:26:53Z
 
 ## What this changes
 **Operators.** None.
@@ -23,18 +23,18 @@ flowchart TD
 ```
 
 ## Merge readiness
-Change is archived; required CI is still running on the master merge. 1 item remains.
+Required CI succeeded. Ready for review. 0 items remain.
 
 Priority: P2 — request-path latency on every Range hit, limited to stream plus in-memory
-Reviewed head: 380bad73
+Reviewed head: c5ae1419
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Archive is on the PR; required CI is still running |
-| CI proof | 3/6 | Main and E2E in progress on 380bad73 |
-| Local tests proof | N/A | Remote CI is the proof axis; local membership tests passed after merge |
+| Overall readiness | 6/6 | OPEN PR, CI succeeded, no open comments |
+| CI proof | 6/6 | Main and E2E succeeded on c5ae1419 |
+| Local tests proof | N/A | Remote CI is the proof axis; localTests passed |
 | Review resolution | 6/6 | No open PR comments |
 
 ## Verification
@@ -43,7 +43,7 @@ Owner decision: None.
 | Branch | 2026-09-18-range-hit-origin pushed | `git` origin/2026-09-18-range-hit-origin |
 | OpenSpec | store-range-remediation-on-radix | `openspec/changes/archive/2026-09-18-store-range-remediation-on-radix/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/106 | pr-host List |
-| CI | build 35379484180 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35379484180 | GitHub Actions API |
+| CI | build 35379782709 success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35379782709 | GitHub Actions API |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | no comments.md; inventory empty |
 
@@ -55,13 +55,13 @@ Owner decision: None.
 None.
 
 ## How this fits together
-Local ticket 2026-09-18-range-hit-origin is on branch 2026-09-18-range-hit-origin and PR 106. OpenSpec change is archived; CI is running on the master merge.
+Local ticket 2026-09-18-range-hit-origin is on branch 2026-09-18-range-hit-origin and OPEN PR 106. Main and E2E succeeded on c5ae1419.
 
 ## Decision needed
 None.
 
 ## Before merge
-- [ ] Required CI must succeed on 380bad73
+None.
 
 ## Findings
 None.
@@ -81,7 +81,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs; do not paste diff --stat |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 380bad734ae1e6cd769151f66d299678d3540a5d | Card must match the branch you measured |
+| Reviewed head | c5ae1419508af5aa313031bd0f7fedbe9d7614d6 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -89,15 +89,15 @@ None.
 ### Technical review
 Best possible solution versus DestBranch: store the blob line on the radix endpoint and drop the request-path ParseCIDR walk.
 
-Do we have a high-confidence way to reproduce? Yes, DestBranch 1k-CIDR hit 52797 ns/op 2012 allocs/op; after apply, membership tests still pass after merging master.
+Do we have a high-confidence way to reproduce? Yes, DestBranch 1k-CIDR hit 52797 ns/op 2012 allocs/op; after apply, Main and E2E succeeded.
 
 Is this the best way to solve the issue? Yes — two helpers, payload on the winning endpoint.
 
 ### Evidence
 What I checked:
-- FindSpecHost archive fold of both deltas
-- `openspec/changes/archive/2026-09-18-store-range-remediation-on-radix/`
-- `go test ./pkg/iplookup ./pkg/decisionscope ./pkg/ip` after merge
+- Main 35379782709 success on c5ae1419
+- E2E 35379782783 success on c5ae1419
+- One OPEN PR 106; title ⚡️ perf(decisionscope): store Range remediation on the radix endpoint
 
 ### Rank-up moves
 None.

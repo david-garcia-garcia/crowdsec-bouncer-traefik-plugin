@@ -39,3 +39,9 @@ phase: archive
 findings: synced both folds then moved to archive/2026-09-18-store-range-remediation-on-radix
 fixed: none
 skipped: none
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: Main and E2E succeeded on c5ae1419
+fixed: none
+skipped: none
