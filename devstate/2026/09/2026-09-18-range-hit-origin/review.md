@@ -15,3 +15,9 @@ phase: propose
 findings: fold core_plugin_ip_radix-lookup and core_plugin_decisions_scopes
 fixed: none
 skipped: none
+
+## implement (2026-09-18)
+phase: implement
+findings: Range hit now reads stored string from the winning endpoint
+fixed: dropped storedByCIDR walk
+skipped: none
