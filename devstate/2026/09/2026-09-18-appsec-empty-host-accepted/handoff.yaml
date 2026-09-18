@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-appsec-empty-host-accepted
+jobName: 2026-09-18-appsec-empty-host-accepted
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:f4f27c51a2cd43739df1400172c472d87f07284bc05510725cb751c2e4dba5f4
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr:
+  id: 89
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/89
