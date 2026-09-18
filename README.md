@@ -71,6 +71,15 @@ There are 5 operating modes (CrowdsecMode) for this plugin:
 | alone  | Standalone mode, similar to the streaming mode but the blacklisted IPs are fetched on the CAPI. Every 2 hours, the cache is updated with news from the Crowdsec CAPI. It does not include any locally banned IP, but can work without a crowdsec service.                                             |
 | appsec | Disable Crowdsec IP checking but apply Crowdsec Appsec checking. This mode is intended to be used when Crowdsec IP checking is applied at the Firewall Level.                                                                                                                                         |
 
+`CrowdsecMode` and `CrowdsecAppsecEnabled` are two independent axes, not one setting with five values:
+
+- `CrowdsecMode` selects **where decisions come from**: `none` queries the LAPI on every request, `live` queries it and caches the answer, `stream` and `alone` poll a stream into the cache, and `appsec` uses **no decision source at all**.
+- `CrowdsecAppsecEnabled` toggles the **Appsec (WAF) check**, which runs on the requests that survive the decision check in **every** mode, not only in `appsec` mode.
+
+So the ordinary combination is `stream` plus `crowdsecAppsecEnabled: true`: decisions come from the stream, and the WAF inspects the requests those decisions allowed. `appsec` mode is how you express "no decisions, WAF only", which is why it is the one mode that depends on the other setting being on.
+
+> `crowdsecMode: appsec` together with `crowdsecAppsecEnabled: false` enforces **nothing**: no decision is looked up and no request is inspected, so every request reaches your service. The plugin logs a warning at startup when it sees that combination, and still starts.
+
 The `streaming mode` is recommended for performance, decisions are updated every 60 sec by default and that's the only communication between Traefik and Crowdsec. Every request that happens hits the cache for quick decisions.
 
 The cache can be local to Traefik in memory or using a separate Redis instance.
