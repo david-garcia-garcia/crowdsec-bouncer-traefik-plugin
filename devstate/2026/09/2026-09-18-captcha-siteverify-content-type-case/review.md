@@ -10,3 +10,9 @@ findings: none
 fixed: explore.md; reproduced Application/JSON → 200 challenge
 skipped: siteverify Validate match (implement); no new research or usage write
 
+## propose (2026-09-18)
+phase: propose
+findings: none
+fixed: OpenSpec `captcha-siteverify-content-type-case`; spec `core_plugin_middleware_captcha-siteverify`
+skipped: product Validate match (implement)
+

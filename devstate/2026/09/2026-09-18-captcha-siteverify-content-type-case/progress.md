@@ -6,7 +6,7 @@ JobName: 2026-09-18-captcha-siteverify-content-type-case
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-18T14:25:41Z |
 | explore | [x] | [x] | 2026-09-18T14:32:37Z |
-| propose | [x] | [ ] | |
+| propose | [x] | [x] | 2026-09-18T14:40:15Z |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
