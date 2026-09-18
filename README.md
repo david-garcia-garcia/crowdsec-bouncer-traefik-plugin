@@ -178,8 +178,25 @@ Path to the ban file. Empty disables it. Content-Type is inferred from the exten
 **CaptchaCustomResponse** (string, no default)
 `custom` only. POST field from `captcha.html` (hCaptcha: `h-captcha-response`).
 
+**CaptchaCustomValidateBody** (string, default `""`)
+Siteverify request encoding. After trim, exact lowercase `""` or `form` POSTs `application/x-www-form-urlencoded` `secret` and `response` (same as omit; Wicketkeeper). `json` POSTs `application/json` `{"secret","response"}`. `json` is `custom` only — a built-in plus `json` fails startup. `JSON`, `Form`, and any other token fail for every provider.
+
+CapJS / Cap Standalone as `custom` (operator HTML stays yours; no `trycap` provider):
+
+```yaml
+captchaProvider: custom
+captchaCustomJsUrl: https://<instance>/assets/widget.js
+captchaCustomKey: cap
+captchaCustomResponse: cap-token
+captchaCustomValidateUrl: https://<instance>/<site_key>/siteverify
+captchaCustomValidateBody: json
+captchaSiteKey: FIXME
+captchaSecretKey: FIXME
+captchaGateSecret: FIXME
+```
+
 **CaptchaCustomValidateURL** (string, no default)
-`custom` only. URL that validates the challenge (hCaptcha: `https://api.hcaptcha.com/siteverify`).
+`custom` only. URL that validates the challenge (hCaptcha: `https://api.hcaptcha.com/siteverify`). Cap Standalone: `https://<instance>/<site_key>/siteverify` with `CaptchaCustomValidateBody: json`.
 
 **CaptchaFilePath** (string, default `/captcha.html`)
 Path to the captcha template. Content-Type is inferred from the extension.
@@ -362,14 +379,19 @@ The following declaration (given here in YAML) defines a plugin:
 > See the examples for advanced usage.
 
 ```yaml
-# Static configuration
+# Static configuration — load this tree as a local plugin.
+# Copy or bind-mount sources to ./plugins-local/src/github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
+# relative to the Traefik working directory (see Local Mode below).
 
 experimental:
-  plugins:
+  localPlugins:
     bouncer:
       moduleName: github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
-      version: vX.Y.Z # To update
 ```
+
+A catalog `GET` of `github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin` at `v1.7.1` or `vX.Y.Z` returns 404, and plugins.traefik.io does not list forks. Do not use `experimental.plugins` plus a `version` of this module as the working install.
+
+If the host already loads upstream `experimental.plugins.bouncer` (`github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin`), register this fork under a different alias, for example `experimental.localPlugins.crowdsec` and `plugin.crowdsec` in the dynamic YAML. In-tree examples keep alias `bouncer`.
 
 ```yaml
 # Simplified dynamic configuration

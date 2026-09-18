@@ -36,7 +36,7 @@ _Avoid_: treating `appsec` as "AppSec on", implying `crowdsecAppsecEnabled` from
 
 ## Overview
 
-Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New` snapshots the config Traefik owns and binds every reclaim `Open` to a bind context derived from the constructor `ctx` — that child is the reclaim holder, and releasing it is how a failed constructor hands back what it already opened. Do not change `.traefik.yml` `import`. Specs: `core_plugin_middleware_bouncer` (Yaegi `New` / Bouncer). Open key: `core_plugin_lapi_reclaim-key.md`.
+Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New` snapshots the config Traefik owns and binds every reclaim `Open` to a bind context derived from the constructor `ctx` — that child is the reclaim holder, and releasing it is how a failed constructor hands back what it already opened. Keep `.traefik.yml` `import` equal to the `go.mod` `module` path. Specs: `core_plugin_middleware_bouncer` (Yaegi `New` / Bouncer). Open key: `core_plugin_lapi_reclaim-key.md`.
 
 ## How to use
 

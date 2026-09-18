@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
 // transport is AppSec HTTP plus the API key.

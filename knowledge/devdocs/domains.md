@@ -2,6 +2,7 @@
 
 ## build
 - e2e
+- ci
 
 ## core
 - cache

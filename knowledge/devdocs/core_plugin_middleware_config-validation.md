@@ -39,6 +39,7 @@ _Avoid_: EffectiveLapi, three inherit wrappers
 - Keep the helper's empty-key pass and explicit-`https` CA parse. Do not fail an empty AppSec key at `ValidateParams`.
 - When the knob is false, skip AppSec host, URL, key, and CA even if leftover fields are set.
 - Leave `New` as `return nil, err` on `ValidateParams` failure.
+- Trim `CaptchaCustomValidateBody`. Accept only `""`, `form`, and `json` (exact lowercase). Reject unknown tokens for any provider (`CaptchaCustomValidateBody: must be empty, form, or json`). Reject `json` when the provider is not `custom` (`CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom`). Built-in leftover `""` / `form` pass and are ignored.
 
 ## Pattern snippet
 

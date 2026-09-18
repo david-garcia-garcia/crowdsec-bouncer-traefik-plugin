@@ -1,5 +1,10 @@
 # ext / traefik
 
+## Catalog plugins
+priority: normal
+local: ext_traefik_plugins_catalog/
+description: How Traefik downloads experimental.plugins by moduleName and version, and how the alias distinguishes two plugins.
+
 ## Local plugins
 priority: normal
 local: ext_traefik_plugins_localplugins/
