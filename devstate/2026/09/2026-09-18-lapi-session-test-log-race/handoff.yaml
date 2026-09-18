@@ -1,0 +1,15 @@
+issueKey: 2026-09-18-lapi-session-test-log-race
+jobName: 2026-09-18-lapi-session-test-log-race
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:575930a59a4191c15bb3605b823c857aa0b3372956c61b8f8fd952617ee1c8e1
+localTests: not-run
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
