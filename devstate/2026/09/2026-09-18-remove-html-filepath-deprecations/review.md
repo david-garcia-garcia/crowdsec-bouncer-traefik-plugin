@@ -27,3 +27,9 @@ phase: codereview
 findings: none
 fixed: none
 skipped: Task tool unavailable in nested session; six axes written in-process; all clean
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: stale-usage 3
+fixed: Middleware New, Real-stack e2e, Mock LAPI e2e usage
+skipped: no Language write (no invented umbrella term)

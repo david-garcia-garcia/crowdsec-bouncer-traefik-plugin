@@ -9,6 +9,6 @@ JobName: 2026-09-18-remove-html-filepath-deprecations
 | propose | [x] | [x] | 2026-09-18T17:29:48Z |
 | implement | [x] | [x] | 2026-09-18T17:45:35Z |
 | codereview | [x] | [x] | 2026-09-18T17:49:29Z |
-| devdocsimpact | [x] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-18T17:55:09Z |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
