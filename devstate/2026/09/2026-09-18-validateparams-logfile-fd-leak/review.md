@@ -27,3 +27,9 @@ phase: codereview
 findings: none
 fixed: none
 skipped: none (no judgement items)
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: missing-packet Config validation
+fixed: produced knowledge/devdocs/core_plugin_middleware_config-validation.md (08888ff)
+skipped: none
