@@ -8,7 +8,7 @@ JobName: 2026-09-18-range-bare-ip-host-prefix
 | explore | [x] | [x] | 2026-09-18T14:20:50.0896127Z |
 | propose | [x] | [x] | 2026-09-18T14:22:53.8972991Z |
 | implement | [x] | [x] | 2026-09-18T14:24:30.5811586Z |
-| codereview | [ ] | [ ] | |
+| codereview | [x] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
