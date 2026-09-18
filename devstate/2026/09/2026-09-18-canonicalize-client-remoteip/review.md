@@ -18,3 +18,10 @@ fixed: none
 skipped: none
 change: canonicalize-client-remoteip
 fold: core_plugin_decisions_scopes
+
+## implement (2026-09-18)
+phase: implement
+findings: none
+fixed: canonicalize remoteIP after parse; deleted IPLookupCacheKey; live memo Set(remoteIP); real e2e Ip spelling
+skipped: local e2e_pester (no crowdsec-test)
+localTests: passed
