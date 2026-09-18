@@ -105,28 +105,30 @@ func hitFromPackedWord(word uint32) lookupHit {
 // remoteIP is the canonical client address string owned by clientRequest; ipAddr is Range membership only.
 func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (kind, origin string, originID uint16, err error) {
 	keys := LookupCacheKeys(remoteIP, scopes)
-	found, err := cacheClient.GetMany(keys)
-	if err != nil {
-		return "", "", 0, err
-	}
-	// Merge packed words first so a leftover GetMany miss does not hide a SetInt hit.
 	var chosen lookupHit
+	var leftoverKeys []string
 	for _, key := range keys {
 		word, getIntErr := cacheClient.GetInt(key)
-		if getIntErr != nil {
+		if getIntErr == nil {
+			chosen = mergeLookupHit(chosen, hitFromPackedWord(word))
 			continue
 		}
-		chosen = mergeLookupHit(chosen, hitFromPackedWord(word))
+		leftoverKeys = append(leftoverKeys, key)
 	}
-	// Merge leftover strings and Range membership so a Country ban beats a Range captcha.
-	chosen = mergeLookupHit(chosen, hitFromStored(found[remoteIP]))
+	if len(leftoverKeys) > 0 {
+		found, err := cacheClient.GetMany(leftoverKeys)
+		if err != nil {
+			return "", "", 0, err
+		}
+		chosen = mergeLookupHit(chosen, hitFromStored(found[remoteIP]))
+		for scope, identifier := range scopes {
+			if identifier == "" {
+				continue
+			}
+			chosen = mergeLookupHit(chosen, hitFromStored(found[HeaderScopeKey(scope, identifier)]))
+		}
+	}
 	chosen = mergeLookupHit(chosen, hitFromStored(membership.Remediation(ipAddr)))
-	for scope, identifier := range scopes {
-		if identifier == "" {
-			continue
-		}
-		chosen = mergeLookupHit(chosen, hitFromStored(found[HeaderScopeKey(scope, identifier)]))
-	}
 	if chosen.stored != "" {
 		return RemediationKind(chosen.stored), chosen.origin, chosen.originID, nil
 	}

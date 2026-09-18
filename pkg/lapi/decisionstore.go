@@ -42,8 +42,8 @@ func StoreKey(cfg *configuration.Config) string {
 
 // DecisionStore is a reclaim value that owns one cache.Client (memory TTL or Redis-protocol prefix).
 type DecisionStore struct {
-	cache *cache.Client
-	redis bool
+	cache       *cache.Client
+	redisBacked bool
 
 	internMu sync.Mutex
 	// internNames is []string with index 0 unused. atomic.Value not atomic.Pointer[T] (Yaegi v0.16).
@@ -81,7 +81,7 @@ func OpenDecisionStore(ctx context.Context, cfg *configuration.Config, log *slog
 			cfg.RedisCacheDatabase,
 			SessionHex(cfg),
 		)
-		store := &DecisionStore{cache: cacheClient, redis: cfg.RedisCacheEnabled}
+		store := &DecisionStore{cache: cacheClient, redisBacked: cfg.RedisCacheEnabled}
 		store.internNames.Store([]string{""})
 		return store, reclaim.Hooks{Close: store.Close}, nil
 	})
@@ -160,7 +160,7 @@ func (s *DecisionStore) OriginName(id uint16) string {
 
 // PackMemory interns origin and packs kind+id when this store is memory-backed.
 func (s *DecisionStore) PackMemory(kind, origin string) (uint32, bool) {
-	if s == nil || s.redis || kind == "" {
+	if s == nil || s.redisBacked || kind == "" {
 		return 0, false
 	}
 	id, ok := s.Intern(origin)
@@ -168,4 +168,16 @@ func (s *DecisionStore) PackMemory(kind, origin string) (uint32, bool) {
 		return 0, false
 	}
 	return decisionscope.PackWord(kind, id), true
+}
+
+// PackedLine is the range-index letter+decimal id line when this store is memory-backed.
+func (s *DecisionStore) PackedLine(kind, origin string) (string, bool) {
+	if s == nil || s.redisBacked || kind == "" {
+		return "", false
+	}
+	id, ok := s.Intern(origin)
+	if !ok {
+		return "", false
+	}
+	return decisionscope.PackedRemediationLine(kind, id), true
 }

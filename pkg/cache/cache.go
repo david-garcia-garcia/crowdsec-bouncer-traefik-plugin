@@ -77,6 +77,7 @@ func (lc *localCache) getInt(key string) (uint32, error) {
 	return 0, errors.New(CacheMiss)
 }
 
+// setInt stores a machine word in the TTL map (not a leftover string).
 func (lc *localCache) setInt(key string, value uint32, duration int64) {
 	lc.heap().Set(key, value, duration)
 }
@@ -180,6 +181,7 @@ func (rc *redisCache) getInt(key string) (uint32, error) {
 	return uint32(parsed), nil
 }
 
+// setInt stores the word as decimal ASCII so Redis stays string-only.
 func (rc *redisCache) setInt(key string, value uint32, duration int64) {
 	rc.set(key, strconv.FormatUint(uint64(value), 10), duration)
 }

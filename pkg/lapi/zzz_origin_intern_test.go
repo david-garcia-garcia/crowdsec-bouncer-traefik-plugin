@@ -43,7 +43,7 @@ func TestDecisionStorePackMemory(t *testing.T) {
 
 func TestDecisionStorePackMemorySkippedOnRedis(t *testing.T) {
 	store := newTestInternStore()
-	store.redis = true
+	store.redisBacked = true
 	if _, ok := store.PackMemory(decisionscope.BannedValue, "crowdsec"); ok {
 		t.Fatal("redis must keep leftover")
 	}
@@ -94,5 +94,29 @@ func TestRememberActiveDecisionForgetCompactSlot(t *testing.T) {
 		if item["name"] == "active_decisions" {
 			t.Fatalf("forgot slot still posted %#v", item)
 		}
+	}
+}
+
+func TestStorePackedOrLeftoverOverflowUsesLeftover(t *testing.T) {
+	cacheClient := &cache.Client{}
+	cacheClient.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
+	store := newTestInternStore()
+	store.cache = cacheClient
+	names := make([]string, 65536)
+	names[0] = ""
+	for i := 1; i < 65536; i++ {
+		names[i] = "filled"
+	}
+	store.internNames.Store(names)
+	client := &Client{cacheClient: cacheClient, decisionStore: store, log: logger.New("ERROR", "")}
+	client.storeStreamDecision(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.99", Origin: "overflow-origin"}, 60)
+	slot := decisionscope.IPCacheKey("203.0.113.99")
+	if _, err := cacheClient.GetInt(slot); err == nil || err.Error() != cache.CacheMiss {
+		t.Fatalf("GetInt leftover got %v, want cache:miss", err)
+	}
+	got, err := cacheClient.Get(slot)
+	want := decisionscope.RemediationWithOrigin(decisionscope.BannedValue, "overflow-origin")
+	if err != nil || got != want {
+		t.Fatalf("leftover %q err %v, want %q", got, err, want)
 	}
 }

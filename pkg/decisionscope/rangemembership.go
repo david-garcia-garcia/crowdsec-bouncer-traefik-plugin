@@ -11,7 +11,7 @@ import (
 type RangeMembership struct {
 	ban          *iplookup.Helper  // CIDRs whose remediation is ban
 	captcha      *iplookup.Helper  // CIDRs whose remediation is captcha
-	storedByCIDR map[string]string // cidr -> stored letter or letter plus origin suffix
+	storedByCIDR map[string]string // cidr -> leftover letter+origin or packed letter+decimal id
 }
 
 // MembershipFromIndex builds RangeMembership from a cidr=remediation blob. Invalid CIDR lines are skipped.

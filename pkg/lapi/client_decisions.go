@@ -112,9 +112,10 @@ func (c *Client) queryLiveDecisions(rawQuery string) (string, time.Duration, err
 
 // rangeIndexRemediation encodes a packed letter+id line on memory, leftover otherwise.
 func (c *Client) rangeIndexRemediation(kind, origin string) string {
-	if word, ok := c.packMemoryRemediation(kind, origin); ok {
-		_, originID := decisionscope.UnpackWord(word)
-		return decisionscope.PackedRemediationLine(kind, originID)
+	if c != nil && c.decisionStore != nil {
+		if line, ok := c.decisionStore.PackedLine(kind, origin); ok {
+			return line
+		}
 	}
 	return decisionscope.RemediationWithOrigin(kind, origin)
 }
@@ -128,7 +129,7 @@ func (c *Client) storePackedOrLeftover(slot, kind, origin string, duration int64
 	c.cacheClient.Set(slot, decisionscope.RemediationWithOrigin(kind, origin), duration)
 }
 
-// packMemoryRemediation is a thin store forward so tests can intern without calling DecisionStore.
+// packMemoryRemediation forwards pack to the DecisionStore this Client holds.
 func (c *Client) packMemoryRemediation(kind, origin string) (uint32, bool) {
 	if c == nil || c.decisionStore == nil {
 		return 0, false
