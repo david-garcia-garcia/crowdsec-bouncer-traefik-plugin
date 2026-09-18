@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: folded same-network requirement into core_plugin_decisions_scopes; moved change to openspec/changes/archive/2026-09-18-range-index-same-network-match
 skipped: FindSpecHost Task (tool unavailable in worker; ran on this thread)
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: reused PR 98; ready title; waited CI success on 3128c0f (runs 35373879981 and 35373879888); final card on PR summary; PR squash-merged as 3043fbb
+skipped: comments.md absent; no checklist replies; did not open a second PR

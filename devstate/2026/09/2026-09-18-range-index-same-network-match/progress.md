@@ -11,6 +11,6 @@ JobName: 2026-09-18-range-index-same-network-match
 | codereview | [x] | [x] | 2026-09-18T17:11:33Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T17:15:15Z |
 | archive | [x] | [x] | 2026-09-18T17:20:13Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-18T17:27:14Z |
 
-Verdict: in progress
+Verdict: ready for review
