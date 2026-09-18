@@ -8,3 +8,9 @@ verdicts:
   - { deltaId: intra-instance-stream-single-flight, fold|new: new, spec-id: core_plugin_lapi_stream-single-flight, confidence: high, candidates: [core_plugin_lapi_stream-lease, core_plugin_lapi_connection, core_plugin_lapi_stream-single-flight] }
   - { deltaId: ci-race-job, fold|new: new, spec-id: build_ci_github_race-detector, confidence: high, candidates: [build_ci_github_module-path, build_ci_github_race-detector] }
 ```
+
+```
+verdicts (archive FindSpecHost):
+  - { deltaId: core_plugin_lapi_stream-single-flight, fold|new: new, spec-id: core_plugin_lapi_stream-single-flight, confidence: high, candidates: [core_plugin_lapi_stream-lease, core_plugin_lapi_connection, core_plugin_lapi_stream-single-flight] }
+  - { deltaId: build_ci_github_race-detector, fold|new: new, spec-id: build_ci_github_race-detector, confidence: high, candidates: [build_ci_github_module-path, build_ci_github_race-detector] }
+```
