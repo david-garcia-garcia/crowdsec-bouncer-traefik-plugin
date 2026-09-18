@@ -42,6 +42,6 @@ skipped: none
 
 ## pullrequest (2026-09-18)
 phase: pullrequest
-findings: none
-fixed: reused stub PR #74, dropped the WIP title, published the delivery card as the PR summary; all four checks succeeded on e2021c3
-skipped: no PR comments to reply to; PR not merged (owner merges)
+findings: master advanced to 87d1084 (#73) mid-run; merge state clean and #73 adds no new capture site in pkg/lapi. pkg/appsec and pkg/logger still capture into a bare bytes.Buffer, which the new leaf now covers.
+fixed: reused stub PR #74, dropped the WIP title, published the delivery card as the PR summary; wrote knowledge/debt/2026-09-18-test-log-sink-outside-pkg-lapi.md with its issues.md row; all four checks succeeded on e2021c3, 6e54beb, and b5ca9de
+skipped: no PR comments to reply to; PR not merged (owner merges); did not sync origin/master into the branch (ticket pinned the base at 389a33b and the merge is clean)
