@@ -5,7 +5,7 @@ JobName: 2026-09-18-cache-accepted-semantics
 | Phase | Work | Card | At |
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-18T18:04:47Z |
-| explore | [x] | [ ] | |
+| explore | [x] | [x] | 2026-09-18T18:09:39Z |
 | propose | [ ] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
