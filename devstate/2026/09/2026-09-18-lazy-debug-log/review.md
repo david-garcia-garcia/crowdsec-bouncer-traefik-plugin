@@ -9,3 +9,9 @@ phase: explore
 findings: none
 fixed: none
 skipped: ticket ns not re-measured; slog research not cloned (stdlib)
+
+## propose (2026-09-18)
+phase: propose
+findings: none
+fixed: none
+skipped: none
