@@ -82,5 +82,5 @@ func SplitStoredRemediation(stored string) (string, string, uint16) {
 	if err != nil {
 		return kind, "", 0
 	}
-	return kind, "", uint16(parsed) //nolint:gosec // G115 ParseUint bitSize 16
+	return kind, "", uint16(parsed)
 }
