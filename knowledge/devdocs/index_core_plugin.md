@@ -53,7 +53,7 @@ description: How this plugin stores replaceable LAPI HTTP+auth on the Client (`c
 ## LAPI query round trip
 priority: normal
 local: core_plugin_lapi_query-round-trip.md
-description: How one CrowdSec LAPI/CAPI exchange renews a token once, releases its body, and names its own failure.
+description: How one CrowdSec LAPI/CAPI exchange encodes the CAPI login body, renews a token once, releases its body, and names its own failure.
 
 ## Captcha gate cookie
 priority: normal
