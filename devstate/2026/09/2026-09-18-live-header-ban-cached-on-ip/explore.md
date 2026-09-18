@@ -53,12 +53,12 @@ Consumed: `knowledge/devdocs/index.md` (no `priority: always`), then `core_plugi
   By: explore
 
 - Q: Fold `core_plugin_decisions_scopes` or open a new spec leaf?
-  Decision: assumed — fold. The leaf already requires Ip keys to be exact-address. Propose confirms via FindSpecHost; do not invent a sibling leaf for this write.
-  By: explore
+  Decision: resolved — fold. FindSpecHost: `{ deltaId: live-ip-slot-holds-ip-query, fold, core_plugin_decisions_scopes, high }`. One added requirement on that leaf. Do not invent a sibling leaf for this write.
+  By: propose
 
 - Q: What product test name lands?
-  Decision: assumed — a dest-style `TestLiveLookup_*` beside `TestLiveLookup_ScopeBanWins` that asserts the IP slot and a second header identity. Do not commit `TestHunt_LiveLookupDoesNotCacheHeaderBanOnIP`.
-  By: explore
+  Decision: resolved — `TestLiveLookup_IPSlotKeepsIPQueryResult` beside `TestLiveLookup_ScopeBanWins`. Assert the IP slot is the IP query result and `LookupCachedRemediation` for the same IP plus a different header does not inherit the header ban. Do not commit `TestHunt_LiveLookupDoesNotCacheHeaderBanOnIP`.
+  By: propose
 
 - Q: When does usage name the IP-slot vs header-slot write?
   Decision: assumed — after the code writes the IP query result (`core_plugin_lapi_connection.md` via implement / devdocsimpact). Explore does not document dest's merged write as the contract.
