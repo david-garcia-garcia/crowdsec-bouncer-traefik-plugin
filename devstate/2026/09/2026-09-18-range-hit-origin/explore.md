@@ -44,8 +44,8 @@ Client address stays `pkg/ip.GetRemoteIP`. This ticket does not reconstruct iden
   By: explore
 
 - Q: Does `Helper.AddCIDR` grow an optional payload, or is a new insert path added?
-  Decision: assumed — new insert path (name TBD at propose). `AddCIDR` stays boolean so `Checker` / `NewHelper` stay a CIDR set. Do not change `IsContained`'s return.
-  By: explore
+  Decision: resolved — `AddCIDRRemediation(cidr, remediation)` stores the string; `ContainedRemediation` reads the longest match. `AddCIDR` / `IsContained` stay boolean.
+  By: propose
 
 - Q: Does `storedByCIDR` remain after the endpoint holds the string?
   Decision: assumed — drop it. Request lookup no longer walks it. Hydrate writes the string onto the node at insert.
