@@ -9,6 +9,9 @@
 - redis
 - traefik-geoblock
 - http
+- hcaptcha
+- recaptcha
+- cloudflare
 
 ## std
 - go

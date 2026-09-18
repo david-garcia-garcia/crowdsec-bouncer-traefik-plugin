@@ -44,3 +44,18 @@ description: Official Go toolchain behavior this product relies on.
 priority: normal
 local: index_ext_http.md
 description: Official HTTP (RFC 9110) field and media-type behavior this product relies on.
+
+## hcaptcha
+priority: normal
+local: index_ext_hcaptcha.md
+description: Official hCaptcha siteverify behavior this product relies on.
+
+## recaptcha
+priority: normal
+local: index_ext_recaptcha.md
+description: Official Google reCAPTCHA siteverify behavior this product relies on.
+
+## cloudflare
+priority: normal
+local: index_ext_cloudflare.md
+description: Official Cloudflare Turnstile siteverify behavior this product relies on.
