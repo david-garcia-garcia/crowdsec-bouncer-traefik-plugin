@@ -49,7 +49,7 @@ func PackWord(kind string, originID uint16) uint32 {
 
 // UnpackWord splits a packed remediation word into kind letter and intern id.
 func UnpackWord(word uint32) (string, uint16) {
-	return string([]byte{byte(word)}), uint16((word >> 8) & 0xffff)
+	return string([]byte{byte(word)}), uint16(word >> 8) //nolint:gosec // G115 packed id is stored in 16 bits
 }
 
 // PackedRemediationLine is a range-index value: letter plus decimal intern id.
@@ -82,5 +82,5 @@ func SplitStoredRemediation(stored string) (string, string, uint16) {
 	if err != nil {
 		return kind, "", 0
 	}
-	return kind, "", uint16(parsed & 0xffff)
+	return kind, "", uint16(parsed) //nolint:gosec // G115 ParseUint bitSize 16
 }

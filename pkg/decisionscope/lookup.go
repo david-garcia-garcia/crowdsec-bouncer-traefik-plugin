@@ -106,7 +106,7 @@ func hitFromPackedWord(word uint32) lookupHit {
 func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16, error) {
 	keys := LookupCacheKeys(remoteIP, scopes)
 	var chosen lookupHit
-	var leftoverKeys []string
+	leftoverKeys := make([]string, 0, len(keys))
 	for _, key := range keys {
 		word, getIntErr := cacheClient.GetInt(key)
 		if getIntErr == nil {

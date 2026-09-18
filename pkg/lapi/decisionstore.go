@@ -110,7 +110,7 @@ func (s *DecisionStore) lookupIntern(name string) (uint16, bool) {
 		if id == 0 || existing != name {
 			continue
 		}
-		return uint16(id & 0xffff), true
+		return uint16(id), true //nolint:gosec // G115 intern snapshot index is capped at 65535
 	}
 	return 0, false
 }
@@ -141,7 +141,7 @@ func (s *DecisionStore) Intern(name string) (uint16, bool) {
 	next := make([]string, len(names)+1)
 	copy(next, names)
 	next[len(names)] = name
-	id := uint16(len(names) & 0xffff)
+	id := uint16(len(names)) //nolint:gosec // G115 overflow returns before append past 65535
 	s.internNames.Store(next)
 	return id, true
 }
