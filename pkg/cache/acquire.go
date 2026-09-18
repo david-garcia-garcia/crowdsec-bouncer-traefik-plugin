@@ -18,9 +18,14 @@ return 0`
 
 // Acquire tries to own key for duration seconds. Redis uses one Eval (EVALSHA, then EVAL on NOSCRIPT).
 // Memory locks around miss+Set. No poller logic. No SetNX wrapper. Caller owns the TTL floor.
+// A non-positive duration takes no lease: in memory it took one that never expired, which stopped
+// that instance polling the stream for good, and a zero one stored nothing so every caller won.
 func (c *Client) Acquire(ctx context.Context, key, value string, duration int64) (bool, error) {
 	if c == nil || c.cache == nil {
 		return false, errors.New(CacheUnreachable)
+	}
+	if duration <= 0 {
+		return false, errors.New(CacheBadTTL)
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -49,6 +54,7 @@ func (rc *redisCache) acquire(ctx context.Context, key, value string, duration i
 	if rc.writer == nil {
 		return false, errors.New(CacheUnreachable)
 	}
+	rc.pin(key)
 	values, err := rc.writer.Eval(
 		ctx,
 		acquireLeaseScript,

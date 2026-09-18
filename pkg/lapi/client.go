@@ -283,8 +283,11 @@ func (c *Client) RangeMembership() *decisionscope.RangeMembership {
 }
 
 // hydrateRangeMembership rebuilds Range membership from the shared blob when the raw string changed.
+// The read is of the authoritative copy because storeRangeMembership memoises what it returns as
+// lastRangeIndex: a stale blob would keep serving the wrong Range trees on every request until the
+// blob next changes, which can be far longer than a replication lag.
 func (c *Client) hydrateRangeMembership() {
-	index, err := c.Cache().Get(decisionscope.RangeIndexKey)
+	index, err := c.Cache().GetConsistent(decisionscope.RangeIndexKey)
 	if err != nil {
 		if err.Error() != cache.CacheMiss {
 			return

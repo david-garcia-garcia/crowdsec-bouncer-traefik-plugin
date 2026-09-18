@@ -83,8 +83,11 @@ func upsertIndexCIDR(index, cidr, remediation string) string {
 }
 
 // readRangeIndex returns the cached range-index blob, or empty on miss or error.
+// ApplyRangeBatch rewrites what this returns, so the read has to be of the authoritative copy: a
+// stale one rebuilds the shared index from an old base and writes that truncated blob back, which
+// drops Range CIDRs for every instance until the next startup=true resync.
 func readRangeIndex(cacheClient *cache.Client) string {
-	index, err := cacheClient.Get(RangeIndexKey)
+	index, err := cacheClient.GetConsistent(RangeIndexKey)
 	if err != nil {
 		return ""
 	}
