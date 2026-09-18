@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: 1 missing-packet
 fixed: produced core_plugin_middleware_config-validation
 skipped: none
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: folded core_plugin_middleware_config-validation; archived reject-empty-captcha-keys
+skipped: Task tool unavailable; FindSpecHost ran on this thread
