@@ -8,7 +8,7 @@ JobName: 2026-09-18-ipv6-zone-id-trusted-hop
 | explore | [x] | [x] | 2026-09-18T14:23:09Z |
 | propose | [x] | [x] | 2026-09-18T14:29:01Z |
 | implement | [x] | [x] | 2026-09-18T14:40:57Z |
-| codereview | [ ] | [ ] | |
+| codereview | [x] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
