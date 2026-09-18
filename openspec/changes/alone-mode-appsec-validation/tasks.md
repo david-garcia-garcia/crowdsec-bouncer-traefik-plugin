@@ -16,5 +16,5 @@
 
 ## 4. Verify
 
-- [ ] 4.1 `go test ./pkg/configuration/ -count=1`
-- [ ] 4.2 `go build ./...`, `go vet ./...`, `go test ./pkg/... -count=1`, `go test . -count=1`
+- [x] 4.1 `go test ./pkg/configuration/ -count=1`
+- [x] 4.2 `go build ./...`, `go vet ./...`, `go test ./pkg/... -count=1`, `go test . -count=1`
