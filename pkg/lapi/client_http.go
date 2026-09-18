@@ -34,6 +34,8 @@ type Login struct {
 }
 
 // loginRequest is the CAPI watchers-login body getToken posts from stored Client credentials.
+//
+//nolint:tagliatelle // CAPI LoginRequest names are machine_id, password, scenarios.
 type loginRequest struct {
 	MachineID string   `json:"machine_id"`
 	Password  string   `json:"password"`
