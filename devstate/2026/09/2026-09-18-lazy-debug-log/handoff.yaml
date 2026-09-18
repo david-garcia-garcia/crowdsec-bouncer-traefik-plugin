@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-lazy-debug-log
+jobName: 2026-09-18-lazy-debug-log
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:2d41ba9783edff316609a81b649c623d9a6157749423057c287e2152717a6652
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr:
+  id: 108
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/108
