@@ -65,3 +65,8 @@ priority: normal
 local: core_plugin_middleware_captcha-routing.md
 description: How handleRemediationServeHTTP routes captcha-kind requests after the gate cookie.
 
+## Captcha siteverify
+priority: normal
+local: core_plugin_middleware_captcha-siteverify.md
+description: How Validate classifies a provider siteverify response as JSON and returns success.
+
