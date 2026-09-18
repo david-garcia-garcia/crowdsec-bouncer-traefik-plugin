@@ -21,3 +21,9 @@ phase: implement
 findings: Main gofmt failure on pkg/cache/zzz_cache_test.go after import rewrite
 fixed: gofmt import order; all retarget-plugin-module-path tasks [x]
 skipped: none; local tests passed; CI Main/Race 35377386877 and e2e 35377387005 succeeded
+
+## codereview (2026-09-18)
+phase: codereview
+findings: P3 1 coverage (job unproven); Main Yaegi exit 2 on 7c109b6 (build 35378563314)
+fixed: 5889a22 added zzz_module_path_test.go TestForkModulePathMatchesManifest
+skipped: none; Race and e2e 35378563305 succeeded
