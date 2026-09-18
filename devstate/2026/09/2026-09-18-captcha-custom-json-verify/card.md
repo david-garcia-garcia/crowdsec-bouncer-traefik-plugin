@@ -1,20 +1,20 @@
-Developer review: in progress — 2026-09-18T18:06:32Z
+Developer review: ready for review — 2026-09-18T18:20:07Z
 
 ## What this changes
-**Operators.** None.
+**Operators.** Optional `captchaCustomValidateBody`: omit/`form` keeps today’s urlencoded siteverify; `json` (custom only) POSTs `application/json` `{"secret","response"}`. CapJS example: `captchaCustomValidateUrl` + `captchaCustomResponse: cap-token` + `json`.
 
 **Admin users.** None.
 
-**Developers.** OpenSpec change `captcha-custom-validate-body` folds custom siteverify request encoding onto `core_plugin_middleware_captcha-siteverify` and `CaptchaCustomValidateBody` tokens onto `core_plugin_middleware_config-validation`. No product apply yet.
+**Developers.** `CaptchaCustomValidateBody` is validated in `validateCaptcha` and stored on `captcha.Client` (sibling of `challengeURL`). Custom+`json` uses `postSiteverify` JSON; form/omit and built-ins stay `PostForm`. Dest `Validate(r)` still has no address, so no `remoteip`. Specs folded on `core_plugin_middleware_captcha-siteverify` and `core_plugin_middleware_config-validation`.
 
-**End users.** None.
+**End users.** A custom CapJS solve that dest re-challenged can now pass: 302 plus `crowdsec_captcha_gate` when the operator sets `json`.
 
 ## Motivation
 Custom captcha already lets an operator name the browser token field and the siteverify URL. Dest always posts that second hop as urlencoded `secret` and `response`. Cap Standalone / CapJS documents the same two fields as a JSON object with `Content-Type: application/json`.
 
 On dest, a custom provider pointed at a CapJS `/<site_key>/siteverify` URL still sends `PostForm`. The provider does not see JSON, so `success` stays false, the gate cookie is not minted, and the client is re-shown the challenge. Form-compatible custom providers (Wicketkeeper) keep working because omit/form is today’s path.
 
-Without the knob, CapJS custom stays unusable on this plugin, and later work has no spec or test for the encoding split.
+Without the knob, CapJS custom stays unusable on this plugin.
 
 ```mermaid
 sequenceDiagram
@@ -29,18 +29,18 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Propose apply-ready; no product apply yet. 5 items remain.
+Implement landed on d7d7602 and CI succeeded. 0 items remain.
 
 Priority: P2 — CapJS custom siteverify fails on dest while form providers still work
-Reviewed head: 4b299f4
+Reviewed head: d7d7602
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI in progress on the propose head; no product apply |
-| CI proof | 3/6 | in progress — [Main Process](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378176157/job/105707774311), [e2e mock](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378176171/job/105707825784) running; [Race detector](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378176157/job/105707774547), [e2e docker](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378176171/job/105707825999) queued |
-| Local tests proof | N/A | `localTests: none` before implement |
+| Overall readiness | 6/6 | CI succeeded; no open PR comments |
+| CI proof | 6/6 | all required checks succeeded on d7d7602 |
+| Local tests proof | N/A | `prHost` remote; CI proof covers it (`localTests: passed`) |
 | Review resolution | 6/6 | OPEN PR #105; no review comments |
 
 ## Verification
@@ -49,8 +49,8 @@ Owner decision: None.
 | Branch | 2026-09-18-captcha-custom-json-verify pushed | `git` / origin |
 | OpenSpec | captcha-custom-validate-body | `openspec/changes/captcha-custom-validate-body/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/105 | pr-host List |
-| CI | in progress on 4b299f4 | GitHub check runs 35378176157 / 35378176171 |
-| Local tests | none | handoff.yaml localTests |
+| CI | Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35379014285/job/105710474593 ; Race detector success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35379014285/job/105710473611 ; e2e (binary + mock LAPI) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35379014280/job/105710593209 ; e2e (docker + pester) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35379014280/job/105710593509 | GitHub check runs |
+| Local tests | passed | handoff.yaml localTests; `go test ./...` |
 | PR comments | no comments | no comments.md; Comment-List empty |
 
 ## Specs
@@ -61,15 +61,16 @@ Owner decision: None.
 None.
 
 ## How this fits together
-Local ticket → branch `2026-09-18-captcha-custom-json-verify` from `origin/master` → stub PR #105 → OpenSpec `captcha-custom-validate-body` apply-ready → CI running on 4b299f4.
+Local ticket → branch `2026-09-18-captcha-custom-json-verify` from `origin/master` → stub PR #105 → OpenSpec `captcha-custom-validate-body` applied → CI green on d7d7602.
 
 ## Decision needed
 None.
 
 ## Before merge
-- [ ] Implement `captchaCustomValidateBody` (`""`/`form` vs `json`) for custom only, with tests and a CapJS README example
+- [x] Implement `captchaCustomValidateBody` (`""`/`form` vs `json`) for custom only, with tests and a CapJS README example
 - [x] OpenSpec change `captcha-custom-validate-body` apply-ready
 - [x] Stub PR #105 opened
+- [x] CI succeeded on d7d7602
 
 ## Findings
 None.
@@ -84,7 +85,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 4b299f41a33849388ce317dfda41dee1a897637c | Card must match the branch you measured |
+| Reviewed head | d7d76027cc01d5f75e58a933d2ed2e17c97a09d9 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -92,16 +93,16 @@ None.
 ### Technical review
 Best possible solution: custom-only `captchaCustomValidateBody` (`""`/`form` keep dest `PostForm`; `json` POSTs official Cap JSON) versus dest `PostForm`-only `Validate`.
 
-Do we have a high-confidence way to reproduce? Yes, dest `Validate` always `PostForm`; CapJS documents JSON siteverify.
+Do we have a high-confidence way to reproduce? Yes — httptest custom+json sees `application/json` `secret`/`response`; dest `Validate(r)` omits `remoteip`.
 
 Is this the best way to solve the issue? Yes — a custom-only encoding knob keeps Wicketkeeper form default and avoids a `trycap` provider.
 
 ### Evidence
 What I checked:
-- dest `Validate(r)` posts urlencoded `secret`+`response` only (`pkg/captcha/captcha.go`, `origin/master` 46a81d0)
-- OpenSpec change `captcha-custom-validate-body` apply-ready (`openspec validate` passed, 4b299f4)
-- FindSpecHost fold: `core_plugin_middleware_captcha-siteverify`, `core_plugin_middleware_config-validation`
-- PR #105 Comment-List empty; CI pending on 4b299f4
+- dest after Sync still `Validate(r)` only; no `remoteip` invented (`pkg/captcha/captcha.go`, origin/master merge already up to date)
+- `go test ./...` passed; golangci-lint on configuration/captcha/bouncer passed
+- CI on d7d7602: Main Process, Race detector, e2e mock, e2e docker all success
+- PR #105 Comment-List empty
 
 ### Rank-up moves
 None.
