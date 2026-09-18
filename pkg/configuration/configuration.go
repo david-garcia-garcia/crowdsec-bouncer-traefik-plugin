@@ -617,6 +617,7 @@ func validateCaptcha(config *Config) error {
 	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider}, config.CaptchaProvider) {
 		return fmt.Errorf("CaptchaProvider: must be one of '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider)
 	}
+	// Accept only empty, form, or json after trim; json is custom-only.
 	validateBody := strings.TrimSpace(config.CaptchaCustomValidateBody)
 	if validateBody != "" && validateBody != CaptchaCustomValidateBodyForm && validateBody != CaptchaCustomValidateBodyJSON {
 		return errors.New("CaptchaCustomValidateBody: must be empty, form, or json")
