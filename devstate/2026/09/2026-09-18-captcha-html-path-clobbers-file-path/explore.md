@@ -83,9 +83,9 @@ No active OpenSpec change. Propose: change name `captcha-html-path-clobbers-file
   By: explore
 
 - Q: How should the regression prove compile and serve, not only the alias assignment?
-  Decision: assumed — after `New`, assert `config.CaptchaFilePath` is the current path. That is the field `ValidateParams` compiles (when provider is set) and `captcha.Client.New` serves. Do not add a captcha ServeHTTP body test.
-  By: explore
+  Decision: resolved — after `New`, assert `config.CaptchaFilePath` is the current path. That is the field `ValidateParams` compiles (when provider is set) and `captcha.Client.New` serves. Do not add a captcha ServeHTTP body test.
+  By: propose
 
 - Q: Which spec leaf hosts the alias SHALL?
-  Decision: assumed — propose folds onto `core_plugin_middleware_bouncer` (`New` alias). Not `core_plugin_middleware_config-validation` (`ValidateParams`). Not a new captcha-path leaf.
-  By: explore
+  Decision: resolved — fold onto `core_plugin_middleware_bouncer` (`New` alias). FindSpecHost: fold, high. Candidates: `core_plugin_middleware_bouncer`, `core_plugin_middleware_config-validation`, `core_plugin_middleware_captcha-routing`, `core_plugin_middleware_captcha-gate`. Not config-validation (`ValidateParams`). Not a new captcha-path leaf.
+  By: propose
