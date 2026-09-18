@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-18T18:24:30Z
+Developer review: ready for review — 2026-09-18T18:38:56Z
 
 ## What this changes
 **Operators.** Optional `captchaCustomValidateBody`: omit/`form` keeps today’s urlencoded siteverify; `json` (custom only) POSTs `application/json` `{"secret","response"}`. CapJS example: `captchaCustomValidateUrl` + `captchaCustomResponse: cap-token` + `json`.
@@ -29,49 +29,45 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Six-axis review applied one Leave a trail comment. CI on e3d44858 is still running. 1 item remains.
+CI on 84a03409 succeeded. 0 items remain.
 
 Priority: P2 — CapJS custom siteverify fails on dest while form providers still work
-Reviewed head: e3d44858
+Reviewed head: 84a03409
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI on the reviewed head is still in progress |
-| CI proof | 3/6 | required checks queued or in progress on e3d44858 |
+| Overall readiness | 6/6 | Checklist empty; CI on the reviewed head succeeded |
+| CI proof | 6/6 | Main Process, Race detector, e2e mock, and e2e docker succeeded on 84a03409 |
 | Local tests proof | N/A | `prHost` remote; CI proof covers it (`localTests: passed`) |
 | Review resolution | 6/6 | OPEN PR #105; no review comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-18-captcha-custom-json-verify pushed | `git` / origin e3d44858 |
-| OpenSpec | captcha-custom-validate-body | `openspec/changes/captcha-custom-validate-body/` |
+| Branch | 2026-09-18-captcha-custom-json-verify pushed | `git` / origin 84a03409 |
+| OpenSpec | captcha-custom-validate-body | `openspec/changes/archive/2026-09-18-captcha-custom-validate-body/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/105 | pr-host List |
-| CI | Main Process queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35379948168/job/105713485282 ; Race detector queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35379948168/job/105713485630 ; e2e (binary + mock LAPI) in_progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35379948087/job/105713484991 ; e2e (docker + pester) in_progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35379948087/job/105713484814 | GitHub check runs on e3d44858 |
+| CI | Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35380886814/job/105716502021 ; Race detector success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35380886814/job/105716502729 ; e2e (binary + mock LAPI) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35380886922/job/105716684393 ; e2e (docker + pester) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35380886922/job/105716684088 | GitHub check runs on 84a03409 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | no comments.md; Comment-List empty |
 
 ## Specs
-- [core_plugin_middleware_captcha-siteverify](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-captcha-custom-json-verify/openspec/changes/captcha-custom-validate-body/proposal.md) — modified
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-captcha-custom-json-verify/openspec/changes/captcha-custom-validate-body/proposal.md) — modified
+- [core_plugin_middleware_captcha-siteverify](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-captcha-custom-json-verify/openspec/changes/archive/2026-09-18-captcha-custom-validate-body/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-captcha-custom-json-verify/openspec/changes/archive/2026-09-18-captcha-custom-validate-body/proposal.md) — modified
 
 ## Follow-up issues
 None.
 
 ## How this fits together
-Local ticket → branch `2026-09-18-captcha-custom-json-verify` from `origin/master` → stub PR #105 → OpenSpec `captcha-custom-validate-body` applied → six-axis review on e3d44858 → CI running.
+Local ticket → branch `2026-09-18-captcha-custom-json-verify` from `origin/master` → PR #105 → OpenSpec `captcha-custom-validate-body` archived → CI succeeded on 84a03409.
 
 ## Decision needed
 None.
 
 ## Before merge
-- [ ] CI on e3d44858 (queued / in progress)
-- [x] Six-axis review (1 hard Leave a trail applied at 01596af9)
-- [x] Implement `captchaCustomValidateBody` (`""`/`form` vs `json`) for custom only, with tests and a CapJS README example
-- [x] OpenSpec change `captcha-custom-validate-body` apply-ready
-- [x] Stub PR #105 opened
+None.
 
 ## Findings
 - [P3] Leave a trail on `validateCaptcha` token-check — FIX — added the missing one-line block comment. Path: `pkg/configuration/configuration.go:620`. Reply none.
@@ -91,7 +87,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | e3d44858e3d05fb8d305962afeb330d1c5b698f1 | Card must match the branch you measured |
+| Reviewed head | 84a0340931b55a281b4777e370692780c2969065 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -107,8 +103,8 @@ Is this the best way to solve the issue? Yes — a custom-only encoding knob kee
 What I checked:
 - dest after Sync still `Validate(r)` only; no `remoteip` invented (`pkg/captcha/captcha.go`)
 - six-axis files under the run root; Standards 1 hard applied at 01596af9
-- CI on e3d44858: Main Process queued, Race detector queued, e2e mock in_progress, e2e docker in_progress
-- PR #105 Comment-List empty
+- CI on 84a03409: Main Process success, Race detector success, e2e mock success, e2e docker success
+- PR #105 title ready; Comment-List empty
 
 ### Rank-up moves
 None.

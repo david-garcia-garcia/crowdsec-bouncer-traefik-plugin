@@ -58,3 +58,12 @@ skipped: Task spawn unavailable (FindSpecHost on this thread)
 qualify: qualified-with-gaps
 pr: 105
 ci: Main Process in_progress / Race detector in_progress on fb372d20; e2e not seen
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: reused PR #105; dropped WIP title; waited CI success on 84a03409
+skipped: comments.md absent (pointer none)
+qualify: qualified-with-gaps
+pr: 105
+ci: Main Process / Race detector / e2e mock / e2e docker success on 84a03409

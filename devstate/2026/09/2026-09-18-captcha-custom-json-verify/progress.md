@@ -11,6 +11,6 @@ JobName: 2026-09-18-captcha-custom-json-verify
 | codereview | [x] | [x] | 2026-09-18T18:24:30Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T18:28:05Z |
 | archive | [x] | [x] | 2026-09-18T18:33:21Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-18T18:39:47Z |
 
-Verdict: in progress
+Verdict: ready for review
