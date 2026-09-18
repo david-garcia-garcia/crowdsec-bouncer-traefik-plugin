@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -40,7 +41,7 @@ func TestReportMetricsPluginFailClosedOrigins(t *testing.T) {
 		t.Fatal(err)
 	}
 	found := map[string]bool{}
-	for _, raw := range usageMetricItems(t, *body) {
+	for _, raw := range usageMetricItems(t, body.bytes()) {
 		item := asObject(t, raw)
 		if item["name"] != "dropped" {
 			continue
@@ -65,7 +66,7 @@ func TestIncProcessedReportsWithoutWindowMap(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := map[string]float64{}
-	for _, raw := range usageMetricItems(t, *body) {
+	for _, raw := range usageMetricItems(t, body.bytes()) {
 		item := asObject(t, raw)
 		if item["name"] != "processed" {
 			continue
@@ -88,7 +89,7 @@ func TestReportMetricsOfficialLabels(t *testing.T) {
 	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
-	assertOfficialUsageItems(t, usageMetricItems(t, *body))
+	assertOfficialUsageItems(t, usageMetricItems(t, body.bytes()))
 }
 
 // TestReportMetricsPluginVersion checks usage-metrics JSON version and LAPI User-Agent carry the Client plugin version.
@@ -143,20 +144,42 @@ func TestReportMetricsStartupTimestampStable(t *testing.T) {
 	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
-	if usageStartupTimestamp(t, *body) != started {
-		t.Fatalf("startup %v", usageStartupTimestamp(t, *body))
+	if usageStartupTimestamp(t, body.bytes()) != started {
+		t.Fatalf("startup %v", usageStartupTimestamp(t, body.bytes()))
 	}
 	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
-	if usageStartupTimestamp(t, *body) != started {
+	if usageStartupTimestamp(t, body.bytes()) != started {
 		t.Fatal("startup moved")
 	}
 }
 
-func newUsageMetricsClient(t *testing.T) (*Client, *[]byte) {
+// testMetricsBody is a test-only capture of the usage-metrics POST body.
+// Sleep drains asynchronously, so the mock handler and the test reader must not
+// race on a bare *[]byte (that race is harness-only, not the production stream bug).
+type testMetricsBody struct {
+	mu  sync.Mutex
+	raw []byte
+}
+
+func (b *testMetricsBody) store(raw []byte) {
+	b.mu.Lock()
+	b.raw = append([]byte(nil), raw...)
+	b.mu.Unlock()
+}
+
+func (b *testMetricsBody) bytes() []byte {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	out := make([]byte, len(b.raw))
+	copy(out, b.raw)
+	return out
+}
+
+func newUsageMetricsClient(t *testing.T) (*Client, *testMetricsBody) {
 	t.Helper()
-	gotBody := new([]byte)
+	gotBody := &testMetricsBody{}
 	lapi := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		if req.URL.Path != "/v1/usage-metrics" {
 			t.Errorf("path %s", req.URL.Path)
@@ -166,7 +189,7 @@ func newUsageMetricsClient(t *testing.T) (*Client, *[]byte) {
 			t.Errorf("read body %v", err)
 			return
 		}
-		*gotBody = raw
+		gotBody.store(raw)
 		rw.WriteHeader(http.StatusCreated)
 	}))
 	t.Cleanup(lapi.Close)
@@ -289,8 +312,8 @@ func TestSleepDrainsMetrics(t *testing.T) {
 	client.IncProcessed("ipv4")
 	client.Sleep()
 	waitMetricsBody(t, body)
-	if processedValue(t, *body, "ipv4") != 1 {
-		t.Fatalf("Sleep must POST remaining processed, body=%s", *body)
+	if processedValue(t, body.bytes(), "ipv4") != 1 {
+		t.Fatalf("Sleep must POST remaining processed, body=%s", body.bytes())
 	}
 }
 
@@ -299,8 +322,8 @@ func TestCloseDrainsMetrics(t *testing.T) {
 	client.metricsInterval = 1
 	client.IncProcessed("ipv6")
 	client.Close()
-	if processedValue(t, *body, "ipv6") != 1 {
-		t.Fatalf("Close must POST remaining processed, body=%s", *body)
+	if processedValue(t, body.bytes(), "ipv6") != 1 {
+		t.Fatalf("Close must POST remaining processed, body=%s", body.bytes())
 	}
 }
 
@@ -416,11 +439,11 @@ func TestReportMetricsWindowSurvivesAdoptTransport(t *testing.T) {
 	}
 }
 
-func waitMetricsBody(t *testing.T, body *[]byte) {
+func waitMetricsBody(t *testing.T, body *testMetricsBody) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if len(*body) > 0 {
+		if len(body.bytes()) > 0 {
 			return
 		}
 		time.Sleep(time.Millisecond)
