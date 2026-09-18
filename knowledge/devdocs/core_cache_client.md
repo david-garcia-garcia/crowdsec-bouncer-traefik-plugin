@@ -42,3 +42,5 @@ _ = lapiClient.Cache()
 - A non-positive TTL used to mean two different things. In memory it stored an entry that **never expires**, so a cached ban outlived its decision; on Redis it was rejected outright and logged an error per call. Both are now a no-op, which is why the memory backend no longer has a way to write a permanent entry at all.
 - Real-stack restart cases still need distinct `X-Forwarded-For` per TTL, because an Ip key is still the client IP inside one store. Header-scope and `range-index` keys are extra keys on the same cache Client.
 - `lapi.Client.Close` / `Sleep` must not Close the shared store.
+- Stream store-write TTL is `int64(duration.Seconds())` with no clamp; a sub-second CrowdSec duration becomes `0`.
+- Live and none writes use `liveCacheTTL` (substitute `defaultDecisionSeconds` when `durationSecond<=0`). Stream must not use `liveCacheTTL`.

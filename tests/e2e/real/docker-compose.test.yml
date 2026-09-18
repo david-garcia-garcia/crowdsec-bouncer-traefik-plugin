@@ -21,7 +21,7 @@ services:
       - "--providers.file.filename=/etc/traefik/dynamic-scopes.yml"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.web.forwardedHeaders.trustedIPs=172.16.0.0/12,192.168.0.0/16,10.0.0.0/8,127.0.0.1/32"
-      - "--experimental.localplugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      - "--experimental.localplugins.bouncer.modulename=github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin"
       - "--experimental.localplugins.geoblock.modulename=github.com/david-garcia-garcia/traefik-geoblock"
       - "--experimental.localplugins.geoblock.settings.useunsafe=true"
     environment:
@@ -34,7 +34,7 @@ services:
       - "./captcha-dummy.html:/e2e-captcha.html:ro"
       - "./ban.html:/e2e-ban.html:ro"
       - "./dynamic-scopes.yml:/etc/traefik/dynamic-scopes.yml:ro"
-      - "../../..:/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      - "../../..:/plugins-local/src/github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin"
       - "./.geoblock:/plugins-local/src/github.com/david-garcia-garcia/traefik-geoblock"
     ports:
       - "8000:80"
@@ -88,7 +88,7 @@ services:
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.updateintervalseconds=5"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.crowdsecmode=none"
-      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.banHtmlFilePath=/ban.html"
+      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.banFilePath=/ban.html"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
@@ -121,7 +121,7 @@ services:
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.updateintervalseconds=5"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.crowdsecmode=none"
-      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaHtmlFilePath=/e2e-captcha.html"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaFilePath=/e2e-captcha.html"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaProvider=custom"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaCustomJsUrl=http://dummy-captcha/dummy.js"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaCustomValidateUrl=http://dummy-captcha/siteverify"
@@ -173,7 +173,7 @@ services:
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.updateintervalseconds=5"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.crowdsecmode=none"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
-      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.banHtmlFilePath=/ban.html"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.banFilePath=/ban.html"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
@@ -312,7 +312,7 @@ services:
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.crowdsecmode=none"
-      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.banhtmlfilepath=/e2e-ban.html"
+      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.banFilePath=/e2e-ban.html"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"

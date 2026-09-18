@@ -16,7 +16,7 @@ import (
 	"strings"
 	"text/template"
 
-	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
+	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
 // Enums for crowdsec mode.
@@ -39,6 +39,10 @@ const (
 	RecaptchaProvider = "recaptcha"
 	TurnstileProvider = "turnstile"
 	CustomProvider    = "custom"
+	// CaptchaCustomValidateBodyForm is urlencoded siteverify secret+response (same as omit).
+	CaptchaCustomValidateBodyForm = "form"
+	// CaptchaCustomValidateBodyJSON is POST application/json secret+response (custom only).
+	CaptchaCustomValidateBodyJSON = "json"
 	// FailureActionPassthrough lets the request continue when LAPI or AppSec is down.
 	FailureActionPassthrough = "passthrough"
 	// FailureActionBan remediates as a ban when LAPI or AppSec is down.
@@ -108,9 +112,7 @@ type Config struct {
 	RedisCachePasswordFile                     string            `json:"redisCachePasswordFile,omitempty"`
 	RedisCacheDatabase                         string            `json:"redisCacheDatabase,omitempty"`
 	RedisCacheUnreachableBlock                 bool              `json:"redisCacheUnreachableBlock,omitempty"`
-	BanHTMLFilePath                            string            `json:"banHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
 	BanFilePath                                string            `json:"banFilePath,omitempty"`
-	CaptchaHTMLFilePath                        string            `json:"captchaHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
 	CaptchaFilePath                            string            `json:"captchaFilePath,omitempty"`
 	CaptchaProvider                            string            `json:"captchaProvider,omitempty"`
 	CaptchaCustomJsURL                         string            `json:"captchaCustomJsUrl,omitempty"`
@@ -118,6 +120,7 @@ type Config struct {
 	CaptchaCustomKey                           string            `json:"captchaCustomKey,omitempty"`
 	CaptchaCustomResponse                      string            `json:"captchaCustomResponse,omitempty"`
 	CaptchaCustomChallengeURL                  string            `json:"captchaCustomChallengeUrl,omitempty"`
+	CaptchaCustomValidateBody                  string            `json:"captchaCustomValidateBody,omitempty"`
 	CaptchaSiteKey                             string            `json:"captchaSiteKey,omitempty"`
 	CaptchaSiteKeyFile                         string            `json:"captchaSiteKeyFile,omitempty"`
 	CaptchaSecretKey                           string            `json:"captchaSecretKey,omitempty"`
@@ -194,6 +197,7 @@ func New() *Config {
 		CaptchaCustomKey:                "",
 		CaptchaCustomResponse:           "",
 		CaptchaCustomChallengeURL:       "",
+		CaptchaCustomValidateBody:       "",
 		CaptchaSiteKey:                  "",
 		CaptchaSecretKey:                "",
 		CaptchaGateBindIP:               true,
@@ -323,8 +327,11 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		return err
 	}
 
-	if _, err := GetVariable(config, "RedisCachePassword"); err != nil {
-		return err
+	// Redis password file is unused when Redis is off; skip Stat/read so leftovers do not fail startup.
+	if config.RedisCacheEnabled {
+		if _, err := GetVariable(config, "RedisCachePassword"); err != nil {
+			return err
+		}
 	}
 
 	if err := validateCaptchaCredentialsAndTemplates(config); err != nil {
@@ -339,7 +346,14 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 			return err
 		}
 	} else {
-		if err := validateLapiAndAppsecConnection(config); err != nil {
+		if err := validateLapiURLAndKeys(config); err != nil {
+			return err
+		}
+	}
+
+	// AppSec URL, key file, and HTTPS CA only when this router will open AppSec.
+	if config.CrowdsecAppsecEnabled {
+		if err := validateAppsecURLKeyAndTLS(config); err != nil {
 			return err
 		}
 	}
@@ -415,21 +429,24 @@ func validateEnabledCaptchaSettings(config *Config) error {
 	return nil
 }
 
+// validateCaptchaCredentials resolves site and secret keys and rejects an empty
+// trimmed value for each field independently, site first. Lookup errors stay.
 func validateCaptchaCredentials(config *Config) error {
-	if _, err := GetVariable(config, "CaptchaSiteKey"); err != nil {
+	siteKey, err := GetVariable(config, "CaptchaSiteKey")
+	if err != nil {
 		return err
 	}
-	if _, err := GetVariable(config, "CaptchaSecretKey"); err != nil {
+	if siteKey == "" {
+		return errors.New("CaptchaSiteKey: cannot be empty when CaptchaProvider is set")
+	}
+	secretKey, err := GetVariable(config, "CaptchaSecretKey")
+	if err != nil {
 		return err
+	}
+	if secretKey == "" {
+		return errors.New("CaptchaSecretKey: cannot be empty when CaptchaProvider is set")
 	}
 	return nil
-}
-
-func validateLapiAndAppsecConnection(config *Config) error {
-	if err := validateLapiURLAndKeys(config); err != nil {
-		return err
-	}
-	return validateAppsecURLKeyAndTLS(config)
 }
 
 func validateLapiURLAndKeys(config *Config) error {
@@ -468,9 +485,16 @@ func validateLapiURLAndKeys(config *Config) error {
 	return nil
 }
 
+// validateAppsecURLKeyAndTLS checks the AppSec listener URL, optional key, and HTTPS CA.
 func validateAppsecURLKeyAndTLS(config *Config) error {
 	appsecScheme := effectiveAppsecScheme(config)
 	if err := validateURL("CrowdsecAppsec", appsecScheme, config.CrowdsecAppsecHost, config.CrowdsecAppsecPath); err != nil {
+		return err
+	}
+
+	// Enabled AppSec needs a listener host. validateURL only asks NewRequest to
+	// accept scheme://host/path, so an empty host (http:///) still returns nil.
+	if err := rejectMissingEnabledAppsecHost(config, appsecScheme); err != nil {
 		return err
 	}
 
@@ -489,6 +513,22 @@ func validateAppsecURLKeyAndTLS(config *Config) error {
 		if err = validateParamsTLS(config, "CrowdsecAppsec"); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// rejectMissingEnabledAppsecHost fails when AppSec is on and the listener host is missing.
+func rejectMissingEnabledAppsecHost(config *Config, appsecScheme string) error {
+	if !config.CrowdsecAppsecEnabled {
+		return nil
+	}
+	appsecURL := url.URL{Scheme: appsecScheme, Host: config.CrowdsecAppsecHost, Path: config.CrowdsecAppsecPath}
+	appsecReq, err := http.NewRequest(http.MethodGet, appsecURL.String(), nil)
+	if err != nil {
+		return fmt.Errorf("CrowdsecLapiScheme://CrowdsecAppsecHost: '%v://%v%v' must be a valid URL", appsecScheme, config.CrowdsecAppsecHost, config.CrowdsecAppsecPath)
+	}
+	if config.CrowdsecAppsecHost == "" || appsecReq.URL.Host == "" {
+		return errors.New("CrowdsecAppsecHost: cannot be empty when CrowdsecAppsecEnabled is true")
 	}
 	return nil
 }
@@ -574,6 +614,14 @@ func validateParamsIPs(log *slog.Logger, listIP []string, key string) error {
 func validateCaptcha(config *Config) error {
 	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider}, config.CaptchaProvider) {
 		return fmt.Errorf("CaptchaProvider: must be one of '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider)
+	}
+	// Accept only empty, form, or json after trim; json is custom-only.
+	validateBody := strings.TrimSpace(config.CaptchaCustomValidateBody)
+	if validateBody != "" && validateBody != CaptchaCustomValidateBodyForm && validateBody != CaptchaCustomValidateBodyJSON {
+		return errors.New("CaptchaCustomValidateBody: must be empty, form, or json")
+	}
+	if validateBody == CaptchaCustomValidateBodyJSON && config.CaptchaProvider != CustomProvider {
+		return errors.New("CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom")
 	}
 	if config.CaptchaProvider == CustomProvider {
 		if config.CaptchaCustomKey == "" || config.CaptchaCustomResponse == "" || config.CaptchaCustomValidateURL == "" || config.CaptchaCustomJsURL == "" {

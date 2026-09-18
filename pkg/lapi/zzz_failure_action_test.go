@@ -2,6 +2,7 @@ package lapi
 
 import (
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -9,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
-	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // newTestLiveClient builds a live-mode Client that queries the mock LAPI behind server.
@@ -152,6 +153,48 @@ func TestLiveLookup_ScopeBanWins(t *testing.T) {
 	}
 	if !decisionscope.IsActiveRemediation(value) {
 		t.Fatalf("scope ban value %q, want an active remediation", value)
+	}
+}
+
+// TestLiveLookup_IPSlotKeepsIPQueryResult is the header-only-ban write: the IP key stays the
+// clean ?ip= result so a later Country DE lookup does not inherit the FR ban.
+func TestLiveLookup_IPSlotKeepsIPQueryResult(t *testing.T) {
+	client := newTestLiveClient(t, testLiveScopeLAPI(t, "null", map[string]string{
+		"country": testLiveBanBody("country", "FR"),
+	}))
+	value, err := client.LiveLookup("1.2.3.4", map[string]string{"country": "FR"}, 60)
+	if err == nil {
+		t.Fatal("a ban is reported with the overloaded banned error")
+	}
+	if !decisionscope.IsActiveRemediation(value) {
+		t.Fatalf("merged lookup value %q, want an active remediation", value)
+	}
+	ipStored, ipErr := client.cacheClient.Get("1.2.3.4")
+	if ipErr != nil {
+		t.Fatalf("clean IP query must write the none payload on the IP key: %v", ipErr)
+	}
+	if ipStored != decisionscope.NoBannedValue {
+		t.Fatalf("IP key %q, want %q", ipStored, decisionscope.NoBannedValue)
+	}
+	headerStored, headerErr := client.cacheClient.Get(decisionscope.HeaderScopeKey("country", "FR"))
+	if headerErr != nil {
+		t.Fatalf("Country FR must stay on HeaderScopeKey: %v", headerErr)
+	}
+	if !decisionscope.IsActiveRemediation(headerStored) {
+		t.Fatalf("Country header key %q, want an active remediation", headerStored)
+	}
+	kind, _, lookupErr := decisionscope.LookupCachedRemediation(
+		client.cacheClient,
+		"1.2.3.4",
+		net.ParseIP("1.2.3.4"),
+		map[string]string{decisionscope.ScopeCountry: "DE"},
+		nil,
+	)
+	if lookupErr != nil {
+		t.Fatalf("later Country DE lookup: %v", lookupErr)
+	}
+	if decisionscope.IsActiveRemediation(kind) {
+		t.Fatalf("later Country DE inherited an active remediation %q", kind)
 	}
 }
 

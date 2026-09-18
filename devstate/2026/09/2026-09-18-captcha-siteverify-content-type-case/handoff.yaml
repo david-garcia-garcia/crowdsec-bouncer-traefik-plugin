@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-captcha-siteverify-content-type-case
+jobName: 2026-09-18-captcha-siteverify-content-type-case
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:31a7192bd4fc1e9a4b0786261a59ee7c973e8cbb171398fefa6a7f057c76490d
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: captcha-siteverify-content-type-case
+pr:
+  id: 94
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/94

@@ -141,3 +141,33 @@ are for.
 - **WHEN** the writer holds a Range index with an existing CIDR, the read host has not received it,
   and `ApplyRangeBatch` adds a second CIDR
 - **THEN** the index on the writer holds both CIDRs
+
+### Requirement: Unpinned Get uses nextReader only
+When Redis read hosts are set, Get and GetMany for a key that is **not** inside the pin window SHALL call `nextReader` only. A miss or replica error MUST NOT be retried on the writer. When the reader list is empty, `nextReader` SHALL return the writer.
+
+#### Scenario: Replica miss is not retried on the writer
+- **WHEN** Redis has one or more read hosts, the key is not pinned, and Get on the selected reader returns miss
+- **THEN** Get returns `cache:miss`
+- **AND** the writer is not called for that Get
+
+#### Scenario: Replica unreachable is not retried on the writer
+- **WHEN** Redis has one or more read hosts, the key is not pinned, and Get on the selected reader is unreachable
+- **THEN** Get returns `cache:unreachable`
+- **AND** the writer is not called for that Get
+
+### Requirement: Set and Delete are void
+`cache.Client` Set and Delete SHALL return no error. Redis Set and Delete SHALL use the writer, log a Redis error, and return. The cache interface Set and Delete MUST NOT grow an error return. Stream and live callers MUST NOT fail closed on a write miss.
+
+#### Scenario: Redis Set error is logged and discarded
+- **WHEN** Redis Set on the writer fails
+- **THEN** the error is logged
+- **AND** `Client.Set` returns without an error value
+
+### Requirement: Redis SET EX uses the duration as given
+When Redis Set runs, it SHALL send `SET EX` with the duration integer as given. The cache MUST NOT omit `EX` or clamp the duration. Which durations reach Redis Set is owned by `core_cache_client_write-lifetime`: a non-positive `Client.Set` duration is a no-op and MUST NOT reach the writer. Stream write TTL is owned by `core_cache_client_decision-store` (`int64` of CrowdSec seconds, no clamp).
+
+#### Scenario: A positive Redis Set sends EX as given
+- **WHEN** Redis `Client.Set` is called with a positive duration
+- **THEN** the writer sends `SET` with `EX` equal to that duration
+- **AND** `EX` is not omitted
+

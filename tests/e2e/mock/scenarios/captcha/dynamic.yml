@@ -35,5 +35,5 @@ http:
           captchaGateSecret: "e2e-mock-captcha-gate-secret"
           captchaGateBindIp: true
           logLevel: DEBUG
-          captchaHtmlFilePath: "@@SCENARIO_DIR@@/captcha.html"
+          captchaFilePath: "@@SCENARIO_DIR@@/captcha.html"
           captchaGracePeriodSeconds: "10"

@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/iplookup"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/iplookup"
 )
 
 // Checker allows to check that addresses are in a trusted IPs.
@@ -26,7 +26,7 @@ func NewChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
 		ipMask := strings.TrimSpace(ipMaskRaw)
 		// Bare addresses enter the tree as a host prefix.
 		if ipAddr := net.ParseIP(ipMask); ipAddr != nil {
-			if err := trustedCIDRs.AddCIDR(hostCIDR(ipAddr)); err != nil {
+			if err := trustedCIDRs.AddCIDR(HostCIDR(ipAddr)); err != nil {
 				return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipMask, err)
 			}
 			log.Debug(fmt.Sprintf("IP %v is trusted", ipAddr))
@@ -72,8 +72,8 @@ func (ip *Checker) ContainsIP(addr net.IP) bool {
 	return found
 }
 
-// hostCIDR formats a bare address as a host prefix for the lookup helper.
-func hostCIDR(addr net.IP) string {
+// HostCIDR formats a bare address as a host prefix for the lookup helper.
+func HostCIDR(addr net.IP) string {
 	if v4 := addr.To4(); v4 != nil {
 		return v4.String() + "/32"
 	}
@@ -81,7 +81,13 @@ func hostCIDR(addr net.IP) string {
 }
 
 // parseIP parses a dotted or compact address string into net.IP.
+// An IPv6 zone (last % after a colon) is stripped first so membership and the
+// yielded net.IP use the zone-free address. Brackets and IPv4 with % stay errors.
 func parseIP(addr string) (net.IP, error) {
+	// Cut RFC 4007 zone so net.ParseIP sees only the address.
+	if zoneSep := strings.LastIndex(addr, "%"); zoneSep >= 0 && strings.Contains(addr[:zoneSep], ":") {
+		addr = addr[:zoneSep]
+	}
 	userIP := net.ParseIP(addr)
 	if userIP == nil {
 		return nil, fmt.Errorf("parseIP:parseAddress %s", addr)

@@ -114,6 +114,7 @@ type redisCache struct {
 	pinWindow time.Duration
 }
 
+// nextReader returns the writer when readers is empty; otherwise a replica only.
 func (rc *redisCache) nextReader() *simpleredis.SimpleRedis {
 	n := len(rc.readers)
 	if n == 0 {
@@ -192,6 +193,8 @@ func (rc *redisCache) window() time.Duration {
 	return writerPinWindow
 }
 
+// get reads one selected host only (readerFor: writer while pinned, otherwise nextReader); a miss
+// or replica error is not retried on the writer.
 func (rc *redisCache) get(key string) (string, error) {
 	return rc.getFrom(rc.readerFor([]string{key}), key)
 }
@@ -250,6 +253,7 @@ func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
 	return out, nil
 }
 
+// set writes the writer, logs a Redis error, and returns; Set is void.
 func (rc *redisCache) set(key, value string, duration int64) {
 	rc.pin(key)
 	if err := rc.writer.Set(context.Background(), prefixed(rc.prefix, key), []byte(value), duration); err != nil {

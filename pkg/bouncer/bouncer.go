@@ -10,13 +10,13 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec"
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
-	captcha "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
-	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
-	ip "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
+	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	captcha "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
+	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 )
 
 // Bouncer is one Traefik router handler. It is not the reclaim value.
@@ -114,6 +114,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		config.CaptchaCustomKey,
 		config.CaptchaCustomResponse,
 		config.CaptchaCustomValidateURL,
+		config.CaptchaCustomValidateBody,
 		config.CaptchaSiteKey,
 		config.CaptchaSecretKey,
 		captchaGateSecret,
@@ -175,6 +176,8 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechTrustIPFail)
 		return
 	}
+	// Lookup, live memo, and captcha bind share this spelling. GetRemoteIP still returned the raw text.
+	req.remoteIP = req.ipAddr.String()
 	isTrusted := b.clientPoolStrategy.Checker.ContainsIP(req.ipAddr)
 	b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", req.remoteIP, isTrusted))
 	if isTrusted {

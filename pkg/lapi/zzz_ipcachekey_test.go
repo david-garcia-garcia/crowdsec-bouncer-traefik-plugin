@@ -8,9 +8,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
-	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // Spellings of one address. CrowdSec was measured to store a decision value verbatim, so all of
@@ -24,10 +24,14 @@ const (
 	bareV4       = "192.0.2.4"
 )
 
-// lookupAsRequest reads the decision cache exactly the way the request path does: the raw client
-// address text plus the net.IP pkg/ip already parsed from it.
+// lookupAsRequest reads the decision cache the way ServeHTTP does after a successful parse:
+// remoteIP is already ipAddr.String().
 func lookupAsRequest(client *Client, remoteIP string) (string, error) {
-	value, _, err := decisionscope.LookupCachedRemediation(client.Cache(), remoteIP, net.ParseIP(remoteIP), nil, nil)
+	ipAddr := net.ParseIP(remoteIP)
+	if ipAddr != nil {
+		remoteIP = ipAddr.String()
+	}
+	value, _, err := decisionscope.LookupCachedRemediation(client.Cache(), remoteIP, ipAddr, nil, nil)
 	return value, err
 }
 
@@ -109,10 +113,14 @@ func liveRequests(t *testing.T, addresses []string) int64 {
 	server, hits := countingLiveLAPI(t, "null")
 	client := newTestLiveClient(t, server)
 	for _, address := range addresses {
-		if _, err := lookupAsRequest(client, address); err == nil {
+		canonical := address
+		if ipAddr := net.ParseIP(address); ipAddr != nil {
+			canonical = ipAddr.String()
+		}
+		if _, err := lookupAsRequest(client, canonical); err == nil {
 			continue
 		}
-		if _, err := client.LiveLookup(address, nil, 60); err != nil {
+		if _, err := client.LiveLookup(canonical, nil, 60); err != nil {
 			t.Fatalf("live lookup %q: %v", address, err)
 		}
 	}

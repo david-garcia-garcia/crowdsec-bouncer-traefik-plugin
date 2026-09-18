@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-range-bare-ip-host-prefix
+jobName: 2026-09-18-range-bare-ip-host-prefix
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:29f7126fd5a85ddea07b447738bc30af44418af49730be64b5209af70268a6b3
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: range-bare-ip-host-prefix
+pr:
+  id: 93
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/93
