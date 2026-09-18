@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: none (usage already updated in apply)
 fixed: none
 skipped: none
+
+## archive (2026-09-18)
+phase: archive
+findings: synced both folds then moved to archive/2026-09-18-store-range-remediation-on-radix
+fixed: none
+skipped: none

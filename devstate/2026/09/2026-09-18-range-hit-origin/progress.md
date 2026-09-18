@@ -10,5 +10,5 @@ JobName: 2026-09-18-range-hit-origin
 | implement | [x] | [x] | 2026-09-18T18:12:02Z |
 | codereview | [x] | [x] | 2026-09-18T18:15:37Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T18:16:30Z |
-| archive | [ ] | [ ] | |
+| archive | [x] | [x] | 2026-09-18T18:20:00Z |
 | pullrequest | [ ] | [ ] | |
