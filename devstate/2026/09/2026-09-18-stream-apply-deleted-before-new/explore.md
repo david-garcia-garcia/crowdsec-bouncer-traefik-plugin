@@ -46,9 +46,9 @@ This work does not reconstruct client address, user, tenant, Host, or trust hop.
   By: explore
 
 - Q: Do the IP/Range regressions land in `zzz_client_stream_test.go` or a new `zzz_` file?
-  Decision: assumed — same file; package already has `newTestRangeClient` / `newTestStreamPoller` and `std_go_test_zzz-prefix` is satisfied.
-  By: explore
+  Decision: resolved — same file; `TestHunt_StreamAppliesDeletedBeforeNew` and `TestHunt_StreamRangeAppliesDeletedBeforeNew`.
+  By: implement
 
 - Q: Should `ApplyRangeBatch` change internal order, or should stream call it twice?
-  Decision: assumed — change internal order (removals then upserts). One-sided `AddRange` / `RemoveRange` call sites stay equivalent.
-  By: explore
+  Decision: resolved — removals then upserts inside one `ApplyRangeBatch`. One-sided `AddRange` / `RemoveRange` stay equivalent.
+  By: implement
