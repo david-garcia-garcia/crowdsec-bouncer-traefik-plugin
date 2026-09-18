@@ -42,3 +42,11 @@ fixed: produced knowledge/devdocs/core_plugin_middleware_config-validation.md
 skipped: none
 verdict: in progress
 ci: succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35358352875
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: folded ADDED Redis password-file requirement onto core_plugin_middleware_config-validation; moved change to openspec/changes/archive/2026-09-18-redis-password-only-when-enabled
+skipped: Task spawn unavailable; FindSpecHost in-process
+verdict: in progress
+ci: queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35359372971
