@@ -15,7 +15,8 @@ func newTestDecisionCache() *cache.Client {
 }
 
 func remediationFromRangeIndex(client *cache.Client, remoteIP string) string {
-	return MembershipFromIndex(readRangeIndex(client)).Remediation(net.ParseIP(remoteIP))
+	index, _ := readRangeIndex(client)
+	return MembershipFromIndex(index).Remediation(net.ParseIP(remoteIP))
 }
 
 func TestAddRangeBanWins(t *testing.T) {
@@ -69,7 +70,8 @@ func TestLookupCachedRemediationBanWinsAcrossScopes(t *testing.T) {
 	client := newTestDecisionCache()
 	AddRange(client, "10.0.0.0/8", CaptchaValue, 60)
 	client.Set(HeaderScopeKey(ScopeCountry, "FR"), BannedValue, 60)
-	got, _, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), map[string]string{ScopeCountry: "FR"}, MembershipFromIndex(readRangeIndex(client)))
+	index, _ := readRangeIndex(client)
+	got, _, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), map[string]string{ScopeCountry: "FR"}, MembershipFromIndex(index))
 	if err != nil || got != BannedValue {
 		t.Fatalf("range captcha + country ban got %q %v, want ban", got, err)
 	}
@@ -77,16 +79,29 @@ func TestLookupCachedRemediationBanWinsAcrossScopes(t *testing.T) {
 
 func TestApplyRangeBatchOneWrite(t *testing.T) {
 	client := newTestDecisionCache()
-	ApplyRangeBatch(client, map[string]string{
+	if err := ApplyRangeBatch(client, map[string]string{
 		"10.0.0.0/8":  CaptchaValue,
 		"10.1.0.0/16": BannedValue,
-	}, nil)
+	}, nil); err != nil {
+		t.Fatalf("batch upsert: %v", err)
+	}
 	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != BannedValue {
 		t.Fatalf("batch upsert got %q, want ban", got)
 	}
-	ApplyRangeBatch(client, nil, []string{"10.1.0.0/16"})
+	if err := ApplyRangeBatch(client, nil, []string{"10.1.0.0/16"}); err != nil {
+		t.Fatalf("batch removal: %v", err)
+	}
 	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != CaptchaValue {
 		t.Fatalf("after removal got %q, want captcha from remaining /8", got)
+	}
+}
+
+// TestReadRangeIndexMissIsNotAnError keeps the miss path applying normally: an index that was
+// never written is an empty index, not a read that failed.
+func TestReadRangeIndexMissIsNotAnError(t *testing.T) {
+	index, err := readRangeIndex(newTestDecisionCache())
+	if err != nil || index != "" {
+		t.Fatalf("missing index got %q err %v, want empty and no error", index, err)
 	}
 }
 
@@ -125,8 +140,10 @@ func TestLookupCachedRemediationOriginSuffix(t *testing.T) {
 func TestApplyRangeBatchRoundTripOriginSuffix(t *testing.T) {
 	client := newTestDecisionCache()
 	stored := cache.RemediationWithOrigin(BannedValue, "crowdsec")
-	ApplyRangeBatch(client, map[string]string{"10.0.0.0/8": stored}, nil)
-	index := readRangeIndex(client)
+	if err := ApplyRangeBatch(client, map[string]string{"10.0.0.0/8": stored}, nil); err != nil {
+		t.Fatalf("round-trip apply: %v", err)
+	}
+	index, _ := readRangeIndex(client)
 	if index != "10.0.0.0/8="+stored {
 		t.Fatalf("blob %q", index)
 	}
@@ -148,7 +165,10 @@ func TestLookupCachedRemediationRangeOnlyOrigin(t *testing.T) {
 func TestAddRangeBareIPIsHostPrefix(t *testing.T) {
 	client := newTestDecisionCache()
 	AddRange(client, "192.0.2.1", BannedValue, 60)
-	index := readRangeIndex(client)
+	index, err := readRangeIndex(client)
+	if err != nil {
+		t.Fatalf("read index: %v", err)
+	}
 	if index != "192.0.2.1/32="+BannedValue {
 		t.Fatalf("blob %q", index)
 	}
@@ -163,27 +183,22 @@ func TestAddRangeBareIPIsHostPrefix(t *testing.T) {
 		t.Fatalf("removed bare host still matched: %q", got)
 	}
 	AddRange(client, "2001:db8::1", BannedValue, 60)
-	if got := remediationFromRangeIndex(client, "2001:db8::1"); got != BannedValue {
+	ipv6, err := readRangeIndex(client)
+	if err != nil {
+		t.Fatalf("read ipv6 index: %v", err)
+	}
+	if ipv6 != "2001:db8::1/128="+BannedValue {
+		t.Fatalf("ipv6 blob %q", ipv6)
+	}
+	if got := MembershipFromIndex(ipv6).Remediation(net.ParseIP("2001:db8::1")); got != BannedValue {
 		t.Fatalf("ipv6 bare host got %q", got)
 	}
 }
 
-func TestMembershipFromIndexBareIPIsHostPrefix(t *testing.T) {
+func TestMembershipFromIndexLeftoverBareIPDoesNotRemediate(t *testing.T) {
 	index := "192.0.2.1=" + BannedValue
-	if got := MembershipFromIndex(index).Remediation(net.ParseIP("192.0.2.1")); got != BannedValue {
-		t.Fatalf("stored bare host got %q", got)
-	}
-	if got := MembershipFromIndex(index).Remediation(net.ParseIP("192.0.2.2")); got != "" {
-		t.Fatalf("neighbor got %q", got)
-	}
-}
-
-func TestRemoveRangeDropsPreRewriteBareSpelling(t *testing.T) {
-	client := newTestDecisionCache()
-	client.Set(RangeIndexKey, "192.0.2.1="+BannedValue, 60)
-	RemoveRange(client, "192.0.2.1")
-	if got := remediationFromRangeIndex(client, "192.0.2.1"); got != "" {
-		t.Fatalf("pre-rewrite line still matched: %q", got)
+	if got := MembershipFromIndex(index).Remediation(net.ParseIP("192.0.2.1")); got != "" {
+		t.Fatalf("leftover bare line remediates: %q", got)
 	}
 }
 

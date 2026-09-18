@@ -11,7 +11,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"strings"
 	"text/template"
 	"time"
 
@@ -321,7 +320,9 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	defer func() {
 		_ = res.Body.Close()
 	}()
-	if !strings.HasPrefix(res.Header.Get("Content-Type"), "application/json") {
+	// Classify siteverify as JSON when the type token equals application/json.
+	mediaType, _, err := mime.ParseMediaType(res.Header.Get("Content-Type"))
+	if err != nil || mediaType != "application/json" {
 		c.log.Debug("captcha:Validate responseType:noJson")
 		return false, nil
 	}

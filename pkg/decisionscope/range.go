@@ -26,21 +26,34 @@ func AddRange(cacheClient *cache.Client, cidr, remediation string, _ int64) {
 	if network == "" || !IsActiveRemediation(remediation) {
 		return
 	}
-	ApplyRangeBatch(cacheClient, map[string]string{network: remediation}, nil)
+	_ = ApplyRangeBatch(cacheClient, map[string]string{network: remediation}, nil)
 }
 
 // RemoveRange drops a Range decision from the shared index.
 func RemoveRange(cacheClient *cache.Client, cidr string) {
-	ApplyRangeBatch(cacheClient, nil, []string{strings.TrimSpace(cidr)})
+	_ = ApplyRangeBatch(cacheClient, nil, []string{strings.TrimSpace(cidr)})
 }
 
 // ApplyRangeBatch upserts and removes Range lines with one cache read and one write.
-func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, removals []string) {
+// Removals run first so a CIDR present in both maps remains the replacement.
+// The index is shared by every bouncer on this cache, so a read that did not answer is not an
+// empty index: writing the batch onto an empty base would drop every Range decision this poll
+// did not carry. A read failure returns the error and leaves the stored index alone.
+func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, removals []string) error {
 	if len(upserts) == 0 && len(removals) == 0 {
-		return
+		return nil
 	}
-	index := readRangeIndex(cacheClient)
-	// Bare hosts enter the blob as /32 or /128 so membership can ParseCIDR.
+	index, err := readRangeIndex(cacheClient)
+	if err != nil {
+		return err
+	}
+	for _, cidr := range removals {
+		network := rangeIndexCIDR(cidr)
+		if network == "" {
+			continue
+		}
+		index = removeCIDRFromIndex(index, network)
+	}
 	for cidr, remediation := range upserts {
 		network := rangeIndexCIDR(cidr)
 		if network == "" || !IsActiveRemediation(remediation) {
@@ -48,23 +61,12 @@ func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, remov
 		}
 		index = upsertIndexCIDR(index, network, remediation)
 	}
-	for _, cidr := range removals {
-		// Drop the host-prefix key and the original spelling so a delete of
-		// the LAPI value still clears a pre-rewrite Redis line.
-		trimmed := strings.TrimSpace(cidr)
-		network := rangeIndexCIDR(trimmed)
-		if network != "" {
-			index = removeCIDRFromIndex(index, network)
-		}
-		if trimmed != "" && trimmed != network {
-			index = removeCIDRFromIndex(index, trimmed)
-		}
-	}
 	if index == "" {
 		cacheClient.Delete(RangeIndexKey)
-		return
+		return nil
 	}
 	cacheClient.Set(RangeIndexKey, index, rangeIndexTTL)
+	return nil
 }
 
 // parseIndexLine splits one cidr=remediation line. A missing equals leaves remediation empty.
@@ -106,13 +108,17 @@ func upsertIndexCIDR(index, cidr, remediation string) string {
 	return strings.Join(kept, "\n")
 }
 
-// readRangeIndex returns the cached range-index blob, or empty on miss or error.
-func readRangeIndex(cacheClient *cache.Client) string {
+// readRangeIndex returns the cached range-index blob. A miss is an empty index and no error; every
+// other failure is returned, because the caller cannot tell "no Range decisions" from "no answer".
+func readRangeIndex(cacheClient *cache.Client) (string, error) {
 	index, err := cacheClient.Get(RangeIndexKey)
 	if err != nil {
-		return ""
+		if err.Error() == cache.CacheMiss {
+			return "", nil
+		}
+		return "", err
 	}
-	return index
+	return index, nil
 }
 
 // removeCIDRFromIndex drops every line whose CIDR equals cidr.

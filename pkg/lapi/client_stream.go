@@ -99,7 +99,8 @@ func (c *Client) handleStreamCache() error {
 }
 
 // fetchAndApplyStreamDecisions GETs the CrowdSec stream delta and writes it into the DecisionStore.
-// It does not own the stream lease; handleStreamCache does.
+// It does not own the stream lease; handleStreamCache does. Deleted is applied before New so a
+// same-window replacement for the same IP or CIDR stays active.
 func (c *Client) fetchAndApplyStreamDecisions() error {
 	streamRouteURL := url.URL{
 		Scheme:   c.crowdsecScheme,
@@ -119,6 +120,16 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 	}
 	rangeUpserts := make(map[string]string)
 	var rangeRemovals []string
+	for _, decision := range stream.Deleted {
+		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
+			if cidr := strings.TrimSpace(decision.Value); cidr != "" {
+				rangeRemovals = append(rangeRemovals, cidr)
+				c.forgetActiveDecision("range:" + cidr)
+			}
+			continue
+		}
+		c.deleteStreamDecision(decision)
+	}
 	for _, decision := range stream.New {
 		duration, parseErr := time.ParseDuration(decision.Duration)
 		if parseErr != nil {
@@ -136,17 +147,12 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 		}
 		c.storeStreamDecision(decision, int64(duration.Seconds()))
 	}
-	for _, decision := range stream.Deleted {
-		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
-			if cidr := strings.TrimSpace(decision.Value); cidr != "" {
-				rangeRemovals = append(rangeRemovals, cidr)
-				c.forgetActiveDecision("range:" + cidr)
-			}
-			continue
-		}
-		c.deleteStreamDecision(decision)
+	// A range apply that could not read the shared index is a poll that did not finish. Returning
+	// the error releases the lease, so the next tick retries; because the tick failed,
+	// isCrowdsecStreamStartup is left set and that retry asks for the full set again.
+	if err := decisionscope.ApplyRangeBatch(c.Cache(), rangeUpserts, rangeRemovals); err != nil {
+		return fmt.Errorf("handleStreamCache:rangeIndex %w", err)
 	}
-	decisionscope.ApplyRangeBatch(c.Cache(), rangeUpserts, rangeRemovals)
 	c.hydrateRangeMembership()
 	return nil
 }

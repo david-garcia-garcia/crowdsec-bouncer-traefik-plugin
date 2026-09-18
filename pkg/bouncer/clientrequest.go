@@ -12,5 +12,5 @@ type clientRequest struct {
 	*http.Request
 	ipAddr   net.IP // same address as net.IP; nil when unparseable
 	ipType   string // FamilyOfIP(ipAddr): ipv4, ipv6, or empty
-	remoteIP string // cache, LAPI, AppSec, logs, ban template ClientIP
+	remoteIP string // after parse: ipAddr.String(); before: raw extract for fail logs
 }

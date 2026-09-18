@@ -5,26 +5,26 @@ Startup validation for plugin configuration in `pkg/configuration.ValidateParams
 ## Requirements
 
 ### Requirement: AppSec URL uses effective scheme
-`ValidateParams` SHALL validate the AppSec URL using the effective AppSec scheme: `crowdsecAppsecScheme` when non-empty, otherwise `crowdsecLapiScheme`. It MUST NOT pass `crowdsecLapiScheme` when AppSec has its own scheme.
+`ValidateParams` SHALL validate the AppSec URL using the effective AppSec scheme: `crowdsecAppsecScheme` when non-empty, otherwise `crowdsecLapiScheme`. It MUST NOT pass `crowdsecLapiScheme` when AppSec has its own scheme. This URL check SHALL run only when `crowdsecAppsecEnabled` is true.
 
 #### Scenario: Distinct AppSec HTTPS scheme
-- **WHEN** `crowdsecAppsecScheme` is `https` and `crowdsecLapiScheme` is `http`
+- **WHEN** `crowdsecAppsecEnabled` is true, `crowdsecAppsecScheme` is `https` and `crowdsecLapiScheme` is `http`
 - **THEN** AppSec URL validation uses `https://` format
 - **AND** an invalid AppSec host fails at `ValidateParams`
 
 ### Requirement: AppSec HTTPS CA validated at startup
-When `crowdsecAppsecScheme` is explicitly set to `https` and `crowdsecAppsecTlsInsecureVerify` is false, `ValidateParams` SHALL parse `crowdsecAppsecTlsCertificateAuthority` PEM when provided, rejecting invalid PEM the same way LAPI CA is rejected today.
+When `crowdsecAppsecEnabled` is true, `crowdsecAppsecScheme` is explicitly set to `https`, and `crowdsecAppsecTlsInsecureVerify` is false, `ValidateParams` SHALL parse `crowdsecAppsecTlsCertificateAuthority` PEM when provided, rejecting invalid PEM the same way LAPI CA is rejected today.
 
 #### Scenario: Invalid AppSec CA with LAPI HTTP
-- **WHEN** `crowdsecLapiScheme` is `http`, `crowdsecAppsecScheme` is `https`, and AppSec CA PEM is garbage
+- **WHEN** `crowdsecAppsecEnabled` is true, `crowdsecLapiScheme` is `http`, `crowdsecAppsecScheme` is `https`, and AppSec CA PEM is garbage
 - **THEN** `ValidateParams` returns an error
 
 ### Requirement: Alone mode validates captcha templates and logging
-In `crowdsecMode: alone`, `ValidateParams` SHALL still validate captcha site/secret keys when a captcha provider is configured, captcha/ban template files when paths are set, and log level / writable log file path. It MAY skip LAPI URL, LAPI key, and LAPI TLS checks after CAPI credential validation.
+In `crowdsecMode: alone`, `ValidateParams` SHALL still validate captcha site/secret keys when a captcha provider is configured, captcha/ban template files when paths are set, and log level / writable log file path. It MAY skip LAPI URL, LAPI key, and LAPI TLS checks after CAPI credential validation. Empty site or secret after file-then-field lookup SHALL fail even when `CaptchaGateSecret` is set. When `crowdsecAppsecEnabled` is true, it SHALL still validate AppSec URL, AppSec key, and AppSec HTTPS CA.
 
 #### Scenario: Alone mode missing captcha keys
-- **WHEN** mode is `alone`, failure action is `captcha`, provider is set, and site/secret keys are empty
-- **THEN** `ValidateParams` returns an error
+- **WHEN** mode is `alone`, failure action is `captcha`, provider is set, `CaptchaGateSecret` is set, and site/secret keys are empty
+- **THEN** `ValidateParams` returns an error that names `CaptchaSiteKey` cannot be empty
 
 #### Scenario: Alone mode invalid log level
 - **WHEN** mode is `alone` and log level is not one of DEBUG/INFO/WARN/ERROR
@@ -48,3 +48,69 @@ The configuration package SHALL include unit tests covering: custom captcha prov
 #### Scenario: AppSec captcha without provider rejected
 - **WHEN** `crowdsecAppsecFailureAction` is `captcha` and `captchaProvider` is empty
 - **THEN** `ValidateParams` returns an error
+
+### Requirement: Enabled AppSec requires a listener host
+When `crowdsecAppsecEnabled` is true, `ValidateParams` SHALL reject an empty `crowdsecAppsecHost` and any AppSec URL that `http.NewRequest` accepts only because the host is missing. When `crowdsecAppsecEnabled` is false, `ValidateParams` MUST NOT fail solely because `crowdsecAppsecHost` is empty. Shared LAPI URL validation MUST keep accepting an empty host the same way it does today.
+
+#### Scenario: Enabled AppSec with empty host is rejected
+- **WHEN** `crowdsecAppsecEnabled` is true and `crowdsecAppsecHost` is empty
+- **THEN** `ValidateParams` returns an error
+
+#### Scenario: Disabled AppSec with empty host is accepted
+- **WHEN** `crowdsecAppsecEnabled` is false, `crowdsecAppsecHost` is empty, and the rest of the config is valid
+- **THEN** `ValidateParams` returns nil
+
+### Requirement: Reject empty captcha site and secret after lookup
+When `captchaProvider` is set, `ValidateParams` SHALL resolve `CaptchaSiteKey` and `CaptchaSecretKey` with the same file-then-field lookup used for `CaptchaGateSecret`. After a successful lookup it SHALL reject an empty trimmed string for each field independently, site first. The trigger is a non-empty provider, not a captcha failure action. Error text SHALL be `CaptchaSiteKey: cannot be empty when CaptchaProvider is set` and `CaptchaSecretKey: cannot be empty when CaptchaProvider is set`. A `ValidateParams` failure from this rule SHALL cause `New` to return a nil handler and that error without opening LAPI.
+
+#### Scenario: Provider set with empty site and secret
+- **WHEN** `captchaProvider` is set, `CaptchaGateSecret` is set, and both site and secret resolve empty
+- **THEN** `ValidateParams` returns `CaptchaSiteKey: cannot be empty when CaptchaProvider is set`
+
+#### Scenario: Only site empty
+- **WHEN** `captchaProvider` is set, secret is non-empty, and site resolves empty
+- **THEN** `ValidateParams` returns `CaptchaSiteKey: cannot be empty when CaptchaProvider is set`
+
+#### Scenario: Only secret empty
+- **WHEN** `captchaProvider` is set, site is non-empty, and secret resolves empty
+- **THEN** `ValidateParams` returns `CaptchaSecretKey: cannot be empty when CaptchaProvider is set`
+
+#### Scenario: Whitespace-only site is empty
+- **WHEN** `captchaProvider` is set and site is only whitespace
+- **THEN** `ValidateParams` returns `CaptchaSiteKey: cannot be empty when CaptchaProvider is set`
+
+#### Scenario: Default ban action still rejects empty keys
+- **WHEN** `captchaProvider` is set, failure actions are the default `ban`, and site/secret resolve empty
+- **THEN** `ValidateParams` returns an error that names the empty site key
+
+#### Scenario: New returns no handler
+- **WHEN** `New` is called with `captchaProvider` set, `CaptchaGateSecret` set, and empty site key
+- **THEN** `New` returns a nil handler and an error
+- **AND** it does not open LAPI
+
+### Requirement: AppSec URL key and HTTPS CA validated only when enabled
+When `crowdsecAppsecEnabled` is true, `ValidateParams` SHALL validate AppSec URL (effective scheme), AppSec key file-then-field lookup, and AppSec HTTPS CA PEM (explicit `https` scheme and insecure-verify false) in every `crowdsecMode`. When `crowdsecAppsecEnabled` is false, it MUST NOT validate AppSec host, URL, key, or CA, even if leftover fields are set. Alone mode SHALL still skip LAPI URL, LAPI key, and LAPI TLS after CAPI machine id and password. Live, stream, none, and appsec modes SHALL still validate LAPI. An empty AppSec key after a successful lookup SHALL still pass.
+
+#### Scenario: Alone AppSec on with invalid CA
+- **WHEN** mode is `alone`, CAPI machine id and password are set, `crowdsecAppsecEnabled` is true, `crowdsecAppsecScheme` is `https`, and AppSec CA PEM is garbage
+- **THEN** `ValidateParams` returns an error
+
+#### Scenario: Alone AppSec on with missing key file
+- **WHEN** mode is `alone`, CAPI machine id and password are set, `crowdsecAppsecEnabled` is true, and `crowdsecAppsecKeyFile` names a missing path
+- **THEN** `ValidateParams` returns an error that names `CrowdsecAppsecKey` and an invalid path
+
+#### Scenario: Alone AppSec off leftover CA and key file
+- **WHEN** mode is `alone`, CAPI machine id and password are set, `crowdsecAppsecEnabled` is false, AppSec CA PEM is garbage, and `crowdsecAppsecKeyFile` names a missing path
+- **THEN** `ValidateParams` returns no error
+
+#### Scenario: Live AppSec off leftover CA and key file
+- **WHEN** mode is `live` or `stream`, LAPI is valid, `crowdsecAppsecEnabled` is false, AppSec CA PEM is garbage, and `crowdsecAppsecKeyFile` names a missing path
+- **THEN** `ValidateParams` returns no error
+
+#### Scenario: Live AppSec on with invalid CA
+- **WHEN** mode is `live` or `stream`, LAPI is valid, `crowdsecAppsecEnabled` is true, `crowdsecAppsecScheme` is `https`, and AppSec CA PEM is garbage
+- **THEN** `ValidateParams` returns an error
+
+#### Scenario: Live AppSec on with missing key file
+- **WHEN** mode is `live` or `stream`, LAPI is valid, `crowdsecAppsecEnabled` is true, and `crowdsecAppsecKeyFile` names a missing path
+- **THEN** `ValidateParams` returns an error that names `CrowdsecAppsecKey` and an invalid path

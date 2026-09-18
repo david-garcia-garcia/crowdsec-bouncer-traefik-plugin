@@ -38,8 +38,8 @@ CrowdSec persist already accepts a bare IP or a CIDR on Ip/Range via `csnet.NewR
   By: explore
 
 - Q: Rewrite the blob to `/32` or `/128` on upsert, or only treat a bare IP as a host prefix at membership?
-  Decision: assumed — canonicalize a parseable bare IP to `/32` or `/128` at `ApplyRangeBatch` upsert and remove, and again at `MembershipFromIndex` (already-stored Redis bare keys must still enter the tree, and `storedMatchingPrefix` must `ParseCIDR`). Delete of the original LAPI spelling still drops the line because remove uses the same expansion. Do not canonicalize equivalent CIDRs (`10.1.2.0/8` vs `10.0.0.0/8`).
-  By: explore
+  Decision: resolved — canonicalize a parseable bare IP to `/32` or `/128` at `ApplyRangeBatch` upsert and remove so write and delete pair. Do not call `rangeIndexCIDR` in `MembershipFromIndex` (ParseCIDR-only; a leftover `192.0.2.1=t` line is skipped). Do not dual-remove the original spelling. Do not canonicalize equivalent CIDRs (`10.1.2.0/8` vs `10.0.0.0/8`).
+  By: implement
 
 - Q: Must dest add an explicit host-prefix scenario on the Range spec, or only a regression test?
   Decision: assumed — both. Add one scenario on `core_plugin_decisions_scopes` (a parseable Range host remediates that address as `/32` or `/128`) plus a regression test. Dest already says treat Range `value` as a CIDR; the scenario names the host-prefix case. Garbage values stay skipped.

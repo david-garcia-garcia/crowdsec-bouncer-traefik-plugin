@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-captcha-gate-cookie-secure-forwarded-https
+jobName: 2026-09-18-captcha-gate-cookie-secure-forwarded-https
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:badfec6020f8dc7f32616e3456b7099079093a20b76ecbe1509d336fab83117e
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: captcha-gate-cookie-secure-forwarded-https
+pr:
+  id: 88
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/88

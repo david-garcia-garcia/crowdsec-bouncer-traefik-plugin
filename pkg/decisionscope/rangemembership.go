@@ -25,8 +25,6 @@ func MembershipFromIndex(index string) *RangeMembership {
 	}
 	for _, line := range strings.Split(index, "\n") {
 		network, remediation := parseIndexLine(line)
-		// Already-stored bare hosts enter the tree as /32 or /128.
-		network = rangeIndexCIDR(network)
 		if network == "" || !IsActiveRemediation(remediation) {
 			continue
 		}
