@@ -21,3 +21,9 @@ phase: implement
 findings: none
 fixed: nestif on ValidateParams alone branch — extracted validateAloneCapiAndAppsec
 skipped: no research write; no new usage packet; no new spec folder
+
+## codereview (2026-09-18)
+phase: codereview
+findings: Standards 1 judgement (Duplicated Code: hunt test vs table row)
+fixed: none
+skipped: Standards 1 judgement — hunt name is the ticket proof and the table row is the spec scenario
