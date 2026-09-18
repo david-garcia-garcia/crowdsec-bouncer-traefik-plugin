@@ -18,3 +18,11 @@ fixed: none
 skipped: none
 change: redis-password-only-when-enabled
 specs: modified core_plugin_middleware_config-validation
+
+## implement (2026-09-18)
+phase: implement
+findings: none
+fixed: ValidateParams gates RedisCachePassword on RedisCacheEnabled; Test_ValidateParams_skipsRedisPasswordFileWhenRedisDisabled
+skipped: lapi.Prepare leftover (issues.md note)
+localTests: passed
+ci: succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35356452399

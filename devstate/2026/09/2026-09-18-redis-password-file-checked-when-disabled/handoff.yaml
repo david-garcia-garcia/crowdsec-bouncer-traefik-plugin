@@ -8,7 +8,7 @@ destBranch: master
 qualify: qualified
 src: sha256:49c2d26a23169a645ae145625da114ffa8a3dfd9ecb4b7f2453b8b377f8f2d7b
 comments: none
-localTests: none
+localTests: passed
 requirement: requirement.md
 explore: explore.md
 change: redis-password-only-when-enabled
