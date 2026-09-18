@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
-	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 func testCaptchaClient(t *testing.T, jsURL, challengeURL, validateURL string, httpClient *http.Client) *captcha.Client {

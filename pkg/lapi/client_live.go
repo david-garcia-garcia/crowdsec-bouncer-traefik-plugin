@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
 // LiveLookup queries LAPI for one IP and mapped header scopes (none/live mode).
