@@ -21,3 +21,9 @@ phase: implement
 findings: none
 fixed: gated validateAppsecURLKeyAndTLS on CrowdsecAppsecEnabled in every mode; dropped validateLapiAndAppsecConnection; flipped leftover-CA dest test; added alone/live on-fail and off-leftover cases
 skipped: no Task subagent used; no new spec folder; usage packet deferred to devdocs-impact; no comments.md FIX rows
+
+## codereview (2026-09-18)
+phase: codereview
+findings: none
+fixed: none
+skipped: Task unavailable to nested executor (cursor namespace has no Task); six axis files written in-process from checklists; no hard/missing/wrong to apply
