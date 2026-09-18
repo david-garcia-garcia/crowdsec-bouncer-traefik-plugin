@@ -1,13 +1,13 @@
-Developer review: in progress — 2026-09-18T18:05:19Z
+Developer review: ready for review — 2026-09-18T18:21:40Z
 
 ## What this changes
-**Operators.** None.
+**Operators.** Optional YAML knobs `crowdsecLapiHttpTimeoutSeconds`, `crowdsecAppsecHttpTimeoutSeconds`, and `captchaSiteverifyHttpTimeoutSeconds` inherit `httpTimeoutSeconds` (still default 10). Example: `crowdsecAppsecHttpTimeoutSeconds: 1` with `crowdsecAppsecFailureAction: passthrough`.
 
 **Admin users.** None.
 
-**Developers.** OpenSpec change `split-http-timeouts` is apply-ready: one inherit helper, three knobs, five folded leaves. Product wiring is not applied yet.
+**Developers.** One `Config.EffectiveHTTPTimeoutSeconds` owner; LAPI/AppSec `newTransport` and the captcha siteverify client store effective seconds so Adopt last-writes; timeout stays out of reclaim identity.
 
-**End users.** None.
+**End users.** An AppSec hang can fail open after the AppSec override instead of waiting the shared 10s LAPI budget.
 
 ## Motivation
 On master, one public `httpTimeoutSeconds` (default 10) is the HTTP client Timeout for LAPI stream/live, AppSec Query, and captcha siteverify. An AppSec listener that never answers holds the request for the same ten seconds as a slow LAPI GET. Operators who want AppSec to fail fast (`crowdsecAppsecHttpTimeoutSeconds: 1` plus passthrough) cannot do that without also shortening LAPI.
@@ -26,18 +26,18 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Propose is apply-ready. Product apply is not started. 4 items remain.
+Product apply landed and CI succeeded. 1 item remains.
 
 Priority: P2 — AppSec hang waits the full shared LAPI timeout; workaround is changing the one knob or disabling AppSec
-Reviewed head: a0d2a30
+Reviewed head: 7a4ca08
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Propose done; CI in progress; no product apply |
-| CI proof | 3/6 | Checks queued on a0d2a30 |
-| Local tests proof | N/A | Before implement |
+| Overall readiness | 6/6 | Apply landed; CI succeeded; no open comments |
+| CI proof | 6/6 | Main Process, Race detector, and both e2e jobs succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378926780 |
+| Local tests proof | N/A | Remote PR; CI proof covers it |
 | Review resolution | 6/6 | No OPEN PR comments |
 
 ## Verification
@@ -46,8 +46,8 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-18-split-http-timeouts pushed | `git` / origin |
 | OpenSpec | split-http-timeouts | `openspec/changes/split-http-timeouts/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/104 | pr-host List |
-| CI | build 35378078637 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378078637 | pr-host check runs |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 35378926780 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378926780 | pr-host check runs |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | no comments.md |
 
 ## Specs
@@ -61,7 +61,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local spec on branch `2026-09-18-split-http-timeouts` opened stub PR 104 against master. Propose wrote `split-http-timeouts`. CI in progress.
+Local spec on branch `2026-09-18-split-http-timeouts` opened stub PR 104 against master. Implement wired inheriting timeouts on the existing LAPI, AppSec, and captcha clients. CI succeeded.
 
 ## Decision needed
 | Question | Decision | By |
@@ -70,10 +70,11 @@ Local spec on branch `2026-09-18-split-http-timeouts` opened stub PR 104 against
 | What Go names for the inherit helpers (ticket shorthand `EffectiveLapi` / `EffectiveAppsec` / `EffectiveCaptcha` hides that they return seconds)? | assumed — one `Config.EffectiveHTTPTimeoutSeconds(override int64) int64`. Call sites pass each knob. | explore |
 
 ## Before merge
-- [ ] Add inheriting LAPI, AppSec, and captcha siteverify timeout knobs; wire effective seconds on the existing clients
-- [ ] Keep timeout out of reclaim identity so a timeout-only YAML change Adopts
-- [ ] Document README knobs, including AppSec 1s + passthrough
-- [ ] Tests that fail if wiring still reads raw HTTPTimeoutSeconds
+- [x] Add inheriting LAPI, AppSec, and captcha siteverify timeout knobs; wire effective seconds on the existing clients
+- [x] Keep timeout out of reclaim identity so a timeout-only YAML change Adopts
+- [x] Document README knobs, including AppSec 1s + passthrough
+- [x] Tests that fail if wiring still reads raw HTTPTimeoutSeconds
+- [ ] Six-axis code review of the apply
 
 ## Findings
 None.
@@ -88,7 +89,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 5 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | a0d2a3057cb55b3b56ef9e63bf876a91c84d9e24 | Card must match the branch you measured |
+| Reviewed head | 7a4ca08531651bd6f74ddc756f612a9460930f2e | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -96,18 +97,18 @@ None.
 ### Technical review
 Best possible solution: One `Config.EffectiveHTTPTimeoutSeconds` and store effective seconds on the existing transports so Adopt last-writes; timeout stays out of identity.
 
-Do we have a high-confidence way to reproduce? Yes, dest `newTransport` and bouncer captcha construct read raw `HTTPTimeoutSeconds`; session tests pass that a timeout-only reload Adopts and identity hex stays.
+Do we have a high-confidence way to reproduce? Yes, hanging-listener AppSec Query with override 1s + passthrough returns well under 10s; LAPI adopt and captcha Timeout tests fail if wiring still reads raw `HTTPTimeoutSeconds`.
 
-Is this the best way to solve the issue? Yes — dest already Adopts timeout; the missing piece is per-backend seconds, not a second HTTP stack or identity key.
+Is this the best way to solve the issue? Yes — dest already Adopts timeout; this apply adds per-backend seconds without a second HTTP stack or identity key.
 
 ### Evidence
 What I checked:
-- Dest LAPI/AppSec `newTransport` Timeout from `HTTPTimeoutSeconds` (`pkg/lapi/client_http.go`, `pkg/appsec/client_http.go`, `46a81d0`)
-- Dest captcha siteverify Timeout from the same field (`pkg/bouncer/bouncer.go`)
-- Dest identity omits timeout (`pkg/lapi/identity.go`, `pkg/lapi/session.go`, `pkg/appsec/session.go`)
-- FindSpecHost folded five existing leaves; no new spec id
-- OpenSpec `split-http-timeouts` apply-ready (`openspec status` 4/4)
-- One OPEN PR 104; comment inventory empty; CI queued on `a0d2a30` (build 35378078637)
+- `EffectiveHTTPTimeoutSeconds` inherit/override and `requiredInt0` validation (`pkg/configuration/configuration.go`, `7a4ca08`)
+- LAPI/AppSec `newTransport` store effective seconds (`pkg/lapi/client_http.go`, `pkg/appsec/client_http.go`)
+- Bouncer captcha siteverify Timeout from Effective (`pkg/bouncer/bouncer.go`)
+- Identity owners unchanged (`pkg/lapi/session.go`, `pkg/lapi/identity.go`, `pkg/appsec/session.go`)
+- Local `go test ./...` passed; targeted lint passed
+- One OPEN PR 104; comment inventory empty; CI succeeded on `7a4ca08` (build 35378926780)
 
 ### Rank-up moves
 None.

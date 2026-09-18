@@ -15,3 +15,9 @@ phase: propose
 findings: none
 fixed: n/a
 skipped: n/a
+
+## implement (2026-09-18)
+phase: implement
+findings: none
+fixed: inheriting timeout knobs wired on LAPI, AppSec, and captcha; timeout kept out of identity
+skipped: n/a
