@@ -15,3 +15,9 @@ phase: propose
 findings: none
 fixed: none
 skipped: folded core_plugin_middleware_config-validation; no comments.md; 6 assumed decisions kept
+
+## implement (2026-09-18)
+phase: implement
+findings: none
+fixed: reject empty captcha site/secret after GetVariable; Yaegi-safe New Cleanup
+skipped: no comments.md; GetVariable rename stays noted
