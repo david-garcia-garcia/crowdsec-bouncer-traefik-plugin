@@ -37,3 +37,9 @@ phase: devdocsimpact
 findings: none
 fixed: none
 skipped: none
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: fold core_plugin_decisions_scopes; moved to archive/2026-09-18-canonicalize-client-remoteip
+skipped: none
