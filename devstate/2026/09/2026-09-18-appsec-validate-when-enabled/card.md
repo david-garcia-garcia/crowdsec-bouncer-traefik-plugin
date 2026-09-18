@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-18T16:10:47Z
+Developer review: in progress — 2026-09-18T16:14:53Z
 
 ## What this changes
 **Operators.** None.
 
 **Admin users.** None.
 
-**Developers.** Prepare only: grounded the AppSec-enabled validation gate and opened stub PR #97. Versus `master`, live/stream still always run AppSec URL/key/CA checks; alone still skips that helper after CAPI credentials.
+**Developers.** Explore recorded the enabled-gate decisions on this ticket. Versus `master`, live/stream still always run AppSec URL/key/CA checks; alone still skips that helper after CAPI credentials.
 
 **End users.** None.
 
@@ -29,11 +29,11 @@ flowchart TD
 ```
 
 ## Merge readiness
-Prepare is grounded (`qualified`). The enabled gate is not on this branch yet. 2 items remain.
+Explore is written. The enabled gate is not on this branch yet. 2 items remain.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: eb314db
-Owner decision: None.
+Reviewed head: 7c060e7
+Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -46,10 +46,10 @@ Owner decision: None.
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-18-appsec-validate-when-enabled pushed | `git` `origin/2026-09-18-appsec-validate-when-enabled` at `eb314db` |
+| Branch | 2026-09-18-appsec-validate-when-enabled pushed | `git` `origin/2026-09-18-appsec-validate-when-enabled` at `7c060e7` |
 | OpenSpec | none | `openspec/` unchanged vs `master` |
-| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/97 | pr-host Create |
-| CI | e2e (binary + mock LAPI) in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35366860838/job/105671321416 ; e2e (docker + pester) in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35366860838/job/105671320983 ; Race detector in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35366860809/job/105671320487 ; Main Process in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35366860809/job/105671320194 | pr-host CI |
+| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/97 | pr-host List |
+| CI | e2e (binary + mock LAPI) in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35367283269/job/105672677127 ; e2e (docker + pester) in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35367283269/job/105672677493 ; Race detector in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35367283296/job/105672677937 ; Main Process in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35367283296/job/105672677858 | pr-host CI |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | no `comments.md` |
 
@@ -60,10 +60,17 @@ None.
 None.
 
 ## How this fits together
-Local ticket `2026-09-18-appsec-validate-when-enabled` runs on branch `2026-09-18-appsec-validate-when-enabled` as PR #97. CI has started on the prepare commit.
+Local ticket `2026-09-18-appsec-validate-when-enabled` on branch `2026-09-18-appsec-validate-when-enabled` as PR #97. Explore wrote `explore.md`; product still matches `master`.
 
 ## Decision needed
-None.
+| Question | Decision | By |
+| --- | --- | --- |
+| Do none and appsec modes share the same enabled gate even though the required test list names live/stream/alone? | assumed — yes, all modes. Do not add empty-host (#89) cases. A leftover-CA success under `crowdsecMode: appsec` with AppSec off is allowed if cheap; the existing warn test stays. | explore |
+| Should AppSec CA parse use `effectiveAppsecScheme` (inherit LAPI `https`) instead of explicit `CrowdsecAppsecScheme == https`? | assumed — keep today’s explicit-scheme trigger. Changing inherit-https CA parse would rewrite live/stream validation and is out of scope. | explore |
+| When AppSec is enabled and the key is empty, should `ValidateParams` fail? | assumed — no. Keep the helper’s empty-key pass; `appsec.Prepare` still copies the LAPI key. This ticket only adds the enabled gate around the existing helper. | explore |
+| Should leftover `CrowdsecAppsecFailureAction` / body-limit checks also skip when AppSec is off (Redis leftover-password analog)? | assumed — leave them. Failure-action behavior is out of scope. Dest still always `GetVariable`s `RedisCachePassword`; do not change Redis in this ticket. | explore |
+| Does this change `appsec.Prepare`, reclaim, or `New` process lifetime? | assumed — no. `ValidateParams` is the constructor gate. Runtime AppSec client, reclaim, and failure-action stay out. | explore |
+| Should leftover AppSec fields warn when the knob is false? | assumed — no. Ticket is skip validation, not a new warn. Bound the ask. | explore |
 
 ## Before merge
 - [ ] [P2] Gate `validateAppsecURLKeyAndTLS` on `crowdsecAppsecEnabled` in every mode; keep alone skipping LAPI URL/key/TLS.
@@ -82,23 +89,24 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | eb314db16e611996fee4f8bfd93e9596e286a388 | Card must match the branch you measured |
+| Reviewed head | 7c060e72f6a77d5f2c7e30032effcba4f3aab7fd | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: Not yet — this branch only records the requirement; DestBranch still always validates AppSec in live/stream and skips it in alone.
+Best possible solution: gate `validateAppsecURLKeyAndTLS` on `CrowdsecAppsecEnabled` in every mode; do not reuse declined PR #80’s always-on AppSec checks in alone.
 
-Do we have a high-confidence way to reproduce? Yes, `ValidateParams` table case "AppSec HTTPS with invalid CA while LAPI HTTP" fails on dest with AppSec off; alone + AppSec on + garbage CA is missing and would pass today.
+Do we have a high-confidence way to reproduce? Yes — dest `Test_ValidateParams` case "AppSec HTTPS with invalid CA while LAPI HTTP" still fails with AppSec off (`go test ./pkg/configuration`); alone + AppSec on + garbage CA is missing and would pass today.
 
-Is this the best way to solve the issue? Not applied yet. The constraint that matters is the enabled gate in all modes, not the declined always-on-in-alone approach.
+Is this the best way to solve the issue? Yes versus DestBranch — reuse the existing helper behind the enabled knob; do not invent a second signal or restore PR #80.
 
 ### Evidence
 What I checked:
-- Dest `origin/master` at `e9852e5` has `validateLapiAndAppsecConnection` always calling `validateAppsecURLKeyAndTLS`; alone skips that helper (`git ls-tree`, `pkg/configuration/configuration.go`)
-- OPEN PR #97; comment inventory empty (pr-host)
-- CI: four checks in progress (pr-host check runs)
+- `origin/master...HEAD` product delta empty (`git diff` excluding `devstate/` and `.cursor/`)
+- Dest leftover-CA table case still fails with AppSec off (`go test ./pkg/configuration -run Test_ValidateParams/AppSec_HTTPS_with_invalid_CA_while_LAPI_HTTP`)
+- OPEN PR #97; comment inventory empty (pr-host List)
+- CI on head `7c060e7`: four checks in progress (pr-host check runs)
 
 ### Rank-up moves
 None.
