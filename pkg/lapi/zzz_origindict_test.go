@@ -67,7 +67,7 @@ func TestOriginOverflowStaysOnStringPathAndLogsOnce(t *testing.T) {
 	cacheClient := &cache.Client{}
 	cacheClient.New(log, false, "", nil, "", "", "")
 	store.cache = cacheClient
-	for i := 0; i < maxInternedOrigins; i++ {
+	for i := range maxInternedOrigins {
 		if _, ok := store.InternOrigin("origin-" + strconv.Itoa(i)); !ok {
 			t.Fatalf("fill intern %d", i)
 		}

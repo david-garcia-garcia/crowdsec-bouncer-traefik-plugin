@@ -46,7 +46,7 @@ func (s Stored) PackedOriginID() (uint16, bool) {
 	if s.word == 0 {
 		return 0, false
 	}
-	return uint16(s.word >> 8), true
+	return uint16((s.word >> 8) & 0xFFFF), true //nolint:gosec // G115: origin id is stored in 16 bits
 }
 
 // Kind is the ban/captcha/none letter from the packed word or leftover first letter.

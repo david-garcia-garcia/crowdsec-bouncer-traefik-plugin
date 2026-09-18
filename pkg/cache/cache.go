@@ -279,9 +279,12 @@ func (c *Client) MemoryBackend() bool {
 // SetRemediation stores a packed word in memory ttl_map, or the leftover string.
 func (c *Client) SetRemediation(key string, stored Stored, duration int64) {
 	c.log.Debug(fmt.Sprintf("cache:SetRemediation key:%v duration:%vs", key, duration))
-	if word, packed := stored.PackedWord(); packed && c.MemoryBackend() {
-		c.cache.(*localCache).setValue(key, word, duration)
-		return
+	if word, packed := stored.PackedWord(); packed {
+		lc, ok := c.cache.(*localCache)
+		if ok {
+			lc.setValue(key, word, duration)
+			return
+		}
 	}
 	c.cache.set(key, stored.IndexForm(), duration)
 }
@@ -300,7 +303,10 @@ func (c *Client) GetManyStored(keys []string) (map[string]Stored, error) {
 		}
 		return out, nil
 	}
-	lc := c.cache.(*localCache)
+	lc, ok := c.cache.(*localCache)
+	if !ok {
+		return map[string]Stored{}, nil
+	}
 	out := make(map[string]Stored)
 	for _, key := range keys {
 		if key == "" {

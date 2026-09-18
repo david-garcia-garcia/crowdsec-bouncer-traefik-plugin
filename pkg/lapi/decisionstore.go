@@ -41,7 +41,7 @@ func StoreKey(cfg *configuration.Config) string {
 type DecisionStore struct {
 	cache   *cache.Client
 	log     *slog.Logger
-	origins originDictionary
+	origins *originDictionary
 }
 
 // Cache is the map or Redis pool this store owns.
@@ -54,7 +54,7 @@ func (s *DecisionStore) Cache() *cache.Client {
 
 // InternOrigin assigns or reuses a uint16 id for a MetricsOrigin name on this store.
 func (s *DecisionStore) InternOrigin(name string) (uint16, bool) {
-	if s == nil {
+	if s == nil || s.origins == nil {
 		return 0, false
 	}
 	return s.origins.InternOrigin(name)
@@ -62,7 +62,7 @@ func (s *DecisionStore) InternOrigin(name string) (uint16, bool) {
 
 // OriginName is the interned MetricsOrigin for id, or empty. Lock-free after intern publishes.
 func (s *DecisionStore) OriginName(id uint16) string {
-	if s == nil {
+	if s == nil || s.origins == nil {
 		return ""
 	}
 	return s.origins.OriginName(id)

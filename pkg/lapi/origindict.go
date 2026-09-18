@@ -19,8 +19,8 @@ type originDictionary struct {
 }
 
 // newOriginDictionary is an empty session-scoped table. Not a package var.
-func newOriginDictionary(log *slog.Logger) originDictionary {
-	dict := originDictionary{byName: make(map[string]uint16), log: log}
+func newOriginDictionary(log *slog.Logger) *originDictionary {
+	dict := &originDictionary{byName: make(map[string]uint16), log: log}
 	dict.names.Store([]string{})
 	return dict
 }
@@ -40,7 +40,8 @@ func (d *originDictionary) InternOrigin(name string) (uint16, bool) {
 		d.logOverflow()
 		return 0, false
 	}
-	id := uint16(len(d.byName) + 1)
+	next := len(d.byName) + 1
+	id := uint16(next) //nolint:gosec // G115: next is 1..maxInternedOrigins after the length check
 	d.byName[name] = id
 	previous, _ := d.names.Load().([]string)
 	published := make([]string, len(previous)+1)
