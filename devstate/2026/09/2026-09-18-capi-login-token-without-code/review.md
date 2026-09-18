@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: none
 fixed: none
 skipped: usage already had the Token-after-2xx gotcha; no Language write
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: folded CAPI login Token-after-2xx into core_plugin_lapi_connection; archived change to openspec/changes/archive/2026-09-18-capi-login-token-without-code/
+skipped: no Task subagent (FindSpecHost on this thread); incomplete-artifact/task prompts skipped (all done)
