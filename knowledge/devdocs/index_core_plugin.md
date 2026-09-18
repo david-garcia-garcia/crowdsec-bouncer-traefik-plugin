@@ -5,6 +5,11 @@ priority: normal
 local: core_plugin_middleware.md
 description: How Traefik New reclaims a LAPI Client and an AppSec Client and returns a per-router Bouncer (`core_plugin_middleware_bouncer`).
 
+## Local plugin
+priority: normal
+local: core_plugin_middleware_local-plugin.md
+description: How this unpublished fork is loaded by Traefik (import equals go.mod, localPlugins, no catalog version).
+
 ## Config validation
 priority: normal
 local: core_plugin_middleware_config-validation.md
@@ -78,5 +83,5 @@ description: How handleRemediationServeHTTP routes captcha-kind requests after t
 ## Captcha siteverify
 priority: normal
 local: core_plugin_middleware_captcha-siteverify.md
-description: How Validate classifies a provider siteverify response as JSON and returns success.
+description: How Validate encodes the provider siteverify request and classifies a JSON success reply.
 
