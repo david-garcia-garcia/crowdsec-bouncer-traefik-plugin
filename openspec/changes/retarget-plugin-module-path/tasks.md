@@ -25,5 +25,5 @@
 
 ## 5. Verify
 
-- [ ] 5.1 `go build ./...`, `go vet ./...`, `go test ./pkg/...`, `go test .`
-- [ ] 5.2 Confirm no remaining product-tree load path still names `github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin` except debt/research/archive and `renovate.json`
+- [x] 5.1 `go build ./...`, `go vet ./...`, `go test ./pkg/...`, `go test .`
+- [x] 5.2 Confirm no remaining product-tree load path still names `github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin` except debt/research/archive and `renovate.json`

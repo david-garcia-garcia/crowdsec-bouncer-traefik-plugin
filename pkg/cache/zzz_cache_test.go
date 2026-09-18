@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	simpleredis "github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	simpleredis "github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis"
 )
 
 func Test_Get(t *testing.T) {
