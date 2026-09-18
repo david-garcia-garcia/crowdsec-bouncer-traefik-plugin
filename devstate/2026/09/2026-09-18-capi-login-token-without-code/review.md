@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: folded CAPI login Token-after-2xx into core_plugin_lapi_connection; archived change to openspec/changes/archive/2026-09-18-capi-login-token-without-code/
 skipped: no Task subagent (FindSpecHost on this thread); incomplete-artifact/task prompts skipped (all done)
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: ready title; reused PR 81; CI succeeded on four checks
+skipped: comments.md absent; no replies; gh CLI unauthenticated (CI via GitHub MCP check runs)
