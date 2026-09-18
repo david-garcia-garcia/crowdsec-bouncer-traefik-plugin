@@ -7,7 +7,7 @@ IssueKey: 2026-09-18-lapi-session-test-log-race
 ## Current (code)
 - `TestClient_LifecycleLogs` builds `var logBuf bytes.Buffer`, wraps it in `slog.NewJSONHandler`, and reads `logBuf.String()`. `pkg/lapi/zzz_session_test.go:144` `:155`
 - `TestOpenStream_LiveMetricsMismatchSharesSilently` does the same at `LevelDebug` and constructs a real client through `OpenStream`. `pkg/lapi/zzz_session_test.go:178` `:203`
-    10|- `TestOpenStream_TLSOnlyAdoptsTransport` does the same at `LevelInfo` and constructs a real client through `OpenStream`. `pkg/lapi/zzz_session_test.go:390` `:416`
+- `TestOpenStream_TLSOnlyAdoptsTransport` does the same at `LevelInfo` and constructs a real client through `OpenStream`. `pkg/lapi/zzz_session_test.go:390` `:416`
 - `captureTestStreamTickLog` builds `var buf bytes.Buffer` and returns `buf.String()` after `fn`. `pkg/lapi/zzz_client_stream_log_test.go:38` `:40`
 - `New` starts the metrics work immediately with `go client.handleMetricsTicker()` and then a 1s metrics ticker (`testStreamConfig` passes `metricsInterval` 1). `pkg/lapi/client.go:148` `:149`
 - `handleMetricsTicker` logs at ERROR on a failed POST; `reportMetrics` also logs at DEBUG on every call. `pkg/lapi/client_metrics.go:76` `:265`
@@ -15,7 +15,7 @@ IssueKey: 2026-09-18-lapi-session-test-log-race
 - No test in `pkg/lapi` stops the `Client` it opened: the three `OpenStream` sites above pass `context.Background()`, so only `t.Cleanup(reclaim.ResetForTest)` ends the client, after the assertions.
 - `Client.Close` stops both tickers, drains metrics synchronously, and is idempotent. `pkg/lapi/client.go:161`
 - `reclaim.ResetForTest` → vendored `Table.Reset` → `Sleep` then `dispose`/`Close` per slot; `Client.Sleep` spawns `go c.drainMetrics()`, which logs after the test body returned. `pkg/reclaim/default.go:55` `vendor/github.com/david-garcia-garcia/traefik-middleware-utilities/reclaim/table.go:752`
-    20|- House rule: in-repo test files are `zzz_*_test.go` (`openspec/specs/std_go_test_zzz-prefix`, `knowledge/devdocs/std_go_test_zzz-prefix.md`).
+- House rule: in-repo test files are `zzz_*_test.go` (`openspec/specs/std_go_test_zzz-prefix`, `knowledge/devdocs/std_go_test_zzz-prefix.md`).
 
 ## Desired
 - One mutex-guarded log sink in the package's test helpers. `Write` and the read both take the same mutex. Every test reads through the wrapper instead of touching `bytes.Buffer.String()`.
@@ -26,7 +26,7 @@ IssueKey: 2026-09-18-lapi-session-test-log-race
 ## Affected
 - `pkg/lapi/zzz_logsink_test.go` (new helper)
 - `pkg/lapi/zzz_session_test.go`
-    30|- `pkg/lapi/zzz_client_stream_log_test.go`
+- `pkg/lapi/zzz_client_stream_log_test.go`
 - `openspec/specs/std_go_test_*` (spec host for the house rule)
 - `knowledge/devdocs/std_go_test_*` (usage packet, after apply)
 
@@ -37,7 +37,7 @@ IssueKey: 2026-09-18-lapi-session-test-log-race
 - Merging, closing, or commenting on the 11 open PRs.
 
 ## Unknowns
-    40|- Whether stopping the client removes every asynchronous writer (the ticker goroutine's deferred DEBUG line and `Sleep`'s `go drainMetrics` can still log), so whether deliverable 1 is load-bearing on its own.
+- Whether stopping the client removes every asynchronous writer (the ticker goroutine's deferred DEBUG line and `Sleep`'s `go drainMetrics` can still log), so whether deliverable 1 is load-bearing on its own.
 
 ## Tensions
 - Ticket line numbers match dest `389a33b`.

@@ -1,7 +1,6 @@
 package lapi
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"log/slog"
@@ -141,8 +140,7 @@ func TestClient_ReclaimGrace(t *testing.T) {
 }
 
 func TestClient_LifecycleLogs(t *testing.T) {
-	var logBuf bytes.Buffer
-	log := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	log, logSink := newTestLogSink(slog.LevelInfo)
 	client := &Client{
 		log:          log,
 		crowdsecMode: configuration.LiveMode,
@@ -152,7 +150,7 @@ func TestClient_LifecycleLogs(t *testing.T) {
 	client.Sleep()
 	client.Wake()
 	client.Close()
-	logged := logBuf.String()
+	logged := logSink.String()
 	for _, msg := range []string{MsgConnectionSleeping, MsgConnectionWaking, MsgConnectionClosed} {
 		if !strings.Contains(logged, msg) {
 			t.Fatalf("missing %q in %s", msg, logged)
@@ -175,8 +173,7 @@ func TestOpenStream_LiveMetricsMismatchSharesSilently(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var logBuf bytes.Buffer
-	log := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	log, logSink := newTestLogSink(slog.LevelDebug)
 	ctx := context.Background()
 
 	ownerCfg := testStreamConfig(parsed.Host, 1)
@@ -200,7 +197,8 @@ func TestOpenStream_LiveMetricsMismatchSharesSilently(t *testing.T) {
 	if atomic.LoadInt64(hits) != 1 {
 		t.Fatalf("one ticker must poll once at startup, hits=%d", atomic.LoadInt64(hits))
 	}
-	logged := logBuf.String()
+	owner.Close() // stop the tickers that log into logSink before reading it
+	logged := logSink.String()
 	if strings.Contains(logged, "lapi session joiner ignored") || strings.Contains(logged, "wiring this middleware") {
 		t.Fatalf("interval mismatch must not warn-and-wire: %s", logged)
 	}
@@ -387,8 +385,7 @@ func TestOpenStream_TLSOnlyAdoptsTransport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var logBuf bytes.Buffer
-	log := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	log, logSink := newTestLogSink(slog.LevelInfo)
 	ctx := context.Background()
 	firstCfg := testStreamConfig(parsed.Host, 1)
 	firstCfg.HTTPTimeoutSeconds = 10
@@ -413,7 +410,8 @@ func TestOpenStream_TLSOnlyAdoptsTransport(t *testing.T) {
 	if current.httpClient.Timeout != 30*time.Second {
 		t.Fatalf("HTTP timeout %v", current.httpClient.Timeout)
 	}
-	logged := logBuf.String()
+	second.Close() // stop the tickers that log into logSink before reading it
+	logged := logSink.String()
 	if !strings.Contains(logged, "lapi transport replaced") {
 		t.Fatalf("INFO must name transport replace: %s", logged)
 	}
