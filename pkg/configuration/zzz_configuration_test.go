@@ -201,6 +201,50 @@ func Test_ValidateParams(t *testing.T) {
 	}
 }
 
+// Test_ValidateParams_skipsRedisPasswordFileWhenRedisDisabled pins that
+// RedisCachePasswordFile is Stat/read only when redisCacheEnabled is true.
+func Test_ValidateParams_skipsRedisPasswordFileWhenRedisDisabled(t *testing.T) {
+	log := logger.New("INFO", "")
+	missingFile := filepath.Join(t.TempDir(), "missing-redis-password")
+	staleDir := t.TempDir()
+
+	disabledMissing := getMinimalConfig()
+	disabledMissing.RedisCacheEnabled = false
+	disabledMissing.RedisCachePasswordFile = missingFile
+
+	disabledStale := getMinimalConfig()
+	disabledStale.RedisCacheEnabled = false
+	disabledStale.RedisCachePasswordFile = staleDir
+
+	enabledMissing := getMinimalConfig()
+	enabledMissing.RedisCacheEnabled = true
+	enabledMissing.RedisCachePasswordFile = missingFile
+
+	enabledEmpty := getMinimalConfig()
+	enabledEmpty.RedisCacheEnabled = true
+	enabledEmpty.RedisCachePassword = ""
+	enabledEmpty.RedisCachePasswordFile = ""
+
+	tests := []struct {
+		name    string
+		config  *Config
+		wantErr bool
+	}{
+		{name: "disabled Redis ignores a missing password file", config: disabledMissing, wantErr: false},
+		{name: "disabled Redis ignores a directory password file", config: disabledStale, wantErr: false},
+		{name: "enabled Redis rejects a missing password file", config: enabledMissing, wantErr: true},
+		{name: "enabled Redis accepts an empty password with no file", config: enabledEmpty, wantErr: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateParams(tt.config, log)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateParams() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func Test_validateParamsTLS(t *testing.T) {
 	cfgEmpty := getMinimalConfig()
 	cfgValid := getMinimalConfig()
