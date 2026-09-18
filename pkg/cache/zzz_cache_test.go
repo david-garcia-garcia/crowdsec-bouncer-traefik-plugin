@@ -331,3 +331,25 @@ func Test_GetManyUnreachable(t *testing.T) {
 		t.Fatalf("GetMany unreachable got %v, want %s", err, CacheUnreachable)
 	}
 }
+
+func Test_SetIntGetIntRoundTrip(t *testing.T) {
+	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
+	const word uint32 = 0x0c0074
+	client.SetInt("k", word, 10)
+	got, err := client.GetInt("k")
+	if err != nil || got != word {
+		t.Fatalf("GetInt got %d err %v", got, err)
+	}
+}
+
+func Test_GetIntMissesLeftoverString(t *testing.T) {
+	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
+	client.Set("k", "t\x1fcrowdsec", 10)
+	if _, err := client.GetInt("k"); err == nil || err.Error() != CacheMiss {
+		t.Fatalf("GetInt leftover got %v, want cache:miss", err)
+	}
+	got, err := client.Get("k")
+	if err != nil || got != "t\x1fcrowdsec" {
+		t.Fatalf("Get leftover got %q err %v", got, err)
+	}
+}

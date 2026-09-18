@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -63,6 +64,20 @@ func (lc *localCache) getMany(keys []string) (map[string]string, error) {
 }
 
 func (lc *localCache) set(key, value string, duration int64) {
+	lc.heap().Set(key, value, duration)
+}
+
+// getInt returns a stored machine word. A leftover string or a miss is CacheMiss.
+func (lc *localCache) getInt(key string) (uint32, error) {
+	value, isCached := lc.heap().Get(key)
+	word, isWord := value.(uint32)
+	if isCached && isWord {
+		return word, nil
+	}
+	return 0, errors.New(CacheMiss)
+}
+
+func (lc *localCache) setInt(key string, value uint32, duration int64) {
 	lc.heap().Set(key, value, duration)
 }
 
@@ -152,6 +167,23 @@ func (rc *redisCache) set(key, value string, duration int64) {
 	}
 }
 
+// getInt parses a decimal ASCII word. A leftover string or a miss is CacheMiss.
+func (rc *redisCache) getInt(key string) (uint32, error) {
+	raw, err := rc.get(key)
+	if err != nil {
+		return 0, err
+	}
+	parsed, parseErr := strconv.ParseUint(raw, 10, 32)
+	if parseErr != nil {
+		return 0, errors.New(CacheMiss)
+	}
+	return uint32(parsed), nil
+}
+
+func (rc *redisCache) setInt(key string, value uint32, duration int64) {
+	rc.set(key, strconv.FormatUint(uint64(value), 10), duration)
+}
+
 func (rc *redisCache) delete(key string) {
 	if err := rc.writer.Del(context.Background(), prefixed(rc.prefix, key)); err != nil {
 		rc.log.Error("cache:deleteDecisionRedisCache " + err.Error())
@@ -172,6 +204,8 @@ type cacheInterface interface {
 	set(key, value string, duration int64)
 	get(key string) (string, error)
 	getMany(keys []string) (map[string]string, error)
+	setInt(key string, value uint32, duration int64)
+	getInt(key string) (uint32, error)
 	delete(key string)
 	acquire(ctx context.Context, key, value string, duration int64) (bool, error)
 	close()
@@ -234,6 +268,18 @@ func (c *Client) GetMany(keys []string) (map[string]string, error) {
 func (c *Client) Set(key string, value string, duration int64) {
 	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
 	c.cache.set(key, value, duration)
+}
+
+// GetInt returns a stored machine word. Miss includes a leftover string at the same key.
+func (c *Client) GetInt(key string) (uint32, error) {
+	c.log.Debug(fmt.Sprintf("cache:GetInt key:%v", key))
+	return c.cache.getInt(key)
+}
+
+// SetInt stores a machine word. Memory keeps uint32 in ttl_map; Redis encoding is opaque.
+func (c *Client) SetInt(key string, value uint32, duration int64) {
+	c.log.Debug(fmt.Sprintf("cache:SetInt key:%v value:%v duration:%vs", key, value, duration))
+	c.cache.setInt(key, value, duration)
 }
 
 // redisClientConfig keeps this plugin’s dial 2s and command 1s (not utilities zero-Config defaults).

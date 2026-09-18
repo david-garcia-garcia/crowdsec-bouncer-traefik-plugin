@@ -63,7 +63,8 @@ lapiClient.IncDropped(origin, req.ipType, "ban")
 - Ban wins across Ip, Range, and header hits. Do not return the first active Ip or Range captcha before considering a Country ban.
 - Redis followers skip LAPI on a lease hit. They still GET `range-index` on that tick and rebuild membership; without that hydrate they would miss every Range decision.
 - Trust the header the same way you trust `X-Forwarded-For`: only from a trusted hop (CDN or geoenrich in front of this middleware).
-- Ip/header/Range-index values MAY be `t`/`c` plus U+001F plus a metrics origin. Bare letters still match. Redis stays one `range-index` key.
+- Leftover Ip/header/Range-index values MAY be `t`/`c` plus U+001F plus a metrics origin. Packed memory Range-index lines are the letter plus a decimal intern id. Bare letters still match. Redis stays one `range-index` key written with `Set`.
+- Request lookup tries `GetInt` then leftover `Get`. Resolve `OriginName` only on drop.
 - After a cache miss, stream/alone use stream health; live/none call `LiveLookup`. Do not name that split after Range membership.
 - CrowdSec does not canonicalize decision values — measured on v1.8.0, the stream hands back `2001:DB8::2` and `::ffff:192.0.2.4` exactly as submitted. LAPI `?ip=` does match numerically, so the spelling problem is ours alone and needs no LAPI workaround.
 - `Get` runs on a round-robin `redisCacheReadHosts` replica while `Acquire` and `Set` run on the writer. A read path can fail on a completely healthy writer; that is how the range-index apply reached its unread-base defect without any timing window.

@@ -50,7 +50,14 @@ type MetricsReporter struct {
 	processedIPv6       int64
 	processedUnknown    int64 // processed when Family is empty
 	activeDecisions     map[usageMetricKey]int64
-	activeDecisionSlots map[string]usageMetricKey
+	activeDecisionSlots map[string]activeDecisionSlot
+}
+
+// activeDecisionSlot is one stream/alone gauge entry: intern id plus family, leftover origin on overflow.
+type activeDecisionSlot struct {
+	originID uint16
+	leftover string
+	ipType   string
 }
 
 // newMetricsReporter snapshots write-once URL and envelope scalars and binds query to crowdsecQuery.
@@ -66,7 +73,7 @@ func newMetricsReporter(client *Client, startedAt time.Time) *MetricsReporter {
 		log:                 client.log,
 		windowCounters:      make(map[usageMetricKey]int64),
 		activeDecisions:     make(map[usageMetricKey]int64),
-		activeDecisionSlots: make(map[string]usageMetricKey),
+		activeDecisionSlots: make(map[string]activeDecisionSlot),
 	}
 }
 
@@ -164,36 +171,71 @@ func (c *Client) rememberActiveDecision(slot, origin, decisionValue string) {
 	if c.metricsReporter == nil {
 		return
 	}
-	c.metricsReporter.rememberActiveDecision(slot, origin, decisionValue)
+	rec := activeDecisionSlot{ipType: ip.FamilyOfHostOrCIDR(decisionValue)}
+	originName := origin
+	if c.decisionStore != nil {
+		if originID, ok := c.decisionStore.Intern(origin); ok {
+			rec.originID = originID
+			originName = c.decisionStore.OriginName(originID)
+		} else {
+			rec.leftover = origin
+		}
+	} else {
+		rec.leftover = origin
+	}
+	c.metricsReporter.rememberActiveDecision(slot, rec, originName, c.originNameOf)
+}
+
+// originNameOf is a thin store forward used when rebuilding a compact slot's gauge key.
+func (c *Client) originNameOf(id uint16) string {
+	if c == nil || c.decisionStore == nil {
+		return ""
+	}
+	return c.decisionStore.OriginName(id)
 }
 
 // rememberActiveDecision records one stream/alone decision for the active_decisions gauge.
-func (r *MetricsReporter) rememberActiveDecision(slot, origin, decisionValue string) {
+func (r *MetricsReporter) rememberActiveDecision(slot string, rec activeDecisionSlot, originName string, originNameOf func(uint16) string) {
 	if r.crowdsecMode != configuration.StreamMode && r.crowdsecMode != configuration.AloneMode {
 		return
 	}
 	key := usageMetricKey{
 		name:   "active_decisions",
 		unit:   "ip",
-		origin: origin,
-		ipType: ip.FamilyOfHostOrCIDR(decisionValue),
+		origin: originName,
+		ipType: rec.ipType,
 	}
 	r.metricsMu.Lock()
 	defer r.metricsMu.Unlock()
 	if r.activeDecisionSlots == nil {
-		r.activeDecisionSlots = make(map[string]usageMetricKey)
+		r.activeDecisionSlots = make(map[string]activeDecisionSlot)
 	}
 	if r.activeDecisions == nil {
 		r.activeDecisions = make(map[usageMetricKey]int64)
 	}
 	if previous, ok := r.activeDecisionSlots[slot]; ok {
-		r.activeDecisions[previous]--
-		if r.activeDecisions[previous] <= 0 {
-			delete(r.activeDecisions, previous)
+		previousKey := r.slotMetricKey(previous, originNameOf)
+		r.activeDecisions[previousKey]--
+		if r.activeDecisions[previousKey] <= 0 {
+			delete(r.activeDecisions, previousKey)
 		}
 	}
-	r.activeDecisionSlots[slot] = key
+	r.activeDecisionSlots[slot] = rec
 	r.activeDecisions[key]++
+}
+
+// slotMetricKey rebuilds the gauge identity from a compact slot.
+func (r *MetricsReporter) slotMetricKey(rec activeDecisionSlot, originNameOf func(uint16) string) usageMetricKey {
+	origin := rec.leftover
+	if origin == "" && originNameOf != nil {
+		origin = originNameOf(rec.originID)
+	}
+	return usageMetricKey{
+		name:   "active_decisions",
+		unit:   "ip",
+		origin: origin,
+		ipType: rec.ipType,
+	}
 }
 
 // forgetActiveDecision drops a previously counted stream/alone decision from the gauge.
@@ -201,11 +243,11 @@ func (c *Client) forgetActiveDecision(slot string) {
 	if c.metricsReporter == nil {
 		return
 	}
-	c.metricsReporter.forgetActiveDecision(slot)
+	c.metricsReporter.forgetActiveDecision(slot, c.originNameOf)
 }
 
 // forgetActiveDecision drops a previously counted stream/alone decision from the gauge.
-func (r *MetricsReporter) forgetActiveDecision(slot string) {
+func (r *MetricsReporter) forgetActiveDecision(slot string, originNameOf func(uint16) string) {
 	r.metricsMu.Lock()
 	defer r.metricsMu.Unlock()
 	if r.activeDecisionSlots == nil {
@@ -216,9 +258,10 @@ func (r *MetricsReporter) forgetActiveDecision(slot string) {
 		return
 	}
 	delete(r.activeDecisionSlots, slot)
-	r.activeDecisions[previous]--
-	if r.activeDecisions[previous] <= 0 {
-		delete(r.activeDecisions, previous)
+	previousKey := r.slotMetricKey(previous, originNameOf)
+	r.activeDecisions[previousKey]--
+	if r.activeDecisions[previousKey] <= 0 {
+		delete(r.activeDecisions, previousKey)
 	}
 }
 

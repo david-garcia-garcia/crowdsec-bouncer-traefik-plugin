@@ -14,10 +14,12 @@ Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx
 
 - Call `lapi.OpenDecisionStore(ctx, cfg, log)` then `lapi.New(..., store)` (or `OpenStream` / `OpenLive`, which Open the store first).
 - Memory: the store owns a private TTL map. Prefix is ignored.
-- Redis: prefix is `SessionHex` (cursor), not live `IdentityHex`. Logical keys are the client IP, `scope:value`, and `range-index`; the store writes `prefix:key`. Payloads are opaque strings. Ban/captcha/none codes live on `pkg/decisionscope`. Captcha grace is the gate cookie (`core_plugin_middleware_captcha-gate.md`), not cache keys.
+- Redis: prefix is `SessionHex` (cursor), not live `IdentityHex`. Logical keys are the client IP, `scope:value`, and `range-index`; the store writes `prefix:key`. The cache is a typed bag: `Set`/`Get`/`GetMany` for strings and `SetInt`/`GetInt` for a `uint32` machine word. Do not put a remediation codec in `pkg/cache`. Ban/captcha/none leftover strings and packed words live on `pkg/decisionscope` plus the DecisionStore intern table. Captcha grace is the gate cookie (`core_plugin_middleware_captcha-gate.md`), not cache keys.
 - Same store key → same cache Client. Different Redis hosts (or enabled/password/database/read hosts) isolate.
 - `decisionScopeHeaders` and poller intervals stay off the store key. Stream `scopes=` and the store header-scope filter are the live-router union (`core_plugin_lapi_scope-union.md`).
 - `cache.Client.Acquire` is the stream lease (Redis Eval or memory mutex). Do not Get-then-Set `updated`.
+- Memory stream/alone Ip and header writes `SetInt` a packed word when intern succeeds. `GetInt` misses a leftover string; then `Get` that string. Range-index stays a string blob (`Set`). Redis, live/none, and intern overflow keep leftover `Set`.
+- Origin intern is a field on `DecisionStore` (append-only name→`uint16`, lock-free `OriginName`). Not a package var. Not shared across store reclaim keys.
 - `cache.Client.Close()` drains Redis idle pools. Call it only from the store’s reclaim Close hook. Memory clients are a no-op. Safe to call more than once (`SimpleRedis.Close` CAS).
 
 ## Pattern snippet

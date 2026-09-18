@@ -23,7 +23,7 @@ Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. S
 - Classify `ip_type` with `ip.FamilyOfIP` on the `net.IP` GetRemoteIP already yielded (`req.ipType` on the request path). Do not parse `RemoteAddr`. Do not call `ip.Family` on the client string on the request path.
 - Build origin with `MetricsOrigin(decision.Origin, decision.Scenario)` before cache store and before `IncDropped`.
 - AppSec remediations use `origin=appsec`. Fail-closed drops use `plugin:tech_getremotefail`, `plugin:tech_trustipfail`, `plugin:tech_cachefail`, `plugin:tech_streamfail`, `plugin:lapi_failure`, or `plugin:appsec_failure`.
-- Persist origin on Ip/header and Range-index via `cache.RemediationWithOrigin`. Bare letter-only Range lines still match and MAY omit origin.
+- Persist leftover origin on Ip/header and Range-index via `decisionscope.RemediationWithOrigin`. Packed memory values use the DecisionStore intern table. Bare letter-only Range lines still match and MAY omit origin. `activeDecisionSlots` stores `originID` + family; POST still emits origin names.
 - Construct one `MetricsReporter` in `New` (`newMetricsReporter`). Bind `query` to `crowdsecQuery`. Do not store `*http.Client` on the reporter.
 - Stamp `utc_startup_timestamp` once on the reporter at construct. Do not use `time.Now()` at each push. `feature_flags` must marshal as `[]`, not `{}`.
 - Keep `IncProcessed` / `IncDropped` / `rememberActiveDecision` / `forgetActiveDecision` as `Client` methods (thin forwards). A Client literal without a reporter no-ops those methods.
@@ -34,14 +34,14 @@ Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. S
 
 ```go
 lapiClient.IncProcessed(req.ipType)
-lapiClient.IncDropped(cache.RemediationOrigin(stored), req.ipType, "ban")
+lapiClient.IncDropped(decisionscope.RemediationOrigin(stored), req.ipType, "ban")
 ```
 
 ## Key files
 
 - `pkg/lapi/client_metrics.go`
 - `pkg/lapi/client.go` (`metricsReporter` field and ticker wiring)
-- `pkg/cache/remediation.go`
+- `pkg/decisionscope/remediation.go`
 - `pkg/ip/network.go` (`Family`, `FamilyOfIP`, `FamilyOfHostOrCIDR`)
 - `pkg/bouncer/bouncer.go`
 

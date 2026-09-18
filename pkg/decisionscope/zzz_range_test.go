@@ -97,7 +97,7 @@ func TestAddRangeUpdatesRemediation(t *testing.T) {
 func TestLookupCachedRemediationHeaderScope(t *testing.T) {
 	client := newTestDecisionCache()
 	client.Set(HeaderScopeKey(ScopeCountry, "FR"), BannedValue, 60)
-	got, _, err := LookupCachedRemediation(client, "203.0.113.10", net.ParseIP("203.0.113.10"), map[string]string{ScopeCountry: "FR"}, nil)
+	got, _, _, err := LookupCachedRemediation(client, "203.0.113.10", net.ParseIP("203.0.113.10"), map[string]string{ScopeCountry: "FR"}, nil)
 	if err != nil || got != BannedValue {
 		t.Fatalf("got %q %v, want ban", got, err)
 	}
@@ -105,7 +105,7 @@ func TestLookupCachedRemediationHeaderScope(t *testing.T) {
 
 func TestLookupCachedRemediationMiss(t *testing.T) {
 	client := newTestDecisionCache()
-	_, _, err := LookupCachedRemediation(client, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
+	_, _, _, err := LookupCachedRemediation(client, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
 	if err == nil || err.Error() != cache.CacheMiss {
 		t.Fatalf("want cache miss, got %v", err)
 	}
@@ -116,7 +116,7 @@ func TestLookupCachedRemediationBanWinsAcrossScopes(t *testing.T) {
 	AddRange(client, "10.0.0.0/8", CaptchaValue, 60)
 	client.Set(HeaderScopeKey(ScopeCountry, "FR"), BannedValue, 60)
 	index, _ := readRangeIndex(client)
-	got, _, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), map[string]string{ScopeCountry: "FR"}, MembershipFromIndex(index))
+	got, _, _, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), map[string]string{ScopeCountry: "FR"}, MembershipFromIndex(index))
 	if err != nil || got != BannedValue {
 		t.Fatalf("range captcha + country ban got %q %v, want ban", got, err)
 	}
@@ -153,7 +153,7 @@ func TestReadRangeIndexMissIsNotAnError(t *testing.T) {
 func TestLookupCachedRemediationNilMembershipDoesNotReadBlob(t *testing.T) {
 	client := newTestDecisionCache()
 	AddRange(client, "10.0.0.0/8", BannedValue, 60)
-	got, _, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, nil)
+	got, _, _, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, nil)
 	if err == nil || err.Error() != cache.CacheMiss {
 		t.Fatalf("nil membership must not read blob, got %q %v", got, err)
 	}
@@ -163,20 +163,29 @@ func TestLookupCachedRemediationStreamUsesMembershipNotBlob(t *testing.T) {
 	client := newTestDecisionCache()
 	AddRange(client, "10.0.0.0/8", CaptchaValue, 60)
 	banOnly := MembershipFromIndex("10.0.0.0/8=" + BannedValue)
-	got, _, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, banOnly)
+	got, _, _, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, banOnly)
 	if err != nil || got != BannedValue {
 		t.Fatalf("membership must win over unread blob, got %q %v", got, err)
 	}
-	_, _, missErr := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, MembershipFromIndex(""))
+	_, _, _, missErr := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, MembershipFromIndex(""))
 	if missErr == nil || missErr.Error() != cache.CacheMiss {
 		t.Fatalf("empty membership must not read blob, got %v", missErr)
 	}
 }
 
+func TestLookupCachedRemediationPackedWord(t *testing.T) {
+	client := newTestDecisionCache()
+	client.SetInt("203.0.113.10", PackWord(BannedValue, 3), 60)
+	got, origin, originID, err := LookupCachedRemediation(client, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
+	if err != nil || got != BannedValue || origin != "" || originID != 3 {
+		t.Fatalf("got %q origin %q id %d err %v", got, origin, originID, err)
+	}
+}
+
 func TestLookupCachedRemediationOriginSuffix(t *testing.T) {
 	client := newTestDecisionCache()
-	client.Set("203.0.113.10", cache.RemediationWithOrigin(BannedValue, "crowdsec"), 60)
-	got, origin, err := LookupCachedRemediation(client, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
+	client.Set("203.0.113.10", RemediationWithOrigin(BannedValue, "crowdsec"), 60)
+	got, origin, _, err := LookupCachedRemediation(client, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
 	if err != nil || got != BannedValue || origin != "crowdsec" {
 		t.Fatalf("got %q origin %q err %v", got, origin, err)
 	}
@@ -184,7 +193,7 @@ func TestLookupCachedRemediationOriginSuffix(t *testing.T) {
 
 func TestApplyRangeBatchRoundTripOriginSuffix(t *testing.T) {
 	client := newTestDecisionCache()
-	stored := cache.RemediationWithOrigin(BannedValue, "crowdsec")
+	stored := RemediationWithOrigin(BannedValue, "crowdsec")
 	if err := ApplyRangeBatch(client, map[string]string{"10.0.0.0/8": stored}, nil); err != nil {
 		t.Fatalf("round-trip apply: %v", err)
 	}
@@ -199,9 +208,9 @@ func TestApplyRangeBatchRoundTripOriginSuffix(t *testing.T) {
 
 func TestLookupCachedRemediationRangeOnlyOrigin(t *testing.T) {
 	client := newTestDecisionCache()
-	stored := cache.RemediationWithOrigin(BannedValue, "crowdsec")
+	stored := RemediationWithOrigin(BannedValue, "crowdsec")
 	membership := MembershipFromIndex("10.0.0.0/8=" + stored)
-	got, origin, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, membership)
+	got, origin, _, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, membership)
 	if err != nil || got != BannedValue || origin != "crowdsec" {
 		t.Fatalf("got %q origin %q err %v", got, origin, err)
 	}
@@ -250,7 +259,7 @@ func TestMembershipFromIndexLeftoverBareIPDoesNotRemediate(t *testing.T) {
 func TestLookupCachedRemediationRangeLetterOnlyStillBans(t *testing.T) {
 	client := newTestDecisionCache()
 	membership := MembershipFromIndex("10.0.0.0/8=" + BannedValue)
-	got, origin, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, membership)
+	got, origin, _, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, membership)
 	if err != nil || got != BannedValue || origin != "" {
 		t.Fatalf("letter-only got %q origin %q err %v", got, origin, err)
 	}

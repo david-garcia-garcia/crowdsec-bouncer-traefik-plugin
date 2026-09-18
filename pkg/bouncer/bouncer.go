@@ -195,7 +195,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 
 	// live, stream, and alone consult the cache.
 	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
-		value, origin, cacheErr := decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
+		value, origin, originID, cacheErr := decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
 		switch {
 		case cacheErr != nil:
 			cacheErrString := cacheErr.Error()
@@ -213,7 +213,8 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			return
 		case decisionscope.IsActiveRemediation(value):
 			b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit remediation:%s", req.remoteIP, value))
-			b.handleRemediationServeHTTP(rw, req, value, origin)
+			// Origin name is resolved only on drop; allow-path GetInt has no intern lock.
+			b.handleRemediationServeHTTP(rw, req, value, b.resolveDroppedOrigin(origin, originID))
 			return
 		case value == decisionscope.NoBannedValue:
 			b.handleNextServeHTTP(rw, req)
@@ -235,8 +236,8 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 
 	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.NoneMode {
 		value, err := b.lapiClient.LiveLookup(req.remoteIP, scopes, b.defaultDecisionSeconds)
-		kind := cache.RemediationKind(value)
-		origin := cache.RemediationOrigin(value)
+		kind := decisionscope.RemediationKind(value)
+		origin := decisionscope.RemediationOrigin(value)
 		if err != nil {
 			b.log.Debug("ServeHTTP:LiveLookup " + err.Error())
 			if !decisionscope.IsActiveRemediation(kind) {
@@ -309,13 +310,24 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 	}
 }
 
+// resolveDroppedOrigin uses a leftover name, or OriginName on drop only.
+func (b *Bouncer) resolveDroppedOrigin(origin string, originID uint16) string {
+	if origin != "" {
+		return origin
+	}
+	if originID == 0 || b.lapiClient == nil {
+		return ""
+	}
+	return b.lapiClient.OriginName(originID)
+}
+
 // handleRemediationServeHTTP applies captcha or ban for a cached or live verdict.
 //
 // Captcha routing covers every method, HEAD included: a HEAD from a client carrying a
 // captcha remediation gets the captcha challenge page, never the ban page. Only ban kind
 // reaches handleBanServeHTTP from here.
 func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientRequest, remediation, origin string) {
-	kind := cache.RemediationKind(remediation)
+	kind := decisionscope.RemediationKind(remediation)
 	b.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", req.remoteIP, kind))
 	if !b.captchaClient.Valid || kind != decisionscope.CaptchaValue {
 		b.handleBanServeHTTP(rw, req, configuration.ReasonLAPI, origin)

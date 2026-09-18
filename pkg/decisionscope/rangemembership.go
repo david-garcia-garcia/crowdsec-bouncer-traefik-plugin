@@ -4,7 +4,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/iplookup"
 )
 
@@ -29,7 +28,7 @@ func MembershipFromIndex(index string) *RangeMembership {
 			continue
 		}
 		helper := captcha
-		if cache.RemediationKind(remediation) == BannedValue {
+		if RemediationKind(remediation) == BannedValue {
 			helper = ban
 		}
 		if err := helper.AddCIDR(network); err != nil {
@@ -64,7 +63,7 @@ func (membership *RangeMembership) Remediation(ipAddr net.IP) string {
 func (membership *RangeMembership) storedMatchingPrefix(ipAddr net.IP, prefixLen int, kind string) string {
 	fallback := ""
 	for cidr, stored := range membership.storedByCIDR {
-		if cache.RemediationKind(stored) != kind {
+		if RemediationKind(stored) != kind {
 			continue
 		}
 		_, network, err := net.ParseCIDR(cidr)

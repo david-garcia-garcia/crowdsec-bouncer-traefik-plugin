@@ -3,8 +3,6 @@ package decisionscope
 import (
 	"net"
 	"testing"
-
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 )
 
 func ipOf(addr string) net.IP {
@@ -70,7 +68,7 @@ func TestMembershipFromIndexIPv6(t *testing.T) {
 }
 
 func TestMembershipFromIndexReturnsOriginSuffix(t *testing.T) {
-	stored := cache.RemediationWithOrigin(BannedValue, "crowdsec")
+	stored := RemediationWithOrigin(BannedValue, "crowdsec")
 	got := MembershipFromIndex("10.0.0.0/8=" + stored).Remediation(ipOf("10.1.2.3"))
 	if got != stored {
 		t.Fatalf("got %q, want suffixed ban", got)
@@ -85,8 +83,8 @@ func TestMembershipFromIndexLetterOnlyStillBans(t *testing.T) {
 }
 
 func TestMembershipFromIndexOverlappingBansLongestPrefixOrigin(t *testing.T) {
-	wide := cache.RemediationWithOrigin(BannedValue, "crowdsec")
-	narrow := cache.RemediationWithOrigin(BannedValue, "cscli")
+	wide := RemediationWithOrigin(BannedValue, "crowdsec")
+	narrow := RemediationWithOrigin(BannedValue, "cscli")
 	index := "10.0.0.0/8=" + wide + "\n10.1.0.0/16=" + narrow
 	got := MembershipFromIndex(index).Remediation(ipOf("10.1.2.3"))
 	if got != narrow {

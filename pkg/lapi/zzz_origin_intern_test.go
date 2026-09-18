@@ -1,0 +1,98 @@
+package lapi
+
+import (
+	"testing"
+
+	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
+)
+
+func newTestInternStore() *DecisionStore {
+	store := &DecisionStore{}
+	store.internNames.Store([]string{""})
+	return store
+}
+
+func TestDecisionStoreInternRoundTrip(t *testing.T) {
+	store := newTestInternStore()
+	id, ok := store.Intern("crowdsec")
+	if !ok || id == 0 {
+		t.Fatalf("intern ok=%v id=%d", ok, id)
+	}
+	if store.OriginName(id) != "crowdsec" {
+		t.Fatalf("OriginName %q", store.OriginName(id))
+	}
+	again, ok := store.Intern("crowdsec")
+	if !ok || again != id {
+		t.Fatalf("second intern %d ok=%v", again, ok)
+	}
+}
+
+func TestDecisionStorePackMemory(t *testing.T) {
+	store := newTestInternStore()
+	word, ok := store.PackMemory(decisionscope.BannedValue, "crowdsec")
+	if !ok {
+		t.Fatal("pack")
+	}
+	kind, originID := decisionscope.UnpackWord(word)
+	if kind != decisionscope.BannedValue || store.OriginName(originID) != "crowdsec" {
+		t.Fatalf("kind %q origin %q", kind, store.OriginName(originID))
+	}
+}
+
+func TestDecisionStorePackMemorySkippedOnRedis(t *testing.T) {
+	store := newTestInternStore()
+	store.redis = true
+	if _, ok := store.PackMemory(decisionscope.BannedValue, "crowdsec"); ok {
+		t.Fatal("redis must keep leftover")
+	}
+}
+
+func TestStoreStreamDecisionPacksMemory(t *testing.T) {
+	cacheClient := &cache.Client{}
+	cacheClient.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
+	store := newTestInternStore()
+	store.cache = cacheClient
+	client := &Client{cacheClient: cacheClient, decisionStore: store, log: logger.New("ERROR", "")}
+	client.storeStreamDecision(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.10", Origin: "crowdsec"}, 60)
+	slot := decisionscope.IPCacheKey("203.0.113.10")
+	word, err := cacheClient.GetInt(slot)
+	if err != nil {
+		t.Fatalf("GetInt %v", err)
+	}
+	kind, originID := decisionscope.UnpackWord(word)
+	if kind != decisionscope.BannedValue || store.OriginName(originID) != "crowdsec" {
+		t.Fatalf("kind %q origin %q", kind, store.OriginName(originID))
+	}
+	if _, getErr := cacheClient.Get(slot); getErr == nil {
+		t.Fatal("leftover Get must miss a packed word")
+	}
+}
+
+func TestRememberActiveDecisionForgetCompactSlot(t *testing.T) {
+	store := newTestInternStore()
+	cacheClient := &cache.Client{}
+	cacheClient.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
+	client, body := newUsageMetricsClient(t)
+	client.decisionStore = store
+	client.cacheClient = cacheClient
+	client.rememberActiveDecision("ip:1.2.3.4", "crowdsec", "1.2.3.4")
+	if len(client.metricsReporter.activeDecisionSlots) != 1 {
+		t.Fatalf("slots %d", len(client.metricsReporter.activeDecisionSlots))
+	}
+	rec := client.metricsReporter.activeDecisionSlots["ip:1.2.3.4"]
+	if rec.originID == 0 || rec.leftover != "" || rec.ipType != "ipv4" {
+		t.Fatalf("slot %#v", rec)
+	}
+	client.forgetActiveDecision("ip:1.2.3.4")
+	if err := client.reportMetrics(); err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range usageMetricItems(t, body.bytes()) {
+		item := asObject(t, raw)
+		if item["name"] == "active_decisions" {
+			t.Fatalf("forgot slot still posted %#v", item)
+		}
+	}
+}

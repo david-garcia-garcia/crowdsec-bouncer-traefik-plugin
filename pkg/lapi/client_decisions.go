@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
@@ -29,12 +28,11 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 		return
 	}
 	origin := MetricsOrigin(item.Origin, item.Scenario)
-	stored := cache.RemediationWithOrigin(value, origin)
 	scope := decisionscope.NormalizeScope(item.Scope)
 	switch scope {
 	case decisionscope.ScopeIP, "":
 		slot := decisionscope.IPCacheKey(item.Value)
-		c.cacheClient.Set(slot, stored, duration)
+		c.storePackedOrLeftover(slot, value, origin, duration)
 		c.rememberActiveDecision(slot, origin, item.Value)
 	case decisionscope.ScopeRange:
 		return
@@ -48,7 +46,7 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 			return
 		}
 		slot := decisionscope.HeaderScopeKey(scope, identifier)
-		c.cacheClient.Set(slot, stored, duration)
+		c.storePackedOrLeftover(slot, value, origin, duration)
 		c.rememberActiveDecision(slot, origin, item.Value)
 	}
 }
@@ -109,7 +107,41 @@ func (c *Client) queryLiveDecisions(rawQuery string) (string, time.Duration, err
 	if value == "" {
 		return decisionscope.NoBannedValue, 0, nil
 	}
-	return cache.RemediationWithOrigin(value, MetricsOrigin(picked.Origin, picked.Scenario)), parsedDuration, nil
+	return decisionscope.RemediationWithOrigin(value, MetricsOrigin(picked.Origin, picked.Scenario)), parsedDuration, nil
+}
+
+// rangeIndexRemediation encodes a packed letter+id line on memory, leftover otherwise.
+func (c *Client) rangeIndexRemediation(kind, origin string) string {
+	if word, ok := c.packMemoryRemediation(kind, origin); ok {
+		_, originID := decisionscope.UnpackWord(word)
+		return decisionscope.PackedRemediationLine(kind, originID)
+	}
+	return decisionscope.RemediationWithOrigin(kind, origin)
+}
+
+// storePackedOrLeftover writes a packed memory word when intern succeeds; otherwise a leftover string.
+func (c *Client) storePackedOrLeftover(slot, kind, origin string, duration int64) {
+	if word, ok := c.packMemoryRemediation(kind, origin); ok {
+		c.cacheClient.SetInt(slot, word, duration)
+		return
+	}
+	c.cacheClient.Set(slot, decisionscope.RemediationWithOrigin(kind, origin), duration)
+}
+
+// packMemoryRemediation is a thin store forward so tests can intern without calling DecisionStore.
+func (c *Client) packMemoryRemediation(kind, origin string) (uint32, bool) {
+	if c == nil || c.decisionStore == nil {
+		return 0, false
+	}
+	return c.decisionStore.PackMemory(kind, origin)
+}
+
+// OriginName is a thin store forward. Unknown id is empty.
+func (c *Client) OriginName(id uint16) string {
+	if c == nil || c.decisionStore == nil {
+		return ""
+	}
+	return c.decisionStore.OriginName(id)
 }
 
 // strongestLiveDecision returns the first ban in items, else the first captcha.
