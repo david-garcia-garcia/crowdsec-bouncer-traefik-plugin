@@ -41,6 +41,7 @@ value, err := client.LiveLookup(remoteIP, scopes, defaultDecisionSeconds)
 ## Gotchas
 
 - A clean `?ip=` plus a remediating header writes `NoBannedValue` on the IP key. A later lookup for the same IP and a different header hits that none slot and does not inherit the first identity's ban. A header-scope query error still skips the none IP write (fail-closed).
+- The IP-key TTL follows the IP query: an active `?ip=` result uses `liveCacheTTL` on that result's duration; a clean `?ip=` result uses `defaultDecisionSeconds`. Do not apply a header winner's duration to the IP key.
 - Concurrent `AdoptTransport` last-writes the stored transport and idle-closes the value it replaced. No extra mutex around write-once Client scalars.
 - Redis host/auth/db stay on the Client Open key (`core_plugin_lapi_reclaim-key.md`). Stream intervals, CAPI scenarios, `updateMaxFailure`, and `decisionScopeHeaders` are not on that key (silent first-wins). Live/none `Key` keeps `MetricsUpdateIntervalSeconds`. Do not call `PeekLivePrefix`.
 - `reclaim_put`, `reclaim_reclaim`, and `reclaim_dispose` stay DEBUG.
