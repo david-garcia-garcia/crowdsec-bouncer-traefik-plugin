@@ -10,7 +10,7 @@ JobName: 2026-09-18-appsec-validate-when-enabled
 | implement | [x] | [x] | 2026-09-18T16:30:00Z |
 | codereview | [x] | [x] | 2026-09-18T16:39:49Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T16:43:30Z |
-| archive | [ ] | [ ] | |
+| archive | [x] | [ ] | |
 | pullrequest | [ ] | [ ] | |
 
 Verdict: ready for review
