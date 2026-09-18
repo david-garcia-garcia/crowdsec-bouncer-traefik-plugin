@@ -13,7 +13,7 @@ description: How this unpublished fork is loaded by Traefik (import equals go.mo
 ## Config validation
 priority: normal
 local: core_plugin_middleware_config-validation.md
-description: How New rejects invalid Traefik Config (ValidateParams) before opening LAPI.
+description: How New rejects invalid Traefik Config (ValidateParams) before opening LAPI, including the LogFilePath writability-check handle.
 
 ## Decision scopes
 priority: normal
