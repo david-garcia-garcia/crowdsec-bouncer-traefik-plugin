@@ -1,6 +1,6 @@
 ## Purpose
 
-Governs one CrowdSec LAPI/CAPI HTTP request-response exchange: how a token renewal replays the original request, how every answered response is released so the connection can be reused, and what an operator reads when the exchange fails.
+Governs one CrowdSec LAPI/CAPI HTTP request-response exchange: how the CAPI login body is encoded as JSON from the stored Client credentials, how a token renewal replays the original request, how every answered response is released so the connection can be reused, and what an operator reads when the exchange fails.
 
 ## Requirements
 
