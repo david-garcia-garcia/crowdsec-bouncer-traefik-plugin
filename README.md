@@ -393,11 +393,11 @@ make run
 - CrowdsecAppsecFailureAction
   - string
   - default: `ban`, expected values are: `passthrough`, `ban`, `captcha`
-  - What to do when AppSec does not return a usable verdict: HTTP 500, unreachable (dial or 502/503/504), or an unreadable HTTP/2 or HTTP/3 body on a method that would send a body. `ban` drops the request. `passthrough` lets 500/unreachable continue as allow, and sends a headers-only GET to AppSec when the body cannot be buffered. `captcha` uses the plugin captcha client (`captchaProvider` must be set). **BREAKING:** this key replaces `crowdsecAppsecFailureBlock`, `crowdsecAppsecUnreachableBlock`, and `crowdsecAppsecUnreadableBodyBlock`. Operators who had those bools set to `false` MUST set `crowdsecAppsecFailureAction: passthrough`.
+  - What to do when AppSec does not return a usable verdict: HTTP 500, unreachable (dial or 502/503/504), an io error reading the AppSec response body, or an unreadable HTTP/2 or HTTP/3 body on POST, PUT, or PATCH. `ban` drops the request. `passthrough` lets 500/unreachable/response-body io errors continue as allow, and sends a headers-only GET to AppSec when the body cannot be buffered. `captcha` uses the plugin captcha client (`captchaProvider` must be set). **BREAKING:** this key replaces `crowdsecAppsecFailureBlock`, `crowdsecAppsecUnreachableBlock`, and `crowdsecAppsecUnreadableBodyBlock`. Operators who had those bools set to `false` MUST set `crowdsecAppsecFailureAction: passthrough`.
 - CrowdsecAppsecBodyLimit
   - int64
   - default: 10485760 (= 10MB)
-  - Transmit only the first number of bytes to Crowdsec Appsec Server.
+  - Transmit only the first number of bytes to Crowdsec Appsec Server. `0` means unlimited (the full readable body is forwarded). Only POST, PUT, PATCH and DELETE bodies are forwarded; any other method (including a GET that carries a body) is sent to AppSec as a headers-only GET with the real verb on `X-Crowdsec-Appsec-Verb`.
 - CrowdsecAppsecKey
   - string
   - default: value of `CrowdsecLapiKey`
@@ -535,7 +535,7 @@ make run
   - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile` or `custom`
 - CaptchaCustomJsURL
   - string
-  - If CaptchaProvider is `custom`, URL used to load the challenge in the HTML (in case of hcaptcha: `https://hcaptcha.com/1/api.js`)
+  - If CaptchaProvider is `custom`, URL used to load the challenge in the HTML (in case of hcaptcha: `https://hcaptcha.com/1/api.js`). When the widget is served by the protected router itself, a captcha-flagged client may request this exact path and it is passed through to the origin (banned clients are not).
 - CaptchaCustomValidateURL
   - string
   - If CaptchaProvider is `custom`, URL used to validate the challenge (in case of hcaptcha: `https://api.hcaptcha.com/siteverify`)
@@ -545,6 +545,10 @@ make run
 - CaptchaCustomResponse
   - string
   - If CaptchaProvider is `custom`, used to set the field in the POST body from the captcha.html to Traefik (in case of hcaptcha: `h-captcha-response`)
+- CaptchaCustomChallengeURL
+  - string
+  - default: ""
+  - If CaptchaProvider is `custom`, URL of the widget challenge endpoint served by the origin (in case of wicketkeeper: `http://captcha.localhost:8000/v0/challenge`). Rendered in the captcha template as `{{ .ChallengeURL }}`, and a captcha-flagged client may request this exact path and it is passed through to the origin (banned clients are not). Empty means no challenge passthrough.
 - CaptchaSiteKey
   - string
   - Site key for the captcha provider

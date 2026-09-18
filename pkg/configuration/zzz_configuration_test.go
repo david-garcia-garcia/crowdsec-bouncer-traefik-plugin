@@ -418,6 +418,13 @@ func Test_validateDecisionScopeHeaders(t *testing.T) {
 func Test_validateCaptcha(t *testing.T) {
 	cfgCustomMissing := getMinimalConfig()
 	cfgCustomMissing.CaptchaProvider = CustomProvider
+	cfgCustomFourFields := getMinimalConfig()
+	cfgCustomFourFields.CaptchaProvider = CustomProvider
+	cfgCustomFourFields.CaptchaCustomKey = "wicketkeeper"
+	cfgCustomFourFields.CaptchaCustomResponse = "wicketkeeper_solution"
+	cfgCustomFourFields.CaptchaCustomValidateURL = "http://wicketkeeper:8080/v0/siteverify"
+	cfgCustomFourFields.CaptchaCustomJsURL = "http://wicketkeeper:8080/fast.js"
+	cfgCustomFourFields.CaptchaCustomChallengeURL = ""
 	tests := []struct {
 		name    string
 		config  *Config
@@ -425,6 +432,7 @@ func Test_validateCaptcha(t *testing.T) {
 	}{
 		{name: "Valid hcaptcha provider", config: getMinimalConfig(), wantErr: false},
 		{name: "Custom provider missing fields", config: cfgCustomMissing, wantErr: true},
+		{name: "Custom provider four fields empty challenge URL", config: cfgCustomFourFields, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -432,6 +440,69 @@ func Test_validateCaptcha(t *testing.T) {
 				t.Errorf("validateCaptcha() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func Test_CustomCaptchaResourcePath(t *testing.T) {
+	tests := []struct {
+		name   string
+		rawURL string
+		want   string
+	}{
+		{name: "Absolute URL keeps its path", rawURL: "http://captcha.localhost:8000/v0/challenge", want: "/v0/challenge"},
+		{name: "Bare path is kept", rawURL: "/v0/challenge", want: "/v0/challenge"},
+		{name: "Query is dropped", rawURL: "/v0/challenge?difficulty=4", want: "/v0/challenge"},
+		{name: "Empty value has no path", rawURL: "", want: ""},
+		{name: "Relative value has no path", rawURL: "fast.js", want: ""},
+		{name: "Host without a path has no path", rawURL: "http://captcha.localhost:8000", want: ""},
+		{name: "Missing scheme is not a path", rawURL: "captcha.localhost:8000/v0/challenge", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CustomCaptchaResourcePath(tt.rawURL); got != tt.want {
+				t.Errorf("CustomCaptchaResourcePath(%q) = %q, want %q", tt.rawURL, got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_validateEnabledCaptchaSettings_customChallengeURL(t *testing.T) {
+	newCustomConfig := func(challengeURL string) *Config {
+		cfg := getMinimalConfig()
+		cfg.CaptchaProvider = CustomProvider
+		cfg.CaptchaGateSecret = "gate-secret"
+		cfg.CaptchaFilePath = ""
+		cfg.CaptchaCustomChallengeURL = challengeURL
+		return cfg
+	}
+	tests := []struct {
+		name         string
+		challengeURL string
+		wantErr      bool
+	}{
+		{name: "Empty challenge URL is valid", challengeURL: "", wantErr: false},
+		{name: "Absolute challenge URL is valid", challengeURL: "http://captcha.localhost:8000/v0/challenge", wantErr: false},
+		{name: "Bare challenge path is valid", challengeURL: "/v0/challenge", wantErr: false},
+		{name: "Challenge URL without a path is rejected", challengeURL: "http://captcha.localhost:8000", wantErr: true},
+		{name: "Relative challenge URL is rejected", challengeURL: "v0/challenge", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateEnabledCaptchaSettings(newCustomConfig(tt.challengeURL))
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateEnabledCaptchaSettings() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+
+	// A built-in provider ignores the key, so a stale value must not block startup.
+	builtin := getMinimalConfig()
+	builtin.CaptchaProvider = HcaptchaProvider
+	builtin.CaptchaGateSecret = "gate-secret"
+	builtin.CaptchaFilePath = ""
+	builtin.CaptchaCustomChallengeURL = "v0/challenge"
+	if err := validateEnabledCaptchaSettings(builtin); err != nil {
+		t.Errorf("built-in provider must ignore CaptchaCustomChallengeURL, got %v", err)
 	}
 }
 

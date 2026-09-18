@@ -117,6 +117,7 @@ type Config struct {
 	CaptchaCustomValidateURL                   string            `json:"captchaCustomValidateUrl,omitempty"`
 	CaptchaCustomKey                           string            `json:"captchaCustomKey,omitempty"`
 	CaptchaCustomResponse                      string            `json:"captchaCustomResponse,omitempty"`
+	CaptchaCustomChallengeURL                  string            `json:"captchaCustomChallengeUrl,omitempty"`
 	CaptchaSiteKey                             string            `json:"captchaSiteKey,omitempty"`
 	CaptchaSiteKeyFile                         string            `json:"captchaSiteKeyFile,omitempty"`
 	CaptchaSecretKey                           string            `json:"captchaSecretKey,omitempty"`
@@ -192,6 +193,7 @@ func New() *Config {
 		CaptchaCustomValidateURL:        "",
 		CaptchaCustomKey:                "",
 		CaptchaCustomResponse:           "",
+		CaptchaCustomChallengeURL:       "",
 		CaptchaSiteKey:                  "",
 		CaptchaSecretKey:                "",
 		CaptchaGateBindIP:               true,
@@ -282,6 +284,24 @@ func GetTemplate(path string) (*template.Template, string, error) {
 	return compiledTemplate, contentType, nil
 }
 
+// CustomCaptchaResourcePath returns the browser path a configured custom captcha
+// resource URL is matched on, or "" when the value names no absolute path.
+// Operators may configure either an absolute URL or a bare path; scheme, host, query
+// and fragment never take part in the match.
+func CustomCaptchaResourcePath(rawURL string) string {
+	if rawURL == "" {
+		return ""
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	if !strings.HasPrefix(parsed.Path, "/") {
+		return ""
+	}
+	return parsed.Path
+}
+
 // ValidateParams validate all the param gave by user.
 func ValidateParams(config *Config, log *slog.Logger) error {
 	if err := validateParamsRequired(config); err != nil {
@@ -334,6 +354,7 @@ func effectiveAppsecScheme(config *Config) string {
 	return config.CrowdsecLapiScheme
 }
 
+// validateCaptchaCredentialsAndTemplates checks captcha credentials and optional HTML templates.
 func validateCaptchaCredentialsAndTemplates(config *Config) error {
 	if err := validateEnabledCaptchaSettings(config); err != nil {
 		return err
@@ -346,13 +367,21 @@ func validateCaptchaCredentialsAndTemplates(config *Config) error {
 	return nil
 }
 
-// validateEnabledCaptchaSettings checks provider credentials and templates when a provider is set.
+// validateEnabledCaptchaSettings checks provider credentials, the optional custom
+// challenge URL, and templates when a provider is set.
 func validateEnabledCaptchaSettings(config *Config) error {
 	if config.CaptchaProvider == "" {
 		return nil
 	}
 	if err := validateCaptchaCredentials(config); err != nil {
 		return err
+	}
+	// Empty is valid; it only leaves the challenge path out of the passthrough match set.
+	// A value that names no path would silently never match, so reject it instead.
+	if config.CaptchaProvider == CustomProvider && config.CaptchaCustomChallengeURL != "" &&
+		CustomCaptchaResourcePath(config.CaptchaCustomChallengeURL) == "" {
+		return errors.New("CaptchaCustomChallengeURL: " + config.CaptchaCustomChallengeURL +
+			" has no absolute path, so no browser request could ever match it")
 	}
 	gateSecret, err := GetVariable(config, "CaptchaGateSecret")
 	if err != nil {

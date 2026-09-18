@@ -10,7 +10,6 @@ import (
 
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -92,32 +91,6 @@ func TestHandleBanServeHTTPContentType(t *testing.T) {
 			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
 			if got := rw.Header().Get("Content-Type"); got != tt.banTemplateContentType {
 				t.Errorf("Expected Content-Type %q, got %q", tt.banTemplateContentType, got)
-			}
-		})
-	}
-}
-
-func TestCaptchaMethodBasedLogic(t *testing.T) {
-	tests := []struct {
-		name              string
-		method            string
-		remediation       string
-		expectBanFallback bool
-	}{
-		{name: "GET with captcha remediation should allow captcha", method: http.MethodGet, remediation: decisionscope.CaptchaValue, expectBanFallback: false},
-		{name: "HEAD with captcha remediation should fallback to ban", method: http.MethodHead, remediation: decisionscope.CaptchaValue, expectBanFallback: true},
-		{name: "POST with captcha remediation should allow captcha", method: http.MethodPost, remediation: decisionscope.CaptchaValue, expectBanFallback: false},
-		{name: "PUT with captcha remediation should allow captcha", method: http.MethodPut, remediation: decisionscope.CaptchaValue, expectBanFallback: false},
-		{name: "DELETE with captcha remediation should allow captcha", method: http.MethodDelete, remediation: decisionscope.CaptchaValue, expectBanFallback: false},
-		{name: "PATCH with captcha remediation should allow captcha", method: http.MethodPatch, remediation: decisionscope.CaptchaValue, expectBanFallback: false},
-		{name: "OPTIONS with captcha remediation should allow captcha", method: http.MethodOptions, remediation: decisionscope.CaptchaValue, expectBanFallback: false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			shouldUseCaptcha := tt.remediation == decisionscope.CaptchaValue && tt.method != http.MethodHead
-			if shouldUseCaptcha == tt.expectBanFallback {
-				t.Errorf("Method %s with %s remediation: expected ban fallback %v, but logic would use captcha %v",
-					tt.method, tt.remediation, tt.expectBanFallback, shouldUseCaptcha)
 			}
 		})
 	}
