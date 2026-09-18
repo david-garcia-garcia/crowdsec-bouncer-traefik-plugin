@@ -183,7 +183,7 @@ Cached request lookup SHALL consult Range membership from the membership argumen
 - **THEN** Range matching does not remediate from that blob
 
 ### Requirement: Remediation cache values may carry origin
-An Ip, header-scope, or Range-index cache value SHALL still start with the ban/captcha/none letter (`t` / `c` / `f`). It MAY append a unit-separator and the metrics origin. `range-index` stays one key whose lines are `cidr=` plus that value. `IsActiveRemediation`, `PreferRemediation`, Range index parsing, and request lookup SHALL use that letter. In-process Range membership SHALL return the stored string of the winning CIDR (ban over captcha; if several bans contain the IP, the longest-prefix matching ban). Lookup key *shapes* (client IP, `scope:value`, `range-index`) MUST NOT change; the spelling of the client-IP key is owned by "Ip decisions key on the canonical address". A value that is only the letter (today’s Redis) SHALL keep matching.
+An Ip, header-scope, or Range-index leftover cache value SHALL still start with the ban/captcha/none letter (`t` / `c` / `f`). It MAY append a unit-separator and the metrics origin. Leftover helpers (`RemediationKind`, `RemediationOrigin`, `RemediationWithOrigin`) SHALL live in `pkg/decisionscope`, not `pkg/cache`. Packed memory Range-index lines SHALL be the letter plus the decimal intern id (no unit-separator). `range-index` stays one key whose lines are `cidr=` plus that leftover or packed value and SHALL be written with cache `Set`, never `SetInt`. `IsActiveRemediation`, `PreferRemediation`, Range index parsing, and request lookup SHALL use that letter. In-process Range membership SHALL return the stored string of the winning CIDR (ban over captcha; if several bans contain the IP, the longest-prefix matching ban). Request lookup SHALL try `GetInt` for packed memory Ip and header keys and SHALL `Get` the leftover string on miss. Origin name SHALL be resolved from the DecisionStore intern table only when the winning kind is remediating. The allow-path `GetInt` MUST NOT take a second intern lock. Lookup key *shapes* (client IP, `scope:value`, `range-index`) MUST NOT change; the spelling of the client-IP key is owned by "Ip decisions key on the canonical address". Client address SHALL reuse `pkg/ip.GetRemoteIP` / `clientRequest.remoteIP`. A value that is only the letter SHALL keep matching.
 
 #### Scenario: Suffixed ban still remediates
 - **WHEN** cache holds `t` plus a unit-separator and `crowdsec` for the client IP
@@ -200,6 +200,12 @@ An Ip, header-scope, or Range-index cache value SHALL still start with the ban/c
 #### Scenario: Bare Range-index letter still remediates
 - **WHEN** `range-index` holds only `10.0.0.0/8=t` and the client IP is `10.1.2.3`
 - **THEN** the request is banned
+
+#### Scenario: Packed memory IP remediates without leftover
+- **WHEN** memory cache GetInt of the client IP returns a packed ban word whose intern id names `crowdsec`
+- **THEN** the request is banned
+- **AND** a drop resolves origin `crowdsec` from the store table
+- **AND** an allow-path GetInt for a none word does not call OriginName
 
 ### Requirement: Live IP cache slot is the IP query result
 When live mode writes a client-address cache entry after a LAPI lookup, that entry SHALL be the client-address (`?ip=`) query result only. Header-mapped remediations SHALL stay on the header-scope cache keys that already store each mapped header result. The client-address key SHALL be the address `pkg/ip.GetRemoteIP` already chose and that the live lookup received; this leaf MUST NOT parse `RemoteAddr` or walk forwarded headers again. Header identity SHALL be the map `decisionscope.RequestScopeValues` already produced; this leaf MUST NOT re-read request headers to decide the IP-slot write.
