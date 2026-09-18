@@ -8,9 +8,9 @@ JobName: 2026-09-18-captcha-custom-json-verify
 | explore | [x] | [x] | 2026-09-18T18:01:19Z |
 | propose | [x] | [x] | 2026-09-18T18:07:10Z |
 | implement | [x] | [x] | 2026-09-18T18:20:07Z |
-| codereview | [ ] | [ ] | |
+| codereview | [x] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
 
-Verdict: ready for review
+Verdict: in progress
