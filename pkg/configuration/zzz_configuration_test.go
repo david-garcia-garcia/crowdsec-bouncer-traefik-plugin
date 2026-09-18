@@ -148,8 +148,50 @@ func Test_ValidateParams(t *testing.T) {
 	cfgAppsecHTTPS.CrowdsecAppsecScheme = HTTPS
 	cfgAppsecHTTPS.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
 	cfgAppsecDistinctScheme := getMinimalConfig()
+	cfgAppsecDistinctScheme.CrowdsecAppsecEnabled = true
 	cfgAppsecDistinctScheme.CrowdsecLapiScheme = HTTP
 	cfgAppsecDistinctScheme.CrowdsecAppsecScheme = HTTPS
+	missingAppsecKeyFile := "../../tests/.missing-appsec-key"
+	cfgAloneAppsecOnInvalidCA := getMinimalConfig()
+	cfgAloneAppsecOnInvalidCA.CrowdsecMode = AloneMode
+	cfgAloneAppsecOnInvalidCA.CrowdsecCapiMachineID = "machine"
+	cfgAloneAppsecOnInvalidCA.CrowdsecCapiPassword = "password"
+	cfgAloneAppsecOnInvalidCA.CrowdsecAppsecEnabled = true
+	cfgAloneAppsecOnInvalidCA.CrowdsecAppsecScheme = HTTPS
+	cfgAloneAppsecOnInvalidCA.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgAloneAppsecOnMissingKey := getMinimalConfig()
+	cfgAloneAppsecOnMissingKey.CrowdsecMode = AloneMode
+	cfgAloneAppsecOnMissingKey.CrowdsecCapiMachineID = "machine"
+	cfgAloneAppsecOnMissingKey.CrowdsecCapiPassword = "password"
+	cfgAloneAppsecOnMissingKey.CrowdsecAppsecEnabled = true
+	cfgAloneAppsecOnMissingKey.CrowdsecAppsecKeyFile = missingAppsecKeyFile
+	cfgAloneAppsecOffLeftover := getMinimalConfig()
+	cfgAloneAppsecOffLeftover.CrowdsecMode = AloneMode
+	cfgAloneAppsecOffLeftover.CrowdsecCapiMachineID = "machine"
+	cfgAloneAppsecOffLeftover.CrowdsecCapiPassword = "password"
+	cfgAloneAppsecOffLeftover.CrowdsecAppsecEnabled = false
+	cfgAloneAppsecOffLeftover.CrowdsecAppsecScheme = HTTPS
+	cfgAloneAppsecOffLeftover.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgAloneAppsecOffLeftover.CrowdsecAppsecKeyFile = missingAppsecKeyFile
+	cfgLiveAppsecOnInvalidCA := getMinimalConfig()
+	cfgLiveAppsecOnInvalidCA.CrowdsecAppsecEnabled = true
+	cfgLiveAppsecOnInvalidCA.CrowdsecLapiScheme = HTTP
+	cfgLiveAppsecOnInvalidCA.CrowdsecAppsecScheme = HTTPS
+	cfgLiveAppsecOnInvalidCA.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgLiveAppsecOnMissingKey := getMinimalConfig()
+	cfgLiveAppsecOnMissingKey.CrowdsecAppsecEnabled = true
+	cfgLiveAppsecOnMissingKey.CrowdsecAppsecKeyFile = missingAppsecKeyFile
+	cfgLiveAppsecOffLeftover := getMinimalConfig()
+	cfgLiveAppsecOffLeftover.CrowdsecAppsecEnabled = false
+	cfgLiveAppsecOffLeftover.CrowdsecAppsecScheme = HTTPS
+	cfgLiveAppsecOffLeftover.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgLiveAppsecOffLeftover.CrowdsecAppsecKeyFile = missingAppsecKeyFile
+	cfgAppsecModeOffLeftover := getMinimalConfig()
+	cfgAppsecModeOffLeftover.CrowdsecMode = AppsecMode
+	cfgAppsecModeOffLeftover.CrowdsecLapiKey = ""
+	cfgAppsecModeOffLeftover.CrowdsecAppsecEnabled = false
+	cfgAppsecModeOffLeftover.CrowdsecAppsecScheme = HTTPS
+	cfgAppsecModeOffLeftover.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
 	cfgAppsecModeNoLapiKey := getMinimalConfig()
 	cfgAppsecModeNoLapiKey.CrowdsecMode = AppsecMode
 	cfgAppsecModeNoLapiKey.CrowdsecLapiKey = ""
@@ -210,8 +252,15 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Provider set with whitespace-only site", args: args{config: cfgWhitespaceSite}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},
 		{name: "Unknown AppSec failure action", args: args{config: cfgUnknownAction}, wantErr: true},
 		{name: "Empty failure actions use default ban", args: args{config: cfgEmptyAction}, wantErr: false},
-		{name: "AppSec HTTPS with invalid CA while LAPI HTTP", args: args{config: cfgAppsecHTTPS}, wantErr: true},
+		{name: "AppSec HTTPS with invalid CA while LAPI HTTP", args: args{config: cfgAppsecHTTPS}, wantErr: false},
 		{name: "AppSec distinct HTTPS scheme validates URL", args: args{config: cfgAppsecDistinctScheme}, wantErr: false},
+		{name: "Alone AppSec on with invalid CA", args: args{config: cfgAloneAppsecOnInvalidCA}, wantErr: true},
+		{name: "Alone AppSec on with missing key file", args: args{config: cfgAloneAppsecOnMissingKey}, wantErr: true, wantErrContains: "CrowdsecAppsecKey"},
+		{name: "Alone AppSec off leftover CA and key file", args: args{config: cfgAloneAppsecOffLeftover}, wantErr: false},
+		{name: "Live AppSec on with invalid CA", args: args{config: cfgLiveAppsecOnInvalidCA}, wantErr: true},
+		{name: "Live AppSec on with missing key file", args: args{config: cfgLiveAppsecOnMissingKey}, wantErr: true, wantErrContains: "CrowdsecAppsecKey"},
+		{name: "Live AppSec off leftover CA and key file", args: args{config: cfgLiveAppsecOffLeftover}, wantErr: false},
+		{name: "Appsec mode off leftover invalid CA", args: args{config: cfgAppsecModeOffLeftover}, wantErr: false},
 		{name: "Appsec mode without LAPI key", args: args{config: cfgAppsecModeNoLapiKey}, wantErr: false},
 		{name: "None mode minimal config", args: args{config: cfgNoneMode}, wantErr: false},
 		{name: "Alone mode with CAPI credentials", args: args{config: cfgAloneValid}, wantErr: false},
@@ -230,6 +279,50 @@ func Test_ValidateParams(t *testing.T) {
 			}
 			if tt.wantErrContains != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErrContains)) {
 				t.Errorf("validateParams() error = %v, want containing %q", err, tt.wantErrContains)
+			}
+		})
+	}
+}
+
+// Test_ValidateParams_skipsRedisPasswordFileWhenRedisDisabled pins that
+// RedisCachePasswordFile is Stat/read only when redisCacheEnabled is true.
+func Test_ValidateParams_skipsRedisPasswordFileWhenRedisDisabled(t *testing.T) {
+	log := logger.New("INFO", "")
+	missingFile := filepath.Join(t.TempDir(), "missing-redis-password")
+	staleDir := t.TempDir()
+
+	disabledMissing := getMinimalConfig()
+	disabledMissing.RedisCacheEnabled = false
+	disabledMissing.RedisCachePasswordFile = missingFile
+
+	disabledStale := getMinimalConfig()
+	disabledStale.RedisCacheEnabled = false
+	disabledStale.RedisCachePasswordFile = staleDir
+
+	enabledMissing := getMinimalConfig()
+	enabledMissing.RedisCacheEnabled = true
+	enabledMissing.RedisCachePasswordFile = missingFile
+
+	enabledEmpty := getMinimalConfig()
+	enabledEmpty.RedisCacheEnabled = true
+	enabledEmpty.RedisCachePassword = ""
+	enabledEmpty.RedisCachePasswordFile = ""
+
+	tests := []struct {
+		name    string
+		config  *Config
+		wantErr bool
+	}{
+		{name: "disabled Redis ignores a missing password file", config: disabledMissing, wantErr: false},
+		{name: "disabled Redis ignores a directory password file", config: disabledStale, wantErr: false},
+		{name: "enabled Redis rejects a missing password file", config: enabledMissing, wantErr: true},
+		{name: "enabled Redis accepts an empty password with no file", config: enabledEmpty, wantErr: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateParams(tt.config, log)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateParams() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

@@ -40,6 +40,51 @@ func TestRemoveRange(t *testing.T) {
 	}
 }
 
+// TestRemoveRangeSameNetworkDifferentSpelling drops AddRange(10.1.2.0/8) when RemoveRange uses 10.0.0.0/8.
+func TestRemoveRangeSameNetworkDifferentSpelling(t *testing.T) {
+	client := newTestDecisionCache()
+	AddRange(client, "10.1.2.0/8", BannedValue, 60)
+	RemoveRange(client, "10.0.0.0/8")
+	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != "" {
+		t.Fatalf("same-network remove still matched: %q", got)
+	}
+}
+
+// TestRemoveRangeUnparseableIdenticalText drops a garbage CIDR line when remove uses that same text.
+func TestRemoveRangeUnparseableIdenticalText(t *testing.T) {
+	client := newTestDecisionCache()
+	if err := ApplyRangeBatch(client, map[string]string{"not-a-cidr": BannedValue}, nil); err != nil {
+		t.Fatalf("seed unparseable: %v", err)
+	}
+	RemoveRange(client, "not-a-cidr")
+	index, err := readRangeIndex(client)
+	if err != nil || index != "" {
+		t.Fatalf("identical unparseable remove left %q err %v", index, err)
+	}
+}
+
+// TestRemoveRangeParseableVsUnparseableKeepsLine leaves 10.0.0.0/8 when remove uses different garbage text.
+func TestRemoveRangeParseableVsUnparseableKeepsLine(t *testing.T) {
+	client := newTestDecisionCache()
+	AddRange(client, "10.0.0.0/8", BannedValue, 60)
+	RemoveRange(client, "not-a-cidr")
+	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != BannedValue {
+		t.Fatalf("unparseable remove dropped parseable line: %q", got)
+	}
+}
+
+// TestAddRangeSameNetworkPersistsIncomingSpelling replaces 10.1.2.0/8 with the incoming 10.0.0.0/8 text.
+func TestAddRangeSameNetworkPersistsIncomingSpelling(t *testing.T) {
+	client := newTestDecisionCache()
+	AddRange(client, "10.1.2.0/8", CaptchaValue, 60)
+	AddRange(client, "10.0.0.0/8", BannedValue, 60)
+	index, err := readRangeIndex(client)
+	want := "10.0.0.0/8=" + BannedValue
+	if err != nil || index != want {
+		t.Fatalf("same-network upsert persisted %q err %v, want %q", index, err, want)
+	}
+}
+
 func TestAddRangeUpdatesRemediation(t *testing.T) {
 	client := newTestDecisionCache()
 	AddRange(client, "10.0.0.0/8", CaptchaValue, 60)
@@ -159,6 +204,46 @@ func TestLookupCachedRemediationRangeOnlyOrigin(t *testing.T) {
 	got, origin, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, membership)
 	if err != nil || got != BannedValue || origin != "crowdsec" {
 		t.Fatalf("got %q origin %q err %v", got, origin, err)
+	}
+}
+
+func TestAddRangeBareIPIsHostPrefix(t *testing.T) {
+	client := newTestDecisionCache()
+	AddRange(client, "192.0.2.1", BannedValue, 60)
+	index, err := readRangeIndex(client)
+	if err != nil {
+		t.Fatalf("read index: %v", err)
+	}
+	if index != "192.0.2.1/32="+BannedValue {
+		t.Fatalf("blob %q", index)
+	}
+	if got := MembershipFromIndex(index).Remediation(net.ParseIP("192.0.2.1")); got != BannedValue {
+		t.Fatalf("bare host got %q", got)
+	}
+	if got := MembershipFromIndex(index).Remediation(net.ParseIP("192.0.2.2")); got != "" {
+		t.Fatalf("neighbor got %q", got)
+	}
+	RemoveRange(client, "192.0.2.1")
+	if got := remediationFromRangeIndex(client, "192.0.2.1"); got != "" {
+		t.Fatalf("removed bare host still matched: %q", got)
+	}
+	AddRange(client, "2001:db8::1", BannedValue, 60)
+	ipv6, err := readRangeIndex(client)
+	if err != nil {
+		t.Fatalf("read ipv6 index: %v", err)
+	}
+	if ipv6 != "2001:db8::1/128="+BannedValue {
+		t.Fatalf("ipv6 blob %q", ipv6)
+	}
+	if got := MembershipFromIndex(ipv6).Remediation(net.ParseIP("2001:db8::1")); got != BannedValue {
+		t.Fatalf("ipv6 bare host got %q", got)
+	}
+}
+
+func TestMembershipFromIndexLeftoverBareIPDoesNotRemediate(t *testing.T) {
+	index := "192.0.2.1=" + BannedValue
+	if got := MembershipFromIndex(index).Remediation(net.ParseIP("192.0.2.1")); got != "" {
+		t.Fatalf("leftover bare line remediates: %q", got)
 	}
 }
 

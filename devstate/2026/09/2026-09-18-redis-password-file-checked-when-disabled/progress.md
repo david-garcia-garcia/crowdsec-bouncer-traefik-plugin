@@ -1,0 +1,14 @@
+# Progress
+IssueKey: 2026-09-18-redis-password-file-checked-when-disabled
+JobName: 2026-09-18-redis-password-file-checked-when-disabled
+
+| Phase | Work | Card | At |
+|-------|------|------|----|
+| prepare | [x] | [x] | 2026-09-18T14:15:40Z |
+| explore | [x] | [x] | 2026-09-18T14:19:28Z |
+| propose | [x] | [x] | 2026-09-18T14:24:38Z |
+| implement | [x] | [x] | 2026-09-18T14:38:32Z |
+| codereview | [x] | [x] | 2026-09-18T14:43:10Z |
+| devdocsimpact | [x] | [x] | 2026-09-18T14:52:09Z |
+| archive | [x] | [x] | 2026-09-18T14:57:35Z |
+| pullrequest | [x] | [x] | 2026-09-18T15:05:53Z |

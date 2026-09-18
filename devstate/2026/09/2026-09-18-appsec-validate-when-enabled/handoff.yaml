@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-appsec-validate-when-enabled
+jobName: 2026-09-18-appsec-validate-when-enabled
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:bebf1d3a62d22a3347dcb4930a6579ee030565f6f7fc4a64d88f941f2729b676
+comments: none
+localTests: passed
+requirement: requirement.md
+explore: explore.md
+change: appsec-validate-when-enabled
+pr:
+  id: 97
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/97

@@ -16,7 +16,7 @@ The bouncer SHALL identify the client IP using the existing remote-IP owner (`pk
 - **THEN** Range matching uses that `net.IP` and MUST NOT parse the client string again
 
 ### Requirement: Range decisions match by CIDR containment
-When a decision scope is `Range` (any case), the bouncer SHALL treat `value` as a CIDR and remediate a request whose client IP is inside that network. Range membership SHALL be stored on one shared cache key `range-index` as `cidr=remediation` lines so Redis replicas that only read can still match. When several containing CIDRs hit, `ban` SHALL win over `captcha`. In stream and alone modes, the request path SHALL match Range from in-process membership rebuilt from that blob and MUST NOT read `range-index` on the request. live and none SHALL keep skipping `range-index` and expand Range via LAPI `?ip=`.
+When a decision scope is `Range` (any case), the bouncer SHALL treat `value` as a CIDR and remediate a request whose client IP is inside that network. A parseable bare IP SHALL be stored as that host `/32` (IPv4) or `/128` (IPv6) on range-index upsert and remove so write and delete pair. Membership rebuild SHALL use `ParseCIDR` only; a leftover bare-IP index line SHALL be skipped. Range membership SHALL be stored on one shared cache key `range-index` as `cidr=remediation` lines so Redis replicas that only read can still match. When several containing CIDRs hit, `ban` SHALL win over `captcha`. In stream and alone modes, the request path SHALL match Range from in-process membership rebuilt from that blob and MUST NOT read `range-index` on the request. live and none SHALL keep skipping `range-index` and expand Range via LAPI `?ip=`.
 
 #### Scenario: Stream Range contains the client
 - **WHEN** stream or alone mode has a Range ban `10.0.0.0/8` and the client IP is `10.1.2.3`
@@ -33,6 +33,18 @@ When a decision scope is `Range` (any case), the bouncer SHALL treat `value` as 
 #### Scenario: Empty Range membership is a miss
 - **WHEN** stream mode has no Range decisions
 - **THEN** Range matching does not remediate the request
+
+#### Scenario: Bare Range host remediates that address
+- **WHEN** stream or alone mode has a Range ban `192.0.2.1` and the client IP is `192.0.2.1`
+- **THEN** the request is forbidden
+
+#### Scenario: Leftover bare Range line does not remediate
+- **WHEN** `range-index` holds `192.0.2.1=t` and the client IP is `192.0.2.1`
+- **THEN** the request is allowed
+
+#### Scenario: Delete of LAPI host drops the rewritten prefix
+- **WHEN** stream stored Range `192.0.2.1` as `192.0.2.1/32` and then deletes Range `192.0.2.1`
+- **THEN** that host is no longer remediating
 
 ### Requirement: Header-mapped scopes match configured request headers
 Public config `decisionScopeHeaders` SHALL map a CrowdSec scope name to a request header. Empty (the default) SHALL disable header-scope matching. Keys `Ip` and `Range` (any case) SHALL be rejected at config validate. Country values SHALL be ISO 3166-1 alpha-2; `XX` and `T1` SHALL NOT match. AS values SHALL be decimal digits; a leading `AS`/`as` SHALL be stripped. Any other key SHALL match the trimmed header to the stored scope string exactly (`username` is not `user`). A missing or empty header SHALL skip that scope (MUST NOT fail closed). This plugin MUST NOT geolocate.
@@ -212,3 +224,24 @@ A later cache lookup for the same client address and a different header identity
 - **WHEN** live mode queries a banned client address and a mapped Country ban
 - **THEN** the client-address cache key holds the IP ban
 - **AND** the Country header-scope key holds the Country ban
+
+### Requirement: Range index upsert and remove match the same network
+`upsertIndexCIDR` and `removeCIDRFromIndex` SHALL treat two CIDR strings as the same `range-index` line when both parse as IP networks and the parsed network addresses are equal and the prefix lengths match (mask ones and bits). They MUST NOT compare `ParseCIDR`'s first (unmasked) IP. When either side fails to parse, they SHALL fall back to raw-text equality so identical unparseable lines still match. A same-network hit SHALL replace or drop every matching line. A replace or append SHALL persist the incoming CIDR text and MUST NOT rewrite that line to `(*net.IPNet).String()`. This leaf MUST NOT sweep-rewrite leftover spellings the call did not name. `ApplyRangeBatch` SHALL keep one read, removals then upserts, and one write; a failed GET that is not a miss SHALL still return and MUST NOT write.
+
+#### Scenario: Different spelling of the same network is removed
+- **WHEN** `AddRange` stores `10.1.2.0/8` as a ban and `RemoveRange` is called with `10.0.0.0/8`
+- **THEN** `range-index` no longer holds that network
+- **AND** membership for `10.1.2.3` is clear
+
+#### Scenario: Same-network upsert persists the incoming spelling
+- **WHEN** `range-index` holds `10.1.2.0/8=c` and `AddRange` upserts `10.0.0.0/8` as a ban
+- **THEN** that line is replaced with the incoming text `10.0.0.0/8` plus the new remediation
+- **AND** leftover lines this call did not name are left as they were
+
+#### Scenario: Identical unparseable text still matches
+- **WHEN** `range-index` holds an unparseable CIDR line and remove is called with that same raw text
+- **THEN** that line is dropped
+
+#### Scenario: Parseable and unparseable text are not the same line
+- **WHEN** `range-index` holds `10.0.0.0/8=t` and remove is called with unparseable text that is not that string
+- **THEN** the `10.0.0.0/8` line stays
