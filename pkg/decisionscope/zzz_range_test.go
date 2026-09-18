@@ -79,6 +79,15 @@ func TestAddRangeUnparseableCIDRDropped(t *testing.T) {
 	}
 }
 
+func TestRemoveRangeUnparseableCIDRSkipped(t *testing.T) {
+	client := newTestDecisionCache()
+	AddRange(client, "10.0.0.0/8", BannedValue, 60)
+	RemoveRange(client, "not-a-cidr")
+	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != BannedValue {
+		t.Fatalf("unparseable remove dropped existing ban: %q", got)
+	}
+}
+
 func TestApplyRangeBatchUnrelatedLeftoverSpellingStays(t *testing.T) {
 	client := newTestDecisionCache()
 	client.Set(RangeIndexKey, "10.1.2.0/8="+BannedValue, 60)
