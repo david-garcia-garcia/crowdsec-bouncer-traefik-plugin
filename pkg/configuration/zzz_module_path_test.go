@@ -1,4 +1,4 @@
-package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
+package configuration
 
 import (
 	"os"
@@ -11,18 +11,29 @@ import (
 // forkModulePath is this tree's Go and Traefik module identity after the retarget.
 const forkModulePath = "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin"
 
-// forkModuleRoot is the directory that holds go.mod and .traefik.yml (this test file's dir).
+// forkModuleRoot walks from this test file to the directory that holds go.mod.
 func forkModuleRoot(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller")
 	}
-	return filepath.Dir(thisFile)
+	dir := filepath.Dir(thisFile)
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatal("go.mod not found above this test")
+		}
+		dir = parent
+	}
 }
 
 // TestForkModulePathMatchesManifest fails if go.mod or .traefik.yml is reverted
 // to a path other than this fork (DestBranch still named maxlerebourg).
+// Lives under pkg/ so `yaegi test .` at the plugin root does not interpret it.
 func TestForkModulePathMatchesManifest(t *testing.T) {
 	root := forkModuleRoot(t)
 
