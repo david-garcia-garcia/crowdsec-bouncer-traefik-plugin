@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
@@ -73,6 +74,49 @@ func TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan(t *testing.T) {
 	b.ServeHTTP(rw, req)
 	if passed {
 		t.Fatal("origin must not run; the expanded header must hit the canonical Ip ban")
+	}
+	if rw.Code != http.StatusForbidden {
+		t.Fatalf("status=%d", rw.Code)
+	}
+}
+
+func TestServeHTTP_PackedMemoryBanRemediates(t *testing.T) {
+	log := logger.New("ERROR", "")
+	lapiClient, cacheClient := lapi.NewTestClient(log)
+	t.Cleanup(cacheClient.Close)
+	cacheClient.SetRemediation("203.0.113.10", cache.Packed(decisionscope.BannedValue, 1), 60)
+	clientChecker, err := ip.NewChecker(log, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	banTemplate, err := template.New("ban").Parse("banned")
+	if err != nil {
+		t.Fatal(err)
+	}
+	passed := false
+	b := &Bouncer{
+		enabled:                  true,
+		crowdsecMode:             configuration.StreamMode,
+		forwardedHeadersInsecure: true,
+		forwardedCustomHeader:    "X-Forwarded-For",
+		lapiClient:               lapiClient,
+		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
+		captchaClient:            &captcha.Client{},
+		log:                      log,
+		remediationStatusCode:    http.StatusForbidden,
+		banTemplate:              banTemplate,
+		banTemplateContentType:   "text/html; charset=utf-8",
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			passed = true
+		}),
+	}
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
+	req.RemoteAddr = "127.0.0.1:1"
+	req.Header.Set("X-Forwarded-For", "203.0.113.10")
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, req)
+	if passed {
+		t.Fatal("packed memory ban must remediate")
 	}
 	if rw.Code != http.StatusForbidden {
 		t.Fatalf("status=%d", rw.Code)
