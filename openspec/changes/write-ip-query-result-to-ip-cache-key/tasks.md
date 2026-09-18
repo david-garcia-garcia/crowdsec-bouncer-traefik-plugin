@@ -1,8 +1,8 @@
 ## 1. Live IP-slot write
 
-- [ ] 1.1 In `handleNoStreamCache`, keep the `?ip=` result and its duration before the header loop mutates `chosen`
-- [ ] 1.2 After the loop, write that IP query result to the client-address key when live caching is on: active IP result always (existing `liveCacheTTL` on the IP duration); clean IP result only when there is no header-scope query error (`defaultDecisionSeconds`)
-- [ ] 1.3 Leave `cacheLiveScope` as the header-slot owner. Do not parse `RemoteAddr` or re-read headers in `pkg/lapi`
+- [x] 1.1 In `handleNoStreamCache`, keep the `?ip=` result and its duration before the header loop mutates `chosen`
+- [x] 1.2 After the loop, write that IP query result to the client-address key when live caching is on: active IP result always (existing `liveCacheTTL` on the IP duration); clean IP result only when there is no header-scope query error (`defaultDecisionSeconds`)
+- [x] 1.3 Leave `cacheLiveScope` as the header-slot owner. Do not parse `RemoteAddr` or re-read headers in `pkg/lapi`
 
 ## 2. Regression
 
