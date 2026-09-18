@@ -8,7 +8,7 @@ JobName: 2026-09-18-canonicalize-client-remoteip
 | explore | [x] | [x] | 2026-09-18T15:42:31Z |
 | propose | [x] | [x] | 2026-09-18T15:44:51Z |
 | implement | [x] | [x] | 2026-09-18T15:49:10Z |
-| codereview | [ ] | [ ] | |
+| codereview | [x] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
