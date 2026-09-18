@@ -8,7 +8,7 @@ _Avoid_: `{ip}_captcha`, `CaptchaDoneValue`, reusing `CaptchaSecretKey` for the 
 
 ## Overview
 
-Configure `captchaGateSecret` (or file) when `captchaProvider` is set. Optional `captchaGateBindIP` (default true) ties the cookie to `GetRemoteIP`'s string on the bouncer request.
+Configure `captchaGateSecret` (or file) when `captchaProvider` is set. Optional `captchaGateBindIP` (default true) ties the cookie to `clientRequest.remoteIP` after ServeHTTP has canonicalized a successful parse.
 
 ## How to use
 

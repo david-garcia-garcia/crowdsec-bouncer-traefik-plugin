@@ -24,10 +24,8 @@ func (c *Client) LiveLookup(remoteIP string, scopes map[string]string, defaultDe
 
 func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, defaultDecisionSeconds int64) (string, error) {
 	isLiveMode := c.crowdsecMode == configuration.LiveMode
-	// The request path reads this memo back through IPLookupCacheKey, so it is written under the
-	// canonical spelling of the address, not the verbatim header text. The LAPI query below keeps
-	// the raw text: LAPI matches numerically and does not care about spelling.
-	ipKey := decisionscope.IPCacheKey(remoteIP)
+	// remoteIP is already canonical on clientRequest. Do not re-parse it for the memo key.
+	// LAPI ?ip= matches numerically and does not care about spelling.
 	chosen, parsedDuration, err := c.queryLiveDecisions(fmt.Sprintf("ip=%v", remoteIP))
 	if err != nil {
 		return "", err
@@ -46,7 +44,7 @@ func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, 
 	// the "banned" error. A scope failure must never downgrade or mask it.
 	if decisionscope.IsActiveRemediation(chosen) {
 		if isLiveMode && defaultDecisionSeconds > 0 {
-			c.cacheClient.Set(ipKey, chosen, liveCacheTTL(parsedDuration, defaultDecisionSeconds))
+			c.cacheClient.Set(remoteIP, chosen, liveCacheTTL(parsedDuration, defaultDecisionSeconds))
 		}
 		return chosen, errors.New("handleNoStreamCache:banned")
 	}
@@ -57,7 +55,7 @@ func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, 
 		return "", scopeErr
 	}
 	if isLiveMode && defaultDecisionSeconds > 0 {
-		c.cacheClient.Set(ipKey, decisionscope.NoBannedValue, defaultDecisionSeconds)
+		c.cacheClient.Set(remoteIP, decisionscope.NoBannedValue, defaultDecisionSeconds)
 	}
 	return decisionscope.NoBannedValue, nil
 }

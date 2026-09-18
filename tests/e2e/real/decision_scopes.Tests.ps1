@@ -2,6 +2,19 @@
 
 # Range and header-mapped CrowdSec scopes against a live LAPI.
 
+function Add-IpSpellingDecision {
+    param(
+        [string]$Stored,
+        [string]$Reason
+    )
+    try {
+        Add-TestDecision -IP $Stored -Type "ban" -Reason $Reason
+    }
+    catch {
+        Add-TestScopeDecision -Scope "Ip" -Value $Stored -Type "ban" -Reason $Reason
+    }
+}
+
 BeforeAll {
     . "$PSScriptRoot/TestUtils.ps1"
 
@@ -122,6 +135,49 @@ Describe "CrowdSec Range and header-mapped scopes" {
                 return ($response.StatusCode -in @(403, 429))
             }
             $result.Success | Should -Be $true -Because "Stream scopes= must include Country"
+        }
+    }
+
+    Context "Ip spelling in none mode" -Tag "scopes" {
+        BeforeEach {
+            Clear-TraefikAccessLogs
+            Remove-AllTestDecisions
+        }
+
+        It "Should block expanded IPv6, upper-case IPv6, and IPv4-mapped bans under a different request spelling" {
+            $cases = @(
+                @{ Stored = "2001:0db8:0000:0000:0000:0000:00b1:0001"; Request = "2001:db8::b1:1" }
+                @{ Stored = "2001:DB8::B1:2"; Request = "2001:db8::b1:2" }
+                @{ Stored = "::ffff:203.0.113.81"; Request = "203.0.113.81" }
+            )
+            foreach ($case in $cases) {
+                Add-IpSpellingDecision -Stored $case.Stored -Reason "Ip spelling none $($case.Stored)"
+                $blocked = Test-HttpRequest -Endpoint "/scope-none" -IP $case.Request -TraefikUrl $script:TraefikUrl
+                $blocked.StatusCode | Should -BeIn @(403, 429) -Because "none mode must ban stored $($case.Stored) when the header is $($case.Request)"
+            }
+        }
+    }
+
+    Context "Ip spelling in stream mode" -Tag "scopes" {
+        BeforeEach {
+            Clear-TraefikAccessLogs
+            Remove-AllTestDecisions
+        }
+
+        It "Should block expanded IPv6, upper-case IPv6, and IPv4-mapped bans under a different request spelling" {
+            $cases = @(
+                @{ Stored = "2001:0db8:0000:0000:0000:0000:00b2:0001"; Request = "2001:db8::b2:1" }
+                @{ Stored = "2001:DB8::B2:2"; Request = "2001:db8::b2:2" }
+                @{ Stored = "::ffff:203.0.113.82"; Request = "203.0.113.82" }
+            )
+            foreach ($case in $cases) {
+                Add-IpSpellingDecision -Stored $case.Stored -Reason "Ip spelling stream $($case.Stored)"
+                $result = Wait-ForCondition -Description "Stream mode to block stored $($case.Stored) as $($case.Request)" -TimeoutSeconds 45 -RetryIntervalSeconds 2 -Condition {
+                    $response = Test-HttpRequest -Endpoint "/scope-stream" -IP $case.Request -TraefikUrl $script:TraefikUrl
+                    return ($response.StatusCode -in @(403, 429))
+                }
+                $result.Success | Should -Be $true -Because "stream mode must ban stored $($case.Stored) when the header is $($case.Request)"
+            }
         }
     }
 }

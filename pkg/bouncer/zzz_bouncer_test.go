@@ -18,7 +18,18 @@ import (
 // testClientRequest is req plus the chosen client address for handler tests.
 func testClientRequest(req *http.Request, remoteIP string) clientRequest {
 	parsed := net.ParseIP(remoteIP)
+	if parsed != nil {
+		remoteIP = parsed.String()
+	}
 	return clientRequest{Request: req, ipAddr: parsed, ipType: ip.FamilyOfIP(parsed), remoteIP: remoteIP}
+}
+
+func TestClientRequestRemoteIPIsCanonical(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+	got := testClientRequest(req, "2001:0db8:0000:0000:0000:0000:0000:0001")
+	if got.remoteIP != "2001:db8::1" {
+		t.Fatalf("remoteIP=%q", got.remoteIP)
+	}
 }
 
 func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
