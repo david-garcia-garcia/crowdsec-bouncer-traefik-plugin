@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: folded five deltas into live specs; archived split-http-timeouts
 skipped: Task FindSpecHost unavailable — ran on main thread
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: n/a
+skipped: n/a
