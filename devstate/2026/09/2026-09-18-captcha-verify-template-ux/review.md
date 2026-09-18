@@ -57,3 +57,14 @@ verdict: in progress
 pr: 103
 ci: Main Process, Race detector, e2e docker+pester in progress; e2e binary+mock queued
 shas: b0494d78f73cc1d2418e0ea01d5e4a2955542824
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: fold core_plugin_middleware_captcha-siteverify, fold core_plugin_middleware_config-validation; moved openspec/changes/captcha-verify-template-ux to archive/2026-09-18-captcha-verify-template-ux
+skipped: none
+verdict: in progress
+pr: 103
+ci: Main Process, Race detector, e2e binary+mock, e2e docker+pester queued
+validators: 0
+shas: ed14080a21d98d241ede7d2971fcac8dd5469ad8
