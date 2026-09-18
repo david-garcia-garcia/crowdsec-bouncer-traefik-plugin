@@ -353,14 +353,19 @@ The following declaration (given here in YAML) defines a plugin:
 > See the examples for advanced usage.
 
 ```yaml
-# Static configuration
+# Static configuration — load this tree as a local plugin.
+# Copy or bind-mount sources to ./plugins-local/src/github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
+# relative to the Traefik working directory (see Local Mode below).
 
 experimental:
-  plugins:
+  localPlugins:
     bouncer:
       moduleName: github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
-      version: vX.Y.Z # To update
 ```
+
+A catalog `GET` of `github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin` at `v1.7.1` or `vX.Y.Z` returns 404, and plugins.traefik.io does not list forks. Do not use `experimental.plugins` plus a `version` of this module as the working install.
+
+If the host already loads upstream `experimental.plugins.bouncer` (`github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin`), register this fork under a different alias, for example `experimental.localPlugins.crowdsec` and `plugin.crowdsec` in the dynamic YAML. In-tree examples keep alias `bouncer`.
 
 ```yaml
 # Simplified dynamic configuration
