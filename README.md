@@ -125,6 +125,8 @@ There are five operating modes (`CrowdsecMode`). Sequence diagrams live in [docs
 
 `stream` is recommended: decisions refresh every 60 seconds by default. The request path does not call LAPI. Usage-metrics still POST to LAPI on `MetricsUpdateIntervalSeconds` unless that interval is zero or less.
 
+`CrowdsecMode` and `CrowdsecAppsecEnabled` are independent axes. The mode picks where decisions come from; `CrowdsecAppsecEnabled` adds the AppSec (WAF) check, which inspects the requests the decision check allowed, in **every** mode. The usual pair is `stream` plus `crowdsecAppsecEnabled: true`. Because `appsec` mode has no decision source, it is the one mode that needs AppSec enabled to do anything: `crowdsecMode: appsec` with `crowdsecAppsecEnabled: false` enforces nothing and every request reaches your service. The plugin logs a warning at startup for that pair and still starts.
+
 ## Cache
 
 The cache remembers CrowdSec remediations so this plugin does not have to ask LAPI on every request.
@@ -210,7 +212,7 @@ Client IPs that bypass bouncer and cache checks (LAN or VPN). Trusted clients al
 Send only the first N bytes to AppSec. `0` is unlimited. Only POST, PUT, PATCH, and DELETE bodies are forwarded; any other method (including a GET with a body) is sent as a headers-only GET with the real verb on `X-Crowdsec-Appsec-Verb`.
 
 **CrowdsecAppsecEnabled** (bool, default `false`)
-Enable CrowdSec AppSec (WAF). CrowdSec 1.8 bot-detection needs this set, plus a Traefik router `PathPrefix(/crowdsec-internal/challenge)` using this same middleware.
+Enable CrowdSec AppSec (WAF). Independent of `CrowdsecMode`: it inspects the requests the decision check allowed, in every mode. CrowdSec 1.8 bot-detection needs this set, plus a Traefik router `PathPrefix(/crowdsec-internal/challenge)` using this same middleware.
 
 **CrowdsecAppsecFailureAction** (string, default `ban`)
 What to do when AppSec does not return a usable verdict (HTTP 500, unreachable, body read error, or unreadable HTTP/2 or HTTP/3 body on POST/PUT/PATCH). Expected: `passthrough`, `ban`, `captcha`. `ban` drops the request. `passthrough` lets 500/unreachable/body-io errors continue as allow, and sends a headers-only GET when the body cannot be buffered. `captcha` uses the plugin captcha client (`captchaProvider` must be set). **BREAKING:** replaces `crowdsecAppsecFailureBlock`, `crowdsecAppsecUnreachableBlock`, and `crowdsecAppsecUnreadableBodyBlock`. Operators who had those bools set to `false` MUST set `crowdsecAppsecFailureAction: passthrough`.
