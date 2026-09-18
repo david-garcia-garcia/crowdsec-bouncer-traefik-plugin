@@ -129,6 +129,57 @@ func Test_ServeHTTP_queryTokenSolvesWithoutBody(t *testing.T) {
 	}
 }
 
+// TestHunt_siteverifyJSONContentTypeIsCaseInsensitive proves a mixed-case
+// siteverify Content-Type still issues the gate cookie and 302.
+func TestHunt_siteverifyJSONContentTypeIsCaseInsensitive(t *testing.T) {
+	siteverify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "Application/JSON")
+		_, _ = w.Write([]byte(`{"success":true}`))
+	}))
+	t.Cleanup(siteverify.Close)
+
+	templatePath := filepath.Join(t.TempDir(), "captcha.html")
+	if err := os.WriteFile(templatePath, []byte("E2E_CAPTCHA_PAGE_MARKER"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	client := &Client{}
+	if err := client.New(
+		slog.Default(),
+		siteverify.Client(),
+		"custom",
+		siteverify.URL+"/dummy.js",
+		"",
+		"dummy-captcha",
+		"dummy-captcha-response",
+		siteverify.URL+"/siteverify",
+		"e2e-dummy-site",
+		"e2e-dummy-secret",
+		"e2e-gate-secret",
+		true,
+		"",
+		templatePath,
+		3600,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	form := url.Values{}
+	form.Set("dummy-captcha-response", "ok")
+	solveReq := httptest.NewRequest(http.MethodPost, "/foo", strings.NewReader(form.Encode()))
+	solveReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	solveRW := httptest.NewRecorder()
+	client.ServeHTTP(solveRW, solveReq, "1.2.3.4")
+	if solveRW.Code != http.StatusFound {
+		body, _ := io.ReadAll(solveRW.Result().Body)
+		t.Fatalf("solve want 302, got %d %s", solveRW.Code, body)
+	}
+	cookie := solveRW.Result().Header.Get("Set-Cookie")
+	if !strings.Contains(cookie, gateCookieName+"=") {
+		t.Fatalf("solve missing gate cookie: %s", cookie)
+	}
+}
+
 func Test_captchaResponseFromRequest_rawBodyWithoutContentType(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/foo", strings.NewReader("dummy-captcha-response=ok"))
 	// No Content-Type: ParseForm skips the body; the raw ParseQuery path must still win.
