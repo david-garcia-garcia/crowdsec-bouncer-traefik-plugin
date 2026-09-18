@@ -15,3 +15,9 @@ phase: propose
 findings: none
 fixed: none
 skipped: no Task subagent; FindSpecHost fold onto core_plugin_lapi_connection on the main thread
+
+## implement (2026-09-18)
+phase: implement
+findings: none
+fixed: getToken stores a non-empty CAPI token after HTTP 2xx without requiring JSON code==200; TestGetToken_TwoXXBodyWithoutJSONCode; empty-token getToken statusCode: kept
+skipped: no Task subagent; research and usage packets already present
