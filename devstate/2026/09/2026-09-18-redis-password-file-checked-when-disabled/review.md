@@ -50,3 +50,11 @@ fixed: folded ADDED Redis password-file requirement onto core_plugin_middleware_
 skipped: Task spawn unavailable; FindSpecHost in-process
 verdict: in progress
 ci: queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35359372971
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: reused PR 87; ready title; comments.md none; CI succeeded on 1da58fb
+skipped: none
+verdict: ready for review
+ci: succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35359564451 https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35359564415
