@@ -10,4 +10,4 @@
 
 ## 3. Verify
 
-- [ ] 3.1 `go test ./pkg/decisionscope/ ./pkg/lapi/ -count=1` including `TestApplyRangeBatch_UnreachableReadKeepsSharedIndex` and `TestApplyRangeBatch_UnreachableReadDoesNotDeleteIndex`
+- [x] 3.1 `go test ./pkg/decisionscope/ ./pkg/lapi/ -count=1` including `TestApplyRangeBatch_UnreachableReadKeepsSharedIndex` and `TestApplyRangeBatch_UnreachableReadDoesNotDeleteIndex`
