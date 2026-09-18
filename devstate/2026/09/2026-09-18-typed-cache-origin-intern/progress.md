@@ -5,7 +5,7 @@ JobName: 2026-09-18-typed-cache-origin-intern
 | Phase | Work | Card | At |
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-18T18:16:57Z |
-| explore | [x] | [ ] | |
+| explore | [x] | [x] | 2026-09-18T18:20:18Z |
 | propose | [ ] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
