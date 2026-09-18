@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: archived to openspec/changes/archive/2026-09-18-range-bare-ip-host-prefix/
 skipped: none
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: ready title; CI succeeded
+skipped: none
