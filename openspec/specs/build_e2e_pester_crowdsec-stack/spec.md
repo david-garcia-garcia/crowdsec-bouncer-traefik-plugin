@@ -43,7 +43,7 @@ The repository SHALL keep `tests/e2e/mock/` and `make e2e_mock` as the mock suit
 - **THEN** the trusted `X-Forwarded-For` is allowed and the untrusted one is forbidden
 
 #### Scenario: Custom ban page body and Content-Type
-- **WHEN** a ban exists and the route sets `banHtmlFilePath` to the suite’s custom HTML
+- **WHEN** a ban exists and the route sets `banFilePath` to the suite’s custom HTML
 - **THEN** the response is forbidden, `Content-Type` is HTML, and the body contains `E2E_CUSTOM_BAN_PAGE_MARKER`
 
 #### Scenario: Real AppSec CRS blocks SQLi

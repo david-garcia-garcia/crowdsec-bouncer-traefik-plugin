@@ -17,6 +17,7 @@ Use this suite for plugin-only CI and for proving two Crowdsec configs in one pr
 ## How to use
 
 - Add a folder under `tests/e2e/mock/scenarios/<name>/`.
+- Captcha scenarios set `captchaFilePath`. Do not use `captchaHtmlFilePath` or HTML-cased twins.
 - dual-bouncer: two middlewares, two LAPI ports (`LAPI_PORT_B`), `lapi_add_decision_at`.
 - Header-mapped scopes: `tests/e2e/mock/scenarios/scope-headers/` injects synthetic Country/AS/username headers. Real-stack Country uses geoblock instead.
 - `mocklapi --lapi-only` when AppSec is not under test.
@@ -33,6 +34,7 @@ make e2e_mock
 
 - `tests/e2e/mock/scenarios/dual-bouncer/`
 - `tests/e2e/mock/scenarios/scope-headers/`
+- `tests/e2e/mock/scenarios/captcha/`
 - `tests/e2e/mock/lib/common.sh`
 - `.github/workflows/e2e.yml`
 
@@ -41,3 +43,4 @@ make e2e_mock
 - Identify the client with `X-Forwarded-For`. Do not parse `RemoteAddr`.
 - Two LAPIs must disagree on a decision so a cache leak would fail the scenario.
 - Captcha solve uses `captchaProvider: custom` and mocklapi `POST /siteverify` (`{"success":true}`). POST `dummy-captcha-response`; do not call a real provider. The gate cookie is `crowdsec_captcha_gate`.
+- Traefik drops unused keys. An old-key-only `captchaHtmlFilePath` serves CreateConfig `/captcha.html`, not the scenario file.
