@@ -27,3 +27,9 @@ phase: codereview
 findings: Standards 1 hard Leave a trail; Coverage 1 judgement; Spec/Security/Performance/Dead none
 fixed: handleNoStreamCache method comment (8b03528)
 skipped: Coverage IP-ban+header-ban slot test (judgement; design scoped one dest-style test)
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: 4 units; 2 stale-usage produced; 0 skipped
+fixed: Decision scopes live How-to names IP-slot vs HeaderScopeKey; LAPI connection Gotcha names IP-key TTL; PR #82 summary Set
+skipped: none
