@@ -21,21 +21,21 @@ func shrinkPinWindow(t *testing.T, client *Client, window time.Duration) *redisC
 
 // newLaggingReplicaClient wires a client whose single read host never caught up with the writer,
 // which is the worst case of the lag RedisCacheReadHosts exposes.
-func newLaggingReplicaClient(t *testing.T) (*Client, *fakeRedis, *fakeRedis) {
+func newLaggingReplicaClient(t *testing.T) (*Client, *fakeRedis) {
 	t.Helper()
-	writer, writerAddr := startFakeRedis(t, false)
+	_, writerAddr := startFakeRedis(t, false)
 	replica, replicaAddr := startFakeRedis(t, true)
 	client := &Client{}
 	client.New(logger.New("INFO", ""), true, writerAddr, []string{replicaAddr}, "", "", "p")
 	t.Cleanup(client.Close)
-	return client, writer, replica
+	return client, replica
 }
 
 // Test_ReadAfterWriteDoesNotReadALaggingReplica is the defect: every read went round-robin through
 // nextReader, so an IP this process had just banned read back as a miss, and stream/alone mode reads
 // a miss as "no decision affecting this IP" and serves the request it had already decided to block.
 func Test_ReadAfterWriteDoesNotReadALaggingReplica(t *testing.T) {
-	client, _, _ := newLaggingReplicaClient(t)
+	client, _ := newLaggingReplicaClient(t)
 
 	client.Set("1.2.3.4", "t", 60)
 
@@ -109,7 +109,7 @@ func Test_ReadsReturnToTheReplicasAfterThePinWindow(t *testing.T) {
 // would have degenerated in live mode, where the cache is a per-request memo and writes never stop,
 // so the window would never lapse and every read would land on the writer.
 func Test_WritingOneKeyDoesNotPinAnother(t *testing.T) {
-	client, _, replica := newLaggingReplicaClient(t)
+	client, replica := newLaggingReplicaClient(t)
 
 	client.Set("1.2.3.4", "t", 60)
 	if _, err := client.Get("5.6.7.8"); err == nil {
@@ -144,10 +144,10 @@ func Test_GetConsistentAlwaysReadsTheWriter(t *testing.T) {
 // pull writes the whole decision list, far past the cap; the set must not grow with it, and the
 // fallback must be the writer, never a silent return to a replica that has not caught up.
 func Test_PinOverflowFailsTowardTheWriter(t *testing.T) {
-	client, _, replica := newLaggingReplicaClient(t)
+	client, replica := newLaggingReplicaClient(t)
 	rc := shrinkPinWindow(t, client, time.Minute)
 
-	for i := 0; i < writerPinMaxKeys+64; i++ {
+	for i := range writerPinMaxKeys + 64 {
 		client.Set("ip-"+strconv.Itoa(i), "t", 60)
 	}
 

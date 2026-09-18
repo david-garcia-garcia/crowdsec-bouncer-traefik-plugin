@@ -17,7 +17,9 @@ Use the utilities SimpleRedis module for Redis-protocol GET/SET/DEL/MGET. Constr
 ## How to use
 
 - `Client.New(..., isRedis=true, writeHost, readHosts, pass, database, keyPrefix)` builds the writer and each reader via `simpleredis.New`. `keyPrefix` is `SessionHex` for every mode so two LAPI Clients that share a DecisionStore also share keys.
-- Request lookup uses `GetMany` (Redis `MGET`, one `nextReader()`): the client IP, optional `range-index`, and each present header-scope key. Prefix each logical key. Missing keys are omitted from the result map.
+- Request lookup uses `GetMany` (Redis `MGET`, one reader): the client IP, optional `range-index`, and each present header-scope key. Prefix each logical key. Missing keys are omitted from the result map.
+- Reads pick their host through `readerFor`, not `nextReader` directly. A key this client just wrote (`set`, `delete`, or `acquire`) reads from the **writer** for `writerPinWindow`; everything else keeps the round-robin over the read hosts. That is read-your-writes for the request path without taking the per-request lookup load off the replicas.
+- Use `Client.GetConsistent` when a read must not be stale at all: a read-modify-write of a shared blob, or a read whose result is memoised and served for longer than the pin window. Both Range-index reads use it (`readRangeIndex`, `hydrateRangeMembership`). Do not use it for `LookupCachedRemediation`.
 - Cache keys for remediations are the client IP, `scope:value` for header-mapped scopes, and one `range-index` blob, namespaced by the store’s `SessionHex` `keyPrefix` when Redis is on.
 - Commands pass `context.Background()` (the cache API has no request context).
 - `SimpleRedis.Close()` drains idle sockets and refuses to pool again. Safe to call more than once (CAS). `cache.Client.Close()` closes the writer and every reader. Only the DecisionStore reclaim Close hook calls that.
@@ -48,3 +50,6 @@ values, err := client.MGet(context.Background(), []string{key, "range-index"})
 - Real-stack Redis-cache e2e uses Dragonfly, not Redis.
 - Pass a non-empty `keyPrefix` (`SessionHex`) when two LAPI Clients share one Redis.
 - Do not take utilities zero-Config dial/command defaults (200ms/900ms).
+- The pin window bounds the stale-read window; it does not abolish it. A read host lagging longer than `writerPinWindow` still answers stale outside the window, and that is a deployment to fix, not a constant to widen. It is deliberately not a configuration key.
+- Do not turn the pin into one deadline covering every key. In `live` mode the cache is a per-request memo, so writes never stop and such a deadline would never lapse: every read would land on the writer, which is the regression the per-key pin exists to avoid.
+- A write burst past `writerPinMaxKeys` (a `startup=true` stream pull is one) pins **all** reads for the window instead of growing the set. Overflow fails toward the writer, never back to a replica.

@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-// fakeRedis is an in-process RESP server over a string map. It mirrors the behaviour measured
+// fakeRedis is an in-process RESP server over a string map. It mirrors the behavior measured
 // against redis:7-alpine, including the error a non-positive EX earns.
 type fakeRedis struct {
 	mu       sync.Mutex
@@ -162,7 +162,7 @@ func readRESPCommand(reader *bufio.Reader) ([]string, error) {
 		return nil, io.ErrUnexpectedEOF
 	}
 	args := make([]string, 0, count)
-	for i := 0; i < count; i++ {
+	for range count {
 		sizeLine, readErr := reader.ReadString('\n')
 		if readErr != nil {
 			return nil, readErr

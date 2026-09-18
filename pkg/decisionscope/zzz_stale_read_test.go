@@ -116,7 +116,7 @@ func readCommand(reader *bufio.Reader) ([]string, error) {
 		return nil, io.ErrUnexpectedEOF
 	}
 	args := make([]string, 0, count)
-	for i := 0; i < count; i++ {
+	for range count {
 		sizeLine, readErr := reader.ReadString('\n')
 		if readErr != nil {
 			return nil, readErr

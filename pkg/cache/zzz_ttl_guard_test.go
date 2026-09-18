@@ -7,7 +7,7 @@ import (
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-// Test_SetNonPositiveTTLIsNoopInMemory locks the dangerous half of the old behaviour: the vendored
+// Test_SetNonPositiveTTLIsNoopInMemory locks the dangerous half of the old behavior: the vendored
 // TTL map stored a negative TTL as timestamp -1, which its Get reads as "never expires", so a
 // cached ban outlived the decision that justified it with no upper bound.
 func Test_SetNonPositiveTTLIsNoopInMemory(t *testing.T) {
