@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: FindSpecHost new core_plugin_middleware_captcha-siteverify; catalog validators 0; moved to openspec/changes/archive/2026-09-18-require-2xx-siteverify-status-before-success
 skipped: n/a
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: reused PR 86; dropped WIP title; CI succeeded on 836a94a; final card on pr-body
+skipped: comments.md none

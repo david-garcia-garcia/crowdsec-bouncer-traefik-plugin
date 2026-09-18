@@ -11,4 +11,4 @@ JobName: 2026-09-18-captcha-siteverify-ignores-http-status
 | codereview | [x] | [x] | 2026-09-18T14:52:15Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T14:56:47Z |
 | archive | [x] | [x] | 2026-09-18T15:02:54Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-18T15:10:36Z |
