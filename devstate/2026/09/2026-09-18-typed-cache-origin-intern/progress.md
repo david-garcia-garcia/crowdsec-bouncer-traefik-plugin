@@ -6,7 +6,7 @@ JobName: 2026-09-18-typed-cache-origin-intern
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-18T18:16:57Z |
 | explore | [x] | [x] | 2026-09-18T18:20:18Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
