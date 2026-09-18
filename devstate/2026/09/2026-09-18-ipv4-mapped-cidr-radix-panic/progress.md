@@ -6,7 +6,7 @@ JobName: 2026-09-18-ipv4-mapped-cidr-radix-panic
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-18T14:16:37Z |
 | explore | [x] | [x] | 2026-09-18T14:22:25Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [x] | 2026-09-18T14:26:33Z |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
