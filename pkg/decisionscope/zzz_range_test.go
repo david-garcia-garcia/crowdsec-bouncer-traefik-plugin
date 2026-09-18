@@ -2,6 +2,7 @@ package decisionscope
 
 import (
 	"net"
+	"strings"
 	"testing"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
@@ -45,6 +46,55 @@ func TestAddRangeUpdatesRemediation(t *testing.T) {
 	AddRange(client, "10.0.0.0/8", BannedValue, 60)
 	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != BannedValue {
 		t.Fatalf("upsert got %q, want ban", got)
+	}
+}
+
+func TestHunt_RemoveRangeEquivalentCIDRSpelling(t *testing.T) {
+	client := newTestDecisionCache()
+	AddRange(client, "10.1.2.0/8", BannedValue, 60)
+	RemoveRange(client, "10.0.0.0/8")
+	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != "" {
+		t.Fatalf("equivalent CIDR remove still matched: %q", got)
+	}
+}
+
+func TestAddRangeEquivalentCIDRSpellingUpdatesRemediation(t *testing.T) {
+	client := newTestDecisionCache()
+	AddRange(client, "10.1.2.0/8", CaptchaValue, 60)
+	AddRange(client, "10.0.0.0/8", BannedValue, 60)
+	index := readRangeIndex(client)
+	if strings.Count(index, "\n") != 0 || !strings.HasPrefix(index, "10.0.0.0/8="+BannedValue) {
+		t.Fatalf("blob %q, want one canonical ban line", index)
+	}
+	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != BannedValue {
+		t.Fatalf("equivalent CIDR upsert got %q, want ban", got)
+	}
+}
+
+func TestAddRangeUnparseableCIDRDropped(t *testing.T) {
+	client := newTestDecisionCache()
+	AddRange(client, "not-a-cidr", BannedValue, 60)
+	if got := readRangeIndex(client); got != "" {
+		t.Fatalf("unparseable upsert stored %q", got)
+	}
+}
+
+func TestApplyRangeBatchUnrelatedLeftoverSpellingStays(t *testing.T) {
+	client := newTestDecisionCache()
+	client.Set(RangeIndexKey, "10.1.2.0/8="+BannedValue, 60)
+	AddRange(client, "192.168.0.0/16", CaptchaValue, 60)
+	index := readRangeIndex(client)
+	if !strings.Contains(index, "10.1.2.0/8="+BannedValue) {
+		t.Fatalf("unrelated leftover spelling dropped from %q", index)
+	}
+}
+
+func TestRemoveRangeIPv4MappedPrefixStaysDistinct(t *testing.T) {
+	client := newTestDecisionCache()
+	AddRange(client, "10.0.0.0/8", BannedValue, 60)
+	RemoveRange(client, "::ffff:10.0.0.0/104")
+	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != BannedValue {
+		t.Fatalf("ipv4-mapped remove dropped ipv4 /8: %q", got)
 	}
 }
 
