@@ -41,6 +41,14 @@ func (s *testLeaseRedis) addr() string {
 	return s.ln.Addr().String()
 }
 
+// value is the writer-side view of a stored key, for assertions a dead reader cannot make.
+func (s *testLeaseRedis) value(key string) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	stored, ok := s.keys[key]
+	return stored, ok
+}
+
 func (s *testLeaseRedis) serve(conn net.Conn) {
 	defer func() { _ = conn.Close() }()
 	reader := bufio.NewReader(conn)
@@ -79,6 +87,15 @@ func (s *testLeaseRedis) replyLocked(verb string, argv []string) []byte {
 		}
 		s.keys[argv[1]] = argv[2]
 		return []byte("+OK\r\n")
+	case "DEL":
+		if len(argv) < 2 {
+			return []byte("-ERR wrong number of arguments\r\n")
+		}
+		if _, exists := s.keys[argv[1]]; !exists {
+			return []byte(":0\r\n")
+		}
+		delete(s.keys, argv[1])
+		return []byte(":1\r\n")
 	case "EVAL", "EVALSHA":
 		if len(argv) < 6 {
 			return []byte("-ERR wrong number of arguments\r\n")
