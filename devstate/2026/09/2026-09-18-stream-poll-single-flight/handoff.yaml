@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-stream-poll-single-flight
+jobName: 2026-09-18-stream-poll-single-flight
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:81909025ea88ce3eefa3242b28a3d53d2d236493728b2786656121b815ccac40
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: stream-poll-single-flight
+pr:
+  id: 72
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/72

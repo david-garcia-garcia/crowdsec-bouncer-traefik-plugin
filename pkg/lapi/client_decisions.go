@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"sync/atomic"
 	"time"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
@@ -13,7 +14,7 @@ import (
 
 // streamQuery is the LAPI/CAPI stream RawQuery. LAPI adds scopes= when this is not CAPI.
 func (c *Client) streamQuery() string {
-	query := fmt.Sprintf("startup=%t", !c.isCrowdsecStreamHealthy || c.isCrowdsecStreamStartup)
+	query := fmt.Sprintf("startup=%t", atomic.LoadInt64(&c.isCrowdsecStreamHealthy) == 0 || atomic.LoadInt64(&c.isCrowdsecStreamStartup) != 0)
 	if c.crowdsecStreamRoute != crowdsecLapiStreamRoute {
 		return query
 	}

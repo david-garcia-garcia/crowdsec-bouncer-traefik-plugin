@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -87,7 +88,7 @@ func TestOpenStream_LateCountryJoinUsesStartupFalse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.isCrowdsecStreamStartup {
+	if atomic.LoadInt64(&first.isCrowdsecStreamStartup) != 0 {
 		t.Fatal("first poll must clear startup")
 	}
 	lateCfg := testStreamConfig(parsed.Host, 1)

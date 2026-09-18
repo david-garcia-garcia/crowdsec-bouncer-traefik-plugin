@@ -235,7 +235,7 @@ func TestOpenStream_SleepingIntervalChangeWakesSameSlot(t *testing.T) {
 	if first != second {
 		t.Fatal("sleeping interval change must Wake the same Client")
 	}
-	if first.isCrowdsecStreamStartup {
+	if atomic.LoadInt64(&first.isCrowdsecStreamStartup) != 0 {
 		t.Fatal("Wake must resume with startup=false")
 	}
 }

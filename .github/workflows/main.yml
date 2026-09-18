@@ -81,3 +81,41 @@ jobs:
         run: make yaegi_test
         env:
           GOPATH: ${{ github.workspace }}/go
+
+  race:
+    name: Race detector
+    runs-on: ubuntu-latest
+    env:
+      GO_VERSION: 1.22
+      CGO_ENABLED: 1
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}/go/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+
+    steps:
+
+      - name: Set up Go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Check out code
+        uses: actions/checkout@v7
+        with:
+          path: go/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+          fetch-depth: 0
+
+      - name: Cache Go modules
+        uses: actions/cache@v6
+        with:
+          path: ${{ github.workspace }}/go/pkg/mod
+          key: ${{ runner.os }}-go-race-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-race-
+            ${{ runner.os }}-go-
+
+      - name: Setup GOPATH
+        run: go env -w GOPATH=${{ github.workspace }}/go
+
+      - name: Race tests
+        run: go test -race -count=1 ./pkg/...

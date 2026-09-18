@@ -39,3 +39,4 @@ if !won {
 - Do not use `atomic.Pointer[T]` to hold the lease.
 - Do not turn write-once Client scalars into mutable lease fields.
 - `cache.Client.Acquire` is the cache API (`core_cache_redis.md`). Isolation of the `updated` key is the DecisionStore (`core_cache_client.md`).
+- The lease is not the intra-instance poll lock. Overlapping `handleStreamTicker` on one Client is `core_plugin_lapi_stream-single-flight.md`.

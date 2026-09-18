@@ -17,6 +17,7 @@ _Avoid_: `atomic.Pointer[T]`, a write-once Client `httpClient` field, CrowdsecCo
 - Write the CAPI token on the stored transport (`getToken`). Do not keep a write-once Client key field beside it.
 - Pass `defaultDecisionSeconds` into `LiveLookup`. Do not store that TTL on Client.
 - Keep `StreamStartupBlock` write-once at `startStream`. First incarnation keeps it. Do not put it on Bouncer. Do not mutate it after construct.
+- Publish stream startup, healthy, and update-failure as `int64` fields with `atomic.LoadInt64` / `StoreInt64`. `StreamHealthy` loads. Do not use `atomic.Bool` or `atomic.Int64`. Intra-instance poll overlap is `core_plugin_lapi_stream-single-flight.md`.
 - `logInfo` includes reclaim `sessionKey` (stream/alone `SessionKey`, live/none `Key`) and `reason` (`started|sleeping|waking|closed`). Name transport replace and a live joiner `adopted` at INFO. Do not log `ignored` or warn-and-wire.
 
 ## Pattern snippet
