@@ -27,3 +27,9 @@ phase: codereview
 findings: P3 1 (Standards Leave a trail on sentinelFor)
 fixed: job comment on sentinelFor (d4bdc02)
 skipped: none
+
+## devdocsimpact (2026-09-18T18:11:20Z)
+phase: devdocsimpact
+findings: none
+fixed: none
+skipped: usage gotcha already on core_cache_client.md from implement
