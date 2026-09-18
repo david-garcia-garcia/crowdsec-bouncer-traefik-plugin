@@ -40,3 +40,9 @@ findings: none
 fixed: FindSpecHost new `core_plugin_middleware_captcha-siteverify`; catalog sync; archive `openspec/changes/archive/2026-09-18-captcha-siteverify-content-type-case/`
 skipped: Task subagent unavailable — FindSpecHost ran on this thread
 
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: reused PR 94; ready title; CI succeeded on `cc4ff0b`; final card on pr-body
+skipped: comments.md absent
+

@@ -11,4 +11,4 @@ JobName: 2026-09-18-captcha-siteverify-content-type-case
 | codereview | [x] | [x] | 2026-09-18T14:55:41Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T15:06:45Z |
 | archive | [x] | [x] | 2026-09-18T15:13:45Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-18T15:20:44Z |
