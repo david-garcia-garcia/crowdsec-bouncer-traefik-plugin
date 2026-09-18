@@ -21,3 +21,9 @@ phase: implement
 findings: none
 fixed: ErrMiss/ErrUnreachable returned from get/getMany/lookup; callers use errors.Is
 skipped: none
+
+## codereview (2026-09-18T18:10:16Z)
+phase: codereview
+findings: P3 1 (Standards Leave a trail on sentinelFor)
+fixed: job comment on sentinelFor (d4bdc02)
+skipped: none

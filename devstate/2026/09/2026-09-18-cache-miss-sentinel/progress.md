@@ -8,7 +8,7 @@ JobName: 2026-09-18-cache-miss-sentinel
 | explore | [x] | [x] | 2026-09-18T18:01:41Z |
 | propose | [x] | [x] | 2026-09-18T18:03:39Z |
 | implement | [x] | [x] | 2026-09-18T18:07:20Z |
-| codereview | [ ] | [ ] | |
+| codereview | [x] | [x] | 2026-09-18T18:10:16Z |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
