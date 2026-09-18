@@ -6,7 +6,7 @@ JobName: 2026-09-18-fork-plugin-module-path
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-18T17:34:58Z |
 | explore | [x] | [x] | 2026-09-18T17:41:48Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [x] | 2026-09-18T17:49:08Z |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |

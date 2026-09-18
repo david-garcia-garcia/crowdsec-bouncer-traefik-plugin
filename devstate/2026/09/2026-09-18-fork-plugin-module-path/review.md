@@ -9,3 +9,9 @@ phase: explore
 findings: catalog GET of this fork module 404s; forks are not listed; same alias overwrites
 fixed: none
 skipped: no Task subagent; research written in-process; assumed Decisions on catalog examples, displayName, README, renovate, spec rename
+
+## propose (2026-09-18)
+phase: propose
+findings: none
+fixed: none
+skipped: no Task subagent; FindSpecHost on main thread; OpenSpec artifacts committed as retarget-plugin-module-path
