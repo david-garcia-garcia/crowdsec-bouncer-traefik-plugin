@@ -15,3 +15,9 @@ phase: propose
 findings: FindSpecHost new core_plugin_lapi_stream-apply; official deleted-first resolved from research
 fixed: OpenSpec change stream-apply-deleted-before-new (proposal, spec, design, tasks)
 skipped: product apply
+
+## implement (2026-09-18)
+phase: implement
+findings: dest New-then-Deleted dropped same-window replacements
+fixed: fetchAndApplyStreamDecisions deleted first; ApplyRangeBatch removals then upserts; two hunt tests; go test -cover ./... passed
+skipped: remote CI still queued
