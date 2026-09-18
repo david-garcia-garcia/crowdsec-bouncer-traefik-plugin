@@ -53,8 +53,8 @@ No comments.md. Qualify: qualified-with-gaps. No active OpenSpec change. Nested 
   By: explore
 
 - Q: Which strings does `CaptchaCustomValidateBody` accept?
-  Decision: assumed — after trim: `""`, `form`, `json` (exact lowercase). `JSON` / `Form` / other tokens fail as unknown. Document lowercase in README.
-  By: explore
+  Decision: resolved — after trim: `""`, `form`, `json` (exact lowercase). `JSON` / `Form` / other tokens fail as unknown. Document lowercase in README.
+  By: propose
 
 - Q: Does Cap Standalone document request `remoteip`?
   Decision: resolved — no. Official JSON is `secret` and `response` only (`knowledge/research/ext_capjs_standalone_siteverify/`). Extra fields stay out of scope except absorb-only `remoteip` if dest later threads the address.
@@ -69,8 +69,8 @@ No comments.md. Qualify: qualified-with-gaps. No active OpenSpec change. Nested 
   By: explore
 
 - Q: Where does the encoding knob live at runtime, and which spec leaf owns it?
-  Decision: assumed — `Client` field filled from `CaptchaCustomValidateBody` in `Client.New` (not `infoProviders`). Propose FindSpecHost; do not rename `core_plugin_middleware_captcha-siteverify`. Likely fold request encoding there and ValidateParams rules into `core_plugin_middleware_config-validation`.
-  By: explore
+  Decision: resolved — `Client` field filled from `CaptchaCustomValidateBody` in `Client.New` (not `infoProviders`). FindSpecHost fold: request encoding onto `core_plugin_middleware_captcha-siteverify`; ValidateParams tokens onto `core_plugin_middleware_config-validation`. Do not rename `core_plugin_middleware_captcha-siteverify` (Purpose now includes request encoding).
+  By: propose
 
 - Q: Dest siteverify reply still `HasPrefix`, or keep the dest `mime.ParseMediaType` rule?
   Decision: resolved — dest already classifies with `mime.ParseMediaType` (spec `core_plugin_middleware_captcha-siteverify`). Keep that hop. Do not revert to `HasPrefix`. Sibling content-type-case already landed.
