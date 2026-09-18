@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: missing-packet Local plugin; missing-packet GitHub Actions GOPATH
 fixed: created core_plugin_middleware_local-plugin.md and build_ci_github.md (plus indexes)
 skipped: none; Race 35380038170 succeeded; Main 35380038170 and e2e 35380038178 in progress
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: none
+skipped: none; change at openspec/changes/archive/2026-09-18-retarget-plugin-module-path; Race 35380694830 succeeded; Main 35380694830 and e2e 35380694724 in progress
