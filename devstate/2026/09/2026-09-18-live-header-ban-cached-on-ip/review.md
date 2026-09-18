@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: 4 units; 2 stale-usage produced; 0 skipped
 fixed: Decision scopes live How-to names IP-slot vs HeaderScopeKey; LAPI connection Gotcha names IP-key TTL; PR #82 summary Set
 skipped: none
+
+## archive (2026-09-18)
+phase: archive
+findings: FindSpecHost fold core_plugin_decisions_scopes (high, already journaled); validators 0/0/0
+fixed: ADDED requirement synced to catalog; change moved to openspec/changes/archive/2026-09-18-write-ip-query-result-to-ip-cache-key; PR #82 summary Set
+skipped: no Task subagent in this session (verdict already on specs.md)
