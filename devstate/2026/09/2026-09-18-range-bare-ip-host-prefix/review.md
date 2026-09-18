@@ -9,3 +9,9 @@ phase: explore
 findings: dest miss reproduced (blob 192.0.2.1=t, membership empty)
 fixed: none
 skipped: none
+
+## propose (2026-09-18)
+phase: propose
+findings: fold core_plugin_decisions_scopes
+fixed: none
+skipped: none
