@@ -587,6 +587,28 @@ func Test_validateParamsTLS_appsec(t *testing.T) {
 	}
 }
 
+// TestValidateParams_EmptyAppsecHost pins enabled AppSec rejecting a missing
+// listener host while disabled AppSec still accepts an empty host.
+func TestValidateParams_EmptyAppsecHost(t *testing.T) {
+	log := logger.New("INFO", "")
+	t.Run("enabled rejects empty host", func(t *testing.T) {
+		cfg := getMinimalConfig()
+		cfg.CrowdsecAppsecEnabled = true
+		cfg.CrowdsecAppsecHost = ""
+		if err := ValidateParams(cfg, log); err == nil {
+			t.Fatal("ValidateParams = nil want error")
+		}
+	})
+	t.Run("disabled accepts empty host", func(t *testing.T) {
+		cfg := getMinimalConfig()
+		cfg.CrowdsecAppsecEnabled = false
+		cfg.CrowdsecAppsecHost = ""
+		if err := ValidateParams(cfg, log); err != nil {
+			t.Fatalf("ValidateParams = %v want nil", err)
+		}
+	})
+}
+
 func TestForwardedHeadersInsecure(t *testing.T) {
 	log := logger.New("INFO", "")
 	t.Run("defaults to false", func(t *testing.T) {
