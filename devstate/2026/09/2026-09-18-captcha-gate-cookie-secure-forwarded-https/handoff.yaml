@@ -10,7 +10,7 @@ src: sha256:badfec6020f8dc7f32616e3456b7099079093a20b76ecbe1509d336fab83117e
 localTests: none
 requirement: requirement.md
 comments: none
-explore: none
+explore: explore.md
 change: none
 pr:
   id: 88
