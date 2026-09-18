@@ -9,3 +9,9 @@ phase: explore
 findings: none
 fixed: none
 skipped: reproduced dest getToken statusCode:0 on a 2xx body without JSON code (throwaway removed); no Task subagent (research folder already present)
+
+## propose (2026-09-18)
+phase: propose
+findings: none
+fixed: none
+skipped: no Task subagent; FindSpecHost fold onto core_plugin_lapi_connection on the main thread
