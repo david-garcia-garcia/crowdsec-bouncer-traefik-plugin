@@ -28,6 +28,8 @@ func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, 
 	if err != nil {
 		return "", err
 	}
+	// Keep the IP query result for the client-address slot. Header merge mutates chosen.
+	ipResult, ipDuration := chosen, parsedDuration
 	// Keep the first scope failure. Every failing scope is already named by its own WARN line,
 	// and an active remediation below still outranks all of them.
 	var scopeErr error
@@ -38,12 +40,18 @@ func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, 
 			scopeErr = mergeErr
 		}
 	}
+	// The IP slot stores the IP query result. Header remediations stay on HeaderScopeKey.
+	// A clean IP result is not written when a header query failed (fail-closed).
+	if isLiveMode && defaultDecisionSeconds > 0 {
+		if decisionscope.IsActiveRemediation(ipResult) {
+			c.cacheClient.Set(remoteIP, ipResult, liveCacheTTL(ipDuration, defaultDecisionSeconds))
+		} else if scopeErr == nil {
+			c.cacheClient.Set(remoteIP, decisionscope.NoBannedValue, defaultDecisionSeconds)
+		}
+	}
 	// An active remediation is a real decision, so it outranks a scope failure and comes back with
 	// the "banned" error. A scope failure must never downgrade or mask it.
 	if decisionscope.IsActiveRemediation(chosen) {
-		if isLiveMode && defaultDecisionSeconds > 0 {
-			c.cacheClient.Set(remoteIP, chosen, liveCacheTTL(parsedDuration, defaultDecisionSeconds))
-		}
 		return chosen, errors.New("handleNoStreamCache:banned")
 	}
 	// A failed scope query is not "no decision". Report it the way a failed IP query is already
@@ -51,9 +59,6 @@ func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, 
 	// CrowdsecLapiFailureAction. Caching the unverified allow would outlive the outage.
 	if scopeErr != nil {
 		return "", scopeErr
-	}
-	if isLiveMode && defaultDecisionSeconds > 0 {
-		c.cacheClient.Set(remoteIP, decisionscope.NoBannedValue, defaultDecisionSeconds)
 	}
 	return decisionscope.NoBannedValue, nil
 }
