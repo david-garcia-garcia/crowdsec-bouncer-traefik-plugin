@@ -31,3 +31,9 @@ phase: codereview
 findings: coverage 1 hard
 fixed: TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan (92275b5)
 skipped: none
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: none
+fixed: none
+skipped: none

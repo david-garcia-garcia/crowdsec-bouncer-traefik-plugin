@@ -9,6 +9,6 @@ JobName: 2026-09-18-canonicalize-client-remoteip
 | propose | [x] | [x] | 2026-09-18T15:44:51Z |
 | implement | [x] | [x] | 2026-09-18T15:49:10Z |
 | codereview | [x] | [x] | 2026-09-18T15:54:37Z |
-| devdocsimpact | [ ] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-18T15:55:16Z |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
