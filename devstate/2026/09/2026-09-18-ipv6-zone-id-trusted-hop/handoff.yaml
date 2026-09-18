@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-ipv6-zone-id-trusted-hop
+jobName: 2026-09-18-ipv6-zone-id-trusted-hop
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:ef0f8ae977dc6e968fb3ab92ab9c2fc5cfd87eaa0fd0e62f98d63e7c54b5dc6e
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr:
+  id: 83
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/83
