@@ -39,3 +39,8 @@ description: reclaim and simpleredis packages in david-garcia-garcia/traefik-mid
 priority: normal
 local: index_std_go.md
 description: Official Go toolchain behavior this product relies on.
+
+## http
+priority: normal
+local: index_ext_http.md
+description: Official HTTP (RFC 9110) field and media-type behavior this product relies on.
