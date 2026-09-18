@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: stale-usage Trusted-IP HostCIDR
 fixed: How-to names HostCIDR
 skipped: none
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: archived to openspec/changes/archive/2026-09-18-range-bare-ip-host-prefix/
+skipped: none

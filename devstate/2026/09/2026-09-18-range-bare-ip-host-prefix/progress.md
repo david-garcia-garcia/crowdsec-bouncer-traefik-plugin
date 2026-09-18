@@ -10,5 +10,5 @@ JobName: 2026-09-18-range-bare-ip-host-prefix
 | implement | [x] | [x] | 2026-09-18T14:24:30.5811586Z |
 | codereview | [x] | [x] | 2026-09-18T14:29:04.8883346Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T14:30:11.3094169Z |
-| archive | [x] | [ ] | |
+| archive | [x] | [x] | 2026-09-18T14:32:28.2745453Z |
 | pullrequest | [ ] | [ ] | |
