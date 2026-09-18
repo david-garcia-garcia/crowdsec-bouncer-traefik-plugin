@@ -198,17 +198,16 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		value, origin, cacheErr := decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
 		switch {
 		case cacheErr != nil:
-			cacheErrString := cacheErr.Error()
-			b.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s cache:%s", req.remoteIP, cacheErrString))
-			if cacheErrString == cache.CacheUnreachable && !b.redisUnreachableBlock {
+			b.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s cache:%s", req.remoteIP, cacheErr.Error()))
+			if errors.Is(cacheErr, cache.ErrUnreachable) && !b.redisUnreachableBlock {
 				b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s redisUnreachable=true", req.remoteIP))
 				b.handleNextServeHTTP(rw, req)
 				return
 			}
-			if cacheErrString == cache.CacheMiss {
+			if errors.Is(cacheErr, cache.ErrMiss) {
 				break
 			}
-			b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", req.remoteIP, cacheErrString))
+			b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", req.remoteIP, cacheErr.Error()))
 			b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
 			return
 		case decisionscope.IsActiveRemediation(value):

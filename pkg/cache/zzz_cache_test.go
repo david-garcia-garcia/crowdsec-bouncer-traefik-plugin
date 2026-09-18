@@ -4,6 +4,7 @@ package cache
 
 import (
 	"bytes"
+	"errors"
 	"net"
 	"testing"
 	"time"
@@ -43,8 +44,8 @@ func Test_Get(t *testing.T) {
 				t.Errorf("Get() = %v, want %v", got, tt.want)
 				return
 			}
-			if tt.valueErr != "" && tt.valueErr != err.Error() {
-				t.Errorf("Get() err = %v, want %v", err.Error(), tt.valueErr)
+			if tt.valueErr != "" && !errors.Is(err, sentinelFor(tt.valueErr)) {
+				t.Errorf("Get() err = %v, want %v", err, tt.valueErr)
 			}
 		})
 	}
@@ -82,8 +83,8 @@ func Test_Set(t *testing.T) {
 				t.Errorf("Set() = %v, want %v", got, tt.want)
 				return
 			}
-			if tt.valueErr != "" && tt.valueErr != err.Error() {
-				t.Errorf("Set() err = %v, want %v", err.Error(), tt.valueErr)
+			if tt.valueErr != "" && !errors.Is(err, sentinelFor(tt.valueErr)) {
+				t.Errorf("Set() err = %v, want %v", err, tt.valueErr)
 			}
 		})
 	}
@@ -120,8 +121,8 @@ func Test_Delete(t *testing.T) {
 				t.Errorf("Delete() = %v, want %v", got, tt.want)
 				return
 			}
-			if tt.valueErr != "" && tt.valueErr != err.Error() {
-				t.Errorf("Delete() err = %v, want %v", err.Error(), tt.valueErr)
+			if tt.valueErr != "" && !errors.Is(err, sentinelFor(tt.valueErr)) {
+				t.Errorf("Delete() err = %v, want %v", err, tt.valueErr)
 			}
 		})
 	}
@@ -212,8 +213,11 @@ func Test_memoryClientsDoNotShare(t *testing.T) {
 	if err == nil || got != "" {
 		t.Fatalf("client B got %q err %v, want miss", got, err)
 	}
+	if !errors.Is(err, ErrMiss) {
+		t.Fatalf("client B err %v, want ErrMiss", err)
+	}
 	if err.Error() != CacheMiss {
-		t.Fatalf("client B err %v, want %s", err, CacheMiss)
+		t.Fatalf("client B err text %q, want %s", err.Error(), CacheMiss)
 	}
 	a.Close()
 	b.Close()
@@ -317,8 +321,8 @@ func Test_redisGetMissMapsCacheMiss(t *testing.T) {
 	client.New(logger.New("INFO", ""), true, host, nil, "", "", "p")
 	defer client.Close()
 	got, err := client.Get("missing-key")
-	if got != "" || err == nil || err.Error() != CacheMiss {
-		t.Fatalf("Get miss got %q err %v, want cache:miss", got, err)
+	if got != "" || err == nil || !errors.Is(err, ErrMiss) {
+		t.Fatalf("Get miss got %q err %v, want ErrMiss", got, err)
 	}
 }
 
@@ -327,7 +331,21 @@ func Test_GetManyUnreachable(t *testing.T) {
 	client.New(logger.New("INFO", ""), true, "127.0.0.1:1", nil, "", "", "p")
 	defer client.Close()
 	_, err := client.GetMany([]string{"k"})
-	if err == nil || err.Error() != CacheUnreachable {
-		t.Fatalf("GetMany unreachable got %v, want %s", err, CacheUnreachable)
+	if err == nil || !errors.Is(err, ErrUnreachable) {
+		t.Fatalf("GetMany unreachable got %v, want ErrUnreachable", err)
+	}
+	if err.Error() != CacheUnreachable {
+		t.Fatalf("GetMany unreachable text %q, want %s", err.Error(), CacheUnreachable)
+	}
+}
+
+func sentinelFor(text string) error {
+	switch text {
+	case CacheMiss:
+		return ErrMiss
+	case CacheUnreachable:
+		return ErrUnreachable
+	default:
+		return errors.New(text)
 	}
 }

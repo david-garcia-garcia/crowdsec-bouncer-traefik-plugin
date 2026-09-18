@@ -2,6 +2,7 @@ package lapi
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -106,7 +107,7 @@ func TestOpenDecisionStore_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.
 	identityClient := &cache.Client{}
 	identityClient.New(log, true, redisServer.addr(), nil, "", "", IdentityHex(cfg))
 	_, identErr := identityClient.Get("1.2.3.4")
-	if identErr == nil || identErr.Error() != cache.CacheMiss {
+	if identErr == nil || !errors.Is(identErr, cache.ErrMiss) {
 		t.Fatalf("IdentityHex prefix Get err %v, want miss", identErr)
 	}
 
@@ -270,7 +271,7 @@ func TestOpenDecisionStore_LastHolderGraceClosesRedisPool(t *testing.T) {
 	cancel()
 	time.Sleep(80 * time.Millisecond)
 	_, closedErr := store.Cache().Get("1.2.3.4")
-	if closedErr == nil || closedErr.Error() != cache.CacheUnreachable {
+	if closedErr == nil || !errors.Is(closedErr, cache.ErrUnreachable) {
 		t.Fatalf("after last-holder grace Get err %v, want unreachable", closedErr)
 	}
 }

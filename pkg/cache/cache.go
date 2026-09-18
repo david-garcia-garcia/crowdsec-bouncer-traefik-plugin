@@ -22,6 +22,12 @@ const (
 	CacheUnreachable = "cache:unreachable"
 )
 
+// ErrMiss and ErrUnreachable are the package sentinels for those strings. Callers use errors.Is.
+var (
+	ErrMiss        = errors.New(CacheMiss)
+	ErrUnreachable = errors.New(CacheUnreachable)
+)
+
 // localCache is the per-store in-memory TTL map.
 type localCache struct {
 	mu    sync.Mutex // acquire serializes miss+Set; vendored Heap Get and Set lock separately
@@ -41,7 +47,7 @@ func (lc *localCache) get(key string) (string, error) {
 	if isCached && isValid && len(valueString) > 0 {
 		return valueString, nil
 	}
-	return "", errors.New(CacheMiss)
+	return "", ErrMiss
 }
 
 func (lc *localCache) getMany(keys []string) (map[string]string, error) {
@@ -55,7 +61,7 @@ func (lc *localCache) getMany(keys []string) (map[string]string, error) {
 			out[key] = value
 			continue
 		}
-		if err.Error() == CacheUnreachable {
+		if errors.Is(err, ErrUnreachable) {
 			return nil, err
 		}
 	}
@@ -102,10 +108,10 @@ func (rc *redisCache) get(key string) (string, error) {
 	value, err := rc.nextReader().Get(context.Background(), prefixed(rc.prefix, key))
 	if err != nil {
 		if simpleredis.IsMiss(err) {
-			return "", errors.New(CacheMiss)
+			return "", ErrMiss
 		}
 		if simpleredis.IsUnreachable(err) {
-			return "", errors.New(CacheUnreachable)
+			return "", ErrUnreachable
 		}
 		return "", err
 	}
@@ -113,7 +119,7 @@ func (rc *redisCache) get(key string) (string, error) {
 	if len(valueString) > 0 {
 		return valueString, nil
 	}
-	return "", errors.New(CacheMiss)
+	return "", ErrMiss
 }
 
 func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
@@ -132,7 +138,7 @@ func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
 	values, err := rc.nextReader().MGet(context.Background(), prefixedNames)
 	if err != nil {
 		if simpleredis.IsUnreachable(err) {
-			return nil, errors.New(CacheUnreachable)
+			return nil, ErrUnreachable
 		}
 		return nil, err
 	}
