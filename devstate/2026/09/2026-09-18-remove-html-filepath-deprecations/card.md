@@ -1,4 +1,4 @@
-Developer review: ready for review — 2026-09-18T17:44:52Z
+Developer review: in progress — 2026-09-18T17:49:29Z
 
 ## What this changes
 **Operators.** Set `banFilePath` and `captchaFilePath` only. YAML or labels that still set `banHtmlFilePath` / `captchaHtmlFilePath` (or the HTML-cased twins) are ignored by Traefik and are not copied onto the current fields; those deploys get CreateConfig defaults (`banFilePath` empty, `captchaFilePath` `/captcha.html`).
@@ -28,28 +28,28 @@ flowchart TD
 ```
 
 ## Merge readiness
-Implement landed and CI succeeded. 0 items remain.
+Six-axis review is clean. CI on `e6f08ee` is still running. 0 review items remain.
 
 Priority: P2 — leftover deprecated captcha key silently replaces the named template; workaround is unset the old key
-Reviewed head: 6701999
+Reviewed head: e6f08ee
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | CI succeeded; no open PR comments |
-| CI proof | 6/6 | All four required checks succeeded on 6701999 |
+| Overall readiness | 3/6 | CI in progress on reviewed head |
+| CI proof | 3/6 | Required checks in progress on e6f08ee |
 | Local tests proof | N/A | Remote PR; CI proof covers this |
 | Review resolution | 6/6 | OPEN PR #100; no reviewer comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-18-remove-html-filepath-deprecations pushed | `git` `origin/2026-09-18-remove-html-filepath-deprecations` at `6701999` |
+| Branch | 2026-09-18-remove-html-filepath-deprecations pushed | `git` `origin/2026-09-18-remove-html-filepath-deprecations` at `e6f08ee` |
 | OpenSpec | remove-html-filepath-deprecations | `openspec/changes/remove-html-filepath-deprecations/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/100 | pr-host |
-| CI | Race detector success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35375827428/job/105700151672 ; Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35375827428/job/105700150692 ; e2e (binary + mock LAPI) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35375827429/job/105700150954 ; e2e (docker + pester) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35375827429/job/105700150666 | pr-host CI |
-| Local tests | passed | handoff.yaml localTests; `go test -v -cover ./...` and `golangci-lint run` |
+| CI | Race detector queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35376562576/job/105702486273 ; Main Process in_progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35376562576/job/105702486611 ; e2e (binary + mock LAPI) queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35376562564/job/105702489804 ; e2e (docker + pester) queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35376562564/job/105702489697 | pr-host CI |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | no `comments.md` |
 
 ## Specs
@@ -59,7 +59,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local ticket `2026-09-18-remove-html-filepath-deprecations` runs on that branch as PR #100. Implement deleted the Deprecated fields and retargeted live leftovers; CI on `6701999` succeeded.
+Local ticket `2026-09-18-remove-html-filepath-deprecations` runs on that branch as PR #100. Code review wrote six clean axis files; CI is re-running on `e6f08ee` after that bus commit.
 
 ## Decision needed
 | Question | Decision | By |
@@ -74,7 +74,12 @@ Local ticket `2026-09-18-remove-html-filepath-deprecations` runs on that branch 
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-remove-html-filepath-deprecations/devstate/2026/09/2026-09-18-remove-html-filepath-deprecations/codereview_standards.md) — 0 total, 0 pending, 0 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-remove-html-filepath-deprecations/devstate/2026/09/2026-09-18-remove-html-filepath-deprecations/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-remove-html-filepath-deprecations/devstate/2026/09/2026-09-18-remove-html-filepath-deprecations/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-remove-html-filepath-deprecations/devstate/2026/09/2026-09-18-remove-html-filepath-deprecations/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-remove-html-filepath-deprecations/devstate/2026/09/2026-09-18-remove-html-filepath-deprecations/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-remove-html-filepath-deprecations/devstate/2026/09/2026-09-18-remove-html-filepath-deprecations/codereview_coverage.md) — 0 total, 0 pending, 0 completed
 
 ## Agent review details
 
@@ -83,7 +88,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 6701999ea232cb47c4c5b4c3969be284cc077eab | Card must match the branch you measured |
+| Reviewed head | e6f08ee29777123e9b3a705a5a84ab11764748b4 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -97,12 +102,12 @@ Is this the best way to solve the issue? Yes versus dest. The constraint that ma
 
 ### Evidence
 What I checked:
-- `BanHTMLFilePath` / `CaptchaHTMLFilePath` removed from `pkg/configuration/configuration.go`; both `plugin.New` copies removed (`6701999`)
-- Live leftovers retargeted; archive `openspec/changes/archive/2026-09-05-add-real-e2e/` unchanged
-- Local `go test -v -cover ./...` passed; `golangci-lint run` passed
-- First CI on `9ad009e`: e2e (docker + pester) failed on custom-ban marker; leftover `banhtmlfilepath` retargeted
-- CI on reviewed head `6701999`: Race detector, Main Process, e2e (binary + mock LAPI), e2e (docker + pester) success
+- Six-axis review of `origin/master...HEAD` excluding `devstate/` and `.cursor/`; all axes `none`
+- Nested Task tool unavailable; axis files written in-process (`e6f08ee`)
+- Product apply unchanged since `6701999` (fields and New copies gone; live leftovers retargeted)
 - OPEN PR #100; comment inventory empty
+- CI on `e6f08ee` in progress (Race detector queued, Main Process in_progress, both e2e queued)
+- Prior product CI on `6701999`: Race detector, Main Process, e2e (binary + mock LAPI), e2e (docker + pester) success
 
 ### Rank-up moves
 None.
