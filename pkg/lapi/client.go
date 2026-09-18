@@ -65,9 +65,11 @@ type Client struct {
 	log             *slog.Logger
 	pluginVersion   string
 
-	isCrowdsecStreamStartup bool
-	isCrowdsecStreamHealthy bool
+	// int64 0/1 published with atomic.LoadInt64/StoreInt64 (Yaegi v0.16: not atomic.Bool / atomic.Int64 / atomic.Pointer[T]).
+	isCrowdsecStreamStartup int64
+	isCrowdsecStreamHealthy int64
 	updateFailure           int64
+	streamPollInFlight      int64
 	streamStop              chan bool
 	metricsStop             chan bool
 	metricsReporter         *MetricsReporter
@@ -129,8 +131,8 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		sessionKey:              reclaimSessionKey(config),
 		log:                     log,
 		pluginVersion:           pluginVersion,
-		isCrowdsecStreamStartup: true,
-		isCrowdsecStreamHealthy: true,
+		isCrowdsecStreamStartup: 1,
+		isCrowdsecStreamHealthy: 1,
 		decisionStore:           store,
 		cacheClient:             store.Cache(),
 	}
@@ -252,7 +254,7 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 		for {
 			select {
 			case <-ticker.C:
-				go work()
+				work()
 			case <-stop:
 				ticker.Stop()
 				return
@@ -304,7 +306,7 @@ func (c *Client) storeRangeMembership(index string) {
 
 // StreamHealthy is true while stream polling is succeeding.
 func (c *Client) StreamHealthy() bool {
-	return c.isCrowdsecStreamHealthy
+	return atomic.LoadInt64(&c.isCrowdsecStreamHealthy) != 0
 }
 
 // StreamFetches is how many times this connection actually called the stream endpoint.
