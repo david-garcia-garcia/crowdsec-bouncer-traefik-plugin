@@ -1,6 +1,7 @@
 package lapi
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -9,6 +10,7 @@ import (
 )
 
 // LiveLookup queries LAPI for one IP and mapped header scopes (none/live mode).
+// ctx is the inbound request context used to admit each GET.
 // defaultDecisionSeconds is the live-cache TTL the caller wants for this lookup.
 //
 // The returned error carries two different meanings and the caller separates them by the
@@ -18,17 +20,17 @@ import (
 //	non-active remediation + non-nil error -> LAPI failed; apply CrowdsecLapiFailureAction
 //
 // Any query this lookup makes can fail that way: the IP query and every header-scope query.
-func (c *Client) LiveLookup(remoteIP string, scopes map[string]string, defaultDecisionSeconds int64) (string, error) {
-	return c.handleNoStreamCache(remoteIP, scopes, defaultDecisionSeconds)
+func (c *Client) LiveLookup(ctx context.Context, remoteIP string, scopes map[string]string, defaultDecisionSeconds int64) (string, error) {
+	return c.handleNoStreamCache(ctx, remoteIP, scopes, defaultDecisionSeconds)
 }
 
 // handleNoStreamCache queries LAPI for the client address and each mapped header, writes the
 // IP query result to the client-address cache key, and returns the PreferRemediation merge.
-func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, defaultDecisionSeconds int64) (string, error) {
+func (c *Client) handleNoStreamCache(ctx context.Context, remoteIP string, scopes map[string]string, defaultDecisionSeconds int64) (string, error) {
 	isLiveMode := c.crowdsecMode == configuration.LiveMode
 	// remoteIP is already canonical on clientRequest. Do not re-parse it for the memo key.
 	// LAPI ?ip= matches numerically and does not care about spelling.
-	chosen, parsedDuration, err := c.queryLiveDecisions(fmt.Sprintf("ip=%v", remoteIP))
+	chosen, parsedDuration, err := c.queryLiveDecisions(ctx, fmt.Sprintf("ip=%v", remoteIP))
 	if err != nil {
 		return "", err
 	}
@@ -38,7 +40,7 @@ func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, 
 	// and an active remediation below still outranks all of them.
 	var scopeErr error
 	for scope, identifier := range scopes {
-		scopeChosen, scopeDuration, mergeErr := c.mergeLiveScope(chosen, parsedDuration, scope, identifier, isLiveMode, defaultDecisionSeconds)
+		scopeChosen, scopeDuration, mergeErr := c.mergeLiveScope(ctx, chosen, parsedDuration, scope, identifier, isLiveMode, defaultDecisionSeconds)
 		chosen, parsedDuration = scopeChosen, scopeDuration
 		if mergeErr != nil && scopeErr == nil {
 			scopeErr = mergeErr
