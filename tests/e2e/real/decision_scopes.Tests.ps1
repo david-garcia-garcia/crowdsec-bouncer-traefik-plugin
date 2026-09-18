@@ -15,6 +15,21 @@ function Add-IpSpellingDecision {
     }
 }
 
+function Assert-IpSpellingBan {
+    param(
+        [string]$Endpoint,
+        [string]$Stored,
+        [string]$Request,
+        [int]$TimeoutSeconds = 15
+    )
+    Add-IpSpellingDecision -Stored $Stored -Reason "Ip spelling $Stored"
+    $result = Wait-ForCondition -Description "LAPI/bouncer to ban stored $Stored as $Request on $Endpoint" -TimeoutSeconds $TimeoutSeconds -RetryIntervalSeconds 2 -Condition {
+        $response = Test-HttpRequest -Endpoint $Endpoint -IP $Request -TraefikUrl $script:TraefikUrl
+        return ($response.StatusCode -in @(403, 429))
+    }
+    $result.Success | Should -Be $true -Because "stored $Stored must ban request $Request on $Endpoint (last wait $($result.TimeTaken)s)"
+}
+
 BeforeAll {
     . "$PSScriptRoot/TestUtils.ps1"
 
@@ -144,17 +159,16 @@ Describe "CrowdSec Range and header-mapped scopes" {
             Remove-AllTestDecisions
         }
 
-        It "Should block expanded IPv6, upper-case IPv6, and IPv4-mapped bans under a different request spelling" {
-            $cases = @(
-                @{ Stored = "2001:0db8:0000:0000:0000:0000:00b1:0001"; Request = "2001:db8::b1:1" }
-                @{ Stored = "2001:DB8::B1:2"; Request = "2001:db8::b1:2" }
-                @{ Stored = "::ffff:203.0.113.81"; Request = "203.0.113.81" }
-            )
-            foreach ($case in $cases) {
-                Add-IpSpellingDecision -Stored $case.Stored -Reason "Ip spelling none $($case.Stored)"
-                $blocked = Test-HttpRequest -Endpoint "/scope-none" -IP $case.Request -TraefikUrl $script:TraefikUrl
-                $blocked.StatusCode | Should -BeIn @(403, 429) -Because "none mode must ban stored $($case.Stored) when the header is $($case.Request)"
-            }
+        It "Should block an expanded IPv6 ban under a compressed request spelling" {
+            Assert-IpSpellingBan -Endpoint "/scope-none" -Stored "2001:0db8:0000:0000:0000:0000:00b1:0001" -Request "2001:db8::b1:1"
+        }
+
+        It "Should block an upper-case IPv6 ban under a lower-case request spelling" {
+            Assert-IpSpellingBan -Endpoint "/scope-none" -Stored "2001:DB8::B1:2" -Request "2001:db8::b1:2"
+        }
+
+        It "Should block an IPv4-mapped ban under a dotted request spelling" {
+            Assert-IpSpellingBan -Endpoint "/scope-none" -Stored "::ffff:10.59.0.81" -Request "10.59.0.81"
         }
     }
 
@@ -164,20 +178,16 @@ Describe "CrowdSec Range and header-mapped scopes" {
             Remove-AllTestDecisions
         }
 
-        It "Should block expanded IPv6, upper-case IPv6, and IPv4-mapped bans under a different request spelling" {
-            $cases = @(
-                @{ Stored = "2001:0db8:0000:0000:0000:0000:00b2:0001"; Request = "2001:db8::b2:1" }
-                @{ Stored = "2001:DB8::B2:2"; Request = "2001:db8::b2:2" }
-                @{ Stored = "::ffff:203.0.113.82"; Request = "203.0.113.82" }
-            )
-            foreach ($case in $cases) {
-                Add-IpSpellingDecision -Stored $case.Stored -Reason "Ip spelling stream $($case.Stored)"
-                $result = Wait-ForCondition -Description "Stream mode to block stored $($case.Stored) as $($case.Request)" -TimeoutSeconds 45 -RetryIntervalSeconds 2 -Condition {
-                    $response = Test-HttpRequest -Endpoint "/scope-stream" -IP $case.Request -TraefikUrl $script:TraefikUrl
-                    return ($response.StatusCode -in @(403, 429))
-                }
-                $result.Success | Should -Be $true -Because "stream mode must ban stored $($case.Stored) when the header is $($case.Request)"
-            }
+        It "Should block an expanded IPv6 ban under a compressed request spelling after the stream poll" {
+            Assert-IpSpellingBan -Endpoint "/scope-stream" -Stored "2001:0db8:0000:0000:0000:0000:00b2:0001" -Request "2001:db8::b2:1" -TimeoutSeconds 45
+        }
+
+        It "Should block an upper-case IPv6 ban under a lower-case request spelling after the stream poll" {
+            Assert-IpSpellingBan -Endpoint "/scope-stream" -Stored "2001:DB8::B2:2" -Request "2001:db8::b2:2" -TimeoutSeconds 45
+        }
+
+        It "Should block an IPv4-mapped ban under a dotted request spelling after the stream poll" {
+            Assert-IpSpellingBan -Endpoint "/scope-stream" -Stored "::ffff:10.59.0.82" -Request "10.59.0.82" -TimeoutSeconds 45
         }
     }
 }
