@@ -11,4 +11,4 @@ JobName: 2026-09-18-backendbackoff-lapi-appsec
 | codereview | [x] | [x] | 2026-09-18T18:16:07Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T18:20:50Z |
 | archive | [x] | [x] | 2026-09-18T18:24:51Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-18T18:31:38Z |

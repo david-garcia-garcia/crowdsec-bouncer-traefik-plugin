@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: synced two new catalog leaves and folded config-validation; moved change to openspec/changes/archive/2026-09-18-backendbackoff-lapi-appsec
 skipped: n/a
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: ready title on PR #102; CI succeeded (Main 35380121656, E2E 35380121667)
+skipped: n/a
