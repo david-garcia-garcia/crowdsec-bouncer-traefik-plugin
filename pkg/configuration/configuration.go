@@ -415,12 +415,22 @@ func validateEnabledCaptchaSettings(config *Config) error {
 	return nil
 }
 
+// validateCaptchaCredentials resolves site and secret keys and rejects an empty
+// trimmed value for each field independently, site first. Lookup errors stay.
 func validateCaptchaCredentials(config *Config) error {
-	if _, err := GetVariable(config, "CaptchaSiteKey"); err != nil {
+	siteKey, err := GetVariable(config, "CaptchaSiteKey")
+	if err != nil {
 		return err
 	}
-	if _, err := GetVariable(config, "CaptchaSecretKey"); err != nil {
+	if siteKey == "" {
+		return errors.New("CaptchaSiteKey: cannot be empty when CaptchaProvider is set")
+	}
+	secretKey, err := GetVariable(config, "CaptchaSecretKey")
+	if err != nil {
 		return err
+	}
+	if secretKey == "" {
+		return errors.New("CaptchaSecretKey: cannot be empty when CaptchaProvider is set")
 	}
 	return nil
 }
