@@ -1,7 +1,7 @@
 ## 1. Validation
 
-- [ ] 1.1 In `validateCaptchaCredentials`, keep `GetVariable` lookup errors; after each successful lookup reject `""` for site then secret
-- [ ] 1.2 Error text: `CaptchaSiteKey: cannot be empty when CaptchaProvider is set` and the secret twin
+- [x] 1.1 In `validateCaptchaCredentials`, keep `GetVariable` lookup errors; after each successful lookup reject `""` for site then secret
+- [x] 1.2 Error text: `CaptchaSiteKey: cannot be empty when CaptchaProvider is set` and the secret twin
 
 ## 2. Tests
 
