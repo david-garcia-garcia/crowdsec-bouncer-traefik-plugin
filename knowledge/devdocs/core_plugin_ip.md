@@ -10,6 +10,10 @@ _Avoid_: Range index, LAPI decision value, geolocation
 In-tree radix of CIDRs (`pkg/iplookup.Helper`). Insert at construction; `IsContained` is membership plus longest prefix length. No associated remediation.
 _Avoid_: range-index, per-CIDR cache key, `InNetwork` (one network)
 
+**IPv4-mapped CIDR**:
+A parseable CIDR whose network `To4()` is non-nil and whose mask `bits` is 128 (for example `::ffff:0:0/96`). It is the IPv4 prefix of length `ones-96` that `net.IPNet.Contains` uses.
+_Avoid_: native IPv6 CIDR, a mapped prefix `ParseCIDR` already rewrote to native IPv6
+
 **GetRemoteIP**:
 The owner of the client address for a request. Unless `ForwardedHeadersInsecure` is true, requires the host from `req.RemoteAddr` to be in the trusted-hop pool before honoring forwarded headers; when the pool is empty or the peer is untrusted, returns `RemoteAddr` only. Otherwise walks the custom forwarded header most-recent-first against the trusted-hop pool, then the host of `RemoteAddr` when every hop is trusted or the header is empty. When the flag is true, skips the checker and returns the whole trimmed header (no hop walk), or the `RemoteAddr` host when that header is absent, empty, or whitespace-only. Also yields that address as `net.IP` when parseable.
 _Avoid_: parsing `RemoteAddr` on the connection, a second X-Forwarded-For walk, Traefik ipstrategy as a second owner
