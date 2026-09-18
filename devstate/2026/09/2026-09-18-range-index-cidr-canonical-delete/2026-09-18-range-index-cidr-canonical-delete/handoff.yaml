@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-range-index-cidr-canonical-delete
+jobName: 2026-09-18-range-index-cidr-canonical-delete
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:298f57857b5685b8a2684a6e2b67fdbda9a1158596f4eca6556f01ac823e9985
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr:
+  id: 92
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/92
