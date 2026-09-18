@@ -11,4 +11,4 @@ JobName: 2026-09-18-captcha-empty-keys-accepted
 | codereview | [x] | [x] | 2026-09-18T14:56:36Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T15:05:59Z |
 | archive | [x] | [x] | 2026-09-18T15:12:04Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-18T15:20:52Z |

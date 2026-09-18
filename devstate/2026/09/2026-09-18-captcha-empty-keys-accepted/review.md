@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: folded core_plugin_middleware_config-validation; archived reject-empty-captcha-keys
 skipped: Task tool unavailable; FindSpecHost ran on this thread
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: reused PR 84; dropped WIP title; CI succeeded on 59da390
+skipped: comments.md absent; no publish walk
