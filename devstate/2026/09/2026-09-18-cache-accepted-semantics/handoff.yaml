@@ -11,7 +11,7 @@ comments: none
 localTests: none
 requirement: requirement.md
 explore: explore.md
-change:
+change: cache-accepted-semantics
 pr:
   id: 109
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/109

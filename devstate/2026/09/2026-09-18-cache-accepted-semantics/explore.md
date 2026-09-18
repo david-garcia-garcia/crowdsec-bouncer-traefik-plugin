@@ -69,12 +69,12 @@ Sibling `2026-09-18-cache-ttl-guard-and-read-your-writes` and closed #38 stay ou
   By: explore
 
 - Q: Exact spec ids after FindSpecHost?
-  Decision: assumed — propose folds into existing cache specs via FindSpecHost; try `core_cache_redis_utilities-client` for routing / void Set / EX-as-given, and `core_cache_client_decision-store` only if that leaf owns stream vs live TTL writes. Do not create a new family unless FindSpecHost says new.
-  By: explore
+  Decision: resolved — fold `replica-lag-reads`, `void-set-delete`, and `ex-as-given` into `core_cache_redis_utilities-client` (high). fold `stream-vs-live-ttl` into `core_cache_client_decision-store` (medium). `core_cache_client_isolated-store` stays isolation-only. No new family.
+  By: propose
 
 - Q: One-liner comments at nextReader/get/set and stream Seconds()?
-  Decision: assumed — yes, only if a one-liner earns its keep at those sites; no behavior change. Propose/implement choose wording or skip.
-  By: explore
+  Decision: resolved — keep one-liners at `nextReader`, `get`, `set`, and stream `int64(duration.Seconds())`. No behavior change.
+  By: propose
 
 - Q: Devdocs gotchas for replica lag, void Set, or EX-as-given?
   Decision: assumed — not this phase. Ticket defers to later `devdocsimpact`. Existing cache packets stay as-is.
