@@ -1,6 +1,6 @@
 ## Purpose
 
-Trusted-IP and trusted-CIDR membership answers in time bounded by address size, not by how many networks the operator listed, without changing public config. Stream and alone Range may reuse boolean CIDR prefix membership without storing a remediation on that helper.
+Trusted-IP and trusted-CIDR membership answers in time bounded by address size, not by how many networks the operator listed, without changing public config. Stream and alone Range may reuse that prefix membership and MAY store the remediation string on the winning endpoint; the trusted-IP pool stays boolean.
 
 ## Requirements
 
