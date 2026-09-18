@@ -7,11 +7,10 @@ JobName: 2026-09-18-range-index-same-network-match
 | prepare | [x] | [x] | 2026-09-18T16:47:36Z |
 | explore | [x] | [x] | 2026-09-18T16:52:06Z |
 | propose | [x] | [x] | 2026-09-18T16:56:27Z |
-| implement | [ ] | [ ] | |
+| implement | [x] | [x] | 2026-09-18T17:06:03Z |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
 
-Verdict: in progress
-
+Verdict: ready for review
