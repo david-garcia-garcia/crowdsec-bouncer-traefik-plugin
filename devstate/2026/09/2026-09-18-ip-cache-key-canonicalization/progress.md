@@ -11,4 +11,4 @@ JobName: 2026-09-18-ip-cache-key-canonicalization
 | codereview | [x] | [x] | 2026-09-18T13:41:00Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T13:41:00Z |
 | archive | [x] | [x] | 2026-09-18T13:42:00Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-18T13:55:00Z |
