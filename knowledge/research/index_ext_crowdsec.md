@@ -25,6 +25,11 @@ priority: normal
 local: ext_crowdsec_bouncers_failure-action/
 description: How CrowdSec bouncers behave when LAPI or AppSec is down, times out, or returns 500.
 
+## Stream apply order
+priority: normal
+local: ext_crowdsec_bouncers_stream-apply/
+description: How official CrowdSec bouncers apply new vs deleted on one /v1/decisions/stream payload.
+
 ## AppSec bot-detection challenge
 priority: normal
 local: ext_crowdsec_appsec_bot-detection/
