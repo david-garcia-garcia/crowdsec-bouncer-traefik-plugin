@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: folded custom-ban WHEN into build_e2e_pester_crowdsec-stack; moved change to openspec/changes/archive/2026-09-18-remove-html-filepath-deprecations
 skipped: FindSpecHost Task (tool unavailable in worker; ran on this thread)
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: reused PR #100; dropped WIP title; CI succeeded on cc999ff
+skipped: comments.md absent — publish checklist skipped; gh CLI unauthenticated, CI measured via GitHub MCP get_check_runs
