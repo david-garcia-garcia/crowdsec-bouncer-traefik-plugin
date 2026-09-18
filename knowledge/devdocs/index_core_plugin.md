@@ -50,6 +50,11 @@ priority: normal
 local: core_plugin_lapi_connection.md
 description: How this plugin stores replaceable LAPI HTTP+auth on the Client (`core_plugin_lapi_connection`).
 
+## LAPI query round trip
+priority: normal
+local: core_plugin_lapi_query-round-trip.md
+description: How one CrowdSec LAPI/CAPI exchange renews a token once, releases its body, and names its own failure.
+
 ## Captcha gate cookie
 priority: normal
 local: core_plugin_middleware_captcha-gate.md

@@ -28,3 +28,9 @@ findings: Standards 3 (all judgement), Spec none, Security 1 (judgement), Perfor
 fixed: nothing to apply — no hard finding inside the diff
 skipped: the six axes ran in-process, not as six Task sub-agents, for the same reason recorded under prepare (this session is itself a sub-agent and cannot spawn one); every axis checklist was read in full and its file written to the run root
 verdict: in progress
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: three — one missing-packet (LAPI query round trip) and two stale-usage (Stream lease, LAPI connection)
+fixed: all three produced; new packet `knowledge/devdocs/core_plugin_lapi_query-round-trip.md` plus its `index_core_plugin.md` row, and usage updates on `core_plugin_lapi_stream-lease.md` and `core_plugin_lapi_connection.md`
+skipped: no `core_plugin_lapi_failure-action` packet (README owns the operator key; the implementer rule folds into the connection packet) and no new Language term for the fail-closed verdict (`core_plugin_decisionscope.md` already owns remediation vocabulary)
+verdict: in progress
