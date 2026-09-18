@@ -32,4 +32,4 @@ So a YAML or Docker label that still sets `banHtmlFilePath` / `captchaHtmlFilePa
 
 Traefik does not set `TagName`. mapstructure then matches the field name, case-insensitive, not the `json` tag string as a separate spelling. `captchaHTMLFilePath` and `captchaHtmlFilePath` both map to `CaptchaHTMLFilePath`. Neither maps to `CaptchaFilePath` (`captchahtmlfilepath` ≠ `captchafilepath`). Same for ban: `banHTMLFilePath` / `banHtmlFilePath` ≠ `BanFilePath`.
 
-Owner: mapstructure default match plus Traefik `DecoderConfig` above. This plugin’s tags: `this-repo` `pkg/configuration/configuration.go` (`BanHTMLFilePath` `json:"banHtmlFilePath,omitempty"`, `CaptchaHTMLFilePath` `json:"captchaHtmlFilePath,omitempty"`).
+Owner: mapstructure default match plus Traefik `DecoderConfig` above. This plugin’s current tags: `this-repo` `pkg/configuration/configuration.go` (`BanFilePath` `json:"banFilePath,omitempty"`, `CaptchaFilePath` `json:"captchaFilePath,omitempty"`). The removed HTML-path fields no longer exist on Config.
