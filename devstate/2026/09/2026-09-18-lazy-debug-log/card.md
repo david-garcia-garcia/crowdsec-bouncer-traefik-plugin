@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-18T18:05:54Z
+Developer review: in progress — 2026-09-18T18:08:13Z
 
 ## What this changes
 **Operators.** None.
 
 **Admin users.** None.
 
-**Developers.** OpenSpec change `lazy-debug-hot-path` adds `std_go_logger_debug-attrs` so request-path Debug must use slog attributes. Product apply has not landed.
+**Developers.** `ServeHTTP` and `cache.Client` Get/GetMany/Set/Delete Debug now use slog attributes, so INFO does not `Sprintf` those strings. Hunt tests assert DEBUG stems plus fields.
 
 **End users.** None.
 
@@ -31,17 +31,17 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Propose is apply-ready; product apply has not started. 2 items remain.
+Apply is on the branch; CI on this head is queued. 1 item remains.
 
 Priority: P2 — INFO allow still formats debug strings on every stream request
-Reviewed head: 9de3d1b
+Reviewed head: f322514
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Apply-ready OpenSpec; CI on this head is queued; no product apply yet |
-| CI proof | 3/6 | queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378166700 |
+| Overall readiness | 3/6 | Apply landed; CI on this head is queued |
+| CI proof | 3/6 | queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378373311 |
 | Local tests proof | N/A | Remote PR; CI proof covers remote |
 | Review resolution | 6/6 | OPEN PR #108; no reviewer comments |
 
@@ -51,8 +51,8 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-18-lazy-debug-log pushed | `git` / pr-host |
 | OpenSpec | lazy-debug-hot-path | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/108 | pr-host List |
-| CI | Main Process queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378166700/job/105707744128 ; Race detector queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378166700/job/105707743960 | pr-host CI |
-| Local tests | none | handoff.yaml localTests |
+| CI | Main Process queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378373311/job/105708408788 ; Race detector queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378373311/job/105708408948 | pr-host CI |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | no `comments.md` |
 
 ## Specs
@@ -62,7 +62,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local ticket `2026-09-18-lazy-debug-log` runs on branch `2026-09-18-lazy-debug-log` as PR #108. Change `lazy-debug-hot-path` is apply-ready; implement is next.
+Local ticket `2026-09-18-lazy-debug-log` runs on branch `2026-09-18-lazy-debug-log` as PR #108. Apply is pushed; code review is next.
 
 ## Decision needed
 | Question | Decision | By |
@@ -74,7 +74,7 @@ Local ticket `2026-09-18-lazy-debug-log` runs on branch `2026-09-18-lazy-debug-l
 | Write a stdlib slog research folder? | assumed — no. Evaluation-before-Enabled is stdlib; ticket already states it. | explore |
 
 ## Before merge
-- [ ] [P2] On `ServeHTTP` and cache Get/GetMany (at minimum), do not evaluate `fmt.Sprintf` unless Debug is enabled; keep the fields.
+- [x] [P2] On `ServeHTTP` and cache Get/GetMany (at minimum), do not evaluate `fmt.Sprintf` unless Debug is enabled; keep the fields.
 - [ ] CI on this head succeeded.
 
 ## Findings
@@ -90,23 +90,22 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 0 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 9de3d1b629491571ea5c65168b340183352dd70d | Card must match the branch you measured |
+| Reviewed head | f322514bf6a7c9929e8a1fb4c31dece87f52f5da | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: Not applied yet. DestBranch still `Sprintf`s before `Debug` on the stream allow path. The change specifies slog attributes.
+Best possible solution: DestBranch `Sprintf`s before `Debug`. This head passes existing values as slog attributes on the request path.
 
-Do we have a high-confidence way to reproduce? Yes — read `pkg/bouncer/bouncer.go` and `pkg/cache/cache.go`; `Sprintf` runs before `Debug`.
+Do we have a high-confidence way to reproduce? Yes — DestBranch call sites `Sprintf` then `Debug`. Local `go test ./pkg/cache/ ./pkg/bouncer/ ./pkg/logger/ -count=1` passed.
 
 Is this the best way to solve the issue? Yes versus DestBranch: slog attributes so INFO does not format those strings. Do not replace slog or change default `logLevel`.
 
 ### Evidence
 What I checked:
-- Dest `origin/master` `46a81d0a52663d922f27b04b66f390f7b952da29` still `Sprintf`s before Debug
-- Change `lazy-debug-hot-path` apply-ready (`openspec validate`)
-- FindSpecHost new `std_go_logger_debug-attrs` (not fold into `std_go_logger_slog-output`)
+- Product delta `origin/master...HEAD` is OpenSpec `lazy-debug-hot-path` plus `pkg/bouncer` / `pkg/cache` Debug attributes and hunt tests
+- Local tests passed (`go test ./pkg/cache/ ./pkg/bouncer/ ./pkg/logger/ -count=1`)
 - OPEN PR #108; comment inventory empty (pr-host)
 - CI on this head: Main Process and Race detector queued (pr-host check runs)
 
