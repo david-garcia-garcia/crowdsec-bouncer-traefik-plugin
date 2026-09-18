@@ -22,3 +22,9 @@ findings: none
 fixed: `Validate` uses `mime.ParseMediaType`; hunt regression `TestHunt_siteverifyJSONContentTypeIsCaseInsensitive`; CI succeeded
 skipped: none
 
+## codereview (2026-09-18)
+phase: codereview
+findings: coverage hard 1
+fixed: `Test_ServeHTTP_jsonpSiteverifyContentTypeIsNotJSON` (`6eb1b04`)
+skipped: none
+
