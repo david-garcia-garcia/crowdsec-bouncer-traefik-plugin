@@ -65,3 +65,8 @@ priority: normal
 local: core_plugin_middleware_captcha-routing.md
 description: How handleRemediationServeHTTP routes captcha-kind requests after the gate cookie.
 
+## Captcha siteverify
+priority: normal
+local: core_plugin_middleware_captcha-siteverify.md
+description: How this plugin decides whether a received captcha siteverify HTTP response may count as a successful provider verify.
+
