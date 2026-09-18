@@ -94,6 +94,9 @@ type Config struct {
 	DefaultDecisionSeconds                     int64             `json:"defaultDecisionSeconds,omitempty"`
 	RemediationStatusCode                      int               `json:"remediationStatusCode,omitempty"`
 	HTTPTimeoutSeconds                         int64             `json:"httpTimeoutSeconds,omitempty"`
+	CrowdsecLapiHTTPTimeoutSeconds             int64             `json:"crowdsecLapiHttpTimeoutSeconds,omitempty"`
+	CrowdsecAppsecHTTPTimeoutSeconds           int64             `json:"crowdsecAppsecHttpTimeoutSeconds,omitempty"`
+	CaptchaSiteverifyHTTPTimeoutSeconds        int64             `json:"captchaSiteverifyHttpTimeoutSeconds,omitempty"`
 	TraceHeadersCustomName                     string            `json:"traceHeadersCustomName,omitempty"`
 	RemediationHeadersCustomName               string            `json:"remediationHeadersCustomName,omitempty"`
 	ForwardedHeadersCustomName                 string            `json:"forwardedHeadersCustomName,omitempty"`
@@ -157,6 +160,15 @@ func EffectiveFailureAction(action string) string {
 		return FailureActionBan
 	}
 	return action
+}
+
+// EffectiveHTTPTimeoutSeconds returns override when it is non-zero, otherwise HTTPTimeoutSeconds.
+// Zero inherits. Negative is not coerced; ValidateParams rejects it on the inherit knobs.
+func (c *Config) EffectiveHTTPTimeoutSeconds(override int64) int64 {
+	if override == 0 {
+		return c.HTTPTimeoutSeconds
+	}
+	return override
 }
 
 // New creates the default plugin configuration.
@@ -637,8 +649,11 @@ func validateParamsRequired(config *Config) error {
 		}
 	}
 	requiredInt0 := map[string]int64{
-		"CrowdsecAppsecBodyLimit":      config.CrowdsecAppsecBodyLimit,
-		"MetricsUpdateIntervalSeconds": config.MetricsUpdateIntervalSeconds,
+		"CrowdsecAppsecBodyLimit":             config.CrowdsecAppsecBodyLimit,
+		"MetricsUpdateIntervalSeconds":        config.MetricsUpdateIntervalSeconds,
+		"CrowdsecLapiHTTPTimeoutSeconds":      config.CrowdsecLapiHTTPTimeoutSeconds,
+		"CrowdsecAppsecHTTPTimeoutSeconds":    config.CrowdsecAppsecHTTPTimeoutSeconds,
+		"CaptchaSiteverifyHTTPTimeoutSeconds": config.CaptchaSiteverifyHTTPTimeoutSeconds,
 	}
 	for key, val := range requiredInt0 {
 		if val < 0 {
