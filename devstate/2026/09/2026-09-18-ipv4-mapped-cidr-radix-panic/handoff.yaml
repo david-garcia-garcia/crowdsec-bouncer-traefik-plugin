@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-ipv4-mapped-cidr-radix-panic
+jobName: 2026-09-18-ipv4-mapped-cidr-radix-panic
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:7840d420e6d2db2369d9a0b8a98da230621edd84ff55c9d0cb0ca9cbcb5272a0
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr:
+  id: 91
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/91
