@@ -38,8 +38,8 @@ This work does not reconstruct client address, user, tenant, Host, or trust hop.
 ## Open questions
 
 - Q: Do official CrowdSec bouncers still apply deleted first?
-  Decision: assumed — apply deleted first anyway; dest replacement disappears regardless. Research folder `ext_crowdsec_bouncers_stream-apply/` is writing the vendor fact.
-  By: explore
+  Decision: resolved — yes. lua-cs-bouncer and cs-firewall-bouncer apply deleted then new; LAPI can put the same IP or CIDR in both arrays. Official docs are silent. Source: `knowledge/research/ext_crowdsec_bouncers_stream-apply/`.
+  By: propose
 
 - Q: Does production LAPI emit same-window replacements at this dest pin?
   Decision: assumed — ticket treats that as given; regressions inject that payload and do not depend on a live LAPI.
