@@ -56,23 +56,23 @@ Published `New(Config)`: fully zero Config applies defaults (FailureRatio 0.30, 
 
 - Q: One Allow per `LiveLookup` vs one Allow per `queryLiveDecisions` GET (IP plus each header scope)?
   Decision: assumed — one Allow per GET (`queryLiveDecisions`). Desired text is "Before LAPI GET / AppSec Do". One Allow per lookup would still hammer a dead LAPI for remaining scopes after the first GET failed.
-  By: explore
+  By: propose
 
 - Q: Whether LAPI captcha/allow (backend answered, not ban) Reports success the same as ban?
   Decision: assumed — yes. Report success on any HTTP+parse that yielded a remediation value (ban, captcha, or none). Health is "backend answered," not the remediation kind.
-  By: explore
+  By: propose
 
 - Q: Whether AppSec response-body io errors (`errAppsecReadBody`) are the ticket’s "unreadable body" or only the inbound `isBodyUnreadable` path?
   Decision: assumed — inbound `isBodyUnreadable` only (no Do, no Report). After an admitted Do, `errAppsecReadBody` Reports success because Desired lists Do error / 502/503/504 / HTTP 500 as the failure set; dest still applies FailureAction on the read error.
-  By: explore
+  By: propose
 
 - Q: How to disable skip, given published `New` has no off switch (zero Config enables defaults)?
   Decision: assumed — always construct the live/none and AppSec gates. Product nil-gate only for stream/alone LAPI (out of scope). Do not invent an enabled flag or a second Tracker. Jitter 0 disables jitter only.
-  By: explore
+  By: propose
 
 - Q: Exact plugin field names and whether LAPI/AppSec share one knob set?
   Decision: assumed — one shared set on `configuration.Config`, CreateConfig defaults = package defaults: `backendBackoffFailureRatio` (0.30), `backendBackoffTripFailures` (5), `backendBackoffBaseCooldownSeconds` (1), `backendBackoffMaxCooldownSeconds` (10), `backendBackoffJitter` (0.10), `backendBackoffTTLSeconds` (60). Validate like other numeric knobs; reject values `backendbackoff.New` would reject. Document in README.
-  By: explore
+  By: propose
 
 - Q: Who already owns the client address this path must not reconstruct?
   Decision: resolved — `pkg/ip.GetRemoteIP` via `clientRequest.remoteIP` (`core_plugin_ip`). Gate key is not the client address. AppSec still reuses that `ip` on `X-Crowdsec-Appsec-Ip`. Do not parse `RemoteAddr` on LAPI or AppSec.
@@ -80,7 +80,7 @@ Published `New(Config)`: fully zero Config applies defaults (FailureRatio 0.30, 
 
 - Q: Who already owns the backend identity used as Allow/Report key (ticket: LAPI URL / AppSec URL, not reclaim key material)?
   Decision: assumed — the Client-stored URL stem already composed for the HTTP attempt (`crowdsecScheme`/`Host`/`Path` on LAPI; `appsecScheme`/`Host`/`Path` on AppSec). Reuse that string. Do not use `lapi.Key` / `appsec.Key` (Redis, key, body limit, metrics interval). Do not hash a second identity.
-  By: explore
+  By: propose
 
 - Q: Who already owns request cancellation and Host if this work would set or reconstruct them?
   Decision: resolved — inbound `*http.Request`: `Context()` for Allow, `Host` for the existing AppSec header copy. Reuse those. Do not build a timeout context from `HTTPTimeoutSeconds` (already on the HTTP client).
