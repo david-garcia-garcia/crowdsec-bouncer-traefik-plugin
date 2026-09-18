@@ -15,6 +15,11 @@ priority: normal
 local: ext_traefik_plugins_yaegi-constructor/
 description: Where Traefik Yaegi looks up CreateConfig and New, how often New runs, and whether Config and subpackages must live in the root package.
 
+## Plugin config decode
+priority: normal
+local: ext_traefik_plugins_config-decode/
+description: How Traefik mapstructure-decodes a Yaegi plugin middleware config map into CreateConfig's result, including unused keys.
+
 ## Plugin manifest useUnsafe
 priority: normal
 local: ext_traefik_plugins_useunsafe/

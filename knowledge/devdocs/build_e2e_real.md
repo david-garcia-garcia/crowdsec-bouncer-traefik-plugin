@@ -19,6 +19,7 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 - Run `./tests/e2e/real/Test-Integration.ps1` or `make e2e_pester` from the repo root.
 - Keep new cases as `tests/e2e/real/*.Tests.ps1`. Do not put them in `tests/e2e/mock/` or at `tests/` root.
 - Identify the client only with `X-Forwarded-For`. Do not parse `RemoteAddr`.
+- Custom-ban and captcha compose labels set `banFilePath` / `captchaFilePath`. Do not use `banHtmlFilePath` / `captchaHtmlFilePath` or HTML-cased twins.
 - Nested plugin maps (`decisionScopeHeaders`, geoblock `databaseSources`) MUST use the file provider (`tests/e2e/real/dynamic-scopes.yml`). Docker labels do not decode those maps.
 - Country matching uses traefik-geoblock enrich on a **public** `X-Forwarded-For`. Do not inject a client-set country header for that case.
 - CI job `e2e (docker + pester)` runs this suite; `e2e (binary + mock LAPI)` stays the mock job.
@@ -51,3 +52,4 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 - The test LAPI key `40796d93c2958f9e58345514e67740e5` is a fixture, not a production secret.
 - The file-provider stream bouncer uses a second fixture key (`BOUNCER_KEY_TRAEFIK_SCOPES`). Do not share one LAPI stream key with the docker-label `/stream` middleware or the polls race.
 - Captcha solve uses `captchaProvider: custom` and compose service `dummy-captcha` (`POST /siteverify` always `{"success":true}`). Pester POSTs `dummy-captcha-response` and asserts `crowdsec_captcha_gate`. Do not call hCaptcha/Turnstile.
+- Traefik drops unused keys. An old-key-only `banHtmlFilePath` / `captchaHtmlFilePath` label serves CreateConfig defaults, not the suite HTML.
