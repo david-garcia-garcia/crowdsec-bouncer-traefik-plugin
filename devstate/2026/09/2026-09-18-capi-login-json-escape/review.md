@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: 1 stale-usage (LAPI query round trip)
 fixed: produced query-round-trip How-to/Gotcha for getToken marshal-not-interpolate
 skipped: none
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: folded CAPI login-body JSON into core_plugin_lapi_query-round-trip; moved change to openspec/changes/archive/2026-09-18-capi-login-json-escape/
+skipped: Task launcher unavailable (cursor Task not in this session); FindSpecHost ran in-process. Validators invoked from caller-repo scripts with worktree repoRoot.
