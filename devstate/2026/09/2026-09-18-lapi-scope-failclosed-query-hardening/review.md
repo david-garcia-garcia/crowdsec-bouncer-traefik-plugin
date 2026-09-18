@@ -41,3 +41,9 @@ fixed: three deltas synced into `openspec/specs/` per the propose verdicts — M
 skipped: FindSpecHost was not re-run as a Task sub-agent — the three verdicts were already measured and journaled in `specs.md` at propose, and this session cannot spawn a sub-agent; the librarian scripts were invoked from the main checkout because `.cursor/skills/` is untracked and therefore absent from this worktree
 issues: two notes written — `knowledge/debt/2026-09-18-empty-isolated-store-spec.md` and `knowledge/debt/2026-09-18-alone-401-holds-its-connection.md`
 verdict: in progress
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: stub PR #73 reused, not replaced; title moved off `🚧` to `🔒 fix(lapi): fail closed on header-scope query errors and harden the LAPI query round trip`
+fixed: delivery card upserted on the PR summary with the deliverable 1 behavior matrix; every gate re-run on the final tree at 234bc23 and all four GitHub checks green on that sha
+skipped: nothing to publish from `comments.md` — the file does not exist and `handoff.yaml` carries `comments: none`
+verdict: ready for review
