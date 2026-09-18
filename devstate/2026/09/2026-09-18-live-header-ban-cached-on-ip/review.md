@@ -15,3 +15,9 @@ phase: propose
 findings: FindSpecHost fold core_plugin_decisions_scopes (high); change write-ip-query-result-to-ip-cache-key apply-ready
 fixed: proposal/design/tasks + one ADDED requirement; explore fold and test-name rows resolved
 skipped: no product code; usage packet deferred (assumed open question)
+
+## implement (2026-09-18)
+phase: implement
+findings: dest IP-slot write fixed; 6/6 tasks complete
+fixed: handleNoStreamCache writes the IP query result only; TestLiveLookup_IPSlotKeepsIPQueryResult; usage names the IP-slot vs header-slot write
+skipped: no comments.md Implement: fills; no new spec folder
