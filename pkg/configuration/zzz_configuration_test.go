@@ -148,8 +148,50 @@ func Test_ValidateParams(t *testing.T) {
 	cfgAppsecHTTPS.CrowdsecAppsecScheme = HTTPS
 	cfgAppsecHTTPS.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
 	cfgAppsecDistinctScheme := getMinimalConfig()
+	cfgAppsecDistinctScheme.CrowdsecAppsecEnabled = true
 	cfgAppsecDistinctScheme.CrowdsecLapiScheme = HTTP
 	cfgAppsecDistinctScheme.CrowdsecAppsecScheme = HTTPS
+	missingAppsecKeyFile := "../../tests/.missing-appsec-key"
+	cfgAloneAppsecOnInvalidCA := getMinimalConfig()
+	cfgAloneAppsecOnInvalidCA.CrowdsecMode = AloneMode
+	cfgAloneAppsecOnInvalidCA.CrowdsecCapiMachineID = "machine"
+	cfgAloneAppsecOnInvalidCA.CrowdsecCapiPassword = "password"
+	cfgAloneAppsecOnInvalidCA.CrowdsecAppsecEnabled = true
+	cfgAloneAppsecOnInvalidCA.CrowdsecAppsecScheme = HTTPS
+	cfgAloneAppsecOnInvalidCA.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgAloneAppsecOnMissingKey := getMinimalConfig()
+	cfgAloneAppsecOnMissingKey.CrowdsecMode = AloneMode
+	cfgAloneAppsecOnMissingKey.CrowdsecCapiMachineID = "machine"
+	cfgAloneAppsecOnMissingKey.CrowdsecCapiPassword = "password"
+	cfgAloneAppsecOnMissingKey.CrowdsecAppsecEnabled = true
+	cfgAloneAppsecOnMissingKey.CrowdsecAppsecKeyFile = missingAppsecKeyFile
+	cfgAloneAppsecOffLeftover := getMinimalConfig()
+	cfgAloneAppsecOffLeftover.CrowdsecMode = AloneMode
+	cfgAloneAppsecOffLeftover.CrowdsecCapiMachineID = "machine"
+	cfgAloneAppsecOffLeftover.CrowdsecCapiPassword = "password"
+	cfgAloneAppsecOffLeftover.CrowdsecAppsecEnabled = false
+	cfgAloneAppsecOffLeftover.CrowdsecAppsecScheme = HTTPS
+	cfgAloneAppsecOffLeftover.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgAloneAppsecOffLeftover.CrowdsecAppsecKeyFile = missingAppsecKeyFile
+	cfgLiveAppsecOnInvalidCA := getMinimalConfig()
+	cfgLiveAppsecOnInvalidCA.CrowdsecAppsecEnabled = true
+	cfgLiveAppsecOnInvalidCA.CrowdsecLapiScheme = HTTP
+	cfgLiveAppsecOnInvalidCA.CrowdsecAppsecScheme = HTTPS
+	cfgLiveAppsecOnInvalidCA.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgLiveAppsecOnMissingKey := getMinimalConfig()
+	cfgLiveAppsecOnMissingKey.CrowdsecAppsecEnabled = true
+	cfgLiveAppsecOnMissingKey.CrowdsecAppsecKeyFile = missingAppsecKeyFile
+	cfgLiveAppsecOffLeftover := getMinimalConfig()
+	cfgLiveAppsecOffLeftover.CrowdsecAppsecEnabled = false
+	cfgLiveAppsecOffLeftover.CrowdsecAppsecScheme = HTTPS
+	cfgLiveAppsecOffLeftover.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgLiveAppsecOffLeftover.CrowdsecAppsecKeyFile = missingAppsecKeyFile
+	cfgAppsecModeOffLeftover := getMinimalConfig()
+	cfgAppsecModeOffLeftover.CrowdsecMode = AppsecMode
+	cfgAppsecModeOffLeftover.CrowdsecLapiKey = ""
+	cfgAppsecModeOffLeftover.CrowdsecAppsecEnabled = false
+	cfgAppsecModeOffLeftover.CrowdsecAppsecScheme = HTTPS
+	cfgAppsecModeOffLeftover.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
 	cfgAppsecModeNoLapiKey := getMinimalConfig()
 	cfgAppsecModeNoLapiKey.CrowdsecMode = AppsecMode
 	cfgAppsecModeNoLapiKey.CrowdsecLapiKey = ""
@@ -210,8 +252,15 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Provider set with whitespace-only site", args: args{config: cfgWhitespaceSite}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},
 		{name: "Unknown AppSec failure action", args: args{config: cfgUnknownAction}, wantErr: true},
 		{name: "Empty failure actions use default ban", args: args{config: cfgEmptyAction}, wantErr: false},
-		{name: "AppSec HTTPS with invalid CA while LAPI HTTP", args: args{config: cfgAppsecHTTPS}, wantErr: true},
+		{name: "AppSec HTTPS with invalid CA while LAPI HTTP", args: args{config: cfgAppsecHTTPS}, wantErr: false},
 		{name: "AppSec distinct HTTPS scheme validates URL", args: args{config: cfgAppsecDistinctScheme}, wantErr: false},
+		{name: "Alone AppSec on with invalid CA", args: args{config: cfgAloneAppsecOnInvalidCA}, wantErr: true},
+		{name: "Alone AppSec on with missing key file", args: args{config: cfgAloneAppsecOnMissingKey}, wantErr: true, wantErrContains: "CrowdsecAppsecKey"},
+		{name: "Alone AppSec off leftover CA and key file", args: args{config: cfgAloneAppsecOffLeftover}, wantErr: false},
+		{name: "Live AppSec on with invalid CA", args: args{config: cfgLiveAppsecOnInvalidCA}, wantErr: true},
+		{name: "Live AppSec on with missing key file", args: args{config: cfgLiveAppsecOnMissingKey}, wantErr: true, wantErrContains: "CrowdsecAppsecKey"},
+		{name: "Live AppSec off leftover CA and key file", args: args{config: cfgLiveAppsecOffLeftover}, wantErr: false},
+		{name: "Appsec mode off leftover invalid CA", args: args{config: cfgAppsecModeOffLeftover}, wantErr: false},
 		{name: "Appsec mode without LAPI key", args: args{config: cfgAppsecModeNoLapiKey}, wantErr: false},
 		{name: "None mode minimal config", args: args{config: cfgNoneMode}, wantErr: false},
 		{name: "Alone mode with CAPI credentials", args: args{config: cfgAloneValid}, wantErr: false},
