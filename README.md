@@ -295,6 +295,24 @@ IPs of trusted proxies in front of Traefik (for example Cloudflare). The forward
 **HTTPTimeoutSeconds** (int64, default `10`)
 Timeout in seconds when contacting LAPI.
 
+**BackendBackoffFailureRatio** (float64, default `0.30`)
+Shared live-LAPI and AppSec admission gate. Fraction of recent attempts that must fail before a backend is skipped. Package default from `traefik-middleware-utilities/backendbackoff`. There is no enabled flag.
+
+**BackendBackoffTripFailures** (int64, default `5`)
+Consecutive CLOSED failures that open the gate for that backend URL. Shared by live LAPI and AppSec.
+
+**BackendBackoffBaseCooldownSeconds** (int64, default `1`)
+Initial skip cooldown after the gate opens, in seconds. Shared by live LAPI and AppSec.
+
+**BackendBackoffMaxCooldownSeconds** (int64, default `10`)
+Cap on the skip cooldown, in seconds. Must be at least `BackendBackoffBaseCooldownSeconds`.
+
+**BackendBackoffJitter** (float64, default `0.10`)
+Cooldown jitter in `[0, 1)`. `0` disables jitter only; it does not turn the gate off.
+
+**BackendBackoffTTLSeconds** (int64, default `60`)
+Idle TTL for a backend key in the gate, in seconds. Must be at least `1`.
+
 **LogFilePath** (string, default `""`)
 File path for logs. Must be writable by Traefik. Rotation may need a Traefik restart.
 

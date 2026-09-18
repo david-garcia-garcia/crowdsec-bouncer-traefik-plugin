@@ -35,6 +35,7 @@ linters-settings:
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
           - github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis
+          - github.com/david-garcia-garcia/traefik-middleware-utilities/backendbackoff
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec
@@ -48,6 +49,7 @@ linters-settings:
         allow:
           - $gostd
           - github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis
+          - github.com/david-garcia-garcia/traefik-middleware-utilities/backendbackoff
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip
           - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
