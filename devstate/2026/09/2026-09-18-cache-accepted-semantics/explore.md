@@ -77,8 +77,8 @@ Sibling `2026-09-18-cache-ttl-guard-and-read-your-writes` and closed #38 stay ou
   By: propose
 
 - Q: Devdocs gotchas for replica lag, void Set, or EX-as-given?
-  Decision: assumed — not this phase. Ticket defers to later `devdocsimpact`. Existing cache packets stay as-is.
-  By: explore
+  Decision: resolved — short Gotchas on existing `core_cache_redis.md` (replica-only nextReader Gets, void Set, EX-as-given / memory ttl==0 no-op) and `core_cache_client.md` (stream Seconds() vs liveCacheTTL). No new packet. No Language write.
+  By: devdocsimpact
 
 - Q: Does Dragonfly accept SET EX 0 unlike Redis?
   Decision: assumed — out of scope to align or special-case. Contract is we send EX as given; the host may reject. Do not add a Dragonfly runtime branch.
