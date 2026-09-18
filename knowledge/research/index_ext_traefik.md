@@ -15,3 +15,8 @@ priority: normal
 local: ext_traefik_plugins_useunsafe/
 description: What the useUnsafe manifest flag unlocks in the Yaegi plugin host, and the matching operator opt-in a Traefik installation must also set.
 
+## Yaegi plugin config overlay
+priority: normal
+local: ext_traefik_plugins_config-overlay/
+description: How Traefik mapstructure-decodes operator YAML onto the CreateConfig pointer, and that missing keys keep CreateConfig defaults.
+
