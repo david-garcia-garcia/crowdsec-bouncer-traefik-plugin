@@ -9,7 +9,7 @@ JobName: 2026-09-18-captcha-custom-json-verify
 | propose | [x] | [x] | 2026-09-18T18:07:10Z |
 | implement | [x] | [x] | 2026-09-18T18:20:07Z |
 | codereview | [x] | [x] | 2026-09-18T18:24:30Z |
-| devdocsimpact | [ ] | [ ] | |
+| devdocsimpact | [x] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
 
