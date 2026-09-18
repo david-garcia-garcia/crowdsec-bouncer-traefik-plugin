@@ -69,8 +69,8 @@ No comments.md. Qualify: qualified-with-gaps. Unattended: every Q has a Decision
   By: explore
 
 - Q: When CaptchaProvider is set and CaptchaFilePath is empty, who fails, and does that contradict "validate templates when paths are set"?
-  Decision: assumed — ValidateParams fails (same provider-set trigger as site/secret/gate). Client.New also returns the GetTemplate error. Ban template stays "when path is set". Extend `core_plugin_middleware_config-validation`; do not invent a bundled default template.
-  By: explore
+  Decision: assumed — ValidateParams fails (same provider-set trigger as site/secret/gate). Error text: `CaptchaFilePath: cannot be empty when CaptchaProvider is set`. Client.New also returns the GetTemplate error. Ban template stays "when path is set". Fold `core_plugin_middleware_config-validation`; do not invent a bundled default template.
+  By: propose
 
 - Q: How do tests that blank CaptchaFilePath keep passing?
   Decision: assumed — give those cases a readable fixture file (temp `captcha.html`, same as captcha ServeHTTP tests). Tests that assert empty site/secret still fail on the key error; they also need a loadable path so the new empty-path rule is not the only error.
