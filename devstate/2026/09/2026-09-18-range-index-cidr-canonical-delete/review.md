@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: stale-usage 1, language-gap 1
 fixed: Range-index String() persist-only gotcha on core_plugin_decisionscope
 skipped: language-gap Canonical network (fuzzy term; do not invent)
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: folded core_plugin_decisions_scopes write-identity; archived range-index-canonical-ipnet
+skipped: FindSpecHost Task tool missing on worker (search ran on archive thread)
