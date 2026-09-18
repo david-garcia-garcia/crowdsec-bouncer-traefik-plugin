@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: none
 fixed: n/a
 skipped: n/a
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: folded empty-host SHALL into core_plugin_middleware_config-validation; archived reject-empty-appsec-host-when-enabled
+skipped: n/a
