@@ -18,7 +18,7 @@ Acquire `updated` in one DecisionStore operation before a stream poll. Redis use
 - Memory: mutex around miss+Set (vendored `ttl_map` Get and Set are separately locked).
 - Do not Get-then-Set. Do not add a SetNX wrapper. Do not put poller or LAPI query logic on `cache.Client`.
 - Two concurrent acquirers on one store: exactly one winner may GET `/v1/decisions/stream`.
-- Release the lease when the poll you won then fails: `c.Cache().Delete(cacheTimeoutKey)` before returning the error. Keep the fetch+apply body in one function (`fetchAndApplyStreamDecisions`) so GET, decode, and apply all release through the same line.
+- Release the lease when the poll you won then fails: `c.Cache().Delete(cacheTimeoutKey)` before returning the error. Keep the fetch+apply body in one function (`fetchAndApplyStreamDecisions`) so GET, decode, and apply all release through the same line. Apply order (deleted before new) is `core_plugin_lapi_stream-apply.md`.
 - A poll that succeeds keeps the key. Do not delete on the success arm — later ticks inside the interval must still skip LAPI.
 
 ## Pattern snippet

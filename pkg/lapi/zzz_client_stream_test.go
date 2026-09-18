@@ -2,6 +2,7 @@ package lapi
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
@@ -239,5 +241,71 @@ func TestHandleStreamCache_TwoRedisPollersOneFetch(t *testing.T) {
 	}
 	if got := atomic.LoadInt64(hits); got != 1 {
 		t.Fatalf("LAPI hits=%d, want 1", got)
+	}
+}
+
+// testReplacementStreamLAPI serves one stream payload with the given new and deleted decisions.
+func testReplacementStreamLAPI(t *testing.T, newItems, deletedItems []Decision) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if !strings.Contains(req.URL.Path, "stream") {
+			rw.WriteHeader(http.StatusOK)
+			return
+		}
+		if err := json.NewEncoder(rw).Encode(Stream{New: newItems, Deleted: deletedItems}); err != nil {
+			t.Errorf("stream stub encode: %v", err)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+// TestHunt_StreamAppliesDeletedBeforeNew proves a same-window IP replacement stays banned.
+func TestHunt_StreamAppliesDeletedBeforeNew(t *testing.T) {
+	const ipValue = "203.0.113.10"
+	server := testReplacementStreamLAPI(t, []Decision{{
+		Type:     "ban",
+		Scope:    "ip",
+		Value:    ipValue,
+		Duration: "1h",
+		Origin:   "crowdsec",
+	}}, []Decision{{
+		Type:  "ban",
+		Scope: "ip",
+		Value: ipValue,
+	}})
+	client, cacheClient := newTestStreamPoller(t, server)
+
+	if err := client.handleStreamCache(); err != nil {
+		t.Fatalf("replacement poll: %v", err)
+	}
+	stored, err := cacheClient.Get(decisionscope.IPCacheKey(ipValue))
+	if err != nil || !decisionscope.IsActiveRemediation(stored) {
+		t.Fatalf("same-window IP replacement must stay banned, got %q err %v", stored, err)
+	}
+}
+
+// TestHunt_StreamRangeAppliesDeletedBeforeNew proves a same-window Range replacement stays banned.
+func TestHunt_StreamRangeAppliesDeletedBeforeNew(t *testing.T) {
+	const cidr = "10.0.0.0/8"
+	server := testReplacementStreamLAPI(t, []Decision{{
+		Type:     "ban",
+		Scope:    "range",
+		Value:    cidr,
+		Duration: "1h",
+		Origin:   "crowdsec",
+	}}, []Decision{{
+		Type:  "ban",
+		Scope: "range",
+		Value: cidr,
+	}})
+	client, _ := newTestStreamPoller(t, server)
+
+	if err := client.handleStreamCache(); err != nil {
+		t.Fatalf("replacement poll: %v", err)
+	}
+	got := client.RangeMembership().Remediation(net.ParseIP("10.1.2.3"))
+	if !decisionscope.IsActiveRemediation(got) {
+		t.Fatalf("same-window Range replacement must stay banned, got %q", got)
 	}
 }
