@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
 func testNextOK() http.Handler {
@@ -106,6 +106,39 @@ func TestServeHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	handler.ServeHTTP(recorder, req)
+}
+
+// TestNew_RejectsEmptyCaptchaKeys stops at ValidateParams so New does not open LAPI.
+func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	var hits int64
+	srv := liveLAPI(t, nil, &hits)
+	t.Cleanup(func() { srv.Close() })
+	u, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := cfgLiveAt(u.Host)
+	cfg.CaptchaProvider = configuration.HcaptchaProvider
+	cfg.CaptchaGateSecret = "gate-secret"
+	cfg.CaptchaFilePath = ""
+
+	handler, err := New(context.Background(), testNextOK(), cfg, "empty-captcha-keys")
+	if err == nil {
+		t.Fatal("New must fail when captchaProvider is set and site key is empty")
+	}
+	if handler != nil {
+		t.Fatal("New must return a nil handler when captcha keys are empty")
+	}
+	if !strings.Contains(err.Error(), "CaptchaSiteKey: cannot be empty when CaptchaProvider is set") {
+		t.Fatalf("error %q", err)
+	}
+	if atomic.LoadInt64(&hits) != 0 {
+		t.Fatalf("New opened LAPI (%d hits)", hits)
+	}
 }
 
 // TestNew_LAPIUserAgentUsesVersionGo checks New sends LAPI User-Agent from version.go pluginVersion.

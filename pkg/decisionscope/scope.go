@@ -137,13 +137,3 @@ func IPCacheKey(value string) string {
 	}
 	return trimmed
 }
-
-// IPLookupCacheKey is the request-path spelling of IPCacheKey. It reuses the address pkg/ip already
-// parsed for this request rather than parsing remoteIP a second time. The two SHALL agree: a key
-// the store and the request path spell differently is a decision that can never be enforced.
-func IPLookupCacheKey(remoteIP string, ipAddr net.IP) string {
-	if ipAddr != nil {
-		return ipAddr.String()
-	}
-	return strings.TrimSpace(remoteIP)
-}

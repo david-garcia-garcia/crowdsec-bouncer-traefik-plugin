@@ -43,7 +43,8 @@ func (tree *ipRadixTree) familyRoot(isIPv4 bool) *radixNode {
 // insert stores one CIDR. IPv4 is walked from bit 96 of the IPv4-mapped form.
 func (tree *ipRadixTree) insert(cidr *net.IPNet) {
 	ip := cidr.IP
-	prefixLen, _ := cidr.Mask.Size()
+	ones, bits := cidr.Mask.Size()
+	prefixLen := ones
 
 	isIPv4 := ip.To4() != nil
 	var bitStart int
@@ -52,6 +53,10 @@ func (tree *ipRadixTree) insert(cidr *net.IPNet) {
 	if isIPv4 {
 		ip = ip.To4().To16()
 		bitStart = 96
+		// A 128-bit mask on a To4() network is IPv4-mapped; Contains uses ones-96.
+		if bits == 128 && ones >= 96 {
+			prefixLen = ones - 96
+		}
 	} else {
 		bitStart = 0
 	}

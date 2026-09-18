@@ -4,7 +4,7 @@ import (
 	"net"
 	"testing"
 
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 )
 
 func ipOf(addr string) net.IP {
@@ -91,5 +91,12 @@ func TestMembershipFromIndexOverlappingBansLongestPrefixOrigin(t *testing.T) {
 	got := MembershipFromIndex(index).Remediation(ipOf("10.1.2.3"))
 	if got != narrow {
 		t.Fatalf("got %q, want longest-prefix suffix", got)
+	}
+}
+
+func TestHunt_MembershipIPv4MappedCIDRDoesNotPanic(t *testing.T) {
+	got := MembershipFromIndex("::ffff:0:0/96=" + BannedValue).Remediation(ipOf("192.0.2.1"))
+	if got != BannedValue {
+		t.Fatalf("got %q, want ban", got)
 	}
 }

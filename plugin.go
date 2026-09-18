@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
-	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
-	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
+	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
+	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // CreateConfig creates the default plugin configuration.
@@ -35,13 +35,6 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	prepared := *config
 	prepared.LogLevel = strings.ToUpper(prepared.LogLevel)
 	log := logger.NewWithFormat(prepared.LogLevel, prepared.LogFilePath, prepared.LogFormat)
-
-	if prepared.BanFilePath == "" && prepared.BanHTMLFilePath != "" {
-		prepared.BanFilePath = prepared.BanHTMLFilePath
-	}
-	if prepared.CaptchaHTMLFilePath != "" {
-		prepared.CaptchaFilePath = prepared.CaptchaHTMLFilePath
-	}
 
 	if err = configuration.ValidateParams(&prepared, log); err != nil {
 		log.Error("New:validateParams " + err.Error())

@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
-	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
 const cacheTimeoutKey = "updated"
@@ -99,7 +99,8 @@ func (c *Client) handleStreamCache() error {
 }
 
 // fetchAndApplyStreamDecisions GETs the CrowdSec stream delta and writes it into the DecisionStore.
-// It does not own the stream lease; handleStreamCache does.
+// It does not own the stream lease; handleStreamCache does. Deleted is applied before New so a
+// same-window replacement for the same IP or CIDR stays active.
 func (c *Client) fetchAndApplyStreamDecisions() error {
 	streamRouteURL := url.URL{
 		Scheme:   c.crowdsecScheme,
@@ -119,6 +120,16 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 	}
 	rangeUpserts := make(map[string]string)
 	var rangeRemovals []string
+	for _, decision := range stream.Deleted {
+		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
+			if cidr := strings.TrimSpace(decision.Value); cidr != "" {
+				rangeRemovals = append(rangeRemovals, cidr)
+				c.forgetActiveDecision("range:" + cidr)
+			}
+			continue
+		}
+		c.deleteStreamDecision(decision)
+	}
 	for _, decision := range stream.New {
 		duration, parseErr := time.ParseDuration(decision.Duration)
 		if parseErr != nil {
@@ -134,17 +145,8 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 			}
 			continue
 		}
+		// Sub-second CrowdSec durations become 0; stream write TTL is not clamped.
 		c.storeStreamDecision(decision, int64(duration.Seconds()))
-	}
-	for _, decision := range stream.Deleted {
-		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
-			if cidr := strings.TrimSpace(decision.Value); cidr != "" {
-				rangeRemovals = append(rangeRemovals, cidr)
-				c.forgetActiveDecision("range:" + cidr)
-			}
-			continue
-		}
-		c.deleteStreamDecision(decision)
 	}
 	// A range apply that could not read the shared index is a poll that did not finish. Returning
 	// the error releases the lease, so the next tick retries; because the tick failed,

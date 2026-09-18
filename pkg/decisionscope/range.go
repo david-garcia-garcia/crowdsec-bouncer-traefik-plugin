@@ -1,10 +1,24 @@
 package decisionscope
 
 import (
+	"net"
 	"strings"
 
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
+
+// rangeIndexCIDR maps a parseable host to /32 or /128 so the index key is a CIDR.
+func rangeIndexCIDR(cidr string) string {
+	network := strings.TrimSpace(cidr)
+	if network == "" {
+		return ""
+	}
+	if ipAddr := net.ParseIP(network); ipAddr != nil {
+		return ip.HostCIDR(ipAddr)
+	}
+	return network
+}
 
 // AddRange upserts a Range decision on the shared index as cidr=remediation.
 func AddRange(cacheClient *cache.Client, cidr, remediation string, _ int64) {
@@ -21,6 +35,7 @@ func RemoveRange(cacheClient *cache.Client, cidr string) {
 }
 
 // ApplyRangeBatch upserts and removes Range lines with one cache read and one write.
+// Removals run first so a CIDR present in both maps remains the replacement.
 // The index is shared by every bouncer on this cache, so a read that did not answer is not an
 // empty index: writing the batch onto an empty base would drop every Range decision this poll
 // did not carry. A read failure returns the error and leaves the stored index alone.
@@ -32,15 +47,19 @@ func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, remov
 	if err != nil {
 		return err
 	}
+	for _, cidr := range removals {
+		network := rangeIndexCIDR(cidr)
+		if network == "" {
+			continue
+		}
+		index = removeCIDRFromIndex(index, network)
+	}
 	for cidr, remediation := range upserts {
-		network := strings.TrimSpace(cidr)
+		network := rangeIndexCIDR(cidr)
 		if network == "" || !IsActiveRemediation(remediation) {
 			continue
 		}
 		index = upsertIndexCIDR(index, network, remediation)
-	}
-	for _, cidr := range removals {
-		index = removeCIDRFromIndex(index, strings.TrimSpace(cidr))
 	}
 	if index == "" {
 		cacheClient.Delete(RangeIndexKey)
@@ -63,6 +82,20 @@ func parseIndexLine(line string) (string, string) {
 	return network, remediation
 }
 
+// indexCIDRsSameNetwork reports whether two range-index CIDR texts name the same network.
+func indexCIDRsSameNetwork(existing, cidr string) bool {
+	// Compare the parsed networks, not the host-bit first IP ParseCIDR also returns.
+	_, existingNet, existingErr := net.ParseCIDR(existing)
+	_, incomingNet, incomingErr := net.ParseCIDR(cidr)
+	// Unparseable text still matches only when the raw strings are identical.
+	if existingErr != nil || incomingErr != nil {
+		return existing == cidr
+	}
+	existingOnes, existingBits := existingNet.Mask.Size()
+	incomingOnes, incomingBits := incomingNet.Mask.Size()
+	return existingNet.IP.Equal(incomingNet.IP) && existingOnes == incomingOnes && existingBits == incomingBits
+}
+
 // upsertIndexCIDR replaces or appends one CIDR line. Ban/captcha for that CIDR is the last write.
 func upsertIndexCIDR(index, cidr, remediation string) string {
 	kept := make([]string, 0)
@@ -72,7 +105,7 @@ func upsertIndexCIDR(index, cidr, remediation string) string {
 		if existing == "" {
 			continue
 		}
-		if existing == cidr {
+		if indexCIDRsSameNetwork(existing, cidr) {
 			kept = append(kept, cidr+"="+remediation)
 			replaced = true
 			continue
@@ -102,12 +135,12 @@ func readRangeIndex(cacheClient *cache.Client) (string, error) {
 	return index, nil
 }
 
-// removeCIDRFromIndex drops every line whose CIDR equals cidr.
+// removeCIDRFromIndex drops every line whose CIDR is the same network as cidr.
 func removeCIDRFromIndex(index, cidr string) string {
 	kept := make([]string, 0)
 	for _, line := range strings.Split(index, "\n") {
 		network, remediation := parseIndexLine(line)
-		if network == "" || network == cidr {
+		if network == "" || indexCIDRsSameNetwork(network, cidr) {
 			continue
 		}
 		if remediation == "" {

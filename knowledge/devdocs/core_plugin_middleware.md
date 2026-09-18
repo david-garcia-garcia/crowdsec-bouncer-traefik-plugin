@@ -36,13 +36,14 @@ _Avoid_: treating `appsec` as "AppSec on", implying `crowdsecAppsecEnabled` from
 
 ## Overview
 
-Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New` snapshots the config Traefik owns and binds every reclaim `Open` to a bind context derived from the constructor `ctx` — that child is the reclaim holder, and releasing it is how a failed constructor hands back what it already opened. Do not change `.traefik.yml` `import`. Specs: `core_plugin_middleware_bouncer` (Yaegi `New` / Bouncer). Open key: `core_plugin_lapi_reclaim-key.md`.
+Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New` snapshots the config Traefik owns and binds every reclaim `Open` to a bind context derived from the constructor `ctx` — that child is the reclaim holder, and releasing it is how a failed constructor hands back what it already opened. Keep `.traefik.yml` `import` equal to the `go.mod` `module` path. Specs: `core_plugin_middleware_bouncer` (Yaegi `New` / Bouncer). Open key: `core_plugin_lapi_reclaim-key.md`.
 
 ## How to use
 
 - Keep `CreateConfig` / `New` on the module root (`plugin.go`).
 - Keep `pluginVersion` in root `version.go` (release workflow bumps it). Pass it into `lapi.New` and `appsec.New`.
 - Snapshot first: `prepared := *config`, then work on `&prepared` for the rest of `New`. Never write through Traefik's pointer.
+- After the snapshot, do not copy leftover YAML keys or peer aliases into `BanFilePath` / `CaptchaFilePath`. Traefik’s decode of those two fields is the only owner.
 - Derive `bindCtx, releaseHolders := context.WithCancel(ctx)` before the first `Open`, and release it from a `defer` that fires only when the named `err` is non-nil. `err` is named for that reason (`//nolint:nonamedreturns`); a closure-captured bool is the form the ticket rejected.
 - Call `lapi.Prepare` then `appsec.Prepare`. Stream/alone: `lapi.OpenStream` (registers this bind ctx on the live-router scope union). Live/none: `lapi.OpenLive`. `crowdsecMode: appsec`: skip LAPI Open. When `crowdsecAppsecEnabled`: `appsec.Open` (`AdoptTransport` inside). Return `bouncer.New(..., lapiClient, appsecClient, ...)`. Open key: `core_plugin_lapi_reclaim-key.md`. Stream `scopes=`: `core_plugin_lapi_scope-union.md`.
 - `bouncer.New`'s appsec-mode early return is conditional: appsec mode still initialises the captcha client when the effective `crowdsecAppsecFailureAction` is `captcha`, because `handleRemediationServeHTTP` bans on an invalid captcha client.
@@ -91,9 +92,11 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 
 ## Gotchas
 
+- Unused keys (`banHtmlFilePath`, `captchaHtmlFilePath`, HTML-cased twins) never reach `New` (Traefik v3.7.11 drops them). Operators who set only those keys get CreateConfig defaults (`BanFilePath` empty, `CaptchaFilePath` `/captcha.html`). Do not re-add Config fields or `New` copies to catch leftovers.
 - The reclaim table has no Release: a holder goes away only when the context it bound is Done (`std_go_reclaim.md`). That is why `New` opens on `bindCtx` — with Traefik's own long-lived ctx, a constructor that failed after `OpenStream` left the stream ticker polling LAPI for the process lifetime.
 - Do not release `bindCtx` on the success path, and do not parent it on `context.Background()`: the first disposes the incarnation the handler is about to use, the second survives a Traefik shutdown.
 - `crowdsecMode: appsec` with `crowdsecAppsecEnabled: false` is accepted and warned at `WARN` from `ValidateParams` (`warnUnenforcedAppsecMode`). Do not turn that into an error and do not imply `crowdsecAppsecEnabled` on — `crowdsecAppsecHost` defaults to `crowdsec:7422` and `crowdsecAppsecFailureAction` to `ban`, so implying it bans every request on that router.
+- When `crowdsecAppsecEnabled` is true, `ValidateParams` rejects an empty `crowdsecAppsecHost` (`http.NewRequest` accepts `http:///`). Disabled-AppSec empty host still passes. Do not require the host in `validateURL` or `validateParamsRequired`.
 - Do not put middleware name, `next`, ban/captcha templates, trusted IPs, Enabled, AppSec knobs, LAPI failure action, Redis fail-closed, live-cache TTL, `StreamStartupBlock`, HTTP timeout, or LAPI TLS in the LAPI reclaim key. Do not put AppSec TLS or HTTP timeout in the AppSec reclaim key.
 - `crowdsecLapiFailureAction` is per-router on Bouncer. `crowdsecAppsecFailureAction` stays on Bouncer. Two routers on one Client MAY disagree.
 - Stream/alone: CrowdSec stores one `GET /v1/decisions/stream` cursor per hashed API key plus the IP LAPI sees (this process’s outbound address). Reclaim `Open` key is `lapi:stream:` plus SessionHex plus Redis store params. A second stream `New` on the same cursor plus Redis `Open`s that key. Interval, CAPI scenario, `updateMaxFailure`, and header-map mismatch is silent first-wins for those create-time scalars. Do not call `Peek` / `PeekLivePrefix`. Last New `AdoptTransport`s TLS/timeout (INFO `adopted`). Last holder Sleeps tickers; reload with the same Redis snapshot Wakes (`startup=false`); a different Redis host Opens a new key and the sleeper dies on grace. Isolated backends need a second bouncer key. Live/none `Key` is `lapi:` plus SessionHex plus Redis and `MetricsUpdateIntervalSeconds` (AppSec excluded). `IdentityHex` is not the live Open suffix.

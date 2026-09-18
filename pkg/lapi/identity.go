@@ -6,7 +6,7 @@ import (
 	"hash/fnv"
 	"strconv"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
 const keyPrefix = "lapi:"

@@ -5,10 +5,15 @@ priority: normal
 local: core_plugin_middleware.md
 description: How Traefik New reclaims a LAPI Client and an AppSec Client and returns a per-router Bouncer (`core_plugin_middleware_bouncer`).
 
+## Local plugin
+priority: normal
+local: core_plugin_middleware_local-plugin.md
+description: How this unpublished fork is loaded by Traefik (import equals go.mod, localPlugins, no catalog version).
+
 ## Config validation
 priority: normal
 local: core_plugin_middleware_config-validation.md
-description: Startup hard-fail of Traefik Config, including the LogFilePath writability-check handle.
+description: How New rejects invalid Traefik Config (ValidateParams) before opening LAPI, including the LogFilePath writability-check handle.
 
 ## Decision scopes
 priority: normal
@@ -50,6 +55,11 @@ priority: normal
 local: core_plugin_lapi_stream-single-flight.md
 description: How one Client skips a stream poll that is already running and publishes health atomically.
 
+## Stream apply
+priority: normal
+local: core_plugin_lapi_stream-apply.md
+description: How this plugin writes one CrowdSec stream payload (deleted before new) into the DecisionStore.
+
 ## LAPI connection
 priority: normal
 local: core_plugin_lapi_connection.md
@@ -58,7 +68,7 @@ description: How this plugin stores replaceable LAPI HTTP+auth on the Client (`c
 ## LAPI query round trip
 priority: normal
 local: core_plugin_lapi_query-round-trip.md
-description: How one CrowdSec LAPI/CAPI exchange renews a token once, releases its body, and names its own failure.
+description: How one CrowdSec LAPI/CAPI exchange encodes the CAPI login body, renews a token once, releases its body, and names its own failure.
 
 ## Captcha gate cookie
 priority: normal
@@ -69,4 +79,9 @@ description: How captcha grace is stored in a signed HttpOnly cookie instead of 
 priority: normal
 local: core_plugin_middleware_captcha-routing.md
 description: How handleRemediationServeHTTP routes captcha-kind requests after the gate cookie.
+
+## Captcha siteverify
+priority: normal
+local: core_plugin_middleware_captcha-siteverify.md
+description: How Validate encodes the provider siteverify request and classifies a JSON success reply.
 

@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-stream-apply-deleted-before-new
+jobName: 2026-09-18-stream-apply-deleted-before-new
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:75a4bc23d8520f89c921ef21072e23e552d1038c55545f680d8727196b6af56a
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: stream-apply-deleted-before-new
+pr:
+  id: 79
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/79

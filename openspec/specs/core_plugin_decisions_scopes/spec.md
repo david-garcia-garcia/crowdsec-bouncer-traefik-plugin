@@ -16,7 +16,7 @@ The bouncer SHALL identify the client IP using the existing remote-IP owner (`pk
 - **THEN** Range matching uses that `net.IP` and MUST NOT parse the client string again
 
 ### Requirement: Range decisions match by CIDR containment
-When a decision scope is `Range` (any case), the bouncer SHALL treat `value` as a CIDR and remediate a request whose client IP is inside that network. Range membership SHALL be stored on one shared cache key `range-index` as `cidr=remediation` lines so Redis replicas that only read can still match. When several containing CIDRs hit, `ban` SHALL win over `captcha`. In stream and alone modes, the request path SHALL match Range from in-process membership rebuilt from that blob and MUST NOT read `range-index` on the request. live and none SHALL keep skipping `range-index` and expand Range via LAPI `?ip=`.
+When a decision scope is `Range` (any case), the bouncer SHALL treat `value` as a CIDR and remediate a request whose client IP is inside that network. A parseable bare IP SHALL be stored as that host `/32` (IPv4) or `/128` (IPv6) on range-index upsert and remove so write and delete pair. Membership rebuild SHALL use `ParseCIDR` only; a leftover bare-IP index line SHALL be skipped. Range membership SHALL be stored on one shared cache key `range-index` as `cidr=remediation` lines so Redis replicas that only read can still match. When several containing CIDRs hit, `ban` SHALL win over `captcha`. In stream and alone modes, the request path SHALL match Range from in-process membership rebuilt from that blob and MUST NOT read `range-index` on the request. live and none SHALL keep skipping `range-index` and expand Range via LAPI `?ip=`.
 
 #### Scenario: Stream Range contains the client
 - **WHEN** stream or alone mode has a Range ban `10.0.0.0/8` and the client IP is `10.1.2.3`
@@ -33,6 +33,18 @@ When a decision scope is `Range` (any case), the bouncer SHALL treat `value` as 
 #### Scenario: Empty Range membership is a miss
 - **WHEN** stream mode has no Range decisions
 - **THEN** Range matching does not remediate the request
+
+#### Scenario: Bare Range host remediates that address
+- **WHEN** stream or alone mode has a Range ban `192.0.2.1` and the client IP is `192.0.2.1`
+- **THEN** the request is forbidden
+
+#### Scenario: Leftover bare Range line does not remediate
+- **WHEN** `range-index` holds `192.0.2.1=t` and the client IP is `192.0.2.1`
+- **THEN** the request is allowed
+
+#### Scenario: Delete of LAPI host drops the rewritten prefix
+- **WHEN** stream stored Range `192.0.2.1` as `192.0.2.1/32` and then deletes Range `192.0.2.1`
+- **THEN** that host is no longer remediating
 
 ### Requirement: Header-mapped scopes match configured request headers
 Public config `decisionScopeHeaders` SHALL map a CrowdSec scope name to a request header. Empty (the default) SHALL disable header-scope matching. Keys `Ip` and `Range` (any case) SHALL be rejected at config validate. Country values SHALL be ISO 3166-1 alpha-2; `XX` and `T1` SHALL NOT match. AS values SHALL be decimal digits; a leading `AS`/`as` SHALL be stripped. Any other key SHALL match the trimmed header to the stored scope string exactly (`username` is not `user`). A missing or empty header SHALL skip that scope (MUST NOT fail closed). This plugin MUST NOT geolocate.
@@ -65,7 +77,7 @@ The LAPI stream request SHALL include `scopes=ip,range` plus every header scope 
 - **THEN** a later stream query includes `country`
 
 ### Requirement: Ip decisions key on the canonical address
-An `Ip` decision SHALL be cached and looked up under one canonical spelling of the address, derived the same way on the store side and on the request side. A decision value that is a `/32` or `/128` CIDR SHALL key on the host address; a value that parses as a bare address SHALL key on `net.IP.String()` of that address, which collapses expanded, upper-case, and IPv4-mapped spellings; a value that parses as neither SHALL be keyed verbatim. The request path SHALL derive that key from the `net.IP` `pkg/ip.GetRemoteIP` already parsed and MUST NOT parse the client address a second time, falling back to the trimmed raw string only when that address did not parse. The store side and the request side MUST NOT be changed independently: a canonical read against a verbatim write is a permanent cache miss. Non-IP scopes MUST NOT be pushed through address parsing.
+An `Ip` decision SHALL be cached and looked up under one canonical spelling of the address. The store path SHALL key a decision value that is a `/32` or `/128` CIDR on the host address; a value that parses as a bare address SHALL key on `net.IP.String()` of that address, which collapses expanded, upper-case, and IPv4-mapped spellings; a value that parses as neither SHALL be keyed verbatim. After `GetRemoteIP` yields a parsed address, `clientRequest.remoteIP` SHALL be that address's `net.IP.String()` and the request path SHALL look up the Ip slot under that string. It MUST NOT re-parse the client address and MUST NOT use a second request-path key helper. Until that parse succeeds, `remoteIP` SHALL stay the raw extracted text so extract-fail and unparseable-address remediations can log it. Live-mode memo SHALL write under that same canonical `remoteIP` and MUST NOT re-derive a key from the raw header. Captcha gate bind SHALL compare that same canonical `remoteIP`. The store side and the request side MUST NOT be changed independently: a canonical read against a verbatim write is a permanent cache miss. Non-IP scopes MUST NOT be pushed through address parsing.
 
 #### Scenario: Bare IP ban still works
 - **WHEN** an Ip ban exists for the client IP
@@ -90,6 +102,22 @@ An `Ip` decision SHALL be cached and looked up under one canonical spelling of t
 #### Scenario: Country value is not an address
 - **WHEN** a Country decision carries the value `fr`
 - **THEN** it is keyed as the normalized header scope `country:FR` and is not parsed as an address
+
+#### Scenario: Real CrowdSec Ip ban matches a different request spelling in none mode
+- **WHEN** a live LAPI holds an Ip ban whose value is an expanded IPv6, an upper-case IPv6, or an IPv4-mapped address, and Traefik is hit in none mode with a different spelling of that same address on the forwarded header
+- **THEN** the request is forbidden
+
+#### Scenario: Real CrowdSec Ip ban matches a different request spelling in stream mode
+- **WHEN** a live LAPI holds an Ip ban whose value is an expanded IPv6, an upper-case IPv6, or an IPv4-mapped address, and Traefik is hit in stream mode with a different spelling of that same address on the forwarded header
+- **THEN** the request is forbidden after the stream poll applies the decision
+
+#### Scenario: Captcha gate bind uses the canonical remoteIP
+- **WHEN** captcha grace is bound to the client address and a later request arrives with a different spelling of the same address
+- **THEN** the gate cookie still matches
+
+#### Scenario: Unparseable address keeps the raw remoteIP
+- **WHEN** `GetRemoteIP` returns raw header text and a nil parsed address
+- **THEN** the request is remediating as an unparseable-address failure and the raw text is what the failure log shows
 
 ### Requirement: Range index apply does not write from an index it could not read
 `readRangeIndex` SHALL distinguish a cache miss from a failed read: a miss SHALL be an empty index with no error, and any other cache failure SHALL be returned. `ApplyRangeBatch` SHALL return that error and MUST NOT `Set` or `Delete` `range-index`, because the blob is shared and rebuilding it from an unread base drops every Range decision this poll did not carry. A stream poll whose Range apply failed SHALL be reported as a failed poll, so the stream lease is released and the retry asks for the full decision set.
@@ -172,3 +200,48 @@ An Ip, header-scope, or Range-index cache value SHALL still start with the ban/c
 #### Scenario: Bare Range-index letter still remediates
 - **WHEN** `range-index` holds only `10.0.0.0/8=t` and the client IP is `10.1.2.3`
 - **THEN** the request is banned
+
+### Requirement: Live IP cache slot is the IP query result
+When live mode writes a client-address cache entry after a LAPI lookup, that entry SHALL be the client-address (`?ip=`) query result only. Header-mapped remediations SHALL stay on the header-scope cache keys that already store each mapped header result. The client-address key SHALL be the address `pkg/ip.GetRemoteIP` already chose and that the live lookup received; this leaf MUST NOT parse `RemoteAddr` or walk forwarded headers again. Header identity SHALL be the map `decisionscope.RequestScopeValues` already produced; this leaf MUST NOT re-read request headers to decide the IP-slot write.
+
+A clean client-address query SHALL write the none payload (`NoBannedValue`) on the client-address key even when a header-mapped query remediates. The request that just merged SHALL still return that header remediation. A remediating client-address query SHALL write that client-address remediation on the client-address key even when a header-mapped query also remediates. Captcha is an active remediation; this leaf MUST NOT split a captcha-only write path.
+
+When a header-mapped query fails and the merged verdict is not active, the lookup MUST NOT write a none payload on the client-address key (the fail-closed rule owned by `core_plugin_lapi_failure-action`).
+
+A later cache lookup for the same client address and a different header identity MUST NOT inherit the first identity's header remediation from the client-address key.
+
+#### Scenario: Header ban does not land on the IP key
+- **WHEN** live mode queries a clean client address and a mapped Country ban `FR`
+- **THEN** the client-address cache key holds the none payload
+- **AND** the Country header-scope key holds the ban
+- **AND** the lookup that just merged still remediates as a ban
+
+#### Scenario: Later header identity does not inherit the ban
+- **WHEN** the previous write has happened and a later cache lookup uses the same client address with Country `DE`
+- **THEN** that lookup does not remediate from the `FR` ban
+
+#### Scenario: IP ban stays on the IP key
+- **WHEN** live mode queries a banned client address and a mapped Country ban
+- **THEN** the client-address cache key holds the IP ban
+- **AND** the Country header-scope key holds the Country ban
+
+### Requirement: Range index upsert and remove match the same network
+`upsertIndexCIDR` and `removeCIDRFromIndex` SHALL treat two CIDR strings as the same `range-index` line when both parse as IP networks and the parsed network addresses are equal and the prefix lengths match (mask ones and bits). They MUST NOT compare `ParseCIDR`'s first (unmasked) IP. When either side fails to parse, they SHALL fall back to raw-text equality so identical unparseable lines still match. A same-network hit SHALL replace or drop every matching line. A replace or append SHALL persist the incoming CIDR text and MUST NOT rewrite that line to `(*net.IPNet).String()`. This leaf MUST NOT sweep-rewrite leftover spellings the call did not name. `ApplyRangeBatch` SHALL keep one read, removals then upserts, and one write; a failed GET that is not a miss SHALL still return and MUST NOT write.
+
+#### Scenario: Different spelling of the same network is removed
+- **WHEN** `AddRange` stores `10.1.2.0/8` as a ban and `RemoveRange` is called with `10.0.0.0/8`
+- **THEN** `range-index` no longer holds that network
+- **AND** membership for `10.1.2.3` is clear
+
+#### Scenario: Same-network upsert persists the incoming spelling
+- **WHEN** `range-index` holds `10.1.2.0/8=c` and `AddRange` upserts `10.0.0.0/8` as a ban
+- **THEN** that line is replaced with the incoming text `10.0.0.0/8` plus the new remediation
+- **AND** leftover lines this call did not name are left as they were
+
+#### Scenario: Identical unparseable text still matches
+- **WHEN** `range-index` holds an unparseable CIDR line and remove is called with that same raw text
+- **THEN** that line is dropped
+
+#### Scenario: Parseable and unparseable text are not the same line
+- **WHEN** `range-index` holds `10.0.0.0/8=t` and remove is called with unparseable text that is not that string
+- **THEN** the `10.0.0.0/8` line stays
