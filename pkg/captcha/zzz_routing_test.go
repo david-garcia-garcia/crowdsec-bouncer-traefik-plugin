@@ -13,6 +13,16 @@ import (
 	"testing"
 )
 
+// writeRoutingCaptchaTemplate writes a readable captcha.html for Client.New.
+func writeRoutingCaptchaTemplate(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "captcha.html")
+	if err := os.WriteFile(path, []byte("CAPTCHA_FIXTURE"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 func Test_IsCaptchaFormPost(t *testing.T) {
 	client := &Client{infoProvider: &infoProvider{response: "dummy-captcha-response"}}
 
@@ -177,7 +187,7 @@ func Test_IsCustomResourceRequest_exactPathOnly(t *testing.T) {
 		"gate",
 		true,
 		"",
-		"",
+		writeRoutingCaptchaTemplate(t),
 		3600,
 	); err != nil {
 		t.Fatal(err)
@@ -216,7 +226,7 @@ func Test_IsCustomResourceRequest_emptyChallengeIsJsOnly(t *testing.T) {
 		"gate",
 		true,
 		"",
-		"",
+		writeRoutingCaptchaTemplate(t),
 		3600,
 	); err != nil {
 		t.Fatal(err)
@@ -245,7 +255,7 @@ func Test_IsCustomResourceRequest_builtinCDNNotStored(t *testing.T) {
 		"gate",
 		true,
 		"",
-		"",
+		writeRoutingCaptchaTemplate(t),
 		3600,
 	); err != nil {
 		t.Fatal(err)

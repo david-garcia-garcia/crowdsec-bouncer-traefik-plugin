@@ -85,8 +85,11 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 	c.gateSecret = []byte(gateSecret)
 	c.gateBindIP = gateBindIP
 	c.remediationCustomHeader = remediationCustomHeader
-	template, contentType, _ := configuration.GetTemplate(captchaTemplatePath)
-	c.template = template
+	challengeTemplate, contentType, err := configuration.GetTemplate(captchaTemplatePath)
+	if err != nil {
+		return err
+	}
+	c.template = challengeTemplate
 	c.templateContentType = contentType
 	c.gracePeriodSeconds = gracePeriodSeconds
 	c.log = log
@@ -96,11 +99,10 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 
 // ServeHTTP Handle captcha html page or validation.
 func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP string) {
-	valid, err := c.Validate(r)
+	valid, err := c.Validate(r, remoteIP)
+	// Transport and JSON decode stay classified; the solver retries the challenge.
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP:validate " + err.Error())
-		rw.WriteHeader(http.StatusBadRequest)
-		return
 	}
 	if valid {
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
@@ -299,7 +301,7 @@ func captchaResponseFromRequest(r *http.Request, field string) string {
 }
 
 // Validate Verify the captcha from provider API.
-func (c *Client) Validate(r *http.Request) (bool, error) {
+func (c *Client) Validate(r *http.Request, remoteIP string) (bool, error) {
 	if r.Method != http.MethodPost {
 		c.log.Debug("captcha:Validate invalid method: " + r.Method)
 		return false, nil
@@ -312,6 +314,7 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	var body = url.Values{}
 	body.Add("secret", c.secretKey)
 	body.Add("response", response)
+	body.Add("remoteip", remoteIP)
 	res, err := c.httpClient.PostForm(c.infoProvider.validate, body)
 	if err != nil {
 		c.log.Error("captcha:Validate " + err.Error())
