@@ -11,6 +11,7 @@ localTests: none
 requirement: requirement.md
 comments: none
 explore: explore.md
+change: captcha-siteverify-content-type-case
 pr:
   id: 94
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/94

@@ -56,8 +56,8 @@ The hunt name is proof, not a dest file. Dest still needs a committed `zzz_` reg
   By: explore
 
 - Q: Which spec unit owns the siteverify media-type match?
-  Decision: assumed — propose runs FindSpecHost. Do not fold this requirement into `core_plugin_middleware_captcha-routing` (owns `handleRemediationServeHTTP` routing) or `core_plugin_middleware_captcha-gate` (owns the gate cookie). Those units do not own `Validate`'s `Content-Type` match.
-  By: explore
+  Decision: resolved — FindSpecHost new `core_plugin_middleware_captcha-siteverify` (high). Candidates: `core_plugin_middleware_captcha-routing`, `core_plugin_middleware_captcha-gate`, `core_plugin_middleware_config-validation`, `core_plugin_middleware_bouncer`. Do not fold into routing or gate.
+  By: propose
 
 - Q: Does this change also treat a non-2xx siteverify HTTP status as failure?
   Decision: resolved — no. Out of scope. Sibling defect. This change does not inspect status.
