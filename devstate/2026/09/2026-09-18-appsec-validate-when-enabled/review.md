@@ -45,3 +45,9 @@ phase: pullrequest
 findings: e2e (binary + mock LAPI) failed on card-commit 6ae4b30
 fixed: reused OPEN PR #97; ready title; waited CI on f0ea972 (four checks success) then 6ae4b30
 skipped: no comments.md; no second PR; gh not on PATH — used GitHub MCP check runs; no workflow rerun tool
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: later write after HEAD f9ac8ca CI succeeded (four checks); recorded 6ae4b30 e2e binary failure as captcha-mock timing flake on a docs-only commit
+skipped: no new phase; no product-code change; Task unused

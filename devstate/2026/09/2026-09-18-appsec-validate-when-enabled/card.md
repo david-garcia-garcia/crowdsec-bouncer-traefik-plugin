@@ -1,4 +1,4 @@
-Developer review: needs changes — 2026-09-18T17:01:29Z
+Developer review: ready for review — 2026-09-18T17:10:35Z
 
 ## What this changes
 **Operators.** Leftover invalid AppSec CA or a missing `crowdsecAppsecKeyFile` no longer fail `ValidateParams` when `crowdsecAppsecEnabled` is false. Alone with AppSec on and those same leftovers now fails closed at startup.
@@ -29,27 +29,27 @@ flowchart TD
 ```
 
 ## Merge readiness
-CI on head `6ae4b30` failed. 1 item remains.
+CI on head `f9ac8ca` succeeded. 0 items remain.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: 6ae4b30
+Reviewed head: f9ac8ca
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 2/6 | e2e (binary + mock LAPI) failed |
-| CI proof | 2/6 | One required check failed |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | Four required checks succeeded on HEAD |
 | Local tests proof | N/A | Remote PR; CI proof covers this |
 | Review resolution | 6/6 | OPEN PR #97; no reviewer comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-18-appsec-validate-when-enabled pushed | `git` `origin/2026-09-18-appsec-validate-when-enabled` at `6ae4b30` |
+| Branch | 2026-09-18-appsec-validate-when-enabled pushed | `git` `origin/2026-09-18-appsec-validate-when-enabled` at `f9ac8ca` |
 | OpenSpec | appsec-validate-when-enabled | `openspec/changes/archive/2026-09-18-appsec-validate-when-enabled/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/97 | pr-host List |
-| CI | Race detector success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35371432958/job/105686078515 ; Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35371432958/job/105686078862 ; e2e (binary + mock LAPI) failure https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35371433064/job/105686080001 ; e2e (docker + pester) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35371433064/job/105686079696 | pr-host CI |
+| CI | Race detector success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35371988749/job/105687873504 ; Main Process success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35371988749/job/105687873182 ; e2e (binary + mock LAPI) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35371988829/job/105687875057 ; e2e (docker + pester) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35371988829/job/105687874781 | pr-host CI |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | no `comments.md` |
 
@@ -60,7 +60,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local ticket `2026-09-18-appsec-validate-when-enabled` on branch `2026-09-18-appsec-validate-when-enabled` as PR #97. Pullrequest reused that stub and dropped WIP. CI on `f0ea972` succeeded; CI on card-commit `6ae4b30` failed e2e (binary + mock LAPI).
+Local ticket `2026-09-18-appsec-validate-when-enabled` on branch `2026-09-18-appsec-validate-when-enabled` as PR #97. Pullrequest reused that stub and dropped WIP. CI on HEAD `f9ac8ca` succeeded (four checks). Earlier `6ae4b30` e2e (binary + mock LAPI) failure was a captcha-mock timing flake on a docs-only commit; the same job already passed on `f0ea972`.
 
 ## Decision needed
 | Question | Decision | By |
@@ -73,7 +73,7 @@ Local ticket `2026-09-18-appsec-validate-when-enabled` on branch `2026-09-18-app
 | Should leftover AppSec fields warn when the knob is false? | assumed — no. Ticket is skip validation, not a new warn. Bound the ask. | propose |
 
 ## Before merge
-- [ ] [P2] e2e (binary + mock LAPI) failed on `6ae4b30` — https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35371433064/job/105686080001
+None.
 
 ## Findings
 None.
@@ -93,7 +93,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 6ae4b30bc9cddc3a12b0f1b79cd4e4d4978e04d9 | Card must match the branch you measured |
+| Reviewed head | f9ac8ca561740dc3a5c39b2cf052b073b068d8af | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -107,12 +107,12 @@ Is this the best way to solve the issue? Yes versus DestBranch — reuse the exi
 
 ### Evidence
 What I checked:
-- Pin `origin/master` (`86ac9266`) three-dot product diff excluding `devstate/` and `.cursor/`
-- Sync: `origin/master` already merged
-- OPEN PR #97 reused; title set to ready gitmoji form (pr-host Update)
+- Pin `origin/master` (`6d7043d`) three-dot product diff excluding `devstate/` and `.cursor/` (merge-base `86ac926`)
+- OPEN PR #97 reused; title kept (pr-host get)
 - Comment inventory empty; no `comments.md` (file on disk)
-- CI on `f0ea972`: four checks success (pr-host check runs)
-- CI on `6ae4b30`: e2e (binary + mock LAPI) failure exit 2, mock captcha logs annotated; other three checks success
+- CI on HEAD `f9ac8ca`: four checks completed success (pr-host check runs)
+- Earlier `6ae4b30` e2e (binary + mock LAPI) failure was a captcha-mock timing flake on a docs-only commit (empty `failure.txt` / `wait_for_body_contains`); same job passed on `f0ea972` and now `f9ac8ca`
+- No product-code change this Set
 
 ### Rank-up moves
 None.
