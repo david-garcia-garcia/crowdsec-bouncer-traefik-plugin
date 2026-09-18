@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: catalog leaves + archive move
 skipped: none
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: PR #72 title ready; CI succeeded including Race detector
+skipped: none

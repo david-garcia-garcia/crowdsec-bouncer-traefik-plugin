@@ -11,4 +11,4 @@ JobName: 2026-09-18-stream-poll-single-flight
 | codereview | [x] | [x] | 2026-09-18T06:46:59Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T06:46:59Z |
 | archive | [x] | [x] | 2026-09-18T06:46:59Z |
-| pullrequest | [x] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-18T06:51:45Z |
