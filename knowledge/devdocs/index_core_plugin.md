@@ -78,5 +78,5 @@ description: How handleRemediationServeHTTP routes captcha-kind requests after t
 ## Captcha siteverify
 priority: normal
 local: core_plugin_middleware_captcha-siteverify.md
-description: How Validate classifies a provider siteverify response as JSON and returns success.
+description: How Validate encodes the provider siteverify request and classifies a JSON success reply.
 

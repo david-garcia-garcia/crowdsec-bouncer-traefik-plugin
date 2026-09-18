@@ -178,8 +178,25 @@ Path to the ban file. Empty disables it. Content-Type is inferred from the exten
 **CaptchaCustomResponse** (string, no default)
 `custom` only. POST field from `captcha.html` (hCaptcha: `h-captcha-response`).
 
+**CaptchaCustomValidateBody** (string, default `""`)
+Siteverify request encoding. After trim, exact lowercase `""` or `form` POSTs `application/x-www-form-urlencoded` `secret` and `response` (same as omit; Wicketkeeper). `json` POSTs `application/json` `{"secret","response"}`. `json` is `custom` only — a built-in plus `json` fails startup. `JSON`, `Form`, and any other token fail for every provider.
+
+CapJS / Cap Standalone as `custom` (operator HTML stays yours; no `trycap` provider):
+
+```yaml
+captchaProvider: custom
+captchaCustomJsUrl: https://<instance>/assets/widget.js
+captchaCustomKey: cap
+captchaCustomResponse: cap-token
+captchaCustomValidateUrl: https://<instance>/<site_key>/siteverify
+captchaCustomValidateBody: json
+captchaSiteKey: FIXME
+captchaSecretKey: FIXME
+captchaGateSecret: FIXME
+```
+
 **CaptchaCustomValidateURL** (string, no default)
-`custom` only. URL that validates the challenge (hCaptcha: `https://api.hcaptcha.com/siteverify`).
+`custom` only. URL that validates the challenge (hCaptcha: `https://api.hcaptcha.com/siteverify`). Cap Standalone: `https://<instance>/<site_key>/siteverify` with `CaptchaCustomValidateBody: json`.
 
 **CaptchaFilePath** (string, default `/captcha.html`)
 Path to the captcha template. Content-Type is inferred from the extension.
