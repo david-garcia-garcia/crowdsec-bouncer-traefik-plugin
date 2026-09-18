@@ -21,3 +21,9 @@ phase: implement
 findings: none
 fixed: captcha alias empty-guard; TestNew_CaptchaFilePathWinsOverDeprecatedHTMLPath; e2e keys retargeted; localTests passed; CI 35356824920 and 35356824938 succeeded; PR 85 implement card
 skipped: no comments.md; no new spec folder; no issues.md rows
+
+## codereview (2026-09-18)
+phase: codereview
+findings: Standards 3 (1 hard, 2 judgement); Spec/Security/Performance/Dead/Coverage none
+fixed: Name for the scope `h` → `handler` (0ce9264); PR 85 code-review card
+skipped: Mysterious Name `au`; Duplicated Code sibling tests; Task spawn unavailable in nested session (in-process axes)
