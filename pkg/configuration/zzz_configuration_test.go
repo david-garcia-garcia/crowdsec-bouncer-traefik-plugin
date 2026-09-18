@@ -147,6 +147,17 @@ func Test_ValidateParams(t *testing.T) {
 	cfgAloneBadLog.CrowdsecCapiMachineID = "machine"
 	cfgAloneBadLog.CrowdsecCapiPassword = "password"
 	cfgAloneBadLog.LogLevel = "Warning"
+	cfgAloneInvalidAppsecCA := getMinimalConfig()
+	cfgAloneInvalidAppsecCA.CrowdsecMode = AloneMode
+	cfgAloneInvalidAppsecCA.CrowdsecCapiMachineID = "machine"
+	cfgAloneInvalidAppsecCA.CrowdsecCapiPassword = "password"
+	cfgAloneInvalidAppsecCA.CrowdsecAppsecScheme = HTTPS
+	cfgAloneInvalidAppsecCA.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgAloneMissingAppsecKeyFile := getMinimalConfig()
+	cfgAloneMissingAppsecKeyFile.CrowdsecMode = AloneMode
+	cfgAloneMissingAppsecKeyFile.CrowdsecCapiMachineID = "machine"
+	cfgAloneMissingAppsecKeyFile.CrowdsecCapiPassword = "password"
+	cfgAloneMissingAppsecKeyFile.CrowdsecAppsecKeyFile = "../../tests/.bad"
 	cfgAppsecCaptchaNoProvider := getMinimalConfig()
 	cfgAppsecCaptchaNoProvider.CrowdsecAppsecFailureAction = FailureActionCaptcha
 	cfgRemediationLow := getMinimalConfig()
@@ -187,6 +198,8 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Alone mode with CAPI credentials", args: args{config: cfgAloneValid}, wantErr: false},
 		{name: "Alone mode captcha without site/secret keys", args: args{config: cfgAloneMissingCaptchaKeys}, wantErr: true},
 		{name: "Alone mode invalid log level", args: args{config: cfgAloneBadLog}, wantErr: true},
+		{name: "Alone mode AppSec HTTPS with invalid CA", args: args{config: cfgAloneInvalidAppsecCA}, wantErr: true},
+		{name: "Alone mode missing AppSec key file", args: args{config: cfgAloneMissingAppsecKeyFile}, wantErr: true},
 		{name: "AppSec captcha action without provider", args: args{config: cfgAppsecCaptchaNoProvider}, wantErr: true},
 		{name: "RemediationStatusCode below 100", args: args{config: cfgRemediationLow}, wantErr: true},
 		{name: "RemediationStatusCode 600 or above", args: args{config: cfgRemediationHigh}, wantErr: true},
@@ -198,6 +211,21 @@ func Test_ValidateParams(t *testing.T) {
 				t.Errorf("validateParams() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+// TestHunt_ValidateParams_aloneModeStillRejectsInvalidAppsecCA pins the hunt proof:
+// alone mode still rejects a garbage AppSec CA after CAPI credentials pass.
+func TestHunt_ValidateParams_aloneModeStillRejectsInvalidAppsecCA(t *testing.T) {
+	cfg := getMinimalConfig()
+	cfg.CrowdsecMode = AloneMode
+	cfg.CrowdsecCapiMachineID = "machine"
+	cfg.CrowdsecCapiPassword = "password"
+	cfg.CrowdsecAppsecScheme = HTTPS
+	cfg.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+
+	if err := ValidateParams(cfg, logger.New("INFO", "")); err == nil {
+		t.Fatal("alone mode with a garbage AppSec CA must fail ValidateParams")
 	}
 }
 
