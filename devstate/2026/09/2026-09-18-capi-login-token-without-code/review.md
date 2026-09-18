@@ -27,3 +27,9 @@ phase: codereview
 findings: none
 fixed: none
 skipped: six axes none. (0 total each)
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: none
+fixed: none
+skipped: usage already had the Token-after-2xx gotcha; no Language write
