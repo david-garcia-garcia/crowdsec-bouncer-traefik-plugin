@@ -302,3 +302,62 @@ func TestHelper_NilIP(t *testing.T) {
 		t.Fatalf("IsContained(nil) = %v, %d; want false, 0", found, prefixLen)
 	}
 }
+
+func TestHunt_IPv4MappedSlash96DoesNotPanic(t *testing.T) {
+	helper, err := NewHelper([]string{"::ffff:0:0/96"})
+	if err != nil {
+		t.Fatalf("AddCIDR ::ffff:0:0/96: %v", err)
+	}
+
+	_, mappedSlash96, err := net.ParseCIDR("::ffff:0:0/96")
+	if err != nil {
+		t.Fatalf("ParseCIDR ::ffff:0:0/96: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		ip   string
+	}{
+		{"IPv4", "192.0.2.1"},
+		{"IPv4-mapped", "::ffff:192.0.2.1"},
+		{"native IPv6", "2001:db8::1"},
+		{"loopback IPv6", "::1"},
+		{"unspecified IPv6", "::"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ip := net.ParseIP(tt.ip)
+			if ip == nil {
+				t.Fatalf("Invalid IP address: %s", tt.ip)
+			}
+			want := mappedSlash96.Contains(ip)
+			found, _, containErr := helper.IsContained(ip)
+			if containErr != nil {
+				t.Fatalf("IsContained returned error: %v", containErr)
+			}
+			if found != want {
+				t.Errorf("IsContained(%s) = %v, want Contains %v", tt.ip, found, want)
+			}
+		})
+	}
+
+	slash120, err := NewHelper([]string{"::ffff:192.0.2.0/120"})
+	if err != nil {
+		t.Fatalf("AddCIDR ::ffff:192.0.2.0/120: %v", err)
+	}
+	_, mappedSlash120, err := net.ParseCIDR("::ffff:192.0.2.0/120")
+	if err != nil {
+		t.Fatalf("ParseCIDR ::ffff:192.0.2.0/120: %v", err)
+	}
+	query := net.ParseIP("192.0.2.10")
+	found, prefixLen, err := slash120.IsContained(query)
+	if err != nil {
+		t.Fatalf("IsContained 192.0.2.10: %v", err)
+	}
+	if !found || !mappedSlash120.Contains(query) {
+		t.Fatalf("IsContained(192.0.2.10) = %v, Contains = %v; want both true", found, mappedSlash120.Contains(query))
+	}
+	if prefixLen != 24 {
+		t.Fatalf("IsContained(192.0.2.10) prefix = %d, want 24", prefixLen)
+	}
+}
