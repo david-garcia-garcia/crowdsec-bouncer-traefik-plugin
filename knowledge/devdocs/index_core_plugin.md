@@ -5,6 +5,11 @@ priority: normal
 local: core_plugin_middleware.md
 description: How Traefik New reclaims a LAPI Client and an AppSec Client and returns a per-router Bouncer (`core_plugin_middleware_bouncer`).
 
+## Config validation
+priority: normal
+local: core_plugin_middleware_config-validation.md
+description: How New rejects invalid Traefik Config (ValidateParams) before opening LAPI.
+
 ## Decision scopes
 priority: normal
 local: core_plugin_decisionscope.md
