@@ -124,7 +124,7 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 	cfg := cfgLiveAt(u.Host)
 	cfg.CaptchaProvider = configuration.HcaptchaProvider
 	cfg.CaptchaGateSecret = "gate-secret"
-	cfg.CaptchaFilePath = ""
+	cfg.CaptchaFilePath = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
 
 	handler, err := New(context.Background(), testNextOK(), cfg, "empty-captcha-keys")
 	if err == nil {
@@ -134,6 +134,41 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 		t.Fatal("New must return a nil handler when captcha keys are empty")
 	}
 	if !strings.Contains(err.Error(), "CaptchaSiteKey: cannot be empty when CaptchaProvider is set") {
+		t.Fatalf("error %q", err)
+	}
+	if atomic.LoadInt64(&hits) != 0 {
+		t.Fatalf("New opened LAPI (%d hits)", hits)
+	}
+}
+
+// TestNew_RejectsEmptyCaptchaFilePath stops at ValidateParams so New does not open LAPI.
+func TestNew_RejectsEmptyCaptchaFilePath(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	var hits int64
+	srv := liveLAPI(t, nil, &hits)
+	t.Cleanup(func() { srv.Close() })
+	u, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := cfgLiveAt(u.Host)
+	cfg.CaptchaProvider = configuration.HcaptchaProvider
+	cfg.CaptchaSiteKey = "site"
+	cfg.CaptchaSecretKey = "secret"
+	cfg.CaptchaGateSecret = "gate-secret"
+	cfg.CaptchaFilePath = ""
+
+	handler, err := New(context.Background(), testNextOK(), cfg, "empty-captcha-path")
+	if err == nil {
+		t.Fatal("New must fail when captchaProvider is set and CaptchaFilePath is empty")
+	}
+	if handler != nil {
+		t.Fatal("New must return a nil handler when CaptchaFilePath is empty")
+	}
+	if !strings.Contains(err.Error(), "CaptchaFilePath: cannot be empty when CaptchaProvider is set") {
 		t.Fatalf("error %q", err)
 	}
 	if atomic.LoadInt64(&hits) != 0 {

@@ -29,6 +29,17 @@ func getMinimalConfig() *Config {
 	return cfg
 }
 
+// writeCaptchaTemplateFixture writes a readable captcha.html so tests that used
+// to blank CaptchaFilePath still skip only the key errors they assert.
+func writeCaptchaTemplateFixture(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "captcha.html")
+	if err := os.WriteFile(path, []byte("CAPTCHA_FIXTURE"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 func Test_contains(t *testing.T) {
 	type args struct {
 		source []string
@@ -109,6 +120,7 @@ func Test_ValidateParams(t *testing.T) {
 	cfg9.LogLevel = "info"
 	cfg10 := getMinimalConfig()
 	cfg10.LogLevel = "Warning"
+	captchaTemplate := writeCaptchaTemplateFixture(t)
 	cfgCaptchaNoProvider := getMinimalConfig()
 	cfgCaptchaNoProvider.CrowdsecLapiFailureAction = FailureActionCaptcha
 	cfgCaptchaWithProvider := getMinimalConfig()
@@ -117,27 +129,27 @@ func Test_ValidateParams(t *testing.T) {
 	cfgCaptchaWithProvider.CaptchaSiteKey = "site"
 	cfgCaptchaWithProvider.CaptchaSecretKey = "secret"
 	cfgCaptchaWithProvider.CaptchaGateSecret = "gate-secret"
-	cfgCaptchaWithProvider.CaptchaFilePath = ""
+	cfgCaptchaWithProvider.CaptchaFilePath = captchaTemplate
 	cfgEmptyKeysDefaultBan := getMinimalConfig()
 	cfgEmptyKeysDefaultBan.CaptchaProvider = HcaptchaProvider
 	cfgEmptyKeysDefaultBan.CaptchaGateSecret = "gate-secret"
-	cfgEmptyKeysDefaultBan.CaptchaFilePath = ""
+	cfgEmptyKeysDefaultBan.CaptchaFilePath = captchaTemplate
 	cfgOnlySiteEmpty := getMinimalConfig()
 	cfgOnlySiteEmpty.CaptchaProvider = HcaptchaProvider
 	cfgOnlySiteEmpty.CaptchaSecretKey = "secret"
 	cfgOnlySiteEmpty.CaptchaGateSecret = "gate-secret"
-	cfgOnlySiteEmpty.CaptchaFilePath = ""
+	cfgOnlySiteEmpty.CaptchaFilePath = captchaTemplate
 	cfgOnlySecretEmpty := getMinimalConfig()
 	cfgOnlySecretEmpty.CaptchaProvider = HcaptchaProvider
 	cfgOnlySecretEmpty.CaptchaSiteKey = "site"
 	cfgOnlySecretEmpty.CaptchaGateSecret = "gate-secret"
-	cfgOnlySecretEmpty.CaptchaFilePath = ""
+	cfgOnlySecretEmpty.CaptchaFilePath = captchaTemplate
 	cfgWhitespaceSite := getMinimalConfig()
 	cfgWhitespaceSite.CaptchaProvider = HcaptchaProvider
 	cfgWhitespaceSite.CaptchaSiteKey = "   "
 	cfgWhitespaceSite.CaptchaSecretKey = "secret"
 	cfgWhitespaceSite.CaptchaGateSecret = "gate-secret"
-	cfgWhitespaceSite.CaptchaFilePath = ""
+	cfgWhitespaceSite.CaptchaFilePath = captchaTemplate
 	cfgUnknownAction := getMinimalConfig()
 	cfgUnknownAction.CrowdsecAppsecFailureAction = "block"
 	cfgEmptyAction := getMinimalConfig()
@@ -208,7 +220,7 @@ func Test_ValidateParams(t *testing.T) {
 	cfgAloneMissingCaptchaKeys.CrowdsecLapiFailureAction = FailureActionCaptcha
 	cfgAloneMissingCaptchaKeys.CaptchaProvider = HcaptchaProvider
 	cfgAloneMissingCaptchaKeys.CaptchaGateSecret = "gate-secret"
-	cfgAloneMissingCaptchaKeys.CaptchaFilePath = ""
+	cfgAloneMissingCaptchaKeys.CaptchaFilePath = captchaTemplate
 	cfgAloneBadLog := getMinimalConfig()
 	cfgAloneBadLog.CrowdsecMode = AloneMode
 	cfgAloneBadLog.CrowdsecCapiMachineID = "machine"
@@ -279,6 +291,68 @@ func Test_ValidateParams(t *testing.T) {
 			}
 			if tt.wantErrContains != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErrContains)) {
 				t.Errorf("validateParams() error = %v, want containing %q", err, tt.wantErrContains)
+			}
+		})
+	}
+}
+
+// Test_ValidateParams_captchaTemplateRequired fails empty or missing captcha
+// templates when a provider is set, and keeps ban template optional.
+func Test_ValidateParams_captchaTemplateRequired(t *testing.T) {
+	log := logger.New("INFO", "")
+	captchaTemplate := writeCaptchaTemplateFixture(t)
+
+	emptyPath := getMinimalConfig()
+	emptyPath.CaptchaProvider = HcaptchaProvider
+	emptyPath.CaptchaSiteKey = "site"
+	emptyPath.CaptchaSecretKey = "secret"
+	emptyPath.CaptchaGateSecret = "gate-secret"
+	emptyPath.CaptchaFilePath = ""
+
+	missingFile := getMinimalConfig()
+	missingFile.CaptchaProvider = HcaptchaProvider
+	missingFile.CaptchaSiteKey = "site"
+	missingFile.CaptchaSecretKey = "secret"
+	missingFile.CaptchaGateSecret = "gate-secret"
+	missingFile.CaptchaFilePath = filepath.Join(t.TempDir(), "missing-captcha.html")
+
+	emptyBan := getMinimalConfig()
+	emptyBan.CaptchaProvider = HcaptchaProvider
+	emptyBan.CaptchaSiteKey = "site"
+	emptyBan.CaptchaSecretKey = "secret"
+	emptyBan.CaptchaGateSecret = "gate-secret"
+	emptyBan.CaptchaFilePath = captchaTemplate
+	emptyBan.BanFilePath = ""
+
+	aloneEmptyPath := getMinimalConfig()
+	aloneEmptyPath.CrowdsecMode = AloneMode
+	aloneEmptyPath.CrowdsecCapiMachineID = "machine"
+	aloneEmptyPath.CrowdsecCapiPassword = "password"
+	aloneEmptyPath.CaptchaProvider = HcaptchaProvider
+	aloneEmptyPath.CaptchaSiteKey = "site"
+	aloneEmptyPath.CaptchaSecretKey = "secret"
+	aloneEmptyPath.CaptchaGateSecret = "gate-secret"
+	aloneEmptyPath.CaptchaFilePath = ""
+
+	tests := []struct {
+		name            string
+		config          *Config
+		wantErr         bool
+		wantErrContains string
+	}{
+		{name: "Provider set with empty captcha path", config: emptyPath, wantErr: true, wantErrContains: "CaptchaFilePath: cannot be empty when CaptchaProvider is set"},
+		{name: "Provider set with missing captcha file", config: missingFile, wantErr: true},
+		{name: "Provider set with empty ban path still accepted", config: emptyBan, wantErr: false},
+		{name: "Alone mode empty captcha path", config: aloneEmptyPath, wantErr: true, wantErrContains: "CaptchaFilePath: cannot be empty when CaptchaProvider is set"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateParams(tt.config, log)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateParams() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErrContains != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErrContains)) {
+				t.Errorf("ValidateParams() error = %v, want containing %q", err, tt.wantErrContains)
 			}
 		})
 	}
@@ -594,13 +668,14 @@ func Test_CustomCaptchaResourcePath(t *testing.T) {
 }
 
 func Test_validateEnabledCaptchaSettings_customChallengeURL(t *testing.T) {
+	captchaTemplate := writeCaptchaTemplateFixture(t)
 	newCustomConfig := func(challengeURL string) *Config {
 		cfg := getMinimalConfig()
 		cfg.CaptchaProvider = CustomProvider
 		cfg.CaptchaSiteKey = "site"
 		cfg.CaptchaSecretKey = "secret"
 		cfg.CaptchaGateSecret = "gate-secret"
-		cfg.CaptchaFilePath = ""
+		cfg.CaptchaFilePath = captchaTemplate
 		cfg.CaptchaCustomChallengeURL = challengeURL
 		return cfg
 	}
@@ -630,7 +705,7 @@ func Test_validateEnabledCaptchaSettings_customChallengeURL(t *testing.T) {
 	builtin.CaptchaSiteKey = "site"
 	builtin.CaptchaSecretKey = "secret"
 	builtin.CaptchaGateSecret = "gate-secret"
-	builtin.CaptchaFilePath = ""
+	builtin.CaptchaFilePath = captchaTemplate
 	builtin.CaptchaCustomChallengeURL = "v0/challenge"
 	if err := validateEnabledCaptchaSettings(builtin); err != nil {
 		t.Errorf("built-in provider must ignore CaptchaCustomChallengeURL, got %v", err)
