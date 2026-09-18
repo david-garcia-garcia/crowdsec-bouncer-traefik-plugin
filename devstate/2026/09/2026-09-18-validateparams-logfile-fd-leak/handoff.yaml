@@ -13,3 +13,5 @@ requirement: requirement.md
 explore:
 change:
 pr:
+  id: 95
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/95
