@@ -46,20 +46,20 @@ Owner of the **client address**. `ForwardedHeadersInsecure` or `RemoteAddr` in `
 
 - Q: Who already owns client HTTPS / the trust hop for proto?
   Decision: assumed — Traefik entrypoint `forwardedHeaders` owns whether `X-Forwarded-Proto` is trustworthy and what value the plugin sees. `r.TLS` owns connection TLS to Traefik. `pkg/ip.GetRemoteIP` owns client address only. Reuse the sanitized header plus `r.TLS`. Do not re-derive hop trust in captcha or extend `GetRemoteIP` to return scheme.
-  By: explore
+  By: propose
 
 - Q: How do `ForwardedHeadersTrustedIPs` / `ForwardedHeadersInsecure` reach `setGateCookie`?
   Decision: assumed — they do not. Ticket asked to reuse that model; Traefik already applied the equivalent gate. `setGateCookie` keeps reading only `r`. No `Client` fields, no bouncer `New` signature change.
-  By: explore
+  By: propose
 
 - Q: Exact `X-Forwarded-Proto` parse (list, case, aliases)?
   Decision: assumed — trim `Header.Get("X-Forwarded-Proto")` and `EqualFold` to `https` on the whole value. Single token. No comma walk, no RFC 7239 `Forwarded`, no vendor aliases, not `wss`.
-  By: explore
+  By: propose
 
 - Q: Where should the named hunt test live?
   Decision: assumed — `pkg/captcha` gate tests with a `Test_setGateCookie_` name. Do not add `TestHunt_gateCookieSecureWhenForwardedProtoHTTPS`. Dest has no `TestHunt_*` functions.
-  By: explore
+  By: propose
 
 - Q: Does the captcha-gate spec stay TLS-only for Secure?
   Decision: assumed — no. Propose updates the Secure clause to TLS or forwarded https. HttpOnly, Path, SameSite, MaxAge, no Domain stay.
-  By: explore
+  By: propose
