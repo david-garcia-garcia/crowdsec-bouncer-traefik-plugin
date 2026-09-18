@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: 4 stale-usage (LAPI connection, LAPI reclaim key, AppSec challenge, Plugin middleware New)
 fixed: neighbor usage packets now pass LiveLookup request Context and keep backend backoff knobs off reclaim keys
 skipped: none
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: synced two new catalog leaves and folded config-validation; moved change to openspec/changes/archive/2026-09-18-backendbackoff-lapi-appsec
+skipped: n/a
