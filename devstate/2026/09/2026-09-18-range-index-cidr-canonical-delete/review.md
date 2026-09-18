@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: folded core_plugin_decisions_scopes write-identity; archived range-index-canonical-ipnet
 skipped: FindSpecHost Task tool missing on worker (search ran on archive thread)
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: reused PR #92; title ready (gitmoji + rank); CI succeeded on d8aa61c
+skipped: none
