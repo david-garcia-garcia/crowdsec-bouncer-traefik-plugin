@@ -59,3 +59,4 @@ lapiClient.IncDropped(origin, req.ipType, "ban")
 - Trust the header the same way you trust `X-Forwarded-For`: only from a trusted hop (CDN or geoenrich in front of this middleware).
 - Ip/header/Range-index values MAY be `t`/`c` plus U+001F plus a metrics origin. Bare letters still match. Redis stays one `range-index` key.
 - After a cache miss, stream/alone use stream health; live/none call `LiveLookup`. Do not name that split after Range membership.
+- Range-index write identity is the canonical network (`net.ParseCIDR` masked IP plus prefix ones/bits), not the CIDR spelling. Upsert persists `(*net.IPNet).String()`. Equivalent spellings replace or delete as one network. Incoming unparseable CIDR text is skipped; leftover unparseable lines stay.
