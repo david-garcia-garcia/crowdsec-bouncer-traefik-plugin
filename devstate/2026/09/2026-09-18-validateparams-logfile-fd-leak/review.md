@@ -9,3 +9,9 @@ phase: explore
 findings: reproduced Windows Remove file-in-use after ValidateParams (and after NewWithFormat+ResetShared)
 fixed: none
 skipped: no product apply; no research folder; no new devdocs packet
+
+## propose (2026-09-18)
+phase: propose
+findings: none
+fixed: none
+skipped: no new spec leaf; no research folder; no new devdocs packet
