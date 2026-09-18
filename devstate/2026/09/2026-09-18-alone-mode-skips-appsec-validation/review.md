@@ -9,3 +9,9 @@ phase: explore
 findings: none
 fixed: none
 skipped: no research write; no new usage packet — validation contract stays on core_plugin_middleware_config-validation
+
+## propose (2026-09-18)
+phase: propose
+findings: none
+fixed: none
+skipped: no research write; no new usage packet — fold onto core_plugin_middleware_config-validation
