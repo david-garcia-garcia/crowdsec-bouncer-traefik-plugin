@@ -11,7 +11,7 @@ In-tree radix of CIDRs (`pkg/iplookup.Helper`). Insert at construction; `IsConta
 _Avoid_: range-index, per-CIDR cache key, `InNetwork` (one network)
 
 **GetRemoteIP**:
-The owner of the client address for a request. Requires the host from `req.RemoteAddr` to be in the trusted-hop pool before honoring forwarded headers; when the pool is empty or the peer is untrusted, returns `RemoteAddr` only. Otherwise walks the custom forwarded header most-recent-first against the trusted-hop pool, then the host of `RemoteAddr` when every hop is trusted or the header is empty. Also yields that address as `net.IP` when parseable.
+The owner of the client address for a request. Unless `ForwardedHeadersInsecure` is true, requires the host from `req.RemoteAddr` to be in the trusted-hop pool before honoring forwarded headers; when the pool is empty or the peer is untrusted, returns `RemoteAddr` only. Otherwise walks the custom forwarded header most-recent-first against the trusted-hop pool, then the host of `RemoteAddr` when every hop is trusted or the header is empty. When the flag is true, skips the checker and returns the whole trimmed header (no hop walk), or the `RemoteAddr` host when that header is absent, empty, or whitespace-only. Also yields that address as `net.IP` when parseable.
 _Avoid_: parsing `RemoteAddr` on the connection, a second X-Forwarded-For walk, Traefik ipstrategy as a second owner
 
 **clientRequest**:
@@ -54,3 +54,5 @@ ok := checker.ContainsIP(req.ipAddr)
 - The helper does not store remediation strings. Range ban and captcha are two Helpers, not one payload tree.
 - Invalid CIDR fails `NewChecker` / `AddCIDR`; config validate already constructs a Checker and discards it.
 - `0.0.0.0/0` is IPv4 only; `::/0` is IPv6 only. A shared radix root would mark `/0` on both families.
+- On the default path, `ForwardedHeadersTrustedIPs` does double duty: it gates whether `GetRemoteIP` reads the header at all, and it skips hops inside the header. A catch-all pool passes the gate and then makes every hop trusted, so `getIP` returns the empty string and the address falls back to `RemoteAddr` — the named header is silently ignored.
+- `ForwardedHeadersInsecure` is the defer-to-Traefik mode: it skips the socket-peer gate and hop walk. `bouncer.New` then defaults the header to `X-Real-Ip` when `ForwardedHeadersCustomName` is still `X-Forwarded-For`. Safe only when the Traefik entrypoint already sanitizes that header. It is still wrong behind an upstream that does not set `X-Real-Ip`, such as Cloudflare, where the header ends up holding the edge address.

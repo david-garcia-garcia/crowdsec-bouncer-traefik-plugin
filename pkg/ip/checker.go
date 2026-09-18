@@ -128,15 +128,31 @@ func (s *PoolStrategy) getIP(req *http.Request, customHeader string) (string, ne
 }
 
 // GetRemoteIP returns the client address for a request.
-// It requires req.RemoteAddr to be in the trusted-hop pool before honoring forwarded headers.
-// When the pool is empty, the checker is nil, or the socket peer is not trusted, it returns
-// the host from req.RemoteAddr only. Otherwise it walks the custom forwarded header
-// most-recent-first against the trusted-hop pool, then falls back to RemoteAddr when every
-// hop is trusted or the header is empty. The net.IP is that chosen address when parseable.
-func GetRemoteIP(req *http.Request, strategy *PoolStrategy, customHeader string) (string, net.IP, error) {
+// Unless insecure is true, it requires req.RemoteAddr to be in the trusted-hop pool
+// before honoring forwarded headers. When the pool is empty, the checker is nil, or
+// the socket peer is not trusted, it returns the host from req.RemoteAddr only.
+// Otherwise it walks the custom forwarded header most-recent-first against the
+// trusted-hop pool, then falls back to RemoteAddr when every hop is trusted or the
+// header is empty. When insecure is true it does not consult the checker: it returns
+// the whole trimmed header value (no comma split) when that value is non-empty, or
+// the RemoteAddr host when the header is absent, empty, or whitespace-only.
+// The net.IP is that chosen address when parseable.
+func GetRemoteIP(req *http.Request, strategy *PoolStrategy, customHeader string, insecure bool) (string, net.IP, error) {
 	remoteHost, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
 		return "", nil, fmt.Errorf("GetRemoteIP:extractIP: %w", err)
+	}
+
+	if insecure {
+		headerVal := strings.TrimSpace(req.Header.Get(customHeader))
+		if headerVal == "" {
+			parsed, _ := parseIP(remoteHost)
+			return remoteHost, parsed, nil
+		}
+		if parsed, parseErr := parseIP(headerVal); parseErr == nil {
+			return headerVal, parsed, nil
+		}
+		return headerVal, nil, nil
 	}
 
 	trustedPeer := false
