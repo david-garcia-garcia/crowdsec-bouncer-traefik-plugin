@@ -46,3 +46,14 @@ verdict: in progress
 pr: 103
 ci: Main Process, Race detector, e2e binary+mock, e2e docker+pester succeeded
 shas: e31caf3aa2243d716d7be3db70925ae694019b03
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+units: Captcha siteverify, Config validation
+findings: none
+produced: 0
+skipped: 0
+verdict: in progress
+pr: 103
+ci: Main Process, Race detector, e2e docker+pester in progress; e2e binary+mock queued
+shas: b0494d78f73cc1d2418e0ea01d5e4a2955542824
