@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: synced core_plugin_lapi_stream-apply into catalog; moved change to archive/2026-09-18-stream-apply-deleted-before-new
 skipped: none
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: ready title; all four CI checks succeeded on baf7dc7
+skipped: none

@@ -11,4 +11,4 @@ JobName: 2026-09-18-stream-apply-deleted-before-new
 | codereview | [x] | [x] | 2026-09-18T14:30:27Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T14:31:06Z |
 | archive | [x] | [x] | 2026-09-18T14:33:33Z |
-| pullrequest | [x] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-18T14:50:11Z |
