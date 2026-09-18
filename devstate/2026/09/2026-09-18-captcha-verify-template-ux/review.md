@@ -68,3 +68,16 @@ pr: 103
 ci: Main Process, Race detector, e2e binary+mock, e2e docker+pester queued
 validators: 0
 shas: ed14080a21d98d241ede7d2971fcac8dd5469ad8
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: dropped WIP title on PR 103; reused stub; no comments.md replies
+skipped: none
+localTests: passed
+ci: Main Process, Race detector, e2e binary+mock, e2e docker+pester succeeded
+verdict: ready for review
+qualify: qualified-with-gaps
+pr: 103
+title: "🐛 fix(captcha): send siteverify remoteip, re-render 200 on retryable errors, require loadable template"
+shas: 76869d63a6a2d841da75f70e31fe328b4619847c
