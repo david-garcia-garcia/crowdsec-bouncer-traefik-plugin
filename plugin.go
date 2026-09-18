@@ -36,13 +36,6 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	prepared.LogLevel = strings.ToUpper(prepared.LogLevel)
 	log := logger.NewWithFormat(prepared.LogLevel, prepared.LogFilePath, prepared.LogFormat)
 
-	if prepared.BanFilePath == "" && prepared.BanHTMLFilePath != "" {
-		prepared.BanFilePath = prepared.BanHTMLFilePath
-	}
-	if prepared.CaptchaHTMLFilePath != "" {
-		prepared.CaptchaFilePath = prepared.CaptchaHTMLFilePath
-	}
-
 	if err = configuration.ValidateParams(&prepared, log); err != nil {
 		log.Error("New:validateParams " + err.Error())
 		return nil, err
