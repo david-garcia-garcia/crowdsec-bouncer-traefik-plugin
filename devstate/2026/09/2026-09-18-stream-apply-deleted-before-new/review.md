@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: none
 fixed: none
 skipped: usage packet already matched the apply
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: synced core_plugin_lapi_stream-apply into catalog; moved change to archive/2026-09-18-stream-apply-deleted-before-new
+skipped: none
