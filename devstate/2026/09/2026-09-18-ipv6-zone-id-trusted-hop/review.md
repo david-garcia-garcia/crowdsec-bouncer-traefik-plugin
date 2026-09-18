@@ -15,3 +15,9 @@ phase: propose
 findings: fold core_plugin_ip_radix-lookup; noted vague radix-lookup leaf
 fixed: none (propose only)
 skipped: no Task subagent; research already answered zone parse; no usage write
+
+## implement (2026-09-18)
+phase: implement
+findings: parseIP now strips IPv6 zone; Contains/GetRemoteIP regressions; localTests passed; CI in progress
+fixed: zone strip in pkg/ip/checker.go parseIP; TestCheckerContains and TestGetRemoteIP cases
+skipped: no Task subagent; no new spec folder; note large radix-lookup rename left; #77 not taken
