@@ -39,6 +39,10 @@ const (
 	RecaptchaProvider = "recaptcha"
 	TurnstileProvider = "turnstile"
 	CustomProvider    = "custom"
+	// CaptchaCustomValidateBodyForm is urlencoded siteverify secret+response (same as omit).
+	CaptchaCustomValidateBodyForm = "form"
+	// CaptchaCustomValidateBodyJSON is POST application/json secret+response (custom only).
+	CaptchaCustomValidateBodyJSON = "json"
 	// FailureActionPassthrough lets the request continue when LAPI or AppSec is down.
 	FailureActionPassthrough = "passthrough"
 	// FailureActionBan remediates as a ban when LAPI or AppSec is down.
@@ -116,6 +120,7 @@ type Config struct {
 	CaptchaCustomKey                           string            `json:"captchaCustomKey,omitempty"`
 	CaptchaCustomResponse                      string            `json:"captchaCustomResponse,omitempty"`
 	CaptchaCustomChallengeURL                  string            `json:"captchaCustomChallengeUrl,omitempty"`
+	CaptchaCustomValidateBody                  string            `json:"captchaCustomValidateBody,omitempty"`
 	CaptchaSiteKey                             string            `json:"captchaSiteKey,omitempty"`
 	CaptchaSiteKeyFile                         string            `json:"captchaSiteKeyFile,omitempty"`
 	CaptchaSecretKey                           string            `json:"captchaSecretKey,omitempty"`
@@ -192,6 +197,7 @@ func New() *Config {
 		CaptchaCustomKey:                "",
 		CaptchaCustomResponse:           "",
 		CaptchaCustomChallengeURL:       "",
+		CaptchaCustomValidateBody:       "",
 		CaptchaSiteKey:                  "",
 		CaptchaSecretKey:                "",
 		CaptchaGateBindIP:               true,
@@ -608,6 +614,14 @@ func validateParamsIPs(log *slog.Logger, listIP []string, key string) error {
 func validateCaptcha(config *Config) error {
 	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider}, config.CaptchaProvider) {
 		return fmt.Errorf("CaptchaProvider: must be one of '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider)
+	}
+	// Accept only empty, form, or json after trim; json is custom-only.
+	validateBody := strings.TrimSpace(config.CaptchaCustomValidateBody)
+	if validateBody != "" && validateBody != CaptchaCustomValidateBodyForm && validateBody != CaptchaCustomValidateBodyJSON {
+		return errors.New("CaptchaCustomValidateBody: must be empty, form, or json")
+	}
+	if validateBody == CaptchaCustomValidateBodyJSON && config.CaptchaProvider != CustomProvider {
+		return errors.New("CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom")
 	}
 	if config.CaptchaProvider == CustomProvider {
 		if config.CaptchaCustomKey == "" || config.CaptchaCustomResponse == "" || config.CaptchaCustomValidateURL == "" || config.CaptchaCustomJsURL == "" {

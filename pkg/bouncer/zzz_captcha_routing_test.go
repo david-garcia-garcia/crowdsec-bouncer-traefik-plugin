@@ -38,6 +38,7 @@ func testCaptchaClient(t *testing.T, jsURL, challengeURL, validateURL string, ht
 		"dummy-captcha",
 		"dummy-captcha-response",
 		validateURL,
+		"",
 		"site",
 		"secret",
 		"gate-secret",

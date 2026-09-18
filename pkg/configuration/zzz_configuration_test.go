@@ -270,6 +270,18 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "RemediationStatusCode below 100", args: args{config: cfgRemediationLow}, wantErr: true},
 		{name: "RemediationStatusCode 600 or above", args: args{config: cfgRemediationHigh}, wantErr: true},
 		{name: "UpdateMaxFailure -1 accepted", args: args{config: cfgUpdateMaxFailureNegOne}, wantErr: false},
+		{name: "Custom json validate body accepted", args: args{config: newCustomValidateBodyConfig("json")}, wantErr: false},
+		{name: "Custom form validate body accepted", args: args{config: newCustomValidateBodyConfig("form")}, wantErr: false},
+		{name: "Custom omit validate body accepted", args: args{config: newCustomValidateBodyConfig("")}, wantErr: false},
+		{name: "Custom whitespace-padded json accepted", args: args{config: newCustomValidateBodyConfig(" json ")}, wantErr: false},
+		{name: "Built-in json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(HcaptchaProvider, "json")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom"},
+		{name: "Recaptcha json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(RecaptchaProvider, "json")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom"},
+		{name: "Turnstile json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(TurnstileProvider, "json")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom"},
+		{name: "Unknown JSON token rejected", args: args{config: newCustomValidateBodyConfig("JSON")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: must be empty, form, or json"},
+		{name: "Unknown Form token rejected", args: args{config: newCustomValidateBodyConfig("Form")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: must be empty, form, or json"},
+		{name: "Unknown xml token rejected", args: args{config: newCustomValidateBodyConfig("xml")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: must be empty, form, or json"},
+		{name: "Built-in form validate body accepted", args: args{config: newBuiltinValidateBodyConfig(HcaptchaProvider, "form")}, wantErr: false},
+		{name: "Built-in omit validate body accepted", args: args{config: newBuiltinValidateBodyConfig(HcaptchaProvider, "")}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -542,6 +554,32 @@ func Test_validateDecisionScopeHeaders(t *testing.T) {
 	}
 }
 
+func newCustomValidateBodyConfig(validateBody string) *Config {
+	cfg := getMinimalConfig()
+	cfg.CaptchaProvider = CustomProvider
+	cfg.CaptchaCustomKey = "wicketkeeper"
+	cfg.CaptchaCustomResponse = "wicketkeeper_solution"
+	cfg.CaptchaCustomValidateURL = "http://wicketkeeper:8080/v0/siteverify"
+	cfg.CaptchaCustomJsURL = "http://wicketkeeper:8080/fast.js"
+	cfg.CaptchaCustomValidateBody = validateBody
+	cfg.CaptchaSiteKey = "site"
+	cfg.CaptchaSecretKey = "secret"
+	cfg.CaptchaGateSecret = "gate-secret"
+	cfg.CaptchaFilePath = ""
+	return cfg
+}
+
+func newBuiltinValidateBodyConfig(provider, validateBody string) *Config {
+	cfg := getMinimalConfig()
+	cfg.CaptchaProvider = provider
+	cfg.CaptchaCustomValidateBody = validateBody
+	cfg.CaptchaSiteKey = "site"
+	cfg.CaptchaSecretKey = "secret"
+	cfg.CaptchaGateSecret = "gate-secret"
+	cfg.CaptchaFilePath = ""
+	return cfg
+}
+
 func Test_validateCaptcha(t *testing.T) {
 	cfgCustomMissing := getMinimalConfig()
 	cfgCustomMissing.CaptchaProvider = CustomProvider
@@ -560,6 +598,15 @@ func Test_validateCaptcha(t *testing.T) {
 		{name: "Valid hcaptcha provider", config: getMinimalConfig(), wantErr: false},
 		{name: "Custom provider missing fields", config: cfgCustomMissing, wantErr: true},
 		{name: "Custom provider four fields empty challenge URL", config: cfgCustomFourFields, wantErr: false},
+		{name: "Custom json", config: newCustomValidateBodyConfig("json"), wantErr: false},
+		{name: "Custom form", config: newCustomValidateBodyConfig("form"), wantErr: false},
+		{name: "Custom omit", config: newCustomValidateBodyConfig(""), wantErr: false},
+		{name: "Custom whitespace-padded json", config: newCustomValidateBodyConfig(" json "), wantErr: false},
+		{name: "Built-in json rejected", config: newBuiltinValidateBodyConfig(HcaptchaProvider, "json"), wantErr: true},
+		{name: "Unknown JSON token rejected", config: newCustomValidateBodyConfig("JSON"), wantErr: true},
+		{name: "Unknown Form token rejected", config: newCustomValidateBodyConfig("Form"), wantErr: true},
+		{name: "Built-in form ignored", config: newBuiltinValidateBodyConfig(HcaptchaProvider, "form"), wantErr: false},
+		{name: "Built-in omit ignored", config: newBuiltinValidateBodyConfig(HcaptchaProvider, ""), wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

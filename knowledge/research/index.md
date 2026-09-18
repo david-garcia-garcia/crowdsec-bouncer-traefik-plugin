@@ -44,3 +44,8 @@ description: Official Go toolchain behavior this product relies on.
 priority: normal
 local: index_ext_http.md
 description: Official HTTP (RFC 9110) field and media-type behavior this product relies on.
+
+## capjs
+priority: normal
+local: index_ext_capjs.md
+description: Official Cap Standalone (trycap.dev / CapJS) siteverify behavior this product relies on.
