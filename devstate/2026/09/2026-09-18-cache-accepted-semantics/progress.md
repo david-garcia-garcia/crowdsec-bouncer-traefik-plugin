@@ -6,7 +6,7 @@ JobName: 2026-09-18-cache-accepted-semantics
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-18T18:04:47Z |
 | explore | [x] | [x] | 2026-09-18T18:09:39Z |
-| propose | [x] | [ ] | |
+| propose | [x] | [x] | 2026-09-18T18:16:27Z |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
