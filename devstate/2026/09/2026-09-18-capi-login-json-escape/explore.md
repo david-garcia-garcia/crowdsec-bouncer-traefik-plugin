@@ -70,12 +70,12 @@ Existing tests (`TestGetToken_UnauthorizedLoginDoesNotRecurse`, renewal replay) 
   By: explore
 
 - Q: How should an empty or nil scenario list be encoded?
-  Decision: assumed — marshal the Client slice as-is (`null` / `[]`). Do not emit sprintf’s `[""]`. Do not add `omitempty` unless propose finds CAPI rejects `null`.
-  By: explore
+  Decision: assumed — marshal the Client slice as-is (`null` / `[]`). Official `WatcherAuthRequest` also has no `omitempty`. CAPI swagger marks `scenarios` optional; no evidence it rejects `null`. Do not emit sprintf’s `[""]`.
+  By: propose
 
 - Q: Does login-body encoding belong on `core_plugin_lapi_query-round-trip`?
-  Decision: assumed — yes, one added requirement on that spec/usage pair. Do not open a new leaf. Propose writes the delta.
-  By: explore
+  Decision: resolved — FindSpecHost fold into `core_plugin_lapi_query-round-trip` (high). Same `getToken` / `sendQuery` leaf; `connection` is transport storage only. Do not open a new leaf.
+  By: propose
 
 - Q: Should this ticket set `Content-Type: application/json` on the login POST?
   Decision: assumed — no. Official client sets it; `sendQuery` does not. Ticket fences `sendQuery` header/renewal changes. Alone mode already works for plain credentials without it.
