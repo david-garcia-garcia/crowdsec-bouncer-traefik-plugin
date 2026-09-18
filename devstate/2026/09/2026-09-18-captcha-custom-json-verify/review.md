@@ -49,3 +49,12 @@ skipped: none
 qualify: qualified-with-gaps
 pr: 105
 ci: Main Process in_progress / Race detector in_progress on 4954daf6; e2e not seen
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: FindSpecHost fold siteverify + config-validation; catalog sync; move to openspec/changes/archive/2026-09-18-captcha-custom-validate-body/
+skipped: Task spawn unavailable (FindSpecHost on this thread)
+qualify: qualified-with-gaps
+pr: 105
+ci: Main Process in_progress / Race detector in_progress on fb372d20; e2e not seen
