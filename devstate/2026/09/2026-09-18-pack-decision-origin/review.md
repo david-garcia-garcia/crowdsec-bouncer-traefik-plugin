@@ -15,3 +15,9 @@ phase: propose
 findings: none
 fixed: none
 skipped: none
+
+## implement (2026-09-18T17:33:26Z)
+phase: implement
+findings: first Main Process lint (copylocks, forcetypeassert, G115, intrange)
+fixed: pointer intern table, checked type asserts, bounded id conversions, range loop
+skipped: none

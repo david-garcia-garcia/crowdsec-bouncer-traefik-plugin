@@ -7,8 +7,8 @@ JobName: 2026-09-18-pack-decision-origin
 | prepare | [x] | [x] | 2026-09-18T17:04:55Z |
 | explore | [x] | [x] | 2026-09-18T17:08:06Z |
 | propose | [x] | [x] | 2026-09-18T17:15:15Z |
-| implement | [ ] | [ ] | |
-| codereview | [ ] | [ ] | |
+| implement | [x] | [x] | 2026-09-18T17:33:26Z |
+| codereview | [x] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
