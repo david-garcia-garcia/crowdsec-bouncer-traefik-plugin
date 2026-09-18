@@ -2,7 +2,9 @@ package lapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"sync/atomic"
@@ -11,6 +13,9 @@ import (
 	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
+
+// errQuerySkipped is a denied or failed Allow: no live LAPI GET ran.
+var errQuerySkipped = errors.New("queryLiveDecisions:skipped")
 
 // streamQuery is the LAPI/CAPI stream RawQuery. LAPI adds scopes= when this is not CAPI.
 func (c *Client) streamQuery() string {
@@ -74,8 +79,45 @@ func (c *Client) deleteStreamDecision(item Decision) {
 	}
 }
 
+// liveBackendURLStem is scheme+host+path for Allow/Report (no query).
+func (c *Client) liveBackendURLStem() string {
+	stem := url.URL{
+		Scheme: c.crowdsecScheme,
+		Host:   c.crowdsecHost,
+		Path:   c.crowdsecPath + crowdsecLapiRoute,
+	}
+	return stem.String()
+}
+
+// admitLiveGET Allow-checks the LAPI stem. A nil Gate admits. Denied or Allow-error skips HTTP.
+func (c *Client) admitLiveGET(ctx context.Context) error {
+	if c.gate == nil {
+		return nil
+	}
+	ok, wait, err := c.gate.Allow(ctx, c.liveBackendURLStem())
+	if err != nil || !ok {
+		c.log.Debug("queryLiveDecisions:skipped", "wait", wait, "err", err)
+		if err != nil {
+			return fmt.Errorf("%w: %w", errQuerySkipped, err)
+		}
+		return errQuerySkipped
+	}
+	return nil
+}
+
+// reportLiveGET records the admitted GET outcome. A nil Gate is a no-op.
+func (c *Client) reportLiveGET(success bool) {
+	if c.gate == nil {
+		return
+	}
+	_ = c.gate.Report(c.liveBackendURLStem(), success)
+}
+
 // queryLiveDecisions GETs LAPI decisions for rawQuery and returns the strongest remediation.
-func (c *Client) queryLiveDecisions(rawQuery string) (string, time.Duration, error) {
+func (c *Client) queryLiveDecisions(ctx context.Context, rawQuery string) (string, time.Duration, error) {
+	if err := c.admitLiveGET(ctx); err != nil {
+		return "", 0, err
+	}
 	routeURL := url.URL{
 		Scheme:   c.crowdsecScheme,
 		Host:     c.crowdsecHost,
@@ -84,31 +126,39 @@ func (c *Client) queryLiveDecisions(rawQuery string) (string, time.Duration, err
 	}
 	body, err := c.crowdsecQuery(routeURL.String(), nil)
 	if err != nil {
+		c.reportLiveGET(false)
 		return "", 0, err
 	}
 	if bytes.Equal(body, []byte("null")) {
+		c.reportLiveGET(true)
 		return decisionscope.NoBannedValue, 0, nil
 	}
 	var items []Decision
 	err = json.Unmarshal(body, &items)
 	if err != nil {
+		c.reportLiveGET(false)
 		return "", 0, fmt.Errorf("handleNoStreamCache:parseBody %w", err)
 	}
 	if len(items) == 0 {
+		c.reportLiveGET(true)
 		return decisionscope.NoBannedValue, 0, nil
 	}
 	picked := strongestLiveDecision(items)
 	if picked == nil {
+		c.reportLiveGET(true)
 		return decisionscope.NoBannedValue, 0, nil
 	}
 	parsedDuration, err := time.ParseDuration(picked.Duration)
 	if err != nil {
+		c.reportLiveGET(false)
 		return "", 0, fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
 	}
 	value := decisionscope.RemediationValue(picked.Type)
 	if value == "" {
+		c.reportLiveGET(true)
 		return decisionscope.NoBannedValue, 0, nil
 	}
+	c.reportLiveGET(true)
 	return cache.RemediationWithOrigin(value, MetricsOrigin(picked.Origin, picked.Scenario)), parsedDuration, nil
 }
 
@@ -130,11 +180,11 @@ func strongestLiveDecision(items []Decision) *Decision {
 // A query failure is returned alongside the caller's unchanged verdict so the caller can fail
 // closed instead of reading it as "this scope has no decision". It is logged at WARN because an
 // operator must see a scope path that stopped answering.
-func (c *Client) mergeLiveScope(chosen string, parsedDuration time.Duration, scope, identifier string, isLiveMode bool, defaultDecisionSeconds int64) (string, time.Duration, error) {
+func (c *Client) mergeLiveScope(ctx context.Context, chosen string, parsedDuration time.Duration, scope, identifier string, isLiveMode bool, defaultDecisionSeconds int64) (string, time.Duration, error) {
 	if identifier == "" {
 		return chosen, parsedDuration, nil
 	}
-	headerChosen, headerDuration, headerErr := c.queryLiveDecisions("scope=" + url.QueryEscape(scope) + "&value=" + url.QueryEscape(identifier))
+	headerChosen, headerDuration, headerErr := c.queryLiveDecisions(ctx, "scope="+url.QueryEscape(scope)+"&value="+url.QueryEscape(identifier))
 	if headerErr != nil {
 		c.log.Warn("handleNoStreamCache:scopeQuery " + scope + " " + headerErr.Error())
 		return chosen, parsedDuration, headerErr

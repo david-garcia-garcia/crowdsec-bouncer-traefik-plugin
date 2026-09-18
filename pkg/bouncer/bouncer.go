@@ -235,7 +235,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	}
 
 	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.NoneMode {
-		value, err := b.lapiClient.LiveLookup(req.remoteIP, scopes, b.defaultDecisionSeconds)
+		value, err := b.lapiClient.LiveLookup(req.Request.Context(), req.remoteIP, scopes, b.defaultDecisionSeconds)
 		kind := cache.RemediationKind(value)
 		origin := cache.RemediationOrigin(value)
 		if err != nil {

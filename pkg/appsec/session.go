@@ -15,8 +15,8 @@ import (
 const keyPrefix = "appsec:"
 
 // identity is the reclaim-key payload for one AppSec listener.
-// HTTP timeout and AppSec TLS are omitted so a reload of those knobs
-// reuses the Client. Per-router failure action is not included either.
+// HTTP timeout, AppSec TLS, and backend backoff knobs are omitted so a reload
+// of those knobs reuses the Client. Per-router failure action is not included either.
 type identity struct {
 	Scheme    string `json:"scheme"`
 	Host      string `json:"host"`

@@ -15,8 +15,8 @@ const keyPrefix = "lapi:"
 // MetricsUpdateIntervalSeconds stays so none/live routers that disagree get sibling
 // Clients and each keeps its write-once metrics ticker. CAPI scenarios,
 // updateMaxFailure, and UpdateIntervalSeconds stay omitted. Per-router policy,
-// StreamStartupBlock, HTTP timeout, and LAPI TLS are omitted so a reload of
-// those knobs reuses the Client. Ban/captcha templates, trusted IPs, Enabled,
+// StreamStartupBlock, HTTP timeout, LAPI TLS, and backend backoff knobs are
+// omitted so a reload of those knobs reuses the Client. Ban/captcha templates, trusted IPs, Enabled,
 // middleware name, log path, and decisionScopeHeaders are not included here
 // either (stream scopes= is poller-owned; live passes scopes per LiveLookup).
 type identity struct {

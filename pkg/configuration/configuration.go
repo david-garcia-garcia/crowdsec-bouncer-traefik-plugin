@@ -15,7 +15,9 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
+	"time"
 
+	"github.com/david-garcia-garcia/traefik-middleware-utilities/backendbackoff"
 	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
@@ -98,6 +100,12 @@ type Config struct {
 	DefaultDecisionSeconds                     int64             `json:"defaultDecisionSeconds,omitempty"`
 	RemediationStatusCode                      int               `json:"remediationStatusCode,omitempty"`
 	HTTPTimeoutSeconds                         int64             `json:"httpTimeoutSeconds,omitempty"`
+	BackendBackoffFailureRatio                 float64           `json:"backendBackoffFailureRatio,omitempty"`
+	BackendBackoffTripFailures                 int64             `json:"backendBackoffTripFailures,omitempty"`
+	BackendBackoffBaseCooldownSeconds          int64             `json:"backendBackoffBaseCooldownSeconds,omitempty"`
+	BackendBackoffMaxCooldownSeconds           int64             `json:"backendBackoffMaxCooldownSeconds,omitempty"`
+	BackendBackoffJitter                       float64           `json:"backendBackoffJitter,omitempty"`
+	BackendBackoffTTLSeconds                   int64             `json:"backendBackoffTTLSeconds,omitempty"` //nolint:tagliatelle // spec key keeps TTL
 	TraceHeadersCustomName                     string            `json:"traceHeadersCustomName,omitempty"`
 	RemediationHeadersCustomName               string            `json:"remediationHeadersCustomName,omitempty"`
 	ForwardedHeadersCustomName                 string            `json:"forwardedHeadersCustomName,omitempty"`
@@ -165,58 +173,76 @@ func EffectiveFailureAction(action string) string {
 // New creates the default plugin configuration.
 func New() *Config {
 	return &Config{
-		Enabled:                         false,
-		LogLevel:                        LogINFO,
-		LogFormat:                       "common",
-		LogFilePath:                     "",
-		CrowdsecMode:                    LiveMode,
-		CrowdsecAppsecEnabled:           false,
-		CrowdsecAppsecBodyLimit:         10485760,
-		CrowdsecAppsecFailureAction:     FailureActionBan,
-		CrowdsecAppsecScheme:            "",
-		CrowdsecAppsecHost:              "crowdsec:7422",
-		CrowdsecAppsecPath:              "/",
-		CrowdsecAppsecKey:               "",
-		CrowdsecAppsecTLSInsecureVerify: false,
-		CrowdsecLapiScheme:              HTTP,
-		CrowdsecLapiHost:                "crowdsec:8080",
-		CrowdsecLapiPath:                "/",
-		CrowdsecLapiKey:                 "",
-		CrowdsecLapiTLSInsecureVerify:   false,
-		UpdateIntervalSeconds:           60,
-		MetricsUpdateIntervalSeconds:    600,
-		UpdateMaxFailure:                0,
-		CrowdsecLapiFailureAction:       FailureActionBan,
-		StreamStartupBlock:              true,
-		DefaultDecisionSeconds:          60,
-		RemediationStatusCode:           http.StatusForbidden,
-		HTTPTimeoutSeconds:              10,
-		CaptchaProvider:                 "",
-		CaptchaCustomJsURL:              "",
-		CaptchaCustomValidateURL:        "",
-		CaptchaCustomKey:                "",
-		CaptchaCustomResponse:           "",
-		CaptchaCustomChallengeURL:       "",
-		CaptchaCustomValidateBody:       "",
-		CaptchaSiteKey:                  "",
-		CaptchaSecretKey:                "",
-		CaptchaGateBindIP:               true,
-		CaptchaGracePeriodSeconds:       1800,
-		CaptchaFilePath:                 "/captcha.html",
-		BanFilePath:                     "",
-		TraceHeadersCustomName:          "",
-		RemediationHeadersCustomName:    "",
-		ForwardedHeadersCustomName:      "X-Forwarded-For",
-		ForwardedHeadersInsecure:        false,
-		DecisionScopeHeaders:            map[string]string{},
-		ForwardedHeadersTrustedIPs:      []string{},
-		ClientTrustedIPs:                []string{},
-		RedisCacheEnabled:               false,
-		RedisCacheHost:                  "redis:6379",
-		RedisCacheReadHosts:             []string{},
-		RedisCachePassword:              "",
-		RedisCacheDatabase:              "",
-		RedisCacheUnreachableBlock:      true,
+		Enabled:                           false,
+		LogLevel:                          LogINFO,
+		LogFormat:                         "common",
+		LogFilePath:                       "",
+		CrowdsecMode:                      LiveMode,
+		CrowdsecAppsecEnabled:             false,
+		CrowdsecAppsecBodyLimit:           10485760,
+		CrowdsecAppsecFailureAction:       FailureActionBan,
+		CrowdsecAppsecScheme:              "",
+		CrowdsecAppsecHost:                "crowdsec:7422",
+		CrowdsecAppsecPath:                "/",
+		CrowdsecAppsecKey:                 "",
+		CrowdsecAppsecTLSInsecureVerify:   false,
+		CrowdsecLapiScheme:                HTTP,
+		CrowdsecLapiHost:                  "crowdsec:8080",
+		CrowdsecLapiPath:                  "/",
+		CrowdsecLapiKey:                   "",
+		CrowdsecLapiTLSInsecureVerify:     false,
+		UpdateIntervalSeconds:             60,
+		MetricsUpdateIntervalSeconds:      600,
+		UpdateMaxFailure:                  0,
+		CrowdsecLapiFailureAction:         FailureActionBan,
+		StreamStartupBlock:                true,
+		DefaultDecisionSeconds:            60,
+		RemediationStatusCode:             http.StatusForbidden,
+		HTTPTimeoutSeconds:                10,
+		BackendBackoffFailureRatio:        0.30,
+		BackendBackoffTripFailures:        5,
+		BackendBackoffBaseCooldownSeconds: 1,
+		BackendBackoffMaxCooldownSeconds:  10,
+		BackendBackoffJitter:              0.10,
+		BackendBackoffTTLSeconds:          60,
+		CaptchaProvider:                   "",
+		CaptchaCustomJsURL:                "",
+		CaptchaCustomValidateURL:          "",
+		CaptchaCustomKey:                  "",
+		CaptchaCustomResponse:             "",
+		CaptchaCustomChallengeURL:         "",
+		CaptchaCustomValidateBody:         "",
+		CaptchaSiteKey:                    "",
+		CaptchaSecretKey:                  "",
+		CaptchaGateBindIP:                 true,
+		CaptchaGracePeriodSeconds:         1800,
+		CaptchaFilePath:                   "/captcha.html",
+		BanFilePath:                       "",
+		TraceHeadersCustomName:            "",
+		RemediationHeadersCustomName:      "",
+		ForwardedHeadersCustomName:        "X-Forwarded-For",
+		ForwardedHeadersInsecure:          false,
+		DecisionScopeHeaders:              map[string]string{},
+		ForwardedHeadersTrustedIPs:        []string{},
+		ClientTrustedIPs:                  []string{},
+		RedisCacheEnabled:                 false,
+		RedisCacheHost:                    "redis:6379",
+		RedisCacheReadHosts:               []string{},
+		RedisCachePassword:                "",
+		RedisCacheDatabase:                "",
+		RedisCacheUnreachableBlock:        true,
+	}
+}
+
+// BackendBackoffConfig maps the shared plugin knobs onto the published gate Config.
+func (c *Config) BackendBackoffConfig() backendbackoff.Config {
+	return backendbackoff.Config{
+		FailureRatio: c.BackendBackoffFailureRatio,
+		TripFailures: int(c.BackendBackoffTripFailures),
+		BaseCooldown: time.Duration(c.BackendBackoffBaseCooldownSeconds) * time.Second,
+		MaxCooldown:  time.Duration(c.BackendBackoffMaxCooldownSeconds) * time.Second,
+		Jitter:       c.BackendBackoffJitter,
+		TTL:          time.Duration(c.BackendBackoffTTLSeconds) * time.Second,
 	}
 }
 
@@ -360,7 +386,21 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 
 	warnUnenforcedAppsecMode(config, log)
 
+	if err := validateBackendBackoff(config); err != nil {
+		return err
+	}
+
 	return validateLogging(config)
+}
+
+// validateBackendBackoff rejects knobs the published Gate constructor would reject.
+func validateBackendBackoff(config *Config) error {
+	gate, err := backendbackoff.New(config.BackendBackoffConfig())
+	if err != nil {
+		return fmt.Errorf("backendBackoff: %w", err)
+	}
+	gate.Close()
+	return nil
 }
 
 // warnUnenforcedAppsecMode reports the one accepted combination that enforces nothing. appsec mode

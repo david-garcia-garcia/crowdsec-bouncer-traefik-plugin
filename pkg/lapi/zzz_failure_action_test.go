@@ -1,6 +1,7 @@
 package lapi
 
 import (
+	"context"
 	"log/slog"
 	"net"
 	"net/http"
@@ -77,7 +78,7 @@ func Test_liveLookup_lapiErrorIsNotABan(t *testing.T) {
 	}))
 	defer lapi.Close()
 	client := newTestLiveClient(t, lapi)
-	value, err := client.LiveLookup("1.2.3.4", nil, 0)
+	value, err := client.LiveLookup(context.Background(), "1.2.3.4", nil, 0)
 	if err == nil {
 		t.Fatal("live LAPI 500 expected an error")
 	}
@@ -92,10 +93,10 @@ func TestLiveLookup_PerRouterTTLLastWrites(t *testing.T) {
 	}))
 	defer lapi.Close()
 	client := newTestLiveClient(t, lapi)
-	if _, err := client.LiveLookup("1.2.3.4", nil, 60); err != nil {
+	if _, err := client.LiveLookup(context.Background(), "1.2.3.4", nil, 60); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := client.LiveLookup("1.2.3.4", nil, 1); err != nil {
+	if _, err := client.LiveLookup(context.Background(), "1.2.3.4", nil, 1); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := client.cacheClient.Get("1.2.3.4"); err != nil {
@@ -117,7 +118,7 @@ func TestLiveLookup_CleanIPAndCleanScopesAllows(t *testing.T) {
 		"country":  "null",
 		"username": "null",
 	}))
-	value, err := client.LiveLookup("1.2.3.4", map[string]string{"country": "FR", "username": "alice"}, 60)
+	value, err := client.LiveLookup(context.Background(), "1.2.3.4", map[string]string{"country": "FR", "username": "alice"}, 60)
 	if err != nil {
 		t.Fatalf("clean IP and clean scopes must not error: %v", err)
 	}
@@ -130,7 +131,7 @@ func TestLiveLookup_CleanIPAndCleanScopesAllows(t *testing.T) {
 // non-active kind so pkg/bouncer applies CrowdsecLapiFailureAction instead of allowing.
 func TestLiveLookup_ScopeErrorFailsClosed(t *testing.T) {
 	client := newTestLiveClient(t, testLiveScopeLAPI(t, "null", map[string]string{"country": ""}))
-	value, err := client.LiveLookup("1.2.3.4", map[string]string{"country": "FR"}, 60)
+	value, err := client.LiveLookup(context.Background(), "1.2.3.4", map[string]string{"country": "FR"}, 60)
 	if err == nil {
 		t.Fatalf("a failed scope query must not be reported as no decision, got value %q", value)
 	}
@@ -147,7 +148,7 @@ func TestLiveLookup_ScopeBanWins(t *testing.T) {
 	client := newTestLiveClient(t, testLiveScopeLAPI(t, "null", map[string]string{
 		"country": testLiveBanBody("country", "FR"),
 	}))
-	value, err := client.LiveLookup("1.2.3.4", map[string]string{"country": "FR"}, 60)
+	value, err := client.LiveLookup(context.Background(), "1.2.3.4", map[string]string{"country": "FR"}, 60)
 	if err == nil {
 		t.Fatal("a ban is reported with the overloaded banned error")
 	}
@@ -162,7 +163,7 @@ func TestLiveLookup_IPSlotKeepsIPQueryResult(t *testing.T) {
 	client := newTestLiveClient(t, testLiveScopeLAPI(t, "null", map[string]string{
 		"country": testLiveBanBody("country", "FR"),
 	}))
-	value, err := client.LiveLookup("1.2.3.4", map[string]string{"country": "FR"}, 60)
+	value, err := client.LiveLookup(context.Background(), "1.2.3.4", map[string]string{"country": "FR"}, 60)
 	if err == nil {
 		t.Fatal("a ban is reported with the overloaded banned error")
 	}
@@ -202,7 +203,7 @@ func TestLiveLookup_IPSlotKeepsIPQueryResult(t *testing.T) {
 // masked, and the request must not be diverted to CrowdsecLapiFailureAction.
 func TestLiveLookup_ActiveBanOutranksScopeError(t *testing.T) {
 	client := newTestLiveClient(t, testLiveScopeLAPI(t, testLiveBanBody("ip", "1.2.3.4"), map[string]string{"country": ""}))
-	value, err := client.LiveLookup("1.2.3.4", map[string]string{"country": "FR"}, 60)
+	value, err := client.LiveLookup(context.Background(), "1.2.3.4", map[string]string{"country": "FR"}, 60)
 	if err == nil {
 		t.Fatal("a ban is reported with the overloaded banned error")
 	}
@@ -219,7 +220,7 @@ func TestLiveLookup_IPErrorStillPropagates(t *testing.T) {
 	client := newTestLiveClient(t, testLiveScopeLAPI(t, "", map[string]string{
 		"country": testLiveBanBody("country", "FR"),
 	}))
-	value, err := client.LiveLookup("1.2.3.4", map[string]string{"country": "FR"}, 60)
+	value, err := client.LiveLookup(context.Background(), "1.2.3.4", map[string]string{"country": "FR"}, 60)
 	if err == nil {
 		t.Fatal("IP query 500 expected an error")
 	}
@@ -234,7 +235,7 @@ func TestLiveLookup_ScopeBanWinsOverAnotherScopeError(t *testing.T) {
 		"country":  "",
 		"username": testLiveBanBody("username", "alice"),
 	}))
-	value, err := client.LiveLookup("1.2.3.4", map[string]string{"country": "FR", "username": "alice"}, 60)
+	value, err := client.LiveLookup(context.Background(), "1.2.3.4", map[string]string{"country": "FR", "username": "alice"}, 60)
 	if err == nil {
 		t.Fatal("a ban is reported with the overloaded banned error")
 	}
@@ -261,7 +262,7 @@ func TestLiveLookup_ScopeErrorLogsAtWarn(t *testing.T) {
 			logged := captureTestStreamTickLog(t, tc.level, func(log *slog.Logger) {
 				client := newTestLiveClient(t, server)
 				client.log = log
-				_, _ = client.LiveLookup("1.2.3.4", map[string]string{"country": "FR"}, 60)
+				_, _ = client.LiveLookup(context.Background(), "1.2.3.4", map[string]string{"country": "FR"}, 60)
 			})
 			if got := strings.Contains(logged, "handleNoStreamCache:scopeQuery"); got != tc.want {
 				t.Fatalf("scopeQuery at %s: got %v want %v\n%s", tc.level, got, tc.want, logged)

@@ -2,6 +2,7 @@ package appsec
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -130,25 +131,33 @@ func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response,
 		c.log.Error("appsecQuery:unreachable")
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
+	if skipErr := c.admitQuery(httpReq.Context()); skipErr != nil {
+		return resultForFailureAction(pol.FailureAction, skipErr.Error())
+	}
 	res, err := current.httpClient.Do(req)
 	if err != nil {
+		c.reportQuery(false)
 		c.log.Error("appsecQuery:unreachable")
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
 	// Drain every live response, including 502/503/504, so keep-alive can reuse the slot.
 	defer c.drainResponse(res)
 	if isReverseProxyError(res.StatusCode) {
+		c.reportQuery(false)
 		c.log.Error("appsecQuery:unreachable")
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
 
 	if res.StatusCode == http.StatusInternalServerError {
+		c.reportQuery(false)
 		c.log.Info("appsecQuery:failure")
 		return resultForFailureAction(pol.FailureAction, "appsecQuery statusCode:500")
 	}
 
 	body, err := c.readCappedAppsecBody(res)
 	if err != nil {
+		// After an admitted Do the backend answered; io/oversized still Report success.
+		c.reportQuery(true)
 		// Io errors use FailureAction; oversized bodies stay as dest (allow 200 / error otherwise).
 		if errors.Is(err, errAppsecReadBody) {
 			c.log.Info("appsecQuery:failure")
@@ -156,7 +165,32 @@ func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response,
 		}
 		return nil, err
 	}
+	c.reportQuery(true)
 	return interpretAppsecBody(res.StatusCode, body, c.log)
+}
+
+// admitQuery Allow-checks the AppSec stem. A nil Gate admits. Denied or Allow-error skips Do.
+func (c *Client) admitQuery(ctx context.Context) error {
+	if c.gate == nil {
+		return nil
+	}
+	ok, wait, err := c.gate.Allow(ctx, c.backendURLStem())
+	if err != nil || !ok {
+		c.log.Debug("appsecQuery:skipped", "wait", wait, "err", err)
+		if err != nil {
+			return fmt.Errorf("appsecQuery:skipped: %w", err)
+		}
+		return errors.New("appsecQuery:skipped")
+	}
+	return nil
+}
+
+// reportQuery records the admitted Do outcome. A nil Gate is a no-op.
+func (c *Client) reportQuery(success bool) {
+	if c.gate == nil {
+		return
+	}
+	_ = c.gate.Report(c.backendURLStem(), success)
 }
 
 // newAppsecForwardRequest builds the AppSec listener request, copying client headers and identity.

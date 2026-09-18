@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/david-garcia-garcia/traefik-middleware-utilities/backendbackoff"
 	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
@@ -74,6 +75,7 @@ type Client struct {
 	metricsStop             chan bool
 	metricsReporter         *MetricsReporter
 	streamFetches           int64
+	gate                    *backendbackoff.Gate // live/none only; stream/alone stays nil
 }
 
 // Prepare resolves secrets and CAPI/LAPI routing on cfg. Call before Key and New.
@@ -139,6 +141,14 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 	client.metricsReporter = newMetricsReporter(client, time.Now())
 	client.transport.Store(next)
 
+	if config.CrowdsecMode == configuration.LiveMode || config.CrowdsecMode == configuration.NoneMode {
+		gate, gateErr := backendbackoff.New(config.BackendBackoffConfig())
+		if gateErr != nil {
+			return nil, gateErr
+		}
+		client.gate = gate
+	}
+
 	if err := client.startStream(config, log); err != nil {
 		return nil, err
 	}
@@ -176,6 +186,9 @@ func (c *Client) Close() {
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.gate != nil {
+		c.gate.Close()
+	}
 	if current := c.currentTransport(); current != nil {
 		closeIdle(current.httpClient)
 	}

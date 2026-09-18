@@ -1,6 +1,7 @@
 package lapi
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -120,7 +121,7 @@ func liveRequests(t *testing.T, addresses []string) int64 {
 		if _, err := lookupAsRequest(client, canonical); err == nil {
 			continue
 		}
-		if _, err := client.LiveLookup(canonical, nil, 60); err != nil {
+		if _, err := client.LiveLookup(context.Background(), canonical, nil, 60); err != nil {
 			t.Fatalf("live lookup %q: %v", address, err)
 		}
 	}

@@ -4,9 +4,11 @@ package appsec
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
 	"sync"
 	"sync/atomic"
 
+	"github.com/david-garcia-garcia/traefik-middleware-utilities/backendbackoff"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
@@ -21,6 +23,7 @@ type Client struct {
 	transport       atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
 	log             *slog.Logger
 	pluginVersion   string
+	gate            *backendbackoff.Gate
 }
 
 // Prepare resolves AppSec secrets on cfg. Call lapi.Prepare first so an empty AppSec key can copy the LAPI key.
@@ -50,6 +53,10 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		log.Error("New:getTLSConfigCrowdsec fail to get tlsAppsecConfig " + err.Error())
 		return nil, err
 	}
+	gate, gateErr := backendbackoff.New(config.BackendBackoffConfig())
+	if gateErr != nil {
+		return nil, gateErr
+	}
 	client := &Client{
 		appsecScheme:    config.CrowdsecAppsecScheme,
 		appsecHost:      config.CrowdsecAppsecHost,
@@ -57,6 +64,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		appsecBodyLimit: config.CrowdsecAppsecBodyLimit,
 		log:             log,
 		pluginVersion:   pluginVersion,
+		gate:            gate,
 	}
 	client.transport.Store(next)
 	return client, nil
@@ -66,10 +74,23 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 func (c *Client) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.gate != nil {
+		c.gate.Close()
+	}
 	current := c.currentTransport()
 	if current != nil {
 		closeIdle(current.httpClient)
 	}
+}
+
+// backendURLStem is scheme+host+path for Allow/Report.
+func (c *Client) backendURLStem() string {
+	stem := url.URL{
+		Scheme: c.appsecScheme,
+		Host:   c.appsecHost,
+		Path:   c.appsecPath,
+	}
+	return stem.String()
 }
 
 // Sleep is a reclaim no-op: AppSec has no tickers.
