@@ -2,6 +2,7 @@ package ip
 
 import (
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -68,6 +69,17 @@ func TestCheckerContains(t *testing.T) {
 			t.Fatal("expected error for 192.168.1.0/33")
 		}
 	})
+
+	t.Run("zoned IPv6 is in link-local pool", func(t *testing.T) {
+		checker, err := NewChecker(log, []string{"fe80::/10"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ok, err := checker.Contains("fe80::1%eth0")
+		if err != nil || !ok {
+			t.Fatalf("Contains fe80::1%%eth0 = %v, %v want true", ok, err)
+		}
+	})
 }
 
 func TestCheckerContainsCatchAllFamily(t *testing.T) {
@@ -105,16 +117,17 @@ func TestCheckerContainsCatchAllFamily(t *testing.T) {
 }
 
 type getRemoteIPCase struct {
-	name        string
-	remoteAddr  string
-	headerName  string
-	headerVal   string
-	forceHeader bool
-	strategy    *PoolStrategy
-	insecure    bool
-	wantIP      string
-	wantParsed  bool
-	wantErr     bool
+	name         string
+	remoteAddr   string
+	headerName   string
+	headerVal    string
+	forceHeader  bool
+	strategy     *PoolStrategy
+	insecure     bool
+	wantIP       string
+	wantParsed   bool
+	wantParsedIP string
+	wantErr      bool
 }
 
 func runGetRemoteIPCases(t *testing.T, tests []getRemoteIPCase) {
@@ -144,6 +157,15 @@ func runGetRemoteIPCases(t *testing.T, tests []getRemoteIPCase) {
 			if !tc.wantParsed && parsed != nil {
 				t.Fatalf("GetRemoteIP parsed = %v want nil for %q", parsed, got)
 			}
+			if tc.wantParsedIP != "" {
+				want := net.ParseIP(tc.wantParsedIP)
+				if want == nil {
+					t.Fatalf("invalid wantParsedIP %q", tc.wantParsedIP)
+				}
+				if parsed == nil || !parsed.Equal(want) {
+					t.Fatalf("GetRemoteIP parsed = %v want %v", parsed, want)
+				}
+			}
 		})
 	}
 }
@@ -169,6 +191,11 @@ func newTestGetRemoteIPStrategies(t *testing.T) (*PoolStrategy, *PoolStrategy, *
 // TestGetRemoteIP covers the forwarded-header walk, RemoteAddr gate, and fallback.
 func TestGetRemoteIP(t *testing.T) {
 	strategy, emptyStrategy, catchallStrategy, trustedProxyAddr := newTestGetRemoteIPStrategies(t)
+	linkLocalChecker, err := NewChecker(slog.Default(), []string{"fe80::/10"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	linkLocalStrategy := &PoolStrategy{Checker: linkLocalChecker}
 
 	runGetRemoteIPCases(t, []getRemoteIPCase{
 		{
@@ -275,6 +302,43 @@ func TestGetRemoteIP(t *testing.T) {
 			strategy:   catchallStrategy,
 			wantIP:     "203.0.113.7",
 			wantParsed: true,
+		},
+		{
+			name:       "zoned link-local RemoteAddr is trusted hop",
+			remoteAddr: "[fe80::1%eth0]:443",
+			headerName: "X-Forwarded-For",
+			headerVal:  "203.0.113.10",
+			strategy:   linkLocalStrategy,
+			wantIP:     "203.0.113.10",
+			wantParsed: true,
+		},
+		{
+			name:         "zoned RemoteAddr fallback keeps zone on the string",
+			remoteAddr:   "[fe80::1%eth0]:443",
+			headerName:   "X-Forwarded-For",
+			strategy:     linkLocalStrategy,
+			wantIP:       "fe80::1%eth0",
+			wantParsed:   true,
+			wantParsedIP: "fe80::1",
+		},
+		{
+			name:         "zoned hop keeps hop text",
+			remoteAddr:   trustedProxyAddr,
+			headerName:   "X-Forwarded-For",
+			headerVal:    "fe80::1%eth0",
+			strategy:     strategy,
+			wantIP:       "fe80::1%eth0",
+			wantParsed:   true,
+			wantParsedIP: "fe80::1",
+		},
+		{
+			name:       "bracketed zoned hop stays fail-closed",
+			remoteAddr: trustedProxyAddr,
+			headerName: "X-Forwarded-For",
+			headerVal:  "[fe80::1%eth0]",
+			strategy:   strategy,
+			wantIP:     "[fe80::1%eth0]",
+			wantParsed: false,
 		},
 	})
 }
