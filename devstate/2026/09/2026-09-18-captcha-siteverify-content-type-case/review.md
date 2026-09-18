@@ -28,3 +28,9 @@ findings: coverage hard 1
 fixed: `Test_ServeHTTP_jsonpSiteverifyContentTypeIsNotJSON` (`6eb1b04`)
 skipped: none
 
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: missing-packet 1
+fixed: `knowledge/devdocs/core_plugin_middleware_captcha-siteverify.md`
+skipped: none
+
