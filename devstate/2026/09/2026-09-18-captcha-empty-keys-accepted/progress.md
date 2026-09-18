@@ -5,7 +5,7 @@ JobName: 2026-09-18-captcha-empty-keys-accepted
 | Phase | Work | Card | At |
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-18T14:15:06Z |
-| explore | [x] | [ ] | |
+| explore | [x] | [x] | 2026-09-18T14:19:52Z |
 | propose | [ ] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
