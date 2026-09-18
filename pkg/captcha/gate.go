@@ -71,6 +71,7 @@ func validateGateValue(secret []byte, bindIPConfig bool, remoteIP, value string,
 	return true
 }
 
+// setGateCookie writes crowdsec_captcha_gate onto rw.
 func setGateCookie(rw http.ResponseWriter, r *http.Request, value string, maxAge int64) {
 	cookie := &http.Cookie{
 		Name:     gateCookieName,
@@ -80,7 +81,8 @@ func setGateCookie(rw http.ResponseWriter, r *http.Request, value string, maxAge
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	}
-	if r.TLS != nil {
+	// Secure on connection TLS or Traefik-left X-Forwarded-Proto https.
+	if r.TLS != nil || strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")), "https") {
 		cookie.Secure = true
 	}
 	http.SetCookie(rw, cookie)
