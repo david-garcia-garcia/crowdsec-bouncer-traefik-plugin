@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: 3 produced, 0 skipped
 fixed: EffectiveHTTPTimeoutSeconds Language; AppSec and LAPI reclaim-key timeout-knob usage
 skipped: none
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: folded five deltas into live specs; archived split-http-timeouts
+skipped: Task FindSpecHost unavailable — ran on main thread
