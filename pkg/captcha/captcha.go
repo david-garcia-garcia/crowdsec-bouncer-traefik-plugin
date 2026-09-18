@@ -321,6 +321,11 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	defer func() {
 		_ = res.Body.Close()
 	}()
+	// Non-2xx is a failed verify; do not inspect Content-Type or decode success.
+	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
+		c.log.Debug(fmt.Sprintf("captcha:Validate status:%d", res.StatusCode))
+		return false, nil
+	}
 	if !strings.HasPrefix(res.Header.Get("Content-Type"), "application/json") {
 		c.log.Debug("captcha:Validate responseType:noJson")
 		return false, nil

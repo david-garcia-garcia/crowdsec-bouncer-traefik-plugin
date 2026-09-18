@@ -87,6 +87,61 @@ func Test_ServeHTTP_dummyProviderSolveIssuesGateCookie(t *testing.T) {
 	}
 }
 
+// Test_ServeHTTP_siteverifyHTTP500SuccessJSONDoesNotMintGate is the regression
+// for a received non-2xx siteverify: JSON success must not mint the gate cookie
+// or 302 as solved. ServeHTTP re-renders the challenge at 200.
+func Test_ServeHTTP_siteverifyHTTP500SuccessJSONDoesNotMintGate(t *testing.T) {
+	siteverify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"success":true}`))
+	}))
+	t.Cleanup(siteverify.Close)
+
+	templatePath := filepath.Join(t.TempDir(), "captcha.html")
+	if err := os.WriteFile(templatePath, []byte("E2E_CAPTCHA_PAGE_MARKER"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	client := &Client{}
+	if err := client.New(
+		slog.Default(),
+		siteverify.Client(),
+		"custom",
+		siteverify.URL+"/dummy.js",
+		"",
+		"dummy-captcha",
+		"dummy-captcha-response",
+		siteverify.URL+"/siteverify",
+		"e2e-dummy-site",
+		"e2e-dummy-secret",
+		"e2e-gate-secret",
+		true,
+		"",
+		templatePath,
+		3600,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	form := url.Values{}
+	form.Set("dummy-captcha-response", "ok")
+	solveReq := httptest.NewRequest(http.MethodPost, "/foo", strings.NewReader(form.Encode()))
+	solveReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	solveRW := httptest.NewRecorder()
+	client.ServeHTTP(solveRW, solveReq, "1.2.3.4")
+	if solveRW.Code != http.StatusOK {
+		t.Fatalf("non-2xx siteverify want 200 challenge, not 302; got %d", solveRW.Code)
+	}
+	cookie := solveRW.Result().Header.Get("Set-Cookie")
+	if strings.Contains(cookie, gateCookieName+"=") {
+		t.Fatalf("non-2xx siteverify must not mint gate cookie: %s", cookie)
+	}
+	if !strings.Contains(solveRW.Body.String(), "E2E_CAPTCHA_PAGE_MARKER") {
+		t.Fatalf("non-2xx siteverify want captcha page, got %q", solveRW.Body.String())
+	}
+}
+
 // Test_ServeHTTP_queryTokenSolvesWithoutBody covers Traefik Yaegi leaving POST form empty.
 func Test_ServeHTTP_queryTokenSolvesWithoutBody(t *testing.T) {
 	siteverify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
