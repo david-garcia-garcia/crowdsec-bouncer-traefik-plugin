@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: missing-packet Config validation
 fixed: produced knowledge/devdocs/core_plugin_middleware_config-validation.md (08888ff)
 skipped: none
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: catalog fold + archive move (bd6138c)
+skipped: none
