@@ -1,5 +1,5 @@
 {
-  "commentId": "pending",
+  "commentId": "pr-body",
   "issueKey": "2026-09-18-captcha-siteverify-ignores-http-status",
   "markerValue": "[sgsi-dev-ticket-status:2026-09-18-captcha-siteverify-ignores-http-status]",
   "issueHost": "local"
