@@ -10,5 +10,5 @@ JobName: 2026-09-18-captcha-verify-template-ux
 | implement | [x] | [x] | 2026-09-18T18:06:58Z |
 | codereview | [x] | [x] | 2026-09-18T18:18:47Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T18:22:12Z |
-| archive | [ ] | [ ] | |
+| archive | [x] | [ ] | |
 | pullrequest | [ ] | [ ] | |
