@@ -27,3 +27,9 @@ phase: codereview
 findings: none
 fixed: n/a
 skipped: n/a
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: 3 produced, 0 skipped
+fixed: EffectiveHTTPTimeoutSeconds Language; AppSec and LAPI reclaim-key timeout-knob usage
+skipped: none
