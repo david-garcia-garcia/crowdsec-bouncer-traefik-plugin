@@ -8,7 +8,7 @@ destBranch: master
 qualify: qualified
 src: sha256:17e467dce5e9a43590c65edf1a57a309b82b5d0a621d9c46ae63960bb0bbb35b
 comments: none
-localTests: none
+localTests: passed
 requirement: requirement.md
 explore: explore.md
 change: write-ip-query-result-to-ip-cache-key

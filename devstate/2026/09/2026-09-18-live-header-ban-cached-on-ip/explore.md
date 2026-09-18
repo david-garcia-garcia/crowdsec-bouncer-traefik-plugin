@@ -61,5 +61,5 @@ Consumed: `knowledge/devdocs/index.md` (no `priority: always`), then `core_plugi
   By: propose
 
 - Q: When does usage name the IP-slot vs header-slot write?
-  Decision: assumed — after the code writes the IP query result (`core_plugin_lapi_connection.md` via implement / devdocsimpact). Explore does not document dest's merged write as the contract.
-  By: explore
+  Decision: resolved — named on `core_plugin_lapi_connection.md` How to use / Gotchas after the write matches.
+  By: implement
