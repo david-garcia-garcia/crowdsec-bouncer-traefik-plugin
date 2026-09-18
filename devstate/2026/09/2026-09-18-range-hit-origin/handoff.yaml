@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-range-hit-origin
+jobName: 2026-09-18-range-hit-origin
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:ab50ba1763b8051aed98a65c48332d49de8a54375983a62b5779af6cc0d66f88
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr:
+  id: 106
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/106
