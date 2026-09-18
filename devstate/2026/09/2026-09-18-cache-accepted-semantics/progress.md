@@ -10,5 +10,5 @@ JobName: 2026-09-18-cache-accepted-semantics
 | implement | [x] | [x] | 2026-09-18T18:28:28Z |
 | codereview | [x] | [x] | 2026-09-18T18:35:36Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T18:40:22Z |
-| archive | [x] | [ ] | |
+| archive | [x] | [x] | 2026-09-18T18:44:24Z |
 | pullrequest | [ ] | [ ] | |
