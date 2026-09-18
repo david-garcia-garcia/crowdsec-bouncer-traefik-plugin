@@ -27,3 +27,9 @@ phase: codereview
 findings: P1 0, P2 0
 fixed: none
 skipped: none
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: missing-packet 1, stale-usage 1
+fixed: std_go_logger_debug-attrs.md; log-sink Key files
+skipped: none

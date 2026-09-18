@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-18T18:10:59Z
+Developer review: in progress — 2026-09-18T18:12:08Z
 
 ## What this changes
 **Operators.** None.
 
 **Admin users.** None.
 
-**Developers.** `ServeHTTP` and `cache.Client` Get/GetMany/Set/Delete Debug now use slog attributes, so INFO does not `Sprintf` those strings. Hunt tests assert DEBUG stems plus fields.
+**Developers.** `ServeHTTP` and `cache.Client` Get/GetMany/Set/Delete Debug now use slog attributes, so INFO does not `Sprintf` those strings. Usage packet `std_go_logger_debug-attrs`. Hunt tests assert DEBUG stems plus fields.
 
 **End users.** None.
 
@@ -31,17 +31,17 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Six-axis review is clean; CI on this head is still in progress. 1 item remains.
+Usage docs caught up; CI on this head is queued. 1 item remains.
 
 Priority: P2 — INFO allow still formats debug strings on every stream request
-Reviewed head: 890416b
+Reviewed head: d14993c
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Apply and axis review landed; CI on this head is in progress |
-| CI proof | 3/6 | in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378467186 |
+| Overall readiness | 3/6 | Apply, review, and usage packet landed; CI on this head is queued |
+| CI proof | 3/6 | queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378779651 |
 | Local tests proof | N/A | Remote PR; CI proof covers remote |
 | Review resolution | 6/6 | OPEN PR #108; no reviewer comments |
 
@@ -51,7 +51,7 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-18-lazy-debug-log pushed | `git` / pr-host |
 | OpenSpec | lazy-debug-hot-path | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/108 | pr-host List |
-| CI | e2e (docker + pester) in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378467223/job/105708757123 ; e2e (binary + mock LAPI) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378467223/job/105708754958 ; Race detector in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378467186/job/105708710664 ; Main Process in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378467186/job/105708710423 | pr-host CI |
+| CI | Main Process queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378779651/job/105709731725 ; Race detector queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378779651/job/105709731540 | pr-host CI |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | no `comments.md` |
 
@@ -62,7 +62,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local ticket `2026-09-18-lazy-debug-log` runs on branch `2026-09-18-lazy-debug-log` as PR #108. Six-axis review is clean; devdocs impact is next.
+Local ticket `2026-09-18-lazy-debug-log` runs on branch `2026-09-18-lazy-debug-log` as PR #108. Devdocs impact is produced; archive is next.
 
 ## Decision needed
 | Question | Decision | By |
@@ -95,13 +95,13 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 0 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 890416b8843fa9862ac3c2ebd0d3e92702847e1c | Card must match the branch you measured |
+| Reviewed head | d14993c4acce9acf4c35b63211ebad6200a277d8 | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: DestBranch `Sprintf`s before `Debug`. This head passes existing values as slog attributes on the request path.
+Best possible solution: DestBranch `Sprintf`s before `Debug`. This head passes existing values as slog attributes and documents that pattern.
 
 Do we have a high-confidence way to reproduce? Yes — DestBranch call sites `Sprintf` then `Debug`. Local tests passed. Six-axis review: none.
 
@@ -109,11 +109,10 @@ Is this the best way to solve the issue? Yes versus DestBranch: slog attributes 
 
 ### Evidence
 What I checked:
-- Product delta `origin/master...HEAD` is OpenSpec `lazy-debug-hot-path` plus `pkg/bouncer` / `pkg/cache` Debug attributes and hunt tests
-- Axis files all `none.`
-- Local tests passed (`go test ./pkg/cache/ ./pkg/bouncer/ ./pkg/logger/ -count=1`)
+- Produced `knowledge/devdocs/std_go_logger_debug-attrs.md`; updated log-sink Key files
+- Product delta still the request-path Debug apply plus usage packet
 - OPEN PR #108; comment inventory empty (pr-host)
-- CI on this head: one success, three in progress (pr-host check runs)
+- CI on this head: Main Process and Race detector queued (pr-host check runs)
 
 ### Rank-up moves
 None.
