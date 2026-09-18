@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
@@ -140,7 +139,7 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 			cidr := strings.TrimSpace(decision.Value)
 			if value != "" && cidr != "" {
 				origin := MetricsOrigin(decision.Origin, decision.Scenario)
-				rangeUpserts[cidr] = cache.RemediationWithOrigin(value, origin)
+				rangeUpserts[cidr] = c.remediationStored(value, origin).IndexForm()
 				c.rememberActiveDecision("range:"+cidr, origin, cidr)
 			}
 			continue

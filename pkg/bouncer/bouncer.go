@@ -195,7 +195,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 
 	// live, stream, and alone consult the cache.
 	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
-		value, origin, cacheErr := decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
+		kind, stored, cacheErr := decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
 		switch {
 		case cacheErr != nil:
 			cacheErrString := cacheErr.Error()
@@ -211,11 +211,12 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", req.remoteIP, cacheErrString))
 			b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
 			return
-		case decisionscope.IsActiveRemediation(value):
-			b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit remediation:%s", req.remoteIP, value))
-			b.handleRemediationServeHTTP(rw, req, value, origin)
+		case decisionscope.IsActiveRemediation(kind):
+			origin := b.resolveStoredOrigin(stored)
+			b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit remediation:%s", req.remoteIP, kind))
+			b.handleRemediationServeHTTP(rw, req, kind, origin)
 			return
-		case value == decisionscope.NoBannedValue:
+		case kind == decisionscope.NoBannedValue:
 			b.handleNextServeHTTP(rw, req)
 			return
 		}
@@ -277,6 +278,18 @@ func (b *Bouncer) recordDropped(origin, ipType, remediation string) {
 	if b.lapiClient != nil {
 		b.lapiClient.IncDropped(origin, ipType, remediation)
 	}
+}
+
+// resolveStoredOrigin is the leftover U+001F suffix or DecisionStore table[id], used only on drop.
+func (b *Bouncer) resolveStoredOrigin(stored string) string {
+	if origin := cache.RemediationOrigin(stored); origin != "" {
+		return origin
+	}
+	id, packed := cache.ParsePackedOriginID(stored)
+	if !packed || b.lapiClient == nil {
+		return ""
+	}
+	return b.lapiClient.OriginName(id)
 }
 
 // handleBanServeHTTP writes the operator ban template for this client.

@@ -272,6 +272,22 @@ func (c *Client) Cache() *cache.Client {
 	return c.cacheClient
 }
 
+// OriginName is the DecisionStore intern string for id, or empty when this Client has no store.
+func (c *Client) OriginName(id uint16) string {
+	if c == nil || c.decisionStore == nil {
+		return ""
+	}
+	return c.decisionStore.OriginName(id)
+}
+
+// remediationStored packs kind plus interned origin on stream/alone memory; Redis and live stay leftover.
+func (c *Client) remediationStored(kind, origin string) cache.Stored {
+	if c == nil || c.decisionStore == nil || !c.Cache().MemoryBackend() {
+		return cache.Leftover(cache.RemediationWithOrigin(kind, origin))
+	}
+	return c.decisionStore.RemediationStored(kind, origin)
+}
+
 // RangeMembership is the current in-process Range lookup, or nil before the first hydrate.
 func (c *Client) RangeMembership() *decisionscope.RangeMembership {
 	stored := c.rangeMembership.Load()

@@ -49,8 +49,9 @@ type MetricsReporter struct {
 	processedIPv4       int64                    // processed ipv4; atomic on the request path
 	processedIPv6       int64
 	processedUnknown    int64 // processed when Family is empty
-	activeDecisions     map[usageMetricKey]int64
-	activeDecisionSlots map[string]usageMetricKey
+	activeDecisions     map[activeDecisionKey]int64
+	activeDecisionSlots map[string]activeDecisionKey
+	origins             originResolver
 }
 
 // newMetricsReporter snapshots write-once URL and envelope scalars and binds query to crowdsecQuery.
@@ -65,9 +66,23 @@ func newMetricsReporter(client *Client, startedAt time.Time) *MetricsReporter {
 		query:               client.crowdsecQuery,
 		log:                 client.log,
 		windowCounters:      make(map[usageMetricKey]int64),
-		activeDecisions:     make(map[usageMetricKey]int64),
-		activeDecisionSlots: make(map[string]usageMetricKey),
+		activeDecisions:     make(map[activeDecisionKey]int64),
+		activeDecisionSlots: make(map[string]activeDecisionKey),
+		origins:             client.decisionStore,
 	}
+}
+
+// originResolver is the DecisionStore intern table a reporter resolves POST labels through.
+type originResolver interface {
+	InternOrigin(name string) (uint16, bool)
+	OriginName(id uint16) string
+}
+
+// activeDecisionKey is one compact active_decisions identity: intern id or leftover origin, plus family.
+type activeDecisionKey struct {
+	originID   uint16
+	originText string
+	family     byte
 }
 
 // handleMetricsTicker POSTs the current usage-metrics window from the Client ticker.
@@ -172,19 +187,14 @@ func (r *MetricsReporter) rememberActiveDecision(slot, origin, decisionValue str
 	if r.crowdsecMode != configuration.StreamMode && r.crowdsecMode != configuration.AloneMode {
 		return
 	}
-	key := usageMetricKey{
-		name:   "active_decisions",
-		unit:   "ip",
-		origin: origin,
-		ipType: ip.FamilyOfHostOrCIDR(decisionValue),
-	}
+	key := compactActiveDecisionKey(r.origins, origin, ip.FamilyOfHostOrCIDR(decisionValue))
 	r.metricsMu.Lock()
 	defer r.metricsMu.Unlock()
 	if r.activeDecisionSlots == nil {
-		r.activeDecisionSlots = make(map[string]usageMetricKey)
+		r.activeDecisionSlots = make(map[string]activeDecisionKey)
 	}
 	if r.activeDecisions == nil {
-		r.activeDecisions = make(map[usageMetricKey]int64)
+		r.activeDecisions = make(map[activeDecisionKey]int64)
 	}
 	if previous, ok := r.activeDecisionSlots[slot]; ok {
 		r.activeDecisions[previous]--
@@ -194,6 +204,59 @@ func (r *MetricsReporter) rememberActiveDecision(slot, origin, decisionValue str
 	}
 	r.activeDecisionSlots[slot] = key
 	r.activeDecisions[key]++
+}
+
+// compactActiveDecisionKey interns origin when the store table can; overflow/empty keep today's label text.
+func compactActiveDecisionKey(origins originResolver, origin, ipType string) activeDecisionKey {
+	key := activeDecisionKey{family: familyByte(ipType), originText: origin}
+	if origins == nil || origin == "" {
+		return key
+	}
+	id, interned := origins.InternOrigin(origin)
+	if !interned {
+		return key
+	}
+	key.originID = id
+	key.originText = ""
+	return key
+}
+
+// activeUsageKey is the POST item identity for one compact slot aggregate.
+func (r *MetricsReporter) activeUsageKey(key activeDecisionKey) usageMetricKey {
+	origin := key.originText
+	if key.originID != 0 && r.origins != nil {
+		origin = r.origins.OriginName(key.originID)
+	}
+	return usageMetricKey{
+		name:   "active_decisions",
+		unit:   "ip",
+		origin: origin,
+		ipType: familyLabel(key.family),
+	}
+}
+
+// familyByte is 4/6 for ipv4/ipv6. Empty family is 0.
+func familyByte(ipType string) byte {
+	switch ipType {
+	case "ipv4":
+		return '4'
+	case "ipv6":
+		return '6'
+	default:
+		return 0
+	}
+}
+
+// familyLabel is the usage-metrics ip_type for a compact family byte.
+func familyLabel(family byte) string {
+	switch family {
+	case '4':
+		return "ipv4"
+	case '6':
+		return "ipv6"
+	default:
+		return ""
+	}
 }
 
 // forgetActiveDecision drops a previously counted stream/alone decision from the gauge.
@@ -250,7 +313,7 @@ func (r *MetricsReporter) reportMetrics() error {
 	}
 	for key, value := range r.activeDecisions {
 		if value > 0 {
-			items = append(items, usageMetricItem(key, value))
+			items = append(items, usageMetricItem(r.activeUsageKey(key), value))
 		}
 	}
 	r.metricsMu.Unlock()

@@ -70,13 +70,18 @@ func RequestScopeValues(headers map[string]string, req *http.Request) map[string
 
 // LookupCachedRemediation merges Ip, Range, and present header-scope hits. Ban wins across those scopes.
 // Range comes from membership.Remediation; nil or empty membership is a miss (live/none never hydrate).
-// The first return is ban, captcha, or none; the second is the metrics origin of the winning cache value.
+// The first return is ban, captcha, or none; the second is the winning stored payload (packed form or leftover).
+// Origin name resolve (table[id] or leftover suffix) is the caller's job on drop, not here.
 // remoteIP is the canonical client address string owned by clientRequest; ipAddr is Range membership only.
 func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, error) {
 	ipKey := remoteIP
-	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, scopes))
+	foundStored, err := cacheClient.GetManyStored(LookupCacheKeys(remoteIP, scopes))
 	if err != nil {
 		return "", "", err
+	}
+	found := make(map[string]string, len(foundStored))
+	for key, stored := range foundStored {
+		found[key] = stored.IndexForm()
 	}
 	// Merge Ip, Range, and header hits so a Country ban beats a Range captcha.
 	chosen := found[ipKey]
@@ -88,10 +93,10 @@ func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr 
 		chosen = PreferRemediation(chosen, found[HeaderScopeKey(scope, identifier)])
 	}
 	if IsActiveRemediation(chosen) {
-		return cache.RemediationKind(chosen), cache.RemediationOrigin(chosen), nil
+		return cache.RemediationKind(chosen), chosen, nil
 	}
 	if value, ok := found[ipKey]; ok {
-		return cache.RemediationKind(value), cache.RemediationOrigin(value), nil
+		return cache.RemediationKind(value), value, nil
 	}
 	return "", "", errors.New(cache.CacheMiss)
 }

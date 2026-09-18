@@ -29,12 +29,12 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 		return
 	}
 	origin := MetricsOrigin(item.Origin, item.Scenario)
-	stored := cache.RemediationWithOrigin(value, origin)
+	stored := c.remediationStored(value, origin)
 	scope := decisionscope.NormalizeScope(item.Scope)
 	switch scope {
 	case decisionscope.ScopeIP, "":
 		slot := decisionscope.IPCacheKey(item.Value)
-		c.cacheClient.Set(slot, stored, duration)
+		c.Cache().SetRemediation(slot, stored, duration)
 		c.rememberActiveDecision(slot, origin, item.Value)
 	case decisionscope.ScopeRange:
 		return
@@ -48,7 +48,7 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 			return
 		}
 		slot := decisionscope.HeaderScopeKey(scope, identifier)
-		c.cacheClient.Set(slot, stored, duration)
+		c.Cache().SetRemediation(slot, stored, duration)
 		c.rememberActiveDecision(slot, origin, item.Value)
 	}
 }
