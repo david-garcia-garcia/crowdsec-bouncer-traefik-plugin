@@ -1,0 +1,14 @@
+issueKey: 2026-09-18-remove-html-filepath-deprecations
+jobName: 2026-09-18-remove-html-filepath-deprecations
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify:
+comments: none
+localTests: none
+requirement:
+explore:
+change:
+pr:
