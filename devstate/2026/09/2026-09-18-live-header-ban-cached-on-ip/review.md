@@ -21,3 +21,9 @@ phase: implement
 findings: dest IP-slot write fixed; 6/6 tasks complete
 fixed: handleNoStreamCache writes the IP query result only; TestLiveLookup_IPSlotKeepsIPQueryResult; usage names the IP-slot vs header-slot write
 skipped: no comments.md Implement: fills; no new spec folder
+
+## codereview (2026-09-18)
+phase: codereview
+findings: Standards 1 hard Leave a trail; Coverage 1 judgement; Spec/Security/Performance/Dead none
+fixed: handleNoStreamCache method comment (8b03528)
+skipped: Coverage IP-ban+header-ban slot test (judgement; design scoped one dest-style test)
