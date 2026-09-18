@@ -53,6 +53,8 @@ Access the dashboard with: [localhost:9000/dashboard/#/](http://localhost:9000/d
 
 #### Install the plugin
 
+`traefik/values.yml` registers this tree as `experimental.localPlugins.bouncer`. Catalog download of this module 404s. Mount or copy the repository to `plugins-local/src/github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin` on the Traefik pod before the Helm install.
+
 ```bash
 kubectl apply -f traefik/plugin.yml
 ```

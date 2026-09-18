@@ -11,8 +11,10 @@ logs:
       headers: 
         defaultmode: keep
 
+# Catalog download of this fork 404s. Mount or copy this repository to
+# plugins-local/src/github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
+# on the Traefik pod (hostPath, ConfigMap, or init copy).
 experimental:
-  plugins:
+  localPlugins:
     bouncer:
-      moduleName: "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
-      version: "v1.7.1"
+      moduleName: "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin"

@@ -35,6 +35,7 @@ _Avoid_: `GetVariable` as a feature-flag check
 - When the knob is false, skip AppSec host, URL, key, and CA even if leftover fields are set.
 - Leave `New` as `return nil, err` on `ValidateParams` failure.
 - Map shared `backendBackoff*` knobs with `BackendBackoffConfig()`. `CreateConfig` defaults match the published package. Call `backendbackoff.New` then `Close` inside `ValidateParams` so reject rules cannot drift. There is no enabled flag. `Jitter` `0` disables jitter only.
+- Trim `CaptchaCustomValidateBody`. Accept only `""`, `form`, and `json` (exact lowercase). Reject unknown tokens for any provider (`CaptchaCustomValidateBody: must be empty, form, or json`). Reject `json` when the provider is not `custom` (`CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom`). Built-in leftover `""` / `form` pass and are ignored.
 
 ## Pattern snippet
 

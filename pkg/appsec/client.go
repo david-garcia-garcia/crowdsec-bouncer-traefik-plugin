@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/david-garcia-garcia/traefik-middleware-utilities/backendbackoff"
-	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
 // Client owns the AppSec HTTP round-trip for one listener identity.
