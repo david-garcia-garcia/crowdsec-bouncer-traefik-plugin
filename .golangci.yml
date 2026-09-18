@@ -29,18 +29,18 @@ linters-settings:
           - "!$test"
         allow:
           - $gostd
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha
           - github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/iplookup
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/iplookup
           - github.com/leprosus/golang-ttl-map
       Test:
         files:
@@ -48,17 +48,17 @@ linters-settings:
         allow:
           - $gostd
           - github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/reclaim
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/bouncer
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/iplookup
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/iplookup
 
 linters:
   enable-all: true
