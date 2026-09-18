@@ -21,3 +21,9 @@ phase: implement
 findings: none
 fixed: HostCIDR export; Range upsert/remove/membership host prefix
 skipped: none
+
+## codereview (2026-09-18)
+phase: codereview
+findings: P1 0, P2 0; Standards 1 hard (name)
+fixed: rangeIndexCIDR param renamed to cidr
+skipped: none
