@@ -1,20 +1,18 @@
-Developer review: in progress — 2026-09-18T14:40:15Z
+Developer review: ready for review — 2026-09-18T14:49:33Z
 
 ## What this changes
 **Operators.** None.
 
 **Admin users.** None.
 
-**Developers.** Adds OpenSpec change `captcha-siteverify-content-type-case` and spec `core_plugin_middleware_captcha-siteverify` (siteverify JSON is the media type before parameters, case-insensitive; `success:true` issues `crowdsec_captcha_gate` and 302). Records RFC 9110 media-type rules in `knowledge/research/ext_http_media-types/`. Product `Validate` still matches `Content-Type` with a lowercase `application/json` prefix.
+**Developers.** `Client.Validate` treats a provider siteverify response as JSON when the `Content-Type` media type before parameters equals `application/json` (via `mime.ParseMediaType`); `success:true` still issues `crowdsec_captcha_gate` and 302. Adds `TestHunt_siteverifyJSONContentTypeIsCaseInsensitive` and spec `core_plugin_middleware_captcha-siteverify`.
 
-**End users.** None.
+**End users.** A successful captcha solve against a provider that sends mixed-case JSON `Content-Type` now receives the gate cookie and redirect instead of another challenge page.
 
 ## Motivation
 After a captcha solve, this plugin POSTs the token to the provider siteverify URL and only mints `crowdsec_captcha_gate` when that response is treated as JSON with `success:true`. On `master`, that JSON check is `strings.HasPrefix(Content-Type, "application/json")`.
 
-A provider that sends `Application/JSON` plus `{"success":true}` is classified as non-JSON (`responseType:noJson`). `ServeHTTP` then writes the 200 challenge page and skips the gate cookie and 302. RFC 9110 type and subtype tokens are case-insensitive, so that header is JSON.
-
-Explore reproduced that path: the same stub with `Application/JSON` returned `200` and the challenge HTML; the lowercase `application/json` control still 302s and sets the cookie. If this does not land, a successful solve against a provider (or proxy) that capitalizes the media type never clears captcha.
+A provider that sends `Application/JSON` plus `{"success":true}` is classified as non-JSON (`responseType:noJson`). `ServeHTTP` then writes the 200 challenge page and skips the gate cookie and 302. RFC 9110 type and subtype tokens are case-insensitive, so that header is JSON. If this does not land, a successful solve against a provider (or proxy) that capitalizes the media type never clears captcha.
 
 ```mermaid
 sequenceDiagram
@@ -29,28 +27,28 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Propose is apply-ready; product `Validate` is unchanged. 1 item remains.
+Implement applied the siteverify media-type match and CI succeeded. 0 items remain.
 
 Priority: P2 — real solver pain when the provider capitalizes Content-Type, limited to that header match
-Reviewed head: 3eca817
+Reviewed head: 3b00468
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI is still queued; no product fix on the branch |
-| CI proof | 3/6 | Checks queued on [35357551797](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35357551797) and [35357552002](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35357552002) |
-| Local tests proof | N/A | `localTests: none`; remote CI is the proof axis |
+| Overall readiness | 6/6 | CI succeeded and there are no open PR comments |
+| CI proof | 6/6 | All checks succeeded on [35358201876](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35358201876) and [35358201849](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35358201849) |
+| Local tests proof | N/A | `prHost` is remote; CI proof covers remote |
 | Review resolution | 6/6 | No OPEN PR comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-18-captcha-siteverify-content-type-case pushed | `git` `3eca817` |
+| Branch | 2026-09-18-captcha-siteverify-content-type-case pushed | `git` `3b00468` |
 | OpenSpec | captcha-siteverify-content-type-case | `openspec/changes/captcha-siteverify-content-type-case/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/94 | GitHub PR 94 |
-| CI | build 35357551797 queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35357551797 ; build 35357552002 queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35357552002 | GitHub check runs |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 35358201876 success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35358201876 ; build 35358201849 success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35358201849 | GitHub check runs |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | no comments.md |
 
 ## Specs
@@ -60,7 +58,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Propose wrote apply-ready OpenSpec on branch `2026-09-18-captcha-siteverify-content-type-case`; stub PR 94 is OPEN; CI is queued on that head; the siteverify match is not applied yet.
+Implement applied the `Validate` media-type match and hunt regression on branch `2026-09-18-captcha-siteverify-content-type-case`; stub PR 94 is OPEN; CI succeeded on that head.
 
 ## Decision needed
 | Question | Decision | By |
@@ -69,7 +67,9 @@ Propose wrote apply-ready OpenSpec on branch `2026-09-18-captcha-siteverify-cont
 | Where should the dest regression live, and may it keep the hunt name? | assumed — add a `zzz_*_test.go` under `pkg/captcha/` (existing `zzz_servehttp_test.go` or a new `zzz_` file). The function may keep `TestHunt_siteverifyJSONContentTypeIsCaseInsensitive`. Do not copy a hunt worktree file as dest. | explore |
 
 ## Before merge
-- [ ] Treat siteverify as JSON when the media type before parameters equals `application/json` case-insensitively; `success:true` must set the gate cookie and 302; add a regression [P2]
+- [x] Treat siteverify as JSON when the media type before parameters equals `application/json` case-insensitively; `success:true` sets the gate cookie and 302; hunt regression landed [P2]
+- [x] Local `go test ./pkg/...` and `go test .` passed
+- [x] CI succeeded on `3b00468`
 - [x] Stub PR opened
 - [x] Explore reproduced `Application/JSON` → 200 challenge
 - [x] OpenSpec change `captcha-siteverify-content-type-case` apply-ready
@@ -87,26 +87,25 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 0 modified | Same list as ## Specs; do not paste diff --stat |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 3eca817546458b483de79f3afdfca05044fba649 | Card must match the branch you measured |
+| Reviewed head | 3b0046889f0759261e8d03a8c7605158a25e3596 | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: DestBranch still does the case-sensitive prefix check; this PR now owns the required match in `core_plugin_middleware_captcha-siteverify` and tasks for `mime.ParseMediaType` plus one `zzz_` regression.
+Best possible solution: DestBranch still uses a lowercase `application/json` prefix; this PR classifies siteverify JSON with `mime.ParseMediaType` equals-before-parameters in `Validate`.
 
-Do we have a high-confidence way to reproduce? Yes — throwaway `TestHunt_siteverifyJSONContentTypeIsCaseInsensitive` failed (`solve want 302, got 200 E2E_CAPTCHA_PAGE_MARKER`); lowercase control passed.
+Do we have a high-confidence way to reproduce? Yes — committed `TestHunt_siteverifyJSONContentTypeIsCaseInsensitive` (`Application/JSON` + `{"success":true}` → 302 and `crowdsec_captcha_gate`).
 
-Is this the best way to solve the issue? Yes versus DestBranch: fix the shared `Validate` media-type owner (equals-before-parameters), not a `ServeHTTP` special case.
+Is this the best way to solve the issue? Yes versus DestBranch: fix the shared `Validate` media-type owner, not a `ServeHTTP` special case.
 
 ### Evidence
 What I checked:
-- `Validate` Content-Type prefix and `(false, nil)` → 200 challenge (`pkg/captcha/captcha.go`, `origin/master` `fad36a1`)
-- Existing solve stub uses lowercase `application/json` (`pkg/captcha/zzz_servehttp_test.go`, `fad36a1`)
-- RFC 9110 § 8.3.1 type/subtype case-insensitive (`knowledge/research/ext_http_media-types/notes.md`, `3eca817`)
-- FindSpecHost new `core_plugin_middleware_captcha-siteverify` (high); not folded into captcha-gate or captcha-routing
-- OpenSpec artifacts apply-ready (`openspec/changes/captcha-siteverify-content-type-case/`, `3eca817`)
-- PR 94 OPEN, comments empty, checks queued (`3eca817`)
+- `Validate` now parses `Content-Type` with `mime.ParseMediaType` (`pkg/captcha/captcha.go`, `18c1dc3`)
+- Hunt regression asserts 302 and `crowdsec_captcha_gate` (`pkg/captcha/zzz_servehttp_test.go`, `8228cb8`)
+- Local `go test ./pkg/... -count=1` and `go test . -count=1` passed (`3b00468`)
+- PR 94 checks succeeded: Main Process, Race detector, e2e binary+mock, e2e docker+pester (builds 35358201876 and 35358201849)
+- RFC 9110 § 8.3.1 type/subtype case-insensitive (`knowledge/research/ext_http_media-types/notes.md`)
 
 ### Rank-up moves
 None.

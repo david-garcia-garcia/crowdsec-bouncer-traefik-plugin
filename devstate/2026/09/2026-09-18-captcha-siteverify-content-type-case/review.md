@@ -16,3 +16,9 @@ findings: none
 fixed: OpenSpec `captcha-siteverify-content-type-case`; spec `core_plugin_middleware_captcha-siteverify`
 skipped: product Validate match (implement)
 
+## implement (2026-09-18)
+phase: implement
+findings: none
+fixed: `Validate` uses `mime.ParseMediaType`; hunt regression `TestHunt_siteverifyJSONContentTypeIsCaseInsensitive`; CI succeeded
+skipped: none
+
