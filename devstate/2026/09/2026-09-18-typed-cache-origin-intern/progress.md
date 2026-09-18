@@ -9,6 +9,6 @@ JobName: 2026-09-18-typed-cache-origin-intern
 | propose | [x] | [x] | 2026-09-18T18:23:34Z |
 | implement | [x] | [x] | 2026-09-18T18:31:45Z |
 | codereview | [x] | [x] | 2026-09-18T18:42:20Z |
-| devdocsimpact | [ ] | [ ] | |
-| archive | [ ] | [ ] | |
-| pullrequest | [ ] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-18T19:00:27Z |
+| archive | [x] | [x] | 2026-09-18T19:00:27Z |
+| pullrequest | [x] | [x] | 2026-09-18T19:00:27Z |
