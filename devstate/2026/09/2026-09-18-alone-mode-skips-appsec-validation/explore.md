@@ -39,8 +39,8 @@ No identity reconstruction (client address, user, tenant, Host, trust hop). No r
   By: explore
 
 - Q: Must the regression be named `TestHunt_ValidateParams_aloneModeStillRejectsInvalidAppsecCA`?
-  Decision: assumed — no; hunt name is not in-tree. Use existing `Test_ValidateParams` table rows in `zzz_configuration_test.go`.
-  By: explore
+  Decision: resolved — yes; keep the `Test_ValidateParams` table rows and add that hunt function name as a dedicated test. Conductor bound the named hunt proof.
+  By: implement
 
 - Q: Should alone AppSec CA parse use `effectiveAppsecScheme` (inherit LAPI `https`) instead of explicit `CrowdsecAppsecScheme == https`?
   Decision: assumed — keep today’s explicit-scheme trigger. Changing it would rewrite live/stream validation (out of scope). Hunt proof uses an explicit AppSec `https` scheme.
