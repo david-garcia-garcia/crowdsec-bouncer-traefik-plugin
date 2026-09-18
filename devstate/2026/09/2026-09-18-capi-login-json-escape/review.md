@@ -15,3 +15,9 @@ phase: propose
 findings: none
 fixed: none
 skipped: Task subagent unused. Three assumed rows remain (Marshal vs Encoder, empty/nil scenarios, Content-Type). Fold Q resolved.
+
+## implement (2026-09-18)
+phase: implement
+findings: Main Process lint failed on tagliatelle (machine_id) and gocognit (TestGetToken_LoginBodyIsValidJSON)
+fixed: json.Marshal loginRequest in getToken; TestGetToken_LoginBodyIsValidJSON; tagliatelle nolint + test helpers; cdc4ae1
+skipped: Content-Type and SetEscapeHTML(false) stay out of scope. Three assumed rows remain.
