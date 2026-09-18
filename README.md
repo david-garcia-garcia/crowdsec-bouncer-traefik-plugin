@@ -534,7 +534,7 @@ make run
   - Provider to validate the captcha, expected values are: `hcaptcha`, `recaptcha`, `turnstile` or `custom`
 - CaptchaCustomJsURL
   - string
-  - If CaptchaProvider is `custom`, URL used to load the challenge in the HTML (in case of hcaptcha: `https://hcaptcha.com/1/api.js`)
+  - If CaptchaProvider is `custom`, URL used to load the challenge in the HTML (in case of hcaptcha: `https://hcaptcha.com/1/api.js`). When the widget is served by the protected router itself, a captcha-flagged client may request this exact path and it is passed through to the origin (banned clients are not).
 - CaptchaCustomValidateURL
   - string
   - If CaptchaProvider is `custom`, URL used to validate the challenge (in case of hcaptcha: `https://api.hcaptcha.com/siteverify`)
@@ -544,6 +544,10 @@ make run
 - CaptchaCustomResponse
   - string
   - If CaptchaProvider is `custom`, used to set the field in the POST body from the captcha.html to Traefik (in case of hcaptcha: `h-captcha-response`)
+- CaptchaCustomChallengeURL
+  - string
+  - default: ""
+  - If CaptchaProvider is `custom`, URL of the widget challenge endpoint served by the origin (in case of wicketkeeper: `http://captcha.localhost:8000/v0/challenge`). Rendered in the captcha template as `{{ .ChallengeURL }}`, and a captcha-flagged client may request this exact path and it is passed through to the origin (banned clients are not). Empty means no challenge passthrough.
 - CaptchaSiteKey
   - string
   - Site key for the captcha provider
