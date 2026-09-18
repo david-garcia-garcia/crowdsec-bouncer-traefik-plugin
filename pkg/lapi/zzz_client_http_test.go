@@ -160,6 +160,66 @@ func TestGetToken_UnauthorizedLoginDoesNotRecurse(t *testing.T) {
 	}
 }
 
+// TestGetToken_TwoXXBodyWithoutJSONCode proves a 2xx CAPI login body with token and no JSON code
+// stores that token on the transport.
+func TestGetToken_TwoXXBodyWithoutJSONCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if !strings.Contains(req.URL.Path, crowdsecCapiLoginRoute) {
+			t.Errorf("unexpected path %s", req.URL.Path)
+			rw.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if _, err := rw.Write([]byte(`{"token":"fresh","expire":"later"}`)); err != nil {
+			t.Errorf("login stub write: %v", err)
+		}
+	}))
+	defer server.Close()
+	client := newTestQueryClient(t, server, configuration.AloneMode)
+
+	if err := client.getToken(); err != nil {
+		t.Fatalf("getToken after 2xx token-without-code: %v", err)
+	}
+	stored := client.currentTransport()
+	if stored == nil {
+		t.Fatal("stored transport is nil")
+	}
+	if stored.key != "fresh" {
+		t.Fatalf("stored transport key %q, want fresh", stored.key)
+	}
+}
+
+// TestGetToken_TwoXXEmptyTokenKeepsStatusCodeError proves a 2xx login body with an empty token
+// still returns the existing getToken statusCode: error.
+func TestGetToken_TwoXXEmptyTokenKeepsStatusCodeError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if !strings.Contains(req.URL.Path, crowdsecCapiLoginRoute) {
+			t.Errorf("unexpected path %s", req.URL.Path)
+			rw.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if _, err := rw.Write([]byte(`{"token":"","expire":"later"}`)); err != nil {
+			t.Errorf("login stub write: %v", err)
+		}
+	}))
+	defer server.Close()
+	client := newTestQueryClient(t, server, configuration.AloneMode)
+
+	err := client.getToken()
+	if err == nil {
+		t.Fatal("an empty token on 2xx must return an error")
+	}
+	if !strings.HasPrefix(err.Error(), "getToken statusCode:") {
+		t.Fatalf("empty-token error %q, want prefix getToken statusCode:", err)
+	}
+	stored := client.currentTransport()
+	if stored == nil {
+		t.Fatal("stored transport is nil")
+	}
+	if stored.key != "stale-token" {
+		t.Fatalf("stored transport key %q, want stale-token", stored.key)
+	}
+}
+
 // testLoginBodyStub records the last watchers-login POST body.
 type testLoginBodyStub struct {
 	mu   sync.Mutex

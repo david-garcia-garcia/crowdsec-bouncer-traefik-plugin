@@ -40,6 +40,7 @@ value, err := client.LiveLookup(remoteIP, scopes, defaultDecisionSeconds)
 
 ## Gotchas
 
+- After `sendQuery` returns a 2xx CAPI login body, store `login.Token` when it is non-empty. Do not require JSON `code == 200`. Official `WatcherAuthResponse` marks `code` omitempty (`ext_crowdsec_watchers_login-response`). Keep the existing `getToken statusCode:` error when the token is empty.
 - A clean `?ip=` plus a remediating header writes `NoBannedValue` on the IP key. A later lookup for the same IP and a different header hits that none slot and does not inherit the first identity's ban. A header-scope query error still skips the none IP write (fail-closed).
 - The IP-key TTL follows the IP query: an active `?ip=` result uses `liveCacheTTL` on that result's duration; a clean `?ip=` result uses `defaultDecisionSeconds`. Do not apply a header winner's duration to the IP key.
 - Concurrent `AdoptTransport` last-writes the stored transport and idle-closes the value it replaced. No extra mutex around write-once Client scalars.

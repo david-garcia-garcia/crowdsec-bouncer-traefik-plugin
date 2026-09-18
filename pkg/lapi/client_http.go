@@ -190,7 +190,9 @@ func (c *Client) getToken() error {
 	if err != nil {
 		return fmt.Errorf("getToken:parsingBody %w", err)
 	}
-	if login.Code == http.StatusOK && len(login.Token) > 0 {
+	// After sendQuery 2xx, store a non-empty token. Do not require JSON code==200:
+	// official WatcherAuthResponse marks code omitempty.
+	if len(login.Token) > 0 {
 		// Write the token on the stored transport, not a write-once Client field.
 		current := c.currentTransport()
 		if current == nil {
