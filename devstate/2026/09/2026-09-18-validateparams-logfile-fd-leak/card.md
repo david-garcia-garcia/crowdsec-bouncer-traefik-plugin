@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-18T14:51:38Z
+Developer review: in progress — 2026-09-18T14:56:35Z
 
 ## What this changes
 **Operators.** None.
@@ -28,17 +28,17 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Prepare is done; product apply has not started. 4 items remain.
+Explore is done; product apply has not started. 3 items remain.
 
 Priority: P2 — real operator and test pain (file-in-use plus extra descriptor) when `logFilePath` is set, limited blast radius.
-Reviewed head: 185ef4a
-Owner decision: None.
+Reviewed head: 9e08331
+Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI still in progress; no apply yet |
-| CI proof | 3/6 | Main Process in progress; other jobs queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35358805790/job/105644658638 |
+| Overall readiness | 3/6 | CI queued on the explore head; no apply yet |
+| CI proof | 3/6 | Main Process and Race detector queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35359309660 |
 | Local tests proof | N/A | Before implement (`localTests: none`) |
 | Review resolution | 6/6 | OPEN PR, no review comments |
 
@@ -47,8 +47,8 @@ Owner decision: None.
 | --- | --- | --- |
 | Branch | 2026-09-18-validateparams-logfile-fd-leak pushed | git |
 | OpenSpec | none | `openspec/` |
-| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/95 | pr-host Create |
-| CI | build 35358805790 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35358805790 | GitHub check runs |
+| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/95 | pr-host List |
+| CI | build 35359309660 queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35359309660 | GitHub check runs |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | no comments.md |
 
@@ -59,16 +59,18 @@ None.
 None.
 
 ## How this fits together
-Local dump → branch `2026-09-18-validateparams-logfile-fd-leak` → stub PR #95 → prepare bus on `185ef4a`. Product fix is not in this head.
+Local dump → branch `2026-09-18-validateparams-logfile-fd-leak` → stub PR #95 → explore.md on `9e08331`. Product fix is not in this head.
 
 ## Decision needed
-None.
+| Question | Decision | By |
+| --- | --- | --- |
+| How does the test prove the handle is closed on Linux CI, where `Remove` can succeed while the file is still open? | assumed — Windows `Remove` after successful `ValidateParams` is the hunt proof (measured file-in-use on this host). On Linux, after `ValidateParams` scan `/proc/self/fd` and assert no descriptor still names the temp path. Skip the leak assertion only when neither Windows nor `/proc/self/fd` is available; still assert `ValidateParams` succeeds. | explore |
+| What if `Close` fails after a successful open? | assumed — ignore the `Close` error; writability is already proven. Same discard as the logger `LoadOrStore` loser close. | explore |
 
 ## Before merge
-- [ ] Close the writability-check file (or reuse the logger handle) so successful ValidateParams does not keep an extra descriptor
-- [ ] Add a regression test that the check handle is not held (Windows Remove after successful ValidateParams)
-- [ ] Do not take logger-file-reclaim unless that close-or-reuse fix requires it
-- [ ] Remaining workflow phases after prepare
+- [ ] Close the writability-check file after a successful open so ValidateParams does not keep an extra descriptor
+- [ ] Add `TestHunt_ValidateParams_closesLogFileAfterWritabilityCheck` in `pkg/configuration/zzz_configuration_test.go`
+- [ ] Do not take logger-file-reclaim unless that close fix requires it
 
 ## Findings
 None.
@@ -83,24 +85,26 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 185ef4a6bb4450030552bbe4deaabdae6f04ca88 | Card must match the branch you measured |
+| Reviewed head | 9e08331b04c537412fe7c865ac4d9f499822b7ce | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: not chosen yet — dest still discards the writability `OpenFile` handle.
+Best possible solution: close the writability-check `OpenFile` after success; keep the independent hard-fail check. Dest still discards the handle.
 
-Do we have a high-confidence way to reproduce? Yes — hunt proof `TestHunt_ValidateParams_closesLogFileAfterWritabilityCheck` (not on dest); ticket names Windows Remove file-in-use after ValidateParams.
+Do we have a high-confidence way to reproduce? Yes — measured on this Windows host: `ValidateParams` then `Remove` fails file-in-use; `NewWithFormat` + `ValidateParams` + `ResetSharedLogFilesForTest` then `Remove` still fails (extra handle is the check open).
 
-Is this the best way to solve the issue? Not applied. Desired is close-or-reuse so ValidateParams does not retain an extra descriptor.
+Is this the best way to solve the issue? Yes vs dest — close is smaller than reuse and keeps the constructor fail when the logger already fell back to stdout.
 
 ### Evidence
 What I checked:
 - `validateLogging` opens `LogFilePath` and assigns the file to `_` (`pkg/configuration/configuration.go`, `origin/master` 84a9045)
 - `plugin.New` opens the same path via `logger.NewWithFormat` before `ValidateParams` (`plugin.go`)
-- Hunt test not on dest (path not found)
-- PR #95 opened; CI run 35358805790 in progress on head 185ef4a
+- Throwaway probe (OS temp): control open-without-close Remove FAIL; close then Remove OK; ValidateParams then Remove FAIL; logger+ValidateParams+ResetShared then Remove FAIL
+- Existing `go test ./pkg/configuration/ ./pkg/logger/` pass (they do not assert this close)
+- Hunt test not on dest
+- PR #95; CI run 35359309660 queued on head 9e08331
 
 ### Rank-up moves
 None.
