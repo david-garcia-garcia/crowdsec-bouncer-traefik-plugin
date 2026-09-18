@@ -34,3 +34,11 @@ fixed: none
 skipped: Task subagent unavailable; caller wrote six axis files in-process from the checklists and pinned origin/master...HEAD diff
 verdict: in progress
 ci: queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35357904222
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: missing-packet 1
+fixed: produced knowledge/devdocs/core_plugin_middleware_config-validation.md
+skipped: none
+verdict: in progress
+ci: succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35358352875
