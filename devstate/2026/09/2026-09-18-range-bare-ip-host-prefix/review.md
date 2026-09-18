@@ -15,3 +15,9 @@ phase: propose
 findings: fold core_plugin_decisions_scopes
 fixed: none
 skipped: none
+
+## implement (2026-09-18)
+phase: implement
+findings: none
+fixed: HostCIDR export; Range upsert/remove/membership host prefix
+skipped: none
