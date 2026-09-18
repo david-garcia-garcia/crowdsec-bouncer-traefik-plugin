@@ -25,3 +25,14 @@ change: captcha-verify-template-ux
 specs: fold core_plugin_middleware_captcha-siteverify, fold core_plugin_middleware_config-validation
 verdict: in progress
 pr: 103
+
+## implement (2026-09-18)
+phase: implement
+findings: none
+fixed: siteverify remoteip; ServeHTTP 200 on transport/decode; ValidateParams and Client.New fail empty/missing captcha template; deleted knowledge/debt/2026-09-18-captcha-nil-template-panic.md
+skipped: none
+localTests: passed
+ci: Main Process, Race detector, e2e binary+mock, e2e docker+pester succeeded
+verdict: ready for review
+pr: 103
+shas: 0b57813bd41c6699299edc6d816cd38e0f88bd02, 9a740b016459025d8144fdeb11609949e81eaccf
