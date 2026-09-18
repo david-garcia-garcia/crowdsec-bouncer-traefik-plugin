@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: none
 fixed: none
 skipped: usage already matched the apply; no Language write
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: FindSpecHost fold core_plugin_middleware_captcha-gate; catalog already matched the MODIFIED Secure clause; validators exit 0; moved openspec/changes/archive/2026-09-18-captcha-gate-cookie-secure-forwarded-https/
+skipped: Task sub-agent unavailable; FindSpecHost run inline; map.md --write no family delta
