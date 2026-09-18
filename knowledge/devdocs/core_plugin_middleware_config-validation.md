@@ -34,6 +34,7 @@ _Avoid_: `GetVariable` as a feature-flag check
 - Keep the helper's empty-key pass and explicit-`https` CA parse. Do not fail an empty AppSec key at `ValidateParams`.
 - When the knob is false, skip AppSec host, URL, key, and CA even if leftover fields are set.
 - Leave `New` as `return nil, err` on `ValidateParams` failure.
+- Map shared `backendBackoff*` knobs with `BackendBackoffConfig()`. `CreateConfig` defaults match the published package. Call `backendbackoff.New` then `Close` inside `ValidateParams` so reject rules cannot drift. There is no enabled flag. `Jitter` `0` disables jitter only.
 
 ## Pattern snippet
 

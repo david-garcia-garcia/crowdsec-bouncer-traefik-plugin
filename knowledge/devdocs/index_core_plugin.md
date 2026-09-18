@@ -15,6 +15,11 @@ priority: normal
 local: core_plugin_decisionscope.md
 description: How this plugin matches CrowdSec Range and header-mapped scopes without geolocating.
 
+## AppSec backendbackoff Gate
+priority: normal
+local: core_plugin_appsec_backend-backoff.md
+description: How an AppSec Client admits each Do through the published backendbackoff Gate.
+
 ## AppSec challenge
 priority: normal
 local: core_plugin_appsec.md
@@ -54,6 +59,11 @@ description: How one Client skips a stream poll that is already running and publ
 priority: normal
 local: core_plugin_lapi_stream-apply.md
 description: How this plugin writes one CrowdSec stream payload (deleted before new) into the DecisionStore.
+
+## LAPI backendbackoff Gate
+priority: normal
+local: core_plugin_lapi_backend-backoff.md
+description: How a live/none LAPI Client admits each GET through the published backendbackoff Gate.
 
 ## LAPI connection
 priority: normal
