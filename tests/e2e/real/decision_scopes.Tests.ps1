@@ -7,12 +7,16 @@ function Add-IpSpellingDecision {
         [string]$Stored,
         [string]$Reason
     )
-    try {
-        Add-TestDecision -IP $Stored -Type "ban" -Reason $Reason
+    # Avoid TestUtils' `sh -c` string: IPv6/mapped values must stay one argv.
+    $add = docker exec crowdsec-test cscli decisions add --ip $Stored --duration 1h --type ban --reason $Reason 2>&1 | Out-String
+    if ($LASTEXITCODE -eq 0) {
+        return
     }
-    catch {
-        Add-TestScopeDecision -Scope "Ip" -Value $Stored -Type "ban" -Reason $Reason
+    $scope = docker exec crowdsec-test cscli decisions add --scope Ip --value $Stored --duration 1h --type ban --reason $Reason 2>&1 | Out-String
+    if ($LASTEXITCODE -eq 0) {
+        return
     }
+    throw "cscli --ip: $add --scope Ip: $scope"
 }
 
 function Assert-IpSpellingBan {
@@ -22,12 +26,19 @@ function Assert-IpSpellingBan {
         [string]$Request,
         [int]$TimeoutSeconds = 15
     )
-    Add-IpSpellingDecision -Stored $Stored -Reason "Ip spelling $Stored"
+    $addError = $null
+    try {
+        Add-IpSpellingDecision -Stored $Stored -Reason "Ip spelling $Stored"
+    }
+    catch {
+        $addError = $_.Exception.Message
+    }
+    $addError | Should -BeNullOrEmpty -Because "cscli must accept stored $Stored : $addError"
     $result = Wait-ForCondition -Description "LAPI/bouncer to ban stored $Stored as $Request on $Endpoint" -TimeoutSeconds $TimeoutSeconds -RetryIntervalSeconds 2 -Condition {
         $response = Test-HttpRequest -Endpoint $Endpoint -IP $Request -TraefikUrl $script:TraefikUrl
         return ($response.StatusCode -in @(403, 429))
     }
-    $result.Success | Should -Be $true -Because "stored $Stored must ban request $Request on $Endpoint (last wait $($result.TimeTaken)s)"
+    $result.Success | Should -Be $true -Because "stored $Stored must ban request $Request on $Endpoint (last wait $($result.TimeTaken)s; $($result.Error))"
 }
 
 BeforeAll {
