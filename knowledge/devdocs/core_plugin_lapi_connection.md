@@ -14,6 +14,7 @@ _Avoid_: `atomic.Pointer[T]`, a write-once Client `httpClient` field, CrowdsecCo
 
 - Declare `transport` in `client_http.go`. Store it on Client as `atomic.Value`. Do not use `atomic.Pointer[T]` (Yaegi v0.16).
 - After `OpenStream` / `OpenLive` bind, call `AdoptTransport(cfg)`: Store the new transport and idle-close the previous `*http.Client`. Last `New` wins.
+- `newTransport` sets `http.Client.Timeout` and stored `httpTimeoutSeconds` from `cfg.EffectiveHTTPTimeoutSeconds(cfg.CrowdsecLapiHTTPTimeoutSeconds)`. Do not read raw `HTTPTimeoutSeconds` when the LAPI override is non-zero. Store effective seconds so `fieldsDiffer` sees a shared-default change when the override is still 0.
 - Write the CAPI token on the stored transport (`getToken`). Do not keep a write-once Client key field beside it.
 - Pass `defaultDecisionSeconds` into `LiveLookup`. Do not store that TTL on Client.
 - After `LiveLookup`, the client-address cache key holds the `?ip=` result only. Header remediations stay on `HeaderScopeKey` via `cacheLiveScope`. Do not write the merged PreferRemediation verdict onto the IP key.

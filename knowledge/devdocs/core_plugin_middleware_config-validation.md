@@ -21,6 +21,7 @@ _Avoid_: `GetVariable` as a feature-flag check
 ## How to use
 
 - Run `ValidateParams` on `&prepared` after the snapshot and before `lapi.Prepare`.
+- Keep `HTTPTimeoutSeconds` in `requiredInt1` (`< 1` invalid). Put `CrowdsecLapiHTTPTimeoutSeconds`, `CrowdsecAppsecHTTPTimeoutSeconds`, and `CaptchaSiteverifyHTTPTimeoutSeconds` in `requiredInt0` (`< 0` invalid). Zero or omitted inherits. Call `cfg.EffectiveHTTPTimeoutSeconds(override)` — do not add three `EffectiveLapi` wrappers.
 - Resolve `RedisCachePassword` / `RedisCachePasswordFile` only when `redisCacheEnabled` is true.
 - When Redis is off, do not Stat or read a leftover `redisCachePasswordFile`.
 - When Redis is on, keep today's file-error fail. Accept an empty password with an empty file path.
