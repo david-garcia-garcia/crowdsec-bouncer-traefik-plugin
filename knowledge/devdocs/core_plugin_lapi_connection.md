@@ -16,6 +16,8 @@ _Avoid_: `atomic.Pointer[T]`, a write-once Client `httpClient` field, CrowdsecCo
 - After `OpenStream` / `OpenLive` bind, call `AdoptTransport(cfg)`: Store the new transport and idle-close the previous `*http.Client`. Last `New` wins.
 - Write the CAPI token on the stored transport (`getToken`). Do not keep a write-once Client key field beside it.
 - Pass `defaultDecisionSeconds` into `LiveLookup`. Do not store that TTL on Client.
+- Read a `LiveLookup` result by the remediation kind, never by the error alone: an active remediation plus a non-nil error is a decision to remediate; a non-active remediation plus a non-nil error is a LAPI failure, and the caller applies `CrowdsecLapiFailureAction`. Every query the lookup makes reports that way — the client-address query and each mapped header scope.
+- One exchange over the stored transport is `core_plugin_lapi_query-round-trip.md` (drain, `401` replay, message shape). Do not restate those rules here.
 - Keep `StreamStartupBlock` write-once at `startStream`. First incarnation keeps it. Do not put it on Bouncer. Do not mutate it after construct.
 - Publish stream startup, healthy, and update-failure as `int64` fields with `atomic.LoadInt64` / `StoreInt64`. `StreamHealthy` loads. Do not use `atomic.Bool` or `atomic.Int64`. Intra-instance poll overlap is `core_plugin_lapi_stream-single-flight.md`.
 - `logInfo` includes reclaim `sessionKey` (stream/alone `SessionKey`, live/none `Key`) and `reason` (`started|sleeping|waking|closed`). Name transport replace and a live joiner `adopted` at INFO. Do not log `ignored` or warn-and-wire.

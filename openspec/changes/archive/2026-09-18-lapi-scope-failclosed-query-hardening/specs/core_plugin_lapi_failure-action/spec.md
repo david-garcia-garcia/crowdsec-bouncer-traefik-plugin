@@ -1,26 +1,4 @@
-## Purpose
-
-Governs what this plugin does when CrowdSec LAPI does not return a usable verdict: live request errors, and stream/alone cache misses after the stream is marked unhealthy.
-
-## Requirements
-
-### Requirement: CrowdsecLapiFailureAction is the public LAPI fallback
-Public config `crowdsecLapiFailureAction` SHALL be one of `passthrough`, `ban`, or `captcha`. The default SHALL be `ban`. `captcha` SHALL be rejected at ValidateParams unless a captcha provider is configured. Empty SHALL be treated as `ban` (same as omit). Unknown values SHALL be rejected.
-
-#### Scenario: Default is ban
-- **WHEN** the operator omits `crowdsecLapiFailureAction`
-- **THEN** live LAPI errors and stream-unhealthy cache misses ban as today
-
-#### Scenario: Captcha without provider is invalid
-- **WHEN** `crowdsecLapiFailureAction` is `captcha` and no captcha provider is set
-- **THEN** plugin initialization fails validation
-
-### Requirement: UpdateMaxFailure remains the stream unhealthy counter
-`UpdateMaxFailure` SHALL keep today’s meaning: stream/alone poll failures increment a counter; when the counter reaches the configured maximum the stream is unhealthy; `-1` never marks unhealthy; default `0` marks unhealthy on the first failed poll. A later successful poll SHALL restore healthy. `CrowdsecLapiFailureAction` SHALL NOT replace this counter.
-
-#### Scenario: Minus one never unhealthies
-- **WHEN** `updateMaxFailure` is `-1` and stream polls fail
-- **THEN** the stream stays healthy and cache-miss requests are allowed (then AppSec if enabled)
+## MODIFIED Requirements
 
 ### Requirement: Live LAPI error uses CrowdsecLapiFailureAction
 When a live (or none-mode) LAPI lookup fails, the plugin SHALL apply `crowdsecLapiFailureAction`: `passthrough` proceeds to the pass path; `ban` remediates as a ban; `captcha` uses the configured captcha client. Cached hits SHALL still apply before a live lookup. A failure of **any** query the lookup makes counts as a failed lookup: the client-address query and every mapped header-scope query alike. A header-scope query that errors MUST NOT be reported as "no decision on that scope". The lookup SHALL report it to the caller with a **non-active** remediation, exactly as a failed client-address query is reported, so the configured action decides. When a header-scope query fails, the lookup MUST NOT write a negative live-cache entry for that client address, so the unverified allow does not survive in cache. The failure SHALL be logged at a level an operator sees at the plugin's default log level, not at `DEBUG`.
@@ -51,6 +29,8 @@ When a live (or none-mode) LAPI lookup fails, the plugin SHALL apply `crowdsecLa
 - **WHEN** the client-address query errors
 - **THEN** the lookup reports that failure with a non-active remediation, unchanged from before this change
 
+## ADDED Requirements
+
 ### Requirement: An active remediation outranks a header-scope failure
 When a live (or none-mode) lookup has an active remediation and one of its header-scope queries also failed, the active remediation SHALL be the outcome. The failure MUST NOT downgrade it, mask it, or divert the request to `crowdsecLapiFailureAction`. The lookup SHALL keep returning an active remediation together with its existing non-nil "banned" signal, and SHALL return a non-active remediation together with a failure signal, so the caller can tell the two apart by the remediation kind alone.
 
@@ -62,30 +42,3 @@ When a live (or none-mode) lookup has an active remediation and one of its heade
 #### Scenario: One scope errors and another returns a ban
 - **WHEN** two header scopes are mapped, one query errors and the other returns a ban
 - **THEN** that ban is the outcome
-
-### Requirement: Stream unhealthy miss uses CrowdsecLapiFailureAction
-When stream or alone mode is unhealthy, cache hits SHALL still apply. A cache miss SHALL apply `crowdsecLapiFailureAction` instead of a hardcoded technical ban. `passthrough` SHALL use the existing pass path (AppSec still runs if enabled).
-
-#### Scenario: Unhealthy miss passthrough
-- **WHEN** the stream is unhealthy, the client IP is not in cache, and `crowdsecLapiFailureAction` is `passthrough`
-- **THEN** the request continues to the pass path
-
-#### Scenario: Unhealthy miss ban
-- **WHEN** the stream is unhealthy, the client IP is not in cache, and `crowdsecLapiFailureAction` is `ban`
-- **THEN** the client is forbidden with a technical remediation
-
-#### Scenario: Unhealthy cache hit still remediates
-- **WHEN** the stream is unhealthy and cache has an active ban for the client IP
-- **THEN** that ban still applies regardless of `crowdsecLapiFailureAction`
-
-### Requirement: CrowdsecLapiFailureAction is per-router on Bouncer
-Routers that share one LAPI Client SHALL each apply their own `crowdsecLapiFailureAction`. The action MUST NOT be part of LAPI reclaim identity. Two routers MAY disagree on LAPI fallback against one `lapi.Client`. The Client MUST NOT expose a failure-action accessor.
-
-#### Scenario: Two routers disagree on LAPI action
-- **WHEN** two middlewares reclaim the same `lapi.Client` and set different `crowdsecLapiFailureAction` values
-- **THEN** each router applies its own action on a live LAPI error or stream-unhealthy cache miss
-
-#### Scenario: Failure action is not on Client identity
-- **WHEN** two live `New` calls share LAPI URL and key and differ only on `crowdsecLapiFailureAction`
-- **THEN** they reclaim the same Client
-- **AND** the Client has no failure-action getter

@@ -87,6 +87,20 @@ func (c *Client) handleStreamCache() error {
 		atomic.StoreInt64(&c.isCrowdsecStreamStartup, 0)
 		return nil
 	}
+	if pollErr := c.fetchAndApplyStreamDecisions(); pollErr != nil {
+		// This tick owned the lease and did not finish, so the store was not updated. Drop the
+		// key: the next tick retries now instead of waiting out max(updateInterval-1, 1) seconds.
+		c.Cache().Delete(cacheTimeoutKey)
+		return pollErr
+	}
+	c.log.Debug("handleStreamCache:updated")
+	atomic.StoreInt64(&c.isCrowdsecStreamStartup, 0)
+	return nil
+}
+
+// fetchAndApplyStreamDecisions GETs the CrowdSec stream delta and writes it into the DecisionStore.
+// It does not own the stream lease; handleStreamCache does.
+func (c *Client) fetchAndApplyStreamDecisions() error {
 	streamRouteURL := url.URL{
 		Scheme:   c.crowdsecScheme,
 		Host:     c.crowdsecHost,
@@ -134,7 +148,5 @@ func (c *Client) handleStreamCache() error {
 	}
 	decisionscope.ApplyRangeBatch(c.Cache(), rangeUpserts, rangeRemovals)
 	c.hydrateRangeMembership()
-	c.log.Debug("handleStreamCache:updated")
-	atomic.StoreInt64(&c.isCrowdsecStreamStartup, 0)
 	return nil
 }
