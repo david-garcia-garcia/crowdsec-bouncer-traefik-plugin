@@ -15,3 +15,9 @@ phase: propose
 findings: none
 fixed: none
 skipped: product apply not started; Secure still TLS-only; change captcha-gate-cookie-secure-forwarded-https apply-ready; five assumed decisions taken
+
+## implement (2026-09-18)
+phase: implement
+findings: none
+fixed: setGateCookie Secure on TLS or Traefik-left X-Forwarded-Proto https; Test_setGateCookie_* added; spec and usage packet updated (f315de3)
+skipped: five assumed proto/parse/test/spec decisions unchanged
