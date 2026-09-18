@@ -45,6 +45,11 @@ priority: normal
 local: ext_crowdsec_lapi_usage-metrics/
 description: What CrowdSec LAPI accepts on POST /v1/usage-metrics and which labels official bouncers send.
 
+## Watcher login response
+priority: normal
+local: ext_crowdsec_watchers_login-response/
+description: What CrowdSec returns on watchers/login and how official apiclient stores Token after HTTP 2xx.
+
 ## CAPI watchers login
 priority: normal
 local: ext_crowdsec_capi_watchers-login/
