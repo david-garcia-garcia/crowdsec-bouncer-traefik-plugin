@@ -9,6 +9,6 @@ JobName: 2026-09-18-split-http-timeouts
 | propose | [x] | [x] | 2026-09-18T18:05:19Z |
 | implement | [x] | [x] | 2026-09-18T18:22:14Z |
 | codereview | [x] | [x] | 2026-09-18T18:26:34Z |
-| devdocsimpact | [ ] | [ ] | |
+| devdocsimpact | [x] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
