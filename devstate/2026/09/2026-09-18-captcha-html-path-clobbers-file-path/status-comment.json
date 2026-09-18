@@ -1,5 +1,5 @@
 {
-  "commentId": "pending",
+  "commentId": "pr-body",
   "issueKey": "2026-09-18-captcha-html-path-clobbers-file-path",
   "markerValue": "2026-09-18-captcha-html-path-clobbers-file-path",
   "issueHost": "local"
