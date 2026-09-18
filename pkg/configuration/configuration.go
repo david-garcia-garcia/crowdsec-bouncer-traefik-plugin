@@ -97,6 +97,7 @@ type Config struct {
 	TraceHeadersCustomName                     string            `json:"traceHeadersCustomName,omitempty"`
 	RemediationHeadersCustomName               string            `json:"remediationHeadersCustomName,omitempty"`
 	ForwardedHeadersCustomName                 string            `json:"forwardedHeadersCustomName,omitempty"`
+	ForwardedHeadersInsecure                   bool              `json:"forwardedHeadersInsecure,omitempty"`
 	DecisionScopeHeaders                       map[string]string `json:"decisionScopeHeaders,omitempty"`
 	ForwardedHeadersTrustedIPs                 []string          `json:"forwardedHeadersTrustedIps,omitempty"`
 	ClientTrustedIPs                           []string          `json:"clientTrustedIps,omitempty"`
@@ -200,6 +201,7 @@ func New() *Config {
 		TraceHeadersCustomName:          "",
 		RemediationHeadersCustomName:    "",
 		ForwardedHeadersCustomName:      "X-Forwarded-For",
+		ForwardedHeadersInsecure:        false,
 		DecisionScopeHeaders:            map[string]string{},
 		ForwardedHeadersTrustedIPs:      []string{},
 		ClientTrustedIPs:                []string{},

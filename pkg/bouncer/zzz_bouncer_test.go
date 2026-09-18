@@ -479,3 +479,41 @@ func TestHandleNextServeHTTPAppsecFailureAction(t *testing.T) {
 		}
 	})
 }
+
+func TestNewForwardedHeadersInsecureHeaderName(t *testing.T) {
+	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+	log := logger.New("ERROR", "")
+	t.Run("default custom name becomes X-Real-Ip", func(t *testing.T) {
+		cfg := configuration.New()
+		cfg.CrowdsecMode = configuration.AppsecMode
+		cfg.ForwardedHeadersInsecure = true
+		handler, err := New(next, "test", cfg, nil, nil, log)
+		if err != nil {
+			t.Fatalf("New = %v", err)
+		}
+		b, ok := handler.(*Bouncer)
+		if !ok {
+			t.Fatalf("handler type %T want *Bouncer", handler)
+		}
+		if b.forwardedCustomHeader != "X-Real-Ip" {
+			t.Fatalf("forwardedCustomHeader = %q want X-Real-Ip", b.forwardedCustomHeader)
+		}
+	})
+	t.Run("explicit non-default name is passed through", func(t *testing.T) {
+		cfg := configuration.New()
+		cfg.CrowdsecMode = configuration.AppsecMode
+		cfg.ForwardedHeadersInsecure = true
+		cfg.ForwardedHeadersCustomName = "CF-Connecting-IP"
+		handler, err := New(next, "test", cfg, nil, nil, log)
+		if err != nil {
+			t.Fatalf("New = %v", err)
+		}
+		b, ok := handler.(*Bouncer)
+		if !ok {
+			t.Fatalf("handler type %T want *Bouncer", handler)
+		}
+		if b.forwardedCustomHeader != "CF-Connecting-IP" {
+			t.Fatalf("forwardedCustomHeader = %q want CF-Connecting-IP", b.forwardedCustomHeader)
+		}
+	})
+}
