@@ -47,7 +47,7 @@ function Add-TestDecision {
     
     Write-Host "➕ Adding $Type decision for $IP" -ForegroundColor Yellow
     
-    $addCommand = "cscli decisions add --ip $IP --duration $Duration --type $Type --reason '$Reason'"
+    $addCommand = "cscli decisions add --ip '$IP' --duration '$Duration' --type '$Type' --reason '$Reason'"
     $result = docker exec crowdsec-test sh -c $addCommand
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to add decision: $result"
@@ -90,7 +90,7 @@ function Add-TestScopeDecision {
 
     Write-Host "➕ Adding $Type $Scope decision for $Value" -ForegroundColor Yellow
 
-    $addCommand = "cscli decisions add --scope $Scope --value $Value --duration $Duration --type $Type --reason '$Reason'"
+    $addCommand = "cscli decisions add --scope '$Scope' --value '$Value' --duration '$Duration' --type '$Type' --reason '$Reason'"
     $result = docker exec crowdsec-test sh -c $addCommand
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to add scope decision: $result"

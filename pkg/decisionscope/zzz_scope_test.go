@@ -113,31 +113,26 @@ func TestIPCacheKey(t *testing.T) {
 	}
 }
 
-// TestIPLookupCacheKeyAgreesWithStore is the invariant the whole ticket rests on: the request path
-// and the store path have to spell the same address the same way. A key only one of them can
-// produce is a decision that can never be enforced.
-func TestIPLookupCacheKeyAgreesWithStore(t *testing.T) {
+// TestCanonicalRemoteIPAgreesWithStore is the request-path invariant after canonicalize-at-origin:
+// ServeHTTP sets remoteIP to ipAddr.String(), and that string is the lookup key. It must match
+// IPCacheKey of every spelling of the same address (unparseable values never reach lookup).
+func TestCanonicalRemoteIPAgreesWithStore(t *testing.T) {
 	addresses := []string{
 		"1.2.3.4",
 		"2001:db8::1",
 		"2001:0db8:0000:0000:0000:0000:0000:0001",
 		"2001:DB8::2",
 		"::ffff:192.0.2.4",
-		"not-an-address",
 	}
 	for _, address := range addresses {
-		lookup := IPLookupCacheKey(address, net.ParseIP(address))
+		ipAddr := net.ParseIP(address)
+		if ipAddr == nil {
+			t.Fatalf("parse %q", address)
+		}
+		lookup := ipAddr.String()
 		if store := IPCacheKey(address); lookup != store {
 			t.Errorf("%q: lookup key %q, store key %q", address, lookup, store)
 		}
-	}
-}
-
-// TestIPLookupCacheKeyUnparseableFallsBackToRaw covers forwardedHeadersInsecure, the one path that
-// can hand the request a client address string that is not an address.
-func TestIPLookupCacheKeyUnparseableFallsBackToRaw(t *testing.T) {
-	if got := IPLookupCacheKey(" 203.0.113.1, 10.0.0.1 ", nil); got != "203.0.113.1, 10.0.0.1" {
-		t.Fatalf("unparseable: %q", got)
 	}
 }
 

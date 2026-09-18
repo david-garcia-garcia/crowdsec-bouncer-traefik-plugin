@@ -11,8 +11,8 @@ Two boolean CIDR sets (ban, captcha) on the reclaimed LAPI Client plus the store
 _Avoid_: trusted-IP Checker, one LPM tree with a stored remediation, `sync.Once`, package globals, a Crowdsec-mode flag on lookup
 
 **Ip cache key**:
-The one canonical spelling an Ip-scoped decision is filed under, `net.IP.String()` of the address. `IPCacheKey` derives it from a decision value (host prefix, bare address, or verbatim when neither); `IPLookupCacheKey` derives the same key on the request path from the `net.IP` `pkg/ip.GetRemoteIP` already produced. CrowdSec stores decision values verbatim, so both entry points exist to make one address one slot.
-_Avoid_: keying on the raw header text, canonicalizing one side without the other, re-parsing `remoteIP` in the request path, pushing a Country or AS value through address parsing
+The one canonical spelling an Ip-scoped decision is filed under, `net.IP.String()` of the address. `IPCacheKey` derives it from a LAPI decision value (host prefix, bare address, or verbatim when neither). After a successful parse, `clientRequest.remoteIP` is that same string and is the request-path key. CrowdSec stores decision values verbatim, so the store path still canonicalizes text; the request path must not re-parse.
+_Avoid_: keying on the raw header text, a second request-path key helper, re-parsing `remoteIP` in lookup or the live memo, pushing a Country or AS value through address parsing
 
 **Header-mapped scope**:
 A CrowdSec scope other than Ip/Range whose value comes from a request header named in `decisionScopeHeaders`. Country and AS are normalized; a missing header skips that scope.
@@ -29,8 +29,8 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 ## How to use
 
 - Pass `decisionScopeHeaders` from config into the bouncer (request headers). Stream `scopes=` and the stream store filter are the live-router union (`core_plugin_lapi_scope-union.md`). Live/none still pass scopes per `LiveLookup`.
-- Resolve the client IP with `pkg/ip.GetRemoteIP`. Then `LookupCachedRemediation` with `lapiClient.RangeMembership()`. Pass `req.ipAddr` into Range membership; it is also what `IPLookupCacheKey` derives the Ip slot from. Matching uses the first letter; origin is for usage-metrics only. Do not put scopes on `clientRequest`.
-- Writing an Ip slot from anywhere (stream store, stream delete, live memo) goes through `IPCacheKey`. Changing one side of that pair on its own is a permanent cache miss, not a partial fix.
+- Resolve the client IP with `pkg/ip.GetRemoteIP`. After a successful parse, set `req.remoteIP = req.ipAddr.String()` before lookup, live memo, or captcha bind. Then `LookupCachedRemediation` with `lapiClient.RangeMembership()`. Pass `req.remoteIP` as the Ip key and `req.ipAddr` only into Range membership. Matching uses the first letter; origin is for usage-metrics only. Do not put scopes on `clientRequest`.
+- Writing an Ip slot from a LAPI decision value (stream store, stream delete) goes through `IPCacheKey`. The live memo writes `Set(remoteIP)` using the already-canonical request string. Changing one side of that pair on its own is a permanent cache miss, not a partial fix.
 - Stream Range items: collect the tick, then `ApplyRangeBatch` (one read, one write) with `RemediationWithOrigin`. Removals run before upserts so a same-window CIDR replacement stays (`core_plugin_lapi_stream-apply.md`). It returns an error when it could not read the shared blob; propagate it so the poll counts as failed. Hydrate membership from the blob after apply and on a lease hit. Do not GET+SET per Range line.
 - Live/none: keep `?ip=` (LAPI expands Range). Add `scope`+`value` when a mapped header is present. Do not hydrate membership. The live client-address cache key stores the `?ip=` result only; header remediations stay on `HeaderScopeKey`. A cache miss still live-looks-up; do not treat that miss as a stream-health decision.
 - CAPI (alone) omits `scopes=`. Apply any streamed scope this bouncer is configured to match.
@@ -39,6 +39,7 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 
 ```go
 scopes := decisionscope.RequestScopeValues(headers, req)
+req.remoteIP = req.ipAddr.String()
 kind, origin, err := decisionscope.LookupCachedRemediation(cacheClient, req.remoteIP, req.ipAddr, scopes, lapiClient.RangeMembership())
 lapiClient.IncDropped(origin, req.ipType, "ban")
 ```

@@ -71,10 +71,10 @@ func RequestScopeValues(headers map[string]string, req *http.Request) map[string
 // LookupCachedRemediation merges Ip, Range, and present header-scope hits. Ban wins across those scopes.
 // Range comes from membership.Remediation; nil or empty membership is a miss (live/none never hydrate).
 // The first return is ban, captcha, or none; the second is the metrics origin of the winning cache value.
-// remoteIP is the raw client address text; ipAddr is the same address GetRemoteIP already parsed.
+// remoteIP is the canonical client address string owned by clientRequest; ipAddr is Range membership only.
 func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, error) {
-	ipKey := IPLookupCacheKey(remoteIP, ipAddr)
-	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, ipAddr, scopes))
+	ipKey := remoteIP
+	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, scopes))
 	if err != nil {
 		return "", "", err
 	}
@@ -97,8 +97,8 @@ func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr 
 }
 
 // LookupCacheKeys is the GetMany key list for the request path: IP, then present header scopes. Range is not a cache key.
-func LookupCacheKeys(remoteIP string, ipAddr net.IP, scopes map[string]string) []string {
-	keys := []string{IPLookupCacheKey(remoteIP, ipAddr)}
+func LookupCacheKeys(remoteIP string, scopes map[string]string) []string {
+	keys := []string{remoteIP}
 	for scope, identifier := range scopes {
 		if identifier != "" {
 			keys = append(keys, HeaderScopeKey(scope, identifier))
