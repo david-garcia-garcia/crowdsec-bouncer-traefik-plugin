@@ -27,3 +27,9 @@ phase: codereview
 findings: six axes none
 fixed: none
 skipped: none
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: 1 produced, 0 skipped (1 language-gap)
+fixed: IPv4-mapped CIDR Language on core_plugin_ip.md
+skipped: none
