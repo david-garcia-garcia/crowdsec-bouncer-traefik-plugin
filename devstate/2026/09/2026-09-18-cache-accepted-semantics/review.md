@@ -27,3 +27,9 @@ phase: codereview
 findings: none
 fixed: none
 skipped: none
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: stale-usage Redis cache client; stale-usage DecisionStore cache
+fixed: short Gotchas on existing core_cache_redis.md and core_cache_client.md
+skipped: Language (fuzzy; existing terms stay)
