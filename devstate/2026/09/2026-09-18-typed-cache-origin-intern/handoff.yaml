@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-typed-cache-origin-intern
+jobName: 2026-09-18-typed-cache-origin-intern
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:cc163140b41baf0fac2ff0e2560bdb71ec6fe8f76e658a33fe64f0df303f7c44
+comments: none
+localTests: none
+requirement: requirement.md
+explore:
+change:
+pr:
+  id: 110
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/110
