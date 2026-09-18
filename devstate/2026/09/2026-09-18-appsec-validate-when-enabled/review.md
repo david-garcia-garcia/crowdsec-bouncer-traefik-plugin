@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: 1 stale-usage (Config validation)
 fixed: produced enabled-gate Language + usage on core_plugin_middleware_config-validation.md
 skipped: none
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: folded core_plugin_middleware_config-validation into catalog; moved change to openspec/changes/archive/2026-09-18-appsec-validate-when-enabled/
+skipped: Task unavailable in archive subagent; FindSpecHost ran on this thread
