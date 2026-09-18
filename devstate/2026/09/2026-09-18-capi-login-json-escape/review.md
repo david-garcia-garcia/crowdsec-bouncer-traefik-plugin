@@ -21,3 +21,9 @@ phase: implement
 findings: Main Process lint failed on tagliatelle (machine_id) and gocognit (TestGetToken_LoginBodyIsValidJSON)
 fixed: json.Marshal loginRequest in getToken; TestGetToken_LoginBodyIsValidJSON; tagliatelle nolint + test helpers; cdc4ae1
 skipped: Content-Type and SetEscapeHTML(false) stay out of scope. Three assumed rows remain.
+
+## codereview (2026-09-18)
+phase: codereview
+findings: none
+fixed: none
+skipped: Task launcher unavailable (cursor Task not in this session); six-axis review ran in-process. No hard/missing/wrong.
