@@ -21,3 +21,9 @@ phase: implement
 findings: none
 fixed: setGateCookie Secure on TLS or Traefik-left X-Forwarded-Proto https; Test_setGateCookie_* added; spec and usage packet updated (f315de3)
 skipped: five assumed proto/parse/test/spec decisions unchanged
+
+## codereview (2026-09-18)
+phase: codereview
+findings: none
+fixed: none
+skipped: Task sub-agents unavailable; six axes run inline; all none; e2e binary CI failed on 365f206
