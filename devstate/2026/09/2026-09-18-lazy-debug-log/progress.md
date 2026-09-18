@@ -9,6 +9,6 @@ JobName: 2026-09-18-lazy-debug-log
 | propose | [x] | [x] | 2026-09-18T18:05:54Z |
 | implement | [x] | [x] | 2026-09-18T18:08:13Z |
 | codereview | [x] | [x] | 2026-09-18T18:10:59Z |
-| devdocsimpact | [ ] | [ ] | |
+| devdocsimpact | [x] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
