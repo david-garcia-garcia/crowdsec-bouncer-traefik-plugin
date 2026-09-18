@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-18T18:12:08Z
+Developer review: in progress — 2026-09-18T18:14:46Z
 
 ## What this changes
 **Operators.** None.
@@ -31,17 +31,17 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Usage docs caught up; CI on this head is queued. 1 item remains.
+Change archived; CI on this head is queued. 1 item remains.
 
 Priority: P2 — INFO allow still formats debug strings on every stream request
-Reviewed head: d14993c
+Reviewed head: d68df32
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Apply, review, and usage packet landed; CI on this head is queued |
-| CI proof | 3/6 | queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378779651 |
+| Overall readiness | 3/6 | Apply archived; CI on this head is queued |
+| CI proof | 3/6 | queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35379018871 |
 | Local tests proof | N/A | Remote PR; CI proof covers remote |
 | Review resolution | 6/6 | OPEN PR #108; no reviewer comments |
 
@@ -51,18 +51,18 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-18-lazy-debug-log pushed | `git` / pr-host |
 | OpenSpec | lazy-debug-hot-path | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/108 | pr-host List |
-| CI | Main Process queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378779651/job/105709731725 ; Race detector queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378779651/job/105709731540 | pr-host CI |
+| CI | Main Process in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35379018871/job/105710486535 ; Race detector queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35379018871/job/105710486896 | pr-host CI |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | no `comments.md` |
 
 ## Specs
-- [std_go_logger_debug-attrs](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-lazy-debug-log/openspec/changes/lazy-debug-hot-path/proposal.md) — added
+- [std_go_logger_debug-attrs](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-lazy-debug-log/openspec/changes/archive/2026-09-18-lazy-debug-hot-path/proposal.md) — added
 
 ## Follow-up issues
 None.
 
 ## How this fits together
-Local ticket `2026-09-18-lazy-debug-log` runs on branch `2026-09-18-lazy-debug-log` as PR #108. Devdocs impact is produced; archive is next.
+Local ticket `2026-09-18-lazy-debug-log` runs on branch `2026-09-18-lazy-debug-log` as PR #108. Change archived to `openspec/changes/archive/2026-09-18-lazy-debug-hot-path`; pullrequest is next.
 
 ## Decision needed
 | Question | Decision | By |
@@ -95,7 +95,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 0 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | d14993c4acce9acf4c35b63211ebad6200a277d8 | Card must match the branch you measured |
+| Reviewed head | d68df322746c323595aa7452de9bc52b21efd0a2 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -109,10 +109,10 @@ Is this the best way to solve the issue? Yes versus DestBranch: slog attributes 
 
 ### Evidence
 What I checked:
-- Produced `knowledge/devdocs/std_go_logger_debug-attrs.md`; updated log-sink Key files
-- Product delta still the request-path Debug apply plus usage packet
+- Archived `lazy-debug-hot-path` to `openspec/changes/archive/2026-09-18-lazy-debug-hot-path`
+- Main spec `openspec/specs/std_go_logger_debug-attrs/spec.md` synced
 - OPEN PR #108; comment inventory empty (pr-host)
-- CI on this head: Main Process and Race detector queued (pr-host check runs)
+- CI on this head: Main Process in progress, Race detector queued (pr-host check runs)
 
 ### Rank-up moves
 None.

@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: missing-packet 1, stale-usage 1
 fixed: std_go_logger_debug-attrs.md; log-sink Key files
 skipped: none
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: synced std_go_logger_debug-attrs; archived lazy-debug-hot-path
+skipped: none
