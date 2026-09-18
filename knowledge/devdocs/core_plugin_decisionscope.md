@@ -60,3 +60,4 @@ lapiClient.IncDropped(origin, req.ipType, "ban")
 - Ip/header/Range-index values MAY be `t`/`c` plus U+001F plus a metrics origin. Bare letters still match. Redis stays one `range-index` key.
 - After a cache miss, stream/alone use stream health; live/none call `LiveLookup`. Do not name that split after Range membership.
 - Range-index write identity is the canonical network (`net.ParseCIDR` masked IP plus prefix ones/bits), not the CIDR spelling. Upsert persists `(*net.IPNet).String()`. Equivalent spellings replace or delete as one network. Incoming unparseable CIDR text is skipped; leftover unparseable lines stay.
+- Do not compare Range-index lines by `(*net.IPNet).String()`. That persist form can collide (IPv4 `/8` and IPv4-mapped `/104` both stringify to `10.0.0.0/8`); identity is still masked IP plus ones and bits. Unrelated leftover non-canonical spellings stay until that network is upserted or removed.
