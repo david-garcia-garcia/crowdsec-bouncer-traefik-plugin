@@ -6,7 +6,7 @@ See proposal.md — Why. Dest `plugin.New` aliases ban only when `BanFilePath` i
 
 **Goals:**
 - Make the captcha alias match the ban empty-guard.
-- Prove both-set current-wins on the mutated `config.CaptchaFilePath` after `New`.
+- Prove both-set current-wins by serving the current template after `New` (New snapshots the caller config).
 - Keep mock and real e2e custom templates compiling after the guard.
 
 **Non-Goals:**
@@ -19,7 +19,7 @@ See proposal.md — Why. Dest `plugin.New` aliases ban only when `BanFilePath` i
 ## Decisions
 
 1. Same `if` shape as ban: `CaptchaFilePath == "" && CaptchaHTMLFilePath != ""` then copy. Alternative considered: special-case the default so deprecated-only Traefik YAML still wins. Ticket bound both-set current-wins and asked for the ban-shaped guard; do not special-case `/captcha.html`.
-2. Regression `TestNew_CaptchaFilePathWinsOverDeprecatedHTMLPath` in `zzz_plugin_test.go`. After `New`, assert `config.CaptchaFilePath` equals the current path. Leave `CaptchaProvider` empty so `GetTemplate` is skipped. Optional sibling: empty current + non-empty deprecated fills. Alternative considered: `TestHunt_*` name or a ServeHTTP compile/serve test. Existing plugin tests use `TestNew_*`; compile/serve already follow that field.
+2. Regression `TestNew_CaptchaFilePathWinsOverDeprecatedHTMLPath` in `zzz_plugin_test.go`. After `New`, serve an AppSec-failure captcha challenge and assert the current template body. `New` snapshots the caller config (constructor rollback), so asserting the caller's `CaptchaFilePath` cannot see the alias. Optional sibling: empty current + non-empty deprecated fills and is served. Alternative considered: `TestHunt_*` name or asserting the caller field. Existing plugin tests use `TestNew_*`; compile/serve follow the snapshot field.
 3. Retarget mock `dynamic.yml` and real compose labels from `captchaHtmlFilePath` to `captchaFilePath`. Same defect: those suites set only the deprecated key and assert a custom marker that bundled `/captcha.html` does not have. Leave README and examples.
 
 ## Risks / Trade-offs

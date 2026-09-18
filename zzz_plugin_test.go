@@ -441,3 +441,74 @@ func TestNew_StreamIntervalChangeDuringGrace_WakesSameClient(t *testing.T) {
 		t.Fatal("sleeping interval change must Wake the same Client")
 	}
 }
+
+// TestNew_CaptchaFilePathWinsOverDeprecatedHTMLPath checks that a leftover captchaHtmlFilePath
+// does not replace a set captchaFilePath. New works on a snapshot, so the proof is the compiled
+// challenge body, not the caller's field after New.
+func TestNew_CaptchaFilePathWinsOverDeprecatedHTMLPath(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	appsecSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(func() { appsecSrv.Close() })
+	au, _ := url.Parse(appsecSrv.URL)
+
+	cfg := cfgAppsecCaptchaAt(t, au.Host)
+	currentPath := writeTestFile(t, "current.html", "CURRENT_CAPTCHA_PAGE")
+	deprecatedPath := writeTestFile(t, "deprecated.html", "DEPRECATED_CAPTCHA_PAGE")
+	cfg.CaptchaFilePath = currentPath
+	cfg.CaptchaHTMLFilePath = deprecatedPath
+
+	h, err := New(context.Background(), testNextOK(), cfg, "captcha-path-wins")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.CaptchaFilePath != currentPath {
+		t.Fatalf("New mutated caller CaptchaFilePath to %q", cfg.CaptchaFilePath)
+	}
+
+	rw := httptest.NewRecorder()
+	h.ServeHTTP(rw, reqForIP("203.0.113.7"))
+	body := rw.Body.String()
+	if !strings.Contains(body, "CURRENT_CAPTCHA_PAGE") {
+		t.Fatalf("current captcha path not served, body: %s", body)
+	}
+	if strings.Contains(body, "DEPRECATED_CAPTCHA_PAGE") {
+		t.Fatalf("deprecated captcha path was served, body: %s", body)
+	}
+}
+
+// TestNew_EmptyCaptchaFilePathFillsFromDeprecatedHTMLPath checks the empty-guard still copies
+// captchaHtmlFilePath when captchaFilePath is empty, and that compiled serve uses that path.
+func TestNew_EmptyCaptchaFilePathFillsFromDeprecatedHTMLPath(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	appsecSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(func() { appsecSrv.Close() })
+	au, _ := url.Parse(appsecSrv.URL)
+
+	cfg := cfgAppsecCaptchaAt(t, au.Host)
+	deprecatedPath := writeTestFile(t, "deprecated.html", "DEPRECATED_CAPTCHA_PAGE")
+	cfg.CaptchaFilePath = ""
+	cfg.CaptchaHTMLFilePath = deprecatedPath
+
+	h, err := New(context.Background(), testNextOK(), cfg, "captcha-path-fill")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.CaptchaFilePath != "" {
+		t.Fatalf("New mutated caller CaptchaFilePath to %q", cfg.CaptchaFilePath)
+	}
+
+	rw := httptest.NewRecorder()
+	h.ServeHTTP(rw, reqForIP("203.0.113.7"))
+	body := rw.Body.String()
+	if !strings.Contains(body, "DEPRECATED_CAPTCHA_PAGE") {
+		t.Fatalf("deprecated captcha path not served after empty-guard fill, body: %s", body)
+	}
+}

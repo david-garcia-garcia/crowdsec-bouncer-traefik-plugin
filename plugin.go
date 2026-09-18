@@ -39,7 +39,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	if prepared.BanFilePath == "" && prepared.BanHTMLFilePath != "" {
 		prepared.BanFilePath = prepared.BanHTMLFilePath
 	}
-	if prepared.CaptchaHTMLFilePath != "" {
+	if prepared.CaptchaFilePath == "" && prepared.CaptchaHTMLFilePath != "" {
 		prepared.CaptchaFilePath = prepared.CaptchaHTMLFilePath
 	}
 
