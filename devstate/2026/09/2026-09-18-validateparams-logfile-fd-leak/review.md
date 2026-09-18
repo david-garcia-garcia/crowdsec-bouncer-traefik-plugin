@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: catalog fold + archive move (bd6138c)
 skipped: none
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: reused PR 95; ready title; required CI succeeded on 236da23
+skipped: no comments.md
