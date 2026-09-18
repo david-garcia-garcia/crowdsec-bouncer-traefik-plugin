@@ -207,6 +207,46 @@ func TestLookupCachedRemediationRangeOnlyOrigin(t *testing.T) {
 	}
 }
 
+func TestAddRangeBareIPIsHostPrefix(t *testing.T) {
+	client := newTestDecisionCache()
+	AddRange(client, "192.0.2.1", BannedValue, 60)
+	index, err := readRangeIndex(client)
+	if err != nil {
+		t.Fatalf("read index: %v", err)
+	}
+	if index != "192.0.2.1/32="+BannedValue {
+		t.Fatalf("blob %q", index)
+	}
+	if got := MembershipFromIndex(index).Remediation(net.ParseIP("192.0.2.1")); got != BannedValue {
+		t.Fatalf("bare host got %q", got)
+	}
+	if got := MembershipFromIndex(index).Remediation(net.ParseIP("192.0.2.2")); got != "" {
+		t.Fatalf("neighbor got %q", got)
+	}
+	RemoveRange(client, "192.0.2.1")
+	if got := remediationFromRangeIndex(client, "192.0.2.1"); got != "" {
+		t.Fatalf("removed bare host still matched: %q", got)
+	}
+	AddRange(client, "2001:db8::1", BannedValue, 60)
+	ipv6, err := readRangeIndex(client)
+	if err != nil {
+		t.Fatalf("read ipv6 index: %v", err)
+	}
+	if ipv6 != "2001:db8::1/128="+BannedValue {
+		t.Fatalf("ipv6 blob %q", ipv6)
+	}
+	if got := MembershipFromIndex(ipv6).Remediation(net.ParseIP("2001:db8::1")); got != BannedValue {
+		t.Fatalf("ipv6 bare host got %q", got)
+	}
+}
+
+func TestMembershipFromIndexLeftoverBareIPDoesNotRemediate(t *testing.T) {
+	index := "192.0.2.1=" + BannedValue
+	if got := MembershipFromIndex(index).Remediation(net.ParseIP("192.0.2.1")); got != "" {
+		t.Fatalf("leftover bare line remediates: %q", got)
+	}
+}
+
 func TestLookupCachedRemediationRangeLetterOnlyStillBans(t *testing.T) {
 	client := newTestDecisionCache()
 	membership := MembershipFromIndex("10.0.0.0/8=" + BannedValue)

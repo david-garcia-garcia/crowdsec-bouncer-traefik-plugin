@@ -5,7 +5,20 @@ import (
 	"strings"
 
 	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
+
+// rangeIndexCIDR maps a parseable host to /32 or /128 so the index key is a CIDR.
+func rangeIndexCIDR(cidr string) string {
+	network := strings.TrimSpace(cidr)
+	if network == "" {
+		return ""
+	}
+	if ipAddr := net.ParseIP(network); ipAddr != nil {
+		return ip.HostCIDR(ipAddr)
+	}
+	return network
+}
 
 // AddRange upserts a Range decision on the shared index as cidr=remediation.
 func AddRange(cacheClient *cache.Client, cidr, remediation string, _ int64) {
@@ -35,10 +48,14 @@ func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, remov
 		return err
 	}
 	for _, cidr := range removals {
-		index = removeCIDRFromIndex(index, strings.TrimSpace(cidr))
+		network := rangeIndexCIDR(cidr)
+		if network == "" {
+			continue
+		}
+		index = removeCIDRFromIndex(index, network)
 	}
 	for cidr, remediation := range upserts {
-		network := strings.TrimSpace(cidr)
+		network := rangeIndexCIDR(cidr)
 		if network == "" || !IsActiveRemediation(remediation) {
 			continue
 		}
