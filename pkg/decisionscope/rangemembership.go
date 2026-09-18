@@ -4,7 +4,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/iplookup"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/iplookup"
 )
 
 // RangeMembership is in-process ban-then-captcha CIDR membership rebuilt from range-index.

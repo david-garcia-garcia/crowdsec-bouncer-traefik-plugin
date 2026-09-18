@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 )
 
 const (

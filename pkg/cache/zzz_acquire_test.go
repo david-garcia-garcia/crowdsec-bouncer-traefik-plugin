@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // leaseRedis is an in-process RESP stand-in that records verbs and implements SET-if-absent for EVAL/EVALSHA.

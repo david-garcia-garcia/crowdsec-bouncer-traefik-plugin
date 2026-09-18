@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
 // streamQuery is the LAPI/CAPI stream RawQuery. LAPI adds scopes= when this is not CAPI.

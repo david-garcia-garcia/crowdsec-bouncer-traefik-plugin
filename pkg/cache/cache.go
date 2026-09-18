@@ -105,6 +105,7 @@ type redisCache struct {
 	counter atomic.Uint64
 }
 
+// nextReader returns the writer when readers is empty; otherwise a replica only.
 func (rc *redisCache) nextReader() *simpleredis.SimpleRedis {
 	n := len(rc.readers)
 	if n == 0 {
@@ -114,6 +115,7 @@ func (rc *redisCache) nextReader() *simpleredis.SimpleRedis {
 	return rc.readers[idx]
 }
 
+// get reads the selected nextReader only; a miss or replica error is not retried on the writer.
 func (rc *redisCache) get(key string) (string, error) {
 	value, err := rc.nextReader().Get(context.Background(), prefixed(rc.prefix, key))
 	if err != nil {
@@ -162,6 +164,7 @@ func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
 	return out, nil
 }
 
+// set writes the writer, logs a Redis error, and returns; Set is void.
 func (rc *redisCache) set(key, value string, duration int64) {
 	if err := rc.writer.Set(context.Background(), prefixed(rc.prefix, key), []byte(value), duration); err != nil {
 		rc.log.Error("cache:setDecisionRedisCache" + err.Error())

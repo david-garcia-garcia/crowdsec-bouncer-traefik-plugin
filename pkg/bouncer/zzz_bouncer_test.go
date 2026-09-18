@@ -8,13 +8,13 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/appsec"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/lapi"
-	logger "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
+	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // testClientRequest is req plus the chosen client address for handler tests.

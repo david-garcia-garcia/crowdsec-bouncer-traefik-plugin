@@ -48,3 +48,6 @@ values, err := client.MGet(context.Background(), []string{key, "range-index"})
 - Real-stack Redis-cache e2e uses Dragonfly, not Redis.
 - Pass a non-empty `keyPrefix` (`SessionHex`) when two LAPI Clients share one Redis.
 - Do not take utilities zero-Config dial/command defaults (200ms/900ms).
+- When read hosts are set, Get and GetMany call `nextReader` only; a miss or replica error is not retried on the writer. Empty readers return the writer.
+- `Client.Set` and `Delete` are void: Redis write errors are logged and discarded. Do not add an error return. Stream and live must not fail closed on a write miss.
+- Redis Set sends `SET EX` with the duration as given, including `0`. Do not omit `EX`, clamp, or skip the write because duration is `0`. Memory `Heap.Set` no-ops when `ttl==0`. Do not align Redis and memory.

@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"time"
 
-	cache "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache"
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
 // NewTestClient returns an in-memory Client whose Cache tests can seed.
