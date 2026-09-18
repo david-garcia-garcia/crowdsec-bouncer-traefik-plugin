@@ -7,16 +7,22 @@ function Add-IpSpellingDecision {
         [string]$Stored,
         [string]$Reason
     )
-    # Avoid TestUtils' `sh -c` string: IPv6/mapped values must stay one argv.
-    $add = docker exec crowdsec-test cscli decisions add --ip $Stored --duration 1h --type ban --reason $Reason 2>&1 | Out-String
-    if ($LASTEXITCODE -eq 0) {
+    try {
+        Add-TestDecision -IP $Stored -Type "ban" -Reason $Reason
         return
     }
-    $scope = docker exec crowdsec-test cscli decisions add --scope Ip --value $Stored --duration 1h --type ban --reason $Reason 2>&1 | Out-String
-    if ($LASTEXITCODE -eq 0) {
+    catch {
+        $ipErr = $_.Exception.Message
+    }
+    try {
+        Add-TestScopeDecision -Scope "Ip" -Value $Stored -Type "ban" -Reason $Reason
         return
     }
-    throw "cscli --ip: $add --scope Ip: $scope"
+    catch {
+        $msg = "cscli --ip: $ipErr --scope Ip: $($_.Exception.Message)"
+        Write-Host "::error::$msg"
+        throw $msg
+    }
 }
 
 function Assert-IpSpellingBan {
@@ -161,6 +167,33 @@ Describe "CrowdSec Range and header-mapped scopes" {
                 return ($response.StatusCode -in @(403, 429))
             }
             $result.Success | Should -Be $true -Because "Stream scopes= must include Country"
+        }
+    }
+
+    Context "Ip spelling canary" -Tag "scopes" {
+        BeforeEach {
+            Remove-AllTestDecisions
+        }
+
+        It "Should accept IPv4, compressed IPv6, expanded IPv6, upper-case IPv6, and IPv4-mapped via cscli" {
+            $probes = @(
+                "10.59.0.90"
+                "2001:db8::b1:9"
+                "2001:0db8:0000:0000:0000:0000:00b1:0009"
+                "2001:DB8::B1:9"
+                "::ffff:10.59.0.90"
+            )
+            $failed = @()
+            foreach ($ip in $probes) {
+                try {
+                    Add-TestDecision -IP $ip -Type "ban" -Reason "canary $ip"
+                }
+                catch {
+                    $failed += "${ip}: $($_.Exception.Message)"
+                    Write-Host "::error::canary add $ip $($_.Exception.Message)"
+                }
+            }
+            ($failed -join " | ") | Should -BeNullOrEmpty -Because ($failed -join " | ")
         }
     }
 
