@@ -96,7 +96,10 @@ func (c *Client) admitLiveGET(ctx context.Context) error {
 	}
 	ok, wait, err := c.gate.Allow(ctx, c.liveBackendURLStem())
 	if err != nil || !ok {
-		c.log.Debug("queryLiveDecisions:skipped", "wait", wait)
+		c.log.Debug("queryLiveDecisions:skipped", "wait", wait, "err", err)
+		if err != nil {
+			return fmt.Errorf("%w: %w", errQuerySkipped, err)
+		}
 		return errQuerySkipped
 	}
 	return nil

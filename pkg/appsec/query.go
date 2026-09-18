@@ -176,7 +176,10 @@ func (c *Client) admitQuery(ctx context.Context) error {
 	}
 	ok, wait, err := c.gate.Allow(ctx, c.backendURLStem())
 	if err != nil || !ok {
-		c.log.Debug("appsecQuery:skipped", "wait", wait)
+		c.log.Debug("appsecQuery:skipped", "wait", wait, "err", err)
+		if err != nil {
+			return fmt.Errorf("appsecQuery:skipped: %w", err)
+		}
 		return errors.New("appsecQuery:skipped")
 	}
 	return nil

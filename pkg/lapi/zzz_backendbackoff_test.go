@@ -167,6 +167,66 @@ func TestHandleStreamCache_PollsStayUngated(t *testing.T) {
 	}
 }
 
+func TestLiveLookup_CloseDeniesLaterAllow(t *testing.T) {
+	server, hits := testFailingLiveLAPI(t)
+	client := newTestLiveClient(t, server)
+	attachTestGate(t, client)
+	client.Close()
+
+	value, err := client.LiveLookup(context.Background(), "1.2.3.4", nil, 0)
+	if err == nil || decisionscope.IsActiveRemediation(value) {
+		t.Fatalf("closed gate must skip, value %q err %v", value, err)
+	}
+	if !strings.Contains(err.Error(), "queryLiveDecisions:skipped") {
+		t.Fatalf("skip error %q", err)
+	}
+	if atomic.LoadInt64(hits) != 0 {
+		t.Fatalf("closed gate must not hit LAPI, hits=%d", atomic.LoadInt64(hits))
+	}
+}
+
+func TestLiveLookup_ParseErrorReportsFailure(t *testing.T) {
+	var hits int64
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		_, _ = rw.Write([]byte("{not-json"))
+	}))
+	t.Cleanup(server.Close)
+	client := newTestLiveClient(t, server)
+	attachTestGate(t, client)
+
+	if _, err := client.LiveLookup(context.Background(), "1.2.3.4", nil, 0); err == nil {
+		t.Fatal("parse error expected")
+	}
+	if _, err := client.LiveLookup(context.Background(), "1.2.3.4", nil, 0); err == nil || !strings.Contains(err.Error(), "queryLiveDecisions:skipped") {
+		t.Fatalf("parse failure must trip the Gate, err %v", err)
+	}
+	if atomic.LoadInt64(&hits) != 1 {
+		t.Fatalf("parse failure must skip the next GET, hits=%d", atomic.LoadInt64(&hits))
+	}
+}
+
+func TestLiveLookup_DurationParseReportsFailure(t *testing.T) {
+	var hits int64
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		_, _ = rw.Write([]byte(`[{"id":1,"origin":"CAPI","type":"ban","scope":"ip","value":"1.2.3.4","duration":"nope","scenario":"test"}]`))
+	}))
+	t.Cleanup(server.Close)
+	client := newTestLiveClient(t, server)
+	attachTestGate(t, client)
+
+	if _, err := client.LiveLookup(context.Background(), "1.2.3.4", nil, 0); err == nil {
+		t.Fatal("duration parse error expected")
+	}
+	if _, err := client.LiveLookup(context.Background(), "1.2.3.4", nil, 0); err == nil || !strings.Contains(err.Error(), "queryLiveDecisions:skipped") {
+		t.Fatalf("duration-parse failure must trip the Gate, err %v", err)
+	}
+	if atomic.LoadInt64(&hits) != 1 {
+		t.Fatalf("duration-parse failure must skip the next GET, hits=%d", atomic.LoadInt64(&hits))
+	}
+}
+
 func TestOpen_LiveHasGateStreamDoesNot(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
@@ -196,6 +256,17 @@ func TestOpen_LiveHasGateStreamDoesNot(t *testing.T) {
 	t.Cleanup(liveClient.Close)
 	if liveClient.gate == nil {
 		t.Fatal("live Client must own a Gate")
+	}
+
+	noneCfg := testStreamConfig(parsed.Host, 0)
+	noneCfg.CrowdsecMode = configuration.NoneMode
+	noneClient, err := OpenLive(ctx, noneCfg, slog.Default(), "none", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(noneClient.Close)
+	if noneClient.gate == nil {
+		t.Fatal("none Client must own a Gate")
 	}
 }
 

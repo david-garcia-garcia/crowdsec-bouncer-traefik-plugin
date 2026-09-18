@@ -101,6 +101,85 @@ func TestQuery_SuccessReportRecovers(t *testing.T) {
 	}
 }
 
+func TestQuery_CloseDeniesLaterAllow(t *testing.T) {
+	var hits int64
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		rw.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+	parsed, _ := url.Parse(server.URL)
+	client := newQueryClient(parsed, server.Client())
+	attachTestGate(t, client)
+	client.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, "http://localhost/", nil)
+	if _, err := client.Query("1.2.3.4", req, Policy{FailureAction: configuration.FailureActionBan}); err == nil || !strings.Contains(err.Error(), "appsecQuery:skipped") {
+		t.Fatalf("closed gate must skip, err %v", err)
+	}
+	if atomic.LoadInt64(&hits) != 0 {
+		t.Fatalf("closed gate must not hit AppSec, hits=%d", atomic.LoadInt64(&hits))
+	}
+}
+
+func TestQuery_DeniedPassthroughDoesNotHitAppSec(t *testing.T) {
+	var hits int64
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		rw.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(server.Close)
+	parsed, _ := url.Parse(server.URL)
+	client := newQueryClient(parsed, server.Client())
+	attachTestGate(t, client)
+	req, _ := http.NewRequest(http.MethodGet, "http://localhost/", nil)
+	if _, err := client.Query("1.2.3.4", req, Policy{FailureAction: configuration.FailureActionBan}); err == nil {
+		t.Fatal("trip expected")
+	}
+
+	decision, err := client.Query("1.2.3.4", req, Policy{FailureAction: configuration.FailureActionPassthrough})
+	if err != nil {
+		t.Fatalf("denied passthrough must allow, err %v", err)
+	}
+	if decision == nil || decision.Action != ActionAllow {
+		t.Fatalf("denied passthrough want allow, got %#v", decision)
+	}
+	if atomic.LoadInt64(&hits) != 1 {
+		t.Fatalf("denied passthrough must not hit AppSec, hits=%d", atomic.LoadInt64(&hits))
+	}
+}
+
+func TestQuery_ReadBodyReportsSuccess(t *testing.T) {
+	var hits int64
+	client := NewTestClient(&url.URL{Scheme: "http", Host: "appsec.example"}, &http.Client{Transport: countingFailBody{hits: &hits}}, slog.Default())
+	attachTestGate(t, client)
+	req, _ := http.NewRequest(http.MethodGet, "http://localhost/", nil)
+
+	if _, err := client.Query("1.2.3.4", req, Policy{FailureAction: configuration.FailureActionBan}); err == nil || !strings.Contains(err.Error(), "appsecQuery:readBody") {
+		t.Fatalf("read-body FailureAction expected, err %v", err)
+	}
+	if _, err := client.Query("1.2.3.4", req, Policy{FailureAction: configuration.FailureActionBan}); err == nil || !strings.Contains(err.Error(), "appsecQuery:readBody") {
+		t.Fatalf("success Report must keep the Gate admitting, err %v", err)
+	}
+	if atomic.LoadInt64(&hits) != 2 {
+		t.Fatalf("read-body success Report must not trip, hits=%d", atomic.LoadInt64(&hits))
+	}
+}
+
+type countingFailBody struct {
+	hits *int64
+}
+
+func (c countingFailBody) RoundTrip(req *http.Request) (*http.Response, error) {
+	atomic.AddInt64(c.hits, 1)
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       failReadCloser{},
+		Header:     make(http.Header),
+		Request:    req,
+	}, nil
+}
+
 func TestQuery_UnreadableBodyBanNeverAllows(t *testing.T) {
 	var hits int64
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
