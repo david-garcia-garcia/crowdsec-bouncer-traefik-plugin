@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
@@ -32,6 +31,15 @@ type Login struct {
 	Code   int    `json:"code"`
 	Token  string `json:"token"`
 	Expire string `json:"expire"`
+}
+
+// loginRequest is the CAPI watchers-login body getToken posts from stored Client credentials.
+//
+//nolint:tagliatelle // CAPI LoginRequest names are machine_id, password, scenarios.
+type loginRequest struct {
+	MachineID string   `json:"machine_id"`
+	Password  string   `json:"password"`
+	Scenarios []string `json:"scenarios"`
 }
 
 // transport is LAPI HTTP plus the request header name and CAPI/LAPI key.
@@ -156,18 +164,22 @@ func (c *Client) AdoptTransport(cfg *configuration.Config) (bool, error) {
 	return replaced, nil
 }
 
+// getToken POSTs CAPI watchers-login and writes the token on the stored transport.
 func (c *Client) getToken() error {
 	loginURL := url.URL{
 		Scheme: c.crowdsecScheme,
 		Host:   c.crowdsecHost,
 		Path:   crowdsecCapiLoginRoute,
 	}
-	loginData := []byte(fmt.Sprintf(
-		`{"machine_id": "%v","password": "%v","scenarios": ["%v"]}`,
-		c.crowdsecMachineID,
-		c.crowdsecPassword,
-		strings.Join(c.crowdsecScenarios, `","`),
-	))
+	// Encode stored credentials; interpolation cannot keep quotes and backslashes valid JSON.
+	loginData, err := json.Marshal(loginRequest{
+		MachineID: c.crowdsecMachineID,
+		Password:  c.crowdsecPassword,
+		Scenarios: c.crowdsecScenarios,
+	})
+	if err != nil {
+		return fmt.Errorf("getToken:marshal %w", err)
+	}
 	// The login request must never renew a token: a 401 here would recurse into getToken forever.
 	body, err := c.sendQuery(loginURL.String(), loginData, false)
 	if err != nil {

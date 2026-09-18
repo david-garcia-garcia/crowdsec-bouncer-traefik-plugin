@@ -10,6 +10,10 @@ _Avoid_: Range index, LAPI decision value, geolocation
 In-tree radix of CIDRs (`pkg/iplookup.Helper`). Insert at construction; `IsContained` is membership plus longest prefix length. No associated remediation.
 _Avoid_: range-index, per-CIDR cache key, `InNetwork` (one network)
 
+**IPv4-mapped CIDR**:
+A parseable CIDR whose network `To4()` is non-nil and whose mask `bits` is 128 (for example `::ffff:0:0/96`). It is the IPv4 prefix of length `ones-96` that `net.IPNet.Contains` uses.
+_Avoid_: native IPv6 CIDR, a mapped prefix `ParseCIDR` already rewrote to native IPv6
+
 **GetRemoteIP**:
 The owner of the client address for a request. Unless `ForwardedHeadersInsecure` is true, requires the host from `req.RemoteAddr` to be in the trusted-hop pool before honoring forwarded headers; when the pool is empty or the peer is untrusted, returns `RemoteAddr` only. Otherwise walks the custom forwarded header most-recent-first against the trusted-hop pool, then the host of `RemoteAddr` when every hop is trusted or the header is empty. When the flag is true, skips the checker and returns the whole trimmed header (no hop walk), or the `RemoteAddr` host when that header is absent, empty, or whitespace-only. Also yields that address as `net.IP` when parseable.
 _Avoid_: parsing `RemoteAddr` on the connection, a second X-Forwarded-For walk, Traefik ipstrategy as a second owner
@@ -58,6 +62,7 @@ ok := checker.ContainsIP(req.ipAddr)
 - The helper does not store remediation strings. Range ban and captcha are two Helpers, not one payload tree.
 - Invalid CIDR fails `NewChecker` / `AddCIDR`; config validate already constructs a Checker and discards it.
 - `0.0.0.0/0` is IPv4 only; `::/0` is IPv6 only. A shared radix root would mark `/0` on both families.
+- An IPv4-mapped CIDR (`To4()` non-nil and mask `bits==128`, such as `::ffff:0:0/96`) remaps to IPv4 prefix `ones-96` on the v4 root. Do not walk `ones` from bit 0 on the v6 root. Membership matches `net.IPNet.Contains` (IPv4 and IPv4-mapped hit; native IPv6 miss). `AddCIDR` does not reject a parseable mapped CIDR.
 - On the default path, `ForwardedHeadersTrustedIPs` does double duty: it gates whether `GetRemoteIP` reads the header at all, and it skips hops inside the header. A catch-all pool passes the gate and then makes every hop trusted, so `getIP` returns the empty string and the address falls back to `RemoteAddr` — the named header is silently ignored.
 - `ForwardedHeadersInsecure` is the defer-to-Traefik mode: it skips the socket-peer gate and hop walk. `bouncer.New` then defaults the header to `X-Real-Ip` when `ForwardedHeadersCustomName` is still `X-Forwarded-For`. Safe only when the Traefik entrypoint already sanitizes that header. It is still wrong behind an upstream that does not set `X-Real-Ip`, such as Cloudflare, where the header ends up holding the edge address.
 - `parseIP` (shared by `Contains`, `GetRemoteIP`, `getIP`, and `InNetwork`) strips an IPv6 RFC 4007 zone (`%eth0`, `%12`) when the prefix contains `:`, then calls `net.ParseIP`. The public string stays as received; the yielded `net.IP` is zone-free. A hop that still has brackets (`[fe80::1%eth0]`) stays unparseable. IPv4 with `%` stays unparseable. `NewChecker` pool entries and `Family` / `FamilyOfHostOrCIDR` still use `net.ParseIP` on the raw string (a zoned pool entry fails construction).

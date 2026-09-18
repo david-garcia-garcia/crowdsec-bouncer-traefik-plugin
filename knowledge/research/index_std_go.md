@@ -22,3 +22,8 @@ description: How the Go HTTP client chooses outbound Content-Length from the fie
 priority: normal
 local: std_go_net_ipv6-zone/
 description: How Go net.ParseIP, SplitHostPort, and TCPAddr treat RFC 4007 IPv6 zone IDs.
+
+## IPv4-mapped CIDR Contains
+priority: normal
+local: std_go_net_ipv4-mapped-cidr/
+description: How Go ParseCIDR and IPNet.Contains treat IPv4-mapped IPv6 CIDRs.

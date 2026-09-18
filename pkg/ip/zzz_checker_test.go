@@ -97,6 +97,17 @@ func TestCheckerContainsZonedAddress(t *testing.T) {
 	})
 }
 
+func TestHunt_NewCheckerIPv4MappedSlash96(t *testing.T) {
+	checker, err := NewChecker(slog.Default(), []string{"::ffff:0:0/96"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok, err := checker.Contains("192.0.2.1")
+	if err != nil || !ok {
+		t.Fatalf("Contains 192.0.2.1 = %v, %v want true", ok, err)
+	}
+}
+
 func TestCheckerContainsCatchAllFamily(t *testing.T) {
 	log := slog.Default()
 
