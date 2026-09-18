@@ -23,7 +23,7 @@ For now 3 captcha providers are supported:
       # Define captcha grace period seconds
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=1800"
       # Define captcha HTML file path
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaFilePath=/captcha.html"
 ```
 
 The captcha HTML file must be present in the Traefik container (bind mounted or added during a custom build).  

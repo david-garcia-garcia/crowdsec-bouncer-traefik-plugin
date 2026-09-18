@@ -40,7 +40,7 @@ clients never get that passthrough.
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomKey=wicketkeeper"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomResponse=wicketkeeper_solution"
       # Define captcha HTML file path
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaFilePath=/captcha.html"
 ```
 
 ```yaml
