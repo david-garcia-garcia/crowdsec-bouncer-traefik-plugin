@@ -10,8 +10,8 @@ src: sha256:57c61115b23208d9e226e68368385ee63560e21ef68be3df97bdf5c17d47c8d8
 comments: none
 localTests: none
 requirement: requirement.md
-explore: none
-change: none
+explore: explore.md
+change: pack-decision-origin
 pr:
   id: 99
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/99
