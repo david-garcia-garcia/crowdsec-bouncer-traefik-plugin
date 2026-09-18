@@ -43,3 +43,10 @@ phase: archive
 findings: none
 fixed: fold core_plugin_decisions_scopes; moved to archive/2026-09-18-canonicalize-client-remoteip
 skipped: none
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: synced origin/master; Pester Ip-spelling helpers in BeforeAll
+skipped: none
+CI: Main success 35368934805; E2E success 35368934699 (mock + docker pester)
