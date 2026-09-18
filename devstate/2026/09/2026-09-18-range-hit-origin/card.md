@@ -1,18 +1,18 @@
-Developer review: in progress — 2026-09-18T18:04:07Z
+Developer review: in progress — 2026-09-18T18:08:20Z
 
 ## What this changes
 **Operators.** None.
 
 **Admin users.** None.
 
-**Developers.** None.
+**Developers.** Propose `store-range-remediation-on-radix`: a Range helper endpoint MAY hold the stored letter and optional origin; trusted-IP Checker stays a boolean set.
 
 **End users.** None.
 
 ## Motivation
 On DestBranch, stream mode with the in-memory DecisionStore already knows the winning Range prefix from the radix walk. It then re-parses every stored CIDR to recover the letter and optional origin of that prefix. A miss skips that walk; a hit does not.
 
-That second scan is the request-path cost. Reproduced here (compiled Go, 1k CIDRs): a hit is about 53µs and 2012 allocs; a miss is 26 ns and zero allocs. Ticket-measured 10k hits are about 450µs and 20k allocs. Not merging leaves every Range ban or captcha paying that linear parse on the hot path.
+That second scan is the request-path cost. Reproduced here (compiled Go, 1k CIDRs): a hit is about 53µs and 2012 allocs; a miss is 26 ns and zero allocs. Not merging leaves every Range ban or captcha paying that linear parse on the hot path.
 
 ```mermaid
 flowchart TD
@@ -23,17 +23,17 @@ flowchart TD
 ```
 
 ## Merge readiness
-Explore is written; product apply has not started. 1 item remains.
+Propose is apply-ready; product apply has not started. 1 item remains.
 
 Priority: P2 — request-path latency on every Range hit, limited to stream plus in-memory
-Reviewed head: 8203915
+Reviewed head: 0d8f83d
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Stub PR is open; required CI is still running |
-| CI proof | 3/6 | Checks in progress on the explore head |
+| Overall readiness | 3/6 | Stub PR is open; required CI is still queued |
+| CI proof | 3/6 | Checks queued on the propose head |
 | Local tests proof | N/A | Before implement; remote CI is the proof axis |
 | Review resolution | 6/6 | No open PR comments |
 
@@ -41,25 +41,25 @@ Owner decision: Required. See Decision needed.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-18-range-hit-origin pushed | `git` origin/2026-09-18-range-hit-origin |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | store-range-remediation-on-radix | `openspec/changes/store-range-remediation-on-radix/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/106 | pr-host List |
-| CI | build 35377885653 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35377885653 | GitHub Actions API |
+| CI | build 35378384010 queued https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35378384010 | GitHub Actions API |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | no comments.md; inventory empty |
 
 ## Specs
-None.
+- [core_plugin_ip_radix-lookup](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-range-hit-origin/openspec/changes/store-range-remediation-on-radix/proposal.md) — modified
+- [core_plugin_decisions_scopes](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-18-range-hit-origin/openspec/changes/store-range-remediation-on-radix/proposal.md) — modified
 
 ## Follow-up issues
 None.
 
 ## How this fits together
-Local ticket 2026-09-18-range-hit-origin is on branch 2026-09-18-range-hit-origin and stub PR 106. Explore recorded the Range-hit cliff and the two-tree payload plan; propose has not started.
+Local ticket 2026-09-18-range-hit-origin is on branch 2026-09-18-range-hit-origin and stub PR 106. OpenSpec change `store-range-remediation-on-radix` is apply-ready; implement has not started.
 
 ## Decision needed
 | Question | Decision | By |
 | --- | --- | --- |
-| Does `Helper.AddCIDR` grow an optional payload, or is a new insert path added? | assumed — new insert path; `AddCIDR` stays boolean so Checker stays a CIDR set | explore |
 | Does `storedByCIDR` remain after the endpoint holds the string? | assumed — drop it; hydrate writes the string onto the node | explore |
 | Does a prefixLen vs stored-key `ones` mismatch still need `storedMatchingPrefix`? | assumed — no; store the string on the same endpoint `contains` reports | explore |
 | When two blob keys occupy the same remapped endpoint, which stored string wins? | assumed — last successful insert of that kind wins (blob order) | explore |
@@ -78,9 +78,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs; do not paste diff --stat |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs; do not paste diff --stat |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 8203915973ca7af045046a1ead91b3b6fc17b0f5 | Card must match the branch you measured |
+| Reviewed head | 0d8f83d8132ffbefc1d108c568cf4d94020010e0 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -88,16 +88,15 @@ None.
 ### Technical review
 Best possible solution: DestBranch still recovers origin by walking every stored CIDR after the radix already has the winning prefix.
 
-Do we have a high-confidence way to reproduce? Yes, `go test` bench of `RangeMembership.Remediation` after `IsContained` calls `storedMatchingPrefix`: 1k-CIDR hit 52797 ns/op 2012 allocs/op; miss 26.19 ns/op 0 allocs.
+Do we have a high-confidence way to reproduce? Yes, measured `storedMatchingPrefix` on 1k CIDRs: hit 52797 ns/op 2012 allocs/op; miss 26.19 ns/op 0 allocs.
 
-Is this the best way to solve the issue? Yes for this ticket — store the letter and origin on the endpoint the walk already stops on; keep two trees so ban still wins.
+Is this the best way to solve the issue? Yes — `AddCIDRRemediation` / `ContainedRemediation` on the existing helper; keep two trees so ban still wins.
 
 ### Evidence
 What I checked:
-- `go test ./pkg/decisionscope` passed
-- Scratch bench then deleted: hit 1k ≈ 53µs / 2012 allocs; miss ≈ 26 ns / 0 allocs
-- `radixNode` has no remediation payload (`pkg/iplookup/iplookup.go`)
-- Product delta `origin/master...HEAD` excluding `devstate/` is empty
+- `openspec validate store-range-remediation-on-radix --strict` passed
+- Product delta vs `origin/master` is the OpenSpec change plus radix-lookup Purpose
+- FindSpecHost fold `core_plugin_ip_radix-lookup` and `core_plugin_decisions_scopes`
 
 ### Rank-up moves
 None.
