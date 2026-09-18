@@ -13,4 +13,4 @@
 ## 3. Verify
 
 - [x] 3.1 Confirm no remaining product references to `BanHTMLFilePath`, `CaptchaHTMLFilePath`, `banHtmlFilePath`, `captchaHtmlFilePath`, `banHTMLFilePath`, or `captchaHTMLFilePath` outside archive OpenSpec and ticket bus
-- [ ] 3.2 `go test ./pkg/configuration/ ./` and `golangci-lint run ./pkg/configuration/... .` — do not add an empty-guard alias test
+- [x] 3.2 `go test ./pkg/configuration/ ./` and `golangci-lint run ./pkg/configuration/... .` — do not add an empty-guard alias test
