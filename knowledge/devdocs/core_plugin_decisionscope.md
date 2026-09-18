@@ -3,11 +3,19 @@
 ## Language
 
 **Range index**:
-One cache blob at key `range-index` whose lines are `cidr=remediation`. Remediation MAY be the letter only or the letter plus U+001F plus a metrics origin. Redis-sharing instances share this document (prefixed by LAPI identity). Stream and alone rebuild in-process membership from it on the ticker and at stream start.
+One cache blob at key `range-index` whose lines are `cidr=remediation`. Remediation MAY be the letter only, the leftover letter plus U+001F plus a metrics origin, or a packed letter plus decimal intern id. Redis-sharing instances share this document (prefixed by LAPI identity). Stream and alone rebuild in-process membership from it on the ticker and at stream start. The blob is always `Set`, never `SetInt`.
 _Avoid_: walking the blob on the request path, one cache key per CIDR, LAPI `?ip=` on the stream path
 
+**Leftover remediation**:
+A string of kind letter plus U+001F plus a metrics origin name. Redis, live/none, and intern overflow keep this spelling. Helpers live in `pkg/decisionscope`.
+_Avoid_: a leftover type in `pkg/cache`, `\x1e`
+
+**Packed range line**:
+A range-index remediation of the letter plus a decimal intern id (`t12`). Bare letters still match.
+_Avoid_: packing the blob as `SetInt`, U+001F on a packed line
+
 **Range membership**:
-Two boolean CIDR sets (ban, captcha) on the reclaimed LAPI Client plus the stored remediation string per CIDR. Request lookup always asks this pair. Nil or empty (live/none never hydrate) is a Range miss. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s stored suffix.
+Two boolean CIDR sets (ban, captcha) on the reclaimed LAPI Client plus the stored remediation string per CIDR. Request lookup always asks this pair. Nil or empty (live/none never hydrate) is a Range miss. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s leftover suffix or packed intern id.
 _Avoid_: trusted-IP Checker, one LPM tree with a stored remediation, `sync.Once`, package globals, a Crowdsec-mode flag on lookup
 
 **Ip cache key**:
@@ -67,7 +75,7 @@ lapiClient.IncDropped(origin, req.ipType, "ban")
 - Redis followers skip LAPI on a lease hit. They still GET `range-index` on that tick and rebuild membership; without that hydrate they would miss every Range decision.
 - Trust the header the same way you trust `X-Forwarded-For`: only from a trusted hop (CDN or geoenrich in front of this middleware).
 - Leftover Ip/header/Range-index values MAY be `t`/`c` plus U+001F plus a metrics origin. Packed memory Range-index lines are the letter plus a decimal intern id. Bare letters still match. Redis stays one `range-index` key written with `Set`.
-- Request lookup tries `GetInt` then leftover `Get`. Resolve `OriginName` only on drop.
+- Request lookup tries `GetInt` per key, then `GetMany` only on leftover misses. Resolve `OriginName` only on drop.
 - After a cache miss, stream/alone use stream health; live/none call `LiveLookup`. Do not name that split after Range membership.
 - CrowdSec does not canonicalize decision values — measured on v1.8.0, the stream hands back `2001:DB8::2` and `::ffff:192.0.2.4` exactly as submitted. LAPI `?ip=` does match numerically, so the spelling problem is ours alone and needs no LAPI workaround.
 - `Get` runs on a round-robin `redisCacheReadHosts` replica while `Acquire` and `Set` run on the writer. A read path can fail on a completely healthy writer; that is how the range-index apply reached its unread-base defect without any timing window.

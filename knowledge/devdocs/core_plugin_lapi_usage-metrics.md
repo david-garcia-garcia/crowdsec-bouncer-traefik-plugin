@@ -14,6 +14,10 @@ _Avoid_: parsing `RemoteAddr` on the metrics path
 The owner of one Client's usage-metrics window (dropped counters, processed atomics, active_decisions gauge, last successful push) and the POST/restore path. Client holds one pointer for the reclaim lifetime; tickers stay on Client.
 _Avoid_: a second reclaim key, a reporter-owned `*http.Client`, a second metrics ticker
 
+**Compact decision slot**:
+One `activeDecisionSlots` map value: intern `originID` plus address family, leftover origin string only on intern overflow. The slot map stays so forget can drop one key. POST still emits origin names.
+_Avoid_: storing the origin name on every slot, deleting the slot map
+
 ## Overview
 
 Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. Stream/alone also `rememberActiveDecision` / `forgetActiveDecision` when storing or deleting Ip, header, and Range records. The Client ticker POSTs `v1/usage-metrics` through the `MetricsReporter` Client holds. `IncProcessed` is lock-free (`atomic.AddInt64`); `IncDropped` takes the reporter `metricsMu` because drops already left the allow path.
@@ -33,8 +37,12 @@ Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. S
 ## Pattern snippet
 
 ```go
+kind, origin, originID, err := decisionscope.LookupCachedRemediation(cacheClient, req.remoteIP, req.ipAddr, scopes, lapiClient.RangeMembership())
+if origin == "" {
+	origin = lapiClient.OriginName(originID)
+}
 lapiClient.IncProcessed(req.ipType)
-lapiClient.IncDropped(decisionscope.RemediationOrigin(stored), req.ipType, "ban")
+lapiClient.IncDropped(origin, req.ipType, "ban")
 ```
 
 ## Key files

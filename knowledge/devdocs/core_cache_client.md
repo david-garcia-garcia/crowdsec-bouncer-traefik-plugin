@@ -6,6 +6,18 @@
 A reclaim value that owns one `pkg/cache.Client` (memory TTL map or Redis-protocol pool). Isolation is by store key: CrowdSec cursor `SessionHex` plus Redis store parameters. Two `lapi.Client` incarnations that share that key share remediations.
 _Avoid_: process `ttl_map`, shared `var cache`, isolated-per-Client map, `sync.Once`, utilities `reclaim`
 
+**Typed bag**:
+`pkg/cache` as string `Set`/`Get`/`GetMany` plus `SetInt`/`GetInt` of a `uint32`. Cache does not name kind, origin, Packed, Leftover, or remediation.
+_Avoid_: `Stored`, `SetRemediation`, `GetManyStored`, `ParsePackedOriginID`, a MemoryBackend remediation switch, `\x1e`
+
+**Origin intern**:
+An append-only name→`uint16` table on one DecisionStore incarnation. Index 0 is unused. `OriginName` is lock-free. Overflow does not wrap.
+_Avoid_: package `var`, a table shared across store reclaim keys, `atomic.Pointer[T]`
+
+**Packed word**:
+A memory `uint32` of `kind[0]` in the low byte and intern id in the upper bits. Overflow, Redis, and live/none stay leftover strings instead.
+_Avoid_: packing inside `pkg/cache`, wrapping intern ids
+
 ## Overview
 
 Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx as `OpenStream` / `OpenLive`. Pass `SessionHex` as Redis `keyPrefix` for every mode. Do not restore a package-level map. Do not Close the cache from `lapi.Client.Close`.
