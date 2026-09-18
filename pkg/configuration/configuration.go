@@ -344,7 +344,23 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		}
 	}
 
+	warnUnenforcedAppsecMode(config, log)
+
 	return validateLogging(config)
+}
+
+// warnUnenforcedAppsecMode reports the one accepted combination that enforces nothing. appsec mode
+// selects no decision source, so with the AppSec leg off the middleware only calls next. This is a
+// warning and not an error on purpose: the plugin doing nothing is not worth refusing to boot over,
+// and implying crowdsecAppsecEnabled would point at the crowdsec:7422 default and, with the default
+// ban failure action, ban every request on that router.
+func warnUnenforcedAppsecMode(config *Config, log *slog.Logger) {
+	if config.CrowdsecMode != AppsecMode || config.CrowdsecAppsecEnabled {
+		return
+	}
+	log.Warn("crowdsecMode is 'appsec' while crowdsecAppsecEnabled is false: " +
+		"this middleware checks nothing at all, no CrowdSec decisions and no AppSec inspection. " +
+		"Set crowdsecAppsecEnabled to true, or pick a crowdsecMode that queries LAPI ('none', 'live', 'stream' or 'alone')")
 }
 
 func effectiveAppsecScheme(config *Config) string {
