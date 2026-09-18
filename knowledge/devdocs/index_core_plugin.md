@@ -40,6 +40,11 @@ priority: normal
 local: core_plugin_lapi_stream-lease.md
 description: The `updated` cache key that grants one CrowdSec stream GET on a shared DecisionStore.
 
+## Stream single-flight
+priority: normal
+local: core_plugin_lapi_stream-single-flight.md
+description: How one Client skips a stream poll that is already running and publishes health atomically.
+
 ## LAPI connection
 priority: normal
 local: core_plugin_lapi_connection.md
