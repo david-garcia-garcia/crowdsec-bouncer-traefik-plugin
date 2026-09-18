@@ -67,8 +67,8 @@ Official pages (fetched 2026-09-18) define the vendor verdict as JSON `success`,
   By: explore
 
 - Q: Which spec owns siteverify HTTP acceptance?
-  Decision: assumed — new `core_plugin_middleware_captcha-siteverify` via FindSpecHost at propose. Gate spec keeps cookie + first-solve 302 after success. Do not rename `captcha-gate`.
-  By: explore
+  Decision: resolved — new `core_plugin_middleware_captcha-siteverify` (FindSpecHost: new, high). Gate spec keeps cookie + first-solve 302 after success. Do not rename `captcha-gate`.
+  By: propose
 
 - Q: Does this work reconstruct client address, user, tenant, Host, or trust hop?
   Decision: resolved — none. `Validate` does not choose identity. `ServeHTTP` already receives `remoteIP` from `clientRequest`. Reuse that owner; do not add `remoteip` to siteverify in this change.

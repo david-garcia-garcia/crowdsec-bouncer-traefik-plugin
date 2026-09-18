@@ -11,7 +11,7 @@ localTests: none
 requirement: requirement.md
 comments: none
 explore: explore.md
-change: none
+change: require-2xx-siteverify-status-before-success
 pr:
   id: 86
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/86
