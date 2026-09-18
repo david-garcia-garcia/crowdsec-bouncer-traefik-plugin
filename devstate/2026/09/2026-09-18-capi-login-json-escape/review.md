@@ -9,3 +9,9 @@ phase: explore
 findings: dest sprintf login body fails JSON decode on quote/backslash/newline; official CAPI/LAPI login is only machine_id, password, scenarios
 fixed: none (think-only)
 skipped: Task subagent unavailable; research write ran in-process. Four assumed rows left for propose.
+
+## propose (2026-09-18)
+phase: propose
+findings: none
+fixed: none
+skipped: Task subagent unused. Three assumed rows remain (Marshal vs Encoder, empty/nil scenarios, Content-Type). Fold Q resolved.
