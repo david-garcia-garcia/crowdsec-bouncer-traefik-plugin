@@ -5,6 +5,11 @@ priority: normal
 local: core_plugin_middleware.md
 description: How Traefik New reclaims a LAPI Client and an AppSec Client and returns a per-router Bouncer (`core_plugin_middleware_bouncer`).
 
+## Config validation
+priority: normal
+local: core_plugin_middleware_config-validation.md
+description: How New rejects invalid Traefik Config (ValidateParams) before opening LAPI.
+
 ## Decision scopes
 priority: normal
 local: core_plugin_decisionscope.md
@@ -44,6 +49,11 @@ description: The `updated` cache key that grants one CrowdSec stream GET on a sh
 priority: normal
 local: core_plugin_lapi_stream-single-flight.md
 description: How one Client skips a stream poll that is already running and publishes health atomically.
+
+## Stream apply
+priority: normal
+local: core_plugin_lapi_stream-apply.md
+description: How this plugin writes one CrowdSec stream payload (deleted before new) into the DecisionStore.
 
 ## LAPI connection
 priority: normal

@@ -21,6 +21,7 @@ func RemoveRange(cacheClient *cache.Client, cidr string) {
 }
 
 // ApplyRangeBatch upserts and removes Range lines with one cache read and one write.
+// Removals run first so a CIDR present in both maps remains the replacement.
 // The index is shared by every bouncer on this cache, so a read that did not answer is not an
 // empty index: writing the batch onto an empty base would drop every Range decision this poll
 // did not carry. A read failure returns the error and leaves the stored index alone.
@@ -32,15 +33,15 @@ func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, remov
 	if err != nil {
 		return err
 	}
+	for _, cidr := range removals {
+		index = removeCIDRFromIndex(index, strings.TrimSpace(cidr))
+	}
 	for cidr, remediation := range upserts {
 		network := strings.TrimSpace(cidr)
 		if network == "" || !IsActiveRemediation(remediation) {
 			continue
 		}
 		index = upsertIndexCIDR(index, network, remediation)
-	}
-	for _, cidr := range removals {
-		index = removeCIDRFromIndex(index, strings.TrimSpace(cidr))
 	}
 	if index == "" {
 		cacheClient.Delete(RangeIndexKey)
