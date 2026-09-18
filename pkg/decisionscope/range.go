@@ -9,8 +9,8 @@ import (
 )
 
 // rangeIndexCIDR maps a parseable host to /32 or /128 so the index key is a CIDR.
-func rangeIndexCIDR(value string) string {
-	network := strings.TrimSpace(value)
+func rangeIndexCIDR(cidr string) string {
+	network := strings.TrimSpace(cidr)
 	if network == "" {
 		return ""
 	}
