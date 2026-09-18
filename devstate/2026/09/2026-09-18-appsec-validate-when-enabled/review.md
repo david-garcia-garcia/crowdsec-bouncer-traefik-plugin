@@ -42,6 +42,6 @@ skipped: Task unavailable in archive subagent; FindSpecHost ran on this thread
 
 ## pullrequest (2026-09-18)
 phase: pullrequest
-findings: none
-fixed: reused OPEN PR #97; ready title; waited CI on f0ea972 (four checks success)
-skipped: no comments.md; no second PR; gh not on PATH — used GitHub MCP check runs
+findings: e2e (binary + mock LAPI) failed on card-commit 6ae4b30
+fixed: reused OPEN PR #97; ready title; waited CI on f0ea972 (four checks success) then 6ae4b30
+skipped: no comments.md; no second PR; gh not on PATH — used GitHub MCP check runs; no workflow rerun tool
