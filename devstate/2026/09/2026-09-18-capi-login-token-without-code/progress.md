@@ -6,7 +6,7 @@ JobName: 2026-09-18-capi-login-token-without-code
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-18T14:15:49Z |
 | explore | [x] | [x] | 2026-09-18T14:20:07Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |

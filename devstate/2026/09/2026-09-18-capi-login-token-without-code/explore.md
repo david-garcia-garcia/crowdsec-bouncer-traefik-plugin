@@ -50,8 +50,8 @@ Not process-lifetime work. No `sync.Once` / package global. `Login` struct tags,
   By: explore
 
 - Q: Does the accept-token requirement fold into `core_plugin_lapi_query-round-trip`?
-  Decision: assumed — no. That leaf owns 401 replay, drain, and named failures. Propose runs FindSpecHost and folds onto `core_plugin_lapi_connection` unless the librarian says new.
-  By: explore
+  Decision: resolved — no. FindSpecHost fold onto `core_plugin_lapi_connection` (high). That leaf already owns the `getToken` token write. `query-round-trip` stays 401 replay, drain, and named failures.
+  By: propose
 
 - Q: What is the committed regression test name?
   Decision: assumed — `TestGetToken_TwoXXBodyWithoutJSONCode` in `pkg/lapi/zzz_client_http_test.go`. Not `TestHunt_*`. Prove store of `fresh` on a 2xx body with no `code`, and keep the empty-token error on a 2xx body with an empty `token`.
