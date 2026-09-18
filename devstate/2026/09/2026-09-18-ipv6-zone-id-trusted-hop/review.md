@@ -45,3 +45,9 @@ phase: pullrequest
 findings: reused PR 83; title ready; Main Process gocognit failed
 fixed: title drop 🚧; delivery card on PR summary
 skipped: comments.md absent (no reply walk)
+
+## pullrequest (2026-09-18 remasured)
+phase: pullrequest
+findings: CI remasured green on 5ba82a2; checklist none
+fixed: delivery card refreshed on PR 83 summary
+skipped: comments.md absent (no reply walk)
