@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: folded empty-host SHALL into core_plugin_middleware_config-validation; archived reject-empty-appsec-host-when-enabled
 skipped: n/a
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: reused PR 89; ready title; waited CI success on 0ec92da
+skipped: n/a
