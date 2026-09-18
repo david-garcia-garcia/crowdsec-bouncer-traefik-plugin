@@ -31,3 +31,12 @@ qualify: qualified-with-gaps
 localTests: passed
 pr: 105
 ci: Main Process / Race detector / e2e mock / e2e docker success on d7d7602
+
+## codereview (2026-09-18)
+phase: codereview
+findings: Standards 1 hard Leave a trail; other axes none
+fixed: validateCaptcha token-check block comment (01596af9)
+skipped: none (Task spawn unavailable; phase runner wrote the six axis files)
+qualify: qualified-with-gaps
+pr: 105
+ci: queued / in_progress on e3d44858
