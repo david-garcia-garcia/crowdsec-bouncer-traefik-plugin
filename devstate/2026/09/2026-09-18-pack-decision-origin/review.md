@@ -33,3 +33,9 @@ phase: devdocsimpact
 findings: missing-packet Origin dictionary; stale-usage DecisionStore cache; stale-usage Decision scopes; language-gap LAPI usage-metrics
 fixed: created core_cache_client_origin-dictionary; updated DecisionStore, Decision scopes, and usage-metrics packets (86f4c1b)
 skipped: none
+
+## archive (2026-09-18T17:56:03Z)
+phase: archive
+findings: FindSpecHost new origin-dictionary; fold decision-store, decisions_scopes, usage-metrics
+fixed: catalog sync + move to openspec/changes/archive/2026-09-18-pack-decision-origin/ (320726b)
+skipped: none
