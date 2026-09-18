@@ -312,7 +312,7 @@ services:
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.crowdsecmode=none"
-      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.banhtmlfilepath=/e2e-ban.html"
+      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.banFilePath=/e2e-ban.html"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
