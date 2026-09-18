@@ -8,7 +8,7 @@ JobName: 2026-09-18-captcha-verify-template-ux
 | explore | [x] | [x] | 2026-09-18T17:46:49Z |
 | propose | [x] | [x] | 2026-09-18T17:54:31Z |
 | implement | [x] | [x] | 2026-09-18T18:06:58Z |
-| codereview | [x] | [ ] | |
+| codereview | [x] | [x] | 2026-09-18T18:18:47Z |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
