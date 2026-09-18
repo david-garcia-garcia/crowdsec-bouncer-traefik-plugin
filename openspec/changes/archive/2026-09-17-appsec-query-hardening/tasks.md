@@ -29,15 +29,24 @@
 - [x] 5.1 After the forwarded bytes exist, omit client `Content-Length` and `Transfer-Encoding` from the header copy
 - [x] 5.2 Set `Request.ContentLength` and the `Content-Length` header from those bytes
 - [x] 5.3 Reuse the `ip` argument on `X-Crowdsec-Appsec-Ip`; do not reconstruct from `RemoteAddr` or Host
-- [x] 5.4 Do not add a hop-by-hop filter (Connection, Upgrade, …)
+- [x] 5.4 ~~Do not add a hop-by-hop filter (Connection, Upgrade, …)~~ — superseded by 8.1 (folded from #35 at owner direction)
 
 ## 6. DELETE out of the unreadable-body set
 
 - [x] 6.1 Remove DELETE from `isMethodWithBody`; keep POST, PUT, PATCH
-- [x] 6.2 Do not gate the readable-body copy on that set
+- [x] 6.2 ~~Do not gate the readable-body copy on that set~~ — superseded by 8.2: the readable copy is gated on a **separate** predicate; `isMethodWithBody` (the drop set) is unchanged
 
 ## 7. Verify
 
 - [x] 7.1 `go test ./pkg/appsec/ -count=1`
 - [x] 7.2 Grep live product paths (not `openspec/changes/archive/`, not `devstate/`) for `crowdsecAppsecUnreadableBodyBlock` and `atomic.Pointer` in `pkg/appsec/`
 - [ ] 7.3 Cite #35 and #43 on the PR body when pullrequest lands
+
+## 8. Folded from #35 (amendment; #35 closed as superseded)
+
+- [x] 8.1 Add `isHopByHopHeader` (RFC 7230 section 6.1, errata 4522) and skip those names plus the client `Content-Length` in the header copy; `Transfer-Encoding` is covered by the hop-by-hop set, so the 5.1 skip is not duplicated
+- [x] 8.2 Add `isMethodWithForwardableBody` (POST, PUT, PATCH, DELETE) and gate the readable-body copy on it; also skip `http.NoBody`. Leave `isMethodWithBody` (POST, PUT, PATCH) and the unreadable-body drop policy untouched
+- [x] 8.3 Keep the outbound `Content-Length` header on the POST branch only (do not switch to `req.ContentLength >= 0` as #35 did); after 8.2 the outbound POST is exactly the body-carrying case, so a bodyless GET sends no length header
+- [x] 8.4 Do not honour names listed in the client `Connection` header: a client could otherwise hide `Cookie` or any header from AppSec
+- [x] 8.5 Tests: a GET carrying a body is not forwarded as POST (table over GET/HEAD/OPTIONS/POST/PUT/PATCH/DELETE) and hop-by-hop headers do not reach the listener
+- [x] 8.6 Do not touch the unreadable-body security posture or add `crowdsecAppsecUnreadableBodyBlock` (#51 stays the owner's separate decision)

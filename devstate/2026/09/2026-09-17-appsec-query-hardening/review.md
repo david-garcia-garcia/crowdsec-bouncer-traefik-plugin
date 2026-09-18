@@ -45,3 +45,10 @@ phase: pullrequest
 findings: reused PR #70; ready title 🐛; comments none; Main Process failed dest nestif CaptchaProvider; both e2e success
 fixed: title drop 🚧; card cites #35 and #43; PR #70 summary
 skipped: dest nestif (note large); second PR
+
+## amendment fold-35 (2026-09-18)
+phase: implement + codereview + devdocsimpact + archive (in-place on the open PR, owner direction)
+findings: owner closes #35 as superseded, so its two held-back items land here; #70's CI base a57c848 is stale, merged origin/master 0e7dbf0 clean (no conflict in pkg/appsec/query.go); both new tests reproduced red against the pre-fix query.go
+fixed: isHopByHopHeader (RFC 7230 6.1, errata 4522) replaces the literal Transfer-Encoding skip; isMethodWithForwardableBody (POST/PUT/PATCH/DELETE) gates the readable copy and skips http.NoBody; Content-Length stays POST-only; spec leaf + archived delta + design/tasks/proposal + usage packet + README updated
+skipped: dynamic Connection-token stripping (lets a client hide Cookie from the WAF); any change to isMethodWithBody, the unreadable-body drop policy, or #51's crowdsecAppsecUnreadableBodyBlock
+gates: build, vet, go test ./pkg/... -count=1, go test . -count=1, golangci-lint run ./..., docker golang:1.22.12 go test -race -count=1 ./pkg/... — all green on the merged tree

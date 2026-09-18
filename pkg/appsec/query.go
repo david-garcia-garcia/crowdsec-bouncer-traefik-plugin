@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	configuration "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
@@ -92,6 +93,30 @@ func isMethodWithBody(method string) bool {
 	}
 }
 
+// isMethodWithForwardableBody reports whether a readable body on this method is copied to AppSec.
+// Deliberately wider than isMethodWithBody: a DELETE body is worth inspecting, but an unreadable
+// DELETE body is not a drop candidate. Keep the two sets separate.
+func isMethodWithForwardableBody(method string) bool {
+	switch method {
+	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+		return true
+	default:
+		return false
+	}
+}
+
+// isHopByHopHeader reports whether a header is connection-scoped (RFC 7230 section 6.1, errata 4522)
+// and therefore must not be forwarded to the AppSec listener.
+func isHopByHopHeader(name string) bool {
+	switch strings.ToLower(name) {
+	case "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
+		"te", "trailer", "transfer-encoding", "upgrade":
+		return true
+	default:
+		return false
+	}
+}
+
 // Query forwards the request to this AppSec HTTP client.
 // A structured JSON envelope is returned when AppSec supplies a non-empty action.
 func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response, error) {
@@ -145,15 +170,17 @@ func (c *Client) newAppsecForwardRequest(ip string, httpReq *http.Request, pol P
 	if err != nil {
 		return nil, err
 	}
-	// Omit client body-size headers; rebuild length from the bytes actually forwarded.
+	// Omit hop-by-hop headers (Transfer-Encoding among them) and the client Content-Length;
+	// the length is rebuilt below from the bytes actually forwarded.
 	for key, headers := range httpReq.Header {
-		if key == "Content-Length" || key == "Transfer-Encoding" {
+		if isHopByHopHeader(key) || strings.EqualFold(key, "Content-Length") {
 			continue
 		}
 		for _, value := range headers {
 			req.Header.Add(key, value)
 		}
 	}
+	// POST is the only outbound method that carries bytes; a bodyless GET gets no length header.
 	if req.Method == http.MethodPost {
 		req.Header.Set("Content-Length", strconv.FormatInt(req.ContentLength, 10))
 	}
@@ -172,7 +199,8 @@ func (c *Client) newAppsecForwardRequest(ip string, httpReq *http.Request, pol P
 	return req, nil
 }
 
-// newAppsecBodyRequest chooses GET (no/unreadable body) or POST (copied client body) toward AppSec.
+// newAppsecBodyRequest chooses GET (no, unreadable, or non-body-method body) or POST (copied client
+// body) toward AppSec. The original verb always travels on X-Crowdsec-Appsec-Verb.
 func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol Policy) (*http.Request, error) {
 	switch {
 	case isBodyUnreadable(httpReq):
@@ -181,7 +209,7 @@ func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol 
 		}
 		req, _ := http.NewRequest(http.MethodGet, target, nil)
 		return req, nil
-	case httpReq.Body != nil:
+	case httpReq.Body != nil && httpReq.Body != http.NoBody && isMethodWithForwardableBody(httpReq.Method):
 		// Readable body: cap with LimitReader only when the operator set a positive limit.
 		var bodyBuffer bytes.Buffer
 		bodyReader := io.Reader(httpReq.Body)

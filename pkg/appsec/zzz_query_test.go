@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -408,6 +409,168 @@ func Test_appsecQuery_unreadableBodyDeleteNotDropped(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Query() blocked on an HTTP/2 DELETE request body")
+	}
+}
+
+// forwardCaptureRoundTripper records the whole outbound AppSec request without dialing a listener.
+type forwardCaptureRoundTripper struct {
+	method string
+	header http.Header
+	body   string
+}
+
+// RoundTrip records the forwarded method, headers, and body then allows the query.
+func (rt *forwardCaptureRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	rt.method = req.Method
+	rt.header = req.Header.Clone()
+	if req.Body != nil {
+		body, _ := io.ReadAll(req.Body)
+		rt.body = string(body)
+	}
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"action":"allow"}`)),
+		Header:     make(http.Header),
+		Request:    req,
+	}, nil
+}
+
+// newForwardCaptureClient returns a Client whose AppSec round-trip is captured instead of sent.
+func newForwardCaptureClient(capture *forwardCaptureRoundTripper) *Client {
+	return NewTestClient(&url.URL{Scheme: "http", Host: "appsec.example"}, &http.Client{Transport: capture}, logger.New("INFO", ""))
+}
+
+// Test_appsecQuery_forwardsBodyOnlyForBodyMethods proves a readable body reaches AppSec only on
+// methods that legitimately carry one; a GET with a body must not be forwarded as a POST.
+func Test_appsecQuery_forwardsBodyOnlyForBodyMethods(t *testing.T) {
+	const payload = "hello-appsec-body"
+	tests := []struct {
+		name        string
+		method      string
+		wantForward bool
+	}{
+		{name: "get body is not forwarded", method: http.MethodGet, wantForward: false},
+		{name: "head body is not forwarded", method: http.MethodHead, wantForward: false},
+		{name: "options body is not forwarded", method: http.MethodOptions, wantForward: false},
+		{name: "post body is forwarded", method: http.MethodPost, wantForward: true},
+		{name: "put body is forwarded", method: http.MethodPut, wantForward: true},
+		{name: "patch body is forwarded", method: http.MethodPatch, wantForward: true},
+		{name: "delete body is forwarded", method: http.MethodDelete, wantForward: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wantMethod, wantBody, wantLength := http.MethodGet, "", ""
+			if tt.wantForward {
+				wantMethod, wantBody, wantLength = http.MethodPost, payload, strconv.Itoa(len(payload))
+			}
+			capture := &forwardCaptureRoundTripper{}
+			req := httptest.NewRequest(tt.method, "http://localhost/", strings.NewReader(payload))
+			if _, err := newForwardCaptureClient(capture).Query("1.2.3.4", req, Policy{}); err != nil {
+				t.Fatalf("Query() returned error: %v", err)
+			}
+			if capture.method != wantMethod {
+				t.Errorf("AppSec method %q want %q", capture.method, wantMethod)
+			}
+			if capture.body != wantBody {
+				t.Errorf("AppSec body %q want %q", capture.body, wantBody)
+			}
+			if got := capture.header.Get("Content-Length"); got != wantLength {
+				t.Errorf("Content-Length header %q want %q", got, wantLength)
+			}
+			if got := capture.header.Get(crowdsecAppsecVerbHeader); got != tt.method {
+				t.Errorf("%s %q want %q", crowdsecAppsecVerbHeader, got, tt.method)
+			}
+			origin, err := io.ReadAll(req.Body)
+			if err != nil {
+				t.Fatalf("origin body: %v", err)
+			}
+			if string(origin) != payload {
+				t.Errorf("origin body %q want %q", origin, payload)
+			}
+		})
+	}
+}
+
+// Test_appsecQuery_stripsHopByHopHeaders proves connection-scoped headers never reach the listener.
+func Test_appsecQuery_stripsHopByHopHeaders(t *testing.T) {
+	hopByHop := []string{
+		"Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization",
+		"Te", "Trailer", "Transfer-Encoding", "Upgrade",
+	}
+	capture := &forwardCaptureRoundTripper{}
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/", strings.NewReader("payload"))
+	for _, name := range hopByHop {
+		req.Header.Set(name, "probe")
+	}
+	req.Header.Set("Cookie", "session=keep")
+	req.Header.Set("X-Forwarded-For", "1.2.3.4")
+	if _, err := newForwardCaptureClient(capture).Query("1.2.3.4", req, Policy{}); err != nil {
+		t.Fatalf("Query() returned error: %v", err)
+	}
+	for _, name := range hopByHop {
+		if got := capture.header.Get(name); got != "" {
+			t.Errorf("hop-by-hop header %s reached AppSec with %q", name, got)
+		}
+	}
+	if got := capture.header.Get("Cookie"); got != "session=keep" {
+		t.Errorf("Cookie %q want %q", got, "session=keep")
+	}
+	if got := capture.header.Get("X-Forwarded-For"); got != "1.2.3.4" {
+		t.Errorf("X-Forwarded-For %q want %q", got, "1.2.3.4")
+	}
+}
+
+// Test_isHopByHopHeader checks the RFC 7230 section 6.1 set and that end-to-end headers pass.
+func Test_isHopByHopHeader(t *testing.T) {
+	tests := []struct {
+		name string
+		want bool
+	}{
+		{name: "Connection", want: true},
+		{name: "keep-alive", want: true},
+		{name: "Proxy-Authenticate", want: true},
+		{name: "Proxy-Authorization", want: true},
+		{name: "TE", want: true},
+		{name: "Trailer", want: true},
+		{name: "Transfer-Encoding", want: true},
+		{name: "Upgrade", want: true},
+		{name: "Content-Type", want: false},
+		{name: "Cookie", want: false},
+		{name: "Content-Length", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isHopByHopHeader(tt.name); got != tt.want {
+				t.Errorf("isHopByHopHeader(%q) = %v, want %v", tt.name, got, tt.want)
+			}
+		})
+	}
+}
+
+// Test_isMethodWithForwardableBody proves the readable-forward set stays wider than the drop set.
+func Test_isMethodWithForwardableBody(t *testing.T) {
+	tests := []struct {
+		method      string
+		wantForward bool
+		wantDropSet bool
+	}{
+		{method: http.MethodPost, wantForward: true, wantDropSet: true},
+		{method: http.MethodPut, wantForward: true, wantDropSet: true},
+		{method: http.MethodPatch, wantForward: true, wantDropSet: true},
+		{method: http.MethodDelete, wantForward: true, wantDropSet: false},
+		{method: http.MethodGet, wantForward: false, wantDropSet: false},
+		{method: http.MethodHead, wantForward: false, wantDropSet: false},
+		{method: http.MethodOptions, wantForward: false, wantDropSet: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.method, func(t *testing.T) {
+			if got := isMethodWithForwardableBody(tt.method); got != tt.wantForward {
+				t.Errorf("isMethodWithForwardableBody(%q) = %v, want %v", tt.method, got, tt.wantForward)
+			}
+			if got := isMethodWithBody(tt.method); got != tt.wantDropSet {
+				t.Errorf("isMethodWithBody(%q) = %v, want %v", tt.method, got, tt.wantDropSet)
+			}
+		})
 	}
 }
 

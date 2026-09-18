@@ -397,7 +397,7 @@ make run
 - CrowdsecAppsecBodyLimit
   - int64
   - default: 10485760 (= 10MB)
-  - Transmit only the first number of bytes to Crowdsec Appsec Server. `0` means unlimited (the full readable body is forwarded).
+  - Transmit only the first number of bytes to Crowdsec Appsec Server. `0` means unlimited (the full readable body is forwarded). Only POST, PUT, PATCH and DELETE bodies are forwarded; any other method (including a GET that carries a body) is sent to AppSec as a headers-only GET with the real verb on `X-Crowdsec-Appsec-Verb`.
 - CrowdsecAppsecKey
   - string
   - default: value of `CrowdsecLapiKey`
