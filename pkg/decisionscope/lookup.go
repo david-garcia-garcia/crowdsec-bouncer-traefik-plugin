@@ -103,7 +103,7 @@ func hitFromPackedWord(word uint32) lookupHit {
 // Range comes from membership.Remediation; nil or empty membership is a miss (live/none never hydrate).
 // Kind is ban, captcha, or none. Origin is a leftover name; OriginID is a packed intern id.
 // remoteIP is the canonical client address string owned by clientRequest; ipAddr is Range membership only.
-func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (kind, origin string, originID uint16, err error) {
+func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16, error) {
 	keys := LookupCacheKeys(remoteIP, scopes)
 	var chosen lookupHit
 	var leftoverKeys []string

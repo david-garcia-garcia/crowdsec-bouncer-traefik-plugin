@@ -358,7 +358,7 @@ func Test_GetIntMissesLeftoverString(t *testing.T) {
 
 func parseRESPStrings(payload []byte) []string {
 	parts := bytes.Split(payload, []byte("\r\n"))
-	var out []string
+	out := make([]string, 0, len(parts))
 	for _, line := range parts {
 		if len(line) == 0 || line[0] == '*' || line[0] == '$' {
 			continue
@@ -366,6 +366,22 @@ func parseRESPStrings(payload []byte) []string {
 		out = append(out, string(line))
 	}
 	return out
+}
+
+func writeRedisKV(c net.Conn, store map[string]string, cmd []string) {
+	switch {
+	case len(cmd) >= 3 && cmd[0] == "SET":
+		store[cmd[1]] = cmd[2]
+		_, _ = c.Write([]byte("+OK\r\n"))
+	case len(cmd) >= 2 && cmd[0] == "GET":
+		if value, ok := store[cmd[1]]; ok {
+			_, _ = c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(value), value)))
+			return
+		}
+		_, _ = c.Write([]byte("$-1\r\n"))
+	default:
+		_, _ = c.Write([]byte("+OK\r\n"))
+	}
 }
 
 func serveRedisKV(t *testing.T) string {
@@ -391,19 +407,7 @@ func serveRedisKV(t *testing.T) string {
 					if n > 0 {
 						cmd := parseRESPStrings(buf[:n])
 						mu.Lock()
-						switch {
-						case len(cmd) >= 3 && cmd[0] == "SET":
-							store[cmd[1]] = cmd[2]
-							_, _ = c.Write([]byte("+OK\r\n"))
-						case len(cmd) >= 2 && cmd[0] == "GET":
-							if value, ok := store[cmd[1]]; ok {
-								_, _ = c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(value), value)))
-							} else {
-								_, _ = c.Write([]byte("$-1\r\n"))
-							}
-						default:
-							_, _ = c.Write([]byte("+OK\r\n"))
-						}
+						writeRedisKV(c, store, cmd)
 						mu.Unlock()
 					}
 					if readErr != nil {
