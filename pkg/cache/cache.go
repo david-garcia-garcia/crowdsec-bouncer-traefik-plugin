@@ -37,9 +37,20 @@ func (lc *localCache) heap() *ttl_map.Heap {
 
 func (lc *localCache) get(key string) (string, error) {
 	value, isCached := lc.heap().Get(key)
-	valueString, isValid := value.(string)
-	if isCached && isValid && len(valueString) > 0 {
-		return valueString, nil
+	if !isCached {
+		return "", errors.New(CacheMiss)
+	}
+	// Packed remediations are uint32; string Get returns the kind letter only.
+	switch typed := value.(type) {
+	case string:
+		if len(typed) > 0 {
+			return typed, nil
+		}
+	case uint32:
+		kind := storedFromWord(typed).Kind()
+		if kind != "" {
+			return kind, nil
+		}
 	}
 	return "", errors.New(CacheMiss)
 }
@@ -64,6 +75,26 @@ func (lc *localCache) getMany(keys []string) (map[string]string, error) {
 
 func (lc *localCache) set(key, value string, duration int64) {
 	lc.heap().Set(key, value, duration)
+}
+
+func (lc *localCache) setValue(key string, value interface{}, duration int64) {
+	lc.heap().Set(key, value, duration)
+}
+
+func (lc *localCache) getStored(key string) (Stored, bool) {
+	value, isCached := lc.heap().Get(key)
+	if !isCached {
+		return Stored{}, false
+	}
+	switch typed := value.(type) {
+	case uint32:
+		return storedFromWord(typed), true
+	case string:
+		if len(typed) > 0 {
+			return ParseStored(typed), true
+		}
+	}
+	return Stored{}, false
 }
 
 func (lc *localCache) delete(key string) {
@@ -234,6 +265,52 @@ func (c *Client) GetMany(keys []string) (map[string]string, error) {
 func (c *Client) Set(key string, value string, duration int64) {
 	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
 	c.cache.set(key, value, duration)
+}
+
+// MemoryBackend is true when this Client owns an in-process ttl_map.
+func (c *Client) MemoryBackend() bool {
+	if c == nil || c.cache == nil {
+		return false
+	}
+	_, ok := c.cache.(*localCache)
+	return ok
+}
+
+// SetRemediation stores a packed word in memory ttl_map, or the leftover string.
+func (c *Client) SetRemediation(key string, stored Stored, duration int64) {
+	c.log.Debug(fmt.Sprintf("cache:SetRemediation key:%v duration:%vs", key, duration))
+	if word, packed := stored.PackedWord(); packed && c.MemoryBackend() {
+		c.cache.(*localCache).setValue(key, word, duration)
+		return
+	}
+	c.cache.set(key, stored.IndexForm(), duration)
+}
+
+// GetManyStored returns packed or leftover remediations. Missing keys are omitted.
+func (c *Client) GetManyStored(keys []string) (map[string]Stored, error) {
+	c.log.Debug(fmt.Sprintf("cache:GetManyStored keys:%v", keys))
+	if !c.MemoryBackend() {
+		raw, err := c.GetMany(keys)
+		if err != nil {
+			return nil, err
+		}
+		out := make(map[string]Stored, len(raw))
+		for key, value := range raw {
+			out[key] = Leftover(value)
+		}
+		return out, nil
+	}
+	lc := c.cache.(*localCache)
+	out := make(map[string]Stored)
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		if stored, ok := lc.getStored(key); ok {
+			out[key] = stored
+		}
+	}
+	return out, nil
 }
 
 // redisClientConfig keeps this plugin’s dial 2s and command 1s (not utilities zero-Config defaults).
