@@ -15,3 +15,9 @@ phase: propose
 findings: none
 fixed: n/a
 skipped: n/a
+
+## implement (2026-09-18)
+phase: implement
+findings: none
+fixed: 2xx siteverify status gate before decode; regression Test_ServeHTTP_siteverifyHTTP500SuccessJSONDoesNotMintGate; SHA 98eb1b0
+skipped: n/a
