@@ -7,9 +7,11 @@ repoSlug: crowdsec-bouncer-traefik-plugin
 destBranch: master
 qualify: qualified
 src: sha256:d2b1bf88b08f8a1a1e9be5e922dc2f4e11f0ac29953e563f668527779eaccd90
-localTests: not-run
+localTests: passed
 requirement: requirement.md
 comments: none
 explore: explore.md
 change: plugin-constructor-rollback-appsec-captcha
-pr: none
+pr:
+  id: 76
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/76
