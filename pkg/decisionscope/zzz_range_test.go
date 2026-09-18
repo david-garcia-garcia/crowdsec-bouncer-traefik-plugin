@@ -40,6 +40,29 @@ func TestRemoveRange(t *testing.T) {
 	}
 }
 
+// TestRemoveRangeSameNetworkDifferentSpelling drops AddRange(10.1.2.0/8) when RemoveRange uses 10.0.0.0/8.
+func TestRemoveRangeSameNetworkDifferentSpelling(t *testing.T) {
+	client := newTestDecisionCache()
+	AddRange(client, "10.1.2.0/8", BannedValue, 60)
+	RemoveRange(client, "10.0.0.0/8")
+	if got := remediationFromRangeIndex(client, "10.1.2.3"); got != "" {
+		t.Fatalf("same-network remove still matched: %q", got)
+	}
+}
+
+// TestRemoveRangeUnparseableIdenticalText drops a garbage CIDR line when remove uses that same text.
+func TestRemoveRangeUnparseableIdenticalText(t *testing.T) {
+	client := newTestDecisionCache()
+	if err := ApplyRangeBatch(client, map[string]string{"not-a-cidr": BannedValue}, nil); err != nil {
+		t.Fatalf("seed unparseable: %v", err)
+	}
+	RemoveRange(client, "not-a-cidr")
+	index, err := readRangeIndex(client)
+	if err != nil || index != "" {
+		t.Fatalf("identical unparseable remove left %q err %v", index, err)
+	}
+}
+
 func TestAddRangeUpdatesRemediation(t *testing.T) {
 	client := newTestDecisionCache()
 	AddRange(client, "10.0.0.0/8", CaptchaValue, 60)
