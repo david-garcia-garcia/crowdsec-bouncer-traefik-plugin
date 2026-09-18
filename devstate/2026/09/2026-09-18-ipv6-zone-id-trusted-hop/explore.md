@@ -43,17 +43,17 @@
 ## Open questions
 
 - Q: Who already owns the client address / trust hop this change would reconstruct?
-  Decision: resolved — `pkg/ip.GetRemoteIP` is the in-product owner. Go `net/http` via `TCPAddr.String` owns `req.RemoteAddr` text (including `%zone`). Traefik `ipstrategy` is not the owner. Reuse GetRemoteIP; strip inside `parseIP` that it already calls. Do not parse `RemoteAddr` in a neighbor.
-  By: explore
+  Decision: resolved — `pkg/ip.GetRemoteIP` is the in-product owner. Go `net/http` via `TCPAddr.String` owns `req.RemoteAddr` text (including `%zone`). Traefik `ipstrategy` is not the owner. Reuse GetRemoteIP; strip inside `parseIP` that it already calls. Do not parse `RemoteAddr` in a neighbor. Spec uses GetRemoteIP output only.
+  By: propose
 
 - Q: Should the GetRemoteIP **string** for a zoned RemoteAddr fallback keep `%eth0` or become `fe80::1`?
   Decision: assumed — keep `fe80::1%eth0` (the `SplitHostPort` host). Ticket names membership, hop walk, and yielded `net.IP` only. Rewriting the string is #77-adjacent.
-  By: explore
+  By: propose
 
 - Q: Should a zoned hop in the forwarded header return the original hop text or the stripped address?
   Decision: assumed — original hop text plus stripped `net.IP`, same as today’s unparseable-then-parseable hop contract after the strip lands.
-  By: explore
+  By: propose
 
 - Q: How should `parseIP` strip the zone?
-  Decision: assumed — last `%` on an IPv6-looking string (prefix contains `:`), then existing `net.ParseIP`. One owner. No `netip` import unless propose measures a Yaegi gap.
-  By: explore
+  Decision: resolved — last `%` on an IPv6-looking string (prefix contains `:`), then existing `net.ParseIP`. No `netip` in-tree; Yaegi gap not measured because this path does not import `netip`.
+  By: propose
