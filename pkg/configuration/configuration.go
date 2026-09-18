@@ -111,9 +111,7 @@ type Config struct {
 	RedisCachePasswordFile                     string            `json:"redisCachePasswordFile,omitempty"`
 	RedisCacheDatabase                         string            `json:"redisCacheDatabase,omitempty"`
 	RedisCacheUnreachableBlock                 bool              `json:"redisCacheUnreachableBlock,omitempty"`
-	BanHTMLFilePath                            string            `json:"banHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
 	BanFilePath                                string            `json:"banFilePath,omitempty"`
-	CaptchaHTMLFilePath                        string            `json:"captchaHtmlFilePath,omitempty"` // Deprecated: Keep it for historical compatibility
 	CaptchaFilePath                            string            `json:"captchaFilePath,omitempty"`
 	CaptchaProvider                            string            `json:"captchaProvider,omitempty"`
 	CaptchaCustomJsURL                         string            `json:"captchaCustomJsUrl,omitempty"`
