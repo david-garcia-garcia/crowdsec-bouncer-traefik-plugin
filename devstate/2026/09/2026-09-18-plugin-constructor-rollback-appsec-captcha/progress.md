@@ -11,4 +11,4 @@ JobName: 2026-09-18-plugin-constructor-rollback-appsec-captcha
 | codereview | [x] | [x] | 2026-09-18T13:52:00Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T13:55:00Z |
 | archive | [x] | [x] | 2026-09-18T13:58:00Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-18T13:22:00Z |

@@ -43,4 +43,4 @@
 - [x] 8.2 `go test . -count=1` and `yaegi test -v .` at v0.16.1 — the named-return `defer` under the interpreter is the known risk
 - [x] 8.3 `golangci-lint run ./...`
 - [x] 8.4 Docker `go test -race -count=1 ./pkg/...`
-- [ ] 8.5 CI on the pushed head, including `e2e (docker + pester)`, compared against the previous head's conclusions
+- [x] 8.5 CI on the pushed head, including `e2e (docker + pester)`, compared against the previous head's conclusions

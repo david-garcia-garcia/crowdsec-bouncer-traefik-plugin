@@ -30,4 +30,5 @@ Every defect was measured red on `87d1084` before the fix, then green after.
 - [ ] V5 Real-stack Pester e2e coverage of appsec-mode captcha.
   Status: not taken. Argument: the suite cannot run locally (hard-coded ports 8000/8080/8081 and
   subnet `172.20.0.0/16` collide with the owner's dev stack) and is independently flaky at startup.
-  CI on the pushed head is the measurement.
+  CI on the pushed head is the measurement: `e2e (docker + pester)` succeeded on `77730df`
+  (run 35351880057), as did `e2e (binary + mock LAPI)`, `Race detector` and `Main Process`.
