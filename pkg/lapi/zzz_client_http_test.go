@@ -1,6 +1,7 @@
 package lapi
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -156,6 +157,106 @@ func TestGetToken_UnauthorizedLoginDoesNotRecurse(t *testing.T) {
 	defer mu.Unlock()
 	if loginHits != 1 {
 		t.Fatalf("login requests=%d, want 1", loginHits)
+	}
+}
+
+// TestGetToken_LoginBodyIsValidJSON proves the CAPI login POST is JSON that decodes back to the
+// stored Client credentials, including quote, backslash, newline, and empty or nil scenario lists.
+func TestGetToken_LoginBodyIsValidJSON(t *testing.T) {
+	const metacharacters = "a\"b\\c\nd"
+	cases := []struct {
+		name      string
+		machineID string
+		password  string
+		scenarios []string
+	}{
+		{
+			name:      "metacharacters",
+			machineID: metacharacters,
+			password:  metacharacters,
+			scenarios: []string{metacharacters},
+		},
+		{
+			name:      "empty-scenarios",
+			machineID: "machine",
+			password:  "password",
+			scenarios: []string{},
+		},
+		{
+			name:      "nil-scenarios",
+			machineID: "machine",
+			password:  "password",
+			scenarios: nil,
+		},
+	}
+	for _, loginCase := range cases {
+		t.Run(loginCase.name, func(t *testing.T) {
+			var mu sync.Mutex
+			var loginBody []byte
+			server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+				body, readErr := io.ReadAll(req.Body)
+				if readErr != nil {
+					t.Errorf("login stub read: %v", readErr)
+				}
+				mu.Lock()
+				loginBody = body
+				mu.Unlock()
+				if _, err := rw.Write([]byte(`{"code":200,"token":"fresh","expire":"later"}`)); err != nil {
+					t.Errorf("login stub write: %v", err)
+				}
+			}))
+			defer server.Close()
+			client := newTestQueryClient(t, server, configuration.AloneMode)
+			client.crowdsecMachineID = loginCase.machineID
+			client.crowdsecPassword = loginCase.password
+			client.crowdsecScenarios = loginCase.scenarios
+
+			if err := client.getToken(); err != nil {
+				t.Fatalf("getToken: %v", err)
+			}
+			mu.Lock()
+			postedBody := loginBody
+			mu.Unlock()
+
+			var posted map[string]json.RawMessage
+			if err := json.Unmarshal(postedBody, &posted); err != nil {
+				t.Fatalf("login body is not valid JSON: %v\n%s", err, postedBody)
+			}
+			if len(posted) != 3 {
+				t.Fatalf("login body fields=%d (%v), want 3", len(posted), posted)
+			}
+			var postedMachineID, postedPassword string
+			if err := json.Unmarshal(posted["machine_id"], &postedMachineID); err != nil {
+				t.Fatalf("machine_id: %v", err)
+			}
+			if err := json.Unmarshal(posted["password"], &postedPassword); err != nil {
+				t.Fatalf("password: %v", err)
+			}
+			if postedMachineID != loginCase.machineID {
+				t.Fatalf("machine_id %q, want %q", postedMachineID, loginCase.machineID)
+			}
+			if postedPassword != loginCase.password {
+				t.Fatalf("password %q, want %q", postedPassword, loginCase.password)
+			}
+			if loginCase.scenarios == nil {
+				if string(posted["scenarios"]) != "null" {
+					t.Fatalf("scenarios %s, want null", posted["scenarios"])
+				}
+				return
+			}
+			var postedScenarios []string
+			if err := json.Unmarshal(posted["scenarios"], &postedScenarios); err != nil {
+				t.Fatalf("scenarios: %v", err)
+			}
+			if len(postedScenarios) != len(loginCase.scenarios) {
+				t.Fatalf("scenarios %q, want %q", postedScenarios, loginCase.scenarios)
+			}
+			for i := range loginCase.scenarios {
+				if postedScenarios[i] != loginCase.scenarios[i] {
+					t.Fatalf("scenarios %q, want %q", postedScenarios, loginCase.scenarios)
+				}
+			}
+		})
 	}
 }
 
