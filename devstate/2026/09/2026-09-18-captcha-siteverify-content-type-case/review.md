@@ -34,3 +34,9 @@ findings: missing-packet 1
 fixed: `knowledge/devdocs/core_plugin_middleware_captcha-siteverify.md`
 skipped: none
 
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: FindSpecHost new `core_plugin_middleware_captcha-siteverify`; catalog sync; archive `openspec/changes/archive/2026-09-18-captcha-siteverify-content-type-case/`
+skipped: Task subagent unavailable — FindSpecHost ran on this thread
+
