@@ -21,3 +21,9 @@ phase: implement
 findings: remapped To4 plus 128-bit mask to IPv4 ones-96; hunt tests pass; CI succeeded
 fixed: insert remap on v4 root; three hunt regressions; radix-lookup spec and usage gotcha
 skipped: none
+
+## codereview (2026-09-18)
+phase: codereview
+findings: six axes none
+fixed: none
+skipped: none
