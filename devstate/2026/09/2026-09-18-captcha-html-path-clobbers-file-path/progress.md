@@ -11,4 +11,4 @@ JobName: 2026-09-18-captcha-html-path-clobbers-file-path
 | codereview | [x] | [x] | 2026-09-18T14:49:57.507Z |
 | devdocsimpact | [x] | [x] | 2026-09-18T14:59:33.8409790Z |
 | archive | [x] | [x] | 2026-09-18T15:03:07.588Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-18T15:11:03.230Z |
