@@ -53,7 +53,7 @@ services:
       # Define captcha grade period seconds
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=20"
       # Define captcha HTML file path
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaFilePath=/captcha.html"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.7.8
