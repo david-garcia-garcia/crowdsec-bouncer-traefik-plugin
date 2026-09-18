@@ -115,7 +115,7 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 
 	var hits int64
 	srv := liveLAPI(t, nil, &hits)
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	u, err := url.Parse(srv.URL)
 	if err != nil {
 		t.Fatal(err)
