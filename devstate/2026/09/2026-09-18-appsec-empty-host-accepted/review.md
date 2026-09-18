@@ -21,3 +21,9 @@ phase: implement
 findings: none
 fixed: reject empty AppSec host when enabled; ValidateParams regression
 skipped: n/a
+
+## codereview (2026-09-18)
+phase: codereview
+findings: none
+fixed: n/a
+skipped: n/a
