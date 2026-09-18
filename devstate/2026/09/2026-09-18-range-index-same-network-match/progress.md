@@ -5,7 +5,7 @@ JobName: 2026-09-18-range-index-same-network-match
 | Phase | Work | Card | At |
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-18T16:47:36Z |
-| explore | [ ] | [ ] | |
+| explore | [x] | [ ] | |
 | propose | [ ] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
@@ -14,3 +14,4 @@ JobName: 2026-09-18-range-index-same-network-match
 | pullrequest | [ ] | [ ] | |
 
 Verdict: in progress
+
