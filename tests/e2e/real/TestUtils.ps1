@@ -257,6 +257,10 @@ function Test-HttpRequest {
         Method              = $Method
         MaximumRedirection  = $MaximumRedirection
     }
+    if ($headers.ContainsKey("Content-Type")) {
+        $invoke.ContentType = [string]$headers["Content-Type"]
+        $headers.Remove("Content-Type")
+    }
     if ($null -ne $Body) {
         $invoke.Body = $Body
     }
