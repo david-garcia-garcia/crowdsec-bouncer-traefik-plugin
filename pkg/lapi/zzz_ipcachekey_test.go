@@ -1,6 +1,7 @@
 package lapi
 
 import (
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -172,8 +173,8 @@ func TestApplyRangeBatch_UnreachableReadKeepsSharedIndex(t *testing.T) {
 	client.Set(decisionscope.RangeIndexKey, "10.0.0.0/8="+decisionscope.BannedValue, 3600)
 
 	err := decisionscope.ApplyRangeBatch(client, map[string]string{"192.168.0.0/16": decisionscope.BannedValue}, nil)
-	if err == nil || err.Error() != cache.CacheUnreachable {
-		t.Errorf("apply on an unreadable index returned %v, want %s", err, cache.CacheUnreachable)
+	if err == nil || !errors.Is(err, cache.ErrUnreachable) {
+		t.Errorf("apply on an unreadable index returned %v, want ErrUnreachable", err)
 	}
 	stored, ok := writer.value("sess:" + decisionscope.RangeIndexKey)
 	if !ok || stored != "10.0.0.0/8="+decisionscope.BannedValue {

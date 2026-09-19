@@ -29,7 +29,7 @@ func (c *Client) startStream(config *configuration.Config, log *slog.Logger) err
 	}
 	if config.CrowdsecMode == configuration.AloneMode {
 		if err := c.getToken(); err != nil {
-			c.log.Error("startStream:getToken " + err.Error())
+			c.log.Error("startStream:getToken", "error", err)
 			return err
 		}
 	}
@@ -54,11 +54,11 @@ func (c *Client) handleStreamTicker() {
 	if err := c.handleStreamCache(); err != nil {
 		updateFailure := atomic.LoadInt64(&c.updateFailure)
 		healthy := atomic.LoadInt64(&c.isCrowdsecStreamHealthy) != 0
-		c.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", updateFailure, healthy, err.Error()))
+		c.log.Warn("handleStreamTicker", "updateFailure", updateFailure, "isCrowdsecStreamHealthy", healthy, "error", err)
 		if c.updateMaxFailure != -1 && updateFailure >= c.updateMaxFailure && healthy {
 			atomic.StoreInt64(&c.isCrowdsecStreamHealthy, 0)
 			c.logInfo(MsgStreamUnhealthy, "unhealthy")
-			c.log.Error(fmt.Sprintf("handleStreamTicker:error updateFailure:%d %s", updateFailure, err.Error()))
+			c.log.Error("handleStreamTicker:error", "updateFailure", updateFailure, "error", err)
 		}
 		atomic.AddInt64(&c.updateFailure, 1)
 	} else {

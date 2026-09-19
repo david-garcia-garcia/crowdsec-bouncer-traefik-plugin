@@ -1,6 +1,7 @@
 package decisionscope
 
 import (
+	"errors"
 	"net"
 	"testing"
 
@@ -109,7 +110,7 @@ func TestLookupCachedRemediationMiss(t *testing.T) {
 	if origin != "" || originID != 0 {
 		t.Fatalf("miss origin %q id %d", origin, originID)
 	}
-	if err == nil || err.Error() != cache.CacheMiss {
+	if err == nil || !errors.Is(err, cache.ErrMiss) {
 		t.Fatalf("want cache miss, got %v", err)
 	}
 }
@@ -157,7 +158,7 @@ func TestLookupCachedRemediationNilMembershipDoesNotReadBlob(t *testing.T) {
 	client := newTestDecisionCache()
 	AddRange(client, "10.0.0.0/8", BannedValue, 60)
 	got, _, _, err := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, nil)
-	if err == nil || err.Error() != cache.CacheMiss {
+	if err == nil || !errors.Is(err, cache.ErrMiss) {
 		t.Fatalf("nil membership must not read blob, got %q %v", got, err)
 	}
 }
@@ -171,7 +172,7 @@ func TestLookupCachedRemediationStreamUsesMembershipNotBlob(t *testing.T) {
 		t.Fatalf("membership must win over unread blob, got %q %v", got, err)
 	}
 	_, origin, originID, missErr := LookupCachedRemediation(client, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, MembershipFromIndex(""))
-	if missErr == nil || missErr.Error() != cache.CacheMiss || origin != "" || originID != 0 {
+	if missErr == nil || !errors.Is(missErr, cache.ErrMiss) || origin != "" || originID != 0 {
 		t.Fatalf("empty membership must not read blob, got %v origin %q id %d", missErr, origin, originID)
 	}
 }

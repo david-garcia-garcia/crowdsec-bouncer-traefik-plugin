@@ -24,7 +24,7 @@ func (c *Client) streamQuery() string {
 func (c *Client) storeStreamDecision(item Decision, duration int64) {
 	value := decisionscope.RemediationValue(item.Type)
 	if value == "" {
-		c.log.Debug("handleStreamCache:unknownType " + item.Type)
+		c.log.Debug("handleStreamCache:unknownType", "type", item.Type)
 		return
 	}
 	origin := MetricsOrigin(item.Origin, item.Scenario)
@@ -38,7 +38,7 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 		return
 	default:
 		if _, ok := c.snapshotLiveHeaderScopes()[scope]; !ok {
-			c.log.Debug("handleStreamCache:ignoredScope " + item.Scope)
+			c.log.Debug("handleStreamCache:ignoredScope", "scope", item.Scope)
 			return
 		}
 		identifier := decisionscope.NormalizeHeaderScopeValue(scope, item.Value)
@@ -169,7 +169,7 @@ func (c *Client) mergeLiveScope(chosen string, parsedDuration time.Duration, sco
 	}
 	headerChosen, headerDuration, headerErr := c.queryLiveDecisions("scope=" + url.QueryEscape(scope) + "&value=" + url.QueryEscape(identifier))
 	if headerErr != nil {
-		c.log.Warn("handleNoStreamCache:scopeQuery " + scope + " " + headerErr.Error())
+		c.log.Warn("handleNoStreamCache:scopeQuery", "scope", scope, "error", headerErr)
 		return chosen, parsedDuration, headerErr
 	}
 	c.cacheLiveScope(decisionscope.HeaderScopeKey(scope, identifier), headerChosen, headerDuration, isLiveMode, defaultDecisionSeconds)

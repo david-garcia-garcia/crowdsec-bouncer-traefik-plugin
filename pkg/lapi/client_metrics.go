@@ -82,7 +82,7 @@ func newMetricsReporter(client *Client, startedAt time.Time) *MetricsReporter {
 // handleMetricsTicker POSTs the current usage-metrics window from the Client ticker.
 func (c *Client) handleMetricsTicker() {
 	if err := c.reportMetrics(); err != nil {
-		c.log.Error("handleMetricsTicker:reportMetrics " + err.Error())
+		c.log.Error("handleMetricsTicker:reportMetrics", "error", err)
 	}
 }
 
@@ -92,7 +92,7 @@ func (c *Client) drainMetrics() {
 		return
 	}
 	if err := c.reportMetrics(); err != nil {
-		c.log.Error("drainMetrics:reportMetrics " + err.Error())
+		c.log.Error("drainMetrics:reportMetrics", "error", err)
 	}
 }
 
@@ -292,7 +292,7 @@ func (r *MetricsReporter) reportMetrics() error {
 	items = appendProcessedWindow(items, "ipv6", processedIPv6)
 	items = appendProcessedWindow(items, "", processedUnknown)
 
-	r.log.Debug(fmt.Sprintf("reportMetrics: items=%d window_size=%ds", len(items), windowSizeSeconds))
+	r.log.Debug("reportMetrics", "items", len(items), "window_size", windowSizeSeconds)
 
 	metrics := map[string]interface{}{
 		"remediation_components": []map[string]interface{}{

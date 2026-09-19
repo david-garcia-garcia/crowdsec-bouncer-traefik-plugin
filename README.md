@@ -222,6 +222,9 @@ Site secret key for the captcha provider.
 **CaptchaSiteKey** (string, no default)
 Site key for the captcha provider.
 
+**CaptchaSiteverifyHTTPTimeoutSeconds** (int64, default `0`)
+Timeout in seconds for the captcha provider siteverify client. Zero or omitted inherits `HTTPTimeoutSeconds`.
+
 **ClientTrustedIPs** ([]string, default `[]`)
 Client IPs that bypass bouncer and cache checks (LAN or VPN). Trusted clients also skip AppSec.
 
@@ -236,6 +239,9 @@ What to do when AppSec does not return a usable verdict (HTTP 500, unreachable, 
 
 **CrowdsecAppsecHost** (string, default `"crowdsec:7422"`)
 AppSec host and port.
+
+**CrowdsecAppsecHTTPTimeoutSeconds** (int64, default `0`)
+Timeout in seconds when contacting AppSec. Zero or omitted inherits `HTTPTimeoutSeconds`. Example: `crowdsecAppsecHttpTimeoutSeconds: 1` with `crowdsecAppsecFailureAction: passthrough` so an AppSec hang fails open after one second instead of the shared default.
 
 **CrowdsecAppsecKey** (string, default value of `CrowdsecLapiKey`)
 AppSec key for the bouncer.
@@ -266,6 +272,9 @@ What to do when LAPI does not return a usable verdict (live/none HTTP or parse e
 
 **CrowdsecLapiHost** (string, default `"crowdsec:8080"`)
 LAPI host and port.
+
+**CrowdsecLapiHTTPTimeoutSeconds** (int64, default `0`)
+Timeout in seconds when contacting LAPI. Zero or omitted inherits `HTTPTimeoutSeconds`.
 
 **CrowdsecLapiKey** (string, default `""`)
 LAPI key for the bouncer.
@@ -310,7 +319,7 @@ Skip the socket-peer gate, treat the named header as a single client address wit
 IPs of trusted proxies in front of Traefik (for example Cloudflare). The forwarded header is honored only when the connecting peer is in this list. While empty, forwarded headers are ignored and the plugin remediates the connecting address. If Traefik sits behind a load balancer or CDN, list it here or every visitor is remediated as the proxy. Without `ForwardedHeadersInsecure` there is no way to trust every peer. A catch-all `0.0.0.0/0` plus `::/0` passes the peer check but then treats the header value as a trusted hop and falls back to the connecting address with no warning (peer `203.0.113.7`, `X-Real-Ip: 198.51.100.9` resolves to `203.0.113.7`). `0.0.0.0/0` is IPv4 only and `::/0` is IPv6 only. Private ranges `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` are the alternative to enumerating proxies on a private ingress: the peer must be inside a listed range and the real client must not. Verified working: pool `172.16.0.0/12`, peer `172.18.0.5`, `X-Real-Ip: 198.51.100.9` → `198.51.100.9`. Verified failure: pool `10.0.0.0/8`, peer `10.1.2.3`, `X-Real-Ip: 10.9.9.9` → `10.1.2.3`.
 
 **HTTPTimeoutSeconds** (int64, default `10`)
-Timeout in seconds when contacting LAPI.
+Shared default timeout in seconds for LAPI, AppSec, and captcha siteverify. Per-backend knobs inherit this value when they are zero or omitted.
 
 **LogFilePath** (string, default `""`)
 File path for logs. Must be writable by Traefik. Rotation may need a Traefik restart.
@@ -448,12 +457,15 @@ http:
           defaultDecisionSeconds: 60
           remediationStatusCode: 403
           httpTimeoutSeconds: 10
+          crowdsecLapiHttpTimeoutSeconds: 0
+          captchaSiteverifyHttpTimeoutSeconds: 0
           crowdsecMode: live
           crowdsecAppsecEnabled: false
           crowdsecAppsecScheme: ""
           crowdsecAppsecHost: crowdsec:7422
           crowdsecAppsecPath: "/"
-          crowdsecAppsecFailureAction: ban
+          crowdsecAppsecHttpTimeoutSeconds: 1
+          crowdsecAppsecFailureAction: passthrough
           crowdsecAppsecBodyLimit: 10485760
           crowdsecLapiKey: privateKey-foo
           crowdsecLapiScheme: http

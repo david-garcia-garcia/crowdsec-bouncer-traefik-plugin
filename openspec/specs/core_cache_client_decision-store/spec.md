@@ -53,7 +53,7 @@ When Redis is enabled, every GET/SET/DEL/MGET/Eval key the store sends SHALL be 
 - **AND** the Redis pool is not closed
 
 ### Requirement: Cache payloads stay opaque strings
-A cache Client SHALL store and return opaque strings on `Set`/`Get`/`GetMany` and SHALL also store and return a machine word on `SetInt`/`GetInt` (`uint32` is enough). The cache package MUST NOT export CrowdSec remediation names (`BannedValue`, `CaptchaValue`, `NoBannedValue`). The cache package MUST NOT know kind, origin, Packed, Stored, Leftover, Remediation, or range-index separators. It MUST NOT export `SetRemediation`, `GetManyStored`, `ParsePackedOriginID`, or a `MemoryBackend` type switch for remediations. Store errors SHALL remain `CacheMiss` and `CacheUnreachable`. `GetInt` SHALL return `CacheMiss` when the key is absent or the stored value is not that word (including a leftover string). Client address, when this leaf mentions it, SHALL reuse `pkg/ip.GetRemoteIP` (do not parse `RemoteAddr`).
+A cache Client SHALL store and return opaque strings on `Set`/`Get`/`GetMany` and SHALL also store and return a machine word on `SetInt`/`GetInt` (`uint32` is enough). The cache package MUST NOT export CrowdSec remediation names (`BannedValue`, `CaptchaValue`, `NoBannedValue`). The cache package MUST NOT know kind, origin, Packed, Stored, Leftover, Remediation, or range-index separators. It MUST NOT export `SetRemediation`, `GetManyStored`, `ParsePackedOriginID`, or a `MemoryBackend` type switch for remediations. Store errors SHALL be the package sentinels `ErrMiss` and `ErrUnreachable`. Their `Error()` text SHALL remain `CacheMiss` (`cache:miss`) and `CacheUnreachable` (`cache:unreachable`). Callers that distinguish miss from unreachable SHALL use `errors.Is`. A clean miss MUST NOT allocate a new error value. Memory and Redis backends SHALL return the same sentinels. GetMany SHALL keep omitting missing keys. `GetInt` SHALL return `ErrMiss` when the key is absent or the stored value is not that word (including a leftover string). Client address, when this leaf mentions it, SHALL reuse `pkg/ip.GetRemoteIP` (do not parse `RemoteAddr`).
 
 #### Scenario: Cache tests treat values as opaque
 - **WHEN** a cache test Sets and Gets a payload
@@ -65,8 +65,22 @@ A cache Client SHALL store and return opaque strings on `Set`/`Get`/`GetMany` an
 
 #### Scenario: GetInt misses a leftover string
 - **WHEN** a memory cache Client Sets key `k` to a leftover string
-- **THEN** GetInt of `k` returns `CacheMiss`
+- **THEN** GetInt of `k` returns `ErrMiss`
 - **AND** Get of `k` returns that string
+
+#### Scenario: In-memory miss is the miss sentinel
+- **WHEN** a memory DecisionStore Get of an absent key returns an error
+- **THEN** `errors.Is(err, ErrMiss)` is true
+- **AND** `err.Error()` is `cache:miss`
+
+#### Scenario: Redis unreachable is the unreachable sentinel
+- **WHEN** a Redis DecisionStore Get fails because the store is unreachable
+- **THEN** `errors.Is(err, ErrUnreachable)` is true
+- **AND** `err.Error()` is `cache:unreachable`
+
+#### Scenario: Lookup miss is the miss sentinel
+- **WHEN** `LookupCachedRemediation` finds no active remediation and the Ip key is absent
+- **THEN** the returned error satisfies `errors.Is(err, ErrMiss)`
 
 ### Requirement: DecisionStore owns the origin intern table
 A DecisionStore SHALL own an append-only origin intern table (name→`uint16`) and a lock-free `OriginName` lookup. The pack word SHALL be `uint32(kind[0]) | uint32(id)<<8`. The table MUST NOT be a package variable. Two DecisionStores with different reclaim keys MUST NOT share the table. Intern MUST stay off `lapi.Client` except thin forwards tests need. When intern would overflow `uint16`, that origin SHALL stay on the leftover string path. Stream and alone memory Ip and header writes SHALL pack and `SetInt` when intern succeeds. Redis, live/none, and overflow SHALL keep leftover strings via `Set`. Range-index blobs SHALL use `Set`, never `SetInt`. Client address SHALL reuse `pkg/ip.GetRemoteIP`. CrowdSec cursor identity SHALL reuse `SessionHex`.
@@ -82,7 +96,7 @@ A DecisionStore SHALL own an append-only origin intern table (name→`uint16`) a
 #### Scenario: Overflow keeps leftover strings
 - **WHEN** intern would assign an id past `uint16` max
 - **THEN** that origin’s Ip slot is stored with `Set` as a leftover string
-- **AND** GetInt of that slot is `CacheMiss`
+- **AND** GetInt of that slot is `ErrMiss`
 
 ### Requirement: Stream and live write TTLs stay split
 When stream apply stores a non-Range decision, the store write TTL SHALL be `int64` of the parsed CrowdSec duration in seconds, with no clamp. A sub-second duration SHALL become `0`. Live and none writes SHALL use `liveCacheTTL`: when `durationSecond<=0` or `defaultDecisionSeconds` is smaller than `durationSecond`, the write TTL SHALL be `defaultDecisionSeconds`; otherwise it SHALL be `durationSecond`. Stream MUST NOT use `liveCacheTTL`. Live and none MUST NOT pass raw `Seconds()` without that substitution.

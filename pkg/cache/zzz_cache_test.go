@@ -4,6 +4,7 @@ package cache
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -27,12 +28,12 @@ func Test_Get(t *testing.T) {
 		args     args
 		want     string
 		wantErr  bool
-		valueErr string
+		valueErr error
 	}{
-		{name: "Fetch Known valid IP", args: args{clientIP: IPInCache}, want: "t", wantErr: false, valueErr: ""},
-		{name: "Fetch Unknown valid IP", args: args{clientIP: IPNotInCache}, want: "", wantErr: true, valueErr: CacheMiss},
-		{name: "Fetch invalid value", args: args{clientIP: "test"}, want: "", wantErr: true, valueErr: CacheMiss},
-		{name: "Fetch empty value", args: args{clientIP: ""}, want: "", wantErr: true, valueErr: CacheMiss},
+		{name: "Fetch Known valid IP", args: args{clientIP: IPInCache}, want: "t", wantErr: false},
+		{name: "Fetch Unknown valid IP", args: args{clientIP: IPNotInCache}, want: "", wantErr: true, valueErr: ErrMiss},
+		{name: "Fetch invalid value", args: args{clientIP: "test"}, want: "", wantErr: true, valueErr: ErrMiss},
+		{name: "Fetch empty value", args: args{clientIP: ""}, want: "", wantErr: true, valueErr: ErrMiss},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -45,8 +46,8 @@ func Test_Get(t *testing.T) {
 				t.Errorf("Get() = %v, want %v", got, tt.want)
 				return
 			}
-			if tt.valueErr != "" && tt.valueErr != err.Error() {
-				t.Errorf("Get() err = %v, want %v", err.Error(), tt.valueErr)
+			if tt.valueErr != nil && !errors.Is(err, tt.valueErr) {
+				t.Errorf("Get() err = %v, want %v", err, tt.valueErr)
 			}
 		})
 	}
@@ -66,11 +67,11 @@ func Test_Set(t *testing.T) {
 		args     args
 		want     string
 		wantErr  bool
-		valueErr string
+		valueErr error
 	}{
-		{name: "Set valid IP in local cache for 0 sec", args: args{clientIP: IPInCache, value: "t", duration: 0}, want: "", wantErr: true, valueErr: CacheMiss},
-		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: "t", duration: 10}, want: "t", wantErr: false, valueErr: ""},
-		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: "f", duration: 10}, want: "f", wantErr: false, valueErr: ""},
+		{name: "Set valid IP in local cache for 0 sec", args: args{clientIP: IPInCache, value: "t", duration: 0}, want: "", wantErr: true, valueErr: ErrMiss},
+		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: "t", duration: 10}, want: "t", wantErr: false},
+		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: "f", duration: 10}, want: "f", wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -84,8 +85,8 @@ func Test_Set(t *testing.T) {
 				t.Errorf("Set() = %v, want %v", got, tt.want)
 				return
 			}
-			if tt.valueErr != "" && tt.valueErr != err.Error() {
-				t.Errorf("Set() err = %v, want %v", err.Error(), tt.valueErr)
+			if tt.valueErr != nil && !errors.Is(err, tt.valueErr) {
+				t.Errorf("Set() err = %v, want %v", err, tt.valueErr)
 			}
 		})
 	}
@@ -105,10 +106,10 @@ func Test_Delete(t *testing.T) {
 		args     args
 		want     string
 		wantErr  bool
-		valueErr string
+		valueErr error
 	}{
-		{name: "Delete Known valid IP", args: args{clientIP: IPInCache}, want: "", wantErr: true, valueErr: CacheMiss},
-		{name: "Delete Unknown valid IP", args: args{clientIP: IPNotInCache}, want: "", wantErr: true, valueErr: CacheMiss},
+		{name: "Delete Known valid IP", args: args{clientIP: IPInCache}, want: "", wantErr: true, valueErr: ErrMiss},
+		{name: "Delete Unknown valid IP", args: args{clientIP: IPNotInCache}, want: "", wantErr: true, valueErr: ErrMiss},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -122,8 +123,8 @@ func Test_Delete(t *testing.T) {
 				t.Errorf("Delete() = %v, want %v", got, tt.want)
 				return
 			}
-			if tt.valueErr != "" && tt.valueErr != err.Error() {
-				t.Errorf("Delete() err = %v, want %v", err.Error(), tt.valueErr)
+			if tt.valueErr != nil && !errors.Is(err, tt.valueErr) {
+				t.Errorf("Delete() err = %v, want %v", err, tt.valueErr)
 			}
 		})
 	}
@@ -214,8 +215,11 @@ func Test_memoryClientsDoNotShare(t *testing.T) {
 	if err == nil || got != "" {
 		t.Fatalf("client B got %q err %v, want miss", got, err)
 	}
+	if !errors.Is(err, ErrMiss) {
+		t.Fatalf("client B err %v, want ErrMiss", err)
+	}
 	if err.Error() != CacheMiss {
-		t.Fatalf("client B err %v, want %s", err, CacheMiss)
+		t.Fatalf("client B err text %q, want %s", err.Error(), CacheMiss)
 	}
 	a.Close()
 	b.Close()
@@ -319,8 +323,8 @@ func Test_redisGetMissMapsCacheMiss(t *testing.T) {
 	client.New(logger.New("INFO", ""), true, host, nil, "", "", "p")
 	defer client.Close()
 	got, err := client.Get("missing-key")
-	if got != "" || err == nil || err.Error() != CacheMiss {
-		t.Fatalf("Get miss got %q err %v, want cache:miss", got, err)
+	if got != "" || err == nil || !errors.Is(err, ErrMiss) {
+		t.Fatalf("Get miss got %q err %v, want ErrMiss", got, err)
 	}
 }
 
@@ -329,8 +333,11 @@ func Test_GetManyUnreachable(t *testing.T) {
 	client.New(logger.New("INFO", ""), true, "127.0.0.1:1", nil, "", "", "p")
 	defer client.Close()
 	_, err := client.GetMany([]string{"k"})
-	if err == nil || err.Error() != CacheUnreachable {
-		t.Fatalf("GetMany unreachable got %v, want %s", err, CacheUnreachable)
+	if err == nil || !errors.Is(err, ErrUnreachable) {
+		t.Fatalf("GetMany unreachable got %v, want ErrUnreachable", err)
+	}
+	if err.Error() != CacheUnreachable {
+		t.Fatalf("GetMany unreachable text %q, want %s", err.Error(), CacheUnreachable)
 	}
 }
 

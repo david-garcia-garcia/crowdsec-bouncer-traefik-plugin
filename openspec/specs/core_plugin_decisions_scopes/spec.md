@@ -207,6 +207,21 @@ An Ip, header-scope, or Range-index leftover cache value SHALL still start with 
 - **AND** a drop resolves origin `crowdsec` from the store table
 - **AND** an allow-path GetInt for a none word does not call OriginName
 
+### Requirement: Range hit recovers stored remediation from the winning prefix
+When in-process Range membership remediates a client IP, it SHALL return the utilities Helper metadata already held on the winning prefix of the matching ban or captcha set. It MUST NOT re-parse `storedByCIDR` on that request. Nil or empty membership SHALL still be a miss. Ban SHALL still win over captcha. Packed letter-plus-intern-id lines and leftover letter-plus-origin lines SHALL both stay valid metadata. The client address SHALL remain the `net.IP` already produced by `pkg/ip.GetRemoteIP`. The `range-index` blob format SHALL stay `cidr=remediation` lines. Ban and captcha MUST stay on separate Helpers.
+
+#### Scenario: Suffixed Range hit returns the stored origin
+- **WHEN** membership holds `10.0.0.0/8=` plus `t` plus a unit-separator and `crowdsec` and the client IP is `10.1.2.3`
+- **THEN** remediation is that stored string
+
+#### Scenario: Longer ban prefix wins the origin
+- **WHEN** membership holds a wide ban with origin `crowdsec` and a narrower ban with origin `cscli` that both contain the client IP
+- **THEN** remediation is the narrower stored string
+
+#### Scenario: Nil membership is a miss
+- **WHEN** membership is nil
+- **THEN** Range matching does not remediate
+
 ### Requirement: Live IP cache slot is the IP query result
 When live mode writes a client-address cache entry after a LAPI lookup, that entry SHALL be the client-address (`?ip=`) query result only. Header-mapped remediations SHALL stay on the header-scope cache keys that already store each mapped header result. The client-address key SHALL be the address `pkg/ip.GetRemoteIP` already chose and that the live lookup received; this leaf MUST NOT parse `RemoteAddr` or walk forwarded headers again. Header identity SHALL be the map `decisionscope.RequestScopeValues` already produced; this leaf MUST NOT re-read request headers to decide the IP-slot write.
 

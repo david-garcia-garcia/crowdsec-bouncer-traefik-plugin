@@ -26,6 +26,8 @@ func newTransport(config *configuration.Config, log *slog.Logger) (*transport, e
 	if err != nil {
 		return nil, err
 	}
+	// Store effective seconds so AdoptTransport last-writes a shared-default change when the override is still 0.
+	timeoutSeconds := config.EffectiveHTTPTimeoutSeconds(config.CrowdsecAppsecHTTPTimeoutSeconds)
 	return &transport{
 		httpClient: &http.Client{
 			Transport: &http.Transport{
@@ -34,10 +36,10 @@ func newTransport(config *configuration.Config, log *slog.Logger) (*transport, e
 				IdleConnTimeout:     30 * time.Second,
 				TLSClientConfig:     tlsConfig,
 			},
-			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
+			Timeout: time.Duration(timeoutSeconds) * time.Second,
 		},
 		key:                           config.CrowdsecAppsecKey,
-		httpTimeoutSeconds:            config.HTTPTimeoutSeconds,
+		httpTimeoutSeconds:            timeoutSeconds,
 		appsecTLSInsecureVerify:       config.CrowdsecAppsecTLSInsecureVerify,
 		appsecTLSCertificateAuthority: config.CrowdsecAppsecTLSCertificateAuthority,
 		appsecTLSCertificateBouncer:   config.CrowdsecAppsecTLSCertificateBouncer,

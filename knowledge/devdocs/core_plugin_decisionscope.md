@@ -15,8 +15,8 @@ A range-index remediation of the letter plus a decimal intern id (`t12`). Bare l
 _Avoid_: packing the blob as `SetInt`, U+001F on a packed line
 
 **Range membership**:
-Two boolean CIDR sets (ban, captcha) on the reclaimed LAPI Client plus the stored remediation string per CIDR. Request lookup always asks this pair. Nil or empty (live/none never hydrate) is a Range miss. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s leftover suffix or packed intern id.
-_Avoid_: trusted-IP Checker, one LPM tree with a stored remediation, `sync.Once`, package globals, a Crowdsec-mode flag on lookup
+Two utilities Helpers (ban, captcha) on the reclaimed LAPI Client. Each Range `AddCIDR` MAY pass the blob remediation string (letter, leftover U+001F origin, or packed letter plus decimal intern id) as metadata. Request lookup always asks this pair. Nil or empty (live/none never hydrate) is a Range miss. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s leftover suffix or packed intern id.
+_Avoid_: trusted-IP Checker, one LPM tree, `sync.Once`, package globals, a Crowdsec-mode flag on lookup, re-parsing `storedByCIDR` on a Range hit
 
 **Ip cache key**:
 The one canonical spelling an Ip-scoped decision is filed under, `net.IP.String()` of the address. `IPCacheKey` derives it from a LAPI decision value (host prefix, bare address, or verbatim when neither). After a successful parse, `clientRequest.remoteIP` is that same string and is the request-path key. CrowdSec stores decision values verbatim, so the store path still canonicalizes text; the request path must not re-parse.

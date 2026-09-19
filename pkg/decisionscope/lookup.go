@@ -1,7 +1,6 @@
 package decisionscope
 
 import (
-	"errors"
 	"net"
 	"net/http"
 	"sort"
@@ -132,7 +131,7 @@ func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr 
 	if chosen.stored != "" {
 		return RemediationKind(chosen.stored), chosen.origin, chosen.originID, nil
 	}
-	return "", "", 0, errors.New(cache.CacheMiss)
+	return "", "", 0, cache.ErrMiss
 }
 
 // LookupCacheKeys is the GetMany key list for the request path: IP, then present header scopes. Range is not a cache key.
