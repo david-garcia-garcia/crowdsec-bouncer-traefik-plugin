@@ -4,7 +4,7 @@ JobName: 2026-09-19-optcow-stream-lookup
 
 | Phase | Work | Card | At |
 |-------|------|------|----|
-| prepare | [ ] | [ ] | |
+| prepare | [x] | [x] | 2026-09-19T14:41:30.375Z |
 | explore | [ ] | [ ] | |
 | propose | [ ] | [ ] | |
 | implement | [ ] | [ ] | |
