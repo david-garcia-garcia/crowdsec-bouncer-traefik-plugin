@@ -25,7 +25,7 @@ func (c *Client) Acquire(ctx context.Context, key, value string, duration int64)
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	c.log.Debug("cache:Acquire key:" + key)
+	c.log.Debug("cache:Acquire", "key", key)
 	return c.cache.acquire(ctx, key, value, duration)
 }
 

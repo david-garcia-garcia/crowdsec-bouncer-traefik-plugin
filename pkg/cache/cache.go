@@ -5,7 +5,6 @@ package cache
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -157,13 +156,13 @@ func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
 // set writes the writer, logs a Redis error, and returns; Set is void.
 func (rc *redisCache) set(key, value string, duration int64) {
 	if err := rc.writer.Set(context.Background(), prefixed(rc.prefix, key), []byte(value), duration); err != nil {
-		rc.log.Error("cache:setDecisionRedisCache" + err.Error())
+		rc.log.Error("cache:setDecisionRedisCache", "error", err)
 	}
 }
 
 func (rc *redisCache) delete(key string) {
 	if err := rc.writer.Del(context.Background(), prefixed(rc.prefix, key)); err != nil {
-		rc.log.Error("cache:deleteDecisionRedisCache " + err.Error())
+		rc.log.Error("cache:deleteDecisionRedisCache", "error", err)
 	}
 }
 
@@ -200,14 +199,14 @@ func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts
 		// Hold each client by pointer after New so the pool mutex is not copied.
 		writer, err := simpleredis.New(redisClientConfig(writeHost, pass, database, log))
 		if err != nil {
-			log.Error("cache:New writer " + err.Error())
+			log.Error("cache:New writer", "error", err)
 			return
 		}
 		rc.writer = writer
 		for _, h := range readHosts {
 			reader, readerErr := simpleredis.New(redisClientConfig(h, pass, database, log))
 			if readerErr != nil {
-				log.Error("cache:New reader " + readerErr.Error())
+				log.Error("cache:New reader", "error", readerErr)
 				continue
 			}
 			rc.readers = append(rc.readers, reader)
@@ -216,32 +215,32 @@ func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts
 	} else {
 		c.cache = &localCache{store: ttl_map.New()}
 	}
-	c.log.Debug(fmt.Sprintf("cache:New initialized isRedis:%v writeHost:%v readHosts:%v prefix:%v", isRedis, writeHost, readHosts, keyPrefix))
+	c.log.Debug("cache:New initialized", "isRedis", isRedis, "writeHost", writeHost, "readHosts", readHosts, "prefix", keyPrefix)
 }
 
 // Delete delete decision in cache.
 func (c *Client) Delete(key string) {
-	c.log.Debug(fmt.Sprintf("cache:Delete key:%v", key))
+	c.log.Debug("cache:Delete", "key", key)
 	c.cache.delete(key)
 }
 
 // Get check in the cache if the IP has the banned / not banned value.
 // Otherwise return with an error to add the IP in cache if we are on.
 func (c *Client) Get(key string) (string, error) {
-	c.log.Debug(fmt.Sprintf("cache:Get key:%v", key))
+	c.log.Debug("cache:Get", "key", key)
 	return c.cache.get(key)
 }
 
 // GetMany returns the values for the given keys. Missing keys are omitted.
 // Redis issues one MGET on a single reader. Unreachable returns CacheUnreachable.
 func (c *Client) GetMany(keys []string) (map[string]string, error) {
-	c.log.Debug(fmt.Sprintf("cache:GetMany keys:%v", keys))
+	c.log.Debug("cache:GetMany", "keys", keys)
 	return c.cache.getMany(keys)
 }
 
 // Set update the cache with the IP as key and the value banned / not banned.
 func (c *Client) Set(key string, value string, duration int64) {
-	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
+	c.log.Debug("cache:Set", "key", key, "value", value, "duration", duration)
 	c.cache.set(key, value, duration)
 }
 

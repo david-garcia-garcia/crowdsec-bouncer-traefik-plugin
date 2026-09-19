@@ -203,17 +203,17 @@ func (c *Client) getToken() error {
 		c.transport.Store(&updated)
 		return nil
 	}
-	c.log.Warn("getToken statusCode:" + strconv.Itoa(login.Code))
+	c.log.Warn("getToken", "statusCode", login.Code)
 	return errors.New("getToken statusCode:" + strconv.Itoa(login.Code))
 }
 
 // drainResponse consumes leftover bytes so the LAPI HTTP connection can be reused.
 func (c *Client) drainResponse(res *http.Response) {
 	if _, errDrain := io.Copy(io.Discard, res.Body); errDrain != nil {
-		c.log.Debug("crowdsecQuery:drainBody " + errDrain.Error())
+		c.log.Debug("crowdsecQuery:drainBody", "error", errDrain)
 	}
 	if errClose := res.Body.Close(); errClose != nil {
-		c.log.Error("crowdsecQuery:closeBody " + errClose.Error())
+		c.log.Error("crowdsecQuery:closeBody", "error", errClose)
 	}
 }
 
