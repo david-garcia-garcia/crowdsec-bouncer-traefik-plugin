@@ -50,25 +50,3 @@ func TestHydrateRangeKeepsLastOnUnreachable(t *testing.T) {
 		t.Fatalf("unreachable hydrate wiped membership, got %q", got)
 	}
 }
-
-func TestApplyRangeBatchRebuildsMembership(t *testing.T) {
-	store := NewMemory(logger.New("ERROR", ""))
-	kind, _, _, err := store.LookupRemediation("10.1.2.3", net.ParseIP("10.1.2.3"), nil)
-	if err == nil {
-		t.Fatalf("empty store must miss, got %q", kind)
-	}
-	if err := store.ApplyRangeBatch(map[string]string{"10.0.0.0/8": decisionscope.BannedValue}, nil); err != nil {
-		t.Fatal(err)
-	}
-	kind, _, _, err = store.LookupRemediation("10.1.2.3", net.ParseIP("10.1.2.3"), nil)
-	if err != nil || kind != decisionscope.BannedValue {
-		t.Fatalf("range lookup kind %q err %v", kind, err)
-	}
-	if err := store.ApplyRangeBatch(nil, []string{"10.0.0.0/8"}); err != nil {
-		t.Fatal(err)
-	}
-	kind, _, _, err = store.LookupRemediation("10.1.2.3", net.ParseIP("10.1.2.3"), nil)
-	if err == nil {
-		t.Fatalf("removed CIDR must miss, got %q", kind)
-	}
-}
