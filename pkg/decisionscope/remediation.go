@@ -1,9 +1,7 @@
 package decisionscope
 
 import (
-	"strconv"
 	"strings"
-	"unicode"
 )
 
 const remediationOriginSep = "\x1f"
@@ -39,48 +37,41 @@ func RemediationWithOrigin(kind, origin string) string {
 	return kind + remediationOriginSep + origin
 }
 
-// PackWord is the store/lapi packed remediation: kind letter in the low byte, intern id above.
-func PackWord(kind string, originID uint16) uint32 {
+// OriginIntern is the DecisionStore intern table used when packing cache payloads.
+type OriginIntern interface {
+	Intern(name string) (uint16, bool)
+	PacksMemory() bool
+}
+
+// Pack encodes a cache slot payload: a memory uint32 word when intern succeeds, otherwise a leftover string.
+func Pack(kind, origin string, origins OriginIntern) any {
+	if kind != "" && origins != nil && origins.PacksMemory() {
+		if originID, ok := origins.Intern(origin); ok {
+			return packWord(kind, originID)
+		}
+	}
+	return RemediationWithOrigin(kind, origin)
+}
+
+// Unpack reads a Pack word or a leftover/bare letter string.
+func Unpack(payload any) (kind, origin string, originID uint16) {
+	switch stored := payload.(type) {
+	case uint32:
+		return unpackWord(stored)
+	case string:
+		return RemediationKind(stored), RemediationOrigin(stored), 0
+	default:
+		return "", "", 0
+	}
+}
+
+func packWord(kind string, originID uint16) uint32 {
 	if kind == "" {
 		return 0
 	}
 	return uint32(kind[0]) | uint32(originID)<<8
 }
 
-// UnpackWord splits a packed remediation word into kind letter and intern id.
-func UnpackWord(word uint32) (string, uint16) {
-	return string([]byte{byte(word)}), uint16(word >> 8) //nolint:gosec // G115 packed id is stored in 16 bits
-}
-
-// PackedRemediationLine is a range-index value: letter plus decimal intern id.
-func PackedRemediationLine(kind string, originID uint16) string {
-	if originID == 0 {
-		return kind
-	}
-	return kind + strconv.FormatUint(uint64(originID), 10)
-}
-
-// SplitStoredRemediation reads leftover U+001F origin or a packed letter+decimal id.
-func SplitStoredRemediation(stored string) (string, string, uint16) {
-	kind := RemediationKind(stored)
-	if stored == "" {
-		return "", "", 0
-	}
-	if _, origin, ok := strings.Cut(stored, remediationOriginSep); ok {
-		return kind, origin, 0
-	}
-	if len(stored) <= 1 {
-		return kind, "", 0
-	}
-	rest := stored[1:]
-	for _, r := range rest {
-		if !unicode.IsDigit(r) {
-			return kind, "", 0
-		}
-	}
-	parsed, err := strconv.ParseUint(rest, 10, 16)
-	if err != nil {
-		return kind, "", 0
-	}
-	return kind, "", uint16(parsed)
+func unpackWord(word uint32) (kind, origin string, originID uint16) {
+	return string([]byte{byte(word)}), "", uint16(word >> 8) //nolint:gosec // G115 intern id is stored in 16 bits
 }

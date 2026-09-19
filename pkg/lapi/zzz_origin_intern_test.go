@@ -29,22 +29,22 @@ func TestDecisionStoreInternRoundTrip(t *testing.T) {
 	}
 }
 
-func TestDecisionStorePackMemory(t *testing.T) {
+func TestPackUsesInternOnMemoryStore(t *testing.T) {
 	store := newTestInternStore()
-	word, ok := store.PackMemory(decisionscope.BannedValue, "crowdsec")
+	word, ok := decisionscope.Pack(decisionscope.BannedValue, "crowdsec", store).(uint32)
 	if !ok {
 		t.Fatal("pack")
 	}
-	kind, originID := decisionscope.UnpackWord(word)
+	kind, _, originID := decisionscope.Unpack(word)
 	if kind != decisionscope.BannedValue || store.OriginName(originID) != "crowdsec" {
 		t.Fatalf("kind %q origin %q", kind, store.OriginName(originID))
 	}
 }
 
-func TestDecisionStorePackMemorySkippedOnRedis(t *testing.T) {
+func TestPackSkippedOnRedisStore(t *testing.T) {
 	store := newTestInternStore()
 	store.redisBacked = true
-	if _, ok := store.PackMemory(decisionscope.BannedValue, "crowdsec"); ok {
+	if _, ok := decisionscope.Pack(decisionscope.BannedValue, "crowdsec", store).(uint32); ok {
 		t.Fatal("redis must keep leftover")
 	}
 }
@@ -61,7 +61,7 @@ func TestStoreStreamDecisionPacksMemory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetInt %v", err)
 	}
-	kind, originID := decisionscope.UnpackWord(word)
+	kind, _, originID := decisionscope.Unpack(word)
 	if kind != decisionscope.BannedValue || store.OriginName(originID) != "crowdsec" {
 		t.Fatalf("kind %q origin %q", kind, store.OriginName(originID))
 	}

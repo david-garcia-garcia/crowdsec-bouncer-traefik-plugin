@@ -86,16 +86,14 @@ func mergeLookupHit(chosen lookupHit, incoming lookupHit) lookupHit {
 	return incoming
 }
 
-// hitFromStored splits a leftover string or packed letter+id line.
-func hitFromStored(stored string) lookupHit {
-	_, leftover, originID := SplitStoredRemediation(stored)
-	return lookupHit{stored: stored, origin: leftover, originID: originID}
-}
-
-// hitFromPackedWord unpacks a memory SetInt word.
-func hitFromPackedWord(word uint32) lookupHit {
-	kind, originID := UnpackWord(word)
-	return lookupHit{stored: kind, origin: "", originID: originID}
+// hitFromPayload unpacks a Pack word or leftover string.
+func hitFromPayload(payload any) lookupHit {
+	kind, origin, originID := Unpack(payload)
+	stored, isString := payload.(string)
+	if !isString {
+		stored = kind
+	}
+	return lookupHit{stored: stored, origin: origin, originID: originID}
 }
 
 // LookupCachedRemediation merges Ip, Range, and present header-scope hits. Ban wins across those scopes.
@@ -109,7 +107,7 @@ func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr 
 	for _, key := range keys {
 		word, getIntErr := cacheClient.GetInt(key)
 		if getIntErr == nil {
-			chosen = mergeLookupHit(chosen, hitFromPackedWord(word))
+			chosen = mergeLookupHit(chosen, hitFromPayload(word))
 			continue
 		}
 		leftoverKeys = append(leftoverKeys, key)
@@ -119,15 +117,15 @@ func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr 
 		if err != nil {
 			return "", "", 0, err
 		}
-		chosen = mergeLookupHit(chosen, hitFromStored(found[remoteIP]))
+		chosen = mergeLookupHit(chosen, hitFromPayload(found[remoteIP]))
 		for scope, identifier := range scopes {
 			if identifier == "" {
 				continue
 			}
-			chosen = mergeLookupHit(chosen, hitFromStored(found[HeaderScopeKey(scope, identifier)]))
+			chosen = mergeLookupHit(chosen, hitFromPayload(found[HeaderScopeKey(scope, identifier)]))
 		}
 	}
-	chosen = mergeLookupHit(chosen, hitFromStored(membership.Remediation(ipAddr)))
+	chosen = mergeLookupHit(chosen, hitFromPayload(membership.Remediation(ipAddr)))
 	if chosen.stored != "" {
 		return RemediationKind(chosen.stored), chosen.origin, chosen.originID, nil
 	}

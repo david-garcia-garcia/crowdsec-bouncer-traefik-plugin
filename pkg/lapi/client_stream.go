@@ -139,7 +139,7 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 			cidr := strings.TrimSpace(decision.Value)
 			if value != "" && cidr != "" {
 				origin := MetricsOrigin(decision.Origin, decision.Scenario)
-				rangeUpserts[cidr] = c.rangeIndexRemediation(value, origin)
+				rangeUpserts[cidr] = decisionscope.RemediationWithOrigin(value, origin)
 				c.rememberActiveDecision("range:"+cidr, origin, cidr)
 			}
 			continue

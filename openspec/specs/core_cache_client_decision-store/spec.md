@@ -53,14 +53,14 @@ When Redis is enabled, every GET/SET/DEL/MGET/Eval key the store sends SHALL be 
 - **AND** the Redis pool is not closed
 
 ### Requirement: Cache payloads stay opaque strings
-A cache Client SHALL store and return opaque strings on `Set`/`Get`/`GetMany` and SHALL also store and return a machine word on `SetInt`/`GetInt` (`uint32` is enough). The cache package MUST NOT export CrowdSec remediation names (`BannedValue`, `CaptchaValue`, `NoBannedValue`). The cache package MUST NOT know kind, origin, Packed, Stored, Leftover, Remediation, or range-index separators. It MUST NOT export `SetRemediation`, `GetManyStored`, `ParsePackedOriginID`, or a `MemoryBackend` type switch for remediations. Store errors SHALL be the package sentinels `ErrMiss` and `ErrUnreachable`. Their `Error()` text SHALL remain `CacheMiss` (`cache:miss`) and `CacheUnreachable` (`cache:unreachable`). Callers that distinguish miss from unreachable SHALL use `errors.Is`. A clean miss MUST NOT allocate a new error value. Memory and Redis backends SHALL return the same sentinels. GetMany SHALL keep omitting missing keys. `GetInt` SHALL return `ErrMiss` when the key is absent or the stored value is not that word (including a leftover string). Client address, when this leaf mentions it, SHALL reuse `pkg/ip.GetRemoteIP` (do not parse `RemoteAddr`).
+A cache Client SHALL store and return opaque strings on `Set`/`Get`/`GetMany` and SHALL also store and return a machine word when `Set`/`GetInt` receive or find a `uint32` (`uint32` is enough). `Set` SHALL accept a leftover/plain `string` or a packed `uint32`. The cache package MUST NOT export CrowdSec remediation names (`BannedValue`, `CaptchaValue`, `NoBannedValue`). The cache package MUST NOT know kind, origin, Packed, Stored, Leftover, Remediation, or range-index separators. It MUST NOT export `SetRemediation`, `GetManyStored`, `ParsePackedOriginID`, or a `MemoryBackend` type switch for remediations. Store errors SHALL be the package sentinels `ErrMiss` and `ErrUnreachable`. Their `Error()` text SHALL remain `CacheMiss` (`cache:miss`) and `CacheUnreachable` (`cache:unreachable`). Callers that distinguish miss from unreachable SHALL use `errors.Is`. A clean miss MUST NOT allocate a new error value. Memory and Redis backends SHALL return the same sentinels. GetMany SHALL keep omitting missing keys. `GetInt` SHALL return `ErrMiss` when the key is absent or the stored value is not that word (including a leftover string). Client address, when this leaf mentions it, SHALL reuse `pkg/ip.GetRemoteIP` (do not parse `RemoteAddr`).
 
 #### Scenario: Cache tests treat values as opaque
 - **WHEN** a cache test Sets and Gets a payload
 - **THEN** it uses a string literal, not a decisionscope or captcha const
 
-#### Scenario: SetInt then GetInt returns the word
-- **WHEN** a memory cache Client SetInts key `k` to `uint32` `0x00637374`
+#### Scenario: Set then GetInt returns the word
+- **WHEN** a memory cache Client Sets key `k` to `uint32` `0x00637374`
 - **THEN** GetInt of `k` returns that same word
 
 #### Scenario: GetInt misses a leftover string
@@ -83,7 +83,7 @@ A cache Client SHALL store and return opaque strings on `Set`/`Get`/`GetMany` an
 - **THEN** the returned error satisfies `errors.Is(err, ErrMiss)`
 
 ### Requirement: DecisionStore owns the origin intern table
-A DecisionStore SHALL own an append-only origin intern table (name→`uint16`) and a lock-free `OriginName` lookup. The pack word SHALL be `uint32(kind[0]) | uint32(id)<<8`. The table MUST NOT be a package variable. Two DecisionStores with different reclaim keys MUST NOT share the table. Intern MUST stay off `lapi.Client` except thin forwards tests need. When intern would overflow `uint16`, that origin SHALL stay on the leftover string path. Stream and alone memory Ip and header writes SHALL pack and `SetInt` when intern succeeds. Redis, live/none, and overflow SHALL keep leftover strings via `Set`. Range-index blobs SHALL use `Set`, never `SetInt`. Client address SHALL reuse `pkg/ip.GetRemoteIP`. CrowdSec cursor identity SHALL reuse `SessionHex`.
+A DecisionStore SHALL own an append-only origin intern table (name→`uint16`) and a lock-free `OriginName` lookup. CrowdSec `Pack`/`Unpack` SHALL live in `pkg/decisionscope`. The pack word SHALL be `uint32(kind[0]) | uint32(id)<<8`. The table MUST NOT be a package variable. Two DecisionStores with different reclaim keys MUST NOT share the table. Intern MUST stay off `lapi.Client` except thin forwards tests need. When intern would overflow `uint16`, that origin SHALL stay on the leftover string path. Stream and alone memory Ip and header writes SHALL `Pack` then `Set`. Redis, live/none, and overflow SHALL keep leftover strings via `Set`. Range-index blobs SHALL store leftover or bare-letter remediations via `Set`. Client address SHALL reuse `pkg/ip.GetRemoteIP`. CrowdSec cursor identity SHALL reuse `SessionHex`.
 
 #### Scenario: Memory stream IP write packs the intern id
 - **WHEN** stream/alone memory stores an Ip ban whose origin is `crowdsec`

@@ -274,22 +274,21 @@ func (c *Client) GetMany(keys []string) (map[string]string, error) {
 	return c.cache.getMany(keys)
 }
 
-// Set update the cache with the IP as key and the value banned / not banned.
-func (c *Client) Set(key string, value string, duration int64) {
+// Set stores a uint32 machine word or a string. Other types are ignored.
+func (c *Client) Set(key string, value any, duration int64) {
 	c.log.Debug("cache:Set", "key", key, "value", value, "duration", duration)
-	c.cache.set(key, value, duration)
+	switch stored := value.(type) {
+	case uint32:
+		c.cache.setInt(key, stored, duration)
+	case string:
+		c.cache.set(key, stored, duration)
+	}
 }
 
 // GetInt returns a stored machine word. Miss includes a leftover string at the same key.
 func (c *Client) GetInt(key string) (uint32, error) {
 	c.log.Debug("cache:GetInt", "key", key)
 	return c.cache.getInt(key)
-}
-
-// SetInt stores a machine word. Memory keeps uint32 in ttl_map; Redis encoding is opaque.
-func (c *Client) SetInt(key string, value uint32, duration int64) {
-	c.log.Debug("cache:SetInt", "key", key, "value", value, "duration", duration)
-	c.cache.setInt(key, value, duration)
 }
 
 // redisClientConfig keeps this plugin’s dial 2s and command 1s (not utilities zero-Config defaults).

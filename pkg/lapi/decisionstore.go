@@ -9,7 +9,6 @@ import (
 
 	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -115,6 +114,11 @@ func (s *DecisionStore) lookupIntern(name string) (uint16, bool) {
 	return 0, false
 }
 
+// PacksMemory is true when this store may pack remediations as uint32 words.
+func (s *DecisionStore) PacksMemory() bool {
+	return s != nil && !s.redisBacked
+}
+
 // Intern appends an origin name. Empty name is id 0. Overflow does not wrap.
 func (s *DecisionStore) Intern(name string) (uint16, bool) {
 	if s == nil {
@@ -156,28 +160,4 @@ func (s *DecisionStore) OriginName(id uint16) string {
 		return ""
 	}
 	return names[id]
-}
-
-// PackMemory interns origin and packs kind+id when this store is memory-backed.
-func (s *DecisionStore) PackMemory(kind, origin string) (uint32, bool) {
-	if s == nil || s.redisBacked || kind == "" {
-		return 0, false
-	}
-	id, ok := s.Intern(origin)
-	if !ok {
-		return 0, false
-	}
-	return decisionscope.PackWord(kind, id), true
-}
-
-// PackedLine is the range-index letter+decimal id line when this store is memory-backed.
-func (s *DecisionStore) PackedLine(kind, origin string) (string, bool) {
-	if s == nil || s.redisBacked || kind == "" {
-		return "", false
-	}
-	id, ok := s.Intern(origin)
-	if !ok {
-		return "", false
-	}
-	return decisionscope.PackedRemediationLine(kind, id), true
 }

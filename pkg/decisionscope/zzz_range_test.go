@@ -179,7 +179,7 @@ func TestLookupCachedRemediationStreamUsesMembershipNotBlob(t *testing.T) {
 
 func TestLookupCachedRemediationPackedWord(t *testing.T) {
 	client := newTestDecisionCache()
-	client.SetInt("203.0.113.10", PackWord(BannedValue, 3), 60)
+	client.Set("203.0.113.10", packWord(BannedValue, 3), 60)
 	got, origin, originID, err := LookupCachedRemediation(client, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
 	if err != nil || got != BannedValue || origin != "" || originID != 3 {
 		t.Fatalf("got %q origin %q id %d err %v", got, origin, originID, err)

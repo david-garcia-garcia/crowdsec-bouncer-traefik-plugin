@@ -344,7 +344,7 @@ func Test_GetManyUnreachable(t *testing.T) {
 func Test_SetIntGetIntRoundTrip(t *testing.T) {
 	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
 	const word uint32 = 0x0c0074
-	client.SetInt("k", word, 10)
+	client.Set("k", word, 10)
 	got, err := client.GetInt("k")
 	if err != nil || got != word {
 		t.Fatalf("GetInt got %d err %v", got, err)

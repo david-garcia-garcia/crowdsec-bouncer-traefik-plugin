@@ -3,19 +3,15 @@
 ## Language
 
 **Range index**:
-One cache blob at key `range-index` whose lines are `cidr=remediation`. Remediation MAY be the letter only, the leftover letter plus U+001F plus a metrics origin, or a packed letter plus decimal intern id. Redis-sharing instances share this document (prefixed by LAPI identity). Stream and alone rebuild in-process membership from it on the ticker and at stream start. The blob is always `Set`, never `SetInt`.
-_Avoid_: walking the blob on the request path, one cache key per CIDR, LAPI `?ip=` on the stream path
+One cache blob at key `range-index` whose lines are `cidr=remediation`. Remediation MAY be the letter only, or the leftover letter plus U+001F plus a metrics origin. Redis-sharing instances share this document (prefixed by LAPI identity). Stream and alone rebuild in-process membership from it on the ticker and at stream start. The blob is always a leftover/bare string `Set`.
+_Avoid_: walking the blob on the request path, one cache key per CIDR, LAPI `?ip=` on the stream path, intern ids in the blob
 
 **Leftover remediation**:
-A string of kind letter plus U+001F plus a metrics origin name. Redis, live/none, and intern overflow keep this spelling. Helpers live in `pkg/decisionscope`.
+A string of kind letter plus U+001F plus a metrics origin name. Redis, live/none, intern overflow, and range-index keep this spelling. Helpers live in `pkg/decisionscope`.
 _Avoid_: a leftover type in `pkg/cache`, `\x1e`
 
-**Packed range line**:
-A range-index remediation of the letter plus a decimal intern id (`t12`). Bare letters still match.
-_Avoid_: packing the blob as `SetInt`, U+001F on a packed line
-
 **Range membership**:
-Two utilities Helpers (ban, captcha) on the reclaimed LAPI Client. Each Range `AddCIDR` MAY pass the blob remediation string (letter, leftover U+001F origin, or packed letter plus decimal intern id) as metadata. Request lookup always asks this pair. Nil or empty (live/none never hydrate) is a Range miss. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s leftover suffix or packed intern id.
+Two utilities Helpers (ban, captcha) on the reclaimed LAPI Client. Each Range `AddCIDR` MAY pass the blob remediation string (letter, optional U+001F origin) as metadata. Request lookup always asks this pair. Nil or empty (live/none never hydrate) is a Range miss. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s leftover suffix.
 _Avoid_: trusted-IP Checker, one LPM tree, `sync.Once`, package globals, a Crowdsec-mode flag on lookup, re-parsing `storedByCIDR` on a Range hit
 
 **Ip cache key**:
@@ -74,7 +70,7 @@ lapiClient.IncDropped(origin, req.ipType, "ban")
 - Ban wins across Ip, Range, and header hits. Do not return the first active Ip or Range captcha before considering a Country ban.
 - Redis followers skip LAPI on a lease hit. They still GET `range-index` on that tick and rebuild membership; without that hydrate they would miss every Range decision.
 - Trust the header the same way you trust `X-Forwarded-For`: only from a trusted hop (CDN or geoenrich in front of this middleware).
-- Leftover Ip/header/Range-index values MAY be `t`/`c` plus U+001F plus a metrics origin. Packed memory Range-index lines are the letter plus a decimal intern id. Bare letters still match. Redis stays one `range-index` key written with `Set`.
+- Leftover Ip/header/Range-index values MAY be `t`/`c` plus U+001F plus a metrics origin. Bare letters still match. Redis stays one `range-index` key written with `Set`. Packed intern ids are uint32 words on memory Ip/header slots only.
 - Request lookup tries `GetInt` per key, then `GetMany` only on leftover misses. Resolve `OriginName` only on drop.
 - After a cache miss, stream/alone use stream health; live/none call `LiveLookup`. Do not name that split after Range membership.
 - CrowdSec does not canonicalize decision values — measured on v1.8.0, the stream hands back `2001:DB8::2` and `::ffff:192.0.2.4` exactly as submitted. LAPI `?ip=` does match numerically, so the spelling problem is ours alone and needs no LAPI workaround.
