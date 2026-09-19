@@ -183,7 +183,7 @@ Cached request lookup SHALL consult Range membership from the membership argumen
 - **THEN** Range matching does not remediate from that blob
 
 ### Requirement: Remediation cache values may carry origin
-An Ip, header-scope, or Range-index cache value SHALL still start with the ban/captcha/none letter (`t` / `c` / `f`). It MAY append a unit-separator and the metrics origin. `range-index` stays one key whose lines are `cidr=` plus that value. `IsActiveRemediation`, `PreferRemediation`, Range index parsing, and request lookup SHALL use that letter. In-process Range membership SHALL return the stored string of the winning CIDR (ban over captcha; if several bans contain the IP, the longest-prefix matching ban). Lookup key *shapes* (client IP, `scope:value`, `range-index`) MUST NOT change; the spelling of the client-IP key is owned by "Ip decisions key on the canonical address". A value that is only the letter (today’s Redis) SHALL keep matching.
+An Ip, header-scope, or Range-index leftover cache value SHALL still start with the ban/captcha/none letter (`t` / `c` / `f`). It MAY append a unit-separator and the metrics origin. Leftover helpers (`RemediationKind`, `RemediationOrigin`, `RemediationWithOrigin`) SHALL live in `pkg/decisionscope`, not `pkg/cache`. `range-index` stays one key whose lines are `cidr=` plus a leftover or bare-letter value and SHALL be written with cache `Set`. Packed intern ids SHALL NOT appear in that blob. `IsActiveRemediation`, `PreferRemediation`, Range index parsing, and request lookup SHALL use that letter. In-process Range membership SHALL return the stored string of the winning CIDR (ban over captcha; if several bans contain the IP, the longest-prefix matching ban). Request lookup SHALL try `GetInt` for packed memory Ip and header keys and SHALL `Get` the leftover string on miss. Origin name SHALL be resolved from the DecisionStore intern table only when the winning kind is remediating. The allow-path `GetInt` MUST NOT take a second intern lock. Lookup key *shapes* (client IP, `scope:value`, `range-index`) MUST NOT change; the spelling of the client-IP key is owned by "Ip decisions key on the canonical address". Client address SHALL reuse `pkg/ip.GetRemoteIP` / `clientRequest.remoteIP`. A value that is only the letter SHALL keep matching.
 
 #### Scenario: Suffixed ban still remediates
 - **WHEN** cache holds `t` plus a unit-separator and `crowdsec` for the client IP
@@ -201,8 +201,14 @@ An Ip, header-scope, or Range-index cache value SHALL still start with the ban/c
 - **WHEN** `range-index` holds only `10.0.0.0/8=t` and the client IP is `10.1.2.3`
 - **THEN** the request is banned
 
+#### Scenario: Packed memory IP remediates without leftover
+- **WHEN** memory cache GetInt of the client IP returns a packed ban word whose intern id names `crowdsec`
+- **THEN** the request is banned
+- **AND** a drop resolves origin `crowdsec` from the store table
+- **AND** an allow-path GetInt for a none word does not call OriginName
+
 ### Requirement: Range hit recovers stored remediation from the winning prefix
-When in-process Range membership remediates a client IP, it SHALL return the utilities Helper metadata already held on the winning prefix of the matching ban or captcha set. It MUST NOT re-parse `storedByCIDR` on that request. Nil or empty membership SHALL still be a miss. Ban SHALL still win over captcha. The client address SHALL remain the `net.IP` already produced by `pkg/ip.GetRemoteIP`. The `range-index` blob format SHALL stay `cidr=remediation` lines. Ban and captcha MUST stay on separate Helpers.
+When in-process Range membership remediates a client IP, it SHALL return the utilities Helper metadata already held on the winning prefix of the matching ban or captcha set. It MUST NOT re-parse `storedByCIDR` on that request. Nil or empty membership SHALL still be a miss. Ban SHALL still win over captcha. Range metadata SHALL be leftover letter-plus-origin or a bare letter. The client address SHALL remain the `net.IP` already produced by `pkg/ip.GetRemoteIP`. The `range-index` blob format SHALL stay `cidr=remediation` lines. Ban and captcha MUST stay on separate Helpers.
 
 #### Scenario: Suffixed Range hit returns the stored origin
 - **WHEN** membership holds `10.0.0.0/8=` plus `t` plus a unit-separator and `crowdsec` and the client IP is `10.1.2.3`

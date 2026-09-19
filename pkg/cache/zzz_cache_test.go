@@ -5,7 +5,9 @@ package cache
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -336,5 +338,107 @@ func Test_GetManyUnreachable(t *testing.T) {
 	}
 	if err.Error() != CacheUnreachable {
 		t.Fatalf("GetMany unreachable text %q, want %s", err.Error(), CacheUnreachable)
+	}
+}
+
+func Test_SetIntGetIntRoundTrip(t *testing.T) {
+	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
+	const word uint32 = 0x0c0074
+	client.Set("k", word, 10)
+	got, err := client.GetInt("k")
+	if err != nil || got != word {
+		t.Fatalf("GetInt got %d err %v", got, err)
+	}
+}
+
+func Test_GetIntMissesLeftoverString(t *testing.T) {
+	client := &Client{cache: &localCache{}, log: logger.New("INFO", "")}
+	client.Set("k", "t\x1fcrowdsec", 10)
+	if _, err := client.GetInt("k"); err == nil || err.Error() != CacheMiss {
+		t.Fatalf("GetInt leftover got %v, want cache:miss", err)
+	}
+	got, err := client.Get("k")
+	if err != nil || got != "t\x1fcrowdsec" {
+		t.Fatalf("Get leftover got %q err %v", got, err)
+	}
+}
+
+func parseRESPStrings(payload []byte) []string {
+	parts := bytes.Split(payload, []byte("\r\n"))
+	out := make([]string, 0, len(parts))
+	for _, line := range parts {
+		if len(line) == 0 || line[0] == '*' || line[0] == '$' {
+			continue
+		}
+		out = append(out, string(line))
+	}
+	return out
+}
+
+func writeRedisKV(c net.Conn, store map[string]string, cmd []string) {
+	switch {
+	case len(cmd) >= 3 && cmd[0] == "SET":
+		store[cmd[1]] = cmd[2]
+		_, _ = c.Write([]byte("+OK\r\n"))
+	case len(cmd) >= 2 && cmd[0] == "GET":
+		if value, ok := store[cmd[1]]; ok {
+			_, _ = c.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(value), value)))
+			return
+		}
+		_, _ = c.Write([]byte("$-1\r\n"))
+	default:
+		_, _ = c.Write([]byte("+OK\r\n"))
+	}
+}
+
+func serveRedisKV(t *testing.T) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	var mu sync.Mutex
+	store := map[string]string{}
+	go func() {
+		for {
+			conn, acceptErr := ln.Accept()
+			if acceptErr != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer func() { _ = c.Close() }()
+				buf := make([]byte, 4096)
+				for {
+					n, readErr := c.Read(buf)
+					if n > 0 {
+						cmd := parseRESPStrings(buf[:n])
+						mu.Lock()
+						writeRedisKV(c, store, cmd)
+						mu.Unlock()
+					}
+					if readErr != nil {
+						return
+					}
+				}
+			}(conn)
+		}
+	}()
+	return ln.Addr().String()
+}
+
+func Test_GetIntMissesLeftoverStringRedis(t *testing.T) {
+	host := serveRedisKV(t)
+	client := &Client{}
+	client.New(logger.New("INFO", ""), true, host, nil, "", "", "p")
+	defer client.Close()
+	leftover := "t\x1fcrowdsec"
+	client.Set("k", leftover, 10)
+	if _, err := client.GetInt("k"); err == nil || err.Error() != CacheMiss {
+		t.Fatalf("GetInt leftover got %v, want cache:miss", err)
+	}
+	got, err := client.Get("k")
+	if err != nil || got != leftover {
+		t.Fatalf("Get leftover got %q err %v", got, err)
 	}
 }

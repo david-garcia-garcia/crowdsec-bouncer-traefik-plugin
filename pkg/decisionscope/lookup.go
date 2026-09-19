@@ -20,7 +20,7 @@ const (
 
 // IsActiveRemediation reports whether value is ban or captcha (origin suffix ignored).
 func IsActiveRemediation(value string) bool {
-	kind := cache.RemediationKind(value)
+	kind := RemediationKind(value)
 	return kind == BannedValue || kind == CaptchaValue
 }
 
@@ -38,8 +38,8 @@ func RemediationValue(decisionType string) string {
 
 // PreferRemediation keeps ban over captcha over empty. Origin suffix is ignored for the winner's letter.
 func PreferRemediation(current, incoming string) string {
-	currentKind := cache.RemediationKind(current)
-	incomingKind := cache.RemediationKind(incoming)
+	currentKind := RemediationKind(current)
+	incomingKind := RemediationKind(incoming)
 	if currentKind == BannedValue {
 		return current
 	}
@@ -67,32 +67,69 @@ func RequestScopeValues(headers map[string]string, req *http.Request) map[string
 	return out
 }
 
+// lookupHit is one Ip, header, or Range candidate while merging ban over captcha.
+type lookupHit struct {
+	stored   string
+	origin   string
+	originID uint16
+}
+
+// mergeLookupHit keeps ban over captcha and remembers the winner's leftover origin or packed id.
+func mergeLookupHit(chosen lookupHit, incoming lookupHit) lookupHit {
+	if incoming.stored == "" {
+		return chosen
+	}
+	next := PreferRemediation(chosen.stored, incoming.stored)
+	if next == chosen.stored {
+		return chosen
+	}
+	return incoming
+}
+
+// hitFromPayload unpacks a Pack word or leftover string.
+func hitFromPayload(payload any) lookupHit {
+	kind, origin, originID := Unpack(payload)
+	stored, isString := payload.(string)
+	if !isString {
+		stored = kind
+	}
+	return lookupHit{stored: stored, origin: origin, originID: originID}
+}
+
 // LookupCachedRemediation merges Ip, Range, and present header-scope hits. Ban wins across those scopes.
 // Range comes from membership.Remediation; nil or empty membership is a miss (live/none never hydrate).
-// The first return is ban, captcha, or none; the second is the metrics origin of the winning cache value.
+// Kind is ban, captcha, or none. Origin is a leftover name; OriginID is a packed intern id.
 // remoteIP is the canonical client address string owned by clientRequest; ipAddr is Range membership only.
-func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, error) {
-	ipKey := remoteIP
-	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, scopes))
-	if err != nil {
-		return "", "", err
-	}
-	// Merge Ip, Range, and header hits so a Country ban beats a Range captcha.
-	chosen := found[ipKey]
-	chosen = PreferRemediation(chosen, membership.Remediation(ipAddr))
-	for scope, identifier := range scopes {
-		if identifier == "" {
+func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16, error) {
+	keys := LookupCacheKeys(remoteIP, scopes)
+	var chosen lookupHit
+	leftoverKeys := make([]string, 0, len(keys))
+	for _, key := range keys {
+		word, getIntErr := cacheClient.GetInt(key)
+		if getIntErr == nil {
+			chosen = mergeLookupHit(chosen, hitFromPayload(word))
 			continue
 		}
-		chosen = PreferRemediation(chosen, found[HeaderScopeKey(scope, identifier)])
+		leftoverKeys = append(leftoverKeys, key)
 	}
-	if IsActiveRemediation(chosen) {
-		return cache.RemediationKind(chosen), cache.RemediationOrigin(chosen), nil
+	if len(leftoverKeys) > 0 {
+		found, err := cacheClient.GetMany(leftoverKeys)
+		if err != nil {
+			return "", "", 0, err
+		}
+		chosen = mergeLookupHit(chosen, hitFromPayload(found[remoteIP]))
+		for scope, identifier := range scopes {
+			if identifier == "" {
+				continue
+			}
+			chosen = mergeLookupHit(chosen, hitFromPayload(found[HeaderScopeKey(scope, identifier)]))
+		}
 	}
-	if value, ok := found[ipKey]; ok {
-		return cache.RemediationKind(value), cache.RemediationOrigin(value), nil
+	chosen = mergeLookupHit(chosen, hitFromPayload(membership.Remediation(ipAddr)))
+	if chosen.stored != "" {
+		return RemediationKind(chosen.stored), chosen.origin, chosen.originID, nil
 	}
-	return "", "", cache.ErrMiss
+	return "", "", 0, cache.ErrMiss
 }
 
 // LookupCacheKeys is the GetMany key list for the request path: IP, then present header scopes. Range is not a cache key.

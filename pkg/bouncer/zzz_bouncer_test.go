@@ -80,6 +80,51 @@ func TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan(t *testing.T) {
 	}
 }
 
+func TestServeHTTP_PackedMemoryBanRecordsCrowdsecOrigin(t *testing.T) {
+	log := logger.New("ERROR", "")
+	lapiClient, cacheClient := lapi.NewTestClient(log)
+	t.Cleanup(cacheClient.Close)
+	store := lapi.AttachTestInternStore(lapiClient)
+	lapi.AttachTestMetricsReporter(lapiClient)
+	cacheClient.Set("203.0.113.10", decisionscope.Pack(decisionscope.BannedValue, "crowdsec", store), 60)
+	clientChecker, err := ip.NewChecker(log, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	banTemplate, err := template.New("ban").Parse("banned")
+	if err != nil {
+		t.Fatal(err)
+	}
+	passed := false
+	b := &Bouncer{
+		enabled:                true,
+		crowdsecMode:           configuration.StreamMode,
+		lapiClient:             lapiClient,
+		clientPoolStrategy:     &ip.PoolStrategy{Checker: clientChecker},
+		captchaClient:          &captcha.Client{},
+		log:                    log,
+		remediationStatusCode:  http.StatusForbidden,
+		banTemplate:            banTemplate,
+		banTemplateContentType: "text/html; charset=utf-8",
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			passed = true
+		}),
+	}
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
+	req.RemoteAddr = "203.0.113.10:1"
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, req)
+	if passed {
+		t.Fatal("origin must not run; packed ban must drop")
+	}
+	if rw.Code != http.StatusForbidden {
+		t.Fatalf("status=%d", rw.Code)
+	}
+	if got := lapiClient.TestDroppedCount("crowdsec", "ipv4", "ban"); got != 1 {
+		t.Fatalf("dropped crowdsec=%d", got)
+	}
+}
+
 func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 	html := "<html>You are banned</html>"
 	banTemplate, _ := template.New("html").Delims("{{", "}}").Parse(html)

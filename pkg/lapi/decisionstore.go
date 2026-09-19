@@ -7,6 +7,7 @@ import (
 
 	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -39,7 +40,9 @@ func StoreKey(cfg *configuration.Config) string {
 
 // DecisionStore is a reclaim value that owns one cache.Client (memory TTL or Redis-protocol prefix).
 type DecisionStore struct {
-	cache *cache.Client
+	cache       *cache.Client
+	redisBacked bool
+	origins     *intern.Table
 }
 
 // Cache is the map or Redis pool this store owns.
@@ -73,7 +76,7 @@ func OpenDecisionStore(ctx context.Context, cfg *configuration.Config, log *slog
 			cfg.RedisCacheDatabase,
 			SessionHex(cfg),
 		)
-		store := &DecisionStore{cache: cacheClient}
+		store := &DecisionStore{cache: cacheClient, redisBacked: cfg.RedisCacheEnabled, origins: intern.New()}
 		return store, reclaim.Hooks{Close: store.Close}, nil
 	})
 	if err != nil {
@@ -84,4 +87,25 @@ func OpenDecisionStore(ctx context.Context, cfg *configuration.Config, log *slog
 		return nil, fmt.Errorf("reclaim: want *lapi.DecisionStore, got %T", stored)
 	}
 	return store, nil
+}
+
+// PacksMemory is true when this store may pack remediations as uint32 words.
+func (s *DecisionStore) PacksMemory() bool {
+	return s != nil && !s.redisBacked
+}
+
+// Intern appends an origin name. Empty name is id 0. Overflow does not wrap.
+func (s *DecisionStore) Intern(name string) (uint16, bool) {
+	if s == nil {
+		return 0, false
+	}
+	return s.origins.ID(name)
+}
+
+// OriginName is the interned origin for id. Lock-free. Unknown id is empty.
+func (s *DecisionStore) OriginName(id uint16) string {
+	if s == nil {
+		return ""
+	}
+	return s.origins.Name(id)
 }

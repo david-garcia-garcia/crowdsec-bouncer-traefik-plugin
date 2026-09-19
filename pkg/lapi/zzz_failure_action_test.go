@@ -183,7 +183,7 @@ func TestLiveLookup_IPSlotKeepsIPQueryResult(t *testing.T) {
 	if !decisionscope.IsActiveRemediation(headerStored) {
 		t.Fatalf("Country header key %q, want an active remediation", headerStored)
 	}
-	kind, _, lookupErr := decisionscope.LookupCachedRemediation(
+	kind, _, _, lookupErr := decisionscope.LookupCachedRemediation(
 		client.cacheClient,
 		"1.2.3.4",
 		net.ParseIP("1.2.3.4"),

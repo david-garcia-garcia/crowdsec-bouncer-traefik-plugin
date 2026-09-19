@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
@@ -29,12 +28,11 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 		return
 	}
 	origin := MetricsOrigin(item.Origin, item.Scenario)
-	stored := cache.RemediationWithOrigin(value, origin)
 	scope := decisionscope.NormalizeScope(item.Scope)
 	switch scope {
 	case decisionscope.ScopeIP, "":
 		slot := decisionscope.IPCacheKey(item.Value)
-		c.cacheClient.Set(slot, stored, duration)
+		c.cacheClient.Set(slot, decisionscope.Pack(value, origin, c.decisionStore), duration)
 		c.rememberActiveDecision(slot, origin, item.Value)
 	case decisionscope.ScopeRange:
 		return
@@ -48,7 +46,7 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 			return
 		}
 		slot := decisionscope.HeaderScopeKey(scope, identifier)
-		c.cacheClient.Set(slot, stored, duration)
+		c.cacheClient.Set(slot, decisionscope.Pack(value, origin, c.decisionStore), duration)
 		c.rememberActiveDecision(slot, origin, item.Value)
 	}
 }
@@ -109,7 +107,15 @@ func (c *Client) queryLiveDecisions(rawQuery string) (string, time.Duration, err
 	if value == "" {
 		return decisionscope.NoBannedValue, 0, nil
 	}
-	return cache.RemediationWithOrigin(value, MetricsOrigin(picked.Origin, picked.Scenario)), parsedDuration, nil
+	return decisionscope.RemediationWithOrigin(value, MetricsOrigin(picked.Origin, picked.Scenario)), parsedDuration, nil
+}
+
+// OriginName is a thin store forward. Unknown id is empty.
+func (c *Client) OriginName(id uint16) string {
+	if c == nil || c.decisionStore == nil {
+		return ""
+	}
+	return c.decisionStore.OriginName(id)
 }
 
 // strongestLiveDecision returns the first ban in items, else the first captcha.

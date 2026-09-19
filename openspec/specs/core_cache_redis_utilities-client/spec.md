@@ -66,6 +66,18 @@ Cache SHALL treat utilities miss as `cache:miss` and unreachable as `cache:unrea
 - **THEN** exactly one acquire wins
 - **AND** the loser sees the key present
 
+### Requirement: Redis Int uses existing byte Set and Get
+`Set` of a `uint32` and `GetInt` on a Redis cache Client SHALL encode the `uint32` as decimal ASCII through existing SimpleRedis `Set`/`Get` `[]byte`. Callers MUST treat that encoding as opaque. The cache MUST NOT add an Int helper on SimpleRedis. A GetInt that cannot parse that encoding (including a leftover remediation string) SHALL return `CacheMiss`. Stream and alone Redis writers MAY keep leftover strings via `Set`. Commands SHALL pass a `context.Context` (`context.Background()` when the cache API has no request context).
+
+#### Scenario: Redis GetInt misses a leftover string
+- **WHEN** a Redis cache Client Sets a leftover remediation string on an Ip key
+- **THEN** GetInt of that key returns `CacheMiss`
+- **AND** Get of that key returns the leftover string
+
+#### Scenario: Redis Set of a word round-trips
+- **WHEN** a Redis cache Client Sets key `k` to `uint32` `116`
+- **THEN** GetInt of `k` returns `116`
+
 ### Requirement: Get uses nextReader only
 When Redis read hosts are set, Get and GetMany SHALL call `nextReader` only. A miss or replica error MUST NOT be retried on the writer. The cache MUST NOT keep a local set of recently written keys. When the reader list is empty, `nextReader` SHALL return the writer.
 

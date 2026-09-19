@@ -32,7 +32,7 @@ func lookupAsRequest(client *Client, remoteIP string) (string, error) {
 	if ipAddr != nil {
 		remoteIP = ipAddr.String()
 	}
-	value, _, err := decisionscope.LookupCachedRemediation(client.Cache(), remoteIP, ipAddr, nil, nil)
+	value, _, _, err := decisionscope.LookupCachedRemediation(client.Cache(), remoteIP, ipAddr, nil, nil)
 	return value, err
 }
 

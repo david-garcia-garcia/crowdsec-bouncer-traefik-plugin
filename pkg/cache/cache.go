@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -68,6 +69,21 @@ func (lc *localCache) getMany(keys []string) (map[string]string, error) {
 }
 
 func (lc *localCache) set(key, value string, duration int64) {
+	lc.heap().Set(key, value, duration)
+}
+
+// getInt returns a stored machine word. A leftover string or a miss is CacheMiss.
+func (lc *localCache) getInt(key string) (uint32, error) {
+	value, isCached := lc.heap().Get(key)
+	word, isWord := value.(uint32)
+	if isCached && isWord {
+		return word, nil
+	}
+	return 0, ErrMiss
+}
+
+// setInt stores a machine word in the TTL map (not a leftover string).
+func (lc *localCache) setInt(key string, value uint32, duration int64) {
 	lc.heap().Set(key, value, duration)
 }
 
@@ -160,6 +176,24 @@ func (rc *redisCache) set(key, value string, duration int64) {
 	}
 }
 
+// getInt parses a decimal ASCII word. A leftover string or a miss is CacheMiss.
+func (rc *redisCache) getInt(key string) (uint32, error) {
+	raw, err := rc.get(key)
+	if err != nil {
+		return 0, err
+	}
+	parsed, parseErr := strconv.ParseUint(raw, 10, 32)
+	if parseErr != nil {
+		return 0, ErrMiss
+	}
+	return uint32(parsed), nil
+}
+
+// setInt stores the word as decimal ASCII so Redis stays string-only.
+func (rc *redisCache) setInt(key string, value uint32, duration int64) {
+	rc.set(key, strconv.FormatUint(uint64(value), 10), duration)
+}
+
 func (rc *redisCache) delete(key string) {
 	if err := rc.writer.Del(context.Background(), prefixed(rc.prefix, key)); err != nil {
 		rc.log.Error("cache:deleteDecisionRedisCache", "error", err)
@@ -180,6 +214,8 @@ type cacheInterface interface {
 	set(key, value string, duration int64)
 	get(key string) (string, error)
 	getMany(keys []string) (map[string]string, error)
+	setInt(key string, value uint32, duration int64)
+	getInt(key string) (uint32, error)
 	delete(key string)
 	acquire(ctx context.Context, key, value string, duration int64) (bool, error)
 	close()
@@ -238,10 +274,21 @@ func (c *Client) GetMany(keys []string) (map[string]string, error) {
 	return c.cache.getMany(keys)
 }
 
-// Set update the cache with the IP as key and the value banned / not banned.
-func (c *Client) Set(key string, value string, duration int64) {
+// Set stores a uint32 machine word or a string. Other types are ignored.
+func (c *Client) Set(key string, value any, duration int64) {
 	c.log.Debug("cache:Set", "key", key, "value", value, "duration", duration)
-	c.cache.set(key, value, duration)
+	switch stored := value.(type) {
+	case uint32:
+		c.cache.setInt(key, stored, duration)
+	case string:
+		c.cache.set(key, stored, duration)
+	}
+}
+
+// GetInt returns a stored machine word. Miss includes a leftover string at the same key.
+func (c *Client) GetInt(key string) (uint32, error) {
+	c.log.Debug("cache:GetInt", "key", key)
+	return c.cache.getInt(key)
 }
 
 // redisClientConfig keeps this plugin’s dial 2s and command 1s (not utilities zero-Config defaults).

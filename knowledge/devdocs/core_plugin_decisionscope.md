@@ -3,12 +3,16 @@
 ## Language
 
 **Range index**:
-One cache blob at key `range-index` whose lines are `cidr=remediation`. Remediation MAY be the letter only or the letter plus U+001F plus a metrics origin. Redis-sharing instances share this document (prefixed by LAPI identity). Stream and alone rebuild in-process membership from it on the ticker and at stream start.
-_Avoid_: walking the blob on the request path, one cache key per CIDR, LAPI `?ip=` on the stream path
+One cache blob at key `range-index` whose lines are `cidr=remediation`. Remediation MAY be the letter only, or the leftover letter plus U+001F plus a metrics origin. Redis-sharing instances share this document (prefixed by LAPI identity). Stream and alone rebuild in-process membership from it on the ticker and at stream start. The blob is always a leftover/bare string `Set`.
+_Avoid_: walking the blob on the request path, one cache key per CIDR, LAPI `?ip=` on the stream path, intern ids in the blob
+
+**Leftover remediation**:
+A string of kind letter plus U+001F plus a metrics origin name. Redis, live/none, intern overflow, and range-index keep this spelling. Helpers live in `pkg/decisionscope`.
+_Avoid_: a leftover type in `pkg/cache`, `\x1e`
 
 **Range membership**:
-Two utilities Helpers (ban, captcha) on the reclaimed LAPI Client. Each Range `AddCIDR` MAY pass the blob remediation string (letter, optional U+001F origin) as metadata. Request lookup always asks this pair. Nil or empty (live/none never hydrate) is a Range miss. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s stored suffix.
-_Avoid_: trusted-IP Checker, one LPM tree with a stored remediation, `sync.Once`, package globals, a Crowdsec-mode flag on lookup, re-parsing `storedByCIDR` on a Range hit
+Two utilities Helpers (ban, captcha) on the reclaimed LAPI Client. Each Range `AddCIDR` MAY pass the blob remediation string (letter, optional U+001F origin) as metadata. Request lookup always asks this pair. Nil or empty (live/none never hydrate) is a Range miss. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s leftover suffix.
+_Avoid_: trusted-IP Checker, one LPM tree, `sync.Once`, package globals, a Crowdsec-mode flag on lookup, re-parsing `storedByCIDR` on a Range hit
 
 **Ip cache key**:
 The one canonical spelling an Ip-scoped decision is filed under, `net.IP.String()` of the address. `IPCacheKey` derives it from a LAPI decision value (host prefix, bare address, or verbatim when neither). After a successful parse, `clientRequest.remoteIP` is that same string and is the request-path key. CrowdSec stores decision values verbatim, so the store path still canonicalizes text; the request path must not re-parse.
@@ -31,7 +35,7 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 - Pass `decisionScopeHeaders` from config into the bouncer (request headers). Stream `scopes=` and the stream store filter are the live-router union (`core_plugin_lapi_scope-union.md`). Live/none still pass scopes per `LiveLookup`.
 - Resolve the client IP with `pkg/ip.GetRemoteIP`. After a successful parse, set `req.remoteIP = req.ipAddr.String()` before lookup, live memo, or captcha bind. Then `LookupCachedRemediation` with `lapiClient.RangeMembership()`. Pass `req.remoteIP` as the Ip key and `req.ipAddr` only into Range membership. Matching uses the first letter; origin is for usage-metrics only. Do not put scopes on `clientRequest`.
 - Writing an Ip slot from a LAPI decision value (stream store, stream delete) goes through `IPCacheKey`. The live memo writes `Set(remoteIP)` using the already-canonical request string. Changing one side of that pair on its own is a permanent cache miss, not a partial fix.
-- Stream Range items: collect the tick, then `ApplyRangeBatch` (one read, one write) with `RemediationWithOrigin`. Removals run before upserts so a same-window CIDR replacement stays (`core_plugin_lapi_stream-apply.md`). It returns an error when it could not read the shared blob; propagate it so the poll counts as failed. Hydrate membership from the blob after apply and on a lease hit. Do not GET+SET per Range line.
+- Stream Range items: collect the tick, then `ApplyRangeBatch` (one read, one write) with `rangeIndexRemediation`. Removals run before upserts so a same-window CIDR replacement stays (`core_plugin_lapi_stream-apply.md`). It returns an error when it could not read the shared blob; propagate it so the poll counts as failed. Hydrate membership from the blob after apply and on a lease hit. Do not GET+SET per Range line.
 - Live/none: keep `?ip=` (LAPI expands Range). Add `scope`+`value` when a mapped header is present. Do not hydrate membership. The live client-address cache key stores the `?ip=` result only; header remediations stay on `HeaderScopeKey`. A cache miss still live-looks-up; do not treat that miss as a stream-health decision.
 - CAPI (alone) omits `scopes=`. Apply any streamed scope this bouncer is configured to match.
 
@@ -40,7 +44,10 @@ Use `pkg/decisionscope` for cache keys, range-index edits, Range membership from
 ```go
 scopes := decisionscope.RequestScopeValues(headers, req)
 req.remoteIP = req.ipAddr.String()
-kind, origin, err := decisionscope.LookupCachedRemediation(cacheClient, req.remoteIP, req.ipAddr, scopes, lapiClient.RangeMembership())
+kind, origin, originID, err := decisionscope.LookupCachedRemediation(cacheClient, req.remoteIP, req.ipAddr, scopes, lapiClient.RangeMembership())
+if origin == "" {
+	origin = lapiClient.OriginName(originID)
+}
 lapiClient.IncDropped(origin, req.ipType, "ban")
 ```
 
@@ -63,7 +70,8 @@ lapiClient.IncDropped(origin, req.ipType, "ban")
 - Ban wins across Ip, Range, and header hits. Do not return the first active Ip or Range captcha before considering a Country ban.
 - Redis followers skip LAPI on a lease hit. They still GET `range-index` on that tick and rebuild membership; without that hydrate they would miss every Range decision.
 - Trust the header the same way you trust `X-Forwarded-For`: only from a trusted hop (CDN or geoenrich in front of this middleware).
-- Ip/header/Range-index values MAY be `t`/`c` plus U+001F plus a metrics origin. Bare letters still match. Redis stays one `range-index` key.
+- Leftover Ip/header/Range-index values MAY be `t`/`c` plus U+001F plus a metrics origin. Bare letters still match. Redis stays one `range-index` key written with `Set`. Packed intern ids are uint32 words on memory Ip/header slots only.
+- Request lookup tries `GetInt` per key, then `GetMany` only on leftover misses. Resolve `OriginName` only on drop.
 - After a cache miss, stream/alone use stream health; live/none call `LiveLookup`. Do not name that split after Range membership.
 - CrowdSec does not canonicalize decision values — measured on v1.8.0, the stream hands back `2001:DB8::2` and `::ffff:192.0.2.4` exactly as submitted. LAPI `?ip=` does match numerically, so the spelling problem is ours alone and needs no LAPI workaround.
 - `Get` runs on a round-robin `redisCacheReadHosts` replica while `Acquire` and `Set` run on the writer. A read path can fail on a completely healthy writer; that is how the range-index apply reached its unread-base defect without any timing window.

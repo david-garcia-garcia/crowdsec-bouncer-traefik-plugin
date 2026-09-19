@@ -4,7 +4,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup"
 )
 
@@ -27,7 +26,7 @@ func MembershipFromIndex(index string) *RangeMembership {
 			continue
 		}
 		helper := captcha
-		if cache.RemediationKind(remediation) == BannedValue {
+		if RemediationKind(remediation) == BannedValue {
 			helper = ban
 		}
 		// Store the blob line on the endpoint so a later hit is O(prefix).
