@@ -8,11 +8,6 @@ type LiveSlot struct {
 	ExpiresAt int64
 }
 
-// HitFromLiveSlot unpacks a live snapshot slot into lookup merge input.
-func HitFromLiveSlot(slot LiveSlot) lookupHit {
-	return hitFromPayload(slot.Word)
-}
-
 // LiveSlotFromPack builds a slot from a Pack payload and CrowdSec duration seconds.
 func LiveSlotFromPack(payload any, durationSec int64) LiveSlot {
 	expiresAt := time.Now().Unix() + durationSec

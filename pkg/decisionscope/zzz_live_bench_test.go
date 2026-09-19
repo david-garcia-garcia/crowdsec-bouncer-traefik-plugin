@@ -21,9 +21,10 @@ func BenchmarkLookupStreamMiss_100kSeq(b *testing.B) {
 	snapshot := benchLiveSnapshot(b)
 	remoteIP, ipAddr, scopes := benchLookupKeys()
 	membership := MembershipFromIndex("10.0.0.0/8=" + BannedValue)
+	get := benchSnapshotGet(snapshot)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _, _, _ = LookupStreamMapRemediation(snapshot, remoteIP, ipAddr, scopes, membership)
+		_, _, _ = LookupHits(get, remoteIP, ipAddr, scopes, membership)
 	}
 }
 
@@ -31,10 +32,11 @@ func BenchmarkLookupStreamMiss_100kParallel(b *testing.B) {
 	snapshot := benchLiveSnapshot(b)
 	remoteIP, ipAddr, scopes := benchLookupKeys()
 	membership := MembershipFromIndex("10.0.0.0/8=" + BannedValue)
+	get := benchSnapshotGet(snapshot)
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			_, _, _, _ = LookupStreamMapRemediation(snapshot, remoteIP, ipAddr, scopes, membership)
+			_, _, _ = LookupHits(get, remoteIP, ipAddr, scopes, membership)
 		}
 	})
 }
@@ -72,4 +74,14 @@ func benchLiveSnapshot(b *testing.B) map[string]LiveSlot {
 	}
 	snapshot[HeaderScopeKey(ScopeCountry, "US")] = LiveSlot{Word: packWord(BannedValue, 1), ExpiresAt: 9_999_999_999}
 	return snapshot
+}
+
+func benchSnapshotGet(snapshot map[string]LiveSlot) func(string) any {
+	return func(key string) any {
+		slot, ok := snapshot[key]
+		if !ok {
+			return nil
+		}
+		return slot.Word
+	}
 }

@@ -215,7 +215,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			return
 		case decisionscope.IsActiveRemediation(value):
 			b.log.Debug("ServeHTTP", "ip", req.remoteIP, "cache", "hit", "remediation", value)
-			// Origin name is resolved only on drop; allow-path GetInt has no intern lock.
+			// Origin name is resolved only on drop; allow-path intern Name is lock-free.
 			b.handleRemediationServeHTTP(rw, req, value, b.resolveDroppedOrigin(origin, originID))
 			return
 		case value == decisionscope.NoBannedValue:

@@ -1,12 +1,10 @@
 package decisionscope
 
 import (
-	"errors"
 	"net"
 	"net/http"
 	"sort"
 	"strings"
-	"time"
 )
 
 const (
@@ -17,9 +15,6 @@ const (
 	// CaptchaValue is the cache payload for a captcha remediation.
 	CaptchaValue = "c"
 )
-
-// ErrLookupMiss is an empty Ip, header, and Range merge.
-var ErrLookupMiss = errors.New("store:miss")
 
 // IsActiveRemediation reports whether value is ban or captcha (origin suffix ignored).
 func IsActiveRemediation(value string) bool {
@@ -123,29 +118,6 @@ func LookupHits(get func(string) any, remoteIP string, ipAddr net.IP, scopes map
 		return "", "", 0
 	}
 	return RemediationKind(chosen.stored), chosen.origin, chosen.originID
-}
-
-// LookupStreamMapRemediation merges Ip, header scopes, and Range from a published memory stream map.
-// Ban on Ip skips Range membership. Nil or empty snapshot is a miss when nothing else hits.
-func LookupStreamMapRemediation(snapshot map[string]LiveSlot, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16, error) {
-	now := time.Now().Unix()
-	kind, origin, originID := LookupHits(func(key string) any {
-		if snapshot == nil {
-			return nil
-		}
-		slot, ok := snapshot[key]
-		if !ok {
-			return nil
-		}
-		if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
-			return nil
-		}
-		return slot.Word
-	}, remoteIP, ipAddr, scopes, membership)
-	if kind == "" {
-		return "", "", 0, ErrLookupMiss
-	}
-	return kind, origin, originID, nil
 }
 
 // LookupCacheKeys is the GetMany key list for the Redis request path: IP, then present header scopes. Range is not a cache key.
