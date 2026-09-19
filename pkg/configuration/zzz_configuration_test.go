@@ -314,37 +314,37 @@ func Test_ValidateParams_captchaTemplateRequired(t *testing.T) {
 	log := logger.New("INFO", "")
 	captchaTemplate := writeCaptchaTemplateFixture(t)
 
-	emptyPath := getMinimalConfig()
-	emptyPath.CaptchaProvider = HcaptchaProvider
-	emptyPath.CaptchaSiteKey = "site"
-	emptyPath.CaptchaSecretKey = "secret"
-	emptyPath.CaptchaGateSecret = "gate-secret"
-	emptyPath.CaptchaFilePath = ""
+	cfgEmptyCaptchaPath := getMinimalConfig()
+	cfgEmptyCaptchaPath.CaptchaProvider = HcaptchaProvider
+	cfgEmptyCaptchaPath.CaptchaSiteKey = "site"
+	cfgEmptyCaptchaPath.CaptchaSecretKey = "secret"
+	cfgEmptyCaptchaPath.CaptchaGateSecret = "gate-secret"
+	cfgEmptyCaptchaPath.CaptchaFilePath = ""
 
-	missingFile := getMinimalConfig()
-	missingFile.CaptchaProvider = HcaptchaProvider
-	missingFile.CaptchaSiteKey = "site"
-	missingFile.CaptchaSecretKey = "secret"
-	missingFile.CaptchaGateSecret = "gate-secret"
-	missingFile.CaptchaFilePath = filepath.Join(t.TempDir(), "missing-captcha.html")
+	cfgMissingCaptchaFile := getMinimalConfig()
+	cfgMissingCaptchaFile.CaptchaProvider = HcaptchaProvider
+	cfgMissingCaptchaFile.CaptchaSiteKey = "site"
+	cfgMissingCaptchaFile.CaptchaSecretKey = "secret"
+	cfgMissingCaptchaFile.CaptchaGateSecret = "gate-secret"
+	cfgMissingCaptchaFile.CaptchaFilePath = filepath.Join(t.TempDir(), "missing-captcha.html")
 
-	emptyBan := getMinimalConfig()
-	emptyBan.CaptchaProvider = HcaptchaProvider
-	emptyBan.CaptchaSiteKey = "site"
-	emptyBan.CaptchaSecretKey = "secret"
-	emptyBan.CaptchaGateSecret = "gate-secret"
-	emptyBan.CaptchaFilePath = captchaTemplate
-	emptyBan.BanFilePath = ""
+	cfgEmptyBanPath := getMinimalConfig()
+	cfgEmptyBanPath.CaptchaProvider = HcaptchaProvider
+	cfgEmptyBanPath.CaptchaSiteKey = "site"
+	cfgEmptyBanPath.CaptchaSecretKey = "secret"
+	cfgEmptyBanPath.CaptchaGateSecret = "gate-secret"
+	cfgEmptyBanPath.CaptchaFilePath = captchaTemplate
+	cfgEmptyBanPath.BanFilePath = ""
 
-	aloneEmptyPath := getMinimalConfig()
-	aloneEmptyPath.CrowdsecMode = AloneMode
-	aloneEmptyPath.CrowdsecCapiMachineID = "machine"
-	aloneEmptyPath.CrowdsecCapiPassword = "password"
-	aloneEmptyPath.CaptchaProvider = HcaptchaProvider
-	aloneEmptyPath.CaptchaSiteKey = "site"
-	aloneEmptyPath.CaptchaSecretKey = "secret"
-	aloneEmptyPath.CaptchaGateSecret = "gate-secret"
-	aloneEmptyPath.CaptchaFilePath = ""
+	cfgAloneEmptyCaptchaPath := getMinimalConfig()
+	cfgAloneEmptyCaptchaPath.CrowdsecMode = AloneMode
+	cfgAloneEmptyCaptchaPath.CrowdsecCapiMachineID = "machine"
+	cfgAloneEmptyCaptchaPath.CrowdsecCapiPassword = "password"
+	cfgAloneEmptyCaptchaPath.CaptchaProvider = HcaptchaProvider
+	cfgAloneEmptyCaptchaPath.CaptchaSiteKey = "site"
+	cfgAloneEmptyCaptchaPath.CaptchaSecretKey = "secret"
+	cfgAloneEmptyCaptchaPath.CaptchaGateSecret = "gate-secret"
+	cfgAloneEmptyCaptchaPath.CaptchaFilePath = ""
 
 	tests := []struct {
 		name            string
@@ -352,10 +352,10 @@ func Test_ValidateParams_captchaTemplateRequired(t *testing.T) {
 		wantErr         bool
 		wantErrContains string
 	}{
-		{name: "Provider set with empty captcha path", config: emptyPath, wantErr: true, wantErrContains: "CaptchaFilePath: cannot be empty when CaptchaProvider is set"},
-		{name: "Provider set with missing captcha file", config: missingFile, wantErr: true},
-		{name: "Provider set with empty ban path still accepted", config: emptyBan, wantErr: false},
-		{name: "Alone mode empty captcha path", config: aloneEmptyPath, wantErr: true, wantErrContains: "CaptchaFilePath: cannot be empty when CaptchaProvider is set"},
+		{name: "Provider set with empty captcha path", config: cfgEmptyCaptchaPath, wantErr: true, wantErrContains: "CaptchaFilePath: cannot be empty when CaptchaProvider is set"},
+		{name: "Provider set with missing captcha file", config: cfgMissingCaptchaFile, wantErr: true},
+		{name: "Provider set with empty ban path still accepted", config: cfgEmptyBanPath, wantErr: false},
+		{name: "Alone mode empty captcha path", config: cfgAloneEmptyCaptchaPath, wantErr: true, wantErrContains: "CaptchaFilePath: cannot be empty when CaptchaProvider is set"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

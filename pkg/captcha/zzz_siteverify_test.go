@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,15 +44,6 @@ func newTestSiteverifyClient(t *testing.T, siteverifyURL string, httpClient *htt
 	return client
 }
 
-func newSolvePOST(t *testing.T) *http.Request {
-	t.Helper()
-	form := url.Values{}
-	form.Set("dummy-captcha-response", "ok")
-	req := httptest.NewRequest(http.MethodPost, "/foo", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	return req
-}
-
 // Test_ServeHTTP_siteverifyPostsRemoteIP proves the provider form includes the
 // remoteIP already passed into ServeHTTP, not a header parse inside captcha.
 func Test_ServeHTTP_siteverifyPostsRemoteIP(t *testing.T) {
@@ -73,7 +63,7 @@ func Test_ServeHTTP_siteverifyPostsRemoteIP(t *testing.T) {
 
 	client := newTestSiteverifyClient(t, siteverify.URL, siteverify.Client())
 	solveRW := httptest.NewRecorder()
-	client.ServeHTTP(solveRW, newSolvePOST(t), passedRemoteIP)
+	client.ServeHTTP(solveRW, solverPOST(), passedRemoteIP)
 	if solveRW.Code != http.StatusFound {
 		body, _ := io.ReadAll(solveRW.Result().Body)
 		t.Fatalf("solve want 302, got %d %s", solveRW.Code, body)
@@ -82,8 +72,8 @@ func Test_ServeHTTP_siteverifyPostsRemoteIP(t *testing.T) {
 	if !strings.Contains(cookie, gateCookieName+"=") {
 		t.Fatalf("solve missing gate cookie: %s", cookie)
 	}
-	if gotSecret != client.secretKey || gotResponse != "ok" || gotRemoteIP != passedRemoteIP {
-		t.Fatalf("siteverify form secret=%q response=%q remoteip=%q, want secret=%q response=ok remoteip=%s",
+	if gotSecret != client.secretKey || gotResponse != "ok-token" || gotRemoteIP != passedRemoteIP {
+		t.Fatalf("siteverify form secret=%q response=%q remoteip=%q, want secret=%q response=ok-token remoteip=%s",
 			gotSecret, gotResponse, gotRemoteIP, client.secretKey, passedRemoteIP)
 	}
 }
@@ -100,7 +90,7 @@ func Test_ServeHTTP_transportErrorRendersChallenge(t *testing.T) {
 
 	client := newTestSiteverifyClient(t, siteverify.URL, httpClient)
 	solveRW := httptest.NewRecorder()
-	client.ServeHTTP(solveRW, newSolvePOST(t), "1.2.3.4")
+	client.ServeHTTP(solveRW, solverPOST(), "1.2.3.4")
 	if solveRW.Code != http.StatusOK {
 		t.Fatalf("transport error want 200 challenge, got %d (must not be 400)", solveRW.Code)
 	}
@@ -124,7 +114,7 @@ func Test_ServeHTTP_jsonDecodeErrorRendersChallenge(t *testing.T) {
 
 	client := newTestSiteverifyClient(t, siteverify.URL, siteverify.Client())
 	solveRW := httptest.NewRecorder()
-	client.ServeHTTP(solveRW, newSolvePOST(t), "1.2.3.4")
+	client.ServeHTTP(solveRW, solverPOST(), "1.2.3.4")
 	if solveRW.Code != http.StatusOK {
 		t.Fatalf("decode error want 200 challenge, got %d (must not be 400)", solveRW.Code)
 	}

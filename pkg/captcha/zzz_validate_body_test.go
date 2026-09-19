@@ -99,6 +99,33 @@ func Test_Validate_customJSONPostsJSONSecretAndResponse(t *testing.T) {
 	}
 }
 
+// Test_Validate_customJSONPostsRemoteIP proves custom+json marshals a non-empty
+// Validate remoteIP as JSON "remoteip".
+func Test_Validate_customJSONPostsRemoteIP(t *testing.T) {
+	const passedRemoteIP = "203.0.113.9"
+	var gotBody string
+	siteverify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		gotBody = string(raw)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true}`))
+	}))
+	t.Cleanup(siteverify.Close)
+
+	client := newTestCaptchaClient(t, configuration.CustomProvider, configuration.CaptchaCustomValidateBodyJSON, siteverify.URL+"/siteverify", siteverify.Client())
+	ok, err := client.Validate(solverPOST(), passedRemoteIP)
+	if err != nil || !ok {
+		t.Fatalf("Validate json want success, got ok=%v err=%v", ok, err)
+	}
+	var payload siteverifyRequest
+	if err := json.Unmarshal([]byte(gotBody), &payload); err != nil {
+		t.Fatalf("body is not JSON: %v %q", err, gotBody)
+	}
+	if payload.RemoteIP != passedRemoteIP {
+		t.Fatalf("JSON remoteip=%q, want %s", payload.RemoteIP, passedRemoteIP)
+	}
+}
+
 func Test_Validate_customFormOrOmitStaysURLEncoded(t *testing.T) {
 	for _, validateBody := range []string{"", configuration.CaptchaCustomValidateBodyForm} {
 		t.Run("body="+validateBody, func(t *testing.T) {
