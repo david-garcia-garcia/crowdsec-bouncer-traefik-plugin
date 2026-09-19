@@ -44,9 +44,11 @@ func TestHydrateRangeKeepsLastOnUnreachable(t *testing.T) {
 	if got := store.RangeMembership().Remediation(net.ParseIP("10.1.2.3")); got != decisionscope.BannedValue {
 		t.Fatalf("seed got %q, want ban", got)
 	}
-	store.red = newRedis(logger.New("ERROR", ""), "127.0.0.1:1", nil, "", "", "p")
+	red := newRedis(logger.New("ERROR", ""), "127.0.0.1:1", nil, "", "", "p")
+	store.engine = redisEngine(red)
+	store.red = red
 	store.mem = nil
-	defer store.red.close()
+	defer store.Close()
 	store.HydrateRange()
 	if got := store.RangeMembership().Remediation(net.ParseIP("10.1.2.3")); got != decisionscope.BannedValue {
 		t.Fatalf("unreachable hydrate wiped membership, got %q", got)

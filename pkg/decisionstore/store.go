@@ -15,9 +15,48 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
+// engine is the slot and Range ops bound at NewMemory or NewRedis.
+// Funcs, not an interface: Yaegi v0.16 panics putting a map-holding *memory in an interface.
+type engine struct {
+	beginTick   func()
+	publishTick func(int64)
+	put         func(Decision)
+	deleteSlot  func(string, string)
+	lookup      func(string, net.IP, map[string]string, *RangeMembership) (string, string, uint16, error)
+	applyRange  func(map[string]string, []string) error
+	rangeIndex  func() (string, error)
+	close       func()
+}
+
+func memoryEngine(mem *memory) engine {
+	return engine{
+		beginTick:   mem.BeginTick,
+		publishTick: mem.PublishTick,
+		put:         mem.Put,
+		deleteSlot:  mem.Delete,
+		lookup:      mem.LookupRemediation,
+		applyRange:  mem.ApplyRangeBatch,
+		rangeIndex:  mem.RangeIndex,
+		close:       func() {},
+	}
+}
+
+func redisEngine(red *redis) engine {
+	return engine{
+		beginTick:   red.BeginTick,
+		publishTick: red.PublishTick,
+		put:         red.Put,
+		deleteSlot:  red.Delete,
+		lookup:      red.LookupRemediation,
+		applyRange:  red.ApplyRangeBatch,
+		rangeIndex:  red.RangeIndex,
+		close:       red.close,
+	}
+}
+
 // Store is one reclaim value: intern table, Range membership, and the decision engine.
-// Memory and Redis are concrete fields: Yaegi v0.16 panics putting a map-holding struct in an interface.
 type Store struct {
+	engine          engine
 	mem             *memory
 	red             *redis
 	origins         *intern.Table
@@ -28,16 +67,20 @@ type Store struct {
 // NewMemory is in-process COW slots and an in-process Range blob.
 func NewMemory(log *slog.Logger) *Store {
 	origins := intern.New()
+	mem := newMemory(log, origins)
 	return &Store{
-		mem:     newMemory(log, origins),
+		engine:  memoryEngine(mem),
+		mem:     mem,
 		origins: origins,
 	}
 }
 
 // NewRedis stores Ip, header-scope, and Range on Redis (keyPrefix namespaces keys).
 func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string) *Store {
+	red := newRedis(log, writeHost, readHosts, pass, database, keyPrefix)
 	return &Store{
-		red:     newRedis(log, writeHost, readHosts, pass, database, keyPrefix),
+		engine:  redisEngine(red),
+		red:     red,
 		origins: intern.New(),
 	}
 }
@@ -86,98 +129,67 @@ func (o originIntern) Intern(name string) (uint16, bool) {
 // BeginTick opens the write window for one stream poll. Memory clones published into tick.
 // Redis is a no-op: each Set/Delete is already visible to other processes.
 func (s *Store) BeginTick() {
-	if s != nil && s.mem != nil {
-		s.mem.BeginTick()
+	if s == nil || s.engine.beginTick == nil {
+		return
 	}
+	s.engine.beginTick()
 }
 
 // PublishTick closes that window. Memory drops expired tick slots and publishes tick.
 // Redis is a no-op: key TTL is the expiry.
 func (s *Store) PublishTick(now int64) {
-	if s != nil && s.mem != nil {
-		s.mem.PublishTick(now)
+	if s == nil || s.engine.publishTick == nil {
+		return
 	}
+	s.engine.publishTick(now)
 }
 
 // Put stores one Ip or header-scope decision. Range is ignored (use ApplyRangeBatch).
 func (s *Store) Put(item Decision) {
-	if s == nil {
+	if s == nil || s.engine.put == nil {
 		return
 	}
-	if s.mem != nil {
-		s.mem.Put(item)
-		return
-	}
-	if s.red != nil {
-		s.red.Put(item)
-	}
+	s.engine.put(item)
 }
 
 // Delete drops the canonical slot for scope+value, and a prior Ip spelling when it differs.
 func (s *Store) Delete(scope, value string) {
-	if s == nil {
+	if s == nil || s.engine.deleteSlot == nil {
 		return
 	}
-	if s.mem != nil {
-		s.mem.Delete(scope, value)
-		return
-	}
-	if s.red != nil {
-		s.red.Delete(scope, value)
-	}
+	s.engine.deleteSlot(scope, value)
 }
 
 // LookupRemediation is the request path for stream/alone and live/none.
 func (s *Store) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string) (string, string, uint16, error) {
-	if s == nil {
+	if s == nil || s.engine.lookup == nil {
 		return "", "", 0, ErrMiss
 	}
-	membership := s.RangeMembership()
-	if s.mem != nil {
-		return s.mem.LookupRemediation(remoteIP, ipAddr, scopes, membership)
-	}
-	if s.red != nil {
-		return s.red.LookupRemediation(remoteIP, ipAddr, scopes, membership)
-	}
-	return "", "", 0, ErrMiss
+	return s.engine.lookup(remoteIP, ipAddr, scopes, s.RangeMembership())
 }
 
 // Close drains the Redis pool. Memory is a no-op. Reclaim last-holder hook.
 func (s *Store) Close() {
-	if s != nil && s.red != nil {
-		s.red.close()
+	if s == nil || s.engine.close == nil {
+		return
 	}
+	s.engine.close()
 }
 
 // RangeIndex is the Range blob, or empty when none has been written.
 func (s *Store) RangeIndex() (string, error) {
-	if s == nil {
+	if s == nil || s.engine.rangeIndex == nil {
 		return "", ErrMiss
 	}
-	if s.mem != nil {
-		return s.mem.RangeIndex()
-	}
-	if s.red != nil {
-		return s.red.RangeIndex()
-	}
-	return "", ErrMiss
+	return s.engine.rangeIndex()
 }
 
 // ApplyRangeBatch upserts and removes Range CIDRs, then rebuilds in-process membership.
 func (s *Store) ApplyRangeBatch(upserts map[string]string, removals []string) error {
-	if s == nil {
+	if s == nil || s.engine.applyRange == nil {
 		return ErrMiss
 	}
-	var err error
-	switch {
-	case s.mem != nil:
-		err = s.mem.ApplyRangeBatch(upserts, removals)
-	case s.red != nil:
-		err = s.red.ApplyRangeBatch(upserts, removals)
-	default:
-		return ErrMiss
-	}
-	if err != nil {
+	if err := s.engine.applyRange(upserts, removals); err != nil {
 		return err
 	}
 	s.HydrateRange()
