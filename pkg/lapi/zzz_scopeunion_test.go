@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
@@ -77,22 +76,15 @@ func TestOpenStream_LiveRoutersUnionCountryAndUsername(t *testing.T) {
 }
 
 func testStreamHasDecision(client *Client, key string) bool {
-	if client.decisionStore != nil {
-		if snap := client.decisionStore.PublishedMemoryMapForTest(); snap != nil {
-			_, ok := snap[key]
-			return ok
-		}
-		return testCacheHasDecision(client.CacheForTest(), key)
+	if client.decisionStore == nil {
+		return false
 	}
-	return testCacheHasDecision(client.CacheForTest(), key)
-}
-
-func testCacheHasDecision(cacheClient *cache.Client, key string) bool {
-	if _, err := cacheClient.GetInt(key); err == nil {
-		return true
+	snap := client.decisionStore.PublishedMemoryMapForTest()
+	if snap == nil {
+		return false
 	}
-	_, err := cacheClient.Get(key)
-	return err == nil
+	_, ok := snap[key]
+	return ok
 }
 
 func TestOpenStream_LateCountryJoinUsesStartupFalse(t *testing.T) {

@@ -16,8 +16,7 @@ import (
 // testStreamAllowBouncer is a stream bouncer whose cache says none for 203.0.113.10.
 func testStreamAllowBouncer(t *testing.T, log *slog.Logger) (*Bouncer, *httptest.ResponseRecorder, *http.Request, *bool) {
 	t.Helper()
-	lapiClient, cacheClient := lapi.NewTestClient(log)
-	t.Cleanup(cacheClient.Close)
+	lapiClient, _ := lapi.NewTestClient(log)
 	lapi.AttachTestInternStore(lapiClient)
 	lapiClient.SetStreamHealthyForTest(true)
 	clientChecker, err := ip.NewChecker(log, nil)

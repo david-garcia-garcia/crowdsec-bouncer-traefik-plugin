@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	captcha "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 )
@@ -198,20 +198,16 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		var value, origin string
 		var originID uint16
 		var cacheErr error
-		if b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
-			value, origin, originID, cacheErr = b.lapiClient.LookupStreamRemediation(req.remoteIP, req.ipAddr, scopes)
-		} else {
-			value, origin, originID, cacheErr = b.lapiClient.LookupCachedRemediation(req.remoteIP, req.ipAddr, scopes)
-		}
+		value, origin, originID, cacheErr = b.lapiClient.LookupRemediation(req.remoteIP, req.ipAddr, scopes)
 		switch {
 		case cacheErr != nil:
 			b.log.Debug("ServeHTTP:Get", "ip", req.remoteIP, "cache", cacheErr)
-			if errors.Is(cacheErr, cache.ErrUnreachable) && !b.redisUnreachableBlock {
+			if errors.Is(cacheErr, decisionstore.ErrUnreachable) && !b.redisUnreachableBlock {
 				b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "redisUnreachable", true)
 				b.handleNextServeHTTP(rw, req)
 				return
 			}
-			if errors.Is(cacheErr, cache.ErrMiss) {
+			if errors.Is(cacheErr, decisionstore.ErrMiss) {
 				break
 			}
 			b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "error", cacheErr)

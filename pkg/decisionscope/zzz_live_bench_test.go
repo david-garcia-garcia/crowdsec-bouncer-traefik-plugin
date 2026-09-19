@@ -5,8 +5,6 @@ import (
 	"net"
 	"testing"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
-	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	ttl_map "github.com/leprosus/golang-ttl-map"
 )
 
@@ -19,16 +17,6 @@ func benchLookupKeys() (remoteIP string, ipAddr net.IP, scopes map[string]string
 	return remoteIP, ipAddr, scopes
 }
 
-func BenchmarkLookupCachedMiss_100kSeq(b *testing.B) {
-	client := newBenchTTLClient(b)
-	remoteIP, ipAddr, scopes := benchLookupKeys()
-	membership := MembershipFromIndex("10.0.0.0/8=" + BannedValue)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _, _, _ = LookupCachedRemediation(client, remoteIP, ipAddr, scopes, membership)
-	}
-}
-
 func BenchmarkLookupStreamMiss_100kSeq(b *testing.B) {
 	snapshot := benchLiveSnapshot(b)
 	remoteIP, ipAddr, scopes := benchLookupKeys()
@@ -37,18 +25,6 @@ func BenchmarkLookupStreamMiss_100kSeq(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, _, _, _ = LookupStreamMapRemediation(snapshot, remoteIP, ipAddr, scopes, membership)
 	}
-}
-
-func BenchmarkLookupCachedMiss_100kParallel(b *testing.B) {
-	client := newBenchTTLClient(b)
-	remoteIP, ipAddr, scopes := benchLookupKeys()
-	membership := MembershipFromIndex("10.0.0.0/8=" + BannedValue)
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			_, _, _, _ = LookupCachedRemediation(client, remoteIP, ipAddr, scopes, membership)
-		}
-	})
 }
 
 func BenchmarkLookupStreamMiss_100kParallel(b *testing.B) {
@@ -85,19 +61,6 @@ func BenchmarkHeapRetained_LiveMap100k(b *testing.B) {
 		}
 		b.SetBytes(int64(len(snapshot)) * 68)
 	}
-}
-
-func newBenchTTLClient(b *testing.B) *cache.Client {
-	b.Helper()
-	client := &cache.Client{}
-	client.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
-	for n := 0; n < benchLiveEntries; n++ {
-		key := fmt.Sprintf("10.%d.%d.%d", n>>16&0xff, n>>8&0xff, n&0xff)
-		client.Set(key, packWord(BannedValue, 1), 3600)
-	}
-	countryKey := HeaderScopeKey(ScopeCountry, "US")
-	client.Set(countryKey, packWord(BannedValue, 1), 3600)
-	return client
 }
 
 func benchLiveSnapshot(b *testing.B) map[string]LiveSlot {

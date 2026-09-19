@@ -1,11 +1,9 @@
 package decisionscope
 
 import (
-	"errors"
 	"net"
 	"strings"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
@@ -21,33 +19,9 @@ func rangeIndexCIDR(cidr string) string {
 	return network
 }
 
-// AddRange upserts a Range decision on the shared index as cidr=remediation.
-func AddRange(cacheClient *cache.Client, cidr, remediation string, _ int64) {
-	network := strings.TrimSpace(cidr)
-	if network == "" || !IsActiveRemediation(remediation) {
-		return
-	}
-	_ = ApplyRangeBatch(cacheClient, map[string]string{network: remediation}, nil)
-}
-
-// RemoveRange drops a Range decision from the shared index.
-func RemoveRange(cacheClient *cache.Client, cidr string) {
-	_ = ApplyRangeBatch(cacheClient, nil, []string{strings.TrimSpace(cidr)})
-}
-
-// ApplyRangeBatch upserts and removes Range lines with one cache read and one write.
+// ApplyRangeIndex applies removals then upserts to a range-index blob.
 // Removals run first so a CIDR present in both maps remains the replacement.
-// The index is shared by every bouncer on this cache, so a read that did not answer is not an
-// empty index: writing the batch onto an empty base would drop every Range decision this poll
-// did not carry. A read failure returns the error and leaves the stored index alone.
-func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, removals []string) error {
-	if len(upserts) == 0 && len(removals) == 0 {
-		return nil
-	}
-	index, err := readRangeIndex(cacheClient)
-	if err != nil {
-		return err
-	}
+func ApplyRangeIndex(index string, upserts map[string]string, removals []string) string {
 	for _, cidr := range removals {
 		network := rangeIndexCIDR(cidr)
 		if network == "" {
@@ -62,12 +36,7 @@ func ApplyRangeBatch(cacheClient *cache.Client, upserts map[string]string, remov
 		}
 		index = upsertIndexCIDR(index, network, remediation)
 	}
-	if index == "" {
-		cacheClient.Delete(RangeIndexKey)
-		return nil
-	}
-	cacheClient.Set(RangeIndexKey, index, rangeIndexTTL)
-	return nil
+	return index
 }
 
 // parseIndexLine splits one cidr=remediation line. A missing equals leaves remediation empty.
@@ -121,19 +90,6 @@ func upsertIndexCIDR(index, cidr, remediation string) string {
 		kept = append(kept, cidr+"="+remediation)
 	}
 	return strings.Join(kept, "\n")
-}
-
-// readRangeIndex returns the cached range-index blob. A miss is an empty index and no error; every
-// other failure is returned, because the caller cannot tell "no Range decisions" from "no answer".
-func readRangeIndex(cacheClient *cache.Client) (string, error) {
-	index, err := cacheClient.Get(RangeIndexKey)
-	if err != nil {
-		if errors.Is(err, cache.ErrMiss) {
-			return "", nil
-		}
-		return "", err
-	}
-	return index, nil
 }
 
 // removeCIDRFromIndex drops every line whose CIDR is the same network as cidr.

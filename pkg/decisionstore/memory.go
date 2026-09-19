@@ -3,18 +3,21 @@ package decisionstore
 import (
 	"log/slog"
 	"net"
+	"sync"
 	"sync/atomic"
+	"time"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 )
 
 type memory struct {
-	log       *slog.Logger
-	origins   *intern.Table
-	tick      map[string]decisionscope.LiveSlot
-	published atomic.Value // map[string]decisionscope.LiveSlot
+	log        *slog.Logger
+	origins    *intern.Table
+	mu         sync.Mutex
+	tick       map[string]decisionscope.LiveSlot
+	published  atomic.Value // map[string]decisionscope.LiveSlot
+	rangeIndex string
 }
 
 func newMemory(log *slog.Logger, origins *intern.Table) *memory {
@@ -26,6 +29,8 @@ func (m *memory) BeginTick() {
 	if m == nil {
 		return
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	prev, _ := m.published.Load().(map[string]decisionscope.LiveSlot)
 	if len(prev) == 0 {
 		m.tick = make(map[string]decisionscope.LiveSlot)
@@ -40,7 +45,12 @@ func (m *memory) BeginTick() {
 
 // PublishTick drops expired tick slots, publishes tick, and clears it.
 func (m *memory) PublishTick(now int64) {
-	if m == nil || m.tick == nil {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.tick == nil {
 		return
 	}
 	for key, slot := range m.tick {
@@ -52,11 +62,22 @@ func (m *memory) PublishTick(now int64) {
 	m.tick = nil
 }
 
-// Put writes one decision into tick. Intern overflow logs Warn and stores kind only.
+// Put writes one decision into tick when a stream window is open, else onto the published map (live).
 func (m *memory) Put(item Decision) {
-	if m == nil || m.tick == nil {
+	if m == nil {
 		return
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.tick != nil {
+		m.putTick(item)
+		return
+	}
+	m.putPublishedLocked(item)
+}
+
+// putTick writes one decision into tick. Intern overflow logs Warn and stores kind only.
+func (m *memory) putTick(item Decision) {
 	key, _ := slotKeys(item.Scope, item.Value)
 	if key == "" {
 		return
@@ -68,6 +89,25 @@ func (m *memory) Put(item Decision) {
 	m.tick[key] = decisionscope.LiveSlotFromPack(payload, item.DurationSec)
 }
 
+// putPublishedLocked copy-on-write one live slot onto the published map. Caller holds mu.
+func (m *memory) putPublishedLocked(item Decision) {
+	key, _ := slotKeys(item.Scope, item.Value)
+	if key == "" {
+		return
+	}
+	payload := m.pack(item.Kind, item.Origin)
+	if stored, isString := payload.(string); isString && m.log != nil {
+		m.log.Warn("decisionstore:intern overflow", "kind", decisionscope.RemediationKind(stored))
+	}
+	prev, _ := m.published.Load().(map[string]decisionscope.LiveSlot)
+	next := make(map[string]decisionscope.LiveSlot, len(prev)+1)
+	for slotKey, slot := range prev {
+		next[slotKey] = slot
+	}
+	next[key] = decisionscope.LiveSlotFromPack(payload, item.DurationSec)
+	m.published.Store(next)
+}
+
 // pack encodes a uint32 word when intern succeeds, else a leftover kind+origin string.
 func (m *memory) pack(kind, origin string) any {
 	if m == nil {
@@ -76,31 +116,88 @@ func (m *memory) pack(kind, origin string) any {
 	return decisionscope.Pack(kind, origin, originIntern{table: m.origins, packsMemory: true})
 }
 
-// Delete drops the canonical slot and a prior Ip spelling from tick.
+// Delete drops the canonical slot and a prior Ip spelling from tick or the published map.
 func (m *memory) Delete(scope, value string) {
-	if m == nil || m.tick == nil {
+	if m == nil {
 		return
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	key, legacy := slotKeys(scope, value)
 	if key == "" {
 		return
 	}
-	delete(m.tick, key)
-	if legacy != "" && legacy != key {
-		delete(m.tick, legacy)
+	if m.tick != nil {
+		delete(m.tick, key)
+		if legacy != "" && legacy != key {
+			delete(m.tick, legacy)
+		}
+		return
 	}
+	prev, _ := m.published.Load().(map[string]decisionscope.LiveSlot)
+	if len(prev) == 0 {
+		return
+	}
+	next := make(map[string]decisionscope.LiveSlot, len(prev))
+	for slotKey, slot := range prev {
+		if slotKey == key || (legacy != "" && slotKey == legacy) {
+			continue
+		}
+		next[slotKey] = slot
+	}
+	m.published.Store(next)
 }
 
-// LookupRemediation reads the published map (Ip, header scopes, Range).
+// LookupRemediation reads the published map (Ip, header scopes, Range). Expired slots miss.
 func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *decisionscope.RangeMembership) (string, string, uint16, error) {
 	if m == nil {
-		return "", "", 0, cache.ErrMiss
+		return "", "", 0, ErrMiss
 	}
 	snap, _ := m.published.Load().(map[string]decisionscope.LiveSlot)
-	return decisionscope.LookupStreamMapRemediation(snap, remoteIP, ipAddr, scopes, membership)
+	now := time.Now().Unix()
+	kind, origin, originID := decisionscope.LookupHits(func(key string) any {
+		slot, ok := snap[key]
+		if !ok {
+			return nil
+		}
+		if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
+			return nil
+		}
+		return slot.Word
+	}, remoteIP, ipAddr, scopes, membership)
+	if kind == "" {
+		return "", "", 0, ErrMiss
+	}
+	return kind, origin, originID, nil
 }
 
-// publishedMap is the lookup snapshot. Nil before the first PublishTick.
+// ApplyRangeBatch mutates the in-process range-index blob.
+func (m *memory) ApplyRangeBatch(upserts map[string]string, removals []string) error {
+	if m == nil {
+		return nil
+	}
+	if len(upserts) == 0 && len(removals) == 0 {
+		return nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.rangeIndex = decisionscope.ApplyRangeIndex(m.rangeIndex, upserts, removals)
+	return nil
+}
+
+// RangeIndex is the in-process range-index blob.
+func (m *memory) RangeIndex() (string, error) {
+	if m == nil {
+		return "", nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.rangeIndex, nil
+}
+
+func (m *memory) close() {}
+
+// publishedMap is the lookup snapshot. Nil before the first publish or live Put.
 func (m *memory) publishedMap() map[string]decisionscope.LiveSlot {
 	if m == nil {
 		return nil
@@ -114,16 +211,7 @@ func (m *memory) seedPublished(item Decision) {
 	if m == nil {
 		return
 	}
-	key, _ := slotKeys(item.Scope, item.Value)
-	if key == "" {
-		return
-	}
-	payload := m.pack(item.Kind, item.Origin)
-	prev := m.publishedMap()
-	next := make(map[string]decisionscope.LiveSlot, len(prev)+1)
-	for slotKey, slot := range prev {
-		next[slotKey] = slot
-	}
-	next[key] = decisionscope.LiveSlotFromPack(payload, item.DurationSec)
-	m.published.Store(next)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.putPublishedLocked(item)
 }

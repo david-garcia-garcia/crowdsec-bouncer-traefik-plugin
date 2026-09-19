@@ -1,6 +1,7 @@
 package decisionstore
 
 import (
+	"errors"
 	"net"
 	"testing"
 	"time"
@@ -10,11 +11,11 @@ import (
 )
 
 func TestMemoryTickPublishLookup(t *testing.T) {
-	store := NewMemory(nil, logger.New("ERROR", ""))
+	store := NewMemory(logger.New("ERROR", ""))
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60})
 	store.PublishTick(0)
-	kind, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
+	kind, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	if err != nil || kind != decisionscope.BannedValue {
 		t.Fatalf("kind %q err %v", kind, err)
 	}
@@ -24,12 +25,50 @@ func TestMemoryTickPublishLookup(t *testing.T) {
 }
 
 func TestMemoryExpiryOnPublish(t *testing.T) {
-	store := NewMemory(nil, logger.New("ERROR", ""))
+	store := NewMemory(logger.New("ERROR", ""))
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: -1})
 	store.PublishTick(time.Now().Unix())
-	_, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
+	_, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	if !errors.Is(err, ErrMiss) || err.Error() != "store:miss" {
+		t.Fatalf("expired slot must miss, got %v", err)
+	}
+}
+
+func TestHydrateRangeKeepsLastOnUnreachable(t *testing.T) {
+	store := NewMemory(logger.New("ERROR", ""))
+	if err := store.ApplyRangeBatch(map[string]string{"10.0.0.0/8": decisionscope.BannedValue}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := store.RangeMembership().Remediation(net.ParseIP("10.1.2.3")); got != decisionscope.BannedValue {
+		t.Fatalf("seed got %q, want ban", got)
+	}
+	store.backend = newRedis(logger.New("ERROR", ""), "127.0.0.1:1", nil, "", "", "p")
+	defer store.backend.close()
+	store.HydrateRange()
+	if got := store.RangeMembership().Remediation(net.ParseIP("10.1.2.3")); got != decisionscope.BannedValue {
+		t.Fatalf("unreachable hydrate wiped membership, got %q", got)
+	}
+}
+
+func TestApplyRangeBatchRebuildsMembership(t *testing.T) {
+	store := NewMemory(logger.New("ERROR", ""))
+	kind, _, _, err := store.LookupRemediation("10.1.2.3", net.ParseIP("10.1.2.3"), nil)
 	if err == nil {
-		t.Fatal("expired slot must miss")
+		t.Fatalf("empty store must miss, got %q", kind)
+	}
+	if err := store.ApplyRangeBatch(map[string]string{"10.0.0.0/8": decisionscope.BannedValue}, nil); err != nil {
+		t.Fatal(err)
+	}
+	kind, _, _, err = store.LookupRemediation("10.1.2.3", net.ParseIP("10.1.2.3"), nil)
+	if err != nil || kind != decisionscope.BannedValue {
+		t.Fatalf("range lookup kind %q err %v", kind, err)
+	}
+	if err := store.ApplyRangeBatch(nil, []string{"10.0.0.0/8"}); err != nil {
+		t.Fatal(err)
+	}
+	kind, _, _, err = store.LookupRemediation("10.1.2.3", net.ParseIP("10.1.2.3"), nil)
+	if err == nil {
+		t.Fatalf("removed CIDR must miss, got %q", kind)
 	}
 }

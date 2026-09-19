@@ -14,11 +14,6 @@ const (
 	ScopeAS      = "AS"
 )
 
-// RangeIndexKey is the shared cache key for Range membership (cidr=remediation lines).
-const RangeIndexKey = "range-index"
-
-const rangeIndexTTL = 365 * 24 * 3600
-
 // NormalizeScope returns the CrowdSec stored spelling for ip, range, country, and AS.
 func NormalizeScope(scope string) string {
 	switch strings.ToLower(strings.TrimSpace(scope)) {

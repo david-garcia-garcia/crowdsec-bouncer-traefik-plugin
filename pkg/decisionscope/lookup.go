@@ -1,12 +1,12 @@
 package decisionscope
 
 import (
+	"errors"
 	"net"
 	"net/http"
 	"sort"
 	"strings"
-
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"time"
 )
 
 const (
@@ -17,6 +17,9 @@ const (
 	// CaptchaValue is the cache payload for a captcha remediation.
 	CaptchaValue = "c"
 )
+
+// ErrLookupMiss is an empty Ip, header, and Range merge.
+var ErrLookupMiss = errors.New("store:miss")
 
 // IsActiveRemediation reports whether value is ban or captcha (origin suffix ignored).
 func IsActiveRemediation(value string) bool {
@@ -88,6 +91,9 @@ func mergeLookupHit(chosen lookupHit, incoming lookupHit) lookupHit {
 
 // hitFromPayload unpacks a Pack word or leftover string.
 func hitFromPayload(payload any) lookupHit {
+	if payload == nil {
+		return lookupHit{}
+	}
 	kind, origin, originID := Unpack(payload)
 	stored, isString := payload.(string)
 	if !isString {
@@ -96,43 +102,53 @@ func hitFromPayload(payload any) lookupHit {
 	return lookupHit{stored: stored, origin: origin, originID: originID}
 }
 
-// LookupCachedRemediation merges Ip, Range, and present header-scope hits. Ban wins across those scopes.
-// Range comes from membership.Remediation; nil or empty membership is a miss (live/none never hydrate).
-// Kind is ban, captcha, or none. Origin is a leftover name; OriginID is a packed intern id.
-// remoteIP is the canonical client address string owned by clientRequest; ipAddr is Range membership only.
-func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16, error) {
-	keys := LookupCacheKeys(remoteIP, scopes)
+// LookupHits merges Ip, present header scopes, and Range. Ban on Ip skips Range membership.
+// get returns a Pack word, leftover string, or nil when the key is absent. Empty kind is a miss.
+func LookupHits(get func(string) any, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16) {
+	if get == nil {
+		get = func(string) any { return nil }
+	}
 	var chosen lookupHit
-	leftoverKeys := make([]string, 0, len(keys))
-	for _, key := range keys {
-		word, getIntErr := cacheClient.GetInt(key)
-		if getIntErr == nil {
-			chosen = mergeLookupHit(chosen, hitFromPayload(word))
+	chosen = mergeLookupHit(chosen, hitFromPayload(get(remoteIP)))
+	for scope, identifier := range scopes {
+		if identifier == "" {
 			continue
 		}
-		leftoverKeys = append(leftoverKeys, key)
+		chosen = mergeLookupHit(chosen, hitFromPayload(get(HeaderScopeKey(scope, identifier))))
 	}
-	if len(leftoverKeys) > 0 {
-		found, err := cacheClient.GetMany(leftoverKeys)
-		if err != nil {
-			return "", "", 0, err
-		}
-		chosen = mergeLookupHit(chosen, hitFromPayload(found[remoteIP]))
-		for scope, identifier := range scopes {
-			if identifier == "" {
-				continue
-			}
-			chosen = mergeLookupHit(chosen, hitFromPayload(found[HeaderScopeKey(scope, identifier)]))
-		}
+	if RemediationKind(chosen.stored) != BannedValue {
+		chosen = mergeLookupHit(chosen, hitFromPayload(membership.Remediation(ipAddr)))
 	}
-	chosen = mergeLookupHit(chosen, hitFromPayload(membership.Remediation(ipAddr)))
-	if chosen.stored != "" {
-		return RemediationKind(chosen.stored), chosen.origin, chosen.originID, nil
+	if chosen.stored == "" {
+		return "", "", 0
 	}
-	return "", "", 0, cache.ErrMiss
+	return RemediationKind(chosen.stored), chosen.origin, chosen.originID
 }
 
-// LookupCacheKeys is the GetMany key list for the request path: IP, then present header scopes. Range is not a cache key.
+// LookupStreamMapRemediation merges Ip, header scopes, and Range from a published memory stream map.
+// Ban on Ip skips Range membership. Nil or empty snapshot is a miss when nothing else hits.
+func LookupStreamMapRemediation(snapshot map[string]LiveSlot, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16, error) {
+	now := time.Now().Unix()
+	kind, origin, originID := LookupHits(func(key string) any {
+		if snapshot == nil {
+			return nil
+		}
+		slot, ok := snapshot[key]
+		if !ok {
+			return nil
+		}
+		if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
+			return nil
+		}
+		return slot.Word
+	}, remoteIP, ipAddr, scopes, membership)
+	if kind == "" {
+		return "", "", 0, ErrLookupMiss
+	}
+	return kind, origin, originID, nil
+}
+
+// LookupCacheKeys is the GetMany key list for the Redis request path: IP, then present header scopes. Range is not a cache key.
 func LookupCacheKeys(remoteIP string, scopes map[string]string) []string {
 	keys := []string{remoteIP}
 	for scope, identifier := range scopes {

@@ -6,29 +6,20 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
 // newTestStreamTickClient builds a stream Client that can poll a mock LAPI without starting tickers.
 func newTestStreamTickClient(t *testing.T, log *slog.Logger, host string, httpClient *http.Client) *Client {
 	t.Helper()
-	cacheClient := &cache.Client{}
-	cacheClient.New(log, false, "", nil, "", "", "")
-	client := &Client{
-		cacheClient:             cacheClient,
-		log:                     log,
-		crowdsecScheme:          "http",
-		crowdsecHost:            host,
-		crowdsecPath:            "/",
-		crowdsecStreamRoute:     crowdsecLapiStreamRoute,
-		updateInterval:          60,
-		pluginVersion:           "test",
-		isCrowdsecStreamStartup: 1,
-	}
+	client, _ := NewTestClient(log)
+	client.crowdsecScheme = "http"
+	client.crowdsecHost = host
+	client.crowdsecPath = "/"
+	client.crowdsecStreamRoute = crowdsecLapiStreamRoute
+	client.updateInterval = 60
+	client.pluginVersion = "test"
+	client.isCrowdsecStreamStartup = 1
 	attachTestTransport(client, httpClient, "test-key")
-	AttachTestInternStore(client)
 	return client
 }
 
@@ -59,31 +50,6 @@ func TestHandleStreamCacheUpdatedIsDebug(t *testing.T) {
 		t.Run(tc.level.String(), func(t *testing.T) {
 			logged := captureTestStreamTickLog(t, tc.level, func(log *slog.Logger) {
 				client := newTestStreamTickClient(t, log, serverURL.Host, server.Client())
-				if err := client.handleStreamCache(); err != nil {
-					t.Fatalf("handleStreamCache: %v", err)
-				}
-			})
-			if got := strings.Contains(logged, tickMsg); got != tc.want {
-				t.Fatalf("%s at %s: got %v want %v\n%s", tickMsg, tc.level, got, tc.want, logged)
-			}
-		})
-	}
-}
-
-// TestHandleStreamCacheAlreadyUpdatedIsDebug proves a lease hit logs at DEBUG, not INFO.
-func TestHandleStreamCacheAlreadyUpdatedIsDebug(t *testing.T) {
-	const tickMsg = "handleStreamCache:alreadyUpdated"
-	for _, tc := range []struct {
-		level slog.Level
-		want  bool
-	}{
-		{slog.LevelInfo, false},
-		{slog.LevelDebug, true},
-	} {
-		t.Run(tc.level.String(), func(t *testing.T) {
-			logged := captureTestStreamTickLog(t, tc.level, func(log *slog.Logger) {
-				client := newTestStreamTickClient(t, log, "unused", nil)
-				client.cacheClient.Set(cacheTimeoutKey, decisionscope.NoBannedValue, 60)
 				if err := client.handleStreamCache(); err != nil {
 					t.Fatalf("handleStreamCache: %v", err)
 				}

@@ -6,7 +6,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
-// Decision is one stream/alone Ip or header-scope remediation. Range is ApplyRangeBatch.
+// Decision is one Ip or header-scope remediation (stream/alone or live/none). Range is ApplyRangeBatch.
 type Decision struct {
 	Scope       string
 	Value       string

@@ -3,24 +3,39 @@ package lapi
 import (
 	"log/slog"
 	"sync/atomic"
+	"testing"
 	"time"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
+	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-// NewTestClient returns an in-memory Client whose Cache tests can seed.
-func NewTestClient(log *slog.Logger) (*Client, *cache.Client) {
-	cacheClient := &cache.Client{}
-	cacheClient.New(log, false, "", nil, "", "", "")
-	return &Client{cacheClient: cacheClient, log: log}, cacheClient
+// NewTestClient returns an in-memory Client with a memory DecisionStore.
+func NewTestClient(log *slog.Logger) (*Client, *decisionstore.Store) {
+	store := decisionstore.NewMemory(log)
+	return &Client{decisionStore: store, log: log}, store
+}
+
+// newTestRangeClient is a stream-mode memory Client plus its DecisionStore.
+func newTestRangeClient(t *testing.T) (*Client, *decisionstore.Store) {
+	t.Helper()
+	client, store := NewTestClient(logger.New("ERROR", ""))
+	client.crowdsecMode = configuration.StreamMode
+	return client, store
+}
+
+func newTestRedisStore(t *testing.T, host string, readHosts []string, prefix string) *decisionstore.Store {
+	t.Helper()
+	store := decisionstore.NewRedis(logger.New("ERROR", ""), host, readHosts, "", "", prefix)
+	t.Cleanup(store.Close)
+	return store
 }
 
 // AttachTestInternStore wires a memory decision store so tests can intern origins.
 func AttachTestInternStore(client *Client) *decisionstore.Store {
-	store := decisionstore.NewMemory(client.cacheClient, client.log)
+	store := decisionstore.NewMemory(client.log)
 	client.decisionStore = store
 	return store
 }

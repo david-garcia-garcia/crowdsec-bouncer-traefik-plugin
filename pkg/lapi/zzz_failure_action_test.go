@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -23,16 +22,11 @@ func newTestLiveClient(t *testing.T, server *httptest.Server) *Client {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cacheClient := &cache.Client{}
-	cacheClient.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
-	client := &Client{
-		crowdsecScheme: serverURL.Scheme,
-		crowdsecHost:   serverURL.Host,
-		crowdsecPath:   "/",
-		crowdsecMode:   configuration.LiveMode,
-		cacheClient:    cacheClient,
-		log:            logger.New("ERROR", ""),
-	}
+	client, _ := NewTestClient(logger.New("ERROR", ""))
+	client.crowdsecScheme = serverURL.Scheme
+	client.crowdsecHost = serverURL.Host
+	client.crowdsecPath = "/"
+	client.crowdsecMode = configuration.LiveMode
 	attachTestTransport(client, server.Client(), "")
 	return client
 }
@@ -98,12 +92,14 @@ func TestLiveLookup_PerRouterTTLLastWrites(t *testing.T) {
 	if _, err := client.LiveLookup("1.2.3.4", nil, 1); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := client.cacheClient.Get("1.2.3.4"); err != nil {
+	kind, _, _, err := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil)
+	if err != nil {
 		t.Fatal("last write must still be cached immediately")
 	}
+	_ = kind
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		if _, err := client.cacheClient.Get("1.2.3.4"); err != nil {
+		if _, _, _, err := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil); err != nil {
 			return
 		}
 		time.Sleep(50 * time.Millisecond)
@@ -137,7 +133,7 @@ func TestLiveLookup_ScopeErrorFailsClosed(t *testing.T) {
 	if decisionscope.IsActiveRemediation(value) {
 		t.Fatalf("scope failure must come back non-active so the failure action applies, got %q", value)
 	}
-	if _, cacheErr := client.cacheClient.Get("1.2.3.4"); cacheErr == nil {
+	if _, _, _, cacheErr := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil); cacheErr == nil {
 		t.Fatal("scope failure must not cache the unverified allow for the client address")
 	}
 }
@@ -169,27 +165,21 @@ func TestLiveLookup_IPSlotKeepsIPQueryResult(t *testing.T) {
 	if !decisionscope.IsActiveRemediation(value) {
 		t.Fatalf("merged lookup value %q, want an active remediation", value)
 	}
-	ipStored, ipErr := client.cacheClient.Get("1.2.3.4")
+	ipKind, _, _, ipErr := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil)
 	if ipErr != nil {
 		t.Fatalf("clean IP query must write the none payload on the IP key: %v", ipErr)
 	}
-	if ipStored != decisionscope.NoBannedValue {
-		t.Fatalf("IP key %q, want %q", ipStored, decisionscope.NoBannedValue)
+	if ipKind != decisionscope.NoBannedValue {
+		t.Fatalf("IP key %q, want %q", ipKind, decisionscope.NoBannedValue)
 	}
-	headerStored, headerErr := client.cacheClient.Get(decisionscope.HeaderScopeKey("country", "FR"))
+	headerKind, _, _, headerErr := client.LookupRemediation("203.0.113.99", net.ParseIP("203.0.113.99"), map[string]string{decisionscope.ScopeCountry: "FR"})
 	if headerErr != nil {
 		t.Fatalf("Country FR must stay on HeaderScopeKey: %v", headerErr)
 	}
-	if !decisionscope.IsActiveRemediation(headerStored) {
-		t.Fatalf("Country header key %q, want an active remediation", headerStored)
+	if !decisionscope.IsActiveRemediation(headerKind) {
+		t.Fatalf("Country header key %q, want an active remediation", headerKind)
 	}
-	kind, _, _, lookupErr := decisionscope.LookupCachedRemediation(
-		client.cacheClient,
-		"1.2.3.4",
-		net.ParseIP("1.2.3.4"),
-		map[string]string{decisionscope.ScopeCountry: "DE"},
-		nil,
-	)
+	kind, _, _, lookupErr := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), map[string]string{decisionscope.ScopeCountry: "DE"})
 	if lookupErr != nil {
 		t.Fatalf("later Country DE lookup: %v", lookupErr)
 	}

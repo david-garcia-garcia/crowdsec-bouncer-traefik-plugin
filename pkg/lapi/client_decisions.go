@@ -131,7 +131,7 @@ func (c *Client) mergeLiveScope(chosen string, parsedDuration time.Duration, sco
 		c.log.Warn("handleNoStreamCache:scopeQuery", "scope", scope, "error", headerErr)
 		return chosen, parsedDuration, headerErr
 	}
-	c.cacheLiveScope(decisionscope.HeaderScopeKey(scope, identifier), headerChosen, headerDuration, isLiveMode, defaultDecisionSeconds)
+	c.cacheLiveScope(scope, identifier, headerChosen, headerDuration, isLiveMode, defaultDecisionSeconds)
 	next := decisionscope.PreferRemediation(chosen, headerChosen)
 	if next != chosen {
 		return next, headerDuration, nil
@@ -140,24 +140,27 @@ func (c *Client) mergeLiveScope(chosen string, parsedDuration time.Duration, sco
 }
 
 // cacheLiveScope stores a live/none header-scope result when live caching is on.
-func (c *Client) cacheLiveScope(key, value string, parsedDuration time.Duration, isLiveMode bool, defaultDecisionSeconds int64) {
+func (c *Client) cacheLiveScope(scope, identifier, value string, parsedDuration time.Duration, isLiveMode bool, defaultDecisionSeconds int64) {
 	if !isLiveMode || defaultDecisionSeconds <= 0 {
 		return
 	}
 	if !decisionscope.IsActiveRemediation(value) {
-		c.memoLive(key, decisionscope.NoBannedValue, defaultDecisionSeconds)
+		c.memoLive(scope, identifier, decisionscope.NoBannedValue, defaultDecisionSeconds)
 		return
 	}
-	c.memoLive(key, value, liveCacheTTL(parsedDuration, defaultDecisionSeconds))
+	c.memoLive(scope, identifier, value, liveCacheTTL(parsedDuration, defaultDecisionSeconds))
 }
 
-// memoLive writes a live/none TTL slot through the decision store, or the test cache.
-func (c *Client) memoLive(key string, payload any, durationSec int64) {
-	if c.decisionStore != nil {
-		c.decisionStore.Memo(key, payload, durationSec)
+// memoLive writes a live/none TTL slot through the decision store.
+func (c *Client) memoLive(scope, value, payload string, durationSec int64) {
+	if c == nil || c.decisionStore == nil {
 		return
 	}
-	c.cacheClient.Set(key, payload, durationSec)
+	c.decisionStore.Put(decisionstore.Decision{
+		Scope: scope, Value: value,
+		Kind: decisionscope.RemediationKind(payload), Origin: decisionscope.RemediationOrigin(payload),
+		DurationSec: durationSec,
+	})
 }
 
 // liveCacheTTL is the live-mode cache TTL: min(decision duration, defaultDecisionSeconds).

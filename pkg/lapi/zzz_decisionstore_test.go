@@ -6,11 +6,21 @@ import (
 	"testing"
 	"time"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
+
+func putBan(store *decisionstore.Store, ip string) {
+	store.Put(decisionstore.Decision{Scope: decisionscope.ScopeIP, Value: ip, Kind: decisionscope.BannedValue, DurationSec: 10})
+}
+
+func lookupBan(store *decisionstore.Store, ip string) (string, error) {
+	kind, _, _, err := store.LookupRemediation(ip, nil, nil)
+	return kind, err
+}
 
 // testLiveConfig is a live-mode config aimed at a mock LAPI host.
 func testLiveConfig(updateInterval int64) *configuration.Config {
@@ -95,20 +105,18 @@ func TestOpenDecisionStore_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	store.CacheForTest().Set("1.2.3.4", "t", 10)
+	putBan(store, "1.2.3.4")
 
-	sessionClient := &cache.Client{}
-	sessionClient.New(log, true, redisServer.addr(), nil, "", "", SessionHex(cfg))
-	got, getErr := sessionClient.Get("1.2.3.4")
-	if getErr != nil || got != "t" {
-		t.Fatalf("SessionHex prefix Get %q err %v", got, getErr)
+	session := newTestRedisStore(t, redisServer.addr(), nil, SessionHex(cfg))
+	kind, _, _, getErr := session.LookupRemediation("1.2.3.4", nil, nil)
+	if getErr != nil || kind != decisionscope.BannedValue {
+		t.Fatalf("SessionHex prefix lookup %q err %v", kind, getErr)
 	}
 
-	identityClient := &cache.Client{}
-	identityClient.New(log, true, redisServer.addr(), nil, "", "", IdentityHex(cfg))
-	_, identErr := identityClient.Get("1.2.3.4")
-	if identErr == nil || !errors.Is(identErr, cache.ErrMiss) {
-		t.Fatalf("IdentityHex prefix Get err %v, want miss", identErr)
+	identity := newTestRedisStore(t, redisServer.addr(), nil, IdentityHex(cfg))
+	_, _, _, identErr := identity.LookupRemediation("1.2.3.4", nil, nil)
+	if identErr == nil || !errors.Is(identErr, decisionstore.ErrMiss) {
+		t.Fatalf("IdentityHex prefix lookup err %v, want miss", identErr)
 	}
 
 	if SessionHex(cfg) != SessionHex(other) {
@@ -138,10 +146,10 @@ func TestOpenDecisionStore_LiveIntervalSplitSharesStore(t *testing.T) {
 	if first != second {
 		t.Fatal("same cursor and Redis params must reclaim one store")
 	}
-	first.CacheForTest().Set("1.2.3.4", "t", 10)
-	got, getErr := second.CacheForTest().Get("1.2.3.4")
-	if getErr != nil || got != "t" {
-		t.Fatalf("shared store Get %q err %v", got, getErr)
+	putBan(first, "1.2.3.4")
+	got, getErr := lookupBan(second, "1.2.3.4")
+	if getErr != nil || got != decisionscope.BannedValue {
+		t.Fatalf("shared store lookup %q err %v", got, getErr)
 	}
 }
 
@@ -186,13 +194,13 @@ func TestOpenLive_TwoClientsShareOneStore(t *testing.T) {
 	if first != second {
 		t.Fatal("different live intervals must share one Client")
 	}
-	if first.CacheForTest() != second.CacheForTest() {
-		t.Fatal("those Clients must share one cache incarnation")
+	if first.decisionStore != second.decisionStore {
+		t.Fatal("those Clients must share one decision store")
 	}
-	first.CacheForTest().Set("1.2.3.4", "t", 10)
-	got, getErr := second.CacheForTest().Get("1.2.3.4")
-	if getErr != nil || got != "t" {
-		t.Fatalf("sibling Get %q err %v", got, getErr)
+	putBan(first.decisionStore, "1.2.3.4")
+	got, getErr := lookupBan(second.decisionStore, "1.2.3.4")
+	if getErr != nil || got != decisionscope.BannedValue {
+		t.Fatalf("sibling lookup %q err %v", got, getErr)
 	}
 }
 
@@ -212,11 +220,11 @@ func TestClientClose_LeavesSiblingCacheLive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	first.CacheForTest().Set("1.2.3.4", "t", 10)
+	putBan(first.decisionStore, "1.2.3.4")
 	first.Close()
-	got, getErr := second.CacheForTest().Get("1.2.3.4")
-	if getErr != nil || got != "t" {
-		t.Fatalf("after sibling Close Get %q err %v", got, getErr)
+	got, getErr := lookupBan(second.decisionStore, "1.2.3.4")
+	if getErr != nil || got != decisionscope.BannedValue {
+		t.Fatalf("after sibling Close lookup %q err %v", got, getErr)
 	}
 }
 
@@ -241,11 +249,11 @@ func TestClientClose_LeavesSiblingRedisPoolLive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	first.CacheForTest().Set("1.2.3.4", "t", 10)
+	putBan(first.decisionStore, "1.2.3.4")
 	first.Close()
-	got, getErr := second.CacheForTest().Get("1.2.3.4")
-	if getErr != nil || got != "t" {
-		t.Fatalf("after sibling Close Redis Get %q err %v", got, getErr)
+	kind, _, _, getErr := second.decisionStore.LookupRemediation("1.2.3.4", nil, nil)
+	if getErr != nil || kind != decisionscope.BannedValue {
+		t.Fatalf("after sibling Close lookup %q err %v", kind, getErr)
 	}
 }
 
@@ -263,15 +271,15 @@ func TestOpenDecisionStore_LastHolderGraceClosesRedisPool(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store.CacheForTest().Set("1.2.3.4", "t", 10)
-	got, getErr := store.CacheForTest().Get("1.2.3.4")
-	if getErr != nil || got != "t" {
-		t.Fatalf("before cancel Get %q err %v", got, getErr)
+	putBan(store, "1.2.3.4")
+	kind, _, _, getErr := store.LookupRemediation("1.2.3.4", nil, nil)
+	if getErr != nil || kind != decisionscope.BannedValue {
+		t.Fatalf("before cancel lookup %q err %v", kind, getErr)
 	}
 	cancel()
 	time.Sleep(80 * time.Millisecond)
-	_, closedErr := store.CacheForTest().Get("1.2.3.4")
-	if closedErr == nil || !errors.Is(closedErr, cache.ErrUnreachable) {
-		t.Fatalf("after last-holder grace Get err %v, want unreachable", closedErr)
+	_, _, _, closedErr := store.LookupRemediation("1.2.3.4", nil, nil)
+	if closedErr == nil || !errors.Is(closedErr, decisionstore.ErrUnreachable) {
+		t.Fatalf("after last-holder grace lookup err %v, want unreachable", closedErr)
 	}
 }

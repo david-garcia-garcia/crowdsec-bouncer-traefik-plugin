@@ -123,7 +123,7 @@ An `Ip` decision SHALL be cached and looked up under one canonical spelling of t
 `readRangeIndex` SHALL distinguish a cache miss from a failed read: a miss SHALL be an empty index with no error, and any other cache failure SHALL be returned. `ApplyRangeBatch` SHALL return that error and MUST NOT `Set` or `Delete` `range-index`, because the blob is shared and rebuilding it from an unread base drops every Range decision this poll did not carry. A stream poll whose Range apply failed SHALL be reported as a failed poll, so the stream lease is released and the retry asks for the full decision set.
 
 #### Scenario: Unreachable read preserves the shared index
-- **WHEN** `Get(range-index)` answers `cache:unreachable` — for example a `redisCacheReadHosts` replica is down while the writer is healthy — and a poll would upsert a new Range CIDR
+- **WHEN** `Get(range-index)` answers `store:unreachable` — for example a `redisCacheReadHosts` replica is down while the writer is healthy — and a poll would upsert a new Range CIDR
 - **THEN** `ApplyRangeBatch` returns the error and the stored `range-index` still holds the CIDRs it held before
 
 #### Scenario: Unreachable read does not delete the shared index
@@ -131,7 +131,7 @@ An `Ip` decision SHALL be cached and looked up under one canonical spelling of t
 - **THEN** `range-index` is not deleted
 
 #### Scenario: Cache miss still applies
-- **WHEN** `Get(range-index)` answers `cache:miss` and the poll upserts `10.0.0.0/8`
+- **WHEN** `Get(range-index)` answers `store:miss` and the poll upserts `10.0.0.0/8`
 - **THEN** `range-index` is written with that line
 
 #### Scenario: A failed range apply releases the stream lease

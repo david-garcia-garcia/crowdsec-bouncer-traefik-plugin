@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
@@ -37,7 +36,7 @@ type Decision struct {
 	Simulated bool   `json:"simulated"`
 }
 
-// Client owns stream ticker, a reclaimed DecisionStore, in-process Range membership, LAPI/CAPI HTTP, and metrics.
+// Client owns stream ticker, a reclaimed DecisionStore, LAPI/CAPI HTTP, and metrics.
 type Client struct {
 	mu       sync.Mutex
 	closed   bool
@@ -58,13 +57,10 @@ type Client struct {
 	sessionKey           string            // reclaim SessionKey (stream/alone) or Key (live/none)
 	liveHeaderScopes     liveHeaderScopes  // live constructor ctx → normalized header scopes
 
-	transport       atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
-	decisionStore   *decisionstore.Store
-	cacheClient     *cache.Client // tests may set this without a store; production aliases store.CacheForTest()
-	rangeMembership atomic.Value  // *decisionscope.RangeMembership rebuilt from range-index
-	lastRangeIndex  atomic.Value  // string of the blob last used to build membership
-	log             *slog.Logger
-	pluginVersion   string
+	transport     atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
+	decisionStore *decisionstore.Store
+	log           *slog.Logger
+	pluginVersion string
 
 	// int64 0/1 published with atomic.LoadInt64/StoreInt64 (Yaegi v0.16: not atomic.Bool / atomic.Int64 / atomic.Pointer[T]).
 	isCrowdsecStreamStartup int64
@@ -137,7 +133,6 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		isCrowdsecStreamStartup: 1,
 		isCrowdsecStreamHealthy: 1,
 		decisionStore:           store,
-		cacheClient:             store.CacheForTest(),
 	}
 	client.metricsReporter = newMetricsReporter(client, time.Now())
 	client.transport.Store(next)
@@ -265,52 +260,6 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 		}
 	}()
 	return stop
-}
-
-// CacheForTest is the TTL/Redis pool. Tests only.
-func (c *Client) CacheForTest() *cache.Client {
-	if c.decisionStore != nil {
-		return c.decisionStore.CacheForTest()
-	}
-	return c.cacheClient
-}
-
-// RangeMembership is the current in-process Range lookup, or nil before the first hydrate.
-func (c *Client) RangeMembership() *decisionscope.RangeMembership {
-	stored := c.rangeMembership.Load()
-	if stored == nil {
-		return nil
-	}
-	membership, _ := stored.(*decisionscope.RangeMembership)
-	return membership
-}
-
-// hydrateRangeMembership rebuilds Range membership from the shared blob when the raw string changed.
-func (c *Client) hydrateRangeMembership() {
-	var index string
-	var err error
-	if c.decisionStore != nil {
-		index, err = c.decisionStore.RangeIndex()
-	} else {
-		index, err = c.cacheClient.Get(decisionscope.RangeIndexKey)
-	}
-	if err != nil {
-		if !errors.Is(err, cache.ErrMiss) {
-			return
-		}
-		index = ""
-	}
-	c.storeRangeMembership(index)
-}
-
-// storeRangeMembership replaces the in-process trees when index differs from the last hydrate.
-func (c *Client) storeRangeMembership(index string) {
-	previous, _ := c.lastRangeIndex.Load().(string)
-	if c.rangeMembership.Load() != nil && previous == index {
-		return
-	}
-	c.rangeMembership.Store(decisionscope.MembershipFromIndex(index))
-	c.lastRangeIndex.Store(index)
 }
 
 // StreamHealthy is true while stream polling is succeeding.

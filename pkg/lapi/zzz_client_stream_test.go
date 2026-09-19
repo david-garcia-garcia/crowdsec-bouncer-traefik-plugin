@@ -11,20 +11,19 @@ import (
 	"sync/atomic"
 	"testing"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-// TestHandleStreamCacheIntervalOneStoresLease proves updateInterval 1 still stores
-// cache key updated so a second poll skips LAPI (upstream #370 TTL 0 never stored).
-func TestHandleStreamCacheIntervalOneStoresLease(t *testing.T) {
+// TestHandleStreamCacheIntervalOnePollsEveryTick proves updateInterval 1 still GETs stream on every tick.
+func TestHandleStreamCacheIntervalOnePollsEveryTick(t *testing.T) {
 	server, hits := testStreamLAPI(t)
 	parsed, err := url.Parse(server.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	lapiClient, cacheClient := newTestRangeClient(t)
+	lapiClient, _ := newTestRangeClient(t)
 	lapiClient.updateInterval = 1
 	lapiClient.crowdsecScheme = "http"
 	lapiClient.crowdsecHost = parsed.Host
@@ -33,26 +32,19 @@ func TestHandleStreamCacheIntervalOneStoresLease(t *testing.T) {
 	attachTestTransport(lapiClient, server.Client(), "test-key")
 
 	if err := lapiClient.handleStreamCache(); err != nil {
-		t.Fatalf("interval-1 miss: %v", err)
-	}
-	if _, err := cacheClient.Get(cacheTimeoutKey); err != nil {
-		t.Fatalf("interval-1 must store lease, Get: %v", err)
+		t.Fatalf("first poll: %v", err)
 	}
 	if got := lapiClient.StreamFetches(); got != 1 {
 		t.Fatalf("first poll streamFetches=%d, want 1", got)
 	}
-	if got := atomic.LoadInt64(hits); got != 1 {
-		t.Fatalf("first poll LAPI hits=%d, want 1", got)
-	}
-
 	if err := lapiClient.handleStreamCache(); err != nil {
-		t.Fatalf("interval-1 lease hit: %v", err)
+		t.Fatalf("second poll: %v", err)
 	}
-	if got := lapiClient.StreamFetches(); got != 1 {
-		t.Fatalf("lease hit streamFetches=%d, want 1", got)
+	if got := lapiClient.StreamFetches(); got != 2 {
+		t.Fatalf("second poll streamFetches=%d, want 2", got)
 	}
-	if got := atomic.LoadInt64(hits); got != 1 {
-		t.Fatalf("lease hit LAPI hits=%d, want 1", got)
+	if got := atomic.LoadInt64(hits); got != 2 {
+		t.Fatalf("LAPI hits=%d, want 2", got)
 	}
 }
 
@@ -77,34 +69,31 @@ func testFailThenServeStreamLAPI(t *testing.T, failures int64) (*httptest.Server
 	return server, &hits
 }
 
-// newTestStreamPoller builds a stream Client pointed at host that shares cacheClient.
-func newTestStreamPoller(t *testing.T, server *httptest.Server) (*Client, *cache.Client) {
+func newTestStreamPoller(t *testing.T, server *httptest.Server) *Client {
 	t.Helper()
 	parsed, err := url.Parse(server.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	client, cacheClient := newTestRangeClient(t)
+	client, _ := newTestRangeClient(t)
 	client.updateInterval = 60
 	client.crowdsecScheme = "http"
 	client.crowdsecHost = parsed.Host
 	client.crowdsecPath = "/"
 	client.crowdsecStreamRoute = crowdsecLapiStreamRoute
 	attachTestTransport(client, server.Client(), "test-key")
-	return client, cacheClient
+	return client
 }
 
-// TestHandleStreamCache_FailedGetReleasesLease proves a poll that won the lease and then failed
-// drops cache key updated, instead of parking every poller until the TTL expires.
-func TestHandleStreamCache_FailedGetReleasesLease(t *testing.T) {
+func TestHandleStreamCache_FailedGetAllowsRetry(t *testing.T) {
 	server, _ := testFailThenServeStreamLAPI(t, 1)
-	client, cacheClient := newTestStreamPoller(t, server)
+	client := newTestStreamPoller(t, server)
 
 	if err := client.handleStreamCache(); err == nil {
 		t.Fatal("stream 500 must return an error")
 	}
-	if _, err := cacheClient.Get(cacheTimeoutKey); err == nil {
-		t.Fatal("a failed poll must release the stream lease")
+	if err := client.handleStreamCache(); err != nil {
+		t.Fatalf("retry after failure: %v", err)
 	}
 }
 
@@ -112,19 +101,16 @@ func TestHandleStreamCache_FailedGetReleasesLease(t *testing.T) {
 // tick call LAPI again rather than waiting out max(updateInterval-1, 1) seconds.
 func TestHandleStreamCache_NextTickRepollsAfterFailure(t *testing.T) {
 	server, hits := testFailThenServeStreamLAPI(t, 1)
-	client, cacheClient := newTestStreamPoller(t, server)
+	client := newTestStreamPoller(t, server)
 
 	if err := client.handleStreamCache(); err == nil {
 		t.Fatal("stream 500 must return an error")
 	}
 	if err := client.handleStreamCache(); err != nil {
-		t.Fatalf("retry after a released lease: %v", err)
+		t.Fatalf("retry after failure: %v", err)
 	}
 	if got := atomic.LoadInt64(hits); got != 2 {
 		t.Fatalf("LAPI stream hits=%d, want 2 (the retry did not re-poll)", got)
-	}
-	if _, err := cacheClient.Get(cacheTimeoutKey); err != nil {
-		t.Fatalf("a successful poll must keep the lease: %v", err)
 	}
 }
 
@@ -137,20 +123,17 @@ func TestHandleStreamCache_UndecodableBodyReleasesLease(t *testing.T) {
 		}
 	}))
 	t.Cleanup(server.Close)
-	client, cacheClient := newTestStreamPoller(t, server)
+	client := newTestStreamPoller(t, server)
 
 	if err := client.handleStreamCache(); err == nil {
 		t.Fatal("an undecodable stream body must return an error")
 	}
-	if _, err := cacheClient.Get(cacheTimeoutKey); err == nil {
-		t.Fatal("a poll that failed to decode must release the stream lease")
-	}
 }
 
-func newSharedStreamPoller(t *testing.T, cacheClient *cache.Client, host string) *Client {
+func newSharedStreamPoller(t *testing.T, store *decisionstore.Store, host string) *Client {
 	t.Helper()
 	client := &Client{
-		cacheClient:         cacheClient,
+		decisionStore:       store,
 		log:                 logger.New("ERROR", ""),
 		crowdsecScheme:      "http",
 		crowdsecHost:        host,
@@ -158,20 +141,18 @@ func newSharedStreamPoller(t *testing.T, cacheClient *cache.Client, host string)
 		crowdsecStreamRoute: crowdsecLapiStreamRoute,
 		updateInterval:      60,
 	}
-	AttachTestInternStore(client)
 	return client
 }
 
-func TestHandleStreamCache_TwoMemoryPollersOneFetch(t *testing.T) {
+func TestHandleStreamCache_TwoMemoryPollersBothFetch(t *testing.T) {
 	server, hits := testStreamLAPI(t)
 	parsed, err := url.Parse(server.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	shared := &cache.Client{}
-	shared.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
-	first := newSharedStreamPoller(t, shared, parsed.Host)
-	second := newSharedStreamPoller(t, shared, parsed.Host)
+	store := decisionstore.NewMemory(logger.New("ERROR", ""))
+	first := newSharedStreamPoller(t, store, parsed.Host)
+	second := newSharedStreamPoller(t, store, parsed.Host)
 	attachTestTransport(first, server.Client(), "test-key")
 	attachTestTransport(second, server.Client(), "test-key")
 
@@ -195,26 +176,24 @@ func TestHandleStreamCache_TwoMemoryPollersOneFetch(t *testing.T) {
 	release.Done()
 	done.Wait()
 
-	if got := first.StreamFetches() + second.StreamFetches(); got != 1 {
-		t.Fatalf("streamFetches=%d, want 1", got)
+	if got := first.StreamFetches() + second.StreamFetches(); got != 2 {
+		t.Fatalf("streamFetches=%d, want 2", got)
 	}
-	if got := atomic.LoadInt64(hits); got != 1 {
-		t.Fatalf("LAPI hits=%d, want 1", got)
+	if got := atomic.LoadInt64(hits); got != 2 {
+		t.Fatalf("LAPI hits=%d, want 2", got)
 	}
 }
 
-func TestHandleStreamCache_TwoRedisPollersOneFetch(t *testing.T) {
+func TestHandleStreamCache_TwoRedisPollersBothFetch(t *testing.T) {
 	lapiServer, hits := testStreamLAPI(t)
 	parsed, err := url.Parse(lapiServer.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
 	redisServer := startTestLeaseRedis(t)
-	shared := &cache.Client{}
-	shared.New(logger.New("ERROR", ""), true, redisServer.addr(), nil, "", "", "sess")
-	defer shared.Close()
-	first := newSharedStreamPoller(t, shared, parsed.Host)
-	second := newSharedStreamPoller(t, shared, parsed.Host)
+	store := newTestRedisStore(t, redisServer.addr(), nil, "sess")
+	first := newSharedStreamPoller(t, store, parsed.Host)
+	second := newSharedStreamPoller(t, store, parsed.Host)
 	attachTestTransport(first, lapiServer.Client(), "test-key")
 	attachTestTransport(second, lapiServer.Client(), "test-key")
 
@@ -238,11 +217,11 @@ func TestHandleStreamCache_TwoRedisPollersOneFetch(t *testing.T) {
 	release.Done()
 	done.Wait()
 
-	if got := first.StreamFetches() + second.StreamFetches(); got != 1 {
-		t.Fatalf("streamFetches=%d, want 1", got)
+	if got := first.StreamFetches() + second.StreamFetches(); got != 2 {
+		t.Fatalf("streamFetches=%d, want 2", got)
 	}
-	if got := atomic.LoadInt64(hits); got != 1 {
-		t.Fatalf("LAPI hits=%d, want 1", got)
+	if got := atomic.LoadInt64(hits); got != 2 {
+		t.Fatalf("LAPI hits=%d, want 2", got)
 	}
 }
 
@@ -276,17 +255,14 @@ func TestHunt_StreamAppliesDeletedBeforeNew(t *testing.T) {
 		Scope: "ip",
 		Value: ipValue,
 	}})
-	client, cacheClient := newTestStreamPoller(t, server)
+	client := newTestStreamPoller(t, server)
 
 	if err := client.handleStreamCache(); err != nil {
 		t.Fatalf("replacement poll: %v", err)
 	}
-	kind, _, _, err := client.LookupStreamRemediation(ipValue, net.ParseIP(ipValue), nil)
+	kind, _, _, err := client.LookupRemediation(ipValue, net.ParseIP(ipValue), nil)
 	if err != nil || kind != decisionscope.BannedValue {
 		t.Fatalf("same-window IP replacement must stay banned, got %q err %v", kind, err)
-	}
-	if _, heapErr := cacheClient.Get(decisionscope.IPCacheKey(ipValue)); heapErr == nil {
-		t.Fatal("memory stream Ip must not duplicate on TTL heap")
 	}
 }
 
@@ -304,13 +280,13 @@ func TestHunt_StreamRangeAppliesDeletedBeforeNew(t *testing.T) {
 		Scope: "range",
 		Value: cidr,
 	}})
-	client, _ := newTestStreamPoller(t, server)
+	client := newTestStreamPoller(t, server)
 
 	if err := client.handleStreamCache(); err != nil {
 		t.Fatalf("replacement poll: %v", err)
 	}
-	got := client.RangeMembership().Remediation(net.ParseIP("10.1.2.3"))
-	if !decisionscope.IsActiveRemediation(got) {
-		t.Fatalf("same-window Range replacement must stay banned, got %q", got)
+	got, _, _, err := client.LookupRemediation("10.1.2.3", net.ParseIP("10.1.2.3"), nil)
+	if err != nil || !decisionscope.IsActiveRemediation(got) {
+		t.Fatalf("same-window Range replacement must stay banned, got %q err %v", got, err)
 	}
 }

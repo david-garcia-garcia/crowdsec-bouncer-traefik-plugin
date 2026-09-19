@@ -1,7 +1,6 @@
 // Package decisionstore is the reclaimed holder of CrowdSec decisions.
-// Stream/alone Ip and header-scope slots are a memory copy-on-write map or Redis
-// via cache.Client. That same cache.Client is the range-index, stream lease, and
-// live/none memo — not a second stream of Ip keys.
+// Stream/alone and live/none Ip and header-scope slots are a memory copy-on-write map
+// or Redis via SimpleRedis. Range is ApplyRangeBatch on the same backend.
 package decisionstore
 
 import (
@@ -9,17 +8,16 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"sync/atomic"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
-// backend holds stream/alone Ip and header-scope slots. Redis writes those keys
-// through cache.Client; memory uses a copy-on-write LiveSlot map. Range, lease,
-// and live memo stay on Store.cache, not on this interface.
+// backend holds Ip, header-scope, and Range decisions. Redis writes those keys through
+// SimpleRedis; memory uses a copy-on-write LiveSlot map plus an in-process range blob.
 type backend interface {
 	// BeginTick opens the write window for one stream poll.
 	// Memory clones the published map into tick so Put/Delete mutate a private copy
@@ -32,65 +30,66 @@ type backend interface {
 	// Redis is a no-op: key TTL is the expiry.
 	PublishTick(now int64)
 	// Put stores one Ip or header-scope decision for DurationSec seconds.
-	// Memory writes tick (BeginTick must have run) and packs a uint32 word when intern succeeds.
-	// Redis is cache.Set of a leftover kind+origin string with that TTL.
+	// Memory writes tick when a stream window is open, else the published map (live).
+	// Redis is a leftover kind+origin string SET with that TTL.
 	Put(item Decision)
 	// Delete drops the canonical slot for scope+value. For Ip, a prior spelling of the same
 	// address is deleted too so a lift cannot survive under the old key.
-	// Memory deletes from tick. Redis is cache.Delete.
+	// Memory deletes from tick or the published map. Redis is DEL.
 	Delete(scope, value string)
 	// LookupRemediation is the request path: Ip slot, then header scopes, then Range.
-	// Memory reads the published map. Redis reads cache.Client.
-	// Returns kind, leftover origin name, intern origin id, or cache.ErrMiss.
+	// Memory reads the published map. Redis reads SimpleRedis.
+	// Returns kind, leftover origin name, intern origin id, or ErrMiss.
 	LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *decisionscope.RangeMembership) (string, string, uint16, error)
+	// ApplyRangeBatch upserts and removes Range CIDRs on this backend's index.
+	ApplyRangeBatch(upserts map[string]string, removals []string) error
+	// RangeIndex is the Range blob, or empty when none has been written.
+	RangeIndex() (string, error)
+	close()
 }
 
-// Store is one reclaim value: intern table, cache.Client, and the stream/alone slot backend.
+// Store is one reclaim value: intern table, Range membership, and the decision backend.
 type Store struct {
 	backend
-	cache   *cache.Client
-	origins *intern.Table
+	origins         *intern.Table
+	rangeMembership atomic.Value // *decisionscope.RangeMembership
+	lastRangeIndex  atomic.Value // string of the blob last used to build membership
 }
 
-// NewMemory is in-process COW slots. cacheClient is lease, range-index, and live memo.
-func NewMemory(cacheClient *cache.Client, log *slog.Logger) *Store {
+// NewMemory is in-process COW slots and an in-process Range blob.
+func NewMemory(log *slog.Logger) *Store {
 	origins := intern.New()
 	return &Store{
 		backend: newMemory(log, origins),
-		cache:   cacheClient,
 		origins: origins,
 	}
 }
 
-// NewRedis stores stream/alone slots on cacheClient (Redis-protocol prefix).
-func NewRedis(cacheClient *cache.Client) *Store {
+// NewRedis stores Ip, header-scope, and Range on Redis (keyPrefix namespaces keys).
+func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string) *Store {
 	return &Store{
-		backend: newRedis(cacheClient),
-		cache:   cacheClient,
+		backend: newRedis(log, writeHost, readHosts, pass, database, keyPrefix),
 		origins: intern.New(),
 	}
 }
 
-// Open reclaims one Store per reclaimKey. cachePrefix is the Redis/memory key prefix.
+// Open reclaims one Store per reclaimKey. cachePrefix is the Redis key prefix.
 func Open(ctx context.Context, reclaimKey, cachePrefix string, cfg *configuration.Config, log *slog.Logger) (*Store, error) {
 	stored, err := reclaim.OpenWithHooks(ctx, reclaimKey, log, func() (any, reclaim.Hooks, error) {
-		cacheClient := &cache.Client{}
-		cacheClient.New(
-			log,
-			cfg.RedisCacheEnabled,
-			cfg.RedisCacheHost,
-			cfg.RedisCacheReadHosts,
-			cfg.RedisCachePassword,
-			cfg.RedisCacheDatabase,
-			cachePrefix,
-		)
 		var store *Store
 		if cfg.RedisCacheEnabled {
-			store = NewRedis(cacheClient)
+			store = NewRedis(
+				log,
+				cfg.RedisCacheHost,
+				cfg.RedisCacheReadHosts,
+				cfg.RedisCachePassword,
+				cfg.RedisCacheDatabase,
+				cachePrefix,
+			)
 		} else {
-			store = NewMemory(cacheClient, log)
+			store = NewMemory(log)
 		}
-		return store, reclaim.Hooks{Close: store.close}, nil
+		return store, reclaim.Hooks{Close: store.Close}, nil
 	})
 	if err != nil {
 		return nil, err
@@ -137,60 +136,70 @@ func (s *Store) Delete(scope, value string) {
 	s.backend.Delete(scope, value)
 }
 
-// close drains the cache Redis pool. Memory is a no-op. Reclaim last-holder hook.
-func (s *Store) close() {
-	if s == nil || s.cache == nil {
+// LookupRemediation is the request path for stream/alone and live/none.
+func (s *Store) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string) (string, string, uint16, error) {
+	if s == nil || s.backend == nil {
+		return "", "", 0, ErrMiss
+	}
+	return s.backend.LookupRemediation(remoteIP, ipAddr, scopes, s.RangeMembership())
+}
+
+// Close drains the Redis pool. Memory is a no-op. Reclaim last-holder hook.
+func (s *Store) Close() {
+	if s == nil || s.backend == nil {
 		return
 	}
-	s.cache.Close()
+	s.backend.close()
 }
 
-// TryLease tries to own the stream-poll key for duration seconds.
-func (s *Store) TryLease(ctx context.Context, key, value string, duration int64) (bool, error) {
-	if s == nil || s.cache == nil {
-		return false, cache.ErrUnreachable
-	}
-	return s.cache.Acquire(ctx, key, value, duration)
-}
-
-// DropLease deletes the stream-poll lease key so the next tick can retry immediately.
-func (s *Store) DropLease(key string) {
-	if s == nil || s.cache == nil {
-		return
-	}
-	s.cache.Delete(key)
-}
-
-// RangeIndex is the shared Range blob, or a miss when no index has been written.
+// RangeIndex is the Range blob, or empty when none has been written.
 func (s *Store) RangeIndex() (string, error) {
-	if s == nil || s.cache == nil {
-		return "", cache.ErrMiss
+	if s == nil || s.backend == nil {
+		return "", ErrMiss
 	}
-	return s.cache.Get(decisionscope.RangeIndexKey)
+	return s.backend.RangeIndex()
 }
 
-// ApplyRangeBatch upserts and removes Range CIDRs on the shared index.
+// ApplyRangeBatch upserts and removes Range CIDRs, then rebuilds in-process membership.
 func (s *Store) ApplyRangeBatch(upserts map[string]string, removals []string) error {
-	if s == nil || s.cache == nil {
-		return cache.ErrMiss
+	if s == nil || s.backend == nil {
+		return ErrMiss
 	}
-	return decisionscope.ApplyRangeBatch(s.cache, upserts, removals)
+	if err := s.backend.ApplyRangeBatch(upserts, removals); err != nil {
+		return err
+	}
+	s.HydrateRange()
+	return nil
 }
 
-// Memo writes a live/none TTL slot (not a stream/alone COW slot).
-func (s *Store) Memo(key string, payload any, durationSec int64) {
-	if s == nil || s.cache == nil {
+// RangeMembership is the current in-process Range lookup, or nil before the first hydrate.
+func (s *Store) RangeMembership() *decisionscope.RangeMembership {
+	if s == nil {
+		return nil
+	}
+	stored := s.rangeMembership.Load()
+	if stored == nil {
+		return nil
+	}
+	membership, _ := stored.(*decisionscope.RangeMembership)
+	return membership
+}
+
+// HydrateRange rebuilds Range membership from the stored blob. A read that did not answer keeps the last trees.
+func (s *Store) HydrateRange() {
+	if s == nil || s.backend == nil {
 		return
 	}
-	s.cache.Set(key, payload, durationSec)
-}
-
-// LookupCached is the live/none request path: Ip, header scopes, then Range on cache.Client.
-func (s *Store) LookupCached(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *decisionscope.RangeMembership) (string, string, uint16, error) {
-	if s == nil || s.cache == nil {
-		return "", "", 0, cache.ErrMiss
+	index, err := s.backend.RangeIndex()
+	if err != nil {
+		return
 	}
-	return decisionscope.LookupCachedRemediation(s.cache, remoteIP, ipAddr, scopes, membership)
+	previous, _ := s.lastRangeIndex.Load().(string)
+	if s.rangeMembership.Load() != nil && previous == index {
+		return
+	}
+	s.rangeMembership.Store(decisionscope.MembershipFromIndex(index))
+	s.lastRangeIndex.Store(index)
 }
 
 // OriginID appends an origin name for metrics. Empty name is id 0. Overflow does not wrap.
@@ -209,14 +218,6 @@ func (s *Store) OriginName(id uint16) string {
 	return s.origins.Name(id)
 }
 
-// CacheForTest is the TTL/Redis pool. Tests only.
-func (s *Store) CacheForTest() *cache.Client {
-	if s == nil {
-		return nil
-	}
-	return s.cache
-}
-
 // FillUntilMaxForTest fills the intern table so the next OriginID overflows. Tests only.
 func (s *Store) FillUntilMaxForTest() {
 	if s == nil {
@@ -225,7 +226,7 @@ func (s *Store) FillUntilMaxForTest() {
 	s.origins.FillUntilMaxForTest()
 }
 
-// SeedSlotForTest publishes one memory slot without a tick. Redis Put goes to cache.
+// SeedSlotForTest publishes one memory slot without a tick. Redis Put goes to Redis.
 func (s *Store) SeedSlotForTest(item Decision) {
 	if s == nil || s.backend == nil {
 		return

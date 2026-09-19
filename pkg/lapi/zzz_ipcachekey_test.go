@@ -9,10 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
-	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 )
 
 // Spellings of one address. CrowdSec was measured to store a decision value verbatim, so all of
@@ -33,11 +31,7 @@ func lookupAsRequest(client *Client, remoteIP string) (string, error) {
 	if ipAddr != nil {
 		remoteIP = ipAddr.String()
 	}
-	if client.crowdsecMode == configuration.StreamMode || client.crowdsecMode == configuration.AloneMode {
-		value, _, _, err := client.LookupStreamRemediation(remoteIP, ipAddr, nil)
-		return value, err
-	}
-	value, _, _, err := client.LookupCachedRemediation(remoteIP, ipAddr, nil)
+	value, _, _, err := client.LookupRemediation(remoteIP, ipAddr, nil)
 	return value, err
 }
 
@@ -99,7 +93,7 @@ func TestDeleteStreamDecision_ClearsTheSlotAnySpelling(t *testing.T) {
 // TestStoreStreamDecision_HeaderScopesAreNotAddresses guards the other half of the contract: a
 // Country or AS value must never be pushed through IP parsing.
 func TestStoreStreamDecision_HeaderScopesAreNotAddresses(t *testing.T) {
-	client, cacheClient := newTestRangeClient(t)
+	client, _ := newTestRangeClient(t)
 	client.decisionScopeHeaders = map[string]string{decisionscope.ScopeCountry: "CF-IPCountry"}
 	applyStreamDecisionForTest(client, Decision{
 		Origin: "crowdsec", Type: "ban", Scope: "Country", Value: "fr", Duration: "1h",
@@ -107,9 +101,6 @@ func TestStoreStreamDecision_HeaderScopesAreNotAddresses(t *testing.T) {
 	key := decisionscope.HeaderScopeKey(decisionscope.ScopeCountry, "FR")
 	if _, ok := client.decisionStore.PublishedMemoryMapForTest()[key]; !ok {
 		t.Fatal("Country ban must live-map on normalized country code")
-	}
-	if _, err := cacheClient.Get(key); err == nil {
-		t.Fatal("Country ban must not duplicate on TTL heap")
 	}
 }
 
@@ -174,30 +165,29 @@ func TestLiveLookup_MemoHitsAcrossSpellings(t *testing.T) {
 	}
 }
 
-// splitCacheOnDeadReader builds the production shape that reaches the range-index defect with no
-// timing window at all: writes and the stream lease go to a healthy writer, reads round-robin onto
-// a read replica that is down. Returns the client and the writer's view of the stored keys.
-func splitCacheOnDeadReader(t *testing.T) (*cache.Client, *testLeaseRedis) {
+// splitStoreOnDeadReader builds the production shape that reaches the range-index defect:
+// writes go to a healthy writer, reads round-robin onto a read replica that is down.
+func splitStoreOnDeadReader(t *testing.T) (*decisionstore.Store, *testLeaseRedis) {
 	t.Helper()
 	writer := startTestLeaseRedis(t)
-	client := &cache.Client{}
-	client.New(logger.New("ERROR", ""), true, writer.addr(), []string{"127.0.0.1:1"}, "", "", "sess")
-	t.Cleanup(client.Close)
-	return client, writer
+	seed := newTestRedisStore(t, writer.addr(), nil, "sess")
+	if err := seed.ApplyRangeBatch(map[string]string{"10.0.0.0/8": decisionscope.BannedValue}, nil); err != nil {
+		t.Fatal(err)
+	}
+	store := newTestRedisStore(t, writer.addr(), []string{"127.0.0.1:1"}, "sess")
+	return store, writer
 }
 
 // TestApplyRangeBatch_UnreachableReadKeepsSharedIndex is the range half of the defect. The index is
 // shared by every bouncer on this cache; rebuilding it from a read that never answered writes back
 // only what this one poll carried and silently drops every other Range ban.
 func TestApplyRangeBatch_UnreachableReadKeepsSharedIndex(t *testing.T) {
-	client, writer := splitCacheOnDeadReader(t)
-	client.Set(decisionscope.RangeIndexKey, "10.0.0.0/8="+decisionscope.BannedValue, 3600)
-
-	err := decisionscope.ApplyRangeBatch(client, map[string]string{"192.168.0.0/16": decisionscope.BannedValue}, nil)
-	if err == nil || !errors.Is(err, cache.ErrUnreachable) {
+	store, writer := splitStoreOnDeadReader(t)
+	err := store.ApplyRangeBatch(map[string]string{"192.168.0.0/16": decisionscope.BannedValue}, nil)
+	if err == nil || !errors.Is(err, decisionstore.ErrUnreachable) {
 		t.Errorf("apply on an unreadable index returned %v, want ErrUnreachable", err)
 	}
-	stored, ok := writer.value("sess:" + decisionscope.RangeIndexKey)
+	stored, ok := writer.value("sess:" + decisionstore.RangeIndexKey)
 	if !ok || stored != "10.0.0.0/8="+decisionscope.BannedValue {
 		t.Fatalf("shared range index is now %q (present:%v); the other bouncers' Range bans were dropped", stored, ok)
 	}
@@ -206,13 +196,11 @@ func TestApplyRangeBatch_UnreachableReadKeepsSharedIndex(t *testing.T) {
 // TestApplyRangeBatch_UnreachableReadDoesNotDeleteIndex is the same defect on the removal path,
 // where an empty rebuilt index deletes the shared key outright.
 func TestApplyRangeBatch_UnreachableReadDoesNotDeleteIndex(t *testing.T) {
-	client, writer := splitCacheOnDeadReader(t)
-	client.Set(decisionscope.RangeIndexKey, "10.0.0.0/8="+decisionscope.BannedValue, 3600)
-
-	if err := decisionscope.ApplyRangeBatch(client, nil, []string{"172.16.0.0/12"}); err == nil {
+	store, writer := splitStoreOnDeadReader(t)
+	if err := store.ApplyRangeBatch(nil, []string{"172.16.0.0/12"}); err == nil {
 		t.Error("removal on an unreadable index must return an error")
 	}
-	if _, ok := writer.value("sess:" + decisionscope.RangeIndexKey); !ok {
+	if _, ok := writer.value("sess:" + decisionstore.RangeIndexKey); !ok {
 		t.Fatal("the shared range index was deleted")
 	}
 }
@@ -231,17 +219,13 @@ func TestHandleStreamCache_RangeApplyFailureReleasesLease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client, writer := splitCacheOnDeadReader(t)
-	client.Set(decisionscope.RangeIndexKey, "10.0.0.0/8="+decisionscope.BannedValue, 3600)
-	poller := newSharedStreamPoller(t, client, parsed.Host)
+	store, _ := splitStoreOnDeadReader(t)
+	poller := newSharedStreamPoller(t, store, parsed.Host)
 	atomic.StoreInt64(&poller.isCrowdsecStreamStartup, 1)
 	attachTestTransport(poller, server.Client(), "test-key")
 
 	if pollErr := poller.handleStreamCache(); pollErr == nil {
 		t.Fatal("a poll that could not apply its Range delta must report the failure")
-	}
-	if _, ok := writer.value("sess:" + cacheTimeoutKey); ok {
-		t.Fatal("a failed poll must release the stream lease so the next tick retries")
 	}
 	if atomic.LoadInt64(&poller.isCrowdsecStreamStartup) == 0 {
 		t.Fatal("a failed poll must stay in startup so the retry asks for the full decision set")
