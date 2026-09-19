@@ -26,12 +26,12 @@ func Test_Get(t *testing.T) {
 		args     args
 		want     string
 		wantErr  bool
-		valueErr string
+		valueErr error
 	}{
-		{name: "Fetch Known valid IP", args: args{clientIP: IPInCache}, want: "t", wantErr: false, valueErr: ""},
-		{name: "Fetch Unknown valid IP", args: args{clientIP: IPNotInCache}, want: "", wantErr: true, valueErr: CacheMiss},
-		{name: "Fetch invalid value", args: args{clientIP: "test"}, want: "", wantErr: true, valueErr: CacheMiss},
-		{name: "Fetch empty value", args: args{clientIP: ""}, want: "", wantErr: true, valueErr: CacheMiss},
+		{name: "Fetch Known valid IP", args: args{clientIP: IPInCache}, want: "t", wantErr: false},
+		{name: "Fetch Unknown valid IP", args: args{clientIP: IPNotInCache}, want: "", wantErr: true, valueErr: ErrMiss},
+		{name: "Fetch invalid value", args: args{clientIP: "test"}, want: "", wantErr: true, valueErr: ErrMiss},
+		{name: "Fetch empty value", args: args{clientIP: ""}, want: "", wantErr: true, valueErr: ErrMiss},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -44,7 +44,7 @@ func Test_Get(t *testing.T) {
 				t.Errorf("Get() = %v, want %v", got, tt.want)
 				return
 			}
-			if tt.valueErr != "" && !errors.Is(err, sentinelFor(tt.valueErr)) {
+			if tt.valueErr != nil && !errors.Is(err, tt.valueErr) {
 				t.Errorf("Get() err = %v, want %v", err, tt.valueErr)
 			}
 		})
@@ -65,11 +65,11 @@ func Test_Set(t *testing.T) {
 		args     args
 		want     string
 		wantErr  bool
-		valueErr string
+		valueErr error
 	}{
-		{name: "Set valid IP in local cache for 0 sec", args: args{clientIP: IPInCache, value: "t", duration: 0}, want: "", wantErr: true, valueErr: CacheMiss},
-		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: "t", duration: 10}, want: "t", wantErr: false, valueErr: ""},
-		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: "f", duration: 10}, want: "f", wantErr: false, valueErr: ""},
+		{name: "Set valid IP in local cache for 0 sec", args: args{clientIP: IPInCache, value: "t", duration: 0}, want: "", wantErr: true, valueErr: ErrMiss},
+		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: "t", duration: 10}, want: "t", wantErr: false},
+		{name: "Set valid IP in local cache for 10 sec", args: args{clientIP: IPInCache, value: "f", duration: 10}, want: "f", wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -83,7 +83,7 @@ func Test_Set(t *testing.T) {
 				t.Errorf("Set() = %v, want %v", got, tt.want)
 				return
 			}
-			if tt.valueErr != "" && !errors.Is(err, sentinelFor(tt.valueErr)) {
+			if tt.valueErr != nil && !errors.Is(err, tt.valueErr) {
 				t.Errorf("Set() err = %v, want %v", err, tt.valueErr)
 			}
 		})
@@ -104,10 +104,10 @@ func Test_Delete(t *testing.T) {
 		args     args
 		want     string
 		wantErr  bool
-		valueErr string
+		valueErr error
 	}{
-		{name: "Delete Known valid IP", args: args{clientIP: IPInCache}, want: "", wantErr: true, valueErr: CacheMiss},
-		{name: "Delete Unknown valid IP", args: args{clientIP: IPNotInCache}, want: "", wantErr: true, valueErr: CacheMiss},
+		{name: "Delete Known valid IP", args: args{clientIP: IPInCache}, want: "", wantErr: true, valueErr: ErrMiss},
+		{name: "Delete Unknown valid IP", args: args{clientIP: IPNotInCache}, want: "", wantErr: true, valueErr: ErrMiss},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -121,7 +121,7 @@ func Test_Delete(t *testing.T) {
 				t.Errorf("Delete() = %v, want %v", got, tt.want)
 				return
 			}
-			if tt.valueErr != "" && !errors.Is(err, sentinelFor(tt.valueErr)) {
+			if tt.valueErr != nil && !errors.Is(err, tt.valueErr) {
 				t.Errorf("Delete() err = %v, want %v", err, tt.valueErr)
 			}
 		})
@@ -336,17 +336,5 @@ func Test_GetManyUnreachable(t *testing.T) {
 	}
 	if err.Error() != CacheUnreachable {
 		t.Fatalf("GetMany unreachable text %q, want %s", err.Error(), CacheUnreachable)
-	}
-}
-
-// sentinelFor maps table valueErr text (CacheMiss / CacheUnreachable) to ErrMiss / ErrUnreachable for errors.Is.
-func sentinelFor(text string) error {
-	switch text {
-	case CacheMiss:
-		return ErrMiss
-	case CacheUnreachable:
-		return ErrUnreachable
-	default:
-		return errors.New(text)
 	}
 }
