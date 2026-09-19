@@ -99,7 +99,8 @@ func TestLiveLookup_PerRouterTTLLastWrites(t *testing.T) {
 	_ = kind
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		if _, _, _, err := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil); err != nil {
+		if _, _, originID, err := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil); err != nil {
+			_ = originID
 			return
 		}
 		time.Sleep(50 * time.Millisecond)
@@ -133,7 +134,8 @@ func TestLiveLookup_ScopeErrorFailsClosed(t *testing.T) {
 	if decisionscope.IsActiveRemediation(value) {
 		t.Fatalf("scope failure must come back non-active so the failure action applies, got %q", value)
 	}
-	if _, _, _, cacheErr := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil); cacheErr == nil {
+	if _, _, originID, cacheErr := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil); cacheErr == nil {
+		_ = originID
 		t.Fatal("scope failure must not cache the unverified allow for the client address")
 	}
 }
@@ -251,7 +253,10 @@ func TestLiveLookup_ScopeErrorLogsAtWarn(t *testing.T) {
 			logged := captureTestStreamTickLog(t, tc.level, func(log *slog.Logger) {
 				client := newTestLiveClient(t, server)
 				client.log = log
-				_, _, _ = client.LiveLookup("1.2.3.4", map[string]string{"country": "FR"}, 60)
+				kind, origin, err := client.LiveLookup("1.2.3.4", map[string]string{"country": "FR"}, 60)
+				_ = kind
+				_ = origin
+				_ = err
 			})
 			if got := strings.Contains(logged, "handleNoStreamCache:scopeQuery"); got != tc.want {
 				t.Fatalf("scopeQuery at %s: got %v want %v\n%s", tc.level, got, tc.want, logged)

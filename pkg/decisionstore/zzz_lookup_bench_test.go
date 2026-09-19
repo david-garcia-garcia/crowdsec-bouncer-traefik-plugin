@@ -12,11 +12,9 @@ import (
 
 const benchLiveEntries = 100_000
 
-func benchLookupArgs() (remoteIP string, ipAddr net.IP, scopes map[string]string) {
-	remoteIP = "198.51.100.42"
-	ipAddr = net.ParseIP(remoteIP)
-	scopes = map[string]string{decisionscope.ScopeCountry: "US"}
-	return remoteIP, ipAddr, scopes
+func benchLookupArgs() (string, net.IP, map[string]string) {
+	remoteIP := "198.51.100.42"
+	return remoteIP, net.ParseIP(remoteIP), map[string]string{decisionscope.ScopeCountry: "US"}
 }
 
 func BenchmarkLookupStreamMiss_100kSeq(b *testing.B) {
@@ -25,8 +23,11 @@ func BenchmarkLookupStreamMiss_100kSeq(b *testing.B) {
 	membership := MembershipFromIndex("10.0.0.0/8=" + decisionscope.BannedValue)
 	get := benchSnapshotGet(snapshot)
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _, _ = lookupHits(get, remoteIP, ipAddr, scopes, membership)
+	for range b.N {
+		kind, origin, originID := lookupHits(get, remoteIP, ipAddr, scopes, membership)
+		_ = kind
+		_ = origin
+		_ = originID
 	}
 }
 
@@ -38,7 +39,10 @@ func BenchmarkLookupStreamMiss_100kParallel(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			_, _, _ = lookupHits(get, remoteIP, ipAddr, scopes, membership)
+			kind, origin, originID := lookupHits(get, remoteIP, ipAddr, scopes, membership)
+			_ = kind
+			_ = origin
+			_ = originID
 		}
 	})
 }
@@ -47,7 +51,7 @@ func benchLiveSnapshot(b *testing.B) map[string]LiveSlot {
 	b.Helper()
 	word := benchPackedBan()
 	snapshot := make(map[string]LiveSlot, benchLiveEntries+1)
-	for n := 0; n < benchLiveEntries; n++ {
+	for n := range benchLiveEntries {
 		key := fmt.Sprintf("10.%d.%d.%d", n>>16&0xff, n>>8&0xff, n&0xff)
 		snapshot[key] = LiveSlot{Word: word, ExpiresAt: 9_999_999_999}
 	}
@@ -72,9 +76,9 @@ func benchSnapshotGet(snapshot map[string]LiveSlot) func(string) any {
 
 func BenchmarkHeapRetained_TTLMap100k(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		heap := ttl_map.New()
-		for n := 0; n < benchLiveEntries; n++ {
+		for n := range benchLiveEntries {
 			key := fmt.Sprintf("10.%d.%d.%d", n>>16&0xff, n>>8&0xff, n&0xff)
 			heap.Set(key, uint32('t'), 3600)
 		}
@@ -84,9 +88,9 @@ func BenchmarkHeapRetained_TTLMap100k(b *testing.B) {
 
 func BenchmarkHeapRetained_LiveMap100k(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		snapshot := make(map[string]LiveSlot, benchLiveEntries)
-		for n := 0; n < benchLiveEntries; n++ {
+		for n := range benchLiveEntries {
 			key := fmt.Sprintf("10.%d.%d.%d", n>>16&0xff, n>>8&0xff, n&0xff)
 			snapshot[key] = LiveSlot{Word: packWord(decisionscope.BannedValue, 1), ExpiresAt: 9_999_999_999}
 		}

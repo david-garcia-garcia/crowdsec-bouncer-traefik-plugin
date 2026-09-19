@@ -29,7 +29,8 @@ func TestMemoryExpiryOnPublish(t *testing.T) {
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: -1})
 	store.PublishTick(time.Now().Unix())
-	_, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	_, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	_ = originID
 	if !errors.Is(err, ErrMiss) || err.Error() != "store:miss" {
 		t.Fatalf("expired slot must miss, got %v", err)
 	}

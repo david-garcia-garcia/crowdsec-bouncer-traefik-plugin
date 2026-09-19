@@ -84,10 +84,12 @@ func TestBackendContract(t *testing.T) {
 }
 
 func checkEmptyLookupMiss(t *testing.T, store *Store) {
+	t.Helper()
 	mustMiss(t, store, backendBanIP, nil)
 }
 
 func checkLivePutIPBanThenDelete(t *testing.T, store *Store) {
+	t.Helper()
 	store.Put(Decision{
 		Scope: decisionscope.ScopeIP, Value: backendBanIP,
 		Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec,
@@ -98,6 +100,7 @@ func checkLivePutIPBanThenDelete(t *testing.T, store *Store) {
 }
 
 func checkStreamTickPutVisibleAfterPublish(t *testing.T, store *Store) {
+	t.Helper()
 	store.BeginTick()
 	store.Put(Decision{
 		Scope: decisionscope.ScopeIP, Value: backendBanIP,
@@ -108,17 +111,16 @@ func checkStreamTickPutVisibleAfterPublish(t *testing.T, store *Store) {
 }
 
 func checkLiveAllowMemoIsNotMiss(t *testing.T, store *Store) {
+	t.Helper()
 	store.Put(Decision{
 		Scope: decisionscope.ScopeIP, Value: backendBanIP,
 		Kind: decisionscope.NoBannedValue, DurationSec: backendLiveTTLSec,
 	})
-	kind, _, err := lookupRemediation(store, backendBanIP, nil)
-	if err != nil || kind != decisionscope.NoBannedValue {
-		t.Fatalf("allow memo kind %q err %v, want %q", kind, err, decisionscope.NoBannedValue)
-	}
+	mustKind(t, store, backendBanIP, nil, decisionscope.NoBannedValue, "")
 }
 
 func checkHeaderBanDoesNotLeakToOtherHeader(t *testing.T, store *Store) {
+	t.Helper()
 	store.Put(Decision{
 		Scope: decisionscope.ScopeCountry, Value: "fr",
 		Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec,
@@ -129,6 +131,7 @@ func checkHeaderBanDoesNotLeakToOtherHeader(t *testing.T, store *Store) {
 }
 
 func checkHeaderBanOutranksIPCaptcha(t *testing.T, store *Store) {
+	t.Helper()
 	store.Put(Decision{
 		Scope: decisionscope.ScopeIP, Value: backendBanIP,
 		Kind: decisionscope.CaptchaValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec,
@@ -141,6 +144,7 @@ func checkHeaderBanOutranksIPCaptcha(t *testing.T, store *Store) {
 }
 
 func checkIPBanSkipsRangeCaptcha(t *testing.T, store *Store) {
+	t.Helper()
 	store.Put(Decision{
 		Scope: decisionscope.ScopeIP, Value: backendRangeIP,
 		Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec,
@@ -152,6 +156,7 @@ func checkIPBanSkipsRangeCaptcha(t *testing.T, store *Store) {
 }
 
 func checkRangeBanWhenIPIsCaptcha(t *testing.T, store *Store) {
+	t.Helper()
 	store.Put(Decision{
 		Scope: decisionscope.ScopeIP, Value: backendRangeIP,
 		Kind: decisionscope.CaptchaValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec,
@@ -163,6 +168,7 @@ func checkRangeBanWhenIPIsCaptcha(t *testing.T, store *Store) {
 }
 
 func checkRangeApplyThenRemove(t *testing.T, store *Store) {
+	t.Helper()
 	mustMiss(t, store, backendRangeIP, nil)
 	if err := store.ApplyRangeBatch(map[string]Decision{backendRangeCIDR: {Kind: decisionscope.BannedValue}}, nil); err != nil {
 		t.Fatal(err)
@@ -175,6 +181,7 @@ func checkRangeApplyThenRemove(t *testing.T, store *Store) {
 }
 
 func checkIPv6SpellingsShareSlot(t *testing.T, store *Store) {
+	t.Helper()
 	store.Put(Decision{
 		Scope: decisionscope.ScopeIP, Value: expandedV6,
 		Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec,
@@ -185,6 +192,7 @@ func checkIPv6SpellingsShareSlot(t *testing.T, store *Store) {
 }
 
 func checkPutRangeScopeIsIgnored(t *testing.T, store *Store) {
+	t.Helper()
 	store.Put(Decision{
 		Scope: decisionscope.ScopeRange, Value: backendRangeCIDR,
 		Kind: decisionscope.BannedValue, DurationSec: backendLiveTTLSec,
@@ -194,7 +202,7 @@ func checkPutRangeScopeIsIgnored(t *testing.T, store *Store) {
 
 // lookupRemediation is Store.LookupRemediation the way ServeHTTP does: remoteIP is ipAddr.String().
 // Packed intern ids and Redis kind+origin strings resolve to the same origin name.
-func lookupRemediation(store *Store, remoteIP string, scopes map[string]string) (kind, origin string, err error) {
+func lookupRemediation(store *Store, remoteIP string, scopes map[string]string) (string, string, error) {
 	ipAddr := net.ParseIP(remoteIP)
 	if ipAddr != nil {
 		remoteIP = ipAddr.String()

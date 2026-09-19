@@ -24,21 +24,21 @@ func SlotKey(scope, value string) string {
 }
 
 // slotKeys is the canonical slot key and a prior Ip spelling to delete on lift.
-func slotKeys(scope, value string) (key, legacy string) {
+func slotKeys(scope, value string) (string, string) {
 	scope = decisionscope.NormalizeScope(scope)
 	switch scope {
 	case decisionscope.ScopeRange:
 		return "", ""
 	case decisionscope.ScopeIP, "":
-		key = IPCacheKey(value)
+		key := IPCacheKey(value)
 		if key == "" {
 			return "", ""
 		}
 		trimmed := strings.TrimSpace(value)
 		if trimmed != "" && trimmed != key {
-			legacy = trimmed
+			return key, trimmed
 		}
-		return key, legacy
+		return key, ""
 	default:
 		identifier := decisionscope.NormalizeHeaderScopeValue(scope, value)
 		if identifier == "" {

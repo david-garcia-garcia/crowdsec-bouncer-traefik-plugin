@@ -13,12 +13,13 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
-func putBan(store *decisionstore.Store, ip string) {
-	store.Put(decisionstore.Decision{Scope: decisionscope.ScopeIP, Value: ip, Kind: decisionscope.BannedValue, DurationSec: 10})
+func putBan(store *decisionstore.Store) {
+	store.Put(decisionstore.Decision{Scope: decisionscope.ScopeIP, Value: "1.2.3.4", Kind: decisionscope.BannedValue, DurationSec: 10})
 }
 
-func lookupBan(store *decisionstore.Store, ip string) (string, error) {
-	kind, _, _, err := store.LookupRemediation(ip, nil, nil)
+func lookupBan(store *decisionstore.Store) (string, error) {
+	kind, _, originID, err := store.LookupRemediation("1.2.3.4", nil, nil)
+	_ = originID
 	return kind, err
 }
 
@@ -105,7 +106,7 @@ func TestOpenDecisionStore_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	putBan(store, "1.2.3.4")
+	putBan(store)
 
 	session := newTestRedisStore(t, redisServer.addr(), nil, SessionHex(cfg))
 	kind, _, _, getErr := session.LookupRemediation("1.2.3.4", nil, nil)
@@ -114,7 +115,8 @@ func TestOpenDecisionStore_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.
 	}
 
 	identity := newTestRedisStore(t, redisServer.addr(), nil, IdentityHex(cfg))
-	_, _, _, identErr := identity.LookupRemediation("1.2.3.4", nil, nil)
+	_, _, originID, identErr := identity.LookupRemediation("1.2.3.4", nil, nil)
+	_ = originID
 	if identErr == nil || !errors.Is(identErr, decisionstore.ErrMiss) {
 		t.Fatalf("IdentityHex prefix lookup err %v, want miss", identErr)
 	}
@@ -146,8 +148,8 @@ func TestOpenDecisionStore_LiveIntervalSplitSharesStore(t *testing.T) {
 	if first != second {
 		t.Fatal("same cursor and Redis params must reclaim one store")
 	}
-	putBan(first, "1.2.3.4")
-	got, getErr := lookupBan(second, "1.2.3.4")
+	putBan(first)
+	got, getErr := lookupBan(second)
 	if getErr != nil || got != decisionscope.BannedValue {
 		t.Fatalf("shared store lookup %q err %v", got, getErr)
 	}
@@ -197,8 +199,8 @@ func TestOpenLive_TwoClientsShareOneStore(t *testing.T) {
 	if first.decisionStore != second.decisionStore {
 		t.Fatal("those Clients must share one decision store")
 	}
-	putBan(first.decisionStore, "1.2.3.4")
-	got, getErr := lookupBan(second.decisionStore, "1.2.3.4")
+	putBan(first.decisionStore)
+	got, getErr := lookupBan(second.decisionStore)
 	if getErr != nil || got != decisionscope.BannedValue {
 		t.Fatalf("sibling lookup %q err %v", got, getErr)
 	}
@@ -220,9 +222,9 @@ func TestClientClose_LeavesSiblingCacheLive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	putBan(first.decisionStore, "1.2.3.4")
+	putBan(first.decisionStore)
 	first.Close()
-	got, getErr := lookupBan(second.decisionStore, "1.2.3.4")
+	got, getErr := lookupBan(second.decisionStore)
 	if getErr != nil || got != decisionscope.BannedValue {
 		t.Fatalf("after sibling Close lookup %q err %v", got, getErr)
 	}
@@ -249,7 +251,7 @@ func TestClientClose_LeavesSiblingRedisPoolLive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	putBan(first.decisionStore, "1.2.3.4")
+	putBan(first.decisionStore)
 	first.Close()
 	kind, _, _, getErr := second.decisionStore.LookupRemediation("1.2.3.4", nil, nil)
 	if getErr != nil || kind != decisionscope.BannedValue {
@@ -271,14 +273,15 @@ func TestOpenDecisionStore_LastHolderGraceClosesRedisPool(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	putBan(store, "1.2.3.4")
+	putBan(store)
 	kind, _, _, getErr := store.LookupRemediation("1.2.3.4", nil, nil)
 	if getErr != nil || kind != decisionscope.BannedValue {
 		t.Fatalf("before cancel lookup %q err %v", kind, getErr)
 	}
 	cancel()
 	time.Sleep(80 * time.Millisecond)
-	_, _, _, closedErr := store.LookupRemediation("1.2.3.4", nil, nil)
+	_, _, originID, closedErr := store.LookupRemediation("1.2.3.4", nil, nil)
+	_ = originID
 	if closedErr == nil || !errors.Is(closedErr, decisionstore.ErrUnreachable) {
 		t.Fatalf("after last-holder grace lookup err %v, want unreachable", closedErr)
 	}
