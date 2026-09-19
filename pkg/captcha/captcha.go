@@ -4,7 +4,6 @@ package captcha
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log/slog"
 	"mime"
@@ -102,7 +101,7 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP string) {
 	valid, err := c.Validate(r)
 	if err != nil {
-		c.log.Info("captcha:ServeHTTP:validate " + err.Error())
+		c.log.Info("captcha:ServeHTTP:validate", "error", err)
 		rw.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -128,14 +127,14 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		"ChallengeURL": c.challengeURL,
 	})
 	if err != nil {
-		c.log.Info("captcha:ServeHTTP captchaTemplateServe " + err.Error())
+		c.log.Info("captcha:ServeHTTP captchaTemplateServe", "error", err)
 	}
 }
 
 // Check Verify if the captcha is already done via gate cookie.
 func (c *Client) Check(r *http.Request, remoteIP string) bool {
 	passed := validateGateValue(c.gateSecret, c.gateBindIP, remoteIP, gateCookieValue(r), time.Now(), c.gracePeriodSeconds)
-	c.log.Debug(fmt.Sprintf("captcha:Check ip:%s pass:%v", remoteIP, passed))
+	c.log.Debug("captcha:Check", "ip", remoteIP, "pass", passed)
 	return passed
 }
 
@@ -332,7 +331,7 @@ func (c *Client) postSiteverify(response string) (*http.Response, error) {
 // Validate Verify the captcha from provider API.
 func (c *Client) Validate(r *http.Request) (bool, error) {
 	if r.Method != http.MethodPost {
-		c.log.Debug("captcha:Validate invalid method: " + r.Method)
+		c.log.Debug("captcha:Validate invalid method", "method", r.Method)
 		return false, nil
 	}
 	response := captchaResponseFromRequest(r, c.infoProvider.response)
@@ -342,7 +341,7 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	}
 	res, err := c.postSiteverify(response)
 	if err != nil {
-		c.log.Error("captcha:Validate " + err.Error())
+		c.log.Error("captcha:Validate", "error", err)
 		return false, err
 	}
 	defer func() {
@@ -359,6 +358,6 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	c.log.Debug(fmt.Sprintf("captcha:Validate success:%v", captchaResponse.Success))
+	c.log.Debug("captcha:Validate", "success", captchaResponse.Success)
 	return captchaResponse.Success, nil
 }

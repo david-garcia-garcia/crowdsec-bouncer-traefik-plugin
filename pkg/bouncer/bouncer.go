@@ -3,7 +3,6 @@ package bouncer
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -56,7 +55,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		forwardedCustomHeader = "X-Real-Ip"
 	}
 	if config.ForwardedHeadersInsecure {
-		log.Info("ForwardedHeadersInsecure enabled, using header " + forwardedCustomHeader)
+		log.Info("ForwardedHeadersInsecure enabled", "header", forwardedCustomHeader)
 	}
 
 	var banTemplate *template.Template
@@ -96,7 +95,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 	// handleRemediationServeHTTP bans whenever that client is not valid.
 	if config.CrowdsecMode == configuration.AppsecMode &&
 		routeHandler.appsecFailureAction != configuration.FailureActionCaptcha {
-		routeHandler.log.Debug("Bouncer initialized name:" + name)
+		routeHandler.log.Debug("Bouncer initialized", "name", name)
 		return routeHandler, nil
 	}
 	config.CaptchaSiteKey, _ = configuration.GetVariable(config, "CaptchaSiteKey")
@@ -124,10 +123,10 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		config.CaptchaGracePeriodSeconds,
 	)
 	if err != nil {
-		log.Error("CaptchaClient not valid " + err.Error())
+		log.Error("CaptchaClient not valid", "error", err)
 		return nil, err
 	}
-	routeHandler.log.Debug("Bouncer initialized name:" + name)
+	routeHandler.log.Debug("Bouncer initialized", "name", name)
 	return routeHandler, nil
 }
 
@@ -167,12 +166,12 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	}
 	b.recordProcessed(req.ipType)
 	if err != nil {
-		b.log.Error(fmt.Sprintf("ServeHTTP:getRemoteIp ip:%s %s", req.remoteIP, err.Error()))
+		b.log.Error("ServeHTTP:getRemoteIp", "ip", req.remoteIP, "error", err)
 		b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechGetRemoteFail)
 		return
 	}
 	if req.ipAddr == nil {
-		b.log.Error(fmt.Sprintf("ServeHTTP:parseClientIP ip:%s", req.remoteIP))
+		b.log.Error("ServeHTTP:parseClientIP", "ip", req.remoteIP)
 		b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechTrustIPFail)
 		return
 	}
@@ -202,14 +201,14 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			cacheErrString := cacheErr.Error()
 			b.log.Debug("ServeHTTP:Get", "ip", req.remoteIP, "cache", cacheErrString)
 			if cacheErrString == cache.CacheUnreachable && !b.redisUnreachableBlock {
-				b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s redisUnreachable=true", req.remoteIP))
+				b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "redisUnreachable", true)
 				b.handleNextServeHTTP(rw, req)
 				return
 			}
 			if cacheErrString == cache.CacheMiss {
 				break
 			}
-			b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", req.remoteIP, cacheErrString))
+			b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "error", cacheErr)
 			b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
 			return
 		case decisionscope.IsActiveRemediation(value):
@@ -306,7 +305,7 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 
 	err := b.banTemplate.Execute(rw, templateData)
 	if err != nil {
-		b.log.Warn("handleBanServeHTTP could not write template to ResponseWriter: " + err.Error())
+		b.log.Warn("handleBanServeHTTP could not write template to ResponseWriter", "error", err)
 	}
 }
 
@@ -317,7 +316,7 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 // reaches handleBanServeHTTP from here.
 func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientRequest, remediation, origin string) {
 	kind := cache.RemediationKind(remediation)
-	b.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", req.remoteIP, kind))
+	b.log.Debug("handleRemediationServeHTTP", "ip", req.remoteIP, "remediation", kind)
 	if !b.captchaClient.Valid || kind != decisionscope.CaptchaValue {
 		b.handleBanServeHTTP(rw, req, configuration.ReasonLAPI, origin)
 		return
@@ -362,7 +361,7 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientRequest
 		return true
 	}
 	if err != nil {
-		b.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", req.remoteIP, err.Error()))
+		b.log.Debug("handleNextServeHTTP", "ip", req.remoteIP, "isWaf", true, "error", err)
 		b.handleBanServeHTTP(rw, req, configuration.ReasonAPPSEC, lapi.OriginPluginAppsecFailure)
 		return true
 	}
@@ -418,7 +417,7 @@ func (b *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req clie
 		return
 	}
 	if _, err := rw.Write([]byte(decision.UserBodyContent)); err != nil {
-		b.log.Warn(fmt.Sprintf("handleAppsecResponseServeHTTP ip:%s could not write appsec response: %s", req.remoteIP, err.Error()))
+		b.log.Warn("handleAppsecResponseServeHTTP could not write appsec response", "ip", req.remoteIP, "error", err)
 	}
 }
 

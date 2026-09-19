@@ -5,7 +5,6 @@ package cache
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -151,13 +150,13 @@ func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
 // set writes the writer, logs a Redis error, and returns; Set is void.
 func (rc *redisCache) set(key, value string, duration int64) {
 	if err := rc.writer.Set(context.Background(), prefixed(rc.prefix, key), []byte(value), duration); err != nil {
-		rc.log.Error("cache:setDecisionRedisCache" + err.Error())
+		rc.log.Error("cache:setDecisionRedisCache", "error", err)
 	}
 }
 
 func (rc *redisCache) delete(key string) {
 	if err := rc.writer.Del(context.Background(), prefixed(rc.prefix, key)); err != nil {
-		rc.log.Error("cache:deleteDecisionRedisCache " + err.Error())
+		rc.log.Error("cache:deleteDecisionRedisCache", "error", err)
 	}
 }
 
@@ -194,14 +193,14 @@ func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts
 		// Hold each client by pointer after New so the pool mutex is not copied.
 		writer, err := simpleredis.New(redisClientConfig(writeHost, pass, database, log))
 		if err != nil {
-			log.Error("cache:New writer " + err.Error())
+			log.Error("cache:New writer", "error", err)
 			return
 		}
 		rc.writer = writer
 		for _, h := range readHosts {
 			reader, readerErr := simpleredis.New(redisClientConfig(h, pass, database, log))
 			if readerErr != nil {
-				log.Error("cache:New reader " + readerErr.Error())
+				log.Error("cache:New reader", "error", readerErr)
 				continue
 			}
 			rc.readers = append(rc.readers, reader)
@@ -210,7 +209,7 @@ func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts
 	} else {
 		c.cache = &localCache{store: ttl_map.New()}
 	}
-	c.log.Debug(fmt.Sprintf("cache:New initialized isRedis:%v writeHost:%v readHosts:%v prefix:%v", isRedis, writeHost, readHosts, keyPrefix))
+	c.log.Debug("cache:New initialized", "isRedis", isRedis, "writeHost", writeHost, "readHosts", readHosts, "prefix", keyPrefix)
 }
 
 // Delete delete decision in cache.

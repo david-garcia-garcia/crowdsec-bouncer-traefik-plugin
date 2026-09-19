@@ -234,10 +234,10 @@ func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol 
 // drainResponse consumes leftover bytes so the AppSec HTTP connection can be reused.
 func (c *Client) drainResponse(res *http.Response) {
 	if _, errDrain := io.Copy(io.Discard, res.Body); errDrain != nil {
-		c.log.Debug("appsecQuery:drainBody " + errDrain.Error())
+		c.log.Debug("appsecQuery:drainBody", "error", errDrain)
 	}
 	if errClose := res.Body.Close(); errClose != nil {
-		c.log.Error("appsecQuery:closeBody " + errClose.Error())
+		c.log.Error("appsecQuery:closeBody", "error", errClose)
 	}
 }
 
@@ -264,7 +264,7 @@ func interpretAppsecBody(statusCode int, body []byte, log *slog.Logger) (*Respon
 		return decision, nil
 	}
 	if parseErr != nil && len(bytes.TrimSpace(body)) > 0 {
-		log.Debug("appsecQuery:parseBody " + parseErr.Error())
+		log.Debug("appsecQuery:parseBody", "error", parseErr)
 	}
 	if statusCode == http.StatusOK {
 		return appsecAllow(), nil
