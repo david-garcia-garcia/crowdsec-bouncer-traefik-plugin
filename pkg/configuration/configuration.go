@@ -410,7 +410,7 @@ func validateCaptchaCredentialsAndTemplates(config *Config) error {
 }
 
 // validateEnabledCaptchaSettings checks provider credentials, the optional custom
-// challenge URL, and templates when a provider is set.
+// challenge URL, and a loadable captcha template when a provider is set.
 func validateEnabledCaptchaSettings(config *Config) error {
 	if config.CaptchaProvider == "" {
 		return nil
@@ -433,7 +433,7 @@ func validateEnabledCaptchaSettings(config *Config) error {
 		return errors.New("CaptchaGateSecret: cannot be empty when CaptchaProvider is set")
 	}
 	if config.CaptchaFilePath == "" {
-		return nil
+		return errors.New("CaptchaFilePath: cannot be empty when CaptchaProvider is set")
 	}
 	if _, _, err := GetTemplate(config.CaptchaFilePath); err != nil {
 		return err
@@ -714,7 +714,7 @@ func validateParamsRequired(config *Config) error {
 func getTLSConfig(config *Config, log *slog.Logger, prefix, scheme string, insecureVerify bool) (*tls.Config, error) {
 	tlsConfig := new(tls.Config)
 	if scheme != HTTPS {
-		log.Debug("getTLSConfig:" + prefix + "Scheme https:no")
+		log.Debug("getTLSConfig:Scheme https:no", "prefix", prefix)
 		return tlsConfig, nil
 	}
 	// RootCAs is intentionally left nil unless a custom CA is provided:
@@ -724,7 +724,7 @@ func getTLSConfig(config *Config, log *slog.Logger, prefix, scheme string, insec
 	//nolint:nestif
 	if insecureVerify {
 		tlsConfig.InsecureSkipVerify = true
-		log.Debug("getTLSConfig:" + prefix + "TLSInsecureVerify tlsInsecure:true")
+		log.Debug("getTLSConfig:TLSInsecureVerify", "prefix", prefix, "tlsInsecure", true)
 	} else {
 		certAuthority, err := GetVariable(config, prefix+"TLSCertificateAuthority")
 		if err != nil {
@@ -735,9 +735,9 @@ func getTLSConfig(config *Config, log *slog.Logger, prefix, scheme string, insec
 			if !tlsConfig.RootCAs.AppendCertsFromPEM([]byte(certAuthority)) {
 				return nil, errors.New("getTLSConfig:" + prefix + " cannot load CA and verify cert is enabled")
 			}
-			log.Debug("getTLSConfig:" + prefix + "TLSCertificateAuthority CA added successfully")
+			log.Debug("getTLSConfig:TLSCertificateAuthority CA added successfully", "prefix", prefix)
 		} else {
-			log.Debug("getTLSConfig:" + prefix + " no CA provided, using system trust store")
+			log.Debug("getTLSConfig: no CA provided, using system trust store", "prefix", prefix)
 		}
 	}
 	certBouncer, err := GetVariable(config, prefix+"TLSCertificateBouncer")

@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-captcha-verify-template-ux
+jobName: 2026-09-18-captcha-verify-template-ux
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:062cecfee7f1534e38f6f0e17b25e72e843a50199d967bdb4da941a6df7b9c1e
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: captcha-verify-template-ux
+pr:
+  id: 103
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/103
