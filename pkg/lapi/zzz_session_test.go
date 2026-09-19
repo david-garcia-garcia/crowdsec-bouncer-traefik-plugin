@@ -420,6 +420,143 @@ func TestOpenStream_TLSOnlyAdoptsTransport(t *testing.T) {
 	}
 }
 
+func TestOpenStream_LapiOverrideAdoptsTimeout(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	server, _ := testStreamLAPI(t)
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	firstCfg := testStreamConfig(parsed.Host, 1)
+	firstCfg.HTTPTimeoutSeconds = 10
+	secondCfg := testStreamConfig(parsed.Host, 1)
+	secondCfg.HTTPTimeoutSeconds = 10
+	secondCfg.CrowdsecLapiHTTPTimeoutSeconds = 30
+
+	first, err := OpenStream(ctx, firstCfg, slog.Default(), "first", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := OpenStream(ctx, secondCfg, slog.Default(), "second", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second {
+		t.Fatal("LAPI override-only New must reuse the Client")
+	}
+	current := second.currentTransport()
+	if current == nil || current.httpTimeoutSeconds != 30 {
+		t.Fatalf("adopted timeout: %+v", current)
+	}
+	if current.httpClient.Timeout != 30*time.Second {
+		t.Fatalf("HTTP timeout %v", current.httpClient.Timeout)
+	}
+}
+
+func TestOpenStream_SharedDefaultChangeAdoptsWhenOverrideZero(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	server, _ := testStreamLAPI(t)
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	firstCfg := testStreamConfig(parsed.Host, 1)
+	firstCfg.HTTPTimeoutSeconds = 10
+	secondCfg := testStreamConfig(parsed.Host, 1)
+	secondCfg.HTTPTimeoutSeconds = 20
+
+	first, err := OpenStream(ctx, firstCfg, slog.Default(), "first", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := OpenStream(ctx, secondCfg, slog.Default(), "second", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second {
+		t.Fatal("shared-default timeout New must reuse the Client")
+	}
+	current := second.currentTransport()
+	if current == nil || current.httpTimeoutSeconds != 20 {
+		t.Fatalf("adopted timeout: %+v", current)
+	}
+	if current.httpClient.Timeout != 20*time.Second {
+		t.Fatalf("HTTP timeout %v", current.httpClient.Timeout)
+	}
+}
+
+func TestOpenStream_OverrideEqualSharedDoesNotReplace(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	server, _ := testStreamLAPI(t)
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log, logSink := newTestLogSink(slog.LevelInfo)
+	ctx := context.Background()
+	firstCfg := testStreamConfig(parsed.Host, 1)
+	firstCfg.HTTPTimeoutSeconds = 10
+	first, err := OpenStream(ctx, firstCfg, log, "first", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	secondCfg := testStreamConfig(parsed.Host, 1)
+	secondCfg.HTTPTimeoutSeconds = 10
+	secondCfg.CrowdsecLapiHTTPTimeoutSeconds = 10
+	second, err := OpenStream(ctx, secondCfg, log, "second", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second {
+		t.Fatal("override 10 vs inherit 10 must reuse the Client")
+	}
+	current := second.currentTransport()
+	if current == nil || current.httpTimeoutSeconds != 10 {
+		t.Fatalf("stored timeout: %+v", current)
+	}
+	if current.httpClient.Timeout != 10*time.Second {
+		t.Fatalf("HTTP timeout %v", current.httpClient.Timeout)
+	}
+	replaced, adoptErr := second.AdoptTransport(secondCfg)
+	if adoptErr != nil {
+		t.Fatal(adoptErr)
+	}
+	if replaced {
+		t.Fatal("override 10 vs inherit 10 must not fieldsDiffer")
+	}
+	second.Close()
+	if strings.Contains(logSink.String(), "lapi transport replaced") {
+		t.Fatalf("no-op must not log transport replace: %s", logSink.String())
+	}
+}
+
+func TestSessionKey_TimeoutKnobsDoNotChangeKey(t *testing.T) {
+	base := testStreamConfig("lapi.example:8080", 1)
+	timeouts := testStreamConfig("lapi.example:8080", 1)
+	timeouts.HTTPTimeoutSeconds = 30
+	timeouts.CrowdsecLapiHTTPTimeoutSeconds = 5
+	timeouts.CrowdsecAppsecHTTPTimeoutSeconds = 2
+	timeouts.CaptchaSiteverifyHTTPTimeoutSeconds = 1
+	if SessionKey(base) != SessionKey(timeouts) {
+		t.Fatal("timeout knobs must not change SessionKey")
+	}
+	if IdentityHex(base) != IdentityHex(timeouts) {
+		t.Fatal("timeout knobs must not change IdentityHex")
+	}
+	if Key(base) != Key(timeouts) {
+		t.Fatal("timeout knobs must not change live Key")
+	}
+}
+
 // waitClientSleeping fails if the Client never Sleeps after its last holder is gone.
 func waitClientSleeping(t *testing.T, client *Client) {
 	t.Helper()

@@ -88,3 +88,12 @@ When no live constructor context remains for a LAPI connection key and grace ela
 - **AND** the last holder of an `lapi.Client` is cancelled
 - **THEN** the incarnation is still sleeping after 20 milliseconds
 - **AND** it is disposed after 30 seconds
+
+### Requirement: Inherit HTTP timeout knobs stay out of LAPI reclaim identity
+Stream/alone `SessionKey`, live/none `Key`, and `IdentityHex` MUST NOT include `CrowdsecLapiHTTPTimeoutSeconds`, `CrowdsecAppsecHTTPTimeoutSeconds`, or `CaptchaSiteverifyHTTPTimeoutSeconds`. Composition SHALL reuse those existing owners. Those owners MUST NOT gain timeout knobs or effective seconds.
+
+#### Scenario: Timeout knobs only do not change stream or live keys
+- **WHEN** two stream configs share LAPI URL, key, and Redis store parameters and differ only on `HTTPTimeoutSeconds` or any of the three inherit timeout knobs
+- **THEN** `SessionKey` is the same
+- **AND** `IdentityHex` is the same
+- **AND** live/none `Key` is the same

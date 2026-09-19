@@ -14,6 +14,10 @@ _Avoid_: leftover AppSec host/CA/key, `crowdsecMode: appsec`
 The `ValidateParams` startup gate `plugin.New` runs on the prepared Config before `lapi.Prepare`.
 _Avoid_: `GetVariable` as a feature-flag check
 
+**EffectiveHTTPTimeoutSeconds**:
+The inherited timeout in seconds for one backend: `HTTPTimeoutSeconds` when that backend's override is 0, otherwise the override.
+_Avoid_: EffectiveLapi, three inherit wrappers
+
 ## Overview
 
 `ValidateParams` is `New`'s constructor gate. When it fails, `New` returns a nil handler and that error and does not open LAPI. File-backed secrets go through `GetVariable`, which Stats and reads `<key>File` when that path is non-empty. Gate each `GetVariable` call behind the flag that uses that secret. Captcha site and secret keys are required whenever `captchaProvider` is set, including `crowdsecMode: alone` and the default `ban` failure action. AppSec URL, key-file, and HTTPS CA run only when `CrowdsecAppsecEnabled` is true.
@@ -21,6 +25,7 @@ _Avoid_: `GetVariable` as a feature-flag check
 ## How to use
 
 - Run `ValidateParams` on `&prepared` after the snapshot and before `lapi.Prepare`.
+- Keep `HTTPTimeoutSeconds` in `requiredInt1` (`< 1` invalid). Put `CrowdsecLapiHTTPTimeoutSeconds`, `CrowdsecAppsecHTTPTimeoutSeconds`, and `CaptchaSiteverifyHTTPTimeoutSeconds` in `requiredInt0` (`< 0` invalid). Zero or omitted inherits. Call `cfg.EffectiveHTTPTimeoutSeconds(override)` — do not add three `EffectiveLapi` wrappers.
 - Resolve `RedisCachePassword` / `RedisCachePasswordFile` only when `redisCacheEnabled` is true.
 - When Redis is off, do not Stat or read a leftover `redisCachePasswordFile`.
 - When Redis is on, keep today's file-error fail. Accept an empty password with an empty file path.

@@ -100,6 +100,11 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 	return nil
 }
 
+// HTTPClientForTest returns the stored siteverify client. Tests only.
+func (c *Client) HTTPClientForTest() *http.Client {
+	return c.httpClient
+}
+
 // ServeHTTP Handle captcha html page or validation.
 func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP string) {
 	valid, err := c.Validate(r, remoteIP)
