@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/iplookup"
+	"github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup"
 )
 
 // Checker allows to check that addresses are in a trusted IPs.
@@ -20,24 +20,24 @@ type Checker struct {
 
 // NewChecker builds a new Checker given a list of CIDR-Strings to trusted IPs.
 func NewChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
-	trustedCIDRs := iplookup.NewEmptyHelper()
+	trustedCIDRs := iplookup.New()
 
 	for _, ipMaskRaw := range trustedIPs {
 		ipMask := strings.TrimSpace(ipMaskRaw)
 		// Bare addresses enter the tree as a host prefix.
 		if ipAddr := net.ParseIP(ipMask); ipAddr != nil {
-			if err := trustedCIDRs.AddCIDR(HostCIDR(ipAddr)); err != nil {
+			if err := trustedCIDRs.AddCIDR(HostCIDR(ipAddr), ""); err != nil {
 				return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipMask, err)
 			}
-			log.Debug(fmt.Sprintf("IP %v is trusted", ipAddr))
+			log.Debug("IP is trusted", "ip", ipAddr)
 			continue
 		}
 
 		// CIDR strings are inserted as given (not rewritten to a host prefix).
-		if err := trustedCIDRs.AddCIDR(ipMask); err != nil {
+		if err := trustedCIDRs.AddCIDR(ipMask, ""); err != nil {
 			return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipMask, err)
 		}
-		log.Debug(fmt.Sprintf("IP network %v is trusted", ipMask))
+		log.Debug("IP network is trusted", "network", ipMask)
 	}
 
 	return &Checker{trustedCIDRs: trustedCIDRs}, nil
@@ -63,8 +63,8 @@ func (ip *Checker) ContainsIP(addr net.IP) bool {
 	if ip == nil || ip.trustedCIDRs == nil {
 		return false
 	}
-	// Boolean any-match: ignore longest-prefix length.
-	found, _, err := ip.trustedCIDRs.IsContained(addr)
+	// Boolean any-match: ignore longest-prefix length and metadata.
+	found, _, _, err := ip.trustedCIDRs.Contains(addr)
 	// Nil IP is an error from the helper and is not trusted.
 	if err != nil {
 		return false

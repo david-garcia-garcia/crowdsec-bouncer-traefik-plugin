@@ -36,7 +36,7 @@ func Prepare(cfg *configuration.Config, log *slog.Logger) error {
 	}
 	apiAppsecKey, errAppsecKey := configuration.GetVariable(cfg, "CrowdsecAppsecKey")
 	if errAppsecKey != nil {
-		log.Info("Prepare:crowdsecAppsecKey fail to get CrowdsecAppsecKey and no client certificate setup " + errAppsecKey.Error())
+		log.Info("Prepare:crowdsecAppsecKey fail to get CrowdsecAppsecKey and no client certificate setup", "error", errAppsecKey)
 	} else {
 		cfg.CrowdsecAppsecKey = apiAppsecKey
 	}
@@ -47,7 +47,7 @@ func Prepare(cfg *configuration.Config, log *slog.Logger) error {
 func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (*Client, error) {
 	next, err := newTransport(config, log)
 	if err != nil {
-		log.Error("New:getTLSConfigCrowdsec fail to get tlsAppsecConfig " + err.Error())
+		log.Error("New:getTLSConfigCrowdsec fail to get tlsAppsecConfig", "error", err)
 		return nil, err
 	}
 	client := &Client{

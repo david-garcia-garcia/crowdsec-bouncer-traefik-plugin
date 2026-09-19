@@ -1,6 +1,6 @@
 ## Purpose
 
-Trusted-IP and trusted-CIDR membership answers in time bounded by address size, not by how many networks the operator listed, without changing public config. Stream and alone Range may reuse that prefix membership and MAY store the remediation string on the winning endpoint; the trusted-IP pool stays boolean.
+Trusted-IP and trusted-CIDR membership answers in time bounded by address size, not by how many networks the operator listed, without changing public config. Membership is the vendored utilities Helper (`github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup`: `New`, `AddCIDR`, `Contains`), not an in-tree helper package. Stream and alone Range MAY store the blob remediation string as Helper metadata on each of the two trees; the trusted-IP pool stays boolean (`AddCIDR(cidr, "")`).
 
 ## Requirements
 
@@ -62,7 +62,7 @@ Building the trusted-IP pool SHALL fail when an entry is neither a parseable IP 
 - **THEN** validation returns an error
 
 ### Requirement: Range membership may reuse boolean CIDR prefix lookup
-Stream and alone Range matching MAY use the same CIDR prefix membership as the trusted-IP pool. A Range helper endpoint MAY store the remediation string (letter, optional unit-separator origin) of that CIDR. The trusted-IP pool MUST NOT store a remediation payload. Boolean insert and boolean membership SHALL stay available for the trusted-IP pool. Ban and captcha SHALL be separate sets so longest-prefix-wins cannot hide a containing ban behind a longer captcha. Range membership MUST NOT live in the trusted-IP Checker. Public trusted-IP config keys SHALL stay `forwardedHeadersTrustedIps` and `clientTrustedIps`. When two Range CIDRs of the same kind occupy the same remapped prefix endpoint, the last successful insert SHALL win.
+Stream and alone Range matching MAY use the same CIDR prefix membership as the trusted-IP pool (`github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup`). A Range helper MAY store the blob remediation string (letter, optional unit-separator origin) as Helper metadata of that CIDR. The trusted-IP pool MUST stay boolean (`AddCIDR(cidr, "")`). Ban and captcha SHALL be separate sets so longest-prefix-wins cannot hide a containing ban behind a longer captcha. Range membership MUST NOT live in the trusted-IP Checker. Public trusted-IP config keys SHALL stay `forwardedHeadersTrustedIps` and `clientTrustedIps`. When two Range CIDRs of the same kind occupy the same remapped prefix endpoint, the last successful insert SHALL win.
 
 #### Scenario: Range ban still matches by CIDR containment
 - **WHEN** stream has a Range ban `10.0.0.0/8` and the client IP is `10.1.2.3`
@@ -81,7 +81,7 @@ Stream and alone Range matching MAY use the same CIDR prefix membership as the t
 - **THEN** Range membership returns the stored string of `::ffff:0:0/96`
 
 ### Requirement: Range hit reads the stored string from the winning prefix
-When a Range helper contains the client IP, membership SHALL return the stored string already held on the longest matching prefix of that helper. It MUST NOT re-parse stored CIDR text to recover that string. Boolean membership for the trusted-IP pool SHALL ignore any stored string.
+When a Range helper contains the client IP, membership SHALL return the Helper metadata already held on the longest matching prefix of that helper. It MUST NOT re-parse `storedByCIDR` to recover that string. Boolean membership for the trusted-IP pool SHALL ignore any stored string.
 
 #### Scenario: Overlapping bans keep the longest-prefix stored string
 - **WHEN** a Range helper holds `10.0.0.0/8` stored as `t` plus origin `crowdsec` and `10.1.0.0/16` stored as `t` plus origin `cscli` and the query is `10.1.2.3`

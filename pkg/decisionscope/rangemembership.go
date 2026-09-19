@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/iplookup"
+	"github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup"
 )
 
 // RangeMembership is in-process ban-then-captcha CIDR membership rebuilt from range-index.
@@ -16,8 +16,8 @@ type RangeMembership struct {
 
 // MembershipFromIndex builds RangeMembership from a cidr=remediation blob. Invalid CIDR lines are skipped.
 func MembershipFromIndex(index string) *RangeMembership {
-	ban := iplookup.NewEmptyHelper()
-	captcha := iplookup.NewEmptyHelper()
+	ban := iplookup.New()
+	captcha := iplookup.New()
 	if index == "" {
 		return &RangeMembership{ban: ban, captcha: captcha}
 	}
@@ -31,7 +31,7 @@ func MembershipFromIndex(index string) *RangeMembership {
 			helper = ban
 		}
 		// Store the blob line on the endpoint so a later hit is O(prefix).
-		if err := helper.AddCIDRRemediation(network, remediation); err != nil {
+		if err := helper.AddCIDR(network, remediation); err != nil {
 			continue
 		}
 	}
@@ -44,13 +44,13 @@ func (membership *RangeMembership) Remediation(ipAddr net.IP) string {
 		return ""
 	}
 	if membership.ban != nil {
-		stored, found, err := membership.ban.ContainedRemediation(ipAddr)
+		found, _, stored, err := membership.ban.Contains(ipAddr)
 		if err == nil && found {
 			return stored
 		}
 	}
 	if membership.captcha != nil {
-		stored, found, err := membership.captcha.ContainedRemediation(ipAddr)
+		found, _, stored, err := membership.captcha.Contains(ipAddr)
 		if err == nil && found {
 			return stored
 		}

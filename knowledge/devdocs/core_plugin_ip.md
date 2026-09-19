@@ -7,8 +7,8 @@ The pool built from `ForwardedHeadersTrustedIPs` or `ClientTrustedIPs`. `Contain
 _Avoid_: Range index, LAPI decision value, geolocation
 
 **IP lookup helper**:
-In-tree radix of CIDRs (`pkg/iplookup.Helper`). Insert at construction; `IsContained` is membership plus longest prefix length. A Range helper endpoint MAY hold the stored remediation string; trusted-IP insert leaves it empty.
-_Avoid_: range-index as a request-path walk, per-CIDR cache key, `InNetwork` (one network)
+Vendored utilities Helper (`github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup`). `New` builds an empty set; `AddCIDR` inserts a CIDR with metadata; `Contains` is membership plus longest prefix length. Trusted-IP Checker passes empty metadata. Range MAY store the blob remediation string as metadata on each of the two trees.
+_Avoid_: range-index as a request-path walk, per-CIDR cache key, `InNetwork` (one network), `pkg/iplookup`, `IsContained`, `storedByCIDR`
 
 **IPv4-mapped CIDR**:
 A parseable CIDR whose network `To4()` is non-nil and whose mask `bits` is 128 (for example `::ffff:0:0/96`). It is the IPv4 prefix of length `ones-96` that `net.IPNet.Contains` uses.
@@ -28,7 +28,7 @@ _Avoid_: renaming `req` to `client`; a fourth address field; a bag for scopes, o
 
 ## Overview
 
-Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker stores those CIDRs in `pkg/iplookup`. Stream/alone Range uses two Helpers on the LAPI Client (ban set, captcha set), not Checker. Use `ip.InNetwork` when the question is one CIDR (blob line parse). Do not parse `RemoteAddr` in the helper; classify `GetRemoteIP`.
+Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker stores those CIDRs in the utilities `iplookup` Helper. Stream/alone Range uses two Helpers on the LAPI Client (ban set, captcha set), not Checker. Use `ip.InNetwork` when the question is one CIDR (blob line parse). Do not parse `RemoteAddr` in the helper; classify `GetRemoteIP`.
 
 ## How to use
 
@@ -36,7 +36,7 @@ Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker st
 - Resolve the client address with `GetRemoteIP` (server/trusted-hop pool + custom header). Put that string, `ipAddr`, and `FamilyOfIP` on `clientRequest`. After a successful parse, set `req.remoteIP = req.ipAddr.String()` before lookup, live memo, or captcha bind. Keep the name `req`. Then `ContainsIP` on `req.ipAddr` for the client pool. Do not parse `RemoteAddr` again. Do not parse the chosen string again for trusted-client membership. Do not add scopes or origin to `clientRequest`.
 - On the request path, call `ContainsIP` on the parsed GetRemoteIP address. `Contains` remains for string callers. Do not walk a CIDR slice beside the helper.
 - Call `HostCIDR` to format a parseable bare address as `/32` or `/128` before `AddCIDR`.
-- Range stream/alone membership reuses two Helpers on the LAPI Client (`AddCIDRRemediation` / `ContainedRemediation`). Do not put Range in Checker. Do not widen `AddCIDR` / `IsContained`.
+- Range stream/alone membership reuses two Helpers on the LAPI Client (`AddCIDR(network, remediation)` then `Contains` metadata). Checker stays `AddCIDR(cidr, "")`. Do not put Range in Checker. Do not put ban and captcha on one LPM tree.
 - One-CIDR questions (`InNetwork`) live in `pkg/ip/network.go`, not in Checker.
 - Classify an already-parsed address with `FamilyOfIP` for usage-metrics `ip_type`. Keep `Family` / `FamilyOfHostOrCIDR` for decision values. Do not parse `RemoteAddr`.
 
@@ -51,15 +51,15 @@ ok := checker.ContainsIP(req.ipAddr)
 
 - `pkg/ip/checker.go`
 - `pkg/ip/network.go`
-- `pkg/iplookup/`
+- `vendor/github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup/`
 - `pkg/bouncer/clientrequest.go`
 - `pkg/bouncer/bouncer.go`
 - `pkg/configuration/configuration.go` (`validateParamsIPs`)
 
 ## Gotchas
 
-- `IsContained` prefix length is for longest-match callers. Checker is boolean any-match.
-- Trusted-IP insert leaves the endpoint string empty. Range ban and captcha are two Helpers, not one payload tree. A Range hit reads the stored string from the winning endpoint; do not re-parse stored CIDRs.
+- `Contains` prefix length is for longest-match callers. Checker is boolean any-match (`AddCIDR(cidr, "")`).
+- Trusted-IP insert leaves metadata empty. Range ban and captcha are two Helpers, not one payload tree. A Range hit reads metadata from the winning prefix; do not re-parse `storedByCIDR`.
 - Invalid CIDR fails `NewChecker` / `AddCIDR`; config validate already constructs a Checker and discards it.
 - `0.0.0.0/0` is IPv4 only; `::/0` is IPv6 only. A shared radix root would mark `/0` on both families.
 - An IPv4-mapped CIDR (`To4()` non-nil and mask `bits==128`, such as `::ffff:0:0/96`) remaps to IPv4 prefix `ones-96` on the v4 root. Do not walk `ones` from bit 0 on the v6 root. Membership matches `net.IPNet.Contains` (IPv4 and IPv4-mapped hit; native IPv6 miss). `AddCIDR` does not reject a parseable mapped CIDR.

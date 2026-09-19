@@ -7,8 +7,8 @@ One cache blob at key `range-index` whose lines are `cidr=remediation`. Remediat
 _Avoid_: walking the blob on the request path, one cache key per CIDR, LAPI `?ip=` on the stream path
 
 **Range membership**:
-Two CIDR helpers (ban, captcha) on the reclaimed LAPI Client. Each Range endpoint MAY hold the stored remediation string (letter, optional U+001F origin). Request lookup always asks this pair. Nil or empty (live/none never hydrate) is a Range miss. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s stored suffix.
-_Avoid_: trusted-IP Checker, one LPM tree with a stored remediation, `sync.Once`, package globals, a Crowdsec-mode flag on lookup, walking stored CIDRs on a Range hit
+Two utilities Helpers (ban, captcha) on the reclaimed LAPI Client. Each Range `AddCIDR` MAY pass the blob remediation string (letter, optional U+001F origin) as metadata. Request lookup always asks this pair. Nil or empty (live/none never hydrate) is a Range miss. Ban wins if several containing CIDRs hit; origin comes from the winning CIDR’s stored suffix.
+_Avoid_: trusted-IP Checker, one LPM tree with a stored remediation, `sync.Once`, package globals, a Crowdsec-mode flag on lookup, re-parsing `storedByCIDR` on a Range hit
 
 **Ip cache key**:
 The one canonical spelling an Ip-scoped decision is filed under, `net.IP.String()` of the address. `IPCacheKey` derives it from a LAPI decision value (host prefix, bare address, or verbatim when neither). After a successful parse, `clientRequest.remoteIP` is that same string and is the request-path key. CrowdSec stores decision values verbatim, so the store path still canonicalizes text; the request path must not re-parse.
