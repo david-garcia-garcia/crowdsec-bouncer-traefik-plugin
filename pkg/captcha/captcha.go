@@ -88,8 +88,11 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 	c.gateSecret = []byte(gateSecret)
 	c.gateBindIP = gateBindIP
 	c.remediationCustomHeader = remediationCustomHeader
-	template, contentType, _ := configuration.GetTemplate(captchaTemplatePath)
-	c.template = template
+	challengeTemplate, contentType, err := configuration.GetTemplate(captchaTemplatePath)
+	if err != nil {
+		return err
+	}
+	c.template = challengeTemplate
 	c.templateContentType = contentType
 	c.gracePeriodSeconds = gracePeriodSeconds
 	c.log = log
@@ -99,11 +102,10 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 
 // ServeHTTP Handle captcha html page or validation.
 func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP string) {
-	valid, err := c.Validate(r)
+	valid, err := c.Validate(r, remoteIP)
+	// Transport and JSON decode stay classified; the solver retries the challenge.
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP:validate", "error", err)
-		rw.WriteHeader(http.StatusBadRequest)
-		return
 	}
 	if valid {
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
@@ -264,9 +266,11 @@ type responseProvider struct {
 }
 
 // siteverifyRequest is the JSON body custom+json POSTs to the provider validate URL.
+// RemoteIP is omitempty so an empty Validate address does not invent the field.
 type siteverifyRequest struct {
 	Secret   string `json:"secret"`
 	Response string `json:"response"`
+	RemoteIP string `json:"remoteip,omitempty"`
 }
 
 // captchaResponseFromRequest reads the provider token from query, POST form, or
@@ -309,9 +313,10 @@ func captchaResponseFromRequest(r *http.Request, field string) string {
 
 // postSiteverify POSTs secret and response to the provider validate URL.
 // Custom+json sends application/json; form/omit and built-ins keep PostForm.
-func (c *Client) postSiteverify(response string) (*http.Response, error) {
+// remoteip is added on both encodings only when remoteIP is non-empty.
+func (c *Client) postSiteverify(response, remoteIP string) (*http.Response, error) {
 	if c.validateBody == configuration.CaptchaCustomValidateBodyJSON {
-		payload, err := json.Marshal(siteverifyRequest{Secret: c.secretKey, Response: response})
+		payload, err := json.Marshal(siteverifyRequest{Secret: c.secretKey, Response: response, RemoteIP: remoteIP})
 		if err != nil {
 			return nil, err
 		}
@@ -325,11 +330,14 @@ func (c *Client) postSiteverify(response string) (*http.Response, error) {
 	body := url.Values{}
 	body.Add("secret", c.secretKey)
 	body.Add("response", response)
+	if remoteIP != "" {
+		body.Add("remoteip", remoteIP)
+	}
 	return c.httpClient.PostForm(c.infoProvider.validate, body)
 }
 
 // Validate Verify the captcha from provider API.
-func (c *Client) Validate(r *http.Request) (bool, error) {
+func (c *Client) Validate(r *http.Request, remoteIP string) (bool, error) {
 	if r.Method != http.MethodPost {
 		c.log.Debug("captcha:Validate invalid method", "method", r.Method)
 		return false, nil
@@ -339,7 +347,7 @@ func (c *Client) Validate(r *http.Request) (bool, error) {
 		c.log.Debug("captcha:Validate no captcha response found in request")
 		return false, nil
 	}
-	res, err := c.postSiteverify(response)
+	res, err := c.postSiteverify(response, remoteIP)
 	if err != nil {
 		c.log.Error("captcha:Validate", "error", err)
 		return false, err

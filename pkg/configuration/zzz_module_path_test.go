@@ -41,7 +41,8 @@ func TestForkModulePathMatchesManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(string(goMod), "module "+forkModulePath+"\n") {
+	goModText := strings.ReplaceAll(string(goMod), "\r\n", "\n")
+	if !strings.HasPrefix(goModText, "module "+forkModulePath+"\n") {
 		t.Fatalf("go.mod module line does not name %s", forkModulePath)
 	}
 

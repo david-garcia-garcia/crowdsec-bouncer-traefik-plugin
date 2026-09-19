@@ -398,7 +398,7 @@ func validateCaptchaCredentialsAndTemplates(config *Config) error {
 }
 
 // validateEnabledCaptchaSettings checks provider credentials, the optional custom
-// challenge URL, and templates when a provider is set.
+// challenge URL, and a loadable captcha template when a provider is set.
 func validateEnabledCaptchaSettings(config *Config) error {
 	if config.CaptchaProvider == "" {
 		return nil
@@ -421,7 +421,7 @@ func validateEnabledCaptchaSettings(config *Config) error {
 		return errors.New("CaptchaGateSecret: cannot be empty when CaptchaProvider is set")
 	}
 	if config.CaptchaFilePath == "" {
-		return nil
+		return errors.New("CaptchaFilePath: cannot be empty when CaptchaProvider is set")
 	}
 	if _, _, err := GetTemplate(config.CaptchaFilePath); err != nil {
 		return err
