@@ -13,7 +13,7 @@ Describe "CrowdSec LAPI and AppSec failure actions" {
     Context "Unreachable LAPI" -Tag "failure-action" {
         It "Should ban when crowdsecLapiFailureAction is ban" {
             $response = Test-HttpRequest -Endpoint "/lapi-fail-ban" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl -TimeoutSec 8
-            $response.StatusCode | Should -BeIn @(403, 429) -Because "none-mode LiveLookup errors must apply crowdsecLapiFailureAction=ban; a 200 means this router joined the healthy crowdsec:8080 Client instead of crowdsec:9"
+            $response.StatusCode | Should -BeIn @(403, 429) -Because "none-mode LiveLookup errors must apply crowdsecLapiFailureAction=ban"
         }
 
         It "Should pass when crowdsecLapiFailureAction is passthrough" {

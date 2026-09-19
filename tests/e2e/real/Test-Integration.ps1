@@ -202,8 +202,7 @@ try {
             (Wait-ForHttpStatus -Url "http://localhost:8000/appsec" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/header-none" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/lapi-fail-pass" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
-            # Route-up only. Fail-closed 403 is asserted in failure_action.Tests.ps1 with an untrusted X-Forwarded-For.
-            (Wait-ForHttpStatus -Url "http://localhost:8000/lapi-fail-ban" -ExpectedStatusCodes @(200, 403) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/lapi-fail-ban" -ExpectedStatusCodes @(403) -TimeoutSeconds 180).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/waf-only" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/waf-fail-pass" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/waf-fail-ban" -ExpectedStatusCodes @(403) -TimeoutSeconds 180).Success,
