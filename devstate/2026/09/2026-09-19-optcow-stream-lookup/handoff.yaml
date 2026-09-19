@@ -1,0 +1,15 @@
+issueKey: 2026-09-19-optcow-stream-lookup
+jobName: 2026-09-19-optcow-stream-lookup
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: main
+qualify: qualified-with-gaps
+src: 6e16b7cda2dc603a30090000fdc7ceea3bd8cc11dc1b818772935f8ea30700da
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
