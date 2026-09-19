@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"text/template"
 
@@ -120,6 +121,45 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 			}
 			if tt.expectBodyContent && body != html {
 				t.Errorf("Expected body %q, got %q", html, body)
+			}
+		})
+	}
+}
+
+// TestHandleBanServeHTTPTrustedTraceID checks that only a conservative inbound TraceID token reaches the ban template.
+func TestHandleBanServeHTTPTrustedTraceID(t *testing.T) {
+	banTemplate, err := template.New("html").Parse("id={{ .TraceID }}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name        string
+		headerValue string
+		wantBody    string
+	}{
+		{name: "UUID", headerValue: "550e8400-e29b-41d4-a716-446655440000", wantBody: "id=550e8400-e29b-41d4-a716-446655440000"},
+		{name: "W3C traceparent", headerValue: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01", wantBody: "id=00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"},
+		{name: "injection", headerValue: `";alert(1);//`, wantBody: "id="},
+		{name: "201-character token", headerValue: strings.Repeat("a", 201), wantBody: "id="},
+		{name: "empty header", headerValue: "", wantBody: "id="},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := &Bouncer{
+				remediationStatusCode:  http.StatusForbidden,
+				banTemplate:            banTemplate,
+				banTemplateContentType: "text/html; charset=utf-8",
+				traceCustomHeader:      "X-Request-Id",
+			}
+			rw := httptest.NewRecorder()
+			req := &http.Request{Method: http.MethodGet, Header: make(http.Header)}
+			if tt.headerValue != "" {
+				req.Header.Set("X-Request-Id", tt.headerValue)
+			}
+			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
+			body := rw.Body.String()
+			if body != tt.wantBody {
+				t.Errorf("body=%q want %q", body, tt.wantBody)
 			}
 		})
 	}
