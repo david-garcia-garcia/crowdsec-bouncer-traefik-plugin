@@ -43,14 +43,17 @@ type MetricsReporter struct {
 	originName    func(uint16) string
 	log           *slog.Logger
 
-	lastMetricsPush     time.Time
-	metricsMu           sync.Mutex
-	reportMu            sync.Mutex               // one usage-metrics POST at a time (ticker, Sleep drain, Close drain)
-	windowCounters      map[usageMetricKey]int64 // dropped counters for the current push window
-	processedIPv4       int64                    // processed ipv4; atomic on the request path
-	processedIPv6       int64
-	processedUnknown    int64 // processed when Family is empty
-	activeDecisions     map[usageMetricKey]int64
+	lastMetricsPush  time.Time
+	metricsMu        sync.Mutex
+	reportMu         sync.Mutex               // one usage-metrics POST at a time (ticker, Sleep drain, Close drain)
+	windowCounters   map[usageMetricKey]int64 // dropped counters for the current push window
+	processedIPv4    int64                    // processed ipv4; atomic on the request path
+	processedIPv6    int64
+	processedUnknown int64 // processed when Family is empty
+	// activeDecisionsByOriginIPType is the gauge we POST: count grouped by origin + ip_type.
+	activeDecisionsByOriginIPType map[usageMetricKey]int64
+	// activeDecisionSlots is the forget index: cache slot → origin id + family. Needed so
+	// delete of one IP can decrement the right group-by bucket. Not the POST payload.
 	activeDecisionSlots map[string]activeDecisionSlot
 }
 
@@ -64,18 +67,18 @@ type activeDecisionSlot struct {
 // newMetricsReporter snapshots write-once URL and envelope scalars and binds query to crowdsecQuery.
 func newMetricsReporter(client *Client, startedAt time.Time) *MetricsReporter {
 	return &MetricsReporter{
-		scheme:              client.crowdsecScheme,
-		host:                client.crowdsecHost,
-		path:                client.crowdsecPath,
-		pluginVersion:       client.pluginVersion,
-		startedAt:           startedAt,
-		crowdsecMode:        client.crowdsecMode,
-		query:               client.crowdsecQuery,
-		originName:          client.OriginName,
-		log:                 client.log,
-		windowCounters:      make(map[usageMetricKey]int64),
-		activeDecisions:     make(map[usageMetricKey]int64),
-		activeDecisionSlots: make(map[string]activeDecisionSlot),
+		scheme:                        client.crowdsecScheme,
+		host:                          client.crowdsecHost,
+		path:                          client.crowdsecPath,
+		pluginVersion:                 client.pluginVersion,
+		startedAt:                     startedAt,
+		crowdsecMode:                  client.crowdsecMode,
+		query:                         client.crowdsecQuery,
+		originName:                    client.OriginName,
+		log:                           client.log,
+		windowCounters:                make(map[usageMetricKey]int64),
+		activeDecisionsByOriginIPType: make(map[usageMetricKey]int64),
+		activeDecisionSlots:           make(map[string]activeDecisionSlot),
 	}
 }
 
@@ -197,18 +200,18 @@ func (r *MetricsReporter) rememberActiveDecision(slot string, decisionSlot activ
 	if r.activeDecisionSlots == nil {
 		r.activeDecisionSlots = make(map[string]activeDecisionSlot)
 	}
-	if r.activeDecisions == nil {
-		r.activeDecisions = make(map[usageMetricKey]int64)
+	if r.activeDecisionsByOriginIPType == nil {
+		r.activeDecisionsByOriginIPType = make(map[usageMetricKey]int64)
 	}
 	if previous, ok := r.activeDecisionSlots[slot]; ok {
 		previousKey := r.slotMetricKey(previous)
-		r.activeDecisions[previousKey]--
-		if r.activeDecisions[previousKey] <= 0 {
-			delete(r.activeDecisions, previousKey)
+		r.activeDecisionsByOriginIPType[previousKey]--
+		if r.activeDecisionsByOriginIPType[previousKey] <= 0 {
+			delete(r.activeDecisionsByOriginIPType, previousKey)
 		}
 	}
 	r.activeDecisionSlots[slot] = decisionSlot
-	r.activeDecisions[key]++
+	r.activeDecisionsByOriginIPType[key]++
 }
 
 // slotMetricKey rebuilds the gauge identity from a compact slot.
@@ -246,9 +249,9 @@ func (r *MetricsReporter) forgetActiveDecision(slot string) {
 	}
 	delete(r.activeDecisionSlots, slot)
 	previousKey := r.slotMetricKey(previous)
-	r.activeDecisions[previousKey]--
-	if r.activeDecisions[previousKey] <= 0 {
-		delete(r.activeDecisions, previousKey)
+	r.activeDecisionsByOriginIPType[previousKey]--
+	if r.activeDecisionsByOriginIPType[previousKey] <= 0 {
+		delete(r.activeDecisionsByOriginIPType, previousKey)
 	}
 }
 
@@ -274,11 +277,11 @@ func (r *MetricsReporter) reportMetrics() error {
 	r.metricsMu.Lock()
 	window := r.windowCounters
 	r.windowCounters = make(map[usageMetricKey]int64)
-	items := make([]map[string]interface{}, 0, len(window)+len(r.activeDecisions)+3)
+	items := make([]map[string]interface{}, 0, len(window)+len(r.activeDecisionsByOriginIPType)+3)
 	for key, value := range window {
 		items = append(items, usageMetricItem(key, value))
 	}
-	for key, value := range r.activeDecisions {
+	for key, value := range r.activeDecisionsByOriginIPType {
 		if value > 0 {
 			items = append(items, usageMetricItem(key, value))
 		}
