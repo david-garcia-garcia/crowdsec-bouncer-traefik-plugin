@@ -1,0 +1,17 @@
+issueKey: 2026-09-06-ip-xff-trust-gate
+jobName: 2026-09-06-ip-xff-trust-gate
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: 81ab4e16beed2c3cce51fbccb45baae39bb22919667a47df71cb90091500fa73
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: ip-xff-trust-gate
+pr:
+  id: 39
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/39

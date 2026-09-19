@@ -29,24 +29,38 @@ linters-settings:
           - "!$test"
         allow:
           - $gostd
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha
+          - github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis
+          - github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
           - github.com/leprosus/golang-ttl-map
-          - github.com/maxlerebourg/simpleredis
       Test:
         files:
           - $test
         allow:
           - $gostd
-          - github.com/maxlerebourg/simpleredis
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/logger
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/ip
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/cache
-          - github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/captcha
+          - github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis
+          - github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
 
 linters:
   enable-all: true
@@ -80,9 +94,23 @@ issues:
   max-same-issues: 0
   exclude:
     - "G402: TLS InsecureSkipVerify may be true."
+  exclude-files:
+    - pkg/reclaim/
   exclude-rules:
     - path: (.+)_test.go
       linters:
         - goconst
         - funlen
         - godot
+    - path: pkg/lapi/
+      linters:
+        - perfsprint
+    - path: pkg/appsec/
+      linters:
+        - perfsprint
+    - path: pkg/bouncer/
+      linters:
+        - perfsprint
+    - path: plugin.go
+      linters:
+        - perfsprint

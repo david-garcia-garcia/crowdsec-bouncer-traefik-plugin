@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-canonicalize-client-remoteip
+jobName: 2026-09-18-canonicalize-client-remoteip
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: a334fbc0034701fac21c4584df71a0efcd3a6e1af3f09ee92d119e33a3add869
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: canonicalize-client-remoteip
+pr:
+  id: 96
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/96

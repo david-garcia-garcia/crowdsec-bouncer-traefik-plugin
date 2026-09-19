@@ -1,0 +1,180 @@
+// Package ip implements utility routines to manipulate IP and CIDR.
+// It allows searching an IP on a list, and find if an IP is part of a list of CIDR.
+package ip
+
+import (
+	"errors"
+	"fmt"
+	"log/slog"
+	"net"
+	"net/http"
+	"strings"
+
+	"github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup"
+)
+
+// Checker allows to check that addresses are in a trusted IPs.
+type Checker struct {
+	trustedCIDRs *iplookup.Helper
+}
+
+// NewChecker builds a new Checker given a list of CIDR-Strings to trusted IPs.
+func NewChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
+	trustedCIDRs := iplookup.New()
+
+	for _, ipMaskRaw := range trustedIPs {
+		ipMask := strings.TrimSpace(ipMaskRaw)
+		// Bare addresses enter the tree as a host prefix.
+		if ipAddr := net.ParseIP(ipMask); ipAddr != nil {
+			if err := trustedCIDRs.AddCIDR(HostCIDR(ipAddr), ""); err != nil {
+				return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipMask, err)
+			}
+			log.Debug("IP is trusted", "ip", ipAddr)
+			continue
+		}
+
+		// CIDR strings are inserted as given (not rewritten to a host prefix).
+		if err := trustedCIDRs.AddCIDR(ipMask, ""); err != nil {
+			return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipMask, err)
+		}
+		log.Debug("IP network is trusted", "network", ipMask)
+	}
+
+	return &Checker{trustedCIDRs: trustedCIDRs}, nil
+}
+
+// Contains checks if provided address is in the trusted IPs.
+func (ip *Checker) Contains(addr string) (bool, error) {
+	if len(addr) == 0 {
+		return false, errors.New("Contains:noAddress")
+	}
+
+	ipAddr, err := parseIP(addr)
+	if err != nil {
+		return false, fmt.Errorf("Contains:parseAddress addr:%s %w", addr, err)
+	}
+
+	return ip.ContainsIP(ipAddr), nil
+}
+
+// ContainsIP checks if provided address is in the trusted IPs.
+func (ip *Checker) ContainsIP(addr net.IP) bool {
+	// An uninitialized Checker trusts nothing.
+	if ip == nil || ip.trustedCIDRs == nil {
+		return false
+	}
+	// Boolean any-match: ignore longest-prefix length and metadata.
+	found, _, _, err := ip.trustedCIDRs.Contains(addr)
+	// Nil IP is an error from the helper and is not trusted.
+	if err != nil {
+		return false
+	}
+	return found
+}
+
+// HostCIDR formats a bare address as a host prefix for the lookup helper.
+func HostCIDR(addr net.IP) string {
+	if v4 := addr.To4(); v4 != nil {
+		return v4.String() + "/32"
+	}
+	return addr.String() + "/128"
+}
+
+// parseIP parses a dotted or compact address string into net.IP.
+// An IPv6 zone (last % after a colon) is stripped first so membership and the
+// yielded net.IP use the zone-free address. Brackets and IPv4 with % stay errors.
+func parseIP(addr string) (net.IP, error) {
+	// Cut RFC 4007 zone so net.ParseIP sees only the address.
+	if zoneSep := strings.LastIndex(addr, "%"); zoneSep >= 0 && strings.Contains(addr[:zoneSep], ":") {
+		addr = addr[:zoneSep]
+	}
+	userIP := net.ParseIP(addr)
+	if userIP == nil {
+		return nil, fmt.Errorf("parseIP:parseAddress %s", addr)
+	}
+
+	return userIP, nil
+}
+
+// PoolStrategy is a strategy based on an IP Checker.
+// It allows to check whether addresses are in a given pool of IPs.
+type PoolStrategy struct {
+	Checker *Checker
+}
+
+// GetIP checks the list of Forwarded IPs (most recent first) against the
+// Checker pool of IPs. It returns the first IP that is not in the pool, or the
+// empty string otherwise. The net.IP is the parse of that hop when parseable.
+func (s *PoolStrategy) getIP(req *http.Request, customHeader string) (string, net.IP) {
+	if s.Checker == nil {
+		return "", nil
+	}
+
+	xff := req.Header.Get(customHeader)
+
+	xffs := strings.Split(xff, ",")
+
+	// Walk most-recent hop first (right to left). Keep the winning hop’s parse.
+	for i := len(xffs) - 1; i >= 0; i-- {
+		xffTrimmed := strings.TrimSpace(xffs[i])
+		if len(xffTrimmed) == 0 {
+			continue
+		}
+		hopIP, err := parseIP(xffTrimmed)
+		if err != nil {
+			// Unparseable hop is not in the pool (same as Contains parse error).
+			return xffTrimmed, nil
+		}
+		if !s.Checker.ContainsIP(hopIP) {
+			return xffTrimmed, hopIP
+		}
+	}
+
+	return "", nil
+}
+
+// GetRemoteIP returns the client address for a request.
+// Unless insecure is true, it requires req.RemoteAddr to be in the trusted-hop pool
+// before honoring forwarded headers. When the pool is empty, the checker is nil, or
+// the socket peer is not trusted, it returns the host from req.RemoteAddr only.
+// Otherwise it walks the custom forwarded header most-recent-first against the
+// trusted-hop pool, then falls back to RemoteAddr when every hop is trusted or the
+// header is empty. When insecure is true it does not consult the checker: it returns
+// the whole trimmed header value (no comma split) when that value is non-empty, or
+// the RemoteAddr host when the header is absent, empty, or whitespace-only.
+// The net.IP is that chosen address when parseable.
+func GetRemoteIP(req *http.Request, strategy *PoolStrategy, customHeader string, insecure bool) (string, net.IP, error) {
+	remoteHost, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		return "", nil, fmt.Errorf("GetRemoteIP:extractIP: %w", err)
+	}
+
+	if insecure {
+		headerVal := strings.TrimSpace(req.Header.Get(customHeader))
+		if headerVal == "" {
+			parsed, _ := parseIP(remoteHost)
+			return remoteHost, parsed, nil
+		}
+		if parsed, parseErr := parseIP(headerVal); parseErr == nil {
+			return headerVal, parsed, nil
+		}
+		return headerVal, nil, nil
+	}
+
+	trustedPeer := false
+	if strategy != nil && strategy.Checker != nil {
+		if peerIP, parseErr := parseIP(remoteHost); parseErr == nil && strategy.Checker.ContainsIP(peerIP) {
+			trustedPeer = true
+		}
+	}
+
+	if trustedPeer {
+		remoteIP, parsed := strategy.getIP(req, customHeader)
+		if len(remoteIP) != 0 {
+			return remoteIP, parsed, nil
+		}
+	}
+
+	parsed, _ := parseIP(remoteHost)
+	return remoteHost, parsed, nil
+}

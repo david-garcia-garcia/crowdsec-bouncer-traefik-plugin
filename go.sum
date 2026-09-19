@@ -1,4 +1,6 @@
+github.com/david-garcia-garcia/traefik-middleware-utilities v1.0.4 h1:ExAKYjnVP5oWVKKFx8txPMagFVltibK1lQPkYeCRCac=
+github.com/david-garcia-garcia/traefik-middleware-utilities v1.0.4/go.mod h1:oQP+EKFW8Wa+iWd9VuHuqS/8jeMKZWs/jJr0O8WKfEQ=
 github.com/leprosus/golang-ttl-map v1.1.7 h1:cF4AAFDDnJTFSV+/42sKLhmMluvLdRlCGS2UaifH6UM=
 github.com/leprosus/golang-ttl-map v1.1.7/go.mod h1:4QWHJPeVBbrkhOhXdhCv9IEiyj/YzkO04/iexy4vSe0=
-github.com/maxlerebourg/simpleredis v1.0.12 h1:VsJpk2l8U9QqxOWbYnEXbrs7iSNZFm2fNmFvlxYlQNk=
-github.com/maxlerebourg/simpleredis v1.0.12/go.mod h1:lT4LX02SOsE9PxUcSrz1QW5ZnO86gPbaiYBxmtcXEls=
+github.com/traefik/yaegi v0.16.1 h1:f1De3DVJqIDKmnasUF6MwmWv1dSEEat0wcpXhD2On3E=
+github.com/traefik/yaegi v0.16.1/go.mod h1:4eVhbPb3LnD2VigQjhYbEJ69vDRFdT2HQNrXx8eEwUY=

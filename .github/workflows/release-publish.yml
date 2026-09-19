@@ -3,13 +3,13 @@ name: Release (2/2) Publish
 # Step 2 of the release process: tag and publish the commit prepared by
 # Release (1/2) Prepare.
 #
-# Triggered by the release PR landing on main. The tag is created on that
+# Triggered by the release PR landing on master. The tag is created on that
 # commit, so version.go inside the released source always matches the tag —
 # no post-release patching, no force-moved tags.
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths: ["version.go"]
 
 permissions:

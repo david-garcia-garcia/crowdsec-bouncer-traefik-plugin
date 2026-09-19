@@ -18,6 +18,7 @@ TRAEFIK_VERSION="${TRAEFIK_VERSION:-v3.7.11}"
 
 WEB_PORT="${WEB_PORT:-8000}"
 LAPI_PORT="${LAPI_PORT:-8090}"
+LAPI_PORT_B="${LAPI_PORT_B:-}"
 BACKEND_PORT="${BACKEND_PORT:-8091}"
 APPSEC_PORT="${APPSEC_PORT:-8092}"
 REDIS_PORT="${REDIS_PORT:-8093}"
@@ -32,6 +33,7 @@ CACHE_DIR="$MOCK_LIB_DIR/../.cache"
 WORKDIR=""
 TRAEFIK_PID=""
 MOCK_PID=""
+MOCK_PID_B=""
 SCENARIO_NAME=""
 SCENARIO_LOG=""
 
@@ -121,7 +123,7 @@ assert_status() {
   local got
   got=$(curl -s -o /dev/null -w '%{http_code}' "$@" "$url")
   if [[ "$got" != "$expected" ]]; then
-    echo "assert_status: $url expected $expected, got $got" >&2
+    echo "assert_status: $url expected $expected, got $got" | tee "$WORKDIR/failure.txt" >&2
     return 1
   fi
 }
@@ -135,7 +137,7 @@ assert_header() {
   got=$(curl -s -D - -o /dev/null "$@" "$url" | tr -d '\r' \
     | awk -v h="${header,,}" -F': ' 'tolower($1) == h { print $2; exit }')
   if [[ "$got" != "$expected" ]]; then
-    echo "assert_header: $url header $header expected \"$expected\", got \"$got\"" >&2
+    echo "assert_header: $url header $header expected \"$expected\", got \"$got\"" | tee "$WORKDIR/failure.txt" >&2
     return 1
   fi
 }
@@ -148,22 +150,46 @@ assert_body_contains() {
   local body
   body=$(curl -s "$@" "$url")
   if ! grep -q "$needle" <<<"$body"; then
-    echo "assert_body_contains: $url expected to contain \"$needle\", got:" >&2
-    echo "$body" >&2
+    {
+      echo "assert_body_contains: $url expected to contain \"$needle\", got:"
+      echo "$body"
+    } | tee "$WORKDIR/failure.txt" >&2
     return 1
   fi
 }
 
 # --- mock admin client -------------------------------------------------------
 
+lapi_add_decision_at() {
+  local port="$1" ip="$2" type="${3:-ban}" duration="${4:-4h}"
+  curl -sS -X POST "http://127.0.0.1:${port}/admin/decisions?ip=${ip}&type=${type}&duration=${duration}" >/dev/null
+}
+
 lapi_add_decision() {
-  local ip="$1" type="${2:-ban}" duration="${3:-4h}"
-  curl -sS -X POST "http://127.0.0.1:${LAPI_PORT}/admin/decisions?ip=${ip}&type=${type}&duration=${duration}" >/dev/null
+  lapi_add_decision_at "${LAPI_PORT}" "$@"
 }
 
 lapi_delete_decision() {
   local ip="$1"
   curl -sS -X DELETE "http://127.0.0.1:${LAPI_PORT}/admin/decisions?ip=${ip}" >/dev/null
+}
+
+# Generic CrowdSec scope (Country, AS, Range, username, …).
+# Usage: lapi_add_scope_decision SCOPE VALUE [type] [duration]
+lapi_add_scope_decision() {
+  local scope="$1" value="$2" type="${3:-ban}" duration="${4:-4h}"
+  curl -sS -G -X POST "http://127.0.0.1:${LAPI_PORT}/admin/decisions" \
+    --data-urlencode "scope=${scope}" \
+    --data-urlencode "value=${value}" \
+    --data-urlencode "type=${type}" \
+    --data-urlencode "duration=${duration}" >/dev/null
+}
+
+lapi_delete_scope_decision() {
+  local scope="$1" value="$2"
+  curl -sS -G -X DELETE "http://127.0.0.1:${LAPI_PORT}/admin/decisions" \
+    --data-urlencode "scope=${scope}" \
+    --data-urlencode "value=${value}" >/dev/null
 }
 
 # --- stack lifecycle ---------------------------------------------------------
@@ -178,8 +204,8 @@ start_stack() {
 
   WORKDIR="$(mktemp -d)"
   # Expose the plugin source where Traefik's localPlugins loader expects it.
-  mkdir -p "$WORKDIR/plugins-local/src/github.com/maxlerebourg"
-  ln -s "$REPO_ROOT" "$WORKDIR/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+  mkdir -p "$WORKDIR/plugins-local/src/github.com/david-garcia-garcia"
+  ln -s "$REPO_ROOT" "$WORKDIR/plugins-local/src/github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin"
 
   cp "$MOCK_LIB_DIR/traefik.yml" "$WORKDIR/traefik.yml"
 
@@ -187,6 +213,7 @@ start_stack() {
   sed \
     -e "s|@@APIKEY@@|${LAPI_KEY}|g" \
     -e "s|@@LAPI_HOST@@|127.0.0.1:${LAPI_PORT}|g" \
+    -e "s|@@LAPI_HOST_B@@|127.0.0.1:${LAPI_PORT_B}|g" \
     -e "s|@@APPSEC_HOST@@|127.0.0.1:${APPSEC_PORT}|g" \
     -e "s|@@BACKEND_URL@@|http://127.0.0.1:${BACKEND_PORT}|g" \
     -e "s|@@REDIS_HOST@@|127.0.0.1:${REDIS_PORT}|g" \
@@ -212,6 +239,13 @@ start_stack() {
     "${mock_tls_args[@]}" >"$WORKDIR/mock.log" 2>&1 &
   MOCK_PID=$!
 
+  if [[ -n "${LAPI_PORT_B}" ]]; then
+    "$mock_bin" \
+      --lapi-only \
+      --lapi-addr "127.0.0.1:${LAPI_PORT_B}" >"$WORKDIR/mock-b.log" 2>&1 &
+    MOCK_PID_B=$!
+  fi
+
   # Opt-in trust store for the Traefik process: a scenario exports
   # TRAEFIK_SSL_CERT_FILE to point Go's x509.SystemCertPool() at a specific CA
   # bundle. Empty -> Go's default system store (unchanged behaviour).
@@ -219,6 +253,9 @@ start_stack() {
   TRAEFIK_PID=$!
 
   wait_for_status "${lapi_scheme}://127.0.0.1:${LAPI_PORT}/health" 200 30 "${lapi_curl[@]}"
+  if [[ -n "${LAPI_PORT_B}" ]]; then
+    wait_for_status "http://127.0.0.1:${LAPI_PORT_B}/health" 200 30
+  fi
   # AppSec stand-in: a bare GET carries no "rpc2" URI, so it answers 200 (allow).
   wait_for_status "http://127.0.0.1:${APPSEC_PORT}/" 200 30
   # /ping is served by Traefik itself once it is up (plugin compilation included).
@@ -228,16 +265,26 @@ start_stack() {
 stop_stack() {
   [[ -n "$TRAEFIK_PID" ]] && kill "$TRAEFIK_PID" 2>/dev/null || true
   [[ -n "$MOCK_PID" ]] && kill "$MOCK_PID" 2>/dev/null || true
+  [[ -n "$MOCK_PID_B" ]] && kill "$MOCK_PID_B" 2>/dev/null || true
   [[ -n "$TRAEFIK_PID" ]] && wait "$TRAEFIK_PID" 2>/dev/null || true
   [[ -n "$MOCK_PID" ]] && wait "$MOCK_PID" 2>/dev/null || true
+  [[ -n "$MOCK_PID_B" ]] && wait "$MOCK_PID_B" 2>/dev/null || true
   [[ -n "$WORKDIR" && -d "$WORKDIR" ]] && rm -rf "$WORKDIR" || true
 }
 
 dump_diagnostics() {
+  echo "=== failure.txt ==="
+  cat "$WORKDIR/failure.txt" 2>/dev/null || true
+  echo "=== solve.headers ==="
+  cat "$WORKDIR/solve.headers" 2>/dev/null || true
+  echo "=== solve.body ==="
+  cat "$WORKDIR/solve.body" 2>/dev/null || true
   echo "=== traefik.log ==="
   cat "$WORKDIR/traefik.log" 2>/dev/null || true
   echo "=== mock.log ==="
   cat "$WORKDIR/mock.log" 2>/dev/null || true
+  echo "=== mock-b.log ==="
+  cat "$WORKDIR/mock-b.log" 2>/dev/null || true
 }
 
 # EXIT trap: runs after the scenario body (or after a failed assertion under
@@ -247,6 +294,7 @@ _scenario_cleanup() {
   if (( rc != 0 )); then
     dump_diagnostics > "$SCENARIO_LOG" 2>&1 || true
     echo "[$SCENARIO_NAME] failed. Logs written to $SCENARIO_LOG" >&2
+    cat "$SCENARIO_LOG" >&2 || true
   fi
   stop_stack
   exit $rc

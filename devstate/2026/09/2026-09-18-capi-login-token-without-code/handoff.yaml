@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-capi-login-token-without-code
+jobName: 2026-09-18-capi-login-token-without-code
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:32b690fe5e572709d01537ad594369098427053a9b7085959d5180e89adad533
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: capi-login-token-without-code
+pr:
+  id: 81
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/81

@@ -3,103 +3,222 @@
 package cache
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"log/slog"
+	"strconv"
+	"sync"
 	"sync/atomic"
+	"time"
 
+	simpleredis "github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis"
 	ttl_map "github.com/leprosus/golang-ttl-map"
-	simpleredis "github.com/maxlerebourg/simpleredis"
 )
 
 const (
-	// BannedValue Banned string.
-	BannedValue = "t"
-	// NoBannedValue No banned string.
-	NoBannedValue = "f"
-	// CaptchaValue Need captcha string.
-	CaptchaValue = "c"
-	// CaptchaDoneValue Captcha done string.
-	CaptchaDoneValue = "d"
 	// CacheMiss error string when cache is miss.
 	CacheMiss = "cache:miss"
 	// CacheUnreachable error string when cache is unreachable.
 	CacheUnreachable = "cache:unreachable"
 )
 
-//nolint:gochecknoglobals
-var cache = ttl_map.New()
+// ErrMiss and ErrUnreachable are the package sentinels for those strings. Callers use errors.Is.
+var (
+	ErrMiss        = errors.New(CacheMiss)
+	ErrUnreachable = errors.New(CacheUnreachable)
+)
 
-type localCache struct{}
+// localCache is the per-store in-memory TTL map.
+type localCache struct {
+	mu    sync.Mutex // acquire serializes miss+Set; vendored Heap Get and Set lock separately
+	store *ttl_map.Heap
+}
 
-func (localCache) get(key string) (string, error) {
-	value, isCached := cache.Get(key)
+func (lc *localCache) heap() *ttl_map.Heap {
+	if lc.store == nil {
+		lc.store = ttl_map.New()
+	}
+	return lc.store
+}
+
+func (lc *localCache) get(key string) (string, error) {
+	value, isCached := lc.heap().Get(key)
 	valueString, isValid := value.(string)
 	if isCached && isValid && len(valueString) > 0 {
 		return valueString, nil
 	}
-	return "", errors.New(CacheMiss)
+	return "", ErrMiss
 }
 
-func (localCache) set(key, value string, duration int64) {
-	cache.Set(key, value, duration)
+func (lc *localCache) getMany(keys []string) (map[string]string, error) {
+	out := make(map[string]string)
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		value, err := lc.get(key)
+		if err == nil {
+			out[key] = value
+			continue
+		}
+		if errors.Is(err, ErrUnreachable) {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
-func (localCache) delete(key string) {
-	cache.Del(key)
+func (lc *localCache) set(key, value string, duration int64) {
+	lc.heap().Set(key, value, duration)
+}
+
+// getInt returns a stored machine word. A leftover string or a miss is CacheMiss.
+func (lc *localCache) getInt(key string) (uint32, error) {
+	value, isCached := lc.heap().Get(key)
+	word, isWord := value.(uint32)
+	if isCached && isWord {
+		return word, nil
+	}
+	return 0, ErrMiss
+}
+
+// setInt stores a machine word in the TTL map (not a leftover string).
+func (lc *localCache) setInt(key string, value uint32, duration int64) {
+	lc.heap().Set(key, value, duration)
+}
+
+func (lc *localCache) delete(key string) {
+	lc.heap().Del(key)
+}
+
+// close is a no-op: the TTL map has no sockets or background goroutine.
+func (lc *localCache) close() {}
+
+// prefixed namespaces Redis keys so two Clients on one host do not share remediations.
+func prefixed(prefix, key string) string {
+	if prefix == "" {
+		return key
+	}
+	return prefix + ":" + key
 }
 
 type redisCache struct {
 	log     *slog.Logger
-	writer  simpleredis.SimpleRedis
-	readers []simpleredis.SimpleRedis
+	prefix  string
+	writer  *simpleredis.SimpleRedis
+	readers []*simpleredis.SimpleRedis
 	counter atomic.Uint64
 }
 
+// nextReader returns the writer when readers is empty; otherwise a replica only.
 func (rc *redisCache) nextReader() *simpleredis.SimpleRedis {
 	n := len(rc.readers)
 	if n == 0 {
-		return &rc.writer
+		return rc.writer
 	}
 	idx := rc.counter.Add(1) % uint64(n)
-	return &rc.readers[idx]
+	return rc.readers[idx]
 }
 
+// get reads the selected nextReader only; a miss or replica error is not retried on the writer.
 func (rc *redisCache) get(key string) (string, error) {
-	value, err := rc.nextReader().Get(key)
+	value, err := rc.nextReader().Get(context.Background(), prefixed(rc.prefix, key))
 	if err != nil {
-		switch err.Error() {
-		case simpleredis.RedisMiss:
-			return "", errors.New(CacheMiss)
-		case simpleredis.RedisUnreachable:
-			return "", errors.New(CacheUnreachable)
-		default:
-			return "", err
+		if simpleredis.IsMiss(err) {
+			return "", ErrMiss
 		}
+		if simpleredis.IsUnreachable(err) {
+			return "", ErrUnreachable
+		}
+		return "", err
 	}
 	valueString := string(value)
 	if len(valueString) > 0 {
 		return valueString, nil
 	}
-	return "", errors.New(CacheMiss)
+	return "", ErrMiss
 }
 
+func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
+	logical := make([]string, 0, len(keys))
+	prefixedNames := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		logical = append(logical, key)
+		prefixedNames = append(prefixedNames, prefixed(rc.prefix, key))
+	}
+	if len(prefixedNames) == 0 {
+		return map[string]string{}, nil
+	}
+	values, err := rc.nextReader().MGet(context.Background(), prefixedNames)
+	if err != nil {
+		if simpleredis.IsUnreachable(err) {
+			return nil, ErrUnreachable
+		}
+		return nil, err
+	}
+	out := make(map[string]string)
+	for i, key := range logical {
+		if i >= len(values) || values[i] == nil || len(values[i]) == 0 {
+			continue
+		}
+		out[key] = string(values[i])
+	}
+	return out, nil
+}
+
+// set writes the writer, logs a Redis error, and returns; Set is void.
 func (rc *redisCache) set(key, value string, duration int64) {
-	if err := rc.writer.Set(key, []byte(value), duration); err != nil {
-		rc.log.Error("cache:setDecisionRedisCache" + err.Error())
+	if err := rc.writer.Set(context.Background(), prefixed(rc.prefix, key), []byte(value), duration); err != nil {
+		rc.log.Error("cache:setDecisionRedisCache", "error", err)
 	}
 }
 
+// getInt parses a decimal ASCII word. A leftover string or a miss is CacheMiss.
+func (rc *redisCache) getInt(key string) (uint32, error) {
+	raw, err := rc.get(key)
+	if err != nil {
+		return 0, err
+	}
+	parsed, parseErr := strconv.ParseUint(raw, 10, 32)
+	if parseErr != nil {
+		return 0, ErrMiss
+	}
+	return uint32(parsed), nil
+}
+
+// setInt stores the word as decimal ASCII so Redis stays string-only.
+func (rc *redisCache) setInt(key string, value uint32, duration int64) {
+	rc.set(key, strconv.FormatUint(uint64(value), 10), duration)
+}
+
 func (rc *redisCache) delete(key string) {
-	if err := rc.writer.Del(key); err != nil {
-		rc.log.Error("cache:deleteDecisionRedisCache " + err.Error())
+	if err := rc.writer.Del(context.Background(), prefixed(rc.prefix, key)); err != nil {
+		rc.log.Error("cache:deleteDecisionRedisCache", "error", err)
+	}
+}
+
+// close drains the writer and every reader idle pool.
+func (rc *redisCache) close() {
+	if rc.writer != nil {
+		rc.writer.Close()
+	}
+	for _, reader := range rc.readers {
+		reader.Close()
 	}
 }
 
 type cacheInterface interface {
 	set(key, value string, duration int64)
 	get(key string) (string, error)
+	getMany(keys []string) (map[string]string, error)
+	setInt(key string, value uint32, duration int64)
+	getInt(key string) (uint32, error)
 	delete(key string)
+	acquire(ctx context.Context, key, value string, duration int64) (bool, error)
+	close()
 }
 
 // Client Cache client.
@@ -108,39 +227,89 @@ type Client struct {
 	log   *slog.Logger
 }
 
-// New Initialize cache client.
-func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts []string, pass, database string) {
+// New Initialize cache client. keyPrefix namespaces Redis keys; memory clients ignore it and each own a map.
+func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts []string, pass, database, keyPrefix string) {
 	c.log = log
 	if isRedis {
-		rc := &redisCache{log: log}
-		rc.writer.Init(writeHost, pass, database)
+		rc := &redisCache{log: log, prefix: keyPrefix}
+		// Hold each client by pointer after New so the pool mutex is not copied.
+		writer, err := simpleredis.New(redisClientConfig(writeHost, pass, database, log))
+		if err != nil {
+			log.Error("cache:New writer", "error", err)
+			return
+		}
+		rc.writer = writer
 		for _, h := range readHosts {
-			var r simpleredis.SimpleRedis
-			r.Init(h, pass, database)
-			rc.readers = append(rc.readers, r)
+			reader, readerErr := simpleredis.New(redisClientConfig(h, pass, database, log))
+			if readerErr != nil {
+				log.Error("cache:New reader", "error", readerErr)
+				continue
+			}
+			rc.readers = append(rc.readers, reader)
 		}
 		c.cache = rc
 	} else {
-		c.cache = &localCache{}
+		c.cache = &localCache{store: ttl_map.New()}
 	}
-	c.log.Debug(fmt.Sprintf("cache:New initialized isRedis:%v writeHost:%v readHosts:%v", isRedis, writeHost, readHosts))
+	c.log.Debug("cache:New initialized", "isRedis", isRedis, "writeHost", writeHost, "readHosts", readHosts, "prefix", keyPrefix)
 }
 
 // Delete delete decision in cache.
 func (c *Client) Delete(key string) {
-	c.log.Debug(fmt.Sprintf("cache:Delete key:%v", key))
+	c.log.Debug("cache:Delete", "key", key)
 	c.cache.delete(key)
 }
 
 // Get check in the cache if the IP has the banned / not banned value.
 // Otherwise return with an error to add the IP in cache if we are on.
 func (c *Client) Get(key string) (string, error) {
-	c.log.Debug(fmt.Sprintf("cache:Get key:%v", key))
+	c.log.Debug("cache:Get", "key", key)
 	return c.cache.get(key)
 }
 
-// Set update the cache with the IP as key and the value banned / not banned.
-func (c *Client) Set(key string, value string, duration int64) {
-	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
-	c.cache.set(key, value, duration)
+// GetMany returns the values for the given keys. Missing keys are omitted.
+// Redis issues one MGET on a single reader. Unreachable returns CacheUnreachable.
+func (c *Client) GetMany(keys []string) (map[string]string, error) {
+	c.log.Debug("cache:GetMany", "keys", keys)
+	return c.cache.getMany(keys)
+}
+
+// Set stores a uint32 machine word or a string. Other types are ignored.
+func (c *Client) Set(key string, value any, duration int64) {
+	c.log.Debug("cache:Set", "key", key, "value", value, "duration", duration)
+	switch stored := value.(type) {
+	case uint32:
+		c.cache.setInt(key, stored, duration)
+	case string:
+		c.cache.set(key, stored, duration)
+	}
+}
+
+// GetInt returns a stored machine word. Miss includes a leftover string at the same key.
+func (c *Client) GetInt(key string) (uint32, error) {
+	c.log.Debug("cache:GetInt", "key", key)
+	return c.cache.getInt(key)
+}
+
+// redisClientConfig keeps this plugin’s dial 2s and command 1s (not utilities zero-Config defaults).
+func redisClientConfig(host, pass, database string, log *slog.Logger) simpleredis.Config {
+	return simpleredis.Config{
+		Host:           host,
+		Pass:           pass,
+		Database:       database,
+		DialTimeout:    2 * time.Second,
+		CommandTimeout: time.Second,
+		IdleTimeout:    30 * time.Second,
+		PoolSize:       8,
+		MaxIdleConns:   8,
+		Logger:         log,
+	}
+}
+
+// Close drains Redis idle pools. Memory clients have nothing to stop. Safe to call more than once.
+func (c *Client) Close() {
+	if c == nil || c.cache == nil {
+		return
+	}
+	c.cache.close()
 }

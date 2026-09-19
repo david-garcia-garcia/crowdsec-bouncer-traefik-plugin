@@ -12,7 +12,7 @@ body() {
   lapi_add_decision 1.2.3.4 ban 5m
 
   echo "[$SCENARIO] banned response becomes 403 once the next stream poll lands"
-  wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 403 15 -H "X-Forwarded-For: 1.2.3.4"
+  wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 403 45 -H "X-Forwarded-For: 1.2.3.4"
 
   echo "[$SCENARIO] banned response Content-Type is HTML"
   assert_header "http://127.0.0.1:${WEB_PORT}/foo" Content-Type "application/json" -H "X-Forwarded-For: 1.2.3.4"

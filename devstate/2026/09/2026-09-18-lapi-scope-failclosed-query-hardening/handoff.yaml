@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-lapi-scope-failclosed-query-hardening
+jobName: 2026-09-18-lapi-scope-failclosed-query-hardening
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:76b18229bb663f74994a9724e405be094a2fba964d979f7933c2364c468b0de4
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: lapi-scope-failclosed-query-hardening
+pr:
+  id: 73
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/73
