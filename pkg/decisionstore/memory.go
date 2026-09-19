@@ -13,8 +13,10 @@ type memory struct {
 	log        *slog.Logger
 	origins    *intern.Table
 	mu         sync.RWMutex
-	tick       map[string]LiveSlot
-	published  map[string]LiveSlot
+	tickWord   map[string]uint32
+	tickExp    map[string]int64
+	pubWord    map[string]uint32
+	pubExp     map[string]int64
 	rangeIndex string
 }
 
@@ -22,22 +24,14 @@ func newMemory(log *slog.Logger, origins *intern.Table) *memory {
 	return &memory{log: log, origins: origins}
 }
 
-// BeginTick clones the published map into tick. Lookups keep reading published.
+// BeginTick clones the published maps into tick. Lookups keep reading published.
 func (m *memory) BeginTick() {
 	if m == nil {
 		return
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if len(m.published) == 0 {
-		m.tick = make(map[string]LiveSlot)
-		return
-	}
-	next := make(map[string]LiveSlot, len(m.published))
-	for key, slot := range m.published {
-		next[key] = slot
-	}
-	m.tick = next
+	m.tickWord, m.tickExp = cloneSlotMaps(m.pubWord, m.pubExp)
 }
 
 // PublishTick drops expired tick slots, publishes tick, and clears it.
@@ -47,16 +41,17 @@ func (m *memory) PublishTick(now int64) {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.tick == nil {
+	if m.tickWord == nil {
 		return
 	}
-	for key, slot := range m.tick {
-		if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
-			delete(m.tick, key)
+	for key, expiresAt := range m.tickExp {
+		if expiresAt > 0 && expiresAt <= now {
+			delete(m.tickWord, key)
+			delete(m.tickExp, key)
 		}
 	}
-	m.published = m.tick
-	m.tick = nil
+	m.pubWord, m.pubExp = m.tickWord, m.tickExp
+	m.tickWord, m.tickExp = nil, nil
 }
 
 // Put writes one decision into tick when a stream window is open, else onto the published map (live).
@@ -66,7 +61,7 @@ func (m *memory) Put(item Decision) {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.tick != nil {
+	if m.tickWord != nil {
 		m.putTick(item)
 		return
 	}
@@ -79,21 +74,22 @@ func (m *memory) putTick(item Decision) {
 	if key == "" {
 		return
 	}
-	m.tick[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
+	slot := LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
+	m.tickWord[key] = slot.Word
+	m.tickExp[key] = slot.ExpiresAt
 }
 
-// putPublishedLocked copy-on-write one live slot onto the published map. Caller holds mu.
+// putPublishedLocked copy-on-write one live slot onto the published maps. Caller holds mu.
 func (m *memory) putPublishedLocked(item Decision) {
 	key, _ := slotKeys(item.Scope, item.Value)
 	if key == "" {
 		return
 	}
-	next := make(map[string]LiveSlot, len(m.published)+1)
-	for slotKey, slot := range m.published {
-		next[slotKey] = slot
-	}
-	next[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
-	m.published = next
+	word, exp := cloneSlotMaps(m.pubWord, m.pubExp)
+	slot := LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
+	word[key] = slot.Word
+	exp[key] = slot.ExpiresAt
+	m.pubWord, m.pubExp = word, exp
 }
 
 // pack encodes a uint32 word. Intern overflow Warns and uses origin id 0.
@@ -123,24 +119,26 @@ func (m *memory) Delete(scope, value string) {
 	if key == "" {
 		return
 	}
-	if m.tick != nil {
-		delete(m.tick, key)
+	if m.tickWord != nil {
+		delete(m.tickWord, key)
+		delete(m.tickExp, key)
 		if legacy != "" && legacy != key {
-			delete(m.tick, legacy)
+			delete(m.tickWord, legacy)
+			delete(m.tickExp, legacy)
 		}
 		return
 	}
-	if len(m.published) == 0 {
+	if len(m.pubWord) == 0 {
 		return
 	}
-	next := make(map[string]LiveSlot, len(m.published))
-	for slotKey, slot := range m.published {
-		if slotKey == key || (legacy != "" && slotKey == legacy) {
-			continue
-		}
-		next[slotKey] = slot
+	word, exp := cloneSlotMaps(m.pubWord, m.pubExp)
+	delete(word, key)
+	delete(exp, key)
+	if legacy != "" && legacy != key {
+		delete(word, legacy)
+		delete(exp, legacy)
 	}
-	m.published = next
+	m.pubWord, m.pubExp = word, exp
 }
 
 // LookupRemediation reads the published map (Ip, header scopes, Range). Expired slots miss.
@@ -149,18 +147,18 @@ func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[st
 		return "", "", 0, ErrMiss
 	}
 	m.mu.RLock()
-	snap := m.published
+	words, exps := m.pubWord, m.pubExp
 	m.mu.RUnlock()
 	now := time.Now().Unix()
 	kind, origin, originID := lookupHits(func(key string) any {
-		slot, ok := snap[key]
+		word, ok := words[key]
 		if !ok {
 			return nil
 		}
-		if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
+		if expiresAt := exps[key]; expiresAt > 0 && expiresAt <= now {
 			return nil
 		}
-		return slot.Word
+		return word
 	}, remoteIP, ipAddr, scopes, membership)
 	if kind == "" {
 		return "", "", 0, ErrMiss
@@ -201,7 +199,14 @@ func (m *memory) publishedMap() map[string]LiveSlot {
 	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.published
+	if m.pubWord == nil {
+		return nil
+	}
+	out := make(map[string]LiveSlot, len(m.pubWord))
+	for key, word := range m.pubWord {
+		out[key] = LiveSlot{Word: word, ExpiresAt: m.pubExp[key]}
+	}
+	return out
 }
 
 // seedPublished writes one decision onto the published map without a tick.
@@ -212,4 +217,17 @@ func (m *memory) seedPublished(item Decision) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.putPublishedLocked(item)
+}
+
+// cloneSlotMaps copies word and expiry maps. Yaegi v0.16 panics on map[string]struct.
+func cloneSlotMaps(word map[string]uint32, exp map[string]int64) (map[string]uint32, map[string]int64) {
+	nextWord := make(map[string]uint32, len(word))
+	nextExp := make(map[string]int64, len(exp))
+	for key, packed := range word {
+		nextWord[key] = packed
+	}
+	for key, expiresAt := range exp {
+		nextExp[key] = expiresAt
+	}
+	return nextWord, nextExp
 }

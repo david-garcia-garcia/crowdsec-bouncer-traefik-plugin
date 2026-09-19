@@ -9,17 +9,16 @@ import (
 const maxID = 65535
 
 // Table is an append-only string intern. ID and Name are inverse. Empty name is id 0.
-// Maps stay behind the mutex: Yaegi v0.16 panics boxing a map into interface{}.
 type Table struct {
 	mu     sync.RWMutex
-	byID   map[uint16]string
+	names  []string // index is id; names[0] is unused
 	byName map[string]uint16
 }
 
 // New returns an empty table.
 func New() *Table {
 	return &Table{
-		byID:   map[uint16]string{},
+		names:  []string{""},
 		byName: map[string]uint16{},
 	}
 }
@@ -46,8 +45,8 @@ func (t *Table) ID(name string) (uint16, bool) {
 	if len(t.byName) >= maxID {
 		return 0, false
 	}
-	id = uint16(len(t.byName) + 1) //nolint:gosec // G115 overflow returns before append past 65535
-	t.byID[id] = name
+	id = uint16(len(t.names)) //nolint:gosec // G115 overflow returns before append past 65535
+	t.names = append(t.names, name)
 	t.byName[name] = id
 	return id, true
 }
@@ -58,9 +57,11 @@ func (t *Table) Name(id uint16) string {
 		return ""
 	}
 	t.mu.RLock()
-	name := t.byID[id]
-	t.mu.RUnlock()
-	return name
+	defer t.mu.RUnlock()
+	if int(id) >= len(t.names) {
+		return ""
+	}
+	return t.names[id]
 }
 
 // FillUntilMaxForTest stores unique names for ids 1..65535. Tests only.
@@ -68,16 +69,16 @@ func (t *Table) FillUntilMaxForTest() {
 	if t == nil {
 		return
 	}
-	byID := make(map[uint16]string, maxID)
+	names := make([]string, maxID+1)
 	byName := make(map[string]uint16, maxID)
 	for n := 1; n <= maxID; n++ {
 		name := strconv.Itoa(n)
 		id := uint16(n) //nolint:gosec // G115 loop is capped at maxID
-		byID[id] = name
+		names[id] = name
 		byName[name] = id
 	}
 	t.mu.Lock()
-	t.byID = byID
+	t.names = names
 	t.byName = byName
 	t.mu.Unlock()
 }
