@@ -10,7 +10,9 @@ import (
 )
 
 func newTestInternStore() *DecisionStore {
-	return &DecisionStore{origins: intern.New()}
+	store := &DecisionStore{origins: intern.New()}
+	store.initStreamStore(logger.New("ERROR", ""))
+	return store
 }
 
 func TestPackUsesInternOnMemoryStore(t *testing.T) {
@@ -39,11 +41,11 @@ func TestStoreStreamDecisionPacksMemory(t *testing.T) {
 	store := newTestInternStore()
 	store.cache = cacheClient
 	client := &Client{cacheClient: cacheClient, decisionStore: store, log: logger.New("ERROR", "")}
-	client.liveTick = store.cloneLiveSnapshot()
+	store.beginStreamTick()
 	client.storeStreamDecision(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.10", Origin: "crowdsec"}, 60)
-	client.publishLiveTick()
+	store.publishStreamTick()
 	slot := decisionscope.IPCacheKey("203.0.113.10")
-	live, ok := store.LiveSnapshot()[slot]
+	live, ok := store.streamMapForTest()[slot]
 	if !ok {
 		t.Fatal("live slot missing")
 	}
@@ -83,24 +85,24 @@ func TestRememberActiveDecisionForgetCompactSlot(t *testing.T) {
 	}
 }
 
-func TestStorePackedOrLeftoverOverflowUsesLeftover(t *testing.T) {
+func TestStorePackedOrLeftoverOverflowUsesKindOnly(t *testing.T) {
 	cacheClient := &cache.Client{}
 	cacheClient.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
 	store := newTestInternStore()
 	store.cache = cacheClient
 	store.origins.FillUntilMaxForTest()
 	client := &Client{cacheClient: cacheClient, decisionStore: store, log: logger.New("ERROR", "")}
-	client.liveTick = store.cloneLiveSnapshot()
+	store.beginStreamTick()
 	client.storeStreamDecision(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.99", Origin: "overflow-origin"}, 60)
-	client.publishLiveTick()
+	store.publishStreamTick()
 	slot := decisionscope.IPCacheKey("203.0.113.99")
-	live, ok := store.LiveSnapshot()[slot]
+	live, ok := store.streamMapForTest()[slot]
 	if !ok {
 		t.Fatal("live slot missing")
 	}
-	want := decisionscope.RemediationWithOrigin(decisionscope.BannedValue, "overflow-origin")
-	if live.Leftover != want {
-		t.Fatalf("leftover %q, want %q", live.Leftover, want)
+	kind, origin, originID := decisionscope.Unpack(live.Word)
+	if kind != decisionscope.BannedValue || origin != "" || originID != 0 {
+		t.Fatalf("kind %q origin %q id %d", kind, origin, originID)
 	}
 	if _, err := cacheClient.Get(slot); err == nil {
 		t.Fatal("ttl heap must not duplicate overflow Ip")

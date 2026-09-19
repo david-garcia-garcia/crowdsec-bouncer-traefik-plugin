@@ -73,9 +73,7 @@ type Client struct {
 	streamStop              chan bool
 	metricsStop             chan bool
 	metricsReporter         *MetricsReporter
-	streamFetches           int64
-
-	liveTick map[string]decisionscope.LiveSlot // non-nil only during fetchAndApplyStreamDecisions on memory stores
+	streamFetches int64
 }
 
 // Prepare resolves secrets and CAPI/LAPI routing on cfg. Call before Key and New.

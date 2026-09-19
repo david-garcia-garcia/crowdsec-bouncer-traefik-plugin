@@ -11,7 +11,7 @@ func TestLookupLiveSnapshotSkipsRangeOnIpBan(t *testing.T) {
 		"203.0.113.10": {Word: packWord(BannedValue, 1), ExpiresAt: time.Now().Unix() + 60},
 	}
 	membership := MembershipFromIndex("10.0.0.0/8=" + CaptchaValue)
-	kind, _, _, err := LookupLiveSnapshotRemediation(snapshot, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, membership)
+	kind, _, _, err := LookupStreamMapRemediation(snapshot, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, membership)
 	if err != nil || kind != BannedValue {
 		t.Fatalf("kind %q err %v", kind, err)
 	}

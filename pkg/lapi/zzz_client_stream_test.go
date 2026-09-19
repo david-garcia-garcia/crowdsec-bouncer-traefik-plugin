@@ -279,9 +279,12 @@ func TestHunt_StreamAppliesDeletedBeforeNew(t *testing.T) {
 	if err := client.handleStreamCache(); err != nil {
 		t.Fatalf("replacement poll: %v", err)
 	}
-	stored, err := cacheClient.Get(decisionscope.IPCacheKey(ipValue))
-	if err != nil || !decisionscope.IsActiveRemediation(stored) {
-		t.Fatalf("same-window IP replacement must stay banned, got %q err %v", stored, err)
+	kind, _, _, err := client.LookupStreamRemediation(ipValue, net.ParseIP(ipValue), nil)
+	if err != nil || kind != decisionscope.BannedValue {
+		t.Fatalf("same-window IP replacement must stay banned, got %q err %v", kind, err)
+	}
+	if _, heapErr := cacheClient.Get(decisionscope.IPCacheKey(ipValue)); heapErr == nil {
+		t.Fatal("memory stream Ip must not duplicate on TTL heap")
 	}
 }
 

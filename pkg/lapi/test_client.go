@@ -2,11 +2,11 @@ package lapi
 
 import (
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 )
 
@@ -20,24 +20,32 @@ func NewTestClient(log *slog.Logger) (*Client, *cache.Client) {
 // AttachTestInternStore wires a memory DecisionStore so tests can intern origins.
 func AttachTestInternStore(client *Client) *DecisionStore {
 	store := &DecisionStore{cache: client.cacheClient, origins: intern.New()}
+	store.initStreamStore(client.log)
 	client.decisionStore = store
 	return store
 }
 
 // SeedLiveSnapshotForTest publishes one stream/alone memory slot for bouncer tests.
 func SeedLiveSnapshotForTest(store *DecisionStore, key string, payload any, durationSec int64) {
-	if store == nil {
-		return
-	}
-	next := store.cloneLiveSnapshot()
-	next[key] = decisionscope.LiveSlotFromPack(payload, durationSec)
-	store.publishLiveSnapshot(next, time.Now().Unix()-1)
+	store.seedStreamSlotForTest(key, payload, durationSec)
 }
 
 // AttachTestMetricsReporter wires a stream-mode reporter so tests can read IncDropped.
 func AttachTestMetricsReporter(client *Client) {
 	client.crowdsecMode = configuration.StreamMode
 	client.metricsReporter = newMetricsReporter(client, time.Now())
+}
+
+// SetStreamHealthyForTest sets stream health for bouncer tests.
+func (c *Client) SetStreamHealthyForTest(healthy bool) {
+	if c == nil {
+		return
+	}
+	if healthy {
+		atomic.StoreInt64(&c.isCrowdsecStreamHealthy, 1)
+		return
+	}
+	atomic.StoreInt64(&c.isCrowdsecStreamHealthy, 0)
 }
 
 // TestDroppedCount is the current window dropped count for origin+ipType+remediation.

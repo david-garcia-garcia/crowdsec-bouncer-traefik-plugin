@@ -6,14 +6,10 @@ import "time"
 type LiveSlot struct {
 	Word      uint32
 	ExpiresAt int64
-	Leftover  string
 }
 
 // HitFromLiveSlot unpacks a live snapshot slot into lookup merge input.
 func HitFromLiveSlot(slot LiveSlot) lookupHit {
-	if slot.Leftover != "" {
-		return hitFromPayload(slot.Leftover)
-	}
 	return hitFromPayload(slot.Word)
 }
 
@@ -24,7 +20,7 @@ func LiveSlotFromPack(payload any, durationSec int64) LiveSlot {
 	case uint32:
 		return LiveSlot{Word: stored, ExpiresAt: expiresAt}
 	case string:
-		return LiveSlot{Leftover: stored, ExpiresAt: expiresAt}
+		return LiveSlot{Word: packWord(RemediationKind(stored), 0), ExpiresAt: expiresAt}
 	default:
 		return LiveSlot{ExpiresAt: expiresAt}
 	}

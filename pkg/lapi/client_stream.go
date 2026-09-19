@@ -117,10 +117,8 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 	if err != nil {
 		return fmt.Errorf("handleStreamCache:parsingBody %w", err)
 	}
-	if c.UsesLiveSnapshot() {
-		c.liveTick = c.decisionStore.cloneLiveSnapshot()
-		defer c.publishLiveTick()
-	}
+	c.decisionStore.beginStreamTick()
+	defer c.decisionStore.publishStreamTick()
 	rangeUpserts := make(map[string]string)
 	var rangeRemovals []string
 	for _, decision := range stream.Deleted {

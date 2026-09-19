@@ -198,8 +198,8 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		var value, origin string
 		var originID uint16
 		var cacheErr error
-		if (b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode) && b.lapiClient.UsesLiveSnapshot() {
-			value, origin, originID, cacheErr = decisionscope.LookupLiveSnapshotRemediation(b.lapiClient.LiveSnapshot(), req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
+		if b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
+			value, origin, originID, cacheErr = b.lapiClient.LookupStreamRemediation(req.remoteIP, req.ipAddr, scopes)
 		} else {
 			value, origin, originID, cacheErr = decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
 		}

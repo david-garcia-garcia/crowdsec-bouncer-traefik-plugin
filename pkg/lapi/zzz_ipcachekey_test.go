@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
@@ -32,8 +33,8 @@ func lookupAsRequest(client *Client, remoteIP string) (string, error) {
 	if ipAddr != nil {
 		remoteIP = ipAddr.String()
 	}
-	if client.UsesLiveSnapshot() {
-		value, _, _, err := decisionscope.LookupLiveSnapshotRemediation(client.LiveSnapshot(), remoteIP, ipAddr, nil, nil)
+	if client.crowdsecMode == configuration.StreamMode || client.crowdsecMode == configuration.AloneMode {
+		value, _, _, err := client.LookupStreamRemediation(remoteIP, ipAddr, nil)
 		return value, err
 	}
 	value, _, _, err := decisionscope.LookupCachedRemediation(client.Cache(), remoteIP, ipAddr, nil, nil)
@@ -41,23 +42,15 @@ func lookupAsRequest(client *Client, remoteIP string) (string, error) {
 }
 
 func applyStreamDecisionForTest(client *Client, decision Decision, duration int64) {
-	if client.UsesLiveSnapshot() {
-		client.liveTick = client.decisionStore.cloneLiveSnapshot()
-		client.storeStreamDecision(decision, duration)
-		client.publishLiveTick()
-		return
-	}
+	client.decisionStore.beginStreamTick()
 	client.storeStreamDecision(decision, duration)
+	client.decisionStore.publishStreamTick()
 }
 
 func deleteStreamDecisionForTest(client *Client, decision Decision) {
-	if client.UsesLiveSnapshot() {
-		client.liveTick = client.decisionStore.cloneLiveSnapshot()
-		client.deleteStreamDecision(decision)
-		client.publishLiveTick()
-		return
-	}
+	client.decisionStore.beginStreamTick()
 	client.deleteStreamDecision(decision)
+	client.decisionStore.publishStreamTick()
 }
 
 // TestStoreStreamDecision_SpellingsShareOneCacheSlot is the Ip-scope half of the defect: a ban the
@@ -112,12 +105,11 @@ func TestStoreStreamDecision_HeaderScopesAreNotAddresses(t *testing.T) {
 		Origin: "crowdsec", Type: "ban", Scope: "Country", Value: "fr", Duration: "1h",
 	}, 3600)
 	key := decisionscope.HeaderScopeKey(decisionscope.ScopeCountry, "FR")
-	if client.UsesLiveSnapshot() {
-		if _, ok := client.LiveSnapshot()[key]; !ok {
-			t.Fatal("Country ban must live-map on normalized country code")
-		}
-	} else if _, err := cacheClient.Get(key); err != nil {
-		t.Fatalf("Country ban must still key on the normalized country code: %v", err)
+	if _, ok := client.decisionStore.streamMapForTest()[key]; !ok {
+		t.Fatal("Country ban must live-map on normalized country code")
+	}
+	if _, err := cacheClient.Get(key); err == nil {
+		t.Fatal("Country ban must not duplicate on TTL heap")
 	}
 }
 

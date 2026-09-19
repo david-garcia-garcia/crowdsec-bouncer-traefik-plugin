@@ -1,34 +1,33 @@
-## 1. Live map on DecisionStore
+## 1. Stream store on DecisionStore
 
-- [x] 1.1 Add `liveSlot` and `atomic.Value` holder on `DecisionStore` (reclaim-bound, no package global).
-- [x] 1.2 Implement clone → apply stream Ip/header delta → expiry sweep → single `Store` per successful tick.
-- [x] 1.3 Stop TTL heap Set/Get for stream/alone memory Ip and header request keys; keep lease and `range-index` on `cache.Client`.
+- [x] 1.1 Define `streamStore` interface (Put, Delete, BeginTick, PublishTick, LookupRemediation) and wire it on `DecisionStore` at `OpenDecisionStore` (Redis vs memory selection).
+- [x] 1.2 Implement `redisStreamStore` delegating Put/Delete/Get path to `cache.Client`; no-op BeginTick/PublishTick.
+- [x] 1.3 Implement `memoryStreamStore` with `atomic.Value` `map[string]liveSlot{word, expiresAt}`; tick clone, apply, expiry sweep, single Store.
+- [x] 1.4 Remove DecisionStore/Client bolt-on live map fields that duplicate the store (including `LiveSlot.Leftover`).
 
 ## 2. Stream apply wiring
 
-- [x] 2.1 Route `storeStreamDecision` for non-Range stream/alone memory into the tick clone (deleted-before-new preserved).
-- [x] 2.2 Publish live map once at end of tick; leave `hydrateRangeMembership` cadence unchanged.
+- [x] 2.1 Route `storeStreamDecision` / `deleteStreamDecision` for non-Range stream/alone through stream store only (no `liveTick != nil` / cache Set branch on Client).
+- [x] 2.2 Wrap each successful `fetchAndApplyStreamDecisions` with BeginTick → apply deleted then new → PublishTick once; keep Range batch and hydrate cadence unchanged.
 
 ## 3. Request lookup
 
-- [x] 3.1 Add stream/alone memory lookup path that `Load()`s the live map and probes Ip plus present header keys once each.
-- [x] 3.2 Skip Range when Ip slot is ban; keep live/none on cache `GetInt`/`GetMany`.
-- [x] 3.3 Wire bouncer to pass live map / mode into lookup without duplicating merge semantics.
+- [x] 3.1 Add `Client.LookupStreamRemediation` delegating to stream store + `RangeMembership()` with shared merge in `decisionscope`.
+- [x] 3.2 Memory lookup: Load map, one probe per Ip/header key; skip Range when Ip is ban; no GetMany on memory stream path.
+- [x] 3.3 Bouncer: stream/alone always call stream lookup; remove `UsesLiveSnapshot` / `LookupLiveSnapshotRemediation` branch.
 
-## 4. Range read path
+## 4. Remove bolt-on
 
-- [x] 4.1 Ensure published Range membership Contains does not exclusive-lock immutable trees (wrapper or utilities bump).
-- [x] 4.2 Confirm hydrate still replaces trees via existing `rangeMembership` atomic.Value.
+- [x] 4.1 Delete `Client.liveTick`, `publishLiveTick`, `UsesLiveSnapshot`, and related test hooks; remove or replace `livesnapshot.go` / live-only lookup paths superseded by store.
 
-## 5. Overflow and intern
+## 5. Intern overflow
 
-- [x] 5.1 Encode intern overflow in `liveSlot` (optional leftover field) without a second Ip map.
-- [x] 5.2 Keep `OriginName` and drop metrics behavior aligned with packed and overflow slots.
+- [x] 5.1 On memory stream Put: Warn on intern overflow; pack kind-only word (origin id 0); drop leftover string field on slots and tests expecting overflow strings in memory map.
 
 ## 6. Tests and benchmarks
 
-- [x] 6.1 Unit tests: tick publish, expiry on publish, delete-before-new, skip-Range-on-Ip-ban, live path unchanged.
-- [x] 6.2 Benchmarks vs `origin/main`: heap retained, allocs/op, sequential/parallel miss ns/op; document fixture size on delivery card.
+- [x] 6.1 Unit tests: tick publish, expiry on publish, delete-before-new, skip-Range-on-Ip-ban, Redis direct Set path, live/none unchanged.
+- [x] 6.2 Benchmarks vs `origin/master`: heap retained, allocs/op, sequential/parallel miss; document 100k fixture on delivery card.
 
 ## 7. Verify
 

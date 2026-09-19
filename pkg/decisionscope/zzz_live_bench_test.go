@@ -29,13 +29,13 @@ func BenchmarkLookupCachedMiss_100kSeq(b *testing.B) {
 	}
 }
 
-func BenchmarkLookupLiveMiss_100kSeq(b *testing.B) {
+func BenchmarkLookupStreamMiss_100kSeq(b *testing.B) {
 	snapshot := benchLiveSnapshot(b)
 	remoteIP, ipAddr, scopes := benchLookupKeys()
 	membership := MembershipFromIndex("10.0.0.0/8=" + BannedValue)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _, _, _ = LookupLiveSnapshotRemediation(snapshot, remoteIP, ipAddr, scopes, membership)
+		_, _, _, _ = LookupStreamMapRemediation(snapshot, remoteIP, ipAddr, scopes, membership)
 	}
 }
 
@@ -51,14 +51,14 @@ func BenchmarkLookupCachedMiss_100kParallel(b *testing.B) {
 	})
 }
 
-func BenchmarkLookupLiveMiss_100kParallel(b *testing.B) {
+func BenchmarkLookupStreamMiss_100kParallel(b *testing.B) {
 	snapshot := benchLiveSnapshot(b)
 	remoteIP, ipAddr, scopes := benchLookupKeys()
 	membership := MembershipFromIndex("10.0.0.0/8=" + BannedValue)
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			_, _, _, _ = LookupLiveSnapshotRemediation(snapshot, remoteIP, ipAddr, scopes, membership)
+			_, _, _, _ = LookupStreamMapRemediation(snapshot, remoteIP, ipAddr, scopes, membership)
 		}
 	})
 }

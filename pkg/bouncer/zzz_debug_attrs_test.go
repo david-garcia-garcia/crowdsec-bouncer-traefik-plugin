@@ -9,7 +9,6 @@ import (
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 )
@@ -19,7 +18,8 @@ func testStreamAllowBouncer(t *testing.T, log *slog.Logger) (*Bouncer, *httptest
 	t.Helper()
 	lapiClient, cacheClient := lapi.NewTestClient(log)
 	t.Cleanup(cacheClient.Close)
-	cacheClient.Set("203.0.113.10", decisionscope.NoBannedValue, 60)
+	lapi.AttachTestInternStore(lapiClient)
+	lapiClient.SetStreamHealthyForTest(true)
 	clientChecker, err := ip.NewChecker(log, nil)
 	if err != nil {
 		t.Fatal(err)

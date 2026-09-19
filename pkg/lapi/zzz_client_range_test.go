@@ -5,15 +5,18 @@ import (
 	"testing"
 
 	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 func newTestRangeClient(t *testing.T) (*Client, *cache.Client) {
 	t.Helper()
-	cacheClient := &cache.Client{}
-	cacheClient.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
-	return &Client{cacheClient: cacheClient, log: logger.New("ERROR", "")}, cacheClient
+	log := logger.New("ERROR", "")
+	client, cacheClient := NewTestClient(log)
+	AttachTestInternStore(client)
+	client.crowdsecMode = configuration.StreamMode
+	return client, cacheClient
 }
 
 func TestHydrateRangeMembershipFromBlob(t *testing.T) {

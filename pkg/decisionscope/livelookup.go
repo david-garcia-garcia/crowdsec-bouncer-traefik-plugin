@@ -6,9 +6,9 @@ import (
 	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 )
 
-// LookupLiveSnapshotRemediation merges Ip, header scopes, and Range from a tick snapshot.
+// LookupStreamMapRemediation merges Ip, header scopes, and Range from a published memory stream map.
 // Ban on Ip skips Range membership. Nil or empty snapshot is a miss when nothing else hits.
-func LookupLiveSnapshotRemediation(snapshot map[string]LiveSlot, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16, error) {
+func LookupStreamMapRemediation(snapshot map[string]LiveSlot, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16, error) {
 	var chosen lookupHit
 	if snapshot != nil {
 		if slot, ok := snapshot[remoteIP]; ok {
