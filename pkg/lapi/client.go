@@ -91,7 +91,9 @@ func Prepare(cfg *configuration.Config, _ *slog.Logger) error {
 			cfg.CrowdsecLapiKey = apiKey
 		}
 	}
-	cfg.RedisCachePassword, _ = configuration.GetVariable(cfg, "RedisCachePassword")
+	if cfg.RedisCacheEnabled {
+		cfg.RedisCachePassword, _ = configuration.GetVariable(cfg, "RedisCachePassword")
+	}
 	return nil
 }
 
