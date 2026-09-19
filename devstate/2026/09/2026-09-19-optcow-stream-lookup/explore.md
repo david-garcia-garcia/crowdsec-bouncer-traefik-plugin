@@ -1,86 +1,101 @@
 # Explore
 IssueKey: 2026-09-19-optcow-stream-lookup
 
+**Verdict:** `in progress` — RETHINK `chat-store-split` addressed in propose (store split OpenSpec); implement must replace bolt-on branch code per regenerated tasks.
+
+## Change intent
+
+Lift stream/alone **Ip and header-scope** put, delete, tick publish, and request lookup off `cache.Client` and off `lapi.Client` scratch state. One **stream store** abstraction with two backends:
+
+- **Redis:** same keys as today via `cache.Client` Set/Delete/Get (no COW map).
+- **Memory:** one `atomic.Value` holding `map[string]liveSlot{word uint32, expiresAt int64}`; tick clones, applies stream New/Deleted, sweeps expiry, single `Store`; lookup `Load` + one probe per key, skip Range when Ip is already ban.
+
+`DecisionStore` (reclaim value on Traefik `New` ctx) owns `cache.Client` **and** the stream-store implementation. `lapi.Client` applies stream deltas and serves lookup **only through that store** — no `liveTick`, no `if liveTick != nil`, no `UsesLiveSnapshot` / `LookupLiveSnapshotRemediation` switches in Client or bouncer.
+
+```
+  OpenDecisionStore(ctx) ──► DecisionStore (reclaim)
+        │
+        ├── cache.Client     lease, range-index blob, live/none memo (unchanged this ticket)
+        └── streamStore      Put / Delete / BeginTick / PublishTick / LookupRemediation
+                 ├── redis  ──► cache Set/Delete/Get path (today’s Redis stream keys)
+                 └── memory ──► COW map[string]liveSlot
+
+  fetchAndApplyStreamDecisions
+        └── streamStore.BeginTick → apply storeStreamDecision/delete → PublishTick
+
+  ServeHTTP (stream/alone)
+        └── lapiClient.LookupStreamRemediation(...)   // single entry; no mode branch in bouncer
+```
+
+Replace the current PR implementation (`Client.liveTick`, `publishLiveTick`, bouncer `UsesLiveSnapshot` branch). Do **not** extend that bolt-on.
+
 ## Concepts
 
-Stream/alone in-memory request lookup today: `ServeHTTP` → `LookupCachedRemediation` → per-key `cache.Client.GetInt`, leftover keys batched through `GetMany`, then `RangeMembership.Remediation` → `iplookup.Helper.Contains` under an **exclusive** mutex (`vendor/.../iplookup/helper.go:72-73`). Stream ticks call `storeStreamDecision` → `cache.Client.Set` into the same `ttl_map.Heap` the request path reads (`pkg/lapi/client_decisions.go`, `pkg/cache/cache.go`). Range membership is already a separate `atomic.Value` on `lapi.Client`, rebuilt when `range-index` changes (`pkg/lapi/client.go`).
+**Defect (RETHINK):** Branch optimized memory lookup with a third store on `Client` while stream apply still branches `liveTick != nil` vs `cacheClient.Set` (`pkg/lapi/client_decisions.go`). Domain should be: backend chosen once at `OpenDecisionStore` (Redis vs memory), Client always calls the store.
 
-Target shape (human lock-in this session):
+**Memory slot:** Packed remediation in `word`; CrowdSec duration as `expiresAt`. **No** `Leftover` string field on the slot (human lock). Intern table overflow: **Warn**, store kind-only in `word` (origin id 0); **no** GetMany / leftover-string serving on the memory path.
 
-```
-  stream tick (same cadence as hydrateRangeMembership)
-       │
-       ├─ Load prior map[string]liveSlot (or empty)
-       ├─ clone map; apply stream New/Deleted; drop expiresAt <= now
-       ├─ Store clone in atomic.Value  (DecisionStore or Client — see OQ)
-       └─ hydrateRangeMembership (unchanged blob → RangeMembership snapshot)
+**Range:** Still `Client.rangeMembership` `atomic.Value` + `range-index` on `cache.Client`. Lookup merge unchanged (ban wins). Vendor `iplookup.Helper.Contains` already uses `RLock` on immutable trees published at hydrate time — requirement “not exclusive Lock” is satisfied on current vendor; do not stuff /32s into Helper.
 
-  ServeHTTP (stream/alone, memory only)
-       │
-       ├─ snap := Load() map[string]liveSlot
-       ├─ one map probe per Ip + present header keys (same strings as today)
-       ├─ skip Range when Ip word is already ban
-       └─ else RangeMembership.Remediation(ipAddr) without exclusive-lock on immutable trees
-```
+**Out of scope (unchanged):** live/none packing onto memory map; removing Redis/live `GetMany`; Patricia merge; changing `origin/HEAD`.
 
-`liveSlot { word uint32; expiresAt int64 }` — `word` is packed kind + intern id (`decisionscope.Pack`); `expiresAt` is CrowdSec duration deadline (replaces ttl_map `Data.Timestamp` for Ip/header slots). **One** copy-on-write map only; do **not** keep a writer-only map plus a parallel `uint32` snapshot of the same IPs.
-
-Out of scope unchanged: range-index blob, stream lease key, `intern.Table`, live/none TTL map, Redis, Patricia IP+range merge, stuffing /32s into Helper.
+**Pin:** Compare benchmarks and delivery narrative to **`origin/master`**, not frozen `main`. PR #118 retargeted to `master`.
 
 ## Decisions
 
-- **Single live map (session correction):** `map[string]liveSlot` published via `atomic.Value`; ticker is the sole writer (clone → apply stream delta → expiry sweep → `Store`). Between ticks readers see one map; during publish two copies until GC. Reject ticket wording that implied `map[string]uint32` plus Range only, and reject dual writer map + uint32 snapshot.
-- **Redis / live / none:** keep existing TTL map behavior and `LookupCachedRemediation` cache-client path for those modes.
-- **Reclaim / lifetime:** consume `knowledge/devdocs/std_go_reclaim.md` and `core_plugin_lapi_reclaim-key.md`; do not use `sync.Once` or package globals for the snapshot holder — bind to reclaimed `DecisionStore` or `lapi.Client` on Traefik `New` ctx.
-- **Metrics / origin:** packed `word` + `DecisionStore.OriginName` on drop unchanged; `intern.Table` stays on DecisionStore.
+- **Store split (RETHINK / human):** Stream Ip/header lifecycle lives on a dedicated store with Redis and memory implementations; Redis delegates to `cache.Client`; memory uses the single COW map. `cache.Client` remains utility for lease, range-index, live/none memo.
+- **No Client liveTick (human):** Remove `liveTick`, `publishLiveTick`, `UsesLiveSnapshot`, and bouncer lookup branching. Stream apply always mutates the store (memory: in-tick clone owned by store, not Client field).
+- **Memory slot shape (human):** `liveSlot{word, expiresAt}` only; drop `LiveSlot.Leftover` and tests that assert overflow strings in slots; overflow → Warn + kind-only word.
+- **Reclaim (human + devdocs):** `DecisionStore` stays the reclaim value (`decisionstore:` + SessionHex + Redis params). Stream store state lives on that value, not `sync.Once` or package globals. Traefik constructor `ctx` is the holder (`core_plugin_lapi_reclaim-key.md`).
+- **Client IP key (reuse):** `pkg/ip.GetRemoteIP` → `req.remoteIP` in bouncer; same string for map keys — no second IP map or re-parse.
+- **Tick cadence:** One publish per successful stream apply tick (after full delta applied to clone), not per `storeStreamDecision`. `hydrateRangeMembership` cadence unchanged.
+- **Implement strategy:** Revert/replace bolt-on deltas on this branch; OpenSpec propose artifacts must be regenerated (only `tasks.md` present; no committed `proposal.md`/`design.md` for this change id after RETHINK).
 
 ## Reproduce
 
-**reproduced** on `master` worktree (`go1.x`, windows/amd64), ephemeral probes (not committed):
+**reproduced** (windows/amd64, worktree HEAD, 2026-09-19):
 
 | Claim | Result |
 | --- | --- |
-| `LookupCachedRemediation` miss (1 Ip + 1 header scope, Range index present) | ~341 ns/op, **10 allocs/op**, 232 B/op — `GetInt` loop + `GetMany` leftovers + Range path |
-| Same with Ip slot packed ban hit | ~351 ns/op, **10 allocs/op** — still merges Range (skip-Range not implemented) |
-| `RangeMembership.Remediation` miss | ~50 ns/op, **2 allocs/op** — Helper exclusive lock on read |
-| Heap 100k IPv4 packed words: ttl_map `Data` vs `map[string]liveSlot` | **9.55 MiB (~100 B/IP)** vs **6.53 MiB (~68 B/IP)** — matches human/session numbers |
+| Branch bolt-on: `Client.liveTick` + `UsesLiveSnapshot` in bouncer | Present — confirms wrong split to remove |
+| `LookupCachedRemediation` miss (100k fixture, branch bench) | ~408 ns/op, **12 allocs/op**, 248 B/op |
+| `LookupLiveSnapshotRemediation` miss (same fixture) | ~86 ns/op, **1 alloc/op**, 8 B/op |
+| Parallel miss live vs cached | ~6.8 ns vs ~153 ns; 1 vs 12 allocs |
+| Heap 100k packed Ips: TTL map vs live map (branch bench) | ~18.4 MiB vs ~8.9 MiB retained per build |
+| Range read lock | `iplookup.Helper.Contains` uses `RLock` (vendor) |
 
-Delivery card must still include sequential + parallel miss benchmarks vs `origin/main` after implement (fixture size TBD below).
+Master has no live benchmarks yet; delivery card should add comparable benches on `origin/master` baseline when implement lands.
 
 ## Open questions
 
-- Q: Who owns the client address string used as the Ip cache key?
-  Decision: resolved — `pkg/ip.GetRemoteIP` → canonical `req.remoteIP = req.ipAddr.String()` in `pkg/bouncer/bouncer.go` before lookup; reuse that string for snapshot keys, do not re-parse or re-key.
+- Q: What is the stream-store surface — methods on `DecisionStore` vs small interface field `streamStore`?
+  Decision: **resolved (propose)** — private `streamStore` interface field on `DecisionStore` in `pkg/lapi`; merge helper in `pkg/decisionscope`; Put/Delete keyed like today; memory BeginTick/PublishTick; Lookup merges Ip, headers, Range with ban-wins rules.
+  By: propose
+
+- Q: How does Redis implementation handle tick API?
+  Decision: **resolved (propose)** — `BeginTick`/`PublishTick` on the shared interface; Redis implementation no-ops; Put/Delete go straight to `cache.Client`.
+  By: propose
+
+- Q: Who calls lookup — bouncer vs Client vs DecisionStore?
+  Decision: **resolved (propose)** — `Client.LookupStreamRemediation(remoteIP, ipAddr, scopes)` delegates to DecisionStore stream store + `RangeMembership()`; bouncer always calls it for stream/alone; live/none unchanged.
+  By: propose
+
+- Q: Intern overflow without `Leftover` on the slot?
+  Decision: **resolved (human)** — Warn on intern overflow; slot stores packed kind with origin id 0; lookup returns kind without origin name (matches today’s overflow metrics posture); no GetMany for overflow on memory path.
   By: explore
 
-- Q: Where does the live snapshot `atomic.Value` live under reclaim?
-  Decision: resolved — **DecisionStore** (shared reclaim value keyed `decisionstore:` + SessionHex + Redis params). Stream ticks on any Client that shares the store publish through the store; not `sync.Once`, not a package global.
+- Q: Does Range need a utilities change for lock-free read?
+  Decision: **resolved** — immutable snapshot + existing `RLock` on `Contains` is enough; no exclusive lock on request path for published trees.
   By: explore
 
-- Q: What cache keys stay on the TTL map after Ip/header words move to the live map?
-  Decision: assumed — **only non-request-path keys:** stream lease (`updated`), `range-index` blob, and any live/none paths unchanged. Stream/alone Ip and header-scope keys stop `Set`/`GetInt` on the heap for request lookup; no duplicate Ip copies in both stores.
+- Q: Benchmark baseline branch for delivery card?
+  Decision: **resolved** — **`origin/master`**, sequential + parallel miss, heap retained; fixture 100k documented on card (400k optional follow-up).
   By: explore
 
-- Q: How do intern-overflow leftover strings (Pack returns `RemediationWithOrigin`) live in `map[string]liveSlot` with only `word` + `expiresAt`?
-  Decision: assumed — overflow stays **rare**; slot stores kind-only in `word` (origin id 0) matching today’s overflow metrics behavior, **or** a single optional string side field on `liveSlot` only when `Intern` fails — propose picks one struct; do not add a second parallel Ip map.
+- Q: Persist destBranch `master` vs repo `origin/HEAD` → `main`?
+  Decision: **none** — ticket-only on `requirement.md`; no devdocs owner for default branch policy (`Persist: none` on RETHINK row).
   By: explore
 
-- Q: How does Range `Contains` avoid exclusive mutex on immutable snapshot data?
-  Decision: assumed — each hydrate builds **new** `iplookup.Helper` trees and publishes via existing `rangeMembership` atomic.Value; request path uses a **read-only** Contains (RLock or forked lock-free read on frozen trees). May need utilities bump or a thin wrapper; do not stuff /32s into Helper.
-  By: explore
+## Blocked
 
-- Q: How does `LookupCachedRemediation` split stream/alone memory vs live/none without duplicating merge semantics?
-  Decision: assumed — add a stream/alone memory entry (or caller flag) that `Load()`s the live map and probes per key; live/none keep `cache.Client` GetInt/GetMany path. Ban-wins merge across Ip, Range, headers unchanged.
-  By: explore
-
-- Q: When does the tick publish relative to incremental stream apply?
-  Decision: resolved — **once per successful tick** after `fetchAndApplyStreamDecisions` logic is applied into the **clone** of the prior live map (not per-`storeStreamDecision` Set). During the tick, build from Load(previous) + deleted/new + expiry; then single `Store`. `hydrateRangeMembership` stays same cadence (end of tick / lease skip path).
-  By: explore
-
-- Q: Where do benchmark numbers for the delivery card live (100k vs 400k, sequential vs parallel)?
-  Decision: assumed — new benchmarks beside `pkg/decisionscope` lookup tests and/or `pkg/lapi` stream tests; compare `origin/main` vs branch with `-benchmem`, report heap retained, allocs/op, ns/op miss path; document fixture size in card.
-  By: explore
-
-- Q: Does this work reconstruct client address / Host / trust hop?
-  Decision: resolved — none; reuse GetRemoteIP output only.
-  By: explore
+None for explore. **Propose** is blocked on naming the store interface and rewriting OpenSpec artifacts; **implement** must not proceed until propose reflects RETHINK (replace bolt-on).

@@ -2,50 +2,49 @@
 IssueKey: 2026-09-19-optcow-stream-lookup
 
 ## Problem
-Stream/alone in-memory request lookup still walks the TTL heap per key (GetInt/GetMany), may batch leftover string keys, and consults Range membership through iplookup.Helper.Contains under an exclusive mutex. Stream ticks mutate the same TTL store the request path reads, so IPs can exist twice (packed words in ttl_map plus no separate snapshot). Ticket asks for one immutable snapshot per tick (map[string]uint32 plus Range membership) published via atomic.Value, lock-free Load on ServeHTTP, expired IP slots dropped on publish—not on Get—and benchmark proof vs origin/main.
+Stream IP/header decisions are still modeled as “whatever `cache.Client` is” (Redis pool or TTL map). OptCOW then bolted a third store onto `lapi.Client` (`liveTick` vs `cache.Set`, `UsesLiveSnapshot` vs `LookupCachedRemediation`). That is the wrong domain split: `Client` should apply stream New/Deleted and look up a request without knowing the backend. Two store implementations: Redis uses `cache.Client`; memory uses the copy-on-write `LiveSlot` map. Bolt-on branching on this PR is the defect to remove.
+
+DestBranch is `master` (not frozen `main`).
 
 ## Current (code)
-- `pkg/lapi/decisionstore.go`: memory DecisionStore uses `cache.Client` backed by `ttl_map.Heap` when Redis is off (`pkg/cache/cache.go` localCache).
-- `pkg/lapi/client_stream.go`: `fetchAndApplyStreamDecisions` writes each non-range decision via `storeStreamDecision` into that TTL map; `handleStreamCache` calls `hydrateRangeMembership` each tick (`pkg/lapi/client.go`).
-- `pkg/lapi/client.go`: `rangeMembership` and `lastRangeIndex` are already `atomic.Value`; `storeRangeMembership` stores `*decisionscope.RangeMembership` built from range-index blob.
-- `pkg/lapi/client_decisions.go`: `storeStreamDecision` calls `cacheClient.Set` with `decisionscope.Pack` uint32 or leftover string per decision.
-- `pkg/decisionscope/lookup.go`: `LookupCachedRemediation` loops keys, `GetInt` then `GetMany(leftoverKeys)`, merges header scopes, then `membership.Remediation(ipAddr)`.
-- `pkg/bouncer/bouncer.go`: stream/alone/live call `LookupCachedRemediation` with `lapiClient.Cache()` and `RangeMembership()`.
-- `vendor/.../iplookup/helper.go`: `Helper.Contains` takes `sync.Mutex` (exclusive) on every lookup.
-- `pkg/cache/cache.go`: `localCache.get` / `getInt` call `ttl_map.Heap.Get` (expiry can drop entries on read per vendored TTL map).
-- OptCOW snapshot type / publish path: not found.
+- `DecisionStore` owns one `cache.Client` and an `atomic.Value` live snapshot; `PacksMemory()` is `!redisBacked`.
+- `Client.liveTick` is a tick scratch map. `storeStreamDecision` / `deleteStreamDecision` branch `if c.liveTick != nil` vs `cacheClient.Set`/`Delete`.
+- `fetchAndApplyStreamDecisions` sets `liveTick` when `UsesLiveSnapshot()`.
+- ServeHTTP branches stream/alone + `UsesLiveSnapshot()` → `LookupLiveSnapshotRemediation`, else `LookupCachedRemediation`.
+- Lease and range-index still use `cache.Client` on both backends.
+- Live/none still `Set` leftover strings on `cache.Client`.
+- `LiveSlot` still has a leftover-string field for intern overflow.
 
 ## Desired
-- In-memory stream/alone only: on each stream tick (same cadence as range hydrate), build one immutable snapshot: `map[string]uint32` for IP and header-scope keys (packed words) plus existing Range membership snapshot; publish via `atomic.Value`; request path `Load()` only.
-- Lookup: single map probe per relevant key on packed path; no leftover `GetMany` on that path; skip Range when IP slot is already ban.
-- Range `Contains` on the snapshot must not use exclusive mutex on immutable data (new snapshot trees or lock-free read path).
-- TTL: do not rely on write-on-Get expiry; drop expired IP slots when publishing the tick snapshot; one publish per tick, not per stream `Set`.
-- Snapshot replaces TTL map as stream/alone memory request-path IP store—no duplicate IP copies in TTL map and snapshot.
-- Header scopes remain string keys on the same map; ban wins across Ip, Range, headers (unchanged merge semantics).
-- Delivery card: measured heap retained, allocs/op, sequential/parallel miss ns/op vs origin/main with brief why.
-- Redis, live, and none modes unchanged on TTL map behavior.
+- Lift stream IP/header put, delete, tick publish, and request lookup onto a store abstraction with two implementations (names from explore; meaning is Redis vs memory).
+- Redis implementation: existing `cache.Client` for those slots. No COW map.
+- Memory implementation: one `atomic.Value` `map[string]liveSlot{word uint32, expiresAt int64}`. Tick: clone, apply, drop expired, Store once. Lookup: Load, one probe per key, skip Range when IP is ban. Do not `Set` those keys on the TTL heap.
+- `lapi.Client` must not carry `liveTick` or `if liveTick != nil` / `UsesLiveSnapshot` lookup switches. Stream apply always talks to the store.
+- `cache.Client` stays a utility: stream lease, range-index blob, live/none memo (unchanged this ticket).
+- Intern overflow is not a production leftover path: log Warn; do not keep a leftover string field on the memory slot to serve GetMany.
+- Range Contains on immutable hydrate snapshots must not exclusive-Lock.
+- Delivery card: measured heap, allocs/op, sequential+parallel miss vs `origin/master`, with why.
+- PR target `master`.
 
 ## Affected
-- `pkg/lapi/` (client stream tick, snapshot publish, possibly Client fields)
-- `pkg/decisionscope/lookup.go` (stream/alone lookup entry or caller)
-- `pkg/bouncer/bouncer.go` (ServeHTTP lookup wiring for stream/alone memory)
-- `pkg/cache/` (only if stream writer still needs TTL map for lease/range-index or live path—must not duplicate IP store)
-- Benchmarks / tests proving perf claims
+- `pkg/lapi/` DecisionStore / Client stream apply / lookup wiring
+- `pkg/decisionscope/` lookup entry used by the store
+- `pkg/bouncer/bouncer.go` ServeHTTP (call store lookup; no snapshot-vs-cache branch)
+- Tests that seed `liveTick` or assert TTL copies
+- OpenSpec change for this IssueKey (replace bolt-on deltas)
 
 ## Out of scope
 - Path-compressed Patricia combining IPs and ranges
-- Redis backend changes
-- Live negative-cache copy-on-write
-- Stuffing individual IPs into uncompressed `iplookup.Helper` as /32s
-- Combining header scopes into a radix (stay map keys)
+- Packing live/none onto the memory map (still `cache.Client` strings)
+- Removing `GetMany` from Redis/live leftover lookup
+- Stuffing IPs into Helper as /32s
+- Changing GitHub `origin/HEAD` (operators set dest `master`)
 
 ## Unknowns
-- Exact split: whether range-index blob and stream lease key stay in TTL map while IP/header words move to snapshot only (ticket implies replace request-path IP store, not necessarily all cache keys).
-- How leftover string origins (intern overflow) encode in `map[string]uint32`-only snapshot vs parallel string sidecar—not specified in ticket.
-- Benchmark package location and fixture size for card numbers—not specified.
+- Exact type/package names for the two implementations (DecisionStore methods vs a small interface).
+- Whether Redis `BeginTick`/`PublishTick` are no-ops on the same interface or Redis has no tick API.
 
 ## Tensions
-- Ticket forbids write-on-Get TTL for IP slots; current `ttl_map.Heap.Get` may delete expired entries on read (`pkg/cache/cache.go` → vendored heap).
-- Ticket wants Range without exclusive mutex on immutable snapshot; current `RangeMembership` uses `iplookup.Helper` with mutex on Contains (`vendor/.../iplookup/helper.go`).
-- Stream path still mutates TTL map today while ticket says snapshot replaces it for IPs—incremental stream `Set` per decision vs publish-once-per-tick needs a staging model during the tick.
-- `LookupCachedRemediation` is shared with live mode; live must keep TTL map path while stream/alone memory switches to snapshot Load.
+- Memory still needs `cache.Client` for lease and range-index — the store split is IP/header lookup, not “memory has no cache.”
+- Live/none still uses `LookupCachedRemediation`; stream/alone must not reintroduce a Client-level snapshot flag to hide that.
+- Existing implement on this branch is the bolt-on to replace, not to extend.
