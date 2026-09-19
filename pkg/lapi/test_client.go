@@ -6,6 +6,7 @@ import (
 
 	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 )
 
 // NewTestClient returns an in-memory Client whose Cache tests can seed.
@@ -17,8 +18,7 @@ func NewTestClient(log *slog.Logger) (*Client, *cache.Client) {
 
 // AttachTestInternStore wires a memory DecisionStore so tests can intern origins.
 func AttachTestInternStore(client *Client) *DecisionStore {
-	store := &DecisionStore{cache: client.cacheClient}
-	store.internNames.Store([]string{""})
+	store := &DecisionStore{cache: client.cacheClient, origins: intern.New()}
 	client.decisionStore = store
 	return store
 }

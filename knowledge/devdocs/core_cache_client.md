@@ -11,8 +11,8 @@ _Avoid_: process `ttl_map`, shared `var cache`, isolated-per-Client map, `sync.O
 _Avoid_: `Stored`, `SetRemediation`, `GetManyStored`, `ParsePackedOriginID`, a MemoryBackend remediation switch, `\x1e`
 
 **Origin intern**:
-An append-only name→`uint16` table on one DecisionStore incarnation. Index 0 is unused. `OriginName` is lock-free. Overflow does not wrap.
-_Avoid_: package `var`, a table shared across store reclaim keys, `atomic.Pointer[T]`
+A `pkg/intern.Table` on one DecisionStore incarnation. Append-only name→`uint16`. Index 0 is unused. `OriginName` is lock-free. Overflow does not wrap.
+_Avoid_: package `var`, a table shared across store reclaim keys, inlining intern on DecisionStore
 
 **Packed word**:
 A memory `uint32` of `kind[0]` in the low byte and intern id in the upper bits. Overflow, Redis, live/none, and range-index stay leftover strings instead.
@@ -31,7 +31,7 @@ Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx
 - `decisionScopeHeaders` and poller intervals stay off the store key. Stream `scopes=` and the store header-scope filter are the live-router union (`core_plugin_lapi_scope-union.md`).
 - `cache.Client.Acquire` is the stream lease (Redis Eval or memory mutex). Do not Get-then-Set `updated`.
 - Memory stream/alone Ip and header writes `Pack` then `Set` a word when intern succeeds. `GetInt` misses a leftover string; then `Get` that string. Range-index stays leftover/bare strings via `Set`. Redis, live/none, and intern overflow keep leftover `Set`.
-- Origin intern is a field on `DecisionStore` (append-only name→`uint16`, lock-free `OriginName`). Not a package var. Not shared across store reclaim keys.
+- Origin intern is a `pkg/intern.Table` field on `DecisionStore`. Not a package var. Not shared across store reclaim keys. `OriginName` is a thin `Table.Name` forward.
 - `cache.Client.Close()` drains Redis idle pools. Call it only from the store’s reclaim Close hook. Memory clients are a no-op. Safe to call more than once (`SimpleRedis.Close` CAS).
 
 ## Pattern snippet
@@ -45,6 +45,7 @@ _ = lapiClient.Cache()
 ## Key files
 
 - `pkg/lapi/decisionstore.go`
+- `pkg/intern/table.go`
 - `pkg/cache/cache.go`
 - `pkg/cache/acquire.go`
 - `pkg/lapi/session.go`

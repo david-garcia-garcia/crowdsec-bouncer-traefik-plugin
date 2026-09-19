@@ -54,7 +54,7 @@ func Pack(kind, origin string, origins OriginIntern) any {
 }
 
 // Unpack reads a Pack word or a leftover/bare letter string.
-func Unpack(payload any) (kind, origin string, originID uint16) {
+func Unpack(payload any) (string, string, uint16) {
 	switch stored := payload.(type) {
 	case uint32:
 		return unpackWord(stored)
@@ -72,6 +72,6 @@ func packWord(kind string, originID uint16) uint32 {
 	return uint32(kind[0]) | uint32(originID)<<8
 }
 
-func unpackWord(word uint32) (kind, origin string, originID uint16) {
+func unpackWord(word uint32) (string, string, uint16) {
 	return string([]byte{byte(word)}), "", uint16(word >> 8) //nolint:gosec // G115 intern id is stored in 16 bits
 }

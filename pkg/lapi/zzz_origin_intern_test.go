@@ -5,28 +5,12 @@ import (
 
 	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 func newTestInternStore() *DecisionStore {
-	store := &DecisionStore{}
-	store.internNames.Store([]string{""})
-	return store
-}
-
-func TestDecisionStoreInternRoundTrip(t *testing.T) {
-	store := newTestInternStore()
-	id, ok := store.Intern("crowdsec")
-	if !ok || id == 0 {
-		t.Fatalf("intern ok=%v id=%d", ok, id)
-	}
-	if store.OriginName(id) != "crowdsec" {
-		t.Fatalf("OriginName %q", store.OriginName(id))
-	}
-	again, ok := store.Intern("crowdsec")
-	if !ok || again != id {
-		t.Fatalf("second intern %d ok=%v", again, ok)
-	}
+	return &DecisionStore{origins: intern.New()}
 }
 
 func TestPackUsesInternOnMemoryStore(t *testing.T) {
@@ -107,7 +91,7 @@ func TestStorePackedOrLeftoverOverflowUsesLeftover(t *testing.T) {
 	for i := 1; i < 65536; i++ {
 		names[i] = "filled"
 	}
-	store.internNames.Store(names)
+	store.origins.ReplaceNamesForTest(names)
 	client := &Client{cacheClient: cacheClient, decisionStore: store, log: logger.New("ERROR", "")}
 	client.storeStreamDecision(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.99", Origin: "overflow-origin"}, 60)
 	slot := decisionscope.IPCacheKey("203.0.113.99")

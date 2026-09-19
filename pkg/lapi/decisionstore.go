@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sync"
-	"sync/atomic"
 
 	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -43,10 +42,7 @@ func StoreKey(cfg *configuration.Config) string {
 type DecisionStore struct {
 	cache       *cache.Client
 	redisBacked bool
-
-	internMu sync.Mutex
-	// internNames is []string with index 0 unused. atomic.Value not atomic.Pointer[T] (Yaegi v0.16).
-	internNames atomic.Value
+	origins     *intern.Table
 }
 
 // Cache is the map or Redis pool this store owns.
@@ -80,8 +76,7 @@ func OpenDecisionStore(ctx context.Context, cfg *configuration.Config, log *slog
 			cfg.RedisCacheDatabase,
 			SessionHex(cfg),
 		)
-		store := &DecisionStore{cache: cacheClient, redisBacked: cfg.RedisCacheEnabled}
-		store.internNames.Store([]string{""})
+		store := &DecisionStore{cache: cacheClient, redisBacked: cfg.RedisCacheEnabled, origins: intern.New()}
 		return store, reclaim.Hooks{Close: store.Close}, nil
 	})
 	if err != nil {
@@ -94,26 +89,6 @@ func OpenDecisionStore(ctx context.Context, cfg *configuration.Config, log *slog
 	return store, nil
 }
 
-// internNamesSnapshot is the lock-free name table. Index 0 is unused.
-func (s *DecisionStore) internNamesSnapshot() []string {
-	if s == nil {
-		return nil
-	}
-	names, _ := s.internNames.Load().([]string)
-	return names
-}
-
-// lookupIntern finds an already interned origin on the snapshot.
-func (s *DecisionStore) lookupIntern(name string) (uint16, bool) {
-	for id, existing := range s.internNamesSnapshot() {
-		if id == 0 || existing != name {
-			continue
-		}
-		return uint16(id), true //nolint:gosec // G115 intern snapshot index is capped at 65535
-	}
-	return 0, false
-}
-
 // PacksMemory is true when this store may pack remediations as uint32 words.
 func (s *DecisionStore) PacksMemory() bool {
 	return s != nil && !s.redisBacked
@@ -124,40 +99,13 @@ func (s *DecisionStore) Intern(name string) (uint16, bool) {
 	if s == nil {
 		return 0, false
 	}
-	if name == "" {
-		return 0, true
-	}
-	if id, ok := s.lookupIntern(name); ok {
-		return id, true
-	}
-	s.internMu.Lock()
-	defer s.internMu.Unlock()
-	if id, ok := s.lookupIntern(name); ok {
-		return id, true
-	}
-	names := s.internNamesSnapshot()
-	if names == nil {
-		names = []string{""}
-	}
-	if len(names) > 65535 {
-		return 0, false
-	}
-	next := make([]string, len(names)+1)
-	copy(next, names)
-	next[len(names)] = name
-	id := uint16(len(names)) //nolint:gosec // G115 overflow returns before append past 65535
-	s.internNames.Store(next)
-	return id, true
+	return s.origins.Intern(name)
 }
 
 // OriginName is the interned origin for id. Lock-free. Unknown id is empty.
 func (s *DecisionStore) OriginName(id uint16) string {
-	if id == 0 {
+	if s == nil {
 		return ""
 	}
-	names := s.internNamesSnapshot()
-	if int(id) >= len(names) {
-		return ""
-	}
-	return names[id]
+	return s.origins.Name(id)
 }
