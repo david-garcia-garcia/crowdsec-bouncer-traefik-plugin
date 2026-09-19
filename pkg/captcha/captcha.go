@@ -4,7 +4,6 @@ package captcha
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log/slog"
 	"mime"
@@ -106,7 +105,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 	valid, err := c.Validate(r, remoteIP)
 	// Transport and JSON decode stay classified; the solver retries the challenge.
 	if err != nil {
-		c.log.Info("captcha:ServeHTTP:validate " + err.Error())
+		c.log.Info("captcha:ServeHTTP:validate", "error", err)
 	}
 	if valid {
 		c.log.Debug("captcha:ServeHTTP captcha:valid")
@@ -130,14 +129,14 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		"ChallengeURL": c.challengeURL,
 	})
 	if err != nil {
-		c.log.Info("captcha:ServeHTTP captchaTemplateServe " + err.Error())
+		c.log.Info("captcha:ServeHTTP captchaTemplateServe", "error", err)
 	}
 }
 
 // Check Verify if the captcha is already done via gate cookie.
 func (c *Client) Check(r *http.Request, remoteIP string) bool {
 	passed := validateGateValue(c.gateSecret, c.gateBindIP, remoteIP, gateCookieValue(r), time.Now(), c.gracePeriodSeconds)
-	c.log.Debug(fmt.Sprintf("captcha:Check ip:%s pass:%v", remoteIP, passed))
+	c.log.Debug("captcha:Check", "ip", remoteIP, "pass", passed)
 	return passed
 }
 
@@ -340,7 +339,7 @@ func (c *Client) postSiteverify(response, remoteIP string) (*http.Response, erro
 // Validate Verify the captcha from provider API.
 func (c *Client) Validate(r *http.Request, remoteIP string) (bool, error) {
 	if r.Method != http.MethodPost {
-		c.log.Debug("captcha:Validate invalid method: " + r.Method)
+		c.log.Debug("captcha:Validate invalid method", "method", r.Method)
 		return false, nil
 	}
 	response := captchaResponseFromRequest(r, c.infoProvider.response)
@@ -350,7 +349,7 @@ func (c *Client) Validate(r *http.Request, remoteIP string) (bool, error) {
 	}
 	res, err := c.postSiteverify(response, remoteIP)
 	if err != nil {
-		c.log.Error("captcha:Validate " + err.Error())
+		c.log.Error("captcha:Validate", "error", err)
 		return false, err
 	}
 	defer func() {
@@ -367,6 +366,6 @@ func (c *Client) Validate(r *http.Request, remoteIP string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	c.log.Debug(fmt.Sprintf("captcha:Validate success:%v", captchaResponse.Success))
+	c.log.Debug("captcha:Validate", "success", captchaResponse.Success)
 	return captchaResponse.Success, nil
 }

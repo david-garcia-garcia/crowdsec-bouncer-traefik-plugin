@@ -1,6 +1,6 @@
 ## Purpose
 
-Trusted-IP and trusted-CIDR membership answers in time bounded by address size, not by how many networks the operator listed, without changing public config. Stream and alone Range may reuse boolean CIDR prefix membership without storing a remediation on that helper.
+Trusted-IP and trusted-CIDR membership answers in time bounded by address size, not by how many networks the operator listed, without changing public config. Membership is the vendored utilities Helper (`github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup`: `New`, `AddCIDR`, `Contains`), not an in-tree helper package. Stream and alone Range may reuse boolean CIDR prefix membership without storing a remediation on that helper.
 
 ## Requirements
 
@@ -62,7 +62,7 @@ Building the trusted-IP pool SHALL fail when an entry is neither a parseable IP 
 - **THEN** validation returns an error
 
 ### Requirement: Range membership may reuse boolean CIDR prefix lookup
-Stream and alone Range matching MAY use the same boolean CIDR prefix membership as the trusted-IP pool. That membership MUST NOT store a remediation payload. Ban and captcha SHALL be separate sets so longest-prefix-wins cannot hide a containing ban behind a longer captcha. Range membership MUST NOT live in the trusted-IP Checker. Public trusted-IP config keys SHALL stay `forwardedHeadersTrustedIps` and `clientTrustedIps`.
+Stream and alone Range matching MAY use the same boolean CIDR prefix membership as the trusted-IP pool (`github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup`). That membership MUST NOT store a remediation payload on the Helper. Ban and captcha SHALL be separate boolean sets so longest-prefix-wins cannot hide a containing ban behind a longer captcha. Range membership MUST NOT live in the trusted-IP Checker. Public trusted-IP config keys SHALL stay `forwardedHeadersTrustedIps` and `clientTrustedIps`.
 
 #### Scenario: Range ban still matches by CIDR containment
 - **WHEN** stream has a Range ban `10.0.0.0/8` and the client IP is `10.1.2.3`
