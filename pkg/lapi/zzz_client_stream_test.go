@@ -149,7 +149,7 @@ func TestHandleStreamCache_UndecodableBodyReleasesLease(t *testing.T) {
 
 func newSharedStreamPoller(t *testing.T, cacheClient *cache.Client, host string) *Client {
 	t.Helper()
-	return &Client{
+	client := &Client{
 		cacheClient:         cacheClient,
 		log:                 logger.New("ERROR", ""),
 		crowdsecScheme:      "http",
@@ -158,6 +158,8 @@ func newSharedStreamPoller(t *testing.T, cacheClient *cache.Client, host string)
 		crowdsecStreamRoute: crowdsecLapiStreamRoute,
 		updateInterval:      60,
 	}
+	AttachTestInternStore(client)
+	return client
 }
 
 func TestHandleStreamCache_TwoMemoryPollersOneFetch(t *testing.T) {

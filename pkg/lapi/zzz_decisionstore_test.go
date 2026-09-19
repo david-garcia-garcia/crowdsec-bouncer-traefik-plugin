@@ -95,7 +95,7 @@ func TestOpenDecisionStore_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	store.Cache().Set("1.2.3.4", "t", 10)
+	store.CacheForTest().Set("1.2.3.4", "t", 10)
 
 	sessionClient := &cache.Client{}
 	sessionClient.New(log, true, redisServer.addr(), nil, "", "", SessionHex(cfg))
@@ -138,8 +138,8 @@ func TestOpenDecisionStore_LiveIntervalSplitSharesStore(t *testing.T) {
 	if first != second {
 		t.Fatal("same cursor and Redis params must reclaim one store")
 	}
-	first.Cache().Set("1.2.3.4", "t", 10)
-	got, getErr := second.Cache().Get("1.2.3.4")
+	first.CacheForTest().Set("1.2.3.4", "t", 10)
+	got, getErr := second.CacheForTest().Get("1.2.3.4")
 	if getErr != nil || got != "t" {
 		t.Fatalf("shared store Get %q err %v", got, getErr)
 	}
@@ -186,11 +186,11 @@ func TestOpenLive_TwoClientsShareOneStore(t *testing.T) {
 	if first != second {
 		t.Fatal("different live intervals must share one Client")
 	}
-	if first.Cache() != second.Cache() {
+	if first.CacheForTest() != second.CacheForTest() {
 		t.Fatal("those Clients must share one cache incarnation")
 	}
-	first.Cache().Set("1.2.3.4", "t", 10)
-	got, getErr := second.Cache().Get("1.2.3.4")
+	first.CacheForTest().Set("1.2.3.4", "t", 10)
+	got, getErr := second.CacheForTest().Get("1.2.3.4")
 	if getErr != nil || got != "t" {
 		t.Fatalf("sibling Get %q err %v", got, getErr)
 	}
@@ -212,9 +212,9 @@ func TestClientClose_LeavesSiblingCacheLive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	first.Cache().Set("1.2.3.4", "t", 10)
+	first.CacheForTest().Set("1.2.3.4", "t", 10)
 	first.Close()
-	got, getErr := second.Cache().Get("1.2.3.4")
+	got, getErr := second.CacheForTest().Get("1.2.3.4")
 	if getErr != nil || got != "t" {
 		t.Fatalf("after sibling Close Get %q err %v", got, getErr)
 	}
@@ -241,9 +241,9 @@ func TestClientClose_LeavesSiblingRedisPoolLive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	first.Cache().Set("1.2.3.4", "t", 10)
+	first.CacheForTest().Set("1.2.3.4", "t", 10)
 	first.Close()
-	got, getErr := second.Cache().Get("1.2.3.4")
+	got, getErr := second.CacheForTest().Get("1.2.3.4")
 	if getErr != nil || got != "t" {
 		t.Fatalf("after sibling Close Redis Get %q err %v", got, getErr)
 	}
@@ -263,14 +263,14 @@ func TestOpenDecisionStore_LastHolderGraceClosesRedisPool(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store.Cache().Set("1.2.3.4", "t", 10)
-	got, getErr := store.Cache().Get("1.2.3.4")
+	store.CacheForTest().Set("1.2.3.4", "t", 10)
+	got, getErr := store.CacheForTest().Get("1.2.3.4")
 	if getErr != nil || got != "t" {
 		t.Fatalf("before cancel Get %q err %v", got, getErr)
 	}
 	cancel()
 	time.Sleep(80 * time.Millisecond)
-	_, closedErr := store.Cache().Get("1.2.3.4")
+	_, closedErr := store.CacheForTest().Get("1.2.3.4")
 	if closedErr == nil || !errors.Is(closedErr, cache.ErrUnreachable) {
 		t.Fatalf("after last-holder grace Get err %v, want unreachable", closedErr)
 	}

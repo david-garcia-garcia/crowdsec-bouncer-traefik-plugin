@@ -268,7 +268,7 @@ func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 		t.Fatalf("bouncer B: got %d want 200", rb.Code)
 	}
 
-	got, err := testRoute(t, hb).LapiClient().Cache().Get("1.2.3.4")
+	got, err := testRoute(t, hb).LapiClient().CacheForTest().Get("1.2.3.4")
 	if err == nil && got == decisionscope.BannedValue {
 		t.Fatal("B's cache must not contain A's ban")
 	}

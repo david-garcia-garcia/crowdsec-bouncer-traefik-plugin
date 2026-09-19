@@ -12,6 +12,7 @@ import (
 	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 )
 
 // Operator-visible lifecycle and stream-health lines (stable for log grep).
@@ -58,8 +59,8 @@ type Client struct {
 	liveHeaderScopes     liveHeaderScopes  // live constructor ctx → normalized header scopes
 
 	transport       atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
-	decisionStore   *DecisionStore
-	cacheClient     *cache.Client // alias of store.Cache(); tests may set this without a store
+	decisionStore   *decisionstore.Store
+	cacheClient     *cache.Client // tests may set this without a store; production aliases store.CacheForTest()
 	rangeMembership atomic.Value  // *decisionscope.RangeMembership rebuilt from range-index
 	lastRangeIndex  atomic.Value  // string of the blob last used to build membership
 	log             *slog.Logger
@@ -73,7 +74,7 @@ type Client struct {
 	streamStop              chan bool
 	metricsStop             chan bool
 	metricsReporter         *MetricsReporter
-	streamFetches int64
+	streamFetches           int64
 }
 
 // Prepare resolves secrets and CAPI/LAPI routing on cfg. Call before Key and New.
@@ -99,7 +100,7 @@ func Prepare(cfg *configuration.Config, _ *slog.Logger) error {
 
 // New constructs a Client and starts tickers. store is the reclaimed DecisionStore for this cursor.
 // Call Prepare first. Close stops tickers and HTTP only; it does not Close the shared store.
-func New(config *configuration.Config, log *slog.Logger, pluginVersion string, store *DecisionStore) (*Client, error) {
+func New(config *configuration.Config, log *slog.Logger, pluginVersion string, store *decisionstore.Store) (*Client, error) {
 	crowdsecStreamRoute := crowdsecLapiStreamRoute
 	if config.CrowdsecMode == configuration.AloneMode {
 		crowdsecStreamRoute = crowdsecCapiStreamRoute
@@ -113,7 +114,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		log.Error("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup")
 		return nil, errors.New("CrowdsecLapiKey is missing")
 	}
-	if store == nil || store.Cache() == nil {
+	if store == nil {
 		return nil, errors.New("decision store is required")
 	}
 
@@ -136,7 +137,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		isCrowdsecStreamStartup: 1,
 		isCrowdsecStreamHealthy: 1,
 		decisionStore:           store,
-		cacheClient:             store.Cache(),
+		cacheClient:             store.CacheForTest(),
 	}
 	client.metricsReporter = newMetricsReporter(client, time.Now())
 	client.transport.Store(next)
@@ -266,10 +267,10 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 	return stop
 }
 
-// Cache is the shared DecisionStore cache, or the test-assigned cacheClient.
-func (c *Client) Cache() *cache.Client {
+// CacheForTest is the TTL/Redis pool. Tests only.
+func (c *Client) CacheForTest() *cache.Client {
 	if c.decisionStore != nil {
-		return c.decisionStore.Cache()
+		return c.decisionStore.CacheForTest()
 	}
 	return c.cacheClient
 }
@@ -286,7 +287,13 @@ func (c *Client) RangeMembership() *decisionscope.RangeMembership {
 
 // hydrateRangeMembership rebuilds Range membership from the shared blob when the raw string changed.
 func (c *Client) hydrateRangeMembership() {
-	index, err := c.Cache().Get(decisionscope.RangeIndexKey)
+	var index string
+	var err error
+	if c.decisionStore != nil {
+		index, err = c.decisionStore.RangeIndex()
+	} else {
+		index, err = c.cacheClient.Get(decisionscope.RangeIndexKey)
+	}
 	if err != nil {
 		if !errors.Is(err, cache.ErrMiss) {
 			return

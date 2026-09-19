@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 )
 
 // streamQuery is the LAPI/CAPI stream RawQuery. LAPI adds scopes= when this is not CAPI.
@@ -29,47 +30,32 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 	}
 	origin := MetricsOrigin(item.Origin, item.Scenario)
 	scope := decisionscope.NormalizeScope(item.Scope)
-	payload := decisionscope.Pack(value, origin, c.decisionStore)
-	switch scope {
-	case decisionscope.ScopeIP, "":
-		slot := decisionscope.IPCacheKey(item.Value)
-		c.decisionStore.putStreamSlot(slot, payload, duration)
-		c.rememberActiveDecision(slot, origin, item.Value)
-	case decisionscope.ScopeRange:
+	if scope == decisionscope.ScopeRange {
 		return
-	default:
+	}
+	if scope != decisionscope.ScopeIP && scope != "" {
 		if _, ok := c.snapshotLiveHeaderScopes()[scope]; !ok {
 			c.log.Debug("handleStreamCache:ignoredScope", "scope", item.Scope)
 			return
 		}
-		identifier := decisionscope.NormalizeHeaderScopeValue(scope, item.Value)
-		if identifier == "" {
-			return
-		}
-		slot := decisionscope.HeaderScopeKey(scope, identifier)
-		c.decisionStore.putStreamSlot(slot, payload, duration)
-		c.rememberActiveDecision(slot, origin, item.Value)
 	}
+	if decisionstore.SlotKey(scope, item.Value) == "" {
+		return
+	}
+	c.decisionStore.Put(decisionstore.Decision{
+		Scope: scope, Value: item.Value, Kind: value, Origin: origin, DurationSec: duration,
+	})
+	c.rememberActiveDecision(decisionstore.SlotKey(scope, item.Value), origin, item.Value)
 }
 
 // deleteStreamDecision drops one non-Range stream decision from the cache.
 func (c *Client) deleteStreamDecision(item Decision) {
 	scope := decisionscope.NormalizeScope(item.Scope)
-	switch scope {
-	case decisionscope.ScopeIP, "":
-		slot := decisionscope.IPCacheKey(item.Value)
-		c.forgetActiveDecision(slot)
-		c.decisionStore.deleteStreamSlot(slot, item.Value)
-	case decisionscope.ScopeRange:
+	if scope == decisionscope.ScopeRange {
 		return
-	default:
-		identifier := decisionscope.NormalizeHeaderScopeValue(scope, item.Value)
-		if identifier != "" {
-			slot := decisionscope.HeaderScopeKey(scope, identifier)
-			c.forgetActiveDecision(slot)
-			c.decisionStore.deleteStreamSlot(slot, "")
-		}
 	}
+	c.forgetActiveDecision(decisionstore.SlotKey(scope, item.Value))
+	c.decisionStore.Delete(scope, item.Value)
 }
 
 // queryLiveDecisions GETs LAPI decisions for rawQuery and returns the strongest remediation.
@@ -159,10 +145,19 @@ func (c *Client) cacheLiveScope(key, value string, parsedDuration time.Duration,
 		return
 	}
 	if !decisionscope.IsActiveRemediation(value) {
-		c.cacheClient.Set(key, decisionscope.NoBannedValue, defaultDecisionSeconds)
+		c.memoLive(key, decisionscope.NoBannedValue, defaultDecisionSeconds)
 		return
 	}
-	c.cacheClient.Set(key, value, liveCacheTTL(parsedDuration, defaultDecisionSeconds))
+	c.memoLive(key, value, liveCacheTTL(parsedDuration, defaultDecisionSeconds))
+}
+
+// memoLive writes a live/none TTL slot through the decision store, or the test cache.
+func (c *Client) memoLive(key string, payload any, durationSec int64) {
+	if c.decisionStore != nil {
+		c.decisionStore.Memo(key, payload, durationSec)
+		return
+	}
+	c.cacheClient.Set(key, payload, durationSec)
 }
 
 // liveCacheTTL is the live-mode cache TTL: min(decision duration, defaultDecisionSeconds).

@@ -5,53 +5,53 @@ import (
 
 	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-func newTestInternStore() *DecisionStore {
-	store := &DecisionStore{origins: intern.New()}
-	store.initStreamStore(logger.New("ERROR", ""))
-	return store
+func newTestInternStore() *decisionstore.Store {
+	return decisionstore.NewMemory(nil, logger.New("ERROR", ""))
 }
 
 func TestPackUsesInternOnMemoryStore(t *testing.T) {
 	store := newTestInternStore()
-	word, ok := decisionscope.Pack(decisionscope.BannedValue, "crowdsec", store).(uint32)
-	if !ok {
-		t.Fatal("pack")
-	}
-	kind, _, originID := decisionscope.Unpack(word)
-	if kind != decisionscope.BannedValue || store.OriginName(originID) != "crowdsec" {
-		t.Fatalf("kind %q origin %q", kind, store.OriginName(originID))
+	store.BeginTick()
+	store.Put(decisionstore.Decision{Scope: decisionscope.ScopeIP, Value: "k", Kind: decisionscope.BannedValue, Origin: "crowdsec", DurationSec: 60})
+	store.PublishTick(0)
+	kind, _, originID, err := store.LookupRemediation("k", nil, nil, nil)
+	if err != nil || kind != decisionscope.BannedValue || store.OriginName(originID) != "crowdsec" {
+		t.Fatalf("kind %q origin %q err %v", kind, store.OriginName(originID), err)
 	}
 }
 
 func TestPackSkippedOnRedisStore(t *testing.T) {
-	store := newTestInternStore()
-	store.redisBacked = true
-	if _, ok := decisionscope.Pack(decisionscope.BannedValue, "crowdsec", store).(uint32); ok {
+	cacheClient := &cache.Client{}
+	log := logger.New("ERROR", "")
+	cacheClient.New(log, false, "", nil, "", "", "")
+	store := decisionstore.NewRedis(cacheClient)
+	store.Put(decisionstore.Decision{Scope: decisionscope.ScopeIP, Value: "k", Kind: decisionscope.BannedValue, Origin: "crowdsec", DurationSec: 60})
+	if _, err := cacheClient.GetInt("k"); err == nil {
 		t.Fatal("redis must keep leftover")
+	}
+	got, err := cacheClient.Get("k")
+	if err != nil || decisionscope.RemediationKind(got) != decisionscope.BannedValue {
+		t.Fatalf("leftover %q err %v", got, err)
 	}
 }
 
 func TestStoreStreamDecisionPacksMemory(t *testing.T) {
 	cacheClient := &cache.Client{}
-	cacheClient.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
-	store := newTestInternStore()
-	store.cache = cacheClient
-	client := &Client{cacheClient: cacheClient, decisionStore: store, log: logger.New("ERROR", "")}
-	store.beginStreamTick()
+	log := logger.New("ERROR", "")
+	cacheClient.New(log, false, "", nil, "", "", "")
+	store := decisionstore.NewMemory(cacheClient, log)
+	client := &Client{cacheClient: cacheClient, decisionStore: store, log: log}
+	store.BeginTick()
 	client.storeStreamDecision(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.10", Origin: "crowdsec"}, 60)
-	store.publishStreamTick()
+	store.PublishTick(0)
 	slot := decisionscope.IPCacheKey("203.0.113.10")
-	live, ok := store.streamMapForTest()[slot]
-	if !ok {
-		t.Fatal("live slot missing")
-	}
-	kind, _, originID := decisionscope.Unpack(live.Word)
-	if kind != decisionscope.BannedValue || store.OriginName(originID) != "crowdsec" {
-		t.Fatalf("kind %q origin %q", kind, store.OriginName(originID))
+	kind, _, originID, err := store.LookupRemediation("203.0.113.10", nil, nil, nil)
+	if err != nil || kind != decisionscope.BannedValue || store.OriginName(originID) != "crowdsec" {
+		t.Fatalf("kind %q origin %q err %v", kind, store.OriginName(originID), err)
 	}
 	if _, getErr := cacheClient.GetInt(slot); getErr == nil {
 		t.Fatal("ttl heap must not duplicate packed Ip")
@@ -87,22 +87,18 @@ func TestRememberActiveDecisionForgetCompactSlot(t *testing.T) {
 
 func TestStorePackedOrLeftoverOverflowUsesKindOnly(t *testing.T) {
 	cacheClient := &cache.Client{}
-	cacheClient.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
-	store := newTestInternStore()
-	store.cache = cacheClient
-	store.origins.FillUntilMaxForTest()
-	client := &Client{cacheClient: cacheClient, decisionStore: store, log: logger.New("ERROR", "")}
-	store.beginStreamTick()
+	log := logger.New("ERROR", "")
+	cacheClient.New(log, false, "", nil, "", "", "")
+	store := decisionstore.NewMemory(cacheClient, log)
+	store.FillUntilMaxForTest()
+	client := &Client{cacheClient: cacheClient, decisionStore: store, log: log}
+	store.BeginTick()
 	client.storeStreamDecision(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.99", Origin: "overflow-origin"}, 60)
-	store.publishStreamTick()
+	store.PublishTick(0)
 	slot := decisionscope.IPCacheKey("203.0.113.99")
-	live, ok := store.streamMapForTest()[slot]
-	if !ok {
-		t.Fatal("live slot missing")
-	}
-	kind, origin, originID := decisionscope.Unpack(live.Word)
-	if kind != decisionscope.BannedValue || origin != "" || originID != 0 {
-		t.Fatalf("kind %q origin %q id %d", kind, origin, originID)
+	kind, origin, originID, err := store.LookupRemediation("203.0.113.99", nil, nil, nil)
+	if err != nil || kind != decisionscope.BannedValue || origin != "" || originID != 0 {
+		t.Fatalf("kind %q origin %q id %d err %v", kind, origin, originID, err)
 	}
 	if _, err := cacheClient.Get(slot); err == nil {
 		t.Fatal("ttl heap must not duplicate overflow Ip")

@@ -28,6 +28,7 @@ func newTestStreamTickClient(t *testing.T, log *slog.Logger, host string, httpCl
 		isCrowdsecStreamStartup: 1,
 	}
 	attachTestTransport(client, httpClient, "test-key")
+	AttachTestInternStore(client)
 	return client
 }
 

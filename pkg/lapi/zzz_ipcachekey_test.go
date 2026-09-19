@@ -37,20 +37,20 @@ func lookupAsRequest(client *Client, remoteIP string) (string, error) {
 		value, _, _, err := client.LookupStreamRemediation(remoteIP, ipAddr, nil)
 		return value, err
 	}
-	value, _, _, err := decisionscope.LookupCachedRemediation(client.Cache(), remoteIP, ipAddr, nil, nil)
+	value, _, _, err := client.LookupCachedRemediation(remoteIP, ipAddr, nil)
 	return value, err
 }
 
 func applyStreamDecisionForTest(client *Client, decision Decision, duration int64) {
-	client.decisionStore.beginStreamTick()
+	client.decisionStore.BeginTick()
 	client.storeStreamDecision(decision, duration)
-	client.decisionStore.publishStreamTick()
+	client.decisionStore.PublishTick(0)
 }
 
 func deleteStreamDecisionForTest(client *Client, decision Decision) {
-	client.decisionStore.beginStreamTick()
+	client.decisionStore.BeginTick()
 	client.deleteStreamDecision(decision)
-	client.decisionStore.publishStreamTick()
+	client.decisionStore.PublishTick(0)
 }
 
 // TestStoreStreamDecision_SpellingsShareOneCacheSlot is the Ip-scope half of the defect: a ban the
@@ -105,7 +105,7 @@ func TestStoreStreamDecision_HeaderScopesAreNotAddresses(t *testing.T) {
 		Origin: "crowdsec", Type: "ban", Scope: "Country", Value: "fr", Duration: "1h",
 	}, 3600)
 	key := decisionscope.HeaderScopeKey(decisionscope.ScopeCountry, "FR")
-	if _, ok := client.decisionStore.streamMapForTest()[key]; !ok {
+	if _, ok := client.decisionStore.PublishedMemoryMapForTest()[key]; !ok {
 		t.Fatal("Country ban must live-map on normalized country code")
 	}
 	if _, err := cacheClient.Get(key); err == nil {

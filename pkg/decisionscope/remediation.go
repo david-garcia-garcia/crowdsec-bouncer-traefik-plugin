@@ -37,7 +37,7 @@ func RemediationWithOrigin(kind, origin string) string {
 	return kind + remediationOriginSep + origin
 }
 
-// OriginIntern is the DecisionStore intern table used when packing cache payloads.
+// OriginIntern is the decisionstore intern table used when packing cache payloads.
 type OriginIntern interface {
 	Intern(name string) (uint16, bool)
 	PacksMemory() bool

@@ -7,7 +7,8 @@ import (
 
 	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 )
 
 // NewTestClient returns an in-memory Client whose Cache tests can seed.
@@ -17,17 +18,18 @@ func NewTestClient(log *slog.Logger) (*Client, *cache.Client) {
 	return &Client{cacheClient: cacheClient, log: log}, cacheClient
 }
 
-// AttachTestInternStore wires a memory DecisionStore so tests can intern origins.
-func AttachTestInternStore(client *Client) *DecisionStore {
-	store := &DecisionStore{cache: client.cacheClient, origins: intern.New()}
-	store.initStreamStore(client.log)
+// AttachTestInternStore wires a memory decision store so tests can intern origins.
+func AttachTestInternStore(client *Client) *decisionstore.Store {
+	store := decisionstore.NewMemory(client.cacheClient, client.log)
 	client.decisionStore = store
 	return store
 }
 
 // SeedLiveSnapshotForTest publishes one stream/alone memory slot for bouncer tests.
-func SeedLiveSnapshotForTest(store *DecisionStore, key string, payload any, durationSec int64) {
-	store.seedStreamSlotForTest(key, payload, durationSec)
+func SeedLiveSnapshotForTest(store *decisionstore.Store, key, kind, origin string, durationSec int64) {
+	store.SeedSlotForTest(decisionstore.Decision{
+		Scope: decisionscope.ScopeIP, Value: key, Kind: kind, Origin: origin, DurationSec: durationSec,
+	})
 }
 
 // AttachTestMetricsReporter wires a stream-mode reporter so tests can read IncDropped.

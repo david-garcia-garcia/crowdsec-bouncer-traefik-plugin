@@ -178,7 +178,7 @@ func (c *Client) rememberActiveDecision(slot, origin, decisionValue string) {
 	}
 	decisionSlot := activeDecisionSlot{ipType: ip.FamilyOfHostOrCIDR(decisionValue)}
 	if c.decisionStore != nil {
-		if originID, ok := c.decisionStore.Intern(origin); ok {
+		if originID, ok := c.decisionStore.OriginID(origin); ok {
 			decisionSlot.originID = originID
 		} else {
 			decisionSlot.leftover = origin

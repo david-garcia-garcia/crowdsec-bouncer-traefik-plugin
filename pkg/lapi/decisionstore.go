@@ -2,13 +2,10 @@ package lapi
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 )
 
 const decisionStoreKeyPrefix = "decisionstore:"
@@ -38,76 +35,7 @@ func StoreKey(cfg *configuration.Config) string {
 	return decisionStoreKeyPrefix + SessionHex(cfg) + ":" + hashJSON(storeParamsFrom(cfg))
 }
 
-// DecisionStore is a reclaim value that owns one cache.Client (memory TTL or Redis-protocol prefix).
-type DecisionStore struct {
-	cache       *cache.Client
-	redisBacked bool
-	origins     *intern.Table
-	stream      streamStore
-}
-
-// Cache is the map or Redis pool this store owns.
-func (s *DecisionStore) Cache() *cache.Client {
-	if s == nil {
-		return nil
-	}
-	return s.cache
-}
-
-// Close drains the cache Redis pool. Memory is a no-op.
-// Safe to call more than once: cache.Client.Close is nil-safe and SimpleRedis.Close CAS-gates.
-func (s *DecisionStore) Close() {
-	if s == nil || s.cache == nil {
-		return
-	}
-	s.cache.Close()
-}
-
 // OpenDecisionStore reclaims one store per cursor plus Redis params on the Traefik New context.
-func OpenDecisionStore(ctx context.Context, cfg *configuration.Config, log *slog.Logger) (*DecisionStore, error) {
-	stored, err := reclaim.OpenWithHooks(ctx, StoreKey(cfg), log, func() (any, reclaim.Hooks, error) {
-		cacheClient := &cache.Client{}
-		// Prefix is SessionHex for every mode so live interval splits share remediations.
-		cacheClient.New(
-			log,
-			cfg.RedisCacheEnabled,
-			cfg.RedisCacheHost,
-			cfg.RedisCacheReadHosts,
-			cfg.RedisCachePassword,
-			cfg.RedisCacheDatabase,
-			SessionHex(cfg),
-		)
-		store := &DecisionStore{cache: cacheClient, redisBacked: cfg.RedisCacheEnabled, origins: intern.New()}
-		store.initStreamStore(log)
-		return store, reclaim.Hooks{Close: store.Close}, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	store, ok := stored.(*DecisionStore)
-	if !ok {
-		return nil, fmt.Errorf("reclaim: want *lapi.DecisionStore, got %T", stored)
-	}
-	return store, nil
-}
-
-// PacksMemory is true when this store may pack remediations as uint32 words.
-func (s *DecisionStore) PacksMemory() bool {
-	return s != nil && !s.redisBacked
-}
-
-// Intern appends an origin name. Empty name is id 0. Overflow does not wrap.
-func (s *DecisionStore) Intern(name string) (uint16, bool) {
-	if s == nil {
-		return 0, false
-	}
-	return s.origins.ID(name)
-}
-
-// OriginName is the interned origin for id. Lock-free. Unknown id is empty.
-func (s *DecisionStore) OriginName(id uint16) string {
-	if s == nil {
-		return ""
-	}
-	return s.origins.Name(id)
+func OpenDecisionStore(ctx context.Context, cfg *configuration.Config, log *slog.Logger) (*decisionstore.Store, error) {
+	return decisionstore.Open(ctx, StoreKey(cfg), SessionHex(cfg), cfg, log)
 }

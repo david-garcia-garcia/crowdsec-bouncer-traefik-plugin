@@ -201,7 +201,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		if b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
 			value, origin, originID, cacheErr = b.lapiClient.LookupStreamRemediation(req.remoteIP, req.ipAddr, scopes)
 		} else {
-			value, origin, originID, cacheErr = decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
+			value, origin, originID, cacheErr = b.lapiClient.LookupCachedRemediation(req.remoteIP, req.ipAddr, scopes)
 		}
 		switch {
 		case cacheErr != nil:

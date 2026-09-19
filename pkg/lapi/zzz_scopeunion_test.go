@@ -51,10 +51,10 @@ func TestOpenStream_LiveRoutersUnionCountryAndUsername(t *testing.T) {
 	if !strings.Contains(query, "country") || !strings.Contains(query, "username") {
 		t.Fatalf("union scopes: %s", query)
 	}
-	countryClient.decisionStore.beginStreamTick()
+	countryClient.decisionStore.BeginTick()
 	countryClient.storeStreamDecision(Decision{Type: "ban", Scope: "Country", Value: "FR", Origin: "CAPI"}, 60)
 	countryClient.storeStreamDecision(Decision{Type: "ban", Scope: "username", Value: "alice", Origin: "CAPI"}, 60)
-	countryClient.decisionStore.publishStreamTick()
+	countryClient.decisionStore.PublishTick(0)
 	if !testStreamHasDecision(countryClient, decisionscope.HeaderScopeKey(decisionscope.ScopeCountry, "FR")) {
 		t.Fatal("Country decision must store")
 	}
@@ -78,15 +78,13 @@ func TestOpenStream_LiveRoutersUnionCountryAndUsername(t *testing.T) {
 
 func testStreamHasDecision(client *Client, key string) bool {
 	if client.decisionStore != nil {
-		if _, ok := client.decisionStore.streamMapForTest()[key]; ok {
-			return true
+		if snap := client.decisionStore.PublishedMemoryMapForTest(); snap != nil {
+			_, ok := snap[key]
+			return ok
 		}
-		if client.decisionStore.redisBacked {
-			return testCacheHasDecision(client.Cache(), key)
-		}
-		return false
+		return testCacheHasDecision(client.CacheForTest(), key)
 	}
-	return testCacheHasDecision(client.Cache(), key)
+	return testCacheHasDecision(client.CacheForTest(), key)
 }
 
 func testCacheHasDecision(cacheClient *cache.Client, key string) bool {

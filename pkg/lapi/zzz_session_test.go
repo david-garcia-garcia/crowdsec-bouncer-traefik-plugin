@@ -302,11 +302,11 @@ func TestOpenStream_DifferentRedisIsolatesClientAndStore(t *testing.T) {
 	if redisAClient == redisBClient {
 		t.Fatal("different Redis must isolate the Client")
 	}
-	if redisAClient.Cache() == redisBClient.Cache() {
+	if redisAClient.CacheForTest() == redisBClient.CacheForTest() {
 		t.Fatal("different Redis must isolate the store")
 	}
-	redisAClient.Cache().Set("1.2.3.4", "t", 60)
-	if _, getErr := redisBClient.Cache().Get("1.2.3.4"); getErr == nil {
+	redisAClient.CacheForTest().Set("1.2.3.4", "t", 60)
+	if _, getErr := redisBClient.CacheForTest().Get("1.2.3.4"); getErr == nil {
 		t.Fatal("ban in store A must miss in store B")
 	}
 }

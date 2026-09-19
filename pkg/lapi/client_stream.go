@@ -76,7 +76,7 @@ func (c *Client) handleStreamCache() error {
 		leaseDuration = 1
 	}
 	// One acquire: Redis Eval or memory mutex. Do not Get-then-Set.
-	won, err := c.Cache().Acquire(context.Background(), cacheTimeoutKey, decisionscope.NoBannedValue, leaseDuration)
+	won, err := c.decisionStore.TryLease(context.Background(), cacheTimeoutKey, decisionscope.NoBannedValue, leaseDuration)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (c *Client) handleStreamCache() error {
 	if pollErr := c.fetchAndApplyStreamDecisions(); pollErr != nil {
 		// This tick owned the lease and did not finish, so the store was not updated. Drop the
 		// key: the next tick retries now instead of waiting out max(updateInterval-1, 1) seconds.
-		c.Cache().Delete(cacheTimeoutKey)
+		c.decisionStore.DropLease(cacheTimeoutKey)
 		return pollErr
 	}
 	c.log.Debug("handleStreamCache:updated")
@@ -117,8 +117,8 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 	if err != nil {
 		return fmt.Errorf("handleStreamCache:parsingBody %w", err)
 	}
-	c.decisionStore.beginStreamTick()
-	defer c.decisionStore.publishStreamTick()
+	c.decisionStore.BeginTick()
+	defer c.decisionStore.PublishTick(time.Now().Unix())
 	rangeUpserts := make(map[string]string)
 	var rangeRemovals []string
 	for _, decision := range stream.Deleted {
@@ -152,7 +152,7 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 	// A range apply that could not read the shared index is a poll that did not finish. Returning
 	// the error releases the lease, so the next tick retries; because the tick failed,
 	// isCrowdsecStreamStartup is left set and that retry asks for the full set again.
-	if err := decisionscope.ApplyRangeBatch(c.Cache(), rangeUpserts, rangeRemovals); err != nil {
+	if err := c.decisionStore.ApplyRangeBatch(rangeUpserts, rangeRemovals); err != nil {
 		return fmt.Errorf("handleStreamCache:rangeIndex %w", err)
 	}
 	c.hydrateRangeMembership()
