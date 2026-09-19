@@ -1,6 +1,7 @@
 package decisionscope
 
 import (
+	"errors"
 	"net"
 	"strings"
 
@@ -129,7 +130,7 @@ func upsertIndexCIDR(index, cidr, remediation string) string {
 func readRangeIndex(cacheClient *cache.Client) (string, error) {
 	index, err := cacheClient.GetConsistent(RangeIndexKey)
 	if err != nil {
-		if err.Error() == cache.CacheMiss {
+		if errors.Is(err, cache.ErrMiss) {
 			return "", nil
 		}
 		return "", err

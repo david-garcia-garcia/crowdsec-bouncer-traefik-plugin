@@ -22,7 +22,7 @@ return 0`
 // that instance polling the stream for good, and a zero one stored nothing so every caller won.
 func (c *Client) Acquire(ctx context.Context, key, value string, duration int64) (bool, error) {
 	if c == nil || c.cache == nil {
-		return false, errors.New(CacheUnreachable)
+		return false, ErrUnreachable
 	}
 	if duration <= 0 {
 		return false, errors.New(CacheBadTTL)
@@ -30,7 +30,7 @@ func (c *Client) Acquire(ctx context.Context, key, value string, duration int64)
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	c.log.Debug("cache:Acquire key:" + key)
+	c.log.Debug("cache:Acquire", "key", key)
 	return c.cache.acquire(ctx, key, value, duration)
 }
 
@@ -42,7 +42,7 @@ func (lc *localCache) acquire(_ context.Context, key, value string, duration int
 	if err == nil {
 		return false, nil
 	}
-	if err.Error() != CacheMiss {
+	if !errors.Is(err, ErrMiss) {
 		return false, err
 	}
 	lc.set(key, value, duration)
@@ -52,7 +52,7 @@ func (lc *localCache) acquire(_ context.Context, key, value string, duration int
 // acquire runs SET-if-absent on the writer with the prefixed key. Readers are not used.
 func (rc *redisCache) acquire(ctx context.Context, key, value string, duration int64) (bool, error) {
 	if rc.writer == nil {
-		return false, errors.New(CacheUnreachable)
+		return false, ErrUnreachable
 	}
 	rc.pin(key)
 	values, err := rc.writer.Eval(
@@ -64,17 +64,17 @@ func (rc *redisCache) acquire(ctx context.Context, key, value string, duration i
 	)
 	if err != nil {
 		if simpleredis.IsUnreachable(err) {
-			return false, errors.New(CacheUnreachable)
+			return false, ErrUnreachable
 		}
 		return false, err
 	}
 	// Lua returns integer 1 or 0; SimpleRedis surfaces that as one decimal slot.
 	if len(values) != 1 {
-		return false, errors.New(CacheUnreachable)
+		return false, ErrUnreachable
 	}
 	won, convErr := strconv.ParseInt(string(values[0]), 10, 64)
 	if convErr != nil {
-		return false, errors.New(CacheUnreachable)
+		return false, ErrUnreachable
 	}
 	return won == 1, nil
 }

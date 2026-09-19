@@ -53,11 +53,25 @@ When Redis is enabled, every GET/SET/DEL/MGET/Eval key the store sends SHALL be 
 - **AND** the Redis pool is not closed
 
 ### Requirement: Cache payloads stay opaque strings
-A cache Client SHALL store and return opaque strings. The cache package MUST NOT export CrowdSec remediation names (`BannedValue`, `CaptchaValue`, `NoBannedValue`). Store errors SHALL remain `CacheMiss` and `CacheUnreachable`.
+A cache Client SHALL store and return opaque strings. The cache package MUST NOT export CrowdSec remediation names (`BannedValue`, `CaptchaValue`, `NoBannedValue`). Store errors SHALL be the package sentinels `ErrMiss` and `ErrUnreachable`. Their `Error()` text SHALL remain `CacheMiss` (`cache:miss`) and `CacheUnreachable` (`cache:unreachable`). Callers that distinguish miss from unreachable SHALL use `errors.Is`. A clean miss MUST NOT allocate a new error value. Memory and Redis backends SHALL return the same sentinels. GetMany SHALL keep omitting missing keys.
 
 #### Scenario: Cache tests treat values as opaque
 - **WHEN** a cache test Sets and Gets a payload
 - **THEN** it uses a string literal, not a decisionscope or captcha const
+
+#### Scenario: In-memory miss is the miss sentinel
+- **WHEN** a memory DecisionStore Get of an absent key returns an error
+- **THEN** `errors.Is(err, ErrMiss)` is true
+- **AND** `err.Error()` is `cache:miss`
+
+#### Scenario: Redis unreachable is the unreachable sentinel
+- **WHEN** a Redis DecisionStore Get fails because the store is unreachable
+- **THEN** `errors.Is(err, ErrUnreachable)` is true
+- **AND** `err.Error()` is `cache:unreachable`
+
+#### Scenario: Lookup miss is the miss sentinel
+- **WHEN** `LookupCachedRemediation` finds no active remediation and the Ip key is absent
+- **THEN** the returned error satisfies `errors.Is(err, ErrMiss)`
 
 ### Requirement: Stream and live write TTLs stay split
 When stream apply stores a non-Range decision, the store write TTL SHALL be `int64` of the parsed CrowdSec duration in seconds, with no clamp. A sub-second duration SHALL become `0`. Live and none writes SHALL use `liveCacheTTL`: when `durationSecond<=0` or `defaultDecisionSeconds` is smaller than `durationSecond`, the write TTL SHALL be `defaultDecisionSeconds`; otherwise it SHALL be `durationSecond`. Stream MUST NOT use `liveCacheTTL`. Live and none MUST NOT pass raw `Seconds()` without that substitution.

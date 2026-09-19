@@ -38,6 +38,7 @@ _ = lapiClient.Cache()
 
 ## Gotchas
 
+- Match miss and unreachable with `errors.Is(err, cache.ErrMiss)` / `errors.Is(err, cache.ErrUnreachable)`. Do not string-compare `err.Error()` to `CacheMiss` / `CacheUnreachable`.
 - SessionHex and store Redis params stay. Existing Redis keys stay reachable. Changing the Client Open string does not migrate Redis keys.
 - A non-positive TTL used to mean two different things. In memory it stored an entry that **never expires**, so a cached ban outlived its decision; on Redis it was rejected outright and logged an error per call. Both are now a no-op, which is why the memory backend no longer has a way to write a permanent entry at all.
 - Real-stack restart cases still need distinct `X-Forwarded-For` per TTL, because an Ip key is still the client IP inside one store. Header-scope and `range-index` keys are extra keys on the same cache Client.

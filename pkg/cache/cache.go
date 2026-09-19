@@ -5,7 +5,6 @@ package cache
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -35,6 +34,12 @@ const (
 	writerPinMaxKeys = 4096
 )
 
+// ErrMiss and ErrUnreachable are the package sentinels for those strings. Callers use errors.Is.
+var (
+	ErrMiss        = errors.New(CacheMiss)
+	ErrUnreachable = errors.New(CacheUnreachable)
+)
+
 // localCache is the per-store in-memory TTL map.
 type localCache struct {
 	mu    sync.Mutex // acquire serializes miss+Set; vendored Heap Get and Set lock separately
@@ -54,7 +59,7 @@ func (lc *localCache) get(key string) (string, error) {
 	if isCached && isValid && len(valueString) > 0 {
 		return valueString, nil
 	}
-	return "", errors.New(CacheMiss)
+	return "", ErrMiss
 }
 
 // getConsistent is get: one in-process map has no replicas to lag behind it.
@@ -73,7 +78,7 @@ func (lc *localCache) getMany(keys []string) (map[string]string, error) {
 			out[key] = value
 			continue
 		}
-		if err.Error() == CacheUnreachable {
+		if errors.Is(err, ErrUnreachable) {
 			return nil, err
 		}
 	}
@@ -209,10 +214,10 @@ func (rc *redisCache) getFrom(from *simpleredis.SimpleRedis, key string) (string
 	value, err := from.Get(context.Background(), prefixed(rc.prefix, key))
 	if err != nil {
 		if simpleredis.IsMiss(err) {
-			return "", errors.New(CacheMiss)
+			return "", ErrMiss
 		}
 		if simpleredis.IsUnreachable(err) {
-			return "", errors.New(CacheUnreachable)
+			return "", ErrUnreachable
 		}
 		return "", err
 	}
@@ -220,7 +225,7 @@ func (rc *redisCache) getFrom(from *simpleredis.SimpleRedis, key string) (string
 	if len(valueString) > 0 {
 		return valueString, nil
 	}
-	return "", errors.New(CacheMiss)
+	return "", ErrMiss
 }
 
 func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
@@ -239,7 +244,7 @@ func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
 	values, err := rc.readerFor(logical).MGet(context.Background(), prefixedNames)
 	if err != nil {
 		if simpleredis.IsUnreachable(err) {
-			return nil, errors.New(CacheUnreachable)
+			return nil, ErrUnreachable
 		}
 		return nil, err
 	}
@@ -257,14 +262,14 @@ func (rc *redisCache) getMany(keys []string) (map[string]string, error) {
 func (rc *redisCache) set(key, value string, duration int64) {
 	rc.pin(key)
 	if err := rc.writer.Set(context.Background(), prefixed(rc.prefix, key), []byte(value), duration); err != nil {
-		rc.log.Error("cache:setDecisionRedisCache" + err.Error())
+		rc.log.Error("cache:setDecisionRedisCache", "error", err)
 	}
 }
 
 func (rc *redisCache) delete(key string) {
 	rc.pin(key)
 	if err := rc.writer.Del(context.Background(), prefixed(rc.prefix, key)); err != nil {
-		rc.log.Error("cache:deleteDecisionRedisCache " + err.Error())
+		rc.log.Error("cache:deleteDecisionRedisCache", "error", err)
 	}
 }
 
@@ -302,14 +307,14 @@ func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts
 		// Hold each client by pointer after New so the pool mutex is not copied.
 		writer, err := simpleredis.New(redisClientConfig(writeHost, pass, database, log))
 		if err != nil {
-			log.Error("cache:New writer " + err.Error())
+			log.Error("cache:New writer", "error", err)
 			return
 		}
 		rc.writer = writer
 		for _, h := range readHosts {
 			reader, readerErr := simpleredis.New(redisClientConfig(h, pass, database, log))
 			if readerErr != nil {
-				log.Error("cache:New reader " + readerErr.Error())
+				log.Error("cache:New reader", "error", readerErr)
 				continue
 			}
 			rc.readers = append(rc.readers, reader)
@@ -318,19 +323,19 @@ func (c *Client) New(log *slog.Logger, isRedis bool, writeHost string, readHosts
 	} else {
 		c.cache = &localCache{store: ttl_map.New()}
 	}
-	c.log.Debug(fmt.Sprintf("cache:New initialized isRedis:%v writeHost:%v readHosts:%v prefix:%v", isRedis, writeHost, readHosts, keyPrefix))
+	c.log.Debug("cache:New initialized", "isRedis", isRedis, "writeHost", writeHost, "readHosts", readHosts, "prefix", keyPrefix)
 }
 
 // Delete delete decision in cache.
 func (c *Client) Delete(key string) {
-	c.log.Debug(fmt.Sprintf("cache:Delete key:%v", key))
+	c.log.Debug("cache:Delete", "key", key)
 	c.cache.delete(key)
 }
 
 // Get check in the cache if the IP has the banned / not banned value.
 // Otherwise return with an error to add the IP in cache if we are on.
 func (c *Client) Get(key string) (string, error) {
-	c.log.Debug(fmt.Sprintf("cache:Get key:%v", key))
+	c.log.Debug("cache:Get", "key", key)
 	return c.cache.get(key)
 }
 
@@ -338,14 +343,14 @@ func (c *Client) Get(key string) (string, error) {
 // window. Use it for a read-modify-write of a shared value, and for a read whose staleness keeps
 // changing the remediation served after the pin window has elapsed. Memory clients are unaffected.
 func (c *Client) GetConsistent(key string) (string, error) {
-	c.log.Debug(fmt.Sprintf("cache:GetConsistent key:%v", key))
+	c.log.Debug("cache:GetConsistent", "key", key)
 	return c.cache.getConsistent(key)
 }
 
 // GetMany returns the values for the given keys. Missing keys are omitted.
 // Redis issues one MGET on a single reader. Unreachable returns CacheUnreachable.
 func (c *Client) GetMany(keys []string) (map[string]string, error) {
-	c.log.Debug(fmt.Sprintf("cache:GetMany keys:%v", keys))
+	c.log.Debug("cache:GetMany", "keys", keys)
 	return c.cache.getMany(keys)
 }
 
@@ -354,9 +359,9 @@ func (c *Client) GetMany(keys []string) (map[string]string, error) {
 // expires, so a cached ban outlived the decision that justified it, and Redis rejected the write
 // outright. Neither is a lifetime any caller asked for.
 func (c *Client) Set(key string, value string, duration int64) {
-	c.log.Debug(fmt.Sprintf("cache:Set key:%v value:%v duration:%vs", key, value, duration))
+	c.log.Debug("cache:Set", "key", key, "value", value, "duration", duration)
 	if duration <= 0 {
-		c.log.Debug(fmt.Sprintf("cache:Set skipped key:%v duration:%vs is not a lifetime", key, duration))
+		c.log.Debug("cache:Set skipped", "key", key, "duration", duration)
 		return
 	}
 	c.cache.set(key, value, duration)

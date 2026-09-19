@@ -37,7 +37,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	log := logger.NewWithFormat(prepared.LogLevel, prepared.LogFilePath, prepared.LogFormat)
 
 	if err = configuration.ValidateParams(&prepared, log); err != nil {
-		log.Error("New:validateParams " + err.Error())
+		log.Error("New:validateParams", "error", err)
 		return nil, err
 	}
 
