@@ -81,3 +81,13 @@ qualify: qualified-with-gaps
 pr: 103
 title: "🐛 fix(captcha): send siteverify remoteip, re-render 200 on retryable errors, require loadable template"
 shas: 76869d63a6a2d841da75f70e31fe328b4619847c
+
+## codereview (2026-09-19)
+phase: codereview
+findings: Standards 3, Spec 0, Security 0, Performance 0, Dead 0, Test coverage 1
+fixed: none
+skipped: none (attended; awaiting item selection)
+verdict: needs changes
+pr: 103
+ci: Main Process, Race detector, e2e binary+mock, e2e docker+pester succeeded
+shas: 45675a8ac0bf6f10de7abced5ea4e68a0ff21af4
