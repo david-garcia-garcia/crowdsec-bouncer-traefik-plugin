@@ -4,24 +4,17 @@ import (
 	"log/slog"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 )
 
-// liveMap wraps the published slots so atomic.Value stores a pointer.
-// Yaegi v0.16 panics boxing a map into interface{}.
-type liveMap struct {
-	slots map[string]LiveSlot
-}
-
 type memory struct {
 	log        *slog.Logger
 	origins    *intern.Table
-	mu         sync.Mutex
+	mu         sync.RWMutex
 	tick       map[string]LiveSlot
-	published  atomic.Value // *liveMap
+	published  map[string]LiveSlot
 	rangeIndex string
 }
 
@@ -36,13 +29,12 @@ func (m *memory) BeginTick() {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	prev := m.loadPublished()
-	if len(prev) == 0 {
+	if len(m.published) == 0 {
 		m.tick = make(map[string]LiveSlot)
 		return
 	}
-	next := make(map[string]LiveSlot, len(prev))
-	for key, slot := range prev {
+	next := make(map[string]LiveSlot, len(m.published))
+	for key, slot := range m.published {
 		next[key] = slot
 	}
 	m.tick = next
@@ -63,7 +55,7 @@ func (m *memory) PublishTick(now int64) {
 			delete(m.tick, key)
 		}
 	}
-	m.storePublished(m.tick)
+	m.published = m.tick
 	m.tick = nil
 }
 
@@ -96,13 +88,12 @@ func (m *memory) putPublishedLocked(item Decision) {
 	if key == "" {
 		return
 	}
-	prev := m.loadPublished()
-	next := make(map[string]LiveSlot, len(prev)+1)
-	for slotKey, slot := range prev {
+	next := make(map[string]LiveSlot, len(m.published)+1)
+	for slotKey, slot := range m.published {
 		next[slotKey] = slot
 	}
 	next[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
-	m.storePublished(next)
+	m.published = next
 }
 
 // pack encodes a uint32 word. Intern overflow Warns and uses origin id 0.
@@ -139,18 +130,17 @@ func (m *memory) Delete(scope, value string) {
 		}
 		return
 	}
-	prev := m.loadPublished()
-	if len(prev) == 0 {
+	if len(m.published) == 0 {
 		return
 	}
-	next := make(map[string]LiveSlot, len(prev))
-	for slotKey, slot := range prev {
+	next := make(map[string]LiveSlot, len(m.published))
+	for slotKey, slot := range m.published {
 		if slotKey == key || (legacy != "" && slotKey == legacy) {
 			continue
 		}
 		next[slotKey] = slot
 	}
-	m.storePublished(next)
+	m.published = next
 }
 
 // LookupRemediation reads the published map (Ip, header scopes, Range). Expired slots miss.
@@ -158,7 +148,9 @@ func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[st
 	if m == nil {
 		return "", "", 0, ErrMiss
 	}
-	snap := m.loadPublished()
+	m.mu.RLock()
+	snap := m.published
+	m.mu.RUnlock()
 	now := time.Now().Unix()
 	kind, origin, originID := lookupHits(func(key string) any {
 		slot, ok := snap[key]
@@ -195,8 +187,8 @@ func (m *memory) RangeIndex() (string, error) {
 	if m == nil {
 		return "", nil
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.rangeIndex, nil
 }
 
@@ -204,22 +196,12 @@ func (m *memory) close() {}
 
 // publishedMap is the lookup snapshot. Nil before the first publish or live Put.
 func (m *memory) publishedMap() map[string]LiveSlot {
-	return m.loadPublished()
-}
-
-func (m *memory) loadPublished() map[string]LiveSlot {
 	if m == nil {
 		return nil
 	}
-	stored, _ := m.published.Load().(*liveMap)
-	if stored == nil {
-		return nil
-	}
-	return stored.slots
-}
-
-func (m *memory) storePublished(slots map[string]LiveSlot) {
-	m.published.Store(&liveMap{slots: slots})
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.published
 }
 
 // seedPublished writes one decision onto the published map without a tick.
