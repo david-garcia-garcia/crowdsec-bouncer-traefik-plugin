@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
 // newTestCaptchaClient builds a captcha Client for siteverify encoding tests.

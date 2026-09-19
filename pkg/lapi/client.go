@@ -104,7 +104,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 	}
 	next, err := newTransport(config, log)
 	if err != nil {
-		log.Error("New:getTLSConfigCrowdsec fail to get tlsConfig " + err.Error())
+		log.Error("New:getTLSConfigCrowdsec fail to get tlsConfig", "error", err)
 		return nil, err
 	}
 	if config.CrowdsecMode != configuration.AloneMode && config.CrowdsecLapiKey == "" && next.clientCertCount() == 0 {
@@ -250,7 +250,7 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 	ticker := time.NewTicker(time.Duration(updateInterval) * time.Second)
 	stop := make(chan bool, 1)
 	go func() {
-		defer log.Debug(name + "_ticker:stopped")
+		defer log.Debug("ticker:stopped", "name", name)
 		for {
 			select {
 			case <-ticker.C:

@@ -29,7 +29,7 @@ func NewChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
 			if err := trustedCIDRs.AddCIDR(HostCIDR(ipAddr)); err != nil {
 				return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipMask, err)
 			}
-			log.Debug(fmt.Sprintf("IP %v is trusted", ipAddr))
+			log.Debug("IP is trusted", "ip", ipAddr)
 			continue
 		}
 
@@ -37,7 +37,7 @@ func NewChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
 		if err := trustedCIDRs.AddCIDR(ipMask); err != nil {
 			return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipMask, err)
 		}
-		log.Debug(fmt.Sprintf("IP network %v is trusted", ipMask))
+		log.Debug("IP network is trusted", "network", ipMask)
 	}
 
 	return &Checker{trustedCIDRs: trustedCIDRs}, nil
