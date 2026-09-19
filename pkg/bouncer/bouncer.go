@@ -296,10 +296,8 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 	}
 
 	if b.traceCustomHeader != "" {
-		headerVal := req.Header.Get(b.traceCustomHeader)
-		if headerVal != "" {
-			templateData["TraceID"] = headerVal
-		}
+		headerValue := req.Header.Get(b.traceCustomHeader)
+		templateData["TraceID"] = trustedTraceID(headerValue)
 	}
 
 	err := b.banTemplate.Execute(rw, templateData)
