@@ -63,6 +63,22 @@ Describe "CrowdSec Bouncer Stream Mode Tests" {
             
             $result.Success | Should -Be $true -Because "Stream mode should eventually allow the IP after decision removal"
         }
+
+        It "Should drop an expired IP ban without an explicit delete" {
+            Add-TestDecision -IP $script:TestIPs.BannedIP -Type "ban" -Duration "8s"
+
+            $blocked = Wait-ForCondition -Description "Stream mode to block short-lived $($script:TestIPs.BannedIP)" -TimeoutSeconds 30 -RetryIntervalSeconds 2 -Condition {
+                $response = Test-HttpRequest -Endpoint "/stream" -IP $script:TestIPs.BannedIP -TraefikUrl $script:TraefikUrl
+                return ($response.StatusCode -in @(403, 429))
+            }
+            $blocked.Success | Should -Be $true
+
+            $expired = Wait-ForCondition -Description "Stream cache TTL to drop expired $($script:TestIPs.BannedIP)" -TimeoutSeconds 30 -RetryIntervalSeconds 2 -Condition {
+                $response = Test-HttpRequest -Endpoint "/stream" -IP $script:TestIPs.BannedIP -TraefikUrl $script:TraefikUrl
+                return ($response.StatusCode -eq 200)
+            }
+            $expired.Success | Should -Be $true -Because "stream Set uses the decision duration as cache TTL"
+        }
         
         It "Should handle decision updates within timeout" {
             # This test ensures the bouncer can handle updates within the configured timeout

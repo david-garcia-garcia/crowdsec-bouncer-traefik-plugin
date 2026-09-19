@@ -46,5 +46,23 @@ Describe "CrowdSec Bouncer Live Mode Tests" {
             $clean = Test-HttpRequest -Endpoint "/live" -IP $script:LiveCleanIP -TraefikUrl $script:TraefikUrl
             $clean.StatusCode | Should -Be 200
         }
+
+        It "Should keep a cached ban until defaultDecisionSeconds after the decision is deleted" {
+            Add-TestDecision -IP $script:LiveBannedIP -Type "ban"
+
+            $blocked = Test-HttpRequest -Endpoint "/live" -IP $script:LiveBannedIP -TraefikUrl $script:TraefikUrl
+            $blocked.StatusCode | Should -BeIn @(403, 429)
+
+            Remove-TestDecision -IP $script:LiveBannedIP
+
+            $stillCached = Test-HttpRequest -Endpoint "/live" -IP $script:LiveBannedIP -TraefikUrl $script:TraefikUrl
+            $stillCached.StatusCode | Should -BeIn @(403, 429) -Because "live mode caches the ban for defaultDecisionSeconds (2s on /live)"
+
+            $allowed = Wait-ForCondition -Description "live mode to re-query LAPI and allow $($script:LiveBannedIP)" -TimeoutSeconds 15 -RetryIntervalSeconds 1 -Condition {
+                $response = Test-HttpRequest -Endpoint "/live" -IP $script:LiveBannedIP -TraefikUrl $script:TraefikUrl
+                return ($response.StatusCode -eq 200)
+            }
+            $allowed.Success | Should -Be $true
+        }
     }
 }

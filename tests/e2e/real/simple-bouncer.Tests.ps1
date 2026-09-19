@@ -116,6 +116,27 @@ Describe "Basic CrowdSec Bouncer Integration Test" {
         # Cleanup: Remove the decision
         Remove-TestDecision -IP $script:TestIP
     }
+
+    It "Should return remediationStatusCode 429 when that route is banned" {
+        Add-TestDecision -IP $script:TestIP -Type "ban" -Reason "status-429"
+        $response = Test-HttpRequest -Endpoint "/status-429" -IP $script:TestIP -TraefikUrl $script:TraefikUrl
+        $response.StatusCode | Should -Be 429 -Because "the coverage route sets remediationStatusCode=429"
+        Remove-TestDecision -IP $script:TestIP
+    }
+
+    It "Should use the rightmost untrusted X-Forwarded-For hop as the client" {
+        $left = "10.85.0.1"
+        $right = "10.85.0.2"
+        Add-TestDecision -IP $right -Type "ban" -Reason "xff-right"
+        $blocked = Test-HttpRequest -Endpoint "/whoami" -IP "$left, $right" -TraefikUrl $script:TraefikUrl
+        $blocked.StatusCode | Should -BeIn @(403, 429) -Because "plugin walks XFF right-to-left; $right is the first untrusted hop"
+
+        Remove-TestDecision -IP $right
+        Add-TestDecision -IP $left -Type "ban" -Reason "xff-left"
+        $leftOnly = Test-HttpRequest -Endpoint "/whoami" -IP "$left, $right" -TraefikUrl $script:TraefikUrl
+        $leftOnly.StatusCode | Should -Be 200 -Because "a ban on the leftmost hop must not apply when $right is the client"
+        Remove-TestDecision -IP $left
+    }
 }
 
 Describe "CrowdSec Bouncer General Tests" {

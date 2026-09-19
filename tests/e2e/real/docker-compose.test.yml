@@ -65,7 +65,7 @@ services:
       - "traefik.http.middlewares.bouncer-test.plugin.bouncer.updateintervalseconds=5"
       - "traefik.http.middlewares.bouncer-test.plugin.bouncer.crowdsecmode=none"
       - "traefik.http.middlewares.bouncer-test.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
-      - "traefik.http.middlewares.bouncer-test.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-test.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-test.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   # Test service - protected endpoint
@@ -89,7 +89,7 @@ services:
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.updateintervalseconds=5"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.crowdsecmode=none"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.banFilePath=/ban.html"
-      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   # Always-pass siteverify so Pester can POST a dummy form and assert the gate cookie.
@@ -132,7 +132,7 @@ services:
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaGateSecret=test-gate-secret"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.captchaGateBindIp=true"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
-      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   # Test service - disabled bouncer
@@ -174,7 +174,7 @@ services:
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.crowdsecmode=none"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.banFilePath=/ban.html"
-      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   # Test service - stream mode
@@ -198,7 +198,7 @@ services:
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.updateintervalseconds=5"
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.metricsupdateintervalseconds=1"
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.crowdsecmode=stream"
-      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   # Live mode: cache an allow, then re-query after defaultDecisionSeconds (PR 333)
@@ -219,7 +219,7 @@ services:
       - "traefik.http.middlewares.bouncer-live.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-live.plugin.bouncer.crowdsecmode=live"
       - "traefik.http.middlewares.bouncer-live.plugin.bouncer.defaultdecisionseconds=2"
-      - "traefik.http.middlewares.bouncer-live.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-live.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-live.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   # Live mode with Dragonfly as the Redis-protocol cache (not in-process TTL map)
@@ -242,7 +242,7 @@ services:
       - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.defaultdecisionseconds=2"
       - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.rediscacheenabled=true"
       - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.rediscachehost=dragonfly:6379"
-      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   # Same Dragonfly cache with a longer live TTL so a Traefik restart still hits Redis.
@@ -267,7 +267,7 @@ services:
       - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.defaultdecisionseconds=120"
       - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.rediscacheenabled=true"
       - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.rediscachehost=dragonfly:6379"
-      - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   # Trusted client IPs bypass even when banned (PR 333)
@@ -292,7 +292,7 @@ services:
       # still POST within 20s whichever middleware Traefik constructs first (default is 600).
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.metricsupdateintervalseconds=1"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.clienttrustedips=172.19.0.10/32"
-      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   # Custom ban HTML body + Content-Type (PR 333)
@@ -314,7 +314,7 @@ services:
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.crowdsecmode=none"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.banFilePath=/e2e-ban.html"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.remediationHeadersCustomName=X-Crowdsec-Remediation"
-      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   # Range + Country via file-provider chain (geoblock enrich then bouncer). Nested maps live in dynamic-scopes.yml.
@@ -361,8 +361,133 @@ services:
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.metricsupdateintervalseconds=1"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.crowdsecappsecenabled=true"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.crowdsecappsechost=crowdsec:7422"
-      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+  # Extra coverage routes on one whoami. Paths must not sit under /appsec, /captcha, or /redis-cache.
+  coverage:
+    image: traefik/whoami
+    container_name: "coverage-test"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.coverage.loadbalancer.server.port=80"
+
+      - "traefik.http.routers.header-none.rule=PathPrefix(`/header-none`)"
+      - "traefik.http.routers.header-none.entrypoints=web"
+      - "traefik.http.routers.header-none.middlewares=bouncer-header-none@file"
+      - "traefik.http.routers.header-none.service=coverage"
+
+      - "traefik.http.routers.lapi-fail-ban.rule=PathPrefix(`/lapi-fail-ban`)"
+      - "traefik.http.routers.lapi-fail-ban.entrypoints=web"
+      - "traefik.http.routers.lapi-fail-ban.middlewares=bouncer-lapi-fail-ban@docker"
+      - "traefik.http.routers.lapi-fail-ban.service=coverage"
+      - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.crowdseclapishost=crowdsec:9"
+      - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.httptimeoutseconds=2"
+      - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.crowdsecmode=none"
+      - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.crowdseclapifailureaction=ban"
+      - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
+      - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+      - "traefik.http.routers.lapi-fail-pass.rule=PathPrefix(`/lapi-fail-pass`)"
+      - "traefik.http.routers.lapi-fail-pass.entrypoints=web"
+      - "traefik.http.routers.lapi-fail-pass.middlewares=bouncer-lapi-fail-pass@docker"
+      - "traefik.http.routers.lapi-fail-pass.service=coverage"
+      - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.crowdseclapishost=crowdsec:9"
+      - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.httptimeoutseconds=2"
+      - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.crowdsecmode=none"
+      - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.crowdseclapifailureaction=passthrough"
+      - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
+      - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+      - "traefik.http.routers.waf-only.rule=PathPrefix(`/waf-only`)"
+      - "traefik.http.routers.waf-only.entrypoints=web"
+      - "traefik.http.routers.waf-only.middlewares=bouncer-waf-only@docker"
+      - "traefik.http.routers.waf-only.service=coverage"
+      - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.crowdsecmode=appsec"
+      - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.crowdsecappsecenabled=true"
+      - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.crowdsecappsechost=crowdsec:7422"
+      - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
+      - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+      - "traefik.http.routers.waf-fail-ban.rule=PathPrefix(`/waf-fail-ban`)"
+      - "traefik.http.routers.waf-fail-ban.entrypoints=web"
+      - "traefik.http.routers.waf-fail-ban.middlewares=bouncer-waf-fail-ban@docker"
+      - "traefik.http.routers.waf-fail-ban.service=coverage"
+      - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.httptimeoutseconds=2"
+      - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.crowdsecmode=none"
+      - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.crowdsecappsecenabled=true"
+      - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.crowdsecappsechost=crowdsec:9"
+      - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.crowdsecappsecfailureaction=ban"
+      - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
+      - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+      - "traefik.http.routers.waf-fail-pass.rule=PathPrefix(`/waf-fail-pass`)"
+      - "traefik.http.routers.waf-fail-pass.entrypoints=web"
+      - "traefik.http.routers.waf-fail-pass.middlewares=bouncer-waf-fail-pass@docker"
+      - "traefik.http.routers.waf-fail-pass.service=coverage"
+      - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.httptimeoutseconds=2"
+      - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.crowdsecmode=none"
+      - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.crowdsecappsecenabled=true"
+      - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.crowdsecappsechost=crowdsec:9"
+      - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.crowdsecappsecfailureaction=passthrough"
+      - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
+      - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+      - "traefik.http.routers.status-429.rule=PathPrefix(`/status-429`)"
+      - "traefik.http.routers.status-429.entrypoints=web"
+      - "traefik.http.routers.status-429.middlewares=bouncer-status-429@docker"
+      - "traefik.http.routers.status-429.service=coverage"
+      - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.crowdsecmode=none"
+      - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.remediationstatuscode=429"
+      - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
+      - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+      - "traefik.http.routers.short-captcha.rule=PathPrefix(`/short-captcha`)"
+      - "traefik.http.routers.short-captcha.entrypoints=web"
+      - "traefik.http.routers.short-captcha.middlewares=bouncer-short-captcha@docker"
+      - "traefik.http.routers.short-captcha.service=coverage"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.crowdseclapishost=crowdsec:8080"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.crowdsecmode=none"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.captchaFilePath=/e2e-captcha.html"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.captchaProvider=custom"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.captchaCustomJsUrl=http://dummy-captcha/dummy.js"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.captchaCustomValidateUrl=http://dummy-captcha/siteverify"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.captchaCustomKey=dummy-captcha"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.captchaCustomResponse=dummy-captcha-response"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.captchaSiteKey=e2e-dummy-site"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.captchaSecretKey=e2e-dummy-secret"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.captchaGateSecret=test-gate-secret"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.captchaGateBindIp=true"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.captchaGracePeriodSeconds=3"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   # CrowdSec 1.8 bot-detection on a separate AppSec port so CRS /appsec stays unchallenged
   bot-detection:
@@ -383,7 +508,7 @@ services:
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.crowdsecmode=none"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.crowdsecappsecenabled=true"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.crowdsecappsechost=crowdsec:7423"
-      - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.forwardedheaderstrustedips=172.20.0.1/32"
+      - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
   dragonfly:
@@ -452,5 +577,5 @@ networks:
     name: crowdsec-test-network
     ipam:
       config:
-        - subnet: 172.20.0.0/16
-          gateway: 172.20.0.1 
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1 
