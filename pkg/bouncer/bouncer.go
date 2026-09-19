@@ -198,14 +198,13 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		value, origin, cacheErr := decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
 		switch {
 		case cacheErr != nil:
-			cacheErrString := cacheErr.Error()
-			b.log.Debug("ServeHTTP:Get", "ip", req.remoteIP, "cache", cacheErrString)
-			if cacheErrString == cache.CacheUnreachable && !b.redisUnreachableBlock {
+			b.log.Debug("ServeHTTP:Get", "ip", req.remoteIP, "cache", cacheErr)
+			if errors.Is(cacheErr, cache.ErrUnreachable) && !b.redisUnreachableBlock {
 				b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "redisUnreachable", true)
 				b.handleNextServeHTTP(rw, req)
 				return
 			}
-			if cacheErrString == cache.CacheMiss {
+			if errors.Is(cacheErr, cache.ErrMiss) {
 				break
 			}
 			b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "error", cacheErr)

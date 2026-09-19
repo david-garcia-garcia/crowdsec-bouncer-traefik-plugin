@@ -286,7 +286,7 @@ func (c *Client) RangeMembership() *decisionscope.RangeMembership {
 func (c *Client) hydrateRangeMembership() {
 	index, err := c.Cache().Get(decisionscope.RangeIndexKey)
 	if err != nil {
-		if err.Error() != cache.CacheMiss {
+		if !errors.Is(err, cache.ErrMiss) {
 			return
 		}
 		index = ""
