@@ -1,9 +1,9 @@
-package decisionscope
+package decisionstore
 
 import (
 	"net"
-	"strings"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup"
 )
 
@@ -13,24 +13,22 @@ type RangeMembership struct {
 	captcha *iplookup.Helper // CIDRs whose remediation is captcha
 }
 
-// MembershipFromIndex builds RangeMembership from a cidr=remediation blob. Invalid CIDR lines are skipped.
+// MembershipFromIndex builds RangeMembership from a cidr=kind blob. Origin is the following line.
 func MembershipFromIndex(index string) *RangeMembership {
 	ban := iplookup.New()
 	captcha := iplookup.New()
 	if index == "" {
 		return &RangeMembership{ban: ban, captcha: captcha}
 	}
-	for _, line := range strings.Split(index, "\n") {
-		network, remediation := parseIndexLine(line)
-		if network == "" || !IsActiveRemediation(remediation) {
+	for _, rec := range parseRangeRecords(index) {
+		if rec.cidr == "" || !decisionscope.IsActiveRemediation(rec.kind) {
 			continue
 		}
 		helper := captcha
-		if RemediationKind(remediation) == BannedValue {
+		if decisionscope.RemediationKind(rec.kind) == decisionscope.BannedValue {
 			helper = ban
 		}
-		// Store the blob line on the endpoint so a later hit is O(prefix).
-		if err := helper.AddCIDR(network, remediation); err != nil {
+		if err := helper.AddCIDR(rec.cidr, KindOriginString(rec.kind, rec.origin)); err != nil {
 			continue
 		}
 	}

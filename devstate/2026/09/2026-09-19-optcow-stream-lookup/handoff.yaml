@@ -1,0 +1,18 @@
+issueKey: 2026-09-19-optcow-stream-lookup
+jobName: 2026-09-19-optcow-stream-lookup
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 6e16b7cda2dc603a30090000fdc7ceea3bd8cc11dc1b818772935f8ea30700da
+localTests: passed
+lastProductSha: 584ff695
+requirement: requirement.md
+comments: comments.md
+explore: explore.md
+change: 2026-09-19-optcow-stream-lookup
+pr:
+  id: 118
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/118

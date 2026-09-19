@@ -53,7 +53,7 @@ When Redis is enabled, every GET/SET/DEL/MGET/Eval key the store sends SHALL be 
 - **AND** the Redis pool is not closed
 
 ### Requirement: Cache payloads stay opaque strings
-A cache Client SHALL store and return opaque strings on `Set`/`Get`/`GetMany` and SHALL also store and return a machine word when `Set`/`GetInt` receive or find a `uint32` (`uint32` is enough). `Set` SHALL accept a leftover/plain `string` or a packed `uint32`. The cache package MUST NOT export CrowdSec remediation names (`BannedValue`, `CaptchaValue`, `NoBannedValue`). The cache package MUST NOT know kind, origin, Packed, Stored, Leftover, Remediation, or range-index separators. It MUST NOT export `SetRemediation`, `GetManyStored`, `ParsePackedOriginID`, or a `MemoryBackend` type switch for remediations. Store errors SHALL be the package sentinels `ErrMiss` and `ErrUnreachable`. Their `Error()` text SHALL remain `CacheMiss` (`cache:miss`) and `CacheUnreachable` (`cache:unreachable`). Callers that distinguish miss from unreachable SHALL use `errors.Is`. A clean miss MUST NOT allocate a new error value. Memory and Redis backends SHALL return the same sentinels. GetMany SHALL keep omitting missing keys. `GetInt` SHALL return `ErrMiss` when the key is absent or the stored value is not that word (including a leftover string). Client address, when this leaf mentions it, SHALL reuse `pkg/ip.GetRemoteIP` (do not parse `RemoteAddr`).
+A cache Client SHALL store and return opaque strings on `Set`/`Get`/`GetMany` and SHALL also store and return a machine word when `Set`/`GetInt` receive or find a `uint32` (`uint32` is enough). `Set` SHALL accept a leftover/plain `string` or a packed `uint32`. The cache package MUST NOT export CrowdSec remediation names (`BannedValue`, `CaptchaValue`, `NoBannedValue`). The cache package MUST NOT know kind, origin, Packed, Stored, Leftover, Remediation, or range-index separators. It MUST NOT export `SetRemediation`, `GetManyStored`, `ParsePackedOriginID`, or a `MemoryBackend` type switch for remediations. Store errors SHALL be the package sentinels `ErrMiss` and `ErrUnreachable`. Their `Error()` text SHALL remain `store:miss` and `store:unreachable`. Callers that distinguish miss from unreachable SHALL use `errors.Is`. A clean miss MUST NOT allocate a new error value. Memory and Redis backends SHALL return the same sentinels. GetMany SHALL keep omitting missing keys. `GetInt` SHALL return `ErrMiss` when the key is absent or the stored value is not that word (including a leftover string). Client address, when this leaf mentions it, SHALL reuse `pkg/ip.GetRemoteIP` (do not parse `RemoteAddr`).
 
 #### Scenario: Cache tests treat values as opaque
 - **WHEN** a cache test Sets and Gets a payload
@@ -71,12 +71,12 @@ A cache Client SHALL store and return opaque strings on `Set`/`Get`/`GetMany` an
 #### Scenario: In-memory miss is the miss sentinel
 - **WHEN** a memory DecisionStore Get of an absent key returns an error
 - **THEN** `errors.Is(err, ErrMiss)` is true
-- **AND** `err.Error()` is `cache:miss`
+- **AND** `err.Error()` is `store:miss`
 
 #### Scenario: Redis unreachable is the unreachable sentinel
 - **WHEN** a Redis DecisionStore Get fails because the store is unreachable
 - **THEN** `errors.Is(err, ErrUnreachable)` is true
-- **AND** `err.Error()` is `cache:unreachable`
+- **AND** `err.Error()` is `store:unreachable`
 
 #### Scenario: Lookup miss is the miss sentinel
 - **WHEN** `LookupCachedRemediation` finds no active remediation and the Ip key is absent

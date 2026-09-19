@@ -8,8 +8,7 @@ source "$HERE/../../lib/common.sh"
 SCENARIO=redis
 
 # The replica mock returns "f" (not banned) for 1.2.3.4 and "t" (banned) for 1.2.3.5.
-# The primary mock always misses. Leftover lookup GetInts then GetMany, so one
-# request uses both readers; leftover hits come from the replica GetMany.
+# The primary mock always misses. Reads go only to the replica (redisCacheReadHosts).
 body() {
   echo "[$SCENARIO] cached banned IP must be blocked"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 403 -H "X-Forwarded-For: 1.2.3.5"

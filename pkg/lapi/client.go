@@ -9,9 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 )
 
 // Operator-visible lifecycle and stream-health lines (stable for log grep).
@@ -36,7 +36,7 @@ type Decision struct {
 	Simulated bool   `json:"simulated"`
 }
 
-// Client owns stream ticker, a reclaimed DecisionStore, in-process Range membership, LAPI/CAPI HTTP, and metrics.
+// Client owns stream ticker, a reclaimed DecisionStore, LAPI/CAPI HTTP, and metrics.
 type Client struct {
 	mu       sync.Mutex
 	closed   bool
@@ -57,13 +57,10 @@ type Client struct {
 	sessionKey           string            // reclaim SessionKey (stream/alone) or Key (live/none)
 	liveHeaderScopes     liveHeaderScopes  // live constructor ctx → normalized header scopes
 
-	transport       atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
-	decisionStore   *DecisionStore
-	cacheClient     *cache.Client // alias of store.Cache(); tests may set this without a store
-	rangeMembership atomic.Value  // *decisionscope.RangeMembership rebuilt from range-index
-	lastRangeIndex  atomic.Value  // string of the blob last used to build membership
-	log             *slog.Logger
-	pluginVersion   string
+	transport     atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
+	decisionStore *decisionstore.Store
+	log           *slog.Logger
+	pluginVersion string
 
 	// int64 0/1 published with atomic.LoadInt64/StoreInt64 (Yaegi v0.16: not atomic.Bool / atomic.Int64 / atomic.Pointer[T]).
 	isCrowdsecStreamStartup int64
@@ -99,7 +96,7 @@ func Prepare(cfg *configuration.Config, _ *slog.Logger) error {
 
 // New constructs a Client and starts tickers. store is the reclaimed DecisionStore for this cursor.
 // Call Prepare first. Close stops tickers and HTTP only; it does not Close the shared store.
-func New(config *configuration.Config, log *slog.Logger, pluginVersion string, store *DecisionStore) (*Client, error) {
+func New(config *configuration.Config, log *slog.Logger, pluginVersion string, store *decisionstore.Store) (*Client, error) {
 	crowdsecStreamRoute := crowdsecLapiStreamRoute
 	if config.CrowdsecMode == configuration.AloneMode {
 		crowdsecStreamRoute = crowdsecCapiStreamRoute
@@ -113,7 +110,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		log.Error("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup")
 		return nil, errors.New("CrowdsecLapiKey is missing")
 	}
-	if store == nil || store.Cache() == nil {
+	if store == nil {
 		return nil, errors.New("decision store is required")
 	}
 
@@ -136,7 +133,6 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		isCrowdsecStreamStartup: 1,
 		isCrowdsecStreamHealthy: 1,
 		decisionStore:           store,
-		cacheClient:             store.Cache(),
 	}
 	client.metricsReporter = newMetricsReporter(client, time.Now())
 	client.transport.Store(next)
@@ -264,46 +260,6 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 		}
 	}()
 	return stop
-}
-
-// Cache is the shared DecisionStore cache, or the test-assigned cacheClient.
-func (c *Client) Cache() *cache.Client {
-	if c.decisionStore != nil {
-		return c.decisionStore.Cache()
-	}
-	return c.cacheClient
-}
-
-// RangeMembership is the current in-process Range lookup, or nil before the first hydrate.
-func (c *Client) RangeMembership() *decisionscope.RangeMembership {
-	stored := c.rangeMembership.Load()
-	if stored == nil {
-		return nil
-	}
-	membership, _ := stored.(*decisionscope.RangeMembership)
-	return membership
-}
-
-// hydrateRangeMembership rebuilds Range membership from the shared blob when the raw string changed.
-func (c *Client) hydrateRangeMembership() {
-	index, err := c.Cache().Get(decisionscope.RangeIndexKey)
-	if err != nil {
-		if !errors.Is(err, cache.ErrMiss) {
-			return
-		}
-		index = ""
-	}
-	c.storeRangeMembership(index)
-}
-
-// storeRangeMembership replaces the in-process trees when index differs from the last hydrate.
-func (c *Client) storeRangeMembership(index string) {
-	previous, _ := c.lastRangeIndex.Load().(string)
-	if c.rangeMembership.Load() != nil && previous == index {
-		return
-	}
-	c.rangeMembership.Store(decisionscope.MembershipFromIndex(index))
-	c.lastRangeIndex.Store(index)
 }
 
 // StreamHealthy is true while stream polling is succeeding.

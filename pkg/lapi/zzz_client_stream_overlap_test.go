@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
@@ -79,9 +79,8 @@ func TestHandleStreamTicker_LeaseValidOverlapOneFetch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	shared := &cache.Client{}
-	shared.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
-	client := newSharedStreamPoller(t, shared, parsed.Host)
+	store := decisionstore.NewMemory(logger.New("ERROR", ""))
+	client := newSharedStreamPoller(t, store, parsed.Host)
 	attachTestTransport(client, server.Client(), "test-key")
 
 	var started sync.WaitGroup
@@ -116,9 +115,8 @@ func TestStreamHealthy_ConcurrentWithPollWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	shared := &cache.Client{}
-	shared.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
-	client := newSharedStreamPoller(t, shared, parsed.Host)
+	store := decisionstore.NewMemory(logger.New("ERROR", ""))
+	client := newSharedStreamPoller(t, store, parsed.Host)
 	atomic.StoreInt64(&client.isCrowdsecStreamHealthy, 1)
 	attachTestTransport(client, server.Client(), "test-key")
 

@@ -40,18 +40,18 @@ Cache Redis GET/MGET/SET/DEL SHALL pass a `context.Context`. When the cache API 
 - **THEN** it calls `Get` with a non-nil context
 
 ### Requirement: Close stops new dials
-After `Close`, `Get`/`MGet`/`Set`/`Del` SHALL surface `cache:unreachable` and MUST NOT open a new TCP connection. `Close` SHALL remain safe to call more than once.
+After `Close`, `Get`/`MGet`/`Set`/`Del` SHALL surface `store:unreachable` and MUST NOT open a new TCP connection. `Close` SHALL remain safe to call more than once.
 
 #### Scenario: Get after Close does not accept a second connection
 - **WHEN** a test client has completed one `Get` (one accept) and then `Close`
-- **THEN** a following `Get` returns `cache:unreachable` and the fake server's accept count stays 1
+- **THEN** a following `Get` returns `store:unreachable` and the fake server's accept count stays 1
 
 ### Requirement: Miss and unreachable map through helpers or equal strings
-Cache SHALL treat utilities miss as `cache:miss` and unreachable as `cache:unreachable`. Matching SHALL use `simpleredis.IsMiss` / `IsUnreachable` or the same `redis:miss` / `redis:unreachable` strings the module still exports.
+Cache SHALL treat utilities miss as `store:miss` and unreachable as `store:unreachable`. Matching SHALL use `simpleredis.IsMiss` / `IsUnreachable` or the same `redis:miss` / `redis:unreachable` strings the module still exports.
 
 #### Scenario: Miss becomes cache miss
 - **WHEN** the client returns a miss
-- **THEN** `Client.Get` returns `cache:miss`
+- **THEN** `Client.Get` returns `store:miss`
 
 ### Requirement: Cache Client exposes a narrow lease acquire
 `cache.Client` SHALL expose one acquire that talks to the writer plus prefix (Redis) or the memory mutex (local). Redis acquire SHALL call vendored SimpleRedis `Eval` (`EVALSHA` then `EVAL` on NOSCRIPT) with the prefixed key. Memory acquire SHALL lock around miss+Set. The method MUST NOT contain stream poller or LAPI query logic. The cache MUST NOT add a SetNX wrapper; SimpleRedis `Set` remains SET EX only. Acquire SHALL pass a `context.Context` (`context.Background()` when the cache API has no request context).
@@ -83,12 +83,12 @@ When Redis read hosts are set, Get and GetMany SHALL call `nextReader` only. A m
 
 #### Scenario: Replica miss is not retried on the writer
 - **WHEN** Redis has one or more read hosts and Get on the selected reader returns miss
-- **THEN** Get returns `cache:miss`
+- **THEN** Get returns `store:miss`
 - **AND** the writer is not called for that Get
 
 #### Scenario: Replica unreachable is not retried on the writer
 - **WHEN** Redis has one or more read hosts and Get on the selected reader is unreachable
-- **THEN** Get returns `cache:unreachable`
+- **THEN** Get returns `store:unreachable`
 - **AND** the writer is not called for that Get
 
 ### Requirement: Set and Delete are void
