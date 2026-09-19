@@ -8,7 +8,7 @@ import (
 )
 
 func applyRange(index, cidr, kind string) string {
-	return ApplyRangeIndex(index, map[string]Decision{cidr: {Kind: kind}}, nil)
+	return ApplyRangeIndex(index, map[string]string{cidr: kind}, nil)
 }
 
 func removeRange(index, cidr string) string {
@@ -47,7 +47,7 @@ func TestRemoveRangeSameNetworkDifferentSpelling(t *testing.T) {
 }
 
 func TestRemoveRangeUnparseableIdenticalText(t *testing.T) {
-	index := ApplyRangeIndex("", map[string]Decision{"not-a-cidr": {Kind: decisionscope.BannedValue}}, nil)
+	index := ApplyRangeIndex("", map[string]string{"not-a-cidr": decisionscope.BannedValue}, nil)
 	index = removeRange(index, "not-a-cidr")
 	if index != "" {
 		t.Fatalf("identical unparseable remove left %q", index)
@@ -80,9 +80,9 @@ func TestAddRangeUpdatesRemediation(t *testing.T) {
 }
 
 func TestApplyRangeIndexOneWrite(t *testing.T) {
-	index := ApplyRangeIndex("", map[string]Decision{
-		"10.0.0.0/8":  {Kind: decisionscope.CaptchaValue},
-		"10.1.0.0/16": {Kind: decisionscope.BannedValue},
+	index := ApplyRangeIndex("", map[string]string{
+		"10.0.0.0/8":  decisionscope.CaptchaValue,
+		"10.1.0.0/16": decisionscope.BannedValue,
 	}, nil)
 	if got := remediationFromIndex(index, "10.1.2.3"); got != decisionscope.BannedValue {
 		t.Fatalf("batch upsert got %q, want ban", got)
@@ -94,8 +94,8 @@ func TestApplyRangeIndexOneWrite(t *testing.T) {
 }
 
 func TestApplyRangeIndexRoundTripOriginSuffix(t *testing.T) {
-	stored := kindOriginString(decisionscope.BannedValue, "crowdsec")
-	index := ApplyRangeIndex("", map[string]Decision{"10.0.0.0/8": {Kind: decisionscope.BannedValue, Origin: "crowdsec"}}, nil)
+	stored := KindOriginString(decisionscope.BannedValue, "crowdsec")
+	index := ApplyRangeIndex("", map[string]string{"10.0.0.0/8": stored}, nil)
 	if index != "10.0.0.0/8="+stored {
 		t.Fatalf("blob %q", index)
 	}

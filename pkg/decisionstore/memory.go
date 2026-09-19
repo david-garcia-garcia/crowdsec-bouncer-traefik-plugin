@@ -10,12 +10,18 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 )
 
+// liveMap wraps the published slots so atomic.Value stores a pointer.
+// Yaegi v0.16 panics boxing a map into interface{}.
+type liveMap struct {
+	slots map[string]LiveSlot
+}
+
 type memory struct {
 	log        *slog.Logger
 	origins    *intern.Table
 	mu         sync.Mutex
 	tick       map[string]LiveSlot
-	published  atomic.Value // map[string]LiveSlot
+	published  atomic.Value // *liveMap
 	rangeIndex string
 }
 
@@ -30,7 +36,7 @@ func (m *memory) BeginTick() {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	prev, _ := m.published.Load().(map[string]LiveSlot)
+	prev := m.loadPublished()
 	if len(prev) == 0 {
 		m.tick = make(map[string]LiveSlot)
 		return
@@ -57,7 +63,7 @@ func (m *memory) PublishTick(now int64) {
 			delete(m.tick, key)
 		}
 	}
-	m.published.Store(m.tick)
+	m.storePublished(m.tick)
 	m.tick = nil
 }
 
@@ -90,13 +96,13 @@ func (m *memory) putPublishedLocked(item Decision) {
 	if key == "" {
 		return
 	}
-	prev, _ := m.published.Load().(map[string]LiveSlot)
+	prev := m.loadPublished()
 	next := make(map[string]LiveSlot, len(prev)+1)
 	for slotKey, slot := range prev {
 		next[slotKey] = slot
 	}
 	next[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
-	m.published.Store(next)
+	m.storePublished(next)
 }
 
 // pack encodes a uint32 word. Intern overflow Warns and uses origin id 0.
@@ -133,7 +139,7 @@ func (m *memory) Delete(scope, value string) {
 		}
 		return
 	}
-	prev, _ := m.published.Load().(map[string]LiveSlot)
+	prev := m.loadPublished()
 	if len(prev) == 0 {
 		return
 	}
@@ -144,7 +150,7 @@ func (m *memory) Delete(scope, value string) {
 		}
 		next[slotKey] = slot
 	}
-	m.published.Store(next)
+	m.storePublished(next)
 }
 
 // LookupRemediation reads the published map (Ip, header scopes, Range). Expired slots miss.
@@ -152,7 +158,7 @@ func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[st
 	if m == nil {
 		return "", "", 0, ErrMiss
 	}
-	snap, _ := m.published.Load().(map[string]LiveSlot)
+	snap := m.loadPublished()
 	now := time.Now().Unix()
 	kind, origin, originID := lookupHits(func(key string) any {
 		slot, ok := snap[key]
@@ -171,7 +177,7 @@ func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[st
 }
 
 // ApplyRangeBatch mutates the in-process range-index blob.
-func (m *memory) ApplyRangeBatch(upserts map[string]Decision, removals []string) error {
+func (m *memory) ApplyRangeBatch(upserts map[string]string, removals []string) error {
 	if m == nil {
 		return nil
 	}
@@ -198,11 +204,22 @@ func (m *memory) close() {}
 
 // publishedMap is the lookup snapshot. Nil before the first publish or live Put.
 func (m *memory) publishedMap() map[string]LiveSlot {
+	return m.loadPublished()
+}
+
+func (m *memory) loadPublished() map[string]LiveSlot {
 	if m == nil {
 		return nil
 	}
-	snap, _ := m.published.Load().(map[string]LiveSlot)
-	return snap
+	stored, _ := m.published.Load().(*liveMap)
+	if stored == nil {
+		return nil
+	}
+	return stored.slots
+}
+
+func (m *memory) storePublished(slots map[string]LiveSlot) {
+	m.published.Store(&liveMap{slots: slots})
 }
 
 // seedPublished writes one decision onto the published map without a tick.

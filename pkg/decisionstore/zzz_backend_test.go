@@ -149,7 +149,7 @@ func checkIPBanSkipsRangeCaptcha(t *testing.T, store *Store) {
 		Scope: decisionscope.ScopeIP, Value: backendRangeIP,
 		Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec,
 	})
-	if err := store.ApplyRangeBatch(map[string]Decision{backendRangeCIDR: {Kind: decisionscope.CaptchaValue}}, nil); err != nil {
+	if err := store.ApplyRangeBatch(map[string]string{backendRangeCIDR: decisionscope.CaptchaValue}, nil); err != nil {
 		t.Fatal(err)
 	}
 	mustKind(t, store, backendRangeIP, nil, decisionscope.BannedValue, backendOrigin)
@@ -161,7 +161,7 @@ func checkRangeBanWhenIPIsCaptcha(t *testing.T, store *Store) {
 		Scope: decisionscope.ScopeIP, Value: backendRangeIP,
 		Kind: decisionscope.CaptchaValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec,
 	})
-	if err := store.ApplyRangeBatch(map[string]Decision{backendRangeCIDR: {Kind: decisionscope.BannedValue}}, nil); err != nil {
+	if err := store.ApplyRangeBatch(map[string]string{backendRangeCIDR: decisionscope.BannedValue}, nil); err != nil {
 		t.Fatal(err)
 	}
 	mustKind(t, store, backendRangeIP, nil, decisionscope.BannedValue, "")
@@ -170,7 +170,7 @@ func checkRangeBanWhenIPIsCaptcha(t *testing.T, store *Store) {
 func checkRangeApplyThenRemove(t *testing.T, store *Store) {
 	t.Helper()
 	mustMiss(t, store, backendRangeIP, nil)
-	if err := store.ApplyRangeBatch(map[string]Decision{backendRangeCIDR: {Kind: decisionscope.BannedValue}}, nil); err != nil {
+	if err := store.ApplyRangeBatch(map[string]string{backendRangeCIDR: decisionscope.BannedValue}, nil); err != nil {
 		t.Fatal(err)
 	}
 	mustKind(t, store, backendRangeIP, nil, decisionscope.BannedValue, "")

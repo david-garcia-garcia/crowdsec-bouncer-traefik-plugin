@@ -39,8 +39,8 @@ func Unpack(payload any) (string, string, uint16) {
 	}
 }
 
-// kindOriginString is the Redis SET value and the Range blob remediation: kind, then newline, then origin.
-func kindOriginString(kind, origin string) string {
+// KindOriginString is the Redis SET value and the Range blob remediation: kind, then newline, then origin.
+func KindOriginString(kind, origin string) string {
 	if origin == "" {
 		return kind
 	}

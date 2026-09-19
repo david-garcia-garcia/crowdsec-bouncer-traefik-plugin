@@ -38,7 +38,7 @@ func TestMemoryExpiryOnPublish(t *testing.T) {
 
 func TestHydrateRangeKeepsLastOnUnreachable(t *testing.T) {
 	store := NewMemory(logger.New("ERROR", ""))
-	if err := store.ApplyRangeBatch(map[string]Decision{"10.0.0.0/8": {Kind: decisionscope.BannedValue}}, nil); err != nil {
+	if err := store.ApplyRangeBatch(map[string]string{"10.0.0.0/8": decisionscope.BannedValue}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if got := store.RangeMembership().Remediation(net.ParseIP("10.1.2.3")); got != decisionscope.BannedValue {

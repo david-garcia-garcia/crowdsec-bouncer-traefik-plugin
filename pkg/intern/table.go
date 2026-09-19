@@ -18,15 +18,14 @@ type snapshot struct {
 // Table is an append-only string intern. ID and Name are inverse. Empty name is id 0.
 type Table struct {
 	mu sync.Mutex
-	// snap is snapshot. atomic.Value not atomic.Pointer[T]
-	// (interpreters without generic atomics still Load the snapshot).
+	// snap holds *snapshot. Yaegi v0.16 panics boxing a map (or a struct of maps) into interface{}.
 	snap atomic.Value
 }
 
 // New returns an empty table.
 func New() *Table {
 	table := &Table{}
-	table.snap.Store(snapshot{
+	table.snap.Store(&snapshot{
 		byID:   map[uint16]string{},
 		byName: map[string]uint16{},
 	})
@@ -38,8 +37,11 @@ func (t *Table) current() snapshot {
 	if t == nil {
 		return snapshot{}
 	}
-	stored, _ := t.snap.Load().(snapshot)
-	return stored
+	stored, _ := t.snap.Load().(*snapshot)
+	if stored == nil {
+		return snapshot{}
+	}
+	return *stored
 }
 
 // lookup is string→id on the current snapshot.
@@ -74,7 +76,7 @@ func (t *Table) ID(name string) (uint16, bool) {
 	next := cloneSnapshot(prev)
 	next.byID[id] = name
 	next.byName[name] = id
-	t.snap.Store(next)
+	t.snap.Store(&next)
 	return id, true
 }
 
@@ -112,5 +114,5 @@ func (t *Table) FillUntilMaxForTest() {
 		byID[id] = name
 		byName[name] = id
 	}
-	t.snap.Store(snapshot{byID: byID, byName: byName})
+	t.snap.Store(&snapshot{byID: byID, byName: byName})
 }

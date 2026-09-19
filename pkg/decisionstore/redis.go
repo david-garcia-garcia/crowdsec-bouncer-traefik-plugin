@@ -172,7 +172,7 @@ func (r *redis) Put(item Decision) {
 	if key == "" {
 		return
 	}
-	r.set(key, kindOriginString(item.Kind, item.Origin), item.DurationSec)
+	r.set(key, KindOriginString(item.Kind, item.Origin), item.DurationSec)
 }
 
 // Delete is DEL of the canonical slot and a prior Ip spelling.
@@ -215,7 +215,7 @@ func (r *redis) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[str
 // ApplyRangeBatch upserts and removes Range lines with one Redis read and one write.
 // A read that did not answer is not an empty index: writing the batch onto an empty base
 // would drop every Range decision this poll did not carry.
-func (r *redis) ApplyRangeBatch(upserts map[string]Decision, removals []string) error {
+func (r *redis) ApplyRangeBatch(upserts map[string]string, removals []string) error {
 	if r == nil {
 		return ErrMiss
 	}

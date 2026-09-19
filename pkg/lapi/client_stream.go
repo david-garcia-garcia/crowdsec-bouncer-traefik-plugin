@@ -100,7 +100,7 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 	}
 	c.decisionStore.BeginTick()
 	defer c.decisionStore.PublishTick(time.Now().Unix())
-	rangeUpserts := make(map[string]decisionstore.Decision)
+	rangeUpserts := make(map[string]string)
 	var rangeRemovals []string
 	for _, decision := range stream.Deleted {
 		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
@@ -122,7 +122,7 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 			cidr := strings.TrimSpace(decision.Value)
 			if value != "" && cidr != "" {
 				origin := MetricsOrigin(decision.Origin, decision.Scenario)
-				rangeUpserts[cidr] = decisionstore.Decision{Kind: value, Origin: origin}
+				rangeUpserts[cidr] = decisionstore.KindOriginString(value, origin)
 				c.rememberActiveDecision("range:"+cidr, origin, cidr)
 			}
 			continue

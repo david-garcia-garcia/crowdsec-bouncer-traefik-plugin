@@ -70,7 +70,7 @@ func TestMembershipFromIndexIPv6(t *testing.T) {
 }
 
 func TestMembershipFromIndexReturnsOriginSuffix(t *testing.T) {
-	stored := kindOriginString(decisionscope.BannedValue, "crowdsec")
+	stored := KindOriginString(decisionscope.BannedValue, "crowdsec")
 	got := MembershipFromIndex("10.0.0.0/8=" + stored).Remediation(ipOf("10.1.2.3"))
 	if got != stored {
 		t.Fatalf("got %q, want suffixed ban", got)
@@ -85,8 +85,8 @@ func TestMembershipFromIndexLetterOnlyStillBans(t *testing.T) {
 }
 
 func TestMembershipFromIndexOverlappingBansLongestPrefixOrigin(t *testing.T) {
-	wide := kindOriginString(decisionscope.BannedValue, "crowdsec")
-	narrow := kindOriginString(decisionscope.BannedValue, "cscli")
+	wide := KindOriginString(decisionscope.BannedValue, "crowdsec")
+	narrow := KindOriginString(decisionscope.BannedValue, "cscli")
 	index := "10.0.0.0/8=" + wide + "\n10.1.0.0/16=" + narrow
 	got := MembershipFromIndex(index).Remediation(ipOf("10.1.2.3"))
 	if got != narrow {
@@ -102,8 +102,8 @@ func TestHunt_MembershipIPv4MappedCIDRDoesNotPanic(t *testing.T) {
 }
 
 func TestMembershipFromIndexMappedLastInsertWins(t *testing.T) {
-	first := kindOriginString(decisionscope.BannedValue, "crowdsec")
-	last := kindOriginString(decisionscope.BannedValue, "cscli")
+	first := KindOriginString(decisionscope.BannedValue, "crowdsec")
+	last := KindOriginString(decisionscope.BannedValue, "cscli")
 	index := "0.0.0.0/0=" + first + "\n::ffff:0:0/96=" + last
 	got := MembershipFromIndex(index).Remediation(ipOf("192.0.2.1"))
 	if got != last {

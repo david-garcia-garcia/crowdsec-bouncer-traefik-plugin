@@ -28,7 +28,7 @@ func MembershipFromIndex(index string) *RangeMembership {
 		if decisionscope.RemediationKind(rec.kind) == decisionscope.BannedValue {
 			helper = ban
 		}
-		if err := helper.AddCIDR(rec.cidr, kindOriginString(rec.kind, rec.origin)); err != nil {
+		if err := helper.AddCIDR(rec.cidr, KindOriginString(rec.kind, rec.origin)); err != nil {
 			continue
 		}
 	}

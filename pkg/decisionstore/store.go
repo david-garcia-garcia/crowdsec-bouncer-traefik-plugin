@@ -41,7 +41,7 @@ type backend interface {
 	// Returns kind, origin name (Redis string or intern id), or ErrMiss.
 	LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16, error)
 	// ApplyRangeBatch upserts and removes Range CIDRs on this backend's index.
-	ApplyRangeBatch(upserts map[string]Decision, removals []string) error
+	ApplyRangeBatch(upserts map[string]string, removals []string) error
 	// RangeIndex is the Range blob, or empty when none has been written.
 	RangeIndex() (string, error)
 	close()
@@ -154,7 +154,7 @@ func (s *Store) RangeIndex() (string, error) {
 }
 
 // ApplyRangeBatch upserts and removes Range CIDRs, then rebuilds in-process membership.
-func (s *Store) ApplyRangeBatch(upserts map[string]Decision, removals []string) error {
+func (s *Store) ApplyRangeBatch(upserts map[string]string, removals []string) error {
 	if s == nil || s.backend == nil {
 		return ErrMiss
 	}

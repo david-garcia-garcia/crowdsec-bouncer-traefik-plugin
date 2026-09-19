@@ -29,7 +29,7 @@ func rangeIndexCIDR(cidr string) string {
 
 // ApplyRangeIndex applies removals then upserts to a range-index blob.
 // Removals run first so a CIDR present in both maps remains the replacement.
-func ApplyRangeIndex(index string, upserts map[string]Decision, removals []string) string {
+func ApplyRangeIndex(index string, upserts map[string]string, removals []string) string {
 	records := parseRangeRecords(index)
 	for _, cidr := range removals {
 		network := rangeIndexCIDR(cidr)
@@ -38,12 +38,13 @@ func ApplyRangeIndex(index string, upserts map[string]Decision, removals []strin
 		}
 		records = removeRangeRecord(records, network)
 	}
-	for cidr, item := range upserts {
+	for cidr, stored := range upserts {
 		network := rangeIndexCIDR(cidr)
-		if network == "" || !decisionscope.IsActiveRemediation(item.Kind) {
+		if network == "" || !decisionscope.IsActiveRemediation(stored) {
 			continue
 		}
-		records = upsertRangeRecord(records, network, item.Kind, item.Origin)
+		kind, origin := splitKindOrigin(stored)
+		records = upsertRangeRecord(records, network, kind, origin)
 	}
 	return formatRangeRecords(records)
 }

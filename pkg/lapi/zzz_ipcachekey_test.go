@@ -171,7 +171,7 @@ func splitStoreOnDeadReader(t *testing.T) (*decisionstore.Store, *testLeaseRedis
 	t.Helper()
 	writer := startTestLeaseRedis(t)
 	seed := newTestRedisStore(t, writer.addr(), nil, "sess")
-	if err := seed.ApplyRangeBatch(map[string]decisionstore.Decision{"10.0.0.0/8": {Kind: decisionscope.BannedValue}}, nil); err != nil {
+	if err := seed.ApplyRangeBatch(map[string]string{"10.0.0.0/8": decisionscope.BannedValue}, nil); err != nil {
 		t.Fatal(err)
 	}
 	store := newTestRedisStore(t, writer.addr(), []string{"127.0.0.1:1"}, "sess")
@@ -183,7 +183,7 @@ func splitStoreOnDeadReader(t *testing.T) (*decisionstore.Store, *testLeaseRedis
 // only what this one poll carried and silently drops every other Range ban.
 func TestApplyRangeBatch_UnreachableReadKeepsSharedIndex(t *testing.T) {
 	store, writer := splitStoreOnDeadReader(t)
-	err := store.ApplyRangeBatch(map[string]decisionstore.Decision{"192.168.0.0/16": {Kind: decisionscope.BannedValue}}, nil)
+	err := store.ApplyRangeBatch(map[string]string{"192.168.0.0/16": decisionscope.BannedValue}, nil)
 	if err == nil || !errors.Is(err, decisionstore.ErrUnreachable) {
 		t.Errorf("apply on an unreadable index returned %v, want ErrUnreachable", err)
 	}

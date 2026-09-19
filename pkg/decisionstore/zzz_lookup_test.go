@@ -65,7 +65,7 @@ func TestLookupHitsPackedWord(t *testing.T) {
 }
 
 func TestLookupHitsOriginSuffix(t *testing.T) {
-	payloads := map[string]any{"203.0.113.10": kindOriginString(decisionscope.BannedValue, "crowdsec")}
+	payloads := map[string]any{"203.0.113.10": KindOriginString(decisionscope.BannedValue, "crowdsec")}
 	got, origin, _ := lookupHits(func(key string) any { return payloads[key] }, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
 	if got != decisionscope.BannedValue || origin != "crowdsec" {
 		t.Fatalf("got %q origin %q", got, origin)
@@ -73,7 +73,7 @@ func TestLookupHitsOriginSuffix(t *testing.T) {
 }
 
 func TestLookupHitsRangeOnlyOrigin(t *testing.T) {
-	stored := kindOriginString(decisionscope.BannedValue, "crowdsec")
+	stored := KindOriginString(decisionscope.BannedValue, "crowdsec")
 	got, origin, _ := lookupHits(func(string) any { return nil }, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, MembershipFromIndex("10.0.0.0/8="+stored))
 	if got != decisionscope.BannedValue || origin != "crowdsec" {
 		t.Fatalf("got %q origin %q", got, origin)

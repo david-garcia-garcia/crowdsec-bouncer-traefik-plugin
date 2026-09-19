@@ -44,7 +44,7 @@ func TestPackOverflowUsesGenericOrigin(t *testing.T) {
 }
 
 func TestUnpackKindOriginString(t *testing.T) {
-	kind, origin, originID := Unpack(kindOriginString(decisionscope.BannedValue, "crowdsec"))
+	kind, origin, originID := Unpack(KindOriginString(decisionscope.BannedValue, "crowdsec"))
 	if kind != decisionscope.BannedValue || origin != "crowdsec" || originID != 0 {
 		t.Fatalf("kind %q origin %q id %d", kind, origin, originID)
 	}
