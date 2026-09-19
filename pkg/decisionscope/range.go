@@ -123,10 +123,12 @@ func upsertIndexCIDR(index, cidr, remediation string) string {
 	return strings.Join(kept, "\n")
 }
 
-// readRangeIndex returns the cached range-index blob. A miss is an empty index and no error; every
-// other failure is returned, because the caller cannot tell "no Range decisions" from "no answer".
+// readRangeIndex returns the cached range-index blob from the authoritative copy. ApplyRangeBatch
+// rewrites what this returns, so a replica-lagged read would rebuild the shared index from an old
+// base and write that truncated blob back. A miss is an empty index and no error; every other
+// failure is returned, because the caller cannot tell "no Range decisions" from "no answer".
 func readRangeIndex(cacheClient *cache.Client) (string, error) {
-	index, err := cacheClient.Get(RangeIndexKey)
+	index, err := cacheClient.GetConsistent(RangeIndexKey)
 	if err != nil {
 		if errors.Is(err, cache.ErrMiss) {
 			return "", nil

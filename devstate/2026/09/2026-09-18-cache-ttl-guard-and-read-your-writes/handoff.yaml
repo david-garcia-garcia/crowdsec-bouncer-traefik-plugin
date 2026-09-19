@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-cache-ttl-guard-and-read-your-writes
+jobName: 2026-09-18-cache-ttl-guard-and-read-your-writes
+issueHost: github
+issueRef: 38
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: ticket/source.md rebuilt from PR #38, triage trimmed the error-propagation third
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: 2026-09-18-cache-ttl-guard-and-read-your-writes
+pr:
+  id: 78
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/78

@@ -153,24 +153,26 @@ func TestLiveLookup_MemoHitsAcrossSpellings(t *testing.T) {
 	}
 }
 
-// splitCacheOnDeadReader builds the production shape that reaches the range-index defect with no
-// timing window at all: writes and the stream lease go to a healthy writer, reads round-robin onto
-// a read replica that is down. Returns the client and the writer's view of the stored keys.
-func splitCacheOnDeadReader(t *testing.T) (*cache.Client, *testLeaseRedis) {
+// liveWriterCache is a Redis-backed client whose reads of the shared index go to this writer
+// (GetConsistent). A dead replica is no longer the unreadable-index fixture: the apply path
+// does not consult it.
+func liveWriterCache(t *testing.T) (*cache.Client, *testLeaseRedis) {
 	t.Helper()
 	writer := startTestLeaseRedis(t)
 	client := &cache.Client{}
-	client.New(logger.New("ERROR", ""), true, writer.addr(), []string{"127.0.0.1:1"}, "", "", "sess")
+	client.New(logger.New("ERROR", ""), true, writer.addr(), nil, "", "", "sess")
 	t.Cleanup(client.Close)
 	return client, writer
 }
 
 // TestApplyRangeBatch_UnreachableReadKeepsSharedIndex is the range half of the defect. The index is
 // shared by every bouncer on this cache; rebuilding it from a read that never answered writes back
-// only what this one poll carried and silently drops every other Range ban.
+// only what this one poll carried and silently drops every other Range ban. After GetConsistent,
+// that unread is a writer GET that fails, not a down replica.
 func TestApplyRangeBatch_UnreachableReadKeepsSharedIndex(t *testing.T) {
-	client, writer := splitCacheOnDeadReader(t)
+	client, writer := liveWriterCache(t)
 	client.Set(decisionscope.RangeIndexKey, "10.0.0.0/8="+decisionscope.BannedValue, 3600)
+	writer.refuseNextGets()
 
 	err := decisionscope.ApplyRangeBatch(client, map[string]string{"192.168.0.0/16": decisionscope.BannedValue}, nil)
 	if err == nil || !errors.Is(err, cache.ErrUnreachable) {
@@ -185,8 +187,9 @@ func TestApplyRangeBatch_UnreachableReadKeepsSharedIndex(t *testing.T) {
 // TestApplyRangeBatch_UnreachableReadDoesNotDeleteIndex is the same defect on the removal path,
 // where an empty rebuilt index deletes the shared key outright.
 func TestApplyRangeBatch_UnreachableReadDoesNotDeleteIndex(t *testing.T) {
-	client, writer := splitCacheOnDeadReader(t)
+	client, writer := liveWriterCache(t)
 	client.Set(decisionscope.RangeIndexKey, "10.0.0.0/8="+decisionscope.BannedValue, 3600)
+	writer.refuseNextGets()
 
 	if err := decisionscope.ApplyRangeBatch(client, nil, []string{"172.16.0.0/12"}); err == nil {
 		t.Error("removal on an unreadable index must return an error")
@@ -210,8 +213,9 @@ func TestHandleStreamCache_RangeApplyFailureReleasesLease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client, writer := splitCacheOnDeadReader(t)
+	client, writer := liveWriterCache(t)
 	client.Set(decisionscope.RangeIndexKey, "10.0.0.0/8="+decisionscope.BannedValue, 3600)
+	writer.refuseNextGets()
 	poller := newSharedStreamPoller(t, client, parsed.Host)
 	atomic.StoreInt64(&poller.isCrowdsecStreamStartup, 1)
 	attachTestTransport(poller, server.Client(), "test-key")
