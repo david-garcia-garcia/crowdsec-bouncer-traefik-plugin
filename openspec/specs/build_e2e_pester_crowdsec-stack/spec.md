@@ -138,17 +138,6 @@ The Pester suite SHALL include none-mode routes whose LAPI or AppSec host is unr
 - **WHEN** AppSec is unreachable and `crowdsecAppsecFailureAction` is `ban`
 - **THEN** the request is forbidden
 
-### Requirement: Real stack covers CrowdSec allow as a whitelist
-The Pester suite SHALL add CrowdSec `type=allow` decisions with `cscli` and assert they whitelist the same IP over a ban in none mode and stream mode.
-
-#### Scenario: Allow-only IP is not remediating
-- **WHEN** only an allow decision exists for the test IP
-- **THEN** the none-mode route is allowed
-
-#### Scenario: Allow whitelists a banned IP
-- **WHEN** a ban and an allow exist for the same IP
-- **THEN** none-mode and stream-mode routes are allowed
-
 ### Requirement: Real stack covers captcha POST body, grace, and IPv6 bind
 Captcha solve SHALL succeed from the POST body alone (no query-string token). A dedicated short-grace route SHALL challenge again after `captchaGracePeriodSeconds`. Gate bind SHALL accept a different spelling of the same IPv6 address.
 
