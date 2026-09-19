@@ -7,8 +7,8 @@ The pool built from `ForwardedHeadersTrustedIPs` or `ClientTrustedIPs`. `Contain
 _Avoid_: Range index, LAPI decision value, geolocation
 
 **IP lookup helper**:
-In-tree radix of CIDRs (`pkg/iplookup.Helper`). Insert at construction; `IsContained` is membership plus longest prefix length. No associated remediation.
-_Avoid_: range-index, per-CIDR cache key, `InNetwork` (one network)
+Vendored utilities Helper (`github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup`). `New` builds an empty set; `AddCIDR` inserts a CIDR with metadata; `Contains` is membership plus longest prefix length. Callers pass empty metadata. No associated remediation.
+_Avoid_: range-index, per-CIDR cache key, `InNetwork` (one network), `pkg/iplookup`, `IsContained`
 
 **IPv4-mapped CIDR**:
 A parseable CIDR whose network `To4()` is non-nil and whose mask `bits` is 128 (for example `::ffff:0:0/96`). It is the IPv4 prefix of length `ones-96` that `net.IPNet.Contains` uses.
@@ -28,7 +28,7 @@ _Avoid_: renaming `req` to `client`; a fourth address field; a bag for scopes, o
 
 ## Overview
 
-Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker stores those CIDRs in `pkg/iplookup`. Stream/alone Range uses two Helpers on the LAPI Client (ban set, captcha set), not Checker. Use `ip.InNetwork` when the question is one CIDR (blob line parse). Do not parse `RemoteAddr` in the helper; classify `GetRemoteIP`.
+Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker stores those CIDRs in the utilities `iplookup` Helper. Stream/alone Range uses two Helpers on the LAPI Client (ban set, captcha set), not Checker. Use `ip.InNetwork` when the question is one CIDR (blob line parse). Do not parse `RemoteAddr` in the helper; classify `GetRemoteIP`.
 
 ## How to use
 
@@ -51,14 +51,14 @@ ok := checker.ContainsIP(req.ipAddr)
 
 - `pkg/ip/checker.go`
 - `pkg/ip/network.go`
-- `pkg/iplookup/`
+- `vendor/github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup/`
 - `pkg/bouncer/clientrequest.go`
 - `pkg/bouncer/bouncer.go`
 - `pkg/configuration/configuration.go` (`validateParamsIPs`)
 
 ## Gotchas
 
-- `IsContained` prefix length is for longest-match callers. Checker is boolean any-match.
+- `Contains` prefix length is for longest-match callers. Checker is boolean any-match.
 - The helper does not store remediation strings. Range ban and captcha are two Helpers, not one payload tree.
 - Invalid CIDR fails `NewChecker` / `AddCIDR`; config validate already constructs a Checker and discards it.
 - `0.0.0.0/0` is IPv4 only; `::/0` is IPv6 only. A shared radix root would mark `/0` on both families.

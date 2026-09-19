@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/iplookup"
+	"github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup"
 )
 
 // RangeMembership is in-process ban-then-captcha CIDR membership rebuilt from range-index.
@@ -17,8 +17,8 @@ type RangeMembership struct {
 
 // MembershipFromIndex builds RangeMembership from a cidr=remediation blob. Invalid CIDR lines are skipped.
 func MembershipFromIndex(index string) *RangeMembership {
-	ban := iplookup.NewEmptyHelper()
-	captcha := iplookup.NewEmptyHelper()
+	ban := iplookup.New()
+	captcha := iplookup.New()
 	storedByCIDR := make(map[string]string)
 	if index == "" {
 		return &RangeMembership{ban: ban, captcha: captcha, storedByCIDR: storedByCIDR}
@@ -28,12 +28,14 @@ func MembershipFromIndex(index string) *RangeMembership {
 		if network == "" || !IsActiveRemediation(remediation) {
 			continue
 		}
-		helper := captcha
 		if cache.RemediationKind(remediation) == BannedValue {
-			helper = ban
-		}
-		if err := helper.AddCIDR(network); err != nil {
-			continue
+			if err := ban.AddCIDR(network, ""); err != nil {
+				continue
+			}
+		} else {
+			if err := captcha.AddCIDR(network, ""); err != nil {
+				continue
+			}
 		}
 		storedByCIDR[network] = remediation
 	}
@@ -46,13 +48,13 @@ func (membership *RangeMembership) Remediation(ipAddr net.IP) string {
 		return ""
 	}
 	if membership.ban != nil {
-		found, prefixLen, err := membership.ban.IsContained(ipAddr)
+		found, prefixLen, _, err := membership.ban.Contains(ipAddr)
 		if err == nil && found {
 			return membership.storedMatchingPrefix(ipAddr, prefixLen, BannedValue)
 		}
 	}
 	if membership.captcha != nil {
-		found, prefixLen, err := membership.captcha.IsContained(ipAddr)
+		found, prefixLen, _, err := membership.captcha.Contains(ipAddr)
 		if err == nil && found {
 			return membership.storedMatchingPrefix(ipAddr, prefixLen, CaptchaValue)
 		}

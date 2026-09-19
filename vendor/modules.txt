@@ -1,5 +1,6 @@
-# github.com/david-garcia-garcia/traefik-middleware-utilities v1.0.3
+# github.com/david-garcia-garcia/traefik-middleware-utilities v1.0.4
 ## explicit; go 1.21
+github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup
 github.com/david-garcia-garcia/traefik-middleware-utilities/reclaim
 github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis
 # github.com/leprosus/golang-ttl-map v1.1.7
