@@ -1,6 +1,6 @@
 // Package decisionstore is the reclaimed holder of CrowdSec decisions.
 // Stream/alone and live/none Ip and header-scope slots are a memory copy-on-write map
-// or Redis via SimpleRedis. Range is ApplyRangeBatch on the same backend.
+// or Redis via SimpleRedis. Range is ApplyRangeBatch on the same engine.
 package decisionstore
 
 import (
@@ -15,41 +15,11 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
-// backend holds Ip, header-scope, and Range decisions. Redis writes those keys through
-// SimpleRedis; memory uses a copy-on-write LiveSlot map plus an in-process range blob.
-type backend interface {
-	// BeginTick opens the write window for one stream poll.
-	// Memory clones the published map into tick so Put/Delete mutate a private copy
-	// while lookups still read the previous published map.
-	// Redis is a no-op: each Set/Delete is already visible to other processes.
-	BeginTick()
-	// PublishTick closes that window.
-	// Memory drops slots whose expiresAt is at or before now, publishes tick as the
-	// lookup map, and clears tick.
-	// Redis is a no-op: key TTL is the expiry.
-	PublishTick(now int64)
-	// Put stores one Ip or header-scope decision for DurationSec seconds.
-	// Memory writes tick when a stream window is open, else the published map (live).
-	// Redis is a kind+origin string SET with that TTL.
-	Put(item Decision)
-	// Delete drops the canonical slot for scope+value. For Ip, a prior spelling of the same
-	// address is deleted too so a lift cannot survive under the old key.
-	// Memory deletes from tick or the published map. Redis is DEL.
-	Delete(scope, value string)
-	// LookupRemediation is the request path: Ip slot, then header scopes, then Range.
-	// Memory reads the published map. Redis reads SimpleRedis.
-	// Returns kind, origin name (Redis string or intern id), or ErrMiss.
-	LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16, error)
-	// ApplyRangeBatch upserts and removes Range CIDRs on this backend's index.
-	ApplyRangeBatch(upserts map[string]string, removals []string) error
-	// RangeIndex is the Range blob, or empty when none has been written.
-	RangeIndex() (string, error)
-	close()
-}
-
-// Store is one reclaim value: intern table, Range membership, and the decision backend.
+// Store is one reclaim value: intern table, Range membership, and the decision engine.
+// Memory and Redis are concrete fields: Yaegi v0.16 panics putting a map-holding struct in an interface.
 type Store struct {
-	backend
+	mem             *memory
+	red             *redis
 	origins         *intern.Table
 	rangeMembership atomic.Value // *RangeMembership
 	lastRangeIndex  atomic.Value // string of the blob last used to build membership
@@ -59,7 +29,7 @@ type Store struct {
 func NewMemory(log *slog.Logger) *Store {
 	origins := intern.New()
 	return &Store{
-		backend: newMemory(log, origins),
+		mem:     newMemory(log, origins),
 		origins: origins,
 	}
 }
@@ -67,7 +37,7 @@ func NewMemory(log *slog.Logger) *Store {
 // NewRedis stores Ip, header-scope, and Range on Redis (keyPrefix namespaces keys).
 func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string) *Store {
 	return &Store{
-		backend: newRedis(log, writeHost, readHosts, pass, database, keyPrefix),
+		red:     newRedis(log, writeHost, readHosts, pass, database, keyPrefix),
 		origins: intern.New(),
 	}
 }
@@ -113,52 +83,101 @@ func (o originIntern) Intern(name string) (uint16, bool) {
 	return o.table.ID(name)
 }
 
+// BeginTick opens the write window for one stream poll. Memory clones published into tick.
+// Redis is a no-op: each Set/Delete is already visible to other processes.
+func (s *Store) BeginTick() {
+	if s != nil && s.mem != nil {
+		s.mem.BeginTick()
+	}
+}
+
+// PublishTick closes that window. Memory drops expired tick slots and publishes tick.
+// Redis is a no-op: key TTL is the expiry.
+func (s *Store) PublishTick(now int64) {
+	if s != nil && s.mem != nil {
+		s.mem.PublishTick(now)
+	}
+}
+
 // Put stores one Ip or header-scope decision. Range is ignored (use ApplyRangeBatch).
 func (s *Store) Put(item Decision) {
-	if s == nil || s.backend == nil {
+	if s == nil {
 		return
 	}
-	s.backend.Put(item)
+	if s.mem != nil {
+		s.mem.Put(item)
+		return
+	}
+	if s.red != nil {
+		s.red.Put(item)
+	}
 }
 
 // Delete drops the canonical slot for scope+value, and a prior Ip spelling when it differs.
 func (s *Store) Delete(scope, value string) {
-	if s == nil || s.backend == nil {
+	if s == nil {
 		return
 	}
-	s.backend.Delete(scope, value)
+	if s.mem != nil {
+		s.mem.Delete(scope, value)
+		return
+	}
+	if s.red != nil {
+		s.red.Delete(scope, value)
+	}
 }
 
 // LookupRemediation is the request path for stream/alone and live/none.
 func (s *Store) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string) (string, string, uint16, error) {
-	if s == nil || s.backend == nil {
+	if s == nil {
 		return "", "", 0, ErrMiss
 	}
-	return s.backend.LookupRemediation(remoteIP, ipAddr, scopes, s.RangeMembership())
+	membership := s.RangeMembership()
+	if s.mem != nil {
+		return s.mem.LookupRemediation(remoteIP, ipAddr, scopes, membership)
+	}
+	if s.red != nil {
+		return s.red.LookupRemediation(remoteIP, ipAddr, scopes, membership)
+	}
+	return "", "", 0, ErrMiss
 }
 
 // Close drains the Redis pool. Memory is a no-op. Reclaim last-holder hook.
 func (s *Store) Close() {
-	if s == nil || s.backend == nil {
-		return
+	if s != nil && s.red != nil {
+		s.red.close()
 	}
-	s.backend.close()
 }
 
 // RangeIndex is the Range blob, or empty when none has been written.
 func (s *Store) RangeIndex() (string, error) {
-	if s == nil || s.backend == nil {
+	if s == nil {
 		return "", ErrMiss
 	}
-	return s.backend.RangeIndex()
+	if s.mem != nil {
+		return s.mem.RangeIndex()
+	}
+	if s.red != nil {
+		return s.red.RangeIndex()
+	}
+	return "", ErrMiss
 }
 
 // ApplyRangeBatch upserts and removes Range CIDRs, then rebuilds in-process membership.
 func (s *Store) ApplyRangeBatch(upserts map[string]string, removals []string) error {
-	if s == nil || s.backend == nil {
+	if s == nil {
 		return ErrMiss
 	}
-	if err := s.backend.ApplyRangeBatch(upserts, removals); err != nil {
+	var err error
+	switch {
+	case s.mem != nil:
+		err = s.mem.ApplyRangeBatch(upserts, removals)
+	case s.red != nil:
+		err = s.red.ApplyRangeBatch(upserts, removals)
+	default:
+		return ErrMiss
+	}
+	if err != nil {
 		return err
 	}
 	s.HydrateRange()
@@ -180,10 +199,10 @@ func (s *Store) RangeMembership() *RangeMembership {
 
 // HydrateRange rebuilds Range membership from the stored blob. A read that did not answer keeps the last trees.
 func (s *Store) HydrateRange() {
-	if s == nil || s.backend == nil {
+	if s == nil {
 		return
 	}
-	index, err := s.backend.RangeIndex()
+	index, err := s.RangeIndex()
 	if err != nil {
 		return
 	}
@@ -203,7 +222,7 @@ func (s *Store) OriginID(name string) (uint16, bool) {
 	return s.origins.ID(name)
 }
 
-// OriginName is the interned origin for id. Lock-free. Unknown id is empty.
+// OriginName is the interned origin for id. Unknown id is empty.
 func (s *Store) OriginName(id uint16) string {
 	if s == nil {
 		return ""
@@ -221,25 +240,20 @@ func (s *Store) FillUntilMaxForTest() {
 
 // SeedSlotForTest publishes one memory slot without a tick. Redis Put goes to Redis.
 func (s *Store) SeedSlotForTest(item Decision) {
-	if s == nil || s.backend == nil {
+	if s == nil {
 		return
 	}
-	mem, ok := s.backend.(*memory)
-	if !ok {
-		s.backend.Put(item)
+	if s.mem != nil {
+		s.mem.seedPublished(item)
 		return
 	}
-	mem.seedPublished(item)
+	s.Put(item)
 }
 
 // PublishedMemoryMapForTest is the published memory map. Nil when the store is Redis.
 func (s *Store) PublishedMemoryMapForTest() map[string]LiveSlot {
-	if s == nil {
+	if s == nil || s.mem == nil {
 		return nil
 	}
-	mem, ok := s.backend.(*memory)
-	if !ok {
-		return nil
-	}
-	return mem.publishedMap()
+	return s.mem.publishedMap()
 }

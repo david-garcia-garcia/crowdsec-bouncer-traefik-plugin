@@ -49,9 +49,9 @@ func TestNextReader(t *testing.T) {
 func TestNewRedisKeepsReadersByPointer(t *testing.T) {
 	store := NewRedis(logger.New("INFO", ""), "127.0.0.1:1", []string{"127.0.0.1:2", "127.0.0.1:3"}, "", "", "p")
 	defer store.Close()
-	backend, ok := store.backend.(*redis)
-	if !ok {
-		t.Fatalf("backend type %T, want *redis", store.backend)
+	backend := store.red
+	if backend == nil {
+		t.Fatal("redis engine is nil")
 	}
 	if backend.writer == nil {
 		t.Fatal("writer is nil")
