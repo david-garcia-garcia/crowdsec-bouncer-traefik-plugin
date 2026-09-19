@@ -99,7 +99,7 @@ func (s *DecisionStore) Intern(name string) (uint16, bool) {
 	if s == nil {
 		return 0, false
 	}
-	return s.origins.Intern(name)
+	return s.origins.ID(name)
 }
 
 // OriginName is the interned origin for id. Lock-free. Unknown id is empty.

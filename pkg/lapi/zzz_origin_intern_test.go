@@ -86,12 +86,7 @@ func TestStorePackedOrLeftoverOverflowUsesLeftover(t *testing.T) {
 	cacheClient.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
 	store := newTestInternStore()
 	store.cache = cacheClient
-	names := make([]string, 65536)
-	names[0] = ""
-	for i := 1; i < 65536; i++ {
-		names[i] = "filled"
-	}
-	store.origins.ReplaceNamesForTest(names)
+	store.origins.FillUntilMaxForTest()
 	client := &Client{cacheClient: cacheClient, decisionStore: store, log: logger.New("ERROR", "")}
 	client.storeStreamDecision(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.99", Origin: "overflow-origin"}, 60)
 	slot := decisionscope.IPCacheKey("203.0.113.99")

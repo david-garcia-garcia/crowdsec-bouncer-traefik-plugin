@@ -2,43 +2,43 @@ package intern
 
 import "testing"
 
-func TestInternRoundTrip(t *testing.T) {
+func TestIDNameRoundTrip(t *testing.T) {
 	table := New()
-	id, ok := table.Intern("crowdsec")
+	id, ok := table.ID("crowdsec")
 	if !ok || id == 0 {
-		t.Fatalf("intern ok=%v id=%d", ok, id)
+		t.Fatalf("ID ok=%v id=%d", ok, id)
 	}
 	if table.Name(id) != "crowdsec" {
 		t.Fatalf("Name %q", table.Name(id))
 	}
-	again, ok := table.Intern("crowdsec")
+	again, ok := table.ID("crowdsec")
 	if !ok || again != id {
-		t.Fatalf("second intern %d ok=%v", again, ok)
+		t.Fatalf("second ID %d ok=%v", again, ok)
 	}
 }
 
-func TestInternEmptyNameIsZero(t *testing.T) {
+func TestIDEmptyNameIsZero(t *testing.T) {
 	table := New()
-	id, ok := table.Intern("")
+	id, ok := table.ID("")
 	if !ok || id != 0 || table.Name(0) != "" {
 		t.Fatalf("empty id=%d ok=%v", id, ok)
 	}
 }
 
-func TestInternNilTable(t *testing.T) {
+func TestIDNilTable(t *testing.T) {
 	var table *Table
-	id, ok := table.Intern("crowdsec")
+	id, ok := table.ID("crowdsec")
 	if ok || id != 0 || table.Name(1) != "" {
-		t.Fatalf("nil intern id=%d ok=%v", id, ok)
+		t.Fatalf("nil ID id=%d ok=%v", id, ok)
 	}
 }
 
-func TestInternTablesDoNotShareIds(t *testing.T) {
+func TestIDTablesDoNotShareIds(t *testing.T) {
 	first := New()
 	second := New()
-	firstID, _ := first.Intern("crowdsec")
-	second.Intern("other")
-	secondID, _ := second.Intern("crowdsec")
+	firstID, _ := first.ID("crowdsec")
+	second.ID("other")
+	secondID, _ := second.ID("crowdsec")
 	if first.Name(firstID) != "crowdsec" || second.Name(firstID) == "crowdsec" {
 		t.Fatal("tables must not share snapshots")
 	}
@@ -47,19 +47,14 @@ func TestInternTablesDoNotShareIds(t *testing.T) {
 	}
 }
 
-func TestInternOverflowDoesNotWrap(t *testing.T) {
+func TestIDOverflowDoesNotWrap(t *testing.T) {
 	table := New()
-	names := make([]string, 65536)
-	names[0] = ""
-	for i := 1; i < 65536; i++ {
-		names[i] = "filled"
-	}
-	table.ReplaceNamesForTest(names)
-	id, ok := table.Intern("overflow")
+	table.FillUntilMaxForTest()
+	id, ok := table.ID("overflow")
 	if ok || id != 0 {
 		t.Fatalf("overflow id=%d ok=%v", id, ok)
 	}
-	if table.Name(1) != "filled" {
+	if table.Name(1) != "1" {
 		t.Fatalf("full table Name %q", table.Name(1))
 	}
 }
