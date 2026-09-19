@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 
 	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
@@ -40,9 +41,10 @@ func StoreKey(cfg *configuration.Config) string {
 
 // DecisionStore is a reclaim value that owns one cache.Client (memory TTL or Redis-protocol prefix).
 type DecisionStore struct {
-	cache       *cache.Client
-	redisBacked bool
-	origins     *intern.Table
+	cache        *cache.Client
+	redisBacked  bool
+	origins      *intern.Table
+	liveSnapshot atomic.Value // map[string]decisionscope.LiveSlot
 }
 
 // Cache is the map or Redis pool this store owns.

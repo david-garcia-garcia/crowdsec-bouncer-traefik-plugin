@@ -39,18 +39,20 @@ func TestStoreStreamDecisionPacksMemory(t *testing.T) {
 	store := newTestInternStore()
 	store.cache = cacheClient
 	client := &Client{cacheClient: cacheClient, decisionStore: store, log: logger.New("ERROR", "")}
+	client.liveTick = store.cloneLiveSnapshot()
 	client.storeStreamDecision(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.10", Origin: "crowdsec"}, 60)
+	client.publishLiveTick()
 	slot := decisionscope.IPCacheKey("203.0.113.10")
-	word, err := cacheClient.GetInt(slot)
-	if err != nil {
-		t.Fatalf("GetInt %v", err)
+	live, ok := store.LiveSnapshot()[slot]
+	if !ok {
+		t.Fatal("live slot missing")
 	}
-	kind, _, originID := decisionscope.Unpack(word)
+	kind, _, originID := decisionscope.Unpack(live.Word)
 	if kind != decisionscope.BannedValue || store.OriginName(originID) != "crowdsec" {
 		t.Fatalf("kind %q origin %q", kind, store.OriginName(originID))
 	}
-	if _, getErr := cacheClient.Get(slot); getErr == nil {
-		t.Fatal("leftover Get must miss a packed word")
+	if _, getErr := cacheClient.GetInt(slot); getErr == nil {
+		t.Fatal("ttl heap must not duplicate packed Ip")
 	}
 }
 
@@ -88,14 +90,19 @@ func TestStorePackedOrLeftoverOverflowUsesLeftover(t *testing.T) {
 	store.cache = cacheClient
 	store.origins.FillUntilMaxForTest()
 	client := &Client{cacheClient: cacheClient, decisionStore: store, log: logger.New("ERROR", "")}
+	client.liveTick = store.cloneLiveSnapshot()
 	client.storeStreamDecision(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.99", Origin: "overflow-origin"}, 60)
+	client.publishLiveTick()
 	slot := decisionscope.IPCacheKey("203.0.113.99")
-	if _, err := cacheClient.GetInt(slot); err == nil || err.Error() != cache.CacheMiss {
-		t.Fatalf("GetInt leftover got %v, want cache:miss", err)
+	live, ok := store.LiveSnapshot()[slot]
+	if !ok {
+		t.Fatal("live slot missing")
 	}
-	got, err := cacheClient.Get(slot)
 	want := decisionscope.RemediationWithOrigin(decisionscope.BannedValue, "overflow-origin")
-	if err != nil || got != want {
-		t.Fatalf("leftover %q err %v, want %q", got, err, want)
+	if live.Leftover != want {
+		t.Fatalf("leftover %q, want %q", live.Leftover, want)
+	}
+	if _, err := cacheClient.Get(slot); err == nil {
+		t.Fatal("ttl heap must not duplicate overflow Ip")
 	}
 }

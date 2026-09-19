@@ -10,8 +10,8 @@ src: 6e16b7cda2dc603a30090000fdc7ceea3bd8cc11dc1b818772935f8ea30700da
 localTests: none
 requirement: requirement.md
 comments: none
-explore: none
-change: none
+explore: explore.md
+change: 2026-09-19-optcow-stream-lookup
 pr:
   id: 118
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/118

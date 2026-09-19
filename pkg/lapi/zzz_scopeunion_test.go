@@ -51,12 +51,14 @@ func TestOpenStream_LiveRoutersUnionCountryAndUsername(t *testing.T) {
 	if !strings.Contains(query, "country") || !strings.Contains(query, "username") {
 		t.Fatalf("union scopes: %s", query)
 	}
+	countryClient.liveTick = countryClient.decisionStore.cloneLiveSnapshot()
 	countryClient.storeStreamDecision(Decision{Type: "ban", Scope: "Country", Value: "FR", Origin: "CAPI"}, 60)
 	countryClient.storeStreamDecision(Decision{Type: "ban", Scope: "username", Value: "alice", Origin: "CAPI"}, 60)
-	if !testCacheHasDecision(countryClient.Cache(), decisionscope.HeaderScopeKey(decisionscope.ScopeCountry, "FR")) {
+	countryClient.publishLiveTick()
+	if !testStreamHasDecision(countryClient, decisionscope.HeaderScopeKey(decisionscope.ScopeCountry, "FR")) {
 		t.Fatal("Country decision must store")
 	}
-	if !testCacheHasDecision(countryClient.Cache(), decisionscope.HeaderScopeKey("username", "alice")) {
+	if !testStreamHasDecision(countryClient, decisionscope.HeaderScopeKey("username", "alice")) {
 		t.Fatal("username decision must store")
 	}
 
@@ -69,9 +71,17 @@ func TestOpenStream_LiveRoutersUnionCountryAndUsername(t *testing.T) {
 	if strings.Contains(afterDrop, "username") {
 		t.Fatalf("username must drop: %s", afterDrop)
 	}
-	if !testCacheHasDecision(countryClient.Cache(), decisionscope.HeaderScopeKey(decisionscope.ScopeCountry, "FR")) {
+	if !testStreamHasDecision(countryClient, decisionscope.HeaderScopeKey(decisionscope.ScopeCountry, "FR")) {
 		t.Fatal("unregister must not sweep Country key")
 	}
+}
+
+func testStreamHasDecision(client *Client, key string) bool {
+	if client.UsesLiveSnapshot() {
+		_, ok := client.LiveSnapshot()[key]
+		return ok
+	}
+	return testCacheHasDecision(client.Cache(), key)
 }
 
 func testCacheHasDecision(cacheClient *cache.Client, key string) bool {

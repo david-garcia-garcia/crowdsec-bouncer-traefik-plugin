@@ -29,10 +29,16 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 	}
 	origin := MetricsOrigin(item.Origin, item.Scenario)
 	scope := decisionscope.NormalizeScope(item.Scope)
+	payload := decisionscope.Pack(value, origin, c.decisionStore)
 	switch scope {
 	case decisionscope.ScopeIP, "":
 		slot := decisionscope.IPCacheKey(item.Value)
-		c.cacheClient.Set(slot, decisionscope.Pack(value, origin, c.decisionStore), duration)
+		if c.liveTick != nil {
+			c.liveTick[slot] = decisionscope.LiveSlotFromPack(payload, duration)
+			c.rememberActiveDecision(slot, origin, item.Value)
+			return
+		}
+		c.cacheClient.Set(slot, payload, duration)
 		c.rememberActiveDecision(slot, origin, item.Value)
 	case decisionscope.ScopeRange:
 		return
@@ -46,7 +52,12 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 			return
 		}
 		slot := decisionscope.HeaderScopeKey(scope, identifier)
-		c.cacheClient.Set(slot, decisionscope.Pack(value, origin, c.decisionStore), duration)
+		if c.liveTick != nil {
+			c.liveTick[slot] = decisionscope.LiveSlotFromPack(payload, duration)
+			c.rememberActiveDecision(slot, origin, item.Value)
+			return
+		}
+		c.cacheClient.Set(slot, payload, duration)
 		c.rememberActiveDecision(slot, origin, item.Value)
 	}
 }
@@ -58,6 +69,11 @@ func (c *Client) deleteStreamDecision(item Decision) {
 	case decisionscope.ScopeIP, "":
 		slot := decisionscope.IPCacheKey(item.Value)
 		c.forgetActiveDecision(slot)
+		if c.liveTick != nil {
+			delete(c.liveTick, slot)
+			delete(c.liveTick, item.Value)
+			return
+		}
 		c.cacheClient.Delete(slot)
 		c.cacheClient.Delete(item.Value)
 	case decisionscope.ScopeRange:
@@ -67,6 +83,10 @@ func (c *Client) deleteStreamDecision(item Decision) {
 		if identifier != "" {
 			slot := decisionscope.HeaderScopeKey(scope, identifier)
 			c.forgetActiveDecision(slot)
+			if c.liveTick != nil {
+				delete(c.liveTick, slot)
+				return
+			}
 			c.cacheClient.Delete(slot)
 		}
 	}

@@ -32,8 +32,32 @@ func lookupAsRequest(client *Client, remoteIP string) (string, error) {
 	if ipAddr != nil {
 		remoteIP = ipAddr.String()
 	}
+	if client.UsesLiveSnapshot() {
+		value, _, _, err := decisionscope.LookupLiveSnapshotRemediation(client.LiveSnapshot(), remoteIP, ipAddr, nil, nil)
+		return value, err
+	}
 	value, _, _, err := decisionscope.LookupCachedRemediation(client.Cache(), remoteIP, ipAddr, nil, nil)
 	return value, err
+}
+
+func applyStreamDecisionForTest(client *Client, decision Decision, duration int64) {
+	if client.UsesLiveSnapshot() {
+		client.liveTick = client.decisionStore.cloneLiveSnapshot()
+		client.storeStreamDecision(decision, duration)
+		client.publishLiveTick()
+		return
+	}
+	client.storeStreamDecision(decision, duration)
+}
+
+func deleteStreamDecisionForTest(client *Client, decision Decision) {
+	if client.UsesLiveSnapshot() {
+		client.liveTick = client.decisionStore.cloneLiveSnapshot()
+		client.deleteStreamDecision(decision)
+		client.publishLiveTick()
+		return
+	}
+	client.deleteStreamDecision(decision)
 }
 
 // TestStoreStreamDecision_SpellingsShareOneCacheSlot is the Ip-scope half of the defect: a ban the
@@ -55,7 +79,7 @@ func TestStoreStreamDecision_SpellingsShareOneCacheSlot(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client, _ := newTestRangeClient(t)
-			client.storeStreamDecision(Decision{
+			applyStreamDecisionForTest(client, Decision{
 				Origin: "crowdsec", Type: "ban", Scope: "Ip", Value: tt.decisionValue, Duration: "1h",
 			}, 3600)
 			got, err := lookupAsRequest(client, tt.remoteIP)
@@ -70,10 +94,10 @@ func TestStoreStreamDecision_SpellingsShareOneCacheSlot(t *testing.T) {
 // side: a lifted ban must not survive under a key the store can no longer reach.
 func TestDeleteStreamDecision_ClearsTheSlotAnySpelling(t *testing.T) {
 	client, _ := newTestRangeClient(t)
-	client.storeStreamDecision(Decision{
+	applyStreamDecisionForTest(client, Decision{
 		Origin: "crowdsec", Type: "ban", Scope: "Ip", Value: expandedV6, Duration: "1h",
 	}, 3600)
-	client.deleteStreamDecision(Decision{Scope: "Ip", Value: upperV6})
+	deleteStreamDecisionForTest(client, Decision{Scope: "Ip", Value: upperV6})
 	if got, err := lookupAsRequest(client, compressedV6); err == nil {
 		t.Fatalf("lifted ban still enforced as %q", got)
 	}
@@ -84,10 +108,15 @@ func TestDeleteStreamDecision_ClearsTheSlotAnySpelling(t *testing.T) {
 func TestStoreStreamDecision_HeaderScopesAreNotAddresses(t *testing.T) {
 	client, cacheClient := newTestRangeClient(t)
 	client.decisionScopeHeaders = map[string]string{decisionscope.ScopeCountry: "CF-IPCountry"}
-	client.storeStreamDecision(Decision{
+	applyStreamDecisionForTest(client, Decision{
 		Origin: "crowdsec", Type: "ban", Scope: "Country", Value: "fr", Duration: "1h",
 	}, 3600)
-	if _, err := cacheClient.Get(decisionscope.HeaderScopeKey(decisionscope.ScopeCountry, "FR")); err != nil {
+	key := decisionscope.HeaderScopeKey(decisionscope.ScopeCountry, "FR")
+	if client.UsesLiveSnapshot() {
+		if _, ok := client.LiveSnapshot()[key]; !ok {
+			t.Fatal("Country ban must live-map on normalized country code")
+		}
+	} else if _, err := cacheClient.Get(key); err != nil {
 		t.Fatalf("Country ban must still key on the normalized country code: %v", err)
 	}
 }

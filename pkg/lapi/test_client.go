@@ -6,6 +6,7 @@ import (
 
 	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 )
 
@@ -21,6 +22,16 @@ func AttachTestInternStore(client *Client) *DecisionStore {
 	store := &DecisionStore{cache: client.cacheClient, origins: intern.New()}
 	client.decisionStore = store
 	return store
+}
+
+// SeedLiveSnapshotForTest publishes one stream/alone memory slot for bouncer tests.
+func SeedLiveSnapshotForTest(store *DecisionStore, key string, payload any, durationSec int64) {
+	if store == nil {
+		return
+	}
+	next := store.cloneLiveSnapshot()
+	next[key] = decisionscope.LiveSlotFromPack(payload, durationSec)
+	store.publishLiveSnapshot(next, time.Now().Unix()-1)
 }
 
 // AttachTestMetricsReporter wires a stream-mode reporter so tests can read IncDropped.

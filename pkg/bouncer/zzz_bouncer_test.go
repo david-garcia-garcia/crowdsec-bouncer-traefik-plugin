@@ -86,7 +86,7 @@ func TestServeHTTP_PackedMemoryBanRecordsCrowdsecOrigin(t *testing.T) {
 	t.Cleanup(cacheClient.Close)
 	store := lapi.AttachTestInternStore(lapiClient)
 	lapi.AttachTestMetricsReporter(lapiClient)
-	cacheClient.Set("203.0.113.10", decisionscope.Pack(decisionscope.BannedValue, "crowdsec", store), 60)
+	lapi.SeedLiveSnapshotForTest(store, "203.0.113.10", decisionscope.Pack(decisionscope.BannedValue, "crowdsec", store), 60)
 	clientChecker, err := ip.NewChecker(log, nil)
 	if err != nil {
 		t.Fatal(err)
