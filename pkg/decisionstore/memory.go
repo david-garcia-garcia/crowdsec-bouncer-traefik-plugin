@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 )
 
@@ -15,8 +14,8 @@ type memory struct {
 	log        *slog.Logger
 	origins    *intern.Table
 	mu         sync.Mutex
-	tick       map[string]decisionscope.LiveSlot
-	published  atomic.Value // map[string]decisionscope.LiveSlot
+	tick       map[string]LiveSlot
+	published  atomic.Value // map[string]LiveSlot
 	rangeIndex string
 }
 
@@ -31,12 +30,12 @@ func (m *memory) BeginTick() {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	prev, _ := m.published.Load().(map[string]decisionscope.LiveSlot)
+	prev, _ := m.published.Load().(map[string]LiveSlot)
 	if len(prev) == 0 {
-		m.tick = make(map[string]decisionscope.LiveSlot)
+		m.tick = make(map[string]LiveSlot)
 		return
 	}
-	next := make(map[string]decisionscope.LiveSlot, len(prev))
+	next := make(map[string]LiveSlot, len(prev))
 	for key, slot := range prev {
 		next[key] = slot
 	}
@@ -76,17 +75,13 @@ func (m *memory) Put(item Decision) {
 	m.putPublishedLocked(item)
 }
 
-// putTick writes one decision into tick. Intern overflow logs Warn and stores kind only.
+// putTick writes one decision into tick. Intern overflow logs Warn and packs origin id 0.
 func (m *memory) putTick(item Decision) {
 	key, _ := slotKeys(item.Scope, item.Value)
 	if key == "" {
 		return
 	}
-	payload := m.pack(item.Kind, item.Origin)
-	if stored, isString := payload.(string); isString && m.log != nil {
-		m.log.Warn("decisionstore:intern overflow", "kind", decisionscope.RemediationKind(stored))
-	}
-	m.tick[key] = decisionscope.LiveSlotFromPack(payload, item.DurationSec)
+	m.tick[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
 }
 
 // putPublishedLocked copy-on-write one live slot onto the published map. Caller holds mu.
@@ -95,25 +90,29 @@ func (m *memory) putPublishedLocked(item Decision) {
 	if key == "" {
 		return
 	}
-	payload := m.pack(item.Kind, item.Origin)
-	if stored, isString := payload.(string); isString && m.log != nil {
-		m.log.Warn("decisionstore:intern overflow", "kind", decisionscope.RemediationKind(stored))
-	}
-	prev, _ := m.published.Load().(map[string]decisionscope.LiveSlot)
-	next := make(map[string]decisionscope.LiveSlot, len(prev)+1)
+	prev, _ := m.published.Load().(map[string]LiveSlot)
+	next := make(map[string]LiveSlot, len(prev)+1)
 	for slotKey, slot := range prev {
 		next[slotKey] = slot
 	}
-	next[key] = decisionscope.LiveSlotFromPack(payload, item.DurationSec)
+	next[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
 	m.published.Store(next)
 }
 
-// pack encodes a uint32 word when intern succeeds, else a leftover kind+origin string.
-func (m *memory) pack(kind, origin string) any {
+// pack encodes a uint32 word. Intern overflow Warns and uses origin id 0.
+func (m *memory) pack(kind, origin string) uint32 {
 	if m == nil {
-		return decisionscope.RemediationWithOrigin(kind, origin)
+		return packWord(kind, 0)
 	}
-	return decisionscope.Pack(kind, origin, originIntern{table: m.origins, packsMemory: true})
+	if m.origins != nil {
+		if originID, ok := m.origins.ID(origin); ok {
+			return packWord(kind, originID)
+		}
+		if m.log != nil {
+			m.log.Warn("decisionstore:intern overflow", "kind", kind)
+		}
+	}
+	return packWord(kind, 0)
 }
 
 // Delete drops the canonical slot and a prior Ip spelling from tick or the published map.
@@ -134,11 +133,11 @@ func (m *memory) Delete(scope, value string) {
 		}
 		return
 	}
-	prev, _ := m.published.Load().(map[string]decisionscope.LiveSlot)
+	prev, _ := m.published.Load().(map[string]LiveSlot)
 	if len(prev) == 0 {
 		return
 	}
-	next := make(map[string]decisionscope.LiveSlot, len(prev))
+	next := make(map[string]LiveSlot, len(prev))
 	for slotKey, slot := range prev {
 		if slotKey == key || (legacy != "" && slotKey == legacy) {
 			continue
@@ -149,13 +148,13 @@ func (m *memory) Delete(scope, value string) {
 }
 
 // LookupRemediation reads the published map (Ip, header scopes, Range). Expired slots miss.
-func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *decisionscope.RangeMembership) (string, string, uint16, error) {
+func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16, error) {
 	if m == nil {
 		return "", "", 0, ErrMiss
 	}
-	snap, _ := m.published.Load().(map[string]decisionscope.LiveSlot)
+	snap, _ := m.published.Load().(map[string]LiveSlot)
 	now := time.Now().Unix()
-	kind, origin, originID := decisionscope.LookupHits(func(key string) any {
+	kind, origin, originID := lookupHits(func(key string) any {
 		slot, ok := snap[key]
 		if !ok {
 			return nil
@@ -172,7 +171,7 @@ func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[st
 }
 
 // ApplyRangeBatch mutates the in-process range-index blob.
-func (m *memory) ApplyRangeBatch(upserts map[string]string, removals []string) error {
+func (m *memory) ApplyRangeBatch(upserts map[string]Decision, removals []string) error {
 	if m == nil {
 		return nil
 	}
@@ -181,7 +180,7 @@ func (m *memory) ApplyRangeBatch(upserts map[string]string, removals []string) e
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.rangeIndex = decisionscope.ApplyRangeIndex(m.rangeIndex, upserts, removals)
+	m.rangeIndex = ApplyRangeIndex(m.rangeIndex, upserts, removals)
 	return nil
 }
 
@@ -198,11 +197,11 @@ func (m *memory) RangeIndex() (string, error) {
 func (m *memory) close() {}
 
 // publishedMap is the lookup snapshot. Nil before the first publish or live Put.
-func (m *memory) publishedMap() map[string]decisionscope.LiveSlot {
+func (m *memory) publishedMap() map[string]LiveSlot {
 	if m == nil {
 		return nil
 	}
-	snap, _ := m.published.Load().(map[string]decisionscope.LiveSlot)
+	snap, _ := m.published.Load().(map[string]LiveSlot)
 	return snap
 }
 

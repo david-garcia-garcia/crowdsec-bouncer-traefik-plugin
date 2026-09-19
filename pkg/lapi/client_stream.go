@@ -11,6 +11,7 @@ import (
 
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 )
 
 // Stream is the body returned from Crowdsec Stream LAPI.
@@ -99,7 +100,7 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 	}
 	c.decisionStore.BeginTick()
 	defer c.decisionStore.PublishTick(time.Now().Unix())
-	rangeUpserts := make(map[string]string)
+	rangeUpserts := make(map[string]decisionstore.Decision)
 	var rangeRemovals []string
 	for _, decision := range stream.Deleted {
 		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
@@ -121,7 +122,7 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 			cidr := strings.TrimSpace(decision.Value)
 			if value != "" && cidr != "" {
 				origin := MetricsOrigin(decision.Origin, decision.Scenario)
-				rangeUpserts[cidr] = decisionscope.RemediationWithOrigin(value, origin)
+				rangeUpserts[cidr] = decisionstore.Decision{Kind: value, Origin: origin}
 				c.rememberActiveDecision("range:"+cidr, origin, cidr)
 			}
 			continue

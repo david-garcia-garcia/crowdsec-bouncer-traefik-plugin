@@ -98,7 +98,7 @@ func TestStoreStreamDecision_HeaderScopesAreNotAddresses(t *testing.T) {
 	applyStreamDecisionForTest(client, Decision{
 		Origin: "crowdsec", Type: "ban", Scope: "Country", Value: "fr", Duration: "1h",
 	}, 3600)
-	key := decisionscope.HeaderScopeKey(decisionscope.ScopeCountry, "FR")
+	key := decisionstore.HeaderScopeKey(decisionscope.ScopeCountry, "FR")
 	if _, ok := client.decisionStore.PublishedMemoryMapForTest()[key]; !ok {
 		t.Fatal("Country ban must live-map on normalized country code")
 	}
@@ -133,7 +133,7 @@ func liveRequests(t *testing.T, addresses []string) int64 {
 		if _, err := lookupAsRequest(client, canonical); err == nil {
 			continue
 		}
-		if _, err := client.LiveLookup(canonical, nil, 60); err != nil {
+		if _, _, err := client.LiveLookup(canonical, nil, 60); err != nil {
 			t.Fatalf("live lookup %q: %v", address, err)
 		}
 	}
@@ -171,7 +171,7 @@ func splitStoreOnDeadReader(t *testing.T) (*decisionstore.Store, *testLeaseRedis
 	t.Helper()
 	writer := startTestLeaseRedis(t)
 	seed := newTestRedisStore(t, writer.addr(), nil, "sess")
-	if err := seed.ApplyRangeBatch(map[string]string{"10.0.0.0/8": decisionscope.BannedValue}, nil); err != nil {
+	if err := seed.ApplyRangeBatch(map[string]decisionstore.Decision{"10.0.0.0/8": {Kind: decisionscope.BannedValue}}, nil); err != nil {
 		t.Fatal(err)
 	}
 	store := newTestRedisStore(t, writer.addr(), []string{"127.0.0.1:1"}, "sess")
@@ -183,7 +183,7 @@ func splitStoreOnDeadReader(t *testing.T) (*decisionstore.Store, *testLeaseRedis
 // only what this one poll carried and silently drops every other Range ban.
 func TestApplyRangeBatch_UnreachableReadKeepsSharedIndex(t *testing.T) {
 	store, writer := splitStoreOnDeadReader(t)
-	err := store.ApplyRangeBatch(map[string]string{"192.168.0.0/16": decisionscope.BannedValue}, nil)
+	err := store.ApplyRangeBatch(map[string]decisionstore.Decision{"192.168.0.0/16": {Kind: decisionscope.BannedValue}}, nil)
 	if err == nil || !errors.Is(err, decisionstore.ErrUnreachable) {
 		t.Errorf("apply on an unreadable index returned %v, want ErrUnreachable", err)
 	}

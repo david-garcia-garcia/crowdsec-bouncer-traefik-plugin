@@ -29,7 +29,7 @@ func TestPackSkippedOnRedisStore(t *testing.T) {
 	store.Put(decisionstore.Decision{Scope: decisionscope.ScopeIP, Value: "k", Kind: decisionscope.BannedValue, Origin: "crowdsec", DurationSec: 60})
 	kind, origin, originID, err := store.LookupRemediation("k", nil, nil)
 	if err != nil || kind != decisionscope.BannedValue || origin != "crowdsec" || originID != 0 {
-		t.Fatalf("redis leftover kind %q origin %q id %d err %v", kind, origin, originID, err)
+		t.Fatalf("redis kind %q origin %q id %d err %v", kind, origin, originID, err)
 	}
 }
 
@@ -69,7 +69,7 @@ func TestRememberActiveDecisionForgetCompactSlot(t *testing.T) {
 	}
 }
 
-func TestStorePackedOrLeftoverOverflowUsesKindOnly(t *testing.T) {
+func TestStoreInternOverflowUsesGenericOrigin(t *testing.T) {
 	store := newTestInternStore()
 	store.FillUntilMaxForTest()
 	client := &Client{decisionStore: store, log: logger.New("ERROR", "")}

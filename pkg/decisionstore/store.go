@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
@@ -31,7 +30,7 @@ type backend interface {
 	PublishTick(now int64)
 	// Put stores one Ip or header-scope decision for DurationSec seconds.
 	// Memory writes tick when a stream window is open, else the published map (live).
-	// Redis is a leftover kind+origin string SET with that TTL.
+	// Redis is a kind+origin string SET with that TTL.
 	Put(item Decision)
 	// Delete drops the canonical slot for scope+value. For Ip, a prior spelling of the same
 	// address is deleted too so a lift cannot survive under the old key.
@@ -39,10 +38,10 @@ type backend interface {
 	Delete(scope, value string)
 	// LookupRemediation is the request path: Ip slot, then header scopes, then Range.
 	// Memory reads the published map. Redis reads SimpleRedis.
-	// Returns kind, leftover origin name, intern origin id, or ErrMiss.
-	LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *decisionscope.RangeMembership) (string, string, uint16, error)
+	// Returns kind, origin name (Redis string or intern id), or ErrMiss.
+	LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16, error)
 	// ApplyRangeBatch upserts and removes Range CIDRs on this backend's index.
-	ApplyRangeBatch(upserts map[string]string, removals []string) error
+	ApplyRangeBatch(upserts map[string]Decision, removals []string) error
 	// RangeIndex is the Range blob, or empty when none has been written.
 	RangeIndex() (string, error)
 	close()
@@ -52,7 +51,7 @@ type backend interface {
 type Store struct {
 	backend
 	origins         *intern.Table
-	rangeMembership atomic.Value // *decisionscope.RangeMembership
+	rangeMembership atomic.Value // *RangeMembership
 	lastRangeIndex  atomic.Value // string of the blob last used to build membership
 }
 
@@ -103,8 +102,7 @@ func Open(ctx context.Context, reclaimKey, cachePrefix string, cfg *configuratio
 
 // originIntern packs memory words without exporting intern on Store.
 type originIntern struct {
-	table       *intern.Table
-	packsMemory bool
+	table *intern.Table
 }
 
 // Intern appends an origin name. Empty name is id 0. Overflow does not wrap.
@@ -113,11 +111,6 @@ func (o originIntern) Intern(name string) (uint16, bool) {
 		return 0, false
 	}
 	return o.table.ID(name)
-}
-
-// PacksMemory is true when this backend may pack remediations as uint32 words.
-func (o originIntern) PacksMemory() bool {
-	return o.packsMemory
 }
 
 // Put stores one Ip or header-scope decision. Range is ignored (use ApplyRangeBatch).
@@ -161,7 +154,7 @@ func (s *Store) RangeIndex() (string, error) {
 }
 
 // ApplyRangeBatch upserts and removes Range CIDRs, then rebuilds in-process membership.
-func (s *Store) ApplyRangeBatch(upserts map[string]string, removals []string) error {
+func (s *Store) ApplyRangeBatch(upserts map[string]Decision, removals []string) error {
 	if s == nil || s.backend == nil {
 		return ErrMiss
 	}
@@ -173,7 +166,7 @@ func (s *Store) ApplyRangeBatch(upserts map[string]string, removals []string) er
 }
 
 // RangeMembership is the current in-process Range lookup, or nil before the first hydrate.
-func (s *Store) RangeMembership() *decisionscope.RangeMembership {
+func (s *Store) RangeMembership() *RangeMembership {
 	if s == nil {
 		return nil
 	}
@@ -181,7 +174,7 @@ func (s *Store) RangeMembership() *decisionscope.RangeMembership {
 	if stored == nil {
 		return nil
 	}
-	membership, _ := stored.(*decisionscope.RangeMembership)
+	membership, _ := stored.(*RangeMembership)
 	return membership
 }
 
@@ -198,7 +191,7 @@ func (s *Store) HydrateRange() {
 	if s.rangeMembership.Load() != nil && previous == index {
 		return
 	}
-	s.rangeMembership.Store(decisionscope.MembershipFromIndex(index))
+	s.rangeMembership.Store(MembershipFromIndex(index))
 	s.lastRangeIndex.Store(index)
 }
 
@@ -240,7 +233,7 @@ func (s *Store) SeedSlotForTest(item Decision) {
 }
 
 // PublishedMemoryMapForTest is the published memory map. Nil when the store is Redis.
-func (s *Store) PublishedMemoryMapForTest() map[string]decisionscope.LiveSlot {
+func (s *Store) PublishedMemoryMapForTest() map[string]LiveSlot {
 	if s == nil {
 		return nil
 	}

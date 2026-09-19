@@ -1,7 +1,6 @@
 package decisionscope
 
 import (
-	"net"
 	"net/http"
 	"sort"
 	"strings"
@@ -16,7 +15,7 @@ const (
 	CaptchaValue = "c"
 )
 
-// IsActiveRemediation reports whether value is ban or captcha (origin suffix ignored).
+// IsActiveRemediation reports whether value is ban or captcha.
 func IsActiveRemediation(value string) bool {
 	kind := RemediationKind(value)
 	return kind == BannedValue || kind == CaptchaValue
@@ -34,7 +33,7 @@ func RemediationValue(decisionType string) string {
 	}
 }
 
-// PreferRemediation keeps ban over captcha over empty. Origin suffix is ignored for the winner's letter.
+// PreferRemediation keeps ban over captcha over empty.
 func PreferRemediation(current, incoming string) string {
 	currentKind := RemediationKind(current)
 	incomingKind := RemediationKind(incoming)
@@ -63,72 +62,6 @@ func RequestScopeValues(headers map[string]string, req *http.Request) map[string
 		}
 	}
 	return out
-}
-
-// lookupHit is one Ip, header, or Range candidate while merging ban over captcha.
-type lookupHit struct {
-	stored   string
-	origin   string
-	originID uint16
-}
-
-// mergeLookupHit keeps ban over captcha and remembers the winner's leftover origin or packed id.
-func mergeLookupHit(chosen lookupHit, incoming lookupHit) lookupHit {
-	if incoming.stored == "" {
-		return chosen
-	}
-	next := PreferRemediation(chosen.stored, incoming.stored)
-	if next == chosen.stored {
-		return chosen
-	}
-	return incoming
-}
-
-// hitFromPayload unpacks a Pack word or leftover string.
-func hitFromPayload(payload any) lookupHit {
-	if payload == nil {
-		return lookupHit{}
-	}
-	kind, origin, originID := Unpack(payload)
-	stored, isString := payload.(string)
-	if !isString {
-		stored = kind
-	}
-	return lookupHit{stored: stored, origin: origin, originID: originID}
-}
-
-// LookupHits merges Ip, present header scopes, and Range. Ban on Ip skips Range membership.
-// get returns a Pack word, leftover string, or nil when the key is absent. Empty kind is a miss.
-func LookupHits(get func(string) any, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16) {
-	if get == nil {
-		get = func(string) any { return nil }
-	}
-	var chosen lookupHit
-	chosen = mergeLookupHit(chosen, hitFromPayload(get(remoteIP)))
-	for scope, identifier := range scopes {
-		if identifier == "" {
-			continue
-		}
-		chosen = mergeLookupHit(chosen, hitFromPayload(get(HeaderScopeKey(scope, identifier))))
-	}
-	if RemediationKind(chosen.stored) != BannedValue {
-		chosen = mergeLookupHit(chosen, hitFromPayload(membership.Remediation(ipAddr)))
-	}
-	if chosen.stored == "" {
-		return "", "", 0
-	}
-	return RemediationKind(chosen.stored), chosen.origin, chosen.originID
-}
-
-// LookupCacheKeys is the GetMany key list for the Redis request path: IP, then present header scopes. Range is not a cache key.
-func LookupCacheKeys(remoteIP string, scopes map[string]string) []string {
-	keys := []string{remoteIP}
-	for scope, identifier := range scopes {
-		if identifier != "" {
-			keys = append(keys, HeaderScopeKey(scope, identifier))
-		}
-	}
-	return keys
 }
 
 // StreamScopeList is the LAPI scopes query value for this bouncer config.

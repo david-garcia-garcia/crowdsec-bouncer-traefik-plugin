@@ -145,7 +145,7 @@ func checkIPBanSkipsRangeCaptcha(t *testing.T, store *Store) {
 		Scope: decisionscope.ScopeIP, Value: backendRangeIP,
 		Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec,
 	})
-	if err := store.ApplyRangeBatch(map[string]string{backendRangeCIDR: decisionscope.CaptchaValue}, nil); err != nil {
+	if err := store.ApplyRangeBatch(map[string]Decision{backendRangeCIDR: {Kind: decisionscope.CaptchaValue}}, nil); err != nil {
 		t.Fatal(err)
 	}
 	mustKind(t, store, backendRangeIP, nil, decisionscope.BannedValue, backendOrigin)
@@ -156,7 +156,7 @@ func checkRangeBanWhenIPIsCaptcha(t *testing.T, store *Store) {
 		Scope: decisionscope.ScopeIP, Value: backendRangeIP,
 		Kind: decisionscope.CaptchaValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec,
 	})
-	if err := store.ApplyRangeBatch(map[string]string{backendRangeCIDR: decisionscope.BannedValue}, nil); err != nil {
+	if err := store.ApplyRangeBatch(map[string]Decision{backendRangeCIDR: {Kind: decisionscope.BannedValue}}, nil); err != nil {
 		t.Fatal(err)
 	}
 	mustKind(t, store, backendRangeIP, nil, decisionscope.BannedValue, "")
@@ -164,7 +164,7 @@ func checkRangeBanWhenIPIsCaptcha(t *testing.T, store *Store) {
 
 func checkRangeApplyThenRemove(t *testing.T, store *Store) {
 	mustMiss(t, store, backendRangeIP, nil)
-	if err := store.ApplyRangeBatch(map[string]string{backendRangeCIDR: decisionscope.BannedValue}, nil); err != nil {
+	if err := store.ApplyRangeBatch(map[string]Decision{backendRangeCIDR: {Kind: decisionscope.BannedValue}}, nil); err != nil {
 		t.Fatal(err)
 	}
 	mustKind(t, store, backendRangeIP, nil, decisionscope.BannedValue, "")
@@ -193,17 +193,17 @@ func checkPutRangeScopeIsIgnored(t *testing.T, store *Store) {
 }
 
 // lookupRemediation is Store.LookupRemediation the way ServeHTTP does: remoteIP is ipAddr.String().
-// Packed intern ids and Redis leftover origin strings resolve to the same origin name.
+// Packed intern ids and Redis kind+origin strings resolve to the same origin name.
 func lookupRemediation(store *Store, remoteIP string, scopes map[string]string) (kind, origin string, err error) {
 	ipAddr := net.ParseIP(remoteIP)
 	if ipAddr != nil {
 		remoteIP = ipAddr.String()
 	}
-	kind, leftover, originID, err := store.LookupRemediation(remoteIP, ipAddr, scopes)
+	kind, originName, originID, err := store.LookupRemediation(remoteIP, ipAddr, scopes)
 	if originID != 0 {
 		return kind, store.OriginName(originID), err
 	}
-	return kind, leftover, err
+	return kind, originName, err
 }
 
 func mustKind(t *testing.T, store *Store, remoteIP string, scopes map[string]string, wantKind, wantOrigin string) {

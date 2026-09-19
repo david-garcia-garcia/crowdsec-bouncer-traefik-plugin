@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	simpleredis "github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis"
 )
 
@@ -164,7 +163,7 @@ func (r *redis) BeginTick() {}
 // PublishTick is a no-op: Redis key TTL is the expiry.
 func (r *redis) PublishTick(int64) {}
 
-// Put is SET of a leftover kind+origin string with DurationSec as TTL.
+// Put is SET of a kind+origin string with DurationSec as TTL.
 func (r *redis) Put(item Decision) {
 	if r == nil {
 		return
@@ -173,7 +172,7 @@ func (r *redis) Put(item Decision) {
 	if key == "" {
 		return
 	}
-	r.set(key, decisionscope.RemediationWithOrigin(item.Kind, item.Origin), item.DurationSec)
+	r.set(key, kindOriginString(item.Kind, item.Origin), item.DurationSec)
 }
 
 // Delete is DEL of the canonical slot and a prior Ip spelling.
@@ -192,15 +191,15 @@ func (r *redis) Delete(scope, value string) {
 }
 
 // LookupRemediation reads Redis (Ip, header scopes) then merges Range from membership.
-func (r *redis) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *decisionscope.RangeMembership) (string, string, uint16, error) {
+func (r *redis) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16, error) {
 	if r == nil {
 		return "", "", 0, ErrMiss
 	}
-	found, err := r.getMany(decisionscope.LookupCacheKeys(remoteIP, scopes))
+	found, err := r.getMany(lookupKeys(remoteIP, scopes))
 	if err != nil {
 		return "", "", 0, err
 	}
-	kind, origin, originID := decisionscope.LookupHits(func(key string) any {
+	kind, origin, originID := lookupHits(func(key string) any {
 		value, ok := found[key]
 		if !ok || value == "" {
 			return nil
@@ -216,7 +215,7 @@ func (r *redis) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[str
 // ApplyRangeBatch upserts and removes Range lines with one Redis read and one write.
 // A read that did not answer is not an empty index: writing the batch onto an empty base
 // would drop every Range decision this poll did not carry.
-func (r *redis) ApplyRangeBatch(upserts map[string]string, removals []string) error {
+func (r *redis) ApplyRangeBatch(upserts map[string]Decision, removals []string) error {
 	if r == nil {
 		return ErrMiss
 	}
@@ -227,7 +226,7 @@ func (r *redis) ApplyRangeBatch(upserts map[string]string, removals []string) er
 	if err != nil {
 		return err
 	}
-	next := decisionscope.ApplyRangeIndex(index, upserts, removals)
+	next := ApplyRangeIndex(index, upserts, removals)
 	if next == "" {
 		r.deleteKey(RangeIndexKey)
 		return nil
