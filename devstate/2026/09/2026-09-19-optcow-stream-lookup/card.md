@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-19T15:29:09.574Z
+Developer review: in progress — 2026-09-19T15:35:00.000Z
 
 ## What this changes
 
@@ -6,34 +6,38 @@ Developer review: in progress — 2026-09-19T15:29:09.574Z
 
 **Admin users.** None.
 
-**Developers.** OpenSpec `2026-09-19-optcow-stream-lookup`: `streamStore` on `DecisionStore` (Redis → `cache.Client`, memory → COW `map[string]liveSlot{word,expiresAt}`); remove `Client.liveTick` / `UsesLiveSnapshot`; bouncer uses one `LookupStreamRemediation`; intern overflow Warn + kind-only word (no `Leftover`). Branch code still bolt-on until implement replaces it.
+**Developers.** Stream/alone Ip and header decisions live on `DecisionStore.streamStore` (Redis → `cache.Client`; memory → COW `map[string]LiveSlot{word,expiresAt}`). `Client.LookupStreamRemediation` + bouncer single path; removed `liveTick` / `UsesLiveSnapshot`. Memory intern overflow: Warn + kind-only word (no slot leftover string).
 
 **End users.** None.
 
 ## Motivation
 
-On `origin/master`, stream/alone memory still walks the TTL heap on every request. This branch added a faster map but kept the wrong split: `Client` branches `liveTick != nil` vs `cache.Set`, and bouncer branches on `UsesLiveSnapshot()`. Performance belongs on a store chosen at `OpenDecisionStore`, not Client tick scratch.
+On `origin/master`, stream/alone with in-memory `DecisionStore` still resolves each request through the TTL heap (`LookupCachedRemediation`), paying heap churn and many allocations per miss. That path is correct for live/none memo keys but the wrong store for stream Ip/header slots that are updated on a tick cadence.
 
-If we ship the bolt-on, dual write paths become permanent. Branch memory path ~86 ns / 1 alloc vs ~408 ns / 12 allocs (100k fixture) — keep after store split, not the current shape.
+If we keep a parallel `Client.liveTick` scratch map, apply and lookup follow different backends and Redis vs memory leaks into `Client`. The cost of not merging a proper store split is permanent dual paths and continued master-scale lookup cost on stream memory deployments.
 
 ```mermaid
 sequenceDiagram
+  participant Bouncer
   participant Client as lapi.Client
-  participant Store as streamStore
+  participant Store as DecisionStore.streamStore
   participant Cache as cache.Client
-  Note over Client,Cache: Target (proposed)
-  Client->>Store: Put/Delete/BeginTick/PublishTick/Lookup
-  Store->>Cache: Redis Put/Delete/Get
-  Store->>Store: memory COW map
+  Bouncer->>Client: LookupStreamRemediation
+  Client->>Store: LookupRemediation + RangeMembership
+  alt memory
+    Store->>Store: Load COW map, probe keys
+  else Redis
+    Store->>Cache: GetInt/Get/GetMany
+  end
 ```
 
 ## Merge readiness
 
-Propose complete; OpenSpec apply-ready with tasks unchecked. Implement must replace branch bolt-on per tasks. PR base `master`. RETHINK comment has `Propose:` accept; item still `[ ]` until implement lands.
+Implement landed (584ff695); tasks 7/7 complete; full `go test ./...` passed locally. RETHINK comment has `Implement:` but stays `[ ]` until pullrequest. CI re-run pending on pushed head.
 
-Priority: P2 — stream/alone memory cost on master; wrong architecture on branch until store split is implemented.
+Priority: P2 — stream/alone memory lookup cost on master; architecture fix without operator-facing config change.
 
-Reviewed head: 561646c5
+Reviewed head: da134ea4
 
 Owner decision: None.
 
@@ -41,30 +45,30 @@ Owner decision: None.
 
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Propose done; implement/replace pending; RETHINK open |
-| CI proof | N/A | Not re-run this phase |
-| Local tests proof | 6/6 | handoff `localTests: passed` (prior implement; code stale vs spec) |
-| Review resolution | 1/6 | `comments.md` RETHINK `[ ]` (Propose filled) |
+| Overall readiness | 3/6 | Implement done; RETHINK `[ ]`; CI pending |
+| CI proof | 3/6 | Pending on da134ea4 — [PR checks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/118/checks) |
+| Local tests proof | 6/6 | handoff `localTests: passed`; `go test ./...` |
+| Review resolution | 1/6 | `comments.md` RETHINK `[ ]` (Implement filled) |
 
 ## Verification
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-19-optcow-stream-lookup | PR #118 → master |
-| OpenSpec | valid, apply-ready | `openspec validate 2026-09-19-optcow-stream-lookup --strict` |
+| Branch | 2026-09-19-optcow-stream-lookup pushed | PR #118 → master |
+| OpenSpec | tasks 7/7 | `openspec/changes/2026-09-19-optcow-stream-lookup/tasks.md` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/118 | GitHub |
-| Explore reproduce | passed | `explore.md` § Reproduce |
-| PR comments | RETHINK open | chat-store-split — Propose accept |
+| Local tests | passed | implement run |
+| PR comments | RETHINK open | chat-store-split — Implement 584ff695 |
 
-## Performance (branch HEAD, 100k fixture, vs same-tree TTL bench)
+## Performance (100k Ip fixture, windows/amd64, vs `origin/master`)
 
-| Measure | TTL lookup (cached path) | Live snapshot (to keep after store split) |
-| --- | --- | --- |
-| Seq miss | ~408 ns, 12 allocs | ~86 ns, 1 alloc |
-| Parallel miss | ~153 ns, 12 allocs | ~6.8 ns, 1 alloc |
-| Heap 100k Ips | ~18.4 MiB | ~8.9 MiB |
+| Measure | `origin/master` (TTL / cached lookup) | This branch (stream map lookup) | Why |
+| --- | --- | --- | --- |
+| Seq miss | 394 ns/op, 12 allocs, 248 B | 81 ns/op, 1 alloc, 8 B | Map load + fixed probes vs TTL `GetInt` + slice/`GetMany` on miss path |
+| Parallel miss | 173 ns/op, 12 allocs | 6.6 ns/op, 1 alloc | Read-mostly `atomic.Value` map vs contended heap lookups |
+| Heap retained 100k Ips | ~18.4 MiB (TTL map bench) | ~8.9 MiB (packed slot map bench) | Packed `LiveSlot` vs TTL heap nodes + keys |
 
-Baseline for delivery card: **`origin/master`**.
+Master has no stream-map benchmark; baseline row is master’s stream/alone behavior (still TTL-backed). Branch row is `LookupStreamMapRemediation` / memory store after implement.
 
 ## Specs
 
@@ -83,7 +87,7 @@ None.
 
 ## How this fits together
 
-RETHINK → explore → **propose (done)** → implement (replace bolt-on) → codereview.
+RETHINK → explore → propose → **implement (done)** → codereview (next).
 
 ## Decision needed
 
@@ -91,18 +95,18 @@ None.
 
 ## Before merge
 
-- [ ] Implement store split and remove bolt-on
-- [ ] Close RETHINK after implement + reply
+- [x] Implement store split and remove bolt-on
+- [ ] Close RETHINK after pullrequest reply
 - [ ] Green CI on reviewed head
-- [ ] Benchmarks vs `origin/master` on delivery card
+- [x] Benchmarks vs `origin/master` on delivery card
 
 ## Findings
 
-OpenSpec matches human store-split lock; branch product code still wrong shape.
+Store split implemented; codereview not run this phase.
 
 ## Axis review
 
-None (propose phase).
+None (implement phase).
 
 ## Agent review details
 
@@ -110,25 +114,25 @@ None (propose phase).
 
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| OpenSpec validate | pass strict | 4 folds + tasks |
-| RETHINK Propose | accept | chat-store-split |
+| go test ./... | pass | full repo |
+| Product SHA | 584ff695 | streamStore replace |
 
 ### Stored data model
 
 | Store | Field | Type | Sample |
 | --- | --- | --- | --- |
-| DecisionStore | streamStore | interface + redis/memory impl | memory: `atomic.Value` → `map[string]liveSlot{word,expiresAt}` |
-| liveSlot (memory) | word, expiresAt | uint32, int64 | no `Leftover` field |
+| DecisionStore | stream | streamStore | memory: `atomic.Value` → `map[string]LiveSlot` |
+| LiveSlot | Word, ExpiresAt | uint32, int64 | removed `Leftover` |
 
 ### Technical review
 
-Propose only — implement review pending.
+Implement complete — axis review pending codereview phase.
 
 ### Evidence
 
-- `devstate/specs.md`
-- `openspec/changes/2026-09-19-optcow-stream-lookup/`
+- `pkg/lapi/streamstore.go`, `pkg/lapi/client_lookup.go`
+- `openspec/changes/2026-09-19-optcow-stream-lookup/tasks.md`
 
 ### Rank-up moves
 
-Run implement to replace `liveTick` / `UsesLiveSnapshot` per tasks.
+Run `sbs-dev-codereview` on `origin/master...584ff695`.
