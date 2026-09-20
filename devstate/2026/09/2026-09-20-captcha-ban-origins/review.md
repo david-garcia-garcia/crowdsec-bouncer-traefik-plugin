@@ -40,3 +40,9 @@ phase: archive
 findings: new spec core_plugin_lapi_captcha-ban-origins; change moved to archive/2026-09-20-captcha-ban-origins
 fixed: n/a
 skipped: n/a
+
+## pullrequest (2026-09-20)
+phase: pullrequest
+findings: CI succeeded on da02bc1f; title ✨ feat(lapi): serve captcha for configured ban origins
+fixed: n/a
+skipped: n/a

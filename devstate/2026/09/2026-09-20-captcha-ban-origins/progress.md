@@ -11,4 +11,4 @@ JobName: 2026-09-20-captcha-ban-origins
 | codereview | [x] | [x] | 2026-09-20T19:30:53Z |
 | devdocsimpact | [x] | [x] | 2026-09-20T19:30:53Z |
 | archive | [x] | [x] | 2026-09-20T19:30:53Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-20T19:36:14Z |
