@@ -43,9 +43,9 @@ func TestMemoryTickPutHiddenUntilPublish(t *testing.T) {
 	store := NewMemory(logger.New("ERROR", ""))
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60})
-	_, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	kind, origin, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	if !errors.Is(err, ErrMiss) {
-		t.Fatalf("tick Put must stay unpublished, got %v", err)
+		t.Fatalf("tick Put must stay unpublished, kind %q origin %q id %d err %v", kind, origin, originID, err)
 	}
 	store.PublishTick(0)
 	kind, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
@@ -62,9 +62,9 @@ func TestMemoryTickDeleteOnlyMissesAfterPublish(t *testing.T) {
 	store.BeginTick()
 	store.Delete(decisionscope.ScopeIP, "203.0.113.10")
 	store.PublishTick(0)
-	_, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	kind, origin, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	if !errors.Is(err, ErrMiss) {
-		t.Fatalf("tick Delete must miss after publish, got %v", err)
+		t.Fatalf("tick Delete must miss after publish, kind %q origin %q id %d err %v", kind, origin, originID, err)
 	}
 }
 
