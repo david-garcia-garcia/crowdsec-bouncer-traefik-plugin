@@ -11,4 +11,4 @@ JobName: 2026-09-20-header-forced-decision
 | codereview | [x] | [x] | 2026-09-20T17:44:35Z |
 | devdocsimpact | [x] | [x] | 2026-09-20T17:46:53Z |
 | archive | [x] | [x] | 2026-09-20T17:50:40Z |
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-20T17:55:50Z |
