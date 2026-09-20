@@ -2,6 +2,7 @@ package lapi
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -224,19 +225,33 @@ func (c *Client) crowdsecQuery(stringURL string, data []byte) ([]byte, error) {
 	return c.sendQuery(stringURL, data, true)
 }
 
-// sendQuery sends one LAPI/CAPI request. On an alone-mode 401 with mayRenewToken set, it renews the
-// CAPI token and replays the same method and the same body once, with that permission cleared, so a
-// second 401 returns the status error instead of recursing.
+// crowdsecQueryBackground POSTs on context.Background so Sleep/Close drain still reaches LAPI.
+func (c *Client) crowdsecQueryBackground(stringURL string, data []byte) ([]byte, error) {
+	return c.sendQueryOn(context.Background(), stringURL, data, true)
+}
+
+// sendQuery sends one LAPI/CAPI request on the Client IO context. On an alone-mode 401 with
+// mayRenewToken set, it renews the CAPI token and replays the same method and the same body once,
+// with that permission cleared, so a second 401 returns the status error instead of recursing.
 func (c *Client) sendQuery(stringURL string, data []byte, mayRenewToken bool) ([]byte, error) {
+	return c.sendQueryOn(c.ioContext(), stringURL, data, mayRenewToken)
+}
+
+// sendQueryOn sends one LAPI/CAPI request on ctx. Token-renewal replay uses the same ctx.
+func (c *Client) sendQueryOn(ctx context.Context, stringURL string, data []byte, mayRenewToken bool) ([]byte, error) {
 	current := c.currentTransport()
 	if current == nil || current.httpClient == nil {
 		return nil, errors.New("crowdsecQuery: missing transport")
 	}
 	var req *http.Request
+	var err error
 	if len(data) > 0 {
-		req, _ = http.NewRequest(http.MethodPost, stringURL, bytes.NewBuffer(data))
+		req, err = http.NewRequestWithContext(ctx, http.MethodPost, stringURL, bytes.NewBuffer(data))
 	} else {
-		req, _ = http.NewRequest(http.MethodGet, stringURL, nil)
+		req, err = http.NewRequestWithContext(ctx, http.MethodGet, stringURL, nil)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("crowdsecQuery:newRequest url:%s %w", stringURL, err)
 	}
 	req.Header.Set(current.header, current.key)
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+c.pluginVersion)
@@ -254,7 +269,7 @@ func (c *Client) sendQuery(stringURL string, data []byte, mayRenewToken bool) ([
 		if errToken := c.getToken(); errToken != nil {
 			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, errToken)
 		}
-		return c.sendQuery(stringURL, data, false)
+		return c.sendQueryOn(ctx, stringURL, data, false)
 	}
 
 	statusStr := strconv.Itoa(res.StatusCode)

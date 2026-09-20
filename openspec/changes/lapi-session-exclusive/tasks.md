@@ -6,21 +6,21 @@
 
 ## 2. DecisionStore key, createdBy, streamReady
 
-- [ ] 2.1 Change `StoreKey` to `decisionstore:` + SessionHex only. Invert `TestStoreKey_DifferentRedisHostsIsolate` and the store half of `TestOpenStream_DifferentRedisIsolatesClientAndStore`
-- [ ] 2.2 Add write-once `createdBy` on `Store`; pass Traefik name into `OpenDecisionStore` / store `Open` create()
-- [ ] 2.3 Add `streamReady` `int64` on `Store` with `LoadInt64` / `StoreInt64`. Set it on the `handleStreamCache` success path. Expose a load for `lapi.New`
+- [x] 2.1 Change `StoreKey` to `decisionstore:` + SessionHex only. Invert `TestStoreKey_DifferentRedisHostsIsolate` and the store half of `TestOpenStream_DifferentRedisIsolatesClientAndStore`
+- [x] 2.2 Add write-once `createdBy` on `Store`; pass Traefik name into `OpenDecisionStore` / store `Open` create()
+- [x] 2.3 Add `streamReady` `int64` on `Store` with `LoadInt64` / `StoreInt64`. Set it on the `handleStreamCache` success path. Expose a load for `lapi.New`
 
 ## 3. Exclusive name before Open
 
-- [ ] 3.1 In `OpenStream` / `OpenLive`, Peek the store key before Open. Hit + `createdBy != name` → Error log (owner, rejected, clears on Close, isolation is a second bouncer API key) and return error. Miss or same name → Open store then Client
-- [ ] 3.2 Invert different-name share tests (`TestOpenStream_LiveMetricsMismatchSharesSilently` `owner-mw`/`joiner-mw`, `TestOpenStream_HeaderMapMismatchSharesClient` `country`/`user`, `TestOpenStream_FailureActionOnlyKeepsClient` `first`/`test`) to fail the second name, or retarget to one name when they mean many routers / reconfigure. Redis-reload tests that use `first`/`reload` MUST use one name
-- [ ] 3.3 Confirm failed `New` still cancels `plugin.go` bindCtx. Client Close still must not Close the store. AppSec reclaim unchanged
+- [x] 3.1 In `OpenStream` / `OpenLive`, Peek the store key before Open. Hit + `createdBy != name` → Error log (owner, rejected, clears on Close, isolation is a second bouncer API key) and return error. Miss or same name → Open store then Client
+- [x] 3.2 Invert different-name share tests (`TestOpenStream_LiveMetricsMismatchSharesSilently` `owner-mw`/`joiner-mw`, `TestOpenStream_HeaderMapMismatchSharesClient` `country`/`user`, `TestOpenStream_FailureActionOnlyKeepsClient` `first`/`test`) to fail the second name, or retarget to one name when they mean many routers / reconfigure. Redis-reload tests that use `first`/`reload` MUST use one name
+- [x] 3.3 Confirm failed `New` still cancels `plugin.go` bindCtx. Client Close still must not Close the store. AppSec reclaim unchanged
 
 ## 4. Client IO context and warm-store startup
 
-- [ ] 4.1 Add Client `WithCancel` IO context. `sendQuery` and live lookups use `NewRequestWithContext`. Sleep and Close cancel it. Wake mints a new `WithCancel`
-- [ ] 4.2 `drainMetrics` / `reportMetrics` POST with `context.Background()`. Keep `closeIdle`
-- [ ] 4.3 `lapi.New` reads store `streamReady`: non-zero → `isCrowdsecStreamStartup = 0`. Empty store / mode-change SessionHex stays 1. Live/none: exclusive name only; no stream startup flag
+- [x] 4.1 Add Client `WithCancel` IO context. `sendQuery` and live lookups use `NewRequestWithContext`. Sleep and Close cancel it. Wake mints a new `WithCancel`
+- [x] 4.2 `drainMetrics` / `reportMetrics` POST with `context.Background()`. Keep `closeIdle`
+- [x] 4.3 `lapi.New` reads store `streamReady`: non-zero → `isCrowdsecStreamStartup = 0`. Empty store / mode-change SessionHex stays 1. Live/none: exclusive name only; no stream startup flag
 
 ## 5. Verify
 

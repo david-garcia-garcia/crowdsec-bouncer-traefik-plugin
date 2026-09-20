@@ -178,13 +178,13 @@ func TestOpenStream_LiveMetricsMismatchSharesSilently(t *testing.T) {
 
 	ownerCfg := testStreamConfig(parsed.Host, 1)
 	ownerCfg.UpdateIntervalSeconds = 30
-	owner, err := OpenStream(ctx, ownerCfg, log, "owner-mw", "test")
+	owner, err := OpenStream(ctx, ownerCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	joinerCfg := testStreamConfig(parsed.Host, 1)
 	joinerCfg.UpdateIntervalSeconds = 120
-	joiner, err := OpenStream(ctx, joinerCfg, log, "joiner-mw", "test")
+	joiner, err := OpenStream(ctx, joinerCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ func TestOpenStream_SleepingIntervalChangeWakesSameSlot(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	firstCfg := testStreamConfig(parsed.Host, 1)
 	firstCfg.UpdateIntervalSeconds = 30
-	first, err := OpenStream(ctx, firstCfg, log, "first", "test")
+	first, err := OpenStream(ctx, firstCfg, log, "reload", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +251,7 @@ func TestOpenStream_SleepingRedisHostDoesNotOverlapPollers(t *testing.T) {
 	firstCfg := testStreamConfig(parsed.Host, 1)
 	firstCfg.RedisCacheHost = "redis-a:6379"
 	ctx, cancel := context.WithCancel(context.Background())
-	first, err := OpenStream(ctx, firstCfg, log, "first", "test")
+	first, err := OpenStream(ctx, firstCfg, log, "reload", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,12 +271,15 @@ func TestOpenStream_SleepingRedisHostDoesNotOverlapPollers(t *testing.T) {
 	if first.StreamFetches() != fetchesBeforeCancel {
 		t.Fatal("old ticker must stay Sleep’d")
 	}
-	if first.decisionStore == second.decisionStore {
-		t.Fatal("different Redis must isolate the DecisionStore")
+	if first.decisionStore != second.decisionStore {
+		t.Fatal("same Traefik name must keep the DecisionStore across Redis host change")
+	}
+	if atomic.LoadInt64(&second.isCrowdsecStreamStartup) != 0 {
+		t.Fatal("new Client on a warm store must not send startup=true")
 	}
 }
 
-func TestOpenStream_DifferentRedisIsolatesClientAndStore(t *testing.T) {
+func TestOpenStream_DifferentRedisIsolatesClientKeepsStore(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
@@ -291,27 +294,24 @@ func TestOpenStream_DifferentRedisIsolatesClientAndStore(t *testing.T) {
 	redisACfg.RedisCacheHost = "redis-a:6379"
 	redisBCfg := testStreamConfig(parsed.Host, 1)
 	redisBCfg.RedisCacheHost = "redis-b:6379"
-	redisAClient, err := OpenStream(ctx, redisACfg, log, "redis-a", "test")
+	redisAClient, err := OpenStream(ctx, redisACfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	redisBClient, err := OpenStream(ctx, redisBCfg, log, "redis-b", "test")
+	redisBClient, err := OpenStream(ctx, redisBCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if redisAClient == redisBClient {
 		t.Fatal("different Redis must isolate the Client")
 	}
-	if redisAClient.decisionStore == redisBClient.decisionStore {
-		t.Fatal("different Redis must isolate the store")
+	if redisAClient.decisionStore != redisBClient.decisionStore {
+		t.Fatal("different Redis must keep one DecisionStore")
 	}
 	putBan(redisAClient.decisionStore)
 	got, getErr := lookupBan(redisBClient.decisionStore)
-	if getErr != nil {
-		t.Fatalf("store B lookup: %v", getErr)
-	}
-	if got != "" {
-		t.Fatal("ban in store A must miss in store B")
+	if getErr != nil || got == "" {
+		t.Fatalf("ban in store A must hit in store B: %q err %v", got, getErr)
 	}
 }
 
@@ -330,11 +330,11 @@ func TestOpenStream_HeaderMapMismatchSharesClient(t *testing.T) {
 	countryCfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
 	userCfg := testStreamConfig(parsed.Host, 1)
 	userCfg.DecisionScopeHeaders = map[string]string{"username": "X-User"}
-	countryClient, err := OpenStream(ctx, countryCfg, log, "country", "test")
+	countryClient, err := OpenStream(ctx, countryCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	userClient, err := OpenStream(ctx, userCfg, log, "user", "test")
+	userClient, err := OpenStream(ctx, userCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,13 +359,13 @@ func TestOpenStream_FailureActionOnlyKeepsClient(t *testing.T) {
 	secondCfg := testStreamConfig(parsed.Host, 1)
 	secondCfg.CrowdsecLapiFailureAction = configuration.FailureActionPassthrough
 
-	first, err := OpenStream(ctx, firstCfg, log, "first", "test")
+	first, err := OpenStream(ctx, firstCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	fetches := first.StreamFetches()
 	hitsBefore := atomic.LoadInt64(hits)
-	second, err := OpenStream(ctx, secondCfg, log, "second", "test")
+	second, err := OpenStream(ctx, secondCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -396,11 +396,11 @@ func TestOpenStream_TLSOnlyAdoptsTransport(t *testing.T) {
 	secondCfg := testStreamConfig(parsed.Host, 1)
 	secondCfg.HTTPTimeoutSeconds = 30
 
-	first, err := OpenStream(ctx, firstCfg, log, "first", "test")
+	first, err := OpenStream(ctx, firstCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenStream(ctx, secondCfg, log, "second", "test")
+	second, err := OpenStream(ctx, secondCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -440,11 +440,11 @@ func TestOpenStream_LapiOverrideAdoptsTimeout(t *testing.T) {
 	secondCfg.HTTPTimeoutSeconds = 10
 	secondCfg.CrowdsecLapiHTTPTimeoutSeconds = 30
 
-	first, err := OpenStream(ctx, firstCfg, slog.Default(), "first", "test")
+	first, err := OpenStream(ctx, firstCfg, slog.Default(), "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenStream(ctx, secondCfg, slog.Default(), "second", "test")
+	second, err := OpenStream(ctx, secondCfg, slog.Default(), "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -475,11 +475,11 @@ func TestOpenStream_SharedDefaultChangeAdoptsWhenOverrideZero(t *testing.T) {
 	secondCfg := testStreamConfig(parsed.Host, 1)
 	secondCfg.HTTPTimeoutSeconds = 20
 
-	first, err := OpenStream(ctx, firstCfg, slog.Default(), "first", "test")
+	first, err := OpenStream(ctx, firstCfg, slog.Default(), "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenStream(ctx, secondCfg, slog.Default(), "second", "test")
+	second, err := OpenStream(ctx, secondCfg, slog.Default(), "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -508,7 +508,7 @@ func TestOpenStream_OverrideEqualSharedDoesNotReplace(t *testing.T) {
 	ctx := context.Background()
 	firstCfg := testStreamConfig(parsed.Host, 1)
 	firstCfg.HTTPTimeoutSeconds = 10
-	first, err := OpenStream(ctx, firstCfg, log, "first", "test")
+	first, err := OpenStream(ctx, firstCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -516,7 +516,7 @@ func TestOpenStream_OverrideEqualSharedDoesNotReplace(t *testing.T) {
 	secondCfg := testStreamConfig(parsed.Host, 1)
 	secondCfg.HTTPTimeoutSeconds = 10
 	secondCfg.CrowdsecLapiHTTPTimeoutSeconds = 10
-	second, err := OpenStream(ctx, secondCfg, log, "second", "test")
+	second, err := OpenStream(ctx, secondCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -575,4 +575,144 @@ func waitClientSleeping(t *testing.T, client *Client) {
 		time.Sleep(time.Millisecond)
 	}
 	t.Fatal("Client never Sleep'd")
+}
+
+func TestOpenStream_DifferentNameFailsBeforeStoreOpen(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	server, _ := testStreamLAPI(t)
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log, logSink := newTestLogSink(slog.LevelError)
+	ctx := context.Background()
+	owner, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "foo", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, peekState, peekOK := reclaim.Peek(StoreKey(testStreamConfig(parsed.Host, 1)))
+	if !peekOK || peekState != reclaim.Awake {
+		t.Fatal("owner store must Peek Awake")
+	}
+	joiner, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "bar", "test")
+	if err == nil {
+		t.Fatal("different Traefik name must fail OpenStream")
+	}
+	if joiner != nil {
+		t.Fatal("failed OpenStream must not return a Client")
+	}
+	if !strings.Contains(err.Error(), "foo") || !strings.Contains(err.Error(), "bar") {
+		t.Fatalf("error must name owner and rejected: %v", err)
+	}
+	if !strings.Contains(err.Error(), "Closes") || !strings.Contains(err.Error(), "bouncer API key") {
+		t.Fatalf("error must name Close and isolation: %v", err)
+	}
+	logged := logSink.String()
+	if !strings.Contains(logged, `"owner":"foo"`) || !strings.Contains(logged, `"rejected":"bar"`) {
+		t.Fatalf("Error log must name owner and rejected: %s", logged)
+	}
+	_, afterState, afterOK := reclaim.Peek(StoreKey(testStreamConfig(parsed.Host, 1)))
+	if !afterOK || afterState != reclaim.Awake {
+		t.Fatal("Peek-fail must not bind or Wake the store")
+	}
+	if owner.decisionStore.CreatedBy() != "foo" {
+		t.Fatalf("createdBy: %q", owner.decisionStore.CreatedBy())
+	}
+}
+
+func TestOpenStream_EmptyNameStillExclusiveOwns(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	server, _ := testStreamLAPI(t)
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	log := slog.Default()
+	empty, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "named", "test"); err == nil {
+		t.Fatal("non-empty name must fail against empty createdBy")
+	}
+	secondEmpty, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if empty != secondEmpty {
+		t.Fatal("two empty names must share the Client")
+	}
+}
+
+func TestOpenStream_SameNameDuringGraceWakesStore(t *testing.T) {
+	reclaim.ResetForTestWith(500 * time.Millisecond)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	server, _ := testStreamLAPI(t)
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := slog.Default()
+	ctx, cancel := context.WithCancel(context.Background())
+	first, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "foo", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := first.decisionStore
+	cancel()
+	waitClientSleeping(t, first)
+	_, state, ok := reclaim.Peek(StoreKey(testStreamConfig(parsed.Host, 1)))
+	if !ok || state != reclaim.Asleep {
+		t.Fatalf("store must Peek Asleep during grace: ok=%v state=%v", ok, state)
+	}
+	second, err := OpenStream(context.Background(), testStreamConfig(parsed.Host, 1), log, "foo", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.decisionStore != store {
+		t.Fatal("same name during grace must Wake the same store")
+	}
+	if store.CreatedBy() != "foo" {
+		t.Fatalf("Wake must not overwrite createdBy: %q", store.CreatedBy())
+	}
+}
+
+func TestOpenDecisionStore_CreatedByWriteOnce(t *testing.T) {
+	reclaim.ResetForTestWith(500 * time.Millisecond)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cfg := testStreamConfig("lapi.example:8080", 1)
+	log := slog.Default()
+	first, err := OpenDecisionStore(ctx, cfg, log, "foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	deadline := time.Now().Add(2 * time.Second)
+	asleep := false
+	for time.Now().Before(deadline) {
+		_, state, ok := reclaim.Peek(StoreKey(cfg))
+		if ok && state == reclaim.Asleep {
+			asleep = true
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if !asleep {
+		t.Fatal("store must Sleep after last holder is gone")
+	}
+	second, err := OpenDecisionStore(context.Background(), cfg, log, "foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second || first.CreatedBy() != "foo" {
+		t.Fatalf("Wake must keep createdBy foo: %p %p %q", first, second, first.CreatedBy())
+	}
 }

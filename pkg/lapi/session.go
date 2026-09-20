@@ -8,6 +8,7 @@ import (
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -16,7 +17,7 @@ const streamSessionKeyPrefix = "lapi:stream:"
 // streamSession is the CrowdSec-row identity for stream and alone modes.
 // SessionPrefix and SessionHex use only these fields. SessionKey appends a
 // hash of Redis store parameters so two Clients that share a cursor still
-// isolate by Redis host (same payload family as StoreKey).
+// isolate by Redis host. The DecisionStore key is SessionHex only.
 //
 // CrowdSec LAPI does not give each HTTP client its own GET /v1/decisions/stream
 // cursor. The cursor lives on the bouncer database row selected by:
@@ -95,16 +96,49 @@ func reclaimSessionKey(cfg *configuration.Config) string {
 	return Key(cfg)
 }
 
+// rejectForeignStoreOwner Peeks the DecisionStore key and fails when another Traefik name owns it.
+func rejectForeignStoreOwner(log *slog.Logger, storeKey, name string) error {
+	value, _, ok := reclaim.Peek(storeKey)
+	if !ok {
+		return nil
+	}
+	store, isStore := value.(*decisionstore.Store)
+	if !isStore {
+		return nil
+	}
+	owner := store.CreatedBy()
+	if owner == name {
+		return nil
+	}
+	log.Error("lapi session exclusive: DecisionStore already owned",
+		"owner", owner,
+		"rejected", name,
+		"clears", "when the old slot Closes",
+		"isolation", "a second bouncer API key (or a different LAPI host), not a second middleware on the same key",
+	)
+	return fmt.Errorf("lapi session exclusive: store owned by %q, rejected %q; lock clears when the old slot Closes; isolation is a second bouncer API key (or a different LAPI host), not a second middleware on the same key", owner, name)
+}
+
+// openDecisionStoreExclusive Peeks then Opens the SessionHex store for this Traefik name.
+func openDecisionStoreExclusive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, name string) (*decisionstore.Store, error) {
+	if err := rejectForeignStoreOwner(log, StoreKey(cfg), name); err != nil {
+		return nil, err
+	}
+	return OpenDecisionStore(ctx, cfg, log, name)
+}
+
 // OpenStream reclaims one Client per cursor plus Redis (LAPI URL+key).
 //
 // SessionKey is session prefix plus this Redis snapshot’s hash. Same Redis
 // snapshot → Open that key (Sleep/Wake across Traefik’s cancel-then-New gap),
 // even when intervals, CAPI scenarios, updateMaxFailure, or header maps differ.
-// A different Redis host is a different key. Interval / CAPI / updateMaxFailure
+// A different Redis host is a different Client key and the same DecisionStore
+// when the Traefik name matches. Interval / CAPI / updateMaxFailure
 // mismatch on a live sibling is silent first-wins (create already wrote those
-// scalars). After bind, this constructor registers its header scopes.
+// scalars). A different Traefik name on the same SessionHex fails before Open.
+// After bind, this constructor registers its header scopes.
 func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
-	store, storeErr := OpenDecisionStore(ctx, cfg, log)
+	store, storeErr := openDecisionStoreExclusive(ctx, cfg, log, middlewareName)
 	if storeErr != nil {
 		return nil, storeErr
 	}
@@ -140,7 +174,7 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 
 // OpenLive reclaims a Client by cursor plus Redis and metrics interval (live/none).
 func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
-	store, storeErr := OpenDecisionStore(ctx, cfg, log)
+	store, storeErr := openDecisionStoreExclusive(ctx, cfg, log, middlewareName)
 	if storeErr != nil {
 		return nil, storeErr
 	}

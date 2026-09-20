@@ -42,6 +42,9 @@ type Client struct {
 	closed   bool
 	sleeping bool // last reclaim holder gone; tickers stopped until Wake or Close
 
+	ioCtx    context.Context    // LAPI/CAPI request construction; Sleep/Close cancel, Wake mints
+	ioCancel context.CancelFunc
+
 	crowdsecScheme       string
 	crowdsecHost         string
 	crowdsecPath         string
@@ -114,6 +117,11 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		return nil, errors.New("decision store is required")
 	}
 
+	startup := int64(1)
+	if store.StreamReady() != 0 {
+		startup = 0
+	}
+
 	client := &Client{
 		crowdsecMode:            config.CrowdsecMode,
 		crowdsecScheme:          config.CrowdsecLapiScheme,
@@ -130,10 +138,11 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		sessionKey:              reclaimSessionKey(config),
 		log:                     log,
 		pluginVersion:           pluginVersion,
-		isCrowdsecStreamStartup: 1,
+		isCrowdsecStreamStartup: startup,
 		isCrowdsecStreamHealthy: 1,
 		decisionStore:           store,
 	}
+	client.mintIOLocked()
 	client.metricsReporter = newMetricsReporter(client, time.Now())
 	client.transport.Store(next)
 
@@ -164,6 +173,7 @@ func (c *Client) Close() {
 	}
 	c.closed = true
 	c.sleeping = false
+	c.cancelIOLocked()
 	stopTicker(c.streamStop)
 	stopTicker(c.metricsStop)
 	c.streamStop = nil
@@ -190,6 +200,7 @@ func (c *Client) Sleep() {
 		return
 	}
 	c.sleeping = true
+	c.cancelIOLocked()
 	stopTicker(c.streamStop)
 	stopTicker(c.metricsStop)
 	c.streamStop = nil
@@ -208,6 +219,7 @@ func (c *Client) Wake() {
 		return
 	}
 	c.sleeping = false
+	c.mintIOLocked()
 	resumeStream := c.crowdsecMode == configuration.StreamMode || c.crowdsecMode == configuration.AloneMode
 	if resumeStream && c.streamStop == nil {
 		c.streamStop = startTicker("stream", c.updateInterval, c.log, func() {
@@ -232,6 +244,31 @@ func (c *Client) logInfo(msg, reason string) {
 		return
 	}
 	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
+}
+
+// mintIOLocked replaces the Client IO context. New calls it before the Client is published;
+// Sleep/Wake/Close call it under c.mu. A cancelled context cannot be reused.
+func (c *Client) mintIOLocked() {
+	c.ioCtx, c.ioCancel = context.WithCancel(context.Background())
+}
+
+// cancelIOLocked cancels the Client IO context so in-flight LAPI/CAPI GET/POST fail. Caller holds c.mu.
+func (c *Client) cancelIOLocked() {
+	if c.ioCancel == nil {
+		return
+	}
+	c.ioCancel()
+	c.ioCancel = nil
+}
+
+// ioContext is the Client IO context for sendQuery. Missing IO ctx uses Background (test literals).
+func (c *Client) ioContext() context.Context {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.ioCtx == nil {
+		return context.Background()
+	}
+	return c.ioCtx
 }
 
 func stopTicker(stop chan bool) {

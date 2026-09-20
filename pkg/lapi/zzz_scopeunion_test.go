@@ -36,11 +36,11 @@ func TestOpenStream_LiveRoutersUnionCountryAndUsername(t *testing.T) {
 	userCtx, userCancel := context.WithCancel(context.Background())
 	t.Cleanup(userCancel)
 
-	countryClient, err := OpenStream(countryCtx, countryCfg, log, "country", "test")
+	countryClient, err := OpenStream(countryCtx, countryCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	userClient, err := OpenStream(userCtx, userCfg, log, "user", "test")
+	userClient, err := OpenStream(userCtx, userCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestOpenStream_LateCountryJoinUsesStartupFalse(t *testing.T) {
 	}
 	log := slog.Default()
 	firstCfg := testStreamConfig(parsed.Host, 1)
-	first, err := OpenStream(context.Background(), firstCfg, log, "first", "test")
+	first, err := OpenStream(context.Background(), firstCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestOpenStream_LateCountryJoinUsesStartupFalse(t *testing.T) {
 	}
 	lateCfg := testStreamConfig(parsed.Host, 1)
 	lateCfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
-	late, err := OpenStream(context.Background(), lateCfg, log, "late", "test")
+	late, err := OpenStream(context.Background(), lateCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}

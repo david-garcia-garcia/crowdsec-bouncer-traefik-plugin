@@ -76,6 +76,7 @@ func (c *Client) handleStreamCache() error {
 	}
 	c.log.Debug("handleStreamCache:updated")
 	atomic.StoreInt64(&c.isCrowdsecStreamStartup, 0)
+	c.decisionStore.MarkStreamReady()
 	return nil
 }
 

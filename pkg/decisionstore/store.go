@@ -64,6 +64,8 @@ type Store struct {
 	origins         *intern.Table
 	rangeMembership atomic.Value // *RangeMembership
 	lastRangeIndex  atomic.Value // string of the blob last used to build membership
+	createdBy       string       // Traefik New name from the create that first put this store
+	streamReady     int64        // 1 after the first finished stream poll; atomic.LoadInt64/StoreInt64
 }
 
 // NewMemory is in-process COW slots and an in-process Range blob.
@@ -88,7 +90,8 @@ func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, data
 }
 
 // Open reclaims one Store per reclaimKey. keyPrefix is the Redis key prefix.
-func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.Config, log *slog.Logger) (*Store, error) {
+// createdBy is Traefik New(..., name); write-once on the create that first puts the store.
+func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.Config, log *slog.Logger, createdBy string) (*Store, error) {
 	stored, err := reclaim.OpenWithHooks(ctx, reclaimKey, log, func() (any, reclaim.Hooks, error) {
 		var store *Store
 		if cfg.RedisCacheEnabled {
@@ -103,6 +106,7 @@ func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.
 		} else {
 			store = NewMemory(log)
 		}
+		store.createdBy = createdBy
 		return store, reclaim.Hooks{Close: store.Close}, nil
 	})
 	if err != nil {
@@ -113,6 +117,21 @@ func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.
 		return nil, fmt.Errorf("reclaim: want *decisionstore.Store, got %T", stored)
 	}
 	return storedTyped, nil
+}
+
+// CreatedBy is the Traefik New name from the create that first put this store.
+func (s *Store) CreatedBy() string {
+	return s.createdBy
+}
+
+// StreamReady is non-zero after the first stream poll that finished successfully.
+func (s *Store) StreamReady() int64 {
+	return atomic.LoadInt64(&s.streamReady)
+}
+
+// MarkStreamReady records that a stream poll finished successfully.
+func (s *Store) MarkStreamReady() {
+	atomic.StoreInt64(&s.streamReady, 1)
 }
 
 // BeginTick opens the write window for one stream poll. Memory clones published into tick.
