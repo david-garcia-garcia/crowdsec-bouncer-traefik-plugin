@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-20T05:12:39Z
+Developer review: in progress — 2026-09-20T05:21:49Z
 
 ## What this changes
-**Operators.** None.
+**Operators.** None yet (README apply still pending). Specs describe: one LAPI key = one stream ticker and metrics window in this process; Redis/interval disagreements are ignored, not isolated.
 
 **Admin users.** None.
 
-**Developers.** Explore recorded: stream Client key drops Redis; live/none Key does not; DecisionStore opens inside Client create(). Apply not started.
+**Developers.** OpenSpec change `2026-09-20-lapi-session-subscribe` folds four leaves: reclaim-key, decisionstore store, middleware bouncer, LAPI connection. Apply not started.
 
 **End users.** None.
 
@@ -24,10 +24,10 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Explore complete; proceed policy on two assumed questions. Apply not started. 6 items remain.
+Propose apply-ready (18 tasks). Product code not started. 5 items remain.
 
 Priority: P2 — real operator pain (stolen stream deltas / second metrics window) with a workaround (second API key)
-Reviewed head: 0760a805
+Reviewed head: 6a5222de
 Owner decision: Required. See Decision needed.
 
 ## Review scores
@@ -42,20 +42,23 @@ Owner decision: Required. See Decision needed.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-20-lapi-session-subscribe pushed | origin/2026-09-20-lapi-session-subscribe |
-| OpenSpec | none | openspec/ |
+| OpenSpec | 2026-09-20-lapi-session-subscribe | openspec/changes/2026-09-20-lapi-session-subscribe/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/119 | pr-host |
-| CI | build 35491073835 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35491073835 | GitHub check runs |
+| CI | build 35491471361 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35491471361 | GitHub check runs |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | inventory empty |
 
 ## Specs
-None.
+- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/openspec/changes/2026-09-20-lapi-session-subscribe/proposal.md) — modified
+- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/openspec/changes/2026-09-20-lapi-session-subscribe/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/openspec/changes/2026-09-20-lapi-session-subscribe/proposal.md) — modified
+- [core_plugin_lapi_connection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/openspec/changes/2026-09-20-lapi-session-subscribe/proposal.md) — modified
 
 ## Follow-up issues
 None.
 
 ## How this fits together
-Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, stub PR 119. Explore decided stream share+WARN; live Redis key stays. Next is propose.
+Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, stub PR 119. OpenSpec folded four existing leaves. Next is implement.
 
 ## Decision needed
 | Question | Decision | By |
@@ -77,25 +80,25 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as Specs |
+| Specs in this PR | 0 added / 4 modified | Same list as Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 0760a80500ad2e0c664e8ad132b6742886446c23 | Card must match the branch you measured |
+| Reviewed head | 6a5222de1b54c9f30a061d7aa952c1f479326fdb | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: Stream Open key = SessionHex without Redis; store nested in create(); WARN on subscribe mismatch. Live Key unchanged this ticket.
+Best possible solution: Fold reclaim-key + store child + constructor bind + first-create INFO onto existing leaves. No new 4th part.
 
-Do we have a high-confidence way to reproduce? Yes, four DestBranch pkg/lapi OpenStream tests passed and still encode Redis isolation.
+Do we have a high-confidence way to reproduce? Yes, DestBranch OpenStream Redis-isolation tests.
 
-Is this the best way to solve the issue? Yes vs DestBranch: match LAPI row physics; do not fail New; do not migrate Redis.
+Is this the best way to solve the issue? Yes vs DestBranch: match LAPI row; do not fail New; live Key unchanged.
 
 ### Evidence
 What I checked:
-- explore.md Decisions and Open questions (0760a805)
-- `go test ./pkg/lapi` four OpenStream session tests PASS
-- CI still in progress on PR 119
+- FindSpecHost four folds high confidence (`devstate/.../specs.md`)
+- `openspec/changes/2026-09-20-lapi-session-subscribe/` proposal + 18 tasks (6a5222de)
+- CI in progress on PR 119
 
 ### Rank-up moves
 None.
