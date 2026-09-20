@@ -16,13 +16,13 @@ type publishedSlots struct {
 
 // memory is in-process COW tick/published LiveSlot maps plus the Range blob.
 type memory struct {
-	log     *slog.Logger
-	origins *intern.Table       // origin name → id packed into LiveSlot.Word
-	mu      sync.RWMutex        // tick, ticking, rangeIndex; not lookup
-	ticking     bool                // stream window: PutMany/DeleteMany write tick; Lookup reads published
-	tick        map[string]LiveSlot // unpublished clone; SlotKey → packed word + elapsed expiry
-	published   atomic.Value        // *publishedSlots; request-path snapshot, not atomic.Pointer (Yaegi v0.16)
-	rangeIndex  string              // Range CIDR=kind blob; membership is rebuilt from this
+	log        *slog.Logger
+	origins    *intern.Table       // origin name → id packed into LiveSlot.Word
+	mu         sync.RWMutex        // tick, ticking, rangeIndex; not lookup
+	ticking    bool                // stream window: PutMany/DeleteMany write tick; Lookup reads published
+	tick       map[string]LiveSlot // unpublished clone; SlotKey → packed word + elapsed expiry
+	published  atomic.Value        // *publishedSlots; request-path snapshot, not atomic.Pointer (Yaegi v0.16)
+	rangeIndex string              // Range CIDR=kind blob; membership is rebuilt from this
 }
 
 // newMemory allocates non-nil tick and an empty published snapshot.
