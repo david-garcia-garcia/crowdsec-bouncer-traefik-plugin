@@ -100,3 +100,24 @@ jobs:
       - name: Stop test stack
         if: always()
         run: docker compose -f tests/e2e/real/docker-compose.test.yml down -v --remove-orphans
+
+  e2e-go-redis:
+    name: e2e (go + dragonfly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Start Dragonfly
+        run: docker compose -f tests/e2e/go/docker-compose.yml up -d
+      - name: Run realredis Go tests
+        run: go test -tags realredis -count=1 -v ./pkg/decisionstore
+      - name: Show Dragonfly logs on failure
+        if: failure()
+        run: docker logs dragonfly-go-test 2>/dev/null || true
+      - name: Stop Dragonfly
+        if: always()
+        run: docker compose -f tests/e2e/go/docker-compose.yml down -v --remove-orphans

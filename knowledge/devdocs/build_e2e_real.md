@@ -22,7 +22,7 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 - Custom-ban and captcha compose labels set `banFilePath` / `captchaFilePath`. Do not use `banHtmlFilePath` / `captchaHtmlFilePath` or HTML-cased twins.
 - Nested plugin maps (`decisionScopeHeaders`, geoblock `databaseSources`) MUST use the file provider (`tests/e2e/real/dynamic-scopes.yml`). Docker labels do not decode those maps.
 - Country matching uses traefik-geoblock enrich on a **public** `X-Forwarded-For`. Do not inject a client-set country header for that case.
-- CI job `e2e (docker + pester)` runs this suite; `e2e (binary + mock LAPI)` stays the mock job.
+- CI job `e2e (docker + pester)` runs this suite; `e2e (binary + mock LAPI)` stays the mock job; `e2e (go + dragonfly)` is DecisionStore `go test` against Dragonfly (`build_e2e_go-redis.md`).
 
 ## Pattern snippet
 
