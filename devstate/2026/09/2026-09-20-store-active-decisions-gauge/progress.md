@@ -4,7 +4,7 @@ JobName: 2026-09-20-store-active-decisions-gauge
 
 | Phase | Work | Card | At |
 |-------|------|------|----|
-| prepare | [x] | [ ] | |
+| prepare | [x] | [x] | 2026-09-20T17:43:16Z |
 | explore | [ ] | [ ] | |
 | propose | [ ] | [ ] | |
 | implement | [ ] | [ ] | |
