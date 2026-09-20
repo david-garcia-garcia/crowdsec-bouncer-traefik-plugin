@@ -10,5 +10,5 @@ JobName: 2026-09-20-lapi-session-exclusive
 | implement | [x] | [x] | 2026-09-20T16:44:39Z |
 | codereview | [x] | [x] | 2026-09-20T17:16:11Z |
 | devdocsimpact | [x] | [x] | 2026-09-20T17:18:55Z |
-| archive | [x] | [ ] | |
+| archive | [x] | [x] | 2026-09-20T17:22:06Z |
 | pullrequest | [ ] | [ ] | |
