@@ -40,7 +40,8 @@ Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx
 - Stream apply calls Store `BeginTick` / `DeleteMany` / `PutMany` / `PublishTick(ElapsedNow())` / `ApplyRangeBatch` (`core_plugin_lapi_stream-apply.md`). Memory `PublishTick(0)` skips expiry sweep; non-zero `now` drops tick slots where `ExpiresAt > 0 && ExpiresAt <= now`. Redis tick methods are no-ops and ignore `now`; Redis PutMany is MSetEX by TTL in `PutManyChunk` batches.
 - Captcha grace is the gate cookie (`core_plugin_middleware_captcha-gate.md`), not store keys.
 - Origin intern is a `pkg/intern.Table` field on `Store`. `OriginID` / `OriginName` forward to it. `Name` takes `RLock`. Resolve origin only on drop.
-- `Store.Close()` drains Redis idle pools. Call it only from the store’s reclaim Close hook. Memory Close is a no-op. Safe to call more than once on a real Redis store. Do not Close a nil `*Store`.
+- `Store.Close()` logs `crowdsec decision store closed` then drains Redis idle pools. Memory Close is a no-op drain. Call Close only from the store’s reclaim Close hook. Safe to call more than once on a real Redis store. Do not Close a nil `*Store`.
+- Install log-only Sleep/Wake (`crowdsec decision store sleeping` / `waking`). They MUST NOT drain Redis or drop maps. Create logs `crowdsec decision store started`. `reclaim_put|orphan|reclaim|dispose` stay DEBUG.
 
 ## Pattern snippet
 

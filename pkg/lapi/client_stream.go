@@ -45,20 +45,35 @@ func (c *Client) startStream(config *configuration.Config, log *slog.Logger) err
 	return nil
 }
 
+// handleStreamTicker runs one stream poll unless another poll is already in flight.
 func (c *Client) handleStreamTicker() {
 	if !atomic.CompareAndSwapInt64(&c.streamPollInFlight, 0, 1) {
+		c.log.Debug("handleStreamTicker:skip", "sessionKey", c.sessionKey, "reason", "inFlight")
 		return
 	}
 	defer atomic.StoreInt64(&c.streamPollInFlight, 0)
 
+	started := time.Now()
+	c.log.Debug("handleStreamTicker:poll",
+		"sessionKey", c.sessionKey,
+		"startup", c.streamStartup(),
+		"fetches", atomic.LoadInt64(&c.streamFetches),
+		"interval", c.updateInterval,
+	)
 	if err := c.handleStreamCache(); err != nil {
 		updateFailure := atomic.LoadInt64(&c.updateFailure)
 		healthy := atomic.LoadInt64(&c.isCrowdsecStreamHealthy) != 0
-		c.log.Warn("handleStreamTicker", "updateFailure", updateFailure, "isCrowdsecStreamHealthy", healthy, "error", err)
+		c.log.Warn("handleStreamTicker",
+			"sessionKey", c.sessionKey,
+			"updateFailure", updateFailure,
+			"isCrowdsecStreamHealthy", healthy,
+			"durationMs", time.Since(started).Milliseconds(),
+			"error", err,
+		)
 		if c.updateMaxFailure != -1 && updateFailure >= c.updateMaxFailure && healthy {
 			atomic.StoreInt64(&c.isCrowdsecStreamHealthy, 0)
 			c.logInfo(MsgStreamUnhealthy, "unhealthy")
-			c.log.Error("handleStreamTicker:error", "updateFailure", updateFailure, "error", err)
+			c.log.Error("handleStreamTicker:error", "sessionKey", c.sessionKey, "updateFailure", updateFailure, "error", err)
 		}
 		atomic.AddInt64(&c.updateFailure, 1)
 	} else {
@@ -70,18 +85,29 @@ func (c *Client) handleStreamTicker() {
 	}
 }
 
+// handleStreamCache GETs stream, applies the payload, and logs the finish line at DEBUG.
 func (c *Client) handleStreamCache() error {
-	if pollErr := c.fetchAndApplyStreamDecisions(); pollErr != nil {
+	started := time.Now()
+	newCount, deletedCount, pollErr := c.fetchAndApplyStreamDecisions()
+	if pollErr != nil {
 		return pollErr
 	}
-	c.log.Debug("handleStreamCache:updated")
+	c.log.Debug("handleStreamCache:updated",
+		"sessionKey", c.sessionKey,
+		"startup", c.streamStartup(),
+		"new", newCount,
+		"deleted", deletedCount,
+		"durationMs", time.Since(started).Milliseconds(),
+		"fetches", atomic.LoadInt64(&c.streamFetches),
+	)
 	atomic.StoreInt64(&c.isCrowdsecStreamStartup, 0)
 	return nil
 }
 
 // fetchAndApplyStreamDecisions GETs the CrowdSec stream delta and writes it into the DecisionStore.
 // Deleted is applied before New so a same-window replacement for the same IP or CIDR stays active.
-func (c *Client) fetchAndApplyStreamDecisions() error {
+// newCount and deletedCount are the payload lengths after a successful apply.
+func (c *Client) fetchAndApplyStreamDecisions() (int, int, error) {
 	streamRouteURL := url.URL{
 		Scheme:   c.crowdsecScheme,
 		Host:     c.crowdsecHost,
@@ -91,12 +117,12 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 	atomic.AddInt64(&c.streamFetches, 1)
 	body, err := c.crowdsecQuery(streamRouteURL.String(), nil)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	var stream Stream
 	err = json.Unmarshal(body, &stream)
 	if err != nil {
-		return fmt.Errorf("handleStreamCache:parsingBody %w", err)
+		return 0, 0, fmt.Errorf("handleStreamCache:parsingBody %w", err)
 	}
 	c.decisionStore.BeginTick()
 	defer c.decisionStore.PublishTick(decisionstore.ElapsedNow())
@@ -153,7 +179,7 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 	// A range apply that could not read the shared index is a poll that did not finish.
 	// isCrowdsecStreamStartup stays set so the retry asks for the full set again.
 	if err := c.decisionStore.ApplyRangeBatch(rangeUpserts, rangeRemovals); err != nil {
-		return fmt.Errorf("handleStreamCache:rangeIndex %w", err)
+		return 0, 0, fmt.Errorf("handleStreamCache:rangeIndex %w", err)
 	}
-	return nil
+	return len(stream.New), len(stream.Deleted), nil
 }

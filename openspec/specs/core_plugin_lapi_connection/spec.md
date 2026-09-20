@@ -23,17 +23,18 @@
 - **AND** `transport` is declared in `client_http.go`
 
 ### Requirement: Stream poll ticks stay at DEBUG
-Successful stream cache ticks SHALL emit `handleStreamCache:updated` after a LAPI fetch and `handleStreamCache:alreadyUpdated` when the stream lease is already held. Both messages MUST be DEBUG. They MUST NOT appear when the plugin logger is at the default INFO level. Stream health transitions (`crowdsec stream became healthy` / `crowdsec stream became unhealthy`) remain INFO and are not this requirement.
+A stream poll SHALL emit `handleStreamTicker:poll` when it wins the in-flight CAS and SHALL emit `handleStreamCache:updated` after a successful LAPI fetch and apply. A busy tick SHALL emit `handleStreamTicker:skip` and MUST NOT GET stream. Those three messages MUST be DEBUG. They MUST NOT appear when the plugin logger is at the default INFO level. `handleStreamTicker:poll` and `handleStreamCache:updated` SHALL carry `sessionKey`, `startup`, and `fetches`; `updated` SHALL also carry payload `new` and `deleted` counts and `durationMs`. There is no stream lease and no `handleStreamCache:alreadyUpdated` line. Stream health transitions (`crowdsec stream became healthy` / `crowdsec stream became unhealthy`) remain INFO and are not this requirement.
 
-#### Scenario: Lease miss does not INFO-spam
-- **WHEN** stream mode polls LAPI because the stream lease is missing and the fetch succeeds
-- **THEN** `handleStreamCache:updated` is present at DEBUG
-- **AND** that message is absent when the logger is at INFO
+#### Scenario: Successful poll does not INFO-spam
+- **WHEN** stream mode polls LAPI and the fetch succeeds
+- **THEN** `handleStreamTicker:poll` and `handleStreamCache:updated` are present at DEBUG
+- **AND** those messages are absent when the logger is at INFO
 
-#### Scenario: Lease hit does not INFO-spam
-- **WHEN** stream mode ticks while the stream lease is already held
-- **THEN** `handleStreamCache:alreadyUpdated` is present at DEBUG
+#### Scenario: Busy tick does not INFO-spam
+- **WHEN** stream mode ticks while a poll is already in flight
+- **THEN** `handleStreamTicker:skip` is present at DEBUG
 - **AND** that message is absent when the logger is at INFO
+- **AND** the tick does not GET stream
 
 ### Requirement: LAPI HTTP transport is replaceable after Open
 `Client` SHALL store LAPI HTTP+auth (including CAPI token) as `atomic.Value`. After `OpenStream` or `OpenLive` bind, the constructor SHALL call `AdoptTransport` with that config: Store the new transport and idle-close the previous HTTP client. Concurrent replaces SHALL last-write the stored transport and idle-close the value they replaced. Remaining write-once Client scalar fields MUST NOT become mutable. `getToken` SHALL write the CAPI token on the stored transport, not on a write-once Client key field.
