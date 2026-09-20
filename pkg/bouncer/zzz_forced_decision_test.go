@@ -122,6 +122,30 @@ func TestServeHTTP_forcedDecisionCaptchaDoesNotOverrideBan(t *testing.T) {
 	}
 }
 
+// TestServeHTTP_forcedDecisionTrimmedHeaderValues fails if Header.Get values are matched without TrimSpace.
+func TestServeHTTP_forcedDecisionTrimmedHeaderValues(t *testing.T) {
+	client := testCaptchaClient(t, "/fast.js", "", "", nil)
+	captchaBouncer, _, captchaPassed := testForcedDecisionBouncer(t, nil, client, nil, false)
+	captchaRW := httptest.NewRecorder()
+	captchaBouncer.ServeHTTP(captchaRW, testForcedDecisionRequest(" c "))
+	if *captchaPassed {
+		t.Fatal("padded c must still captcha")
+	}
+	if !strings.Contains(captchaRW.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
+		t.Fatalf("padded c want captcha page, got %q", captchaRW.Body.String())
+	}
+
+	banBouncer, _, banPassed := testForcedDecisionBouncer(t, nil, nil, nil, false)
+	banRW := httptest.NewRecorder()
+	banBouncer.ServeHTTP(banRW, testForcedDecisionRequest(" b "))
+	if *banPassed {
+		t.Fatal("padded b must still ban")
+	}
+	if banRW.Code != http.StatusForbidden || !strings.Contains(banRW.Body.String(), "banned") {
+		t.Fatalf("padded b status=%d body=%q", banRW.Code, banRW.Body.String())
+	}
+}
+
 func TestServeHTTP_forcedDecisionBanSkipsStream(t *testing.T) {
 	b, lapiClient, passed := testForcedDecisionBouncer(t, nil, nil, nil, false)
 	rw := httptest.NewRecorder()
