@@ -18,4 +18,4 @@ Ship Ip/header store-owned counts first. Helper has no public exact-prefix get; 
 
 ## Context
 
-Dest stream Range still `rememberActiveDecision("range:"+cidr)` / `forgetActiveDecision("range:"+cidr)` in `pkg/lapi/client_stream.go`. Blob apply is `pkg/decisionstore/range.go` `ApplyRangeIndex`. Membership is `pkg/decisionstore/rangemembership.go`. `Store.Peek` is not found on dest.
+Dest stream Range is omitted from the store-owned gauge (`ApplyRangeBatch` does not adjust counts; stream apply no longer remember/forget `range:` keys). Blob apply is `pkg/decisionstore/range.go` `ApplyRangeIndex`. Membership is `pkg/decisionstore/rangemembership.go`. `Store.Peek` is not found.
