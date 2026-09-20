@@ -31,3 +31,11 @@ fixed: deleted ioCtx/NewRequestWithContext; store CAS skip; localTests passed
 skipped: CI still in progress on 5779763a
 qualify: qualified-with-gaps
 pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/124
+
+## codereview (2026-09-20T17:16:11Z)
+phase: codereview
+findings: Dead 1 hard StreamPollInFlight test-only getter; other axes none
+fixed: deleted StreamPollInFlight; CAS tests use TryBeginStreamPoll skip/reenter
+skipped: none
+qualify: qualified-with-gaps
+pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/124
