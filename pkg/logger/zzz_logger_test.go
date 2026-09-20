@@ -19,6 +19,7 @@ func TestNew(t *testing.T) {
 		{name: "WARN level", logLevel: "WARN"},
 		{name: "INFO level", logLevel: "INFO"},
 		{name: "DEBUG level", logLevel: "DEBUG"},
+		{name: "TRACE level", logLevel: "TRACE"},
 		{name: "Default level (INFO)", logLevel: "INVALID"},
 	}
 
@@ -209,4 +210,47 @@ func TestInvalidLogFile(t *testing.T) {
 
 	// Should not panic when logging
 	logger.Info("test message")
+}
+
+func TestTraceLevelNameAndFiltering(t *testing.T) {
+	tracePath := filepath.Join(t.TempDir(), "trace.log")
+	debugPath := filepath.Join(t.TempDir(), "debug.log")
+	t.Cleanup(ResetSharedLogFilesForTest)
+
+	traceLog := NewWithFormat("TRACE", tracePath, "json")
+	Trace(traceLog, "hotpath")
+	traceLog.Debug("startup")
+
+	debugLog := NewWithFormat("DEBUG", debugPath, "json")
+	Trace(debugLog, "hotpath")
+	debugLog.Debug("startup")
+
+	// #nosec G304 -- paths are test-generated temporary files
+	traceData, err := os.ReadFile(tracePath)
+	if err != nil {
+		t.Fatalf("read TRACE log: %v", err)
+	}
+	traceOut := string(traceData)
+	if !strings.Contains(traceOut, `"level":"TRACE"`) {
+		t.Fatalf("TRACE logger should name LevelTrace as TRACE, got %s", traceOut)
+	}
+	if !strings.Contains(traceOut, `"msg":"hotpath"`) {
+		t.Fatalf("TRACE logger should emit Trace, got %s", traceOut)
+	}
+	if !strings.Contains(traceOut, `"level":"DEBUG"`) || !strings.Contains(traceOut, `"msg":"startup"`) {
+		t.Fatalf("TRACE logger should still emit Debug, got %s", traceOut)
+	}
+
+	// #nosec G304 -- paths are test-generated temporary files
+	debugData, err := os.ReadFile(debugPath)
+	if err != nil {
+		t.Fatalf("read DEBUG log: %v", err)
+	}
+	debugOut := string(debugData)
+	if strings.Contains(debugOut, `"msg":"hotpath"`) || strings.Contains(debugOut, `"level":"TRACE"`) {
+		t.Fatalf("DEBUG logger should drop Trace, got %s", debugOut)
+	}
+	if !strings.Contains(debugOut, `"level":"DEBUG"`) || !strings.Contains(debugOut, `"msg":"startup"`) {
+		t.Fatalf("DEBUG logger should emit Debug, got %s", debugOut)
+	}
 }

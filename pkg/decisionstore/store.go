@@ -66,6 +66,9 @@ type Store struct {
 	lastRangeIndex  atomic.Value // string of the blob last used to build membership
 	createdBy       string       // Traefik New name from the create that first put this store
 	streamReady     int64        // 1 after the first finished stream poll; atomic.LoadInt64/StoreInt64
+	log             *slog.Logger
+	reclaimKey      string
+	engineName      string
 }
 
 // NewMemory is in-process COW slots and an in-process Range blob.
@@ -73,9 +76,10 @@ func NewMemory(log *slog.Logger) *Store {
 	origins := intern.New()
 	mem := newMemory(log, origins)
 	return &Store{
-		engine:  memoryEngine(mem),
-		mem:     mem,
-		origins: origins,
+		engine:     memoryEngine(mem),
+		mem:        mem,
+		origins:    origins,
+		engineName: "memory",
 	}
 }
 
@@ -83,9 +87,10 @@ func NewMemory(log *slog.Logger) *Store {
 func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string) *Store {
 	red := newRedis(log, writeHost, readHosts, pass, database, keyPrefix)
 	return &Store{
-		engine:  redisEngine(red),
-		red:     red,
-		origins: intern.New(),
+		engine:     redisEngine(red),
+		red:        red,
+		origins:    intern.New(),
+		engineName: "redis",
 	}
 }
 
@@ -107,7 +112,8 @@ func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.
 			store = NewMemory(log)
 		}
 		store.createdBy = createdBy
-		return store, reclaim.Hooks{Close: store.Close}, nil
+		store.bindLifecycle(log, reclaimKey)
+		return store, reclaim.Hooks{Sleep: store.Sleep, Wake: store.Wake, Close: store.Close}, nil
 	})
 	if err != nil {
 		return nil, err
@@ -173,8 +179,34 @@ func (s *Store) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[str
 	return s.engine.lookup(remoteIP, ipAddr, scopes, s.RangeMembership())
 }
 
-// Close drains the Redis pool. Memory is a no-op. Reclaim last-holder hook.
+// bindLifecycle records the reclaim key, then logs started. Engine name is already on the store.
+func (s *Store) bindLifecycle(log *slog.Logger, reclaimKey string) {
+	s.log = log
+	s.reclaimKey = reclaimKey
+	s.logLifecycle("crowdsec decision store started", "started")
+}
+
+// logLifecycle writes one INFO line with storeKey, engine, and reason.
+func (s *Store) logLifecycle(msg, reason string) {
+	if s.log == nil {
+		return
+	}
+	s.log.Info(msg, "storeKey", s.reclaimKey, "engine", s.engineName, "reason", reason)
+}
+
+// Sleep logs that the last reclaim holder is gone. Does not drain Redis or drop maps.
+func (s *Store) Sleep() {
+	s.logLifecycle("crowdsec decision store sleeping", "sleeping")
+}
+
+// Wake logs that a later Open reused this incarnation during grace. Maps and Redis stay live.
+func (s *Store) Wake() {
+	s.logLifecycle("crowdsec decision store waking", "waking")
+}
+
+// Close logs closed, then drains the Redis pool. Memory drain is a no-op. Reclaim last-holder hook.
 func (s *Store) Close() {
+	s.logLifecycle("crowdsec decision store closed", "closed")
 	s.engine.close()
 }
 

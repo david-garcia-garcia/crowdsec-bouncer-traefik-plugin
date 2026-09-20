@@ -285,6 +285,7 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 	ticker := time.NewTicker(time.Duration(updateInterval) * time.Second)
 	stop := make(chan bool, 1)
 	go func() {
+		log.Debug("ticker:started", "name", name, "interval", updateInterval)
 		defer log.Debug("ticker:stopped", "name", name)
 		for {
 			select {
