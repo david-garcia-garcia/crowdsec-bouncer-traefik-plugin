@@ -16,3 +16,5 @@ verdicts:
 ```
 
 Search also ranked `std_go_reclaim_context-lease` (table state / no Peek already specified), `core_plugin_lapi_scope-union` (header union stays), and `core_plugin_lapi_usage-metrics` (per-Client reporter stays). No deltas there. No new 4th part. Change kebab was not used as a leaf.
+
+Archive FindSpecHost (2026-09-20) re-ran Search over `openspec/specs/map.md`, baseline `openspec/specs/*/spec.md`, and change deltas (on disk already named for the fold targets). Same four `fold` verdicts; no new 4th part.

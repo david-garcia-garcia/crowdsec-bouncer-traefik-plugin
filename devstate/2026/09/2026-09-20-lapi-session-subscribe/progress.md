@@ -10,5 +10,5 @@ JobName: 2026-09-20-lapi-session-subscribe
 | implement | [x] | [x] | 2026-09-20T05:39:02Z |
 | codereview | [x] | [x] | 2026-09-20T05:51:43Z |
 | devdocsimpact | [x] | [x] | 2026-09-20T05:57:45Z |
-| archive | [ ] | [ ] | |
+| archive | [x] | [ ] | |
 | pullrequest | [ ] | [ ] | |
