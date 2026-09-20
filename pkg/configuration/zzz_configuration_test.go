@@ -30,6 +30,17 @@ func getMinimalConfig() *Config {
 	return cfg
 }
 
+// writeCaptchaTemplateFixture writes a readable captcha.html so tests that used
+// to blank CaptchaFilePath still skip only the key errors they assert.
+func writeCaptchaTemplateFixture(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "captcha.html")
+	if err := os.WriteFile(path, []byte("CAPTCHA_FIXTURE"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 func Test_contains(t *testing.T) {
 	type args struct {
 		source []string
@@ -110,6 +121,7 @@ func Test_ValidateParams(t *testing.T) {
 	cfg9.LogLevel = "info"
 	cfg10 := getMinimalConfig()
 	cfg10.LogLevel = "Warning"
+	captchaTemplate := writeCaptchaTemplateFixture(t)
 	cfgCaptchaNoProvider := getMinimalConfig()
 	cfgCaptchaNoProvider.CrowdsecLapiFailureAction = FailureActionCaptcha
 	cfgCaptchaWithProvider := getMinimalConfig()
@@ -118,27 +130,27 @@ func Test_ValidateParams(t *testing.T) {
 	cfgCaptchaWithProvider.CaptchaSiteKey = "site"
 	cfgCaptchaWithProvider.CaptchaSecretKey = "secret"
 	cfgCaptchaWithProvider.CaptchaGateSecret = "gate-secret"
-	cfgCaptchaWithProvider.CaptchaFilePath = ""
+	cfgCaptchaWithProvider.CaptchaFilePath = captchaTemplate
 	cfgEmptyKeysDefaultBan := getMinimalConfig()
 	cfgEmptyKeysDefaultBan.CaptchaProvider = HcaptchaProvider
 	cfgEmptyKeysDefaultBan.CaptchaGateSecret = "gate-secret"
-	cfgEmptyKeysDefaultBan.CaptchaFilePath = ""
+	cfgEmptyKeysDefaultBan.CaptchaFilePath = captchaTemplate
 	cfgOnlySiteEmpty := getMinimalConfig()
 	cfgOnlySiteEmpty.CaptchaProvider = HcaptchaProvider
 	cfgOnlySiteEmpty.CaptchaSecretKey = "secret"
 	cfgOnlySiteEmpty.CaptchaGateSecret = "gate-secret"
-	cfgOnlySiteEmpty.CaptchaFilePath = ""
+	cfgOnlySiteEmpty.CaptchaFilePath = captchaTemplate
 	cfgOnlySecretEmpty := getMinimalConfig()
 	cfgOnlySecretEmpty.CaptchaProvider = HcaptchaProvider
 	cfgOnlySecretEmpty.CaptchaSiteKey = "site"
 	cfgOnlySecretEmpty.CaptchaGateSecret = "gate-secret"
-	cfgOnlySecretEmpty.CaptchaFilePath = ""
+	cfgOnlySecretEmpty.CaptchaFilePath = captchaTemplate
 	cfgWhitespaceSite := getMinimalConfig()
 	cfgWhitespaceSite.CaptchaProvider = HcaptchaProvider
 	cfgWhitespaceSite.CaptchaSiteKey = "   "
 	cfgWhitespaceSite.CaptchaSecretKey = "secret"
 	cfgWhitespaceSite.CaptchaGateSecret = "gate-secret"
-	cfgWhitespaceSite.CaptchaFilePath = ""
+	cfgWhitespaceSite.CaptchaFilePath = captchaTemplate
 	cfgUnknownAction := getMinimalConfig()
 	cfgUnknownAction.CrowdsecAppsecFailureAction = "block"
 	cfgEmptyAction := getMinimalConfig()
@@ -209,7 +221,7 @@ func Test_ValidateParams(t *testing.T) {
 	cfgAloneMissingCaptchaKeys.CrowdsecLapiFailureAction = FailureActionCaptcha
 	cfgAloneMissingCaptchaKeys.CaptchaProvider = HcaptchaProvider
 	cfgAloneMissingCaptchaKeys.CaptchaGateSecret = "gate-secret"
-	cfgAloneMissingCaptchaKeys.CaptchaFilePath = ""
+	cfgAloneMissingCaptchaKeys.CaptchaFilePath = captchaTemplate
 	cfgAloneBadLog := getMinimalConfig()
 	cfgAloneBadLog.CrowdsecMode = AloneMode
 	cfgAloneBadLog.CrowdsecCapiMachineID = "machine"
@@ -271,18 +283,18 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "RemediationStatusCode below 100", args: args{config: cfgRemediationLow}, wantErr: true},
 		{name: "RemediationStatusCode 600 or above", args: args{config: cfgRemediationHigh}, wantErr: true},
 		{name: "UpdateMaxFailure -1 accepted", args: args{config: cfgUpdateMaxFailureNegOne}, wantErr: false},
-		{name: "Custom json validate body accepted", args: args{config: newCustomValidateBodyConfig("json")}, wantErr: false},
-		{name: "Custom form validate body accepted", args: args{config: newCustomValidateBodyConfig("form")}, wantErr: false},
-		{name: "Custom omit validate body accepted", args: args{config: newCustomValidateBodyConfig("")}, wantErr: false},
-		{name: "Custom whitespace-padded json accepted", args: args{config: newCustomValidateBodyConfig(" json ")}, wantErr: false},
-		{name: "Built-in json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(HcaptchaProvider, "json")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom"},
-		{name: "Recaptcha json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(RecaptchaProvider, "json")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom"},
-		{name: "Turnstile json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(TurnstileProvider, "json")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom"},
-		{name: "Unknown JSON token rejected", args: args{config: newCustomValidateBodyConfig("JSON")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: must be empty, form, or json"},
-		{name: "Unknown Form token rejected", args: args{config: newCustomValidateBodyConfig("Form")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: must be empty, form, or json"},
-		{name: "Unknown xml token rejected", args: args{config: newCustomValidateBodyConfig("xml")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: must be empty, form, or json"},
-		{name: "Built-in form validate body accepted", args: args{config: newBuiltinValidateBodyConfig(HcaptchaProvider, "form")}, wantErr: false},
-		{name: "Built-in omit validate body accepted", args: args{config: newBuiltinValidateBodyConfig(HcaptchaProvider, "")}, wantErr: false},
+		{name: "Custom json validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "json")}, wantErr: false},
+		{name: "Custom form validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "form")}, wantErr: false},
+		{name: "Custom omit validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "")}, wantErr: false},
+		{name: "Custom whitespace-padded json accepted", args: args{config: newCustomValidateBodyConfig(t, " json ")}, wantErr: false},
+		{name: "Built-in json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(t, HcaptchaProvider, "json")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom"},
+		{name: "Recaptcha json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(t, RecaptchaProvider, "json")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom"},
+		{name: "Turnstile json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(t, TurnstileProvider, "json")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom"},
+		{name: "Unknown JSON token rejected", args: args{config: newCustomValidateBodyConfig(t, "JSON")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: must be empty, form, or json"},
+		{name: "Unknown Form token rejected", args: args{config: newCustomValidateBodyConfig(t, "Form")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: must be empty, form, or json"},
+		{name: "Unknown xml token rejected", args: args{config: newCustomValidateBodyConfig(t, "xml")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: must be empty, form, or json"},
+		{name: "Built-in form validate body accepted", args: args{config: newBuiltinValidateBodyConfig(t, HcaptchaProvider, "form")}, wantErr: false},
+		{name: "Built-in omit validate body accepted", args: args{config: newBuiltinValidateBodyConfig(t, HcaptchaProvider, "")}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -292,6 +304,68 @@ func Test_ValidateParams(t *testing.T) {
 			}
 			if tt.wantErrContains != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErrContains)) {
 				t.Errorf("validateParams() error = %v, want containing %q", err, tt.wantErrContains)
+			}
+		})
+	}
+}
+
+// Test_ValidateParams_captchaTemplateRequired fails empty or missing captcha
+// templates when a provider is set, and keeps ban template optional.
+func Test_ValidateParams_captchaTemplateRequired(t *testing.T) {
+	log := logger.New("INFO", "")
+	captchaTemplate := writeCaptchaTemplateFixture(t)
+
+	cfgEmptyCaptchaPath := getMinimalConfig()
+	cfgEmptyCaptchaPath.CaptchaProvider = HcaptchaProvider
+	cfgEmptyCaptchaPath.CaptchaSiteKey = "site"
+	cfgEmptyCaptchaPath.CaptchaSecretKey = "secret"
+	cfgEmptyCaptchaPath.CaptchaGateSecret = "gate-secret"
+	cfgEmptyCaptchaPath.CaptchaFilePath = ""
+
+	cfgMissingCaptchaFile := getMinimalConfig()
+	cfgMissingCaptchaFile.CaptchaProvider = HcaptchaProvider
+	cfgMissingCaptchaFile.CaptchaSiteKey = "site"
+	cfgMissingCaptchaFile.CaptchaSecretKey = "secret"
+	cfgMissingCaptchaFile.CaptchaGateSecret = "gate-secret"
+	cfgMissingCaptchaFile.CaptchaFilePath = filepath.Join(t.TempDir(), "missing-captcha.html")
+
+	cfgEmptyBanPath := getMinimalConfig()
+	cfgEmptyBanPath.CaptchaProvider = HcaptchaProvider
+	cfgEmptyBanPath.CaptchaSiteKey = "site"
+	cfgEmptyBanPath.CaptchaSecretKey = "secret"
+	cfgEmptyBanPath.CaptchaGateSecret = "gate-secret"
+	cfgEmptyBanPath.CaptchaFilePath = captchaTemplate
+	cfgEmptyBanPath.BanFilePath = ""
+
+	cfgAloneEmptyCaptchaPath := getMinimalConfig()
+	cfgAloneEmptyCaptchaPath.CrowdsecMode = AloneMode
+	cfgAloneEmptyCaptchaPath.CrowdsecCapiMachineID = "machine"
+	cfgAloneEmptyCaptchaPath.CrowdsecCapiPassword = "password"
+	cfgAloneEmptyCaptchaPath.CaptchaProvider = HcaptchaProvider
+	cfgAloneEmptyCaptchaPath.CaptchaSiteKey = "site"
+	cfgAloneEmptyCaptchaPath.CaptchaSecretKey = "secret"
+	cfgAloneEmptyCaptchaPath.CaptchaGateSecret = "gate-secret"
+	cfgAloneEmptyCaptchaPath.CaptchaFilePath = ""
+
+	tests := []struct {
+		name            string
+		config          *Config
+		wantErr         bool
+		wantErrContains string
+	}{
+		{name: "Provider set with empty captcha path", config: cfgEmptyCaptchaPath, wantErr: true, wantErrContains: "CaptchaFilePath: cannot be empty when CaptchaProvider is set"},
+		{name: "Provider set with missing captcha file", config: cfgMissingCaptchaFile, wantErr: true},
+		{name: "Provider set with empty ban path still accepted", config: cfgEmptyBanPath, wantErr: false},
+		{name: "Alone mode empty captcha path", config: cfgAloneEmptyCaptchaPath, wantErr: true, wantErrContains: "CaptchaFilePath: cannot be empty when CaptchaProvider is set"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateParams(tt.config, log)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateParams() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErrContains != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErrContains)) {
+				t.Errorf("ValidateParams() error = %v, want containing %q", err, tt.wantErrContains)
 			}
 		})
 	}
@@ -555,7 +629,8 @@ func Test_validateDecisionScopeHeaders(t *testing.T) {
 	}
 }
 
-func newCustomValidateBodyConfig(validateBody string) *Config {
+func newCustomValidateBodyConfig(t *testing.T, validateBody string) *Config {
+	t.Helper()
 	cfg := getMinimalConfig()
 	cfg.CaptchaProvider = CustomProvider
 	cfg.CaptchaCustomKey = "wicketkeeper"
@@ -566,18 +641,19 @@ func newCustomValidateBodyConfig(validateBody string) *Config {
 	cfg.CaptchaSiteKey = "site"
 	cfg.CaptchaSecretKey = "secret"
 	cfg.CaptchaGateSecret = "gate-secret"
-	cfg.CaptchaFilePath = ""
+	cfg.CaptchaFilePath = writeCaptchaTemplateFixture(t)
 	return cfg
 }
 
-func newBuiltinValidateBodyConfig(provider, validateBody string) *Config {
+func newBuiltinValidateBodyConfig(t *testing.T, provider, validateBody string) *Config {
+	t.Helper()
 	cfg := getMinimalConfig()
 	cfg.CaptchaProvider = provider
 	cfg.CaptchaCustomValidateBody = validateBody
 	cfg.CaptchaSiteKey = "site"
 	cfg.CaptchaSecretKey = "secret"
 	cfg.CaptchaGateSecret = "gate-secret"
-	cfg.CaptchaFilePath = ""
+	cfg.CaptchaFilePath = writeCaptchaTemplateFixture(t)
 	return cfg
 }
 
@@ -599,15 +675,15 @@ func Test_validateCaptcha(t *testing.T) {
 		{name: "Valid hcaptcha provider", config: getMinimalConfig(), wantErr: false},
 		{name: "Custom provider missing fields", config: cfgCustomMissing, wantErr: true},
 		{name: "Custom provider four fields empty challenge URL", config: cfgCustomFourFields, wantErr: false},
-		{name: "Custom json", config: newCustomValidateBodyConfig("json"), wantErr: false},
-		{name: "Custom form", config: newCustomValidateBodyConfig("form"), wantErr: false},
-		{name: "Custom omit", config: newCustomValidateBodyConfig(""), wantErr: false},
-		{name: "Custom whitespace-padded json", config: newCustomValidateBodyConfig(" json "), wantErr: false},
-		{name: "Built-in json rejected", config: newBuiltinValidateBodyConfig(HcaptchaProvider, "json"), wantErr: true},
-		{name: "Unknown JSON token rejected", config: newCustomValidateBodyConfig("JSON"), wantErr: true},
-		{name: "Unknown Form token rejected", config: newCustomValidateBodyConfig("Form"), wantErr: true},
-		{name: "Built-in form ignored", config: newBuiltinValidateBodyConfig(HcaptchaProvider, "form"), wantErr: false},
-		{name: "Built-in omit ignored", config: newBuiltinValidateBodyConfig(HcaptchaProvider, ""), wantErr: false},
+		{name: "Custom json", config: newCustomValidateBodyConfig(t, "json"), wantErr: false},
+		{name: "Custom form", config: newCustomValidateBodyConfig(t, "form"), wantErr: false},
+		{name: "Custom omit", config: newCustomValidateBodyConfig(t, ""), wantErr: false},
+		{name: "Custom whitespace-padded json", config: newCustomValidateBodyConfig(t, " json "), wantErr: false},
+		{name: "Built-in json rejected", config: newBuiltinValidateBodyConfig(t, HcaptchaProvider, "json"), wantErr: true},
+		{name: "Unknown JSON token rejected", config: newCustomValidateBodyConfig(t, "JSON"), wantErr: true},
+		{name: "Unknown Form token rejected", config: newCustomValidateBodyConfig(t, "Form"), wantErr: true},
+		{name: "Built-in form ignored", config: newBuiltinValidateBodyConfig(t, HcaptchaProvider, "form"), wantErr: false},
+		{name: "Built-in omit ignored", config: newBuiltinValidateBodyConfig(t, HcaptchaProvider, ""), wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -642,13 +718,14 @@ func Test_CustomCaptchaResourcePath(t *testing.T) {
 }
 
 func Test_validateEnabledCaptchaSettings_customChallengeURL(t *testing.T) {
+	captchaTemplate := writeCaptchaTemplateFixture(t)
 	newCustomConfig := func(challengeURL string) *Config {
 		cfg := getMinimalConfig()
 		cfg.CaptchaProvider = CustomProvider
 		cfg.CaptchaSiteKey = "site"
 		cfg.CaptchaSecretKey = "secret"
 		cfg.CaptchaGateSecret = "gate-secret"
-		cfg.CaptchaFilePath = ""
+		cfg.CaptchaFilePath = captchaTemplate
 		cfg.CaptchaCustomChallengeURL = challengeURL
 		return cfg
 	}
@@ -678,7 +755,7 @@ func Test_validateEnabledCaptchaSettings_customChallengeURL(t *testing.T) {
 	builtin.CaptchaSiteKey = "site"
 	builtin.CaptchaSecretKey = "secret"
 	builtin.CaptchaGateSecret = "gate-secret"
-	builtin.CaptchaFilePath = ""
+	builtin.CaptchaFilePath = captchaTemplate
 	builtin.CaptchaCustomChallengeURL = "v0/challenge"
 	if err := validateEnabledCaptchaSettings(builtin); err != nil {
 		t.Errorf("built-in provider must ignore CaptchaCustomChallengeURL, got %v", err)

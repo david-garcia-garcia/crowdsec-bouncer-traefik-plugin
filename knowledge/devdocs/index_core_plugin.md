@@ -1,5 +1,10 @@
 # core / plugin
 
+## DecisionStore
+priority: normal
+local: core_plugin_decisionstore.md
+description: How LAPI Clients share one Store keyed by CrowdSec cursor plus Redis params.
+
 ## Middleware New
 priority: normal
 local: core_plugin_middleware.md
@@ -44,11 +49,6 @@ description: How this plugin keys a reclaimed LAPI Client (cursor SessionHex plu
 priority: normal
 local: core_plugin_lapi_scope-union.md
 description: How a shared stream Client unions live routers' header-scope maps for scopes= and the store filter.
-
-## Stream lease
-priority: normal
-local: core_plugin_lapi_stream-lease.md
-description: The `updated` cache key that grants one CrowdSec stream GET on a shared DecisionStore.
 
 ## Stream single-flight
 priority: normal

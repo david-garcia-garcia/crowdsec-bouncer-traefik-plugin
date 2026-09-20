@@ -16,15 +16,11 @@ Allowlist of root + domain: `openspec/specs/domains.md`.
 
 ## core
 
-### cache
-
-- client
-- redis
-
 ### plugin
 
 - appsec
 - decisions
+- decisionstore
 - ip
 - lapi
 - middleware

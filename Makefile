@@ -1,9 +1,10 @@
-.PHONY: lint test vendor clean e2e_mock e2e_pester
+.PHONY: lint test vendor clean e2e_mock e2e_pester test_realredis
 
 export GO111MODULE=on
 
 # Binary/mock suite (Traefik binary + mock LAPI). CI job "e2e (binary + mock LAPI)".
 # Real-stack Pester suite (Docker Traefik + Crowdsec): make e2e_pester / tests/e2e/real/Test-Integration.ps1
+# Go-layer Dragonfly: make test_realredis (not part of make test; needs Docker).
 E2E_MOCK_SCENARIOS := $(notdir $(wildcard tests/e2e/mock/scenarios/*))
 
 default: lint test
@@ -24,6 +25,13 @@ e2e_mock_%:
 
 e2e_pester:
 	pwsh -File ./tests/e2e/real/Test-Integration.ps1
+
+# DecisionStore go test against Dragonfly (same image as Pester). Untagged go test stays docker-free.
+test_realredis:
+	docker compose -f tests/e2e/go/docker-compose.yml up -d
+	go test -tags realredis -count=1 ./pkg/decisionstore ; status=$$? ; \
+	docker compose -f tests/e2e/go/docker-compose.yml down -v --remove-orphans ; \
+	exit $$status
 
 vendor:
 	go mod vendor

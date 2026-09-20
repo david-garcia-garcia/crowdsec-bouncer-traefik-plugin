@@ -2,7 +2,6 @@
 package decisionscope
 
 import (
-	"net"
 	"strings"
 )
 
@@ -13,11 +12,6 @@ const (
 	ScopeCountry = "Country"
 	ScopeAS      = "AS"
 )
-
-// RangeIndexKey is the shared cache key for Range membership (cidr=remediation lines).
-const RangeIndexKey = "range-index"
-
-const rangeIndexTTL = 365 * 24 * 3600
 
 // NormalizeScope returns the CrowdSec stored spelling for ip, range, country, and AS.
 func NormalizeScope(scope string) string {
@@ -69,11 +63,6 @@ func NormalizeASN(value string) string {
 	return trimmed
 }
 
-// HeaderScopeKey is the shared-cache key for a header-matched scope (Country, AS, or custom).
-func HeaderScopeKey(scope, value string) string {
-	return strings.ToLower(scope) + ":" + value
-}
-
 // NormalizeHeaderScopeValue applies Country/AS rules, else a trim. Empty means skip that scope.
 func NormalizeHeaderScopeValue(scope, raw string) string {
 	switch scope {
@@ -116,24 +105,4 @@ func NormalizeDecisionScopeHeaders(in map[string]string) map[string]string {
 		out[scope] = header
 	}
 	return out
-}
-
-// IPCacheKey is the cache key for an Ip-scoped decision value (bare IP or /32 / /128).
-// CrowdSec stores a decision value exactly as it was submitted, so the same address reaches this
-// bouncer as an expanded, upper-case, or IPv4-mapped spelling. Every spelling that parses as an
-// address collapses to net.IP.String(); a value that parses as neither is keyed verbatim.
-func IPCacheKey(value string) string {
-	trimmed := strings.TrimSpace(value)
-	ipAddr, ipNet, err := net.ParseCIDR(trimmed)
-	if err == nil {
-		ones, bits := ipNet.Mask.Size()
-		if ones == bits {
-			return ipAddr.String()
-		}
-		return trimmed
-	}
-	if bare := net.ParseIP(trimmed); bare != nil {
-		return bare.String()
-	}
-	return trimmed
 }

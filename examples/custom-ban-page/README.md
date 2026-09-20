@@ -54,6 +54,7 @@ In the html of the ban page, you can use:
 ```
 <script>var remediation = "{{ .RemediationReason }}"</script>
 <script>var clientIp = "{{ .ClientIP }}"</script>
+<!-- TraceID is omitted unless the inbound header is A-Z a-z 0-9 _ . : - and length 1–200. -->
 <script>var traceID = "{{ .TraceID }}"</script>
 ```
 With the above tweak and some other js, you can customize your ban page on runtime.

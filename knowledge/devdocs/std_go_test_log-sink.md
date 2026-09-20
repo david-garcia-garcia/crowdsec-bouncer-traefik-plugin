@@ -41,6 +41,7 @@ func (s *syncLogSink) Write(record []byte) (int, error) {
 ## Key files
 
 - `pkg/lapi/zzz_logsink_test.go` — `syncLogSink` and `newTestLogSink` for that package
+- `pkg/bouncer/zzz_logsink_test.go` — same helper in that package
 - `pkg/lapi/zzz_session_test.go`, `pkg/lapi/zzz_client_stream_log_test.go` — callers
 
 ## Gotchas

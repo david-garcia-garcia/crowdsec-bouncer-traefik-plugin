@@ -1,13 +1,9 @@
 package decisionscope
 
 import (
-	"errors"
-	"net"
 	"net/http"
 	"sort"
 	"strings"
-
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 )
 
 const (
@@ -19,9 +15,9 @@ const (
 	CaptchaValue = "c"
 )
 
-// IsActiveRemediation reports whether value is ban or captcha (origin suffix ignored).
+// IsActiveRemediation reports whether value is ban or captcha.
 func IsActiveRemediation(value string) bool {
-	kind := cache.RemediationKind(value)
+	kind := RemediationKind(value)
 	return kind == BannedValue || kind == CaptchaValue
 }
 
@@ -37,10 +33,10 @@ func RemediationValue(decisionType string) string {
 	}
 }
 
-// PreferRemediation keeps ban over captcha over empty. Origin suffix is ignored for the winner's letter.
+// PreferRemediation keeps ban over captcha over empty.
 func PreferRemediation(current, incoming string) string {
-	currentKind := cache.RemediationKind(current)
-	incomingKind := cache.RemediationKind(incoming)
+	currentKind := RemediationKind(current)
+	incomingKind := RemediationKind(incoming)
 	if currentKind == BannedValue {
 		return current
 	}
@@ -66,45 +62,6 @@ func RequestScopeValues(headers map[string]string, req *http.Request) map[string
 		}
 	}
 	return out
-}
-
-// LookupCachedRemediation merges Ip, Range, and present header-scope hits. Ban wins across those scopes.
-// Range comes from membership.Remediation; nil or empty membership is a miss (live/none never hydrate).
-// The first return is ban, captcha, or none; the second is the metrics origin of the winning cache value.
-// remoteIP is the canonical client address string owned by clientRequest; ipAddr is Range membership only.
-func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, error) {
-	ipKey := remoteIP
-	found, err := cacheClient.GetMany(LookupCacheKeys(remoteIP, scopes))
-	if err != nil {
-		return "", "", err
-	}
-	// Merge Ip, Range, and header hits so a Country ban beats a Range captcha.
-	chosen := found[ipKey]
-	chosen = PreferRemediation(chosen, membership.Remediation(ipAddr))
-	for scope, identifier := range scopes {
-		if identifier == "" {
-			continue
-		}
-		chosen = PreferRemediation(chosen, found[HeaderScopeKey(scope, identifier)])
-	}
-	if IsActiveRemediation(chosen) {
-		return cache.RemediationKind(chosen), cache.RemediationOrigin(chosen), nil
-	}
-	if value, ok := found[ipKey]; ok {
-		return cache.RemediationKind(value), cache.RemediationOrigin(value), nil
-	}
-	return "", "", errors.New(cache.CacheMiss)
-}
-
-// LookupCacheKeys is the GetMany key list for the request path: IP, then present header scopes. Range is not a cache key.
-func LookupCacheKeys(remoteIP string, scopes map[string]string) []string {
-	keys := []string{remoteIP}
-	for scope, identifier := range scopes {
-		if identifier != "" {
-			keys = append(keys, HeaderScopeKey(scope, identifier))
-		}
-	}
-	return keys
 }
 
 // StreamScopeList is the LAPI scopes query value for this bouncer config.

@@ -5,7 +5,8 @@ local Traefik plugin, and asserts remediations against a live LAPI. Dragonfly is
 the functional Redis-protocol cache for `redis_cache.Tests.ps1`.
 
 It is a different domain from [`../mock/`](../mock/) (Traefik binary + mock
-LAPI). Do not mix the two trees.
+LAPI) and from [`../go/`](../go/) (`go test -tags realredis` against Dragonfly
+with no Traefik). Do not mix the three trees.
 
 Harness shape is the author’s [PR 273](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/273)
 (PowerShell + Pester). Cases that 273 did not have come from

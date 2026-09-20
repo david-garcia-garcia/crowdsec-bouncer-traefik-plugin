@@ -18,6 +18,10 @@ _Avoid_: `GetVariable` as a feature-flag check
 The `*os.File` opened only to prove a non-empty `LogFilePath` is writable. Not the process-lifetime logger file.
 _Avoid_: sharedLogFiles, reclaim value, log owner
 
+**EffectiveHTTPTimeoutSeconds**:
+The inherited timeout in seconds for one backend: `HTTPTimeoutSeconds` when that backend's override is 0, otherwise the override.
+_Avoid_: EffectiveLapi, three inherit wrappers
+
 ## Overview
 
 `ValidateParams` is `New`'s constructor gate. When it fails, `New` returns a nil handler and that error and does not open LAPI. File-backed secrets go through `GetVariable`, which Stats and reads `<key>File` when that path is non-empty. Gate each `GetVariable` call behind the flag that uses that secret. Captcha site and secret keys are required whenever `captchaProvider` is set, including `crowdsecMode: alone` and the default `ban` failure action. AppSec URL, key-file, and HTTPS CA run only when `CrowdsecAppsecEnabled` is true. `validateLogging` still `OpenFile`s a non-empty `LogFilePath` even when `logger.NewWithFormat` already holds that path. Close that handle after a successful open.
@@ -25,6 +29,7 @@ _Avoid_: sharedLogFiles, reclaim value, log owner
 ## How to use
 
 - Run `ValidateParams` on `&prepared` after the snapshot and before `lapi.Prepare`.
+- Keep `HTTPTimeoutSeconds` in `requiredInt1` (`< 1` invalid). Put `CrowdsecLapiHTTPTimeoutSeconds`, `CrowdsecAppsecHTTPTimeoutSeconds`, and `CaptchaSiteverifyHTTPTimeoutSeconds` in `requiredInt0` (`< 0` invalid). Zero or omitted inherits. Call `cfg.EffectiveHTTPTimeoutSeconds(override)` — do not add three `EffectiveLapi` wrappers.
 - Resolve `RedisCachePassword` / `RedisCachePasswordFile` only when `redisCacheEnabled` is true.
 - When Redis is off, do not Stat or read a leftover `redisCachePasswordFile`.
 - When Redis is on, keep today's file-error fail. Accept an empty password with an empty file path.
@@ -33,6 +38,8 @@ _Avoid_: sharedLogFiles, reclaim value, log owner
 - After a successful lookup, reject `""` for each field independently, site first.
 - Use the same trigger as `CaptchaGateSecret`: provider set, not "failure action is captcha".
 - Error text: `CaptchaSiteKey: cannot be empty when CaptchaProvider is set` and the secret twin.
+- When `CaptchaProvider` is set, reject an empty `CaptchaFilePath` (`CaptchaFilePath: cannot be empty when CaptchaProvider is set`) and fail when `GetTemplate` fails. Ban template stays "when path is set".
+- `captcha.Client.New` returns the `GetTemplate` error. Do not discard it. Do not invent a bundled default template.
 - After CAPI (alone) or LAPI (other modes), call `validateAppsecURLKeyAndTLS` only when `config.CrowdsecAppsecEnabled`. Do not hide that `if` only inside a LAPI wrapper — alone never calls it.
 - Reuse `CrowdsecAppsecEnabled`. Do not re-derive from leftover AppSec fields or `crowdsecMode: appsec`.
 - Keep the helper's empty-key pass and explicit-`https` CA parse. Do not fail an empty AppSec key at `ValidateParams`.
@@ -88,6 +95,7 @@ _ = checkFile.Close()
 - Whitespace-only keys and an empty key file are empty after trim.
 - Alone still skips LAPI URL/key/TLS after CAPI. Captcha still runs. AppSec helper runs only when `CrowdsecAppsecEnabled`.
 - A set provider with default `ban` actions still needs non-empty site and secret.
+- A set provider with an empty `CaptchaFilePath` fails at `ValidateParams`. Tests that used to blank the path to skip `GetTemplate` need a readable fixture.
 - Leftover invalid AppSec CA or missing key file boots when AppSec is off (live, stream, none, appsec, and alone).
 - Empty AppSec key after a successful lookup still passes; `appsec.Prepare` copies the LAPI key.
 - CA parse still triggers on explicit `CrowdsecAppsecScheme == https`, not inherit-https.

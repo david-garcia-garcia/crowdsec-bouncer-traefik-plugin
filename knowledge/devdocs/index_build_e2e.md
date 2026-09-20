@@ -9,3 +9,8 @@ description: Binary Traefik plus mocklapi scenarios, including two bouncers in o
 priority: normal
 local: build_e2e_real.md
 description: Docker Traefik + Crowdsec Pester suite, separate from the mock LAPI suite.
+
+## Go-layer real Redis e2e
+priority: normal
+local: build_e2e_go-redis.md
+description: Tagged go test against Dragonfly, not Traefik HTTP and not the in-process RESP stand-in.

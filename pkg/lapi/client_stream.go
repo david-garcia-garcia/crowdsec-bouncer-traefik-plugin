@@ -1,7 +1,6 @@
 package lapi
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -10,12 +9,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 )
-
-const cacheTimeoutKey = "updated"
 
 // Stream is the body returned from Crowdsec Stream LAPI.
 type Stream struct {
@@ -30,11 +27,13 @@ func (c *Client) startStream(config *configuration.Config, log *slog.Logger) err
 	}
 	if config.CrowdsecMode == configuration.AloneMode {
 		if err := c.getToken(); err != nil {
-			c.log.Error("startStream:getToken " + err.Error())
+			c.log.Error("startStream:getToken", "error", err)
 			return err
 		}
 	}
-	c.hydrateRangeMembership()
+	if c.decisionStore != nil {
+		c.decisionStore.HydrateRange()
+	}
 	if config.StreamStartupBlock {
 		c.handleStreamTicker()
 	} else {
@@ -55,11 +54,11 @@ func (c *Client) handleStreamTicker() {
 	if err := c.handleStreamCache(); err != nil {
 		updateFailure := atomic.LoadInt64(&c.updateFailure)
 		healthy := atomic.LoadInt64(&c.isCrowdsecStreamHealthy) != 0
-		c.log.Warn(fmt.Sprintf("handleStreamTicker updateFailure:%d isCrowdsecStreamHealthy:%t %s", updateFailure, healthy, err.Error()))
+		c.log.Warn("handleStreamTicker", "updateFailure", updateFailure, "isCrowdsecStreamHealthy", healthy, "error", err)
 		if c.updateMaxFailure != -1 && updateFailure >= c.updateMaxFailure && healthy {
 			atomic.StoreInt64(&c.isCrowdsecStreamHealthy, 0)
 			c.logInfo(MsgStreamUnhealthy, "unhealthy")
-			c.log.Error(fmt.Sprintf("handleStreamTicker:error updateFailure:%d %s", updateFailure, err.Error()))
+			c.log.Error("handleStreamTicker:error", "updateFailure", updateFailure, "error", err)
 		}
 		atomic.AddInt64(&c.updateFailure, 1)
 	} else {
@@ -72,25 +71,7 @@ func (c *Client) handleStreamTicker() {
 }
 
 func (c *Client) handleStreamCache() error {
-	leaseDuration := c.updateInterval - 1
-	if leaseDuration < 1 {
-		leaseDuration = 1
-	}
-	// One acquire: Redis Eval or memory mutex. Do not Get-then-Set.
-	won, err := c.Cache().Acquire(context.Background(), cacheTimeoutKey, decisionscope.NoBannedValue, leaseDuration)
-	if err != nil {
-		return err
-	}
-	if !won {
-		c.log.Debug("handleStreamCache:alreadyUpdated")
-		c.hydrateRangeMembership()
-		atomic.StoreInt64(&c.isCrowdsecStreamStartup, 0)
-		return nil
-	}
 	if pollErr := c.fetchAndApplyStreamDecisions(); pollErr != nil {
-		// This tick owned the lease and did not finish, so the store was not updated. Drop the
-		// key: the next tick retries now instead of waiting out max(updateInterval-1, 1) seconds.
-		c.Cache().Delete(cacheTimeoutKey)
 		return pollErr
 	}
 	c.log.Debug("handleStreamCache:updated")
@@ -99,8 +80,7 @@ func (c *Client) handleStreamCache() error {
 }
 
 // fetchAndApplyStreamDecisions GETs the CrowdSec stream delta and writes it into the DecisionStore.
-// It does not own the stream lease; handleStreamCache does. Deleted is applied before New so a
-// same-window replacement for the same IP or CIDR stays active.
+// Deleted is applied before New so a same-window replacement for the same IP or CIDR stays active.
 func (c *Client) fetchAndApplyStreamDecisions() error {
 	streamRouteURL := url.URL{
 		Scheme:   c.crowdsecScheme,
@@ -118,8 +98,11 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 	if err != nil {
 		return fmt.Errorf("handleStreamCache:parsingBody %w", err)
 	}
+	c.decisionStore.BeginTick()
+	defer c.decisionStore.PublishTick(decisionstore.ElapsedNow())
 	rangeUpserts := make(map[string]string)
 	var rangeRemovals []string
+	deletes := make([]decisionstore.Decision, 0)
 	for _, decision := range stream.Deleted {
 		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
 			if cidr := strings.TrimSpace(decision.Value); cidr != "" {
@@ -128,32 +111,49 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 			}
 			continue
 		}
-		c.deleteStreamDecision(decision)
+		stored, ok := c.streamDeleteItem(decision)
+		if !ok {
+			continue
+		}
+		deletes = append(deletes, stored)
+		if len(deletes) >= decisionstore.PutManyChunk {
+			c.decisionStore.DeleteMany(deletes)
+			deletes = deletes[:0]
+		}
 	}
+	c.decisionStore.DeleteMany(deletes)
+	puts := make([]decisionstore.Decision, 0)
 	for _, decision := range stream.New {
 		duration, parseErr := time.ParseDuration(decision.Duration)
 		if parseErr != nil {
 			continue
 		}
 		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
-			value := decisionscope.RemediationValue(decision.Type)
+			kind := decisionscope.RemediationValue(decision.Type)
 			cidr := strings.TrimSpace(decision.Value)
-			if value != "" && cidr != "" {
+			if kind != "" && cidr != "" {
 				origin := MetricsOrigin(decision.Origin, decision.Scenario)
-				rangeUpserts[cidr] = cache.RemediationWithOrigin(value, origin)
+				rangeUpserts[cidr] = decisionstore.KindOriginString(kind, origin)
 				c.rememberActiveDecision("range:"+cidr, origin, cidr)
 			}
 			continue
 		}
 		// Sub-second CrowdSec durations become 0; stream write TTL is not clamped.
-		c.storeStreamDecision(decision, int64(duration.Seconds()))
+		stored, ok := c.streamPutItem(decision, int64(duration.Seconds()))
+		if !ok {
+			continue
+		}
+		puts = append(puts, stored)
+		if len(puts) >= decisionstore.PutManyChunk {
+			c.decisionStore.PutMany(puts)
+			puts = puts[:0]
+		}
 	}
-	// A range apply that could not read the shared index is a poll that did not finish. Returning
-	// the error releases the lease, so the next tick retries; because the tick failed,
-	// isCrowdsecStreamStartup is left set and that retry asks for the full set again.
-	if err := decisionscope.ApplyRangeBatch(c.Cache(), rangeUpserts, rangeRemovals); err != nil {
+	c.decisionStore.PutMany(puts)
+	// A range apply that could not read the shared index is a poll that did not finish.
+	// isCrowdsecStreamStartup stays set so the retry asks for the full set again.
+	if err := c.decisionStore.ApplyRangeBatch(rangeUpserts, rangeRemovals); err != nil {
 		return fmt.Errorf("handleStreamCache:rangeIndex %w", err)
 	}
-	c.hydrateRangeMembership()
 	return nil
 }

@@ -3,7 +3,6 @@ package bouncer
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -11,10 +10,10 @@ import (
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	captcha "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 )
@@ -56,7 +55,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		forwardedCustomHeader = "X-Real-Ip"
 	}
 	if config.ForwardedHeadersInsecure {
-		log.Info("ForwardedHeadersInsecure enabled, using header " + forwardedCustomHeader)
+		log.Info("ForwardedHeadersInsecure enabled", "header", forwardedCustomHeader)
 	}
 
 	var banTemplate *template.Template
@@ -96,7 +95,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 	// handleRemediationServeHTTP bans whenever that client is not valid.
 	if config.CrowdsecMode == configuration.AppsecMode &&
 		routeHandler.appsecFailureAction != configuration.FailureActionCaptcha {
-		routeHandler.log.Debug("Bouncer initialized name:" + name)
+		routeHandler.log.Debug("Bouncer initialized", "name", name)
 		return routeHandler, nil
 	}
 	config.CaptchaSiteKey, _ = configuration.GetVariable(config, "CaptchaSiteKey")
@@ -106,7 +105,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		log,
 		&http.Client{
 			Transport: &http.Transport{MaxIdleConns: 10, MaxIdleConnsPerHost: 10, IdleConnTimeout: 30 * time.Second},
-			Timeout:   time.Duration(config.HTTPTimeoutSeconds) * time.Second,
+			Timeout:   time.Duration(config.EffectiveHTTPTimeoutSeconds(config.CaptchaSiteverifyHTTPTimeoutSeconds)) * time.Second,
 		},
 		config.CaptchaProvider,
 		config.CaptchaCustomJsURL,
@@ -124,10 +123,10 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		config.CaptchaGracePeriodSeconds,
 	)
 	if err != nil {
-		log.Error("CaptchaClient not valid " + err.Error())
+		log.Error("CaptchaClient not valid", "error", err)
 		return nil, err
 	}
-	routeHandler.log.Debug("Bouncer initialized name:" + name)
+	routeHandler.log.Debug("Bouncer initialized", "name", name)
 	return routeHandler, nil
 }
 
@@ -167,19 +166,19 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	}
 	b.recordProcessed(req.ipType)
 	if err != nil {
-		b.log.Error(fmt.Sprintf("ServeHTTP:getRemoteIp ip:%s %s", req.remoteIP, err.Error()))
+		b.log.Error("ServeHTTP:getRemoteIp", "ip", req.remoteIP, "error", err)
 		b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechGetRemoteFail)
 		return
 	}
 	if req.ipAddr == nil {
-		b.log.Error(fmt.Sprintf("ServeHTTP:parseClientIP ip:%s", req.remoteIP))
+		b.log.Error("ServeHTTP:parseClientIP", "ip", req.remoteIP)
 		b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechTrustIPFail)
 		return
 	}
 	// Lookup, live memo, and captcha bind share this spelling. GetRemoteIP still returned the raw text.
 	req.remoteIP = req.ipAddr.String()
 	isTrusted := b.clientPoolStrategy.Checker.ContainsIP(req.ipAddr)
-	b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s isTrusted:%v", req.remoteIP, isTrusted))
+	b.log.Debug("ServeHTTP", "ip", req.remoteIP, "isTrusted", isTrusted)
 	if isTrusted {
 		b.next.ServeHTTP(rw, req.Request)
 		// Trusted clients skip LAPI and AppSec.
@@ -196,27 +195,27 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 
 	// live, stream, and alone consult the cache.
 	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
-		value, origin, cacheErr := decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
+		var kind, origin string
+		var originID uint16
+		var lookupErr error
+		kind, origin, originID, lookupErr = b.lapiClient.LookupRemediation(req.remoteIP, req.ipAddr, scopes)
 		switch {
-		case cacheErr != nil:
-			cacheErrString := cacheErr.Error()
-			b.log.Debug(fmt.Sprintf("ServeHTTP:Get ip:%s cache:%s", req.remoteIP, cacheErrString))
-			if cacheErrString == cache.CacheUnreachable && !b.redisUnreachableBlock {
-				b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s redisUnreachable=true", req.remoteIP))
+		case lookupErr != nil:
+			b.log.Debug("ServeHTTP:Get", "ip", req.remoteIP, "cache", lookupErr)
+			if errors.Is(lookupErr, decisionstore.ErrUnreachable) && !b.redisUnreachableBlock {
+				b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "redisUnreachable", true)
 				b.handleNextServeHTTP(rw, req)
 				return
 			}
-			if cacheErrString == cache.CacheMiss {
-				break
-			}
-			b.log.Error(fmt.Sprintf("ServeHTTP:Get ip:%s %s", req.remoteIP, cacheErrString))
+			b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "error", lookupErr)
 			b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
 			return
-		case decisionscope.IsActiveRemediation(value):
-			b.log.Debug(fmt.Sprintf("ServeHTTP ip:%s cache:hit remediation:%s", req.remoteIP, value))
-			b.handleRemediationServeHTTP(rw, req, value, origin)
+		case decisionscope.IsActiveRemediation(kind):
+			b.log.Debug("ServeHTTP", "ip", req.remoteIP, "cache", "hit", "remediation", kind)
+			// Origin is resolved only on drop; allow-path skips OriginName.
+			b.handleRemediationServeHTTP(rw, req, kind, b.resolveDroppedOrigin(origin, originID))
 			return
-		case value == decisionscope.NoBannedValue:
+		case kind == decisionscope.NoBannedValue:
 			b.handleNextServeHTTP(rw, req)
 			return
 		}
@@ -228,18 +227,16 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			// No decision affecting this IP.
 			return
 		}
-		b.log.Debug(fmt.Sprintf("ServeHTTP isCrowdsecStreamHealthy:false ip:%s", req.remoteIP))
+		b.log.Debug("ServeHTTP", "isCrowdsecStreamHealthy", false, "ip", req.remoteIP)
 		b.applyLapiFailureAction(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechStreamFail)
 		// Stream/alone never query LAPI per request. Miss is allow or failure action.
 		return
 	}
 
 	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.NoneMode {
-		value, err := b.lapiClient.LiveLookup(req.remoteIP, scopes, b.defaultDecisionSeconds)
-		kind := cache.RemediationKind(value)
-		origin := cache.RemediationOrigin(value)
+		kind, origin, err := b.lapiClient.LiveLookup(req.remoteIP, scopes, b.defaultDecisionSeconds)
 		if err != nil {
-			b.log.Debug("ServeHTTP:LiveLookup " + err.Error())
+			b.log.Debug("ServeHTTP:LiveLookup", "error", err.Error())
 			if !decisionscope.IsActiveRemediation(kind) {
 				b.applyLapiFailureAction(rw, req, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
 				return
@@ -249,7 +246,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			b.handleNextServeHTTP(rw, req)
 			return
 		}
-		b.log.Debug(fmt.Sprintf("ServeHTTP:LiveLookup ip:%s isBanned:%v", req.remoteIP, kind))
+		b.log.Debug("ServeHTTP:LiveLookup", "ip", req.remoteIP, "isBanned", kind)
 		b.handleRemediationServeHTTP(rw, req, kind, origin)
 	}
 }
@@ -298,16 +295,25 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 	}
 
 	if b.traceCustomHeader != "" {
-		headerVal := req.Header.Get(b.traceCustomHeader)
-		if headerVal != "" {
-			templateData["TraceID"] = headerVal
-		}
+		headerValue := req.Header.Get(b.traceCustomHeader)
+		templateData["TraceID"] = trustedTraceID(headerValue)
 	}
 
 	err := b.banTemplate.Execute(rw, templateData)
 	if err != nil {
-		b.log.Warn("handleBanServeHTTP could not write template to ResponseWriter: " + err.Error())
+		b.log.Warn("handleBanServeHTTP could not write template to ResponseWriter", "error", err)
 	}
+}
+
+// resolveDroppedOrigin uses a payload origin string, or OriginName(originID) on drop only.
+func (b *Bouncer) resolveDroppedOrigin(origin string, originID uint16) string {
+	if origin != "" {
+		return origin
+	}
+	if originID == 0 || b.lapiClient == nil {
+		return ""
+	}
+	return b.lapiClient.OriginName(originID)
 }
 
 // handleRemediationServeHTTP applies captcha or ban for a cached or live verdict.
@@ -316,8 +322,8 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 // captcha remediation gets the captcha challenge page, never the ban page. Only ban kind
 // reaches handleBanServeHTTP from here.
 func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientRequest, remediation, origin string) {
-	kind := cache.RemediationKind(remediation)
-	b.log.Debug(fmt.Sprintf("handleRemediationServeHTTP ip:%s remediation:%s", req.remoteIP, kind))
+	kind := decisionscope.RemediationKind(remediation)
+	b.log.Debug("handleRemediationServeHTTP", "ip", req.remoteIP, "remediation", kind)
 	if !b.captchaClient.Valid || kind != decisionscope.CaptchaValue {
 		b.handleBanServeHTTP(rw, req, configuration.ReasonLAPI, origin)
 		return
@@ -362,7 +368,7 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientRequest
 		return true
 	}
 	if err != nil {
-		b.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", req.remoteIP, err.Error()))
+		b.log.Debug("handleNextServeHTTP", "ip", req.remoteIP, "isWaf", true, "error", err)
 		b.handleBanServeHTTP(rw, req, configuration.ReasonAPPSEC, lapi.OriginPluginAppsecFailure)
 		return true
 	}
@@ -418,7 +424,7 @@ func (b *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req clie
 		return
 	}
 	if _, err := rw.Write([]byte(decision.UserBodyContent)); err != nil {
-		b.log.Warn(fmt.Sprintf("handleAppsecResponseServeHTTP ip:%s could not write appsec response: %s", req.remoteIP, err.Error()))
+		b.log.Warn("handleAppsecResponseServeHTTP could not write appsec response", "ip", req.remoteIP, "error", err)
 	}
 }
 

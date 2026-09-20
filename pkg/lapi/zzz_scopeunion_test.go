@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -50,13 +51,15 @@ func TestOpenStream_LiveRoutersUnionCountryAndUsername(t *testing.T) {
 	if !strings.Contains(query, "country") || !strings.Contains(query, "username") {
 		t.Fatalf("union scopes: %s", query)
 	}
+	countryClient.decisionStore.BeginTick()
 	countryClient.storeStreamDecision(Decision{Type: "ban", Scope: "Country", Value: "FR", Origin: "CAPI"}, 60)
 	countryClient.storeStreamDecision(Decision{Type: "ban", Scope: "username", Value: "alice", Origin: "CAPI"}, 60)
-	if _, getErr := countryClient.Cache().Get(decisionscope.HeaderScopeKey(decisionscope.ScopeCountry, "FR")); getErr != nil {
-		t.Fatalf("Country decision must store: %v", getErr)
+	countryClient.decisionStore.PublishTick(0)
+	if !testStreamHasDecision(countryClient, decisionstore.HeaderScopeKey(decisionscope.ScopeCountry, "FR")) {
+		t.Fatal("Country decision must store")
 	}
-	if _, getErr := countryClient.Cache().Get(decisionscope.HeaderScopeKey("username", "alice")); getErr != nil {
-		t.Fatalf("username decision must store: %v", getErr)
+	if !testStreamHasDecision(countryClient, decisionstore.HeaderScopeKey("username", "alice")) {
+		t.Fatal("username decision must store")
 	}
 
 	userCancel()
@@ -68,9 +71,21 @@ func TestOpenStream_LiveRoutersUnionCountryAndUsername(t *testing.T) {
 	if strings.Contains(afterDrop, "username") {
 		t.Fatalf("username must drop: %s", afterDrop)
 	}
-	if _, getErr := countryClient.Cache().Get(decisionscope.HeaderScopeKey(decisionscope.ScopeCountry, "FR")); getErr != nil {
-		t.Fatalf("unregister must not sweep Country key: %v", getErr)
+	if !testStreamHasDecision(countryClient, decisionstore.HeaderScopeKey(decisionscope.ScopeCountry, "FR")) {
+		t.Fatal("unregister must not sweep Country key")
 	}
+}
+
+func testStreamHasDecision(client *Client, key string) bool {
+	if client.decisionStore == nil {
+		return false
+	}
+	snap := client.decisionStore.PublishedMemoryMapForTest()
+	if snap == nil {
+		return false
+	}
+	_, ok := snap[key]
+	return ok
 }
 
 func TestOpenStream_LateCountryJoinUsesStartupFalse(t *testing.T) {

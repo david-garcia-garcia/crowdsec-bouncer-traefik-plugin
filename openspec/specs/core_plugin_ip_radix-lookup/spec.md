@@ -1,6 +1,6 @@
 ## Purpose
 
-Trusted-IP and trusted-CIDR membership answers in time bounded by address size, not by how many networks the operator listed, without changing public config. Stream and alone Range may reuse boolean CIDR prefix membership without storing a remediation on that helper.
+Trusted-IP and trusted-CIDR membership answers in time bounded by address size, not by how many networks the operator listed, without changing public config. Membership is the vendored utilities Helper (`github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup`: `New`, `AddCIDR`, `Contains`), not an in-tree helper package. Stream and alone Range MAY store the blob remediation string as Helper metadata on each of the two trees; the trusted-IP pool stays boolean (`AddCIDR(cidr, "")`).
 
 ## Requirements
 
@@ -62,7 +62,7 @@ Building the trusted-IP pool SHALL fail when an entry is neither a parseable IP 
 - **THEN** validation returns an error
 
 ### Requirement: Range membership may reuse boolean CIDR prefix lookup
-Stream and alone Range matching MAY use the same boolean CIDR prefix membership as the trusted-IP pool. That membership MUST NOT store a remediation payload. Ban and captcha SHALL be separate sets so longest-prefix-wins cannot hide a containing ban behind a longer captcha. Range membership MUST NOT live in the trusted-IP Checker. Public trusted-IP config keys SHALL stay `forwardedHeadersTrustedIps` and `clientTrustedIps`.
+Stream and alone Range matching MAY use the same CIDR prefix membership as the trusted-IP pool (`github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup`). A Range helper MAY store the blob remediation string (letter, optional unit-separator origin) as Helper metadata of that CIDR. The trusted-IP pool MUST stay boolean (`AddCIDR(cidr, "")`). Ban and captcha SHALL be separate sets so longest-prefix-wins cannot hide a containing ban behind a longer captcha. Range membership MUST NOT live in the trusted-IP Checker. Public trusted-IP config keys SHALL stay `forwardedHeadersTrustedIps` and `clientTrustedIps`. When two Range CIDRs of the same kind occupy the same remapped prefix endpoint, the last successful insert SHALL win.
 
 #### Scenario: Range ban still matches by CIDR containment
 - **WHEN** stream has a Range ban `10.0.0.0/8` and the client IP is `10.1.2.3`
@@ -71,6 +71,25 @@ Stream and alone Range matching MAY use the same boolean CIDR prefix membership 
 #### Scenario: Captcha prefix does not hide a containing ban
 - **WHEN** stream has a Range ban `10.0.0.0/8` and a Range captcha `10.1.0.0/16` and the client IP is `10.1.2.3`
 - **THEN** the request is forbidden, not captcha
+
+#### Scenario: Range endpoint returns the stored origin
+- **WHEN** stream has a Range ban `10.0.0.0/8` whose stored string is `t` plus a unit-separator and `crowdsec` and the client IP is `10.1.2.3`
+- **THEN** Range membership returns that stored string
+
+#### Scenario: Same remapped endpoint keeps the last insert
+- **WHEN** stream has Range bans `0.0.0.0/0` then `::ffff:0:0/96` with different stored origins and the client IP is `192.0.2.1`
+- **THEN** Range membership returns the stored string of `::ffff:0:0/96`
+
+### Requirement: Range hit reads the stored string from the winning prefix
+When a Range helper contains the client IP, membership SHALL return the Helper metadata already held on the longest matching prefix of that helper. It MUST NOT re-parse `storedByCIDR` to recover that string. Boolean membership for the trusted-IP pool SHALL ignore any stored string.
+
+#### Scenario: Overlapping bans keep the longest-prefix stored string
+- **WHEN** a Range helper holds `10.0.0.0/8` stored as `t` plus origin `crowdsec` and `10.1.0.0/16` stored as `t` plus origin `cscli` and the query is `10.1.2.3`
+- **THEN** the returned string is the `/16` stored value
+
+#### Scenario: Trusted-IP membership stays boolean
+- **WHEN** the trusted-IP pool contains `10.0.0.0/8` and the client IP is `10.1.2.3`
+- **THEN** membership is true and no remediation string is required
 
 ### Requirement: Catch-all CIDRs stay same-family
 Trusted-pool membership SHALL follow `net.IPNet.Contains` address-family rules. `0.0.0.0/0` SHALL NOT match IPv6. `::/0` SHALL NOT match IPv4.

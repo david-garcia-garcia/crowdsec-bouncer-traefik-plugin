@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// testLeaseRedis is an in-process RESP stand-in for Eval acquire plus GET/SET.
+// testLeaseRedis is an in-process RESP stand-in for GET/MGET/SET/DEL/MSETEX plus Eval acquire.
 type testLeaseRedis struct {
 	mu   sync.Mutex
 	keys map[string]string
@@ -81,12 +81,29 @@ func (s *testLeaseRedis) replyLocked(verb string, argv []string) []byte {
 			return []byte("$-1\r\n")
 		}
 		return []byte("$" + strconv.Itoa(len(value)) + "\r\n" + value + "\r\n")
+	case "MGET":
+		if len(argv) < 2 {
+			return []byte("-ERR wrong number of arguments\r\n")
+		}
+		var reply strings.Builder
+		reply.WriteString("*" + strconv.Itoa(len(argv)-1) + "\r\n")
+		for _, key := range argv[1:] {
+			value, ok := s.keys[key]
+			if !ok {
+				reply.WriteString("$-1\r\n")
+				continue
+			}
+			reply.WriteString("$" + strconv.Itoa(len(value)) + "\r\n" + value + "\r\n")
+		}
+		return []byte(reply.String())
 	case "SET":
 		if len(argv) < 3 {
 			return []byte("-ERR wrong number of arguments\r\n")
 		}
 		s.keys[argv[1]] = argv[2]
 		return []byte("+OK\r\n")
+	case "MSETEX":
+		return applyTestMSetEX(s.keys, argv)
 	case "DEL":
 		if len(argv) < 2 {
 			return []byte("-ERR wrong number of arguments\r\n")
@@ -109,6 +126,21 @@ func (s *testLeaseRedis) replyLocked(verb string, argv []string) []byte {
 	default:
 		return []byte("+OK\r\n")
 	}
+}
+
+// applyTestMSetEX stores MSETEX pairs (numkeys key val ... EX|EXAT ttl) into keys.
+func applyTestMSetEX(keys map[string]string, argv []string) []byte {
+	if len(argv) < 6 {
+		return []byte("-ERR wrong number of arguments\r\n")
+	}
+	numkeys, convErr := strconv.Atoi(argv[1])
+	if convErr != nil || numkeys < 1 || len(argv) < 2+2*numkeys+2 {
+		return []byte("-ERR wrong number of arguments\r\n")
+	}
+	for i := range numkeys {
+		keys[argv[2+2*i]] = argv[2+2*i+1]
+	}
+	return []byte(":1\r\n")
 }
 
 func readTestRESPArray(reader *bufio.Reader) ([]string, error) {

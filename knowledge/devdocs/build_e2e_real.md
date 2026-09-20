@@ -22,7 +22,7 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 - Custom-ban and captcha compose labels set `banFilePath` / `captchaFilePath`. Do not use `banHtmlFilePath` / `captchaHtmlFilePath` or HTML-cased twins.
 - Nested plugin maps (`decisionScopeHeaders`, geoblock `databaseSources`) MUST use the file provider (`tests/e2e/real/dynamic-scopes.yml`). Docker labels do not decode those maps.
 - Country matching uses traefik-geoblock enrich on a **public** `X-Forwarded-For`. Do not inject a client-set country header for that case.
-- CI job `e2e (docker + pester)` runs this suite; `e2e (binary + mock LAPI)` stays the mock job.
+- CI job `e2e (docker + pester)` runs this suite; `e2e (binary + mock LAPI)` stays the mock job; `e2e (go + dragonfly)` is DecisionStore `go test` against Dragonfly (`build_e2e_go-redis.md`).
 
 ## Pattern snippet
 
@@ -53,3 +53,9 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 - The file-provider stream bouncer uses a second fixture key (`BOUNCER_KEY_TRAEFIK_SCOPES`). Do not share one LAPI stream key with the docker-label `/stream` middleware or the polls race.
 - Captcha solve uses `captchaProvider: custom` and compose service `dummy-captcha` (`POST /siteverify` always `{"success":true}`). Pester POSTs `dummy-captcha-response` and asserts `crowdsec_captcha_gate`. Do not call hCaptcha/Turnstile.
 - Traefik drops unused keys. An old-key-only `banHtmlFilePath` / `captchaHtmlFilePath` label serves CreateConfig defaults, not the suite HTML.
+- Extra coverage routes live on the `coverage` whoami (`/header-none`, `/lapi-fail-*`, `/waf-only`, `/waf-fail-*`, `/status-429`, `/short-captcha`). Do not put them under `PathPrefix(/appsec)` or `PathPrefix(/captcha)`.
+- Username/AS/Country placeholder cases use `/header-none` (file-provider `decisionScopeHeaders`, no geoblock). Do not inject `CF-IPCountry` on `/scope-none` — geoblock overwrites `X-IPCountry`.
+- CrowdSec `type=allow` over a ban is not in this suite. The Pester file and the storage follow-up live in `knowledge/debt/2026-09-19-multiple-decisions-per-cache-key.md`.
+- LAPI/AppSec failure-action routes point at `crowdsec:9` with `httpTimeoutSeconds=2`. Do not `docker pause` Crowdsec; that would stall the shared LAPI.
+- Docker labels for `CrowdsecLapiHost` are `crowdseclapihost`. `crowdseclapishost` (extra `s`) does not match; Traefik drops it and CreateConfig keeps `crowdsec:8080`.
+- Compose IPAM is `172.28.0.0/16` (gateway `172.28.0.1`) so docker-label `forwardedHeadersTrustedIPs` can pin that gateway without colliding with a common `172.20.0.0/16` on the same Docker engine. File-provider routes still trust `172.16.0.0/12`.

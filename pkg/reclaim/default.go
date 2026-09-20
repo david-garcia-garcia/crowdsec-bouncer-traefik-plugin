@@ -41,11 +41,6 @@ func Default() *Table {
 	return defaultTable
 }
 
-// Open is Default().Open: create-once for key on the process table and bind ctx.
-func Open(ctx context.Context, key string, logger *slog.Logger, create func() (any, error), hooks Hooks) (any, error) {
-	return Default().Open(ctx, key, logger, create, hooks)
-}
-
 // OpenWithHooks is Default().OpenWithHooks.
 func OpenWithHooks(ctx context.Context, key string, logger *slog.Logger, create func() (any, Hooks, error)) (any, error) {
 	return Default().OpenWithHooks(ctx, key, logger, create)

@@ -1,5 +1,7 @@
 run:
   timeout: 3m
+  build-tags:
+    - realredis
 
 linters-settings:
   govet:
@@ -21,6 +23,12 @@ linters-settings:
       - FIXME
   gofumpt:
     extra-rules: true
+  gocritic:
+    enabled-checks:
+      - unnamedResult
+    settings:
+      unnamedResult:
+        checkExported: true
   depguard:
     rules:
       Main:
@@ -32,33 +40,35 @@ linters-settings:
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration
-          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha
           - github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis
+          - github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
-          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/iplookup
-          - github.com/leprosus/golang-ttl-map
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore
       Test:
         files:
           - $test
         allow:
           - $gostd
           - github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis
+          - github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration
-          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
-          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/iplookup
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore
+          - github.com/leprosus/golang-ttl-map
 
 linters:
   enable-all: true
@@ -87,6 +97,7 @@ linters:
     - mnd
     - exportloopref
     - contextcheck
+    - nonamedreturns
 issues:
   exclude-use-default: false
   max-same-issues: 0
@@ -112,6 +123,3 @@ issues:
     - path: plugin.go
       linters:
         - perfsprint
-    - path: pkg/iplookup/
-      linters:
-        - intrange

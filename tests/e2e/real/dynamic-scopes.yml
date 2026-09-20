@@ -33,6 +33,8 @@ http:
           crowdsecMode: none
           decisionScopeHeaders:
             Country: X-IPCountry
+            AS: CF-ASN
+            username: X-User
           forwardedHeadersTrustedIps:
             - "172.16.0.0/12"
             - "127.0.0.1/32"
@@ -50,6 +52,25 @@ http:
           crowdsecMode: stream
           decisionScopeHeaders:
             Country: X-IPCountry
+            AS: CF-ASN
+            username: X-User
+          forwardedHeadersTrustedIps:
+            - "172.16.0.0/12"
+            - "127.0.0.1/32"
+          forwardedHeadersCustomName: X-Forwarded-For
+    bouncer-header-none:
+      plugin:
+        bouncer:
+          enabled: "true"
+          crowdsecLapiKey: "40796d93c2958f9e58345514e67740e5"
+          crowdsecLapiHost: crowdsec:8080
+          httpTimeoutSeconds: "60"
+          logLevel: DEBUG
+          crowdsecMode: none
+          decisionScopeHeaders:
+            Country: CF-IPCountry
+            AS: CF-ASN
+            username: X-User
           forwardedHeadersTrustedIps:
             - "172.16.0.0/12"
             - "127.0.0.1/32"

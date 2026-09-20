@@ -68,6 +68,8 @@ func newTransport(config *configuration.Config, log *slog.Logger) (*transport, e
 			return nil, err
 		}
 	}
+	// Store effective seconds so AdoptTransport last-writes a shared-default change when the override is still 0.
+	timeoutSeconds := config.EffectiveHTTPTimeoutSeconds(config.CrowdsecLapiHTTPTimeoutSeconds)
 	return &transport{
 		httpClient: &http.Client{
 			Transport: &http.Transport{
@@ -76,11 +78,11 @@ func newTransport(config *configuration.Config, log *slog.Logger) (*transport, e
 				IdleConnTimeout:     30 * time.Second,
 				TLSClientConfig:     tlsConfig,
 			},
-			Timeout: time.Duration(config.HTTPTimeoutSeconds) * time.Second,
+			Timeout: time.Duration(timeoutSeconds) * time.Second,
 		},
 		header:                      header,
 		key:                         config.CrowdsecLapiKey,
-		httpTimeoutSeconds:          config.HTTPTimeoutSeconds,
+		httpTimeoutSeconds:          timeoutSeconds,
 		lapiTLSInsecureVerify:       config.CrowdsecLapiTLSInsecureVerify,
 		lapiTLSCertificateAuthority: config.CrowdsecLapiTLSCertificateAuthority,
 		lapiTLSCertificateBouncer:   config.CrowdsecLapiTLSCertificateBouncer,
@@ -203,17 +205,17 @@ func (c *Client) getToken() error {
 		c.transport.Store(&updated)
 		return nil
 	}
-	c.log.Warn("getToken statusCode:" + strconv.Itoa(login.Code))
+	c.log.Warn("getToken", "statusCode", login.Code)
 	return errors.New("getToken statusCode:" + strconv.Itoa(login.Code))
 }
 
 // drainResponse consumes leftover bytes so the LAPI HTTP connection can be reused.
 func (c *Client) drainResponse(res *http.Response) {
 	if _, errDrain := io.Copy(io.Discard, res.Body); errDrain != nil {
-		c.log.Debug("crowdsecQuery:drainBody " + errDrain.Error())
+		c.log.Debug("crowdsecQuery:drainBody", "error", errDrain)
 	}
 	if errClose := res.Body.Close(); errClose != nil {
-		c.log.Error("crowdsecQuery:closeBody " + errClose.Error())
+		c.log.Error("crowdsecQuery:closeBody", "error", errClose)
 	}
 }
 

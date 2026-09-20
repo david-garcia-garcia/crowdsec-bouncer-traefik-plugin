@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"text/template"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -38,9 +40,8 @@ func TestClientRequestRemoteIPIsCanonical(t *testing.T) {
 // header on remoteIP: lookup keys on that string and misses the canonical slot.
 func TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan(t *testing.T) {
 	log := logger.New("ERROR", "")
-	lapiClient, cacheClient := lapi.NewTestClient(log)
-	t.Cleanup(cacheClient.Close)
-	cacheClient.Set("2001:db8::1", decisionscope.BannedValue, 60)
+	lapiClient, store := lapi.NewTestClient(log)
+	store.Put(decisionstore.Decision{Scope: decisionscope.ScopeIP, Value: "2001:db8::1", Kind: decisionscope.BannedValue, DurationSec: 60})
 	clientChecker, err := ip.NewChecker(log, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -76,6 +77,49 @@ func TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan(t *testing.T) {
 	}
 	if rw.Code != http.StatusForbidden {
 		t.Fatalf("status=%d", rw.Code)
+	}
+}
+
+func TestServeHTTP_PackedMemoryBanRecordsCrowdsecOrigin(t *testing.T) {
+	log := logger.New("ERROR", "")
+	lapiClient, store := lapi.NewTestClient(log)
+	lapi.AttachTestMetricsReporter(lapiClient)
+	lapi.SeedLiveSnapshotForTest(store, "203.0.113.10", decisionscope.BannedValue, "crowdsec", 60)
+	clientChecker, err := ip.NewChecker(log, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	banTemplate, err := template.New("ban").Parse("banned")
+	if err != nil {
+		t.Fatal(err)
+	}
+	passed := false
+	b := &Bouncer{
+		enabled:                true,
+		crowdsecMode:           configuration.StreamMode,
+		lapiClient:             lapiClient,
+		clientPoolStrategy:     &ip.PoolStrategy{Checker: clientChecker},
+		captchaClient:          &captcha.Client{},
+		log:                    log,
+		remediationStatusCode:  http.StatusForbidden,
+		banTemplate:            banTemplate,
+		banTemplateContentType: "text/html; charset=utf-8",
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			passed = true
+		}),
+	}
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
+	req.RemoteAddr = "203.0.113.10:1"
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, req)
+	if passed {
+		t.Fatal("origin must not run; packed ban must drop")
+	}
+	if rw.Code != http.StatusForbidden {
+		t.Fatalf("status=%d", rw.Code)
+	}
+	if got := lapiClient.TestDroppedCount("crowdsec", "ipv4", "ban"); got != 1 {
+		t.Fatalf("dropped crowdsec=%d", got)
 	}
 }
 
@@ -120,6 +164,45 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 			}
 			if tt.expectBodyContent && body != html {
 				t.Errorf("Expected body %q, got %q", html, body)
+			}
+		})
+	}
+}
+
+// TestHandleBanServeHTTPTrustedTraceID checks that only a conservative inbound TraceID token reaches the ban template.
+func TestHandleBanServeHTTPTrustedTraceID(t *testing.T) {
+	banTemplate, err := template.New("html").Parse("id={{ .TraceID }}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name        string
+		headerValue string
+		wantBody    string
+	}{
+		{name: "UUID", headerValue: "550e8400-e29b-41d4-a716-446655440000", wantBody: "id=550e8400-e29b-41d4-a716-446655440000"},
+		{name: "W3C traceparent", headerValue: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01", wantBody: "id=00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"},
+		{name: "injection", headerValue: `";alert(1);//`, wantBody: "id="},
+		{name: "201-character token", headerValue: strings.Repeat("a", 201), wantBody: "id="},
+		{name: "empty header", headerValue: "", wantBody: "id="},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := &Bouncer{
+				remediationStatusCode:  http.StatusForbidden,
+				banTemplate:            banTemplate,
+				banTemplateContentType: "text/html; charset=utf-8",
+				traceCustomHeader:      "X-Request-Id",
+			}
+			rw := httptest.NewRecorder()
+			req := &http.Request{Method: http.MethodGet, Header: make(http.Header)}
+			if tt.headerValue != "" {
+				req.Header.Set("X-Request-Id", tt.headerValue)
+			}
+			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
+			body := rw.Body.String()
+			if body != tt.wantBody {
+				t.Errorf("body=%q want %q", body, tt.wantBody)
 			}
 		})
 	}

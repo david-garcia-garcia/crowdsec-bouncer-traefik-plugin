@@ -83,6 +83,7 @@ func TestIncProcessedReportsWithoutWindowMap(t *testing.T) {
 
 func TestReportMetricsOfficialLabels(t *testing.T) {
 	client, body := newUsageMetricsClient(t)
+	AttachTestInternStore(client)
 	client.IncDropped("lists:firehol_level1", "ipv4", "ban")
 	client.IncProcessed("ipv4")
 	client.rememberActiveDecision("ip:1.2.3.4", "crowdsec", "1.2.3.4")
