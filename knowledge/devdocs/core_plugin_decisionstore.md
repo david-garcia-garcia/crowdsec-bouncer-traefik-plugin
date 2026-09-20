@@ -29,7 +29,7 @@ Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx
 ## How to use
 
 - Call `lapi.OpenDecisionStore(ctx, cfg, log)` then `lapi.New(..., store)` (or `OpenStream` / `OpenLive`, which Open the store first).
-- Memory: in-process COW tick/published maps (`pubWord`/`pubExp`) plus the Range blob. Maps stay non-nil. Live Put mutates published maps in place and sweeps expired keys. Lookup holds `RLock` across probes.
+- Memory: in-process COW tick/published `map[string]LiveSlot` plus the Range blob. Maps stay non-nil. Live Put mutates published in place and sweeps expired keys. Lookup holds `RLock` across probes.
 - Redis: import `github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis` at `v1.0.5`. Prefix is `SessionHex` (cursor), not live `IdentityHex`. Logical keys are the client IP, header-scope key, and `range-index`. Writer plus optional readers; `nextReader` never retries the writer. SET/DEL are void. Do not re-patch `vendor/.../iplookup/helper.go` (`Helper.Contains` / `Count` RLock is upstream).
 - Same store key → same Store. Different Redis hosts (or enabled/password/database/read hosts) isolate.
 - `decisionScopeHeaders` and poller intervals stay off the store key. Stream `scopes=` and the store header-scope filter are the live-router union (`core_plugin_lapi_scope-union.md`).

@@ -9,40 +9,35 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 )
 
-// memory is in-process COW tick/published maps plus the Range blob.
+// memory is in-process COW tick/published LiveSlot maps plus the Range blob.
 type memory struct {
 	log        *slog.Logger
-	origins    *intern.Table
-	mu         sync.RWMutex
-	ticking    bool
-	tickWord   map[string]uint32
-	tickExp    map[string]int64
-	pubWord    map[string]uint32
-	pubExp     map[string]int64
-	rangeIndex string
+	origins    *intern.Table       // origin name → id packed into LiveSlot.Word
+	mu         sync.RWMutex        // maps, ticking, rangeIndex
+	ticking    bool                // stream window: Put/Delete write tick; Lookup reads published
+	tick       map[string]LiveSlot // unpublished clone; SlotKey → packed word + Unix expiry
+	published  map[string]LiveSlot // request-path snapshot
+	rangeIndex string              // Range CIDR=kind blob; membership is rebuilt from this
 }
 
 // newMemory allocates non-nil tick/published maps.
 func newMemory(log *slog.Logger, origins *intern.Table) *memory {
 	return &memory{
-		log:      log,
-		origins:  origins,
-		tickWord: map[string]uint32{},
-		tickExp:  map[string]int64{},
-		pubWord:  map[string]uint32{},
-		pubExp:   map[string]int64{},
+		log:       log,
+		origins:   origins,
+		tick:      map[string]LiveSlot{},
+		published: map[string]LiveSlot{},
 	}
 }
 
-// BeginTick clones the published maps into tick. Lookups keep reading published.
+// BeginTick clones the published map into tick. Lookups keep reading published.
 func (m *memory) BeginTick() {
 	if m == nil {
 		return
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.tickWord = cloneUint32Map(m.pubWord)
-	m.tickExp = cloneInt64Map(m.pubExp)
+	m.tick = cloneLiveSlotMap(m.published)
 	m.ticking = true
 }
 
@@ -57,19 +52,16 @@ func (m *memory) PublishTick(now int64) {
 		return
 	}
 	var expired []string
-	for key, expiresAt := range m.tickExp {
-		if expiresAt > 0 && expiresAt <= now {
+	for key, slot := range m.tick {
+		if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
 			expired = append(expired, key)
 		}
 	}
 	for _, key := range expired {
-		delete(m.tickWord, key)
-		delete(m.tickExp, key)
+		delete(m.tick, key)
 	}
-	m.pubWord = m.tickWord
-	m.pubExp = m.tickExp
-	m.tickWord = map[string]uint32{}
-	m.tickExp = map[string]int64{}
+	m.published = m.tick
+	m.tick = map[string]LiveSlot{}
 	m.ticking = false
 }
 
@@ -93,27 +85,22 @@ func (m *memory) putTick(item Decision) {
 	if key == "" {
 		return
 	}
-	slot := LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
-	m.tickWord[key] = slot.Word
-	m.tickExp[key] = slot.ExpiresAt
+	m.tick[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
 }
 
-// putPublishedLocked writes one live slot onto the published maps and sweeps expired keys. Caller holds mu.
+// putPublishedLocked writes one live slot onto the published map and sweeps expired keys. Caller holds mu.
 func (m *memory) putPublishedLocked(item Decision) {
 	key, _ := slotKeys(item.Scope, item.Value)
 	if key == "" {
 		return
 	}
 	now := time.Now().Unix()
-	for existing, expiresAt := range m.pubExp {
-		if expiresAt > 0 && expiresAt <= now {
-			delete(m.pubWord, existing)
-			delete(m.pubExp, existing)
+	for existing, slot := range m.published {
+		if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
+			delete(m.published, existing)
 		}
 	}
-	slot := LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
-	m.pubWord[key] = slot.Word
-	m.pubExp[key] = slot.ExpiresAt
+	m.published[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
 }
 
 // pack encodes a uint32 word. Intern overflow Warns and uses origin id 0.
@@ -144,24 +131,18 @@ func (m *memory) Delete(scope, value string) {
 		return
 	}
 	if m.ticking {
-		delete(m.tickWord, key)
-		delete(m.tickExp, key)
+		delete(m.tick, key)
 		if priorSpelling != "" && priorSpelling != key {
-			delete(m.tickWord, priorSpelling)
-			delete(m.tickExp, priorSpelling)
+			delete(m.tick, priorSpelling)
 		}
 		return
 	}
-	word := cloneUint32Map(m.pubWord)
-	exp := cloneInt64Map(m.pubExp)
-	delete(word, key)
-	delete(exp, key)
+	next := cloneLiveSlotMap(m.published)
+	delete(next, key)
 	if priorSpelling != "" && priorSpelling != key {
-		delete(word, priorSpelling)
-		delete(exp, priorSpelling)
+		delete(next, priorSpelling)
 	}
-	m.pubWord = word
-	m.pubExp = exp
+	m.published = next
 }
 
 // LookupRemediation reads the published map (Ip, header scopes, Range). Expired slots miss.
@@ -173,14 +154,14 @@ func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[st
 	defer m.mu.RUnlock()
 	now := time.Now().Unix()
 	kind, origin, originID := lookupHits(func(key string) any {
-		word, ok := m.pubWord[key]
+		slot, ok := m.published[key]
 		if !ok {
 			return nil
 		}
-		if expiresAt := m.pubExp[key]; expiresAt > 0 && expiresAt <= now {
+		if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
 			return nil
 		}
-		return word
+		return slot.Word
 	}, remoteIP, ipAddr, scopes, membership)
 	if kind == "" {
 		return "", "", 0, ErrMiss
@@ -219,14 +200,10 @@ func (m *memory) publishedMap() map[string]LiveSlot {
 	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	if len(m.pubWord) == 0 {
+	if len(m.published) == 0 {
 		return nil
 	}
-	out := make(map[string]LiveSlot, len(m.pubWord))
-	for key, word := range m.pubWord {
-		out[key] = LiveSlot{Word: word, ExpiresAt: m.pubExp[key]}
-	}
-	return out
+	return cloneLiveSlotMap(m.published)
 }
 
 // seedPublished writes one decision onto the published map without a tick.
@@ -239,18 +216,10 @@ func (m *memory) seedPublished(item Decision) {
 	m.putPublishedLocked(item)
 }
 
-func cloneUint32Map(src map[string]uint32) map[string]uint32 {
-	next := make(map[string]uint32, len(src))
-	for key, word := range src {
-		next[key] = word
-	}
-	return next
-}
-
-func cloneInt64Map(src map[string]int64) map[string]int64 {
-	next := make(map[string]int64, len(src))
-	for key, expiresAt := range src {
-		next[key] = expiresAt
+func cloneLiveSlotMap(src map[string]LiveSlot) map[string]LiveSlot {
+	next := make(map[string]LiveSlot, len(src))
+	for key, slot := range src {
+		next[key] = slot
 	}
 	return next
 }
