@@ -165,7 +165,7 @@ func (r *redis) deleteKey(key string) {
 func (r *redis) BeginTick() {}
 
 // PublishTick is a no-op: Redis key TTL is the expiry.
-func (r *redis) PublishTick(int64) {}
+func (r *redis) PublishTick(int32) {}
 
 // PutMany is SET of kind+origin strings. Same DurationSec share one MSetEX, chunked at PutManyChunk.
 func (r *redis) PutMany(items []Decision) {

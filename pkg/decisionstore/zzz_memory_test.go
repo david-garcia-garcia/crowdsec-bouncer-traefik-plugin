@@ -7,7 +7,6 @@ import (
 	"net"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -27,11 +26,29 @@ func TestMemoryTickPublishLookup(t *testing.T) {
 	}
 }
 
+func TestElapsedNowStaysAboveSkipSentinel(t *testing.T) {
+	if got := elapsedNow(); got < elapsedBias {
+		t.Fatalf("elapsedNow %d, want at least bias %d", got, elapsedBias)
+	}
+}
+
+func TestMemoryDurationZeroMissesAfterPublish(t *testing.T) {
+	store := NewMemory(logger.New("ERROR", ""))
+	store.BeginTick()
+	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 0})
+	store.PublishTick(ElapsedNow())
+	_, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	_ = originID
+	if !errors.Is(err, ErrMiss) {
+		t.Fatalf("duration 0 must miss after publish, got %v", err)
+	}
+}
+
 func TestMemoryExpiryOnPublish(t *testing.T) {
 	store := NewMemory(logger.New("ERROR", ""))
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: -1})
-	store.PublishTick(time.Now().Unix())
+	store.PublishTick(ElapsedNow())
 	_, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	_ = originID
 	if !errors.Is(err, ErrMiss) || err.Error() != "store:miss" {

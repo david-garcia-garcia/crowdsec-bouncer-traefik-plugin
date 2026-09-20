@@ -2,6 +2,7 @@ package decisionstore
 
 import (
 	"fmt"
+	"math"
 	"net"
 	"testing"
 
@@ -53,9 +54,9 @@ func benchLiveSnapshot(b *testing.B) map[string]LiveSlot {
 	snapshot := make(map[string]LiveSlot, benchLiveEntries+1)
 	for n := range benchLiveEntries {
 		key := fmt.Sprintf("10.%d.%d.%d", n>>16&0xff, n>>8&0xff, n&0xff)
-		snapshot[key] = LiveSlot{Word: word, ExpiresAt: 9_999_999_999}
+		snapshot[key] = LiveSlot{Word: word, ExpiresAt: math.MaxInt32}
 	}
-	snapshot[HeaderScopeKey(decisionscope.ScopeCountry, "US")] = LiveSlot{Word: word, ExpiresAt: 9_999_999_999}
+	snapshot[HeaderScopeKey(decisionscope.ScopeCountry, "US")] = LiveSlot{Word: word, ExpiresAt: math.MaxInt32}
 	return snapshot
 }
 
@@ -93,7 +94,7 @@ func BenchmarkHeapRetained_LiveMap100k(b *testing.B) {
 		snapshot := make(map[string]LiveSlot, benchLiveEntries)
 		for n := range benchLiveEntries {
 			key := fmt.Sprintf("10.%d.%d.%d", n>>16&0xff, n>>8&0xff, n&0xff)
-			snapshot[key] = LiveSlot{Word: packWord(decisionscope.BannedValue, 1), ExpiresAt: 9_999_999_999}
+			snapshot[key] = LiveSlot{Word: packWord(decisionscope.BannedValue, 1), ExpiresAt: math.MaxInt32}
 		}
 		b.SetBytes(int64(len(snapshot)) * 68)
 	}

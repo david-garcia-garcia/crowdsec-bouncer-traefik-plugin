@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 )
@@ -15,7 +14,7 @@ type memory struct {
 	origins    *intern.Table       // origin name → id packed into LiveSlot.Word
 	mu         sync.RWMutex        // maps, ticking, rangeIndex
 	ticking    bool                // stream window: PutMany/DeleteMany write tick; Lookup reads published
-	tick       map[string]LiveSlot // unpublished clone; SlotKey → packed word + Unix expiry
+	tick       map[string]LiveSlot // unpublished clone; SlotKey → packed word + elapsed expiry
 	published  map[string]LiveSlot // request-path snapshot
 	rangeIndex string              // Range CIDR=kind blob; membership is rebuilt from this
 }
@@ -42,7 +41,7 @@ func (m *memory) BeginTick() {
 }
 
 // PublishTick drops expired tick slots, publishes tick, and closes the window.
-func (m *memory) PublishTick(now int64) {
+func (m *memory) PublishTick(now int32) {
 	if m == nil {
 		return
 	}
@@ -79,7 +78,7 @@ func (m *memory) PutMany(items []Decision) {
 		return
 	}
 	next := cloneLiveSlotMap(m.published)
-	now := time.Now().Unix()
+	now := elapsedNow()
 	for existing, slot := range next {
 		if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
 			delete(next, existing)
@@ -162,7 +161,7 @@ func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[st
 	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	now := time.Now().Unix()
+	now := elapsedNow()
 	kind, origin, originID := lookupHits(func(key string) any {
 		slot, ok := m.published[key]
 		if !ok {
