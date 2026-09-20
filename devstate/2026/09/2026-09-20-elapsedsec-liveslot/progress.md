@@ -24,5 +24,5 @@ JobName: 2026-09-20-elapsedsec-liveslot
 
 | archive | [x] | [x] | 2026-09-20T06:14:30Z |
 
-| pullrequest | [ ] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-20T06:22:00Z |
 

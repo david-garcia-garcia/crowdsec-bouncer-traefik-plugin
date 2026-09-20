@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-20T06:14:30Z
+Developer review: ready for review — 2026-09-20T06:22:00Z
 
 IssueKey: 2026-09-20-elapsedsec-liveslot
 JobName: 2026-09-20-elapsedsec-liveslot
@@ -10,7 +10,7 @@ JobName: 2026-09-20-elapsedsec-liveslot
 
 **Admin users.** None.
 
-**Developers.** Versus `master`, memory `LiveSlot` is `{uint32,int32}` with elapsed-second `ExpiresAt`, package-init clock and `ElapsedNow()` in `pkg/decisionstore`, and `PublishTick(int32)` from stream apply and memory sweeps; OpenSpec change archived into `core_plugin_decisionstore_store`; devdocs updated; Redis TTL paths unchanged.
+**Developers.** Versus `master`, memory `LiveSlot` is `{uint32,int32}` with elapsed-second `ExpiresAt`, package-init clock and `ElapsedNow()` in `pkg/decisionstore`, and `PublishTick(int32)` from stream apply and memory sweeps; OpenSpec folded into `core_plugin_decisionstore_store`; devdocs updated; Redis TTL paths unchanged.
 
 **End users.** None.
 
@@ -34,17 +34,17 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Archive complete; pullrequest phase remains. CI not yet measured on latest push.
+All workflow phases complete; CI green on reviewed head. 0 items remain.
 
 Priority: P3 — internal memory layout and correctness; no current operator or end-user harm once merged.
-Reviewed head: 3bfd5350
+Reviewed head: f3a4a801
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3 | Local tests passed; CI not seen on 3bfd5350 |
-| CI proof | 1 | Pushed; check status not seen on PR #121 |
+| Overall readiness | 6 | CI succeeded on f3a4a801 |
+| CI proof | 6 | Main Process succeeded — https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35494003693 |
 | Local tests proof | N/A | Remote PR |
 | Review resolution | 6 | No PR review comments |
 
@@ -54,7 +54,7 @@ Owner decision: None.
 | Branch | 2026-09-20-elapsedsec-liveslot pushed | origin tracking |
 | OpenSpec | compact-liveslot-elapsedsec archived | openspec/changes/archive/2026-09-20-compact-liveslot-elapsedsec |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/121 | GitHub |
-| CI | not seen | PR checks |
+| CI | build 35494003693 success (Main Process, Race detector, e2e matrix) https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35494003693 | GitHub check runs on f3a4a801 |
 | Local tests | passed | handoff.yaml |
 | PR comments | no comments | comments: none |
 
@@ -66,15 +66,13 @@ Owner decision: None.
 None.
 
 ## How this fits together
-Local ticket → PR #121 → OpenSpec archived at 3bfd5350 → pullrequest next (title + CI).
+Local ticket → PR #121 (`⚡ perf(decisionstore): compact memory LiveSlot expiry to int32 elapsed`) → CI run 35494003693 succeeded on f3a4a801.
 
 ## Decision needed
 None.
 
 ## Before merge
-- [x] [P3] OpenSpec archive (fold into core_plugin_decisionstore_store)
-- [ ] [P3] Pullrequest phase (drop WIP title, CI green)
-- [ ] [P3] CI green on PR #121
+None.
 
 ## Findings
 None.
@@ -94,7 +92,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Fold into decisionstore store leaf |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | comments: none |
-| Reviewed head | 3bfd53506f1426e21243238376287a27fe2d6b1a | Pin origin/master...HEAD excluding devstate |
+| Reviewed head | f3a4a801f75ebc7e8c189a04e5927f318cdfefb5 | Pin origin/master...HEAD excluding devstate |
 
 ### Stored data model
 - Changed: memory map value `LiveSlot` / field `ExpiresAt` — int32 elapsed seconds — sample wall Unix int64 on master → elapsed since package origin. Upgrade: rewritten on next stream or live Put; in-memory only.
@@ -108,9 +106,8 @@ Is this the best way to solve the issue? Yes — eight-byte slots without a seco
 
 ### Evidence
 What I checked:
-- Delta merged into `openspec/specs/core_plugin_decisionstore_store/spec.md`
-- Change folder moved to `openspec/changes/archive/2026-09-20-compact-liveslot-elapsedsec`
-- validate-spec-map and validate-artifact-names exit 0
+- GitHub check runs on f3a4a801 (all success; Main Process run 35494003693)
+- `go test ./pkg/decisionstore/... ./pkg/lapi/...` passed (handoff.yaml)
 
 ### Rank-up moves
 None.

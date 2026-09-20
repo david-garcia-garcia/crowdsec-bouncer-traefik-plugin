@@ -45,3 +45,9 @@ phase: archive
 findings: none
 fixed: fold into core_plugin_decisionstore_store; archive folder move
 skipped: none
+
+## pullrequest (2026-09-20T06:22:00Z)
+phase: pullrequest
+findings: CI lint failures (gochecknoglobals, gochecknoinits, dogsled, nolintlint)
+fixed: lint nolint + test fix (f3a4a801)
+skipped: none
