@@ -31,9 +31,6 @@ func newMemory(log *slog.Logger, origins *intern.Table) *memory {
 
 // BeginTick clones the published map into tick. Lookups keep reading published.
 func (m *memory) BeginTick() {
-	if m == nil {
-		return
-	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.tick = cloneLiveSlotMap(m.published)
@@ -42,9 +39,6 @@ func (m *memory) BeginTick() {
 
 // PublishTick drops expired tick slots, publishes tick, and closes the window.
 func (m *memory) PublishTick(now int32) {
-	if m == nil {
-		return
-	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if !m.ticking {
@@ -66,7 +60,7 @@ func (m *memory) PublishTick(now int32) {
 
 // PutMany writes decisions into tick when a stream window is open, else copy-on-write onto published (live).
 func (m *memory) PutMany(items []Decision) {
-	if m == nil || len(items) == 0 {
+	if len(items) == 0 {
 		return
 	}
 	m.mu.Lock()
@@ -101,9 +95,6 @@ func (m *memory) putSlot(slots map[string]LiveSlot, item Decision) {
 
 // pack encodes a uint32 word. Intern overflow Warns and uses origin id 0.
 func (m *memory) pack(kind, origin string) uint32 {
-	if m == nil {
-		return packWord(kind, 0)
-	}
 	if m.origins != nil {
 		if originID, ok := m.origins.ID(origin); ok {
 			return packWord(kind, originID)
@@ -117,7 +108,7 @@ func (m *memory) pack(kind, origin string) uint32 {
 
 // DeleteMany drops canonical slots and prior Ip spellings from tick or the published map.
 func (m *memory) DeleteMany(items []Decision) {
-	if m == nil || len(items) == 0 {
+	if len(items) == 0 {
 		return
 	}
 	m.mu.Lock()
@@ -156,9 +147,6 @@ func (m *memory) deleteTickLocked(scope, value string) {
 
 // LookupRemediation reads the published map (Ip, header scopes, Range). Expired slots miss.
 func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (kind string, origin string, originID uint16, err error) {
-	if m == nil {
-		return "", "", 0, ErrMiss
-	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	now := elapsedNow()
@@ -172,17 +160,11 @@ func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[st
 		}
 		return slot.Word
 	}, remoteIP, ipAddr, scopes, membership)
-	if kind == "" {
-		return "", "", 0, ErrMiss
-	}
 	return kind, origin, originID, nil
 }
 
 // ApplyRangeBatch mutates the in-process range-index blob.
 func (m *memory) ApplyRangeBatch(upserts map[string]string, removals []string) error {
-	if m == nil {
-		return nil
-	}
 	if len(upserts) == 0 && len(removals) == 0 {
 		return nil
 	}
@@ -194,9 +176,6 @@ func (m *memory) ApplyRangeBatch(upserts map[string]string, removals []string) e
 
 // RangeIndex is the in-process range-index blob.
 func (m *memory) RangeIndex() (string, error) {
-	if m == nil {
-		return "", nil
-	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.rangeIndex, nil
@@ -204,9 +183,6 @@ func (m *memory) RangeIndex() (string, error) {
 
 // publishedMap is the lookup snapshot. Nil before the first publish or live Put.
 func (m *memory) publishedMap() map[string]LiveSlot {
-	if m == nil {
-		return nil
-	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	if len(m.published) == 0 {
@@ -217,9 +193,6 @@ func (m *memory) publishedMap() map[string]LiveSlot {
 
 // seedPublished writes one decision onto the published map without a tick.
 func (m *memory) seedPublished(item Decision) {
-	if m == nil {
-		return
-	}
 	m.PutMany([]Decision{item})
 }
 

@@ -93,14 +93,17 @@ func TestLiveLookup_PerRouterTTLLastWrites(t *testing.T) {
 		t.Fatal(err)
 	}
 	kind, _, _, err := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil)
-	if err != nil {
+	if err != nil || kind == "" {
 		t.Fatal("last write must still be cached immediately")
 	}
-	_ = kind
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		if _, _, originID, err := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil); err != nil {
-			_ = originID
+		kind, _, originID, err := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil)
+		_ = originID
+		if err != nil {
+			t.Fatalf("lookup while waiting for live TTL: %v", err)
+		}
+		if kind == "" {
 			return
 		}
 		time.Sleep(50 * time.Millisecond)
@@ -134,8 +137,12 @@ func TestLiveLookup_ScopeErrorFailsClosed(t *testing.T) {
 	if decisionscope.IsActiveRemediation(value) {
 		t.Fatalf("scope failure must come back non-active so the failure action applies, got %q", value)
 	}
-	if _, _, originID, cacheErr := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil); cacheErr == nil {
-		_ = originID
+	kind, _, originID, lookupErr := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil)
+	_ = originID
+	if lookupErr != nil {
+		t.Fatalf("scope-failure store lookup: %v", lookupErr)
+	}
+	if kind == decisionscope.NoBannedValue {
 		t.Fatal("scope failure must not cache the unverified allow for the client address")
 	}
 }

@@ -1,7 +1,6 @@
 package decisionstore
 
 import (
-	"errors"
 	"net"
 	"testing"
 
@@ -246,7 +245,7 @@ func mustKind(t *testing.T, store *Store, remoteIP string, scopes map[string]str
 func mustMiss(t *testing.T, store *Store, remoteIP string, scopes map[string]string) {
 	t.Helper()
 	kind, _, err := lookupRemediation(store, remoteIP, scopes)
-	if !errors.Is(err, ErrMiss) || err.Error() != "store:miss" {
-		t.Fatalf("want store:miss, got kind %q err %v", kind, err)
+	if err != nil || kind != "" {
+		t.Fatalf("want empty kind, got kind %q err %v", kind, err)
 	}
 }

@@ -115,10 +115,10 @@ func TestOpenDecisionStore_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.
 	}
 
 	identity := newTestRedisStore(t, redisServer.addr(), nil, IdentityHex(cfg))
-	_, _, originID, identErr := identity.LookupRemediation("1.2.3.4", nil, nil)
+	identKind, _, originID, identErr := identity.LookupRemediation("1.2.3.4", nil, nil)
 	_ = originID
-	if identErr == nil || !errors.Is(identErr, decisionstore.ErrMiss) {
-		t.Fatalf("IdentityHex prefix lookup err %v, want miss", identErr)
+	if identErr != nil || identKind != "" {
+		t.Fatalf("IdentityHex prefix lookup kind %q err %v, want empty kind", identKind, identErr)
 	}
 
 	if SessionHex(cfg) != SessionHex(other) {

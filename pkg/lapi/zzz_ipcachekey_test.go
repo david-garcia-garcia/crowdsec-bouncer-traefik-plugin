@@ -85,7 +85,11 @@ func TestDeleteStreamDecision_ClearsTheSlotAnySpelling(t *testing.T) {
 		Origin: "crowdsec", Type: "ban", Scope: "Ip", Value: expandedV6, Duration: "1h",
 	}, 3600)
 	deleteStreamDecisionForTest(client, Decision{Scope: "Ip", Value: upperV6})
-	if got, err := lookupAsRequest(client, compressedV6); err == nil {
+	got, err := lookupAsRequest(client, compressedV6)
+	if err != nil {
+		t.Fatalf("lifted ban lookup: %v", err)
+	}
+	if got != "" {
 		t.Fatalf("lifted ban still enforced as %q", got)
 	}
 }
@@ -130,7 +134,11 @@ func liveRequests(t *testing.T, addresses []string) int64 {
 		if ipAddr := net.ParseIP(address); ipAddr != nil {
 			canonical = ipAddr.String()
 		}
-		if _, err := lookupAsRequest(client, canonical); err == nil {
+		kind, err := lookupAsRequest(client, canonical)
+		if err != nil {
+			t.Fatalf("memo lookup %q: %v", address, err)
+		}
+		if kind != "" {
 			continue
 		}
 		if _, _, err := client.LiveLookup(canonical, nil, 60); err != nil {
