@@ -15,3 +15,11 @@ fixed: none (think-only)
 skipped: propose not started; Peek types assumed (Awake/Asleep); vendor Peek debt noted
 qualify: qualified-with-gaps
 pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/124
+
+## propose (2026-09-20T15:48:00Z)
+phase: propose
+findings: apply-ready OpenSpec `lapi-session-exclusive`; seven folds (reclaim-key, context-lease, decisionstore_store, query-round-trip, connection, stream-single-flight, middleware_bouncer); no `core_plugin_reclaim`
+fixed: none (design-only)
+skipped: implement not started; Peek types / busy / empty name remain assumed
+qualify: qualified-with-gaps
+pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/124
