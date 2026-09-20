@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-20T06:04:35Z
+Developer review: ready for review — 2026-09-20T06:17:07Z
 
 ## What this changes
 **Operators.** In this Traefik instance, one LAPI key is one stream ticker and one usage-metrics window. Redis and interval disagreements are ignored, not isolated. Isolation still needs a second bouncer API key. WARN names ignored fields and who joined whom.
@@ -24,17 +24,17 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-OpenSpec archived; local tests passed; remote CI still in progress. 1 item remains.
+OpenSpec archived; local tests passed; remote CI succeeded. 0 items remain.
 
 Priority: P2 — real operator pain (stolen stream deltas / second metrics window) with a workaround (second API key)
-Reviewed head: 7e1b0bc5
+Reviewed head: 2f32f70c
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI in progress |
-| CI proof | 3/6 | Checks in progress |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | All required checks succeeded |
 | Local tests proof | N/A | Remote PR uses CI; localTests passed |
 | Review resolution | 6/6 | No PR comments |
 
@@ -44,7 +44,7 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-20-lapi-session-subscribe pushed | origin/2026-09-20-lapi-session-subscribe |
 | OpenSpec | 2026-09-20-lapi-session-subscribe archived | openspec/changes/archive/2026-09-20-2026-09-20-lapi-session-subscribe/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/119 | pr-host |
-| CI | build 35492739774 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35492739774 | GitHub check runs |
+| CI | Main succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35493561271 ; E2E succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35493561266 | GitHub check runs |
 | Local tests | passed | `go test ./pkg/lapi ./pkg/decisionstore ./pkg/bouncer .` |
 | PR comments | no comments | inventory empty |
 
@@ -58,7 +58,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, PR 119. OpenSpec archived. Next is pullrequest (CI wait, drop WIP).
+Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, PR 119. OpenSpec archived. CI succeeded. Ready for review.
 
 ## Decision needed
 | Question | Decision | By |
@@ -67,8 +67,7 @@ Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, PR 119. OpenSpec 
 | Whether live/none Client Key also drops Redis the same way. | assumed — no, not in this ticket. Live `?ip=` does not steal stream_cursor. | explore |
 
 ## Before merge
-- [ ] Remote CI succeeded on PR 119
-- [ ] Drop WIP from the PR title
+None.
 
 ## Findings
 None.
@@ -88,7 +87,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 7e1b0bc5 | Card must match the branch you measured |
+| Reviewed head | 2f32f70c | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -102,10 +101,11 @@ Is this the best way to solve the issue? Yes vs DestBranch: match LAPI physics; 
 
 ### Evidence
 What I checked:
-- Usage packets: middlewareNames / newChildStore (cb5f047d)
-- Six-axis files; hard/wrong items Status done (0a8291fe)
+- Merged `origin/master` (#120 LiveSlot maps); kept Client-child store
+- Lint: unused `testNoneConfig` host; `err` shadow in two-router WARN test
 - `go test ./pkg/lapi ./pkg/decisionstore ./pkg/bouncer .` passed
-- CI in progress on PR 119
+- CI succeeded: Main Process, Race detector, e2e binary+mock, e2e go+dragonfly, e2e docker+pester
+- PR title dropped WIP
 
 ### Rank-up moves
 None.

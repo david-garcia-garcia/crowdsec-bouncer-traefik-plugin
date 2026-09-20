@@ -39,3 +39,9 @@ phase: archive
 findings: none
 fixed: none
 skipped: none
+
+## pullrequest (2026-09-20)
+phase: pullrequest
+findings: none
+fixed: merge origin/master LiveSlot docs; unparam host; govet err shadow
+skipped: none
