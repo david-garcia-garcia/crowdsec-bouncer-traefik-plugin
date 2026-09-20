@@ -52,7 +52,7 @@ func redisEngine(red *redis) engine {
 	}
 }
 
-// Store is one DecisionStore incarnation: intern table, Range membership, and the decision engine.
+// Store is intern table, Range membership, and the decision engine for one Client.
 type Store struct {
 	engine          engine
 	mem             *memory

@@ -4,7 +4,7 @@
 
 **Reclaim key**:
 The Open key this plugin passes to reclaim for one `lapi.Client`. Stream/alone `SessionKey` is `lapi:stream:` plus `SessionHex` (mode + LAPI scheme/host/path + lapiKey, CAPI in alone). Live/none `Key` is `lapi:` plus the same `SessionHex` plus a hash of the identity payload (Redis store params and `MetricsUpdateIntervalSeconds`). `IdentityHex` stays exported; it is not the live Open suffix.
-_Avoid_: middleware name, outbound IP, IdentityHex as the stream or live Open key, Bouncer, CrowdsecConnection, AppSec host, StoreKey as the Client string, Redis hash on the stream Open key
+_Avoid_: middleware name, outbound IP, IdentityHex as the stream or live Open key, Bouncer, CrowdsecConnection, AppSec host, Redis hash on the stream Open key
 
 ## Overview
 
@@ -33,15 +33,15 @@ lapiClient, err := lapi.OpenStream(ctx, cfg, log, name, pluginVersion)
 - `pkg/lapi/identity.go`
 - `pkg/lapi/client.go`
 - `pkg/lapi/sessionresidue.go`
-- `pkg/lapi/liveholders.go`
-- `pkg/lapi/decisionstore.go` (`StoreKey` helper, `newChildStore`)
+- `pkg/lapi/livemiddlewarenames.go`
+- `pkg/lapi/decisionstore.go` (`newChildStore`)
 - `pkg/decisionstore/store.go`
 
 ## Gotchas
 
 - Do not put middleware name, outbound IP, `next`, templates, trusted IPs, Enabled, AppSec host/key/TLS/body limit, LAPI failure action, Redis fail-closed, live-cache TTL, `StreamStartupBlock`, `HTTPTimeoutSeconds`, `CrowdsecLapiHTTPTimeoutSeconds`, `CrowdsecAppsecHTTPTimeoutSeconds`, `CaptchaSiteverifyHTTPTimeoutSeconds`, CAPI scenarios, `updateMaxFailure`, `decisionScopeHeaders`, Redis store parameters, or the three LAPI TLS fields in the stream Client Open key. Stream `SessionKey` also omits intervals. Live/none `Key` keeps Redis and `MetricsUpdateIntervalSeconds` so write-once tickers stay per Client.
 - Do not hash Redis into stream `SessionKey`. Isolated CrowdSec backends need a second bouncer key (or a different LAPI host), not a second ticker on the same row.
-- `StoreKey` is a composition helper only. Do not Open it as a sibling reclaim value. Redis logical keys stay under `SessionHex`.
+- Redis logical keys stay under `SessionHex`. Do not Open a sibling DecisionStore reclaim value.
 - Upgrade: SessionHex stays. Existing Redis keys stay reachable. Only the in-process Client Open string changes. No Redis key migration.
 - Do not parse `RemoteAddr` for client address. Do not fold Open-key composition into `core_plugin_lapi_connection` (that leaf is replaceable transport).
 - Do not call `Peek` / `PeekLivePrefix` to find a sibling or retitle a sleeper. Do not fail `New` on session-owned mismatch. Do not log `ignored` INFO for those knobs (WARN is this packet).

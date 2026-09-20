@@ -78,12 +78,12 @@ func copyStrings(in []string) []string {
 }
 
 // stringSlicesEqual is element-wise equality (Yaegi: do not import slices).
-func stringSlicesEqual(a, b []string) bool {
-	if len(a) != len(b) {
+func stringSlicesEqual(residue, joiner []string) bool {
+	if len(residue) != len(joiner) {
 		return false
 	}
-	for i := range a {
-		if a[i] != b[i] {
+	for i := range residue {
+		if residue[i] != joiner[i] {
 			return false
 		}
 	}

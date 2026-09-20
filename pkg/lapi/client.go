@@ -56,11 +56,11 @@ type Client struct {
 	metricsInterval      int64
 	updateMaxFailure     int64
 	crowdsecStreamRoute  string
-	decisionScopeHeaders map[string]string // write-once first-create residue; not the live union
-	sessionKey           string            // reclaim SessionKey (stream/alone) or Key (live/none)
-	sessionResidue       sessionResidue    // create-time session-owned knobs for subscribe WARN
-	liveHeaderScopes     liveHeaderScopes  // live constructor ctx → normalized header scopes
-	liveHolders          liveHolders       // live constructor ctx → Traefik middleware name
+	decisionScopeHeaders map[string]string   // write-once first-create residue; not the live union
+	sessionKey           string              // reclaim SessionKey (stream/alone) or Key (live/none)
+	sessionResidue       sessionResidue      // create-time session-owned knobs for subscribe WARN
+	liveHeaderScopes     liveHeaderScopes    // live constructor ctx → normalized header scopes
+	liveMiddlewareNames  liveMiddlewareNames // live constructor ctx → Traefik middleware name
 
 	transport     atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
 	decisionStore *decisionstore.Store
@@ -243,14 +243,14 @@ func (c *Client) logInfo(msg, reason string, extra ...any) {
 	c.log.Info(msg, args...)
 }
 
-// registerHolder records this New ctx’s Traefik name and drops it when ctx is Done.
-func (c *Client) registerHolder(ctx context.Context, name string) {
+// registerLiveMiddlewareName records this New ctx’s Traefik name and drops it when ctx is Done.
+func (c *Client) registerLiveMiddlewareName(ctx context.Context, middlewareName string) {
 	c.mu.Lock()
-	c.liveHolders.register(ctx, name)
+	c.liveMiddlewareNames.register(ctx, middlewareName)
 	c.mu.Unlock()
 	context.AfterFunc(ctx, func() {
 		c.mu.Lock()
-		c.liveHolders.unregister(ctx)
+		c.liveMiddlewareNames.unregister(ctx)
 		c.mu.Unlock()
 	})
 }
@@ -262,12 +262,12 @@ func (c *Client) warnIgnoredSessionOwned(cfg *configuration.Config) {
 		return
 	}
 	c.mu.Lock()
-	names := c.liveHolders.distinctNames()
+	middlewareNames := c.liveMiddlewareNames.distinctNames()
 	c.mu.Unlock()
 	c.log.Warn(MsgSessionOwnedIgnored,
 		"sessionKey", c.sessionKey,
 		"ignoredFields", ignored,
-		"holderNames", names,
+		"middlewareNames", middlewareNames,
 		"isolation", msgIsolationNeedsSecondKey,
 	)
 }

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// TestPrepare_DisabledRedisSkipsPasswordFile is leftover RedisCachePasswordFile must not load or hash into StoreKey while Redis is off.
+// TestPrepare_DisabledRedisSkipsPasswordFile is leftover RedisCachePasswordFile must not load while Redis is off.
 func TestPrepare_DisabledRedisSkipsPasswordFile(t *testing.T) {
 	passwordFile := filepath.Join(t.TempDir(), "redis-password")
 	if err := os.WriteFile(passwordFile, []byte("stale-secret"), 0o600); err != nil {
@@ -22,14 +22,6 @@ func TestPrepare_DisabledRedisSkipsPasswordFile(t *testing.T) {
 	}
 	if staleFileDisabled.RedisCachePassword != "" {
 		t.Fatalf("disabled Redis must not load RedisCachePasswordFile, got %q", staleFileDisabled.RedisCachePassword)
-	}
-
-	emptyPasswordDisabled := testStreamConfig("lapi.example:8080", 1)
-	emptyPasswordDisabled.RedisCacheEnabled = false
-	emptyPasswordDisabled.RedisCachePassword = ""
-	emptyPasswordDisabled.RedisCachePasswordFile = ""
-	if StoreKey(staleFileDisabled) != StoreKey(emptyPasswordDisabled) {
-		t.Fatal("disabled Redis leftover password file must not change StoreKey")
 	}
 }
 

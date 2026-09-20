@@ -103,7 +103,7 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	if openErr != nil {
 		return nil, openErr
 	}
-	replaced, adoptErr := finishBind(ctx, client, cfg, middlewareName, created)
+	replaced, adoptErr := adoptRegisterAndWarn(ctx, client, cfg, middlewareName, !created)
 	if adoptErr != nil {
 		return nil, adoptErr
 	}
@@ -124,7 +124,7 @@ func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, 
 	if openErr != nil {
 		return nil, openErr
 	}
-	replaced, adoptErr := finishBind(ctx, client, cfg, middlewareName, created)
+	replaced, adoptErr := adoptRegisterAndWarn(ctx, client, cfg, middlewareName, !created)
 	if adoptErr != nil {
 		return nil, adoptErr
 	}
@@ -159,14 +159,14 @@ func openClient(ctx context.Context, bindKey string, cfg *configuration.Config, 
 	return client, created, nil
 }
 
-// finishBind adopts transport, records the holder name, and WARNs session-owned mismatch on join/Wake.
-func finishBind(ctx context.Context, client *Client, cfg *configuration.Config, middlewareName string, created bool) (bool, error) {
+// adoptRegisterAndWarn adopts transport, records the middleware name, and WARNs session-owned mismatch on join/Wake.
+func adoptRegisterAndWarn(ctx context.Context, client *Client, cfg *configuration.Config, middlewareName string, reused bool) (bool, error) {
 	replaced, adoptErr := client.AdoptTransport(cfg)
 	if adoptErr != nil {
 		return false, adoptErr
 	}
-	client.registerHolder(ctx, middlewareName)
-	if !created {
+	client.registerLiveMiddlewareName(ctx, middlewareName)
+	if reused {
 		client.warnIgnoredSessionOwned(cfg)
 	}
 	return replaced, nil

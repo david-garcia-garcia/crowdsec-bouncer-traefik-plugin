@@ -40,29 +40,17 @@ func testLiveConfig(updateInterval int64) *configuration.Config {
 	}
 }
 
-func TestStoreKey_IgnoresPollerKnobsAndHeaders(t *testing.T) {
+func TestStorePrefix_SessionHexIgnoresPollerKnobsAndHeaders(t *testing.T) {
 	base := testStreamConfig("lapi.example:8080", 1)
 	interval := testStreamConfig("lapi.example:8080", 1)
 	interval.UpdateIntervalSeconds = 30
 	headers := testStreamConfig("lapi.example:8080", 1)
 	headers.DecisionScopeHeaders = map[string]string{"username": "X-User"}
-	if StoreKey(base) != StoreKey(interval) {
-		t.Fatal("store key must ignore updateIntervalSeconds")
+	if SessionHex(base) != SessionHex(interval) {
+		t.Fatal("Redis key prefix must ignore updateIntervalSeconds")
 	}
-	if StoreKey(base) != StoreKey(headers) {
-		t.Fatal("store key must ignore decisionScopeHeaders")
-	}
-}
-
-func TestStoreKey_DifferentRedisHostsIsolate(t *testing.T) {
-	redisA := testStreamConfig("lapi.example:8080", 1)
-	redisA.RedisCacheEnabled = true
-	redisA.RedisCacheHost = "redis-a:6379"
-	redisB := testStreamConfig("lapi.example:8080", 1)
-	redisB.RedisCacheEnabled = true
-	redisB.RedisCacheHost = "redis-b:6379"
-	if StoreKey(redisA) == StoreKey(redisB) {
-		t.Fatal("different redis hosts must be different stores")
+	if SessionHex(base) != SessionHex(headers) {
+		t.Fatal("Redis key prefix must ignore decisionScopeHeaders")
 	}
 }
 
