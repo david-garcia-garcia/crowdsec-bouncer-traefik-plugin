@@ -6,7 +6,7 @@ JobName: 2026-09-20-elapsedsec-liveslot
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-20T05:59:30Z |
 | explore | [x] | [x] | 2026-09-20T06:01:49Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [x] | 2026-09-20T06:03:03Z |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |

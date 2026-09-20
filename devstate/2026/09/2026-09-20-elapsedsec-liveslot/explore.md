@@ -31,8 +31,8 @@ Elapsed seconds since a process epoch fit in int32 (~68 years). Bias 2 keeps `0`
   By: explore
 
 - Q: How is `PublishTick(now)` typed so callers cannot mix wall Unix with elapsed slots?
-  Decision: assumed — change `Store.PublishTick` and the engine from `int64` to `int32`; stream apply and tests call `elapsedNow()` (or `PublishTick(0)`). No named `Elapsed` type unless implement hits a remaining mix-up.
-  By: explore
+  Decision: resolved — change `Store.PublishTick` and the engine from `int64` to `int32`; stream apply and tests call elapsed `now()` (or `PublishTick(0)`). No named `Elapsed` type unless implement hits a remaining mix-up.
+  By: propose
 
 - Q: Who owns the origin seed (package `init`, Store, or reclaim)?
   Decision: resolved — package `init` write-once `originUnix` in `pkg/decisionstore`. Not reclaim (clock is process wall time, not a store incarnation). Not `New` (per router). Intern table stays per-Store.
