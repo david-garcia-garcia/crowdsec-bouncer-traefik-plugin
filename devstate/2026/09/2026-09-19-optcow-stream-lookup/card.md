@@ -1,4 +1,4 @@
-Developer review: needs changes — 2026-09-20T04:11:51.297Z
+Developer review: needs changes — 2026-09-20T04:14:10.847Z
 
 ## What this changes
 
@@ -28,11 +28,11 @@ sequenceDiagram
 
 ## Merge readiness
 
-Usage docs produced (35c34cd4). One RETHINK comment stays `[ ]` until pullrequest Reply. CI is in progress on 3c17d396. 2 items remain.
+OpenSpec change archived to `openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/`. One RETHINK comment stays `[ ]` until pullrequest Reply. CI is in progress on 15a81f52. 2 items remain.
 
 Priority: P2 — stream/alone memory lookup cost and Redis/cache coupling on master, with no operator config change required.
 
-Reviewed head: 3c17d396
+Reviewed head: 15a81f52
 
 Owner decision: None.
 
@@ -41,7 +41,7 @@ Owner decision: None.
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 1/6 | Open RETHINK `[ ]` blocks review resolution |
-| CI proof | 3/6 | In progress on 3c17d396 — [Race detector](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488523351/job/106019196815), [Main Process](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488523351/job/106019196690) queued |
+| CI proof | 3/6 | In progress on 15a81f52 — [Main Process](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488621475/job/106019470272), [Race detector](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488621475/job/106019470088) |
 | Local tests proof | N/A | Remote `prHost`; CI proof covers remote |
 | Review resolution | 1/6 | `comments.md` RETHINK `chat-store-split` still `[ ]` |
 
@@ -50,28 +50,28 @@ Owner decision: None.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-19-optcow-stream-lookup pushed | `git` / PR #118 → master |
-| OpenSpec | 2026-09-19-optcow-stream-lookup | `openspec/changes/2026-09-19-optcow-stream-lookup/` |
+| OpenSpec | 2026-09-19-optcow-stream-lookup archived | `openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/118 | GitHub |
-| CI | build 35488523351 in_progress [Race detector](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488523351/job/106019196815); Main Process queued | GitHub check runs |
+| CI | build 35488621475 in_progress [Main Process](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488621475/job/106019470272) | GitHub check runs |
 | Local tests | passed | handoff.yaml `localTests: passed` (`go test` on decisionstore/lapi/bouncer/decisionscope) |
 | PR comments | 1 open | `comments.md` RETHINK `chat-store-split` |
 
 ## Specs
 
-- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — added
-- [core_cache_client_decision-store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
-- [core_cache_client_isolated-store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
-- [core_cache_redis_utilities-client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
-- [core_plugin_lapi_stream-lease](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
-- [core_plugin_lapi_stream-apply](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
-- [core_plugin_decisions_scopes](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
-- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
-- [core_plugin_lapi_stream-single-flight](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
-- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
-- [core_plugin_middleware_captcha-routing](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
-- [std_go_logger_debug-attrs](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
-- [build_ci_github_module-path](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/proposal.md) — added
+- [core_cache_client_decision-store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_cache_client_isolated-store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_cache_redis_utilities-client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_lapi_stream-lease](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_lapi_stream-apply](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_decisions_scopes](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_lapi_stream-single-flight](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_middleware_captcha-routing](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [std_go_logger_debug-attrs](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [build_ci_github_module-path](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/proposal.md) — modified
 
 ## Follow-up issues
 
@@ -79,7 +79,7 @@ None.
 
 ## How this fits together
 
-Ticket `2026-09-19-optcow-stream-lookup` is branch `2026-09-19-optcow-stream-lookup` on PR #118 to `master`. Devdocs impact produced; CI is in progress on 3c17d396.
+Ticket `2026-09-19-optcow-stream-lookup` is branch `2026-09-19-optcow-stream-lookup` on PR #118 to `master`. Change archived; CI is in progress on 15a81f52.
 
 ## Decision needed
 
@@ -90,6 +90,7 @@ None.
 - [x] [P2] Six-axis hard findings applied (f92c8573)
 - [x] [P2] Human product fixes: no nil-store Close; utilities v1.0.5 (6842765a)
 - [x] [P3] Usage docs: `core_plugin_decisionstore.md`; cache/lease packets removed (35c34cd4)
+- [x] [P3] Catalog synced; change archived at `openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/` (e08b8ba9)
 - [ ] Close RETHINK `chat-store-split` after pullrequest Reply
 - [ ] Green CI on reviewed head
 
@@ -115,7 +116,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 13 modified | Same list as ## Specs |
 | Open reviewer comments walked | 1 FIX / 0 ANSWER / 1 open | Unanswered RETHINK is merge risk |
-| Reviewed head | 3c17d396cf5adcc1069f216843aeb5301e9156c6 | Card matches measured branch |
+| Reviewed head | 15a81f522b34b5afc355b65bc31d1913a8c3f9b2 | Card matches measured branch |
 
 ### Stored data model
 
@@ -137,8 +138,9 @@ What I checked:
 - Six-axis Status after apply (run-root `codereview_*.md`, 5936ac7a)
 - Product apply `f92c8573` (leftover drop, live sweep, Pack delete, coverage tests)
 - Human pins `6842765a` (no nil-store Close; utilities v1.0.5)
-- GitHub check runs on 3c17d396 (in_progress)
+- GitHub check runs on 15a81f52 (in_progress)
 - Usage packets produced (`knowledge/devdocs/core_plugin_decisionstore.md`, 35c34cd4)
+- Catalog archive `e08b8ba9` (`openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/`)
 
 ### Rank-up moves
 

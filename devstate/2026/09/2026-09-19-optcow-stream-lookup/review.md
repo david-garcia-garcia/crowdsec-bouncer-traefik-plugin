@@ -46,3 +46,9 @@ phase: devdocsimpact
 findings: 10 stale-usage / language-gap (cache bag, lease, leftover)
 fixed: created core_plugin_decisionstore.md; deleted cache/lease packets; updated apply, single-flight, metrics, scopes, reclaim, middleware, debug-attrs (35c34cd4)
 skipped: none
+
+## archive (2026-09-20)
+phase: archive
+findings: catalog synced; REMOVED cache/lease leaves; added core_plugin_decisionstore_store
+fixed: validate-spec-map --write + verify + validate-artifact-names OK; moved to openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup (e08b8ba9)
+skipped: none
