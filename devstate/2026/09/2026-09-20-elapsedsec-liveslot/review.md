@@ -33,3 +33,9 @@ phase: codereview
 findings: Standards 7 (6 done, 1 skipped judgement), Spec 1, Test coverage 2; Security/Performance/Dead none
 fixed: trail comments, elapsedExpiresAt rename, wall step-back and duration-zero memory tests (00b0fa5c)
 skipped: Standards item 7 ExpiresAt rename (judgement)
+
+## devdocsimpact (2026-09-20T06:13:30Z)
+phase: devdocsimpact
+findings: language-gap + 2 stale-usage on DecisionStore and stream apply
+fixed: core_plugin_decisionstore.md, core_plugin_lapi_stream-apply.md
+skipped: none

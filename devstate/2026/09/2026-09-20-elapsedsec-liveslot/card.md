@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-20T06:11:00Z
+Developer review: in progress — 2026-09-20T06:13:30Z
 
 IssueKey: 2026-09-20-elapsedsec-liveslot
 JobName: 2026-09-20-elapsedsec-liveslot
@@ -10,7 +10,7 @@ JobName: 2026-09-20-elapsedsec-liveslot
 
 **Admin users.** None.
 
-**Developers.** Versus `master`, memory `LiveSlot` is `{uint32,int32}` with elapsed-second `ExpiresAt`, package-init clock and `ElapsedNow()` in `pkg/decisionstore`, and `PublishTick(int32)` from stream apply and memory sweeps; Redis TTL paths unchanged.
+**Developers.** Versus `master`, memory `LiveSlot` is `{uint32,int32}` with elapsed-second `ExpiresAt`, package-init clock and `ElapsedNow()` in `pkg/decisionstore`, and `PublishTick(int32)` from stream apply and memory sweeps; devdocs now document the elapsed slot clock and stream-apply defer; Redis TTL paths unchanged.
 
 **End users.** None.
 
@@ -34,27 +34,27 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Codereview complete on reviewed head; devdocs-impact, archive, and pullrequest phases remain. CI not yet measured on latest push.
+Devdocs-impact complete; archive and pullrequest phases remain. CI not yet measured on latest push.
 
 Priority: P3 — internal memory layout and correctness; no current operator or end-user harm once merged.
-Reviewed head: fd6cbe50
+Reviewed head: 4763ed3a
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3 | Local tests passed; CI not seen on fd6cbe50 |
-| CI proof | 1 | Pushed fd6cbe50; check status not seen on PR #121 |
-| Local tests proof | N/A | Remote PR; CI proof applies |
+| Overall readiness | 3 | Local tests passed; CI not seen on 4763ed3a |
+| CI proof | 1 | Pushed; check status not seen on PR #121 |
+| Local tests proof | N/A | Remote PR |
 | Review resolution | 6 | No PR review comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-20-elapsedsec-liveslot pushed | origin tracking |
-| OpenSpec | compact-liveslot-elapsedsec | openspec/changes/compact-liveslot-elapsedsec |
+| OpenSpec | compact-liveslot-elapsedsec (live) | openspec/changes/compact-liveslot-elapsedsec |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/121 | GitHub |
-| CI | not seen | PR check status empty on fd6cbe50 |
+| CI | not seen | PR checks |
 | Local tests | passed | handoff.yaml |
 | PR comments | no comments | comments: none |
 
@@ -66,14 +66,14 @@ Owner decision: None.
 None.
 
 ## How this fits together
-Local ticket → branch from `origin/master` → PR #121 → six-axis review closed at fd6cbe50 → devdocs-impact next.
+Local ticket → PR #121 → devdocs updated for DecisionStore and stream apply → archive next.
 
 ## Decision needed
 None.
 
 ## Before merge
-- [x] [P3] Six-axis codereview (hard/wrong done; one Standards judgement skipped)
-- [ ] [P3] Devdocs-impact, archive, pullrequest phases
+- [x] [P3] Devdocs-impact (elapsed clock Language + stream-apply snippet)
+- [ ] [P3] OpenSpec archive and pullrequest phases
 - [ ] [P3] CI green on PR #121
 
 ## Findings
@@ -94,10 +94,10 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Fold into decisionstore store leaf |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | comments: none |
-| Reviewed head | fd6cbe50165e40058754542179f000d16e1c16b4 | Pin origin/master...HEAD excluding devstate |
+| Reviewed head | 4763ed3a | Pin origin/master...HEAD excluding devstate |
 
 ### Stored data model
-- Changed: memory map value `LiveSlot` / field `ExpiresAt` — int32 elapsed seconds — sample `1735689600` (wall Unix int64 on master) → `42` (elapsed since package origin). Upgrade: rewritten on next stream or live Put; in-memory only.
+- Changed: memory map value `LiveSlot` / field `ExpiresAt` — int32 elapsed seconds — sample wall Unix int64 on master → elapsed since package origin. Upgrade: rewritten on next stream or live Put; in-memory only.
 
 ### Technical review
 Best possible solution: Elapsed int32 slots with one package clock and int32 PublishTick matches explore and requirement versus `master` int64 wall encoding.
@@ -108,9 +108,8 @@ Is this the best way to solve the issue? Yes — eight-byte slots without a seco
 
 ### Evidence
 What I checked:
-- Pin `origin/master...HEAD` excluding devstate/.cursor (fd6cbe50)
-- Six-axis files under devstate; hard/wrong items Status done
-- `go test ./pkg/decisionstore/... ./pkg/lapi/...` passed (handoff.yaml)
+- `devdocs-impact.md` three stale/language findings produced
+- Updated `core_plugin_decisionstore.md` and `core_plugin_lapi_stream-apply.md`
 
 ### Rank-up moves
 None.
