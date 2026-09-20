@@ -1,16 +1,21 @@
 ## ADDED Requirements
 
-### Requirement: Stream and alone lookup uses one Client entry
-When `crowdsecMode` is stream or alone, the bouncer SHALL resolve remediation through one `lapi.Client` stream lookup method that delegates to the DecisionStore stream store and Range membership. It MUST NOT call `UsesLiveSnapshot`, MUST NOT branch between live snapshot and cached lookup, and MUST NOT duplicate merge semantics in the bouncer. Live and none modes SHALL keep their existing cached and live lookup paths unchanged.
+### Requirement: Live stream and alone lookup uses one Store entry
+When `crowdsecMode` is live, stream, or alone, the bouncer SHALL resolve memoized remediation through one `lapi.Client.LookupRemediation` that delegates to `Store.LookupRemediation`. It MUST NOT call `UsesLiveSnapshot`, MUST NOT branch between a live snapshot and a cache Client, and MUST NOT duplicate merge semantics in the bouncer. Stream and alone miss SHALL fall through to stream-healthy / failure-action. Live miss SHALL call `LiveLookup`, which returns `(kind, origin, error)` fields. None mode SHALL call `LiveLookup` every request (no memo read).
 
-#### Scenario: Stream mode does not branch on snapshot flag
+#### Scenario: Stream mode uses Store lookup
 - **WHEN** a stream bouncer handles a request and the DecisionStore is memory-backed
-- **THEN** remediation is resolved through the Client stream lookup method only
+- **THEN** remediation is resolved through `LookupRemediation` only
 
 #### Scenario: Stream mode Redis uses the same entry
 - **WHEN** a stream bouncer handles a request and the DecisionStore is Redis-backed
-- **THEN** remediation is resolved through the same Client stream lookup method
+- **THEN** remediation is resolved through the same `LookupRemediation`
 
-#### Scenario: Live mode unchanged
-- **WHEN** `crowdsecMode` is live or none
-- **THEN** the bouncer does not call the stream lookup method for the primary remediation check
+#### Scenario: Live memo then LiveLookup
+- **WHEN** `crowdsecMode` is live and the Store misses
+- **THEN** the bouncer calls `LiveLookup` and remediates from kind and origin fields
+
+#### Scenario: None mode skips Store memo
+- **WHEN** `crowdsecMode` is none
+- **THEN** the bouncer does not use a Store hit as the primary remediation check
+- **AND** it calls `LiveLookup` for kind and origin

@@ -1,52 +1,43 @@
 ## Context
 
-See `proposal.md` — the branch currently implements OptCOW as `DecisionStore` live map plus `Client.liveTick` apply branching and bouncer `UsesLiveSnapshot`. Explore locked the replacement: one stream store on `DecisionStore`, backend picked at open, `Client` never holds tick scratch or mode flags. Reclaim key and Traefik `New` ctx holder stay as in `core_plugin_lapi_reclaim-key` / `core_cache_client_decision-store`.
+The apply deleted `pkg/cache` and folded Redis, Range, live/none memo, pack, and membership onto `pkg/decisionstore.Store`. Live/none memo is Store `Put`/`Lookup`, not a second store type. Stream lease (`Acquire` / `updated`) is gone: in-process pollers are single-flight; distinct pods use distinct LAPI+IP rows.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- `streamStore` interface (name may vary) on `DecisionStore`: `Put`, `Delete`, `BeginTick`, `PublishTick`, `LookupRemediation` (or equivalent) for stream/alone Ip and header keys only.
-- `redisStreamStore`: Put/Delete → `cache.Client` with existing stream TTL; lookup uses Get/GetInt + leftover rules as today on Redis; tick methods no-op.
-- `memoryStreamStore`: one `atomic.Value` of `map[string]liveSlot{word uint32, expiresAt int64}`; tick clone → apply deleted/new → expiry sweep → single `Store`; lookup `Load` + one probe per Ip/header key; skip Range when Ip probe is ban.
-- `lapi.Client`: `storeStreamDecision` / `deleteStreamDecision` always call store; `LookupStreamRemediation(remoteIP, ipAddr, scopes)` delegates to `decisionStore` stream store + `RangeMembership()`.
-- Bouncer: stream/alone always `LookupStreamRemediation`; live/none unchanged (`LookupCachedRemediation` / live path).
-- Intern overflow: `Table` Warn + pack kind-only (id 0); no `Leftover` on `liveSlot`; no GetMany on memory stream lookup.
-- Remove: `liveTick`, `publishLiveTick`, `UsesLiveSnapshot`, `livesnapshot.go` bolt-on, bouncer mode branch.
-- Benchmarks vs `origin/master` for delivery card.
+- Specs describe the landed Store: engine funcs bound at `NewMemory`/`NewRedis` (`memoryEngine`/`redisEngine`), not a backend interface and not `if mem` / `if red` on every method. A constructed Store always has those callbacks; methods do not nil-check `s` or the funcs. Close twice is tested on a real Redis store only. Utilities pin is `traefik-middleware-utilities` v1.0.5 (published vendor; do not re-patch `iplookup/helper.go`).
+- Memory: `map[string]uint32` + `map[string]int64` (always non-nil); tick clone → apply → expiry sweep → publish. Live `Put` copy-on-write onto published maps when no tick is open.
+- Redis: SimpleRedis writer + optional readers inside `pkg/decisionstore`. `nextReader` never retries the writer when readers exist. SET/DEL are void (log and return). Miss vs unreachable are `store:miss` / `store:unreachable`.
+- Intern: `[]string` + `map[string]uint16`. Empty name is id 0. Overflow does not wrap: Warn, pack origin id 0 (generic empty intern name). No leftover strings on Redis.
+- Encoding: memory pack word `uint32(kind[0]) | uint32(id)<<8`. Redis slot and Range payload: `KindOriginString` = kind + newline + origin (bare kind when origin empty). Range blob: `cidr=kind` then origin on the next newline line.
+- Lookup: `Store.LookupRemediation` for stream/alone and live/none. Unexported `lookupHits` / `lookupKeys` in `decisionstore`. Ban on Ip skips Range membership. `HeaderScopeKey` / `IPCacheKey` live in `decisionstore`.
+- `decisionscope` owns letters, `PreferRemediation`, `RequestScopeValues`, `StreamScopeList`, `Normalize*`, `RemediationKind` (first letter only).
+- Live LAPI returns `(kind, origin, error)` fields; no concat-then-split.
+- Yaegi-safe: no map-holding types in interfaces; `atomic.Value` only `*RangeMembership` and `string`.
 
 **Non-Goals:**
 
-- Patricia merge, live/none on memory map, Redis GetMany removal, Helper /32 stuffing, changing `origin/HEAD`.
+- Reintroducing `pkg/cache`, stream lease, leftover `\x1f`, a `liveStore` type, a named-returns checker, or splitting `lapi` into `lapitransport`/`lapimetrics`/`lapisource`.
+- Patricia merge. Changing GitHub `origin/HEAD`.
 
 ## Decisions
 
-1. **Interface location:** `streamStore` as a private interface field on `DecisionStore`, constructed in `OpenDecisionStore` when `PacksMemory()` vs Redis-backed — avoids exporting another package type and keeps reclaim ownership obvious.
-   - *Alternative:* methods directly on `DecisionStore` — rejected to keep Redis/memory files separable and testable.
-
-2. **Redis tick API:** `BeginTick`/`PublishTick` exist on the interface but are no-ops for Redis so `fetchAndApplyStreamDecisions` has one code path.
-   - *Alternative:* type assert to memory-only ticker — rejected (Client would branch on store kind).
-
-3. **Lookup owner:** `decisionscope` provides merge logic (Ip + headers + Range, ban wins) invoked from memory/redis store lookup and from `Client.LookupStreamRemediation`; live/none keep `LookupCachedRemediation`.
-   - *Alternative:* duplicate merge in `pkg/lapi` — rejected (one job, one owner).
-
-4. **Key strings:** Reuse `IPCacheKey` / `HeaderScopeKey` and bouncer `req.remoteIP` — no second IP map or re-parse (`explore` lock).
-
-5. **Range locks:** No utilities change; immutable hydrate snapshots + vendor `RLock` on `Contains` satisfies requirement.
-
-6. **Implement strategy:** Delete/replace bolt-on files (`livesnapshot.go`, Client fields, decisionstore live map on wrong layer if duplicated) rather than layering on branch code.
+1. **One Store, two engines.** Dispatch is funcs bound at construct. Rejected: backend interface (Yaegi panics on map-holding types in interfaces); per-method `if mem`/`if red`.
+2. **No liveStore.** Live/none memo uses the same `Put`/`Lookup` as stream/alone (memory writes published maps when not ticking).
+3. **No leftover path.** Overflow is Warn + origin id 0 on both engines. Redis stores `KindOriginString`, never U+001F leftover.
+4. **No stream lease.** Pollers on one Client do not overlap (single-flight). Distinct processes are distinct CrowdSec rows (LAPI+IP). Redis replicas hydrate Range from `range-index`.
+5. **Range membership on Store.** `atomic.Value` holds `*RangeMembership`. Hydrate from the blob; skip rebuild when the blob string is unchanged.
 
 ## Risks / Trade-offs
 
-- **[Risk] Large replace diff on an already-implemented branch** → Mitigation: tasks ordered store → apply → lookup → bouncer → delete bolt-on; tests per layer.
-- **[Risk] Redis and memory lookup diverge subtly** → Mitigation: shared merge helper; scenarios in `core_plugin_decisions_scopes` delta; bench both backends where cheap.
-- **[Risk] Overflow without leftover loses origin name on memory** → Mitigation: explicit spec scenario; matches existing overflow metrics posture (Warn, kind-only).
+- **[Risk] Catalog still names `pkg/cache` until archive Sync** → Mitigation: change deltas are source of truth; archive folds/removes catalog leaves.
+- **[Risk] Redis replica lag vs memory publish** → Mitigation: request lookup never retries writer; miss is miss. Same as previous `nextReader` rule.
 
 ## Migration Plan
 
-- No Redis key migration; memory stops writing stream Ip/header into TTL heap — cold restart rebuilds from stream.
-- Operators: none; deploy replaces in-process implementation only.
+- No Redis key migration for the lease (`updated` is gone). Range blob spelling changes to `cidr=kind` plus optional origin line; cold stream rebuilds from LAPI. Operators: deploy replaces in-process implementation.
 
 ## Open Questions
 
-None — explore open items resolved in propose (interface on `DecisionStore`, Redis no-op ticks, Client lookup entry, overflow Warn).
+None — explore and implement locked the Store surface.
