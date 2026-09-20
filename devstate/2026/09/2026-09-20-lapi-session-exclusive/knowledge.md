@@ -5,3 +5,7 @@
 - updated knowledge/research/ext_crowdsec_lapi_stream-cursor/
 - updated knowledge/devdocs/core_plugin_lapi_stream-single-flight.md
 - updated knowledge/devdocs/core_plugin_decisionstore.md
+- updated knowledge/devdocs/index_core_plugin.md
+- updated knowledge/devdocs/core_plugin_lapi_reclaim-key.md
+- updated knowledge/devdocs/std_go_reclaim.md
+- updated knowledge/devdocs/core_plugin_middleware.md
