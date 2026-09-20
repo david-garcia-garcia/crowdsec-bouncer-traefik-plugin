@@ -8,7 +8,7 @@ destBranch: master
 qualify: qualified-with-gaps
 src: 6e16b7cda2dc603a30090000fdc7ceea3bd8cc11dc1b818772935f8ea30700da
 localTests: passed
-lastProductSha: 584ff695
+lastProductSha: f92c8573
 requirement: requirement.md
 comments: comments.md
 explore: explore.md
