@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-20T18:27:58Z
+Developer review: in progress — 2026-09-20T18:30:19Z
 
 ## What this changes
 **Operators.** None.
@@ -26,17 +26,17 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Six-axis review closed (hard findings applied; judgement skipped). Local tests passed; CI still running on head `9b0c56a4`. 1 item remains (wait for CI).
+Devdocs impact: none remaining (implement packets already cover DecisionStore, usage-metrics, stream-apply). Local tests passed; CI still running on head `547d9ddc`. 1 item remains (wait for CI).
 
 Priority: P2 — real operator RSS pain at large stream sets, with a workaround of keeping the extra map
-Reviewed head: 9b0c56a4
+Reviewed head: 547d9ddc
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI still running on the review head |
-| CI proof | 3/6 | in progress — [run 35529057487](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35529057487) and [run 35529057492](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35529057492) |
+| Overall readiness | 3/6 | CI still running on the impact head |
+| CI proof | 3/6 | in progress — [run 35529231828](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35529231828) and [run 35529231905](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35529231905) |
 | Local tests proof | N/A | `localTests: passed`; remote CI covers proof |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -46,7 +46,7 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-20-store-active-decisions-gauge pushed | `git` `origin/2026-09-20-store-active-decisions-gauge` |
 | OpenSpec | store-owned-active-decisions-gauge | `openspec/changes/store-owned-active-decisions-gauge/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/129 | pr-host List |
-| CI | build 35529057487 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35529057487 | pr-host CI |
+| CI | build 35529231828 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35529231828 | pr-host CI |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | comments: none |
 
@@ -58,7 +58,7 @@ Owner decision: Required. See Decision needed.
 - [ ] [Range active_decisions forget after dropping the slot map](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-store-active-decisions-gauge/knowledge/debt/2026-09-20-range-active-decisions-forget.md) — Range is a blob + LPM trees, not a slot Peek; omit Range from the store-owned gauge until ApplyRangeBatch displacements.
 
 ## How this fits together
-Local ticket `2026-09-20-store-active-decisions-gauge` is on branch `2026-09-20-store-active-decisions-gauge` targeting `master`, PR 129, code review closed, CI in progress.
+Local ticket `2026-09-20-store-active-decisions-gauge` is on branch `2026-09-20-store-active-decisions-gauge` targeting `master`, PR 129, usage packets already match the apply, CI in progress.
 
 ## Decision needed
 | Question | Decision | By |
@@ -69,7 +69,8 @@ Local ticket `2026-09-20-store-active-decisions-gauge` is on branch `2026-09-20-
 - [x] Move `active_decisions` group-by onto DecisionStore and drop the reporter slot maps
 - [x] Park Range forget debt
 - [x] Apply hard code-review findings (metrics snapshot comment; `TestOpenDecisionStore_CountActiveFromMode`)
-- [ ] [P2] Wait for CI on head `9b0c56a4`
+- [x] Confirm usage packets (DecisionStore, usage-metrics, stream-apply) match the apply
+- [ ] [P2] Wait for CI on head `547d9ddc`
 
 ## Findings
 None.
@@ -89,7 +90,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs; do not paste diff --stat |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 9b0c56a495a0d2b9e9a0cd92c296456e5b4683fc | Card must match the branch you measured |
+| Reviewed head | 547d9ddc66e753147b928640421949db3d19174e | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -103,10 +104,10 @@ Is this the best way to solve the issue? Yes — count at the store mutation ins
 
 ### Evidence
 What I checked:
-- Six-axis files under the run root; no `Status: open` remains
-- Hard findings applied: metrics snapshot comment; `TestOpenDecisionStore_CountActiveFromMode`
-- Judgement skipped: duplicated increment/decrement wrappers; Redis canonicalKeys helper; exported `OriginID`; Redis live no-increment
-- CI in progress on runs 35529057487 (Main Process, Race detector success) and 35529057492 (e2e: go+dragonfly success, binary+mock success, docker+pester in progress)
+- Pin `origin/master...HEAD` excluding `devstate/` and `.cursor`
+- Units DecisionStore, LAPI usage-metrics, Stream apply; packets already have Active counts, reporter snapshot, remember/forget removed
+- `devdocs-impact.md` findings none; no produce this phase
+- CI in progress on runs 35529231828 (Main Process, Race detector) and 35529231905 (e2e: go+dragonfly success; binary and docker in progress)
 
 ### Rank-up moves
 None.

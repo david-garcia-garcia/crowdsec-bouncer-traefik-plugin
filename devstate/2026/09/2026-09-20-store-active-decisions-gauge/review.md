@@ -29,3 +29,9 @@ phase: codereview
 findings: Standards 3, Spec none, Security none, Performance none, Dead 1, Coverage 2; no Status:open
 fixed: metrics snapshot comment; TestOpenDecisionStore_CountActiveFromMode
 skipped: increment/decrement wrappers; Redis canonicalKeys helper; OriginID; Redis live no-increment
+
+## devdocsimpact (2026-09-20)
+phase: devdocsimpact
+findings: none
+fixed: none
+skipped: none (packets already produced in implement)
