@@ -6,7 +6,7 @@ Action: note
 
 ## Why this follow-up
 
-This change ships an ad-hoc `Peek(key) (any, State, bool)` on vendored `traefik-middleware-utilities/reclaim/table.go` and re-exports it from `pkg/reclaim`. Published utilities at this plugin’s pin (`v1.0.6`) still have no Peek. `.github/workflows/main.yml` runs `go mod vendor` with `git diff --exit-code ./vendor/` commented out, so the patch survives today’s CI. A later uncomment, a catalog/Yaegi load that does not use this `vendor/`, or a pin bump that restores the published tree, drops Peek and exclusive-name detection cannot compile.
+This change ships an ad-hoc `Peek(key) (any, State, bool)` on vendored `traefik-middleware-utilities/reclaim/table.go` and re-exports it from `pkg/reclaim`. Published utilities at this plugin’s pin (`v1.0.6`) still have no Peek. Main Process `go mod vendor` restores that published tree and makes `Default().Peek` fail typecheck. This change comments that vendor step out so CI typechecks the committed vendor Peek. A later uncomment, a catalog/Yaegi load that does not use this `vendor/`, or a pin bump that restores the published tree, drops Peek and exclusive-name detection cannot compile.
 
 ## Why it was not taken
 
@@ -18,4 +18,4 @@ A `go mod vendor` that restores published reclaim removes Peek and exclusive LAP
 
 ## Context
 
-Workaround this change ships: exact Peek on `vendor/github.com/david-garcia-garcia/traefik-middleware-utilities/reclaim/table.go` plus `pkg/reclaim` re-export. No `PeekLivePrefix`. No fork of the whole table into `pkg/reclaim`. Upstream: add Peek to `github.com/david-garcia-garcia/traefik-middleware-utilities/reclaim`, bump the pin, then drop the vendor-only method. CI: re-enable vendor git-diff only after the published module includes Peek.
+Workaround this change ships: exact Peek on `vendor/github.com/david-garcia-garcia/traefik-middleware-utilities/reclaim/table.go` plus `pkg/reclaim` re-export, and Main Process skips `go mod vendor` so lint uses that committed tree. No `PeekLivePrefix`. No fork of the whole table into `pkg/reclaim`. Upstream: add Peek to `github.com/david-garcia-garcia/traefik-middleware-utilities/reclaim`, bump the pin, then drop the vendor-only method. CI: re-enable `go mod vendor` and vendor git-diff only after the published module includes Peek.
