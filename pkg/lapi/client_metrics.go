@@ -72,7 +72,7 @@ func newMetricsReporter(client *Client, startedAt time.Time) *MetricsReporter {
 		pluginVersion:                 client.pluginVersion,
 		startedAt:                     startedAt,
 		crowdsecMode:                  client.crowdsecMode,
-		query:                         client.crowdsecQueryBackground,
+		query:                         client.crowdsecQuery,
 		originName:                    client.OriginName,
 		log:                           client.log,
 		windowCounters:                make(map[usageMetricKey]int64),

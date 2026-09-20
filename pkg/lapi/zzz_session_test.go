@@ -282,6 +282,59 @@ func TestOpenStream_SleepingRedisHostDoesNotOverlapPollers(t *testing.T) {
 	}
 }
 
+func TestOpenStream_NewClientKeepsStoreStreamFlags(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	server, hits := testStreamLAPI(t)
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := slog.Default()
+	firstCfg := testStreamConfig(parsed.Host, 1)
+	firstCfg.RedisCacheHost = "redis-a:6379"
+	first, err := OpenStream(context.Background(), firstCfg, log, "reload", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := first.decisionStore
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && store.StreamReady() == 0 {
+		time.Sleep(time.Millisecond)
+	}
+	if store.StreamReady() == 0 {
+		t.Fatal("first poll must mark streamReady")
+	}
+	for time.Now().Before(deadline) && store.StreamPollInFlight() != 0 {
+		time.Sleep(time.Millisecond)
+	}
+	hitsBeforeHold := atomic.LoadInt64(hits)
+	if !store.TryBeginStreamPoll() {
+		t.Fatal("store poll CAS")
+	}
+	secondCfg := testStreamConfig(parsed.Host, 1)
+	secondCfg.RedisCacheHost = "redis-b:6379"
+	second, err := OpenStream(context.Background(), secondCfg, log, "reload", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == second {
+		t.Fatal("Redis host change must Open a new Client")
+	}
+	if second.decisionStore != store {
+		t.Fatal("new Client must keep the same store")
+	}
+	if store.StreamReady() == 0 || store.StreamPollInFlight() == 0 {
+		t.Fatal("new Client must not zero store streamReady or streamPollInFlight")
+	}
+	second.handleStreamTicker()
+	if atomic.LoadInt64(hits) != hitsBeforeHold {
+		t.Fatal("Wake/New poll must skip while the store CAS is held")
+	}
+	store.EndStreamPoll()
+}
+
 func TestOpenStream_DifferentRedisIsolatesClientKeepsStore(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })

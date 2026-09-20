@@ -88,3 +88,23 @@ func TestOpenLogsStartedAtInfo(t *testing.T) {
 		t.Fatalf("reclaim_put must stay DEBUG:\n%s", logged)
 	}
 }
+
+func TestStore_StreamPollCAS(t *testing.T) {
+	store := NewMemory(nil)
+	if !store.TryBeginStreamPoll() {
+		t.Fatal("first enter")
+	}
+	if store.TryBeginStreamPoll() {
+		t.Fatal("second enter must skip")
+	}
+	if store.StreamPollInFlight() == 0 {
+		t.Fatal("held")
+	}
+	store.EndStreamPoll()
+	if store.StreamPollInFlight() != 0 {
+		t.Fatal("released")
+	}
+	if !store.TryBeginStreamPoll() {
+		t.Fatal("reenter")
+	}
+}

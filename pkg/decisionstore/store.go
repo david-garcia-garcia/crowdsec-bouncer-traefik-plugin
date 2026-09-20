@@ -65,10 +65,13 @@ type Store struct {
 	rangeMembership atomic.Value // *RangeMembership
 	lastRangeIndex  atomic.Value // string of the blob last used to build membership
 	createdBy       string       // Traefik New name from the create that first put this store
-	streamReady     int64        // 1 after the first finished stream poll; atomic.LoadInt64/StoreInt64
-	log             *slog.Logger
-	reclaimKey      string
-	engineName      string
+	// streamReady and streamPollInFlight own the CrowdSec cursor and the applied
+	// cache for this session, not this HTTP client. A reincarnated Client must not zero them.
+	streamReady        int64 // 1 after the first finished stream poll; atomic.LoadInt64/StoreInt64
+	streamPollInFlight int64 // 1 while a stream GET+apply is in flight; session-scoped skip
+	log                *slog.Logger
+	reclaimKey         string
+	engineName         string
 }
 
 // NewMemory is in-process COW slots and an in-process Range blob.
@@ -138,6 +141,22 @@ func (s *Store) StreamReady() int64 {
 // MarkStreamReady records that a stream poll finished successfully.
 func (s *Store) MarkStreamReady() {
 	atomic.StoreInt64(&s.streamReady, 1)
+}
+
+// TryBeginStreamPoll is the session-scoped skip: enter when no poll owns the
+// CrowdSec cursor+applied cache. It does not wait and does not cancel Do.
+func (s *Store) TryBeginStreamPoll() bool {
+	return atomic.CompareAndSwapInt64(&s.streamPollInFlight, 0, 1)
+}
+
+// EndStreamPoll releases the session-scoped poll skip after GET+apply (or failure).
+func (s *Store) EndStreamPoll() {
+	atomic.StoreInt64(&s.streamPollInFlight, 0)
+}
+
+// StreamPollInFlight is non-zero while a stream GET+apply owns this session.
+func (s *Store) StreamPollInFlight() int64 {
+	return atomic.LoadInt64(&s.streamPollInFlight)
 }
 
 // BeginTick opens the write window for one stream poll. Memory clones published into tick.
