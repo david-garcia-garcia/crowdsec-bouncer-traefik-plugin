@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-20T05:51:43Z
+Developer review: in progress — 2026-09-20T05:57:45Z
 
 ## What this changes
 **Operators.** In this Traefik instance, one LAPI key is one stream ticker and one usage-metrics window. Redis and interval disagreements are ignored, not isolated. Isolation still needs a second bouncer API key. WARN names ignored fields and who joined whom.
@@ -24,10 +24,10 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Six-axis review applied hard findings; local tests passed; remote CI still in progress. 3 items remain.
+Usage packets caught up (`middlewareNames`, `newChildStore`); local tests passed; remote CI still in progress. 2 items remain.
 
 Priority: P2 — real operator pain (stolen stream deltas / second metrics window) with a workaround (second API key)
-Reviewed head: 0a8291fe
+Reviewed head: cb5f047d
 Owner decision: Required. See Decision needed.
 
 ## Review scores
@@ -58,7 +58,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, PR 119. Hard review findings applied at 0a8291fe. Next is usage-doc impact.
+Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, PR 119. Usage docs produced. Next is archive.
 
 ## Decision needed
 | Question | Decision | By |
@@ -88,7 +88,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 0a8291fe | Card must match the branch you measured |
+| Reviewed head | cb5f047d7a8ca5dfbfc13accf7b90eff1b7e44e1 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -102,7 +102,8 @@ Is this the best way to solve the issue? Yes vs DestBranch: match LAPI physics; 
 
 ### Evidence
 What I checked:
-- Six-axis files under the run root; hard/wrong items Status done (0a8291fe)
+- Usage packets: middlewareNames / newChildStore (cb5f047d)
+- Six-axis files; hard/wrong items Status done (0a8291fe)
 - `go test ./pkg/lapi ./pkg/decisionstore ./pkg/bouncer .` passed
 - CI in progress on PR 119
 
