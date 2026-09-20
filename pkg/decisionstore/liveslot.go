@@ -14,8 +14,8 @@ type LiveSlot struct {
 }
 
 var (
-	originUnix  int64
-	lastElapsed int64 // wall elapsed seconds; monotonic for slot comparisons
+	originUnix  int64 //nolint:gochecknoglobals // process-wide memory slot clock origin at init
+	lastElapsed int64 //nolint:gochecknoglobals // monotonic elapsed seconds for slot comparisons
 )
 
 // init fixes origin at wall Unix minus two so elapsed 0 stays the PublishTick skip sentinel.
@@ -45,7 +45,7 @@ func elapsedNow() int32 {
 	if wallElapsed > math.MaxInt32 {
 		return math.MaxInt32
 	}
-	return int32(wallElapsed)
+	return int32(wallElapsed) //nolint:gosec // G115 capped above MaxInt32
 }
 
 // expiryFromDuration is saturated elapsed ExpiresAt from CrowdSec duration seconds.
@@ -57,7 +57,7 @@ func expiryFromDuration(durationSec int64) int32 {
 	if elapsedExpiresAt > math.MaxInt32 {
 		return math.MaxInt32
 	}
-	return int32(elapsedExpiresAt)
+	return int32(elapsedExpiresAt) //nolint:gosec // G115 saturated into [1, MaxInt32]
 }
 
 // LiveSlotFromPack builds a slot from a packed word and CrowdSec duration seconds.
