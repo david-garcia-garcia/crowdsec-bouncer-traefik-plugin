@@ -1,0 +1,49 @@
+# Review
+
+## prepare (2026-09-20T15:27:35Z)
+phase: prepare
+findings: none
+fixed: none
+skipped: none
+qualify: qualified-with-gaps
+pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/124
+
+## explore (2026-09-20T15:38:20Z)
+phase: explore
+findings: DestBranch share-and-join, StoreKey Redis hash, NewRequest-without-context, New Client startup=1, spec forbids Peek all reproduced; same-Client Wake overlapping GET not reproduced (CAS)
+fixed: none (think-only)
+skipped: propose not started; Peek types assumed (Awake/Asleep); vendor Peek debt noted
+qualify: qualified-with-gaps
+pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/124
+
+## propose (2026-09-20T15:48:00Z)
+phase: propose
+findings: apply-ready OpenSpec `lapi-session-exclusive`; seven folds (reclaim-key, context-lease, decisionstore_store, query-round-trip, connection, stream-single-flight, middleware_bouncer); no `core_plugin_reclaim`
+fixed: none (design-only)
+skipped: implement not started; Peek types / busy / empty name remain assumed
+qualify: qualified-with-gaps
+pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/124
+
+## implement (2026-09-20T16:44:39Z)
+phase: implement
+findings: human correction dropped Client IO cancel; stream skip moved onto DecisionStore streamPollInFlight
+fixed: deleted ioCtx/NewRequestWithContext; store CAS skip; localTests passed
+skipped: CI still in progress on 5779763a
+qualify: qualified-with-gaps
+pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/124
+
+## codereview (2026-09-20T17:16:11Z)
+phase: codereview
+findings: Dead 1 hard StreamPollInFlight test-only getter; other axes none
+fixed: deleted StreamPollInFlight; CAS tests use TryBeginStreamPoll skip/reenter
+skipped: none
+qualify: qualified-with-gaps
+pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/124
+
+## archive (2026-09-20T17:22:06Z)
+phase: archive
+findings: five folds synced; Sleep/Wake INFO kept on DecisionStore engine requirement
+fixed: catalog + archive/2026-09-20-lapi-session-exclusive; validators OK
+skipped: FindSpecHost re-run (propose already folded all five)
+qualify: qualified-with-gaps
+pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/124

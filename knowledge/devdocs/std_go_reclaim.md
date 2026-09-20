@@ -6,13 +6,18 @@
 A process table that stores one value per key while any bound constructor context is live, plus a short grace after the last holder so Traefik reload can reuse the incarnation.
 _Avoid_: `sync.Once`, process singleton, middleware-name key
 
+**Peek**:
+A look at one reclaim slot that does not bind a holder, Wake, or stop grace. Returns `(value, Awake|Asleep, ok)`. `ok=false` for missing, gone, or busy; do not wait.
+_Avoid_: `PeekLivePrefix`, `View`, a table fork, using Peek to retitle a sleeper
+
 ## Overview
 
-`pkg/reclaim` is a thin shim over traefik-middleware-utilities `reclaim` (`Default`, `ProcessGrace` 30s, `Open` / `OpenWithHooks`, `ResetForTest` / `ResetForTestWith`). Call `reclaim.Open` / `OpenWithHooks` with a context that ends when the caller no longer wants the value — in `plugin.go` that is a `context.WithCancel` child of Traefik’s `New` ctx, not the ctx itself, because the table has no Release and a constructor that fails later has to hand the holder back somehow. Pass `reclaim.Hooks` as funcs (Yaegi v0.16 panics on asserting a foreign concrete type). Do not take `OpenTyped` (it still takes `func() (any, Hooks, error)`). Do not use `*Wrapped` or `OpenWithGrace`. Do not export or call `Peek` / `PeekLivePrefix` / `View`.
+`pkg/reclaim` is a thin shim over traefik-middleware-utilities `reclaim` (`Default`, `ProcessGrace` 30s, `Open` / `OpenWithHooks`, exact `Peek`, `ResetForTest` / `ResetForTestWith`). Call `reclaim.Open` / `OpenWithHooks` with a context that ends when the caller no longer wants the value — in `plugin.go` that is a `context.WithCancel` child of Traefik’s `New` ctx, not the ctx itself, because the table has no Release and a constructor that fails later has to hand the holder back somehow. Pass `reclaim.Hooks` as funcs (Yaegi v0.16 panics on asserting a foreign concrete type). Do not take `OpenTyped` (it still takes `func() (any, Hooks, error)`). Do not use `*Wrapped` or `OpenWithGrace`. Export and call exact `Peek` (`Peek(key) (any, State, bool)`). Do not export or call `PeekLivePrefix` / `View`.
 
 ## How to use
 
 - `reclaim.OpenWithHooks(ctx, key, logger, create)` on the process table. Last holder `Sleep()`s; Open during grace `Wake()`s.
+- Exact `Peek(key)` before Open when the caller must fail a foreign owner without binding. `ok=false` means miss, gone, or busy — then Open. Do not wait on busy.
 - LAPI Client and AppSec Client create return the concrete client plus Hooks. Tests that need the same incarnation use pointer equality on the `Open` return.
 - Process table grace is 30s (`ProcessGrace`). Tests that need zero/short grace call `ResetForTestWith`.
 - `create` runs only for a first put or after grace Close.

@@ -45,13 +45,14 @@ func (c *Client) startStream(config *configuration.Config, log *slog.Logger) err
 	return nil
 }
 
-// handleStreamTicker runs one stream poll unless another poll is already in flight.
+// handleStreamTicker runs one stream poll unless the store already owns a poll.
+// Skip is session-scoped on DecisionStore (cursor+applied cache), not this Client.
 func (c *Client) handleStreamTicker() {
-	if !atomic.CompareAndSwapInt64(&c.streamPollInFlight, 0, 1) {
+	if c.decisionStore == nil || !c.decisionStore.TryBeginStreamPoll() {
 		c.log.Warn("handleStreamTicker:skip", "sessionKey", c.sessionKey, "reason", "inFlight")
 		return
 	}
-	defer atomic.StoreInt64(&c.streamPollInFlight, 0)
+	defer c.decisionStore.EndStreamPoll()
 
 	started := time.Now()
 	startup := c.streamStartup()
@@ -103,6 +104,7 @@ func (c *Client) handleStreamCache() error {
 		"fetches", atomic.LoadInt64(&c.streamFetches),
 	)
 	atomic.StoreInt64(&c.isCrowdsecStreamStartup, 0)
+	c.decisionStore.MarkStreamReady()
 	return nil
 }
 

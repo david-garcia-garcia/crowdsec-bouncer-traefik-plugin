@@ -3,12 +3,12 @@
 ## Language
 
 **Stream single-flight**:
-The intra-instance skip-if-busy guard so one Client runs at most one `handleStreamTicker` at a time.
-_Avoid_: queueing mutex, `atomic.Pointer[T]`, `atomic.Bool`, `atomic.Int64`, a second `select`+timer loop
+The session-scoped skip-if-busy guard so one DecisionStore runs at most one stream GET+apply at a time. It owns the CrowdSec cursor and the applied cache, not this HTTP client.
+_Avoid_: Client IO cancel context, queueing mutex, `atomic.Pointer[T]`, `atomic.Bool`, `atomic.Int64`, a second `select`+timer loop
 
 ## Overview
 
-`handleStreamTicker` enters with `CompareAndSwapInt64` on `streamPollInFlight` and releases with `defer StoreInt64`. A busy tick is dropped. The same guard covers the stream ticker, `startStream`'s async first poll, and `Wake`. Startup, healthy, and update-failure are `int64` fields published with `LoadInt64` / `StoreInt64` so `StreamHealthy` and `streamQuery` can run on the request path. Specs: `core_plugin_lapi_stream-single-flight`. There is no stream lease; every tick that wins the CAS GETs stream.
+`handleStreamTicker` enters with `TryBeginStreamPoll` on the DecisionStore and releases with `defer EndStreamPoll`. A busy tick is dropped. The same guard covers the stream ticker, `startStream`'s async first poll, and `Wake`. `streamReady` and `streamPollInFlight` live on the store; a reincarnated Client must not zero them. Client startup, healthy, and update-failure stay `int64` fields on Client so `StreamHealthy` and `streamQuery` can run on the request path. Specs: `core_plugin_lapi_stream-single-flight`. There is no stream lease; every tick that wins the CAS GETs stream. Do not cancel the in-flight `Do` (LAPI already advanced `stream_cursor`).
 
 ## How to use
 
@@ -22,19 +22,20 @@ _Avoid_: queueing mutex, `atomic.Pointer[T]`, `atomic.Bool`, `atomic.Int64`, a s
 ## Pattern snippet
 
 ```go
-if !atomic.CompareAndSwapInt64(&c.streamPollInFlight, 0, 1) {
+if c.decisionStore == nil || !c.decisionStore.TryBeginStreamPoll() {
 	return
 }
-defer atomic.StoreInt64(&c.streamPollInFlight, 0)
+defer c.decisionStore.EndStreamPoll()
 ```
 
 ## Key files
 
 - `pkg/lapi/client_stream.go`
+- `pkg/decisionstore/store.go`
 - `pkg/lapi/client.go`
-- `pkg/lapi/client_decisions.go`
 
 ## Gotchas
 
 - Single-flight is the only skip. A dropped tick does not GET stream and does not apply. It logs `handleStreamTicker:skip` at WARN.
-- `Sleep` and `Close` only signal the ticker. They do not wait for an in-flight GET. `Wake` must hit the same CAS.
+- `Sleep` and `Close` only signal the ticker. They do not wait for an in-flight GET and MUST NOT cancel it. `Wake` must hit the same store CAS.
+- Cancelling a stream GET after LAPI wrote the body loses those deltas (`ext_crowdsec_lapi_stream-cursor`).

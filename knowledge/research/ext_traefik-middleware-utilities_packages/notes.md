@@ -4,7 +4,8 @@
 
 - Module: `github.com/david-garcia-garcia/traefik-middleware-utilities` (Go 1.21).
 - Packages live at repo root as `reclaim/` and `simpleredis/`, not under `pkg/`.
-- Latest tag: `v1.0.3` = `950b08de86b6fd9ea68ac1d205e17a379ec60522` (same pin as this finding’s clone).
+- This plugin’s `go.mod` / `vendor/modules.txt` pin: `v1.0.6`. Vendored `reclaim/table.go` at that pin still has `Open` / `OpenWithHooks` / `Reset` only. No `Peek`, `PeekLivePrefix`, or `View`. Unexported `items` and `slotState` (`slotBusy`, `slotAwake`, `slotAsleep`, `slotGone`) are still the only awake/asleep facts; a different package cannot Peek without a table method.
+- 2026-09-17 clone for this folder: tag `v1.0.3` = `950b08de86b6fd9ea68ac1d205e17a379ec60522`. Peek absence was already true there. Do not treat that tag as this plugin’s pin.
 
 ## reclaim API (upstream v1.0.3)
 

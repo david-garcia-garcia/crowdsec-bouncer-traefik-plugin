@@ -25,6 +25,7 @@ const (
 	OriginPluginTechStreamFail    = "plugin:tech_streamfail"    // stream unhealthy
 	OriginPluginLapiFailure       = "plugin:lapi_failure"       // live LAPI lookup error
 	OriginPluginAppsecFailure     = "plugin:appsec_failure"     // AppSec failure-action
+	OriginPluginForcedDecision    = "plugin:forced_decision"    // crowdsecDecisionHeader forced b or c
 )
 
 // crowdsecQueryFunc POSTs through the Client's current LAPI transport.
@@ -54,7 +55,7 @@ type MetricsReporter struct {
 	activeCounts     func() map[decisionstore.ActiveCountKey]int64
 }
 
-// newMetricsReporter snapshots write-once URL and envelope scalars and binds query to crowdsecQuery.
+// newMetricsReporter snapshots write-once URL and envelope scalars and binds query to Background POST.
 func newMetricsReporter(client *Client, startedAt time.Time) *MetricsReporter {
 	reporter := &MetricsReporter{
 		scheme:         client.crowdsecScheme,

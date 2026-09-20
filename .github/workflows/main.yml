@@ -68,7 +68,10 @@ jobs:
           git diff --exit-code go.mod
           # git diff --exit-code go.sum
           go mod download
-          go mod vendor
+          # Keep committed vendor (ad-hoc reclaim Peek). go mod vendor restores
+          # published utilities v1.0.6 which has no Peek. Re-enable with vendor
+          # git-diff after upstream Peek: knowledge/debt/2026-09-20-upstream-reclaim-peek.md
+          # go mod vendor
           # git diff --exit-code ./vendor/
 
       - name: Lint

@@ -102,7 +102,7 @@ func TestNew_SuccessfulConstructorKeepsItsHolder(t *testing.T) {
 	}
 	held := testRoute(t, first).LapiClient()
 
-	second, err := New(ctx, testNextOK(), cfgLiveAt(u.Host), "holder-join")
+	second, err := New(ctx, testNextOK(), cfgLiveAt(u.Host), "holder")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestNew_SuccessfulConstructorKeepsItsHolder(t *testing.T) {
 
 	cancel()
 	time.Sleep(150 * time.Millisecond)
-	third, err := New(context.Background(), testNextOK(), cfgLiveAt(u.Host), "holder-after-cancel")
+	third, err := New(context.Background(), testNextOK(), cfgLiveAt(u.Host), "holder")
 	if err != nil {
 		t.Fatal(err)
 	}

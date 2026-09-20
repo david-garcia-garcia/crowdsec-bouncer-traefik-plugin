@@ -82,7 +82,7 @@ services:
       
       # Strict bouncer middleware for testing blocks
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000001"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.crowdseclapihost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.loglevel=DEBUG"
@@ -115,7 +115,7 @@ services:
       
       # Captcha-enabled bouncer middleware
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000002"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.crowdseclapihost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.loglevel=DEBUG"
@@ -149,7 +149,7 @@ services:
       
       # Disabled bouncer middleware
       - "traefik.http.middlewares.bouncer-disabled.plugin.bouncer.enabled=false"
-      - "traefik.http.middlewares.bouncer-disabled.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-disabled.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000010"
       - "traefik.http.middlewares.bouncer-disabled.plugin.bouncer.loglevel=DEBUG"
 
   # Test service - remediation headers
@@ -166,7 +166,7 @@ services:
       
       # Bouncer middleware with custom remediation header
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000003"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.crowdseclapihost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.loglevel=DEBUG"
@@ -234,7 +234,7 @@ services:
       - "traefik.http.routers.redis-cache.middlewares=bouncer-redis-cache@docker"
       - "traefik.http.services.redis-cache.loadbalancer.server.port=80"
       - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.crowdseclapikey=c51a1c7000000000000000000000000e"
       - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.crowdseclapihost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.loglevel=DEBUG"
@@ -259,7 +259,7 @@ services:
       - "traefik.http.routers.redis-cache-hold.middlewares=bouncer-redis-cache-hold@docker"
       - "traefik.http.services.redis-cache-hold.loadbalancer.server.port=80"
       - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.crowdseclapikey=c51a1c7000000000000000000000000f"
       - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.crowdseclapihost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.loglevel=DEBUG"
@@ -282,14 +282,14 @@ services:
       - "traefik.http.routers.trusted.middlewares=bouncer-trusted@docker"
       - "traefik.http.services.trusted.loadbalancer.server.port=80"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.crowdseclapikey=c51a1c7000000000000000000000000d"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.crowdseclapihost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.crowdsecmode=stream"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.updateintervalseconds=5"
-      # Same LAPI key as /stream: one ticker (warn-and-wire). Metrics=1 so usage-metrics tests
-      # still POST within 20s whichever middleware Traefik constructs first (default is 600).
+      # Own LAPI key so exclusive DecisionStore New succeeds next to /stream. Metrics=1 so
+      # usage-metrics tests still POST within 20s (default is 600).
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.metricsupdateintervalseconds=1"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.clienttrustedips=172.19.0.10/32"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
@@ -307,7 +307,7 @@ services:
       - "traefik.http.routers.custom-ban.middlewares=bouncer-custom-ban@docker"
       - "traefik.http.services.custom-ban.loadbalancer.server.port=80"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000004"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.crowdseclapihost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.loglevel=DEBUG"
@@ -353,7 +353,7 @@ services:
       - "traefik.http.routers.appsec.middlewares=bouncer-appsec@docker"
       - "traefik.http.services.appsec.loadbalancer.server.port=80"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000005"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.crowdseclapihost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.loglevel=DEBUG"
@@ -397,7 +397,7 @@ services:
       - "traefik.http.routers.lapi-fail-pass.middlewares=bouncer-lapi-fail-pass@docker"
       - "traefik.http.routers.lapi-fail-pass.service=coverage"
       - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000011"
       - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.crowdseclapihost=crowdsec:9"
       - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.httptimeoutseconds=2"
       - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.loglevel=DEBUG"
@@ -424,7 +424,7 @@ services:
       - "traefik.http.routers.waf-fail-ban.middlewares=bouncer-waf-fail-ban@docker"
       - "traefik.http.routers.waf-fail-ban.service=coverage"
       - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000006"
       - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.crowdseclapihost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.httptimeoutseconds=2"
       - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.loglevel=DEBUG"
@@ -440,7 +440,7 @@ services:
       - "traefik.http.routers.waf-fail-pass.middlewares=bouncer-waf-fail-pass@docker"
       - "traefik.http.routers.waf-fail-pass.service=coverage"
       - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000007"
       - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.crowdseclapihost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.httptimeoutseconds=2"
       - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.loglevel=DEBUG"
@@ -456,7 +456,7 @@ services:
       - "traefik.http.routers.status-429.middlewares=bouncer-status-429@docker"
       - "traefik.http.routers.status-429.service=coverage"
       - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000008"
       - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.crowdseclapihost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.loglevel=DEBUG"
@@ -470,7 +470,7 @@ services:
       - "traefik.http.routers.short-captcha.middlewares=bouncer-short-captcha@docker"
       - "traefik.http.routers.short-captcha.service=coverage"
       - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000009"
       - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.crowdseclapihost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.loglevel=DEBUG"
@@ -501,7 +501,7 @@ services:
       - "traefik.http.routers.bot-detection.middlewares=bouncer-bot@docker"
       - "traefik.http.services.bot-detection.loadbalancer.server.port=80"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.crowdseclapikey=c51a1c7000000000000000000000000a"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.crowdseclapihost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.loglevel=DEBUG"
@@ -528,10 +528,30 @@ services:
       # Minimal collections for testing
       COLLECTIONS: "crowdsecurity/traefik crowdsecurity/appsec-crs-inband crowdsecurity/appsec-bot-challenge"
       CUSTOM_HOSTNAME: "crowdsec-test"
-      # Test bouncer key
+      # Fixture keys. Exclusive DecisionStore New allows one Traefik name per
+      # SessionHex (mode + LAPI URL + key). Reuse 40796d93 only where mode or
+      # host already differs (/whoami none, /stream stream, /live live,
+      # /lapi-fail-ban none on crowdsec:9, /waf-only appsec). Sibling names
+      # on the same SessionHex get their own BOUNCER_KEY_*.
       BOUNCER_KEY_TRAEFIK_TEST: "40796d93c2958f9e58345514e67740e5"
-      # Separate stream session so scopes=ip,range,country does not share the default key
       BOUNCER_KEY_TRAEFIK_SCOPES: "a1b2c3d4e5f60718293a4b5c6d7e8f90"
+      BOUNCER_KEY_STRICT: "c51a1c70000000000000000000000001"
+      BOUNCER_KEY_CAPTCHA: "c51a1c70000000000000000000000002"
+      BOUNCER_KEY_REMEDIATION_HEADERS: "c51a1c70000000000000000000000003"
+      BOUNCER_KEY_CUSTOM_BAN: "c51a1c70000000000000000000000004"
+      BOUNCER_KEY_APPSEC: "c51a1c70000000000000000000000005"
+      BOUNCER_KEY_WAF_FAIL_BAN: "c51a1c70000000000000000000000006"
+      BOUNCER_KEY_WAF_FAIL_PASS: "c51a1c70000000000000000000000007"
+      BOUNCER_KEY_STATUS_429: "c51a1c70000000000000000000000008"
+      BOUNCER_KEY_SHORT_CAPTCHA: "c51a1c70000000000000000000000009"
+      BOUNCER_KEY_BOT: "c51a1c7000000000000000000000000a"
+      BOUNCER_KEY_SCOPE_NONE: "c51a1c7000000000000000000000000b"
+      BOUNCER_KEY_HEADER_NONE: "c51a1c7000000000000000000000000c"
+      BOUNCER_KEY_TRUSTED: "c51a1c7000000000000000000000000d"
+      BOUNCER_KEY_REDIS_CACHE: "c51a1c7000000000000000000000000e"
+      BOUNCER_KEY_REDIS_CACHE_HOLD: "c51a1c7000000000000000000000000f"
+      BOUNCER_KEY_DISABLED: "c51a1c70000000000000000000000010"
+      BOUNCER_KEY_LAPI_FAIL_PASS: "c51a1c70000000000000000000000011"
       # Disable aggressive collections that cause 150k decision issue
       DISABLE_COLLECTIONS: "crowdsecurity/iptables crowdsecurity/linux crowdsecurity/sshd"
       # Enable debugging

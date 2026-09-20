@@ -66,7 +66,6 @@ type Client struct {
 	isCrowdsecStreamStartup int64
 	isCrowdsecStreamHealthy int64
 	updateFailure           int64
-	streamPollInFlight      int64
 	streamStop              chan bool
 	metricsStop             chan bool
 	metricsReporter         *MetricsReporter
@@ -114,6 +113,11 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		return nil, errors.New("decision store is required")
 	}
 
+	startup := int64(1)
+	if store.StreamReady() != 0 {
+		startup = 0
+	}
+
 	client := &Client{
 		crowdsecMode:            config.CrowdsecMode,
 		crowdsecScheme:          config.CrowdsecLapiScheme,
@@ -130,7 +134,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		sessionKey:              reclaimSessionKey(config),
 		log:                     log,
 		pluginVersion:           pluginVersion,
-		isCrowdsecStreamStartup: 1,
+		isCrowdsecStreamStartup: startup,
 		isCrowdsecStreamHealthy: 1,
 		decisionStore:           store,
 	}
@@ -156,6 +160,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 // Close stops tickers and idle LAPI HTTP. Safe to call more than once.
 // Remaining usage-metrics are POSTed to LAPI before HTTP is torn down.
 // Does not Close the shared DecisionStore; only the store's reclaim Close hook does.
+// Does not cancel an in-flight stream GET; that poll may finish apply after Close starts.
 func (c *Client) Close() {
 	c.mu.Lock()
 	if c.closed {
@@ -182,6 +187,7 @@ func (c *Client) Close() {
 
 // Sleep stops stream and metrics tickers and keeps HTTP, the DecisionStore, and the LAPI
 // cursor. Reclaim calls this when the last constructor ctx is gone. Not Close.
+// Does not wait for an in-flight stream GET and does not cancel it.
 // Remaining usage-metrics are POSTed asynchronously so the reclaim table lock is not held on LAPI.
 func (c *Client) Sleep() {
 	c.mu.Lock()

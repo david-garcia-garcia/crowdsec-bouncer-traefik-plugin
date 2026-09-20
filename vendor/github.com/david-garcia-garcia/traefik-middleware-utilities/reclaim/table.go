@@ -425,6 +425,42 @@ func (t *Table) OpenWithHooks(ctx context.Context, key string, logger *slog.Logg
 	}
 }
 
+// State is whether a Peek'd slot is usable now (Awake) or kept for grace (Asleep).
+type State int
+
+const (
+	// Awake means the value is bound to at least one live context.
+	Awake State = iota
+	// Asleep means the last holder is gone and grace has not ended.
+	Asleep
+)
+
+// Peek returns the stored value without binding a holder. ok is false when the key is missing,
+// the slot is gone, or the slot is busy (create/Wake/Sleep/Close in flight). Peek does not wait,
+// increment holders, call Wake, or stop grace. Busy is never returned as a State.
+func (t *Table) Peek(key string) (value any, state State, ok bool) {
+	if t == nil {
+		return nil, 0, false
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.items == nil {
+		return nil, 0, false
+	}
+	incarnation, mapped := t.items[key]
+	if !mapped {
+		return nil, 0, false
+	}
+	switch incarnation.state {
+	case slotAwake:
+		return incarnation.value, Awake, true
+	case slotAsleep:
+		return incarnation.value, Asleep, true
+	default:
+		return nil, 0, false
+	}
+}
+
 // put runs create for a slot this Open registered, then publishes the value or the failure to
 // every caller waiting on that slot. The hooks create returns are the ones stored on this
 // incarnation, so a Sleep or Close hook may close over what create just built.

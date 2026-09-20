@@ -3,7 +3,7 @@
 ## DecisionStore
 priority: normal
 local: core_plugin_decisionstore.md
-description: How LAPI Clients share one Store keyed by CrowdSec cursor plus Redis params.
+description: How LAPI Clients share one Store keyed by CrowdSec cursor SessionHex.
 
 ## Middleware New
 priority: normal
@@ -53,7 +53,7 @@ description: How a shared stream Client unions live routers' header-scope maps f
 ## Stream single-flight
 priority: normal
 local: core_plugin_lapi_stream-single-flight.md
-description: How one Client skips a stream poll that is already running and publishes health atomically.
+description: How one DecisionStore skips a stream poll that is already running and publishes health atomically.
 
 ## Stream apply
 priority: normal
@@ -84,4 +84,9 @@ description: How handleRemediationServeHTTP routes captcha-kind requests after t
 priority: normal
 local: core_plugin_middleware_captcha-siteverify.md
 description: How Validate encodes the provider siteverify request and classifies a JSON success reply.
+
+## Forced decision header
+priority: normal
+local: core_plugin_middleware_forced-decision.md
+description: How a config-named request header forces ban without lookup, or captcha unless a CrowdSec ban wins.
 

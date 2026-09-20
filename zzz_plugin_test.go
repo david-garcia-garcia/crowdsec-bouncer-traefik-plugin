@@ -211,7 +211,7 @@ func TestNew_LAPIUserAgentUsesVersionGo(t *testing.T) {
 	}
 }
 
-func TestNew_SameLapiClientFields_ShareIncarnation(t *testing.T) {
+func TestNew_DifferentNameOnSameLapiFails(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
@@ -225,11 +225,17 @@ func TestNew_SameLapiClientFields_ShareIncarnation(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, err := New(ctx, testNextOK(), cfgLiveAt(u.Host), "alias-b")
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("different Traefik names on the same LAPI session must fail New")
 	}
-	if !testRoute(t, a).SameLapiClient(testRoute(t, b)) {
-		t.Fatal("same LAPI fields and different names must share one lapi.Client")
+	if !strings.Contains(err.Error(), "alias-a") || !strings.Contains(err.Error(), "alias-b") {
+		t.Fatalf("error must name owner and rejected: %v", err)
+	}
+	if b != nil {
+		t.Fatal("failed New must not return a handler")
+	}
+	if testRoute(t, a).LapiClient() == nil {
+		t.Fatal("owner handler must still hold its Client")
 	}
 }
 
@@ -379,7 +385,7 @@ func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
 
 	disabled := cfgLiveAt(u.Host)
 	disabled.Enabled = false
-	hOff, err := New(ctx, testNextOK(), disabled, "off")
+	hOff, err := New(ctx, testNextOK(), disabled, "matrix")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -391,7 +397,7 @@ func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
 
 	trusted := cfgLiveAt(u.Host)
 	trusted.ClientTrustedIPs = []string{"9.9.9.9/32"}
-	hTrust, err := New(ctx, testNextOK(), trusted, "trust")
+	hTrust, err := New(ctx, testNextOK(), trusted, "matrix")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -401,7 +407,7 @@ func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
 		t.Fatalf("trusted IP: got %d", rw.Code)
 	}
 
-	h, err := New(ctx, testNextOK(), cfgLiveAt(u.Host), "live")
+	h, err := New(ctx, testNextOK(), cfgLiveAt(u.Host), "matrix")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -464,11 +470,11 @@ func TestNew_SameStreamKeyDifferentMetrics_SharesConnection(t *testing.T) {
 	slow.MetricsUpdateIntervalSeconds = 600
 
 	ctx := context.Background()
-	owner, err := New(ctx, testNextOK(), fast, "stream-fast")
+	owner, err := New(ctx, testNextOK(), fast, "shared")
 	if err != nil {
 		t.Fatal(err)
 	}
-	joiner, err := New(ctx, testNextOK(), slow, "stream-slow")
+	joiner, err := New(ctx, testNextOK(), slow, "shared")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -492,7 +498,7 @@ func TestNew_StreamIntervalChangeDuringGrace_WakesSameClient(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	firstCfg := cfgStreamAt(u.Host, 60)
 	firstCfg.MetricsUpdateIntervalSeconds = 1
-	first, err := New(ctx, testNextOK(), firstCfg, "stream-old")
+	first, err := New(ctx, testNextOK(), firstCfg, "reload")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -502,7 +508,7 @@ func TestNew_StreamIntervalChangeDuringGrace_WakesSameClient(t *testing.T) {
 
 	reloadCfg := cfgStreamAt(u.Host, 60)
 	reloadCfg.MetricsUpdateIntervalSeconds = 600
-	reloaded, err := New(context.Background(), testNextOK(), reloadCfg, "stream-new")
+	reloaded, err := New(context.Background(), testNextOK(), reloadCfg, "reload")
 	if err != nil {
 		t.Fatal(err)
 	}
