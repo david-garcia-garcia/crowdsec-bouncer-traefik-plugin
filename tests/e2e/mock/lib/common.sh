@@ -161,8 +161,13 @@ assert_body_contains() {
 # --- mock admin client -------------------------------------------------------
 
 lapi_add_decision_at() {
-  local port="$1" ip="$2" type="${3:-ban}" duration="${4:-4h}"
-  curl -sS -X POST "http://127.0.0.1:${port}/admin/decisions?ip=${ip}&type=${type}&duration=${duration}" >/dev/null
+  local port="$1" ip="$2" type="${3:-ban}" duration="${4:-4h}" origin="${5:-crowdsec}" scenario="${6:-}"
+  curl -sS -G -X POST "http://127.0.0.1:${port}/admin/decisions" \
+    --data-urlencode "ip=${ip}" \
+    --data-urlencode "type=${type}" \
+    --data-urlencode "duration=${duration}" \
+    --data-urlencode "origin=${origin}" \
+    --data-urlencode "scenario=${scenario}" >/dev/null
 }
 
 lapi_add_decision() {

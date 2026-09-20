@@ -54,6 +54,7 @@ type Client struct {
 	updateMaxFailure     int64
 	crowdsecStreamRoute  string
 	decisionScopeHeaders map[string]string // write-once first-create residue; not the live union
+	captchaBanOrigins    []string          // first-create residue; not on the Open key
 	sessionKey           string            // reclaim SessionKey (stream/alone) or Key (live/none)
 	liveHeaderScopes     liveHeaderScopes  // live constructor ctx → normalized header scopes
 
@@ -130,6 +131,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		metricsInterval:         config.MetricsUpdateIntervalSeconds,
 		updateMaxFailure:        config.UpdateMaxFailure,
 		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
+		captchaBanOrigins:       copyCaptchaBanOrigins(config.CaptchaBanOrigins),
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		sessionKey:              reclaimSessionKey(config),
 		log:                     log,
