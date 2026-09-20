@@ -1,7 +1,6 @@
 package decisionstore
 
 import (
-	"errors"
 	"testing"
 
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -94,7 +93,7 @@ func TestRedisReplicaMissDoesNotReadWriter(t *testing.T) {
 	defer store.Close()
 	store.Put(Decision{Scope: "Ip", Value: "203.0.113.10", Kind: "t", Origin: "crowdsec", DurationSec: 60})
 	kind, origin, originID, err := store.LookupRemediation("203.0.113.10", nil, nil)
-	if !errors.Is(err, ErrMiss) {
+	if err != nil || kind != "" {
 		t.Fatalf("replica miss must not retry writer, kind %q origin %q id %d err %v", kind, origin, originID, err)
 	}
 }

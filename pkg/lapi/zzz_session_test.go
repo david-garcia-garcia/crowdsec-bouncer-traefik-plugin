@@ -306,7 +306,11 @@ func TestOpenStream_DifferentRedisIsolatesClientAndStore(t *testing.T) {
 		t.Fatal("different Redis must isolate the store")
 	}
 	putBan(redisAClient.decisionStore)
-	if _, getErr := lookupBan(redisBClient.decisionStore); getErr == nil {
+	got, getErr := lookupBan(redisBClient.decisionStore)
+	if getErr != nil {
+		t.Fatalf("store B lookup: %v", getErr)
+	}
+	if got != "" {
 		t.Fatal("ban in store A must miss in store B")
 	}
 }

@@ -44,13 +44,10 @@ func waitRealRedis(addr string, budget time.Duration) error {
 		store := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", "wait")
 		_, _, _, last = store.LookupRemediation("203.0.113.254", nil, nil)
 		store.Close()
-		if errors.Is(last, ErrMiss) {
+		if last == nil {
 			return nil
 		}
 		if time.Now().After(deadline) {
-			if last == nil {
-				return fmt.Errorf("no DecisionStore at %s", addr)
-			}
 			return fmt.Errorf("no DecisionStore at %s: %w", addr, last)
 		}
 		time.Sleep(200 * time.Millisecond)
@@ -72,11 +69,11 @@ func waitMiss(t *testing.T, store *Store, remoteIP string) {
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		kind, _, err := lookupRemediation(store, remoteIP, nil)
-		if errors.Is(err, ErrMiss) {
-			return
-		}
 		if err != nil {
 			t.Fatalf("lookup while waiting for expiry: kind %q err %v", kind, err)
+		}
+		if kind == "" {
+			return
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -331,7 +328,7 @@ func TestRealRedisExpandedRemoteIPMissesCanonicalSlot(t *testing.T) {
 		Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec,
 	})
 	kind, _, _, err := store.LookupRemediation(expandedV6, net.ParseIP(expandedV6), nil)
-	if !errors.Is(err, ErrMiss) {
+	if err != nil || kind != "" {
 		t.Fatalf("expanded remoteIP must miss canonical slot, kind %q err %v", kind, err)
 	}
 	mustKind(t, store, compressedV6, nil, decisionscope.BannedValue, backendOrigin)

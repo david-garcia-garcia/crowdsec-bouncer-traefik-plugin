@@ -207,9 +207,6 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 				b.handleNextServeHTTP(rw, req)
 				return
 			}
-			if errors.Is(lookupErr, decisionstore.ErrMiss) {
-				break
-			}
 			b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "error", lookupErr)
 			b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
 			return

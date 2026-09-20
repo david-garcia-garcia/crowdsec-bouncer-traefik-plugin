@@ -2,7 +2,6 @@ package decisionstore
 
 import (
 	"bytes"
-	"errors"
 	"log/slog"
 	"net"
 	"strings"
@@ -37,10 +36,10 @@ func TestMemoryDurationZeroMissesAfterPublish(t *testing.T) {
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 0})
 	store.PublishTick(ElapsedNow())
-	_, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	kind, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	_ = originID
-	if !errors.Is(err, ErrMiss) {
-		t.Fatalf("duration 0 must miss after publish, got %v", err)
+	if err != nil || kind != "" {
+		t.Fatalf("duration 0 must miss after publish, got kind %q err %v", kind, err)
 	}
 }
 
@@ -49,10 +48,10 @@ func TestMemoryExpiryOnPublish(t *testing.T) {
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: -1})
 	store.PublishTick(ElapsedNow())
-	_, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	kind, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	_ = originID
-	if !errors.Is(err, ErrMiss) || err.Error() != "store:miss" {
-		t.Fatalf("expired slot must miss, got %v", err)
+	if err != nil || kind != "" {
+		t.Fatalf("expired slot must miss, got kind %q err %v", kind, err)
 	}
 }
 
@@ -61,7 +60,7 @@ func TestMemoryTickPutHiddenUntilPublish(t *testing.T) {
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60})
 	kind, origin, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
-	if !errors.Is(err, ErrMiss) {
+	if err != nil || kind != "" {
 		t.Fatalf("tick Put must stay unpublished, kind %q origin %q id %d err %v", kind, origin, originID, err)
 	}
 	store.PublishTick(0)
@@ -80,7 +79,7 @@ func TestMemoryTickDeleteOnlyMissesAfterPublish(t *testing.T) {
 	store.Delete(decisionscope.ScopeIP, "203.0.113.10")
 	store.PublishTick(0)
 	kind, origin, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
-	if !errors.Is(err, ErrMiss) {
+	if err != nil || kind != "" {
 		t.Fatalf("tick Delete must miss after publish, kind %q origin %q id %d err %v", kind, origin, originID, err)
 	}
 }
