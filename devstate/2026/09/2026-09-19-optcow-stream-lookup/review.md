@@ -40,3 +40,9 @@ phase: codereview
 findings: Standards 36, Spec 1, Security 0, Performance 2, Dead 1, Coverage 6
 fixed: leftover drop, live sweep + in-place Put, Pack/OriginIntern delete, naming/comments, tick/overflow/replica tests (f92c8573)
 skipped: IPCacheKey rename (ticket pin); lookup nil-callback, LiveSlot.Word, none-mode coverage (judgement)
+
+## devdocsimpact (2026-09-20)
+phase: devdocsimpact
+findings: 10 stale-usage / language-gap (cache bag, lease, leftover)
+fixed: created core_plugin_decisionstore.md; deleted cache/lease packets; updated apply, single-flight, metrics, scopes, reclaim, middleware, debug-attrs (35c34cd4)
+skipped: none

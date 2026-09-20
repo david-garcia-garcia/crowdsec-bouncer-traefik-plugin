@@ -1,4 +1,4 @@
-Developer review: needs changes — 2026-09-20T04:09:04.210Z
+Developer review: needs changes — 2026-09-20T04:11:51.297Z
 
 ## What this changes
 
@@ -6,7 +6,7 @@ Developer review: needs changes — 2026-09-20T04:09:04.210Z
 
 **Admin users.** None.
 
-**Developers.** CrowdSec decisions live on `pkg/decisionstore.Store` with memory and Redis engine funcs bound at `NewMemory`/`NewRedis`. `pkg/cache`, stream lease, and a second `liveStore` type are gone. `LookupRemediation` and `LiveLookup` return kind and origin fields. Intern overflow Warns and keeps origin id 0. A constructed Store always has callbacks (no nil-store Close). Published vendor is v1.0.5; do not re-patch `iplookup/helper.go`.
+**Developers.** CrowdSec decisions live on `pkg/decisionstore.Store` with memory and Redis engine funcs bound at `NewMemory`/`NewRedis`. `pkg/cache`, stream lease, and a second `liveStore` type are gone. `LookupRemediation` and `LiveLookup` return kind and origin fields. Intern overflow Warns and keeps origin id 0. A constructed Store always has callbacks (no nil-store Close). Published vendor is v1.0.5; do not re-patch `iplookup/helper.go`. Usage packet is `knowledge/devdocs/core_plugin_decisionstore.md`.
 
 **End users.** None.
 
@@ -28,11 +28,11 @@ sequenceDiagram
 
 ## Merge readiness
 
-Six-axis hard findings applied on f92c8573. One RETHINK comment stays `[ ]` until pullrequest Reply. CI is in progress on 5936ac7a. 2 items remain.
+Usage docs produced (35c34cd4). One RETHINK comment stays `[ ]` until pullrequest Reply. CI is in progress on 3c17d396. 2 items remain.
 
 Priority: P2 — stream/alone memory lookup cost and Redis/cache coupling on master, with no operator config change required.
 
-Reviewed head: 5936ac7a
+Reviewed head: 3c17d396
 
 Owner decision: None.
 
@@ -41,7 +41,7 @@ Owner decision: None.
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 1/6 | Open RETHINK `[ ]` blocks review resolution |
-| CI proof | 3/6 | In progress on 5936ac7a — [Main Process](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488376035/job/106018794447), [Race detector](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488376035/job/106018794371), [e2e binary](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488376018/job/106018794553), [e2e docker](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488376018/job/106018794492) |
+| CI proof | 3/6 | In progress on 3c17d396 — [Race detector](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488523351/job/106019196815), [Main Process](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488523351/job/106019196690) queued |
 | Local tests proof | N/A | Remote `prHost`; CI proof covers remote |
 | Review resolution | 1/6 | `comments.md` RETHINK `chat-store-split` still `[ ]` |
 
@@ -52,7 +52,7 @@ Owner decision: None.
 | Branch | 2026-09-19-optcow-stream-lookup pushed | `git` / PR #118 → master |
 | OpenSpec | 2026-09-19-optcow-stream-lookup | `openspec/changes/2026-09-19-optcow-stream-lookup/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/118 | GitHub |
-| CI | build 35488376035 in_progress [Main Process](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488376035/job/106018794447); build 35488376018 in_progress [e2e](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488376018/job/106018794553) | GitHub check runs |
+| CI | build 35488523351 in_progress [Race detector](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488523351/job/106019196815); Main Process queued | GitHub check runs |
 | Local tests | passed | handoff.yaml `localTests: passed` (`go test` on decisionstore/lapi/bouncer/decisionscope) |
 | PR comments | 1 open | `comments.md` RETHINK `chat-store-split` |
 
@@ -79,7 +79,7 @@ None.
 
 ## How this fits together
 
-Ticket `2026-09-19-optcow-stream-lookup` is branch `2026-09-19-optcow-stream-lookup` on PR #118 to `master`. Codereview applied hard findings; CI is in progress on 5936ac7a.
+Ticket `2026-09-19-optcow-stream-lookup` is branch `2026-09-19-optcow-stream-lookup` on PR #118 to `master`. Devdocs impact produced; CI is in progress on 3c17d396.
 
 ## Decision needed
 
@@ -89,6 +89,7 @@ None.
 
 - [x] [P2] Six-axis hard findings applied (f92c8573)
 - [x] [P2] Human product fixes: no nil-store Close; utilities v1.0.5 (6842765a)
+- [x] [P3] Usage docs: `core_plugin_decisionstore.md`; cache/lease packets removed (35c34cd4)
 - [ ] Close RETHINK `chat-store-split` after pullrequest Reply
 - [ ] Green CI on reviewed head
 
@@ -114,7 +115,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 13 modified | Same list as ## Specs |
 | Open reviewer comments walked | 1 FIX / 0 ANSWER / 1 open | Unanswered RETHINK is merge risk |
-| Reviewed head | 5936ac7a337f1dc839abd58cc571d4173034af44 | Card matches measured branch |
+| Reviewed head | 3c17d396cf5adcc1069f216843aeb5301e9156c6 | Card matches measured branch |
 
 ### Stored data model
 
@@ -136,7 +137,8 @@ What I checked:
 - Six-axis Status after apply (run-root `codereview_*.md`, 5936ac7a)
 - Product apply `f92c8573` (leftover drop, live sweep, Pack delete, coverage tests)
 - Human pins `6842765a` (no nil-store Close; utilities v1.0.5)
-- GitHub check runs on 5936ac7a (in_progress)
+- GitHub check runs on 3c17d396 (in_progress)
+- Usage packets produced (`knowledge/devdocs/core_plugin_decisionstore.md`, 35c34cd4)
 
 ### Rank-up moves
 
