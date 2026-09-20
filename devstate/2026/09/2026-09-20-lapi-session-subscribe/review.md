@@ -10,6 +10,12 @@ findings: none
 fixed: none
 skipped: none
 
+## propose (2026-09-20)
+phase: propose
+findings: none
+fixed: none
+skipped: none
+
 ## implement (2026-09-20)
 phase: implement
 findings: none
@@ -26,4 +32,10 @@ skipped: duplicated adopted-INFO; create-fail store Close unobservable; remainin
 phase: devdocsimpact
 findings: stale-usage 2
 fixed: reclaim-key middlewareNames; decisionstore newChildStore
+skipped: none
+
+## archive (2026-09-20)
+phase: archive
+findings: none
+fixed: none
 skipped: none

@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-20T05:57:45Z
+Developer review: in progress — 2026-09-20T06:04:35Z
 
 ## What this changes
 **Operators.** In this Traefik instance, one LAPI key is one stream ticker and one usage-metrics window. Redis and interval disagreements are ignored, not isolated. Isolation still needs a second bouncer API key. WARN names ignored fields and who joined whom.
@@ -24,10 +24,10 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Usage packets caught up (`middlewareNames`, `newChildStore`); local tests passed; remote CI still in progress. 2 items remain.
+OpenSpec archived; local tests passed; remote CI still in progress. 1 item remains.
 
 Priority: P2 — real operator pain (stolen stream deltas / second metrics window) with a workaround (second API key)
-Reviewed head: cb5f047d
+Reviewed head: 7e1b0bc5
 Owner decision: Required. See Decision needed.
 
 ## Review scores
@@ -42,23 +42,23 @@ Owner decision: Required. See Decision needed.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-20-lapi-session-subscribe pushed | origin/2026-09-20-lapi-session-subscribe |
-| OpenSpec | 2026-09-20-lapi-session-subscribe | openspec/changes/2026-09-20-lapi-session-subscribe/ |
+| OpenSpec | 2026-09-20-lapi-session-subscribe archived | openspec/changes/archive/2026-09-20-2026-09-20-lapi-session-subscribe/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/119 | pr-host |
 | CI | build 35492739774 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35492739774 | GitHub check runs |
 | Local tests | passed | `go test ./pkg/lapi ./pkg/decisionstore ./pkg/bouncer .` |
 | PR comments | no comments | inventory empty |
 
 ## Specs
-- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/openspec/changes/2026-09-20-lapi-session-subscribe/proposal.md) — modified
-- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/openspec/changes/2026-09-20-lapi-session-subscribe/proposal.md) — modified
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/openspec/changes/2026-09-20-lapi-session-subscribe/proposal.md) — modified
-- [core_plugin_lapi_connection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/openspec/changes/2026-09-20-lapi-session-subscribe/proposal.md) — modified
+- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/openspec/changes/archive/2026-09-20-2026-09-20-lapi-session-subscribe/proposal.md) — modified
+- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/openspec/changes/archive/2026-09-20-2026-09-20-lapi-session-subscribe/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/openspec/changes/archive/2026-09-20-2026-09-20-lapi-session-subscribe/proposal.md) — modified
+- [core_plugin_lapi_connection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/openspec/changes/archive/2026-09-20-2026-09-20-lapi-session-subscribe/proposal.md) — modified
 
 ## Follow-up issues
 None.
 
 ## How this fits together
-Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, PR 119. Usage docs produced. Next is archive.
+Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, PR 119. OpenSpec archived. Next is pullrequest (CI wait, drop WIP).
 
 ## Decision needed
 | Question | Decision | By |
@@ -68,7 +68,7 @@ Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, PR 119. Usage doc
 
 ## Before merge
 - [ ] Remote CI succeeded on PR 119
-- [ ] Archive OpenSpec change and drop WIP from the PR title
+- [ ] Drop WIP from the PR title
 
 ## Findings
 None.
@@ -88,7 +88,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | cb5f047d7a8ca5dfbfc13accf7b90eff1b7e44e1 | Card must match the branch you measured |
+| Reviewed head | 7e1b0bc5 | Card must match the branch you measured |
 
 ### Stored data model
 None.
