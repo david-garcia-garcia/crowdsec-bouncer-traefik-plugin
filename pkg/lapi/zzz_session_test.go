@@ -306,13 +306,18 @@ func TestOpenStream_NewClientKeepsStoreStreamFlags(t *testing.T) {
 	if store.StreamReady() == 0 {
 		t.Fatal("first poll must mark streamReady")
 	}
-	for time.Now().Before(deadline) && store.StreamPollInFlight() != 0 {
+	held := false
+	for time.Now().Before(deadline) {
+		if store.TryBeginStreamPoll() {
+			held = true
+			break
+		}
 		time.Sleep(time.Millisecond)
 	}
-	hitsBeforeHold := atomic.LoadInt64(hits)
-	if !store.TryBeginStreamPoll() {
+	if !held {
 		t.Fatal("store poll CAS")
 	}
+	hitsBeforeHold := atomic.LoadInt64(hits)
 	secondCfg := testStreamConfig(parsed.Host, 1)
 	secondCfg.RedisCacheHost = "redis-b:6379"
 	second, err := OpenStream(context.Background(), secondCfg, log, "reload", "test")
@@ -325,8 +330,11 @@ func TestOpenStream_NewClientKeepsStoreStreamFlags(t *testing.T) {
 	if second.decisionStore != store {
 		t.Fatal("new Client must keep the same store")
 	}
-	if store.StreamReady() == 0 || store.StreamPollInFlight() == 0 {
-		t.Fatal("new Client must not zero store streamReady or streamPollInFlight")
+	if store.StreamReady() == 0 {
+		t.Fatal("new Client must not zero store streamReady")
+	}
+	if store.TryBeginStreamPoll() {
+		t.Fatal("new Client must not zero store streamPollInFlight")
 	}
 	second.handleStreamTicker()
 	if atomic.LoadInt64(hits) != hitsBeforeHold {

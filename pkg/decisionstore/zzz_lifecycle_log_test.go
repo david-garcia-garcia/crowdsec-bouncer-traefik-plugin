@@ -97,13 +97,7 @@ func TestStore_StreamPollCAS(t *testing.T) {
 	if store.TryBeginStreamPoll() {
 		t.Fatal("second enter must skip")
 	}
-	if store.StreamPollInFlight() == 0 {
-		t.Fatal("held")
-	}
 	store.EndStreamPoll()
-	if store.StreamPollInFlight() != 0 {
-		t.Fatal("released")
-	}
 	if !store.TryBeginStreamPoll() {
 		t.Fatal("reenter")
 	}

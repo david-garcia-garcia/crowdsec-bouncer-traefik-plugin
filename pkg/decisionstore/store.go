@@ -154,11 +154,6 @@ func (s *Store) EndStreamPoll() {
 	atomic.StoreInt64(&s.streamPollInFlight, 0)
 }
 
-// StreamPollInFlight is non-zero while a stream GET+apply owns this session.
-func (s *Store) StreamPollInFlight() int64 {
-	return atomic.LoadInt64(&s.streamPollInFlight)
-}
-
 // BeginTick opens the write window for one stream poll. Memory clones published into tick.
 // Redis is a no-op: each PutMany/DeleteMany is already visible to other processes.
 func (s *Store) BeginTick() {
