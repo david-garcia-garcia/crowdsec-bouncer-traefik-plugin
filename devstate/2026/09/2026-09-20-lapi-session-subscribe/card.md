@@ -1,16 +1,16 @@
-Developer review: in progress — 2026-09-20T05:21:49Z
+Developer review: in progress — 2026-09-20T05:39:02Z
 
 ## What this changes
-**Operators.** None yet (README apply still pending). Specs describe: one LAPI key = one stream ticker and metrics window in this process; Redis/interval disagreements are ignored, not isolated.
+**Operators.** In this Traefik instance, one LAPI key is one stream ticker and one usage-metrics window. Redis and interval disagreements are ignored, not isolated. Isolation still needs a second bouncer API key. WARN names ignored fields and who joined whom.
 
 **Admin users.** None.
 
-**Developers.** OpenSpec change `2026-09-20-lapi-session-subscribe` folds four leaves: reclaim-key, decisionstore store, middleware bouncer, LAPI connection. Apply not started.
+**Developers.** Stream `SessionKey` is `lapi:stream:` + `SessionHex` (no Redis hash). Join reuses Client+store; DecisionStore is created inside Client create() and closed on Client Close. Live/none `Key` still includes Redis.
 
 **End users.** None.
 
 ## Motivation
-Two middlewares in one Traefik can share a LAPI host and API key while pointing at different Redis. CrowdSec still keeps one `/v1/decisions/stream` cursor and one usage-metrics window on the bouncer row selected by hashed `X-Api-Key` plus this process’s outbound IP. DestBranch hashes Redis into the stream Client Open key, so that disagreement starts a second ticker. That ticker steals `startup=false` deltas and POSTs a second metrics window. Operators already have a workaround (a second bouncer key); without this change the Redis split stays silent isolation that contradicts LAPI physics.
+Two middlewares in one Traefik can share a LAPI host and API key while pointing at different Redis. CrowdSec still keeps one `/v1/decisions/stream` cursor and one usage-metrics window on the bouncer row selected by hashed `X-Api-Key` plus this process’s outbound IP. DestBranch hashed Redis into the stream Client Open key, so that disagreement started a second ticker. That ticker stole `startup=false` deltas and POSTed a second metrics window. Operators already have a workaround (a second bouncer key); without this change the Redis split stays silent isolation that contradicts LAPI physics.
 
 ```mermaid
 sequenceDiagram
@@ -24,18 +24,18 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Propose apply-ready (18 tasks). Product code not started. 5 items remain.
+Apply landed; local tests passed; remote CI still in progress. 4 items remain.
 
 Priority: P2 — real operator pain (stolen stream deltas / second metrics window) with a workaround (second API key)
-Reviewed head: 6a5222de
+Reviewed head: 8d4d1459
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI in progress; no apply |
+| Overall readiness | 3/6 | CI in progress |
 | CI proof | 3/6 | Checks in progress |
-| Local tests proof | N/A | Before implement; remote PR uses CI |
+| Local tests proof | N/A | Remote PR uses CI; localTests passed |
 | Review resolution | 6/6 | No PR comments |
 
 ## Verification
@@ -44,8 +44,8 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-20-lapi-session-subscribe pushed | origin/2026-09-20-lapi-session-subscribe |
 | OpenSpec | 2026-09-20-lapi-session-subscribe | openspec/changes/2026-09-20-lapi-session-subscribe/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/119 | pr-host |
-| CI | build 35491471361 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35491471361 | GitHub check runs |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 35492198105 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35492198105 | GitHub check runs |
+| Local tests | passed | `go test ./pkg/lapi ./pkg/decisionstore ./pkg/bouncer .` |
 | PR comments | no comments | inventory empty |
 
 ## Specs
@@ -58,7 +58,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, stub PR 119. OpenSpec folded four existing leaves. Next is implement.
+Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, PR 119. Apply on HEAD 8d4d1459. Next is six-axis code review.
 
 ## Decision needed
 | Question | Decision | By |
@@ -67,7 +67,8 @@ Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, stub PR 119. Open
 | Whether live/none Client Key also drops Redis the same way. | assumed — no, not in this ticket. Live `?ip=` does not steal stream_cursor. | explore |
 
 ## Before merge
-- [ ] Apply: stream Client reclaim is LAPI session; subscribe WARNs; store is a child of Client create; README says Redis/interval disagreements are ignored.
+- [ ] Remote CI succeeded on PR 119
+- [ ] Archive OpenSpec change and drop WIP from the PR title
 
 ## Findings
 None.
@@ -82,23 +83,23 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 6a5222de1b54c9f30a061d7aa952c1f479326fdb | Card must match the branch you measured |
+| Reviewed head | 8d4d1459a77938a2b4dd87e7bb6a4af65b7da2dd | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: Fold reclaim-key + store child + constructor bind + first-create INFO onto existing leaves. No new 4th part.
+Best possible solution: Stream Open key matches the CrowdSec row; subscribe WARNs; store is a child of create so dropping Redis from the Client key cannot leak a zombie store.
 
-Do we have a high-confidence way to reproduce? Yes, DestBranch OpenStream Redis-isolation tests.
+Do we have a high-confidence way to reproduce? Yes, inverted OpenStream tests now require share+WARN; local `go test` passed.
 
-Is this the best way to solve the issue? Yes vs DestBranch: match LAPI row; do not fail New; live Key unchanged.
+Is this the best way to solve the issue? Yes vs DestBranch: match LAPI physics; do not fail New; live Key unchanged.
 
 ### Evidence
 What I checked:
-- FindSpecHost four folds high confidence (`devstate/.../specs.md`)
-- `openspec/changes/2026-09-20-lapi-session-subscribe/` proposal + 18 tasks (6a5222de)
-- CI in progress on PR 119
+- `SessionKey` is `lapi:stream:` + `SessionHex` (`pkg/lapi/session.go`)
+- README Note: Redis/interval disagreements ignored (8d4d1459)
+- localTests passed; CI in progress on PR 119
 
 ### Rank-up moves
 None.
