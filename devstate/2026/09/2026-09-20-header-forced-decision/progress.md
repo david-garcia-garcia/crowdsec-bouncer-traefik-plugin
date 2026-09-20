@@ -9,6 +9,6 @@ JobName: 2026-09-20-header-forced-decision
 | propose | [x] | [x] | 2026-09-20T17:27:16Z |
 | implement | [x] | [x] | 2026-09-20T17:32:48Z |
 | codereview | [x] | [x] | 2026-09-20T17:44:35Z |
-| devdocsimpact | [x] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-20T17:46:53Z |
 | archive | [ ] | [ ] | |
 | pullrequest | [ ] | [ ] | |
