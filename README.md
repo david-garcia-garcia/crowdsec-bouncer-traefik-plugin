@@ -152,11 +152,11 @@ make run
 > [!IMPORTANT]
 > You can declare many CrowdSec middlewares in one Traefik. Each router keeps its own request policy (enabled, captcha, trusted IPs, failure actions, templates).
 >
-> CrowdSec LAPI still identifies **one stream per LAPI key + the IP this Traefik uses to call LAPI**. Middlewares that share that pair share the stream and the decision store. A ban on that store applies to every router on that session.
+> CrowdSec LAPI still identifies **one stream per LAPI key + the IP this Traefik uses to call LAPI**. In this Traefik instance, that pair is one stream ticker and one usage-metrics window. Middlewares that share that pair share the stream and the decision store. A ban on that store applies to every router on that session. Redis and interval disagreements are ignored, not isolated.
 >
-> A second CrowdSec configuration (isolated decisions or a different stream) needs a **different LAPI key**. Two stream configs on the same key from the same Traefik instance fight over one cursor.
+> A second CrowdSec configuration (isolated decisions or a different stream) needs a **different LAPI key**. Two stream configs on the same key from the same Traefik instance fight over one cursor. Reclaim is process-local: two Traefik processes that share a key still run two tickers.
 >
-> On a shared session, stream interval, `updateMaxFailure`, and CAPI scenarios are create-time: the first middleware to start keeps those values. `decisionScopeHeaders` is not first-wins: live routers on that Client union their maps into stream `scopes=`. Per-router policy (enabled, captcha, trusted IPs, failure actions, templates) does not have to match.
+> On a shared session, Redis, stream interval, metrics interval, `updateMaxFailure`, and CAPI scenarios are create-time: the first middleware to start keeps those values. `decisionScopeHeaders` is not first-wins: live routers on that Client union their maps into stream `scopes=`. Per-router policy (enabled, captcha, trusted IPs, failure actions, templates) does not have to match. Stream and live on the same key still POST two metrics windows.
 
 > [!WARNING]  
 > **Appsec maximum body limit is defaulted to 10MB** > _Be careful when you upgrade to >1.4.x_

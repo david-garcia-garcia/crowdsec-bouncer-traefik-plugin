@@ -3,7 +3,7 @@
 ## DecisionStore
 priority: normal
 local: core_plugin_decisionstore.md
-description: How LAPI Clients share one Store keyed by CrowdSec cursor plus Redis params.
+description: How a LAPI Client owns a child Store (Redis prefix SessionHex).
 
 ## Middleware New
 priority: normal
@@ -43,7 +43,7 @@ description: How this plugin POSTs CrowdSec usage-metrics with origin and ip_typ
 ## LAPI reclaim key
 priority: normal
 local: core_plugin_lapi_reclaim-key.md
-description: How this plugin keys a reclaimed LAPI Client (cursor SessionHex plus Redis store params).
+description: How this plugin keys a reclaimed LAPI Client (stream SessionHex; live adds Redis and metrics interval).
 
 ## LAPI scope union
 priority: normal
