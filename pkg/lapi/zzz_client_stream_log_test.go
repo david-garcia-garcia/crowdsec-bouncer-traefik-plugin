@@ -1,8 +1,10 @@
 package lapi
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"sync/atomic"
@@ -33,6 +35,30 @@ func captureTestStreamTickLog(t *testing.T, level slog.Level, fn func(*slog.Logg
 	return sink.String()
 }
 
+// testStreamLAPISequence serves one stream payload per GET, in order.
+func testStreamLAPISequence(t *testing.T, payloads []Stream) *httptest.Server {
+	t.Helper()
+	var hits int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if !strings.Contains(req.URL.Path, "stream") {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		idx := int(atomic.AddInt64(&hits, 1) - 1)
+		payload := Stream{}
+		if idx < len(payloads) {
+			payload = payloads[idx]
+		}
+		_ = json.NewEncoder(w).Encode(payload)
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func testBan(value string) Decision {
+	return Decision{Type: "ban", Scope: "Ip", Value: value, Duration: "1h", Origin: "crowdsec"}
+}
+
 // TestHandleStreamCacheUpdatedIsDebug proves a successful LAPI fetch logs at DEBUG, not INFO.
 func TestHandleStreamCacheUpdatedIsDebug(t *testing.T) {
 	server, _ := testStreamLAPI(t)
@@ -59,14 +85,14 @@ func TestHandleStreamCacheUpdatedIsDebug(t *testing.T) {
 			if got := strings.Contains(logged, tickMsg); got != tc.want {
 				t.Fatalf("%s at %s: got %v want %v\n%s", tickMsg, tc.level, got, tc.want, logged)
 			}
-			if tc.want && !strings.Contains(logged, `"sessionKey":"lapi:test-stream"`) {
-				t.Fatalf("updated at DEBUG missing sessionKey:\n%s", logged)
+			if tc.want && !strings.Contains(logged, `"startup":true`) {
+				t.Fatalf("first apply missing startup=true:\n%s", logged)
 			}
 		})
 	}
 }
 
-// TestHandleStreamTickerPollLogsAreDebug proves enter and finish stems stay DEBUG and carry join fields.
+// TestHandleStreamTickerPollLogsAreDebug proves enter and finish stems stay DEBUG with startup=true.
 func TestHandleStreamTickerPollLogsAreDebug(t *testing.T) {
 	server, _ := testStreamLAPI(t)
 	serverURL, err := url.Parse(server.URL)
@@ -108,30 +134,62 @@ func TestHandleStreamTickerPollLogsAreDebug(t *testing.T) {
 	}
 }
 
-// TestHandleStreamTickerSkipLogsAreDebug proves a busy tick logs skip at DEBUG and does not GET.
-func TestHandleStreamTickerSkipLogsAreDebug(t *testing.T) {
+// TestHandleStreamTickerSubsequentPollLogsDelta proves later polls set startup=false and log applied counts.
+func TestHandleStreamTickerSubsequentPollLogsDelta(t *testing.T) {
+	server := testStreamLAPISequence(t, []Stream{
+		{New: []Decision{testBan("203.0.113.10"), testBan("203.0.113.11"), {Type: "log", Scope: "Ip", Value: "203.0.113.12", Duration: "1h"}}, Deleted: []Decision{testBan("198.51.100.1")}},
+		{New: []Decision{testBan("203.0.113.13")}, Deleted: []Decision{testBan("203.0.113.10")}},
+	})
+	serverURL, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	log, sink := newTestLogSink(slog.LevelDebug)
+	client := newTestStreamTickClient(t, log, serverURL.Host, server.Client())
+	client.handleStreamTicker()
+	client.handleStreamTicker()
+	logged := sink.String()
+
+	if strings.Count(logged, `"msg":"handleStreamTicker:poll"`) != 2 {
+		t.Fatalf("want 2 poll enter lines:\n%s", logged)
+	}
+	if strings.Count(logged, `"msg":"handleStreamCache:updated"`) != 2 {
+		t.Fatalf("want 2 updated lines:\n%s", logged)
+	}
+	if !strings.Contains(logged, `"new":2`) || !strings.Contains(logged, `"deleted":1`) {
+		t.Fatalf("startup apply must count written decisions (2 new, skip unknown, 1 deleted):\n%s", logged)
+	}
+	if !strings.Contains(logged, `"new":1`) {
+		t.Fatalf("delta apply missing new=1:\n%s", logged)
+	}
+	startupTrue := strings.Count(logged, `"startup":true`)
+	startupFalse := strings.Count(logged, `"startup":false`)
+	if startupTrue < 2 || startupFalse < 2 {
+		t.Fatalf("want startup=true on first enter+finish and startup=false on second, true=%d false=%d\n%s", startupTrue, startupFalse, logged)
+	}
+}
+
+// TestHandleStreamTickerSkipLogsAreWarn proves a busy tick warns at default INFO and does not GET.
+func TestHandleStreamTickerSkipLogsAreWarn(t *testing.T) {
 	server, hits := testStreamLAPI(t)
 	serverURL, err := url.Parse(server.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for _, tc := range []struct {
-		level slog.Level
-		want  bool
-	}{
-		{slog.LevelInfo, false},
-		{slog.LevelDebug, true},
-	} {
-		t.Run(tc.level.String(), func(t *testing.T) {
-			logged := captureTestStreamTickLog(t, tc.level, func(log *slog.Logger) {
+	for _, level := range []slog.Level{slog.LevelInfo, slog.LevelDebug} {
+		t.Run(level.String(), func(t *testing.T) {
+			logged := captureTestStreamTickLog(t, level, func(log *slog.Logger) {
 				client := newTestStreamTickClient(t, log, serverURL.Host, server.Client())
 				client.streamPollInFlight = 1
 				client.handleStreamTicker()
 			})
-			const skipMsg = "handleStreamTicker:skip"
-			if got := strings.Contains(logged, skipMsg); got != tc.want {
-				t.Fatalf("%s at %s: got %v want %v\n%s", skipMsg, tc.level, got, tc.want, logged)
+			if !strings.Contains(logged, "handleStreamTicker:skip") {
+				t.Fatalf("skip missing at %s:\n%s", level, logged)
+			}
+			if !strings.Contains(logged, `"level":"WARN"`) {
+				t.Fatalf("skip must be WARN at %s:\n%s", level, logged)
 			}
 			if strings.Contains(logged, "handleStreamTicker:poll") || strings.Contains(logged, "handleStreamCache:updated") {
 				t.Fatalf("busy tick must not poll:\n%s", logged)

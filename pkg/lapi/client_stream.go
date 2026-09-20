@@ -48,16 +48,16 @@ func (c *Client) startStream(config *configuration.Config, log *slog.Logger) err
 // handleStreamTicker runs one stream poll unless another poll is already in flight.
 func (c *Client) handleStreamTicker() {
 	if !atomic.CompareAndSwapInt64(&c.streamPollInFlight, 0, 1) {
-		c.log.Debug("handleStreamTicker:skip", "sessionKey", c.sessionKey, "reason", "inFlight")
+		c.log.Warn("handleStreamTicker:skip", "sessionKey", c.sessionKey, "reason", "inFlight")
 		return
 	}
 	defer atomic.StoreInt64(&c.streamPollInFlight, 0)
 
 	started := time.Now()
+	startup := c.streamStartup()
 	c.log.Debug("handleStreamTicker:poll",
 		"sessionKey", c.sessionKey,
-		"startup", c.streamStartup(),
-		"fetches", atomic.LoadInt64(&c.streamFetches),
+		"startup", startup,
 		"interval", c.updateInterval,
 	)
 	if err := c.handleStreamCache(); err != nil {
@@ -65,6 +65,7 @@ func (c *Client) handleStreamTicker() {
 		healthy := atomic.LoadInt64(&c.isCrowdsecStreamHealthy) != 0
 		c.log.Warn("handleStreamTicker",
 			"sessionKey", c.sessionKey,
+			"startup", startup,
 			"updateFailure", updateFailure,
 			"isCrowdsecStreamHealthy", healthy,
 			"durationMs", time.Since(started).Milliseconds(),
@@ -88,13 +89,14 @@ func (c *Client) handleStreamTicker() {
 // handleStreamCache GETs stream, applies the payload, and logs the finish line at DEBUG.
 func (c *Client) handleStreamCache() error {
 	started := time.Now()
+	startup := c.streamStartup()
 	newCount, deletedCount, pollErr := c.fetchAndApplyStreamDecisions()
 	if pollErr != nil {
 		return pollErr
 	}
 	c.log.Debug("handleStreamCache:updated",
 		"sessionKey", c.sessionKey,
-		"startup", c.streamStartup(),
+		"startup", startup,
 		"new", newCount,
 		"deleted", deletedCount,
 		"durationMs", time.Since(started).Milliseconds(),
@@ -106,7 +108,7 @@ func (c *Client) handleStreamCache() error {
 
 // fetchAndApplyStreamDecisions GETs the CrowdSec stream delta and writes it into the DecisionStore.
 // Deleted is applied before New so a same-window replacement for the same IP or CIDR stays active.
-// newCount and deletedCount are the payload lengths after a successful apply.
+// newCount and deletedCount are decisions written into the store, not raw payload length.
 func (c *Client) fetchAndApplyStreamDecisions() (int, int, error) {
 	streamRouteURL := url.URL{
 		Scheme:   c.crowdsecScheme,
@@ -129,11 +131,13 @@ func (c *Client) fetchAndApplyStreamDecisions() (int, int, error) {
 	rangeUpserts := make(map[string]string)
 	var rangeRemovals []string
 	deletes := make([]decisionstore.Decision, 0)
+	deletedCount := 0
 	for _, decision := range stream.Deleted {
 		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
 			if cidr := strings.TrimSpace(decision.Value); cidr != "" {
 				rangeRemovals = append(rangeRemovals, cidr)
 				c.forgetActiveDecision("range:" + cidr)
+				deletedCount++
 			}
 			continue
 		}
@@ -141,6 +145,7 @@ func (c *Client) fetchAndApplyStreamDecisions() (int, int, error) {
 		if !ok {
 			continue
 		}
+		deletedCount++
 		deletes = append(deletes, stored)
 		if len(deletes) >= decisionstore.PutManyChunk {
 			c.decisionStore.DeleteMany(deletes)
@@ -149,6 +154,7 @@ func (c *Client) fetchAndApplyStreamDecisions() (int, int, error) {
 	}
 	c.decisionStore.DeleteMany(deletes)
 	puts := make([]decisionstore.Decision, 0)
+	newCount := 0
 	for _, decision := range stream.New {
 		duration, parseErr := time.ParseDuration(decision.Duration)
 		if parseErr != nil {
@@ -161,6 +167,7 @@ func (c *Client) fetchAndApplyStreamDecisions() (int, int, error) {
 				origin := MetricsOrigin(decision.Origin, decision.Scenario)
 				rangeUpserts[cidr] = decisionstore.KindOriginString(kind, origin)
 				c.rememberActiveDecision("range:"+cidr, origin, cidr)
+				newCount++
 			}
 			continue
 		}
@@ -169,6 +176,7 @@ func (c *Client) fetchAndApplyStreamDecisions() (int, int, error) {
 		if !ok {
 			continue
 		}
+		newCount++
 		puts = append(puts, stored)
 		if len(puts) >= decisionstore.PutManyChunk {
 			c.decisionStore.PutMany(puts)
@@ -181,5 +189,5 @@ func (c *Client) fetchAndApplyStreamDecisions() (int, int, error) {
 	if err := c.decisionStore.ApplyRangeBatch(rangeUpserts, rangeRemovals); err != nil {
 		return 0, 0, fmt.Errorf("handleStreamCache:rangeIndex %w", err)
 	}
-	return len(stream.New), len(stream.Deleted), nil
+	return newCount, deletedCount, nil
 }
