@@ -11,7 +11,7 @@ localTests: none
 requirement: requirement.md
 comments: none
 explore: explore.md
-change: none
+change: 2026-09-20-lapi-session-subscribe
 pr:
   id: 119
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/119
