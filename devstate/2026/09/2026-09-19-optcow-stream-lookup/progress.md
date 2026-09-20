@@ -11,4 +11,4 @@ JobName: 2026-09-19-optcow-stream-lookup
 | codereview | [x] | [x] | 2026-09-20T04:09:04.210Z |
 | devdocsimpact | [x] | [x] | 2026-09-20T04:11:51.297Z |
 | archive | [x] | [x] | 2026-09-20T04:14:10.847Z |
-| pullrequest | [x] | [ ] | |
+| pullrequest | [x] | [x] | 2026-09-20T04:23:54.668Z |

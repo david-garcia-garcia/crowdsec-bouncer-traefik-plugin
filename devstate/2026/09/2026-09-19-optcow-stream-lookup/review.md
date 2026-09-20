@@ -52,3 +52,9 @@ phase: archive
 findings: catalog synced; REMOVED cache/lease leaves; added core_plugin_decisionstore_store
 fixed: validate-spec-map --write + verify + validate-artifact-names OK; moved to openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup (e08b8ba9)
 skipped: none
+
+## pullrequest (2026-09-20)
+phase: pullrequest
+findings: title set; chat-store-split Reply #5747561707; Main/Race/e2e-binary success; e2e docker+pester failure
+fixed: dogsled lint (03d52325, 69163b97)
+skipped: merge (do not merge)

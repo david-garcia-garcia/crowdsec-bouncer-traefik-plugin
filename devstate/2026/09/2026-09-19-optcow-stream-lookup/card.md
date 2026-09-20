@@ -1,4 +1,4 @@
-Developer review: needs changes — 2026-09-20T04:14:10.847Z
+Developer review: needs changes — 2026-09-20T04:23:54.668Z
 
 ## What this changes
 
@@ -28,11 +28,11 @@ sequenceDiagram
 
 ## Merge readiness
 
-OpenSpec change archived to `openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/`. One RETHINK comment stays `[ ]` until pullrequest Reply. CI is in progress on 15a81f52. 2 items remain.
+OpenSpec change archived. RETHINK `chat-store-split` is replied (#5747561707). e2e docker+pester failed on 69163b97. 1 item remains.
 
 Priority: P2 — stream/alone memory lookup cost and Redis/cache coupling on master, with no operator config change required.
 
-Reviewed head: 15a81f52
+Reviewed head: 69163b97
 
 Owner decision: None.
 
@@ -40,10 +40,10 @@ Owner decision: None.
 
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Open RETHINK `[ ]` blocks review resolution |
-| CI proof | 3/6 | In progress on 15a81f52 — [Main Process](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488621475/job/106019470272), [Race detector](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488621475/job/106019470088) |
+| Overall readiness | 2/6 | e2e docker+pester failed on reviewed head |
+| CI proof | 2/6 | Main Process / Race / e2e binary succeeded; [e2e docker+pester failed](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488908465/job/106020295515) |
 | Local tests proof | N/A | Remote `prHost`; CI proof covers remote |
-| Review resolution | 1/6 | `comments.md` RETHINK `chat-store-split` still `[ ]` |
+| Review resolution | 6/6 | `comments.md` RETHINK `chat-store-split` `[x]` Reply #5747561707 |
 
 ## Verification
 
@@ -52,9 +52,9 @@ Owner decision: None.
 | Branch | 2026-09-19-optcow-stream-lookup pushed | `git` / PR #118 → master |
 | OpenSpec | 2026-09-19-optcow-stream-lookup archived | `openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/118 | GitHub |
-| CI | build 35488621475 in_progress [Main Process](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488621475/job/106019470272) | GitHub check runs |
-| Local tests | passed | handoff.yaml `localTests: passed` (`go test` on decisionstore/lapi/bouncer/decisionscope) |
-| PR comments | 1 open | `comments.md` RETHINK `chat-store-split` |
+| CI | build 35488908468 success [Main Process](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488908468/job/106020261552); [Race detector](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488908468/job/106020261706) success; [e2e binary](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488908465/job/106020295410) success; [e2e docker+pester](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488908465/job/106020295515) failure | GitHub check runs |
+| Local tests | passed | handoff.yaml `localTests: passed` |
+| PR comments | no comments | `comments.md` all `[x]` |
 
 ## Specs
 
@@ -79,7 +79,7 @@ None.
 
 ## How this fits together
 
-Ticket `2026-09-19-optcow-stream-lookup` is branch `2026-09-19-optcow-stream-lookup` on PR #118 to `master`. Change archived; CI is in progress on 15a81f52.
+Ticket `2026-09-19-optcow-stream-lookup` is branch `2026-09-19-optcow-stream-lookup` on PR #118 to `master`. Ready title set; do not merge while e2e docker+pester is red.
 
 ## Decision needed
 
@@ -91,12 +91,12 @@ None.
 - [x] [P2] Human product fixes: no nil-store Close; utilities v1.0.5 (6842765a)
 - [x] [P3] Usage docs: `core_plugin_decisionstore.md`; cache/lease packets removed (35c34cd4)
 - [x] [P3] Catalog synced; change archived at `openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/` (e08b8ba9)
-- [ ] Close RETHINK `chat-store-split` after pullrequest Reply
-- [ ] Green CI on reviewed head
+- [x] Close RETHINK `chat-store-split` (Reply #5747561707)
+- [ ] [P2] Green e2e docker+pester on 69163b97 — [job](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488908465/job/106020295515)
 
 ## Findings
 
-- [chat-store-split](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/118) — RETHINK — store split landed as `pkg/decisionstore.Store` engines, not `Client` cache branching. Path: (general). Reply pending pullrequest.
+- [chat-store-split](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/118#issuecomment-5747561707) — RETHINK — store split landed as `pkg/decisionstore.Store` engines. Path: (general). Reply 5747561707.
 - Six-axis hard/wrong items applied in f92c8573; skipped IPCacheKey rename (ticket pin) and three judgement items.
 
 ## Axis review
@@ -115,8 +115,8 @@ None.
 | Metric | Value | Why it matters |
 | --- | --- | --- |
 | Specs in this PR | 1 added / 13 modified | Same list as ## Specs |
-| Open reviewer comments walked | 1 FIX / 0 ANSWER / 1 open | Unanswered RETHINK is merge risk |
-| Reviewed head | 15a81f522b34b5afc355b65bc31d1913a8c3f9b2 | Card matches measured branch |
+| Open reviewer comments walked | 1 FIX / 0 ANSWER / 0 open | RETHINK replied |
+| Reviewed head | 69163b97a4706fe7a9f4969a1384bce41aecf800 | Card matches measured branch |
 
 ### Stored data model
 
@@ -138,10 +138,10 @@ What I checked:
 - Six-axis Status after apply (run-root `codereview_*.md`, 5936ac7a)
 - Product apply `f92c8573` (leftover drop, live sweep, Pack delete, coverage tests)
 - Human pins `6842765a` (no nil-store Close; utilities v1.0.5)
-- GitHub check runs on 15a81f52 (in_progress)
+- GitHub check runs on 69163b97 (Main/Race/e2e-binary success; e2e docker+pester failure)
 - Usage packets produced (`knowledge/devdocs/core_plugin_decisionstore.md`, 35c34cd4)
 - Catalog archive `e08b8ba9` (`openspec/changes/archive/2026-09-20-2026-09-19-optcow-stream-lookup/`)
 
 ### Rank-up moves
 
-- Reply `chat-store-split` in pullrequest (landed store is engines, not `streamStore`/`cache.Client`).
+- Re-run or diagnose e2e docker+pester (failed in 29s on 69163b97 after a 3m success on 7c02f516).
