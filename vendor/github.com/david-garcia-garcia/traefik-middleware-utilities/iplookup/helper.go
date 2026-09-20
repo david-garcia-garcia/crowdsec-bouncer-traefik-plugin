@@ -86,7 +86,7 @@ func (h *Helper) Reset() {
 
 // Count is the number of stored prefixes, not the number of AddCIDR calls.
 func (h *Helper) Count() int {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	return h.count
 }

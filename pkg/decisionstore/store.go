@@ -129,66 +129,42 @@ func (o originIntern) Intern(name string) (uint16, bool) {
 // BeginTick opens the write window for one stream poll. Memory clones published into tick.
 // Redis is a no-op: each Set/Delete is already visible to other processes.
 func (s *Store) BeginTick() {
-	if s == nil || s.engine.beginTick == nil {
-		return
-	}
 	s.engine.beginTick()
 }
 
 // PublishTick closes that window. Memory drops expired tick slots and publishes tick.
 // Redis is a no-op: key TTL is the expiry.
 func (s *Store) PublishTick(now int64) {
-	if s == nil || s.engine.publishTick == nil {
-		return
-	}
 	s.engine.publishTick(now)
 }
 
 // Put stores one Ip or header-scope decision. Range is ignored (use ApplyRangeBatch).
 func (s *Store) Put(item Decision) {
-	if s == nil || s.engine.put == nil {
-		return
-	}
 	s.engine.put(item)
 }
 
 // Delete drops the canonical slot for scope+value, and a prior Ip spelling when it differs.
 func (s *Store) Delete(scope, value string) {
-	if s == nil || s.engine.deleteSlot == nil {
-		return
-	}
 	s.engine.deleteSlot(scope, value)
 }
 
 // LookupRemediation is the request path for stream/alone and live/none.
 func (s *Store) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string) (string, string, uint16, error) {
-	if s == nil || s.engine.lookup == nil {
-		return "", "", 0, ErrMiss
-	}
 	return s.engine.lookup(remoteIP, ipAddr, scopes, s.RangeMembership())
 }
 
 // Close drains the Redis pool. Memory is a no-op. Reclaim last-holder hook.
 func (s *Store) Close() {
-	if s == nil || s.engine.close == nil {
-		return
-	}
 	s.engine.close()
 }
 
 // RangeIndex is the Range blob, or empty when none has been written.
 func (s *Store) RangeIndex() (string, error) {
-	if s == nil || s.engine.rangeIndex == nil {
-		return "", ErrMiss
-	}
 	return s.engine.rangeIndex()
 }
 
 // ApplyRangeBatch upserts and removes Range CIDRs, then rebuilds in-process membership.
 func (s *Store) ApplyRangeBatch(upserts map[string]string, removals []string) error {
-	if s == nil || s.engine.applyRange == nil {
-		return ErrMiss
-	}
 	if err := s.engine.applyRange(upserts, removals); err != nil {
 		return err
 	}
@@ -198,9 +174,6 @@ func (s *Store) ApplyRangeBatch(upserts map[string]string, removals []string) er
 
 // RangeMembership is the current in-process Range lookup, or nil before the first hydrate.
 func (s *Store) RangeMembership() *RangeMembership {
-	if s == nil {
-		return nil
-	}
 	stored := s.rangeMembership.Load()
 	if stored == nil {
 		return nil
@@ -211,9 +184,6 @@ func (s *Store) RangeMembership() *RangeMembership {
 
 // HydrateRange rebuilds Range membership from the stored blob. A read that did not answer keeps the last trees.
 func (s *Store) HydrateRange() {
-	if s == nil {
-		return
-	}
 	index, err := s.RangeIndex()
 	if err != nil {
 		return
@@ -228,33 +198,21 @@ func (s *Store) HydrateRange() {
 
 // OriginID appends an origin name for metrics. Empty name is id 0. Overflow does not wrap.
 func (s *Store) OriginID(name string) (uint16, bool) {
-	if s == nil {
-		return 0, false
-	}
 	return s.origins.ID(name)
 }
 
 // OriginName is the interned origin for id. Unknown id is empty.
 func (s *Store) OriginName(id uint16) string {
-	if s == nil {
-		return ""
-	}
 	return s.origins.Name(id)
 }
 
 // FillUntilMaxForTest fills the intern table so the next OriginID overflows. Tests only.
 func (s *Store) FillUntilMaxForTest() {
-	if s == nil {
-		return
-	}
 	s.origins.FillUntilMaxForTest()
 }
 
 // SeedSlotForTest publishes one memory slot without a tick. Redis Put goes to Redis.
 func (s *Store) SeedSlotForTest(item Decision) {
-	if s == nil {
-		return
-	}
 	if s.mem != nil {
 		s.mem.seedPublished(item)
 		return
@@ -264,7 +222,7 @@ func (s *Store) SeedSlotForTest(item Decision) {
 
 // PublishedMemoryMapForTest is the published memory map. Nil when the store is Redis.
 func (s *Store) PublishedMemoryMapForTest() map[string]LiveSlot {
-	if s == nil || s.mem == nil {
+	if s.mem == nil {
 		return nil
 	}
 	return s.mem.publishedMap()

@@ -90,6 +90,4 @@ func TestStoreCloseRedisTwice(_ *testing.T) {
 	store := NewRedis(logger.New("INFO", ""), "127.0.0.1:1", []string{"127.0.0.1:1"}, "", "", "p")
 	store.Close()
 	store.Close()
-	var empty *Store
-	empty.Close()
 }

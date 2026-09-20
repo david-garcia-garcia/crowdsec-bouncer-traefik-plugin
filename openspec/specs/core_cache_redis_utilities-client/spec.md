@@ -5,12 +5,12 @@ The plugin Redis cache uses the vendored traefik-middleware-utilities SimpleRedi
 ## Requirements
 
 ### Requirement: Vendored utilities client is the Redis client
-The plugin SHALL import `github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis` for Redis GET/SET/DEL/MGET. Runtime SHALL NOT import `github.com/maxlerebourg/simpleredis` and MUST NOT keep `pkg/simpleredis`. `go.mod` SHALL require `github.com/david-garcia-garcia/traefik-middleware-utilities` at `v1.0.4` and that module SHALL be present under `vendor/`.
+The plugin SHALL import `github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis` for Redis GET/SET/DEL/MGET. Runtime SHALL NOT import `github.com/maxlerebourg/simpleredis` and MUST NOT keep `pkg/simpleredis`. `go.mod` SHALL require `github.com/david-garcia-garcia/traefik-middleware-utilities` at `v1.0.5` and that module SHALL be present under `vendor/`.
 
 #### Scenario: Cache compiles against utilities SimpleRedis
 - **WHEN** a reviewer inspects `pkg/cache/cache.go` and `go.mod`
 - **THEN** the cache imports `github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis`
-- **AND** `go.mod` requires that module at `v1.0.4`
+- **AND** `go.mod` requires that module at `v1.0.5`
 - **AND** `go.mod` does not require `github.com/maxlerebourg/simpleredis`
 - **AND** `pkg/simpleredis` is absent
 
