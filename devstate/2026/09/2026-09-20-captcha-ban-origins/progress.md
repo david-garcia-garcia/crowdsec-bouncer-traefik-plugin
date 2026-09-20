@@ -6,7 +6,7 @@ JobName: 2026-09-20-captcha-ban-origins
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-20T18:43:37Z |
 | explore | [x] | [x] | 2026-09-20T19:18:09Z |
-| propose | [ ] | [ ] | |
+| propose | [x] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |

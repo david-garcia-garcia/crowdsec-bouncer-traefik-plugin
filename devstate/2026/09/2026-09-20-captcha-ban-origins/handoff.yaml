@@ -10,8 +10,8 @@ src: sha256:8eb617c9196190d3a7e7715c2365d99f5c6e8847e718e317e970bbd323d1955f
 localTests: none
 requirement: requirement.md
 comments: none
-explore: explore.md explore.md
-change:
+explore: explore.md
+change: captcha-ban-origins
 pr:
   id: 130
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/130
