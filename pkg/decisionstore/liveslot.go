@@ -57,7 +57,7 @@ func expiryFromDuration(durationSec int64) int32 {
 	if elapsedExpiresAt > math.MaxInt32 {
 		return math.MaxInt32
 	}
-	return int32(elapsedExpiresAt) //nolint:gosec // G115 saturated into [1, MaxInt32]
+	return int32(elapsedExpiresAt)
 }
 
 // LiveSlotFromPack builds a slot from a packed word and CrowdSec duration seconds.
