@@ -1,8 +1,8 @@
 ## 1. Exact Peek on vendor table and shim
 
-- [ ] 1.1 Add exported `State` (`Awake`, `Asleep`) and `(*Table).Peek(key) (any, State, bool)` on vendored `traefik-middleware-utilities/reclaim/table.go` (no wait on busy; no bind/Wake/grace stop)
-- [ ] 1.2 Re-export `State`, `Awake`, `Asleep`, and `Peek` on `Default()` from `pkg/reclaim` (`zzz_` tests for awake/asleep/miss/busy). Do not export `PeekLivePrefix` or `View`. Do not fork `table.go` into `pkg/reclaim`
-- [ ] 1.3 Keep `knowledge/debt/2026-09-20-upstream-reclaim-peek.md` as the CI vendor-restore / upstream Peek follow-up. Do not skip Peek
+- [x] 1.1 Add exported `State` (`Awake`, `Asleep`) and `(*Table).Peek(key) (any, State, bool)` on vendored `traefik-middleware-utilities/reclaim/table.go` (no wait on busy; no bind/Wake/grace stop)
+- [x] 1.2 Re-export `State`, `Awake`, `Asleep`, and `Peek` on `Default()` from `pkg/reclaim` (`zzz_` tests for awake/asleep/miss/busy). Do not export `PeekLivePrefix` or `View`. Do not fork `table.go` into `pkg/reclaim`
+- [x] 1.3 Keep `knowledge/debt/2026-09-20-upstream-reclaim-peek.md` as the CI vendor-restore / upstream Peek follow-up. Do not skip Peek
 
 ## 2. DecisionStore key, createdBy, streamReady
 
