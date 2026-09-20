@@ -31,7 +31,7 @@ func elapsedNow() int32 {
 	if elapsed > math.MaxInt32 {
 		return math.MaxInt32
 	}
-	return int32(elapsed) //nolint:gosec // G115 capped above MaxInt32
+	return int32(elapsed)
 }
 
 // expiryFromDuration is saturated elapsed ExpiresAt from CrowdSec duration seconds.
