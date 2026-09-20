@@ -104,5 +104,5 @@ Intended
   By: explore
 
 - Q: Compact decision slot Language after the forget map is gone?
-  Decision: assumed — this change updates `knowledge/devdocs/core_plugin_lapi_usage-metrics.md` (and DecisionStore usage) when implement lands: MetricsReporter no longer owns the gauge; compact group-by is DecisionStore. Do not silent-rename the packet files. No extra Issues row (Range debt is the follow-up).
-  By: explore
+  Decision: resolved — updated `knowledge/devdocs/core_plugin_lapi_usage-metrics.md` and `knowledge/devdocs/core_plugin_decisionstore.md`; MetricsReporter no longer owns the gauge; compact group-by is DecisionStore. Stream-apply usage dropped remember/forget. Do not silent-rename the packet files. No extra Issues row (Range debt is the follow-up).
+  By: implement
