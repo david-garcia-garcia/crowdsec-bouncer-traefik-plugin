@@ -91,6 +91,7 @@ type Config struct {
 	CrowdsecCapiPassword                       string            `json:"crowdsecCapiPassword,omitempty"`
 	CrowdsecCapiPasswordFile                   string            `json:"crowdsecCapiPasswordFile,omitempty"`
 	CrowdsecCapiScenarios                      []string          `json:"crowdsecCapiScenarios,omitempty"`
+	CrowdsecDecisionHeader                     string            `json:"crowdsecDecisionHeader,omitempty"` // incoming header name; empty = off; values b|c
 	UpdateIntervalSeconds                      int64             `json:"updateIntervalSeconds,omitempty"`
 	MetricsUpdateIntervalSeconds               int64             `json:"metricsUpdateIntervalSeconds,omitempty"`
 	UpdateMaxFailure                           int64             `json:"updateMaxFailure,omitempty"`
@@ -217,6 +218,7 @@ func New() *Config {
 		CaptchaGracePeriodSeconds:       1800,
 		CaptchaFilePath:                 "/captcha.html",
 		BanFilePath:                     "",
+		CrowdsecDecisionHeader:          "",
 		TraceHeadersCustomName:          "",
 		RemediationHeadersCustomName:    "",
 		ForwardedHeadersCustomName:      "X-Forwarded-For",

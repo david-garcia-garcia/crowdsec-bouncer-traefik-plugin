@@ -85,3 +85,8 @@ priority: normal
 local: core_plugin_middleware_captcha-siteverify.md
 description: How Validate encodes the provider siteverify request and classifies a JSON success reply.
 
+## Forced decision header
+priority: normal
+local: core_plugin_middleware_forced-decision.md
+description: How a config-named request header forces ban or captcha without stream lookup.
+

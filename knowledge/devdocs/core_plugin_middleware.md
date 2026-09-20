@@ -52,6 +52,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - Pass `config.DefaultDecisionSeconds` into `LiveLookup`. Two routers on one Client last-write that TTL into the shared live cache.
 - Keep `StreamStartupBlock` write-once at `startStream`. First incarnation keeps it. Do not put it on Bouncer.
 - Resolve client IP with `pkg/ip.GetRemoteIP`. Fold `remoteIP`, parsed `net.IP`, and `ipType` into `clientRequest`. Keep the name `req`. Do not parse `RemoteAddr` on LAPI or AppSec. Do not put scopes or origin on that type.
+- After the trusted-client skip, a non-empty `crowdsecDecisionHeader` with exact `b` or `c` remediates without lookup (`core_plugin_middleware_forced-decision.md`).
 - Range and header-mapped CrowdSec scopes live in `pkg/decisionscope`. Do not geolocate in `New` or `ServeHTTP`.
 - Live LAPI error and stream-unhealthy cache miss use `crowdsecLapiFailureAction`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled).
 - Watch logs `reclaim_put|bind|orphan|reclaim|dispose`.

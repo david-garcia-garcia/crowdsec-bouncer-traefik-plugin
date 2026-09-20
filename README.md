@@ -267,6 +267,9 @@ Disable verification of the certificate presented by AppSec.
 **CrowdsecCapiScenarios** ([]string, no default)
 `alone` only. CAPI scenarios.
 
+**CrowdsecDecisionHeader** (string, default `""`)
+Incoming request header that forces ban or captcha without a stream or live lookup. Empty disables the feature (the plugin does not read `X-Crowdsec-Decision` unless you set this key). Values are exact trimmed `b` (ban) or `c` (captcha). Any other token, including `t` and `B`, is ignored and lookup continues. Put a Traefik middleware that writes this header *before* the bouncer. Do not expose the header to the internet; any client who can set it can captcha or ban themselves. A `c` value still honors the captcha gate cookie: a visitor who already solved captcha reaches origin even while the header is still `c`. Trusted client IPs still skip the whole plugin, including this header.
+
 **CrowdsecLapiFailureAction** (string, default `ban`)
 What to do when LAPI does not return a usable verdict (live/none HTTP or parse error, or a cache miss while stream/alone is unhealthy after `updateMaxFailure`). Expected: `passthrough`, `ban`, `captcha`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled). `captcha` uses the plugin captcha client (`captchaProvider` must be set). **Behavior change:** in `live` and `none`, this action also covers a failed `decisionScopeHeaders` query. Previously a LAPI that answered the IP query but errored on a header-scope query was treated as "no decision" and allowed (`DEBUG`). That is now a LAPI failure: default `ban` blocks those requests and logs `WARN`. An active ban still wins. Set `crowdsecLapiFailureAction: passthrough` to keep allowing when a header-scope query fails.
 
@@ -488,6 +491,7 @@ http:
             # Country: X-IPCountry    # key Country (any case) → ISO country matcher (CDN or geoenrich)
             # AS: CF-ASN             # key AS (any case) → ASN matcher
             # username: X-User       # any other key → trimmed exact match
+          crowdsecDecisionHeader: X-Crowdsec-Decision # optional; earlier middleware writes b or c
           remediationHeadersCustomName: cs-remediation
           redisCacheEnabled: false
           redisCacheHost: "redis-primary:6379"

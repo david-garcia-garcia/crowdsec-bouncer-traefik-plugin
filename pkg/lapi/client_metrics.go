@@ -25,6 +25,7 @@ const (
 	OriginPluginTechStreamFail    = "plugin:tech_streamfail"    // stream unhealthy
 	OriginPluginLapiFailure       = "plugin:lapi_failure"       // live LAPI lookup error
 	OriginPluginAppsecFailure     = "plugin:appsec_failure"     // AppSec failure-action
+	OriginPluginForcedDecision    = "plugin:forced_decision"    // crowdsecDecisionHeader forced b or c
 )
 
 // crowdsecQueryFunc POSTs through the Client's current LAPI transport.

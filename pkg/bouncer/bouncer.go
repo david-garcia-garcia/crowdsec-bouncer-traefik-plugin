@@ -30,6 +30,7 @@ type Bouncer struct {
 	clientPoolStrategy       *ip.PoolStrategy
 	crowdsecMode             string
 	decisionScopeHeaders     map[string]string // CrowdSec header scope → request header
+	forcedDecisionHeader     string            // crowdsecDecisionHeader; empty = off
 	enabled                  bool
 	forwardedCustomHeader    string
 	forwardedHeadersInsecure bool
@@ -75,6 +76,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
 		crowdsecMode:             config.CrowdsecMode,
 		decisionScopeHeaders:     decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
+		forcedDecisionHeader:     strings.TrimSpace(config.CrowdsecDecisionHeader),
 		enabled:                  config.Enabled,
 		forwardedCustomHeader:    forwardedCustomHeader,
 		forwardedHeadersInsecure: config.ForwardedHeadersInsecure,
@@ -141,6 +143,22 @@ func (b *Bouncer) SameLapiClient(other *Bouncer) bool {
 	return other != nil && b.lapiClient == other.lapiClient
 }
 
+// forcedDecisionKind returns BannedValue or CaptchaValue when the configured
+// request header forces ban or captcha, otherwise empty.
+func (b *Bouncer) forcedDecisionKind(httpReq *http.Request) string {
+	if b.forcedDecisionHeader == "" {
+		return ""
+	}
+	switch strings.TrimSpace(httpReq.Header.Get(b.forcedDecisionHeader)) {
+	case "b":
+		return decisionscope.BannedValue
+	case "c":
+		return decisionscope.CaptchaValue
+	default:
+		return ""
+	}
+}
+
 // ServeHTTP is the per-router middleware handler.
 //
 // none: no stream, no cache; LiveLookup every request.
@@ -183,6 +201,13 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	if isTrusted {
 		b.next.ServeHTTP(rw, req.Request)
 		// Trusted clients skip LAPI and AppSec.
+		return
+	}
+
+	// Configured header b|c remediates without stream or live lookup.
+	if kind := b.forcedDecisionKind(req.Request); kind != "" {
+		logger.Trace(b.log, "ServeHTTP", "ip", req.remoteIP, "forcedDecision", kind)
+		b.handleRemediationServeHTTP(rw, req, kind, lapi.OriginPluginForcedDecision)
 		return
 	}
 
