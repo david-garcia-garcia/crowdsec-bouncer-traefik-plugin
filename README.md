@@ -328,7 +328,7 @@ File path for logs. Must be writable by Traefik. Rotation may need a Traefik res
 `common` for text logs, `json` for structured JSON. Expected: `common`, `json`.
 
 **LogLevel** (string, default `INFO`)
-Logs go to `stdout` / `stderr`, or to a file if `LogFilePath` is set. Expected: `DEBUG`, `INFO`, `WARN`, `ERROR`.
+Logs go to `stdout` / `stderr`, or to a file if `LogFilePath` is set. Expected: `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`. `TRACE` is for per-request breadcrumbs (`ServeHTTP`, captcha check); `DEBUG` is for startup, stream ticks, and request-path failures.
 
 **MetricsUpdateIntervalSeconds** (int64, default `600`)
 Seconds between metrics updates to CrowdSec. Zero or less disables collection.

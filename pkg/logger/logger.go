@@ -3,6 +3,7 @@
 package logger
 
 import (
+	"context"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -16,12 +17,19 @@ import (
 var sharedLogFiles sync.Map
 
 // Custom log levels following slog best practices.
+// LevelTrace is below Debug (slog.Level(-8)), matching the Go slog custom-levels example.
 const (
+	LevelTrace = slog.Level(-8)
 	LevelDebug = slog.LevelDebug
 	LevelInfo  = slog.LevelInfo
 	LevelWarn  = slog.LevelWarn
 	LevelError = slog.LevelError
 )
+
+// Trace logs at LevelTrace. slog.Logger has no Trace method.
+func Trace(log *slog.Logger, msg string, args ...any) {
+	log.Log(context.Background(), LevelTrace, msg, args...)
+}
 
 // New creates a Log wrapper with default format (common).
 func New(logLevel string, logFilePath string) *slog.Logger {
@@ -41,6 +49,8 @@ func NewWithFormat(logLevel, logFilePath, logFormat string) *slog.Logger {
 		level = LevelInfo
 	case "DEBUG":
 		level = LevelDebug
+	case "TRACE":
+		level = LevelTrace
 	default:
 		// Default to INFO level
 		level = LevelInfo
@@ -60,6 +70,8 @@ func NewWithFormat(logLevel, logFilePath, logFormat string) *slog.Logger {
 					return a
 				}
 				switch {
+				case lvl < LevelDebug:
+					a.Value = slog.StringValue("TRACE")
 				case lvl < LevelInfo:
 					a.Value = slog.StringValue("DEBUG")
 				case lvl < LevelWarn:

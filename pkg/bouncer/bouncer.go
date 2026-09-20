@@ -16,6 +16,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // Bouncer is one Traefik router handler. It is not the reclaim value.
@@ -178,7 +179,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	// Lookup, live memo, and captcha bind share this spelling. GetRemoteIP still returned the raw text.
 	req.remoteIP = req.ipAddr.String()
 	isTrusted := b.clientPoolStrategy.Checker.ContainsIP(req.ipAddr)
-	b.log.Debug("ServeHTTP", "ip", req.remoteIP, "isTrusted", isTrusted)
+	logger.Trace(b.log, "ServeHTTP", "ip", req.remoteIP, "isTrusted", isTrusted)
 	if isTrusted {
 		b.next.ServeHTTP(rw, req.Request)
 		// Trusted clients skip LAPI and AppSec.
@@ -211,7 +212,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
 			return
 		case decisionscope.IsActiveRemediation(kind):
-			b.log.Debug("ServeHTTP", "ip", req.remoteIP, "cache", "hit", "remediation", kind)
+			logger.Trace(b.log, "ServeHTTP", "ip", req.remoteIP, "cache", "hit", "remediation", kind)
 			// Origin is resolved only on drop; allow-path skips OriginName.
 			b.handleRemediationServeHTTP(rw, req, kind, b.resolveDroppedOrigin(origin, originID))
 			return
@@ -246,7 +247,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			b.handleNextServeHTTP(rw, req)
 			return
 		}
-		b.log.Debug("ServeHTTP:LiveLookup", "ip", req.remoteIP, "isBanned", kind)
+		logger.Trace(b.log, "ServeHTTP:LiveLookup", "ip", req.remoteIP, "isBanned", kind)
 		b.handleRemediationServeHTTP(rw, req, kind, origin)
 	}
 }
@@ -323,7 +324,7 @@ func (b *Bouncer) resolveDroppedOrigin(origin string, originID uint16) string {
 // reaches handleBanServeHTTP from here.
 func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientRequest, remediation, origin string) {
 	kind := decisionscope.RemediationKind(remediation)
-	b.log.Debug("handleRemediationServeHTTP", "ip", req.remoteIP, "remediation", kind)
+	logger.Trace(b.log, "handleRemediationServeHTTP", "ip", req.remoteIP, "remediation", kind)
 	if !b.captchaClient.Valid || kind != decisionscope.CaptchaValue {
 		b.handleBanServeHTTP(rw, req, configuration.ReasonLAPI, origin)
 		return
