@@ -19,13 +19,11 @@ See `proposal.md` — Why. On `master`, memory slots store wall Unix in int64 `E
 
 ## Decisions
 
-1. **Origin at package init** — `originUnix = time.Now().Unix() - 2` once at init. Rationale: process wall clock, not reclaim incarnation; bias keeps `0` free for PublishTick sentinel. Alternative (Store `New`) rejected: would differ per router instance without benefit.
+1. **Origin at package load** — `elapsedStart = time.Now()` once (monotonic reading kept). `elapsedNow` is `time.Since(elapsedStart)/time.Second + 2`. Bias keeps `0` free for PublishTick sentinel. Alternative (Unix subtract + CAS) rejected: `.Unix()` is wall time; `Since` is the stdlib monotonic clock. Alternative (Store `New`) rejected: would differ per router instance without benefit.
 
 2. **int32 `PublishTick(now)`** — Store and engine use `int32` so wall Unix cannot compile into memory sweep without conversion. Redis engine keeps no-op and ignores the argument. Alternative: named `Elapsed` type — deferred unless implement still mixes clocks.
 
 3. **Expiry saturation** — `LiveSlotFromPack` sets `ExpiresAt` via `now() + durationSec`, clamped to `[1, MaxInt32]` (`1` is already expired); immediate durations miss lookup on the next elapsed `now`. Alternative: store wall Unix in int32 — rejected (Y2038 and wastes the size win).
-
-4. **Step-back clamp** — if wall Unix steps backward, `now()` does not decrease below the last returned value (monotonic elapsed for comparisons). Mitigates false mass expiry on NTP adjust.
 
 ## Risks / Trade-offs
 

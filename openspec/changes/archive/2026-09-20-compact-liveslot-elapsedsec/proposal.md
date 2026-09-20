@@ -4,7 +4,7 @@ Memory `LiveSlot` values are 16 bytes on current Go map layouts because `Expires
 
 ## What Changes
 
-- Change memory `LiveSlot.ExpiresAt` to int32 elapsed seconds since a package-init origin (wall Unix minus bias 2); keep `0` as the PublishTick skip-sweep sentinel.
+- Change memory `LiveSlot.ExpiresAt` to int32 elapsed seconds since a package-load `time.Time` (`time.Since` plus bias 2); keep `0` as the PublishTick skip-sweep sentinel.
 - Add unexported elapsed clock helpers in `pkg/decisionstore` (no `pkg/elapsedsec`).
 - Change `Store.PublishTick` and engine callbacks from `int64` to `int32`; stream apply and tests pass elapsed `now`.
 - Align memory lookup, live PutMany COW sweep, and `LiveSlotFromPack` with the elapsed clock; saturate expiry into `[1, MaxInt32]`.

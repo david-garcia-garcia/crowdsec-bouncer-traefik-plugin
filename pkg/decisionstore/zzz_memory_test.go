@@ -7,7 +7,6 @@ import (
 	"net"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -27,14 +26,9 @@ func TestMemoryTickPublishLookup(t *testing.T) {
 	}
 }
 
-func TestElapsedNowIgnoresWallStepBack(t *testing.T) {
-	before := elapsedNow()
-	savedOrigin := originUnix
-	originUnix = time.Now().Unix() + 3600
-	t.Cleanup(func() { originUnix = savedOrigin })
-	after := elapsedNow()
-	if after < before {
-		t.Fatalf("elapsedNow decreased after wall step-back: before %d after %d", before, after)
+func TestElapsedNowStaysAboveSkipSentinel(t *testing.T) {
+	if got := elapsedNow(); got < elapsedBias {
+		t.Fatalf("elapsedNow %d, want at least bias %d", got, elapsedBias)
 	}
 }
 

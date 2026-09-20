@@ -2,7 +2,7 @@
 
 
 
-- [x] 1.1 Add package-init origin and unexported elapsed `now()` with step-back clamp in `pkg/decisionstore`
+- [x] 1.1 Add package-load `time.Time` origin and unexported elapsed `now()` via `time.Since` plus bias in `pkg/decisionstore`
 
 - [x] 1.2 Change `LiveSlot.ExpiresAt` to int32; update `LiveSlotFromPack` saturation into `[1, MaxInt32]`
 

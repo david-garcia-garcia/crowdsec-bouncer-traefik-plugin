@@ -23,8 +23,8 @@ The Redis SET value and the Range blob remediation: kind letter, then newline, t
 _Avoid_: leftover, `RemediationWithOrigin`, U+001F
 
 **Elapsed slot clock**:
-Process-wide origin at package init (wall Unix minus two). Memory `LiveSlot.ExpiresAt` and `PublishTick(now int32)` use elapsed whole seconds from `ElapsedNow()`, not wall Unix. `PublishTick(0)` skips the expiry sweep.
-_Avoid_: `time.Now().Unix()` as PublishTick `now` on memory, treating `ExpiresAt` as wall Unix
+Process-wide `time.Time` at package load. Memory `LiveSlot.ExpiresAt` and `PublishTick(now int32)` use whole seconds from `time.Since` that origin plus two (`ElapsedNow()`), not wall Unix. `PublishTick(0)` skips the expiry sweep.
+_Avoid_: `time.Now().Unix()` as PublishTick `now` on memory, treating `ExpiresAt` as wall Unix, homemade CAS on Unix elapsed
 
 ## Overview
 

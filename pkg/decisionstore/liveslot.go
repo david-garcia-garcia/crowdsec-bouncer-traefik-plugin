@@ -2,7 +2,6 @@ package decisionstore
 
 import (
 	"math"
-	"sync/atomic"
 	"time"
 )
 
@@ -13,41 +12,26 @@ type LiveSlot struct {
 	ExpiresAt int32
 }
 
-var (
-	originUnix  int64 //nolint:gochecknoglobals // process-wide memory slot clock origin at init
-	lastElapsed int64 //nolint:gochecknoglobals // monotonic elapsed seconds for slot comparisons
-)
+// elapsedStart is the process-wide memory slot clock. time.Since uses its monotonic reading.
+var elapsedStart = time.Now() //nolint:gochecknoglobals // one slot clock per process
 
-// init fixes origin at wall Unix minus two so elapsed 0 stays the PublishTick skip sentinel.
-//
-//nolint:gochecknoinits // process-wide clock seed; explore rejected per-Store origin
-func init() {
-	originUnix = time.Now().Unix() - 2
-	atomic.StoreInt64(&lastElapsed, 2)
-}
+const elapsedBias = 2 // keeps 0 as PublishTick skip-sweep sentinel
 
 // ElapsedNow is whole seconds on the memory slot clock for stream apply, PublishTick, lookup, and tests.
 func ElapsedNow() int32 {
 	return elapsedNow()
 }
 
-// elapsedNow is wall Unix minus origin, never decreasing when the wall clock steps back.
+// elapsedNow is process uptime in seconds plus bias, from elapsedStart's monotonic clock.
 func elapsedNow() int32 {
-	wallElapsed := time.Now().Unix() - originUnix
-	// Keep lastElapsed monotonic across NTP step-back.
-	for {
-		last := atomic.LoadInt64(&lastElapsed)
-		if wallElapsed < last {
-			wallElapsed = last
-		}
-		if atomic.CompareAndSwapInt64(&lastElapsed, last, wallElapsed) {
-			break
-		}
+	elapsed := int64(time.Since(elapsedStart)/time.Second) + elapsedBias
+	if elapsed < elapsedBias {
+		return elapsedBias
 	}
-	if wallElapsed > math.MaxInt32 {
+	if elapsed > math.MaxInt32 {
 		return math.MaxInt32
 	}
-	return int32(wallElapsed) //nolint:gosec // G115 capped above MaxInt32
+	return int32(elapsed) //nolint:gosec // G115 capped above MaxInt32
 }
 
 // expiryFromDuration is saturated elapsed ExpiresAt from CrowdSec duration seconds.
