@@ -7,7 +7,7 @@ JobName: 2026-09-20-lapi-session-subscribe
 | prepare | [x] | [x] | 2026-09-20T05:06:35Z |
 | explore | [x] | [x] | 2026-09-20T05:12:39Z |
 | propose | [x] | [x] | 2026-09-20T05:21:49Z |
-| implement | [ ] | [ ] | |
+| implement | [x] | [ ] | |
 | codereview | [ ] | [ ] | |
 | devdocsimpact | [ ] | [ ] | |
 | archive | [ ] | [ ] | |
