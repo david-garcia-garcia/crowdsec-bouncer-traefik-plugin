@@ -102,6 +102,7 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 	defer c.decisionStore.PublishTick(time.Now().Unix())
 	rangeUpserts := make(map[string]string)
 	var rangeRemovals []string
+	deletes := make([]decisionstore.Decision, 0)
 	for _, decision := range stream.Deleted {
 		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
 			if cidr := strings.TrimSpace(decision.Value); cidr != "" {
@@ -110,8 +111,18 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 			}
 			continue
 		}
-		c.deleteStreamDecision(decision)
+		stored, ok := c.streamDeleteItem(decision)
+		if !ok {
+			continue
+		}
+		deletes = append(deletes, stored)
+		if len(deletes) >= decisionstore.PutManyChunk {
+			c.decisionStore.DeleteMany(deletes)
+			deletes = deletes[:0]
+		}
 	}
+	c.decisionStore.DeleteMany(deletes)
+	puts := make([]decisionstore.Decision, 0)
 	for _, decision := range stream.New {
 		duration, parseErr := time.ParseDuration(decision.Duration)
 		if parseErr != nil {
@@ -128,8 +139,17 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 			continue
 		}
 		// Sub-second CrowdSec durations become 0; stream write TTL is not clamped.
-		c.storeStreamDecision(decision, int64(duration.Seconds()))
+		stored, ok := c.streamPutItem(decision, int64(duration.Seconds()))
+		if !ok {
+			continue
+		}
+		puts = append(puts, stored)
+		if len(puts) >= decisionstore.PutManyChunk {
+			c.decisionStore.PutMany(puts)
+			puts = puts[:0]
+		}
 	}
+	c.decisionStore.PutMany(puts)
 	// A range apply that could not read the shared index is a poll that did not finish.
 	// isCrowdsecStreamStartup stays set so the retry asks for the full set again.
 	if err := c.decisionStore.ApplyRangeBatch(rangeUpserts, rangeRemovals); err != nil {

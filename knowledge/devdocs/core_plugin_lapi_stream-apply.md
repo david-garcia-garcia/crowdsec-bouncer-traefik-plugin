@@ -18,8 +18,8 @@ After the body is decoded, apply deleted first so a same-window replacement stay
 
 - Keep GET, decode, and apply in `fetchAndApplyStreamDecisions`.
 - Call `decisionStore.BeginTick` before the loops and `PublishTick` after (defer). Memory hides tick writes until publish. Redis tick is a no-op.
-- Loop `stream.Deleted` first: Ip/header `deleteStreamDecision`, Range CIDRs into removals, `forgetActiveDecision`.
-- Then loop `stream.New`: Ip/header `storeStreamDecision`, Range CIDRs into upserts via `KindOriginString`, `rememberActiveDecision`.
+- Loop `stream.Deleted` first: Ip/header `DeleteMany` in `PutManyChunk` flushes, Range CIDRs into removals, `forgetActiveDecision`.
+- Then loop `stream.New`: Ip/header `PutMany` in `PutManyChunk` flushes, Range CIDRs into upserts via `KindOriginString`, `rememberActiveDecision`.
 - Call `decisionStore.ApplyRangeBatch` once with those maps. Inside the batch, apply removals before upserts so a CIDR in both maps remains the replacement.
 - Hydrate Range membership from the store after the batch (`HydrateRange` at stream start; membership follows the blob).
 - Do not GET+SET per Range line. Do not split the batch into two store writes. Do not acquire `updated`.
@@ -30,10 +30,10 @@ After the body is decoded, apply deleted first so a same-window replacement stay
 c.decisionStore.BeginTick()
 defer c.decisionStore.PublishTick(time.Now().Unix())
 for _, decision := range stream.Deleted {
-	// deleteStreamDecision or collect Range removal + forget
+	// streamDeleteItem + DeleteMany (PutManyChunk flushes) or collect Range removal + forget
 }
 for _, decision := range stream.New {
-	// storeStreamDecision or collect Range upsert + remember
+	// streamPutItem + PutMany (PutManyChunk flushes) or collect Range upsert + remember
 }
 if err := c.decisionStore.ApplyRangeBatch(rangeUpserts, rangeRemovals); err != nil {
 	return err

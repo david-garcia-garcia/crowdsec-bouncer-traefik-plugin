@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// testStoreRedis is an in-process RESP stand-in for the verbs DecisionStore issues: GET, MGET, SET, DEL.
+// testStoreRedis is an in-process RESP stand-in for the verbs DecisionStore issues: GET, MGET, SET, DEL, MSETEX.
 type testStoreRedis struct {
 	mu   sync.Mutex
 	keys map[string]string
@@ -95,6 +95,8 @@ func (s *testStoreRedis) replyLocked(verb string, argv []string) []byte {
 		}
 		s.keys[argv[1]] = argv[2]
 		return []byte("+OK\r\n")
+	case "MSETEX":
+		return applyTestMSetEX(s.keys, argv)
 	case "DEL":
 		if len(argv) < 2 {
 			return []byte("-ERR wrong number of arguments\r\n")
@@ -107,6 +109,21 @@ func (s *testStoreRedis) replyLocked(verb string, argv []string) []byte {
 	default:
 		return []byte("+OK\r\n")
 	}
+}
+
+// applyTestMSetEX stores MSETEX pairs (numkeys key val ... EX|EXAT ttl) into keys.
+func applyTestMSetEX(keys map[string]string, argv []string) []byte {
+	if len(argv) < 6 {
+		return []byte("-ERR wrong number of arguments\r\n")
+	}
+	numkeys, convErr := strconv.Atoi(argv[1])
+	if convErr != nil || numkeys < 1 || len(argv) < 2+2*numkeys+2 {
+		return []byte("-ERR wrong number of arguments\r\n")
+	}
+	for i := range numkeys {
+		keys[argv[2+2*i]] = argv[2+2*i+1]
+	}
+	return []byte(":1\r\n")
 }
 
 func readTestStoreRESPArray(reader *bufio.Reader) ([]string, error) {
