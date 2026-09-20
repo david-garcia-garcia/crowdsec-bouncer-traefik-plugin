@@ -97,3 +97,55 @@ The Pester suite SHALL boot Crowdsec `v1.8.0` with AppSec bot-detection loaded (
 - **WHEN** AppSec CRS inband is still enabled on `/appsec`
 - **THEN** a benign `/appsec` request is allowed and a SQL-injection query string is forbidden
 
+#### Scenario: CRS inband still blocks SQLi in a POST body
+- **WHEN** AppSec CRS inband is enabled on `/appsec`
+- **AND** the client POSTs a SQL-injection form body
+- **THEN** the request is forbidden
+
+#### Scenario: Appsec mode ignores LAPI bans
+- **WHEN** `crowdsecMode` is `appsec` and AppSec is enabled
+- **AND** a LAPI IP ban exists for the client
+- **THEN** a benign request is allowed
+- **AND** a SQL-injection query string is still forbidden
+
+### Requirement: Real stack covers header-mapped custom scopes
+The Pester suite SHALL include a none-mode route whose `decisionScopeHeaders` maps `username`, `AS`, and `Country` to request headers (not geoblock enrich). Username and AS SHALL also be proven on the existing stream scope route.
+
+#### Scenario: Username header matches
+- **WHEN** a `username` ban `alice` exists and the request sends `X-User: alice`
+- **THEN** the route is forbidden, and `X-User: bob` or a missing header is allowed
+
+#### Scenario: Country placeholder does not match
+- **WHEN** a Country ban `FR` exists and the request sends `CF-IPCountry: XX`
+- **THEN** the route is allowed
+
+### Requirement: Real stack covers LAPI and AppSec failure actions
+The Pester suite SHALL include none-mode routes whose LAPI or AppSec host is unreachable, with `crowdsecLapiFailureAction` / `crowdsecAppsecFailureAction` set to `ban` and `passthrough`.
+
+#### Scenario: Unreachable LAPI passthrough
+- **WHEN** LAPI is unreachable and `crowdsecLapiFailureAction` is `passthrough`
+- **THEN** the request is allowed
+
+#### Scenario: Unreachable LAPI ban
+- **WHEN** LAPI is unreachable and `crowdsecLapiFailureAction` is `ban`
+- **THEN** the request is forbidden
+
+#### Scenario: Unreachable AppSec passthrough
+- **WHEN** AppSec is unreachable and `crowdsecAppsecFailureAction` is `passthrough`
+- **THEN** the request is allowed
+
+#### Scenario: Unreachable AppSec ban
+- **WHEN** AppSec is unreachable and `crowdsecAppsecFailureAction` is `ban`
+- **THEN** the request is forbidden
+
+### Requirement: Real stack covers captcha POST body, grace, and IPv6 bind
+Captcha solve SHALL succeed from the POST body alone (no query-string token). A dedicated short-grace route SHALL challenge again after `captchaGracePeriodSeconds`. Gate bind SHALL accept a different spelling of the same IPv6 address.
+
+#### Scenario: POST-body-only captcha solve
+- **WHEN** a captcha decision exists and the client POSTs `dummy-captcha-response` only in the form body
+- **THEN** the response is 302 with `crowdsec_captcha_gate` and the next GET reaches the backend
+
+#### Scenario: Captcha grace expires
+- **WHEN** the short-grace captcha route is solved
+- **THEN** a GET with the gate cookie after `captchaGracePeriodSeconds` serves the challenge again
+

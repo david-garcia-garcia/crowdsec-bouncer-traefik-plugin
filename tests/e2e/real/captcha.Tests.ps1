@@ -162,6 +162,68 @@ Describe "CrowdSec Bouncer Captcha Remediation Tests" {
             $otherIP.StatusCode | Should -Be 200
             $otherIP.Content | Should -Match "captcha|challenge"
         }
+
+        It "Should solve from the POST body without a query-string token" {
+            Add-TestDecision -IP $script:TestIPs.CaptchaIP -Type "captcha"
+
+            $formHeaders = @{ "Content-Type" = "application/x-www-form-urlencoded" }
+            $solve = Test-HttpRequest -Endpoint "/captcha" -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl `
+                -Method POST -Body "dummy-captcha-response=ok" -ExtraHeaders $formHeaders `
+                -MaximumRedirection 0
+            $solve.StatusCode | Should -Be 302 -Because "Yaegi FormValue misses POST bodies; the plugin must peek the form itself (status=$($solve.StatusCode) content=$($solve.Content))"
+            $setCookie = [string]$solve.Headers["Set-Cookie"]
+            $setCookie | Should -Match "crowdsec_captcha_gate="
+            $cookieHeaders = @{ Cookie = ($setCookie -split ';')[0].Trim() }
+
+            $passed = Test-HttpRequest -Endpoint "/captcha" -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl `
+                -ExtraHeaders $cookieHeaders
+            $passed.StatusCode | Should -Be 200
+            $passed.Content | Should -Match "Hostname:"
+        }
+
+        It "Should challenge again after captchaGracePeriodSeconds expires" {
+            Add-TestDecision -IP $script:TestIPs.CaptchaIP -Type "captcha"
+
+            $formHeaders = @{ "Content-Type" = "application/x-www-form-urlencoded" }
+            $solve = Test-HttpRequest -Endpoint "/short-captcha?dummy-captcha-response=ok" -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl `
+                -Method POST -Body "dummy-captcha-response=ok" -ExtraHeaders $formHeaders `
+                -MaximumRedirection 0
+            $solve.StatusCode | Should -Be 302
+            $setCookie = [string]$solve.Headers["Set-Cookie"]
+            $setCookie | Should -Match "crowdsec_captcha_gate="
+            $cookieHeaders = @{ Cookie = ($setCookie -split ';')[0].Trim() }
+
+            $passed = Test-HttpRequest -Endpoint "/short-captcha" -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl `
+                -ExtraHeaders $cookieHeaders
+            $passed.Content | Should -Match "Hostname:"
+
+            Start-Sleep -Seconds 5
+
+            $expired = Test-HttpRequest -Endpoint "/short-captcha" -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl `
+                -ExtraHeaders $cookieHeaders
+            $expired.StatusCode | Should -Be 200
+            $expired.Content | Should -Match "captcha|challenge" -Because "grace is 3s on /short-captcha; the gate cookie must not outlive it"
+        }
+
+        It "Should honour captcha gate bind across IPv6 spellings" {
+            $stored = "2001:0db8:0000:0000:0000:0000:00c1:0001"
+            $request = "2001:db8::c1:1"
+            Add-TestDecision -IP $stored -Type "captcha"
+
+            $formHeaders = @{ "Content-Type" = "application/x-www-form-urlencoded" }
+            $solve = Test-HttpRequest -Endpoint "/captcha?dummy-captcha-response=ok" -IP $request -TraefikUrl $script:TraefikUrl `
+                -Method POST -Body "dummy-captcha-response=ok" -ExtraHeaders $formHeaders `
+                -MaximumRedirection 0
+            $solve.StatusCode | Should -Be 302 -Because "compressed request spelling must match the expanded captcha decision"
+            $setCookie = [string]$solve.Headers["Set-Cookie"]
+            $setCookie | Should -Match "crowdsec_captcha_gate="
+            $cookieHeaders = @{ Cookie = ($setCookie -split ';')[0].Trim() }
+
+            $passed = Test-HttpRequest -Endpoint "/captcha" -IP $stored -TraefikUrl $script:TraefikUrl `
+                -ExtraHeaders $cookieHeaders
+            $passed.StatusCode | Should -Be 200
+            $passed.Content | Should -Match "Hostname:" -Because "gate bind compares canonical remoteIP"
+        }
     }
 }
 

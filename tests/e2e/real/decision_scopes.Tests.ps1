@@ -200,4 +200,64 @@ Describe "CrowdSec Range and header-mapped scopes" {
             Assert-IpSpellingBan -Endpoint "/scope-stream" -Stored "::ffff:10.59.0.82" -Request "10.59.0.82" -TimeoutSeconds 45
         }
     }
+
+    Context "IPv6 Range" -Tag "scopes" {
+        BeforeEach {
+            Clear-TraefikAccessLogs
+            Remove-AllTestDecisions
+        }
+
+        It "Should block an IPv6 inside a Range decision in none mode" {
+            Add-TestRangeDecision -Range "2001:db8:a::/48" -Type "ban"
+
+            $blocked = Test-HttpRequest -Endpoint "/scope-none" -IP "2001:db8:a::8" -TraefikUrl $script:TraefikUrl
+            $blocked.StatusCode | Should -BeIn @(403, 429)
+
+            $outside = Test-HttpRequest -Endpoint "/scope-none" -IP "2001:db8:b::8" -TraefikUrl $script:TraefikUrl
+            $outside.StatusCode | Should -Be 200
+        }
+
+        It "Should block an IPv6 inside a Range decision after the stream poll" {
+            Add-TestRangeDecision -Range "2001:db8:c::/48" -Type "ban"
+
+            $result = Wait-ForCondition -Description "stream to block IPv6 Range 2001:db8:c::/48" -TimeoutSeconds 45 -RetryIntervalSeconds 2 -Condition {
+                $response = Test-HttpRequest -Endpoint "/scope-stream" -IP "2001:db8:c::8" -TraefikUrl $script:TraefikUrl
+                return ($response.StatusCode -in @(403, 429))
+            }
+            $result.Success | Should -Be $true
+        }
+    }
+
+    Context "Ban wins over captcha and Range expiry" -Tag "scopes" {
+        BeforeEach {
+            Clear-TraefikAccessLogs
+            Remove-AllTestDecisions
+        }
+
+        It "Should ban when a Range captcha and a username ban both match" {
+            Add-TestRangeDecision -Range "10.83.0.0/16" -Type "captcha"
+            Add-TestScopeDecision -Scope "username" -Value "alice" -Type "ban"
+
+            $response = Test-HttpRequest -Endpoint "/header-none" -IP "10.83.0.8" -TraefikUrl $script:TraefikUrl `
+                -ExtraHeaders @{ "X-User" = "alice" }
+            $response.StatusCode | Should -BeIn @(403, 429) -Because "ban must win over captcha across scopes"
+            $response.Content | Should -Not -Match "E2E captcha challenge"
+        }
+
+        It "Should drop an expired Range in stream mode without an explicit delete" {
+            Add-TestRangeDecision -Range "10.84.0.0/16" -Type "ban" -Duration "8s"
+
+            $blocked = Wait-ForCondition -Description "stream to block short-lived Range 10.84.0.0/16" -TimeoutSeconds 45 -RetryIntervalSeconds 2 -Condition {
+                $response = Test-HttpRequest -Endpoint "/scope-stream" -IP "10.84.0.8" -TraefikUrl $script:TraefikUrl
+                return ($response.StatusCode -in @(403, 429))
+            }
+            $blocked.Success | Should -Be $true
+
+            $expired = Wait-ForCondition -Description "stream to drop expired Range 10.84.0.0/16" -TimeoutSeconds 30 -RetryIntervalSeconds 2 -Condition {
+                $response = Test-HttpRequest -Endpoint "/scope-stream" -IP "10.84.0.8" -TraefikUrl $script:TraefikUrl
+                return ($response.StatusCode -eq 200)
+            }
+            $expired.Success | Should -Be $true -Because "CrowdSec must stream the expiry as a Range delete; range-index has no per-CIDR TTL"
+        }
+    }
 }

@@ -199,7 +199,15 @@ try {
             (Wait-ForHttpStatus -Url "http://localhost:8000/hold-redis" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/scope-none" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/scope-stream" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
-            (Wait-ForHttpStatus -Url "http://localhost:8000/appsec" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success
+            (Wait-ForHttpStatus -Url "http://localhost:8000/appsec" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/header-none" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/lapi-fail-pass" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/lapi-fail-ban" -ExpectedStatusCodes @(403) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/waf-only" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/waf-fail-pass" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/waf-fail-ban" -ExpectedStatusCodes @(403) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/status-429" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/short-captcha" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success
         )
         
         if ($servicesReady -contains $false) {

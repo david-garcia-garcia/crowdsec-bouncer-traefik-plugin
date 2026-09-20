@@ -65,4 +65,38 @@ Describe "CrowdSec Bouncer Real AppSec Tests" {
             $response.Content | Should -Not -Match "Hostname:"
         }
     }
+
+    Context "AppSec request body and appsec mode" -Tag "appsec" {
+        BeforeEach {
+            Clear-TraefikAccessLogs
+            Remove-AllTestDecisions
+        }
+
+        It "Should block SQL injection in a POST body via CRS" {
+            $response = Test-HttpRequest -Endpoint "/appsec" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl `
+                -Method POST -Body "id=1' OR '1'='1" `
+                -ExtraHeaders @{ "Content-Type" = "application/x-www-form-urlencoded" }
+            $response.StatusCode | Should -Be 403 -Because "the plugin must forward the POST body to AppSec so CRS can inspect it"
+        }
+
+        It "Should still apply a LAPI ban on the AppSec-enabled none-mode route" {
+            Add-TestDecision -IP $script:ClientIP -Type "ban"
+
+            $response = Test-HttpRequest -Endpoint "/appsec" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl
+            $response.StatusCode | Should -BeIn @(403, 429) -Because "AppSec enabled does not skip LAPI decisions in none mode"
+        }
+
+        It "Should ignore a LAPI ban when crowdsecMode is appsec" {
+            Add-TestDecision -IP $script:ClientIP -Type "ban"
+
+            $response = Test-HttpRequest -Endpoint "/waf-only" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl
+            $response.StatusCode | Should -Be 200 -Because "appsec mode has no LAPI client and must not remediate IP bans"
+            $response.Content | Should -Match "Hostname:"
+        }
+
+        It "Should still block SQLi when crowdsecMode is appsec" {
+            $response = Test-HttpRequest -Endpoint "/waf-only?id=1%27%20OR%20%271%27%3D%271" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl
+            $response.StatusCode | Should -Be 403
+        }
+    }
 }
