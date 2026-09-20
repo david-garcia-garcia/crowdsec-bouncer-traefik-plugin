@@ -21,3 +21,9 @@ phase: propose
 findings: none
 fixed: none
 skipped: none
+
+## implement (2026-09-20T06:06:30Z)
+phase: implement
+findings: none
+fixed: compact-liveslot-elapsedsec applied (ac0641fc)
+skipped: none

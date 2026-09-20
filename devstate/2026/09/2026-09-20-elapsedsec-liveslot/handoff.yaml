@@ -8,7 +8,7 @@ destBranch: master
 qualify: qualified
 src: sha256:8721addf87daabbb4efdcb5684c71ee677e818d969caf1cda9228c9433289edc
 comments: none
-localTests: none
+localTests: passed
 requirement: requirement.md
 explore: explore.md
 change: compact-liveslot-elapsedsec
