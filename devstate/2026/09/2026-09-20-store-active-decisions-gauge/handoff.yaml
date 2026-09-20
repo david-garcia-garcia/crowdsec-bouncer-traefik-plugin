@@ -8,7 +8,7 @@ destBranch: master
 qualify: qualified-with-gaps
 src: sha256:e87a114b61cd45452255adde8b368007093fc3614734c7451748d5081b916966
 comments: none
-localTests: none
+localTests: passed
 requirement: requirement.md
 explore: explore.md
 change: store-owned-active-decisions-gauge

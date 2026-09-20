@@ -17,3 +17,9 @@ phase: propose
 findings: apply-ready OpenSpec store-owned-active-decisions-gauge; folds usage-metrics and decisionstore; two assumed rows remain
 fixed: none
 skipped: none
+
+## implement (2026-09-20)
+phase: implement
+findings: store-owned ActiveCounts; reporter maps dropped; Range omitted; merged createdBy
+fixed: applied store-owned-active-decisions-gauge tasks 1–4
+skipped: Range forget (debt)
