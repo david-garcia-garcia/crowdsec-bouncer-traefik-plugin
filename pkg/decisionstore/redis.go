@@ -167,30 +167,54 @@ func (r *redis) BeginTick() {}
 // PublishTick is a no-op: Redis key TTL is the expiry.
 func (r *redis) PublishTick(int64) {}
 
-// Put is SET of a kind+origin string with DurationSec as TTL.
-func (r *redis) Put(item Decision) {
-	if r == nil {
+// PutMany is SET of kind+origin strings. Same DurationSec share one MSetEX, chunked at PutManyChunk.
+func (r *redis) PutMany(items []Decision) {
+	if r == nil || r.writer == nil || len(items) == 0 {
 		return
 	}
-	key, _ := slotKeys(item.Scope, item.Value)
-	if key == "" {
-		return
+	namesByTTL := map[int64][]string{}
+	valuesByTTL := map[int64][][]byte{}
+	for _, item := range items {
+		key, _ := slotKeys(item.Scope, item.Value)
+		if key == "" {
+			continue
+		}
+		ttl := item.DurationSec
+		namesByTTL[ttl] = append(namesByTTL[ttl], prefixed(r.prefix, key))
+		valuesByTTL[ttl] = append(valuesByTTL[ttl], []byte(KindOriginString(item.Kind, item.Origin)))
 	}
-	r.set(key, KindOriginString(item.Kind, item.Origin), item.DurationSec)
+	for ttl, names := range namesByTTL {
+		r.msetexGrouped(names, valuesByTTL[ttl], ttl)
+	}
 }
 
-// Delete is DEL of the canonical slot and a prior Ip spelling.
-func (r *redis) Delete(scope, value string) {
-	if r == nil {
+// msetexGrouped writes one TTL group in PutManyChunk MSetEX calls. Set is void.
+func (r *redis) msetexGrouped(names []string, values [][]byte, seconds int64) {
+	for start := 0; start < len(names); start += PutManyChunk {
+		end := start + PutManyChunk
+		if end > len(names) {
+			end = len(names)
+		}
+		if err := r.writer.MSetEX(context.Background(), names[start:end], values[start:end], seconds); err != nil && r.log != nil {
+			r.log.Error("redis:msetex", "error", err)
+		}
+	}
+}
+
+// DeleteMany is DEL of each canonical slot and a prior Ip spelling. SimpleRedis has no multi-DEL.
+func (r *redis) DeleteMany(items []Decision) {
+	if r == nil || len(items) == 0 {
 		return
 	}
-	key, priorSpelling := slotKeys(scope, value)
-	if key == "" {
-		return
-	}
-	r.deleteKey(key)
-	if priorSpelling != "" && priorSpelling != key {
-		r.deleteKey(priorSpelling)
+	for _, item := range items {
+		key, priorSpelling := slotKeys(item.Scope, item.Value)
+		if key == "" {
+			continue
+		}
+		r.deleteKey(key)
+		if priorSpelling != "" && priorSpelling != key {
+			r.deleteKey(priorSpelling)
+		}
 	}
 }
 

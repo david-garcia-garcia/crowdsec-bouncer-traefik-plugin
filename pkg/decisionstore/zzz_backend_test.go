@@ -58,6 +58,7 @@ func backendContracts() []backendContract {
 		{name: "emptyLookupMiss", check: checkEmptyLookupMiss},
 		{name: "livePutIPBanThenDelete", check: checkLivePutIPBanThenDelete},
 		{name: "streamTickPutVisibleAfterPublish", check: checkStreamTickPutVisibleAfterPublish},
+		{name: "putManyTwoIPs", check: checkPutManyTwoIPs},
 		{name: "liveAllowMemoIsNotMiss", check: checkLiveAllowMemoIsNotMiss},
 		{name: "headerBanDoesNotLeakToOtherHeader", check: checkHeaderBanDoesNotLeakToOtherHeader},
 		{name: "headerBanOutranksIPCaptcha", check: checkHeaderBanOutranksIPCaptcha},
@@ -69,7 +70,7 @@ func backendContracts() []backendContract {
 	}
 }
 
-// TestBackendContract is Put/Lookup/Delete/Range through Store for memory and Redis.
+// TestBackendContract is PutMany/Lookup/DeleteMany/Range through Store for memory and Redis.
 // Tick isolation (Put hidden until PublishTick) and Redis TTL vs memory ExpiresAt are not in this matrix.
 func TestBackendContract(t *testing.T) {
 	for _, backend := range testBackends() {
@@ -108,6 +109,23 @@ func checkStreamTickPutVisibleAfterPublish(t *testing.T, store *Store) {
 	})
 	store.PublishTick(0)
 	mustKind(t, store, backendBanIP, nil, decisionscope.BannedValue, backendOrigin)
+}
+
+func checkPutManyTwoIPs(t *testing.T, store *Store) {
+	t.Helper()
+	const secondIP = "203.0.113.11"
+	store.PutMany([]Decision{
+		{Scope: decisionscope.ScopeIP, Value: backendBanIP, Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec},
+		{Scope: decisionscope.ScopeIP, Value: secondIP, Kind: decisionscope.CaptchaValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec},
+	})
+	mustKind(t, store, backendBanIP, nil, decisionscope.BannedValue, backendOrigin)
+	mustKind(t, store, secondIP, nil, decisionscope.CaptchaValue, backendOrigin)
+	store.DeleteMany([]Decision{
+		{Scope: decisionscope.ScopeIP, Value: backendBanIP},
+		{Scope: decisionscope.ScopeIP, Value: secondIP},
+	})
+	mustMiss(t, store, backendBanIP, nil)
+	mustMiss(t, store, secondIP, nil)
 }
 
 func checkLiveAllowMemoIsNotMiss(t *testing.T, store *Store) {

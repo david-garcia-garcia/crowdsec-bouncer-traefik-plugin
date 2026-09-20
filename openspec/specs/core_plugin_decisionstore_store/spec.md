@@ -1,5 +1,5 @@
 ## Purpose\n\nThe reclaim value that holds CrowdSec Ip, header, and Range decisions on a memory or Redis engine.\n\n## Requirements\n\n### Requirement: DecisionStore is a reclaim value that owns the engine
-A DecisionStore SHALL be `pkg/decisionstore.Store`, opened with `reclaim.OpenWithHooks` on the process table using the same Traefik `New` context as `lapi.OpenStream` / `OpenLive`. The store SHALL bind engine funcs at `NewMemory` or `NewRedis` (`memoryEngine` / `redisEngine`): BeginTick, PublishTick, Put, Delete, LookupRemediation, ApplyRangeBatch, RangeIndex, Close. A constructed Store SHALL always have those callbacks. Store methods MUST NOT nil-check `s` or the engine funcs. Close SHALL be safe to call more than once on a real Redis store; tests MUST NOT Close a nil `*Store`. Dispatch MUST NOT be a backend interface and MUST NOT branch `if mem` / `if red` on every method. Yaegi-safe: the engine MUST NOT put a map-holding type in an interface; `map[string]LiveSlot` SHALL always be non-nil; intern SHALL be `[]string` plus `map[string]uint16`; `atomic.Value` SHALL hold only `*RangeMembership` and `string`. The store MUST NOT install Sleep or Wake. The package MUST NOT keep a process-wide map or a `sync.Once`. Callers MUST NOT import utilities `reclaim`. There SHALL NOT be a second `liveStore` type: live/none memo is Store Put and Lookup. `pkg/cache` MUST NOT exist as the DecisionStore bag. Client address, when this leaf mentions it, SHALL reuse `pkg/ip.GetRemoteIP`. CrowdSec cursor identity SHALL reuse `SessionHex` / `streamSession`.
+A DecisionStore SHALL be `pkg/decisionstore.Store`, opened with `reclaim.OpenWithHooks` on the process table using the same Traefik `New` context as `lapi.OpenStream` / `OpenLive`. The store SHALL bind engine funcs at `NewMemory` or `NewRedis` (`memoryEngine` / `redisEngine`): BeginTick, PublishTick, PutMany, DeleteMany, LookupRemediation, ApplyRangeBatch, RangeIndex, Close. Put and Delete SHALL be one-item wrappers around PutMany and DeleteMany. A constructed Store SHALL always have those callbacks. Store methods MUST NOT nil-check `s` or the engine funcs. Close SHALL be safe to call more than once on a real Redis store; tests MUST NOT Close a nil `*Store`. Dispatch MUST NOT be a backend interface and MUST NOT branch `if mem` / `if red` on every method. Yaegi-safe: the engine MUST NOT put a map-holding type in an interface; `map[string]LiveSlot` SHALL always be non-nil; intern SHALL be `[]string` plus `map[string]uint16`; `atomic.Value` SHALL hold only `*RangeMembership` and `string`. The store MUST NOT install Sleep or Wake. The package MUST NOT keep a process-wide map or a `sync.Once`. Callers MUST NOT import utilities `reclaim`. There SHALL NOT be a second `liveStore` type: live/none memo is Store Put and Lookup. `pkg/cache` MUST NOT exist as the DecisionStore bag. Client address, when this leaf mentions it, SHALL reuse `pkg/ip.GetRemoteIP`. CrowdSec cursor identity SHALL reuse `SessionHex` / `streamSession`.
 
 #### Scenario: Interval mismatch still shares one store
 - **WHEN** two live `New` calls use the same LAPI URL and key and the same Redis store parameters and differ only on `updateIntervalSeconds`
@@ -52,7 +52,7 @@ When Redis is enabled, every GET/MGET/SET/DEL key the store sends SHALL be prefi
 - **AND** the Redis pool is not closed
 
 ### Requirement: Memory engine is copy-on-write maps
-A memory-backed Store SHALL hold `map[string]LiveSlot` (packed word and expiresAt), always non-nil. BeginTick SHALL clone published into tick. Put and Delete during a stream apply SHALL mutate tick only. PublishTick SHALL drop expired tick slots by `expiresAt` and publish once. Memory MUST NOT Set stream or live Ip or header keys on a TTL heap. When no tick is open, Put SHALL copy-on-write onto the published map (live/none memo). Redis BeginTick and PublishTick SHALL be no-ops.
+A memory-backed Store SHALL hold `map[string]LiveSlot` (packed word and expiresAt), always non-nil. BeginTick SHALL clone published into tick. PutMany and DeleteMany during a stream apply SHALL mutate tick only. PublishTick SHALL drop expired tick slots by `expiresAt` and publish once. Memory MUST NOT Set stream or live Ip or header keys on a TTL heap. When no tick is open, PutMany SHALL copy-on-write onto the published map (live/none memo). Redis BeginTick and PublishTick SHALL be no-ops. Redis PutMany SHALL group by DurationSec and MSetEX in `PutManyChunk` (1024) batches. Redis DeleteMany SHALL DEL each key (SimpleRedis has no multi-DEL).
 
 #### Scenario: Memory stream IP is not on a TTL heap
 - **WHEN** stream/alone memory stores an Ip ban for a client address
@@ -64,7 +64,7 @@ A memory-backed Store SHALL hold `map[string]LiveSlot` (packed word and expiresA
 - **AND** all three mutations appear together after PublishTick
 
 ### Requirement: Redis engine uses utilities SimpleRedis
-The Redis engine SHALL import `github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis` for GET/SET/DEL/MGET. Runtime SHALL NOT import `github.com/maxlerebourg/simpleredis` and MUST NOT keep `pkg/simpleredis` or `pkg/cache`. `go.mod` SHALL require `github.com/david-garcia-garcia/traefik-middleware-utilities` at `v1.0.5`. Construction SHALL call `simpleredis.New` with Host, Pass, Database, dial 2s and command 1s (idle 30s, pool 8). Writer and readers SHALL be pointers. Commands SHALL pass `context.Background()` when the store API has no request context. After Close, Get/MGET/SET/DEL SHALL surface `store:unreachable` and MUST NOT open a new TCP connection. Close SHALL remain safe to call more than once.
+The Redis engine SHALL import `github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis` for GET/SET/DEL/MGET/MSetEX. Runtime SHALL NOT import `github.com/maxlerebourg/simpleredis` and MUST NOT keep `pkg/simpleredis` or `pkg/cache`. `go.mod` SHALL require `github.com/david-garcia-garcia/traefik-middleware-utilities` at `v1.0.5`. Construction SHALL call `simpleredis.New` with Host, Pass, Database, dial 2s and command 1s (idle 30s, pool 8). Writer and readers SHALL be pointers. Commands SHALL pass `context.Background()` when the store API has no request context. After Close, Get/MGET/SET/DEL/MSetEX SHALL surface `store:unreachable` and MUST NOT open a new TCP connection. Close SHALL remain safe to call more than once.
 
 #### Scenario: Redis compiles against utilities SimpleRedis
 - **WHEN** a reviewer inspects `pkg/decisionstore/redis.go` and `go.mod`
@@ -86,16 +86,16 @@ When Redis read hosts are set, Get and MGet SHALL call `nextReader` only. A miss
 - **AND** the writer is not called for that Get
 
 ### Requirement: Redis Set and Delete are void
-Redis Put and Delete SHALL return no error to callers. Redis SET and DEL SHALL use the writer, log a Redis error, and return. Stream and live callers MUST NOT fail closed on a write miss. Redis SET SHALL send `SET EX` with the duration integer as given, including `0`. Memory MUST NOT store a slot whose duration is `0` as a lasting published entry beyond PublishTick expiry sweep.
+Redis PutMany and DeleteMany SHALL return no error to callers. Redis MSetEX and DEL SHALL use the writer, log a Redis error, and return. Stream and live callers MUST NOT fail closed on a write miss. Redis MSetEX SHALL send `EX` with the duration integer as given, including `0`. Memory MUST NOT store a slot whose duration is `0` as a lasting published entry beyond PublishTick expiry sweep.
 
 #### Scenario: Redis Set error is logged and discarded
-- **WHEN** Redis SET on the writer fails
+- **WHEN** Redis MSetEX on the writer fails
 - **THEN** the error is logged
-- **AND** Put returns without an error value
+- **AND** PutMany returns without an error value
 
 #### Scenario: Redis Set with duration 0 sends EX 0
-- **WHEN** Redis Put is called with DurationSec `0`
-- **THEN** the writer sends `SET` with `EX 0`
+- **WHEN** Redis PutMany is called with DurationSec `0`
+- **THEN** the writer sends MSetEX with `EX 0`
 - **AND** the write is not skipped
 
 ### Requirement: Store errors are miss and unreachable

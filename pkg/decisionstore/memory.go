@@ -14,7 +14,7 @@ type memory struct {
 	log        *slog.Logger
 	origins    *intern.Table       // origin name → id packed into LiveSlot.Word
 	mu         sync.RWMutex        // maps, ticking, rangeIndex
-	ticking    bool                // stream window: Put/Delete write tick; Lookup reads published
+	ticking    bool                // stream window: PutMany/DeleteMany write tick; Lookup reads published
 	tick       map[string]LiveSlot // unpublished clone; SlotKey → packed word + Unix expiry
 	published  map[string]LiveSlot // request-path snapshot
 	rangeIndex string              // Range CIDR=kind blob; membership is rebuilt from this
@@ -65,42 +65,39 @@ func (m *memory) PublishTick(now int64) {
 	m.ticking = false
 }
 
-// Put writes one decision into tick when a stream window is open, else onto the published map (live).
-func (m *memory) Put(item Decision) {
-	if m == nil {
+// PutMany writes decisions into tick when a stream window is open, else copy-on-write onto published (live).
+func (m *memory) PutMany(items []Decision) {
+	if m == nil || len(items) == 0 {
 		return
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.ticking {
-		m.putTick(item)
+		for _, item := range items {
+			m.putSlot(m.tick, item)
+		}
 		return
 	}
-	m.putPublishedLocked(item)
-}
-
-// putTick writes one decision into tick. Intern overflow logs Warn and packs origin id 0.
-func (m *memory) putTick(item Decision) {
-	key, _ := slotKeys(item.Scope, item.Value)
-	if key == "" {
-		return
-	}
-	m.tick[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
-}
-
-// putPublishedLocked writes one live slot onto the published map and sweeps expired keys. Caller holds mu.
-func (m *memory) putPublishedLocked(item Decision) {
-	key, _ := slotKeys(item.Scope, item.Value)
-	if key == "" {
-		return
-	}
+	next := cloneLiveSlotMap(m.published)
 	now := time.Now().Unix()
-	for existing, slot := range m.published {
+	for existing, slot := range next {
 		if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
-			delete(m.published, existing)
+			delete(next, existing)
 		}
 	}
-	m.published[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
+	for _, item := range items {
+		m.putSlot(next, item)
+	}
+	m.published = next
+}
+
+// putSlot writes one decision into slots. Intern overflow logs Warn and packs origin id 0.
+func (m *memory) putSlot(slots map[string]LiveSlot, item Decision) {
+	key, _ := slotKeys(item.Scope, item.Value)
+	if key == "" {
+		return
+	}
+	slots[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
 }
 
 // pack encodes a uint32 word. Intern overflow Warns and uses origin id 0.
@@ -119,30 +116,43 @@ func (m *memory) pack(kind, origin string) uint32 {
 	return packWord(kind, 0)
 }
 
-// Delete drops the canonical slot and a prior Ip spelling from tick or the published map.
-func (m *memory) Delete(scope, value string) {
-	if m == nil {
+// DeleteMany drops canonical slots and prior Ip spellings from tick or the published map.
+func (m *memory) DeleteMany(items []Decision) {
+	if m == nil || len(items) == 0 {
 		return
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	key, priorSpelling := slotKeys(scope, value)
-	if key == "" {
-		return
-	}
 	if m.ticking {
-		delete(m.tick, key)
-		if priorSpelling != "" && priorSpelling != key {
-			delete(m.tick, priorSpelling)
+		for _, item := range items {
+			m.deleteTickLocked(item.Scope, item.Value)
 		}
 		return
 	}
 	next := cloneLiveSlotMap(m.published)
-	delete(next, key)
-	if priorSpelling != "" && priorSpelling != key {
-		delete(next, priorSpelling)
+	for _, item := range items {
+		key, priorSpelling := slotKeys(item.Scope, item.Value)
+		if key == "" {
+			continue
+		}
+		delete(next, key)
+		if priorSpelling != "" && priorSpelling != key {
+			delete(next, priorSpelling)
+		}
 	}
 	m.published = next
+}
+
+// deleteTickLocked drops one slot from tick. Caller holds mu.
+func (m *memory) deleteTickLocked(scope, value string) {
+	key, priorSpelling := slotKeys(scope, value)
+	if key == "" {
+		return
+	}
+	delete(m.tick, key)
+	if priorSpelling != "" && priorSpelling != key {
+		delete(m.tick, priorSpelling)
+	}
 }
 
 // LookupRemediation reads the published map (Ip, header scopes, Range). Expired slots miss.
@@ -211,9 +221,7 @@ func (m *memory) seedPublished(item Decision) {
 	if m == nil {
 		return
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.putPublishedLocked(item)
+	m.PutMany([]Decision{item})
 }
 
 func cloneLiveSlotMap(src map[string]LiveSlot) map[string]LiveSlot {

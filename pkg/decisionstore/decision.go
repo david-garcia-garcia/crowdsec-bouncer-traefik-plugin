@@ -9,6 +9,7 @@ import (
 
 // Decision is one Ip or header-scope remediation (stream/alone or live/none).
 // ApplyRangeBatch uses Kind and Origin; the map key is the CIDR.
+// DeleteMany reads Scope and Value only.
 type Decision struct {
 	Scope       string
 	Value       string
@@ -16,6 +17,9 @@ type Decision struct {
 	Origin      string
 	DurationSec int64
 }
+
+// PutManyChunk is SimpleRedis maxMSetEXPairs. Redis PutMany and stream apply flush at this size.
+const PutManyChunk = 1024
 
 // SlotKey is the canonical map/Redis key for scope+value. Empty when the value cannot be stored.
 func SlotKey(scope, value string) string {
