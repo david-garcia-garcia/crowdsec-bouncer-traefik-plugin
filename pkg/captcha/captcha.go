@@ -15,6 +15,7 @@ import (
 	"time"
 
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // Client Captcha client.
@@ -113,7 +114,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		c.log.Info("captcha:ServeHTTP:validate", "error", err)
 	}
 	if valid {
-		c.log.Debug("captcha:ServeHTTP captcha:valid")
+		logger.Trace(c.log, "captcha:ServeHTTP captcha:valid")
 		value := mintGateValue(c.gateSecret, c.gateBindIP, remoteIP, time.Now())
 		setGateCookie(rw, r, value, c.gracePeriodSeconds)
 		if c.remediationCustomHeader != "" {
@@ -141,7 +142,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 // Check Verify if the captcha is already done via gate cookie.
 func (c *Client) Check(r *http.Request, remoteIP string) bool {
 	passed := validateGateValue(c.gateSecret, c.gateBindIP, remoteIP, gateCookieValue(r), time.Now(), c.gracePeriodSeconds)
-	c.log.Debug("captcha:Check", "ip", remoteIP, "pass", passed)
+	logger.Trace(c.log, "captcha:Check", "ip", remoteIP, "pass", passed)
 	return passed
 }
 
@@ -344,12 +345,12 @@ func (c *Client) postSiteverify(response, remoteIP string) (*http.Response, erro
 // Validate Verify the captcha from provider API.
 func (c *Client) Validate(r *http.Request, remoteIP string) (bool, error) {
 	if r.Method != http.MethodPost {
-		c.log.Debug("captcha:Validate invalid method", "method", r.Method)
+		logger.Trace(c.log, "captcha:Validate invalid method", "method", r.Method)
 		return false, nil
 	}
 	response := captchaResponseFromRequest(r, c.infoProvider.response)
 	if response == "" {
-		c.log.Debug("captcha:Validate no captcha response found in request")
+		logger.Trace(c.log, "captcha:Validate no captcha response found in request")
 		return false, nil
 	}
 	res, err := c.postSiteverify(response, remoteIP)
@@ -363,7 +364,7 @@ func (c *Client) Validate(r *http.Request, remoteIP string) (bool, error) {
 	// Classify siteverify as JSON when the type token equals application/json.
 	mediaType, _, err := mime.ParseMediaType(res.Header.Get("Content-Type"))
 	if err != nil || mediaType != "application/json" {
-		c.log.Debug("captcha:Validate responseType:noJson")
+		logger.Trace(c.log, "captcha:Validate responseType:noJson")
 		return false, nil
 	}
 	var captchaResponse responseProvider
@@ -371,6 +372,6 @@ func (c *Client) Validate(r *http.Request, remoteIP string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	c.log.Debug("captcha:Validate", "success", captchaResponse.Success)
+	logger.Trace(c.log, "captcha:Validate", "success", captchaResponse.Success)
 	return captchaResponse.Success, nil
 }

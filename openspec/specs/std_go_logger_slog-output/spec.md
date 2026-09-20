@@ -20,7 +20,7 @@ When `LogFilePath` is non-empty and writable, the logger package SHALL reuse one
 
 ### Requirement: Case-insensitive JSON format
 
-When the format argument equals `"json"` case-insensitively, the logger SHALL use a JSON slog handler with string level names (`DEBUG`, `INFO`, `WARN`, `ERROR`) and the `component` attribute.
+When the format argument equals `"json"` case-insensitively, the logger SHALL use a JSON slog handler with string level names (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`) and the `component` attribute.
 
 #### Scenario: Uppercase JSON format
 

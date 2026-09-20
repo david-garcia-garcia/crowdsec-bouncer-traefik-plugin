@@ -118,6 +118,8 @@ func Test_ValidateParams(t *testing.T) {
 	cfg8.LogLevel = LogINFO
 	cfg9 := getMinimalConfig()
 	cfg9.LogLevel = "info"
+	cfgTrace := getMinimalConfig()
+	cfgTrace.LogLevel = "trace"
 	cfg10 := getMinimalConfig()
 	cfg10.LogLevel = "Warning"
 	captchaTemplate := writeCaptchaTemplateFixture(t)
@@ -255,6 +257,7 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Validate https without cert authority (falls back to system trust store)", args: args{config: cfg7}, wantErr: false},
 		{name: "Valid log level uppercase INFO", args: args{config: cfg8}, wantErr: false},
 		{name: "Valid log level lowercase info", args: args{config: cfg9}, wantErr: false},
+		{name: "Valid log level lowercase trace", args: args{config: cfgTrace}, wantErr: false},
 		{name: "Invalid log level Warning", args: args{config: cfg10}, wantErr: true},
 		{name: "Captcha LAPI action without provider", args: args{config: cfgCaptchaNoProvider}, wantErr: true},
 		{name: "Captcha LAPI action with provider", args: args{config: cfgCaptchaWithProvider}, wantErr: false},
