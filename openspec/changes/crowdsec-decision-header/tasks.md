@@ -10,9 +10,10 @@
 
 ## 3. ServeHTTP
 
-- [x] 3.1 After trusted-client skip, if the configured name is non-empty after trim, `Header.Get` and trim; `b` → `BannedValue`, `c` → `CaptchaValue`; call `handleRemediationServeHTTP` with `OriginPluginForcedDecision` and return
+- [x] 3.1 After trusted-client skip, `b` remediates without lookup; `c` is merged after lookup so a stream/live ban wins with WARN
 - [x] 3.2 Store the trimmed header name on Bouncer in `New` (do not put it on `clientRequest`)
-- [x] 3.3 Tests: feature off ignores `X-Crowdsec-Decision: c`; `c` captchas without lookup; `b` bans without lookup; `t`/`B`/empty fall through; trusted IP skips force; gated cookie + `c` reaches next; `appsec` mode still honors `c`
+- [x] 3.3 Tests: feature off ignores `X-Crowdsec-Decision: c`; `c` captchas when lookup is not ban; `c` loses to a stream ban with WARN; `b` bans without lookup; `t`/`B`/empty fall through; trusted IP skips force; gated cookie + `c` reaches next when lookup is not ban; `appsec` mode still honors `c`
+- [x] 3.4 Header `c` still looks up; stream/live/fail-closed ban wins and WARN `ServeHTTP:forcedCaptchaSuperseded`
 
 ## 4. Docs
 

@@ -1,6 +1,6 @@
 ## Purpose
 
-Lets an earlier Traefik middleware force this bouncer to ban or captcha a client through a config-named request header, without consulting CrowdSec stream or live lookup, while still honoring an already-passed captcha gate.
+Lets an earlier Traefik middleware force this bouncer to ban or captcha a client through a config-named request header. Ban skips stream and live lookup. Captcha still consults that lookup so an existing ban wins, then reuses the captcha gate.
 
 ## ADDED Requirements
 
@@ -13,15 +13,8 @@ When `crowdsecDecisionHeader` is empty or whitespace-only, the middleware MUST N
 - **THEN** the middleware does not apply captcha from that header
 - **AND** it continues with stream or live lookup as today
 
-### Requirement: Configured header b or c skips stream and live lookup
-When `crowdsecDecisionHeader` names a request header, and that header's first value after trim is exactly `b` or exactly `c`, the middleware SHALL apply ban (`b`) or captcha (`c`) without querying the stream cache or live LAPI. It SHALL reuse the client address `GetRemoteIP` already chose. It MUST NOT treat the decision header as an address, identity scope, or AppSec action. Trusted clients SHALL still skip the whole middleware, including this header.
-
-#### Scenario: Header c captchas without stream lookup
-- **WHEN** `crowdsecDecisionHeader` is `X-Crowdsec-Decision`
-- **AND** a non-trusted client sends `X-Crowdsec-Decision: c`
-- **AND** the captcha gate cookie is absent or invalid
-- **THEN** the response is the captcha challenge
-- **AND** the middleware does not query stream or live LAPI for that request
+### Requirement: Configured header b skips stream and live lookup
+When `crowdsecDecisionHeader` names a request header, and that header's first value after trim is exactly `b`, the middleware SHALL apply ban without querying the stream cache or live LAPI. It SHALL reuse the client address `GetRemoteIP` already chose. It MUST NOT treat the decision header as an address, identity scope, or AppSec action. Trusted clients SHALL still skip the whole middleware, including this header.
 
 #### Scenario: Header b bans without stream lookup
 - **WHEN** `crowdsecDecisionHeader` is `X-Crowdsec-Decision`
@@ -36,6 +29,23 @@ When `crowdsecDecisionHeader` names a request header, and that header's first va
 - **THEN** the request reaches the next handler
 - **AND** the middleware does not apply ban from that header
 
+### Requirement: Header c does not override an internal ban
+When the configured header's trimmed value is exactly `c`, the middleware SHALL still consult stream or live lookup. When that lookup (or a fail-closed / failure-action ban) is ban, the middleware SHALL apply that ban and SHALL log a WARN whose message stem is `ServeHTTP:forcedCaptchaSuperseded`. When lookup is not ban, the middleware SHALL apply captcha without requiring a CrowdSec captcha decision.
+
+#### Scenario: Header c captchas when lookup is not ban
+- **WHEN** `crowdsecDecisionHeader` is `X-Crowdsec-Decision`
+- **AND** a non-trusted client sends `X-Crowdsec-Decision: c`
+- **AND** stream or live lookup is not ban
+- **AND** the captcha gate cookie is absent or invalid
+- **THEN** the response is the captcha challenge
+
+#### Scenario: Header c loses to a stream ban
+- **WHEN** `crowdsecDecisionHeader` is `X-Crowdsec-Decision`
+- **AND** a non-trusted client sends `X-Crowdsec-Decision: c`
+- **AND** stream lookup is ban for that client
+- **THEN** the response is the ban page
+- **AND** the log includes WARN `ServeHTTP:forcedCaptchaSuperseded`
+
 ### Requirement: Other header values are ignored
 A missing header, empty value, or any token other than exact trimmed `b` or `c` (including `t`, `B`, `ban`, `captcha`) SHALL leave lookup unchanged. `New` MUST NOT fail because the header name is set.
 
@@ -46,11 +56,12 @@ A missing header, empty value, or any token other than exact trimmed `b` or `c` 
 - **AND** it continues with stream or live lookup as today
 
 ### Requirement: Forced captcha still honors the gate cookie
-When the forced header is `c` and the request already carries a valid captcha gate cookie for this client address, the middleware SHALL pass the request to the next handler (AppSec on pass still runs when enabled) even though the header is still `c`. A forced `b` SHALL not consult the captcha gate.
+When the forced header is `c`, lookup is not ban, and the request already carries a valid captcha gate cookie for this client address, the middleware SHALL pass the request to the next handler (AppSec on pass still runs when enabled) even though the header is still `c`. A forced `b` SHALL not consult the captcha gate.
 
 #### Scenario: Gated visitor passes with header still c
 - **WHEN** `crowdsecDecisionHeader` is `X-Crowdsec-Decision`
 - **AND** a non-trusted client sends `X-Crowdsec-Decision: c`
+- **AND** stream or live lookup is not ban
 - **AND** `Check` is true for that request and client address
 - **AND** the request is not a captcha-form POST
 - **THEN** the request reaches the next handler

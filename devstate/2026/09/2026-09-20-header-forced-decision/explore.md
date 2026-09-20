@@ -10,13 +10,15 @@ A config-named incoming request header whose value is a public letter `b` (ban) 
 Public contract is `b`/`c` as the ticket wrote. Dest cache letters stay `t`/`c`/`f` (`BannedValue` / `CaptchaValue` / `NoBannedValue` in `pkg/decisionscope/lookup.go`). Map `b` → `BannedValue` before `handleRemediationServeHTTP`. Do not teach other middlewares `t`.
 
 **ServeHTTP insertion point**:
-After GetRemoteIP + trusted-client skip, before `crowdsecMode: appsec` short-circuit and before `LookupRemediation` / `LiveLookup`. A hit calls `handleRemediationServeHTTP` and returns. Captcha gate is already that function’s job (`Check` true → `handleNextServeHTTP` even while kind stays captcha).
+After GetRemoteIP + trusted-client skip. Header `b` remediates ban without lookup. Header `c` still consults stream/live lookup: a ban wins and WARN `ServeHTTP:forcedCaptchaSuperseded`; otherwise captcha via `handleRemediationServeHTTP` (gate still applies).
 
 ```
 GetRemoteIP → trusted skip (unchanged)
-    → crowdsecDecisionHeader set and value b|c?
-         yes → handleRemediationServeHTTP (no stream, no live, no AppSec query yet)
-         no  → today’s mode dispatcher
+    → crowdsecDecisionHeader = b? → ban (no lookup)
+    → else today’s lookup
+         lookup ban + header c → ban + WARN
+         else header c → captcha (gate still applies)
+         else today’s remediator
 ```
 
 **Owner of the letter**:
@@ -31,7 +33,7 @@ The configured header as set by an earlier Traefik middleware (or any hop that c
 - Empty `crowdsecDecisionHeader` (CreateConfig default) means off: do not read any default header name (clients would spoof `X-Crowdsec-Decision`).
 - Header values: exact trimmed `b` and `c` only. Map `b` to `BannedValue`. Do not accept `t`, `ban`, `captcha`, or case variants.
 - Missing header, empty value, or any other token: ignore and continue today’s lookup. Do not reject `New`. Do not fail the request.
-- Skip `LookupRemediation` and `LiveLookup` on a hit. Same skip in `appsec` mode (that mode otherwise never looks up LAPI). AppSec still runs only on the pass path (`handleNextServeHTTP`), so a gated-OK `c` still reaches AppSec; a `b` never does.
+- Skip `LookupRemediation` and `LiveLookup` only for header `b`. Header `c` still looks up; a ban wins and WARN; otherwise captcha. AppSec still runs only on the pass path after a gated-OK captcha.
 - Trusted clients still skip the whole plugin (including the force header). Ticket did not ask to override that.
 - Metrics origin for a forced drop: `plugin:forced_decision` (new `OriginPluginForcedDecision`). Ban template reason stays `ReasonLAPI` (same as stream captcha/ban via `handleRemediationServeHTTP`).
 - Fold specs onto `core_plugin_middleware_bouncer` (ServeHTTP) and `core_plugin_middleware_config-validation` (optional header name). Captcha-routing leaf stays the gate owner; do not restate Check semantics there except a scenario that the force `c` path uses the same gate.
@@ -51,8 +53,8 @@ The configured header as set by an earlier Traefik middleware (or any hop that c
   By: explore
 
 - Q: Does “without querying the stream” also skip live/none `LiveLookup` and AppSec?
-  Decision: assumed — skip `LookupRemediation` and `LiveLookup`. AppSec still runs on pass (`handleNextServeHTTP`) after a gated-OK captcha; a forced ban never reaches AppSec. Same as today’s stream remediations.
-  By: explore
+  Decision: resolved — `b` skips lookup. `c` still runs LookupRemediation / LiveLookup; a ban supersedes captcha and WARN `ServeHTTP:forcedCaptchaSuperseded`. AppSec still runs on pass after a gated-OK captcha; a forced ban never reaches AppSec.
+  By: implement
 
 - Q: Do trusted IPs still skip a forced header?
   Decision: assumed — yes. Trusted skip stays first; the ticket did not ask to apply the header to trusted clients.

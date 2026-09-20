@@ -159,6 +159,37 @@ func (b *Bouncer) forcedDecisionKind(httpReq *http.Request) string {
 	}
 }
 
+// passOrForcedCaptcha passes to next, or captcha when the header forced c.
+func (b *Bouncer) passOrForcedCaptcha(rw http.ResponseWriter, req clientRequest) {
+	if b.forcedDecisionKind(req.Request) == decisionscope.CaptchaValue {
+		b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginForcedDecision)
+		return
+	}
+	b.handleNextServeHTTP(rw, req)
+}
+
+// remediateOrForcedCaptcha applies lookup kind. Header c yields captcha unless lookup is ban (then WARN).
+func (b *Bouncer) remediateOrForcedCaptcha(rw http.ResponseWriter, req clientRequest, kind, origin string) {
+	if b.forcedDecisionKind(req.Request) != decisionscope.CaptchaValue {
+		b.handleRemediationServeHTTP(rw, req, kind, origin)
+		return
+	}
+	if decisionscope.RemediationKind(kind) == decisionscope.BannedValue {
+		b.log.Warn("ServeHTTP:forcedCaptchaSuperseded", "ip", req.remoteIP, "header", b.forcedDecisionHeader)
+		b.handleRemediationServeHTTP(rw, req, kind, origin)
+		return
+	}
+	b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginForcedDecision)
+}
+
+// banOrWarnForcedCaptcha bans, and WARNs when the header asked for captcha.
+func (b *Bouncer) banOrWarnForcedCaptcha(rw http.ResponseWriter, req clientRequest, reason, origin string) {
+	if b.forcedDecisionKind(req.Request) == decisionscope.CaptchaValue {
+		b.log.Warn("ServeHTTP:forcedCaptchaSuperseded", "ip", req.remoteIP, "header", b.forcedDecisionHeader)
+	}
+	b.handleBanServeHTTP(rw, req, reason, origin)
+}
+
 // ServeHTTP is the per-router middleware handler.
 //
 // none: no stream, no cache; LiveLookup every request.
@@ -204,15 +235,15 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		return
 	}
 
-	// Configured header b|c remediates without stream or live lookup.
-	if kind := b.forcedDecisionKind(req.Request); kind != "" {
-		logger.Trace(b.log, "ServeHTTP", "ip", req.remoteIP, "forcedDecision", kind)
-		b.handleRemediationServeHTTP(rw, req, kind, lapi.OriginPluginForcedDecision)
+	// Header b remediates without lookup. Header c is merged after lookup so a ban still wins.
+	if b.forcedDecisionKind(req.Request) == decisionscope.BannedValue {
+		logger.Trace(b.log, "ServeHTTP", "ip", req.remoteIP, "forcedDecision", decisionscope.BannedValue)
+		b.handleRemediationServeHTTP(rw, req, decisionscope.BannedValue, lapi.OriginPluginForcedDecision)
 		return
 	}
 
 	if b.crowdsecMode == configuration.AppsecMode {
-		b.handleNextServeHTTP(rw, req)
+		b.passOrForcedCaptcha(rw, req)
 		return
 	}
 
@@ -230,26 +261,26 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			b.log.Debug("ServeHTTP:Get", "ip", req.remoteIP, "cache", lookupErr)
 			if errors.Is(lookupErr, decisionstore.ErrUnreachable) && !b.redisUnreachableBlock {
 				b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "redisUnreachable", true)
-				b.handleNextServeHTTP(rw, req)
+				b.passOrForcedCaptcha(rw, req)
 				return
 			}
 			b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "error", lookupErr)
-			b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
+			b.banOrWarnForcedCaptcha(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
 			return
 		case decisionscope.IsActiveRemediation(kind):
 			logger.Trace(b.log, "ServeHTTP", "ip", req.remoteIP, "cache", "hit", "remediation", kind)
 			// Origin is resolved only on drop; allow-path skips OriginName.
-			b.handleRemediationServeHTTP(rw, req, kind, b.resolveDroppedOrigin(origin, originID))
+			b.remediateOrForcedCaptcha(rw, req, kind, b.resolveDroppedOrigin(origin, originID))
 			return
 		case kind == decisionscope.NoBannedValue:
-			b.handleNextServeHTTP(rw, req)
+			b.passOrForcedCaptcha(rw, req)
 			return
 		}
 	}
 
 	if b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
 		if b.lapiClient.StreamHealthy() {
-			b.handleNextServeHTTP(rw, req)
+			b.passOrForcedCaptcha(rw, req)
 			// No decision affecting this IP.
 			return
 		}
@@ -269,11 +300,11 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			}
 		}
 		if kind == decisionscope.NoBannedValue {
-			b.handleNextServeHTTP(rw, req)
+			b.passOrForcedCaptcha(rw, req)
 			return
 		}
 		logger.Trace(b.log, "ServeHTTP:LiveLookup", "ip", req.remoteIP, "isBanned", kind)
-		b.handleRemediationServeHTTP(rw, req, kind, origin)
+		b.remediateOrForcedCaptcha(rw, req, kind, origin)
 	}
 }
 
@@ -281,11 +312,11 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req clientRequest, banReason, origin string) {
 	switch b.lapiFailureAction {
 	case configuration.FailureActionPassthrough:
-		b.handleNextServeHTTP(rw, req)
+		b.passOrForcedCaptcha(rw, req)
 	case configuration.FailureActionCaptcha:
-		b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, origin)
+		b.remediateOrForcedCaptcha(rw, req, decisionscope.CaptchaValue, origin)
 	default:
-		b.handleBanServeHTTP(rw, req, banReason, origin)
+		b.banOrWarnForcedCaptcha(rw, req, banReason, origin)
 	}
 }
 
