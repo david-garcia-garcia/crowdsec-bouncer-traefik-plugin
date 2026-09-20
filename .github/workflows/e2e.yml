@@ -59,6 +59,9 @@ jobs:
       - name: Install Pester
         shell: pwsh
         run: Install-Module -Name Pester -Force -Scope CurrentUser -SkipPublisherCheck
+      # persist-credentials extraheader can 403 a public clone of traefik-geoblock.
+      - name: Drop checkout extraheader for public clone
+        run: git config --local --unset-all http.https://github.com/.extraheader || true
       - name: Run Pester real-stack tests
         shell: pwsh
         run: ./tests/e2e/real/Test-Integration.ps1 -HttpTimeoutSeconds 60 -SkipDockerCleanup
@@ -74,6 +77,10 @@ jobs:
       - name: Show Pester results XML
         if: always()
         run: |
+          if [ -f tests/e2e/real/runner.log ]; then
+            echo "=== runner.log ==="
+            cat tests/e2e/real/runner.log
+          fi
           if [ -f tests/e2e/real/test-results.xml ]; then
             cat tests/e2e/real/test-results.xml
             echo "::error::$(tr '\n' ' ' < tests/e2e/real/test-results.xml | head -c 2000)"
@@ -86,7 +93,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: pester-test-results
-          path: tests/e2e/real/test-results.xml
+          path: |
+            tests/e2e/real/test-results.xml
+            tests/e2e/real/runner.log
           if-no-files-found: ignore
       - name: Stop test stack
         if: always()

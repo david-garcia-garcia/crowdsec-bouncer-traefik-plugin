@@ -15,3 +15,4 @@ tests/e2e/real/.geoblock/
 
 # Pester NUnit output from the real-stack suite
 tests/e2e/real/test-results.xml
+tests/e2e/real/runner.log
