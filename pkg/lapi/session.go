@@ -123,7 +123,7 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	if clientErr != nil {
 		return nil, clientErr
 	}
-	client.sessionKey = bindKey
+	// sessionKey is write-once in New; Wake may already be polling.
 	replaced, adoptErr := client.AdoptTransport(cfg)
 	if adoptErr != nil {
 		return nil, adoptErr
@@ -159,7 +159,7 @@ func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, 
 	if clientErr != nil {
 		return nil, clientErr
 	}
-	client.sessionKey = bindKey
+	// sessionKey is write-once in New; Wake may already be polling.
 	replaced, adoptErr := client.AdoptTransport(cfg)
 	if adoptErr != nil {
 		return nil, adoptErr
