@@ -1,11 +1,11 @@
-Developer review: in progress — 2026-09-20T05:06:35Z
+Developer review: in progress — 2026-09-20T05:12:39Z
 
 ## What this changes
 **Operators.** None.
 
 **Admin users.** None.
 
-**Developers.** Ticket grounded on `master`; stream Client reclaim still keys Redis on DestBranch. Apply not started.
+**Developers.** Explore recorded: stream Client key drops Redis; live/none Key does not; DecisionStore opens inside Client create(). Apply not started.
 
 **End users.** None.
 
@@ -24,11 +24,11 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Prepare complete; stub PR open; apply not started. 7 items remain.
+Explore complete; proceed policy on two assumed questions. Apply not started. 6 items remain.
 
 Priority: P2 — real operator pain (stolen stream deltas / second metrics window) with a workaround (second API key)
-Reviewed head: a0eaef6f
-Owner decision: None.
+Reviewed head: 0760a805
+Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -43,8 +43,8 @@ Owner decision: None.
 | --- | --- | --- |
 | Branch | 2026-09-20-lapi-session-subscribe pushed | origin/2026-09-20-lapi-session-subscribe |
 | OpenSpec | none | openspec/ |
-| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/119 | pr-host Create |
-| CI | build 35490815261 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35490815261 | GitHub check runs |
+| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/119 | pr-host |
+| CI | build 35491073835 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35491073835 | GitHub check runs |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | inventory empty |
 
@@ -55,10 +55,13 @@ None.
 None.
 
 ## How this fits together
-Local ticket 2026-09-20-lapi-session-subscribe on branch of the same name, dest `master`, stub PR 119. Next phase is explore.
+Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, stub PR 119. Explore decided stream share+WARN; live Redis key stays. Next is propose.
 
 ## Decision needed
-None.
+| Question | Decision | By |
+| --- | --- | --- |
+| Whether stream+live on the same key should share one metrics reporter. | assumed — no. Mode is in SessionHex; prefixes differ; do not build a cross-mode reporter. | explore |
+| Whether live/none Client Key also drops Redis the same way. | assumed — no, not in this ticket. Live `?ip=` does not steal stream_cursor. | explore |
 
 ## Before merge
 - [ ] Apply: stream Client reclaim is LAPI session; subscribe WARNs; store is a child of Client create; README says Redis/interval disagreements are ignored.
@@ -76,24 +79,23 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | a0eaef6f2d74ec6a908ff63c9fb166bc4fcc0499 | Card must match the branch you measured |
+| Reviewed head | 0760a80500ad2e0c664e8ad132b6742886446c23 | Card must match the branch you measured |
 
 ### Stored data model
 None.
 
 ### Technical review
-Best possible solution: Not yet — prepare only.
+Best possible solution: Stream Open key = SessionHex without Redis; store nested in create(); WARN on subscribe mismatch. Live Key unchanged this ticket.
 
-Do we have a high-confidence way to reproduce? Yes, DestBranch tests `TestOpenStream_DifferentRedisIsolatesClientAndStore` and `TestOpenStream_SleepingRedisHostDoesNotOverlapPollers` encode the second ticker.
+Do we have a high-confidence way to reproduce? Yes, four DestBranch pkg/lapi OpenStream tests passed and still encode Redis isolation.
 
-Is this the best way to solve the issue? Not yet — explore next.
+Is this the best way to solve the issue? Yes vs DestBranch: match LAPI row physics; do not fail New; do not migrate Redis.
 
 ### Evidence
 What I checked:
-- Dest is `master` (`origin/HEAD` is `main` without pkg/lapi reclaim)
-- qualify qualified; src 0b5ec995de88fe208adeea959d65f6f1ccfdbd63e6e0989431f088adeed57e82
-- PR 119 OPEN; comment inventory empty
-- CI Main Process / Race detector / e2e in progress at Set
+- explore.md Decisions and Open questions (0760a805)
+- `go test ./pkg/lapi` four OpenStream session tests PASS
+- CI still in progress on PR 119
 
 ### Rank-up moves
 None.
