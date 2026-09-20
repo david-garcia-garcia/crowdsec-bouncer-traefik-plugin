@@ -43,7 +43,8 @@ func TestMemoryDurationZeroMissesAfterPublish(t *testing.T) {
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 0})
 	store.PublishTick(ElapsedNow())
-	_, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	_, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	_ = originID
 	if !errors.Is(err, ErrMiss) {
 		t.Fatalf("duration 0 must miss after publish, got %v", err)
 	}

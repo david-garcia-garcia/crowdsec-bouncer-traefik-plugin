@@ -19,6 +19,8 @@ var (
 )
 
 // init fixes origin at wall Unix minus two so elapsed 0 stays the PublishTick skip sentinel.
+//
+//nolint:gochecknoinits // process-wide clock seed; explore rejected per-Store origin
 func init() {
 	originUnix = time.Now().Unix() - 2
 	atomic.StoreInt64(&lastElapsed, 2)
