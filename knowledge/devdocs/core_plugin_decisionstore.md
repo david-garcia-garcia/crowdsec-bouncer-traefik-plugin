@@ -3,7 +3,7 @@
 ## Language
 
 **DecisionStore**:
-A reclaim value (`pkg/decisionstore.Store`) that owns one memory or Redis engine. Isolation is by store key: CrowdSec cursor `SessionHex` plus Redis store parameters. Two `lapi.Client` incarnations that share that key share remediations.
+A reclaim value (`pkg/decisionstore.Store`) that owns one memory or Redis engine. Isolation is by store key: CrowdSec cursor `SessionHex` only. Two `lapi.Client` incarnations that share that key share remediations. `streamReady` and `streamPollInFlight` on the store own the CrowdSec cursor and the applied cache, not this HTTP client.
 _Avoid_: `pkg/cache`, `cache.Client`, `liveStore`, process `ttl_map`, `sync.Once`, utilities `reclaim`
 
 **Engine**:
@@ -35,7 +35,8 @@ Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx
 - Call `lapi.OpenDecisionStore(ctx, cfg, log)` then `lapi.New(..., store)` (or `OpenStream` / `OpenLive`, which Open the store first).
 - Memory: in-process COW tick/published `map[string]LiveSlot` plus the Range blob. Maps stay non-nil. Each `LiveSlot.ExpiresAt` is int32 elapsed seconds on the package clock (eight-byte `{uint32,int32}` slots). Live PutMany copy-on-writes onto published (one clone, then sweep expired keys with `elapsedNow()`). Published slots are `atomic.Value` of `*publishedSlots`; lookup `Load`s and does not take `mu`. Expiry compare uses the same elapsed clock.
 - Redis: import `github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis` at `v1.0.6`. Prefix is `SessionHex` (cursor), not live `IdentityHex`. Logical keys are the client IP, header-scope key, and `range-index`. Writer plus optional readers; `nextReader` never retries the writer. MSetEX/DEL are void. Do not re-patch `vendor/.../iplookup` (Contains RLock and IPv4 four-byte walk are upstream).
-- Same store key → same Store. Different Redis hosts (or enabled/password/database/read hosts) isolate.
+- Same store key → same Store. Redis YAML change reuses the existing engine (first-wins). Exclusive ownership is write-once `createdBy`, not a Redis hash.
+- `streamReady` / `streamPollInFlight` stay on the store across Client reincarnation. Do not zero them in `lapi.New`. Stream skip is `TryBeginStreamPoll` (`core_plugin_lapi_stream-single-flight.md`).
 - `decisionScopeHeaders` and poller intervals stay off the store key. Stream `scopes=` and the store header-scope filter are the live-router union (`core_plugin_lapi_scope-union.md`).
 - Stream apply calls Store `BeginTick` / `DeleteMany` / `PutMany` / `PublishTick(ElapsedNow())` / `ApplyRangeBatch` (`core_plugin_lapi_stream-apply.md`). Memory `PublishTick(0)` skips expiry sweep; non-zero `now` drops tick slots where `ExpiresAt > 0 && ExpiresAt <= now`. Redis tick methods are no-ops and ignore `now`; Redis PutMany is MSetEX by TTL in `PutManyChunk` batches.
 - Captcha grace is the gate cookie (`core_plugin_middleware_captcha-gate.md`), not store keys.

@@ -8,7 +8,7 @@
 
 - [x] 2.1 Change `StoreKey` to `decisionstore:` + SessionHex only. Invert `TestStoreKey_DifferentRedisHostsIsolate` and the store half of `TestOpenStream_DifferentRedisIsolatesClientAndStore`
 - [x] 2.2 Add write-once `createdBy` on `Store`; pass Traefik name into `OpenDecisionStore` / store `Open` create()
-- [x] 2.3 Add `streamReady` `int64` on `Store` with `LoadInt64` / `StoreInt64`. Set it on the `handleStreamCache` success path. Expose a load for `lapi.New`
+- [x] 2.3 Add `streamReady` and `streamPollInFlight` `int64` on `Store` with `LoadInt64` / `StoreInt64` / `CompareAndSwapInt64`. They own the CrowdSec cursor+applied cache, not this HTTP client. New Client must not zero them. Set `streamReady` on the `handleStreamCache` success path.
 
 ## 3. Exclusive name before Open
 
@@ -16,10 +16,10 @@
 - [x] 3.2 Invert different-name share tests (`TestOpenStream_LiveMetricsMismatchSharesSilently` `owner-mw`/`joiner-mw`, `TestOpenStream_HeaderMapMismatchSharesClient` `country`/`user`, `TestOpenStream_FailureActionOnlyKeepsClient` `first`/`test`) to fail the second name, or retarget to one name when they mean many routers / reconfigure. Redis-reload tests that use `first`/`reload` MUST use one name
 - [x] 3.3 Confirm failed `New` still cancels `plugin.go` bindCtx. Client Close still must not Close the store. AppSec reclaim unchanged
 
-## 4. Client IO context and warm-store startup
+## 4. Store poll skip and warm-store startup
 
-- [x] 4.1 Add Client `WithCancel` IO context. `sendQuery` and live lookups use `NewRequestWithContext`. Sleep and Close cancel it. Wake mints a new `WithCancel`
-- [x] 4.2 `drainMetrics` / `reportMetrics` POST with `context.Background()`. Keep `closeIdle`
+- [x] 4.1 `handleStreamTicker` and Wake skip when store `TryBeginStreamPoll` fails. No Client IO context. `sendQuery` stays `http.NewRequest`. Sleep does not wait or cancel Do
+- [x] 4.2 Close stops tickers and `closeIdle` only. `drainMetrics` unchanged
 - [x] 4.3 `lapi.New` reads store `streamReady`: non-zero → `isCrowdsecStreamStartup = 0`. Empty store / mode-change SessionHex stays 1. Live/none: exclusive name only; no stream startup flag
 
 ## 5. Verify

@@ -8,7 +8,7 @@
 
 **LAPI Client** is disposable: stream/metrics tickers and replaceable HTTP. Stream/alone Open key stays `lapi:stream:` + `SessionHex` + Redis hash. Live/none `Key` still hashes Redis + metrics interval. Timeout/TLS stay out; `AdoptTransport` last-wins. A new Client on a warm store must not send `startup=true` when the store already finished a stream poll (`streamReady`).
 
-**CrowdSec stream cursor** lives on the LAPI bouncer row (hashed API key + outbound IP LAPI sees), not per HTTP client (`ext_crowdsec_lapi_stream-cursor`). Two in-process `startup=false` GETs on that row can duplicate or rewind the cursor. Sequential polls are fine; overlapping polls are not. Intra-Client skip is already `streamPollInFlight` CAS (`core_plugin_lapi_stream-single-flight`). Sleep/Close still do not cancel `sendQuery`’s `http.NewRequest` (no context).
+**CrowdSec stream cursor** lives on the LAPI bouncer row (hashed API key + outbound IP LAPI sees), not per HTTP client (`ext_crowdsec_lapi_stream-cursor`). Two in-process `startup=false` GETs on that row can duplicate or rewind the cursor. Sequential polls are fine; overlapping polls are not. Skip is session-scoped on DecisionStore `streamPollInFlight` (same store as `streamReady`). Do not cancel an in-flight GET: LAPI already advanced the cursor when it wrote the body.
 
 **Reclaim holder** is the `bindCtx` child of Traefik `New` ctx (`plugin.go`). Sister pattern in this repo: `pkg/reclaim` shim over utilities table, `ProcessGrace` 30s, `OpenWithHooks`, no `sync.Once`, no package map, no Release API. Failed `New` cancels `bindCtx`. Do not invent globals. Peek is a look without bind: it must not increment holders, must not Wake, must not stop grace.
 
@@ -30,8 +30,8 @@
 - Store reclaim key = `decisionstore:` + `SessionHex` only. Drop the Redis hash. Invert `TestStoreKey_DifferentRedisHostsIsolate` / `TestOpenStream_DifferentRedisIsolatesClientAndStore` store assertions. Client keys may still include Redis (and live metrics interval). Redis YAML change with the **same** name Opens a new Client and reuses the existing store engine (first-wins).
 - Rename during 30s grace: Peek still sees the old `createdBy`; `New` fails until the sleeper Closes; Traefik retry self-heals. No table Release. Failed `New` still cancels `plugin.go` `bindCtx`.
 - Client Close/Sleep must not Close the store (already true). Store has Close-only hooks (already true). Do not put store-as-child Close on `lapi.Client.Close`.
-- `streamReady` on the store after the first finished stream poll. `lapi.New` always sets `isCrowdsecStreamStartup = 1` today; new Client reads `streamReady` and must not send `startup=true` when the store is warm. Mode change → new `SessionHex` → empty store → `startup=true`. Live/none: same exclusive name rule; preserve store; no stream startup flag.
-- Client IO: `sendQuery` and live lookups (`crowdsecQuery` → `sendQuery`) use `http.NewRequestWithContext` on a Client `WithCancel` ctx. Sleep and Close cancel it. Wake mints a new `WithCancel`. `drainMetrics` / `reportMetrics` use `context.Background()` so Sleep’s async drain and Close’s sync drain still POST. `closeIdle` stays. AppSec `pkg/appsec/query.go` `NewRequest` stays (out of scope).
+- `streamReady` and `streamPollInFlight` on the store. They own the CrowdSec cursor+applied cache, not this HTTP client. New Client reads `streamReady` and must not zero either flag. handleStreamTicker and Wake skip when the store CAS is held. Mode change → new `SessionHex` → empty store → `startup=true`. Live/none: same exclusive name rule; preserve store; no stream startup flag.
+- Do not add a Client IO cancel context. `sendQuery` stays `http.NewRequest`. Sleep does not wait and does not cancel Do. Close stops tickers and `closeIdle` only; an in-flight poll may finish apply after Close starts. `drainMetrics` unchanged.
 - Exact Peek on vendored `table.go` + `pkg/reclaim` re-export. Do not restore `PeekLivePrefix`. Do not re-implement closed PR 119 (share-and-WARN, `sessionResidue`, `liveMiddlewareNames`, store-as-child Close, `PeekLivePrefix`).
 - Specs this change must rewrite (propose maps): `core_plugin_lapi_reclaim-key` (two names share → exclusive name; still no `PeekLivePrefix` for retitle/warn-and-wire), `std_go_reclaim_context-lease` (allow exact Peek export; still forbid `PeekLivePrefix` / `View` / table fork), `core_plugin_decisionstore_store` (StoreKey without Redis hash; `createdBy`; Redis first-wins), `core_plugin_lapi_query-round-trip` (request context), plus connection / stream-single-flight / middleware usage packets as needed. `core_plugin_lapi_scope-union` stays for **same-name** many routers, not across names.
 - Do not add a `core_plugin_reclaim` packet. Update `std_go_reclaim`, `core_plugin_middleware`, `core_plugin_lapi_reclaim-key`, `core_plugin_decisionstore`. Traefik `New` ctx remains the holder.
@@ -60,7 +60,7 @@ Overlapping-poll **steal on one Client** via Wake while CAS is held: **not repro
 2. `Store.createdBy` write-once in store `Open` create(). `Store.streamReady` set from the first finished stream poll. `OpenDecisionStore(ctx, cfg, log, name)`.
 3. `OpenStream` / `OpenLive`: Peek store key; reject other names with `log.Error` + returned error (owner, rejected, clears when old slot Closes, isolation is a second bouncer API key). Then Open store, then Open Client. New Client reads `streamReady`.
 4. `StoreKey` drops Redis hash. Client `SessionKey` / live `Key` keep Redis (and live metrics).
-5. Client IO ctx + `NewRequestWithContext`. Metrics drain on `Background`.
+5. Store `streamPollInFlight` CAS in `handleStreamTicker` / Wake. No Client IO ctx. Metrics drain unchanged.
 6. Rewrite the specs named above. Invert share-and-join tests. Keep AppSec reclaim as-is.
 
 ## Open questions
@@ -82,8 +82,16 @@ Overlapping-poll **steal on one Client** via Wake while CAS is held: **not repro
   By: explore
 
 - Q: How is `streamReady` stored so Yaegi v0.16 stays safe?
-  Decision: assumed — `int64` field on `Store` with `atomic.LoadInt64` / `StoreInt64` (same as Client stream flags). Do not use `atomic.Bool` or `atomic.Int64` as a struct field. Set after the first stream poll that finished (`handleStreamCache` success path). New Client reads it before the first GET.
-  By: explore
+  Decision: resolved — `int64` field on `Store` with `atomic.LoadInt64` / `StoreInt64`, next to `streamPollInFlight`. Do not use `atomic.Bool` or `atomic.Int64` as a struct field. Set after the first stream poll that finished (`handleStreamCache` success path). New Client reads it before the first GET and must not zero either flag.
+  By: implement
+
+- Q: Should Sleep or Close cancel an in-flight LAPI stream GET via a Client IO context?
+  Decision: resolved — no. Cancelling loses deltas because LAPI already advanced `stream_cursor` when it wrote the body. Overlap is store `streamPollInFlight` CAS. Sleep does not wait. Close stops tickers and `closeIdle` only. An in-flight poll may finish apply after Close starts. `sendQuery` stays `http.NewRequest`. `drainMetrics` unchanged.
+  By: implement
+
+- Q: Where do `streamReady` and `streamPollInFlight` live so a reincarnated Client cannot start a second poll?
+  Decision: resolved — both `int64` fields on DecisionStore. They own the CrowdSec cursor+applied cache, not this HTTP client. `handleStreamTicker` and Wake’s immediate poll skip when the store CAS is held.
+  By: implement
 
 - Q: Does a later `go mod vendor` that restores published utilities v1.0.6 keep Peek?
   Decision: assumed — no, it would drop Peek. Ship the vendor method now. Debt `knowledge/debt/2026-09-20-upstream-reclaim-peek.md`: upstream Peek and only then re-enable CI vendor git-diff. Current CI comments that diff out, so this patch survives today’s workflow.

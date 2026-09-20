@@ -66,6 +66,12 @@ If the two clients resolve to **different rows** (same key, different IPs), each
 
 Official docs do not describe this race or per-IP rows.
 
+## Aborting a stream GET after LAPI wrote the body
+
+`UpdateBouncerStreamPull` runs after a successful stream write (no write error). The cursor on that bouncer row then points past the ids that were in that body. If the bouncer cancels `http.Client.Do` while reading (or after LAPI flushed), those ids are not applied locally and the next `startup=false` poll starts from the advanced cursor. That is a silent miss of `new`/`deleted`, not the duplicate-or-rewind race of two completed polls.
+
+So overlap must be skipped (one in-flight GET+apply per CrowdSec row in this process), not aborted. This product keeps that skip on the DecisionStore (`streamPollInFlight`), not on a Client cancel context.
+
 ## References
 
 - Official: [LAPI for remediation components](https://docs.crowdsec.net/docs/next/local_api/bouncers.md)

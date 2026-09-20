@@ -45,9 +45,9 @@ All seven are one–three-requirement adjustments of existing leaves. Do not add
 
 4. **`StoreKey` = `decisionstore:` + SessionHex only.** Drop `hashJSON(storeParamsFrom)`. Invert store-isolation tests. Client `SessionKey` / live `Key` keep Redis (and live metrics). Redis YAML change with the same name Opens a new Client and reuses the existing store engine (first-wins memory vs Redis host). Alternative: keep Redis on StoreKey — rejected (ticket: store is the session lock).
 
-5. **`streamReady` is `int64` on `Store`** with `atomic.LoadInt64` / `StoreInt64` (Yaegi: not `atomic.Bool` / `atomic.Int64`). Set on the `handleStreamCache` success path after the first finished stream poll. `lapi.New` reads it before the first GET: non-zero → `isCrowdsecStreamStartup = 0`. Mode change → new SessionHex → empty store → startup=true. Live/none: exclusive name only; no stream startup flag. Alternative: keep the flag only on Client — rejected (Client is disposable).
+5. **`streamReady` and `streamPollInFlight` are `int64` on `Store`** with `atomic.LoadInt64` / `StoreInt64` / `CompareAndSwapInt64` (Yaegi: not `atomic.Bool` / `atomic.Int64`). They own the CrowdSec cursor+applied cache, not this HTTP client. `lapi.New` / Open / Wake MUST NOT zero them. `streamReady` is set on the `handleStreamCache` success path. `lapi.New` reads it before the first GET: non-zero → `isCrowdsecStreamStartup = 0`. `handleStreamTicker` and Wake skip when the store CAS is held. Mode change → new SessionHex → empty store → startup=true. Live/none: exclusive name only; no stream startup flag. Alternative: keep the flags only on Client — rejected (Client is disposable).
 
-6. **Client IO `context.WithCancel`.** Field on `Client`. `sendQuery` and live lookups `http.NewRequestWithContext`. Sleep and Close cancel. Wake mints a new `WithCancel` (a cancelled ctx cannot be reused). `drainMetrics` / `reportMetrics` MUST POST with `context.Background()` (Sleep async drain and Close sync drain). `closeIdle` stays. AppSec `NewRequest` stays. Alternative: cancel `http.Client` — rejected (`closeIdle` does not stop in-flight bodies). Alternative: drain on the IO ctx — rejected (Sleep would drop the usage-metrics window).
+6. **No Client IO cancel context.** `sendQuery` stays `http.NewRequest`. Sleep does not wait and does not cancel Do. Close stops tickers and `closeIdle` only; an in-flight poll may finish apply after Close starts. `drainMetrics` unchanged. Alternative: cancel the in-flight GET — rejected (LAPI already advanced `stream_cursor`; abort drops the body). Alternative: wait in Sleep — rejected (ticket: skip, do not wait).
 
 7. **Failed `New` still cancels `plugin.go` bindCtx.** Peek-fail happens before store Open; cancel is still correct. No table Release. Rename during 30s grace: Peek still sees the old `createdBy`; Traefik retry self-heals after Close.
 
@@ -61,7 +61,7 @@ All seven are one–three-requirement adjustments of existing leaves. Do not add
 - [Peek `ok=false` on busy then Open can race two different names] → Out of scope (ticket: sequential routers). Do not add a post-Open closer.
 - [Rename during grace fails `New` until Close] → Required. Operator error names the owner and that it clears when the old slot Closes.
 - [Redis YAML change first-wins the engine] → Same as today’s store create() first-wins, now across hosts because StoreKey dropped the hash. Client still isolates by Redis.
-- [Cancelling IO ctx fails in-flight GET with a context error] → Intended. Intra-Client CAS still serializes overlap on one Client; cancel is so a leftover GET cannot share the CrowdSec row with a reincarnated Client.
+- [In-flight GET may finish apply after Close] → Acceptable vs losing the cursor window. Store CAS still prevents a second poll.
 
 ## Migration Plan
 
@@ -69,4 +69,4 @@ No operator JSON/YAML key change. Isolation of two middleware names that used to
 
 ## Open Questions
 
-None that change specs, approach, or tasks. Explore rows honored: Peek types `State`/`Awake`/`Asleep`; busy → `ok=false`; empty name owns; `streamReady` as `int64`; vendor Peek debt; no `core_plugin_reclaim` packet.
+None that change specs, approach, or tasks. Explore rows honored: Peek types `State`/`Awake`/`Asleep`; busy → `ok=false`; empty name owns; store `streamReady` + `streamPollInFlight`; no Client IO cancel; vendor Peek debt; no `core_plugin_reclaim` packet.

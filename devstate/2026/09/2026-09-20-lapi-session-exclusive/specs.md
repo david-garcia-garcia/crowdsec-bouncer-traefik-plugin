@@ -6,8 +6,6 @@ FindSpecHost (all fold, confidence high):
 - modified core_plugin_lapi_reclaim-key
 - modified std_go_reclaim_context-lease
 - modified core_plugin_decisionstore_store
-- modified core_plugin_lapi_query-round-trip
-- modified core_plugin_lapi_connection
 - modified core_plugin_lapi_stream-single-flight
 - modified core_plugin_middleware_bouncer
 

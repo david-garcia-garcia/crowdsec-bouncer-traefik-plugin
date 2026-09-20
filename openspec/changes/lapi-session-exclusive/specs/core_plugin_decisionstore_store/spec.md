@@ -53,3 +53,11 @@ A DecisionStore SHALL hold `streamReady` as an `int64` field published with `ato
 #### Scenario: Finished stream poll marks the store ready
 - **WHEN** `handleStreamCache` completes a successful stream fetch on a store
 - **THEN** a later load of that store’s `streamReady` is non-zero
+
+### Requirement: Store streamPollInFlight is the session skip
+A DecisionStore SHALL hold `streamPollInFlight` as an `int64` field published with `CompareAndSwapInt64` / `StoreInt64`. Comments on `streamReady` and `streamPollInFlight` SHALL say they own the CrowdSec cursor and the applied cache, not this HTTP client. `Open`, Wake, and `lapi.New` MUST NOT store 0 onto those fields. `handleStreamTicker` SHALL enter with `TryBeginStreamPoll` (`core_plugin_lapi_stream-single-flight`).
+
+#### Scenario: Second enter skips while the store poll is held
+- **WHEN** `TryBeginStreamPoll` has already succeeded on a store
+- **AND** a later `handleStreamTicker` runs against that store
+- **THEN** the later enter is skipped

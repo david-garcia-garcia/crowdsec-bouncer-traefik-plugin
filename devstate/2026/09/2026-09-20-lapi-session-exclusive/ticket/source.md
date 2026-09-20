@@ -1,4 +1,4 @@
-Title: One middleware name owns a LAPI session; keep DecisionStore across Client reincarnation; Peek then fail; Sleep cancels in-flight LAPI IO
+Title: One middleware name owns a LAPI session; keep DecisionStore across Client reincarnation; Peek then fail; session-scoped stream skip
 
 Supersedes closed PR 119 / 2026-09-20-lapi-session-subscribe (share-and-WARN was the wrong control plane).
 
@@ -18,7 +18,7 @@ DecisionStore reclaim key = `decisionstore:` + SessionHex only (mode + LAPI sche
 
 `lapi.Client` may still reclaim with Redis/intervals in the key so a YAML reconfigure creates a **new** Client. Timeout and TLS stay **out** of the Client key: same Client + AdoptTransport last-wins (existing).
 
-Reconfigure (same middleware name, same mode): Open the same store (bind/Wake); new or Woken Client; do **not** `startup=true`. Put **streamReady** on the store (set after the first stream poll that finished). New Client reads it. Mode change (stream↔live/alone) → different SessionHex → new empty store → startup=true.
+Reconfigure (same middleware name, same mode): Open the same store (bind/Wake); new or Woken Client; do **not** `startup=true`. Put **streamReady** and **streamPollInFlight** on the store (they own the CrowdSec cursor+applied cache, not this HTTP client). New Client reads streamReady and must not zero either flag. Mode change (stream↔live/alone) → different SessionHex → new empty store → startup=true.
 
 Client Close must **not** Close the store (master already). Do not make store a child of Client Close.
 
@@ -28,10 +28,14 @@ Live/none: same exclusive name rule; preserve store (live cache); no stream star
 
 AppSec reclaim unchanged.
 
-### Sleep cancels in-flight LAPI IO
-sendQuery today uses http.NewRequest with no context. Sleep stops tickers but an in-flight GET continues; Wake immediately go handleStreamTicker() → two startup=false polls steal CrowdSec cursor deltas.
+### Session-scoped stream skip (do not cancel in-flight GET)
+Cancelling an in-flight stream GET loses deltas (LAPI already advanced the cursor). Overlap is fixed by session-scoped skip, not abort.
 
-Client holds an IO context. sendQuery/live lookups use NewRequestWithContext on it. Sleep **and** Close cancel it. Wake mints a new WithCancel (cancelled ctx cannot be reused). drainMetrics must NOT use that ctx (Sleep drain stays Background so the usage-metrics window is not dropped). closeIdle stays; it does not stop in-flight bodies.
+`streamReady` and `streamPollInFlight` live on DecisionStore, not Client. handleStreamTicker (and Wake's immediate poll) skip if store streamPollInFlight is set (CAS). Sleep does not wait. Do not cancel the in-flight Do. Do not add a Client IO context. sendQuery stays `http.NewRequest`.
+
+Close: still stop tickers and closeIdle; do not add a cancel ctx. An in-flight poll may finish apply after Close starts; that is acceptable vs losing the cursor window.
+
+drainMetrics unchanged (no IO ctx). Timeout stays off Client reclaim key; AdoptTransport on the same Client.
 
 ### Peek API
 Exact Peek(key) → (value, awake|asleep, ok) without binding. Implement on vendored `traefik-middleware-utilities/reclaim` table.go and export via `pkg/reclaim`. No PeekLivePrefix. No fork of the whole table into pkg/reclaim.
