@@ -28,6 +28,7 @@ const (
 	AppsecMode        = "appsec"
 	HTTPS             = "https"
 	HTTP              = "http"
+	LogTRACE          = "TRACE"
 	LogDEBUG          = "DEBUG"
 	LogINFO           = "INFO"
 	LogWARN           = "WARN"
@@ -547,8 +548,8 @@ func rejectMissingEnabledAppsecHost(config *Config, appsecScheme string) error {
 
 // validateLogging rejects an unknown log level and an unwritable LogFilePath.
 func validateLogging(config *Config) error {
-	if !contains([]string{LogDEBUG, LogINFO, LogWARN, LogERROR}, strings.ToUpper(config.LogLevel)) {
-		return fmt.Errorf("LogLevel should be one of (%s,%s,%s,%s)", LogDEBUG, LogINFO, LogWARN, LogERROR)
+	if !contains([]string{LogTRACE, LogDEBUG, LogINFO, LogWARN, LogERROR}, strings.ToUpper(config.LogLevel)) {
+		return fmt.Errorf("LogLevel should be one of (%s,%s,%s,%s,%s)", LogTRACE, LogDEBUG, LogINFO, LogWARN, LogERROR)
 	}
 	if config.LogFilePath != "" {
 		// Prove the path is writable, then close so ValidateParams does not keep the check descriptor.
