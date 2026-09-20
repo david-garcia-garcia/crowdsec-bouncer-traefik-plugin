@@ -39,3 +39,9 @@ phase: devdocsimpact
 findings: language-gap + 2 stale-usage on DecisionStore and stream apply
 fixed: core_plugin_decisionstore.md, core_plugin_lapi_stream-apply.md
 skipped: none
+
+## archive (2026-09-20T06:14:30Z)
+phase: archive
+findings: none
+fixed: fold into core_plugin_decisionstore_store; archive folder move
+skipped: none

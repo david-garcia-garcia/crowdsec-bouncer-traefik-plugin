@@ -22,7 +22,7 @@ JobName: 2026-09-20-elapsedsec-liveslot
 
 | devdocsimpact | [x] | [x] | 2026-09-20T06:13:30Z |
 
-| archive | [ ] | [ ] | |
+| archive | [x] | [x] | 2026-09-20T06:14:30Z |
 
 | pullrequest | [ ] | [ ] | |
 
