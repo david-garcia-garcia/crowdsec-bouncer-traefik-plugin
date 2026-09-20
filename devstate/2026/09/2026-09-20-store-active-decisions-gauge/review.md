@@ -35,3 +35,9 @@ phase: devdocsimpact
 findings: none
 fixed: none
 skipped: none (packets already produced in implement)
+
+## archive (2026-09-20)
+phase: archive
+findings: fold usage-metrics and decisionstore; catalog synced; folder moved
+fixed: none
+skipped: none

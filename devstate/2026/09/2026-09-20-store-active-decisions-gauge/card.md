@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-20T18:30:19Z
+Developer review: in progress — 2026-09-20T18:33:49Z
 
 ## What this changes
 **Operators.** None.
@@ -26,17 +26,17 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Devdocs impact: none remaining (implement packets already cover DecisionStore, usage-metrics, stream-apply). Local tests passed; CI still running on head `547d9ddc`. 1 item remains (wait for CI).
+OpenSpec change archived; catalog specs synced. Local tests passed; CI still running on head `90ffdd5d`. 1 item remains (wait for CI).
 
 Priority: P2 — real operator RSS pain at large stream sets, with a workaround of keeping the extra map
-Reviewed head: 547d9ddc
+Reviewed head: 90ffdd5d
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI still running on the impact head |
-| CI proof | 3/6 | in progress — [run 35529231828](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35529231828) and [run 35529231905](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35529231905) |
+| Overall readiness | 3/6 | CI still running on the archive head |
+| CI proof | 3/6 | in progress — [run 35529457882](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35529457882) |
 | Local tests proof | N/A | `localTests: passed`; remote CI covers proof |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -44,21 +44,21 @@ Owner decision: Required. See Decision needed.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-20-store-active-decisions-gauge pushed | `git` `origin/2026-09-20-store-active-decisions-gauge` |
-| OpenSpec | store-owned-active-decisions-gauge | `openspec/changes/store-owned-active-decisions-gauge/` |
+| OpenSpec | store-owned-active-decisions-gauge | `openspec/changes/archive/2026-09-20-store-owned-active-decisions-gauge/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/129 | pr-host List |
-| CI | build 35529231828 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35529231828 | pr-host CI |
+| CI | build 35529457882 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35529457882 | pr-host CI |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | comments: none |
 
 ## Specs
-- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-store-active-decisions-gauge/openspec/changes/store-owned-active-decisions-gauge/proposal.md) — modified
-- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-store-active-decisions-gauge/openspec/changes/store-owned-active-decisions-gauge/proposal.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-store-active-decisions-gauge/openspec/changes/archive/2026-09-20-store-owned-active-decisions-gauge/proposal.md) — modified
+- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-store-active-decisions-gauge/openspec/changes/archive/2026-09-20-store-owned-active-decisions-gauge/proposal.md) — modified
 
 ## Follow-up issues
 - [ ] [Range active_decisions forget after dropping the slot map](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-store-active-decisions-gauge/knowledge/debt/2026-09-20-range-active-decisions-forget.md) — Range is a blob + LPM trees, not a slot Peek; omit Range from the store-owned gauge until ApplyRangeBatch displacements.
 
 ## How this fits together
-Local ticket `2026-09-20-store-active-decisions-gauge` is on branch `2026-09-20-store-active-decisions-gauge` targeting `master`, PR 129, usage packets already match the apply, CI in progress.
+Local ticket `2026-09-20-store-active-decisions-gauge` is on branch `2026-09-20-store-active-decisions-gauge` targeting `master`, PR 129, change archived, CI in progress.
 
 ## Decision needed
 | Question | Decision | By |
@@ -70,7 +70,8 @@ Local ticket `2026-09-20-store-active-decisions-gauge` is on branch `2026-09-20-
 - [x] Park Range forget debt
 - [x] Apply hard code-review findings (metrics snapshot comment; `TestOpenDecisionStore_CountActiveFromMode`)
 - [x] Confirm usage packets (DecisionStore, usage-metrics, stream-apply) match the apply
-- [ ] [P2] Wait for CI on head `547d9ddc`
+- [x] Archive store-owned-active-decisions-gauge into catalog specs
+- [ ] [P2] Wait for CI on head `90ffdd5d`
 
 ## Findings
 None.
@@ -90,7 +91,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs; do not paste diff --stat |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 547d9ddc66e753147b928640421949db3d19174e | Card must match the branch you measured |
+| Reviewed head | 90ffdd5d83c2e73aaee655331dcef866f4980dc8 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -104,10 +105,10 @@ Is this the best way to solve the issue? Yes — count at the store mutation ins
 
 ### Evidence
 What I checked:
-- Pin `origin/master...HEAD` excluding `devstate/` and `.cursor`
-- Units DecisionStore, LAPI usage-metrics, Stream apply; packets already have Active counts, reporter snapshot, remember/forget removed
-- `devdocs-impact.md` findings none; no produce this phase
-- CI in progress on runs 35529231828 (Main Process, Race detector) and 35529231905 (e2e: go+dragonfly success; binary and docker in progress)
+- FindSpecHost fold: usage-metrics-snapshot → `core_plugin_lapi_usage-metrics`; store-groupby → `core_plugin_decisionstore_store`
+- Catalog spec.md MODIFIED/ADDED synced; validate-spec-map and validate-artifact-names OK
+- Change moved to `openspec/changes/archive/2026-09-20-store-owned-active-decisions-gauge/`
+- CI in progress on run 35529457882 (Main Process, Race detector)
 
 ### Rank-up moves
 None.

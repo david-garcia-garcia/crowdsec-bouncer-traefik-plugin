@@ -10,5 +10,5 @@ JobName: 2026-09-20-store-active-decisions-gauge
 | implement | [x] | [x] | 2026-09-20T18:16:01Z |
 | codereview | [x] | [x] | 2026-09-20T18:29:02Z |
 | devdocsimpact | [x] | [x] | 2026-09-20T18:31:29Z |
-| archive | [ ] | [ ] | |
+| archive | [x] | [x] | 2026-09-20T18:34:44Z |
 | pullrequest | [ ] | [ ] | |
