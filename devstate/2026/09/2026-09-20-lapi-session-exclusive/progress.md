@@ -9,6 +9,6 @@ JobName: 2026-09-20-lapi-session-exclusive
 | propose | [x] | [x] | 2026-09-20T15:48:00Z |
 | implement | [x] | [x] | 2026-09-20T16:44:39Z |
 | codereview | [x] | [x] | 2026-09-20T17:16:11Z |
-| devdocsimpact | [x] | [ ] | |
-| archive | [ ] | [ ] | |
+| devdocsimpact | [x] | [x] | 2026-09-20T17:18:55Z |
+| archive | [x] | [ ] | |
 | pullrequest | [ ] | [ ] | |

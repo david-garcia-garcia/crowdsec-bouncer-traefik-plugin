@@ -39,3 +39,11 @@ fixed: deleted StreamPollInFlight; CAS tests use TryBeginStreamPoll skip/reenter
 skipped: none
 qualify: qualified-with-gaps
 pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/124
+
+## devdocsimpact (2026-09-20T17:18:55Z)
+phase: devdocsimpact
+findings: 6 usage/Language gaps (Peek, CreatedBy, StoreKey Redis, exclusive-name)
+fixed: produced all six on core_plugin_decisionstore, reclaim-key, std_go_reclaim, middleware, index_core_plugin
+skipped: none
+qualify: qualified-with-gaps
+pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/124
