@@ -14,13 +14,17 @@ _Avoid_: leftover AppSec host/CA/key, `crowdsecMode: appsec`
 The `ValidateParams` startup gate `plugin.New` runs on the prepared Config before `lapi.Prepare`.
 _Avoid_: `GetVariable` as a feature-flag check
 
+**Writability-check handle**:
+The `*os.File` opened only to prove a non-empty `LogFilePath` is writable. Not the process-lifetime logger file.
+_Avoid_: sharedLogFiles, reclaim value, log owner
+
 **EffectiveHTTPTimeoutSeconds**:
 The inherited timeout in seconds for one backend: `HTTPTimeoutSeconds` when that backend's override is 0, otherwise the override.
 _Avoid_: EffectiveLapi, three inherit wrappers
 
 ## Overview
 
-`ValidateParams` is `New`'s constructor gate. When it fails, `New` returns a nil handler and that error and does not open LAPI. File-backed secrets go through `GetVariable`, which Stats and reads `<key>File` when that path is non-empty. Gate each `GetVariable` call behind the flag that uses that secret. Captcha site and secret keys are required whenever `captchaProvider` is set, including `crowdsecMode: alone` and the default `ban` failure action. AppSec URL, key-file, and HTTPS CA run only when `CrowdsecAppsecEnabled` is true.
+`ValidateParams` is `New`'s constructor gate. When it fails, `New` returns a nil handler and that error and does not open LAPI. File-backed secrets go through `GetVariable`, which Stats and reads `<key>File` when that path is non-empty. Gate each `GetVariable` call behind the flag that uses that secret. Captcha site and secret keys are required whenever `captchaProvider` is set, including `crowdsecMode: alone` and the default `ban` failure action. AppSec URL, key-file, and HTTPS CA run only when `CrowdsecAppsecEnabled` is true. `validateLogging` still `OpenFile`s a non-empty `LogFilePath` even when `logger.NewWithFormat` already holds that path. Close that handle after a successful open.
 
 ## How to use
 
@@ -42,6 +46,9 @@ _Avoid_: EffectiveLapi, three inherit wrappers
 - When the knob is false, skip AppSec host, URL, key, and CA even if leftover fields are set.
 - Leave `New` as `return nil, err` on `ValidateParams` failure.
 - Trim `CaptchaCustomValidateBody`. Accept only `""`, `form`, and `json` (exact lowercase). Reject unknown tokens for any provider (`CaptchaCustomValidateBody: must be empty, form, or json`). Reject `json` when the provider is not `custom` (`CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom`). Built-in leftover `""` / `form` pass and are ignored.
+- Keep the `LogFilePath` check as its own `OpenFile` (append/create/write). Do not reuse `sharedLogFiles` and do not skip the open when the logger already opened the path.
+- After a successful open, `Close` the writability-check handle. Ignore the `Close` error; writability is already proven.
+- Still return an error when the path is not writable. The logger's stdout fallback is a different job.
 
 ## Pattern snippet
 
@@ -68,10 +75,18 @@ if siteKey == "" {
 }
 ```
 
+```go
+checkFile, err := os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+if err != nil {
+	return fmt.Errorf("LogFilePath is not writable %w", err)
+}
+_ = checkFile.Close()
+```
+
 ## Key files
 
-- `pkg/configuration/configuration.go` (`ValidateParams`, `validateAppsecURLKeyAndTLS`, `validateCaptchaCredentials`, `GetVariable`)
-- `plugin.go` (`New` returns `nil, err` before LAPI Open; `appsec.Open` when `CrowdsecAppsecEnabled`)
+- `pkg/configuration/configuration.go` (`ValidateParams`, `validateAppsecURLKeyAndTLS`, `validateCaptchaCredentials`, `GetVariable`, `validateLogging`)
+- `plugin.go` (`New` returns `nil, err` before LAPI Open; `appsec.Open` when `CrowdsecAppsecEnabled`; `NewWithFormat` then `ValidateParams`)
 
 ## Gotchas
 
@@ -84,3 +99,5 @@ if siteKey == "" {
 - Leftover invalid AppSec CA or missing key file boots when AppSec is off (live, stream, none, appsec, and alone).
 - Empty AppSec key after a successful lookup still passes; `appsec.Prepare` copies the LAPI key.
 - CA parse still triggers on explicit `CrowdsecAppsecScheme == https`, not inherit-https.
+- `NewWithFormat` warns and uses stdout when the path is not writable. `ValidateParams` must still fail so `plugin.New` does not start.
+- Do not put the writability-check handle on `pkg/reclaim` or add `sync.Once` / a package global for this close. `sharedLogFiles` is the process-lifetime owner.

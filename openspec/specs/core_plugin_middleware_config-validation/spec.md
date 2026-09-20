@@ -53,6 +53,17 @@ The configuration package SHALL include unit tests covering: custom captcha prov
 - **WHEN** `crowdsecAppsecFailureAction` is `captcha` and `captchaProvider` is empty
 - **THEN** `ValidateParams` returns an error
 
+### Requirement: Writable log path check does not retain its descriptor
+When `LogFilePath` is non-empty, `ValidateParams` SHALL still reject an unwritable path. After a successful writability check it MUST NOT retain a file descriptor that exists only for that check. It MUST still perform the check even when a process-lifetime logger file is already open for the same path.
+
+#### Scenario: Successful writable path leaves no check descriptor
+- **WHEN** `ValidateParams` succeeds with a non-empty writable `LogFilePath` and no process-lifetime logger file is held for that path
+- **THEN** the process has no open descriptor that names that path
+
+#### Scenario: Unwritable path still fails
+- **WHEN** `LogFilePath` is non-empty and not writable
+- **THEN** `ValidateParams` returns an error
+
 ### Requirement: Redis password file resolved only when Redis is enabled
 `ValidateParams` SHALL resolve `RedisCachePassword` and `RedisCachePasswordFile` only when `redisCacheEnabled` is true. When `redisCacheEnabled` is false, a missing, directory, or unreadable `redisCachePasswordFile` MUST NOT fail startup. When `redisCacheEnabled` is true, a non-empty `redisCachePasswordFile` that is missing, a directory, or unreadable SHALL fail startup. An empty password with an empty file path SHALL still be accepted when Redis is enabled.
 
@@ -216,3 +227,4 @@ When `captchaProvider` is set, `ValidateParams` SHALL reject an empty `CaptchaFi
 #### Scenario: Whitespace-padded json is json
 - **WHEN** the provider is `custom`, the four required custom strings are set, and `CaptchaCustomValidateBody` is ` json `
 - **THEN** `ValidateParams` returns no error
+
