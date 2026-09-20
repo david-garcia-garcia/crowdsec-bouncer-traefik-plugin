@@ -66,32 +66,37 @@ func TestStoreKey_DifferentRedisHostsIsolate(t *testing.T) {
 	}
 }
 
-func TestOpenDecisionStore_DifferentRedisHostsIsolate(t *testing.T) {
+func TestOpenLive_DifferentRedisHostsIsolate(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
 	ctx := context.Background()
 	log := logger.New("ERROR", "")
-	redisA := testStreamConfig("lapi.example:8080", 1)
-	redisB := testStreamConfig("lapi.example:8080", 1)
-	redisA.RedisCacheEnabled = true
-	redisA.RedisCacheHost = "127.0.0.1:1"
-	redisB.RedisCacheEnabled = true
-	redisB.RedisCacheHost = "127.0.0.1:2"
-	first, err := OpenDecisionStore(ctx, redisA, log)
+	redisA := testLiveConfig(1)
+	redisB := testLiveConfig(1)
+	redisA.RedisCacheHost = "redis-a:6379"
+	redisB.RedisCacheHost = "redis-b:6379"
+	first, err := OpenLive(ctx, redisA, log, "redis-a", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenDecisionStore(ctx, redisB, log)
+	second, err := OpenLive(ctx, redisB, log, "redis-b", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if first == second {
+		t.Fatal("different redis hosts must open two live Clients")
+	}
+	if first.decisionStore == second.decisionStore {
 		t.Fatal("different redis hosts must open two stores")
+	}
+	putBan(first.decisionStore)
+	if _, getErr := lookupBan(second.decisionStore); getErr == nil {
+		t.Fatal("ban present only in the first store must miss on the second")
 	}
 }
 
-func TestOpenDecisionStore_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.T) {
+func TestOpenLive_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
@@ -102,11 +107,11 @@ func TestOpenDecisionStore_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.
 	other := testLiveConfig(60)
 	cfg.RedisCacheEnabled = true
 	cfg.RedisCacheHost = redisServer.addr()
-	store, err := OpenDecisionStore(ctx, cfg, log)
+	client, err := OpenLive(ctx, cfg, log, "live", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	putBan(store)
+	putBan(client.decisionStore)
 
 	session := newTestRedisStore(t, redisServer.addr(), nil, SessionHex(cfg))
 	kind, _, _, getErr := session.LookupRemediation("1.2.3.4", nil, nil)
@@ -129,51 +134,31 @@ func TestOpenDecisionStore_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.
 	}
 }
 
-func TestOpenDecisionStore_LiveIntervalSplitSharesStore(t *testing.T) {
+func TestOpenLive_MetricsIntervalSplitDoesNotShareStore(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
 	ctx := context.Background()
 	log := logger.New("ERROR", "")
-	fast := testLiveConfig(1)
-	slow := testLiveConfig(60)
-	first, err := OpenDecisionStore(ctx, fast, log)
+	fast := testNoneConfig("lapi.example:8080", 3600)
+	slow := testNoneConfig("lapi.example:8080", 7200)
+	first, err := OpenLive(ctx, fast, log, "fast", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenDecisionStore(ctx, slow, log)
+	second, err := OpenLive(ctx, slow, log, "slow", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first != second {
-		t.Fatal("same cursor and Redis params must reclaim one store")
+	if first == second {
+		t.Fatal("metrics-interval split must open two Clients")
 	}
-	putBan(first)
-	got, getErr := lookupBan(second)
-	if getErr != nil || got != decisionscope.BannedValue {
-		t.Fatalf("shared store lookup %q err %v", got, getErr)
+	if first.decisionStore == second.decisionStore {
+		t.Fatal("metrics-interval split must not share a reclaim store")
 	}
-}
-
-func TestOpenDecisionStore_HeaderMismatchStillShares(t *testing.T) {
-	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
-
-	ctx := context.Background()
-	log := logger.New("ERROR", "")
-	base := testStreamConfig("lapi.example:8080", 1)
-	withHeaders := testStreamConfig("lapi.example:8080", 1)
-	withHeaders.DecisionScopeHeaders = map[string]string{"username": "X-User"}
-	first, err := OpenDecisionStore(ctx, base, log)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := OpenDecisionStore(ctx, withHeaders, log)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first != second {
-		t.Fatal("header-map mismatch must still share the store")
+	putBan(first.decisionStore)
+	if _, getErr := lookupBan(second.decisionStore); getErr == nil {
+		t.Fatal("memory backends must isolate: ban in the first store must miss on the second")
 	}
 }
 
@@ -230,7 +215,7 @@ func TestClientClose_LeavesSiblingCacheLive(t *testing.T) {
 	}
 }
 
-func TestClientClose_LeavesSiblingRedisPoolLive(t *testing.T) {
+func TestClientClose_ClosesChildRedisStore(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
@@ -238,28 +223,22 @@ func TestClientClose_LeavesSiblingRedisPoolLive(t *testing.T) {
 	ctx := context.Background()
 	log := logger.New("ERROR", "")
 	fast := testLiveConfig(1)
-	slow := testLiveConfig(60)
 	fast.RedisCacheEnabled = true
 	fast.RedisCacheHost = redisServer.addr()
-	slow.RedisCacheEnabled = true
-	slow.RedisCacheHost = redisServer.addr()
 	first, err := OpenLive(ctx, fast, log, "fast", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := OpenLive(ctx, slow, log, "slow", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	putBan(first.decisionStore)
 	first.Close()
-	kind, _, _, getErr := second.decisionStore.LookupRemediation("1.2.3.4", nil, nil)
-	if getErr != nil || kind != decisionscope.BannedValue {
-		t.Fatalf("after sibling Close lookup %q err %v", kind, getErr)
+	_, _, originID, closedErr := first.decisionStore.LookupRemediation("1.2.3.4", nil, nil)
+	_ = originID
+	if closedErr == nil || !errors.Is(closedErr, decisionstore.ErrUnreachable) {
+		t.Fatalf("after Client Close lookup err %v, want unreachable", closedErr)
 	}
 }
 
-func TestOpenDecisionStore_LastHolderGraceClosesRedisPool(t *testing.T) {
+func TestOpenLive_LastHolderGraceClosesRedisPool(t *testing.T) {
 	reclaim.ResetForTestWith(20 * time.Millisecond)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
@@ -269,10 +248,11 @@ func TestOpenDecisionStore_LastHolderGraceClosesRedisPool(t *testing.T) {
 	cfg := testLiveConfig(1)
 	cfg.RedisCacheEnabled = true
 	cfg.RedisCacheHost = redisServer.addr()
-	store, err := OpenDecisionStore(ctx, cfg, log)
+	client, err := OpenLive(ctx, cfg, log, "live", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
+	store := client.decisionStore
 	putBan(store)
 	kind, _, _, getErr := store.LookupRemediation("1.2.3.4", nil, nil)
 	if getErr != nil || kind != decisionscope.BannedValue {
