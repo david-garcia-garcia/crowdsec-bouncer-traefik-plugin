@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-20T05:39:02Z
+Developer review: in progress — 2026-09-20T05:51:43Z
 
 ## What this changes
 **Operators.** In this Traefik instance, one LAPI key is one stream ticker and one usage-metrics window. Redis and interval disagreements are ignored, not isolated. Isolation still needs a second bouncer API key. WARN names ignored fields and who joined whom.
@@ -24,10 +24,10 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-Apply landed; local tests passed; remote CI still in progress. 4 items remain.
+Six-axis review applied hard findings; local tests passed; remote CI still in progress. 3 items remain.
 
 Priority: P2 — real operator pain (stolen stream deltas / second metrics window) with a workaround (second API key)
-Reviewed head: 8d4d1459
+Reviewed head: 0a8291fe
 Owner decision: Required. See Decision needed.
 
 ## Review scores
@@ -44,7 +44,7 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-20-lapi-session-subscribe pushed | origin/2026-09-20-lapi-session-subscribe |
 | OpenSpec | 2026-09-20-lapi-session-subscribe | openspec/changes/2026-09-20-lapi-session-subscribe/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/119 | pr-host |
-| CI | build 35492198105 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35492198105 | GitHub check runs |
+| CI | build 35492739774 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35492739774 | GitHub check runs |
 | Local tests | passed | `go test ./pkg/lapi ./pkg/decisionstore ./pkg/bouncer .` |
 | PR comments | no comments | inventory empty |
 
@@ -58,7 +58,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## How this fits together
-Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, PR 119. Apply on HEAD 8d4d1459. Next is six-axis code review.
+Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, PR 119. Hard review findings applied at 0a8291fe. Next is usage-doc impact.
 
 ## Decision needed
 | Question | Decision | By |
@@ -74,7 +74,12 @@ Local ticket 2026-09-20-lapi-session-subscribe, dest `master`, PR 119. Apply on 
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/devstate/2026/09/2026-09-20-lapi-session-subscribe/codereview_standards.md) — 7 total, 0 pending, 6 completed, 1 skipped
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/devstate/2026/09/2026-09-20-lapi-session-subscribe/codereview_spec.md) — 1 total, 0 pending, 1 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/devstate/2026/09/2026-09-20-lapi-session-subscribe/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/devstate/2026/09/2026-09-20-lapi-session-subscribe/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/devstate/2026/09/2026-09-20-lapi-session-subscribe/codereview_dead.md) — 1 total, 0 pending, 1 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-lapi-session-subscribe/devstate/2026/09/2026-09-20-lapi-session-subscribe/codereview_coverage.md) — 4 total, 0 pending, 2 completed, 2 skipped
 
 ## Agent review details
 
@@ -83,7 +88,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 8d4d1459a77938a2b4dd87e7bb6a4af65b7da2dd | Card must match the branch you measured |
+| Reviewed head | 0a8291fe | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -91,15 +96,15 @@ None.
 ### Technical review
 Best possible solution: Stream Open key matches the CrowdSec row; subscribe WARNs; store is a child of create so dropping Redis from the Client key cannot leak a zombie store.
 
-Do we have a high-confidence way to reproduce? Yes, inverted OpenStream tests now require share+WARN; local `go test` passed.
+Do we have a high-confidence way to reproduce? Yes, inverted OpenStream tests plus Sleep Redis Lookup hit; local `go test` passed.
 
 Is this the best way to solve the issue? Yes vs DestBranch: match LAPI physics; do not fail New; live Key unchanged.
 
 ### Evidence
 What I checked:
-- `SessionKey` is `lapi:stream:` + `SessionHex` (`pkg/lapi/session.go`)
-- README Note: Redis/interval disagreements ignored (8d4d1459)
-- localTests passed; CI in progress on PR 119
+- Six-axis files under the run root; hard/wrong items Status done (0a8291fe)
+- `go test ./pkg/lapi ./pkg/decisionstore ./pkg/bouncer .` passed
+- CI in progress on PR 119
 
 ### Rank-up moves
 None.
