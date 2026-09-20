@@ -1,13 +1,13 @@
 package decisionscope
 
-// RemediationKind is the ban/captcha/none/captcha-done letter.
+// RemediationKind is the ban/captcha/none letter.
 func RemediationKind(stored string) string {
 	if stored == "" {
 		return ""
 	}
 	kind := stored[:1]
 	switch kind {
-	case "t", "f", "c", "d":
+	case BannedValue, NoBannedValue, CaptchaValue:
 		return kind
 	default:
 		return stored
