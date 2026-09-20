@@ -11,7 +11,7 @@ comments: none
 localTests: none
 requirement: requirement.md
 explore: explore.md
-change:
+change: crowdsec-decision-header
 pr:
   id: 128
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/128
