@@ -1,0 +1,17 @@
+issueKey: 2026-09-20-lapi-session-exclusive
+jobName: 2026-09-20-lapi-session-exclusive
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 213157e7d5d3ee2afc44a73aa561764b34272a0ac9038b36a744a9ed2e28d7da
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr:
+  id: 124
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/124
