@@ -23,3 +23,11 @@ fixed: none (design-only)
 skipped: implement not started; Peek types / busy / empty name remain assumed
 qualify: qualified-with-gaps
 pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/124
+
+## implement (2026-09-20T16:44:39Z)
+phase: implement
+findings: human correction dropped Client IO cancel; stream skip moved onto DecisionStore streamPollInFlight
+fixed: deleted ioCtx/NewRequestWithContext; store CAS skip; localTests passed
+skipped: CI still in progress on 5779763a
+qualify: qualified-with-gaps
+pr: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/124
