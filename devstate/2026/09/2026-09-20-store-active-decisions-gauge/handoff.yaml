@@ -11,7 +11,7 @@ comments: none
 localTests: none
 requirement: requirement.md
 explore: explore.md
-change:
+change: store-owned-active-decisions-gauge
 pr:
   id: 129
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/129

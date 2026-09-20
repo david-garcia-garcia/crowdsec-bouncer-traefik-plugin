@@ -76,8 +76,8 @@ Intended
   By: explore
 
 - Q: Exact Store snapshot method name for POST?
-  Decision: assumed — `ActiveCounts()` on `Store` returns a snapshot copy of the compact map (or an iterator-equivalent that does not leak `usageMetricKey`). Propose may pick a longer name if librarian naming objects; do not expose LAPI item structs from decisionstore.
-  By: explore
+  Decision: resolved — `ActiveCounts()` on `Store` returns a snapshot copy of `map[ActiveCountKey]int64` (`OriginID uint16`, `Family string`). Do not expose `usageMetricKey` or LAPI item structs from decisionstore.
+  By: propose
 
 - Q: Redis previous-origin parse — MGET bytes are KindOriginString; Unpack string → originID 0?
   Decision: resolved — MGET previous value, split `KindOriginString` for the origin name, then `Store.OriginID(name)` in-process. Do not persist intern ids on Redis. Do not add a Redis intern table. Family comes from `FamilyOfHostOrCIDR` on the slot identifier, not from Unpack.
@@ -92,8 +92,8 @@ Intended
   By: explore
 
 - Q: Where does the compact map live (Store vs each engine)?
-  Decision: assumed — one compact map on `Store` (or a field both engines update through Store helpers) so `ActiveCounts` does not need an engine interface. Memory adjust runs under the same `mu` as `putSlot` / `deleteTickLocked` / PublishTick sweep. Redis adjust is in-process after MGET, with its own mutex (redis has no `mu` today). Overwrite of an existing canonical slot decrements the previous group then increments the new. Prior-spelling extra DEL is not a second gauge event (dest counted one `SlotKey`).
-  By: explore
+  Decision: resolved — one compact map on `Store`; memory and Redis hold a pointer (same pattern as memory `origins`). `ActiveCounts` is a Store method (no engine interface). Memory adjust runs under the same `mu` as `putSlot` / `deleteTickLocked` / PublishTick sweep (nested count mutex allowed). Redis adjust is in-process after MGET, under the Store count mutex (redis has no `mu` today). Overwrite of an existing canonical slot decrements the previous group then increments the new. Prior-spelling extra DEL is not a second gauge event (dest counted one `SlotKey`).
+  By: propose
 
 - Q: Redis TTL expiry — should counts drop when Redis keys expire without DeleteMany?
   Decision: assumed — no. Dest reporter also never sees Redis TTL. Redis `PublishTick` stays a no-op. Counts drop on DeleteMany / overwrite only. Out of scope: replacing tick maps, Redis intern table.
