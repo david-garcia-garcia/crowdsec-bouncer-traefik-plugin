@@ -1,0 +1,15 @@
+issueKey: 2026-09-20-elapsedsec-liveslot
+jobName: 2026-09-20-elapsedsec-liveslot
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:8721addf87daabbb4efdcb5684c71ee677e818d969caf1cda9228c9433289edc
+comments: none
+localTests: none
+requirement: requirement.md
+pr:
+  id: 121
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/121
