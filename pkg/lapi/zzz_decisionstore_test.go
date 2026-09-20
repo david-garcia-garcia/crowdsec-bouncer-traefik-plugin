@@ -286,3 +286,28 @@ func TestOpenDecisionStore_LastHolderGraceClosesRedisPool(t *testing.T) {
 		t.Fatalf("after last-holder grace lookup err %v, want unreachable", closedErr)
 	}
 }
+
+func TestOpenDecisionStore_CountActiveFromMode(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	ctx := context.Background()
+	log := logger.New("ERROR", "")
+	stream, err := OpenDecisionStore(ctx, testStreamConfig("lapi.example:8080", 0), log, "stream")
+	if err != nil {
+		t.Fatal(err)
+	}
+	putBan(stream)
+	if len(stream.ActiveCounts()) == 0 {
+		t.Fatal("stream OpenDecisionStore Put must increment ActiveCounts")
+	}
+
+	live, err := OpenDecisionStore(ctx, testLiveConfig(1), log, "live")
+	if err != nil {
+		t.Fatal(err)
+	}
+	putBan(live)
+	if got := live.ActiveCounts(); len(got) != 0 {
+		t.Fatalf("live OpenDecisionStore Put must not increment, got %#v", got)
+	}
+}

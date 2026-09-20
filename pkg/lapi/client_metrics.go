@@ -186,7 +186,7 @@ func (r *MetricsReporter) reportMetrics() error {
 	now := time.Now()
 	windowSizeSeconds := int(now.Sub(r.lastMetricsPush).Seconds())
 
-	// Snapshot dropped and gauge items, then swap processed atomics.
+	// Copy dropped counters under metricsMu; gauge snapshot is after unlock.
 	r.metricsMu.Lock()
 	window := r.windowCounters
 	r.windowCounters = make(map[usageMetricKey]int64)
