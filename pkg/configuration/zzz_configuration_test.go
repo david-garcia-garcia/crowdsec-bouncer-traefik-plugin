@@ -3,6 +3,7 @@ package configuration
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -839,6 +840,56 @@ func Test_validateParamsTLS_appsec(t *testing.T) {
 				t.Errorf("validateParamsTLS() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+// TestHunt_ValidateParams_closesLogFileAfterWritabilityCheck proves a successful
+// writable-path check does not keep the check descriptor, and an unwritable path still fails.
+func TestHunt_ValidateParams_closesLogFileAfterWritabilityCheck(t *testing.T) {
+	log := logger.New("INFO", "")
+
+	t.Run("successful writable path leaves no check descriptor", func(t *testing.T) {
+		cfg := getMinimalConfig()
+		logPath := filepath.Join(t.TempDir(), "plugin.log")
+		cfg.LogFilePath = logPath
+		if err := ValidateParams(cfg, log); err != nil {
+			t.Fatalf("ValidateParams = %v want nil", err)
+		}
+		assertWritabilityCheckHandleClosed(t, logPath)
+	})
+
+	t.Run("unwritable path still fails", func(t *testing.T) {
+		cfg := getMinimalConfig()
+		cfg.LogFilePath = filepath.Join(t.TempDir(), "missing-dir", "plugin.log")
+		if err := ValidateParams(cfg, log); err == nil {
+			t.Fatal("ValidateParams = nil want error")
+		}
+	})
+}
+
+// assertWritabilityCheckHandleClosed fails when the process still holds a descriptor for path.
+func assertWritabilityCheckHandleClosed(t *testing.T, path string) {
+	t.Helper()
+	cleaned := filepath.Clean(path)
+	if runtime.GOOS == "windows" {
+		if err := os.Remove(cleaned); err != nil {
+			t.Fatalf("os.Remove(%s) = %v; writability-check handle still open", cleaned, err)
+		}
+		return
+	}
+	entries, err := os.ReadDir("/proc/self/fd")
+	if err != nil {
+		t.Logf("skip leak assertion: neither Windows nor /proc/self/fd (%v)", err)
+		return
+	}
+	for _, entry := range entries {
+		target, err := os.Readlink(filepath.Join("/proc/self/fd", entry.Name()))
+		if err != nil {
+			continue
+		}
+		if target == cleaned || filepath.Clean(target) == cleaned {
+			t.Fatalf("/proc/self/fd/%s still names %s", entry.Name(), cleaned)
+		}
 	}
 }
 
