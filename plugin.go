@@ -27,8 +27,6 @@ func CreateConfig() *configuration.Config {
 // already opened instead of leaving a LAPI stream ticker polling for the process lifetime.
 //
 // err is named so that defer can see which way New left; a bool would not survive a later return.
-//
-//nolint:nonamedreturns
 func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (handler http.Handler, err error) {
 	// Shallow copy: Config's []string and map[string]string fields still alias the caller's.
 	// Nothing below mutates them in place, so whoever adds an in-place mutation must copy them too.
