@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	captcha "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 )
@@ -195,27 +195,30 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 
 	// live, stream, and alone consult the cache.
 	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
-		value, origin, originID, cacheErr := decisionscope.LookupCachedRemediation(b.lapiClient.Cache(), req.remoteIP, req.ipAddr, scopes, b.lapiClient.RangeMembership())
+		var kind, origin string
+		var originID uint16
+		var lookupErr error
+		kind, origin, originID, lookupErr = b.lapiClient.LookupRemediation(req.remoteIP, req.ipAddr, scopes)
 		switch {
-		case cacheErr != nil:
-			b.log.Debug("ServeHTTP:Get", "ip", req.remoteIP, "cache", cacheErr)
-			if errors.Is(cacheErr, cache.ErrUnreachable) && !b.redisUnreachableBlock {
+		case lookupErr != nil:
+			b.log.Debug("ServeHTTP:Get", "ip", req.remoteIP, "cache", lookupErr)
+			if errors.Is(lookupErr, decisionstore.ErrUnreachable) && !b.redisUnreachableBlock {
 				b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "redisUnreachable", true)
 				b.handleNextServeHTTP(rw, req)
 				return
 			}
-			if errors.Is(cacheErr, cache.ErrMiss) {
+			if errors.Is(lookupErr, decisionstore.ErrMiss) {
 				break
 			}
-			b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "error", cacheErr)
+			b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "error", lookupErr)
 			b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
 			return
-		case decisionscope.IsActiveRemediation(value):
-			b.log.Debug("ServeHTTP", "ip", req.remoteIP, "cache", "hit", "remediation", value)
-			// Origin name is resolved only on drop; allow-path GetInt has no intern lock.
-			b.handleRemediationServeHTTP(rw, req, value, b.resolveDroppedOrigin(origin, originID))
+		case decisionscope.IsActiveRemediation(kind):
+			b.log.Debug("ServeHTTP", "ip", req.remoteIP, "cache", "hit", "remediation", kind)
+			// Origin is resolved only on drop; allow-path skips OriginName.
+			b.handleRemediationServeHTTP(rw, req, kind, b.resolveDroppedOrigin(origin, originID))
 			return
-		case value == decisionscope.NoBannedValue:
+		case kind == decisionscope.NoBannedValue:
 			b.handleNextServeHTTP(rw, req)
 			return
 		}
@@ -234,9 +237,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	}
 
 	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.NoneMode {
-		value, err := b.lapiClient.LiveLookup(req.remoteIP, scopes, b.defaultDecisionSeconds)
-		kind := decisionscope.RemediationKind(value)
-		origin := decisionscope.RemediationOrigin(value)
+		kind, origin, err := b.lapiClient.LiveLookup(req.remoteIP, scopes, b.defaultDecisionSeconds)
 		if err != nil {
 			b.log.Debug("ServeHTTP:LiveLookup", "error", err.Error())
 			if !decisionscope.IsActiveRemediation(kind) {
@@ -307,7 +308,7 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 	}
 }
 
-// resolveDroppedOrigin uses a leftover name, or OriginName on drop only.
+// resolveDroppedOrigin uses a payload origin string, or OriginName(originID) on drop only.
 func (b *Bouncer) resolveDroppedOrigin(origin string, originID uint16) string {
 	if origin != "" {
 		return origin

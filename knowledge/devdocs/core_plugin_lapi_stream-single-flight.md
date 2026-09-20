@@ -8,7 +8,7 @@ _Avoid_: queueing mutex, `atomic.Pointer[T]`, `atomic.Bool`, `atomic.Int64`, a s
 
 ## Overview
 
-`handleStreamTicker` enters with `CompareAndSwapInt64` on `streamPollInFlight` and releases with `defer StoreInt64`. A busy tick is dropped. The same guard covers the stream ticker, `startStream`'s async first poll, and `Wake`. Startup, healthy, and update-failure are `int64` fields published with `LoadInt64` / `StoreInt64` so `StreamHealthy` and `streamQuery` can run on the request path. Specs: `core_plugin_lapi_stream-single-flight`. The `updated` lease is a different job (`core_plugin_lapi_stream-lease.md`).
+`handleStreamTicker` enters with `CompareAndSwapInt64` on `streamPollInFlight` and releases with `defer StoreInt64`. A busy tick is dropped. The same guard covers the stream ticker, `startStream`'s async first poll, and `Wake`. Startup, healthy, and update-failure are `int64` fields published with `LoadInt64` / `StoreInt64` so `StreamHealthy` and `streamQuery` can run on the request path. Specs: `core_plugin_lapi_stream-single-flight`. There is no stream lease; every tick that wins the CAS GETs stream.
 
 ## How to use
 
@@ -36,5 +36,5 @@ defer atomic.StoreInt64(&c.streamPollInFlight, 0)
 
 ## Gotchas
 
-- The `updated` lease does not serialize intra-instance flag writes. A lease loser still used to write startup; single-flight skips that enter.
+- Single-flight is the only skip. A dropped tick does not GET stream and does not apply.
 - `Sleep` and `Close` only signal the ticker. They do not wait for an in-flight GET. `Wake` must hit the same CAS.

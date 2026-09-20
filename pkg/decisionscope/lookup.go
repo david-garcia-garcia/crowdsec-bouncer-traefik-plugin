@@ -1,12 +1,9 @@
 package decisionscope
 
 import (
-	"net"
 	"net/http"
 	"sort"
 	"strings"
-
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 )
 
 const (
@@ -18,7 +15,7 @@ const (
 	CaptchaValue = "c"
 )
 
-// IsActiveRemediation reports whether value is ban or captcha (origin suffix ignored).
+// IsActiveRemediation reports whether value is ban or captcha.
 func IsActiveRemediation(value string) bool {
 	kind := RemediationKind(value)
 	return kind == BannedValue || kind == CaptchaValue
@@ -36,7 +33,7 @@ func RemediationValue(decisionType string) string {
 	}
 }
 
-// PreferRemediation keeps ban over captcha over empty. Origin suffix is ignored for the winner's letter.
+// PreferRemediation keeps ban over captcha over empty.
 func PreferRemediation(current, incoming string) string {
 	currentKind := RemediationKind(current)
 	incomingKind := RemediationKind(incoming)
@@ -65,82 +62,6 @@ func RequestScopeValues(headers map[string]string, req *http.Request) map[string
 		}
 	}
 	return out
-}
-
-// lookupHit is one Ip, header, or Range candidate while merging ban over captcha.
-type lookupHit struct {
-	stored   string
-	origin   string
-	originID uint16
-}
-
-// mergeLookupHit keeps ban over captcha and remembers the winner's leftover origin or packed id.
-func mergeLookupHit(chosen lookupHit, incoming lookupHit) lookupHit {
-	if incoming.stored == "" {
-		return chosen
-	}
-	next := PreferRemediation(chosen.stored, incoming.stored)
-	if next == chosen.stored {
-		return chosen
-	}
-	return incoming
-}
-
-// hitFromPayload unpacks a Pack word or leftover string.
-func hitFromPayload(payload any) lookupHit {
-	kind, origin, originID := Unpack(payload)
-	stored, isString := payload.(string)
-	if !isString {
-		stored = kind
-	}
-	return lookupHit{stored: stored, origin: origin, originID: originID}
-}
-
-// LookupCachedRemediation merges Ip, Range, and present header-scope hits. Ban wins across those scopes.
-// Range comes from membership.Remediation; nil or empty membership is a miss (live/none never hydrate).
-// Kind is ban, captcha, or none. Origin is a leftover name; OriginID is a packed intern id.
-// remoteIP is the canonical client address string owned by clientRequest; ipAddr is Range membership only.
-func LookupCachedRemediation(cacheClient *cache.Client, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16, error) {
-	keys := LookupCacheKeys(remoteIP, scopes)
-	var chosen lookupHit
-	leftoverKeys := make([]string, 0, len(keys))
-	for _, key := range keys {
-		word, getIntErr := cacheClient.GetInt(key)
-		if getIntErr == nil {
-			chosen = mergeLookupHit(chosen, hitFromPayload(word))
-			continue
-		}
-		leftoverKeys = append(leftoverKeys, key)
-	}
-	if len(leftoverKeys) > 0 {
-		found, err := cacheClient.GetMany(leftoverKeys)
-		if err != nil {
-			return "", "", 0, err
-		}
-		chosen = mergeLookupHit(chosen, hitFromPayload(found[remoteIP]))
-		for scope, identifier := range scopes {
-			if identifier == "" {
-				continue
-			}
-			chosen = mergeLookupHit(chosen, hitFromPayload(found[HeaderScopeKey(scope, identifier)]))
-		}
-	}
-	chosen = mergeLookupHit(chosen, hitFromPayload(membership.Remediation(ipAddr)))
-	if chosen.stored != "" {
-		return RemediationKind(chosen.stored), chosen.origin, chosen.originID, nil
-	}
-	return "", "", 0, cache.ErrMiss
-}
-
-// LookupCacheKeys is the GetMany key list for the request path: IP, then present header scopes. Range is not a cache key.
-func LookupCacheKeys(remoteIP string, scopes map[string]string) []string {
-	keys := []string{remoteIP}
-	for scope, identifier := range scopes {
-		if identifier != "" {
-			keys = append(keys, HeaderScopeKey(scope, identifier))
-		}
-	}
-	return keys
 }
 
 // StreamScopeList is the LAPI scopes query value for this bouncer config.

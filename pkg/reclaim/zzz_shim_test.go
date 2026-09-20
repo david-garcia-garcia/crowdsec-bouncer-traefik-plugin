@@ -34,17 +34,3 @@ func TestShim_ProcessGraceAndOpenWithHooks(t *testing.T) {
 		t.Fatalf("grace reclaim: first=%v second=%v creates=%d", first, second, creates)
 	}
 }
-
-func TestShim_OpenExists(t *testing.T) {
-	ResetForTestWith(0)
-	t.Cleanup(func() { ResetForTest() })
-	stored, err := Open(context.Background(), "open-key", slog.Default(), func() (any, error) {
-		return 7, nil
-	}, Hooks{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if stored != 7 {
-		t.Fatalf("Open stored: %v", stored)
-	}
-}

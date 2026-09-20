@@ -5,7 +5,6 @@
 - ci
 
 ## core
-- cache
 - plugin
 
 ## std

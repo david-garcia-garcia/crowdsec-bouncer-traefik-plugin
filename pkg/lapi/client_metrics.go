@@ -52,15 +52,14 @@ type MetricsReporter struct {
 	processedUnknown int64 // processed when Family is empty
 	// activeDecisionsByOriginIPType is the gauge we POST: count grouped by origin + ip_type.
 	activeDecisionsByOriginIPType map[usageMetricKey]int64
-	// activeDecisionSlots is the forget index: cache slot → origin id + family. Needed so
+	// activeDecisionSlots is the forget index: slot → origin id + family. Needed so
 	// delete of one IP can decrement the right group-by bucket. Not the POST payload.
 	activeDecisionSlots map[string]activeDecisionSlot
 }
 
-// activeDecisionSlot is one stream/alone gauge entry: intern id plus family, leftover origin on overflow.
+// activeDecisionSlot is one stream/alone gauge entry: intern id plus family. Overflow is origin id 0.
 type activeDecisionSlot struct {
 	originID uint16
-	leftover string
 	ipType   string
 }
 
@@ -178,13 +177,9 @@ func (c *Client) rememberActiveDecision(slot, origin, decisionValue string) {
 	}
 	decisionSlot := activeDecisionSlot{ipType: ip.FamilyOfHostOrCIDR(decisionValue)}
 	if c.decisionStore != nil {
-		if originID, ok := c.decisionStore.Intern(origin); ok {
+		if originID, ok := c.decisionStore.OriginID(origin); ok {
 			decisionSlot.originID = originID
-		} else {
-			decisionSlot.leftover = origin
 		}
-	} else {
-		decisionSlot.leftover = origin
 	}
 	c.metricsReporter.rememberActiveDecision(slot, decisionSlot)
 }
@@ -216,8 +211,8 @@ func (r *MetricsReporter) rememberActiveDecision(slot string, decisionSlot activ
 
 // slotMetricKey rebuilds the gauge identity from a compact slot.
 func (r *MetricsReporter) slotMetricKey(decisionSlot activeDecisionSlot) usageMetricKey {
-	origin := decisionSlot.leftover
-	if origin == "" && r.originName != nil {
+	origin := ""
+	if r.originName != nil {
 		origin = r.originName(decisionSlot.originID)
 	}
 	return usageMetricKey{

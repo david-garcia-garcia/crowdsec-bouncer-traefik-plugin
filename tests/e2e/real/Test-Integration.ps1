@@ -45,8 +45,37 @@ param(
 
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $false
+$exitCode = 1
 $ComposeFile = Join-Path $PSScriptRoot "docker-compose.test.yml"
+$runnerLog = Join-Path $PSScriptRoot "runner.log"
 . "$PSScriptRoot/TestUtils.ps1"
+
+# Checkout persist-credentials writes an Authorization extraheader on this
+# worktree. git clone of another GitHub repo can inherit it and 403.
+function Copy-GeoblockSource {
+    param([string]$Dest, [string]$Tag)
+    $plugin = Join-Path $Dest "plugin.go"
+    if (Test-Path $plugin) {
+        return
+    }
+    if (Test-Path $Dest) {
+        Remove-Item -Recurse -Force $Dest
+    }
+    $url = "https://github.com/david-garcia-garcia/traefik-geoblock.git"
+    foreach ($attempt in 1..3) {
+        Write-Step "Cloning traefik-geoblock $Tag (attempt $attempt)..."
+        git -c "http.https://github.com/.extraheader=" -c advice.detachedHead=false clone --depth 1 --branch $Tag $url $Dest
+        if ($LASTEXITCODE -eq 0 -and (Test-Path $plugin)) {
+            Write-Success "traefik-geoblock $Tag cloned"
+            return
+        }
+        Start-Sleep -Seconds (2 * $attempt)
+        if (Test-Path $Dest) {
+            Remove-Item -Recurse -Force $Dest
+        }
+    }
+    throw "Failed to clone traefik-geoblock $Tag"
+}
 
 # Colors for output
 $Colors = @{
@@ -82,6 +111,7 @@ function Write-StepError {
 
 # Main execution
 try {
+    Start-Transcript -Path $runnerLog -Force | Out-Null
     Write-Host ""
     Write-Host "🚀 CrowdSec Bouncer Traefik Plugin Integration Test Runner" -ForegroundColor $Colors.Info
     Write-Host "=========================================================" -ForegroundColor $Colors.Info
@@ -153,22 +183,7 @@ try {
 
     # Pin traefik-geoblock for Country e2e (enrich writes X-IPCountry). Not committed.
     $geoblockDir = Join-Path $PSScriptRoot ".geoblock"
-    $geoblockTag = "v1.2.0"
-    $geoblockPlugin = Join-Path $geoblockDir "plugin.go"
-    if (-not (Test-Path $geoblockPlugin)) {
-        Write-Step "Cloning traefik-geoblock $geoblockTag for Country e2e..."
-        if (Test-Path $geoblockDir) {
-            Remove-Item -Recurse -Force $geoblockDir
-        }
-        git -c advice.detachedHead=false clone --depth 1 --branch $geoblockTag https://github.com/david-garcia-garcia/traefik-geoblock.git $geoblockDir
-        if ($LASTEXITCODE -ne 0) {
-            Write-StepError "Failed to clone traefik-geoblock $geoblockTag"
-            exit 1
-        }
-        Write-Success "traefik-geoblock $geoblockTag cloned"
-    } else {
-        Write-Success "traefik-geoblock source already present"
-    }
+    Copy-GeoblockSource -Dest $geoblockDir -Tag "v1.2.0"
 
     # Start Docker services
     Write-Step "Starting Docker Compose services for testing..."
@@ -237,9 +252,10 @@ try {
     Write-Step "Running Pester integration tests..."
     Write-Host ""
     
-    if (-not (Test-Path $TestPath)) {
+    $resolvedTests = @(Get-ChildItem -Path $TestPath -ErrorAction SilentlyContinue)
+    if ($resolvedTests.Count -eq 0) {
         Write-StepError "Test path not found: $TestPath"
-        exit 1
+        throw "Test path not found: $TestPath"
     }
 
     try {
@@ -316,6 +332,7 @@ finally {
         Write-Host "🏁 Integration tests completed with failures!" -ForegroundColor $Colors.Error
     }
     Write-Host ""
+    try { Stop-Transcript | Out-Null } catch {}
 }
 
 exit $exitCode 

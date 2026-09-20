@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// testLeaseRedis is an in-process RESP stand-in for Eval acquire plus GET/SET.
+// testLeaseRedis is an in-process RESP stand-in for GET/MGET/SET/DEL plus Eval acquire.
 type testLeaseRedis struct {
 	mu   sync.Mutex
 	keys map[string]string
@@ -81,6 +81,21 @@ func (s *testLeaseRedis) replyLocked(verb string, argv []string) []byte {
 			return []byte("$-1\r\n")
 		}
 		return []byte("$" + strconv.Itoa(len(value)) + "\r\n" + value + "\r\n")
+	case "MGET":
+		if len(argv) < 2 {
+			return []byte("-ERR wrong number of arguments\r\n")
+		}
+		var reply strings.Builder
+		reply.WriteString("*" + strconv.Itoa(len(argv)-1) + "\r\n")
+		for _, key := range argv[1:] {
+			value, ok := s.keys[key]
+			if !ok {
+				reply.WriteString("$-1\r\n")
+				continue
+			}
+			reply.WriteString("$" + strconv.Itoa(len(value)) + "\r\n" + value + "\r\n")
+		}
+		return []byte(reply.String())
 	case "SET":
 		if len(argv) < 3 {
 			return []byte("-ERR wrong number of arguments\r\n")

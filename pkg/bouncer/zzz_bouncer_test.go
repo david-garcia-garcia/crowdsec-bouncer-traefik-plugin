@@ -13,6 +13,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -39,9 +40,8 @@ func TestClientRequestRemoteIPIsCanonical(t *testing.T) {
 // header on remoteIP: lookup keys on that string and misses the canonical slot.
 func TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan(t *testing.T) {
 	log := logger.New("ERROR", "")
-	lapiClient, cacheClient := lapi.NewTestClient(log)
-	t.Cleanup(cacheClient.Close)
-	cacheClient.Set("2001:db8::1", decisionscope.BannedValue, 60)
+	lapiClient, store := lapi.NewTestClient(log)
+	store.Put(decisionstore.Decision{Scope: decisionscope.ScopeIP, Value: "2001:db8::1", Kind: decisionscope.BannedValue, DurationSec: 60})
 	clientChecker, err := ip.NewChecker(log, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -82,11 +82,9 @@ func TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan(t *testing.T) {
 
 func TestServeHTTP_PackedMemoryBanRecordsCrowdsecOrigin(t *testing.T) {
 	log := logger.New("ERROR", "")
-	lapiClient, cacheClient := lapi.NewTestClient(log)
-	t.Cleanup(cacheClient.Close)
-	store := lapi.AttachTestInternStore(lapiClient)
+	lapiClient, store := lapi.NewTestClient(log)
 	lapi.AttachTestMetricsReporter(lapiClient)
-	cacheClient.Set("203.0.113.10", decisionscope.Pack(decisionscope.BannedValue, "crowdsec", store), 60)
+	lapi.SeedLiveSnapshotForTest(store, "203.0.113.10", decisionscope.BannedValue, "crowdsec", 60)
 	clientChecker, err := ip.NewChecker(log, nil)
 	if err != nil {
 		t.Fatal(err)

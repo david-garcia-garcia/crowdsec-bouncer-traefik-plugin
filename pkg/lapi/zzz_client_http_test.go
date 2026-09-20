@@ -11,7 +11,6 @@ import (
 	"sync"
 	"testing"
 
-	cache "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/cache"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
@@ -23,20 +22,16 @@ func newTestQueryClient(t *testing.T, server *httptest.Server, mode string) *Cli
 	if err != nil {
 		t.Fatal(err)
 	}
-	cacheClient := &cache.Client{}
-	cacheClient.New(logger.New("ERROR", ""), false, "", nil, "", "", "")
-	client := &Client{
-		crowdsecScheme:    serverURL.Scheme,
-		crowdsecHost:      serverURL.Host,
-		crowdsecPath:      "/",
-		crowdsecMode:      mode,
-		cacheClient:       cacheClient,
-		log:               logger.New("ERROR", ""),
-		pluginVersion:     "test",
-		crowdsecMachineID: "machine",
-		crowdsecPassword:  "password",
-		crowdsecScenarios: []string{"scenario"},
-	}
+	client, _ := NewTestClient(logger.New("ERROR", ""))
+	client.crowdsecScheme = serverURL.Scheme
+	client.crowdsecHost = serverURL.Host
+	client.crowdsecPath = "/"
+	client.crowdsecMode = mode
+	client.log = logger.New("ERROR", "")
+	client.pluginVersion = "test"
+	client.crowdsecMachineID = "machine"
+	client.crowdsecPassword = "password"
+	client.crowdsecScenarios = []string{"scenario"}
 	attachTestTransport(client, server.Client(), "stale-token")
 	return client
 }

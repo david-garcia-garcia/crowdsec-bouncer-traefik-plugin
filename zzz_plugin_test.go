@@ -3,6 +3,7 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -268,9 +269,9 @@ func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 		t.Fatalf("bouncer B: got %d want 200", rb.Code)
 	}
 
-	got, err := testRoute(t, hb).LapiClient().Cache().Get("1.2.3.4")
-	if err == nil && got == decisionscope.BannedValue {
-		t.Fatal("B's cache must not contain A's ban")
+	kind, _, _, err := testRoute(t, hb).LapiClient().LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil)
+	if err == nil && kind == decisionscope.BannedValue {
+		t.Fatal("B's store must not contain A's ban")
 	}
 }
 
