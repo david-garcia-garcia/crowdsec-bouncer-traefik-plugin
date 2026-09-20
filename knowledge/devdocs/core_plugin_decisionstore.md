@@ -4,7 +4,7 @@
 
 **DecisionStore**:
 A `pkg/decisionstore.Store` owned by one `lapi.Client` incarnation. Constructed in Client `create()` with `NewMemory` or `NewRedis`. Redis `keyPrefix` is CrowdSec cursor `SessionHex`. Two stream Clients that share a LAPI session share that child store. Live/none Clients that differ on Redis or `MetricsUpdateIntervalSeconds` each construct their own store.
-_Avoid_: `pkg/cache`, `cache.Client`, `liveStore`, process `ttl_map`, `sync.Once`, utilities `reclaim`, sibling `OpenDecisionStore`
+_Avoid_: `pkg/cache`, `cache.Client`, `liveStore`, process `ttl_map`, `sync.Once`, utilities `reclaim`, sibling `OpenDecisionStore`, `StoreKey`
 
 **Engine**:
 Funcs bound at `NewMemory` or `NewRedis` (`memoryEngine` / `redisEngine`): BeginTick, PublishTick, Put, Delete, LookupRemediation, ApplyRangeBatch, RangeIndex, Close. A constructed Store always has those callbacks.
@@ -28,7 +28,7 @@ Construct a DecisionStore inside `lapi.Client` `create()` (`NewMemory` / `NewRed
 
 ## How to use
 
-- Call `lapi.OpenStream` / `OpenLive`. Those create the Client; `create()` constructs the store. Do not call `decisionstore.Open` or `lapi.OpenDecisionStore`.
+- Call `lapi.OpenStream` / `OpenLive`. Those create the Client; `create()` constructs the store via `newChildStore` (`NewMemory` / `NewRedis`, Redis prefix `SessionHex`). Do not call `decisionstore.Open`, `lapi.OpenDecisionStore`, or a `StoreKey` helper — those paths are gone.
 - Memory: in-process COW tick/published maps (`pubWord`/`pubExp`) plus the Range blob. Maps stay non-nil. Live Put mutates published maps in place and sweeps expired keys. Lookup holds `RLock` across probes.
 - Redis: import `github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis` at `v1.0.5`. Prefix is `SessionHex` (cursor), not live `IdentityHex`. Logical keys are the client IP, header-scope key, and `range-index`. Writer plus optional readers; `nextReader` never retries the writer. SET/DEL are void. Do not re-patch `vendor/.../iplookup/helper.go` (`Helper.Contains` / `Count` RLock is upstream).
 - Stream Redis disagreement shares the child store (first-wins Redis YAML). Live Redis disagreement isolates Clients and stores. Live metrics-interval split constructs two child stores (memory isolates; Redis still shares `SessionHex` keys).
@@ -50,7 +50,7 @@ kind, origin, originID, err := lapiClient.LookupRemediation(remoteIP, ipAddr, sc
 - `pkg/decisionstore/store.go`
 - `pkg/decisionstore/memory.go`
 - `pkg/decisionstore/redis.go`
-- `pkg/lapi/decisionstore.go`
+- `pkg/lapi/decisionstore.go` (`newChildStore`)
 - `pkg/intern/table.go`
 - `pkg/lapi/session.go`
 - `pkg/lapi/client.go`
