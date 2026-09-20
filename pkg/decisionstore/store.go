@@ -19,7 +19,7 @@ import (
 // Funcs, not an interface: Yaegi v0.16 panics putting a map-holding *memory in an interface.
 type engine struct {
 	beginTick   func()
-	publishTick func(int64)
+	publishTick func(int32)
 	putMany     func([]Decision)
 	deleteMany  func([]Decision)
 	lookup      func(string, net.IP, map[string]string, *RangeMembership) (string, string, uint16, error)
@@ -123,7 +123,7 @@ func (s *Store) BeginTick() {
 
 // PublishTick closes that window. Memory drops expired tick slots and publishes tick.
 // Redis is a no-op: key TTL is the expiry.
-func (s *Store) PublishTick(now int64) {
+func (s *Store) PublishTick(now int32) {
 	s.engine.publishTick(now)
 }
 

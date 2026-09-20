@@ -99,7 +99,7 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 		return fmt.Errorf("handleStreamCache:parsingBody %w", err)
 	}
 	c.decisionStore.BeginTick()
-	defer c.decisionStore.PublishTick(time.Now().Unix())
+	defer c.decisionStore.PublishTick(decisionstore.ElapsedNow())
 	rangeUpserts := make(map[string]string)
 	var rangeRemovals []string
 	deletes := make([]decisionstore.Decision, 0)
