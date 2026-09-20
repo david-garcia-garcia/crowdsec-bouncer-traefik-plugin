@@ -18,7 +18,7 @@ import (
 //	non-active remediation + non-nil error -> LAPI failed; apply CrowdsecLapiFailureAction
 //
 // Any query this lookup makes can fail that way: the IP query and every header-scope query.
-func (c *Client) LiveLookup(remoteIP string, scopes map[string]string, defaultDecisionSeconds int64) (string, string, error) {
+func (c *Client) LiveLookup(remoteIP string, scopes map[string]string, defaultDecisionSeconds int64) (kind string, origin string, err error) {
 	return c.handleNoStreamCache(remoteIP, scopes, defaultDecisionSeconds)
 }
 

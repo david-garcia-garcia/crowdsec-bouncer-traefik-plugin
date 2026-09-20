@@ -44,7 +44,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - Keep `pluginVersion` in root `version.go` (release workflow bumps it). Pass it into `lapi.New` and `appsec.New`.
 - Snapshot first: `prepared := *config`, then work on `&prepared` for the rest of `New`. Never write through Traefik's pointer.
 - After the snapshot, do not copy leftover YAML keys or peer aliases into `BanFilePath` / `CaptchaFilePath`. Traefik’s decode of those two fields is the only owner.
-- Derive `bindCtx, releaseHolders := context.WithCancel(ctx)` before the first `Open`, and release it from a `defer` that fires only when the named `err` is non-nil. `err` is named for that reason (`//nolint:nonamedreturns`); a closure-captured bool is the form the ticket rejected.
+- Derive `bindCtx, releaseHolders := context.WithCancel(ctx)` before the first `Open`, and release it from a `defer` that fires only when the named `err` is non-nil. `err` is named for that reason; a closure-captured bool is the form the ticket rejected.
 - Call `lapi.Prepare` then `appsec.Prepare`. Stream/alone: `lapi.OpenStream` (registers this bind ctx on the live-router scope union). Live/none: `lapi.OpenLive`. `crowdsecMode: appsec`: skip LAPI Open. When `crowdsecAppsecEnabled`: `appsec.Open` (`AdoptTransport` inside). Return `bouncer.New(..., lapiClient, appsecClient, ...)`. Open key: `core_plugin_lapi_reclaim-key.md`. Stream `scopes=`: `core_plugin_lapi_scope-union.md`.
 - `bouncer.New`'s appsec-mode early return is conditional: appsec mode still initialises the captcha client when the effective `crowdsecAppsecFailureAction` is `captcha`, because `handleRemediationServeHTTP` bans on an invalid captcha client.
 - When `bouncer.New` builds the captcha siteverify `http.Client`, set `Timeout` from `cfg.EffectiveHTTPTimeoutSeconds(cfg.CaptchaSiteverifyHTTPTimeoutSeconds)`. Keep that client per-Bouncer. Do not reclaim it.
@@ -59,7 +59,6 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 ## Pattern snippet
 
 ```go
-//nolint:nonamedreturns
 func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (handler http.Handler, err error) {
 	prepared := *config
 

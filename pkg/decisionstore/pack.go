@@ -9,7 +9,7 @@ import (
 const kindOriginSep = "\n"
 
 // Unpack reads a packed word or a kind+origin string (Redis slot or Range blob payload).
-func Unpack(payload any) (string, string, uint16) {
+func Unpack(payload any) (kind string, origin string, originID uint16) {
 	switch payloadTyped := payload.(type) {
 	case uint32:
 		return unpackWord(payloadTyped)

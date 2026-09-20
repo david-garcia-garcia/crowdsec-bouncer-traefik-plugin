@@ -219,7 +219,7 @@ func (r *redis) DeleteMany(items []Decision) {
 }
 
 // LookupRemediation reads Redis (Ip, header scopes) then merges Range from membership.
-func (r *redis) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16, error) {
+func (r *redis) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (kind string, origin string, originID uint16, err error) {
 	if r == nil {
 		return "", "", 0, ErrMiss
 	}
@@ -227,7 +227,7 @@ func (r *redis) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[str
 	if err != nil {
 		return "", "", 0, err
 	}
-	kind, origin, originID := lookupHits(func(key string) any {
+	kind, origin, originID = lookupHits(func(key string) any {
 		value, ok := found[key]
 		if !ok || value == "" {
 			return nil

@@ -155,14 +155,14 @@ func (m *memory) deleteTickLocked(scope, value string) {
 }
 
 // LookupRemediation reads the published map (Ip, header scopes, Range). Expired slots miss.
-func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16, error) {
+func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (kind string, origin string, originID uint16, err error) {
 	if m == nil {
 		return "", "", 0, ErrMiss
 	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	now := elapsedNow()
-	kind, origin, originID := lookupHits(func(key string) any {
+	kind, origin, originID = lookupHits(func(key string) any {
 		slot, ok := m.published[key]
 		if !ok {
 			return nil

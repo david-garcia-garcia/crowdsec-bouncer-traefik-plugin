@@ -150,7 +150,7 @@ func (s *Store) DeleteMany(items []Decision) {
 }
 
 // LookupRemediation is the request path for stream/alone and live/none.
-func (s *Store) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string) (string, string, uint16, error) {
+func (s *Store) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string) (kind string, origin string, originID uint16, err error) {
 	return s.engine.lookup(remoteIP, ipAddr, scopes, s.RangeMembership())
 }
 
