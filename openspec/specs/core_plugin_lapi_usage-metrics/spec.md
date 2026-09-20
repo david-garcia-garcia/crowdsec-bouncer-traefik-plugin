@@ -55,11 +55,15 @@ Each request the bouncer handles (trusted-IP bypass, pass, and drop) SHALL incre
 - **THEN** the next POST includes `processed` with that client's `ip_type`
 
 ### Requirement: Active decisions are a stream/alone gauge
-In stream and alone modes, `active_decisions` SHALL be a gauge (unit `ip`) of decision records this connection currently applies (Ip, header-scope, and Range CIDRs), labeled `origin` (lists-rewritten) and `ip_type` of the decision value. Live, none, and AppSec-only modes SHALL omit `active_decisions`. The gauge MUST NOT expand a CIDR into host addresses.
+In stream and alone modes, `active_decisions` SHALL be a gauge (unit `ip`) of Ip and header-scope decision records this connection currently applies, labeled `origin` (lists-rewritten) and `ip_type` of the decision value. Range CIDRs SHALL be omitted from this gauge until Range exact-CIDR forget lands. Live, none, and AppSec-only modes SHALL omit `active_decisions`. The gauge MUST NOT expand a CIDR into host addresses. Counts SHALL come from a DecisionStore snapshot at POST, not from a reporter-held per-slot map.
 
 #### Scenario: Stream IP ban is counted
 - **WHEN** stream applies one Ip ban whose value is `1.2.3.4` and origin is `crowdsec`
 - **THEN** `active_decisions` includes 1 with `origin=crowdsec` and `ip_type=ipv4`
+
+#### Scenario: Range CIDR is omitted from the gauge
+- **WHEN** stream applies one Range ban whose value is `10.0.0.0/8` and origin is `crowdsec`
+- **THEN** the next `active_decisions` window does not include that CIDR
 
 ### Requirement: Envelope identity
 The remediation-component object SHALL send `version` from the plugin version, `type` `bouncer`, `name` `traefik_plugin`, `feature_flags` as an empty JSON array, and `utc_startup_timestamp` from connection start (MUST NOT be `time.Now()` at each push). User-Agent SHALL remain `Crowdsec-Bouncer-Traefik-Plugin/<version>`. `metrics` SHALL be a JSON array of windows. The plugin version SHALL be the value `version.go` defines and the module-root constructor passes into the LAPI Client.
@@ -82,7 +86,7 @@ The remediation-component object SHALL send `version` from the plugin version, `
 - **AND** that assertion MUST NOT hardcode a release number
 
 ### Requirement: MetricsReporter owns the usage-metrics window
-The dropped window, processed atomics, `active_decisions` gauge maps, last successful push time, and the POST/restore path SHALL live on a `MetricsReporter` that `Client` holds. `Client` MUST NOT keep those window fields on itself. `IncProcessed`, `IncDropped`, `rememberActiveDecision`, `forgetActiveDecision`, `reportMetrics`, and `drainMetrics` SHALL remain `Client` methods that forward to that reporter. Envelope identity (`utc_startup_timestamp`, plugin version, mode) SHALL be snapshotted onto the reporter at construct and MUST NOT be `time.Now()` at each push.
+The dropped window, processed atomics, last successful push time, and the POST/restore path SHALL live on a `MetricsReporter` that `Client` holds. `Client` MUST NOT keep those window fields on itself. The reporter MUST NOT keep `activeDecisionSlots` or `activeDecisionsByOriginIPType`. `IncProcessed`, `IncDropped`, `reportMetrics`, and `drainMetrics` SHALL remain `Client` methods that forward to that reporter. Envelope identity (`utc_startup_timestamp`, plugin version, mode) SHALL be snapshotted onto the reporter at construct and MUST NOT be `time.Now()` at each push. Stream/alone `reportMetrics` SHALL snapshot DecisionStore active counts and MUST NOT restore those counts on a failed POST (they are a gauge, not a window counter).
 
 #### Scenario: Window survives transport replace
 - **WHEN** a Client has unsent dropped or processed counts and a later bind replaces LAPI HTTP+auth
@@ -117,7 +121,7 @@ The reporter SHALL POST `v1/usage-metrics` through the Client LAPI query that lo
 - **AND** the reporter field is the same instance
 
 ### Requirement: Active-decision slots store intern id and family
-In stream and alone modes, the per-slot forget map SHALL keep one entry per active Ip, header-scope, or Range record. Each slot SHALL store the intern `originID` and the `ip_type` family of that decision value, not a second copy of the origin string. Forget SHALL still delete by slot key. The `active_decisions` POST item SHALL still send lists-rewritten origin names via `OriginName`. When intern overflowed, that origin id is `0` and `OriginName` is empty (no leftover origin string). Live, none, and AppSec-only modes SHALL omit this map. The intern table owner is DecisionStore; the reporter MUST NOT own a second intern table.
+In stream and alone modes, DecisionStore SHALL keep compact origin-id × family counts. The reporter MUST NOT keep a per-slot forget map. `reportMetrics` SHALL snapshot store counts and send lists-rewritten origin names via `OriginName` at POST. When intern overflowed, that origin id is `0` and `OriginName` is empty (no leftover origin string). Live, none, and AppSec-only modes SHALL omit `active_decisions` items. The intern table owner is DecisionStore; the reporter MUST NOT own a second intern table. Stream apply MUST NOT remember or forget Ip, header, or Range keys on the reporter.
 
 #### Scenario: Stream IP ban still posts origin name
 - **WHEN** stream applies one Ip ban whose value is `1.2.3.4` and origin is `crowdsec`
