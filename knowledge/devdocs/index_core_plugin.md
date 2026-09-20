@@ -3,7 +3,7 @@
 ## DecisionStore
 priority: normal
 local: core_plugin_decisionstore.md
-description: How LAPI Clients share one Store keyed by CrowdSec cursor plus Redis params.
+description: How LAPI Clients share one Store keyed by CrowdSec cursor SessionHex.
 
 ## Middleware New
 priority: normal
