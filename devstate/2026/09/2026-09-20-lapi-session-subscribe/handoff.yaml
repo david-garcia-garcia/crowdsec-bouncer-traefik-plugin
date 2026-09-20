@@ -1,0 +1,17 @@
+issueKey: 2026-09-20-lapi-session-subscribe
+jobName: 2026-09-20-lapi-session-subscribe
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: 0b5ec995de88fe208adeea959d65f6f1ccfdbd63e6e0989431f088adeed57e82
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr:
+  id: 119
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/119
