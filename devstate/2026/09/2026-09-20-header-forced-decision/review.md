@@ -28,3 +28,9 @@ findings: stale-usage index_core_plugin.md claimed both letters skip lookup
 fixed: a846f51d
 skipped: none
 
+## archive (2026-09-20T17:50:40Z)
+phase: archive
+findings: none
+fixed: synced deltas then moved openspec/changes/archive/2026-09-20-crowdsec-decision-header/
+skipped: none
+
