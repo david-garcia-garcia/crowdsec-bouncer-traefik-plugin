@@ -23,7 +23,7 @@ See `proposal.md` — Why. On `master`, memory slots store wall Unix in int64 `E
 
 2. **int32 `PublishTick(now)`** — Store and engine use `int32` so wall Unix cannot compile into memory sweep without conversion. Redis engine keeps no-op and ignores the argument. Alternative: named `Elapsed` type — deferred unless implement still mixes clocks.
 
-3. **Expiry saturation** — `LiveSlotFromPack` sets `ExpiresAt` via `now() + durationSec`, clamped to `(1, MaxInt32]`; immediate durations map to values that fail lookup on the next elapsed `now`. Alternative: store wall Unix in int32 — rejected (Y2038 and wastes the size win).
+3. **Expiry saturation** — `LiveSlotFromPack` sets `ExpiresAt` via `now() + durationSec`, clamped to `[1, MaxInt32]` (`1` is already expired); immediate durations miss lookup on the next elapsed `now`. Alternative: store wall Unix in int32 — rejected (Y2038 and wastes the size win).
 
 4. **Step-back clamp** — if wall Unix steps backward, `now()` does not decrease below the last returned value (monotonic elapsed for comparisons). Mitigates false mass expiry on NTP adjust.
 

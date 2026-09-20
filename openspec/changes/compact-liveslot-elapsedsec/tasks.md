@@ -4,7 +4,7 @@
 
 - [x] 1.1 Add package-init origin and unexported elapsed `now()` with step-back clamp in `pkg/decisionstore`
 
-- [x] 1.2 Change `LiveSlot.ExpiresAt` to int32; update `LiveSlotFromPack` saturation into `(1, MaxInt32]`
+- [x] 1.2 Change `LiveSlot.ExpiresAt` to int32; update `LiveSlotFromPack` saturation into `[1, MaxInt32]`
 
 - [x] 1.3 Change `Store.PublishTick` and memory/redis engine signatures to `int32`
 

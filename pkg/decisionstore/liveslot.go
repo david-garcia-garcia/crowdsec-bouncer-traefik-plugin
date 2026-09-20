@@ -7,6 +7,7 @@ import (
 )
 
 // LiveSlot is one in-memory stream/alone decision keyed by Ip or header-scope string.
+// ExpiresAt is elapsed whole seconds on the package clock, not wall Unix.
 type LiveSlot struct {
 	Word      uint32
 	ExpiresAt int32
@@ -17,18 +18,21 @@ var (
 	lastElapsed int64 // wall elapsed seconds; monotonic for slot comparisons
 )
 
+// init fixes origin at wall Unix minus two so elapsed 0 stays the PublishTick skip sentinel.
 func init() {
 	originUnix = time.Now().Unix() - 2
 	atomic.StoreInt64(&lastElapsed, 2)
 }
 
-// ElapsedNow is whole seconds on the memory slot clock for PublishTick and tests.
+// ElapsedNow is whole seconds on the memory slot clock for stream apply, PublishTick, lookup, and tests.
 func ElapsedNow() int32 {
 	return elapsedNow()
 }
 
+// elapsedNow is wall Unix minus origin, never decreasing when the wall clock steps back.
 func elapsedNow() int32 {
 	wallElapsed := time.Now().Unix() - originUnix
+	// Keep lastElapsed monotonic across NTP step-back.
 	for {
 		last := atomic.LoadInt64(&lastElapsed)
 		if wallElapsed < last {
@@ -44,15 +48,16 @@ func elapsedNow() int32 {
 	return int32(wallElapsed)
 }
 
+// expiryFromDuration is saturated elapsed ExpiresAt from CrowdSec duration seconds.
 func expiryFromDuration(durationSec int64) int32 {
-	exp := int64(elapsedNow()) + durationSec
-	if exp <= 1 {
+	elapsedExpiresAt := int64(elapsedNow()) + durationSec
+	if elapsedExpiresAt <= 1 {
 		return 1
 	}
-	if exp > math.MaxInt32 {
+	if elapsedExpiresAt > math.MaxInt32 {
 		return math.MaxInt32
 	}
-	return int32(exp)
+	return int32(elapsedExpiresAt)
 }
 
 // LiveSlotFromPack builds a slot from a packed word and CrowdSec duration seconds.

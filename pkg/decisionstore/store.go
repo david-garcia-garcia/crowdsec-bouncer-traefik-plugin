@@ -122,6 +122,7 @@ func (s *Store) BeginTick() {
 }
 
 // PublishTick closes that window. Memory drops expired tick slots and publishes tick.
+// now is elapsed seconds on the package clock (ElapsedNow), not wall Unix; 0 skips the expiry sweep.
 // Redis is a no-op: key TTL is the expiry.
 func (s *Store) PublishTick(now int32) {
 	s.engine.publishTick(now)

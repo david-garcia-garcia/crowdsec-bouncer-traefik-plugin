@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -23,6 +24,28 @@ func TestMemoryTickPublishLookup(t *testing.T) {
 	}
 	if _, ok := store.PublishedMemoryMapForTest()["203.0.113.10"]; !ok {
 		t.Fatal("published map missing slot")
+	}
+}
+
+func TestElapsedNowIgnoresWallStepBack(t *testing.T) {
+	before := elapsedNow()
+	savedOrigin := originUnix
+	originUnix = time.Now().Unix() + 3600
+	t.Cleanup(func() { originUnix = savedOrigin })
+	after := elapsedNow()
+	if after < before {
+		t.Fatalf("elapsedNow decreased after wall step-back: before %d after %d", before, after)
+	}
+}
+
+func TestMemoryDurationZeroMissesAfterPublish(t *testing.T) {
+	store := NewMemory(logger.New("ERROR", ""))
+	store.BeginTick()
+	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 0})
+	store.PublishTick(ElapsedNow())
+	_, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	if !errors.Is(err, ErrMiss) {
+		t.Fatalf("duration 0 must miss after publish, got %v", err)
 	}
 }
 
