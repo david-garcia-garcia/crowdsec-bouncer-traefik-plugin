@@ -19,7 +19,7 @@ After the body is decoded, apply deleted first so a same-window replacement stay
 - Keep GET, decode, and apply in `fetchAndApplyStreamDecisions`.
 - Call `decisionStore.BeginTick` before the loops and `PublishTick(decisionstore.ElapsedNow())` after (defer). Memory hides tick writes until publish and sweeps tick slots on elapsed `now`. Redis tick is a no-op and ignores `now`.
 - Loop `stream.Deleted` first: Ip/header `DeleteMany` in `PutManyChunk` flushes, Range CIDRs into removals, `forgetActiveDecision`.
-- Then loop `stream.New`: Ip/header `PutMany` in `PutManyChunk` flushes, Range CIDRs into upserts via `KindOriginString`, `rememberActiveDecision`.
+- Then loop `stream.New`: Ip/header `PutMany` in `PutManyChunk` flushes, Range CIDRs into upserts via `KindOriginString`, `rememberActiveDecision`. Map kind with `remediationKindForOrigin` after `MetricsOrigin` (`core_plugin_lapi_captcha-ban-origins.md`); do not call `RemediationValue` alone on those writes.
 - Call `decisionStore.ApplyRangeBatch` once with those maps. Inside the batch, apply removals before upserts so a CIDR in both maps remains the replacement.
 - Hydrate Range membership from the store after the batch (`HydrateRange` at stream start; membership follows the blob).
 - Do not GET+SET per Range line. Do not split the batch into two store writes. Do not acquire `updated`.
