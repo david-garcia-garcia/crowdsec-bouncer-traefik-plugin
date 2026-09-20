@@ -55,7 +55,7 @@ func TestClient_WakeMintsNewIOContext(t *testing.T) {
 	attachTestTransport(client, server.Client(), "test-key")
 	client.Sleep()
 	if _, err := client.sendQuery(server.URL, nil, false); err == nil || !errors.Is(err, context.Canceled) {
-		t.Fatalf("Sleep ctx must stay cancelled: %v", err)
+		t.Fatalf("Sleep ctx must stay canceled: %v", err)
 	}
 	client.Wake()
 	if _, err := client.sendQuery(server.URL, nil, false); err != nil {

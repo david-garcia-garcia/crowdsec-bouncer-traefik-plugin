@@ -637,7 +637,7 @@ func TestOpenStream_EmptyNameStillExclusiveOwns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "named", "test"); err == nil {
+	if _, namedErr := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "named", "test"); namedErr == nil {
 		t.Fatal("non-empty name must fail against empty createdBy")
 	}
 	secondEmpty, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "", "test")

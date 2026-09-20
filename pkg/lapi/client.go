@@ -42,7 +42,7 @@ type Client struct {
 	closed   bool
 	sleeping bool // last reclaim holder gone; tickers stopped until Wake or Close
 
-	ioCtx    context.Context    // LAPI/CAPI request construction; Sleep/Close cancel, Wake mints
+	ioCtx    context.Context //nolint:containedctx // Client IO cancel for LAPI GET; Sleep/Close cancel, Wake mints.
 	ioCancel context.CancelFunc
 
 	crowdsecScheme       string
@@ -247,7 +247,7 @@ func (c *Client) logInfo(msg, reason string) {
 }
 
 // mintIOLocked replaces the Client IO context. New calls it before the Client is published;
-// Sleep/Wake/Close call it under c.mu. A cancelled context cannot be reused.
+// Sleep/Wake/Close call it under c.mu. A canceled context cannot be reused.
 func (c *Client) mintIOLocked() {
 	c.ioCtx, c.ioCancel = context.WithCancel(context.Background())
 }

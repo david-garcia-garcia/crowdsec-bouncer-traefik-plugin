@@ -24,4 +24,4 @@
 
 ## 5. Verify
 
-- [ ] 5.1 `go build ./...`, `go vet ./...`, `go test ./pkg/lapi ./pkg/reclaim ./pkg/decisionstore -count=1`, `go test . -count=1`, `golangci-lint run ./...`
+- [x] 5.1 `go build ./...`, `go vet ./...`, `go test ./pkg/lapi ./pkg/reclaim ./pkg/decisionstore -count=1`, `go test . -count=1`, `golangci-lint run ./...`
