@@ -62,38 +62,50 @@ type Store struct {
 	mem             *memory
 	red             *redis
 	origins         *intern.Table
-	rangeMembership atomic.Value // *RangeMembership
-	lastRangeIndex  atomic.Value // string of the blob last used to build membership
+	active          *activeCountState // compact origin×family gauge; engines hold the same pointer
+	countActive     bool              // true only for stream/alone; not part of StoreKey
+	rangeMembership atomic.Value      // *RangeMembership
+	lastRangeIndex  atomic.Value      // string of the blob last used to build membership
 	log             *slog.Logger
 	reclaimKey      string
 	engineName      string
 }
 
 // NewMemory is in-process COW slots and an in-process Range blob.
-func NewMemory(log *slog.Logger) *Store {
+// countActive is true only for stream/alone so live/none Put does not increment the gauge.
+func NewMemory(log *slog.Logger, countActive bool) *Store {
 	origins := intern.New()
-	mem := newMemory(log, origins)
+	active := newActiveCountState()
+	mem := newMemory(log, origins, active, countActive)
 	return &Store{
-		engine:     memoryEngine(mem),
-		mem:        mem,
-		origins:    origins,
-		engineName: "memory",
+		engine:      memoryEngine(mem),
+		mem:         mem,
+		origins:     origins,
+		active:      active,
+		countActive: countActive,
+		engineName:  "memory",
 	}
 }
 
 // NewRedis stores Ip, header-scope, and Range on Redis (keyPrefix namespaces keys).
-func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string) *Store {
-	red := newRedis(log, writeHost, readHosts, pass, database, keyPrefix)
+// countActive is true only for stream/alone; intern stays in-process (no Redis intern table).
+func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string, countActive bool) *Store {
+	origins := intern.New()
+	active := newActiveCountState()
+	red := newRedis(log, writeHost, readHosts, pass, database, keyPrefix, origins, active, countActive)
 	return &Store{
-		engine:     redisEngine(red),
-		red:        red,
-		origins:    intern.New(),
-		engineName: "redis",
+		engine:      redisEngine(red),
+		red:         red,
+		origins:     origins,
+		active:      active,
+		countActive: countActive,
+		engineName:  "redis",
 	}
 }
 
 // Open reclaims one Store per reclaimKey. keyPrefix is the Redis key prefix.
-func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.Config, log *slog.Logger) (*Store, error) {
+// countActive is derived from crowdsecMode by the caller; it is not hashed into reclaimKey.
+func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.Config, log *slog.Logger, countActive bool) (*Store, error) {
 	stored, err := reclaim.OpenWithHooks(ctx, reclaimKey, log, func() (any, reclaim.Hooks, error) {
 		var store *Store
 		if cfg.RedisCacheEnabled {
@@ -104,9 +116,10 @@ func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.
 				cfg.RedisCachePassword,
 				cfg.RedisCacheDatabase,
 				keyPrefix,
+				countActive,
 			)
 		} else {
-			store = NewMemory(log)
+			store = NewMemory(log, countActive)
 		}
 		store.bindLifecycle(log, reclaimKey)
 		return store, reclaim.Hooks{Sleep: store.Sleep, Wake: store.Wake, Close: store.Close}, nil
@@ -197,6 +210,7 @@ func (s *Store) RangeIndex() (string, error) {
 }
 
 // ApplyRangeBatch upserts and removes Range CIDRs, then rebuilds in-process membership.
+// Range is omitted from the active-decision gauge: this method does not adjust counts.
 func (s *Store) ApplyRangeBatch(upserts map[string]string, removals []string) error {
 	if err := s.engine.applyRange(upserts, removals); err != nil {
 		return err

@@ -36,7 +36,7 @@ func testBackends() []testBackend {
 			name: "memory",
 			open: func(t *testing.T) *Store {
 				t.Helper()
-				return NewMemory(logger.New("ERROR", ""))
+				return NewMemory(logger.New("ERROR", ""), false)
 			},
 		},
 		{
@@ -44,7 +44,7 @@ func testBackends() []testBackend {
 			open: func(t *testing.T) *Store {
 				t.Helper()
 				server := startTestStoreRedis(t)
-				store := NewRedis(logger.New("ERROR", ""), server.addr(), nil, "", "", "sess")
+				store := NewRedis(logger.New("ERROR", ""), server.addr(), nil, "", "", "sess", false)
 				t.Cleanup(store.Close)
 				return store
 			},

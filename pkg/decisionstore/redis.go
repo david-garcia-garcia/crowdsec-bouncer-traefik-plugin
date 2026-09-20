@@ -9,6 +9,9 @@ import (
 	"time"
 
 	simpleredis "github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis"
+
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
 const (
@@ -21,16 +24,19 @@ const (
 // Writer does SET/DEL. Readers (or the writer when none) do GET/MGET. A replica
 // miss or error is not retried on the writer.
 type redis struct {
-	log     *slog.Logger
-	prefix  string
-	writer  *simpleredis.SimpleRedis
-	readers []*simpleredis.SimpleRedis
-	counter atomic.Uint64
+	log         *slog.Logger
+	prefix      string
+	writer      *simpleredis.SimpleRedis
+	readers     []*simpleredis.SimpleRedis
+	counter     atomic.Uint64
+	origins     *intern.Table     // in-process intern of MGET origin names; ids are not persisted
+	active      *activeCountState // same pointer as Store; adjusted after MGET under the count mutex
+	countActive bool              // false for live/none
 }
 
 // newRedis dials the writer and optional readers via simpleredis.New.
-func newRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string) *redis {
-	red := &redis{log: log, prefix: keyPrefix}
+func newRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string, origins *intern.Table, active *activeCountState, countActive bool) *redis {
+	red := &redis{log: log, prefix: keyPrefix, origins: origins, active: active, countActive: countActive}
 	writer, err := simpleredis.New(redisClientConfig(writeHost, pass, database, log))
 	if err != nil {
 		if log != nil {
@@ -168,10 +174,21 @@ func (r *redis) BeginTick() {}
 func (r *redis) PublishTick(int32) {}
 
 // PutMany is SET of kind+origin strings. Same DurationSec share one MSetEX, chunked at PutManyChunk.
+// When countActive, MGET the previous canonical KindOriginString, intern the origin name in-process, then adjust.
 func (r *redis) PutMany(items []Decision) {
 	if r == nil || r.writer == nil || len(items) == 0 {
 		return
 	}
+	canonicalKeys := make([]string, 0, len(items))
+	for _, item := range items {
+		key, _ := slotKeys(item.Scope, item.Value)
+		if key == "" {
+			continue
+		}
+		canonicalKeys = append(canonicalKeys, key)
+	}
+	previous, _ := r.getMany(canonicalKeys)
+	r.adjustPutCounts(items, previous)
 	namesByTTL := map[int64][]string{}
 	valuesByTTL := map[int64][][]byte{}
 	for _, item := range items {
@@ -202,10 +219,21 @@ func (r *redis) msetexGrouped(names []string, values [][]byte, seconds int64) {
 }
 
 // DeleteMany is DEL of each canonical slot and a prior Ip spelling. SimpleRedis has no multi-DEL.
+// Gauge follows the canonical key only: a prior-spelling extra DEL is not a second event.
 func (r *redis) DeleteMany(items []Decision) {
 	if r == nil || len(items) == 0 {
 		return
 	}
+	canonicalKeys := make([]string, 0, len(items))
+	for _, item := range items {
+		key, _ := slotKeys(item.Scope, item.Value)
+		if key == "" {
+			continue
+		}
+		canonicalKeys = append(canonicalKeys, key)
+	}
+	previous, _ := r.getMany(canonicalKeys)
+	r.adjustDeleteCounts(items, previous)
 	for _, item := range items {
 		key, priorSpelling := slotKeys(item.Scope, item.Value)
 		if key == "" {
@@ -216,6 +244,70 @@ func (r *redis) DeleteMany(items []Decision) {
 			r.deleteKey(priorSpelling)
 		}
 	}
+}
+
+// adjustPutCounts decrements the previous origin×family group then increments the new.
+// previous is updated in-process so a second Put of the same key in this batch is an overwrite.
+func (r *redis) adjustPutCounts(items []Decision, previous map[string]string) {
+	if !r.countActive {
+		return
+	}
+	if previous == nil {
+		previous = map[string]string{}
+	}
+	for _, item := range items {
+		key, _ := slotKeys(item.Scope, item.Value)
+		if key == "" {
+			continue
+		}
+		family := ip.FamilyOfHostOrCIDR(item.Value)
+		if stored, ok := previous[key]; ok && stored != "" {
+			r.active.add(ActiveCountKey{OriginID: r.originID(splitOriginName(stored)), Family: family}, -1)
+		}
+		r.active.add(ActiveCountKey{OriginID: r.originID(item.Origin), Family: family}, 1)
+		previous[key] = KindOriginString(item.Kind, item.Origin)
+	}
+}
+
+// adjustDeleteCounts decrements the canonical previous group once. Missing delete is a no-op.
+func (r *redis) adjustDeleteCounts(items []Decision, previous map[string]string) {
+	if !r.countActive || previous == nil {
+		return
+	}
+	for _, item := range items {
+		key, _ := slotKeys(item.Scope, item.Value)
+		if key == "" {
+			continue
+		}
+		stored, ok := previous[key]
+		if !ok || stored == "" {
+			continue
+		}
+		family := ip.FamilyOfHostOrCIDR(item.Value)
+		r.active.add(ActiveCountKey{OriginID: r.originID(splitOriginName(stored)), Family: family}, -1)
+		delete(previous, key)
+	}
+}
+
+// originID interns an origin name in-process. Overflow Warns and returns 0.
+func (r *redis) originID(name string) uint16 {
+	if r.origins == nil {
+		return 0
+	}
+	originID, ok := r.origins.ID(name)
+	if ok {
+		return originID
+	}
+	if r.log != nil {
+		r.log.Warn("decisionstore:intern overflow", "origin", name)
+	}
+	return 0
+}
+
+// splitOriginName is the origin suffix of a KindOriginString (empty when letter-only).
+func splitOriginName(stored string) string {
+	_, origin := splitKindOrigin(stored)
+	return origin
 }
 
 // LookupRemediation reads Redis (Ip, header scopes) then merges Range from membership.

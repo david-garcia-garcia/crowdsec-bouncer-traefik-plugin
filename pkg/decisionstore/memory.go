@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
 // publishedSlots is one immutable lookup map. atomic.Value stores *publishedSlots, not the map (Yaegi).
@@ -16,21 +17,25 @@ type publishedSlots struct {
 
 // memory is in-process COW tick/published LiveSlot maps plus the Range blob.
 type memory struct {
-	log        *slog.Logger
-	origins    *intern.Table       // origin name → id packed into LiveSlot.Word
-	mu         sync.RWMutex        // tick, ticking, rangeIndex; not lookup
-	ticking    bool                // stream window: PutMany/DeleteMany write tick; Lookup reads published
-	tick       map[string]LiveSlot // unpublished clone; SlotKey → packed word + elapsed expiry
-	published  atomic.Value        // *publishedSlots; request-path snapshot, not atomic.Pointer (Yaegi v0.16)
-	rangeIndex string              // Range CIDR=kind blob; membership is rebuilt from this
+	log         *slog.Logger
+	origins     *intern.Table       // origin name → id packed into LiveSlot.Word
+	active      *activeCountState   // same pointer as Store; adjusted under mu then the count mutex
+	countActive bool                // false for live/none: Put/Delete/PublishTick must not change the gauge
+	mu          sync.RWMutex        // tick, ticking, rangeIndex; not lookup
+	ticking     bool                // stream window: PutMany/DeleteMany write tick; Lookup reads published
+	tick        map[string]LiveSlot // unpublished clone; SlotKey → packed word + elapsed expiry
+	published   atomic.Value        // *publishedSlots; request-path snapshot, not atomic.Pointer (Yaegi v0.16)
+	rangeIndex  string              // Range CIDR=kind blob; membership is rebuilt from this
 }
 
 // newMemory allocates non-nil tick and an empty published snapshot.
-func newMemory(log *slog.Logger, origins *intern.Table) *memory {
+func newMemory(log *slog.Logger, origins *intern.Table, active *activeCountState, countActive bool) *memory {
 	mem := &memory{
-		log:     log,
-		origins: origins,
-		tick:    map[string]LiveSlot{},
+		log:         log,
+		origins:     origins,
+		active:      active,
+		countActive: countActive,
+		tick:        map[string]LiveSlot{},
 	}
 	mem.storePublished(map[string]LiveSlot{})
 	return mem
@@ -62,20 +67,26 @@ func (m *memory) BeginTick() {
 }
 
 // PublishTick drops expired tick slots, publishes tick, and closes the window.
+// now == 0 skips the expiry sweep so counts stay aligned with slots that remain.
 func (m *memory) PublishTick(now int32) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if !m.ticking {
 		return
 	}
-	var expired []string
-	for key, slot := range m.tick {
-		if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
-			expired = append(expired, key)
+	if now != 0 {
+		var expired []string
+		for key, slot := range m.tick {
+			if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
+				expired = append(expired, key)
+			}
 		}
-	}
-	for _, key := range expired {
-		delete(m.tick, key)
+		for _, key := range expired {
+			if slot, ok := m.tick[key]; ok {
+				m.decrementActive(key, slot.Word)
+			}
+			delete(m.tick, key)
+		}
 	}
 	m.storePublished(m.tick)
 	m.tick = map[string]LiveSlot{}
@@ -109,12 +120,18 @@ func (m *memory) PutMany(items []Decision) {
 }
 
 // putSlot writes one decision into slots. Intern overflow logs Warn and packs origin id 0.
+// Overwrite decrements the previous origin×family group then increments the new (caller holds mu).
 func (m *memory) putSlot(slots map[string]LiveSlot, item Decision) {
 	key, _ := slotKeys(item.Scope, item.Value)
 	if key == "" {
 		return
 	}
-	slots[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
+	word := m.pack(item.Kind, item.Origin)
+	if previous, ok := slots[key]; ok {
+		m.decrementActive(item.Value, previous.Word)
+	}
+	m.incrementActive(item.Value, word)
+	slots[key] = LiveSlotFromPack(word, item.DurationSec)
 }
 
 // pack encodes a uint32 word. Intern overflow Warns and uses origin id 0.
@@ -145,28 +162,47 @@ func (m *memory) DeleteMany(items []Decision) {
 	}
 	next := cloneLiveSlotMap(m.publishedMapValue())
 	for _, item := range items {
-		key, priorSpelling := slotKeys(item.Scope, item.Value)
-		if key == "" {
-			continue
-		}
-		delete(next, key)
-		if priorSpelling != "" && priorSpelling != key {
-			delete(next, priorSpelling)
-		}
+		m.deleteSlotLocked(next, item.Scope, item.Value)
 	}
 	m.storePublished(next)
 }
 
 // deleteTickLocked drops one slot from tick. Caller holds mu.
 func (m *memory) deleteTickLocked(scope, value string) {
+	m.deleteSlotLocked(m.tick, scope, value)
+}
+
+// deleteSlotLocked drops the canonical slot (one gauge event) and a prior Ip spelling (not a second event).
+func (m *memory) deleteSlotLocked(slots map[string]LiveSlot, scope, value string) {
 	key, priorSpelling := slotKeys(scope, value)
 	if key == "" {
 		return
 	}
-	delete(m.tick, key)
-	if priorSpelling != "" && priorSpelling != key {
-		delete(m.tick, priorSpelling)
+	if previous, ok := slots[key]; ok {
+		m.decrementActive(value, previous.Word)
 	}
+	delete(slots, key)
+	if priorSpelling != "" && priorSpelling != key {
+		delete(slots, priorSpelling)
+	}
+}
+
+// incrementActive adds one to the origin×family group when countActive is set.
+func (m *memory) incrementActive(decisionValue string, word uint32) {
+	if !m.countActive {
+		return
+	}
+	_, _, originID := unpackWord(word)
+	m.active.add(ActiveCountKey{OriginID: originID, Family: ip.FamilyOfHostOrCIDR(decisionValue)}, 1)
+}
+
+// decrementActive subtracts one from the origin×family group when countActive is set.
+func (m *memory) decrementActive(decisionValue string, word uint32) {
+	if !m.countActive {
+		return
+	}
+	_, _, originID := unpackWord(word)
+	m.active.add(ActiveCountKey{OriginID: originID, Family: ip.FamilyOfHostOrCIDR(decisionValue)}, -1)
 }
 
 // LookupRemediation reads the published snapshot (Ip, header scopes, Range). Expired slots miss.

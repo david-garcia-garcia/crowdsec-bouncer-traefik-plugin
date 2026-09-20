@@ -41,7 +41,7 @@ func waitRealRedis(addr string, budget time.Duration) error {
 	deadline := time.Now().Add(budget)
 	var last error
 	for {
-		store := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", "wait")
+		store := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", "wait", false)
 		_, _, _, last = store.LookupRemediation("203.0.113.254", nil, nil)
 		store.Close()
 		if last == nil {
@@ -58,7 +58,7 @@ func waitRealRedis(addr string, budget time.Duration) error {
 func openRealRedis(t *testing.T) *Store {
 	t.Helper()
 	prefix := strings.ReplaceAll(t.Name(), "/", "-")
-	store := NewRedis(logger.New("ERROR", ""), realRedisAddr(), nil, "", "", prefix)
+	store := NewRedis(logger.New("ERROR", ""), realRedisAddr(), nil, "", "", prefix, false)
 	t.Cleanup(store.Close)
 	return store
 }
@@ -93,13 +93,13 @@ func TestRealRedisBackendContract(t *testing.T) {
 func TestRealRedisPutManySurvivesNewStore(t *testing.T) {
 	addr := realRedisAddr()
 	prefix := strings.ReplaceAll(t.Name(), "/", "-")
-	writer := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix)
+	writer := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix, false)
 	writer.PutMany([]Decision{
 		{Scope: decisionscope.ScopeIP, Value: backendBanIP, Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec},
 	})
 	mustKind(t, writer, backendBanIP, nil, decisionscope.BannedValue, backendOrigin)
 	writer.Close()
-	reader := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix)
+	reader := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix, false)
 	t.Cleanup(reader.Close)
 	mustKind(t, reader, backendBanIP, nil, decisionscope.BannedValue, backendOrigin)
 }
@@ -108,8 +108,8 @@ func TestRealRedisPutManySurvivesNewStore(t *testing.T) {
 func TestRealRedisPrefixIsolation(t *testing.T) {
 	addr := realRedisAddr()
 	stem := strings.ReplaceAll(t.Name(), "/", "-")
-	banned := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", stem+"-a")
-	other := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", stem+"-b")
+	banned := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", stem+"-a", false)
+	other := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", stem+"-b", false)
 	t.Cleanup(banned.Close)
 	t.Cleanup(other.Close)
 	banned.Put(Decision{
@@ -133,7 +133,7 @@ func TestRealRedisSlotExpires(t *testing.T) {
 
 // TestRealRedisCloseUnreachable is Lookup after Close, which must not dial again.
 func TestRealRedisCloseUnreachable(t *testing.T) {
-	store := NewRedis(logger.New("ERROR", ""), realRedisAddr(), nil, "", "", strings.ReplaceAll(t.Name(), "/", "-"))
+	store := NewRedis(logger.New("ERROR", ""), realRedisAddr(), nil, "", "", strings.ReplaceAll(t.Name(), "/", "-"), false)
 	store.Close()
 	kind, _, _, err := store.LookupRemediation(backendBanIP, nil, nil)
 	if !errors.Is(err, ErrUnreachable) || err.Error() != "store:unreachable" {
@@ -229,7 +229,7 @@ func TestRealRedisDurationZeroIsNotLasting(t *testing.T) {
 
 // TestRealRedisCloseTwiceThenUnreachable is a second Close that must not panic.
 func TestRealRedisCloseTwiceThenUnreachable(t *testing.T) {
-	store := NewRedis(logger.New("ERROR", ""), realRedisAddr(), nil, "", "", strings.ReplaceAll(t.Name(), "/", "-"))
+	store := NewRedis(logger.New("ERROR", ""), realRedisAddr(), nil, "", "", strings.ReplaceAll(t.Name(), "/", "-"), false)
 	store.Close()
 	store.Close()
 	kind, _, _, err := store.LookupRemediation(backendBanIP, nil, nil)
@@ -242,7 +242,7 @@ func TestRealRedisCloseTwiceThenUnreachable(t *testing.T) {
 func TestRealRedisPutAfterCloseIsDiscarded(t *testing.T) {
 	addr := realRedisAddr()
 	prefix := strings.ReplaceAll(t.Name(), "/", "-")
-	writer := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix)
+	writer := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix, false)
 	writer.Put(Decision{
 		Scope: decisionscope.ScopeIP, Value: backendBanIP,
 		Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec,
@@ -252,7 +252,7 @@ func TestRealRedisPutAfterCloseIsDiscarded(t *testing.T) {
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.11",
 		Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec,
 	})
-	reader := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix)
+	reader := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix, false)
 	t.Cleanup(reader.Close)
 	mustKind(t, reader, backendBanIP, nil, decisionscope.BannedValue, backendOrigin)
 	mustMiss(t, reader, "203.0.113.11", nil)
@@ -262,7 +262,7 @@ func TestRealRedisPutAfterCloseIsDiscarded(t *testing.T) {
 func TestRealRedisDeadReaderDoesNotFallBackToWriter(t *testing.T) {
 	addr := realRedisAddr()
 	prefix := strings.ReplaceAll(t.Name(), "/", "-")
-	store := NewRedis(logger.New("ERROR", ""), addr, []string{deadRedisAddr}, "", "", prefix)
+	store := NewRedis(logger.New("ERROR", ""), addr, []string{deadRedisAddr}, "", "", prefix, false)
 	t.Cleanup(store.Close)
 	store.Put(Decision{
 		Scope: decisionscope.ScopeIP, Value: backendBanIP,
@@ -272,7 +272,7 @@ func TestRealRedisDeadReaderDoesNotFallBackToWriter(t *testing.T) {
 	if !errors.Is(err, ErrUnreachable) {
 		t.Fatalf("dead reader must not retry writer, kind %q err %v", kind, err)
 	}
-	direct := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix)
+	direct := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix, false)
 	t.Cleanup(direct.Close)
 	mustKind(t, direct, backendBanIP, nil, decisionscope.BannedValue, backendOrigin)
 }
@@ -405,8 +405,8 @@ func TestRealRedisDeleteMissingIsStillMiss(t *testing.T) {
 func TestRealRedisSamePrefixTwoStoresShare(t *testing.T) {
 	addr := realRedisAddr()
 	prefix := strings.ReplaceAll(t.Name(), "/", "-")
-	first := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix)
-	second := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix)
+	first := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix, false)
+	second := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix, false)
 	t.Cleanup(first.Close)
 	t.Cleanup(second.Close)
 	first.Put(Decision{
@@ -420,12 +420,12 @@ func TestRealRedisSamePrefixTwoStoresShare(t *testing.T) {
 func TestRealRedisRangeNeedsHydrateOnNewStore(t *testing.T) {
 	addr := realRedisAddr()
 	prefix := strings.ReplaceAll(t.Name(), "/", "-")
-	writer := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix)
+	writer := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix, false)
 	if err := writer.ApplyRangeBatch(map[string]string{backendRangeCIDR: KindOriginString(decisionscope.BannedValue, backendOrigin)}, nil); err != nil {
 		t.Fatal(err)
 	}
 	writer.Close()
-	reader := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix)
+	reader := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", prefix, false)
 	t.Cleanup(reader.Close)
 	mustMiss(t, reader, backendRangeIP, nil)
 	reader.HydrateRange()
@@ -477,7 +477,7 @@ func TestRealRedisRangeIndexMissIsEmpty(t *testing.T) {
 
 // TestRealRedisApplyRangeOnClosedIsUnreachable is a GET of range-index after Close.
 func TestRealRedisApplyRangeOnClosedIsUnreachable(t *testing.T) {
-	store := NewRedis(logger.New("ERROR", ""), realRedisAddr(), nil, "", "", strings.ReplaceAll(t.Name(), "/", "-"))
+	store := NewRedis(logger.New("ERROR", ""), realRedisAddr(), nil, "", "", strings.ReplaceAll(t.Name(), "/", "-"), false)
 	store.Close()
 	err := store.ApplyRangeBatch(map[string]string{backendRangeCIDR: decisionscope.BannedValue}, nil)
 	if !errors.Is(err, ErrUnreachable) {
@@ -487,7 +487,7 @@ func TestRealRedisApplyRangeOnClosedIsUnreachable(t *testing.T) {
 
 // TestRealRedisEmptyRangeBatchOnClosedSucceeds does not touch Redis when both maps are empty.
 func TestRealRedisEmptyRangeBatchOnClosedSucceeds(t *testing.T) {
-	store := NewRedis(logger.New("ERROR", ""), realRedisAddr(), nil, "", "", strings.ReplaceAll(t.Name(), "/", "-"))
+	store := NewRedis(logger.New("ERROR", ""), realRedisAddr(), nil, "", "", strings.ReplaceAll(t.Name(), "/", "-"), false)
 	store.Close()
 	if err := store.ApplyRangeBatch(nil, nil); err != nil {
 		t.Fatalf("empty batch on closed store: %v", err)

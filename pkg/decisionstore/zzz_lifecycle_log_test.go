@@ -15,7 +15,7 @@ import (
 func TestStoreLifecycleLogs(t *testing.T) {
 	var buf bytes.Buffer
 	log := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	store := NewMemory(log)
+	store := NewMemory(log, false)
 	store.bindLifecycle(log, "decisionstore:test")
 	store.Sleep()
 	store.Wake()
@@ -49,7 +49,7 @@ func TestStoreLifecycleLogs(t *testing.T) {
 func TestNewMemoryCloseIsSilentWithoutLifecycle(t *testing.T) {
 	var buf bytes.Buffer
 	log := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	store := NewMemory(log)
+	store := NewMemory(log, false)
 	store.Close()
 	if got := buf.String(); got != "" {
 		t.Fatalf("NewMemory Close must not log without bindLifecycle, got %s", got)
@@ -70,7 +70,7 @@ func TestOpenLogsStartedAtInfo(t *testing.T) {
 		CrowdsecLapiPath:   "/",
 		CrowdsecLapiKey:    "test-key",
 	}
-	store, err := Open(context.Background(), "decisionstore:open-started", "prefix", cfg, log)
+	store, err := Open(context.Background(), "decisionstore:open-started", "prefix", cfg, log, true)
 	if err != nil {
 		t.Fatal(err)
 	}
