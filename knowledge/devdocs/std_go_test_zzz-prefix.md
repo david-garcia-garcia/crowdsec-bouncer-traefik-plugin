@@ -13,7 +13,7 @@ _Avoid_: appending `zzz_` after `_test.go`; a trailing `zzz_` is not a test file
 ## Pattern snippet
 
 ```
-pkg/cache/zzz_cache_test.go
+pkg/decisionstore/zzz_lookup_test.go
 pkg/bouncer/zzz_bouncer_test.go
 ```
 

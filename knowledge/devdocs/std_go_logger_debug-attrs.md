@@ -3,7 +3,7 @@
 ## Language
 
 **Request-path Debug**:
-A Debug call on the request hot path (`ServeHTTP` or `cache.Client` Get/GetMany/Set/Delete) that must not format a string unless the logger's level includes Debug.
+A Debug call on the request hot path (`ServeHTTP` or DecisionStore lookup) that must not format a string unless the logger's level includes Debug.
 _Avoid_: Sprintf-then-Debug, concatenating the message before `Debug`
 
 ## Overview
@@ -12,24 +12,22 @@ _Avoid_: Sprintf-then-Debug, concatenating the message before `Debug`
 
 ## How to use
 
-- Call `log.Debug("ServeHTTP", "ip", req.remoteIP, "isTrusted", isTrusted)` (or `cache:Get` + `key`, `cache:GetMany` + `keys`).
+- Call `log.Debug("ServeHTTP", "ip", req.remoteIP, "isTrusted", isTrusted)` (or `ServeHTTP:Get` + lookup error).
 - Reuse `GetRemoteIP` / `clientRequest.remoteIP` and the trusted-client `ContainsIP` result. Do not re-parse `RemoteAddr`.
 - Keep the stem recognizable. Do not drop fields DestBranch already logged.
-- Leave construct-time `cache.New`, `Acquire`, AppSec, and remediation Debug unless they sit on this path.
+- Leave construct-time Store Open, AppSec, and remediation Debug unless they sit on this path.
 - Do not change `NewWithFormat`, default `logLevel`, or file/format (`std_go_logger_slog-output`).
 
 ## Pattern snippet
 
 ```go
 b.log.Debug("ServeHTTP", "ip", req.remoteIP, "isTrusted", isTrusted)
-c.log.Debug("cache:Get", "key", key)
-c.log.Debug("cache:GetMany", "keys", keys)
+b.log.Debug("ServeHTTP:Get", "ip", req.remoteIP, "cache", lookupErr)
 ```
 
 ## Key files
 
 - `pkg/bouncer/bouncer.go` — `ServeHTTP` Debug
-- `pkg/cache/cache.go` — Get/GetMany/Set/Delete Debug
 - `pkg/logger/logger.go` — consume only (`HandlerOptions.Level`)
 
 ## Gotchas
