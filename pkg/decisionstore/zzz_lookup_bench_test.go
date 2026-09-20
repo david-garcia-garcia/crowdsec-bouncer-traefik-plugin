@@ -60,8 +60,9 @@ func benchLiveSnapshot(b *testing.B) map[string]LiveSlot {
 }
 
 func benchPackedBan() uint32 {
-	word := Pack(decisionscope.BannedValue, "o", originIntern{table: intern.New()})
-	return word
+	table := intern.New()
+	originID, _ := table.ID("o")
+	return packWord(decisionscope.BannedValue, originID)
 }
 
 func benchSnapshotGet(snapshot map[string]LiveSlot) func(string) any {

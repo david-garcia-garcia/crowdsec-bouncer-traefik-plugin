@@ -118,11 +118,11 @@ func (c *Client) fetchAndApplyStreamDecisions() error {
 			continue
 		}
 		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
-			value := decisionscope.RemediationValue(decision.Type)
+			kind := decisionscope.RemediationValue(decision.Type)
 			cidr := strings.TrimSpace(decision.Value)
-			if value != "" && cidr != "" {
+			if kind != "" && cidr != "" {
 				origin := MetricsOrigin(decision.Origin, decision.Scenario)
-				rangeUpserts[cidr] = decisionstore.KindOriginString(value, origin)
+				rangeUpserts[cidr] = decisionstore.KindOriginString(kind, origin)
 				c.rememberActiveDecision("range:"+cidr, origin, cidr)
 			}
 			continue

@@ -1,8 +1,11 @@
 package decisionstore
 
 import (
+	"bytes"
 	"errors"
+	"log/slog"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +36,48 @@ func TestMemoryExpiryOnPublish(t *testing.T) {
 	_ = originID
 	if !errors.Is(err, ErrMiss) || err.Error() != "store:miss" {
 		t.Fatalf("expired slot must miss, got %v", err)
+	}
+}
+
+func TestMemoryTickPutHiddenUntilPublish(t *testing.T) {
+	store := NewMemory(logger.New("ERROR", ""))
+	store.BeginTick()
+	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60})
+	_, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	if !errors.Is(err, ErrMiss) {
+		t.Fatalf("tick Put must stay unpublished, got %v", err)
+	}
+	store.PublishTick(0)
+	kind, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	if err != nil || kind != decisionscope.BannedValue {
+		t.Fatalf("kind %q err %v", kind, err)
+	}
+}
+
+func TestMemoryTickDeleteOnlyMissesAfterPublish(t *testing.T) {
+	store := NewMemory(logger.New("ERROR", ""))
+	store.BeginTick()
+	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60})
+	store.PublishTick(0)
+	store.BeginTick()
+	store.Delete(decisionscope.ScopeIP, "203.0.113.10")
+	store.PublishTick(0)
+	_, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	if !errors.Is(err, ErrMiss) {
+		t.Fatalf("tick Delete must miss after publish, got %v", err)
+	}
+}
+
+func TestMemoryInternOverflowWarns(t *testing.T) {
+	var logged bytes.Buffer
+	log := slog.New(slog.NewJSONHandler(&logged, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	store := NewMemory(log)
+	store.FillUntilMaxForTest()
+	store.BeginTick()
+	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.99", Kind: decisionscope.BannedValue, Origin: "overflow-origin", DurationSec: 60})
+	store.PublishTick(0)
+	if !strings.Contains(logged.String(), "decisionstore:intern overflow") {
+		t.Fatalf("want overflow Warn, got %s", logged.String())
 	}
 }
 

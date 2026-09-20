@@ -8,31 +8,13 @@ import (
 
 const kindOriginSep = "\n"
 
-// OriginIntern is the intern table used when packing memory slot words.
-type OriginIntern interface {
-	Intern(name string) (uint16, bool)
-}
-
-// Pack encodes a memory slot as a uint32 word. Intern overflow uses origin id 0.
-func Pack(kind, origin string, origins OriginIntern) uint32 {
-	if kind == "" {
-		return 0
-	}
-	if origins != nil {
-		if originID, ok := origins.Intern(origin); ok {
-			return packWord(kind, originID)
-		}
-	}
-	return packWord(kind, 0)
-}
-
-// Unpack reads a Pack word or a kind+origin string (Redis slot or Range blob payload).
+// Unpack reads a packed word or a kind+origin string (Redis slot or Range blob payload).
 func Unpack(payload any) (string, string, uint16) {
-	switch stored := payload.(type) {
+	switch payloadTyped := payload.(type) {
 	case uint32:
-		return unpackWord(stored)
+		return unpackWord(payloadTyped)
 	case string:
-		kind, origin := splitKindOrigin(stored)
+		kind, origin := splitKindOrigin(payloadTyped)
 		return kind, origin, 0
 	default:
 		return "", "", 0

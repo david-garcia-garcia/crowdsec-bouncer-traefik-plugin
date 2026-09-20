@@ -145,12 +145,12 @@ func TestLiveLookup_ScopeBanWins(t *testing.T) {
 	client := newTestLiveClient(t, testLiveScopeLAPI(t, "null", map[string]string{
 		"country": testLiveBanBody("country", "FR"),
 	}))
-	value, _, err := client.LiveLookup("1.2.3.4", map[string]string{"country": "FR"}, 60)
+	kind, origin, err := client.LiveLookup("1.2.3.4", map[string]string{"country": "FR"}, 60)
 	if err == nil {
 		t.Fatal("a ban is reported with the overloaded banned error")
 	}
-	if !decisionscope.IsActiveRemediation(value) {
-		t.Fatalf("scope ban value %q, want an active remediation", value)
+	if kind != decisionscope.BannedValue || origin != "CAPI" {
+		t.Fatalf("scope ban kind %q origin %q, want ban CAPI", kind, origin)
 	}
 }
 

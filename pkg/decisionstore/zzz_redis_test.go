@@ -1,6 +1,7 @@
 package decisionstore
 
 import (
+	"errors"
 	"testing"
 
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -83,6 +84,18 @@ func TestPrefixed(t *testing.T) {
 	}
 	if got := prefixed("ab", "ip"); got != "ab:ip" {
 		t.Fatalf("prefix: got %q", got)
+	}
+}
+
+func TestRedisReplicaMissDoesNotReadWriter(t *testing.T) {
+	writer := startTestStoreRedis(t)
+	replica := startTestStoreRedis(t)
+	store := NewRedis(logger.New("ERROR", ""), writer.addr(), []string{replica.addr()}, "", "", "sess")
+	defer store.Close()
+	store.Put(Decision{Scope: "Ip", Value: "203.0.113.10", Kind: "t", Origin: "crowdsec", DurationSec: 60})
+	_, _, _, err := store.LookupRemediation("203.0.113.10", nil, nil)
+	if !errors.Is(err, ErrMiss) {
+		t.Fatalf("replica miss must not retry writer, got %v", err)
 	}
 }
 

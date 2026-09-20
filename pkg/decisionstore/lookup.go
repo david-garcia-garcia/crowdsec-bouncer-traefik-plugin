@@ -25,32 +25,33 @@ func mergeLookupHit(chosen lookupHit, incoming lookupHit) lookupHit {
 	return incoming
 }
 
-// hitFromPayload unpacks a Pack word or a kind+origin string.
+// hitFromPayload unpacks a packed word or a kind+origin string.
 func hitFromPayload(payload any) lookupHit {
 	if payload == nil {
 		return lookupHit{}
 	}
 	kind, origin, originID := Unpack(payload)
-	stored, isString := payload.(string)
-	if !isString {
-		stored = kind
+	payloadTyped, isString := payload.(string)
+	stored := kind
+	if isString {
+		stored = payloadTyped
 	}
 	return lookupHit{stored: stored, origin: origin, originID: originID}
 }
 
 // lookupHits merges Ip, present header scopes, and Range. Ban on Ip skips Range membership.
-// get returns a Pack word, kind+origin string, or nil when the key is absent. Empty kind is a miss.
-func lookupHits(get func(string) any, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16) {
-	if get == nil {
-		get = func(string) any { return nil }
+// payloadForKey returns a packed word, kind+origin string, or nil when the key is absent. Empty kind is a miss.
+func lookupHits(payloadForKey func(string) any, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16) {
+	if payloadForKey == nil {
+		payloadForKey = func(string) any { return nil }
 	}
 	var chosen lookupHit
-	chosen = mergeLookupHit(chosen, hitFromPayload(get(remoteIP)))
+	chosen = mergeLookupHit(chosen, hitFromPayload(payloadForKey(remoteIP)))
 	for scope, identifier := range scopes {
 		if identifier == "" {
 			continue
 		}
-		chosen = mergeLookupHit(chosen, hitFromPayload(get(HeaderScopeKey(scope, identifier))))
+		chosen = mergeLookupHit(chosen, hitFromPayload(payloadForKey(HeaderScopeKey(scope, identifier))))
 	}
 	if decisionscope.RemediationKind(chosen.stored) != decisionscope.BannedValue {
 		chosen = mergeLookupHit(chosen, hitFromPayload(membership.Remediation(ipAddr)))

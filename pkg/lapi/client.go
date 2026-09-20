@@ -180,7 +180,7 @@ func (c *Client) Close() {
 	c.logInfo(MsgConnectionClosed, "closed")
 }
 
-// Sleep stops stream and metrics tickers and keeps HTTP, cache, and the LAPI
+// Sleep stops stream and metrics tickers and keeps HTTP, the DecisionStore, and the LAPI
 // cursor. Reclaim calls this when the last constructor ctx is gone. Not Close.
 // Remaining usage-metrics are POSTed asynchronously so the reclaim table lock is not held on LAPI.
 func (c *Client) Sleep() {
@@ -200,7 +200,7 @@ func (c *Client) Sleep() {
 }
 
 // Wake starts stream and metrics tickers again after Sleep. startup=false: the
-// cache is still warm; CrowdSec still holds stream_cursor on the bouncer row.
+// DecisionStore is still warm; CrowdSec still holds stream_cursor on the bouncer row.
 func (c *Client) Wake() {
 	c.mu.Lock()
 	if c.closed || !c.sleeping {

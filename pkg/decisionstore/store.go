@@ -28,6 +28,7 @@ type engine struct {
 	close       func()
 }
 
+// memoryEngine binds *memory methods into engine funcs.
 func memoryEngine(mem *memory) engine {
 	return engine{
 		beginTick:   mem.BeginTick,
@@ -41,6 +42,7 @@ func memoryEngine(mem *memory) engine {
 	}
 }
 
+// redisEngine binds *redis methods into engine funcs.
 func redisEngine(red *redis) engine {
 	return engine{
 		beginTick:   red.BeginTick,
@@ -85,8 +87,8 @@ func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, data
 	}
 }
 
-// Open reclaims one Store per reclaimKey. cachePrefix is the Redis key prefix.
-func Open(ctx context.Context, reclaimKey, cachePrefix string, cfg *configuration.Config, log *slog.Logger) (*Store, error) {
+// Open reclaims one Store per reclaimKey. keyPrefix is the Redis key prefix.
+func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.Config, log *slog.Logger) (*Store, error) {
 	stored, err := reclaim.OpenWithHooks(ctx, reclaimKey, log, func() (any, reclaim.Hooks, error) {
 		var store *Store
 		if cfg.RedisCacheEnabled {
@@ -96,7 +98,7 @@ func Open(ctx context.Context, reclaimKey, cachePrefix string, cfg *configuratio
 				cfg.RedisCacheReadHosts,
 				cfg.RedisCachePassword,
 				cfg.RedisCacheDatabase,
-				cachePrefix,
+				keyPrefix,
 			)
 		} else {
 			store = NewMemory(log)
@@ -106,24 +108,11 @@ func Open(ctx context.Context, reclaimKey, cachePrefix string, cfg *configuratio
 	if err != nil {
 		return nil, err
 	}
-	store, ok := stored.(*Store)
+	storedTyped, ok := stored.(*Store)
 	if !ok {
 		return nil, fmt.Errorf("reclaim: want *decisionstore.Store, got %T", stored)
 	}
-	return store, nil
-}
-
-// originIntern packs memory words without exporting intern on Store.
-type originIntern struct {
-	table *intern.Table
-}
-
-// Intern appends an origin name. Empty name is id 0. Overflow does not wrap.
-func (o originIntern) Intern(name string) (uint16, bool) {
-	if o.table == nil {
-		return 0, false
-	}
-	return o.table.ID(name)
+	return storedTyped, nil
 }
 
 // BeginTick opens the write window for one stream poll. Memory clones published into tick.
@@ -174,12 +163,12 @@ func (s *Store) ApplyRangeBatch(upserts map[string]string, removals []string) er
 
 // RangeMembership is the current in-process Range lookup, or nil before the first hydrate.
 func (s *Store) RangeMembership() *RangeMembership {
-	stored := s.rangeMembership.Load()
-	if stored == nil {
+	membership := s.rangeMembership.Load()
+	if membership == nil {
 		return nil
 	}
-	membership, _ := stored.(*RangeMembership)
-	return membership
+	membershipTyped, _ := membership.(*RangeMembership)
+	return membershipTyped
 }
 
 // HydrateRange rebuilds Range membership from the stored blob. A read that did not answer keeps the last trees.

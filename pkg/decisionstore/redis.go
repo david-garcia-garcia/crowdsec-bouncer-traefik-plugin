@@ -28,16 +28,17 @@ type redis struct {
 	counter atomic.Uint64
 }
 
+// newRedis dials the writer and optional readers via simpleredis.New.
 func newRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string) *redis {
-	backend := &redis{log: log, prefix: keyPrefix}
+	red := &redis{log: log, prefix: keyPrefix}
 	writer, err := simpleredis.New(redisClientConfig(writeHost, pass, database, log))
 	if err != nil {
 		if log != nil {
 			log.Error("redis:New writer", "error", err)
 		}
-		return backend
+		return red
 	}
-	backend.writer = writer
+	red.writer = writer
 	for _, readHost := range readHosts {
 		reader, readerErr := simpleredis.New(redisClientConfig(readHost, pass, database, log))
 		if readerErr != nil {
@@ -46,9 +47,9 @@ func newRedis(log *slog.Logger, writeHost string, readHosts []string, pass, data
 			}
 			continue
 		}
-		backend.readers = append(backend.readers, reader)
+		red.readers = append(red.readers, reader)
 	}
-	return backend
+	return red
 }
 
 func redisClientConfig(host, pass, database string, log *slog.Logger) simpleredis.Config {
@@ -82,6 +83,7 @@ func (r *redis) nextReader() *simpleredis.SimpleRedis {
 	return r.readers[idx]
 }
 
+// get GETs one prefixed key from nextReader only.
 func (r *redis) get(key string) (string, error) {
 	reader := r.nextReader()
 	if reader == nil {
@@ -104,14 +106,15 @@ func (r *redis) get(key string) (string, error) {
 	return "", ErrMiss
 }
 
+// getMany MGETs slot keys from nextReader only.
 func (r *redis) getMany(keys []string) (map[string]string, error) {
-	logical := make([]string, 0, len(keys))
+	slotKeys := make([]string, 0, len(keys))
 	prefixedNames := make([]string, 0, len(keys))
 	for _, key := range keys {
 		if key == "" {
 			continue
 		}
-		logical = append(logical, key)
+		slotKeys = append(slotKeys, key)
 		prefixedNames = append(prefixedNames, prefixed(r.prefix, key))
 	}
 	if len(prefixedNames) == 0 {
@@ -129,7 +132,7 @@ func (r *redis) getMany(keys []string) (map[string]string, error) {
 		return nil, err
 	}
 	out := make(map[string]string)
-	for i, key := range logical {
+	for i, key := range slotKeys {
 		if i >= len(values) || values[i] == nil || len(values[i]) == 0 {
 			continue
 		}
@@ -148,6 +151,7 @@ func (r *redis) set(key, value string, duration int64) {
 	}
 }
 
+// deleteKey DELs one prefixed key on the writer and is void.
 func (r *redis) deleteKey(key string) {
 	if r.writer == nil {
 		return
@@ -180,13 +184,13 @@ func (r *redis) Delete(scope, value string) {
 	if r == nil {
 		return
 	}
-	key, legacy := slotKeys(scope, value)
+	key, priorSpelling := slotKeys(scope, value)
 	if key == "" {
 		return
 	}
 	r.deleteKey(key)
-	if legacy != "" && legacy != key {
-		r.deleteKey(legacy)
+	if priorSpelling != "" && priorSpelling != key {
+		r.deleteKey(priorSpelling)
 	}
 }
 

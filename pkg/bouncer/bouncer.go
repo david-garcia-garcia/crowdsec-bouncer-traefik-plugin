@@ -195,30 +195,30 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 
 	// live, stream, and alone consult the cache.
 	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
-		var value, origin string
+		var kind, origin string
 		var originID uint16
-		var cacheErr error
-		value, origin, originID, cacheErr = b.lapiClient.LookupRemediation(req.remoteIP, req.ipAddr, scopes)
+		var lookupErr error
+		kind, origin, originID, lookupErr = b.lapiClient.LookupRemediation(req.remoteIP, req.ipAddr, scopes)
 		switch {
-		case cacheErr != nil:
-			b.log.Debug("ServeHTTP:Get", "ip", req.remoteIP, "cache", cacheErr)
-			if errors.Is(cacheErr, decisionstore.ErrUnreachable) && !b.redisUnreachableBlock {
+		case lookupErr != nil:
+			b.log.Debug("ServeHTTP:Get", "ip", req.remoteIP, "cache", lookupErr)
+			if errors.Is(lookupErr, decisionstore.ErrUnreachable) && !b.redisUnreachableBlock {
 				b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "redisUnreachable", true)
 				b.handleNextServeHTTP(rw, req)
 				return
 			}
-			if errors.Is(cacheErr, decisionstore.ErrMiss) {
+			if errors.Is(lookupErr, decisionstore.ErrMiss) {
 				break
 			}
-			b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "error", cacheErr)
+			b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "error", lookupErr)
 			b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
 			return
-		case decisionscope.IsActiveRemediation(value):
-			b.log.Debug("ServeHTTP", "ip", req.remoteIP, "cache", "hit", "remediation", value)
-			// Origin name is resolved only on drop; allow-path intern Name is lock-free.
-			b.handleRemediationServeHTTP(rw, req, value, b.resolveDroppedOrigin(origin, originID))
+		case decisionscope.IsActiveRemediation(kind):
+			b.log.Debug("ServeHTTP", "ip", req.remoteIP, "cache", "hit", "remediation", kind)
+			// Origin is resolved only on drop; allow-path skips OriginName.
+			b.handleRemediationServeHTTP(rw, req, kind, b.resolveDroppedOrigin(origin, originID))
 			return
-		case value == decisionscope.NoBannedValue:
+		case kind == decisionscope.NoBannedValue:
 			b.handleNextServeHTTP(rw, req)
 			return
 		}
@@ -308,7 +308,7 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 	}
 }
 
-// resolveDroppedOrigin uses a leftover name, or OriginName on drop only.
+// resolveDroppedOrigin uses a payload origin string, or OriginName(originID) on drop only.
 func (b *Bouncer) resolveDroppedOrigin(origin string, originID uint16) string {
 	if origin != "" {
 		return origin

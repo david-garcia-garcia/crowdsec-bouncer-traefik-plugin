@@ -21,10 +21,10 @@ func (c *Client) streamQuery() string {
 	return query + "&scopes=" + decisionscope.StreamScopeList(c.snapshotLiveHeaderScopes())
 }
 
-// storeStreamDecision writes one non-Range stream decision into the cache.
+// storeStreamDecision Puts one non-Range stream decision into the DecisionStore.
 func (c *Client) storeStreamDecision(item Decision, duration int64) {
-	value := decisionscope.RemediationValue(item.Type)
-	if value == "" {
+	kind := decisionscope.RemediationValue(item.Type)
+	if kind == "" {
 		c.log.Debug("handleStreamCache:unknownType", "type", item.Type)
 		return
 	}
@@ -43,12 +43,12 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 		return
 	}
 	c.decisionStore.Put(decisionstore.Decision{
-		Scope: scope, Value: item.Value, Kind: value, Origin: origin, DurationSec: duration,
+		Scope: scope, Value: item.Value, Kind: kind, Origin: origin, DurationSec: duration,
 	})
 	c.rememberActiveDecision(decisionstore.SlotKey(scope, item.Value), origin, item.Value)
 }
 
-// deleteStreamDecision drops one non-Range stream decision from the cache.
+// deleteStreamDecision Deletes one non-Range stream decision from the DecisionStore.
 func (c *Client) deleteStreamDecision(item Decision) {
 	scope := decisionscope.NormalizeScope(item.Scope)
 	if scope == decisionscope.ScopeRange {
@@ -89,12 +89,12 @@ func (c *Client) queryLiveDecisions(rawQuery string) (liveResult, error) {
 	if err != nil {
 		return liveResult{}, fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
 	}
-	value := decisionscope.RemediationValue(picked.Type)
-	if value == "" {
+	kind := decisionscope.RemediationValue(picked.Type)
+	if kind == "" {
 		return liveResult{kind: decisionscope.NoBannedValue}, nil
 	}
 	return liveResult{
-		kind:     value,
+		kind:     kind,
 		origin:   MetricsOrigin(picked.Origin, picked.Scenario),
 		duration: parsedDuration,
 	}, nil
@@ -180,8 +180,8 @@ func (c *Client) memoLive(scope, value, kind, origin string, durationSec int64) 
 }
 
 // liveCacheTTL is the live-mode cache TTL: min(decision duration, defaultDecisionSeconds).
-func liveCacheTTL(parsedDuration time.Duration, defaultDecisionSeconds int64) int64 {
-	durationSecond := int64(parsedDuration.Seconds())
+func liveCacheTTL(duration time.Duration, defaultDecisionSeconds int64) int64 {
+	durationSecond := int64(duration.Seconds())
 	if durationSecond <= 0 || defaultDecisionSeconds < durationSecond {
 		return defaultDecisionSeconds
 	}

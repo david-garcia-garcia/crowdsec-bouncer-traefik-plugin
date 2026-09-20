@@ -31,8 +31,8 @@ func lookupAsRequest(client *Client, remoteIP string) (string, error) {
 	if ipAddr != nil {
 		remoteIP = ipAddr.String()
 	}
-	value, _, _, err := client.LookupRemediation(remoteIP, ipAddr, nil)
-	return value, err
+	kind, _, _, err := client.LookupRemediation(remoteIP, ipAddr, nil)
+	return kind, err
 }
 
 func applyStreamDecisionForTest(client *Client, decision Decision, duration int64) {

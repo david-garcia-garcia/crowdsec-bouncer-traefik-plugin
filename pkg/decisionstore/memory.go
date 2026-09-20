@@ -9,6 +9,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 )
 
+// memory is in-process COW tick/published maps plus the Range blob.
 type memory struct {
 	log        *slog.Logger
 	origins    *intern.Table
@@ -21,6 +22,7 @@ type memory struct {
 	rangeIndex string
 }
 
+// newMemory allocates non-nil tick/published maps.
 func newMemory(log *slog.Logger, origins *intern.Table) *memory {
 	return &memory{
 		log:      log,
@@ -96,19 +98,22 @@ func (m *memory) putTick(item Decision) {
 	m.tickExp[key] = slot.ExpiresAt
 }
 
-// putPublishedLocked copy-on-write one live slot onto the published maps. Caller holds mu.
+// putPublishedLocked writes one live slot onto the published maps and sweeps expired keys. Caller holds mu.
 func (m *memory) putPublishedLocked(item Decision) {
 	key, _ := slotKeys(item.Scope, item.Value)
 	if key == "" {
 		return
 	}
-	word := cloneUint32Map(m.pubWord)
-	exp := cloneInt64Map(m.pubExp)
+	now := time.Now().Unix()
+	for existing, expiresAt := range m.pubExp {
+		if expiresAt > 0 && expiresAt <= now {
+			delete(m.pubWord, existing)
+			delete(m.pubExp, existing)
+		}
+	}
 	slot := LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
-	word[key] = slot.Word
-	exp[key] = slot.ExpiresAt
-	m.pubWord = word
-	m.pubExp = exp
+	m.pubWord[key] = slot.Word
+	m.pubExp[key] = slot.ExpiresAt
 }
 
 // pack encodes a uint32 word. Intern overflow Warns and uses origin id 0.
@@ -121,7 +126,7 @@ func (m *memory) pack(kind, origin string) uint32 {
 			return packWord(kind, originID)
 		}
 		if m.log != nil {
-			m.log.Warn("decisionstore:intern overflow", "kind", kind)
+			m.log.Warn("decisionstore:intern overflow", "kind", kind, "origin", origin)
 		}
 	}
 	return packWord(kind, 0)
@@ -134,16 +139,16 @@ func (m *memory) Delete(scope, value string) {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	key, legacy := slotKeys(scope, value)
+	key, priorSpelling := slotKeys(scope, value)
 	if key == "" {
 		return
 	}
 	if m.ticking {
 		delete(m.tickWord, key)
 		delete(m.tickExp, key)
-		if legacy != "" && legacy != key {
-			delete(m.tickWord, legacy)
-			delete(m.tickExp, legacy)
+		if priorSpelling != "" && priorSpelling != key {
+			delete(m.tickWord, priorSpelling)
+			delete(m.tickExp, priorSpelling)
 		}
 		return
 	}
@@ -151,9 +156,9 @@ func (m *memory) Delete(scope, value string) {
 	exp := cloneInt64Map(m.pubExp)
 	delete(word, key)
 	delete(exp, key)
-	if legacy != "" && legacy != key {
-		delete(word, legacy)
-		delete(exp, legacy)
+	if priorSpelling != "" && priorSpelling != key {
+		delete(word, priorSpelling)
+		delete(exp, priorSpelling)
 	}
 	m.pubWord = word
 	m.pubExp = exp
@@ -165,16 +170,14 @@ func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[st
 		return "", "", 0, ErrMiss
 	}
 	m.mu.RLock()
-	words := m.pubWord
-	exps := m.pubExp
-	m.mu.RUnlock()
+	defer m.mu.RUnlock()
 	now := time.Now().Unix()
 	kind, origin, originID := lookupHits(func(key string) any {
-		word, ok := words[key]
+		word, ok := m.pubWord[key]
 		if !ok {
 			return nil
 		}
-		if expiresAt := exps[key]; expiresAt > 0 && expiresAt <= now {
+		if expiresAt := m.pubExp[key]; expiresAt > 0 && expiresAt <= now {
 			return nil
 		}
 		return word
@@ -238,8 +241,8 @@ func (m *memory) seedPublished(item Decision) {
 
 func cloneUint32Map(src map[string]uint32) map[string]uint32 {
 	next := make(map[string]uint32, len(src))
-	for key, packed := range src {
-		next[key] = packed
+	for key, word := range src {
+		next[key] = word
 	}
 	return next
 }

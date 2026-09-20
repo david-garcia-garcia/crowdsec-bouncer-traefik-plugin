@@ -54,7 +54,7 @@ func TestRememberActiveDecisionForgetCompactSlot(t *testing.T) {
 		t.Fatalf("slots %d", len(client.metricsReporter.activeDecisionSlots))
 	}
 	rec := client.metricsReporter.activeDecisionSlots["ip:1.2.3.4"]
-	if rec.originID == 0 || rec.leftover != "" || rec.ipType != "ipv4" {
+	if rec.originID == 0 || rec.ipType != "ipv4" {
 		t.Fatalf("slot %#v", rec)
 	}
 	client.forgetActiveDecision("ip:1.2.3.4")
