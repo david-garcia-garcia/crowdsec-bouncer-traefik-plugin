@@ -25,6 +25,7 @@ func CreateConfig() *configuration.Config {
 // New works on a snapshot of the config Traefik owns, and binds every reclaim Open to a context
 // derived from the constructor ctx, so a constructor that fails partway releases what earlier steps
 // already opened instead of leaving a LAPI stream ticker polling for the process lifetime.
+// The LAPI Client create() owns the DecisionStore; Client Close Closes that store.
 //
 // err is named so that defer can see which way New left; a bool would not survive a later return.
 //
@@ -61,7 +62,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	// Stream and alone poll GET /v1/decisions/stream. CrowdSec stores that
 	// cursor on the bouncer row selected by hashed X-Api-Key plus the IP LAPI
 	// sees (this process’s outbound address), not per middleware and not per
-	// metrics interval. OpenStream keeps one ticker per URL+key in this process.
+	// Redis or metrics interval. OpenStream keeps one ticker per URL+key in this process.
 	if prepared.CrowdsecMode == configuration.StreamMode || prepared.CrowdsecMode == configuration.AloneMode {
 		lapiClient, err = lapi.OpenStream(bindCtx, &prepared, log, name, pluginVersion)
 		if err != nil {

@@ -1,7 +1,6 @@
 package lapi
 
 import (
-	"context"
 	"log/slog"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
@@ -10,7 +9,7 @@ import (
 
 const decisionStoreKeyPrefix = "decisionstore:"
 
-// storeParams is the Redis location hashed into the DecisionStore reclaim key.
+// storeParams is the Redis location hashed into StoreKey (composition helper).
 type storeParams struct {
 	RedisCacheEnabled   bool     `json:"redisCacheEnabled"`
 	RedisCacheHost      string   `json:"redisCacheHost"`
@@ -30,12 +29,23 @@ func storeParamsFrom(cfg *configuration.Config) storeParams {
 	}
 }
 
-// StoreKey is the reclaim table key: CrowdSec cursor SessionHex plus Redis store parameters.
+// StoreKey is a composition helper: CrowdSec cursor SessionHex plus Redis store parameters.
+// It is not a sibling reclaim Open for this Client’s store.
 func StoreKey(cfg *configuration.Config) string {
 	return decisionStoreKeyPrefix + SessionHex(cfg) + ":" + hashJSON(storeParamsFrom(cfg))
 }
 
-// OpenDecisionStore reclaims one store per cursor plus Redis params on the Traefik New context.
-func OpenDecisionStore(ctx context.Context, cfg *configuration.Config, log *slog.Logger) (*decisionstore.Store, error) {
-	return decisionstore.Open(ctx, StoreKey(cfg), SessionHex(cfg), cfg, log)
+// newChildStore constructs the Client’s DecisionStore. Redis keys stay under SessionHex.
+func newChildStore(cfg *configuration.Config, log *slog.Logger) *decisionstore.Store {
+	if cfg.RedisCacheEnabled {
+		return decisionstore.NewRedis(
+			log,
+			cfg.RedisCacheHost,
+			cfg.RedisCacheReadHosts,
+			cfg.RedisCachePassword,
+			cfg.RedisCacheDatabase,
+			SessionHex(cfg),
+		)
+	}
+	return decisionstore.NewMemory(log)
 }

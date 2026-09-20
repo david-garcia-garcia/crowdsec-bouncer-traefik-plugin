@@ -14,9 +14,8 @@ import (
 const streamSessionKeyPrefix = "lapi:stream:"
 
 // streamSession is the CrowdSec-row identity for stream and alone modes.
-// SessionPrefix and SessionHex use only these fields. SessionKey appends a
-// hash of Redis store parameters so two Clients that share a cursor still
-// isolate by Redis host (same payload family as StoreKey).
+// SessionHex and SessionKey use only these fields. Redis store parameters
+// are not in the Open key: two Clients that share a cursor share one ticker.
 //
 // CrowdSec LAPI does not give each HTTP client its own GET /v1/decisions/stream
 // cursor. The cursor lives on the bouncer database row selected by:
@@ -26,9 +25,10 @@ const streamSessionKeyPrefix = "lapi:stream:"
 //     the visitor behind Traefik.
 //
 // scopes= on the query string is a filter of the same cursor, not a second
-// cursor. Intervals, CAPI scenarios, updateMaxFailure, and decisionScopeHeaders
-// are also not how LAPI picks the row. Usage-metrics POST uses that same
-// authenticated row (`generated_by` = bouncer name, not payload name).
+// cursor. Intervals, CAPI scenarios, updateMaxFailure, decisionScopeHeaders,
+// Redis, middleware name, and outbound IP are also not how LAPI picks the row.
+// Usage-metrics POST uses that same authenticated row (`generated_by` = bouncer
+// name, not payload name).
 //
 // Two in-process tickers that share scheme+host+path+key therefore share one
 // CrowdSec row. Sequential startup=false polls steal deltas: each connection
@@ -37,7 +37,7 @@ const streamSessionKeyPrefix = "lapi:stream:"
 // Cross-process in-memory with the same LAPI-visible IP already shares that
 // CrowdSec row; Redis is the multi-instance store.
 //
-// Upgrade: SessionHex and store Redis params stay. Existing Redis keys stay
+// Upgrade: SessionHex stays the Redis key prefix. Existing Redis keys stay
 // reachable. Changing the Client Open string only renames the in-process table
 // key. No Redis key migration.
 type streamSession struct {
@@ -77,14 +77,9 @@ func SessionHex(cfg *configuration.Config) string {
 	return hashJSON(sessionFrom(cfg))
 }
 
-// SessionPrefix is the reclaim-key stem shared by every Redis snapshot of one LAPI row.
-func SessionPrefix(cfg *configuration.Config) string {
-	return streamSessionKeyPrefix + SessionHex(cfg) + ":"
-}
-
-// SessionKey is the stream/alone Open key: session prefix plus Redis store-params hash.
+// SessionKey is the stream/alone Open key: lapi:stream: plus SessionHex.
 func SessionKey(cfg *configuration.Config) string {
-	return SessionPrefix(cfg) + hashJSON(storeParamsFrom(cfg))
+	return streamSessionKeyPrefix + SessionHex(cfg)
 }
 
 // reclaimSessionKey is SessionKey for stream/alone and Key for live/none.
@@ -95,36 +90,20 @@ func reclaimSessionKey(cfg *configuration.Config) string {
 	return Key(cfg)
 }
 
-// OpenStream reclaims one Client per cursor plus Redis (LAPI URL+key).
+// OpenStream reclaims one Client per LAPI session (URL+key, mode).
 //
-// SessionKey is session prefix plus this Redis snapshot’s hash. Same Redis
-// snapshot → Open that key (Sleep/Wake across Traefik’s cancel-then-New gap),
-// even when intervals, CAPI scenarios, updateMaxFailure, or header maps differ.
-// A different Redis host is a different key. Interval / CAPI / updateMaxFailure
-// mismatch on a live sibling is silent first-wins (create already wrote those
-// scalars). After bind, this constructor registers its header scopes.
+// SessionKey is lapi:stream: plus SessionHex. Same session → Open that key
+// (Sleep/Wake across Traefik’s cancel-then-New gap), even when Redis, intervals,
+// CAPI scenarios, updateMaxFailure, or header maps differ. Redis / interval /
+// CAPI / updateMaxFailure mismatch on a live sibling or Wake is first-wins with
+// WARN. After bind, this constructor registers its header scopes and holder name.
 func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
-	store, storeErr := OpenDecisionStore(ctx, cfg, log)
-	if storeErr != nil {
-		return nil, storeErr
-	}
 	bindKey := SessionKey(cfg)
-	stored, openErr := reclaim.OpenWithHooks(ctx, bindKey, log, func() (any, reclaim.Hooks, error) {
-		client, err := New(cfg, log, pluginVersion, store)
-		if err != nil {
-			return nil, reclaim.Hooks{}, err
-		}
-		return client, clientHooks(client), nil
-	})
+	client, created, openErr := openClient(ctx, bindKey, cfg, log, middlewareName, pluginVersion)
 	if openErr != nil {
 		return nil, openErr
 	}
-	client, clientErr := clientFromStored(middlewareName, stored)
-	if clientErr != nil {
-		return nil, clientErr
-	}
-	client.sessionKey = bindKey
-	replaced, adoptErr := client.AdoptTransport(cfg)
+	replaced, adoptErr := finishBind(ctx, client, cfg, middlewareName, created)
 	if adoptErr != nil {
 		return nil, adoptErr
 	}
@@ -140,27 +119,12 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 
 // OpenLive reclaims a Client by cursor plus Redis and metrics interval (live/none).
 func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
-	store, storeErr := OpenDecisionStore(ctx, cfg, log)
-	if storeErr != nil {
-		return nil, storeErr
-	}
 	bindKey := Key(cfg)
-	stored, openErr := reclaim.OpenWithHooks(ctx, bindKey, log, func() (any, reclaim.Hooks, error) {
-		client, err := New(cfg, log, pluginVersion, store)
-		if err != nil {
-			return nil, reclaim.Hooks{}, err
-		}
-		return client, clientHooks(client), nil
-	})
+	client, created, openErr := openClient(ctx, bindKey, cfg, log, middlewareName, pluginVersion)
 	if openErr != nil {
 		return nil, openErr
 	}
-	client, clientErr := clientFromStored(middlewareName, stored)
-	if clientErr != nil {
-		return nil, clientErr
-	}
-	client.sessionKey = bindKey
-	replaced, adoptErr := client.AdoptTransport(cfg)
+	replaced, adoptErr := finishBind(ctx, client, cfg, middlewareName, created)
 	if adoptErr != nil {
 		return nil, adoptErr
 	}
@@ -171,6 +135,41 @@ func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, 
 		)
 	}
 	return client, nil
+}
+
+// openClient reclaims or creates a Client for bindKey. created is true when this Open ran create().
+func openClient(ctx context.Context, bindKey string, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, bool, error) {
+	created := false
+	stored, openErr := reclaim.OpenWithHooks(ctx, bindKey, log, func() (any, reclaim.Hooks, error) {
+		created = true
+		client, err := New(cfg, log, pluginVersion)
+		if err != nil {
+			return nil, reclaim.Hooks{}, err
+		}
+		return client, clientHooks(client), nil
+	})
+	if openErr != nil {
+		return nil, created, openErr
+	}
+	client, clientErr := clientFromStored(middlewareName, stored)
+	if clientErr != nil {
+		return nil, created, clientErr
+	}
+	client.sessionKey = bindKey
+	return client, created, nil
+}
+
+// finishBind adopts transport, records the holder name, and WARNs session-owned mismatch on join/Wake.
+func finishBind(ctx context.Context, client *Client, cfg *configuration.Config, middlewareName string, created bool) (bool, error) {
+	replaced, adoptErr := client.AdoptTransport(cfg)
+	if adoptErr != nil {
+		return false, adoptErr
+	}
+	client.registerHolder(ctx, middlewareName)
+	if !created {
+		client.warnIgnoredSessionOwned(cfg)
+	}
+	return replaced, nil
 }
 
 // clientHooks is Sleep/Wake/Close as funcs: Yaegi panics on asserting a foreign concrete type.

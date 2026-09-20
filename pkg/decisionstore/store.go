@@ -1,18 +1,14 @@
-// Package decisionstore is the reclaimed holder of CrowdSec decisions.
+// Package decisionstore holds CrowdSec decisions for one LAPI Client.
 // Stream/alone and live/none Ip and header-scope slots are a memory copy-on-write map
 // or Redis via SimpleRedis. Range is ApplyRangeBatch on the same engine.
 package decisionstore
 
 import (
-	"context"
-	"fmt"
 	"log/slog"
 	"net"
 	"sync/atomic"
 
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
 // engine is the slot and Range ops bound at NewMemory or NewRedis.
@@ -56,7 +52,7 @@ func redisEngine(red *redis) engine {
 	}
 }
 
-// Store is one reclaim value: intern table, Range membership, and the decision engine.
+// Store is one DecisionStore incarnation: intern table, Range membership, and the decision engine.
 type Store struct {
 	engine          engine
 	mem             *memory
@@ -87,34 +83,6 @@ func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, data
 	}
 }
 
-// Open reclaims one Store per reclaimKey. keyPrefix is the Redis key prefix.
-func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.Config, log *slog.Logger) (*Store, error) {
-	stored, err := reclaim.OpenWithHooks(ctx, reclaimKey, log, func() (any, reclaim.Hooks, error) {
-		var store *Store
-		if cfg.RedisCacheEnabled {
-			store = NewRedis(
-				log,
-				cfg.RedisCacheHost,
-				cfg.RedisCacheReadHosts,
-				cfg.RedisCachePassword,
-				cfg.RedisCacheDatabase,
-				keyPrefix,
-			)
-		} else {
-			store = NewMemory(log)
-		}
-		return store, reclaim.Hooks{Close: store.Close}, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	storedTyped, ok := stored.(*Store)
-	if !ok {
-		return nil, fmt.Errorf("reclaim: want *decisionstore.Store, got %T", stored)
-	}
-	return storedTyped, nil
-}
-
 // BeginTick opens the write window for one stream poll. Memory clones published into tick.
 // Redis is a no-op: each Set/Delete is already visible to other processes.
 func (s *Store) BeginTick() {
@@ -142,7 +110,7 @@ func (s *Store) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[str
 	return s.engine.lookup(remoteIP, ipAddr, scopes, s.RangeMembership())
 }
 
-// Close drains the Redis pool. Memory is a no-op. Reclaim last-holder hook.
+// Close drains the Redis pool. Memory is a no-op. Client Close hook.
 func (s *Store) Close() {
 	s.engine.close()
 }

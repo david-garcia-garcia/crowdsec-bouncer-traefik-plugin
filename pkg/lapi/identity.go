@@ -71,8 +71,7 @@ func IdentityHex(cfg *configuration.Config) string {
 }
 
 // Key is the live/none Open key: SessionHex plus a hash of the identity payload
-// (Redis store params and MetricsUpdateIntervalSeconds). Stream SessionKey and
-// StoreKey still omit the metrics interval.
+// (Redis store params and MetricsUpdateIntervalSeconds). Stream SessionKey omits Redis.
 func Key(cfg *configuration.Config) string {
 	return keyPrefix + SessionHex(cfg) + ":" + hashJSON(identityFrom(cfg))
 }

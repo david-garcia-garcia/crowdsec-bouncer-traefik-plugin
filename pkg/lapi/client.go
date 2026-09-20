@@ -16,12 +16,15 @@ import (
 
 // Operator-visible lifecycle and stream-health lines (stable for log grep).
 const (
-	MsgConnectionStarted  = "crowdsec connection started"
-	MsgConnectionSleeping = "crowdsec connection sleeping"
-	MsgConnectionWaking   = "crowdsec connection waking"
-	MsgConnectionClosed   = "crowdsec connection closed"
-	MsgStreamUnhealthy    = "crowdsec stream became unhealthy"
-	MsgStreamHealthy      = "crowdsec stream became healthy"
+	MsgConnectionStarted       = "crowdsec connection started"
+	MsgConnectionSleeping      = "crowdsec connection sleeping"
+	MsgConnectionWaking        = "crowdsec connection waking"
+	MsgConnectionClosed        = "crowdsec connection closed"
+	MsgStreamUnhealthy         = "crowdsec stream became unhealthy"
+	MsgStreamHealthy           = "crowdsec stream became healthy"
+	MsgSessionOwnedIgnored     = "lapi session joiner ignored session-owned knobs"
+	msgProcessWideOwnership    = "this LAPI key owns the process-wide stream and usage-metrics window in this instance"
+	msgIsolationNeedsSecondKey = "isolation requires a second bouncer API key"
 )
 
 // Decision is the body returned from Crowdsec LAPI.
@@ -36,7 +39,7 @@ type Decision struct {
 	Simulated bool   `json:"simulated"`
 }
 
-// Client owns stream ticker, a reclaimed DecisionStore, LAPI/CAPI HTTP, and metrics.
+// Client owns stream ticker, a child DecisionStore, LAPI/CAPI HTTP, and metrics.
 type Client struct {
 	mu       sync.Mutex
 	closed   bool
@@ -55,7 +58,9 @@ type Client struct {
 	crowdsecStreamRoute  string
 	decisionScopeHeaders map[string]string // write-once first-create residue; not the live union
 	sessionKey           string            // reclaim SessionKey (stream/alone) or Key (live/none)
+	sessionResidue       sessionResidue    // create-time session-owned knobs for subscribe WARN
 	liveHeaderScopes     liveHeaderScopes  // live constructor ctx → normalized header scopes
+	liveHolders          liveHolders       // live constructor ctx → Traefik middleware name
 
 	transport     atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
 	decisionStore *decisionstore.Store
@@ -94,9 +99,9 @@ func Prepare(cfg *configuration.Config, _ *slog.Logger) error {
 	return nil
 }
 
-// New constructs a Client and starts tickers. store is the reclaimed DecisionStore for this cursor.
-// Call Prepare first. Close stops tickers and HTTP only; it does not Close the shared store.
-func New(config *configuration.Config, log *slog.Logger, pluginVersion string, store *decisionstore.Store) (*Client, error) {
+// New constructs a Client, its child DecisionStore, and starts tickers.
+// Call Prepare first. Close stops tickers and HTTP and Closes the child store.
+func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (*Client, error) {
 	crowdsecStreamRoute := crowdsecLapiStreamRoute
 	if config.CrowdsecMode == configuration.AloneMode {
 		crowdsecStreamRoute = crowdsecCapiStreamRoute
@@ -110,10 +115,8 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		log.Error("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup")
 		return nil, errors.New("CrowdsecLapiKey is missing")
 	}
-	if store == nil {
-		return nil, errors.New("decision store is required")
-	}
 
+	store := newChildStore(config, log)
 	client := &Client{
 		crowdsecMode:            config.CrowdsecMode,
 		crowdsecScheme:          config.CrowdsecLapiScheme,
@@ -128,6 +131,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		sessionKey:              reclaimSessionKey(config),
+		sessionResidue:          residueFrom(config),
 		log:                     log,
 		pluginVersion:           pluginVersion,
 		isCrowdsecStreamStartup: 1,
@@ -138,6 +142,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 	client.transport.Store(next)
 
 	if err := client.startStream(config, log); err != nil {
+		store.Close()
 		return nil, err
 	}
 
@@ -149,13 +154,12 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		})
 	}
 
-	client.logInfo(MsgConnectionStarted, "started")
+	client.logInfo(MsgConnectionStarted, "started", "detail", msgProcessWideOwnership)
 	return client, nil
 }
 
-// Close stops tickers and idle LAPI HTTP. Safe to call more than once.
-// Remaining usage-metrics are POSTed to LAPI before HTTP is torn down.
-// Does not Close the shared DecisionStore; only the store's reclaim Close hook does.
+// Close stops tickers and idle LAPI HTTP, then Closes the child DecisionStore.
+// Safe to call more than once. Remaining usage-metrics are POSTed to LAPI before HTTP is torn down.
 func (c *Client) Close() {
 	c.mu.Lock()
 	if c.closed {
@@ -176,6 +180,9 @@ func (c *Client) Close() {
 	defer c.mu.Unlock()
 	if current := c.currentTransport(); current != nil {
 		closeIdle(current.httpClient)
+	}
+	if c.decisionStore != nil {
+		c.decisionStore.Close()
 	}
 	c.logInfo(MsgConnectionClosed, "closed")
 }
@@ -227,11 +234,42 @@ func (c *Client) Wake() {
 }
 
 // logInfo writes an operator-visible line with mode, host, reclaim key, and reason.
-func (c *Client) logInfo(msg, reason string) {
+func (c *Client) logInfo(msg, reason string, extra ...any) {
 	if c.log == nil {
 		return
 	}
-	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
+	args := []any{"mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason}
+	args = append(args, extra...)
+	c.log.Info(msg, args...)
+}
+
+// registerHolder records this New ctx’s Traefik name and drops it when ctx is Done.
+func (c *Client) registerHolder(ctx context.Context, name string) {
+	c.mu.Lock()
+	c.liveHolders.register(ctx, name)
+	c.mu.Unlock()
+	context.AfterFunc(ctx, func() {
+		c.mu.Lock()
+		c.liveHolders.unregister(ctx)
+		c.mu.Unlock()
+	})
+}
+
+// warnIgnoredSessionOwned WARNs every session-owned YAML field that differs from create-time residue.
+func (c *Client) warnIgnoredSessionOwned(cfg *configuration.Config) {
+	ignored := c.sessionResidue.ignoredFields(cfg)
+	if len(ignored) == 0 || c.log == nil {
+		return
+	}
+	c.mu.Lock()
+	names := c.liveHolders.distinctNames()
+	c.mu.Unlock()
+	c.log.Warn(MsgSessionOwnedIgnored,
+		"sessionKey", c.sessionKey,
+		"ignoredFields", ignored,
+		"holderNames", names,
+		"isolation", msgIsolationNeedsSecondKey,
+	)
 }
 
 func stopTicker(stop chan bool) {
