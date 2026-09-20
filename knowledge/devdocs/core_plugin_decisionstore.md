@@ -33,7 +33,7 @@ Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx
 ## How to use
 
 - Call `lapi.OpenDecisionStore(ctx, cfg, log)` then `lapi.New(..., store)` (or `OpenStream` / `OpenLive`, which Open the store first).
-- Memory: in-process COW tick/published `map[string]LiveSlot` plus the Range blob. Maps stay non-nil. Each `LiveSlot.ExpiresAt` is int32 elapsed seconds on the package clock (eight-byte `{uint32,int32}` slots). Live PutMany copy-on-writes onto published (one clone, then sweep expired keys with `elapsedNow()`). Lookup holds `RLock` across probes and compares expiry on the same clock.
+- Memory: in-process COW tick/published `map[string]LiveSlot` plus the Range blob. Maps stay non-nil. Each `LiveSlot.ExpiresAt` is int32 elapsed seconds on the package clock (eight-byte `{uint32,int32}` slots). Live PutMany copy-on-writes onto published (one clone, then sweep expired keys with `elapsedNow()`). Published slots are `atomic.Value` of `*publishedSlots`; lookup `Load`s and does not take `mu`. Expiry compare uses the same elapsed clock.
 - Redis: import `github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis` at `v1.0.5`. Prefix is `SessionHex` (cursor), not live `IdentityHex`. Logical keys are the client IP, header-scope key, and `range-index`. Writer plus optional readers; `nextReader` never retries the writer. MSetEX/DEL are void. Do not re-patch `vendor/.../iplookup/helper.go` (`Helper.Contains` / `Count` RLock is upstream).
 - Same store key → same Store. Different Redis hosts (or enabled/password/database/read hosts) isolate.
 - `decisionScopeHeaders` and poller intervals stay off the store key. Stream `scopes=` and the store header-scope filter are the live-router union (`core_plugin_lapi_scope-union.md`).
@@ -69,4 +69,4 @@ kind, origin, originID, err := lapiClient.LookupRemediation(remoteIP, ipAddr, sc
 - After `Close()`, Redis Get/MGET/SET/DEL/MSetEX surface `store:unreachable` and must not open a new TCP connection.
 - Do not copy `SimpleRedis` by value after `New`. Dial 2s and command 1s (not utilities zero-Config defaults).
 - Memory expiry is elapsed-only: wall Unix in `PublishTick` or lookup would treat every slot as expired after stream apply.
-- Yaegi-safe: do not put a map-holding type in an interface. `atomic.Value` holds only `*RangeMembership` and `string`.
+- Yaegi-safe: do not put a map-holding type in an interface. Store `atomic.Value` holds `*RangeMembership` and `string`. Memory published snapshot is `*publishedSlots`, not the map.

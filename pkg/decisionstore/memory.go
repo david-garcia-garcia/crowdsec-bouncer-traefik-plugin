@@ -4,36 +4,60 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"sync/atomic"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 )
+
+// publishedSlots is one immutable lookup map. atomic.Value stores *publishedSlots, not the map (Yaegi).
+type publishedSlots struct {
+	byKey map[string]LiveSlot
+}
 
 // memory is in-process COW tick/published LiveSlot maps plus the Range blob.
 type memory struct {
 	log        *slog.Logger
 	origins    *intern.Table       // origin name → id packed into LiveSlot.Word
-	mu         sync.RWMutex        // maps, ticking, rangeIndex
+	mu         sync.RWMutex        // tick, ticking, rangeIndex; not lookup
 	ticking    bool                // stream window: PutMany/DeleteMany write tick; Lookup reads published
 	tick       map[string]LiveSlot // unpublished clone; SlotKey → packed word + elapsed expiry
-	published  map[string]LiveSlot // request-path snapshot
+	published  atomic.Value        // *publishedSlots; request-path snapshot, not atomic.Pointer (Yaegi v0.16)
 	rangeIndex string              // Range CIDR=kind blob; membership is rebuilt from this
 }
 
-// newMemory allocates non-nil tick/published maps.
+// newMemory allocates non-nil tick and an empty published snapshot.
 func newMemory(log *slog.Logger, origins *intern.Table) *memory {
-	return &memory{
-		log:       log,
-		origins:   origins,
-		tick:      map[string]LiveSlot{},
-		published: map[string]LiveSlot{},
+	mem := &memory{
+		log:     log,
+		origins: origins,
+		tick:    map[string]LiveSlot{},
 	}
+	mem.storePublished(map[string]LiveSlot{})
+	return mem
+}
+
+// publishedMapValue is the current lookup map. Never nil. Callers must not mutate it.
+func (m *memory) publishedMapValue() map[string]LiveSlot {
+	loaded, _ := m.published.Load().(*publishedSlots)
+	if loaded == nil || loaded.byKey == nil {
+		return map[string]LiveSlot{}
+	}
+	return loaded.byKey
+}
+
+// storePublished publishes slots as the lookup snapshot. Caller holds mu except construct.
+func (m *memory) storePublished(slots map[string]LiveSlot) {
+	if slots == nil {
+		slots = map[string]LiveSlot{}
+	}
+	m.published.Store(&publishedSlots{byKey: slots})
 }
 
 // BeginTick clones the published map into tick. Lookups keep reading published.
 func (m *memory) BeginTick() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.tick = cloneLiveSlotMap(m.published)
+	m.tick = cloneLiveSlotMap(m.publishedMapValue())
 	m.ticking = true
 }
 
@@ -53,7 +77,7 @@ func (m *memory) PublishTick(now int32) {
 	for _, key := range expired {
 		delete(m.tick, key)
 	}
-	m.published = m.tick
+	m.storePublished(m.tick)
 	m.tick = map[string]LiveSlot{}
 	m.ticking = false
 }
@@ -71,7 +95,7 @@ func (m *memory) PutMany(items []Decision) {
 		}
 		return
 	}
-	next := cloneLiveSlotMap(m.published)
+	next := cloneLiveSlotMap(m.publishedMapValue())
 	now := elapsedNow()
 	for existing, slot := range next {
 		if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
@@ -81,7 +105,7 @@ func (m *memory) PutMany(items []Decision) {
 	for _, item := range items {
 		m.putSlot(next, item)
 	}
-	m.published = next
+	m.storePublished(next)
 }
 
 // putSlot writes one decision into slots. Intern overflow logs Warn and packs origin id 0.
@@ -119,7 +143,7 @@ func (m *memory) DeleteMany(items []Decision) {
 		}
 		return
 	}
-	next := cloneLiveSlotMap(m.published)
+	next := cloneLiveSlotMap(m.publishedMapValue())
 	for _, item := range items {
 		key, priorSpelling := slotKeys(item.Scope, item.Value)
 		if key == "" {
@@ -130,7 +154,7 @@ func (m *memory) DeleteMany(items []Decision) {
 			delete(next, priorSpelling)
 		}
 	}
-	m.published = next
+	m.storePublished(next)
 }
 
 // deleteTickLocked drops one slot from tick. Caller holds mu.
@@ -145,13 +169,12 @@ func (m *memory) deleteTickLocked(scope, value string) {
 	}
 }
 
-// LookupRemediation reads the published map (Ip, header scopes, Range). Expired slots miss.
+// LookupRemediation reads the published snapshot (Ip, header scopes, Range). Expired slots miss.
 func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (kind string, origin string, originID uint16, err error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	slots := m.publishedMapValue()
 	now := elapsedNow()
 	kind, origin, originID = lookupHits(func(key string) any {
-		slot, ok := m.published[key]
+		slot, ok := slots[key]
 		if !ok {
 			return nil
 		}
@@ -183,12 +206,11 @@ func (m *memory) RangeIndex() (string, error) {
 
 // publishedMap is the lookup snapshot. Nil before the first publish or live Put.
 func (m *memory) publishedMap() map[string]LiveSlot {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	if len(m.published) == 0 {
+	slots := m.publishedMapValue()
+	if len(slots) == 0 {
 		return nil
 	}
-	return cloneLiveSlotMap(m.published)
+	return cloneLiveSlotMap(slots)
 }
 
 // seedPublished writes one decision onto the published map without a tick.

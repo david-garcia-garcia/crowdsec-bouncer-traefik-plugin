@@ -53,7 +53,7 @@ func lookupHits(payloadForKey func(string) any, remoteIP string, ipAddr net.IP, 
 		}
 		chosen = mergeLookupHit(chosen, hitFromPayload(payloadForKey(HeaderScopeKey(scope, identifier))))
 	}
-	if decisionscope.RemediationKind(chosen.stored) != decisionscope.BannedValue {
+	if membership != nil && decisionscope.RemediationKind(chosen.stored) != decisionscope.BannedValue {
 		chosen = mergeLookupHit(chosen, hitFromPayload(membership.Remediation(ipAddr)))
 	}
 	if chosen.stored == "" {
