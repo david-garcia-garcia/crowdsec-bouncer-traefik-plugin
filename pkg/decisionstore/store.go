@@ -64,9 +64,14 @@ type Store struct {
 	origins         *intern.Table
 	rangeMembership atomic.Value // *RangeMembership
 	lastRangeIndex  atomic.Value // string of the blob last used to build membership
-	log             *slog.Logger
-	reclaimKey      string
-	engineName      string
+	createdBy       string       // Traefik New name from the create that first put this store
+	// streamReady and streamPollInFlight own the CrowdSec cursor and the applied
+	// cache for this session, not this HTTP client. A reincarnated Client must not zero them.
+	streamReady        int64 // 1 after the first finished stream poll; atomic.LoadInt64/StoreInt64
+	streamPollInFlight int64 // 1 while a stream GET+apply is in flight; session-scoped skip
+	log                *slog.Logger
+	reclaimKey         string
+	engineName         string
 }
 
 // NewMemory is in-process COW slots and an in-process Range blob.
@@ -93,7 +98,8 @@ func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, data
 }
 
 // Open reclaims one Store per reclaimKey. keyPrefix is the Redis key prefix.
-func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.Config, log *slog.Logger) (*Store, error) {
+// createdBy is Traefik New(..., name); write-once on the create that first puts the store.
+func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.Config, log *slog.Logger, createdBy string) (*Store, error) {
 	stored, err := reclaim.OpenWithHooks(ctx, reclaimKey, log, func() (any, reclaim.Hooks, error) {
 		var store *Store
 		if cfg.RedisCacheEnabled {
@@ -108,6 +114,7 @@ func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.
 		} else {
 			store = NewMemory(log)
 		}
+		store.createdBy = createdBy
 		store.bindLifecycle(log, reclaimKey)
 		return store, reclaim.Hooks{Sleep: store.Sleep, Wake: store.Wake, Close: store.Close}, nil
 	})
@@ -119,6 +126,32 @@ func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.
 		return nil, fmt.Errorf("reclaim: want *decisionstore.Store, got %T", stored)
 	}
 	return storedTyped, nil
+}
+
+// CreatedBy is the Traefik New name from the create that first put this store.
+func (s *Store) CreatedBy() string {
+	return s.createdBy
+}
+
+// StreamReady is non-zero after the first stream poll that finished successfully.
+func (s *Store) StreamReady() int64 {
+	return atomic.LoadInt64(&s.streamReady)
+}
+
+// MarkStreamReady records that a stream poll finished successfully.
+func (s *Store) MarkStreamReady() {
+	atomic.StoreInt64(&s.streamReady, 1)
+}
+
+// TryBeginStreamPoll is the session-scoped skip: enter when no poll owns the
+// CrowdSec cursor+applied cache. It does not wait and does not cancel Do.
+func (s *Store) TryBeginStreamPoll() bool {
+	return atomic.CompareAndSwapInt64(&s.streamPollInFlight, 0, 1)
+}
+
+// EndStreamPoll releases the session-scoped poll skip after GET+apply (or failure).
+func (s *Store) EndStreamPoll() {
+	atomic.StoreInt64(&s.streamPollInFlight, 0)
 }
 
 // BeginTick opens the write window for one stream poll. Memory clones published into tick.

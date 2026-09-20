@@ -3,7 +3,7 @@
 ## DecisionStore
 priority: normal
 local: core_plugin_decisionstore.md
-description: How LAPI Clients share one Store keyed by CrowdSec cursor plus Redis params.
+description: How LAPI Clients share one Store keyed by CrowdSec cursor SessionHex.
 
 ## Middleware New
 priority: normal
@@ -53,7 +53,7 @@ description: How a shared stream Client unions live routers' header-scope maps f
 ## Stream single-flight
 priority: normal
 local: core_plugin_lapi_stream-single-flight.md
-description: How one Client skips a stream poll that is already running and publishes health atomically.
+description: How one DecisionStore skips a stream poll that is already running and publishes health atomically.
 
 ## Stream apply
 priority: normal

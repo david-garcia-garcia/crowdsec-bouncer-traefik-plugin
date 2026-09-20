@@ -21,6 +21,16 @@ type Config = utilreclaim.Config
 // Hooks are Sleep/Wake/Close funcs. Yaegi v0.16 panics asserting a foreign concrete type.
 type Hooks = utilreclaim.Hooks
 
+// State is whether a Peek'd slot is usable now (Awake) or kept for grace (Asleep).
+type State = utilreclaim.State
+
+const (
+	// Awake means the value is bound to at least one live context.
+	Awake = utilreclaim.Awake
+	// Asleep means the last holder is gone and grace has not ended.
+	Asleep = utilreclaim.Asleep
+)
+
 var (
 	defaultMu    sync.Mutex
 	defaultTable *Table
@@ -44,6 +54,11 @@ func Default() *Table {
 // OpenWithHooks is Default().OpenWithHooks.
 func OpenWithHooks(ctx context.Context, key string, logger *slog.Logger, create func() (any, Hooks, error)) (any, error) {
 	return Default().OpenWithHooks(ctx, key, logger, create)
+}
+
+// Peek is Default().Peek: look without bind, Wake, or stopping grace.
+func Peek(key string) (any, State, bool) {
+	return Default().Peek(key)
 }
 
 // ResetForTest tears down the process table and installs a fresh one with ProcessGrace.

@@ -54,19 +54,19 @@ func TestStoreKey_IgnoresPollerKnobsAndHeaders(t *testing.T) {
 	}
 }
 
-func TestStoreKey_DifferentRedisHostsIsolate(t *testing.T) {
+func TestStoreKey_DifferentRedisHostsShare(t *testing.T) {
 	redisA := testStreamConfig("lapi.example:8080", 1)
 	redisA.RedisCacheEnabled = true
 	redisA.RedisCacheHost = "redis-a:6379"
 	redisB := testStreamConfig("lapi.example:8080", 1)
 	redisB.RedisCacheEnabled = true
 	redisB.RedisCacheHost = "redis-b:6379"
-	if StoreKey(redisA) == StoreKey(redisB) {
-		t.Fatal("different redis hosts must be different stores")
+	if StoreKey(redisA) != StoreKey(redisB) {
+		t.Fatal("different redis hosts must share one store key")
 	}
 }
 
-func TestOpenDecisionStore_DifferentRedisHostsIsolate(t *testing.T) {
+func TestOpenDecisionStore_DifferentRedisHostsShare(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
@@ -78,16 +78,16 @@ func TestOpenDecisionStore_DifferentRedisHostsIsolate(t *testing.T) {
 	redisA.RedisCacheHost = "127.0.0.1:1"
 	redisB.RedisCacheEnabled = true
 	redisB.RedisCacheHost = "127.0.0.1:2"
-	first, err := OpenDecisionStore(ctx, redisA, log)
+	first, err := OpenDecisionStore(ctx, redisA, log, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenDecisionStore(ctx, redisB, log)
+	second, err := OpenDecisionStore(ctx, redisB, log, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first == second {
-		t.Fatal("different redis hosts must open two stores")
+	if first != second {
+		t.Fatal("different redis hosts must open one store")
 	}
 }
 
@@ -102,7 +102,7 @@ func TestOpenDecisionStore_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.
 	other := testLiveConfig(60)
 	cfg.RedisCacheEnabled = true
 	cfg.RedisCacheHost = redisServer.addr()
-	store, err := OpenDecisionStore(ctx, cfg, log)
+	store, err := OpenDecisionStore(ctx, cfg, log, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,11 +137,11 @@ func TestOpenDecisionStore_LiveIntervalSplitSharesStore(t *testing.T) {
 	log := logger.New("ERROR", "")
 	fast := testLiveConfig(1)
 	slow := testLiveConfig(60)
-	first, err := OpenDecisionStore(ctx, fast, log)
+	first, err := OpenDecisionStore(ctx, fast, log, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenDecisionStore(ctx, slow, log)
+	second, err := OpenDecisionStore(ctx, slow, log, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,11 +164,11 @@ func TestOpenDecisionStore_HeaderMismatchStillShares(t *testing.T) {
 	base := testStreamConfig("lapi.example:8080", 1)
 	withHeaders := testStreamConfig("lapi.example:8080", 1)
 	withHeaders.DecisionScopeHeaders = map[string]string{"username": "X-User"}
-	first, err := OpenDecisionStore(ctx, base, log)
+	first, err := OpenDecisionStore(ctx, base, log, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenDecisionStore(ctx, withHeaders, log)
+	second, err := OpenDecisionStore(ctx, withHeaders, log, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,11 +185,11 @@ func TestOpenLive_TwoClientsShareOneStore(t *testing.T) {
 	log := logger.New("ERROR", "")
 	fast := testLiveConfig(1)
 	slow := testLiveConfig(60)
-	first, err := OpenLive(ctx, fast, log, "fast", "test")
+	first, err := OpenLive(ctx, fast, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenLive(ctx, slow, log, "slow", "test")
+	second, err := OpenLive(ctx, slow, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,11 +214,11 @@ func TestClientClose_LeavesSiblingCacheLive(t *testing.T) {
 	log := logger.New("ERROR", "")
 	fast := testLiveConfig(1)
 	slow := testLiveConfig(60)
-	first, err := OpenLive(ctx, fast, log, "fast", "test")
+	first, err := OpenLive(ctx, fast, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenLive(ctx, slow, log, "slow", "test")
+	second, err := OpenLive(ctx, slow, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,11 +243,11 @@ func TestClientClose_LeavesSiblingRedisPoolLive(t *testing.T) {
 	fast.RedisCacheHost = redisServer.addr()
 	slow.RedisCacheEnabled = true
 	slow.RedisCacheHost = redisServer.addr()
-	first, err := OpenLive(ctx, fast, log, "fast", "test")
+	first, err := OpenLive(ctx, fast, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenLive(ctx, slow, log, "slow", "test")
+	second, err := OpenLive(ctx, slow, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +269,7 @@ func TestOpenDecisionStore_LastHolderGraceClosesRedisPool(t *testing.T) {
 	cfg := testLiveConfig(1)
 	cfg.RedisCacheEnabled = true
 	cfg.RedisCacheHost = redisServer.addr()
-	store, err := OpenDecisionStore(ctx, cfg, log)
+	store, err := OpenDecisionStore(ctx, cfg, log, "test")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -182,7 +182,9 @@ func TestHandleStreamTickerSkipLogsAreWarn(t *testing.T) {
 		t.Run(level.String(), func(t *testing.T) {
 			logged := captureTestStreamTickLog(t, level, func(log *slog.Logger) {
 				client := newTestStreamTickClient(t, log, serverURL.Host, server.Client())
-				client.streamPollInFlight = 1
+				if !client.decisionStore.TryBeginStreamPoll() {
+					t.Fatal("store poll CAS")
+				}
 				client.handleStreamTicker()
 			})
 			if !strings.Contains(logged, "handleStreamTicker:skip") {

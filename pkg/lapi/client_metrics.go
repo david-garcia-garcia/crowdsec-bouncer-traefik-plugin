@@ -64,7 +64,7 @@ type activeDecisionSlot struct {
 	ipType   string
 }
 
-// newMetricsReporter snapshots write-once URL and envelope scalars and binds query to crowdsecQuery.
+// newMetricsReporter snapshots write-once URL and envelope scalars and binds query to Background POST.
 func newMetricsReporter(client *Client, startedAt time.Time) *MetricsReporter {
 	return &MetricsReporter{
 		scheme:                        client.crowdsecScheme,

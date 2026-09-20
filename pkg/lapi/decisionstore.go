@@ -10,7 +10,7 @@ import (
 
 const decisionStoreKeyPrefix = "decisionstore:"
 
-// storeParams is the Redis location hashed into the DecisionStore reclaim key.
+// storeParams is the Redis location hashed into the LAPI Client reclaim key.
 type storeParams struct {
 	RedisCacheEnabled   bool     `json:"redisCacheEnabled"`
 	RedisCacheHost      string   `json:"redisCacheHost"`
@@ -30,12 +30,13 @@ func storeParamsFrom(cfg *configuration.Config) storeParams {
 	}
 }
 
-// StoreKey is the reclaim table key: CrowdSec cursor SessionHex plus Redis store parameters.
+// StoreKey is the reclaim table key: CrowdSec cursor SessionHex only.
 func StoreKey(cfg *configuration.Config) string {
-	return decisionStoreKeyPrefix + SessionHex(cfg) + ":" + hashJSON(storeParamsFrom(cfg))
+	return decisionStoreKeyPrefix + SessionHex(cfg)
 }
 
-// OpenDecisionStore reclaims one store per cursor plus Redis params on the Traefik New context.
-func OpenDecisionStore(ctx context.Context, cfg *configuration.Config, log *slog.Logger) (*decisionstore.Store, error) {
-	return decisionstore.Open(ctx, StoreKey(cfg), SessionHex(cfg), cfg, log)
+// OpenDecisionStore reclaims one store per SessionHex on the Traefik New context.
+// name is Traefik New(..., name); create() writes it write-once as createdBy.
+func OpenDecisionStore(ctx context.Context, cfg *configuration.Config, log *slog.Logger, name string) (*decisionstore.Store, error) {
+	return decisionstore.Open(ctx, StoreKey(cfg), SessionHex(cfg), cfg, log, name)
 }

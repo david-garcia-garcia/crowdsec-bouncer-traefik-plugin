@@ -70,7 +70,7 @@ func TestOpenLogsStartedAtInfo(t *testing.T) {
 		CrowdsecLapiPath:   "/",
 		CrowdsecLapiKey:    "test-key",
 	}
-	store, err := Open(context.Background(), "decisionstore:open-started", "prefix", cfg, log)
+	store, err := Open(context.Background(), "decisionstore:open-started", "prefix", cfg, log, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,5 +86,19 @@ func TestOpenLogsStartedAtInfo(t *testing.T) {
 	}
 	if strings.Contains(logged, "reclaim_put") {
 		t.Fatalf("reclaim_put must stay DEBUG:\n%s", logged)
+	}
+}
+
+func TestStore_StreamPollCAS(t *testing.T) {
+	store := NewMemory(nil)
+	if !store.TryBeginStreamPoll() {
+		t.Fatal("first enter")
+	}
+	if store.TryBeginStreamPoll() {
+		t.Fatal("second enter must skip")
+	}
+	store.EndStreamPoll()
+	if !store.TryBeginStreamPoll() {
+		t.Fatal("reenter")
 	}
 }
