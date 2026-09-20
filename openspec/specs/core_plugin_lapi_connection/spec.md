@@ -23,17 +23,25 @@
 - **AND** `transport` is declared in `client_http.go`
 
 ### Requirement: Stream poll ticks stay at DEBUG
-Successful stream cache ticks SHALL emit `handleStreamCache:updated` after a LAPI fetch and `handleStreamCache:alreadyUpdated` when the stream lease is already held. Both messages MUST be DEBUG. They MUST NOT appear when the plugin logger is at the default INFO level. Stream health transitions (`crowdsec stream became healthy` / `crowdsec stream became unhealthy`) remain INFO and are not this requirement.
+### Requirement: Stream poll ticks stay at DEBUG
+A stream poll SHALL emit `handleStreamTicker:poll` when it wins the in-flight CAS and SHALL emit `handleStreamCache:updated` after a successful LAPI fetch and apply. Both MUST be DEBUG. They MUST NOT appear when the plugin logger is at the default INFO level. Enter and finish lines SHALL carry `sessionKey` and a `startup` attribute (`true` when the GET uses `startup=true`). The finish line SHALL also carry applied `new` and `deleted` counts (decisions written into the store, not raw payload length), `durationMs`, and `fetches`. A busy tick SHALL emit `handleStreamTicker:skip` at WARN and MUST NOT GET stream. There is no stream lease and no `handleStreamCache:alreadyUpdated` line. Stream health transitions (`crowdsec stream became healthy` / `crowdsec stream became unhealthy`) remain INFO and are not this requirement.
 
-#### Scenario: Lease miss does not INFO-spam
-- **WHEN** stream mode polls LAPI because the stream lease is missing and the fetch succeeds
-- **THEN** `handleStreamCache:updated` is present at DEBUG
-- **AND** that message is absent when the logger is at INFO
+#### Scenario: Successful startup poll does not INFO-spam
+- **WHEN** stream mode polls LAPI with `startup=true` and the fetch succeeds
+- **THEN** `handleStreamTicker:poll` and `handleStreamCache:updated` are present at DEBUG
+- **AND** those records include `startup=true`
+- **AND** those messages are absent when the logger is at INFO
 
-#### Scenario: Lease hit does not INFO-spam
-- **WHEN** stream mode ticks while the stream lease is already held
-- **THEN** `handleStreamCache:alreadyUpdated` is present at DEBUG
-- **AND** that message is absent when the logger is at INFO
+#### Scenario: Successful delta poll does not INFO-spam
+- **WHEN** stream mode polls LAPI with `startup=false` and the fetch succeeds
+- **THEN** `handleStreamTicker:poll` and `handleStreamCache:updated` are present at DEBUG
+- **AND** those records include `startup=false`
+
+#### Scenario: Busy tick warns
+- **WHEN** stream mode ticks while a poll is already in flight
+- **THEN** `handleStreamTicker:skip` is present at WARN
+- **AND** that message is present when the logger is at INFO
+- **AND** the tick does not GET stream
 
 ### Requirement: LAPI HTTP transport is replaceable after Open
 `Client` SHALL store LAPI HTTP+auth (including CAPI token) as `atomic.Value`. After `OpenStream` or `OpenLive` bind, the constructor SHALL call `AdoptTransport` with that config: Store the new transport and idle-close the previous HTTP client. Concurrent replaces SHALL last-write the stored transport and idle-close the value they replaced. Remaining write-once Client scalar fields MUST NOT become mutable. `getToken` SHALL write the CAPI token on the stored transport, not on a write-once Client key field.

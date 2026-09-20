@@ -12,9 +12,14 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 )
 
+// streamStartup is whether this poll asks LAPI for the full decision set (startup=true).
+func (c *Client) streamStartup() bool {
+	return atomic.LoadInt64(&c.isCrowdsecStreamHealthy) == 0 || atomic.LoadInt64(&c.isCrowdsecStreamStartup) != 0
+}
+
 // streamQuery is the LAPI/CAPI stream RawQuery. LAPI adds scopes= when this is not CAPI.
 func (c *Client) streamQuery() string {
-	query := fmt.Sprintf("startup=%t", atomic.LoadInt64(&c.isCrowdsecStreamHealthy) == 0 || atomic.LoadInt64(&c.isCrowdsecStreamStartup) != 0)
+	query := fmt.Sprintf("startup=%t", c.streamStartup())
 	if c.crowdsecStreamRoute != crowdsecLapiStreamRoute {
 		return query
 	}

@@ -36,5 +36,5 @@ defer atomic.StoreInt64(&c.streamPollInFlight, 0)
 
 ## Gotchas
 
-- Single-flight is the only skip. A dropped tick does not GET stream and does not apply.
+- Single-flight is the only skip. A dropped tick does not GET stream and does not apply. It logs `handleStreamTicker:skip` at WARN.
 - `Sleep` and `Close` only signal the ticker. They do not wait for an in-flight GET. `Wake` must hit the same CAS.
