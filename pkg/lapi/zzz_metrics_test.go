@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
@@ -83,10 +85,12 @@ func TestIncProcessedReportsWithoutWindowMap(t *testing.T) {
 
 func TestReportMetricsOfficialLabels(t *testing.T) {
 	client, body := newUsageMetricsClient(t)
-	AttachTestInternStore(client)
+	store := AttachTestInternStore(client)
 	client.IncDropped("lists:firehol_level1", "ipv4", "ban")
 	client.IncProcessed("ipv4")
-	client.rememberActiveDecision("ip:1.2.3.4", "crowdsec", "1.2.3.4")
+	store.Put(decisionstore.Decision{
+		Scope: decisionscope.ScopeIP, Value: "1.2.3.4", Kind: decisionscope.BannedValue, Origin: "crowdsec", DurationSec: 60,
+	})
 	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
@@ -304,6 +308,71 @@ func assertOfficialUsageItems(t *testing.T, items []interface{}) {
 	}
 	if !foundDropped || !foundProcessed || !foundActive {
 		t.Fatalf("missing items dropped=%v processed=%v active=%v", foundDropped, foundProcessed, foundActive)
+	}
+}
+
+func TestReportMetricsOmitsRange(t *testing.T) {
+	client, body := newUsageMetricsClient(t)
+	store := AttachTestInternStore(client)
+	if err := store.ApplyRangeBatch(map[string]string{"10.0.0.0/8": decisionstore.KindOriginString(decisionscope.BannedValue, "crowdsec")}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.reportMetrics(); err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range usageMetricItems(t, body.bytes()) {
+		item := asObject(t, raw)
+		if item["name"] == "active_decisions" {
+			t.Fatalf("Range CIDR must be omitted %#v", item)
+		}
+	}
+}
+
+func TestReportMetricsLiveModeOmitsActive(t *testing.T) {
+	client, body := newUsageMetricsClient(t)
+	client.metricsReporter.crowdsecMode = configuration.LiveMode
+	store := AttachTestInternStore(client)
+	store.Put(decisionstore.Decision{
+		Scope: decisionscope.ScopeIP, Value: "1.2.3.4", Kind: decisionscope.BannedValue, Origin: "crowdsec", DurationSec: 60,
+	})
+	if err := client.reportMetrics(); err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range usageMetricItems(t, body.bytes()) {
+		item := asObject(t, raw)
+		if item["name"] == "active_decisions" {
+			t.Fatalf("live mode must omit active_decisions %#v", item)
+		}
+	}
+}
+
+func TestReportMetricsOverflowEmptyOrigin(t *testing.T) {
+	client, body := newUsageMetricsClient(t)
+	store := AttachTestInternStore(client)
+	store.FillUntilMaxForTest()
+	store.Put(decisionstore.Decision{
+		Scope: decisionscope.ScopeIP, Value: "1.2.3.4", Kind: decisionscope.BannedValue, Origin: "overflow-origin", DurationSec: 60,
+	})
+	if err := client.reportMetrics(); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, raw := range usageMetricItems(t, body.bytes()) {
+		item := asObject(t, raw)
+		if item["name"] != "active_decisions" {
+			continue
+		}
+		found = true
+		labels := map[string]interface{}{}
+		if rawLabels, ok := item["labels"]; ok && rawLabels != nil {
+			labels = asObject(t, rawLabels)
+		}
+		if _, ok := labels["origin"]; ok {
+			t.Fatalf("overflow origin must be empty, labels %#v", labels)
+		}
+	}
+	if !found {
+		t.Fatal("overflow slot must still post active_decisions")
 	}
 }
 

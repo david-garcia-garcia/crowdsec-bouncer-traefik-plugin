@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 )
 
 const crowdsecLapiMetricsRoute = "v1/usage-metrics"
@@ -32,6 +32,7 @@ type crowdsecQueryFunc func(stringURL string, data []byte) ([]byte, error)
 
 // MetricsReporter owns the usage-metrics window and POST/restore path.
 // Client holds one pointer for the cursor reclaim lifetime; tickers stay on Client.
+// active_decisions is a DecisionStore snapshot at POST, not a reporter-held map.
 type MetricsReporter struct {
 	scheme        string
 	host          string
@@ -50,35 +51,31 @@ type MetricsReporter struct {
 	processedIPv4    int64                    // processed ipv4; atomic on the request path
 	processedIPv6    int64
 	processedUnknown int64 // processed when Family is empty
-	// activeDecisionsByOriginIPType is the gauge we POST: count grouped by origin + ip_type.
-	activeDecisionsByOriginIPType map[usageMetricKey]int64
-	// activeDecisionSlots is the forget index: slot → origin id + family. Needed so
-	// delete of one IP can decrement the right group-by bucket. Not the POST payload.
-	activeDecisionSlots map[string]activeDecisionSlot
-}
-
-// activeDecisionSlot is one stream/alone gauge entry: intern id plus family. Overflow is origin id 0.
-type activeDecisionSlot struct {
-	originID uint16
-	ipType   string
+	activeCounts     func() map[decisionstore.ActiveCountKey]int64
 }
 
 // newMetricsReporter snapshots write-once URL and envelope scalars and binds query to crowdsecQuery.
 func newMetricsReporter(client *Client, startedAt time.Time) *MetricsReporter {
-	return &MetricsReporter{
-		scheme:                        client.crowdsecScheme,
-		host:                          client.crowdsecHost,
-		path:                          client.crowdsecPath,
-		pluginVersion:                 client.pluginVersion,
-		startedAt:                     startedAt,
-		crowdsecMode:                  client.crowdsecMode,
-		query:                         client.crowdsecQuery,
-		originName:                    client.OriginName,
-		log:                           client.log,
-		windowCounters:                make(map[usageMetricKey]int64),
-		activeDecisionsByOriginIPType: make(map[usageMetricKey]int64),
-		activeDecisionSlots:           make(map[string]activeDecisionSlot),
+	reporter := &MetricsReporter{
+		scheme:         client.crowdsecScheme,
+		host:           client.crowdsecHost,
+		path:           client.crowdsecPath,
+		pluginVersion:  client.pluginVersion,
+		startedAt:      startedAt,
+		crowdsecMode:   client.crowdsecMode,
+		query:          client.crowdsecQuery,
+		originName:     client.OriginName,
+		log:            client.log,
+		windowCounters: make(map[usageMetricKey]int64),
 	}
+	// Capture the Client so a store attached after construct still snapshots at POST.
+	reporter.activeCounts = func() map[decisionstore.ActiveCountKey]int64 {
+		if client == nil || client.decisionStore == nil {
+			return nil
+		}
+		return client.decisionStore.ActiveCounts()
+	}
+	return reporter
 }
 
 // handleMetricsTicker POSTs the current usage-metrics window from the Client ticker.
@@ -170,86 +167,6 @@ func (r *MetricsReporter) addWindow(key usageMetricKey, delta int64) {
 	r.windowCounters[key] += delta
 }
 
-// rememberActiveDecision records one stream/alone decision for the active_decisions gauge.
-func (c *Client) rememberActiveDecision(slot, origin, decisionValue string) {
-	if c.metricsReporter == nil {
-		return
-	}
-	decisionSlot := activeDecisionSlot{ipType: ip.FamilyOfHostOrCIDR(decisionValue)}
-	if c.decisionStore != nil {
-		if originID, ok := c.decisionStore.OriginID(origin); ok {
-			decisionSlot.originID = originID
-		}
-	}
-	c.metricsReporter.rememberActiveDecision(slot, decisionSlot)
-}
-
-// rememberActiveDecision records one stream/alone decision for the active_decisions gauge.
-func (r *MetricsReporter) rememberActiveDecision(slot string, decisionSlot activeDecisionSlot) {
-	if r.crowdsecMode != configuration.StreamMode && r.crowdsecMode != configuration.AloneMode {
-		return
-	}
-	key := r.slotMetricKey(decisionSlot)
-	r.metricsMu.Lock()
-	defer r.metricsMu.Unlock()
-	if r.activeDecisionSlots == nil {
-		r.activeDecisionSlots = make(map[string]activeDecisionSlot)
-	}
-	if r.activeDecisionsByOriginIPType == nil {
-		r.activeDecisionsByOriginIPType = make(map[usageMetricKey]int64)
-	}
-	if previous, ok := r.activeDecisionSlots[slot]; ok {
-		previousKey := r.slotMetricKey(previous)
-		r.activeDecisionsByOriginIPType[previousKey]--
-		if r.activeDecisionsByOriginIPType[previousKey] <= 0 {
-			delete(r.activeDecisionsByOriginIPType, previousKey)
-		}
-	}
-	r.activeDecisionSlots[slot] = decisionSlot
-	r.activeDecisionsByOriginIPType[key]++
-}
-
-// slotMetricKey rebuilds the gauge identity from a compact slot.
-func (r *MetricsReporter) slotMetricKey(decisionSlot activeDecisionSlot) usageMetricKey {
-	origin := ""
-	if r.originName != nil {
-		origin = r.originName(decisionSlot.originID)
-	}
-	return usageMetricKey{
-		name:   "active_decisions",
-		unit:   "ip",
-		origin: origin,
-		ipType: decisionSlot.ipType,
-	}
-}
-
-// forgetActiveDecision drops a previously counted stream/alone decision from the gauge.
-func (c *Client) forgetActiveDecision(slot string) {
-	if c.metricsReporter == nil {
-		return
-	}
-	c.metricsReporter.forgetActiveDecision(slot)
-}
-
-// forgetActiveDecision drops a previously counted stream/alone decision from the gauge.
-func (r *MetricsReporter) forgetActiveDecision(slot string) {
-	r.metricsMu.Lock()
-	defer r.metricsMu.Unlock()
-	if r.activeDecisionSlots == nil {
-		return
-	}
-	previous, ok := r.activeDecisionSlots[slot]
-	if !ok {
-		return
-	}
-	delete(r.activeDecisionSlots, slot)
-	previousKey := r.slotMetricKey(previous)
-	r.activeDecisionsByOriginIPType[previousKey]--
-	if r.activeDecisionsByOriginIPType[previousKey] <= 0 {
-		delete(r.activeDecisionsByOriginIPType, previousKey)
-	}
-}
-
 // reportMetrics POSTs the current window of usage-metrics items to LAPI.
 // Dropped and processed counters reset only after LAPI accepts the POST.
 func (c *Client) reportMetrics() error {
@@ -272,16 +189,12 @@ func (r *MetricsReporter) reportMetrics() error {
 	r.metricsMu.Lock()
 	window := r.windowCounters
 	r.windowCounters = make(map[usageMetricKey]int64)
-	items := make([]map[string]interface{}, 0, len(window)+len(r.activeDecisionsByOriginIPType)+3)
+	items := make([]map[string]interface{}, 0, len(window)+3)
 	for key, value := range window {
 		items = append(items, usageMetricItem(key, value))
 	}
-	for key, value := range r.activeDecisionsByOriginIPType {
-		if value > 0 {
-			items = append(items, usageMetricItem(key, value))
-		}
-	}
 	r.metricsMu.Unlock()
+	items = append(items, r.activeDecisionItems()...)
 
 	processedIPv4 := atomic.SwapInt64(&r.processedIPv4, 0)
 	processedIPv6 := atomic.SwapInt64(&r.processedIPv6, 0)
@@ -352,6 +265,34 @@ func (r *MetricsReporter) restoreMetricsWindow(window map[usageMetricKey]int64, 
 	atomic.AddInt64(&r.processedIPv4, processedIPv4)
 	atomic.AddInt64(&r.processedIPv6, processedIPv6)
 	atomic.AddInt64(&r.processedUnknown, processedUnknown)
+}
+
+// activeDecisionItems is the stream/alone gauge snapshot. Failed POST does not restore these (gauge, not a window).
+func (r *MetricsReporter) activeDecisionItems() []map[string]interface{} {
+	if r.crowdsecMode != configuration.StreamMode && r.crowdsecMode != configuration.AloneMode {
+		return nil
+	}
+	if r.activeCounts == nil {
+		return nil
+	}
+	counts := r.activeCounts()
+	items := make([]map[string]interface{}, 0, len(counts))
+	for key, value := range counts {
+		if value <= 0 {
+			continue
+		}
+		origin := ""
+		if r.originName != nil {
+			origin = r.originName(key.OriginID)
+		}
+		items = append(items, usageMetricItem(usageMetricKey{
+			name:   "active_decisions",
+			unit:   "ip",
+			origin: origin,
+			ipType: key.Family,
+		}, value))
+	}
+	return items
 }
 
 // appendProcessedWindow adds a processed item when the swapped window count is non-zero.

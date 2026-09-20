@@ -79,7 +79,7 @@ func TestHandleStreamTicker_LeaseValidOverlapOneFetch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store := decisionstore.NewMemory(logger.New("ERROR", ""))
+	store := decisionstore.NewMemory(logger.New("ERROR", ""), false)
 	client := newSharedStreamPoller(t, store, parsed.Host)
 	attachTestTransport(client, server.Client(), "test-key")
 
@@ -115,7 +115,7 @@ func TestStreamHealthy_ConcurrentWithPollWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store := decisionstore.NewMemory(logger.New("ERROR", ""))
+	store := decisionstore.NewMemory(logger.New("ERROR", ""), false)
 	client := newSharedStreamPoller(t, store, parsed.Host)
 	atomic.StoreInt64(&client.isCrowdsecStreamHealthy, 1)
 	attachTestTransport(client, server.Client(), "test-key")

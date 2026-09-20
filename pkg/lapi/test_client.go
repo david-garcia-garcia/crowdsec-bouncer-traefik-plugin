@@ -14,7 +14,7 @@ import (
 
 // NewTestClient returns an in-memory Client with a memory DecisionStore.
 func NewTestClient(log *slog.Logger) (*Client, *decisionstore.Store) {
-	store := decisionstore.NewMemory(log)
+	store := decisionstore.NewMemory(log, false)
 	return &Client{decisionStore: store, log: log}, store
 }
 
@@ -28,14 +28,14 @@ func newTestRangeClient(t *testing.T) (*Client, *decisionstore.Store) {
 
 func newTestRedisStore(t *testing.T, host string, readHosts []string, prefix string) *decisionstore.Store {
 	t.Helper()
-	store := decisionstore.NewRedis(logger.New("ERROR", ""), host, readHosts, "", "", prefix)
+	store := decisionstore.NewRedis(logger.New("ERROR", ""), host, readHosts, "", "", prefix, false)
 	t.Cleanup(store.Close)
 	return store
 }
 
 // AttachTestInternStore wires a memory decision store so tests can intern origins.
 func AttachTestInternStore(client *Client) *decisionstore.Store {
-	store := decisionstore.NewMemory(client.log)
+	store := decisionstore.NewMemory(client.log, true)
 	client.decisionStore = store
 	return store
 }

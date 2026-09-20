@@ -37,5 +37,10 @@ func StoreKey(cfg *configuration.Config) string {
 
 // OpenDecisionStore reclaims one store per cursor plus Redis params on the Traefik New context.
 func OpenDecisionStore(ctx context.Context, cfg *configuration.Config, log *slog.Logger) (*decisionstore.Store, error) {
-	return decisionstore.Open(ctx, StoreKey(cfg), SessionHex(cfg), cfg, log)
+	return decisionstore.Open(ctx, StoreKey(cfg), SessionHex(cfg), cfg, log, countActiveFromMode(cfg.CrowdsecMode))
+}
+
+// countActiveFromMode is true only for stream and alone so live/none memo Put cannot increment.
+func countActiveFromMode(mode string) bool {
+	return mode == configuration.StreamMode || mode == configuration.AloneMode
 }

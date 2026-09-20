@@ -150,7 +150,7 @@ func TestHandleStreamCache_TwoMemoryPollersBothFetch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store := decisionstore.NewMemory(logger.New("ERROR", ""))
+	store := decisionstore.NewMemory(logger.New("ERROR", ""), false)
 	first := newSharedStreamPoller(t, store, parsed.Host)
 	second := newSharedStreamPoller(t, store, parsed.Host)
 	attachTestTransport(first, server.Client(), "test-key")
