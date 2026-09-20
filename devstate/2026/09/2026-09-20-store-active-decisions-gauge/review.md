@@ -11,3 +11,9 @@ phase: explore
 findings: dest current reproduced; Range omitted from gauge; owners named
 fixed: none
 skipped: none
+
+## propose (2026-09-20)
+phase: propose
+findings: apply-ready OpenSpec store-owned-active-decisions-gauge; folds usage-metrics and decisionstore; two assumed rows remain
+fixed: none
+skipped: none
