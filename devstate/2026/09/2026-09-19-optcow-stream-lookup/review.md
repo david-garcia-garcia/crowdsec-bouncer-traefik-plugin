@@ -58,3 +58,9 @@ phase: pullrequest
 findings: title set; chat-store-split Reply #5747561707; Main/Race/e2e-binary success; e2e docker+pester failure
 fixed: dogsled lint (03d52325, 69163b97)
 skipped: merge (do not merge)
+
+## pullrequest (2026-09-20, CI green)
+phase: pullrequest
+findings: HEAD 357ab5c4 all four checks success (e2e docker+pester flake on 69163b97; rerun green)
+fixed: PR summary verdict ready for review
+skipped: merge (do not merge)
