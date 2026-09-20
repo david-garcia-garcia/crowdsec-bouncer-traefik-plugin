@@ -97,15 +97,15 @@ func TestSessionKey_DifferentLapiKeysAreDistinct(t *testing.T) {
 	}
 }
 
-func testNoneConfig(host string, metricsInterval int64) *configuration.Config {
-	cfg := testStreamConfig(host, metricsInterval)
+func testNoneConfig(metricsInterval int64) *configuration.Config {
+	cfg := testStreamConfig("lapi.example:8080", metricsInterval)
 	cfg.CrowdsecMode = configuration.NoneMode
 	return cfg
 }
 
 func TestKey_NoneMetricsIntervalSplitsClient(t *testing.T) {
-	fast := testNoneConfig("lapi.example:8080", 1)
-	slow := testNoneConfig("lapi.example:8080", 600)
+	fast := testNoneConfig(1)
+	slow := testNoneConfig(600)
 	if Key(fast) == Key(slow) {
 		t.Fatal("none Key must include MetricsUpdateIntervalSeconds")
 	}
@@ -117,9 +117,9 @@ func TestKey_NoneMetricsIntervalSplitsClient(t *testing.T) {
 	if SessionKey(streamFast) != SessionKey(streamSlow) {
 		t.Fatal("stream SessionKey must still omit metrics interval")
 	}
-	redisA := testNoneConfig("lapi.example:8080", 1)
+	redisA := testNoneConfig(1)
 	redisA.RedisCacheHost = "redis-a:6379"
-	redisB := testNoneConfig("lapi.example:8080", 1)
+	redisB := testNoneConfig(1)
 	redisB.RedisCacheHost = "redis-b:6379"
 	if Key(redisA) == Key(redisB) {
 		t.Fatal("live/none Key must still include Redis store parameters")
@@ -745,7 +745,8 @@ func TestOpenStream_TwoRoutersOneAliasOneNameOnWarn(t *testing.T) {
 	t.Cleanup(secondCancel)
 	firstCfg := testStreamConfig(parsed.Host, 1)
 	firstCfg.UpdateIntervalSeconds = 30
-	if _, err := OpenStream(firstCtx, firstCfg, log, "same-alias", "test"); err != nil {
+	_, err = OpenStream(firstCtx, firstCfg, log, "same-alias", "test")
+	if err != nil {
 		t.Fatal(err)
 	}
 	secondCfg := testStreamConfig(parsed.Host, 1)

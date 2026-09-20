@@ -128,8 +128,8 @@ func TestOpenLive_MetricsIntervalSplitDoesNotShareStore(t *testing.T) {
 
 	ctx := context.Background()
 	log := logger.New("ERROR", "")
-	fast := testNoneConfig("lapi.example:8080", 3600)
-	slow := testNoneConfig("lapi.example:8080", 7200)
+	fast := testNoneConfig(3600)
+	slow := testNoneConfig(7200)
 	first, err := OpenLive(ctx, fast, log, "fast", "test")
 	if err != nil {
 		t.Fatal(err)
