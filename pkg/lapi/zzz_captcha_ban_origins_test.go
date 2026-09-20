@@ -1,6 +1,9 @@
 package lapi
 
 import (
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
@@ -108,5 +111,36 @@ func TestStrongestLiveDecisionCaptchaBanOrigins(t *testing.T) {
 	}
 	if client.remediationKindForOrigin(onlyCAPI.Type, MetricsOrigin(onlyCAPI.Origin, onlyCAPI.Scenario)) != decisionscope.CaptchaValue {
 		t.Fatal("listed-only pick must still remap to captcha")
+	}
+}
+
+func TestHandleStreamCacheRangeCaptchaBanOrigins(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		if _, err := rw.Write([]byte(`{"new":[{"id":1,"origin":"CAPI","type":"ban","scope":"Range","value":"10.0.0.0/8","duration":"1h","scenario":"scan"}],"deleted":[]}`)); err != nil {
+			t.Errorf("stream stub write: %v", err)
+		}
+	}))
+	t.Cleanup(server.Close)
+	client := newTestStreamPoller(t, server)
+	client.captchaBanOrigins = []string{"CAPI"}
+	if err := client.handleStreamCache(); err != nil {
+		t.Fatalf("range poll: %v", err)
+	}
+	kind, origin, _, err := client.LookupRemediation("10.1.2.3", net.ParseIP("10.1.2.3"), nil)
+	if err != nil || kind != decisionscope.CaptchaValue || origin != "CAPI" {
+		t.Fatalf("listed Range ban must store captcha, got kind=%q origin=%q err=%v", kind, origin, err)
+	}
+}
+
+func TestLiveLookupCaptchaBanOrigins(t *testing.T) {
+	server := testLiveScopeLAPI(t, testLiveBanBody("Ip", "1.2.3.4"), nil)
+	client := newTestLiveClient(t, server)
+	client.captchaBanOrigins = []string{"CAPI"}
+	kind, origin, err := client.LiveLookup("1.2.3.4", nil, 0)
+	if err == nil {
+		t.Fatal("active live remediation returns the banned error")
+	}
+	if kind != decisionscope.CaptchaValue || origin != "CAPI" {
+		t.Fatalf("listed live ban must remap to captcha, got kind=%q origin=%q", kind, origin)
 	}
 }
