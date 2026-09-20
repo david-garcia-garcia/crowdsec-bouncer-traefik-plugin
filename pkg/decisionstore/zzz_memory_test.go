@@ -48,9 +48,9 @@ func TestMemoryTickPutHiddenUntilPublish(t *testing.T) {
 		t.Fatalf("tick Put must stay unpublished, kind %q origin %q id %d err %v", kind, origin, originID, err)
 	}
 	store.PublishTick(0)
-	kind, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	kind, origin, originID, err = store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	if err != nil || kind != decisionscope.BannedValue {
-		t.Fatalf("kind %q err %v", kind, err)
+		t.Fatalf("kind %q origin %q id %d err %v", kind, origin, originID, err)
 	}
 }
 
