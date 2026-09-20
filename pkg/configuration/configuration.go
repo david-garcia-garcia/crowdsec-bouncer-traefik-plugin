@@ -28,6 +28,7 @@ const (
 	AppsecMode        = "appsec"
 	HTTPS             = "https"
 	HTTP              = "http"
+	LogTRACE          = "TRACE"
 	LogDEBUG          = "DEBUG"
 	LogINFO           = "INFO"
 	LogWARN           = "WARN"
@@ -546,8 +547,8 @@ func rejectMissingEnabledAppsecHost(config *Config, appsecScheme string) error {
 }
 
 func validateLogging(config *Config) error {
-	if !contains([]string{LogDEBUG, LogINFO, LogWARN, LogERROR}, strings.ToUpper(config.LogLevel)) {
-		return fmt.Errorf("LogLevel should be one of (%s,%s,%s,%s)", LogDEBUG, LogINFO, LogWARN, LogERROR)
+	if !contains([]string{LogTRACE, LogDEBUG, LogINFO, LogWARN, LogERROR}, strings.ToUpper(config.LogLevel)) {
+		return fmt.Errorf("LogLevel should be one of (%s,%s,%s,%s,%s)", LogTRACE, LogDEBUG, LogINFO, LogWARN, LogERROR)
 	}
 	if config.LogFilePath != "" {
 		_, err := os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
