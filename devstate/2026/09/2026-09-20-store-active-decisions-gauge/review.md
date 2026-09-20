@@ -23,3 +23,9 @@ phase: implement
 findings: store-owned ActiveCounts; reporter maps dropped; Range omitted; merged createdBy
 fixed: applied store-owned-active-decisions-gauge tasks 1–4
 skipped: Range forget (debt)
+
+## codereview (2026-09-20)
+phase: codereview
+findings: Standards 3, Spec none, Security none, Performance none, Dead 1, Coverage 2; no Status:open
+fixed: metrics snapshot comment; TestOpenDecisionStore_CountActiveFromMode
+skipped: increment/decrement wrappers; Redis canonicalKeys helper; OriginID; Redis live no-increment
