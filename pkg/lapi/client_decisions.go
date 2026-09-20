@@ -23,39 +23,57 @@ func (c *Client) streamQuery() string {
 
 // storeStreamDecision Puts one non-Range stream decision into the DecisionStore.
 func (c *Client) storeStreamDecision(item Decision, duration int64) {
+	stored, ok := c.streamPutItem(item, duration)
+	if !ok {
+		return
+	}
+	c.decisionStore.PutMany([]decisionstore.Decision{stored})
+}
+
+// streamPutItem is the Ip/header stream New item to store, or false when the decision is skipped.
+func (c *Client) streamPutItem(item Decision, duration int64) (decisionstore.Decision, bool) {
 	kind := decisionscope.RemediationValue(item.Type)
 	if kind == "" {
 		c.log.Debug("handleStreamCache:unknownType", "type", item.Type)
-		return
+		return decisionstore.Decision{}, false
 	}
 	origin := MetricsOrigin(item.Origin, item.Scenario)
 	scope := decisionscope.NormalizeScope(item.Scope)
 	if scope == decisionscope.ScopeRange {
-		return
+		return decisionstore.Decision{}, false
 	}
 	if scope != decisionscope.ScopeIP && scope != "" {
 		if _, ok := c.snapshotLiveHeaderScopes()[scope]; !ok {
 			c.log.Debug("handleStreamCache:ignoredScope", "scope", item.Scope)
-			return
+			return decisionstore.Decision{}, false
 		}
 	}
 	if decisionstore.SlotKey(scope, item.Value) == "" {
-		return
+		return decisionstore.Decision{}, false
 	}
-	c.decisionStore.Put(decisionstore.Decision{
-		Scope: scope, Value: item.Value, Kind: kind, Origin: origin, DurationSec: duration,
-	})
 	c.rememberActiveDecision(decisionstore.SlotKey(scope, item.Value), origin, item.Value)
+	return decisionstore.Decision{
+		Scope: scope, Value: item.Value, Kind: kind, Origin: origin, DurationSec: duration,
+	}, true
 }
 
 // deleteStreamDecision Deletes one non-Range stream decision from the DecisionStore.
 func (c *Client) deleteStreamDecision(item Decision) {
-	scope := decisionscope.NormalizeScope(item.Scope)
-	if scope == decisionscope.ScopeRange {
+	stored, ok := c.streamDeleteItem(item)
+	if !ok {
 		return
 	}
+	c.decisionStore.DeleteMany([]decisionstore.Decision{stored})
+}
+
+// streamDeleteItem is the Ip/header stream Deleted item to drop, or false when the decision is skipped.
+func (c *Client) streamDeleteItem(item Decision) (decisionstore.Decision, bool) {
+	scope := decisionscope.NormalizeScope(item.Scope)
+	if scope == decisionscope.ScopeRange {
+		return decisionstore.Decision{}, false
+	}
 	c.forgetActiveDecision(decisionstore.SlotKey(scope, item.Value))
-	c.decisionStore.Delete(scope, item.Value)
+	return decisionstore.Decision{Scope: scope, Value: item.Value}, true
 }
 
 // queryLiveDecisions GETs LAPI decisions for rawQuery and returns the strongest kind and origin.

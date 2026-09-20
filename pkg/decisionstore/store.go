@@ -16,8 +16,8 @@ import (
 type engine struct {
 	beginTick   func()
 	publishTick func(int64)
-	put         func(Decision)
-	deleteSlot  func(string, string)
+	putMany     func([]Decision)
+	deleteMany  func([]Decision)
 	lookup      func(string, net.IP, map[string]string, *RangeMembership) (string, string, uint16, error)
 	applyRange  func(map[string]string, []string) error
 	rangeIndex  func() (string, error)
@@ -29,8 +29,8 @@ func memoryEngine(mem *memory) engine {
 	return engine{
 		beginTick:   mem.BeginTick,
 		publishTick: mem.PublishTick,
-		put:         mem.Put,
-		deleteSlot:  mem.Delete,
+		putMany:     mem.PutMany,
+		deleteMany:  mem.DeleteMany,
 		lookup:      mem.LookupRemediation,
 		applyRange:  mem.ApplyRangeBatch,
 		rangeIndex:  mem.RangeIndex,
@@ -43,8 +43,8 @@ func redisEngine(red *redis) engine {
 	return engine{
 		beginTick:   red.BeginTick,
 		publishTick: red.PublishTick,
-		put:         red.Put,
-		deleteSlot:  red.Delete,
+		putMany:     red.PutMany,
+		deleteMany:  red.DeleteMany,
 		lookup:      red.LookupRemediation,
 		applyRange:  red.ApplyRangeBatch,
 		rangeIndex:  red.RangeIndex,
@@ -84,7 +84,7 @@ func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, data
 }
 
 // BeginTick opens the write window for one stream poll. Memory clones published into tick.
-// Redis is a no-op: each Set/Delete is already visible to other processes.
+// Redis is a no-op: each PutMany/DeleteMany is already visible to other processes.
 func (s *Store) BeginTick() {
 	s.engine.beginTick()
 }
@@ -97,12 +97,23 @@ func (s *Store) PublishTick(now int64) {
 
 // Put stores one Ip or header-scope decision. Range is ignored (use ApplyRangeBatch).
 func (s *Store) Put(item Decision) {
-	s.engine.put(item)
+	s.PutMany([]Decision{item})
+}
+
+// PutMany stores Ip or header-scope decisions. Range items are ignored (use ApplyRangeBatch).
+// Redis groups by DurationSec and MSetEX in PutManyChunk batches. Memory loops under one lock.
+func (s *Store) PutMany(items []Decision) {
+	s.engine.putMany(items)
 }
 
 // Delete drops the canonical slot for scope+value, and a prior Ip spelling when it differs.
 func (s *Store) Delete(scope, value string) {
-	s.engine.deleteSlot(scope, value)
+	s.DeleteMany([]Decision{{Scope: scope, Value: value}})
+}
+
+// DeleteMany drops canonical slots and prior Ip spellings. Redis DELs one key at a time.
+func (s *Store) DeleteMany(items []Decision) {
+	s.engine.deleteMany(items)
 }
 
 // LookupRemediation is the request path for stream/alone and live/none.

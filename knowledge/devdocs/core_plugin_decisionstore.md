@@ -7,7 +7,7 @@ A `pkg/decisionstore.Store` owned by one `lapi.Client` incarnation. Constructed 
 _Avoid_: `pkg/cache`, `cache.Client`, `liveStore`, process `ttl_map`, `sync.Once`, utilities `reclaim`, sibling `OpenDecisionStore`, `StoreKey`
 
 **Engine**:
-Funcs bound at `NewMemory` or `NewRedis` (`memoryEngine` / `redisEngine`): BeginTick, PublishTick, Put, Delete, LookupRemediation, ApplyRangeBatch, RangeIndex, Close. A constructed Store always has those callbacks.
+Funcs bound at `NewMemory` or `NewRedis` (`memoryEngine` / `redisEngine`): BeginTick, PublishTick, PutMany, DeleteMany, LookupRemediation, ApplyRangeBatch, RangeIndex, Close. Put and Delete are one-item wrappers. A constructed Store always has those callbacks.
 _Avoid_: a backend interface, `if mem` / `if red` on every method, nil-checking `s` or the funcs
 
 **Origin intern**:
@@ -29,11 +29,11 @@ Construct a DecisionStore inside `lapi.Client` `create()` (`NewMemory` / `NewRed
 ## How to use
 
 - Call `lapi.OpenStream` / `OpenLive`. Those create the Client; `create()` constructs the store via `newChildStore` (`NewMemory` / `NewRedis`, Redis prefix `SessionHex`). Do not call `decisionstore.Open`, `lapi.OpenDecisionStore`, or a `StoreKey` helper — those paths are gone.
-- Memory: in-process COW tick/published maps (`pubWord`/`pubExp`) plus the Range blob. Maps stay non-nil. Live Put mutates published maps in place and sweeps expired keys. Lookup holds `RLock` across probes.
-- Redis: import `github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis` at `v1.0.5`. Prefix is `SessionHex` (cursor), not live `IdentityHex`. Logical keys are the client IP, header-scope key, and `range-index`. Writer plus optional readers; `nextReader` never retries the writer. SET/DEL are void. Do not re-patch `vendor/.../iplookup/helper.go` (`Helper.Contains` / `Count` RLock is upstream).
+- Memory: in-process COW tick/published `map[string]LiveSlot` plus the Range blob. Maps stay non-nil. Live PutMany copy-on-writes onto published (one clone, then sweep expired keys). Lookup holds `RLock` across probes.
+- Redis: import `github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis` at `v1.0.5`. Prefix is `SessionHex` (cursor), not live `IdentityHex`. Logical keys are the client IP, header-scope key, and `range-index`. Writer plus optional readers; `nextReader` never retries the writer. MSetEX/DEL are void. Do not re-patch `vendor/.../iplookup/helper.go` (`Helper.Contains` / `Count` RLock is upstream).
 - Stream Redis disagreement shares the child store (first-wins Redis YAML). Live Redis disagreement isolates Clients and stores. Live metrics-interval split constructs two child stores (memory isolates; Redis still shares `SessionHex` keys).
 - `decisionScopeHeaders` and poller intervals stay off Redis key composition. Stream `scopes=` and the store header-scope filter are the live-router union (`core_plugin_lapi_scope-union.md`).
-- Stream apply calls Store `BeginTick` / `Put` / `Delete` / `PublishTick` / `ApplyRangeBatch` (`core_plugin_lapi_stream-apply.md`). Redis BeginTick/PublishTick are no-ops.
+- Stream apply calls Store `BeginTick` / `DeleteMany` / `PutMany` / `PublishTick` / `ApplyRangeBatch` (`core_plugin_lapi_stream-apply.md`). Redis tick methods are no-ops; Redis PutMany is MSetEX by TTL in `PutManyChunk` batches.
 - Captcha grace is the gate cookie (`core_plugin_middleware_captcha-gate.md`), not store keys.
 - Origin intern is a `pkg/intern.Table` field on `Store`. `OriginID` / `OriginName` forward to it. `Name` takes `RLock`. Resolve origin only on drop.
 - `Store.Close()` drains Redis idle pools. Call it from `lapi.Client.Close`. Memory Close is a no-op. Safe to call more than once on a real Redis store. Do not Close a nil `*Store`. Sleep and Wake must not Close the store.
@@ -63,7 +63,7 @@ kind, origin, originID, err := lapiClient.LookupRemediation(remoteIP, ipAddr, sc
 - On `create()` error after store New, Close the store before return.
 - Stream store-write TTL is `int64(duration.Seconds())` with no clamp; a sub-second CrowdSec duration becomes `0`.
 - Live and none writes use `liveCacheTTL` (substitute `defaultDecisionSeconds` when duration is empty). Stream must not use `liveCacheTTL`.
-- After `Close()`, Redis Get/MGET/SET/DEL surface `store:unreachable` and must not open a new TCP connection.
+- After `Close()`, Redis Get/MGET/SET/DEL/MSetEX surface `store:unreachable` and must not open a new TCP connection.
 - Do not copy `SimpleRedis` by value after `New`. Dial 2s and command 1s (not utilities zero-Config defaults).
 - Yaegi-safe: do not put a map-holding type in an interface. `atomic.Value` holds only `*RangeMembership` and `string`.
 - Callers MUST NOT import utilities `reclaim`.
