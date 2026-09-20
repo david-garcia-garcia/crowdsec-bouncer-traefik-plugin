@@ -1,43 +1,38 @@
-Developer review: in progress — 2026-09-19T15:35:00.000Z
+Developer review: needs changes — 2026-09-20T04:09:04.210Z
 
 ## What this changes
 
-**Operators.** None.
+**Operators.** Redis decision slots and the `range-index` blob now store kind plus optional newline origin (`KindOriginString`). Leftover U+001F payloads and the stream lease key are gone. `traefik-middleware-utilities` is pinned at v1.0.5. No new deploy keys.
 
 **Admin users.** None.
 
-**Developers.** Stream/alone Ip and header decisions live on `DecisionStore.streamStore` (Redis → `cache.Client`; memory → COW `map[string]LiveSlot{word,expiresAt}`). `Client.LookupStreamRemediation` + bouncer single path; removed `liveTick` / `UsesLiveSnapshot`. Memory intern overflow: Warn + kind-only word (no slot leftover string).
+**Developers.** CrowdSec decisions live on `pkg/decisionstore.Store` with memory and Redis engine funcs bound at `NewMemory`/`NewRedis`. `pkg/cache`, stream lease, and a second `liveStore` type are gone. `LookupRemediation` and `LiveLookup` return kind and origin fields. Intern overflow Warns and keeps origin id 0. A constructed Store always has callbacks (no nil-store Close). Published vendor is v1.0.5; do not re-patch `iplookup/helper.go`.
 
 **End users.** None.
 
 ## Motivation
 
-On `origin/master`, stream/alone with in-memory `DecisionStore` still resolves each request through the TTL heap (`LookupCachedRemediation`), paying heap churn and many allocations per miss. That path is correct for live/none memo keys but the wrong store for stream Ip/header slots that are updated on a tick cadence.
+On `origin/master`, stream and alone still resolve Ip and header decisions through the TTL cache heap, and Redis I/O sits behind `cache.Client` including a stream lease. That path is correct for a generic cache and wrong for a decision store that already has a tick cadence and a Range blob.
 
-If we keep a parallel `Client.liveTick` scratch map, apply and lookup follow different backends and Redis vs memory leaks into `Client`. The cost of not merging a proper store split is permanent dual paths and continued master-scale lookup cost on stream memory deployments.
+A miss on master allocates through GetInt/Get/GetMany. Redis and memory leak into `lapi.Client`. The cost of not merging is continued stream-memory lookup cost at master scale and a lease/cache bag that this plugin no longer owns.
 
 ```mermaid
 sequenceDiagram
   participant Bouncer
   participant Client as lapi.Client
-  participant Store as DecisionStore.streamStore
   participant Cache as cache.Client
-  Bouncer->>Client: LookupStreamRemediation
-  Client->>Store: LookupRemediation + RangeMembership
-  alt memory
-    Store->>Store: Load COW map, probe keys
-  else Redis
-    Store->>Cache: GetInt/Get/GetMany
-  end
+  Bouncer->>Client: LookupRemediation
+  Client->>Cache: GetInt / Get / GetMany
+  Note over Cache: DestBranch: TTL heap on memory; lease plus slots on Redis
 ```
 
 ## Merge readiness
 
-Implement landed (584ff695); tasks 7/7 complete; full `go test ./...` passed locally. RETHINK comment has `Implement:` but stays `[ ]` until pullrequest. CI re-run pending on pushed head.
+Six-axis hard findings applied on f92c8573. One RETHINK comment stays `[ ]` until pullrequest Reply. CI is in progress on 5936ac7a. 2 items remain.
 
-Priority: P2 — stream/alone memory lookup cost on master; architecture fix without operator-facing config change.
+Priority: P2 — stream/alone memory lookup cost and Redis/cache coupling on master, with no operator config change required.
 
-Reviewed head: da134ea4
+Reviewed head: 5936ac7a
 
 Owner decision: None.
 
@@ -45,41 +40,38 @@ Owner decision: None.
 
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Implement done; RETHINK `[ ]`; CI pending |
-| CI proof | 3/6 | Pending on da134ea4 — [PR checks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/118/checks) |
-| Local tests proof | 6/6 | handoff `localTests: passed`; `go test ./...` |
-| Review resolution | 1/6 | `comments.md` RETHINK `[ ]` (Implement filled) |
+| Overall readiness | 1/6 | Open RETHINK `[ ]` blocks review resolution |
+| CI proof | 3/6 | In progress on 5936ac7a — [Main Process](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488376035/job/106018794447), [Race detector](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488376035/job/106018794371), [e2e binary](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488376018/job/106018794553), [e2e docker](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488376018/job/106018794492) |
+| Local tests proof | N/A | Remote `prHost`; CI proof covers remote |
+| Review resolution | 1/6 | `comments.md` RETHINK `chat-store-split` still `[ ]` |
 
 ## Verification
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-09-19-optcow-stream-lookup pushed | PR #118 → master |
-| OpenSpec | tasks 7/7 | `openspec/changes/2026-09-19-optcow-stream-lookup/tasks.md` |
+| Branch | 2026-09-19-optcow-stream-lookup pushed | `git` / PR #118 → master |
+| OpenSpec | 2026-09-19-optcow-stream-lookup | `openspec/changes/2026-09-19-optcow-stream-lookup/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/118 | GitHub |
-| Local tests | passed | implement run |
-| PR comments | RETHINK open | chat-store-split — Implement 584ff695 |
-
-## Performance (100k Ip fixture, windows/amd64, vs `origin/master`)
-
-| Measure | `origin/master` (TTL / cached lookup) | This branch (stream map lookup) | Why |
-| --- | --- | --- | --- |
-| Seq miss | 394 ns/op, 12 allocs, 248 B | 81 ns/op, 1 alloc, 8 B | Map load + fixed probes vs TTL `GetInt` + slice/`GetMany` on miss path |
-| Parallel miss | 173 ns/op, 12 allocs | 6.6 ns/op, 1 alloc | Read-mostly `atomic.Value` map vs contended heap lookups |
-| Heap retained 100k Ips | ~18.4 MiB (TTL map bench) | ~8.9 MiB (packed slot map bench) | Packed `LiveSlot` vs TTL heap nodes + keys |
-
-Master has no stream-map benchmark; baseline row is master’s stream/alone behavior (still TTL-backed). Branch row is `LookupStreamMapRemediation` / memory store after implement.
+| CI | build 35488376035 in_progress [Main Process](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488376035/job/106018794447); build 35488376018 in_progress [e2e](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35488376018/job/106018794553) | GitHub check runs |
+| Local tests | passed | handoff.yaml `localTests: passed` (`go test` on decisionstore/lapi/bouncer/decisionscope) |
+| PR comments | 1 open | `comments.md` RETHINK `chat-store-split` |
 
 ## Specs
 
-Modified (fold) — deltas in change folder:
-
-- [core_cache_client_decision-store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/specs/core_cache_client_decision-store/spec.md)
-- [core_plugin_lapi_stream-apply](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/specs/core_plugin_lapi_stream-apply/spec.md)
-- [core_plugin_decisions_scopes](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/specs/core_plugin_decisions_scopes/spec.md)
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/specs/core_plugin_middleware_bouncer/spec.md)
-
-Proposal: [proposal.md](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md)
+- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — added
+- [core_cache_client_decision-store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_cache_client_isolated-store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_cache_redis_utilities-client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_lapi_stream-lease](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_lapi_stream-apply](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_decisions_scopes](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_lapi_stream-single-flight](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [core_plugin_middleware_captcha-routing](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [std_go_logger_debug-attrs](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
+- [build_ci_github_module-path](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/openspec/changes/2026-09-19-optcow-stream-lookup/proposal.md) — modified
 
 ## Follow-up issues
 
@@ -87,7 +79,7 @@ None.
 
 ## How this fits together
 
-RETHINK → explore → propose → **implement (done)** → codereview (next).
+Ticket `2026-09-19-optcow-stream-lookup` is branch `2026-09-19-optcow-stream-lookup` on PR #118 to `master`. Codereview applied hard findings; CI is in progress on 5936ac7a.
 
 ## Decision needed
 
@@ -95,18 +87,24 @@ None.
 
 ## Before merge
 
-- [x] Implement store split and remove bolt-on
-- [ ] Close RETHINK after pullrequest reply
+- [x] [P2] Six-axis hard findings applied (f92c8573)
+- [x] [P2] Human product fixes: no nil-store Close; utilities v1.0.5 (6842765a)
+- [ ] Close RETHINK `chat-store-split` after pullrequest Reply
 - [ ] Green CI on reviewed head
-- [x] Benchmarks vs `origin/master` on delivery card
 
 ## Findings
 
-Store split implemented; codereview not run this phase.
+- [chat-store-split](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/118) — RETHINK — store split landed as `pkg/decisionstore.Store` engines, not `Client` cache branching. Path: (general). Reply pending pullrequest.
+- Six-axis hard/wrong items applied in f92c8573; skipped IPCacheKey rename (ticket pin) and three judgement items.
 
 ## Axis review
 
-None (implement phase).
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/devstate/2026/09/2026-09-19-optcow-stream-lookup/codereview_standards.md) — 36 total, 0 pending, 33 completed, 3 skipped
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/devstate/2026/09/2026-09-19-optcow-stream-lookup/codereview_spec.md) — 1 total, 0 pending, 1 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/devstate/2026/09/2026-09-19-optcow-stream-lookup/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/devstate/2026/09/2026-09-19-optcow-stream-lookup/codereview_performance.md) — 2 total, 0 pending, 2 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/devstate/2026/09/2026-09-19-optcow-stream-lookup/codereview_dead.md) — 1 total, 0 pending, 1 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-19-optcow-stream-lookup/devstate/2026/09/2026-09-19-optcow-stream-lookup/codereview_coverage.md) — 6 total, 0 pending, 5 completed, 1 skipped
 
 ## Agent review details
 
@@ -114,25 +112,32 @@ None (implement phase).
 
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| go test ./... | pass | full repo |
-| Product SHA | 584ff695 | streamStore replace |
+| Specs in this PR | 1 added / 13 modified | Same list as ## Specs |
+| Open reviewer comments walked | 1 FIX / 0 ANSWER / 1 open | Unanswered RETHINK is merge risk |
+| Reviewed head | 5936ac7a337f1dc839abd58cc571d4173034af44 | Card matches measured branch |
 
 ### Stored data model
 
-| Store | Field | Type | Sample |
-| --- | --- | --- | --- |
-| DecisionStore | stream | streamStore | memory: `atomic.Value` → `map[string]LiveSlot` |
-| LiveSlot | Word, ExpiresAt | uint32, int64 | removed `Leftover` |
+- Changed: Redis slot value / remediation payload — string — sample `t` + U+001F + `crowdsec` → `t` + newline + `crowdsec`. Upgrade: rewritten on next write.
+- Changed: Redis key `range-index` / value after `=` — string — sample `10.0.0.0/8=t` + U+001F + `crowdsec` → `10.0.0.0/8=t` + newline + `crowdsec`. Upgrade: rewritten on next write.
+- Changed: Redis key `<SessionHex>:updated` stream lease — removed. Upgrade: leftover lease keys unused.
 
 ### Technical review
 
-Implement complete — axis review pending codereview phase.
+Best possible solution: one DecisionStore engine (memory COW or Redis SimpleRedis) instead of DestBranch `cache.Client` plus TTL heap for stream/alone slots.
+
+Do we have a high-confidence way to reproduce? Yes, `go test ./pkg/decisionstore/ ./pkg/lapi/ ./pkg/bouncer/ ./pkg/decisionscope/` and the new tick/overflow/replica tests.
+
+Is this the best way to solve the issue? Yes versus DestBranch: store owns Put/Lookup/Range; Client does not branch cache vs scratch map.
 
 ### Evidence
 
-- `pkg/lapi/streamstore.go`, `pkg/lapi/client_lookup.go`
-- `openspec/changes/2026-09-19-optcow-stream-lookup/tasks.md`
+What I checked:
+- Six-axis Status after apply (run-root `codereview_*.md`, 5936ac7a)
+- Product apply `f92c8573` (leftover drop, live sweep, Pack delete, coverage tests)
+- Human pins `6842765a` (no nil-store Close; utilities v1.0.5)
+- GitHub check runs on 5936ac7a (in_progress)
 
 ### Rank-up moves
 
-Run `sbs-dev-codereview` on `origin/master...584ff695`.
+- Reply `chat-store-split` in pullrequest (landed store is engines, not `streamStore`/`cache.Client`).

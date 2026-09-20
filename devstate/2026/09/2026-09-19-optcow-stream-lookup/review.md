@@ -34,3 +34,9 @@ phase: propose
 findings: OpenSpec 2026-09-19-optcow-stream-lookup valid (--strict); proposal/design + 4 spec folds; tasks reset unchecked; chat-store-split Propose accept; implement phase reopened
 fixed: n/a
 skipped: n/a
+
+## codereview (2026-09-20)
+phase: codereview
+findings: Standards 36, Spec 1, Security 0, Performance 2, Dead 1, Coverage 6
+fixed: leftover drop, live sweep + in-place Put, Pack/OriginIntern delete, naming/comments, tick/overflow/replica tests (f92c8573)
+skipped: IPCacheKey rename (ticket pin); lookup nil-callback, LiveSlot.Word, none-mode coverage (judgement)
