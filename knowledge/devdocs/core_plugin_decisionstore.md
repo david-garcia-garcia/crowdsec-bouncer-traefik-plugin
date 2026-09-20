@@ -11,7 +11,7 @@ The Traefik `New(..., name)` string written once on the create that first put th
 _Avoid_: router name, Host, bouncer API key in the reclaim key, a second middleware-name registry
 
 **Engine**:
-Funcs bound at `NewMemory` or `NewRedis` (`memoryEngine` / `redisEngine`): BeginTick, PublishTick, PutMany, DeleteMany, LookupRemediation, ApplyRangeBatch, RangeIndex, Close. Put and Delete are one-item wrappers. A constructed Store always has those callbacks.
+Funcs bound at `NewMemory` or `NewRedis` (`memoryEngine` / `redisEngine`): BeginTick, PublishTick, PutMany, DeleteMany, PeekMany, LookupRemediation, ApplyRangeBatch, RangeIndex, Close. Put and Delete are one-item wrappers. PeekMany is “what was there?” for the gauge; engines do not increment or decrement. A constructed Store always has those callbacks.
 _Avoid_: a backend interface, `if mem` / `if red` on every method, nil-checking `s` or the funcs
 
 **Origin intern**:
@@ -27,7 +27,7 @@ The Redis SET value and the Range blob remediation: kind letter, then newline, t
 _Avoid_: leftover, `RemediationWithOrigin`, U+001F
 
 **Active counts**:
-The compact `{originID, family} → int64` group-by of stream/alone Ip and header-scope slots on one DecisionStore. `countActive` is set at Open/New from crowdsecMode (true only for stream/alone) and is not part of the reclaim StoreKey. `ActiveCounts` is a snapshot copy for usage-metrics POST.
+The compact `{originID, family} → int64` group-by of stream/alone Ip and header-scope slots on one DecisionStore. `countActive` is set at Open/New from crowdsecMode (true only for stream/alone), is not part of the reclaim StoreKey, and is not a field on the engine. PutMany/DeleteMany Peek then adjust in one Store path. `ActiveCounts` is a snapshot copy for usage-metrics POST.
 _Avoid_: a reporter forget map, `usageMetricKey` in decisionstore, counting Range or live/none Put
 
 **Elapsed slot clock**:
@@ -46,8 +46,8 @@ Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx
 - Same store key → same Store. Redis YAML change reuses the existing engine (first-wins). Exclusive ownership is write-once `createdBy`, not a Redis hash.
 - `streamReady` / `streamPollInFlight` stay on the store across Client reincarnation. Do not zero them in `lapi.New`. Stream skip is `TryBeginStreamPoll` (`core_plugin_lapi_stream-single-flight.md`).
 - `decisionScopeHeaders` and poller intervals stay off the store key. Stream `scopes=` and the store header-scope filter are the live-router union (`core_plugin_lapi_scope-union.md`).
-- Stream apply calls Store `BeginTick` / `DeleteMany` / `PutMany` / `PublishTick(ElapsedNow())` / `ApplyRangeBatch` (`core_plugin_lapi_stream-apply.md`). Memory `PublishTick(0)` skips expiry sweep; non-zero `now` drops tick slots where `ExpiresAt > 0 && ExpiresAt <= now` and decrements those counted slots. Redis tick methods are no-ops and ignore `now`; Redis PutMany is MSetEX by TTL in `PutManyChunk` batches after MGET of the previous canonical `KindOriginString` when `countActive`.
-- Snapshot origin×family counts with `Store.ActiveCounts` at usage-metrics POST. Do not store `usageMetricKey` or LAPI item JSON in decisionstore. `ApplyRangeBatch` does not adjust the gauge.
+- Stream apply calls Store `BeginTick` / `DeleteMany` / `PutMany` / `PublishTick(ElapsedNow())` / `ApplyRangeBatch` (`core_plugin_lapi_stream-apply.md`). Memory `PublishTick(0)` skips expiry sweep; non-zero `now` drops tick slots where `ExpiresAt > 0 && ExpiresAt <= now` and does not decrement the gauge. Redis tick methods are no-ops and ignore `now`; Redis PutMany is MSetEX by TTL in `PutManyChunk` batches. When `countActive`, Store PeekMany (memory tick/published, Redis MGET) then adjusts before the engine write.
+- Snapshot origin×family counts with `Store.ActiveCounts` at usage-metrics POST. Do not store `usageMetricKey` or LAPI item JSON in decisionstore. `ApplyRangeBatch` does not adjust the gauge. Memory PublishTick expiry and Redis TTL without DeleteMany do not decrement.
 - Captcha grace is the gate cookie (`core_plugin_middleware_captcha-gate.md`), not store keys.
 - Origin intern is a `pkg/intern.Table` field on `Store`. `OriginID` / `OriginName` forward to it. `Name` takes `RLock`. Resolve origin only on drop.
 - `Store.Close()` logs `crowdsec decision store closed` then drains Redis idle pools. Memory Close is a no-op drain. Call Close only from the store’s reclaim Close hook. Safe to call more than once on a real Redis store. Do not Close a nil `*Store`.
@@ -81,3 +81,4 @@ kind, origin, originID, err := lapiClient.LookupRemediation(remoteIP, ipAddr, sc
 - Do not copy `SimpleRedis` by value after `New`. Dial 2s and command 1s (not utilities zero-Config defaults).
 - Memory expiry is elapsed-only: wall Unix in `PublishTick` or lookup would treat every slot as expired after stream apply.
 - Yaegi-safe: do not put a map-holding type in an interface. Store `atomic.Value` holds `*RangeMembership` and `string`. Memory published snapshot is `*publishedSlots`, not the map.
+- `ActiveCounts` does not drop on memory PublishTick expiry or Redis TTL. A later DeleteMany of a missing key is a no-op, so the gauge can stay high until overwrite or an explicit delete of a still-present slot.

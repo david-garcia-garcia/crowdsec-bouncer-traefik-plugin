@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
@@ -106,7 +105,7 @@ func TestHydrateRangeKeepsLastOnUnreachable(t *testing.T) {
 	if got := store.RangeMembership().Remediation(net.ParseIP("10.1.2.3")); got != decisionscope.BannedValue {
 		t.Fatalf("seed got %q, want ban", got)
 	}
-	red := newRedis(logger.New("ERROR", ""), "127.0.0.1:1", nil, "", "", "p", intern.New(), newActiveCountState(), false)
+	red := newRedis(logger.New("ERROR", ""), "127.0.0.1:1", nil, "", "", "p")
 	store.engine = redisEngine(red)
 	store.red = red
 	store.mem = nil

@@ -55,7 +55,7 @@ Each request the bouncer handles (trusted-IP bypass, pass, and drop) SHALL incre
 - **THEN** the next POST includes `processed` with that client's `ip_type`
 
 ### Requirement: Active decisions are a stream/alone gauge
-In stream and alone modes, `active_decisions` SHALL be a gauge (unit `ip`) of Ip and header-scope decision records this connection currently applies, labeled `origin` (lists-rewritten) and `ip_type` of the decision value. Range CIDRs SHALL be omitted from this gauge until Range exact-CIDR forget lands. Live, none, and AppSec-only modes SHALL omit `active_decisions`. The gauge MUST NOT expand a CIDR into host addresses. Counts SHALL come from a DecisionStore snapshot at POST, not from a reporter-held per-slot map.
+In stream and alone modes, `active_decisions` SHALL be a gauge (unit `ip`) of Ip and header-scope decision records this connection currently applies, labeled `origin` (lists-rewritten) and `ip_type` of the decision value. Range CIDRs SHALL be omitted from this gauge until Range exact-CIDR forget lands. Live, none, and AppSec-only modes SHALL omit `active_decisions`. The gauge MUST NOT expand a CIDR into host addresses. Counts SHALL come from a DecisionStore snapshot at POST, not from a reporter-held per-slot map. Memory PublishTick expiry and Redis TTL without DeleteMany MUST NOT decrement the gauge.
 
 #### Scenario: Stream IP ban is counted
 - **WHEN** stream applies one Ip ban whose value is `1.2.3.4` and origin is `crowdsec`
@@ -121,7 +121,7 @@ The reporter SHALL POST `v1/usage-metrics` through the Client LAPI query that lo
 - **AND** the reporter field is the same instance
 
 ### Requirement: Active-decision slots store intern id and family
-In stream and alone modes, DecisionStore SHALL keep compact origin-id × family counts. The reporter MUST NOT keep a per-slot forget map. `reportMetrics` SHALL snapshot store counts and send lists-rewritten origin names via `OriginName` at POST. When intern overflowed, that origin id is `0` and `OriginName` is empty (no leftover origin string). Live, none, and AppSec-only modes SHALL omit `active_decisions` items. The intern table owner is DecisionStore; the reporter MUST NOT own a second intern table. Stream apply MUST NOT remember or forget Ip, header, or Range keys on the reporter.
+In stream and alone modes, DecisionStore SHALL keep compact origin-id × family counts. The reporter MUST NOT keep a per-slot forget map. `reportMetrics` SHALL snapshot store counts and send lists-rewritten origin names via `OriginName` at POST. When intern overflowed, that origin id is `0` and `OriginName` is empty (no leftover origin string). Live, none, and AppSec-only modes SHALL omit `active_decisions` items. The intern table owner is DecisionStore; the reporter MUST NOT own a second intern table. Stream apply MUST NOT remember or forget Ip, header, or Range keys on the reporter. PutMany and DeleteMany SHALL Peek then adjust those counts on the Store; engines MUST NOT increment or decrement.
 
 #### Scenario: Stream IP ban still posts origin name
 - **WHEN** stream applies one Ip ban whose value is `1.2.3.4` and origin is `crowdsec`

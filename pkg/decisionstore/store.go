@@ -22,6 +22,7 @@ type engine struct {
 	publishTick func(int32)
 	putMany     func([]Decision)
 	deleteMany  func([]Decision)
+	peekMany    func([]string) map[string]peekedSlot // canonical key → packed or leftover origin; engines do not adjust the gauge
 	lookup      func(string, net.IP, map[string]string, *RangeMembership) (string, string, uint16, error)
 	applyRange  func(map[string]string, []string) error
 	rangeIndex  func() (string, error)
@@ -35,6 +36,7 @@ func memoryEngine(mem *memory) engine {
 		publishTick: mem.PublishTick,
 		putMany:     mem.PutMany,
 		deleteMany:  mem.DeleteMany,
+		peekMany:    mem.peekMany,
 		lookup:      mem.LookupRemediation,
 		applyRange:  mem.ApplyRangeBatch,
 		rangeIndex:  mem.RangeIndex,
@@ -49,6 +51,7 @@ func redisEngine(red *redis) engine {
 		publishTick: red.PublishTick,
 		putMany:     red.PutMany,
 		deleteMany:  red.DeleteMany,
+		peekMany:    red.peekMany,
 		lookup:      red.LookupRemediation,
 		applyRange:  red.ApplyRangeBatch,
 		rangeIndex:  red.RangeIndex,
@@ -62,7 +65,7 @@ type Store struct {
 	mem             *memory
 	red             *redis
 	origins         *intern.Table
-	active          *activeCountState // compact origin×family gauge; engines hold the same pointer
+	active          *activeCountState // compact origin×family gauge; PutMany/DeleteMany adjust, engines do not
 	countActive     bool              // true only for stream/alone; not part of StoreKey
 	rangeMembership atomic.Value      // *RangeMembership
 	lastRangeIndex  atomic.Value      // string of the blob last used to build membership
@@ -80,13 +83,12 @@ type Store struct {
 // countActive is true only for stream/alone so live/none Put does not increment the gauge.
 func NewMemory(log *slog.Logger, countActive bool) *Store {
 	origins := intern.New()
-	active := newActiveCountState()
-	mem := newMemory(log, origins, active, countActive)
+	mem := newMemory(log, origins)
 	return &Store{
 		engine:      memoryEngine(mem),
 		mem:         mem,
 		origins:     origins,
-		active:      active,
+		active:      newActiveCountState(),
 		countActive: countActive,
 		engineName:  "memory",
 	}
@@ -96,13 +98,12 @@ func NewMemory(log *slog.Logger, countActive bool) *Store {
 // countActive is true only for stream/alone; intern stays in-process (no Redis intern table).
 func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string, countActive bool) *Store {
 	origins := intern.New()
-	active := newActiveCountState()
-	red := newRedis(log, writeHost, readHosts, pass, database, keyPrefix, origins, active, countActive)
+	red := newRedis(log, writeHost, readHosts, pass, database, keyPrefix)
 	return &Store{
 		engine:      redisEngine(red),
 		red:         red,
 		origins:     origins,
-		active:      active,
+		active:      newActiveCountState(),
 		countActive: countActive,
 		engineName:  "redis",
 	}
@@ -188,6 +189,7 @@ func (s *Store) Put(item Decision) {
 // PutMany stores Ip or header-scope decisions. Range items are ignored (use ApplyRangeBatch).
 // Redis groups by DurationSec and MSetEX in PutManyChunk batches. Memory loops under one lock.
 func (s *Store) PutMany(items []Decision) {
+	s.adjustPuts(items)
 	s.engine.putMany(items)
 }
 
@@ -198,6 +200,7 @@ func (s *Store) Delete(scope, value string) {
 
 // DeleteMany drops canonical slots and prior Ip spellings. Redis DELs one key at a time.
 func (s *Store) DeleteMany(items []Decision) {
+	s.adjustDeletes(items)
 	s.engine.deleteMany(items)
 }
 

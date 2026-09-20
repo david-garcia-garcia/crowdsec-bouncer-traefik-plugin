@@ -55,6 +55,16 @@ func TestActiveCountsLivePutDoesNotIncrement(t *testing.T) {
 	}
 }
 
+func TestActiveCountsLiveRedisPutDoesNotIncrement(t *testing.T) {
+	server := startTestStoreRedis(t)
+	store := NewRedis(logger.New("ERROR", ""), server.addr(), nil, "", "", "sess-live", false)
+	t.Cleanup(store.Close)
+	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: activeCountBanIP, Kind: decisionscope.BannedValue, Origin: activeCountOrigin, DurationSec: 60})
+	if got := store.ActiveCounts(); len(got) != 0 {
+		t.Fatalf("live Redis Put must not count, got %#v", got)
+	}
+}
+
 func TestActiveCountsRangeApplyDoesNotIncrement(t *testing.T) {
 	store := countedMemory(t)
 	if err := store.ApplyRangeBatch(map[string]string{"10.0.0.0/8": KindOriginString(decisionscope.BannedValue, activeCountOrigin)}, nil); err != nil {
@@ -74,6 +84,20 @@ func TestActiveCountsOverwriteMovesGroup(t *testing.T) {
 	}
 	if got := originCount(store, activeCountNewOrigin, activeCountFamily); got != 1 {
 		t.Fatalf("new origin got %d", got)
+	}
+}
+
+func TestActiveCountsSameBatchOverwriteMovesGroup(t *testing.T) {
+	store := countedMemory(t)
+	store.PutMany([]Decision{
+		{Scope: decisionscope.ScopeIP, Value: activeCountBanIP, Kind: decisionscope.BannedValue, Origin: activeCountOrigin, DurationSec: 60},
+		{Scope: decisionscope.ScopeIP, Value: activeCountBanIP, Kind: decisionscope.BannedValue, Origin: activeCountNewOrigin, DurationSec: 60},
+	})
+	if got := originCount(store, activeCountOrigin, activeCountFamily); got != 0 {
+		t.Fatalf("same-batch previous origin still counted %d", got)
+	}
+	if got := originCount(store, activeCountNewOrigin, activeCountFamily); got != 1 {
+		t.Fatalf("same-batch new origin got %d", got)
 	}
 }
 
@@ -104,7 +128,7 @@ func TestActiveCountsOverflowOriginIDZero(t *testing.T) {
 	}
 }
 
-func TestActiveCountsMemoryPublishTickExpiryDecrements(t *testing.T) {
+func TestActiveCountsMemoryPublishTickExpiryDoesNotDecrement(t *testing.T) {
 	store := countedMemory(t)
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: activeCountBanIP, Kind: decisionscope.BannedValue, Origin: activeCountOrigin, DurationSec: 0})
@@ -112,8 +136,8 @@ func TestActiveCountsMemoryPublishTickExpiryDecrements(t *testing.T) {
 		t.Fatalf("before expiry got %d", got)
 	}
 	store.PublishTick(ElapsedNow())
-	if got := store.ActiveCounts(); len(got) != 0 {
-		t.Fatalf("expiry must decrement, got %#v", got)
+	if got := originCount(store, activeCountOrigin, activeCountFamily); got != 1 {
+		t.Fatalf("expiry must not decrement the gauge, got %d", got)
 	}
 }
 

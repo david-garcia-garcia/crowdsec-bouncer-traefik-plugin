@@ -24,14 +24,14 @@ Stream/alone `active_decisions` is a second copy of every Ip/header/Range store 
 - LAPI POST shape: research packet exists. `knowledge/research/ext_crowdsec_lapi_usage-metrics/`
 
 ## Desired
-- DecisionStore owns the active-record group-by: compact `{originID uint16, family} → int64`, updated inside PutMany/DeleteMany (memory: same `mu` as `putSlot` / `deleteTickLocked`; Redis: MGET previous origin then adjust in-process counts). Memory `PublishTick` expiry SHOULD decrement when a slot is swept.
+- DecisionStore owns the active-record group-by: compact `{originID uint16, family} → int64`, updated in one shared Store path on PutMany/DeleteMany (engines Peek previous slots; memory tick while ticking else published; Redis MGET). Memory `PublishTick` expiry MUST NOT decrement (accepted imprecision; TTL debt).
 - MetricsReporter MUST NOT keep `activeDecisionSlots` or `activeDecisionsByOriginIPType`. `reportMetrics` snapshots store counts and emits origin names via `OriginName` at POST. Dropped window + processed atomics stay on the reporter.
-- Count only stream/alone Ip and header-scope mutations. Live/none Put memo MUST NOT increment. `OpenDecisionStore` / New sets `countActive` (or equivalent) from `crowdsecMode`; reporter still omits `active_decisions` unless stream/alone.
+- Count only stream/alone Ip and header-scope mutations. Live/none Put memo MUST NOT increment. `OpenDecisionStore` / New sets `countActive` (or equivalent) from `crowdsecMode`; reporter still omits `active_decisions` unless stream/alone. `countActive` is not an engine field.
 - Do not store `usageMetricKey` / LAPI item JSON shape in decisionstore.
-- Do not add a Go interface for the engine. Store method(s) to read counts for POST are fine.
+- Do not add a Go interface for the engine. Store method(s) to read counts for POST are fine. PeekMany is an engine func, not a public Store Peek.
 - Remove remember/forget from stream apply for Ip/header (store mutations carry the gauge). Range: do not forget/peek membership; omit Range from counts (not +1 on New with no Deleted) until debt is taken.
-- Spec fold: `core_plugin_lapi_usage-metrics` (drop per-slot forget map; reporter snapshots store) and `core_plugin_decisionstore_store` (store owns the group-by). Keep intern overflow origin id 0 / empty `OriginName`.
-- Land `knowledge/debt/2026-09-20-range-active-decisions-forget.md` (recreate; IssueKey `2026-09-20-store-active-decisions-gauge`) and an `issues.md` note-large row. Range exact-CIDR forget / `ApplyRangeBatch` displacements stay later.
+- Spec fold: `core_plugin_lapi_usage-metrics` (drop per-slot forget map; reporter snapshots store) and `core_plugin_decisionstore_store` (store owns the group-by; shared peek-then-adjust). Keep intern overflow origin id 0 / empty `OriginName`.
+- Land `knowledge/debt/2026-09-20-range-active-decisions-forget.md` and `knowledge/debt/2026-09-20-active-decisions-ttl-forget.md` (recreate; IssueKey `2026-09-20-store-active-decisions-gauge`) and `issues.md` note rows. Range exact-CIDR forget / `ApplyRangeBatch` displacements stay later. TTL decrement stays later.
 
 ## Affected
 - `pkg/lapi/client_metrics.go`, `client_stream.go`, `client_decisions.go`, tests that call remember/forget
