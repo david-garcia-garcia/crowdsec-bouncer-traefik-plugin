@@ -48,7 +48,10 @@ func waitRealRedis(addr string, budget time.Duration) error {
 			return nil
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("no DecisionStore at %s: last error %v", addr, last)
+			if last == nil {
+				return fmt.Errorf("no DecisionStore at %s", addr)
+			}
+			return fmt.Errorf("no DecisionStore at %s: %w", addr, last)
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
@@ -63,10 +66,10 @@ func openRealRedis(t *testing.T) *Store {
 	return store
 }
 
-// waitMiss polls Lookup until the Ip slot is gone or budget expires.
-func waitMiss(t *testing.T, store *Store, remoteIP string, budget time.Duration) {
+// waitMiss polls Lookup until the Ip slot is gone or 5s elapses.
+func waitMiss(t *testing.T, store *Store, remoteIP string) {
 	t.Helper()
-	deadline := time.Now().Add(budget)
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		kind, _, err := lookupRemediation(store, remoteIP, nil)
 		if errors.Is(err, ErrMiss) {
@@ -77,7 +80,7 @@ func waitMiss(t *testing.T, store *Store, remoteIP string, budget time.Duration)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	t.Fatalf("%s still present after %s", remoteIP, budget)
+	t.Fatalf("%s still present after 5s", remoteIP)
 }
 
 // TestRealRedisBackendContract is the shared PutMany/Lookup/DeleteMany/Range matrix on Dragonfly.
@@ -128,7 +131,7 @@ func TestRealRedisSlotExpires(t *testing.T) {
 		Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: 1,
 	})
 	mustKind(t, store, backendBanIP, nil, decisionscope.BannedValue, backendOrigin)
-	waitMiss(t, store, backendBanIP, 5*time.Second)
+	waitMiss(t, store, backendBanIP)
 }
 
 // TestRealRedisCloseUnreachable is Lookup after Close, which must not dial again.
@@ -202,7 +205,7 @@ func TestRealRedisShorterTTLReplacesExpiry(t *testing.T) {
 		Scope: decisionscope.ScopeIP, Value: backendBanIP,
 		Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: 1,
 	})
-	waitMiss(t, store, backendBanIP, 5*time.Second)
+	waitMiss(t, store, backendBanIP)
 }
 
 // TestRealRedisMixedTTLExpiresIndependently drops only the 1s slot while the 60s sibling stays.
@@ -210,11 +213,11 @@ func TestRealRedisMixedTTLExpiresIndependently(t *testing.T) {
 	const heldIP = "203.0.113.11"
 	store := openRealRedis(t)
 	store.PutMany([]Decision{
-		{Scope: decisionscope.ScopeIP, Value: backendBanIP, Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: 1},
-		{Scope: decisionscope.ScopeIP, Value: heldIP, Kind: decisionscope.CaptchaValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec},
+		{Scope: decisionscope.ScopeIP, Value: backendBanIP, Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec},
+		{Scope: decisionscope.ScopeIP, Value: heldIP, Kind: decisionscope.CaptchaValue, Origin: backendOrigin, DurationSec: 1},
 	})
-	waitMiss(t, store, backendBanIP, 5*time.Second)
-	mustKind(t, store, heldIP, nil, decisionscope.CaptchaValue, backendOrigin)
+	waitMiss(t, store, heldIP)
+	mustKind(t, store, backendBanIP, nil, decisionscope.BannedValue, backendOrigin)
 }
 
 // TestRealRedisDurationZeroIsNotLasting is MSetEX EX 0: Dragonfly must not keep a lasting Ip slot.
@@ -224,7 +227,7 @@ func TestRealRedisDurationZeroIsNotLasting(t *testing.T) {
 		Scope: decisionscope.ScopeIP, Value: backendBanIP,
 		Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: 0,
 	})
-	waitMiss(t, store, backendBanIP, 5*time.Second)
+	waitMiss(t, store, backendBanIP)
 }
 
 // TestRealRedisCloseTwiceThenUnreachable is a second Close that must not panic.
