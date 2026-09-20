@@ -5,7 +5,7 @@ JobName: 2026-09-20-header-forced-decision
 | Phase | Work | Card | At |
 |-------|------|------|----|
 | prepare | [x] | [x] | 2026-09-20T17:16:21Z |
-| explore | [x] | [ ] | |
+| explore | [x] | [x] | 2026-09-20T17:24:20Z |
 | propose | [ ] | [ ] | |
 | implement | [ ] | [ ] | |
 | codereview | [ ] | [ ] | |
