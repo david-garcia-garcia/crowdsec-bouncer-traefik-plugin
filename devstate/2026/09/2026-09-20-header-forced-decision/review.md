@@ -16,3 +16,9 @@ findings: none
 fixed: none
 skipped: none
 
+## codereview (2026-09-20T17:44:35Z)
+phase: codereview
+findings: coverage 1 hard (TrimSpace on padded b/c untested)
+fixed: TestServeHTTP_forcedDecisionTrimmedHeaderValues 98115d9f
+skipped: none
+
