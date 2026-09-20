@@ -1,4 +1,4 @@
-Developer review: in progress — 2026-09-20T18:33:49Z
+Developer review: ready for review — 2026-09-20T18:40:00Z
 
 ## What this changes
 **Operators.** None.
@@ -26,17 +26,17 @@ sequenceDiagram
 ```
 
 ## Merge readiness
-OpenSpec change archived; catalog specs synced. Local tests passed; CI still running on head `90ffdd5d`. 1 item remains (wait for CI).
+Ready for review. 0 items remain.
 
 Priority: P2 — real operator RSS pain at large stream sets, with a workaround of keeping the extra map
-Reviewed head: 90ffdd5d
+Reviewed head: a1f24169
 Owner decision: Required. See Decision needed.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | CI still running on the archive head |
-| CI proof | 3/6 | in progress — [run 35529457882](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35529457882) |
+| Overall readiness | 6/6 | Required checks succeeded; no open PR comments |
+| CI proof | 6/6 | succeeded — [run 35529539040](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35529539040) and [run 35529539013](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35529539013) |
 | Local tests proof | N/A | `localTests: passed`; remote CI covers proof |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -46,7 +46,7 @@ Owner decision: Required. See Decision needed.
 | Branch | 2026-09-20-store-active-decisions-gauge pushed | `git` `origin/2026-09-20-store-active-decisions-gauge` |
 | OpenSpec | store-owned-active-decisions-gauge | `openspec/changes/archive/2026-09-20-store-owned-active-decisions-gauge/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/129 | pr-host List |
-| CI | build 35529457882 in progress https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35529457882 | pr-host CI |
+| CI | build 35529539040 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35529539040 | pr-host CI |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | comments: none |
 
@@ -58,7 +58,7 @@ Owner decision: Required. See Decision needed.
 - [ ] [Range active_decisions forget after dropping the slot map](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-store-active-decisions-gauge/knowledge/debt/2026-09-20-range-active-decisions-forget.md) — Range is a blob + LPM trees, not a slot Peek; omit Range from the store-owned gauge until ApplyRangeBatch displacements.
 
 ## How this fits together
-Local ticket `2026-09-20-store-active-decisions-gauge` is on branch `2026-09-20-store-active-decisions-gauge` targeting `master`, PR 129, change archived, CI in progress.
+Local ticket `2026-09-20-store-active-decisions-gauge` is on branch `2026-09-20-store-active-decisions-gauge` targeting `master`, PR 129, title dropped WIP, required CI succeeded.
 
 ## Decision needed
 | Question | Decision | By |
@@ -71,7 +71,7 @@ Local ticket `2026-09-20-store-active-decisions-gauge` is on branch `2026-09-20-
 - [x] Apply hard code-review findings (metrics snapshot comment; `TestOpenDecisionStore_CountActiveFromMode`)
 - [x] Confirm usage packets (DecisionStore, usage-metrics, stream-apply) match the apply
 - [x] Archive store-owned-active-decisions-gauge into catalog specs
-- [ ] [P2] Wait for CI on head `90ffdd5d`
+- [x] Drop WIP title; wait for required CI on head `a1f24169`
 
 ## Findings
 None.
@@ -91,7 +91,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs; do not paste diff --stat |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 90ffdd5d83c2e73aaee655331dcef866f4980dc8 | Card must match the branch you measured |
+| Reviewed head | a1f241693cc2324977c8d508572840910b4790f8 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -105,10 +105,9 @@ Is this the best way to solve the issue? Yes — count at the store mutation ins
 
 ### Evidence
 What I checked:
-- FindSpecHost fold: usage-metrics-snapshot → `core_plugin_lapi_usage-metrics`; store-groupby → `core_plugin_decisionstore_store`
-- Catalog spec.md MODIFIED/ADDED synced; validate-spec-map and validate-artifact-names OK
-- Change moved to `openspec/changes/archive/2026-09-20-store-owned-active-decisions-gauge/`
-- CI in progress on run 35529457882 (Main Process, Race detector)
+- One OPEN PR 129 reused; title `⚡️ perf(decisionstore): store-owned active_decisions gauge`
+- comments none; no replies
+- Required checks on head `a1f24169` succeeded: Main Process, Race detector (run 35529539040); e2e docker+pester, binary+mock, go+dragonfly (run 35529539013)
 
 ### Rank-up moves
 None.

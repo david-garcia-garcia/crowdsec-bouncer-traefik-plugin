@@ -41,3 +41,9 @@ phase: archive
 findings: fold usage-metrics and decisionstore; catalog synced; folder moved
 fixed: none
 skipped: none
+
+## pullrequest (2026-09-20)
+phase: pullrequest
+findings: reused PR 129; WIP dropped; required CI succeeded
+fixed: none
+skipped: none
