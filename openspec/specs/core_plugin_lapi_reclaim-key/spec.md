@@ -1,6 +1,6 @@
 ## Purpose
 
-How this plugin keys a reclaimed `lapi.Client`: the stream/alone `Open` key is `lapi:stream:` plus `SessionHex` plus a hash of Redis store parameters, so routers that share one CrowdSec cursor row and one Redis share one Client even when intervals or `decisionScopeHeaders` differ; live/none `Key` is `lapi:` plus `SessionHex` plus a hash of the identity payload (Redis store parameters and `MetricsUpdateIntervalSeconds`), so a metrics-interval mismatch Opens a sibling Client. A second stream `New` on the same cursor and Redis Opens that same key and Wakes a sleeper instead of warn-and-wire; there is no `PeekLivePrefix`. An unreclaimed Client waits process-table `ProcessGrace` 30s. Redis keys stay prefixed with `SessionHex`, so changing an Open key never migrates cache.
+How this plugin keys a reclaimed `lapi.Client`: the stream/alone `Open` key is `lapi:stream:` plus `SessionHex` (mode + LAPI scheme/host/path + lapiKey), so routers that share one CrowdSec cursor row share one Client even when Redis or intervals differ; live/none `Key` is `lapi:` plus `SessionHex` plus a hash of the identity payload (Redis store parameters and `MetricsUpdateIntervalSeconds`), so a metrics-interval mismatch Opens a sibling Client. A second stream `New` on the same session Opens that same key (subscribe or Wake) with first-wins WARN for session-owned knobs; there is no `PeekLivePrefix`. An unreclaimed Client waits process-table `ProcessGrace` 30s. Redis keys stay prefixed with `SessionHex`, so changing an Open key never migrates cache.
 
 ## Requirements
 
