@@ -7,7 +7,7 @@ ciHost: github
 repoSlug: crowdsec-bouncer-traefik-plugin
 destBranch: master
 qualify: qualified
-src: 5d626531ab0502ecb307b7e4bd572b2ea693ac62d8691eed86dbf8d67e4e0103
+src: a729cfc2276336496284b8517270e2aaaf88cae03383165c67a3592e2746a4a1
 localTests: none
 requirement: requirement.md
 comments: none

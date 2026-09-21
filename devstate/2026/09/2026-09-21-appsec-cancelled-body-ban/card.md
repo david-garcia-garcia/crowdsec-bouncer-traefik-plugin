@@ -2,8 +2,8 @@
 
 | Phase | Work | Card | Duration |
 | --- | --- | --- | --- |
-| Prepare | done | done | 1m |
-| Explore | done | done | 2m |
+| Prepare | done | done | 9m |
+| Explore | done | done | — |
 | Propose | — | — | — |
 | Implement | — | — | — |
 | Code review | — | — | — |
@@ -11,7 +11,7 @@
 | Archive | — | — | — |
 | Pull request | — | — | — |
 
-Last updated: 2026-09-21 16:32 UTC
+Last updated: 2026-09-21 16:37 UTC
 
 ## Motivation
 Not yet.
@@ -32,7 +32,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 3e130b2f
+Reviewed head: 07c68363
 Owner decision: None.
 
 ## Review scores
@@ -63,7 +63,7 @@ None.
 None.
 
 ## How this fits together
-Ticket https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/395 on branch 2026-09-21-appsec-cancelled-body-ban targeting main; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/133; CI not seen.
+Ticket https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/395 on branch 2026-09-21-appsec-cancelled-body-ban targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/133; CI not seen.
 
 ## Explore Decisions
 None.
@@ -84,7 +84,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 3e130b2fff0e904b57a0ae85da7d7261fc32e327 | Card must match the branch you measured |
+| Reviewed head | 07c68363e1567d7f92ff5be6a8523c81598efb54 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -98,7 +98,7 @@ Is this the best way to solve the issue? Not yet.
 
 ### Evidence
 What I checked:
-- assembled from the run bus (`deliver_card`, 3e130b2fff0e904b57a0ae85da7d7261fc32e327)
+- assembled from the run bus (`deliver_card`, 07c68363e1567d7f92ff5be6a8523c81598efb54)
 
 ### Rank-up moves
 None.
