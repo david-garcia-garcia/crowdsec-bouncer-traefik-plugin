@@ -115,3 +115,12 @@ AppSec HTTP construct SHALL set `http.Client.Timeout` and the stored timeout sec
 #### Scenario: AppSec timeout knobs do not change Key
 - **WHEN** two AppSec configs share URL, key, and body limit and differ only on `HTTPTimeoutSeconds` or `CrowdsecAppsecHTTPTimeoutSeconds`
 - **THEN** `Key` and `IdentityHex` are the same
+
+### Requirement: Client disconnect while buffering is not an AppSec query
+When `Query` copies a readable POST, PUT, PATCH, or DELETE body and `io.ReadAll` fails with `context.Canceled`, `context.DeadlineExceeded`, or `io.ErrUnexpectedEOF`, `Query` SHALL return `ErrClientDisconnected` and MUST NOT send a request to the AppSec listener. `crowdsecAppsecFailureAction` SHALL NOT change that result. Unclassified body-read errors SHALL keep `appsecQuery:GetBody`. Serving the disconnect (TRACE, optional remediation header, no ban, no origin) is owned by `core_plugin_middleware_bouncer`.
+
+#### Scenario: Canceled body does not reach AppSec
+- **WHEN** buffering a readable POST body fails with `context.Canceled`
+- **THEN** `Query` returns `ErrClientDisconnected`
+- **AND** the AppSec listener is not called
+- **AND** `crowdsecAppsecFailureAction: ban` does not change that

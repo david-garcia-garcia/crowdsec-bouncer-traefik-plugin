@@ -46,7 +46,7 @@ func newReadablePostWithFailingBody(readErr error) *http.Request {
 	return req
 }
 
-func assertClientBodyDroppedPassthrough(t *testing.T, readErr error) {
+func assertClientDisconnectedQuery(t *testing.T, readErr error, failureAction string) {
 	t.Helper()
 	var appsecHits int
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
@@ -57,37 +57,12 @@ func assertClientBodyDroppedPassthrough(t *testing.T, readErr error) {
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
 	client := newQueryClient(appsecURL, appsecServer.Client())
-	decision, err := client.Query("1.2.3.4", newReadablePostWithFailingBody(readErr), Policy{FailureAction: configuration.FailureActionPassthrough})
-	if err != nil {
-		t.Fatalf("Query() passthrough returned error: %v", err)
-	}
-	if decision == nil || decision.Action != ActionAllow {
-		t.Fatalf("Query() want allow, got %#v", decision)
-	}
-	if appsecHits != 0 {
-		t.Fatalf("AppSec server called %d times, want 0", appsecHits)
-	}
-}
-
-func assertClientBodyDroppedBan(t *testing.T, readErr error) {
-	t.Helper()
-	var appsecHits int
-	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		appsecHits++
-		rw.WriteHeader(http.StatusOK)
-	}))
-	defer appsecServer.Close()
-	appsecURL, _ := url.Parse(appsecServer.URL)
-	client := newQueryClient(appsecURL, appsecServer.Client())
-	decision, err := client.Query("1.2.3.4", newReadablePostWithFailingBody(readErr), Policy{FailureAction: configuration.FailureActionBan})
-	if err == nil {
-		t.Fatal("Query() ban expected error, got nil")
+	decision, err := client.Query("1.2.3.4", newReadablePostWithFailingBody(readErr), Policy{FailureAction: failureAction})
+	if !errors.Is(err, ErrClientDisconnected) {
+		t.Fatalf("Query() error %v want ErrClientDisconnected", err)
 	}
 	if decision != nil {
 		t.Fatalf("Query() expected no decision, got %#v", decision)
-	}
-	if !strings.Contains(err.Error(), "appsecQuery:clientBodyDropped") {
-		t.Fatalf("Query() error %q want appsecQuery:clientBodyDropped", err.Error())
 	}
 	if appsecHits != 0 {
 		t.Fatalf("AppSec server called %d times, want 0", appsecHits)
@@ -120,9 +95,9 @@ func assertUnclassifiedBodyReadStillGetBody(t *testing.T) {
 	}
 }
 
-// Test_appsecQuery_clientBodyDroppedFailureAction is a regression for
+// Test_appsecQuery_clientDisconnected is a regression for
 // https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/395
-func Test_appsecQuery_clientBodyDroppedFailureAction(t *testing.T) {
+func Test_appsecQuery_clientDisconnected(t *testing.T) {
 	clientGoneErrs := []struct {
 		name string
 		err  error
@@ -132,11 +107,11 @@ func Test_appsecQuery_clientBodyDroppedFailureAction(t *testing.T) {
 		{name: "unexpected EOF", err: io.ErrUnexpectedEOF},
 	}
 	for _, goneCase := range clientGoneErrs {
-		t.Run(goneCase.name+"/passthrough", func(t *testing.T) {
-			assertClientBodyDroppedPassthrough(t, goneCase.err)
+		t.Run(goneCase.name+"/ban-action-still-disconnects", func(t *testing.T) {
+			assertClientDisconnectedQuery(t, goneCase.err, configuration.FailureActionBan)
 		})
-		t.Run(goneCase.name+"/ban", func(t *testing.T) {
-			assertClientBodyDroppedBan(t, goneCase.err)
+		t.Run(goneCase.name+"/passthrough-action-still-disconnects", func(t *testing.T) {
+			assertClientDisconnectedQuery(t, goneCase.err, configuration.FailureActionPassthrough)
 		})
 	}
 	t.Run("unclassified read error keeps GetBody wrap", assertUnclassifiedBodyReadStillGetBody)

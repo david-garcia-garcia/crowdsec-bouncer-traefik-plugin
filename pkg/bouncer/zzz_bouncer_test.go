@@ -1,6 +1,9 @@
 package bouncer
 
 import (
+	"bytes"
+	"context"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -487,6 +490,94 @@ func TestHandleNextServeHTTPAllowCallsNext(t *testing.T) {
 	if !nextCalled {
 		t.Fatal("next handler should be called for allow")
 	}
+}
+
+// failingBodyForDisconnectTest simulates a readable POST whose Read fails mid-copy.
+type failingBodyForDisconnectTest struct {
+	err error
+}
+
+func (b failingBodyForDisconnectTest) Read(_ []byte) (int, error) {
+	return 0, b.err
+}
+
+func (failingBodyForDisconnectTest) Close() error { return nil }
+
+type statusWatchRecorder struct {
+	*httptest.ResponseRecorder
+	wroteStatus bool
+}
+
+func (r *statusWatchRecorder) WriteHeader(code int) {
+	r.wroteStatus = true
+	r.ResponseRecorder.WriteHeader(code)
+}
+
+// TestHandleNextServeHTTP_clientDisconnected is a regression for
+// https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/395
+func TestHandleNextServeHTTP_clientDisconnected(t *testing.T) {
+	var appsecHits int
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		appsecHits++
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+	appsecURL, err := url.Parse(appsecServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var logBuf bytes.Buffer
+	traceLog := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: logger.LevelTrace}))
+	lapiClient, _ := lapi.NewTestClient(logger.New("ERROR", ""))
+	lapi.AttachTestMetricsReporter(lapiClient)
+	nextCalled := false
+	b := &Bouncer{
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			nextCalled = true
+		}),
+		appsecEnabled:           true,
+		appsecFailureAction:     configuration.FailureActionBan,
+		remediationStatusCode:   http.StatusForbidden,
+		remediationCustomHeader: "X-Remediation",
+		log:                     traceLog,
+		lapiClient:              lapiClient,
+		appsecClient:            appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")),
+	}
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", failingBodyForDisconnectTest{err: context.Canceled})
+	req.ContentLength = 100
+	rw := &statusWatchRecorder{ResponseRecorder: httptest.NewRecorder()}
+	b.handleNextServeHTTP(rw, testClientRequest(req, "192.0.2.10"))
+	if nextCalled {
+		t.Fatal("origin must not run after client disconnect")
+	}
+	if appsecHits != 0 {
+		t.Fatalf("AppSec called %d times, want 0", appsecHits)
+	}
+	if rw.wroteStatus {
+		t.Fatalf("must not WriteHeader; got status %d", rw.Code)
+	}
+	if got := rw.Header().Get("X-Remediation"); got != remediationHeaderClientDisconnected {
+		t.Fatalf("header=%q want %q", got, remediationHeaderClientDisconnected)
+	}
+	if got := lapiClient.TestDroppedCount(lapi.OriginPluginAppsecFailure, "ipv4", "ban"); got != 0 {
+		t.Fatalf("dropped ban count=%d want 0", got)
+	}
+	logged := logBuf.String()
+	if !strings.Contains(logged, "client disconnected while buffering AppSec body") {
+		t.Fatalf("TRACE log missing disconnect line: %s", logged)
+	}
+
+	t.Run("INFO logger stays silent", func(t *testing.T) {
+		var infoBuf bytes.Buffer
+		infoLog := slog.New(slog.NewJSONHandler(&infoBuf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+		b.log = infoLog
+		req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", failingBodyForDisconnectTest{err: context.Canceled})
+		req.ContentLength = 100
+		b.handleNextServeHTTP(httptest.NewRecorder(), testClientRequest(req, "192.0.2.10"))
+		if infoBuf.Len() != 0 {
+			t.Fatalf("INFO log should be empty, got %s", infoBuf.String())
+		}
+	})
 }
 
 func TestTwoBouncersDistinctLapiFailureActions(t *testing.T) {

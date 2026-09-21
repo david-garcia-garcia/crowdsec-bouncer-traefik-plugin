@@ -55,7 +55,7 @@ Outside facts: `knowledge/research/std_go_net-http_body-read-errors/notes.md`.
 - **Seam:** classify or fail-open in `pkg/appsec/query.go` `newAppsecBodyRequest` when `io.ReadAll` fails (before AppSec `Do`). Keep `applyAppsecServeHTTP` ban mapping for genuine AppSec failures.
 - **Rejected:** extend `isBodyUnreadable` for mid-stream errors — that gate means “never start buffering”; cancel happens on readable CL requests.
 - **Rejected:** new public config knob first — requirement and #395 prefer pass-through spirit; fork already centralizes fallbacks on `crowdsecAppsecFailureAction`.
-- **Fix-shape lean:** wire **client-disconnect** read errors through existing `resultForFailureActionErr` in `newAppsecBodyRequest` (same family as unreadable-body / unreachable), **not** a silent always-pass that ignores `FailureAction`. Pure “silent pass-through” without honoring `ban`/`captcha` is rejected for this fork unless propose finds spec pressure otherwise.
+- **Fix-shape lean:** stop without ban, origin, or FailureAction; TRACE log; optional `error:client-disconnected` header for Traefik access logs. Requester confirmed.
 - **Proving test (implement):** table in `pkg/appsec/zzz_query_test.go` (requirement Affected); assert today’s `GetBody` error + optional bouncer overlay pattern; after fix assert passthrough allows without AppSec call / without 403.
 - **Live contract:** `openspec/specs/core_plugin_appsec_failure-action` + `core_plugin_appsec_client`. Failure-action covers 500, unreachable, unreadable H2/H3 body (no CL), and **AppSec response-body** io — **does not** mention client request-body `GetBody` / mid-buffer read failure. Propose may **ADD** a scenario on that family; client spec covers copy/limit methods only.
 
@@ -68,8 +68,8 @@ Outside facts: `knowledge/research/std_go_net-http_body-read-errors/notes.md`.
 
 - Q: Fix shape — silent pass-through vs `resultForFailureAction` vs new knob?
   Rank: bounded asked — changes `newAppsecBodyRequest` error contract; **1** caller (`applyAppsecServeHTTP`) enumerated in `pkg/bouncer/bouncer.go`
-  Decision: assumed — classify client-gone errors (`context.Canceled`, `context.DeadlineExceeded`, `io.ErrUnexpectedEOF`) and route through `resultForFailureActionErr` with a dedicated message (e.g. `appsecQuery:clientBodyDropped`); `passthrough` → allow without AppSec POST; `ban`/`captcha` keep today’s drop semantics; no new knob.
-  By: explore
+  Decision: resolved — stop without ban, origin, or FailureAction; TRACE log; optional `remediationHeadersCustomName=error:client-disconnected`. Requester confirmed 2026-09-21 (chat).
+  By: implement
 
 - Q: Which read errors count as client-gone vs genuine fault?
   Rank: additive asked — Desired names cancel, H2 CANCEL, unexpected EOF

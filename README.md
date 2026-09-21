@@ -355,7 +355,7 @@ Redis replica hosts for reads (round-robin). Falls back to `RedisCacheHost` when
 Block the request when Redis is unreachable (adds a 1-second delay per request).
 
 **RemediationHeadersCustomName** (string, default `""`)
-Response header name when the plugin handles the request. Header value is `ban`, `captcha`, or `solved-captcha`.
+Response header name when the plugin handles the request. Header value is `ban`, `captcha`, `solved-captcha`, or `error:client-disconnected` (client dropped the body while AppSec was buffering; not a ban). Include this header in Traefik `accessLog.fields.headers` if you want disconnects in access logs. Empty disables the header.
 
 **RemediationStatusCode** (int, default `403`)
 HTTP status for a banned user (not captcha).
