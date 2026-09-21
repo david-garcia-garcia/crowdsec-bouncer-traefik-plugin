@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
 // publishedSlots is one immutable lookup map. atomic.Value stores *publishedSlots, not the map (Yaegi).
@@ -17,12 +18,13 @@ type publishedSlots struct {
 // memory is in-process COW tick/published LiveSlot maps plus the Range blob.
 type memory struct {
 	log        *slog.Logger
-	origins    *intern.Table       // origin name → id packed into LiveSlot.Word
-	mu         sync.RWMutex        // tick, ticking, rangeIndex; not lookup
-	ticking    bool                // stream window: PutMany/DeleteMany write tick; Lookup reads published
-	tick       map[string]LiveSlot // unpublished clone; SlotKey → packed word + elapsed expiry
-	published  atomic.Value        // *publishedSlots; request-path snapshot, not atomic.Pointer (Yaegi v0.16)
-	rangeIndex string              // Range CIDR=kind blob; membership is rebuilt from this
+	origins    *intern.Table            // origin name → id packed into LiveSlot.Word
+	mu         sync.RWMutex             // tick, ticking, rangeIndex, active; not lookup
+	ticking    bool                     // stream window: PutMany/DeleteMany write tick; Lookup reads published
+	tick       map[string]LiveSlot      // unpublished clone; SlotKey → packed word + elapsed expiry
+	published  atomic.Value             // *publishedSlots; request-path snapshot, not atomic.Pointer (Yaegi v0.16)
+	active     map[ActiveCountKey]int64 // last PublishTick walk of published; not adjusted on Put/Delete
+	rangeIndex string                   // Range CIDR=kind blob; membership is rebuilt from this
 }
 
 // newMemory allocates non-nil tick and an empty published snapshot.
@@ -31,6 +33,7 @@ func newMemory(log *slog.Logger, origins *intern.Table) *memory {
 		log:     log,
 		origins: origins,
 		tick:    map[string]LiveSlot{},
+		active:  map[ActiveCountKey]int64{},
 	}
 	mem.storePublished(map[string]LiveSlot{})
 	return mem
@@ -61,23 +64,27 @@ func (m *memory) BeginTick() {
 	m.ticking = true
 }
 
-// PublishTick drops expired tick slots, publishes tick, and closes the window.
+// PublishTick drops expired tick slots, publishes tick, recounts ActiveCounts, and closes the window.
+// The walk runs after the published snapshot exists so the gauge matches lookup, including TTL drops.
 func (m *memory) PublishTick(now int32) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if !m.ticking {
 		return
 	}
-	var expired []string
-	for key, slot := range m.tick {
-		if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
-			expired = append(expired, key)
+	if now != 0 {
+		var expired []string
+		for key, slot := range m.tick {
+			if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
+				expired = append(expired, key)
+			}
+		}
+		for _, key := range expired {
+			delete(m.tick, key)
 		}
 	}
-	for _, key := range expired {
-		delete(m.tick, key)
-	}
 	m.storePublished(m.tick)
+	m.active = countPublishedSlots(m.publishedMapValue())
 	m.tick = map[string]LiveSlot{}
 	m.ticking = false
 }
@@ -114,20 +121,22 @@ func (m *memory) putSlot(slots map[string]LiveSlot, item Decision) {
 	if key == "" {
 		return
 	}
-	slots[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
+	slots[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin, item.Value), item.DurationSec)
 }
 
-// pack encodes a uint32 word. Intern overflow Warns and uses origin id 0.
-func (m *memory) pack(kind, origin string) uint32 {
+// pack encodes kind, intern origin id, and FamilyOfHostOrCIDR(value) into one uint32.
+// Intern overflow Warns and packs origin id 0; family is still packed.
+func (m *memory) pack(kind, origin, value string) uint32 {
+	family := ip.FamilyOfHostOrCIDR(value)
 	if m.origins != nil {
 		if originID, ok := m.origins.ID(origin); ok {
-			return packWord(kind, originID)
+			return packWord(kind, originID, family)
 		}
 		if m.log != nil {
 			m.log.Warn("decisionstore:intern overflow", "kind", kind, "origin", origin)
 		}
 	}
-	return packWord(kind, 0)
+	return packWord(kind, 0, family)
 }
 
 // DeleteMany drops canonical slots and prior Ip spellings from tick or the published map.
@@ -167,6 +176,17 @@ func (m *memory) deleteTickLocked(scope, value string) {
 	if priorSpelling != "" && priorSpelling != key {
 		delete(m.tick, priorSpelling)
 	}
+}
+
+// activeCounts copies the last PublishTick origin×family walk. Live Put does not PublishTick.
+func (m *memory) activeCounts() map[ActiveCountKey]int64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make(map[ActiveCountKey]int64, len(m.active))
+	for key, value := range m.active {
+		out[key] = value
+	}
+	return out
 }
 
 // LookupRemediation reads the published snapshot (Ip, header scopes, Range). Expired slots miss.

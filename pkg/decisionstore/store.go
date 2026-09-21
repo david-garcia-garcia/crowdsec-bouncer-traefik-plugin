@@ -18,41 +18,44 @@ import (
 // engine is the slot and Range ops bound at NewMemory or NewRedis.
 // Funcs, not an interface: Yaegi v0.16 panics putting a map-holding *memory in an interface.
 type engine struct {
-	beginTick   func()
-	publishTick func(int32)
-	putMany     func([]Decision)
-	deleteMany  func([]Decision)
-	lookup      func(string, net.IP, map[string]string, *RangeMembership) (string, string, uint16, error)
-	applyRange  func(map[string]string, []string) error
-	rangeIndex  func() (string, error)
-	close       func()
+	beginTick    func()
+	publishTick  func(int32)
+	putMany      func([]Decision)
+	deleteMany   func([]Decision)
+	activeCounts func() map[ActiveCountKey]int64 // memory: last PublishTick walk; Redis: always empty
+	lookup       func(string, net.IP, map[string]string, *RangeMembership) (string, string, uint16, error)
+	applyRange   func(map[string]string, []string) error
+	rangeIndex   func() (string, error)
+	close        func()
 }
 
 // memoryEngine binds *memory methods into engine funcs.
 func memoryEngine(mem *memory) engine {
 	return engine{
-		beginTick:   mem.BeginTick,
-		publishTick: mem.PublishTick,
-		putMany:     mem.PutMany,
-		deleteMany:  mem.DeleteMany,
-		lookup:      mem.LookupRemediation,
-		applyRange:  mem.ApplyRangeBatch,
-		rangeIndex:  mem.RangeIndex,
-		close:       func() {},
+		beginTick:    mem.BeginTick,
+		publishTick:  mem.PublishTick,
+		putMany:      mem.PutMany,
+		deleteMany:   mem.DeleteMany,
+		activeCounts: mem.activeCounts,
+		lookup:       mem.LookupRemediation,
+		applyRange:   mem.ApplyRangeBatch,
+		rangeIndex:   mem.RangeIndex,
+		close:        func() {},
 	}
 }
 
 // redisEngine binds *redis methods into engine funcs.
 func redisEngine(red *redis) engine {
 	return engine{
-		beginTick:   red.BeginTick,
-		publishTick: red.PublishTick,
-		putMany:     red.PutMany,
-		deleteMany:  red.DeleteMany,
-		lookup:      red.LookupRemediation,
-		applyRange:  red.ApplyRangeBatch,
-		rangeIndex:  red.RangeIndex,
-		close:       red.close,
+		beginTick:    red.BeginTick,
+		publishTick:  red.PublishTick,
+		putMany:      red.PutMany,
+		deleteMany:   red.DeleteMany,
+		activeCounts: red.activeCounts,
+		lookup:       red.LookupRemediation,
+		applyRange:   red.ApplyRangeBatch,
+		rangeIndex:   red.RangeIndex,
+		close:        red.close,
 	}
 }
 
@@ -87,12 +90,14 @@ func NewMemory(log *slog.Logger) *Store {
 }
 
 // NewRedis stores Ip, header-scope, and Range on Redis (keyPrefix namespaces keys).
+// intern stays in-process (no Redis intern table). ActiveCounts is always empty.
 func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string) *Store {
+	origins := intern.New()
 	red := newRedis(log, writeHost, readHosts, pass, database, keyPrefix)
 	return &Store{
 		engine:     redisEngine(red),
 		red:        red,
-		origins:    intern.New(),
+		origins:    origins,
 		engineName: "redis",
 	}
 }
@@ -160,9 +165,9 @@ func (s *Store) BeginTick() {
 	s.engine.beginTick()
 }
 
-// PublishTick closes that window. Memory drops expired tick slots and publishes tick.
+// PublishTick closes that window. Memory drops expired tick slots, publishes tick, then recounts ActiveCounts.
 // now is elapsed seconds on the package clock (ElapsedNow), not wall Unix; 0 skips the expiry sweep.
-// Redis is a no-op: key TTL is the expiry.
+// Redis is a no-op: key TTL is the expiry, and ActiveCounts stays empty.
 func (s *Store) PublishTick(now int32) {
 	s.engine.publishTick(now)
 }
@@ -230,6 +235,7 @@ func (s *Store) RangeIndex() (string, error) {
 }
 
 // ApplyRangeBatch upserts and removes Range CIDRs, then rebuilds in-process membership.
+// Range is omitted from ActiveCounts: the memory walk covers LiveSlot keys only.
 func (s *Store) ApplyRangeBatch(upserts map[string]string, removals []string) error {
 	if err := s.engine.applyRange(upserts, removals); err != nil {
 		return err

@@ -17,9 +17,9 @@ After the body is decoded, apply deleted first so a same-window replacement stay
 ## How to use
 
 - Keep GET, decode, and apply in `fetchAndApplyStreamDecisions`.
-- Call `decisionStore.BeginTick` before the loops and `PublishTick(decisionstore.ElapsedNow())` after (defer). Memory hides tick writes until publish and sweeps tick slots on elapsed `now`. Redis tick is a no-op and ignores `now`.
-- Loop `stream.Deleted` first: Ip/header `DeleteMany` in `PutManyChunk` flushes, Range CIDRs into removals, `forgetActiveDecision`.
-- Then loop `stream.New`: Ip/header `PutMany` in `PutManyChunk` flushes, Range CIDRs into upserts via `KindOriginString`, `rememberActiveDecision`.
+- Call `decisionStore.BeginTick` before the loops and `PublishTick(decisionstore.ElapsedNow())` after (defer). Memory hides tick writes until publish, sweeps tick slots on elapsed `now`, then recounts `ActiveCounts` from the published map. Redis tick is a no-op and ignores `now`.
+- Loop `stream.Deleted` first: Ip/header `DeleteMany` in `PutManyChunk` flushes, Range CIDRs into removals.
+- Then loop `stream.New`: Ip/header `PutMany` in `PutManyChunk` flushes, Range CIDRs into upserts via `KindOriginString`.
 - Call `decisionStore.ApplyRangeBatch` once with those maps. Inside the batch, apply removals before upserts so a CIDR in both maps remains the replacement.
 - Hydrate Range membership from the store after the batch (`HydrateRange` at stream start; membership follows the blob).
 - Do not GET+SET per Range line. Do not split the batch into two store writes. Do not acquire `updated`.
@@ -30,10 +30,10 @@ After the body is decoded, apply deleted first so a same-window replacement stay
 c.decisionStore.BeginTick()
 defer c.decisionStore.PublishTick(decisionstore.ElapsedNow())
 for _, decision := range stream.Deleted {
-	// streamDeleteItem + DeleteMany (PutManyChunk flushes) or collect Range removal + forget
+	// streamDeleteItem + DeleteMany (PutManyChunk flushes) or collect Range removal
 }
 for _, decision := range stream.New {
-	// streamPutItem + PutMany (PutManyChunk flushes) or collect Range upsert + remember
+	// streamPutItem + PutMany (PutManyChunk flushes) or collect Range upsert
 }
 if err := c.decisionStore.ApplyRangeBatch(rangeUpserts, rangeRemovals); err != nil {
 	return err

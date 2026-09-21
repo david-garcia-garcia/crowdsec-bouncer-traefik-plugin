@@ -63,7 +63,7 @@ func benchLiveSnapshot(b *testing.B) map[string]LiveSlot {
 func benchPackedBan() uint32 {
 	table := intern.New()
 	originID, _ := table.ID("o")
-	return packWord(decisionscope.BannedValue, originID)
+	return packWord(decisionscope.BannedValue, originID, "ipv4")
 }
 
 func benchSnapshotGet(snapshot map[string]LiveSlot) func(string) any {
@@ -94,7 +94,7 @@ func BenchmarkHeapRetained_LiveMap100k(b *testing.B) {
 		snapshot := make(map[string]LiveSlot, benchLiveEntries)
 		for n := range benchLiveEntries {
 			key := fmt.Sprintf("10.%d.%d.%d", n>>16&0xff, n>>8&0xff, n&0xff)
-			snapshot[key] = LiveSlot{Word: packWord(decisionscope.BannedValue, 1), ExpiresAt: math.MaxInt32}
+			snapshot[key] = LiveSlot{Word: packWord(decisionscope.BannedValue, 1, "ipv4"), ExpiresAt: math.MaxInt32}
 		}
 		b.SetBytes(int64(len(snapshot)) * 68)
 	}

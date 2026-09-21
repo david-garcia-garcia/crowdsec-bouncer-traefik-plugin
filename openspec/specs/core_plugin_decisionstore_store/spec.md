@@ -1,5 +1,5 @@
 ## Purpose\n\nThe reclaim value that holds CrowdSec Ip, header, and Range decisions on a memory or Redis engine.\n\n## Requirements\n\n### Requirement: DecisionStore is a reclaim value that owns the engine
-A DecisionStore SHALL be `pkg/decisionstore.Store`, opened with `reclaim.OpenWithHooks` on the process table using the same Traefik `New` context as `lapi.OpenStream` / `OpenLive`. Callers SHALL Peek that store key before Open (`core_plugin_lapi_reclaim-key`). `lapi.OpenDecisionStore` SHALL take the Traefik name so create() can write `createdBy`. The store SHALL bind engine funcs at `NewMemory` or `NewRedis` (`memoryEngine` / `redisEngine`): BeginTick, PublishTick, PutMany, DeleteMany, LookupRemediation, ApplyRangeBatch, RangeIndex, Close. Put and Delete SHALL be one-item wrappers around PutMany and DeleteMany. A constructed Store SHALL always have those callbacks. Store methods MUST NOT nil-check `s` or the engine funcs. Close SHALL be safe to call more than once on a real Redis store; tests MUST NOT Close a nil `*Store`. Dispatch MUST NOT be a backend interface and MUST NOT branch `if mem` / `if red` on every method. Yaegi-safe: the engine MUST NOT put a map-holding type in an interface; `map[string]LiveSlot` SHALL always be non-nil; intern SHALL be `[]string` plus `map[string]uint16`; Store `atomic.Value` SHALL hold only `*RangeMembership` and `string`. Memory published slots SHALL be `atomic.Value` of `*publishedSlots` (not the map). Memory `LookupRemediation` MUST NOT take `mu`; writers still `Lock` to clone and Store. The store SHALL install Sleep and Wake hooks that only log; they MUST NOT drain Redis or drop maps. The package MUST NOT keep a process-wide map or a `sync.Once`. Callers MUST NOT import utilities `reclaim`. There SHALL NOT be a second `liveStore` type: live/none memo is Store Put and Lookup. `pkg/cache` MUST NOT exist as the DecisionStore bag. Client address, when this leaf mentions it, SHALL reuse `pkg/ip.GetRemoteIP`. CrowdSec cursor identity SHALL reuse `SessionHex` / `streamSession`.
+A DecisionStore SHALL be `pkg/decisionstore.Store`, opened with `reclaim.OpenWithHooks` on the process table using the same Traefik `New` context as `lapi.OpenStream` / `OpenLive`. Callers SHALL Peek that store key before Open (`core_plugin_lapi_reclaim-key`). `lapi.OpenDecisionStore` SHALL take the Traefik name so create() can write `createdBy`. The store SHALL bind engine funcs at `NewMemory` or `NewRedis` (`memoryEngine` / `redisEngine`): BeginTick, PublishTick, PutMany, DeleteMany, ActiveCounts, LookupRemediation, ApplyRangeBatch, RangeIndex, Close. Put and Delete SHALL be one-item wrappers around PutMany and DeleteMany. A constructed Store SHALL always have those callbacks. Store methods MUST NOT nil-check `s` or the engine funcs. Close SHALL be safe to call more than once on a real Redis store; tests MUST NOT Close a nil `*Store`. Dispatch MUST NOT be a backend interface and MUST NOT branch `if mem` / `if red` on every method. Yaegi-safe: the engine MUST NOT put a map-holding type in an interface; `map[string]LiveSlot` SHALL always be non-nil; intern SHALL be `[]string` plus `map[string]uint16`; Store `atomic.Value` SHALL hold only `*RangeMembership` and `string`. Memory published slots SHALL be `atomic.Value` of `*publishedSlots` (not the map). Memory `LookupRemediation` MUST NOT take `mu`; writers still `Lock` to clone and Store. The store SHALL install Sleep and Wake hooks that only log; they MUST NOT drain Redis or drop maps. The package MUST NOT keep a process-wide map or a `sync.Once`. Callers MUST NOT import utilities `reclaim`. There SHALL NOT be a second `liveStore` type: live/none memo is Store Put and Lookup. `pkg/cache` MUST NOT exist as the DecisionStore bag. Client address, when this leaf mentions it, SHALL reuse `pkg/ip.GetRemoteIP`. CrowdSec cursor identity SHALL reuse `SessionHex` / `streamSession`.
 
 #### Scenario: Interval mismatch still shares one store
 - **WHEN** two live `New` calls use the same Traefik name, the same LAPI URL and key, and the same Redis store parameters and differ only on `updateIntervalSeconds`
@@ -164,7 +164,7 @@ Store errors SHALL be the package sentinels `ErrMiss` and `ErrUnreachable`. Thei
 - **AND** `err.Error()` is `store:unreachable`
 
 ### Requirement: DecisionStore owns the origin intern table
-A DecisionStore SHALL own a `pkg/intern.Table` (`names []string` index-is-id, `byName` string→`uint16`; empty name is id 0; lock-free `Name` for a known id). CrowdSec `Pack`/`Unpack`/`KindOriginString` SHALL live in `pkg/decisionstore`. The pack word SHALL be `uint32(kind[0]) | uint32(id)<<8`. The table MUST NOT be a package variable. Two DecisionStores with different reclaim keys MUST NOT share the table. Intern MUST stay off `lapi.Client` except thin forwards tests need. When intern would overflow `uint16`, the store SHALL log at Warn and SHALL store a kind-only packed word with origin id `0` (generic empty intern name) on memory, and SHALL store `KindOriginString(kind, origin)` on Redis without a leftover U+001F string. Redis slots SHALL be `KindOriginString` (kind, then newline, then origin; bare kind when origin is empty). Memory Ip and header writes SHALL Pack into the word map. Range-index blobs SHALL use `KindOriginString`, never a packed intern id in the blob. `HeaderScopeKey` and `IPCacheKey` SHALL live in `pkg/decisionstore`.
+A DecisionStore SHALL own a `pkg/intern.Table` (`names []string` index-is-id, `byName` string→`uint16`; empty name is id 0; lock-free `Name` for a known id). CrowdSec `Pack`/`Unpack`/`KindOriginString` SHALL live in `pkg/decisionstore`. The pack word SHALL be `uint32(kind[0]) | uint32(id)<<8 | familyCode<<24` (`familyCode` 1=`ipv4`, 2=`ipv6`, 0=empty). Unpack origin id SHALL be `uint16(word>>8)` so bits 24–25 do not collide. Memory Put SHALL classify family with `FamilyOfHostOrCIDR` on the decision value once. The table MUST NOT be a package variable. Two DecisionStores with different reclaim keys MUST NOT share the table. Intern MUST stay off `lapi.Client` except thin forwards tests need. When intern would overflow `uint16`, the store SHALL log at Warn and SHALL store a kind-only packed word with origin id `0` (generic empty intern name) on memory, and SHALL store `KindOriginString(kind, origin)` on Redis without a leftover U+001F string. Redis slots SHALL be `KindOriginString` (kind, then newline, then origin; bare kind when origin is empty). Memory Ip and header writes SHALL Pack into the word map. Range-index blobs SHALL use `KindOriginString`, never a packed intern id in the blob. `HeaderScopeKey` and `IPCacheKey` SHALL live in `pkg/decisionstore`.
 
 #### Scenario: Memory stream IP write packs the intern id
 - **WHEN** stream/alone memory stores an Ip ban whose origin is `crowdsec`
@@ -227,3 +227,42 @@ Stream/alone and live/none request lookup SHALL call `Store.LookupRemediation(re
 #### Scenario: Unreachable read preserves the shared index
 - **WHEN** RangeIndex answers `store:unreachable` and a poll would upsert a new Range CIDR
 - **THEN** `ApplyRangeBatch` returns the error and the stored `range-index` still holds the CIDRs it held before
+
+### Requirement: DecisionStore owns the active-decision group-by
+A DecisionStore SHALL expose `ActiveCounts` as a snapshot copy of `{originID uint16, family} → int64` for Ip and header-scope slots. The gauge is the engine's job. Memory SHALL recount from the published LiveSlot map after PublishTick builds that snapshot (including after the elapsed-expiry sweep when `now` is not `0`). PutMany, DeleteMany, and live copy-on-write MUST NOT increment or decrement a running map. Live/none memo Put MUST NOT PublishTick, so `ActiveCounts` SHALL stay empty. Range MUST NOT be counted: `ApplyRangeBatch` MUST NOT appear in the published LiveSlot walk; the store MUST NOT Peek membership or query Range Helper Contains for metrics. Redis `ActiveCounts` SHALL be empty: per-key SET has no slot inventory, and SCAN+MGET or a HASH of slots would be a storage redesign only for this gauge. Overwrite of an existing canonical slot SHALL appear as the last origin after the next memory PublishTick. A prior-spelling extra DEL MUST NOT be a second gauge event. `ActiveCounts` MUST NOT expose `usageMetricKey` or LAPI item JSON. Family SHALL be the packed family code from that word (`FamilyOfHostOrCIDR` at memory Put on the decision value; header-scope Country/AS POST empty `ip_type`). The PublishTick walk MUST NOT parse the slot key. Intern overflow SHALL count origin id `0`. Dispatch MUST NOT add a Go engine interface for this gauge.
+
+#### Scenario: Stream Ip Put increments the compact map
+- **WHEN** a memory store Puts one Ip ban whose value is `1.2.3.4` and origin is `crowdsec` during a tick
+- **AND** PublishTick runs
+- **THEN** `ActiveCounts` includes 1 for that origin id and `ipv4`
+
+#### Scenario: Stream IPv6 Put uses packed family
+- **WHEN** a memory store Puts one Ip ban whose value is `2001:db8::1` during a tick
+- **AND** PublishTick runs
+- **THEN** `ActiveCounts` includes 1 for that origin id and `ipv6`
+
+#### Scenario: Stream Ip Delete decrements
+- **WHEN** that same store later Deletes that Ip slot during a tick
+- **AND** PublishTick runs
+- **THEN** `ActiveCounts` omits that group (or the count is 0)
+
+#### Scenario: Live Put does not increment
+- **WHEN** a store Puts a memo Ip ban without PublishTick
+- **THEN** `ActiveCounts` is empty
+
+#### Scenario: Range apply does not increment
+- **WHEN** stream ApplyRangeBatch upserts a Range CIDR
+- **THEN** `ActiveCounts` does not include that CIDR
+
+#### Scenario: Memory PublishTick expiry drops the slot
+- **WHEN** a memory store holds an Ip slot whose elapsed expiry is due
+- **AND** PublishTick runs with non-zero elapsed `now`
+- **THEN** `ActiveCounts` omits that slot
+
+#### Scenario: Redis ActiveCounts is empty
+- **WHEN** a Redis store Puts or Deletes Ip slots
+- **THEN** `ActiveCounts` is empty
+
+#### Scenario: Overflow counts origin id 0
+- **WHEN** intern would overflow and a memory store Puts an Ip slot then PublishTick runs
+- **THEN** `ActiveCounts` keys that slot with origin id `0`
