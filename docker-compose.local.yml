@@ -48,7 +48,7 @@ services:
       - "traefik.http.services.service-bar.loadbalancer.server.port=80"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerEnabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.metricsupdateintervalseconds=15"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiMetricsIntervalSeconds=15"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.appsecEnabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiMode=stream"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiKey=40796d93c2958f9e58345514e67740e5="
@@ -67,8 +67,8 @@ services:
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.bouncerEnabled=true"
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.lapiMode=stream"
-      - "traefik.http.middlewares.crowdsec2.plugin.bouncer.updateintervalseconds=10"
-      - "traefik.http.middlewares.crowdsec2.plugin.bouncer.updatemaxfailure=-1"
+      - "traefik.http.middlewares.crowdsec2.plugin.bouncer.lapiUpdateIntervalSeconds=10"
+      - "traefik.http.middlewares.crowdsec2.plugin.bouncer.lapiUpdateMaxFailure=-1"
       - "traefik.http.middlewares.crowdsec2.plugin.bouncer.lapiKey=40796d93c2958f9e58345514e67740e5="
   bar3:
     image: traefik/whoami
