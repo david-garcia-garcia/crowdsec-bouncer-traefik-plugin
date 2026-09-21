@@ -39,6 +39,87 @@ func (b failingBody) Read(_ []byte) (int, error) {
 
 func (failingBody) Close() error { return nil }
 
+func newReadablePostWithFailingBody(readErr error) *http.Request {
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/", failingBody{err: readErr})
+	req.ProtoMajor = 1
+	req.ContentLength = 100
+	return req
+}
+
+func assertClientBodyDroppedPassthrough(t *testing.T, readErr error) {
+	t.Helper()
+	var appsecHits int
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		appsecHits++
+		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write([]byte(`{"action":"allow"}`))
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	client := newQueryClient(appsecURL, appsecServer.Client())
+	decision, err := client.Query("1.2.3.4", newReadablePostWithFailingBody(readErr), Policy{FailureAction: configuration.FailureActionPassthrough})
+	if err != nil {
+		t.Fatalf("Query() passthrough returned error: %v", err)
+	}
+	if decision == nil || decision.Action != ActionAllow {
+		t.Fatalf("Query() want allow, got %#v", decision)
+	}
+	if appsecHits != 0 {
+		t.Fatalf("AppSec server called %d times, want 0", appsecHits)
+	}
+}
+
+func assertClientBodyDroppedBan(t *testing.T, readErr error) {
+	t.Helper()
+	var appsecHits int
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		appsecHits++
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	client := newQueryClient(appsecURL, appsecServer.Client())
+	decision, err := client.Query("1.2.3.4", newReadablePostWithFailingBody(readErr), Policy{FailureAction: configuration.FailureActionBan})
+	if err == nil {
+		t.Fatal("Query() ban expected error, got nil")
+	}
+	if decision != nil {
+		t.Fatalf("Query() expected no decision, got %#v", decision)
+	}
+	if !strings.Contains(err.Error(), "appsecQuery:clientBodyDropped") {
+		t.Fatalf("Query() error %q want appsecQuery:clientBodyDropped", err.Error())
+	}
+	if appsecHits != 0 {
+		t.Fatalf("AppSec server called %d times, want 0", appsecHits)
+	}
+}
+
+func assertUnclassifiedBodyReadStillGetBody(t *testing.T) {
+	t.Helper()
+	var appsecHits int
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		appsecHits++
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	client := newQueryClient(appsecURL, appsecServer.Client())
+	sentinel := errors.New("disk read fault")
+	_, err := client.Query("1.2.3.4", newReadablePostWithFailingBody(sentinel), Policy{FailureAction: configuration.FailureActionPassthrough})
+	if err == nil {
+		t.Fatal("Query() expected error for unclassified body read failure")
+	}
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("Query() error %v want wrap of %v", err, sentinel)
+	}
+	if !strings.Contains(err.Error(), "appsecQuery:GetBody") {
+		t.Fatalf("Query() error %q want appsecQuery:GetBody prefix", err.Error())
+	}
+	if appsecHits != 0 {
+		t.Fatalf("AppSec server called %d times, want 0", appsecHits)
+	}
+}
+
 // Test_appsecQuery_clientBodyDroppedFailureAction is a regression for
 // https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/395
 func Test_appsecQuery_clientBodyDroppedFailureAction(t *testing.T) {
@@ -51,85 +132,14 @@ func Test_appsecQuery_clientBodyDroppedFailureAction(t *testing.T) {
 		{name: "unexpected EOF", err: io.ErrUnexpectedEOF},
 	}
 	for _, readErr := range clientGoneErrs {
-		readErr := readErr
 		t.Run(readErr.name+"/passthrough", func(t *testing.T) {
-			var appsecHits int
-			appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-				appsecHits++
-				rw.WriteHeader(http.StatusOK)
-				_, _ = rw.Write([]byte(`{"action":"allow"}`))
-			}))
-			defer appsecServer.Close()
-			appsecURL, _ := url.Parse(appsecServer.URL)
-			client := newQueryClient(appsecURL, appsecServer.Client())
-			req := httptest.NewRequest(http.MethodPost, "http://localhost/", failingBody{err: readErr.err})
-			req.ProtoMajor = 1
-			req.ContentLength = 100
-			decision, err := client.Query("1.2.3.4", req, Policy{FailureAction: configuration.FailureActionPassthrough})
-			if err != nil {
-				t.Fatalf("Query() passthrough returned error: %v", err)
-			}
-			if decision == nil || decision.Action != ActionAllow {
-				t.Fatalf("Query() want allow, got %#v", decision)
-			}
-			if appsecHits != 0 {
-				t.Fatalf("AppSec server called %d times, want 0", appsecHits)
-			}
+			assertClientBodyDroppedPassthrough(t, readErr.err)
 		})
 		t.Run(readErr.name+"/ban", func(t *testing.T) {
-			var appsecHits int
-			appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-				appsecHits++
-				rw.WriteHeader(http.StatusOK)
-			}))
-			defer appsecServer.Close()
-			appsecURL, _ := url.Parse(appsecServer.URL)
-			client := newQueryClient(appsecURL, appsecServer.Client())
-			req := httptest.NewRequest(http.MethodPost, "http://localhost/", failingBody{err: readErr.err})
-			req.ProtoMajor = 1
-			req.ContentLength = 100
-			decision, err := client.Query("1.2.3.4", req, Policy{FailureAction: configuration.FailureActionBan})
-			if err == nil {
-				t.Fatal("Query() ban expected error, got nil")
-			}
-			if decision != nil {
-				t.Fatalf("Query() expected no decision, got %#v", decision)
-			}
-			if !strings.Contains(err.Error(), "appsecQuery:clientBodyDropped") {
-				t.Fatalf("Query() error %q want appsecQuery:clientBodyDropped", err.Error())
-			}
-			if appsecHits != 0 {
-				t.Fatalf("AppSec server called %d times, want 0", appsecHits)
-			}
+			assertClientBodyDroppedBan(t, readErr.err)
 		})
 	}
-	t.Run("unclassified read error keeps GetBody wrap", func(t *testing.T) {
-		var appsecHits int
-		appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-			appsecHits++
-			rw.WriteHeader(http.StatusOK)
-		}))
-		defer appsecServer.Close()
-		appsecURL, _ := url.Parse(appsecServer.URL)
-		client := newQueryClient(appsecURL, appsecServer.Client())
-		sentinel := errors.New("disk read fault")
-		req := httptest.NewRequest(http.MethodPost, "http://localhost/", failingBody{err: sentinel})
-		req.ProtoMajor = 1
-		req.ContentLength = 100
-		_, err := client.Query("1.2.3.4", req, Policy{FailureAction: configuration.FailureActionPassthrough})
-		if err == nil {
-			t.Fatal("Query() expected error for unclassified body read failure")
-		}
-		if !errors.Is(err, sentinel) {
-			t.Fatalf("Query() error %v want wrap of %v", err, sentinel)
-		}
-		if !strings.Contains(err.Error(), "appsecQuery:GetBody") {
-			t.Fatalf("Query() error %q want appsecQuery:GetBody prefix", err.Error())
-		}
-		if appsecHits != 0 {
-			t.Fatalf("AppSec server called %d times, want 0", appsecHits)
-		}
-	})
+	t.Run("unclassified read error keeps GetBody wrap", assertUnclassifiedBodyReadStillGetBody)
 }
 
 func Test_isBodyUnreadable(t *testing.T) {
