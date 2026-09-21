@@ -2,8 +2,8 @@
 
 | Phase | Work | Card | Duration |
 | --- | --- | --- | --- |
-| Prepare | done | done | 9m |
-| Explore | done | done | — |
+| Prepare | done | done | 1m |
+| Explore | done | done | 11m |
 | Propose | — | — | — |
 | Implement | — | — | — |
 | Code review | — | — | — |
@@ -11,7 +11,7 @@
 | Archive | — | — | — |
 | Pull request | — | — | — |
 
-Last updated: 2026-09-21 16:37 UTC
+Last updated: 2026-09-21 16:41 UTC
 
 ## Motivation
 Not yet.
@@ -32,7 +32,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 07c68363
+Reviewed head: 74036baa
 Owner decision: None.
 
 ## Review scores
@@ -84,7 +84,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 07c68363e1567d7f92ff5be6a8523c81598efb54 | Card must match the branch you measured |
+| Reviewed head | 74036baa6ad51e997b914eb075df0a6821511fba | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -98,7 +98,7 @@ Is this the best way to solve the issue? Not yet.
 
 ### Evidence
 What I checked:
-- assembled from the run bus (`deliver_card`, 07c68363e1567d7f92ff5be6a8523c81598efb54)
+- assembled from the run bus (`deliver_card`, 74036baa6ad51e997b914eb075df0a6821511fba)
 
 ### Rank-up moves
 None.

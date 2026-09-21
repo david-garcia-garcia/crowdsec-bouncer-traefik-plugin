@@ -1,80 +1,92 @@
 # Explore
 
+Verdict: **in progress** (ready for propose; no structural incidental escalations).
+
+Upstream: [maxlerebourg/crowdsec-bouncer-traefik-plugin#395](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/395). Fork PR [#133](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/133) (base **master**).
+
 ## Concepts
 
-Upstream report: [maxlerebourg/crowdsec-bouncer-traefik-plugin#395](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/395). Fork PR [#133](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/133) tracks investigation/fix on this tree.
-
 ```
-Client POST (HTTP/2, Content-Length set)
+Client POST (HTTP/2, Content-Length set, readable body)
         │
         ▼
-Bouncer.ServeHTTP → … → handleNextServeHTTP
+Bouncer.handleNextServeHTTP
         │
-        ├─ appsecEnabled ──► appsecQuery
+        ├─ appsecEnabled ──► appsecClient.Query
         │                         │
-        │                    isBodyUnreadable? ──no (CL=1000, Proto≥2)
+        │                    newAppsecForwardRequest
         │                         │
-        │                    appsecBodyLimit>0 ──► io.ReadAll(TeeReader(LimitReader(Body)))
+        │                    newAppsecBodyRequest
         │                         │
-        │                    err != nil ──► "appsecQuery:GetBody %w"
-        │
-        └─ err != nil ──► handleBanServeHTTP(ReasonAPPSEC) ──► 403
+        │                    isBodyUnreadable? ──no (CL≥0, not streaming)
+        │                         │
+        │                    io.ReadAll(TeeReader(LimitReader(Body)))
+        │                         │
+        │                    err != nil ──► fmt.Errorf("appsecQuery:GetBody %w", err)
+        │                         │              (no resultForFailureAction)
+        │                         ▼
+        └─ applyAppsecServeHTTP: err ──► handleBanServeHTTP(ReasonAPPSEC) ──► 403
 ```
 
 | Unit | Path | Job |
 |------|------|-----|
-| AppSec gate | `bouncer.go` `handleNextServeHTTP` | Any `appsecQuery` error → ban with `configuration.ReasonAPPSEC` |
-| Body buffer | `bouncer.go` `appsecQuery` | Default limit 10MiB via `io.ReadAll`; no fail-open on read error |
-| Unreadable skip | `bouncer.go` `isBodyUnreadable` | HTTP/2+ **without** Content-Length only; mid-read errors not covered |
-| Config flags | `pkg/configuration/configuration.go` + `bouncer.go` `New` | `CrowdsecAppsecFailureBlock`, `Unreachable`, `UnreadableBodyBlock` — none gate `GetBody` errors |
-| Tests | `bouncer_test.go` | Streaming/unreadable (#323, #351); no cancel-mid-read case |
+| Body buffer | `pkg/appsec/query.go` `newAppsecBodyRequest` | Copy readable POST/PUT/PATCH/DELETE body; `GetBody` errors bypass `FailureAction` |
+| AppSec round-trip | `pkg/appsec/query.go` `Query` | Unreachable / 500 / response-body io / unreadable H2 body use `resultForFailureAction` |
+| Unreadable predicate | `pkg/appsec/query.go` `isBodyUnreadable` | HTTP/2+ **without** Content-Length only; mid-read cancel is not unreadable |
+| Ban wiring | `pkg/bouncer/bouncer.go` `applyAppsecServeHTTP` | Any `Query` error except `ErrFailureCaptcha` → ban |
+| Config | `pkg/configuration/configuration.go` | `crowdsecAppsecFailureAction` per router; default `ban` |
+| Tests today | `pkg/appsec/zzz_query_test.go` | Streaming/unreadable/failure-action; **no** mid-read cancel on buffered body |
 
-Call sites for `appsecQuery` error → ban: **1** production path (`handleNextServeHTTP` in `bouncer.go`), searched `*.go` under worktree root and `pkg/`.
+**Call sites** where a `Query` error becomes a ban: **1** — `applyAppsecServeHTTP` in `pkg/bouncer/bouncer.go` (searched `*.go` under worktree `pkg/`).
 
-**Reproduce:** **reproduced** on this fork (copy of worktree sources + throwaway `explore_repro_test.go` in temp dir, not committed).
+**Reproduce:** **reproduced** on this worktree (`master` product layout).
 
-- Command: `go test -run TestExploreAppSecCancelBody -count=1 -v` from `C:\Users\DAVIDG~1\AppData\Local\Temp\opd-explore-appsec-cancel-72058561`
-- `appsecQuery` with `context.Canceled` mid-read → `appsecQuery:GetBody context canceled`
-- `handleNextServeHTTP` same body → **HTTP 403**, `next` not called (AppSec mock server not hit)
+- Temp dir (not committed): `C:\Users\DAVIDG~1\AppData\Local\Temp\opd-explore-appsec-cancel-301881134`
+- Command (overlay tests; no product-tree test files):
+  - `go test -overlay=<tmpdir>\overlay.json ./pkg/appsec/ -run TestExploreAppSecCancelBody_Query -count=1 -v`
+  - `go test -overlay=<tmpdir>\overlay_bouncer.json ./pkg/bouncer/ -run TestExploreAppSecCancelBody_HandleNext403 -count=1 -v`
+- **Query + `FailureAction: passthrough`:** error `appsecQuery:GetBody context canceled`; AppSec httptest server **not** hit.
+- **`handleNextServeHTTP` same body:** **HTTP 403**; `next` **not** called; DEBUG log `appsecQuery:GetBody context canceled`.
 
 Outside facts: `knowledge/research/std_go_net-http_body-read-errors/notes.md`.
 
 ## Decisions
 
-- **Seam:** classify or fail-open at `appsecQuery` `GetBody` error (before AppSec HTTP `Do`), not in `handleNextServeHTTP` — keeps ban mapping unchanged for real AppSec failures.
-- **Rejected:** new config knob first — requirement allows pass-through; existing unreadable-body pattern is pass-through unless `appsecUnreadableBodyBlock`.
-- **Rejected:** extend `isBodyUnreadable` for buffered bodies — that predicate is “never start ReadAll”; cancel happens mid-read on readable CL requests.
-- **Proving test (implement):** table-driven cases in `bouncer_test.go` next to #323/#351 helpers; assert `appsecQuery` error today, and after fix assert nil + optional `handleNextServeHTTP` 200 to origin.
-- **Live contract:** `no live contract` (no `openspec/` on this worktree; no AppSec delta spec in catalog).
+- **Seam:** classify or fail-open in `pkg/appsec/query.go` `newAppsecBodyRequest` when `io.ReadAll` fails (before AppSec `Do`). Keep `applyAppsecServeHTTP` ban mapping for genuine AppSec failures.
+- **Rejected:** extend `isBodyUnreadable` for mid-stream errors — that gate means “never start buffering”; cancel happens on readable CL requests.
+- **Rejected:** new public config knob first — requirement and #395 prefer pass-through spirit; fork already centralizes fallbacks on `crowdsecAppsecFailureAction`.
+- **Fix-shape lean:** wire **client-disconnect** read errors through existing `resultForFailureActionErr` in `newAppsecBodyRequest` (same family as unreadable-body / unreachable), **not** a silent always-pass that ignores `FailureAction`. Pure “silent pass-through” without honoring `ban`/`captcha` is rejected for this fork unless propose finds spec pressure otherwise.
+- **Proving test (implement):** table in `pkg/appsec/zzz_query_test.go` (requirement Affected); assert today’s `GetBody` error + optional bouncer overlay pattern; after fix assert passthrough allows without AppSec call / without 403.
+- **Live contract:** `openspec/specs/core_plugin_appsec_failure-action` + `core_plugin_appsec_client`. Failure-action covers 500, unreachable, unreadable H2/H3 body (no CL), and **AppSec response-body** io — **does not** mention client request-body `GetBody` / mid-buffer read failure. Propose may **ADD** a scenario on that family; client spec covers copy/limit methods only.
 
 ## Open questions
 
-- Q: Does this fork currently 403 when `io.ReadAll` fails on a client-cancelled body during AppSec buffering?
-  Rank: additive asked — temp repro only; Desired fork-scope line names automated proof
-  Decision: resolved — yes; `handleNextServeHTTP` returned 403 for `context.Canceled` mid-read (temp path above).
+- Q: Does this fork 403 when `io.ReadAll` fails on a client-cancelled body during AppSec buffering?
+  Rank: additive asked — Desired fork-scope line names automated proof
+  Decision: resolved — yes; repro above (`Query` error + `handleNextServeHTTP` 403 even with `passthrough`).
   By: explore
 
-- Q: Fix shape — silent pass-through vs new fail-open configuration flag?
-  Rank: bounded asked — changes existing `appsecQuery` error contract; 1 caller (`handleNextServeHTTP`) enumerated in `bouncer.go`
-  Decision: assumed — silent pass-through (return nil from `appsecQuery` on client-disconnect class) aligned with unreadable-body spirit; no new knob unless implement finds an existing FailureAction pattern worth mirroring.
+- Q: Fix shape — silent pass-through vs `resultForFailureAction` vs new knob?
+  Rank: bounded asked — changes `newAppsecBodyRequest` error contract; **1** caller (`applyAppsecServeHTTP`) enumerated in `pkg/bouncer/bouncer.go`
+  Decision: assumed — classify client-gone errors (`context.Canceled`, `context.DeadlineExceeded`, `io.ErrUnexpectedEOF`) and route through `resultForFailureActionErr` with a dedicated message (e.g. `appsecQuery:clientBodyDropped`); `passthrough` → allow without AppSec POST; `ban`/`captcha` keep today’s drop semantics; no new knob.
   By: explore
 
 - Q: Which read errors count as client-gone vs genuine fault?
-  Rank: additive asked — Desired names `context.Canceled`, HTTP/2 CANCEL, `io.ErrUnexpectedEOF`
-  Decision: assumed — `errors.Is` for `context.Canceled` and `context.DeadlineExceeded`, plus `io.ErrUnexpectedEOF`; leave unclassified errors on the ban path until Traefik-specific evidence.
+  Rank: additive asked — Desired names cancel, H2 CANCEL, unexpected EOF
+  Decision: assumed — `errors.Is` for `context.Canceled`, `context.DeadlineExceeded`, and `io.ErrUnexpectedEOF`; unclassified `GetBody` errors stay on the ban path until Traefik-specific evidence.
   By: explore
 
 - Q: Where should the durable proving test live?
-  Rank: additive asked — `requirement.md` Affected lists `bouncer_test.go`
-  Decision: assumed — `bouncer_test.go` beside `Test_appsecQuery_streamingDoesNotBlock` / unreadable-body tests; reuse httptest AppSec server pattern.
+  Rank: additive asked — `requirement.md` Affected lists `pkg/appsec/zzz_query_test.go`
+  Decision: assumed — `zzz_query_test.go` beside streaming/unreadable/failure-action tests; bouncer 403 wiring can stay a focused test in `pkg/bouncer/zzz_bouncer_test.go` only if implement needs end-to-end proof beyond `Query`.
   By: explore
 
 - Q: Should `handleBanServeHTTP` be skipped when the client already disconnected?
   Rank: additive incidental — no acceptance criterion; optimize dead work only
-  Decision: assumed — out of scope for #395; fixing `appsecQuery` to not error is enough; ban write on dead conn is harmless.
+  Decision: assumed — out of scope for #395; fixing `Query`/`GetBody` classification is enough.
   By: explore
 
-- Q: Effect on `blockedRequests` / LAPI dropped-request metrics if cancel pass-through?
-  Rank: additive incidental — metric change not in scope (`requirement.md` Out of scope)
-  Decision: assumed — fewer false APPSEC bans; no dedicated metric work in this ticket.
+- Q: Effect on LAPI dropped-request / blocked metrics if cancel pass-through?
+  Rank: additive incidental — `requirement.md` Out of scope for metrics work
+  Decision: assumed — fewer false APPSEC bans; no dedicated metric change in this ticket.
   By: explore

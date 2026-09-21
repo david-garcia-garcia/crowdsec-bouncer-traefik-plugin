@@ -6,7 +6,7 @@ Fetched: 2026-09-21. Pin: Go 1.22.12 (module `go` directive in this worktree).
 
 ## io.ReadAll propagates the reader error
 
-`io.ReadAll` reads until EOF or a non-nil error from `Read`. Any mid-stream `Read` error is returned wrapped only by the caller (`fmt.Errorf("appsecQuery:GetBody %w", err)` in `bouncer.go`). ([io.ReadAll](https://pkg.go.dev/io#ReadAll))
+`io.ReadAll` reads until EOF or a non-nil error from `Read`. Any mid-stream `Read` error is returned wrapped only by the caller (`fmt.Errorf("appsecQuery:GetBody %w", err)` in `pkg/appsec/query.go` `newAppsecBodyRequest`). ([io.ReadAll](https://pkg.go.dev/io#ReadAll))
 
 ## Common cancel/disconnect errors
 
