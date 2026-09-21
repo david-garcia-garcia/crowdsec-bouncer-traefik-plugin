@@ -32,7 +32,7 @@ func testAppsecConfig(host string) *configuration.Config {
 		AppsecHost:              host,
 		AppsecPath:              "/",
 		AppsecKey:               "test-key",
-		HTTPTimeoutSeconds:              1,
+		HTTPTimeoutSeconds:      1,
 		AppsecTLSInsecureVerify: true,
 		AppsecBodyLimit:         10485760,
 	}

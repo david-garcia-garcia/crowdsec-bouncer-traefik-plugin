@@ -128,7 +128,7 @@ func TestReportMetricsPluginVersion(t *testing.T) {
 		crowdsecScheme: lapiURL.Scheme,
 		crowdsecHost:   lapiURL.Host,
 		crowdsecPath:   "/",
-		lapiMode:   configuration.StreamMode,
+		lapiMode:       configuration.StreamMode,
 		log:            logger.New("ERROR", ""),
 		pluginVersion:  wantVersion,
 	}
@@ -210,7 +210,7 @@ func newUsageMetricsClient(t *testing.T) (*Client, *testMetricsBody) {
 		crowdsecScheme: lapiURL.Scheme,
 		crowdsecHost:   lapiURL.Host,
 		crowdsecPath:   "/",
-		lapiMode:   configuration.StreamMode,
+		lapiMode:       configuration.StreamMode,
 		log:            logger.New("ERROR", ""),
 		pluginVersion:  "test",
 	}
@@ -428,7 +428,7 @@ func TestReportMetricsRestoresOnFailure(t *testing.T) {
 		crowdsecScheme:  lapiURL.Scheme,
 		crowdsecHost:    lapiURL.Host,
 		crowdsecPath:    "/",
-		lapiMode:    configuration.StreamMode,
+		lapiMode:        configuration.StreamMode,
 		log:             logger.New("ERROR", ""),
 		pluginVersion:   "test",
 		metricsInterval: 1,
@@ -478,7 +478,7 @@ func TestReportMetricsWindowSurvivesAdoptTransport(t *testing.T) {
 		crowdsecScheme: lapiURL.Scheme,
 		crowdsecHost:   lapiURL.Host,
 		crowdsecPath:   "/",
-		lapiMode:   configuration.StreamMode,
+		lapiMode:       configuration.StreamMode,
 		log:            logger.New("ERROR", ""),
 		pluginVersion:  "test",
 	}

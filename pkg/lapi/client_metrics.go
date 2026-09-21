@@ -40,7 +40,7 @@ type MetricsReporter struct {
 	path          string
 	pluginVersion string
 	startedAt     time.Time
-	lapiMode  string
+	lapiMode      string
 	query         crowdsecQueryFunc
 	originName    func(uint16) string
 	log           *slog.Logger
@@ -63,7 +63,7 @@ func newMetricsReporter(client *Client, startedAt time.Time) *MetricsReporter {
 		path:           client.crowdsecPath,
 		pluginVersion:  client.pluginVersion,
 		startedAt:      startedAt,
-		lapiMode:   client.lapiMode,
+		lapiMode:       client.lapiMode,
 		query:          client.crowdsecQuery,
 		originName:     client.OriginName,
 		log:            client.log,

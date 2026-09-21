@@ -44,6 +44,7 @@ linters-settings:
           - github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis
           - github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec
@@ -62,6 +63,7 @@ linters-settings:
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec
@@ -120,6 +122,9 @@ issues:
     - path: pkg/bouncer/
       linters:
         - perfsprint
+    - path: pkg/instance/
+      linters:
+        - gochecknoglobals
     - path: plugin.go
       linters:
         - perfsprint

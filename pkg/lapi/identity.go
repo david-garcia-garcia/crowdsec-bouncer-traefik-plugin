@@ -20,36 +20,36 @@ const keyPrefix = "lapi:"
 // middleware name, log path, and lapiScopeHeaders are not included here
 // either (stream scopes= is poller-owned; live passes scopes per LiveLookup).
 type identity struct {
-	Mode                         string   `json:"mode"`
-	LapiScheme                   string   `json:"lapiScheme"`
-	LapiHost                     string   `json:"lapiHost"`
-	LapiPath                     string   `json:"lapiPath"`
-	LapiKey                      string   `json:"lapiKey"`
-	CapiMachineID                string   `json:"capiMachineId"`
-	CapiPassword                 string   `json:"capiPassword"`
-	LapiRedisEnabled            bool     `json:"lapiRedisEnabled"`
-	LapiRedisHost               string   `json:"lapiRedisHost"`
-	LapiRedisReadHosts          []string `json:"lapiRedisReadHosts"`
-	LapiRedisPassword           string   `json:"lapiRedisPassword"`
-	LapiRedisDatabase           string   `json:"lapiRedisDatabase"`
+	Mode                       string   `json:"mode"`
+	LapiScheme                 string   `json:"lapiScheme"`
+	LapiHost                   string   `json:"lapiHost"`
+	LapiPath                   string   `json:"lapiPath"`
+	LapiKey                    string   `json:"lapiKey"`
+	CapiMachineID              string   `json:"capiMachineId"`
+	CapiPassword               string   `json:"capiPassword"`
+	LapiRedisEnabled           bool     `json:"lapiRedisEnabled"`
+	LapiRedisHost              string   `json:"lapiRedisHost"`
+	LapiRedisReadHosts         []string `json:"lapiRedisReadHosts"`
+	LapiRedisPassword          string   `json:"lapiRedisPassword"`
+	LapiRedisDatabase          string   `json:"lapiRedisDatabase"`
 	LapiMetricsIntervalSeconds int64    `json:"lapiMetricsIntervalSeconds"`
 }
 
 // identityFrom maps configuration.Config into IdentityHex fields.
 func identityFrom(cfg *configuration.Config) identity {
 	return identity{
-		Mode:                         cfg.LapiMode,
-		LapiScheme:                   cfg.LapiScheme,
-		LapiHost:                     cfg.LapiHost,
-		LapiPath:                     cfg.LapiPath,
-		LapiKey:                      cfg.LapiKey,
-		CapiMachineID:                cfg.LapiCapiMachineID,
-		CapiPassword:                 cfg.LapiCapiPassword,
-		LapiRedisEnabled:            cfg.LapiRedisEnabled,
-		LapiRedisHost:               cfg.LapiRedisHost,
-		LapiRedisReadHosts:          cfg.LapiRedisReadHosts,
-		LapiRedisPassword:           cfg.LapiRedisPassword,
-		LapiRedisDatabase:           cfg.LapiRedisDatabase,
+		Mode:                       cfg.LapiMode,
+		LapiScheme:                 cfg.LapiScheme,
+		LapiHost:                   cfg.LapiHost,
+		LapiPath:                   cfg.LapiPath,
+		LapiKey:                    cfg.LapiKey,
+		CapiMachineID:              cfg.LapiCapiMachineID,
+		CapiPassword:               cfg.LapiCapiPassword,
+		LapiRedisEnabled:           cfg.LapiRedisEnabled,
+		LapiRedisHost:              cfg.LapiRedisHost,
+		LapiRedisReadHosts:         cfg.LapiRedisReadHosts,
+		LapiRedisPassword:          cfg.LapiRedisPassword,
+		LapiRedisDatabase:          cfg.LapiRedisDatabase,
 		LapiMetricsIntervalSeconds: cfg.LapiMetricsIntervalSeconds,
 	}
 }

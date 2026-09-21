@@ -60,11 +60,11 @@ func testCaptchaRoutingBouncer(t *testing.T, client *captcha.Client) (*Bouncer, 
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			originCalled = true
 		}),
-		captchaClient:           client,
-		log:                     logger.New("ERROR", ""),
-		bouncerRemediationStatusCode:   http.StatusForbidden,
-		remediationCustomHeader: "X-Remediation",
-		banTemplateContentType:  "text/html; charset=utf-8",
+		captchaClient:                client,
+		log:                          logger.New("ERROR", ""),
+		bouncerRemediationStatusCode: http.StatusForbidden,
+		remediationCustomHeader:      "X-Remediation",
+		banTemplateContentType:       "text/html; charset=utf-8",
 	}, &originCalled
 }
 
@@ -170,11 +170,11 @@ func TestHandleRemediationServeHTTP_overMaxPostAfterSolveReachesOriginIntact(t *
 			}
 			originBody = string(raw)
 		}),
-		captchaClient:           client,
-		log:                     logger.New("ERROR", ""),
-		bouncerRemediationStatusCode:   http.StatusForbidden,
-		remediationCustomHeader: "X-Remediation",
-		banTemplateContentType:  "text/html; charset=utf-8",
+		captchaClient:                client,
+		log:                          logger.New("ERROR", ""),
+		bouncerRemediationStatusCode: http.StatusForbidden,
+		remediationCustomHeader:      "X-Remediation",
+		banTemplateContentType:       "text/html; charset=utf-8",
 	}
 
 	payload := "dummy-captcha-response=token&blob=" + strings.Repeat("a", 64<<10)

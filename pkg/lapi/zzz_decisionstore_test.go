@@ -26,17 +26,17 @@ func lookupBan(store *decisionstore.Store) (string, error) {
 // testLiveConfig is a live-mode config aimed at a mock LAPI host.
 func testLiveConfig(updateInterval int64) *configuration.Config {
 	return &configuration.Config{
-		LapiMode:                  configuration.LiveMode,
-		LapiScheme:            "http",
-		LapiHost:              "lapi.example:8080",
-		LapiPath:              "/",
-		LapiKey:               "test-key",
-		LapiTLSInsecureVerify: true,
-		BouncerLapiFailureAction:     configuration.FailureActionBan,
-		LapiUpdateIntervalSeconds:         updateInterval,
-		LapiMetricsIntervalSeconds:  0,
-		HTTPTimeoutSeconds:            10,
-		BouncerLiveTTLSeconds:        60,
+		LapiMode:                   configuration.LiveMode,
+		LapiScheme:                 "http",
+		LapiHost:                   "lapi.example:8080",
+		LapiPath:                   "/",
+		LapiKey:                    "test-key",
+		LapiTLSInsecureVerify:      true,
+		BouncerLapiFailureAction:   configuration.FailureActionBan,
+		LapiUpdateIntervalSeconds:  updateInterval,
+		LapiMetricsIntervalSeconds: 0,
+		HTTPTimeoutSeconds:         10,
+		BouncerLiveTTLSeconds:      60,
 	}
 }
 

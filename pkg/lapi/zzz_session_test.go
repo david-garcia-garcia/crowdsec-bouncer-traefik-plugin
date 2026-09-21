@@ -19,18 +19,18 @@ import (
 // testStreamConfig is a stream-mode config aimed at a mock LAPI host.
 func testStreamConfig(host string, metricsInterval int64) *configuration.Config {
 	return &configuration.Config{
-		LapiMode:                  configuration.StreamMode,
-		LapiScheme:            "http",
-		LapiHost:              host,
-		LapiPath:              "/",
-		LapiKey:               "test-key",
-		LapiTLSInsecureVerify: true,
-		BouncerLapiFailureAction:     configuration.FailureActionBan,
-		LapiUpdateIntervalSeconds:         60,
-		LapiMetricsIntervalSeconds:  metricsInterval,
-		HTTPTimeoutSeconds:            10,
-		BouncerLiveTTLSeconds:        60,
-		LapiStreamStartupBlock:            true,
+		LapiMode:                   configuration.StreamMode,
+		LapiScheme:                 "http",
+		LapiHost:                   host,
+		LapiPath:                   "/",
+		LapiKey:                    "test-key",
+		LapiTLSInsecureVerify:      true,
+		BouncerLapiFailureAction:   configuration.FailureActionBan,
+		LapiUpdateIntervalSeconds:  60,
+		LapiMetricsIntervalSeconds: metricsInterval,
+		HTTPTimeoutSeconds:         10,
+		BouncerLiveTTLSeconds:      60,
+		LapiStreamStartupBlock:     true,
 	}
 }
 
@@ -143,7 +143,7 @@ func TestClient_LifecycleLogs(t *testing.T) {
 	log, logSink := newTestLogSink(slog.LevelInfo)
 	client := &Client{
 		log:          log,
-		lapiMode: configuration.LiveMode,
+		lapiMode:     configuration.LiveMode,
 		crowdsecHost: "lapi.example:8080",
 		sessionKey:   "lapi:test-key",
 	}

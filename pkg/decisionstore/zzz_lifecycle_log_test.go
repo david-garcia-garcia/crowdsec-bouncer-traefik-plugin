@@ -64,7 +64,7 @@ func TestOpenLogsStartedAtInfo(t *testing.T) {
 	var buf bytes.Buffer
 	log := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	cfg := &configuration.Config{
-		LapiMode:       configuration.StreamMode,
+		LapiMode:   configuration.StreamMode,
 		LapiScheme: "http",
 		LapiHost:   "lapi.example:8080",
 		LapiPath:   "/",

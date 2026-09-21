@@ -19,7 +19,7 @@ import (
 const (
 	crowdsecAppsecIPHeader   = "X-Crowdsec-Appsec-Ip"
 	crowdsecAppsecURIHeader  = "X-Crowdsec-Appsec-Uri"
-	appsecHostHeader = "X-Crowdsec-Appsec-Host"
+	appsecHostHeader         = "X-Crowdsec-Appsec-Host"
 	crowdsecAppsecVerbHeader = "X-Crowdsec-Appsec-Verb"
 	crowdsecAppsecHeader     = "X-Crowdsec-Appsec-Api-Key"
 	crowdsecAppsecUserAgent  = "X-Crowdsec-Appsec-User-Agent"
