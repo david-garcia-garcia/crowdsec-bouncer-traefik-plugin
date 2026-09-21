@@ -214,7 +214,7 @@ File path for `CaptchaGateSecret` (preferred over an inline secret when both are
 How long after a passed captcha before a new challenge, if the CrowdSec decision is still valid.
 
 **BanToCaptchaOrigins** ([]string, default `[]`)
-Decision origins whose `ban` decisions are stored as captcha instead of ban. Empty disables the mapping. Match is on the metrics origin (`MetricsOrigin`): `CAPI` is exact; `lists` matches every CrowdSec list; `lists:<name>` matches one list (the decision scenario). Unlisted origins stay ban. Without a captcha provider, stored captcha still renders as ban. The first middleware `New` for a shared LAPI Client wins (the list is not on the reclaim key). Adopted from upstream [PR 369](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/369) with per-list matching.
+Decision origins whose `ban` decisions are stored as captcha instead of ban. Empty disables the mapping. Match is on the metrics origin (`MetricsOrigin`): `CAPI` is exact; `lists` matches every CrowdSec list; `lists:<name>` matches one list (the decision scenario). Unlisted origins stay ban. Without a captcha provider, stored captcha still renders as ban. The first middleware `New` for a shared LAPI Client wins (the list is not on the reclaim key).
 
 **CaptchaProvider** (string, no default)
 Captcha validator. Expected: `hcaptcha`, `recaptcha`, `turnstile`, `custom`.
