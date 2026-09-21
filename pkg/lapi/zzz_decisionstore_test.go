@@ -31,7 +31,7 @@ func testLiveConfig(updateInterval int64) *configuration.Config {
 		LapiHost:              "lapi.example:8080",
 		LapiPath:              "/",
 		LapiKey:               "test-key",
-		LapiTlsInsecureVerify: true,
+		LapiTLSInsecureVerify: true,
 		BouncerLapiFailureAction:     configuration.FailureActionBan,
 		LapiUpdateIntervalSeconds:         updateInterval,
 		LapiMetricsIntervalSeconds:  0,

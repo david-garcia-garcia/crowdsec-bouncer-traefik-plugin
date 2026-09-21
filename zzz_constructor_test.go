@@ -73,9 +73,9 @@ func TestNew_FailedConstructorReleasesLapiHolder(t *testing.T) {
 	cfg.AppsecScheme = "https"
 	cfg.AppsecHost = u.Host
 	cfg.AppsecPath = "/"
-	cfg.AppsecTlsInsecureVerify = true
-	cfg.AppsecTlsCert = "not a certificate"
-	cfg.AppsecTlsKey = "not a key"
+	cfg.AppsecTLSInsecureVerify = true
+	cfg.AppsecTLSCert = "not a certificate"
+	cfg.AppsecTLSKey = "not a key"
 
 	if _, err := New(context.Background(), testNextOK(), cfg, "rollback"); err == nil {
 		t.Fatal("New must fail when the AppSec client certificate cannot be loaded")

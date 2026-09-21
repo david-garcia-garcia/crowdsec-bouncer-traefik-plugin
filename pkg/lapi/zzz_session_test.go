@@ -24,7 +24,7 @@ func testStreamConfig(host string, metricsInterval int64) *configuration.Config 
 		LapiHost:              host,
 		LapiPath:              "/",
 		LapiKey:               "test-key",
-		LapiTlsInsecureVerify: true,
+		LapiTLSInsecureVerify: true,
 		BouncerLapiFailureAction:     configuration.FailureActionBan,
 		LapiUpdateIntervalSeconds:         60,
 		LapiMetricsIntervalSeconds:  metricsInterval,
@@ -122,9 +122,9 @@ func TestSessionKey_PolicyAndTLSDoNotChangeKey(t *testing.T) {
 	policy.LapiStreamStartupBlock = false
 	tlsOnly := testStreamConfig("lapi.example:8080", 1)
 	tlsOnly.HTTPTimeoutSeconds = 30
-	tlsOnly.LapiTlsInsecureVerify = false
-	tlsOnly.LapiTlsCa = "ca"
-	tlsOnly.LapiTlsCert = "cert"
+	tlsOnly.LapiTLSInsecureVerify = false
+	tlsOnly.LapiTLSCa = "ca"
+	tlsOnly.LapiTLSCert = "cert"
 	if SessionKey(base) != SessionKey(policy) || IdentityHex(base) != IdentityHex(policy) {
 		t.Fatal("policy knobs must not change stream or live reclaim keys")
 	}

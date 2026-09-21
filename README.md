@@ -264,13 +264,13 @@ AppSec path, appended to `AppsecHost`. Must end with `/`.
 **AppsecScheme** (string, default value of `LapiScheme`)
 Expected: `http`, `https`.
 
-**CrowdsecAppsecTlsCertificateAuthority** (string, default `""`)
+**AppsecTLSCa** (string, default `""`)
 PEM CA used to verify AppSec's server certificate. When empty (and `appsecTlsInsecureVerify` is `false`), the host system trust store is used.
 
-**CrowdsecAppsecTlsInsecureVerify** (bool, default `false`)
+**AppsecTLSInsecureVerify** (bool, default `false`)
 Disable verification of the certificate presented by AppSec.
 
-**CrowdsecCapiMachineId** (string, no default)
+**LapiCapiMachineID** (string, no default)
 `alone` only. CAPI login.
 
 **LapiCapiPassword** (string, no default)
@@ -300,20 +300,20 @@ LAPI path, appended to `LapiHost`. Must end with `/`.
 **LapiScheme** (string, default `http`)
 Expected: `http`, `https`.
 
-**CrowdsecLapiTlsCertificateAuthority** (string, default `""`)
+**LapiTLSCa** (string, default `""`)
 PEM CA used to verify LAPI's server certificate. When empty (and `lapiTlsInsecureVerify` is `false`), the host system trust store is used.
 
-**CrowdsecLapiTlsCertificateBouncer** (string, default `""`)
+**LapiTLSCert** (string, default `""`)
 PEM client certificate of the bouncer.
 
-**CrowdsecLapiTlsCertificateBouncerKey** (string, default `""`)
+**LapiTLSKey** (string, default `""`)
 PEM client private key of the bouncer.
 
-**CrowdsecLapiTlsInsecureVerify** (bool, default `false`)
+**LapiTLSInsecureVerify** (bool, default `false`)
 Disable verification of the certificate presented by LAPI.
 
 **LapiMode** (string, default `live`)
-Expected: `none`, `live`, `stream`, `alone`, `appsec`.
+Expected: `none`, `live`, `stream`, `alone`. AppSec-only is `lapiEnabled: false` with `appsecEnabled: true`, not a mode value.
 
 **LapiScopeHeaders** (map[string]string, default `{}`)
 Maps a CrowdSec scope name (key) to a request header (value). `Country` (any case) is ISO 3166-1 alpha-2 and ignores `XX`/`T1`; `AS` (any case) is decimal digits and strips a leading `AS`; any other key is a trimmed exact match. Do not map `Ip` or `Range`. Empty disables header scopes. This plugin does not geolocate. See the `lapiScopeHeaders` example above.
@@ -321,8 +321,8 @@ Maps a CrowdSec scope name (key) to a request header (value). `Country` (any cas
 **BouncerLiveTtlSeconds** (int64, default `60`)
 `live` only. Maximum decision duration.
 
-**Enabled** (bool, default `false`)
-Enable the plugin.
+**BouncerEnabled** (bool, default `false`)
+Enable bouncing on this middleware. When false, `New` still calls next (no bounce) unless `bouncerHold` is set.
 
 **BouncerForwardedHeader** (string, default `"X-Forwarded-For"`)
 Header that holds the real client IP. Read only when the socket peer is in `BouncerForwardedTrustedIPs`. That list also skips hops in the header right-to-left; the first value not in the list wins. `X-Real-Ip` is trustworthy only when the front proxy sets it. Traefik's entrypoint deletes `X-Forwarded-*` and `X-Real-Ip` from untrusted peers and only writes `X-Real-Ip` when absent, filling it with the socket peer. Cloudflare sends `CF-Connecting-IP` and `X-Forwarded-For` but not `X-Real-Ip`, so Traefik would fill in the Cloudflare edge and every visitor would be remediated as Cloudflare. Use `X-Real-Ip` with an nginx or HAProxy front that sets it.
@@ -557,7 +557,7 @@ http:
 
 #### Fill variable with value of file
 
-`LapiTlsKey`, `LapiTlsCert`, `LapiTlsCa`, `AppsecTlsCa`, `LapiCapiMachineId`, `LapiCapiPassword`, `LapiKey`, `AppsecKey`, `BouncerCaptchaSiteKey`, `BouncerCaptchaSecretKey`, `BouncerCaptchaGateSecret` and `LapiRedisPassword` can be provided with the content as raw or through a file path that Traefik can read.  
+`LapiTLSKey`, `LapiTLSCert`, `LapiTLSCa`, `AppsecTLSCa`, `LapiCapiMachineId`, `LapiCapiPassword`, `LapiKey`, `AppsecKey`, `BouncerCaptchaSiteKey`, `BouncerCaptchaSecretKey`, `BouncerCaptchaGateSecret` and `LapiRedisPassword` can be provided with the content as raw or through a file path that Traefik can read.  
 The file variable will be used as preference if both content and file are provided for the same variable.
 
 Format is:

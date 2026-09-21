@@ -83,9 +83,9 @@ func newTransport(config *configuration.Config, log *slog.Logger) (*transport, e
 		header:                      header,
 		key:                         config.LapiKey,
 		httpTimeoutSeconds:          timeoutSeconds,
-		lapiTLSInsecureVerify:       config.LapiTlsInsecureVerify,
-		lapiTLSCertificateAuthority: config.LapiTlsCa,
-		lapiTLSCertificateBouncer:   config.LapiTlsCert,
+		lapiTLSInsecureVerify:       config.LapiTLSInsecureVerify,
+		lapiTLSCertificateAuthority: config.LapiTLSCa,
+		lapiTLSCertificateBouncer:   config.LapiTLSCert,
 	}, nil
 }
 

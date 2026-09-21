@@ -40,9 +40,9 @@ func newTransport(config *configuration.Config, log *slog.Logger) (*transport, e
 		},
 		key:                           config.AppsecKey,
 		httpTimeoutSeconds:            timeoutSeconds,
-		appsecTLSInsecureVerify:       config.AppsecTlsInsecureVerify,
-		appsecTLSCertificateAuthority: config.AppsecTlsCa,
-		appsecTLSCertificateBouncer:   config.AppsecTlsCert,
+		appsecTLSInsecureVerify:       config.AppsecTLSInsecureVerify,
+		appsecTLSCertificateAuthority: config.AppsecTLSCa,
+		appsecTLSCertificateBouncer:   config.AppsecTLSCert,
 	}, nil
 }
 

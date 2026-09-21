@@ -68,13 +68,13 @@ type Config struct {
 	AppsecPath                       string                       `json:"appsecPath,omitempty"`
 	AppsecKey                        string                       `json:"appsecKey,omitempty"`
 	AppsecKeyFile                    string                       `json:"appsecKeyFile,omitempty"`
-	AppsecTlsInsecureVerify          bool                         `json:"appsecTlsInsecureVerify,omitempty"`
-	AppsecTlsCa                      string                       `json:"appsecTlsCa,omitempty"`
-	AppsecTlsCaFile                  string                       `json:"appsecTlsCaFile,omitempty"`
-	AppsecTlsCert                    string                       `json:"appsecTlsCert,omitempty"`
-	AppsecTlsCertFile                string                       `json:"appsecTlsCertFile,omitempty"`
-	AppsecTlsKey                     string                       `json:"appsecTlsKey,omitempty"`
-	AppsecTlsKeyFile                 string                       `json:"appsecTlsKeyFile,omitempty"`
+	AppsecTLSInsecureVerify          bool                         `json:"appsecTlsInsecureVerify,omitempty"`
+	AppsecTLSCa                      string                       `json:"appsecTlsCa,omitempty"`
+	AppsecTLSCaFile                  string                       `json:"appsecTlsCaFile,omitempty"`
+	AppsecTLSCert                    string                       `json:"appsecTlsCert,omitempty"`
+	AppsecTLSCertFile                string                       `json:"appsecTlsCertFile,omitempty"`
+	AppsecTLSKey                     string                       `json:"appsecTlsKey,omitempty"`
+	AppsecTLSKeyFile                 string                       `json:"appsecTlsKeyFile,omitempty"`
 	AppsecBodyLimit                  int64                        `json:"appsecBodyLimit,omitempty"`
 	BouncerAppsecFailureAction       string                       `json:"bouncerAppsecFailureAction,omitempty"`
 	LapiScheme                       string                       `json:"lapiScheme,omitempty"`
@@ -82,13 +82,13 @@ type Config struct {
 	LapiPath                         string                       `json:"lapiPath,omitempty"`
 	LapiKey                          string                       `json:"lapiKey,omitempty"`
 	LapiKeyFile                      string                       `json:"lapiKeyFile,omitempty"`
-	LapiTlsInsecureVerify            bool                         `json:"lapiTlsInsecureVerify,omitempty"`
-	LapiTlsCa                        string                       `json:"lapiTlsCa,omitempty"`
-	LapiTlsCaFile                    string                       `json:"lapiTlsCaFile,omitempty"`
-	LapiTlsCert                      string                       `json:"lapiTlsCert,omitempty"`
-	LapiTlsCertFile                  string                       `json:"lapiTlsCertFile,omitempty"`
-	LapiTlsKey                       string                       `json:"lapiTlsKey,omitempty"`
-	LapiTlsKeyFile                   string                       `json:"lapiTlsKeyFile,omitempty"`
+	LapiTLSInsecureVerify            bool                         `json:"lapiTlsInsecureVerify,omitempty"`
+	LapiTLSCa                        string                       `json:"lapiTlsCa,omitempty"`
+	LapiTLSCaFile                    string                       `json:"lapiTlsCaFile,omitempty"`
+	LapiTLSCert                      string                       `json:"lapiTlsCert,omitempty"`
+	LapiTLSCertFile                  string                       `json:"lapiTlsCertFile,omitempty"`
+	LapiTLSKey                       string                       `json:"lapiTlsKey,omitempty"`
+	LapiTLSKeyFile                   string                       `json:"lapiTlsKeyFile,omitempty"`
 	LapiCapiMachineID                string                       `json:"lapiCapiMachineId,omitempty"`
 	LapiCapiMachineIDFile            string                       `json:"lapiCapiMachineIdFile,omitempty"`
 	LapiCapiPassword                 string                       `json:"lapiCapiPassword,omitempty"`
@@ -197,12 +197,12 @@ func New() *Config {
 		AppsecHost:                       "crowdsec:7422",
 		AppsecPath:                       "/",
 		AppsecKey:                        "",
-		AppsecTlsInsecureVerify:          false,
+		AppsecTLSInsecureVerify:          false,
 		LapiScheme:                       HTTP,
 		LapiHost:                         "crowdsec:8080",
 		LapiPath:                         "/",
 		LapiKey:                          "",
-		LapiTlsInsecureVerify:            false,
+		LapiTLSInsecureVerify:            false,
 		LapiUpdateIntervalSeconds:        60,
 		LapiMetricsIntervalSeconds:       600,
 		LapiUpdateMaxFailure:             0,
@@ -501,17 +501,17 @@ func validateLapiURLAndKeys(config *Config) error {
 	if err != nil {
 		return err
 	}
-	certBouncer, err := GetVariable(config, "LapiTlsCert")
+	certBouncer, err := GetVariable(config, "LapiTLSCert")
 	if err != nil {
 		return err
 	}
-	certBouncerKey, err := GetVariable(config, "LapiTlsKey")
+	certBouncerKey, err := GetVariable(config, "LapiTLSKey")
 	if err != nil {
 		return err
 	}
 
 	if lapiKey == "" && (certBouncer == "" || certBouncerKey == "") {
-		return errors.New("LapiKey || (LapiTlsCert && LapiTlsKey): cannot be all empty")
+		return errors.New("LapiKey || (LapiTLSCert && LapiTLSKey): cannot be all empty")
 	}
 	if lapiKey != "" && (certBouncer == "" || certBouncerKey == "") {
 		lapiKey = strings.TrimSpace(lapiKey)
@@ -520,7 +520,7 @@ func validateLapiURLAndKeys(config *Config) error {
 		}
 	}
 
-	if config.LapiScheme == HTTPS && !config.LapiTlsInsecureVerify {
+	if config.LapiScheme == HTTPS && !config.LapiTLSInsecureVerify {
 		if err = validateParamsTLS(config, "Lapi"); err != nil {
 			return err
 		}
@@ -552,7 +552,7 @@ func validateAppsecURLKeyAndTLS(config *Config) error {
 		}
 	}
 
-	if config.AppsecScheme == HTTPS && !config.AppsecTlsInsecureVerify {
+	if config.AppsecScheme == HTTPS && !config.AppsecTLSInsecureVerify {
 		if err = validateParamsTLS(config, "Appsec"); err != nil {
 			return err
 		}
@@ -632,7 +632,7 @@ func validateParamsAPIKey(key string, paramName string) error {
 }
 
 func validateParamsTLS(config *Config, prefix string) error {
-	certAuth, err := GetVariable(config, prefix+"TlsCa")
+	certAuth, err := GetVariable(config, prefix+"TLSCa")
 	if err != nil {
 		return err
 	}
@@ -762,7 +762,7 @@ func getTLSConfig(config *Config, log *slog.Logger, prefix, scheme string, insec
 		tlsConfig.InsecureSkipVerify = true
 		log.Debug("getTLSConfig:TLSInsecureVerify", "prefix", prefix, "tlsInsecure", true)
 	} else {
-		certAuthority, err := GetVariable(config, prefix+"TlsCa")
+		certAuthority, err := GetVariable(config, prefix+"TLSCa")
 		if err != nil {
 			return nil, err
 		}
@@ -776,11 +776,11 @@ func getTLSConfig(config *Config, log *slog.Logger, prefix, scheme string, insec
 			log.Debug("getTLSConfig: no CA provided, using system trust store", "prefix", prefix)
 		}
 	}
-	certBouncer, err := GetVariable(config, prefix+"TlsCert")
+	certBouncer, err := GetVariable(config, prefix+"TLSCert")
 	if err != nil {
 		return nil, err
 	}
-	certBouncerKey, err := GetVariable(config, prefix+"TlsKey")
+	certBouncerKey, err := GetVariable(config, prefix+"TLSKey")
 	if err != nil {
 		return nil, err
 	}
@@ -801,10 +801,10 @@ func GetTLSConfigCrowdsec(config *Config, log *slog.Logger, isAppsec bool) (*tls
 	var prefix string
 	if isAppsec && config.AppsecScheme != "" {
 		prefix = "Appsec"
-		return getTLSConfig(config, log, prefix, config.AppsecScheme, config.AppsecTlsInsecureVerify)
+		return getTLSConfig(config, log, prefix, config.AppsecScheme, config.AppsecTLSInsecureVerify)
 	}
 	prefix = "Lapi"
-	return getTLSConfig(config, log, prefix, config.LapiScheme, config.LapiTlsInsecureVerify)
+	return getTLSConfig(config, log, prefix, config.LapiScheme, config.LapiTLSInsecureVerify)
 }
 
 // NamedLapiInstance is lapiInstance, or traefikName when that field is empty.
@@ -829,8 +829,8 @@ func HasLapiSecrets(config *Config) bool {
 	if strings.TrimSpace(key) != "" {
 		return true
 	}
-	cert, _ := GetVariable(config, "LapiTlsCert")
-	certKey, _ := GetVariable(config, "LapiTlsKey")
+	cert, _ := GetVariable(config, "LapiTLSCert")
+	certKey, _ := GetVariable(config, "LapiTLSKey")
 	if strings.TrimSpace(cert) != "" && strings.TrimSpace(certKey) != "" {
 		return true
 	}
@@ -848,8 +848,8 @@ func HasAppsecSecrets(config *Config) bool {
 	if strings.TrimSpace(key) != "" {
 		return true
 	}
-	cert, _ := GetVariable(config, "AppsecTlsCert")
-	certKey, _ := GetVariable(config, "AppsecTlsKey")
+	cert, _ := GetVariable(config, "AppsecTLSCert")
+	certKey, _ := GetVariable(config, "AppsecTLSKey")
 	return strings.TrimSpace(cert) != "" && strings.TrimSpace(certKey) != ""
 }
 

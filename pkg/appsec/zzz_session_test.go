@@ -33,7 +33,7 @@ func testAppsecConfig(host string) *configuration.Config {
 		AppsecPath:              "/",
 		AppsecKey:               "test-key",
 		HTTPTimeoutSeconds:              1,
-		AppsecTlsInsecureVerify: true,
+		AppsecTLSInsecureVerify: true,
 		AppsecBodyLimit:         10485760,
 	}
 }
@@ -98,9 +98,9 @@ func TestOpen_TLSOnlyAdoptsTransport(t *testing.T) {
 
 	ctx := context.Background()
 	firstCfg := testAppsecConfig("127.0.0.1:1")
-	firstCfg.AppsecTlsInsecureVerify = true
+	firstCfg.AppsecTLSInsecureVerify = true
 	secondCfg := testAppsecConfig("127.0.0.1:1")
-	secondCfg.AppsecTlsInsecureVerify = false
+	secondCfg.AppsecTLSInsecureVerify = false
 
 	first, err := Open(ctx, firstCfg, slog.Default(), "first", "test")
 	if err != nil {

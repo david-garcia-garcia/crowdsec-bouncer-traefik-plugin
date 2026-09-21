@@ -112,7 +112,7 @@ func Test_ValidateParams(t *testing.T) {
 	cfg5.BouncerClientTrustedIPs = []string{0: "bad"}
 	cfg6 := getMinimalConfig()
 	cfg6.LapiScheme = HTTPS
-	cfg6.LapiTlsInsecureVerify = true
+	cfg6.LapiTLSInsecureVerify = true
 	cfg7 := getMinimalConfig()
 	cfg7.LapiScheme = HTTPS
 	cfg8 := getMinimalConfig()
@@ -161,7 +161,7 @@ func Test_ValidateParams(t *testing.T) {
 	cfgAppsecHTTPS := getMinimalConfig()
 	cfgAppsecHTTPS.LapiScheme = HTTP
 	cfgAppsecHTTPS.AppsecScheme = HTTPS
-	cfgAppsecHTTPS.AppsecTlsCa = "not a pem"
+	cfgAppsecHTTPS.AppsecTLSCa = "not a pem"
 	cfgAppsecDistinctScheme := getMinimalConfig()
 	cfgAppsecDistinctScheme.AppsecEnabled = true
 	cfgAppsecDistinctScheme.LapiScheme = HTTP
@@ -173,7 +173,7 @@ func Test_ValidateParams(t *testing.T) {
 	cfgAloneAppsecOnInvalidCA.LapiCapiPassword = "password"
 	cfgAloneAppsecOnInvalidCA.AppsecEnabled = true
 	cfgAloneAppsecOnInvalidCA.AppsecScheme = HTTPS
-	cfgAloneAppsecOnInvalidCA.AppsecTlsCa = "not a pem"
+	cfgAloneAppsecOnInvalidCA.AppsecTLSCa = "not a pem"
 	cfgAloneAppsecOnMissingKey := getMinimalConfig()
 	cfgAloneAppsecOnMissingKey.LapiMode = AloneMode
 	cfgAloneAppsecOnMissingKey.LapiCapiMachineID = "machine"
@@ -186,27 +186,27 @@ func Test_ValidateParams(t *testing.T) {
 	cfgAloneAppsecOffLeftover.LapiCapiPassword = "password"
 	cfgAloneAppsecOffLeftover.AppsecEnabled = false
 	cfgAloneAppsecOffLeftover.AppsecScheme = HTTPS
-	cfgAloneAppsecOffLeftover.AppsecTlsCa = "not a pem"
+	cfgAloneAppsecOffLeftover.AppsecTLSCa = "not a pem"
 	cfgAloneAppsecOffLeftover.AppsecKeyFile = missingAppsecKeyFile
 	cfgLiveAppsecOnInvalidCA := getMinimalConfig()
 	cfgLiveAppsecOnInvalidCA.AppsecEnabled = true
 	cfgLiveAppsecOnInvalidCA.LapiScheme = HTTP
 	cfgLiveAppsecOnInvalidCA.AppsecScheme = HTTPS
-	cfgLiveAppsecOnInvalidCA.AppsecTlsCa = "not a pem"
+	cfgLiveAppsecOnInvalidCA.AppsecTLSCa = "not a pem"
 	cfgLiveAppsecOnMissingKey := getMinimalConfig()
 	cfgLiveAppsecOnMissingKey.AppsecEnabled = true
 	cfgLiveAppsecOnMissingKey.AppsecKeyFile = missingAppsecKeyFile
 	cfgLiveAppsecOffLeftover := getMinimalConfig()
 	cfgLiveAppsecOffLeftover.AppsecEnabled = false
 	cfgLiveAppsecOffLeftover.AppsecScheme = HTTPS
-	cfgLiveAppsecOffLeftover.AppsecTlsCa = "not a pem"
+	cfgLiveAppsecOffLeftover.AppsecTLSCa = "not a pem"
 	cfgLiveAppsecOffLeftover.AppsecKeyFile = missingAppsecKeyFile
 	cfgAppsecModeOffLeftover := getMinimalConfig()
 	cfgAppsecModeOffLeftover.LapiEnabled = false
 	cfgAppsecModeOffLeftover.LapiKey = ""
 	cfgAppsecModeOffLeftover.AppsecEnabled = false
 	cfgAppsecModeOffLeftover.AppsecScheme = HTTPS
-	cfgAppsecModeOffLeftover.AppsecTlsCa = "not a pem"
+	cfgAppsecModeOffLeftover.AppsecTLSCa = "not a pem"
 	cfgAppsecModeNoLapiKey := getMinimalConfig()
 	cfgAppsecModeNoLapiKey.LapiEnabled = false
 	cfgAppsecModeNoLapiKey.LapiKey = ""
@@ -423,9 +423,9 @@ func Test_ValidateParams_skipsRedisPasswordFileWhenRedisDisabled(t *testing.T) {
 func Test_validateParamsTLS(t *testing.T) {
 	cfgEmpty := getMinimalConfig()
 	cfgValid := getMinimalConfig()
-	cfgValid.LapiTlsCa = validPEM
+	cfgValid.LapiTLSCa = validPEM
 	cfgInvalidCA := getMinimalConfig()
-	cfgInvalidCA.LapiTlsCa = "not a pem"
+	cfgInvalidCA.LapiTLSCa = "not a pem"
 
 	tests := []struct {
 		name    string
@@ -542,15 +542,15 @@ func Test_GetTLSConfigCrowdsec(t *testing.T) {
 
 	httpsCustomCA := getMinimalConfig()
 	httpsCustomCA.LapiScheme = HTTPS
-	httpsCustomCA.LapiTlsCa = validPEM
+	httpsCustomCA.LapiTLSCa = validPEM
 
 	httpsInsecure := getMinimalConfig()
 	httpsInsecure.LapiScheme = HTTPS
-	httpsInsecure.LapiTlsInsecureVerify = true
+	httpsInsecure.LapiTLSInsecureVerify = true
 
 	httpsBadCA := getMinimalConfig()
 	httpsBadCA.LapiScheme = HTTPS
-	httpsBadCA.LapiTlsCa = "not a pem"
+	httpsBadCA.LapiTLSCa = "not a pem"
 
 	tests := []struct {
 		name             string
@@ -827,9 +827,9 @@ func Test_GetTemplate(t *testing.T) {
 
 func Test_validateParamsTLS_appsec(t *testing.T) {
 	cfgValid := getMinimalConfig()
-	cfgValid.AppsecTlsCa = validPEM
+	cfgValid.AppsecTLSCa = validPEM
 	cfgInvalid := getMinimalConfig()
-	cfgInvalid.AppsecTlsCa = "not a pem"
+	cfgInvalid.AppsecTLSCa = "not a pem"
 
 	tests := []struct {
 		name    string
