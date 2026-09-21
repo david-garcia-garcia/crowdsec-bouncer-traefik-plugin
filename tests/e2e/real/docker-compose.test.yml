@@ -461,7 +461,7 @@ services:
       - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.httpTimeoutSeconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.logLevel=DEBUG"
       - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.lapiMode=none"
-      - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.remediationstatuscode=429"
+      - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.bouncerRemediationStatusCode=429"
       - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.bouncerForwardedTrustedIps=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.bouncerForwardedHeader=X-Forwarded-For"
 
