@@ -2,6 +2,7 @@ package appsec
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,6 +41,9 @@ type Policy struct {
 
 // ErrFailureCaptcha tells the bouncer to run pkg/captcha instead of ban or next.
 var ErrFailureCaptcha = errors.New("failureAction captcha")
+
+// errClientBodyDroppedAllow signals passthrough allow when the client body cannot be buffered.
+var errClientBodyDroppedAllow = errors.New("appsecQuery:clientBodyDropped allow")
 
 // errAppsecReadBody is the io failure from readCappedAppsecBody (not an oversized body).
 var errAppsecReadBody = errors.New("appsecQuery:readBody")
@@ -83,6 +87,13 @@ func isBodyUnreadable(httpReq *http.Request) bool {
 	return httpReq.Body != nil && httpReq.Body != http.NoBody && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
 }
 
+// isClientGoneBodyReadErr reports disconnect or cancel while buffering a readable client body.
+func isClientGoneBodyReadErr(err error) bool {
+	return errors.Is(err, context.Canceled) ||
+		errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, io.ErrUnexpectedEOF)
+}
+
 // isMethodWithBody reports whether an unreadable body on this method is a drop candidate.
 func isMethodWithBody(method string) bool {
 	switch method {
@@ -121,6 +132,9 @@ func isHopByHopHeader(name string) bool {
 // A structured JSON envelope is returned when AppSec supplies a non-empty action.
 func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response, error) {
 	req, err := c.newAppsecForwardRequest(ip, httpReq, pol)
+	if errors.Is(err, errClientBodyDroppedAllow) {
+		return appsecAllow(), nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -219,6 +233,12 @@ func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol 
 		teeReader := io.TeeReader(bodyReader, &bodyBuffer)
 		bodyBytes, err := io.ReadAll(teeReader)
 		if err != nil {
+			if isClientGoneBodyReadErr(err) {
+				if faErr := resultForFailureActionErr(pol.FailureAction, "appsecQuery:clientBodyDropped"); faErr != nil {
+					return nil, faErr
+				}
+				return nil, errClientBodyDroppedAllow
+			}
 			return nil, fmt.Errorf("appsecQuery:GetBody %w", err)
 		}
 		httpReq.Body = io.NopCloser(io.MultiReader(&bodyBuffer, httpReq.Body))
