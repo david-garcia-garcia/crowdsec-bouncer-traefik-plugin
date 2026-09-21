@@ -368,19 +368,8 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		return err
 	}
 
-	if OpensLAPI(config) {
-		if config.LapiMode == AloneMode {
-			if _, err := GetVariable(config, "LapiCapiMachineID"); err != nil {
-				return err
-			}
-			if _, err := GetVariable(config, "LapiCapiPassword"); err != nil {
-				return err
-			}
-		} else {
-			if err := validateLapiURLAndKeys(config); err != nil {
-				return err
-			}
-		}
+	if err := validateOpenedLAPI(config); err != nil {
+		return err
 	}
 
 	if OpensAppsec(config) {
@@ -392,11 +381,32 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 	return validateLogging(config)
 }
 
+func validateOpenedLAPI(config *Config) error {
+	if !OpensLAPI(config) {
+		return nil
+	}
+	if config.LapiMode != AloneMode {
+		return validateLapiURLAndKeys(config)
+	}
+	if _, err := GetVariable(config, "LapiCapiMachineID"); err != nil {
+		return err
+	}
+	_, err := GetVariable(config, "LapiCapiPassword")
+	return err
+}
+
 // validateInstanceFlags checks enable/instance/secrets and hold vs bounce.
 func validateInstanceFlags(config *Config) error {
 	if config.BouncerHold && config.BouncerEnabled {
 		return errors.New("bouncerHold: cannot be true when bouncerEnabled is true")
 	}
+	if err := validateLapiEnableFlags(config); err != nil {
+		return err
+	}
+	return validateAppsecEnableFlags(config)
+}
+
+func validateLapiEnableFlags(config *Config) error {
 	if !config.LapiEnabled {
 		if strings.TrimSpace(config.LapiInstance) != "" {
 			return errors.New("lapiInstance: cannot be set when lapiEnabled is false")
@@ -404,9 +414,15 @@ func validateInstanceFlags(config *Config) error {
 		if HasLapiSecrets(config) {
 			return errors.New("lapiKey: cannot be set when lapiEnabled is false")
 		}
-	} else if !HasLapiSecrets(config) && strings.TrimSpace(config.LapiInstance) == "" {
+		return nil
+	}
+	if !HasLapiSecrets(config) && strings.TrimSpace(config.LapiInstance) == "" {
 		return errors.New("lapiKey: cannot be empty when lapiEnabled is true and lapiInstance is empty")
 	}
+	return nil
+}
+
+func validateAppsecEnableFlags(config *Config) error {
 	if !config.AppsecEnabled {
 		if strings.TrimSpace(config.AppsecInstance) != "" {
 			return errors.New("appsecInstance: cannot be set when appsecEnabled is false")
@@ -414,7 +430,9 @@ func validateInstanceFlags(config *Config) error {
 		if HasAppsecSecrets(config) {
 			return errors.New("appsecKey: cannot be set when appsecEnabled is false")
 		}
-	} else if !HasAppsecSecrets(config) && strings.TrimSpace(config.AppsecInstance) == "" && !HasLapiSecrets(config) {
+		return nil
+	}
+	if !HasAppsecSecrets(config) && strings.TrimSpace(config.AppsecInstance) == "" && !HasLapiSecrets(config) {
 		return errors.New("appsecKey: cannot be empty when appsecEnabled is true and appsecInstance is empty")
 	}
 	return nil
