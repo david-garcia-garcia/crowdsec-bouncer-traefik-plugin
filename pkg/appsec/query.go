@@ -42,8 +42,8 @@ type Policy struct {
 // ErrFailureCaptcha tells the bouncer to run pkg/captcha instead of ban or next.
 var ErrFailureCaptcha = errors.New("failureAction captcha")
 
-// errClientBodyDroppedAllow signals passthrough allow when the client body cannot be buffered.
-var errClientBodyDroppedAllow = errors.New("appsecQuery:clientBodyDropped allow")
+// errClientBodyDropped is a classified client disconnect while buffering a readable body.
+var errClientBodyDropped = errors.New("appsecQuery:clientBodyDropped")
 
 // errAppsecReadBody is the io failure from readCappedAppsecBody (not an oversized body).
 var errAppsecReadBody = errors.New("appsecQuery:readBody")
@@ -132,8 +132,9 @@ func isHopByHopHeader(name string) bool {
 // A structured JSON envelope is returned when AppSec supplies a non-empty action.
 func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response, error) {
 	req, err := c.newAppsecForwardRequest(ip, httpReq, pol)
-	if errors.Is(err, errClientBodyDroppedAllow) {
-		return appsecAllow(), nil
+	// Client-gone body drop uses the same FailureAction owner as unreachable / 500 / readBody.
+	if errors.Is(err, errClientBodyDropped) {
+		return resultForFailureAction(pol.FailureAction, "appsecQuery:clientBodyDropped")
 	}
 	if err != nil {
 		return nil, err
@@ -234,10 +235,7 @@ func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol 
 		bodyBytes, err := io.ReadAll(teeReader)
 		if err != nil {
 			if isClientGoneBodyReadErr(err) {
-				if faErr := resultForFailureActionErr(pol.FailureAction, "appsecQuery:clientBodyDropped"); faErr != nil {
-					return nil, faErr
-				}
-				return nil, errClientBodyDroppedAllow
+				return nil, errClientBodyDropped
 			}
 			return nil, fmt.Errorf("appsecQuery:GetBody %w", err)
 		}

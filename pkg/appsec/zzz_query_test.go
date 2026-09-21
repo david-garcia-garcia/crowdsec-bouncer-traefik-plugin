@@ -131,12 +131,12 @@ func Test_appsecQuery_clientBodyDroppedFailureAction(t *testing.T) {
 		{name: "deadline exceeded", err: context.DeadlineExceeded},
 		{name: "unexpected EOF", err: io.ErrUnexpectedEOF},
 	}
-	for _, readErr := range clientGoneErrs {
-		t.Run(readErr.name+"/passthrough", func(t *testing.T) {
-			assertClientBodyDroppedPassthrough(t, readErr.err)
+	for _, goneCase := range clientGoneErrs {
+		t.Run(goneCase.name+"/passthrough", func(t *testing.T) {
+			assertClientBodyDroppedPassthrough(t, goneCase.err)
 		})
-		t.Run(readErr.name+"/ban", func(t *testing.T) {
-			assertClientBodyDroppedBan(t, readErr.err)
+		t.Run(goneCase.name+"/ban", func(t *testing.T) {
+			assertClientBodyDroppedBan(t, goneCase.err)
 		})
 	}
 	t.Run("unclassified read error keeps GetBody wrap", assertUnclassifiedBodyReadStillGetBody)
