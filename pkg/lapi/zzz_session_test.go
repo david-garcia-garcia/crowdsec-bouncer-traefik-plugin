@@ -29,7 +29,7 @@ func testStreamConfig(host string, metricsInterval int64) *configuration.Config 
 		LapiUpdateIntervalSeconds:         60,
 		LapiMetricsIntervalSeconds:  metricsInterval,
 		HTTPTimeoutSeconds:            10,
-		BouncerLiveTtlSeconds:        60,
+		BouncerLiveTTLSeconds:        60,
 		LapiStreamStartupBlock:            true,
 	}
 }
@@ -118,7 +118,7 @@ func TestSessionKey_PolicyAndTLSDoNotChangeKey(t *testing.T) {
 	policy := testStreamConfig("lapi.example:8080", 1)
 	policy.BouncerLapiFailureAction = configuration.FailureActionPassthrough
 	policy.BouncerRedisUnreachableBlock = true
-	policy.BouncerLiveTtlSeconds = 5
+	policy.BouncerLiveTTLSeconds = 5
 	policy.LapiStreamStartupBlock = false
 	tlsOnly := testStreamConfig("lapi.example:8080", 1)
 	tlsOnly.HTTPTimeoutSeconds = 30
@@ -502,7 +502,7 @@ func TestOpenStream_LapiOverrideAdoptsTimeout(t *testing.T) {
 	firstCfg.HTTPTimeoutSeconds = 10
 	secondCfg := testStreamConfig(parsed.Host, 1)
 	secondCfg.HTTPTimeoutSeconds = 10
-	secondCfg.LapiHttpTimeoutSeconds = 30
+	secondCfg.LapiHTTPTimeoutSeconds = 30
 
 	first, err := OpenStream(ctx, firstCfg, slog.Default(), "shared", "test")
 	if err != nil {
@@ -579,7 +579,7 @@ func TestOpenStream_OverrideEqualSharedDoesNotReplace(t *testing.T) {
 
 	secondCfg := testStreamConfig(parsed.Host, 1)
 	secondCfg.HTTPTimeoutSeconds = 10
-	secondCfg.LapiHttpTimeoutSeconds = 10
+	secondCfg.LapiHTTPTimeoutSeconds = 10
 	second, err := OpenStream(ctx, secondCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -611,9 +611,9 @@ func TestSessionKey_TimeoutKnobsDoNotChangeKey(t *testing.T) {
 	base := testStreamConfig("lapi.example:8080", 1)
 	timeouts := testStreamConfig("lapi.example:8080", 1)
 	timeouts.HTTPTimeoutSeconds = 30
-	timeouts.LapiHttpTimeoutSeconds = 5
-	timeouts.AppsecHttpTimeoutSeconds = 2
-	timeouts.BouncerCaptchaHttpTimeoutSeconds = 1
+	timeouts.LapiHTTPTimeoutSeconds = 5
+	timeouts.AppsecHTTPTimeoutSeconds = 2
+	timeouts.BouncerCaptchaHTTPTimeoutSeconds = 1
 	if SessionKey(base) != SessionKey(timeouts) {
 		t.Fatal("timeout knobs must not change SessionKey")
 	}

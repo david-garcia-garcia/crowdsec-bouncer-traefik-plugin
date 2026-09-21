@@ -20,7 +20,7 @@ func testCaptchaBouncerConfig(t *testing.T, captchaTimeout int64) *configuration
 	cfg := configuration.New()
 	cfg.LapiMode = configuration.LiveMode
 	cfg.HTTPTimeoutSeconds = 10
-	cfg.BouncerCaptchaHttpTimeoutSeconds = captchaTimeout
+	cfg.BouncerCaptchaHTTPTimeoutSeconds = captchaTimeout
 	cfg.BouncerCaptchaProvider = configuration.HbouncerCaptchaProvider
 	cfg.BouncerCaptchaSiteKey = "site"
 	cfg.BouncerCaptchaSecretKey = "secret"

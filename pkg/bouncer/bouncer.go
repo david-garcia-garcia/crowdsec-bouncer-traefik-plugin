@@ -41,7 +41,7 @@ type Bouncer struct {
 	appsecInstanceName           string
 	lapiFailureAction            string // per-router LAPI fallback (not on Client identity)
 	redisUnreachableBlock        bool   // per-router Redis fail-closed
-	bouncerLiveTtlSeconds        int64  // per-router live-cache TTL passed into LiveLookup
+	bouncerLiveTTLSeconds        int64  // per-router live-cache TTL passed into LiveLookup
 	log                          *slog.Logger
 	name                         string
 	next                         http.Handler
@@ -95,7 +95,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		appsecInstanceName:           configuration.NamedAppsecInstance(config, name),
 		lapiFailureAction:            configuration.EffectiveFailureAction(config.BouncerLapiFailureAction),
 		redisUnreachableBlock:        config.BouncerRedisUnreachableBlock,
-		bouncerLiveTtlSeconds:        config.BouncerLiveTtlSeconds,
+		bouncerLiveTTLSeconds:        config.BouncerLiveTTLSeconds,
 		log:                          log,
 		name:                         name,
 		next:                         next,
@@ -122,7 +122,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		log,
 		&http.Client{
 			Transport: &http.Transport{MaxIdleConns: 10, MaxIdleConnsPerHost: 10, IdleConnTimeout: 30 * time.Second},
-			Timeout:   time.Duration(config.EffectiveHTTPTimeoutSeconds(config.BouncerCaptchaHttpTimeoutSeconds)) * time.Second,
+			Timeout:   time.Duration(config.EffectiveHTTPTimeoutSeconds(config.BouncerCaptchaHTTPTimeoutSeconds)) * time.Second,
 		},
 		config.BouncerCaptchaProvider,
 		config.BouncerCaptchaCustomJsURL,
@@ -333,7 +333,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	}
 
 	if lapiMode == configuration.LiveMode || lapiMode == configuration.NoneMode {
-		kind, origin, err := lapiClient.LiveLookup(req.remoteIP, scopes, b.bouncerLiveTtlSeconds)
+		kind, origin, err := lapiClient.LiveLookup(req.remoteIP, scopes, b.bouncerLiveTTLSeconds)
 		if err != nil {
 			b.log.Debug("ServeHTTP:LiveLookup", "error", err.Error())
 			if !decisionscope.IsActiveRemediation(kind) {

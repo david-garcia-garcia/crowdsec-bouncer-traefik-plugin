@@ -29,7 +29,7 @@ func getTestConfig() *configuration.Config {
 		LapiHost:                         "localhost",
 		LapiScheme:                       "http",
 		LapiUpdateIntervalSeconds:        60,
-		BouncerLiveTtlSeconds:            60,
+		BouncerLiveTTLSeconds:            60,
 		HTTPTimeoutSeconds:               10,
 		BouncerForwardedTrustedIPs:       []string{"127.0.0.1"},
 		BouncerForwardedHeader:           "",

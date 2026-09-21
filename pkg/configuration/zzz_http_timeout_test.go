@@ -9,15 +9,15 @@ import (
 
 func TestEffectiveHTTPTimeoutSeconds_InheritAndOverride(t *testing.T) {
 	cfg := New()
-	if cfg.LapiHttpTimeoutSeconds != 0 || cfg.AppsecHttpTimeoutSeconds != 0 || cfg.BouncerCaptchaHttpTimeoutSeconds != 0 {
+	if cfg.LapiHTTPTimeoutSeconds != 0 || cfg.AppsecHTTPTimeoutSeconds != 0 || cfg.BouncerCaptchaHTTPTimeoutSeconds != 0 {
 		t.Fatalf("New must leave inherit knobs at 0, got lapi=%d appsec=%d captcha=%d",
-			cfg.LapiHttpTimeoutSeconds, cfg.AppsecHttpTimeoutSeconds, cfg.BouncerCaptchaHttpTimeoutSeconds)
+			cfg.LapiHTTPTimeoutSeconds, cfg.AppsecHTTPTimeoutSeconds, cfg.BouncerCaptchaHTTPTimeoutSeconds)
 	}
 	if got := cfg.EffectiveHTTPTimeoutSeconds(0); got != 10 {
 		t.Fatalf("omit/0 inherit: got %d want 10", got)
 	}
-	cfg.AppsecHttpTimeoutSeconds = 1
-	if got := cfg.EffectiveHTTPTimeoutSeconds(cfg.AppsecHttpTimeoutSeconds); got != 1 {
+	cfg.AppsecHTTPTimeoutSeconds = 1
+	if got := cfg.EffectiveHTTPTimeoutSeconds(cfg.AppsecHTTPTimeoutSeconds); got != 1 {
 		t.Fatalf("positive override: got %d want 1", got)
 	}
 }
@@ -30,9 +30,9 @@ func TestValidateParams_HTTPTimeoutInheritKnobs(t *testing.T) {
 	}
 
 	negative := getMinimalConfig()
-	negative.LapiHttpTimeoutSeconds = -1
+	negative.LapiHTTPTimeoutSeconds = -1
 	err := ValidateParams(negative, log)
-	if err == nil || !strings.Contains(err.Error(), "LapiHttpTimeoutSeconds") || !strings.Contains(err.Error(), "cannot be less than 0") {
+	if err == nil || !strings.Contains(err.Error(), "LapiHTTPTimeoutSeconds") || !strings.Contains(err.Error(), "cannot be less than 0") {
 		t.Fatalf("negative knob: %v", err)
 	}
 

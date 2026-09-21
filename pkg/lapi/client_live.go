@@ -9,7 +9,7 @@ import (
 )
 
 // LiveLookup queries LAPI for one IP and mapped header scopes (none/live mode).
-// bouncerLiveTtlSeconds is the live-cache TTL the caller wants for this lookup.
+// bouncerLiveTTLSeconds is the live-cache TTL the caller wants for this lookup.
 //
 // The returned error carries two different meanings and the caller separates them by the
 // remediation kind, never by the error alone:
@@ -18,13 +18,13 @@ import (
 //	non-active remediation + non-nil error -> LAPI failed; apply BouncerLapiFailureAction
 //
 // Any query this lookup makes can fail that way: the IP query and every header-scope query.
-func (c *Client) LiveLookup(remoteIP string, scopes map[string]string, bouncerLiveTtlSeconds int64) (kind string, origin string, err error) {
-	return c.handleNoStreamCache(remoteIP, scopes, bouncerLiveTtlSeconds)
+func (c *Client) LiveLookup(remoteIP string, scopes map[string]string, bouncerLiveTTLSeconds int64) (kind string, origin string, err error) {
+	return c.handleNoStreamCache(remoteIP, scopes, bouncerLiveTTLSeconds)
 }
 
 // handleNoStreamCache queries LAPI for the client address and each mapped header, writes the
 // IP query result to the client-address cache key, and returns the PreferRemediation merge.
-func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, bouncerLiveTtlSeconds int64) (string, string, error) {
+func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, bouncerLiveTTLSeconds int64) (string, string, error) {
 	isLiveMode := c.lapiMode == configuration.LiveMode
 	// remoteIP is already canonical on clientRequest. Do not re-parse it for the memo key.
 	// LAPI ?ip= matches numerically and does not care about spelling.
@@ -38,7 +38,7 @@ func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, 
 	// and an active remediation below still outranks all of them.
 	var scopeErr error
 	for scope, identifier := range scopes {
-		scopeChosen, mergeErr := c.mergeLiveScope(chosen, scope, identifier, isLiveMode, bouncerLiveTtlSeconds)
+		scopeChosen, mergeErr := c.mergeLiveScope(chosen, scope, identifier, isLiveMode, bouncerLiveTTLSeconds)
 		chosen = scopeChosen
 		if mergeErr != nil && scopeErr == nil {
 			scopeErr = mergeErr
@@ -46,11 +46,11 @@ func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, 
 	}
 	// The IP slot stores the IP query result. Header remediations stay on HeaderScopeKey.
 	// A clean IP result is not written when a header query failed (fail-closed).
-	if isLiveMode && bouncerLiveTtlSeconds > 0 {
+	if isLiveMode && bouncerLiveTTLSeconds > 0 {
 		if decisionscope.IsActiveRemediation(ipResult.kind) {
-			c.memoLive(decisionscope.ScopeIP, remoteIP, ipResult.kind, ipResult.origin, liveCacheTTL(ipResult.duration, bouncerLiveTtlSeconds))
+			c.memoLive(decisionscope.ScopeIP, remoteIP, ipResult.kind, ipResult.origin, liveCacheTTL(ipResult.duration, bouncerLiveTTLSeconds))
 		} else if scopeErr == nil {
-			c.memoLive(decisionscope.ScopeIP, remoteIP, decisionscope.NoBannedValue, "", bouncerLiveTtlSeconds)
+			c.memoLive(decisionscope.ScopeIP, remoteIP, decisionscope.NoBannedValue, "", bouncerLiveTTLSeconds)
 		}
 	}
 	// An active remediation is a real decision, so it outranks a scope failure and comes back with

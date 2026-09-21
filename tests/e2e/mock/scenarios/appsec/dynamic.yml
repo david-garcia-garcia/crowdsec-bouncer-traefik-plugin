@@ -18,11 +18,9 @@ http:
         bouncer:
           bouncerEnabled: "true"
           # IP bouncing disabled — this scenario exercises AppSec only.
-          lapiMode: appsec
-          lapiScheme: http
-          lapiHost: "@@LAPI_HOST@@"
-          lapiKey: "@@APIKEY@@"
+          lapiEnabled: "false"
           appsecEnabled: "true"
+          appsecKey: "@@APIKEY@@"
           bouncerAppsecFailureAction: ban
           appsecBodyLimit: 4
           appsecScheme: http

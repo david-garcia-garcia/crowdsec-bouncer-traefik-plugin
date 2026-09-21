@@ -27,7 +27,7 @@ func newTransport(config *configuration.Config, log *slog.Logger) (*transport, e
 		return nil, err
 	}
 	// Store effective seconds so AdoptTransport last-writes a shared-default change when the override is still 0.
-	timeoutSeconds := config.EffectiveHTTPTimeoutSeconds(config.AppsecHttpTimeoutSeconds)
+	timeoutSeconds := config.EffectiveHTTPTimeoutSeconds(config.AppsecHTTPTimeoutSeconds)
 	return &transport{
 		httpClient: &http.Client{
 			Transport: &http.Transport{

@@ -100,12 +100,12 @@ type Config struct {
 	LapiUpdateMaxFailure             int64                        `json:"lapiUpdateMaxFailure,omitempty"`
 	BouncerLapiFailureAction         string                       `json:"bouncerLapiFailureAction,omitempty"`
 	LapiStreamStartupBlock           bool                         `json:"lapiStreamStartupBlock,omitempty"`
-	BouncerLiveTtlSeconds            int64                        `json:"bouncerLiveTtlSeconds,omitempty"`
+	BouncerLiveTTLSeconds            int64                        `json:"bouncerLiveTtlSeconds,omitempty"`
 	BouncerRemediationStatusCode     int                          `json:"bouncerRemediationStatusCode,omitempty"`
 	HTTPTimeoutSeconds               int64                        `json:"httpTimeoutSeconds,omitempty"`
-	LapiHttpTimeoutSeconds           int64                        `json:"lapiHttpTimeoutSeconds,omitempty"`
-	AppsecHttpTimeoutSeconds         int64                        `json:"appsecHttpTimeoutSeconds,omitempty"`
-	BouncerCaptchaHttpTimeoutSeconds int64                        `json:"bouncerCaptchaHttpTimeoutSeconds,omitempty"`
+	LapiHTTPTimeoutSeconds           int64                        `json:"lapiHttpTimeoutSeconds,omitempty"`
+	AppsecHTTPTimeoutSeconds         int64                        `json:"appsecHttpTimeoutSeconds,omitempty"`
+	BouncerCaptchaHTTPTimeoutSeconds int64                        `json:"bouncerCaptchaHttpTimeoutSeconds,omitempty"`
 	BouncerTraceHeader               string                       `json:"bouncerTraceHeader,omitempty"`
 	BouncerRemediationHeader         string                       `json:"bouncerRemediationHeader,omitempty"`
 	BouncerForwardedHeader           string                       `json:"bouncerForwardedHeader,omitempty"`
@@ -208,7 +208,7 @@ func New() *Config {
 		LapiUpdateMaxFailure:             0,
 		BouncerLapiFailureAction:         FailureActionBan,
 		LapiStreamStartupBlock:           true,
-		BouncerLiveTtlSeconds:            60,
+		BouncerLiveTTLSeconds:            60,
 		BouncerRemediationStatusCode:     http.StatusForbidden,
 		HTTPTimeoutSeconds:               10,
 		BouncerCaptchaProvider:           "",
@@ -705,9 +705,9 @@ func validateParamsRequired(config *Config) error {
 	requiredInt0 := map[string]int64{
 		"AppsecBodyLimit":                  config.AppsecBodyLimit,
 		"LapiMetricsIntervalSeconds":       config.LapiMetricsIntervalSeconds,
-		"LapiHttpTimeoutSeconds":           config.LapiHttpTimeoutSeconds,
-		"AppsecHttpTimeoutSeconds":         config.AppsecHttpTimeoutSeconds,
-		"BouncerCaptchaHttpTimeoutSeconds": config.BouncerCaptchaHttpTimeoutSeconds,
+		"LapiHTTPTimeoutSeconds":           config.LapiHTTPTimeoutSeconds,
+		"AppsecHTTPTimeoutSeconds":         config.AppsecHTTPTimeoutSeconds,
+		"BouncerCaptchaHTTPTimeoutSeconds": config.BouncerCaptchaHTTPTimeoutSeconds,
 	}
 	for key, val := range requiredInt0 {
 		if val < 0 {
@@ -716,7 +716,7 @@ func validateParamsRequired(config *Config) error {
 	}
 	requiredInt1 := map[string]int64{
 		"LapiUpdateIntervalSeconds":        config.LapiUpdateIntervalSeconds,
-		"BouncerLiveTtlSeconds":            config.BouncerLiveTtlSeconds,
+		"BouncerLiveTTLSeconds":            config.BouncerLiveTTLSeconds,
 		"HTTPTimeoutSeconds":               config.HTTPTimeoutSeconds,
 		"BouncerCaptchaGracePeriodSeconds": config.BouncerCaptchaGracePeriodSeconds,
 	}

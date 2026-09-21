@@ -481,7 +481,7 @@ func Test_validateParamsRequired(t *testing.T) {
 	cfg4 := getMinimalConfig()
 	cfg4.LapiUpdateIntervalSeconds = 0
 	cfg5 := getMinimalConfig()
-	cfg5.BouncerLiveTtlSeconds = 0
+	cfg5.BouncerLiveTTLSeconds = 0
 	type args struct {
 		config *Config
 	}

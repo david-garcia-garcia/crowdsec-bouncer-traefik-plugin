@@ -36,7 +36,7 @@ func testLiveConfig(updateInterval int64) *configuration.Config {
 		LapiUpdateIntervalSeconds:         updateInterval,
 		LapiMetricsIntervalSeconds:  0,
 		HTTPTimeoutSeconds:            10,
-		BouncerLiveTtlSeconds:        60,
+		BouncerLiveTTLSeconds:        60,
 	}
 }
 

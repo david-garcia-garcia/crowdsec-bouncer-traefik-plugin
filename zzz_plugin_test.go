@@ -75,7 +75,7 @@ func cfgLiveAt(host string) *configuration.Config {
 	c.LapiMetricsIntervalSeconds = 0
 	c.BouncerForwardedTrustedIPs = []string{"127.0.0.1/32"}
 	c.BouncerForwardedHeader = "X-Forwarded-For"
-	c.BouncerLiveTtlSeconds = 2
+	c.BouncerLiveTTLSeconds = 2
 	return c
 }
 
