@@ -1,0 +1,14 @@
+issueKey: 2026-09-21-bouncer-instance-severance
+jobName: 2026-09-21-bouncer-instance-severance
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
