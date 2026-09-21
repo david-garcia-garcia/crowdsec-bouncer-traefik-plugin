@@ -1,0 +1,12 @@
+# Performance
+
+1. [judgement] Missing release of a pooled connection — `pkg/lapi/client_http.go:233` with `:241` — on the alone-mode 401 the outer response is released by `defer`, which runs only after `getToken` and the replay have both finished. So the exact path deliverable 4 exists to fix keeps one connection parked while two more requests go out: the 401 exchange holds its slot, `getToken` dials a second, the replay a third.
+   → Drain the 401 response before calling `getToken` (and drop the `defer` for that arm, so the body is not closed twice)
+   Status: skipped
+   Argument: judgement, and bounded. What grows is connections per renewal, not per request: the fan-out is at most three sockets, only on a 401, only in `alone` mode, and only until the replay returns — nothing accumulates and the idle pool reclaims all three. Applying it means splitting the release out of the `defer` for one arm, which risks a double `Close` logged at `ERROR` (`:201`) and touches the 401 semantics the ticket fenced. Named here so the owner can decide; it is a one-line follow-up if they want it.
+
+Every other row is clean, and two are worth stating because the diff moved code near them:
+
+- I/O in a loop: the per-scope `queryLiveDecisions` inside `for scope, identifier := range scopes` (`pkg/lapi/client_live.go:34`) is one HTTP call per mapped header scope. It is unchanged by this diff — the loop and its bound (the operator's `decisionScopeHeaders` map, fixed at config time, not client input) are both on `0e7dbf0`. The diff adds a variable, not a call. It also does not short-circuit after the first scope error, deliberately: the spec requires a ban on a later scope to outrank an earlier scope failure, so all mapped scopes must still be asked.
+- Missing deadline on outbound I/O: no new client. `sendQuery` reads the `currentTransport()` snapshot from #62, which carries `http.Client{Timeout: HTTPTimeoutSeconds}`. The 401 retry is bounded to exactly one replay by `mayRenewToken` (`:214`, `:241`), which is also what stops the unbounded recursion.
+- Unbounded collection: `scopeErr` holds one error; `fetchAndApplyStreamDecisions` allocates the same batch slices as before the extraction. `c.Cache().Delete(cacheTimeoutKey)` (`pkg/lapi/client_stream.go:92`) is one extra store op per failed poll, and it removes waiting, not throughput: the next tick re-polls instead of sleeping out `max(updateInterval-1, 1)`.

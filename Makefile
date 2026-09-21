@@ -1,9 +1,10 @@
-.PHONY: lint test vendor clean e2e_mock
+.PHONY: lint test vendor clean e2e_mock e2e_pester test_realredis
 
 export GO111MODULE=on
 
-# Binary/mock suite (Traefik binary + mock LAPI). This is what CI runs.
-# The local Docker suite (make e2e) lives in a separate PR/branch.
+# Binary/mock suite (Traefik binary + mock LAPI). CI job "e2e (binary + mock LAPI)".
+# Real-stack Pester suite (Docker Traefik + Crowdsec): make e2e_pester / tests/e2e/real/Test-Integration.ps1
+# Go-layer Dragonfly: make test_realredis (not part of make test; needs Docker).
 E2E_MOCK_SCENARIOS := $(notdir $(wildcard tests/e2e/mock/scenarios/*))
 
 default: lint test
@@ -21,6 +22,16 @@ e2e_mock: $(addprefix e2e_mock_,$(E2E_MOCK_SCENARIOS))
 
 e2e_mock_%:
 	bash ./tests/e2e/mock/scenarios/$*/run.sh
+
+e2e_pester:
+	pwsh -File ./tests/e2e/real/Test-Integration.ps1
+
+# DecisionStore go test against Dragonfly (same image as Pester). Untagged go test stays docker-free.
+test_realredis:
+	docker compose -f tests/e2e/go/docker-compose.yml up -d
+	go test -tags realredis -count=1 ./pkg/decisionstore ; status=$$? ; \
+	docker compose -f tests/e2e/go/docker-compose.yml down -v --remove-orphans ; \
+	exit $$status
 
 vendor:
 	go mod vendor
@@ -61,6 +72,15 @@ run_captcha:
 run_custom_ban_page:
 	docker compose -f examples/custom-ban-page/docker-compose.yml up -d --remove-orphans
 
+GEOBLOCK_TAG := v1.2.0
+GEOBLOCK_DIR := examples/geoenrich-decisions/geoblock
+
+run_geoenrich:
+	@if [ ! -f "$(GEOBLOCK_DIR)/plugin.go" ]; then \
+		git clone --depth 1 --branch $(GEOBLOCK_TAG) https://github.com/david-garcia-garcia/traefik-geoblock.git $(GEOBLOCK_DIR); \
+	fi
+	docker compose -f examples/geoenrich-decisions/docker-compose.yml up -d --remove-orphans
+
 run:
 	docker compose -f docker-compose.yml up -d --remove-orphans
 
@@ -94,6 +114,9 @@ restart_captcha:
 restart_custombanpage:
 	docker compose -f examples/custom-ban-page/docker-compose.yml
 
+restart_geoenrich:
+	docker compose -f examples/geoenrich-decisions/docker-compose.yml
+
 show_logs:
 	docker compose -f docker-compose.yml restart
 
@@ -112,6 +135,7 @@ clean_all_docker:
 	docker compose -f examples/captcha/docker-compose.yml down --remove-orphans
 	docker compose -f examples/custom-captcha/docker-compose.yml down --remove-orphans
 	docker compose -f examples/custom-ban-page/docker-compose.yml down --remove-orphans
+	docker compose -f examples/geoenrich-decisions/docker-compose.yml down --remove-orphans
 	docker compose -f docker-compose.local.yml down --remove-orphans
 	docker compose -f docker-compose.yml down --remove-orphans
 

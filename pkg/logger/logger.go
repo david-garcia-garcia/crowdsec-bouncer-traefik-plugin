@@ -3,18 +3,33 @@
 package logger
 
 import (
+	"context"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 )
 
+// sharedLogFiles holds process-lifetime log files keyed by cleaned path.
+//
+//nolint:gochecknoglobals // intentional process-wide cache for Traefik reload semantics
+var sharedLogFiles sync.Map
+
 // Custom log levels following slog best practices.
+// LevelTrace is below Debug (slog.Level(-8)), matching the Go slog custom-levels example.
 const (
+	LevelTrace = slog.Level(-8)
 	LevelDebug = slog.LevelDebug
 	LevelInfo  = slog.LevelInfo
 	LevelWarn  = slog.LevelWarn
 	LevelError = slog.LevelError
 )
+
+// Trace logs at LevelTrace. slog.Logger has no Trace method.
+func Trace(log *slog.Logger, msg string, args ...any) {
+	log.Log(context.Background(), LevelTrace, msg, args...)
+}
 
 // New creates a Log wrapper with default format (common).
 func New(logLevel string, logFilePath string) *slog.Logger {
@@ -34,25 +49,14 @@ func NewWithFormat(logLevel, logFilePath, logFormat string) *slog.Logger {
 		level = LevelInfo
 	case "DEBUG":
 		level = LevelDebug
+	case "TRACE":
+		level = LevelTrace
 	default:
 		// Default to INFO level
 		level = LevelInfo
 	}
 
-	// Set output destination
-	var output *os.File
-	if logFilePath != "" {
-		logFile, err := os.OpenFile(filepath.Clean(logFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-		if err == nil {
-			output = logFile
-		} else {
-			// Fall back to stdout and log the error
-			output = os.Stdout
-			slog.Warn("LogFilePath is not writable, using stdout", "error", err)
-		}
-	} else {
-		output = os.Stdout
-	}
+	output := logOutput(logFilePath)
 
 	// Create handler based on format with custom level names
 	var handler slog.Handler
@@ -66,6 +70,8 @@ func NewWithFormat(logLevel, logFilePath, logFormat string) *slog.Logger {
 					return a
 				}
 				switch {
+				case lvl < LevelDebug:
+					a.Value = slog.StringValue("TRACE")
 				case lvl < LevelInfo:
 					a.Value = slog.StringValue("DEBUG")
 				case lvl < LevelWarn:
@@ -80,7 +86,7 @@ func NewWithFormat(logLevel, logFilePath, logFormat string) *slog.Logger {
 		},
 	}
 
-	if logFormat == "json" {
+	if strings.EqualFold(logFormat, "json") {
 		handler = slog.NewJSONHandler(output, opts)
 	} else {
 		// Common format (default)
@@ -89,4 +95,53 @@ func NewWithFormat(logLevel, logFilePath, logFormat string) *slog.Logger {
 
 	// Create logger with component attribute
 	return slog.New(handler).With("component", "CrowdsecBouncerTraefikPlugin")
+}
+
+// logOutput returns stdout or a process-lifetime shared file for logFilePath.
+func logOutput(logFilePath string) *os.File {
+	if logFilePath == "" {
+		return os.Stdout
+	}
+
+	path := filepath.Clean(logFilePath)
+	if existing, ok := sharedLogFiles.Load(path); ok {
+		if file, isFile := existing.(*os.File); isFile {
+			return file
+		}
+	}
+
+	logFile, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		slog.Warn("LogFilePath is not writable, using stdout", "error", err)
+		return os.Stdout
+	}
+
+	actual, loaded := sharedLogFiles.LoadOrStore(path, logFile)
+	if loaded {
+		_ = logFile.Close()
+	}
+	if file, ok := actual.(*os.File); ok {
+		return file
+	}
+	return os.Stdout
+}
+
+// ResetSharedLogFilesForTest closes and clears process-lifetime log files. Test-only.
+func ResetSharedLogFilesForTest() {
+	sharedLogFiles.Range(func(key, value any) bool {
+		if file, ok := value.(*os.File); ok {
+			_ = file.Close()
+		}
+		sharedLogFiles.Delete(key)
+		return true
+	})
+}
+
+func sharedLogFileCountForTest() int {
+	count := 0
+	sharedLogFiles.Range(func(_, _ any) bool {
+		count++
+		return true
+	})
+	return count
 }

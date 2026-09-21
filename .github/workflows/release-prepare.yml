@@ -29,10 +29,10 @@ jobs:
     name: Open release PR for ${{ inputs.version }}
     runs-on: ubuntu-latest
     steps:
-      - name: Check out main
+      - name: Check out master
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: master
           fetch-depth: 0
 
       - name: Validate version
@@ -80,4 +80,4 @@ jobs:
           > Keep the PR title as-is: **Release (2/2) Publish** matches on it.
           EOF
 
-          gh pr create --base main --head "release/$VERSION" --title "🔖 release $VERSION" --body-file /tmp/pr-body.md
+          gh pr create --base master --head "release/$VERSION" --title "🔖 release $VERSION" --body-file /tmp/pr-body.md

@@ -1,0 +1,15 @@
+name: crowdsec-bouncer-go-redis
+
+# Same Dragonfly image as tests/e2e/real/docker-compose.test.yml, published so
+# host-side go test -tags realredis can dial it. Do not boot Traefik or Crowdsec.
+services:
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2
+    container_name: dragonfly-go-test
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    ulimits:
+      memlock: -1
+    labels:
+      - "traefik.enable=false"

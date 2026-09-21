@@ -1,0 +1,47 @@
+## prepare (2026-09-18)
+phase: prepare
+findings: none
+fixed: none
+skipped: no Task subagent used; prepare wrote the bus in-process
+
+## explore (2026-09-18)
+phase: explore
+findings: none
+fixed: none
+skipped: reproduced empty-key accept; 9 open questions (6 assumed, 3 resolved); noted GetVariable rename
+
+## propose (2026-09-18)
+phase: propose
+findings: none
+fixed: none
+skipped: folded core_plugin_middleware_config-validation; no comments.md; 6 assumed decisions kept
+
+## implement (2026-09-18)
+phase: implement
+findings: none
+fixed: reject empty captcha site/secret after GetVariable; Yaegi-safe New Cleanup
+skipped: no comments.md; GetVariable rename stays noted
+
+## codereview (2026-09-18)
+phase: codereview
+findings: none
+fixed: none
+skipped: Task tool unavailable in this nested session; conductor wrote six clean axis files in-process
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: 1 missing-packet
+fixed: produced core_plugin_middleware_config-validation
+skipped: none
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: folded core_plugin_middleware_config-validation; archived reject-empty-captcha-keys
+skipped: Task tool unavailable; FindSpecHost ran on this thread
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: reused PR 84; dropped WIP title; CI succeeded on 59da390
+skipped: comments.md absent; no publish walk

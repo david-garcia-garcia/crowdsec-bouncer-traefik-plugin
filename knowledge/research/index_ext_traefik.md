@@ -1,0 +1,32 @@
+# ext / traefik
+
+## Catalog plugins
+priority: normal
+local: ext_traefik_plugins_catalog/
+description: How Traefik downloads experimental.plugins by moduleName and version, and how the alias distinguishes two plugins.
+
+## Local plugins
+priority: normal
+local: ext_traefik_plugins_localplugins/
+description: How Traefik loads a plugin from a bind-mounted module path instead of the catalog.
+
+## Yaegi middleware constructor
+priority: normal
+local: ext_traefik_plugins_yaegi-constructor/
+description: Where Traefik Yaegi looks up CreateConfig and New, how often New runs, and whether Config and subpackages must live in the root package.
+
+## Plugin config decode
+priority: normal
+local: ext_traefik_plugins_config-decode/
+description: How Traefik mapstructure-decodes a Yaegi plugin middleware config map into CreateConfig's result, including unused keys.
+
+## Plugin manifest useUnsafe
+priority: normal
+local: ext_traefik_plugins_useunsafe/
+description: What the useUnsafe manifest flag unlocks in the Yaegi plugin host, and the matching operator opt-in a Traefik installation must also set.
+
+## Entrypoint X-Forwarded-Proto
+priority: normal
+local: ext_traefik_forwardedheaders_x-forwarded-proto/
+description: How Traefik's entrypoint XForwarded sanitizes X-Forwarded-Proto before plugin middleware runs.
+

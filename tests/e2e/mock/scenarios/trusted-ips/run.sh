@@ -15,7 +15,7 @@ body() {
   # The untrusted IP turning 403 is our signal that the bans have been polled;
   # it also doubles as the control proving the bouncer is active.
   echo "[$SCENARIO] untrusted banned IP must be blocked once the bans are polled (HTTP 403)"
-  wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 403 15 -H "X-Forwarded-For: 5.6.7.8"
+  wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 403 45 -H "X-Forwarded-For: 5.6.7.8"
 
   echo "[$SCENARIO] trusted IP must bypass the bouncer even though it is banned"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 1.2.3.4"

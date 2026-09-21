@@ -1,0 +1,8 @@
+host: github
+ref: 389
+title: AppSec bot-detection challenge (CrowdSec 1.8.0) is not Supported YET
+url: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/389
+number: 389
+related_pr: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/343
+related_pr_head: sabban/crowdsec-bouncer-traefik-plugin@crowdsec/bot/detection
+related_pr_sha: 18721dcbfd55c5044d3f1d4b2632d4e91ac1b3e9
