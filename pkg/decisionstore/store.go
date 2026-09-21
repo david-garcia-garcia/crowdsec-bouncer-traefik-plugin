@@ -18,44 +18,44 @@ import (
 // engine is the slot and Range ops bound at NewMemory or NewRedis.
 // Funcs, not an interface: Yaegi v0.16 panics putting a map-holding *memory in an interface.
 type engine struct {
-	beginTick   func()
-	publishTick func(int32)
-	putMany     func([]Decision)
-	deleteMany  func([]Decision)
-	peekMany    func([]string) map[string]peekedSlot // canonical key → packed or leftover origin; engines do not adjust the gauge
-	lookup      func(string, net.IP, map[string]string, *RangeMembership) (string, string, uint16, error)
-	applyRange  func(map[string]string, []string) error
-	rangeIndex  func() (string, error)
-	close       func()
+	beginTick    func()
+	publishTick  func(int32)
+	putMany      func([]Decision)
+	deleteMany   func([]Decision)
+	activeCounts func() map[ActiveCountKey]int64 // memory: last PublishTick walk; Redis: always empty
+	lookup       func(string, net.IP, map[string]string, *RangeMembership) (string, string, uint16, error)
+	applyRange   func(map[string]string, []string) error
+	rangeIndex   func() (string, error)
+	close        func()
 }
 
 // memoryEngine binds *memory methods into engine funcs.
 func memoryEngine(mem *memory) engine {
 	return engine{
-		beginTick:   mem.BeginTick,
-		publishTick: mem.PublishTick,
-		putMany:     mem.PutMany,
-		deleteMany:  mem.DeleteMany,
-		peekMany:    mem.peekMany,
-		lookup:      mem.LookupRemediation,
-		applyRange:  mem.ApplyRangeBatch,
-		rangeIndex:  mem.RangeIndex,
-		close:       func() {},
+		beginTick:    mem.BeginTick,
+		publishTick:  mem.PublishTick,
+		putMany:      mem.PutMany,
+		deleteMany:   mem.DeleteMany,
+		activeCounts: mem.activeCounts,
+		lookup:       mem.LookupRemediation,
+		applyRange:   mem.ApplyRangeBatch,
+		rangeIndex:   mem.RangeIndex,
+		close:        func() {},
 	}
 }
 
 // redisEngine binds *redis methods into engine funcs.
 func redisEngine(red *redis) engine {
 	return engine{
-		beginTick:   red.BeginTick,
-		publishTick: red.PublishTick,
-		putMany:     red.PutMany,
-		deleteMany:  red.DeleteMany,
-		peekMany:    red.peekMany,
-		lookup:      red.LookupRemediation,
-		applyRange:  red.ApplyRangeBatch,
-		rangeIndex:  red.RangeIndex,
-		close:       red.close,
+		beginTick:    red.BeginTick,
+		publishTick:  red.PublishTick,
+		putMany:      red.PutMany,
+		deleteMany:   red.DeleteMany,
+		activeCounts: red.activeCounts,
+		lookup:       red.LookupRemediation,
+		applyRange:   red.ApplyRangeBatch,
+		rangeIndex:   red.RangeIndex,
+		close:        red.close,
 	}
 }
 
@@ -65,11 +65,9 @@ type Store struct {
 	mem             *memory
 	red             *redis
 	origins         *intern.Table
-	active          *activeCountState // compact origin×family gauge; PutMany/DeleteMany adjust, engines do not
-	countActive     bool              // true only for stream/alone; not part of StoreKey
-	rangeMembership atomic.Value      // *RangeMembership
-	lastRangeIndex  atomic.Value      // string of the blob last used to build membership
-	createdBy       string            // Traefik New name from the create that first put this store
+	rangeMembership atomic.Value // *RangeMembership
+	lastRangeIndex  atomic.Value // string of the blob last used to build membership
+	createdBy       string       // Traefik New name from the create that first put this store
 	// streamReady and streamPollInFlight own the CrowdSec cursor and the applied
 	// cache for this session, not this HTTP client. A reincarnated Client must not zero them.
 	streamReady        int64 // 1 after the first finished stream poll; atomic.LoadInt64/StoreInt64
@@ -80,39 +78,33 @@ type Store struct {
 }
 
 // NewMemory is in-process COW slots and an in-process Range blob.
-// countActive is true only for stream/alone so live/none Put does not increment the gauge.
-func NewMemory(log *slog.Logger, countActive bool) *Store {
+func NewMemory(log *slog.Logger) *Store {
 	origins := intern.New()
 	mem := newMemory(log, origins)
 	return &Store{
-		engine:      memoryEngine(mem),
-		mem:         mem,
-		origins:     origins,
-		active:      newActiveCountState(),
-		countActive: countActive,
-		engineName:  "memory",
+		engine:     memoryEngine(mem),
+		mem:        mem,
+		origins:    origins,
+		engineName: "memory",
 	}
 }
 
 // NewRedis stores Ip, header-scope, and Range on Redis (keyPrefix namespaces keys).
-// countActive is true only for stream/alone; intern stays in-process (no Redis intern table).
-func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string, countActive bool) *Store {
+// intern stays in-process (no Redis intern table). ActiveCounts is always empty.
+func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string) *Store {
 	origins := intern.New()
 	red := newRedis(log, writeHost, readHosts, pass, database, keyPrefix)
 	return &Store{
-		engine:      redisEngine(red),
-		red:         red,
-		origins:     origins,
-		active:      newActiveCountState(),
-		countActive: countActive,
-		engineName:  "redis",
+		engine:     redisEngine(red),
+		red:        red,
+		origins:    origins,
+		engineName: "redis",
 	}
 }
 
 // Open reclaims one Store per reclaimKey. keyPrefix is the Redis key prefix.
 // createdBy is Traefik New(..., name); write-once on the create that first puts the store.
-// countActive is derived from crowdsecMode by the caller; it is not hashed into reclaimKey.
-func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.Config, log *slog.Logger, createdBy string, countActive bool) (*Store, error) {
+func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.Config, log *slog.Logger, createdBy string) (*Store, error) {
 	stored, err := reclaim.OpenWithHooks(ctx, reclaimKey, log, func() (any, reclaim.Hooks, error) {
 		var store *Store
 		if cfg.RedisCacheEnabled {
@@ -123,10 +115,9 @@ func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.
 				cfg.RedisCachePassword,
 				cfg.RedisCacheDatabase,
 				keyPrefix,
-				countActive,
 			)
 		} else {
-			store = NewMemory(log, countActive)
+			store = NewMemory(log)
 		}
 		store.createdBy = createdBy
 		store.bindLifecycle(log, reclaimKey)
@@ -174,9 +165,9 @@ func (s *Store) BeginTick() {
 	s.engine.beginTick()
 }
 
-// PublishTick closes that window. Memory drops expired tick slots and publishes tick.
+// PublishTick closes that window. Memory drops expired tick slots, publishes tick, then recounts ActiveCounts.
 // now is elapsed seconds on the package clock (ElapsedNow), not wall Unix; 0 skips the expiry sweep.
-// Redis is a no-op: key TTL is the expiry.
+// Redis is a no-op: key TTL is the expiry, and ActiveCounts stays empty.
 func (s *Store) PublishTick(now int32) {
 	s.engine.publishTick(now)
 }
@@ -189,7 +180,6 @@ func (s *Store) Put(item Decision) {
 // PutMany stores Ip or header-scope decisions. Range items are ignored (use ApplyRangeBatch).
 // Redis groups by DurationSec and MSetEX in PutManyChunk batches. Memory loops under one lock.
 func (s *Store) PutMany(items []Decision) {
-	s.adjustPuts(items)
 	s.engine.putMany(items)
 }
 
@@ -200,7 +190,6 @@ func (s *Store) Delete(scope, value string) {
 
 // DeleteMany drops canonical slots and prior Ip spellings. Redis DELs one key at a time.
 func (s *Store) DeleteMany(items []Decision) {
-	s.adjustDeletes(items)
 	s.engine.deleteMany(items)
 }
 
@@ -246,7 +235,7 @@ func (s *Store) RangeIndex() (string, error) {
 }
 
 // ApplyRangeBatch upserts and removes Range CIDRs, then rebuilds in-process membership.
-// Range is omitted from the active-decision gauge: this method does not adjust counts.
+// Range is omitted from ActiveCounts: the memory walk covers LiveSlot keys only.
 func (s *Store) ApplyRangeBatch(upserts map[string]string, removals []string) error {
 	if err := s.engine.applyRange(upserts, removals); err != nil {
 		return err

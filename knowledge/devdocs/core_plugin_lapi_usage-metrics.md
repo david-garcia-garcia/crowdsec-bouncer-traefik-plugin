@@ -20,7 +20,7 @@ _Avoid_: leftover origin string, storing the origin name on every slot, a report
 
 ## Overview
 
-Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. Stream/alone Ip and header slots are counted inside DecisionStore PutMany/DeleteMany (shared peek-then-adjust; engines only Peek). The Client ticker POSTs `v1/usage-metrics` through the `MetricsReporter` Client holds. `IncProcessed` is lock-free (`atomic.AddInt64`); `IncDropped` takes the reporter `metricsMu` because drops already left the allow path.
+Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. Stream/alone `active_decisions` is a DecisionStore snapshot at POST (memory recounts after PublishTick; Redis is empty). The Client ticker POSTs `v1/usage-metrics` through the `MetricsReporter` Client holds. `IncProcessed` is lock-free (`atomic.AddInt64`); `IncDropped` takes the reporter `metricsMu` because drops already left the allow path.
 
 ## How to use
 
@@ -56,7 +56,7 @@ lapiClient.IncDropped(origin, req.ipType, "ban")
 ## Gotchas
 
 - `cscli metrics show bouncers` reads `origin` and `ip_type` only. Do not send a `scenario` label.
-- `processed` is `ip_type` only and is incremented with `atomic.AddInt64` (no `metricsMu`). `dropped` may add `origin` and `remediation` and uses `metricsMu`. `active_decisions` is stream/alone only and counts records, not hosts in a CIDR. Range CIDRs and slots that expired via memory PublishTick or Redis TTL without DeleteMany stay out of or stuck on the gauge until a later Put/Delete peeks the key.
+- `processed` is `ip_type` only and is incremented with `atomic.AddInt64` (no `metricsMu`). `dropped` may add `origin` and `remediation` and uses `metricsMu`. `active_decisions` is stream/alone only and counts records, not hosts in a CIDR. Range CIDRs stay out of the gauge. Memory recounts after PublishTick (expired slots drop). Redis posts an empty gauge.
 - HTTP success from LAPI is 201.
 - Sleep and Close POST the remaining window (`drainMetrics`) so a Traefik reload does not drop counters. Sleep drains in a goroutine (reclaim holds the table lock). Close drains synchronously before idle HTTP is closed. A failed POST restores the window for the next drain or ticker. `metricsInterval == 0` skips drain.
 - The reporter POSTs through the injected query (`crowdsecQuery` loads `currentTransport()`). Window counters survive `AdoptTransport`. Do not put `*http.Client` on the reporter.

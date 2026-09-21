@@ -17,12 +17,13 @@ type publishedSlots struct {
 // memory is in-process COW tick/published LiveSlot maps plus the Range blob.
 type memory struct {
 	log        *slog.Logger
-	origins    *intern.Table       // origin name → id packed into LiveSlot.Word
-	mu         sync.RWMutex        // tick, ticking, rangeIndex; not lookup
-	ticking    bool                // stream window: PutMany/DeleteMany write tick; Lookup reads published
-	tick       map[string]LiveSlot // unpublished clone; SlotKey → packed word + elapsed expiry
-	published  atomic.Value        // *publishedSlots; request-path snapshot, not atomic.Pointer (Yaegi v0.16)
-	rangeIndex string              // Range CIDR=kind blob; membership is rebuilt from this
+	origins    *intern.Table            // origin name → id packed into LiveSlot.Word
+	mu         sync.RWMutex             // tick, ticking, rangeIndex, active; not lookup
+	ticking    bool                     // stream window: PutMany/DeleteMany write tick; Lookup reads published
+	tick       map[string]LiveSlot      // unpublished clone; SlotKey → packed word + elapsed expiry
+	published  atomic.Value             // *publishedSlots; request-path snapshot, not atomic.Pointer (Yaegi v0.16)
+	active     map[ActiveCountKey]int64 // last PublishTick walk of published; not adjusted on Put/Delete
+	rangeIndex string                   // Range CIDR=kind blob; membership is rebuilt from this
 }
 
 // newMemory allocates non-nil tick and an empty published snapshot.
@@ -31,6 +32,7 @@ func newMemory(log *slog.Logger, origins *intern.Table) *memory {
 		log:     log,
 		origins: origins,
 		tick:    map[string]LiveSlot{},
+		active:  map[ActiveCountKey]int64{},
 	}
 	mem.storePublished(map[string]LiveSlot{})
 	return mem
@@ -61,7 +63,8 @@ func (m *memory) BeginTick() {
 	m.ticking = true
 }
 
-// PublishTick drops expired tick slots, publishes tick, and closes the window.
+// PublishTick drops expired tick slots, publishes tick, recounts ActiveCounts, and closes the window.
+// The walk runs after the published snapshot exists so the gauge matches lookup, including TTL drops.
 func (m *memory) PublishTick(now int32) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -80,6 +83,7 @@ func (m *memory) PublishTick(now int32) {
 		}
 	}
 	m.storePublished(m.tick)
+	m.active = countPublishedSlots(m.publishedMapValue())
 	m.tick = map[string]LiveSlot{}
 	m.ticking = false
 }
@@ -171,28 +175,13 @@ func (m *memory) deleteTickLocked(scope, value string) {
 	}
 }
 
-// peekMany is the packed origin id on tick (while ticking) or published. Missing keys are omitted.
-func (m *memory) peekMany(keys []string) map[string]peekedSlot {
-	if len(keys) == 0 {
-		return map[string]peekedSlot{}
-	}
+// activeCounts copies the last PublishTick origin×family walk. Live Put does not PublishTick.
+func (m *memory) activeCounts() map[ActiveCountKey]int64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	slots := m.tick
-	if !m.ticking {
-		slots = m.publishedMapValue()
-	}
-	out := make(map[string]peekedSlot, len(keys))
-	for _, key := range keys {
-		if key == "" {
-			continue
-		}
-		slot, ok := slots[key]
-		if !ok {
-			continue
-		}
-		_, _, originID := unpackWord(slot.Word)
-		out[key] = peekedSlot{OriginID: originID, Present: true}
+	out := make(map[ActiveCountKey]int64, len(m.active))
+	for key, value := range m.active {
+		out[key] = value
 	}
 	return out
 }

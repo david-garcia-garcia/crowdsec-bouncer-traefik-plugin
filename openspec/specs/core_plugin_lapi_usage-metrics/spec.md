@@ -55,7 +55,7 @@ Each request the bouncer handles (trusted-IP bypass, pass, and drop) SHALL incre
 - **THEN** the next POST includes `processed` with that client's `ip_type`
 
 ### Requirement: Active decisions are a stream/alone gauge
-In stream and alone modes, `active_decisions` SHALL be a gauge (unit `ip`) of Ip and header-scope decision records this connection currently applies, labeled `origin` (lists-rewritten) and `ip_type` of the decision value. Range CIDRs SHALL be omitted from this gauge until Range exact-CIDR forget lands. Live, none, and AppSec-only modes SHALL omit `active_decisions`. The gauge MUST NOT expand a CIDR into host addresses. Counts SHALL come from a DecisionStore snapshot at POST, not from a reporter-held per-slot map. Memory PublishTick expiry and Redis TTL without DeleteMany MUST NOT decrement the gauge.
+In stream and alone modes, `active_decisions` SHALL be a gauge (unit `ip`) of Ip and header-scope decision records this connection currently applies, labeled `origin` (lists-rewritten) and `ip_type` of the decision value. Range CIDRs SHALL be omitted from this gauge until Range exact-CIDR forget lands. Live, none, and AppSec-only modes SHALL omit `active_decisions`. The gauge MUST NOT expand a CIDR into host addresses. Counts SHALL come from a DecisionStore snapshot at POST, not from a reporter-held per-slot map. Memory SHALL recount after PublishTick builds the published snapshot (expiry sweep included). Redis `ActiveCounts` SHALL be empty.
 
 #### Scenario: Stream IP ban is counted
 - **WHEN** stream applies one Ip ban whose value is `1.2.3.4` and origin is `crowdsec`

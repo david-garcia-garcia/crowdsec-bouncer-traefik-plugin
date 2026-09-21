@@ -287,7 +287,7 @@ func TestOpenDecisionStore_LastHolderGraceClosesRedisPool(t *testing.T) {
 	}
 }
 
-func TestOpenDecisionStore_CountActiveFromMode(t *testing.T) {
+func TestOpenDecisionStore_StreamPublishTickCounts(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
@@ -298,8 +298,10 @@ func TestOpenDecisionStore_CountActiveFromMode(t *testing.T) {
 		t.Fatal(err)
 	}
 	putBan(stream)
+	stream.BeginTick()
+	stream.PublishTick(0)
 	if len(stream.ActiveCounts()) == 0 {
-		t.Fatal("stream OpenDecisionStore Put must increment ActiveCounts")
+		t.Fatal("stream OpenDecisionStore after PublishTick must count ActiveCounts")
 	}
 
 	live, err := OpenDecisionStore(ctx, testLiveConfig(1), log, "live")

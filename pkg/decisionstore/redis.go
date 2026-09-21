@@ -19,7 +19,9 @@ const (
 
 // redis holds Ip, header-scope, and Range keys on SimpleRedis.
 // Writer does SET/DEL. Readers (or the writer when none) do GET/MGET. A replica
-// miss or error is not retried on the writer.
+// miss or error is not retried on the writer. ActiveCounts is unsupported: one SET
+// per slot has no inventory to walk without SCAN+MGET or a second HASH of slots,
+// which would exist only for this gauge.
 type redis struct {
 	log     *slog.Logger
 	prefix  string
@@ -218,18 +220,11 @@ func (r *redis) DeleteMany(items []Decision) {
 	}
 }
 
-// peekMany is KindOriginString on the replica MGET. Missing keys are omitted. Gauge adjust is Store.
-func (r *redis) peekMany(keys []string) map[string]peekedSlot {
-	found, err := r.getMany(keys)
-	if err != nil || len(found) == 0 {
-		return map[string]peekedSlot{}
-	}
-	out := make(map[string]peekedSlot, len(found))
-	for key, stored := range found {
-		_, origin, originID := Unpack(stored)
-		out[key] = peekedSlot{OriginID: originID, Leftover: origin, Present: true}
-	}
-	return out
+// activeCounts is empty. Per-key SET has no slot inventory. SCAN+MGET at metrics
+// interval, or a HASH of slots, would be complexity plus a storage redesign only
+// for this gauge. Unsupported until that redesign is taken.
+func (r *redis) activeCounts() map[ActiveCountKey]int64 {
+	return map[ActiveCountKey]int64{}
 }
 
 // LookupRemediation reads Redis (Ip, header scopes) then merges Range from membership.

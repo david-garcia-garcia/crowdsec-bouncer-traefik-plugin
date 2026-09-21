@@ -38,10 +38,5 @@ func StoreKey(cfg *configuration.Config) string {
 // OpenDecisionStore reclaims one store per SessionHex on the Traefik New context.
 // name is Traefik New(..., name); create() writes it write-once as createdBy.
 func OpenDecisionStore(ctx context.Context, cfg *configuration.Config, log *slog.Logger, name string) (*decisionstore.Store, error) {
-	return decisionstore.Open(ctx, StoreKey(cfg), SessionHex(cfg), cfg, log, name, countActiveFromMode(cfg.CrowdsecMode))
-}
-
-// countActiveFromMode is true only for stream and alone so live/none memo Put cannot increment.
-func countActiveFromMode(mode string) bool {
-	return mode == configuration.StreamMode || mode == configuration.AloneMode
+	return decisionstore.Open(ctx, StoreKey(cfg), SessionHex(cfg), cfg, log, name)
 }

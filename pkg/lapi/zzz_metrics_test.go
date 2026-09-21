@@ -92,6 +92,8 @@ func TestReportMetricsOfficialLabels(t *testing.T) {
 	store.Put(decisionstore.Decision{
 		Scope: decisionscope.ScopeIP, Value: "1.2.3.4", Kind: decisionscope.BannedValue, Origin: "crowdsec", DurationSec: 60,
 	})
+	store.BeginTick()
+	store.PublishTick(0)
 	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
@@ -354,6 +356,8 @@ func TestReportMetricsOverflowEmptyOrigin(t *testing.T) {
 	store.Put(decisionstore.Decision{
 		Scope: decisionscope.ScopeIP, Value: "1.2.3.4", Kind: decisionscope.BannedValue, Origin: "overflow-origin", DurationSec: 60,
 	})
+	store.BeginTick()
+	store.PublishTick(0)
 	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}

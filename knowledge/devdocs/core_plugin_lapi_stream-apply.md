@@ -17,7 +17,7 @@ After the body is decoded, apply deleted first so a same-window replacement stay
 ## How to use
 
 - Keep GET, decode, and apply in `fetchAndApplyStreamDecisions`.
-- Call `decisionStore.BeginTick` before the loops and `PublishTick(decisionstore.ElapsedNow())` after (defer). Memory hides tick writes until publish and sweeps tick slots on elapsed `now`. Redis tick is a no-op and ignores `now`.
+- Call `decisionStore.BeginTick` before the loops and `PublishTick(decisionstore.ElapsedNow())` after (defer). Memory hides tick writes until publish, sweeps tick slots on elapsed `now`, then recounts `ActiveCounts` from the published map. Redis tick is a no-op and ignores `now`.
 - Loop `stream.Deleted` first: Ip/header `DeleteMany` in `PutManyChunk` flushes, Range CIDRs into removals.
 - Then loop `stream.New`: Ip/header `PutMany` in `PutManyChunk` flushes, Range CIDRs into upserts via `KindOriginString`.
 - Call `decisionStore.ApplyRangeBatch` once with those maps. Inside the batch, apply removals before upserts so a CIDR in both maps remains the replacement.

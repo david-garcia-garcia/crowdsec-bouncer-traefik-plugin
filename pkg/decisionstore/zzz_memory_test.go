@@ -12,7 +12,7 @@ import (
 )
 
 func TestMemoryTickPublishLookup(t *testing.T) {
-	store := NewMemory(logger.New("ERROR", ""), false)
+	store := NewMemory(logger.New("ERROR", ""))
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60})
 	store.PublishTick(0)
@@ -32,7 +32,7 @@ func TestElapsedNowStaysAboveSkipSentinel(t *testing.T) {
 }
 
 func TestMemoryDurationZeroMissesAfterPublish(t *testing.T) {
-	store := NewMemory(logger.New("ERROR", ""), false)
+	store := NewMemory(logger.New("ERROR", ""))
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 0})
 	store.PublishTick(ElapsedNow())
@@ -44,7 +44,7 @@ func TestMemoryDurationZeroMissesAfterPublish(t *testing.T) {
 }
 
 func TestMemoryExpiryOnPublish(t *testing.T) {
-	store := NewMemory(logger.New("ERROR", ""), false)
+	store := NewMemory(logger.New("ERROR", ""))
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: -1})
 	store.PublishTick(ElapsedNow())
@@ -56,7 +56,7 @@ func TestMemoryExpiryOnPublish(t *testing.T) {
 }
 
 func TestMemoryTickPutHiddenUntilPublish(t *testing.T) {
-	store := NewMemory(logger.New("ERROR", ""), false)
+	store := NewMemory(logger.New("ERROR", ""))
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60})
 	kind, origin, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
@@ -71,7 +71,7 @@ func TestMemoryTickPutHiddenUntilPublish(t *testing.T) {
 }
 
 func TestMemoryTickDeleteOnlyMissesAfterPublish(t *testing.T) {
-	store := NewMemory(logger.New("ERROR", ""), false)
+	store := NewMemory(logger.New("ERROR", ""))
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60})
 	store.PublishTick(0)
@@ -87,7 +87,7 @@ func TestMemoryTickDeleteOnlyMissesAfterPublish(t *testing.T) {
 func TestMemoryInternOverflowWarns(t *testing.T) {
 	var logged bytes.Buffer
 	log := slog.New(slog.NewJSONHandler(&logged, &slog.HandlerOptions{Level: slog.LevelWarn}))
-	store := NewMemory(log, false)
+	store := NewMemory(log)
 	store.FillUntilMaxForTest()
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.99", Kind: decisionscope.BannedValue, Origin: "overflow-origin", DurationSec: 60})
@@ -98,7 +98,7 @@ func TestMemoryInternOverflowWarns(t *testing.T) {
 }
 
 func TestHydrateRangeKeepsLastOnUnreachable(t *testing.T) {
-	store := NewMemory(logger.New("ERROR", ""), false)
+	store := NewMemory(logger.New("ERROR", ""))
 	if err := store.ApplyRangeBatch(map[string]string{"10.0.0.0/8": decisionscope.BannedValue}, nil); err != nil {
 		t.Fatal(err)
 	}

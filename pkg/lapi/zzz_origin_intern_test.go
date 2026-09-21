@@ -9,11 +9,7 @@ import (
 )
 
 func newTestInternStore() *decisionstore.Store {
-	return decisionstore.NewMemory(logger.New("ERROR", ""), false)
-}
-
-func newTestCountedInternStore() *decisionstore.Store {
-	return decisionstore.NewMemory(logger.New("ERROR", ""), true)
+	return decisionstore.NewMemory(logger.New("ERROR", ""))
 }
 
 func TestPackUsesInternOnMemoryStore(t *testing.T) {
@@ -50,13 +46,17 @@ func TestStoreStreamDecisionPacksMemory(t *testing.T) {
 }
 
 func TestActiveDecisionDeleteOmitsGauge(t *testing.T) {
-	store := newTestCountedInternStore()
+	store := newTestInternStore()
 	client, body := newUsageMetricsClient(t)
 	client.decisionStore = store
+	store.BeginTick()
 	store.Put(decisionstore.Decision{
 		Scope: decisionscope.ScopeIP, Value: "1.2.3.4", Kind: decisionscope.BannedValue, Origin: "crowdsec", DurationSec: 60,
 	})
+	store.PublishTick(0)
+	store.BeginTick()
 	store.Delete(decisionscope.ScopeIP, "1.2.3.4")
+	store.PublishTick(0)
 	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}

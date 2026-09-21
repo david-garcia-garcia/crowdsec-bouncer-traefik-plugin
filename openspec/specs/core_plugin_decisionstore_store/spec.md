@@ -1,5 +1,5 @@
 ## Purpose\n\nThe reclaim value that holds CrowdSec Ip, header, and Range decisions on a memory or Redis engine.\n\n## Requirements\n\n### Requirement: DecisionStore is a reclaim value that owns the engine
-A DecisionStore SHALL be `pkg/decisionstore.Store`, opened with `reclaim.OpenWithHooks` on the process table using the same Traefik `New` context as `lapi.OpenStream` / `OpenLive`. Callers SHALL Peek that store key before Open (`core_plugin_lapi_reclaim-key`). `lapi.OpenDecisionStore` SHALL take the Traefik name so create() can write `createdBy`. The store SHALL bind engine funcs at `NewMemory` or `NewRedis` (`memoryEngine` / `redisEngine`): BeginTick, PublishTick, PutMany, DeleteMany, PeekMany, LookupRemediation, ApplyRangeBatch, RangeIndex, Close. Put and Delete SHALL be one-item wrappers around PutMany and DeleteMany. A constructed Store SHALL always have those callbacks. Store methods MUST NOT nil-check `s` or the engine funcs. Close SHALL be safe to call more than once on a real Redis store; tests MUST NOT Close a nil `*Store`. Dispatch MUST NOT be a backend interface and MUST NOT branch `if mem` / `if red` on every method. Yaegi-safe: the engine MUST NOT put a map-holding type in an interface; `map[string]LiveSlot` SHALL always be non-nil; intern SHALL be `[]string` plus `map[string]uint16`; Store `atomic.Value` SHALL hold only `*RangeMembership` and `string`. Memory published slots SHALL be `atomic.Value` of `*publishedSlots` (not the map). Memory `LookupRemediation` MUST NOT take `mu`; writers still `Lock` to clone and Store. The store SHALL install Sleep and Wake hooks that only log; they MUST NOT drain Redis or drop maps. The package MUST NOT keep a process-wide map or a `sync.Once`. Callers MUST NOT import utilities `reclaim`. There SHALL NOT be a second `liveStore` type: live/none memo is Store Put and Lookup. `pkg/cache` MUST NOT exist as the DecisionStore bag. Client address, when this leaf mentions it, SHALL reuse `pkg/ip.GetRemoteIP`. CrowdSec cursor identity SHALL reuse `SessionHex` / `streamSession`.
+A DecisionStore SHALL be `pkg/decisionstore.Store`, opened with `reclaim.OpenWithHooks` on the process table using the same Traefik `New` context as `lapi.OpenStream` / `OpenLive`. Callers SHALL Peek that store key before Open (`core_plugin_lapi_reclaim-key`). `lapi.OpenDecisionStore` SHALL take the Traefik name so create() can write `createdBy`. The store SHALL bind engine funcs at `NewMemory` or `NewRedis` (`memoryEngine` / `redisEngine`): BeginTick, PublishTick, PutMany, DeleteMany, ActiveCounts, LookupRemediation, ApplyRangeBatch, RangeIndex, Close. Put and Delete SHALL be one-item wrappers around PutMany and DeleteMany. A constructed Store SHALL always have those callbacks. Store methods MUST NOT nil-check `s` or the engine funcs. Close SHALL be safe to call more than once on a real Redis store; tests MUST NOT Close a nil `*Store`. Dispatch MUST NOT be a backend interface and MUST NOT branch `if mem` / `if red` on every method. Yaegi-safe: the engine MUST NOT put a map-holding type in an interface; `map[string]LiveSlot` SHALL always be non-nil; intern SHALL be `[]string` plus `map[string]uint16`; Store `atomic.Value` SHALL hold only `*RangeMembership` and `string`. Memory published slots SHALL be `atomic.Value` of `*publishedSlots` (not the map). Memory `LookupRemediation` MUST NOT take `mu`; writers still `Lock` to clone and Store. The store SHALL install Sleep and Wake hooks that only log; they MUST NOT drain Redis or drop maps. The package MUST NOT keep a process-wide map or a `sync.Once`. Callers MUST NOT import utilities `reclaim`. There SHALL NOT be a second `liveStore` type: live/none memo is Store Put and Lookup. `pkg/cache` MUST NOT exist as the DecisionStore bag. Client address, when this leaf mentions it, SHALL reuse `pkg/ip.GetRemoteIP`. CrowdSec cursor identity SHALL reuse `SessionHex` / `streamSession`.
 
 #### Scenario: Interval mismatch still shares one store
 - **WHEN** two live `New` calls use the same Traefik name, the same LAPI URL and key, and the same Redis store parameters and differ only on `updateIntervalSeconds`
@@ -229,33 +229,35 @@ Stream/alone and live/none request lookup SHALL call `Store.LookupRemediation(re
 - **THEN** `ApplyRangeBatch` returns the error and the stored `range-index` still holds the CIDRs it held before
 
 ### Requirement: DecisionStore owns the active-decision group-by
-A DecisionStore SHALL keep a compact `{originID uint16, family} → int64` count of stream/alone Ip and header-scope slots. `Open`, `NewMemory`, and `NewRedis` SHALL set `countActive` true only when `crowdsecMode` is stream or alone. `countActive` MUST NOT be part of the reclaim StoreKey and MUST NOT be a field on the memory or Redis engine. When `countActive` is false, PutMany and DeleteMany MUST NOT increment or decrement, MUST NOT Peek, and `ActiveCounts` SHALL return an empty snapshot. Live/none memo Put MUST NOT increment. Range MUST NOT be counted: `ApplyRangeBatch` MUST NOT adjust the map; the store MUST NOT Peek membership or query Range Helper Contains for metrics. PutMany and DeleteMany SHALL Peek the canonical keys then adjust the compact map in one shared Store path (memory: tick while ticking, else published; Redis: MGET). Overwrite of an existing canonical slot SHALL decrement the previous group then increment the new. A prior-spelling extra DEL MUST NOT be a second gauge event. Memory and Redis engines MUST NOT increment or decrement the gauge inside put, delete, or PublishTick. Memory PublishTick expiry and Redis TTL without DeleteMany MUST NOT decrement. `ActiveCounts` SHALL return a snapshot copy of the compact map and MUST NOT expose `usageMetricKey` or LAPI item JSON. Family SHALL be `FamilyOfHostOrCIDR` on the decision value (header-scope Country/AS POST empty `ip_type`). Intern overflow SHALL count origin id `0`. Dispatch MUST NOT add a Go engine interface for this gauge.
+A DecisionStore SHALL expose `ActiveCounts` as a snapshot copy of `{originID uint16, family} → int64` for Ip and header-scope slots. The gauge is the engine's job. Memory SHALL recount from the published LiveSlot map after PublishTick builds that snapshot (including after the elapsed-expiry sweep when `now` is not `0`). PutMany, DeleteMany, and live copy-on-write MUST NOT increment or decrement a running map. Live/none memo Put MUST NOT PublishTick, so `ActiveCounts` SHALL stay empty. Range MUST NOT be counted: `ApplyRangeBatch` MUST NOT appear in the published LiveSlot walk; the store MUST NOT Peek membership or query Range Helper Contains for metrics. Redis `ActiveCounts` SHALL be empty: per-key SET has no slot inventory, and SCAN+MGET or a HASH of slots would be a storage redesign only for this gauge. Overwrite of an existing canonical slot SHALL appear as the last origin after the next memory PublishTick. A prior-spelling extra DEL MUST NOT be a second gauge event. `ActiveCounts` MUST NOT expose `usageMetricKey` or LAPI item JSON. Family SHALL be `FamilyOfHostOrCIDR` on the published slot key (header-scope Country/AS POST empty `ip_type`). Intern overflow SHALL count origin id `0`. Dispatch MUST NOT add a Go engine interface for this gauge.
 
 #### Scenario: Stream Ip Put increments the compact map
-- **WHEN** a stream/alone store Puts one Ip ban whose value is `1.2.3.4` and origin is `crowdsec`
+- **WHEN** a memory store Puts one Ip ban whose value is `1.2.3.4` and origin is `crowdsec` during a tick
+- **AND** PublishTick runs
 - **THEN** `ActiveCounts` includes 1 for that origin id and `ipv4`
 
 #### Scenario: Stream Ip Delete decrements
-- **WHEN** that same store later Deletes that Ip slot
+- **WHEN** that same store later Deletes that Ip slot during a tick
+- **AND** PublishTick runs
 - **THEN** `ActiveCounts` omits that group (or the count is 0)
 
 #### Scenario: Live Put does not increment
-- **WHEN** a live/none store Puts a memo Ip ban
+- **WHEN** a store Puts a memo Ip ban without PublishTick
 - **THEN** `ActiveCounts` is empty
 
 #### Scenario: Range apply does not increment
 - **WHEN** stream ApplyRangeBatch upserts a Range CIDR
 - **THEN** `ActiveCounts` does not include that CIDR
 
-#### Scenario: Memory PublishTick expiry does not decrement
-- **WHEN** a stream/alone memory store holds an Ip slot whose elapsed expiry is due
+#### Scenario: Memory PublishTick expiry drops the slot
+- **WHEN** a memory store holds an Ip slot whose elapsed expiry is due
 - **AND** PublishTick runs with non-zero elapsed `now`
-- **THEN** `ActiveCounts` still includes that slot
+- **THEN** `ActiveCounts` omits that slot
 
-#### Scenario: Redis overwrite uses previous origin
-- **WHEN** a stream/alone Redis store Puts an Ip slot that already holds a different origin
-- **THEN** `ActiveCounts` decrements the previous origin group and increments the new
+#### Scenario: Redis ActiveCounts is empty
+- **WHEN** a Redis store Puts or Deletes Ip slots
+- **THEN** `ActiveCounts` is empty
 
 #### Scenario: Overflow counts origin id 0
-- **WHEN** intern would overflow and a stream/alone store Puts an Ip slot
+- **WHEN** intern would overflow and a memory store Puts an Ip slot then PublishTick runs
 - **THEN** `ActiveCounts` keys that slot with origin id `0`
