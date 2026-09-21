@@ -12,20 +12,12 @@
 - **THEN** `appsec.Client.Query` resolves
 - **AND** the call does not go through `lapi.Client`
 
-### Requirement: AppSec is reclaimed by listener identity
-When `appsecEnabled` is true, `New` SHALL reclaim an `appsec.Client` with `reclaim.Open` on the process table (30s grace). The reclaim key SHALL be derived from AppSec scheme, host, path, key, and body limit. AppSec TLS, HTTP timeout, middleware name, `next`, templates, trusted IPs, Enabled, LAPI fields, and per-router AppSec failure action MUST NOT be in that key. The Open call SHALL pass `reclaim.Hooks` for Sleep/Wake/Close. `Close` SHALL release idle AppSec HTTP connections.
+### Requirement: AppSec Client is reclaimed by listener identity
+`appsec.Open` SHALL run when this middleware `appsecEnabled` is true and it has AppSec secrets. After Open, `New` SHALL publish the Client under `appsecInstance` (`core_plugin_middleware_named-instance`). Public key `appsecEnabled` replaces `appsecEnabled`. Body limit, URL, and TLS keys use the `appsec*` names.
 
-#### Scenario: Two routers share one AppSec listener
-- **WHEN** two `New` calls enable AppSec with the same AppSec URL, key, and body limit and live constructor contexts
-- **THEN** both bouncers use the same `appsec.Client` incarnation
-
-#### Scenario: Different AppSec hosts are isolated
-- **WHEN** two `New` calls enable AppSec with different AppSec hosts
-- **THEN** two AppSec client incarnations exist
-
-#### Scenario: TLS- or timeout-only reload reuses the Client
-- **WHEN** a later `New` enables AppSec with the same URL, key, and body limit but a different AppSec TLS knob or HTTP timeout
-- **THEN** both constructors use the same `appsec.Client` incarnation
+#### Scenario: Disabled AppSec does not Open
+- **WHEN** `appsecEnabled` is false
+- **THEN** `New` does not reclaim an AppSec Client
 
 ### Requirement: AppSec HTTP transport is replaceable after Open
 `Client` SHALL store AppSec HTTP+auth (HTTP client, API key, timeout, AppSec TLS extras) as `atomic.Value`. After `Open` bind, the constructor SHALL call `AdoptTransport` with that config: Store the new transport and idle-close the previous HTTP client. Remaining write-once Client scalar fields MUST NOT become mutable. The Client field that holds that transport MUST NOT be `atomic.Pointer[T]`. `Query` SHALL send the API key and HTTP round-trip from the stored transport.

@@ -4,27 +4,13 @@ How a shared LAPI Client builds stream `scopes=` and the stream store filter fro
 
 ## Requirements
 
-### Requirement: Stream scopes are the live-router union
-A stream or alone `lapi.Client` SHALL hold a Client-owned registry of header-scope maps from each opener that bound that Client. After a successful `OpenStream` bind, the opener SHALL register this `New` ctx and this router’s normalized `lapiScopeHeaders`. Bouncing subscribers MUST NOT register. When that ctx is Done, the Client SHALL drop that registration. `streamQuery` and `storeStreamDecision` SHALL snapshot the union of registered maps under the existing Client mutex. The write-once `lapiScopeHeaders` field set in `New` MUST NOT become mutable and MUST NOT be the live union. Implementations MUST NOT use `atomic.Pointer[T]`, `sync.Once`, or a package global for this registry. CAPI (alone) SHALL still omit `scopes=`. Live and none SHALL keep passing scopes per `LiveLookup` from the bouncer map. AppSec reclaim key is unchanged. Client address, when this leaf mentions it, SHALL reuse `pkg/ip.GetRemoteIP` (do not parse `RemoteAddr`).
+### Requirement: Live routers union header scopes into stream query
+Only the middleware that Opens the stream Client SHALL register `lapiScopeHeaders` on that Client. Bouncing subscribers MUST NOT register. Stream `scopes=` and the store filter still snapshot the opener's map (write-once plus that Open's ctx).
 
 #### Scenario: Subscriber does not add scopes
 - **WHEN** the opener published a stream Client with no `lapiScopeHeaders`
 - **AND** a bouncing subscriber has `lapiScopeHeaders` Country
 - **THEN** stream `scopes=` does not include Country from that subscriber
-
-#### Scenario: Two routers union Country and username
-- **WHEN** two live stream `New` calls share one Client and one maps `Country` while the other maps `username`
-- **THEN** the next LAPI stream query includes both `country` and `username` in `scopes=`
-- **AND** a streamed `username` decision is stored
-- **AND** a streamed `Country` decision is stored
-
-#### Scenario: Unregister drops a scope from the next query
-- **WHEN** the constructor ctx that registered `username` is cancelled and the other holder still maps `Country`
-- **THEN** a later stream query includes `country` and does not include `username`
-
-#### Scenario: Empty union streams only ip and range
-- **WHEN** every live holder’s normalized header map is empty
-- **THEN** the stream query does not include `country`
 
 ### Requirement: Growing the union does not send startup=true
 When a later live router registers a header scope after the CrowdSec cursor has advanced, the Client MUST NOT send `startup=true` for that registration. LAPI `scopes=` is a filter of `id_gt`; a newly added scope misses decisions already past the cursor until a later incarnation `startup=true`.
