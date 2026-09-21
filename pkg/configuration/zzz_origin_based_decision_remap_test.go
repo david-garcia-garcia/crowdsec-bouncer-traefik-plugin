@@ -25,9 +25,13 @@ func TestValidateOriginBasedDecisionRemap(t *testing.T) {
 		want  string
 	}{
 		{
-			name:  "empty origin",
-			remap: map[string]map[string]string{"  ": {"ban": "captcha"}},
-			want:  "origin cannot be empty",
+			name: "empty origin",
+			remap: func() map[string]map[string]string {
+				remap := make(map[string]map[string]string)
+				remap["  "] = map[string]string{"ban": "captcha"}
+				return remap
+			}(),
+			want: "origin cannot be empty",
 		},
 		{
 			name:  "empty edges",

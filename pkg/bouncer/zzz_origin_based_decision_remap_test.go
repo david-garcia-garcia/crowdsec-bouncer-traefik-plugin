@@ -42,11 +42,13 @@ func TestOriginBasedDecisionRemapEdges(t *testing.T) {
 }
 
 func TestCopyOriginBasedDecisionRemapTrimsBlanks(t *testing.T) {
-	got := copyOriginBasedDecisionRemap(map[string]map[string]string{
-		" CAPI ": {" Ban ": " Captcha "},
-		"":       {"ban": "captcha"},
-		"cscli":  {"ban": "ban"},
-	})
+	src := make(map[string]map[string]string)
+	paddedFrom := make(map[string]string)
+	paddedFrom[" Ban "] = " Captcha "
+	src[" CAPI "] = paddedFrom
+	src[""] = map[string]string{"ban": "captcha"}
+	src["cscli"] = map[string]string{"ban": "ban"}
+	got := copyOriginBasedDecisionRemap(src)
 	if len(got) != 1 || got["CAPI"]["ban"] != decisionscope.CaptchaValue {
 		t.Fatalf("got %#v", got)
 	}

@@ -1,6 +1,7 @@
 package configuration
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -20,7 +21,7 @@ func validateOriginBasedDecisionRemap(config *Config) error {
 	}
 	for origin, edges := range config.OriginBasedDecisionRemap {
 		if strings.TrimSpace(origin) == "" {
-			return fmt.Errorf("originBasedDecisionRemap: origin cannot be empty")
+			return errors.New("originBasedDecisionRemap: origin cannot be empty")
 		}
 		if len(edges) == 0 {
 			return fmt.Errorf("originBasedDecisionRemap: %q has no mappings", origin)
