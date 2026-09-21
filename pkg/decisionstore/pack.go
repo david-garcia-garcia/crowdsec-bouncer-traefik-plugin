@@ -40,9 +40,12 @@ func splitKindOrigin(stored string) (string, string) {
 const packedFamilyShift = 24
 const packedFamilyMask = 3
 
-var packedFamilyNames = [4]string{"", "ipv4", "ipv6", ""}
+const (
+	packedFamilyIPv4 = 1
+	packedFamilyIPv6 = 2
+)
 
-// packWord is kind[0] in bits 0–7, intern id in 8–23, family code in 24–25 (1=ipv4, 2=ipv6, 0=empty).
+// packWord is kind[0] in bits 0-7, intern id in 8-23, family code in 24-25 (1=ipv4, 2=ipv6, 0=empty).
 func packWord(kind string, originID uint16, family string) uint32 {
 	if kind == "" {
 		return 0
@@ -54,22 +57,29 @@ func packWord(kind string, originID uint16, family string) uint32 {
 func packFamilyCode(family string) uint32 {
 	switch family {
 	case "ipv4":
-		return 1
+		return packedFamilyIPv4
 	case "ipv6":
-		return 2
+		return packedFamilyIPv6
 	default:
 		return 0
 	}
 }
 
-// packedOriginID is bits 8–23. The uint16 cast drops the family code.
+// packedOriginID is bits 8-23. The uint16 cast drops the family code.
 func packedOriginID(word uint32) uint16 {
 	return uint16(word >> 8) //nolint:gosec // G115 intern id is stored in 16 bits
 }
 
-// packedFamily is ipv4, ipv6, or empty from bits 24–25.
+// packedFamily is ipv4, ipv6, or empty from bits 24-25.
 func packedFamily(word uint32) string {
-	return packedFamilyNames[(word>>packedFamilyShift)&packedFamilyMask]
+	switch (word >> packedFamilyShift) & packedFamilyMask {
+	case packedFamilyIPv4:
+		return "ipv4"
+	case packedFamilyIPv6:
+		return "ipv6"
+	default:
+		return ""
+	}
 }
 
 // unpackWord is kind letter, empty origin name, and intern id. Family stays in the high bits for packedFamily.
