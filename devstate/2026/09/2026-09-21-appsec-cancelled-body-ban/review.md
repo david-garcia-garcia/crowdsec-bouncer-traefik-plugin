@@ -54,3 +54,8 @@ head: 513b2188d83e88bbbb2123f4e50a93cdd3cf7b87
 phase: archive
 verdict: in progress
 head: fa4a6a6005cb9ba8c9f71889ff9d0f9794520d16
+
+## implement (2026-09-21)
+phase: implement
+verdict: in progress
+head: e590414a85cea45961339c8cd9ad4fe650fc37be

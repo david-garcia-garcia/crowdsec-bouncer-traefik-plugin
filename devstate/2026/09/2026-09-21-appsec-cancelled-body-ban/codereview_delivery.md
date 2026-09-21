@@ -8,9 +8,9 @@ If the client stops sending the body mid-copy (HTTP/2 stream cancel, request con
 
 Upstream report: [maxlerebourg/crowdsec-bouncer-traefik-plugin#395](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/395).
 
-Leaving it in place produces false AppSec bans on benign client disconnects, undermines the unified failure-action knob for a common edge case, and can block or confuse end users who already abandoned the request.
+Leaving it in place produces false AppSec bans on benign client disconnects, pollutes CrowdSec logs and LAPI dropped metrics, and can confuse operators who already abandoned the request.
 
-Priority: P2 — real operator and end-user pain on client disconnect, with `FailureAction` intended as the control but ineffective on this path today.
+Priority: P2 — real operator pain on client disconnect: a false CrowdSec 403 and dropped metric for a client that is already gone.
 
 ## Implementation
 

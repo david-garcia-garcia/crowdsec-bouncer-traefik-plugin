@@ -5,18 +5,18 @@
 | Prepare | done | done | 1m |
 | Explore | done | done | 2m |
 | Propose | done | done | 11m |
-| Implement | done | done | 8m |
-| Code review | done | done | 5m |
+| Implement | done | done | 30m |
+| Code review | done | done | — |
 | Devdocs impact | done | done | 1m |
 | Archive | done | done | 2m |
 | Pull request | — | — | — |
 
-Last updated: 2026-09-21 16:59 UTC
+Last updated: 2026-09-21 17:13 UTC
 
 ## Motivation
 With AppSec enabled, the bouncer buffers readable POST, PUT, PATCH, and DELETE bodies before calling the AppSec listener. That path matches normal forwardable requests: known or positive `Content-Length`, body not classified as unreadable under HTTP/2 or HTTP/3 streaming rules.
 
-If the client stops sending the body mid-copy (HTTP/2 stream cancel, request context canceled, truncated body versus `Content-Length`), `io.ReadAll` on the tee/limit reader fails. `newAppsecBodyRequest` wraps that as `appsecQuery:GetBody` and does not consult `crowdsecAppsecFailureAction`. `applyAppsecServeHTTP` treats any non-captcha `Query` error as an AppSec failure and responds with HTTP 403 and `ReasonAPPSEC`, even though AppSec never received the request. Operators who set `crowdsecAppsecFailureAction: passthrough` still hit this ban path; the failure is easy to miss at default log level because the message looks like a generic AppSec query error.
+If the client stops sending the body mid-copy (HTTP/2 stream cancel, request context canceled, truncated body versus `Content-Length`), `io.ReadAll` on the tee/limit reader fails. Previously the plugin treated that as an AppSec query failure and answered HTTP 403 with `ReasonAPPSEC`, even though AppSec never received the request. Operators who set `crowdsecAppsecFailureAction: passthrough` still hit that ban path.
 
 Upstream report: [maxlerebourg/crowdsec-bouncer-traefik-plugin#395](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/395).
 
@@ -25,21 +25,19 @@ Leaving it in place produces false AppSec bans on benign client disconnects, und
 Priority: P2 — real operator and end-user pain on client disconnect, with `FailureAction` intended as the control but ineffective on this path today.
 
 ## Implementation
-After `io.ReadAll` fails while buffering a forwardable body, read errors classified as client-gone (`context.Canceled`, `context.DeadlineExceeded`, `io.ErrUnexpectedEOF` via `errors.Is`) become `errClientBodyDropped`. `Query` maps that sentinel through the existing `resultForFailureAction` helper with message prefix `appsecQuery:clientBodyDropped`, the same family as unreachable, AppSec 500, and AppSec response-body I/O fallbacks. Unclassified read faults keep `appsecQuery:GetBody` wrapping so they still follow today’s ban wiring in `applyAppsecServeHTTP`.
-
-`passthrough` returns allow without reaching AppSec. `ban` and `captcha` use the existing failure-action mapping without calling AppSec. No bouncer or new config key changes; regression coverage lives in `pkg/appsec/zzz_query_test.go` (table over the three client-gone errors plus an unclassified error that must stay on the `GetBody` path).
+After `io.ReadAll` fails while buffering a forwardable body, read errors classified as client-gone (`context.Canceled`, `context.DeadlineExceeded`, `io.ErrUnexpectedEOF` via `errors.Is`) become `ErrClientDisconnected`. `Query` returns that sentinel without calling AppSec and without `crowdsecAppsecFailureAction`. The bouncer logs TRACE (`client disconnected while buffering AppSec body`), sets `remediationHeadersCustomName` to `error:client-disconnected` when that header is configured, does not `WriteHeader`, does not increment LAPI dropped metrics, and does not call origin. Unclassified read faults keep `appsecQuery:GetBody` wrapping so they still follow today’s ban wiring in `applyAppsecServeHTTP`. Regression coverage lives in `pkg/appsec/zzz_query_test.go` and `pkg/bouncer/zzz_bouncer_test.go` (cites #395).
 
 ## What this changes
-**Operators.** `crowdsecAppsecFailureAction` now governs client disconnect or cancel during AppSec body buffering; `passthrough` stops issuing false `ReasonAPPSEC` 403s on that path, and logs/errors distinguish `appsecQuery:clientBodyDropped` from unclassified `appsecQuery:GetBody` faults.
+**Operators.** A client that disconnects mid-body is no longer logged as a CrowdSec 403/AppSec ban. If `remediationHeadersCustomName` is set, Traefik access logs can record `error:client-disconnected` (include that header in Traefik access-log fields). Plugin log is TRACE only.
 **Admin users.** None.
-**Developers.** AppSec `Query` honors failure action for classified client-body-dropped reads; unclassified body read errors remain `appsecQuery:GetBody` and still surface as ban-path errors from `Query`.
-**End users.** Mid-upload disconnect with operator `passthrough` no longer receives a false AppSec 403; with `ban`, the request is still forbidden but via the failure-action drop path rather than a spurious AppSec verdict.
+**Developers.** `Query` returns `ErrClientDisconnected` for classified client-gone body reads; unclassified body read errors remain `appsecQuery:GetBody`.
+**End users.** Mid-upload disconnect is not answered with a false AppSec 403.
 
 ## Merge readiness
 In progress. 0 items remain.
 
 Priority: P2 — real operator and end-user pain on client disconnect, with `FailureAction` intended as the control but ineffective on this path today.
-Reviewed head: fa4a6a60
+Reviewed head: e590414a
 Owner decision: None.
 
 ## Review scores
@@ -61,11 +59,13 @@ Owner decision: None.
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-- core_plugin_appsec_failure-action — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-21-appsec-cancelled-body-ban/openspec/changes/archive/2026-09-21-appsec-cancelled-body-ban/proposal.md) — modified
+- core_plugin_appsec_client — modified
+- core_plugin_middleware_bouncer — modified
 - 2026-09-21-appsec-cancelled-body-ban — added
 
 ## Deviations from the ask
-None.
+- taken: do not treat client-side body cancel as an AppSec ban; distinguish cancel from genuine faults; reporter offered pass-through or a fail-open option. → detect client-gone, TRACE-only log, optional `remediationHeadersCustomName` `error:client-disconnected`, do not call AppSec, origin, or `handleBanServeHTTP`. `crowdsecAppsecFailureAction` does not apply. — `pkg/bouncer/bouncer.go handleClientDisconnectedServeHTTP` — a cancelled stream has no client to protect or to serve 403 to; FailureAction would still 403 (default ban) or call origin (passthrough). Access-log header is the metric.. Requester: confirmed.
 
 ## Follow-up issues
 None.
@@ -97,9 +97,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 1 added / 1 modified | Same list as ## Specs |
+| Specs in this PR | 1 added / 3 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | fa4a6a6005cb9ba8c9f71889ff9d0f9794520d16 | Card must match the branch you measured |
+| Reviewed head | e590414a85cea45961339c8cd9ad4fe650fc37be | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -113,7 +113,7 @@ Is this the best way to solve the issue? Not yet.
 
 ### Evidence
 What I checked:
-- assembled from the run bus (`deliver_card`, fa4a6a6005cb9ba8c9f71889ff9d0f9794520d16)
+- assembled from the run bus (`deliver_card`, e590414a85cea45961339c8cd9ad4fe650fc37be)
 
 ### Rank-up moves
 None.
