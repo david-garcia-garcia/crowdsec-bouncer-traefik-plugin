@@ -21,7 +21,7 @@ Consumed: `core_plugin_appsec` (enough to call Query; desired contract is missin
 ## Decisions
 
 - Drain every non-nil `Do` response before any return, including 502/503/504. Transport errors have no body. Keep #64 `currentTransport()`; do not restore `httpClient` / `appsecKey` fields.
-- `crowdsecAppsecBodyLimit == 0` is unlimited: skip `LimitReader` (`N <= 0` is immediate EOF — `std_go_io_limit-reader`); `io.ReadAll` the body; restore it for origin. Default 10 MiB when omitted. No new knob. No invented max cap. README documents `0` = unlimited.
+- `appsecBodyLimit == 0` is unlimited: skip `LimitReader` (`N <= 0` is immediate EOF — `std_go_io_limit-reader`); `io.ReadAll` the body; restore it for origin. Default 10 MiB when omitted. No new knob. No invented max cap. README documents `0` = unlimited.
 - `readCappedAppsecBody` **io** errors go through `resultForFailureAction` with `err.Error()` (keep `appsecQuery:readBody`). Log `appsecQuery:failure` like 500. Oversized-body cap stays as today (200 allow / non-200 error, not FA).
 - After the forwarded bytes exist, omit client `Content-Length` and `Transfer-Encoding` from the copy; set `Request.ContentLength` and the header from those bytes. Go 1.25.6 Transport already writes the field and suppresses those header names (`std_go_net-http_request-content-length`); rebuild is the durable contract. Do not add a general hop-by-hop filter.
 - Remove DELETE only from `isMethodWithBody`. Do not gate the readable-body copy on that set (would change readable DELETE/GET forward). Independent of #51.
@@ -32,7 +32,7 @@ Consumed: `core_plugin_appsec` (enough to call Query; desired contract is missin
 
 ## Open questions
 
-- Q: How to implement unlimited `crowdsecAppsecBodyLimit` `0` without a new knob?
+- Q: How to implement unlimited `appsecBodyLimit` `0` without a new knob?
   Decision: resolved — skip `io.LimitReader`; `io.ReadAll` the client body when `appsecBodyLimit == 0`; restore the body for origin. Do not pass `0` into `LimitReader`. Do not invent a max cap.
   By: explore
 

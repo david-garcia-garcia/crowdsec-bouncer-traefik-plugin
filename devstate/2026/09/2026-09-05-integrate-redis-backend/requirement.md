@@ -7,11 +7,11 @@ The plugin talks to Redis through the published module `github.com/maxlerebourg/
 ## Current (code)
 - Module pin: `go.mod` requires `github.com/maxlerebourg/simpleredis v1.0.12`.
 - Vendored copy: `vendor/github.com/maxlerebourg/simpleredis/simpleredis.go` — `Get`/`Set`/`Del` only; each command `Dial`s TCP, runs AUTH/SELECT, sends an inline (space-joined) command, closes. No `MGet`. No pool.
-- Production caller: `pkg/cache/cache.go` `redisCache` holds `writer simpleredis.SimpleRedis` and `readers []simpleredis.SimpleRedis` **by value**, round-robins with `nextReader()`, maps `redis:miss` / `redis:unreachable` to cache errors. `Client.New` `Init`s one writer plus each `redisCacheReadHosts` entry.
+- Production caller: `pkg/cache/cache.go` `redisCache` holds `writer simpleredis.SimpleRedis` and `readers []simpleredis.SimpleRedis` **by value**, round-robins with `nextReader()`, maps `redis:miss` / `redis:unreachable` to cache errors. `Client.New` `Init`s one writer plus each `lapiRedisReadHosts` entry.
 - Unit tests: `pkg/cache/cache_test.go` uses local TTL cache for Get/Set/Delete; `Test_nextReader` allocates `[]simpleredis.SimpleRedis` and compares pointers. No live Redis.
 - Lint allowlist: `.golangci.yml` depguard allows `github.com/maxlerebourg/simpleredis` for main and test.
 - Mock e2e Redis: `tests/e2e/mock/scenarios/redis/` plus `tests/e2e/mock/mocklapi/main.go` `serveRedis` — a TCP stand-in that parses **inline** `GET ` lines, not RESP arrays. Comment in that file: SET/DEL/AUTH/SELECT get `+OK` and “don't read the response anyway”.
-- Real-stack e2e: `tests/e2e/real/docker-compose.test.yml` boots Traefik + Crowdsec + whoami routes. **No Redis/Dragonfly service.** No `redisCacheEnabled` labels. Pester files under `tests/e2e/real/*.Tests.ps1` do not cover a functional Redis cache. CI job `e2e (docker + pester)` in `.github/workflows/e2e.yml` runs that suite.
+- Real-stack e2e: `tests/e2e/real/docker-compose.test.yml` boots Traefik + Crowdsec + whoami routes. **No Redis/Dragonfly service.** No `lapiRedisEnabled` labels. Pester files under `tests/e2e/real/*.Tests.ps1` do not cover a functional Redis cache. CI job `e2e (docker + pester)` in `.github/workflows/e2e.yml` runs that suite.
 - Examples: `examples/redis-cache/` uses Redis images for operator demos, not e2e.
 
 ## Desired

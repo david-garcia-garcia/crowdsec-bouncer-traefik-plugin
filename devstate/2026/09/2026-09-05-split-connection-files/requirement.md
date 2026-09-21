@@ -31,7 +31,7 @@ Move the remaining jobs into same-package files matching the existing `identity.
 ## Out of scope
 - `pkg/appsec` or any new package
 - `GetTLSConfigCrowdsec` (sibling ticket)
-- `identity.go`, `DecisionScopeHeaders`, cache constants, `pkg/ip`, `configuration.go` layout, `Prepare`/`plugin.go` mutation
+- `identity.go`, `LapiScopeHeaders`, cache constants, `pkg/ip`, `configuration.go` layout, `Prepare`/`plugin.go` mutation
 - sibling tickets: 2026-09-05-split-configuration-files, 2026-09-05-split-ip-trust, 2026-09-05-scope-headers-identity, 2026-09-05-remediation-codes-owner, 2026-09-05-decisionscope-mode-bool, 2026-09-05-config-prepare-snapshot
 - behavior, signatures, JSON tags, log strings, HTTP routes
 

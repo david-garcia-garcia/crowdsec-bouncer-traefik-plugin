@@ -11,8 +11,8 @@ IssueKey: 2026-09-17-captcha-request-routing
 - `captchaResponseFromRequest` reads query / POST form / raw body and restores `Body`. Unexported. `pkg/captcha/captcha.go`
 - `IsCaptchaFormPost` / `WriteSolvedRedirect`: not found
 - `TestCaptchaMethodBasedLogic` expects HEAD + captcha → ban fallback. `pkg/bouncer/zzz_bouncer_test.go`
-- Custom provider stores `CaptchaCustomJsURL` as `infoProvider.js`. No challenge-URL field. `pkg/configuration/configuration.go` `pkg/captcha/captcha.go`
-- `captchaCustomChallengeUrl` / `CaptchaCustomChallengeURL`: not found
+- Custom provider stores `BouncerCaptchaCustomJsURL` as `infoProvider.js`. No challenge-URL field. `pkg/configuration/configuration.go` `pkg/captcha/captcha.go`
+- `bouncerCaptchaCustomChallengeUrl` / `BouncerCaptchaCustomChallengeURL`: not found
 - `IsCustomResourceRequest`: not found
 - Captcha-gate spec owns cookie grace and the first-solve 302. It does not specify Check-path form POST, custom-resource passthrough, or HEAD. `openspec/specs/core_plugin_middleware_captcha-gate/spec.md`
 - `core_plugin_captcha_solved-form-post` / `core_plugin_captcha_custom-resource-passthrough`: not found
@@ -48,8 +48,8 @@ IssueKey: 2026-09-17-captcha-request-routing
 - #50's template `ChallengeURL` wiring as a must
 
 ## Unknowns
-- Passthrough match set: `CaptchaCustomJsURL` path only, or also a widget/challenge URL. Ticket names both the script and the widget endpoint; dest has only JsURL as a browser-facing custom URL.
-- Whether that needs a new optional public key. Ticket does not name one. Old #50 added `captchaCustomChallengeUrl`.
+- Passthrough match set: `BouncerCaptchaCustomJsURL` path only, or also a widget/challenge URL. Ticket names both the script and the widget endpoint; dest has only JsURL as a browser-facing custom URL.
+- Whether that needs a new optional public key. Ticket does not name one. Old #50 added `bouncerCaptchaCustomChallengeUrl`.
 - Path vs host vs prefix matching. Ticket: scope to what the configured challenge URL needs, and say in the spec why that is safe.
 - Export `captchaResponseFromRequest` vs a wrapper. Unexported today.
 - HEAD-like-GET for every captcha URL, or only custom-resource paths. Ticket: HEAD is not excluded from the captcha path.
@@ -59,4 +59,4 @@ IssueKey: 2026-09-17-captcha-request-routing
 - Ticket: HEAD treated like GET on the captcha path. Current test and old #50 assumed non-matching captcha HEAD stays ban.
 - Ticket forbids cache grace; captcha-gate already forbids it. Old branches wrote `{ip}_captcha`.
 - Ticket DoD: write routing rules into spec leaves. The #48/#50 leaves never landed on dest.
-- Old #50 added `captchaCustomChallengeUrl` and template `ChallengeURL`. This ticket does not name either. Not Desired.
+- Old #50 added `bouncerCaptchaCustomChallengeUrl` and template `ChallengeURL`. This ticket does not name either. Not Desired.

@@ -35,7 +35,7 @@ There is no official bool named `fail_open`. Open-bastion’s `crowdsec_fail_ope
 |---|---|---|---|---|
 | Spec (new RC) | Live: `lapi_failure_action` = passthrough\|ban\|captcha (default passthrough). Stream: unspecified. | Same `appsec_failure_action` | Same field (timeout + 500 + 401) | One enum per backend |
 | Nginx (lua) | No LAPI fail-open documented. `REQUEST_TIMEOUT` only. | `APPSEC_FAILURE_ACTION` = `passthrough`\|`deny` (default passthrough). Docs: “when AppSec returns a 500”. | Not a separate knob. Timeouts `APPSEC_*_TIMEOUT`. | One AppSec enum; values are **deny**, not spec `ban`/`captcha` |
-| Traefik plugin (community, CrowdSec docs) | Live: **no knob** — LAPI error bans. Stream: `updateMaxFailure` then **block all traffic**. | `crowdsecAppsecFailureBlock` bool (default **true** = block) | `crowdsecAppsecUnreachableBlock` bool (default **true** = block) | Two AppSec bools (failure vs unreachable). No LAPI enum. |
+| Traefik plugin (community, CrowdSec docs) | Live: **no knob** — LAPI error bans. Stream: `lapiUpdateMaxFailure` then **block all traffic**. | `crowdsecAppsecFailureBlock` bool (default **true** = block) | `crowdsecAppsecUnreachableBlock` bool (default **true** = block) | Two AppSec bools (failure vs unreachable). No LAPI enum. |
 | Firewall | No fail-open/closed field. Stream-only. | n/a (no AppSec) | n/a | Keep last ipset while process stays up |
 
 Owners: spec table as above; nginx [APPSEC_FAILURE_ACTION](https://docs.crowdsec.net/u/bouncers/nginx); Traefik [AppSec quickstart](https://docs.crowdsec.net/docs/next/appsec/quickstart/traefik.md) (extract `.sources/appsec-quickstart-traefik.md`) plus [plugin README](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/04d928872df12bdb9d953b2d92948e0b89692d6a/README.md) (extract `.sources/traefik-plugin-readme.md`); firewall [docs](https://docs.crowdsec.net/u/bouncers/firewall) (extract `.sources/firewall-bouncer.md`) and [config](https://github.com/crowdsecurity/cs-firewall-bouncer/blob/1dd4492523e04a25faadc9d87d45a7dc1e06c654/pkg/cfg/config.go) (extract `.sources/firewall-config.go.md`).
@@ -60,13 +60,13 @@ Authority **inference** (files read: `cmd/root.go`, `pkg/cfg/config.go`): while 
 
 ### Traefik plugin (`@04d92887`)
 
-Stream/alone: `updateMaxFailure` (default **0**) is “maximum number of times we cannot reach Crowdsec before blocking traffic; `-1` never block”. After that many failed stream updates, `isCrowdsecStreamHealthy` becomes false and **every** uncached request is banned (`ReasonTECH`). A later successful poll restores healthy and cache-miss means allow. Cache hits still apply last decisions. ([README](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/04d928872df12bdb9d953b2d92948e0b89692d6a/README.md); [bouncer.go](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/04d928872df12bdb9d953b2d92948e0b89692d6a/bouncer.go), extract `.sources/traefik-bouncer.go.md`)
+Stream/alone: `lapiUpdateMaxFailure` (default **0**) is “maximum number of times we cannot reach Crowdsec before blocking traffic; `-1` never block”. After that many failed stream updates, `isCrowdsecStreamHealthy` becomes false and **every** uncached request is banned (`ReasonTECH`). A later successful poll restores healthy and cache-miss means allow. Cache hits still apply last decisions. ([README](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/04d928872df12bdb9d953b2d92948e0b89692d6a/README.md); [bouncer.go](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/04d928872df12bdb9d953b2d92948e0b89692d6a/bouncer.go), extract `.sources/traefik-bouncer.go.md`)
 
-Default `0` plus `updateFailure >= updateMaxFailure` on the first failed tick means the **first** failed poll marks the stream unhealthy and blocks all new traffic. Set `-1` to keep last decisions forever (never block on poll failure).
+Default `0` plus `updateFailure >= lapiUpdateMaxFailure` on the first failed tick means the **first** failed poll marks the stream unhealthy and blocks all new traffic. Set `-1` to keep last decisions forever (never block on poll failure).
 
-`streamStartupBlock` (default true): plugin init waits for the first stream sync. When false, requests bypass remediation until the first sync completes. ([README](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/04d928872df12bdb9d953b2d92948e0b89692d6a/README.md))
+`lapiStreamStartupBlock` (default true): plugin init waits for the first stream sync. When false, requests bypass remediation until the first sync completes. ([README](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/04d928872df12bdb9d953b2d92948e0b89692d6a/README.md))
 
-CrowdSec Traefik docs do not document `updateMaxFailure`. Owner for that knob is the plugin README/source.
+CrowdSec Traefik docs do not document `lapiUpdateMaxFailure`. Owner for that knob is the plugin README/source.
 
 ### Nginx
 

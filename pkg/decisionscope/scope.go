@@ -87,8 +87,8 @@ func StreamScopeToken(scope string) string {
 	}
 }
 
-// NormalizeDecisionScopeHeaders keeps configured header scopes. Ip and Range are not header scopes.
-func NormalizeDecisionScopeHeaders(in map[string]string) map[string]string {
+// NormalizeLapiScopeHeaders keeps configured header scopes. Ip and Range are not header scopes.
+func NormalizeLapiScopeHeaders(in map[string]string) map[string]string {
 	if len(in) == 0 {
 		return nil
 	}

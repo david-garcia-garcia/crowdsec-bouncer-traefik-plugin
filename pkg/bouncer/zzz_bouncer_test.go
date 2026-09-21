@@ -55,17 +55,18 @@ func TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan(t *testing.T) {
 	}
 	passed := false
 	b := &Bouncer{
-		enabled:                  true,
-		crowdsecMode:             configuration.StreamMode,
-		forwardedHeadersInsecure: true,
-		forwardedCustomHeader:    "X-Forwarded-For",
-		lapiClient:               lapiClient,
-		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
-		captchaClient:            &captcha.Client{},
-		log:                      log,
-		remediationStatusCode:    http.StatusForbidden,
-		banTemplate:              banTemplate,
-		banTemplateContentType:   "text/html; charset=utf-8",
+		enabled:                      true,
+		lapiMode:                     configuration.StreamMode,
+		bouncerForwardedInsecure:     true,
+		forwardedCustomHeader:        "X-Forwarded-For",
+		lapiEnabled:                  true,
+		lapiClient:                   lapiClient,
+		clientPoolStrategy:           &ip.PoolStrategy{Checker: clientChecker},
+		captchaClient:                &captcha.Client{},
+		log:                          log,
+		bouncerRemediationStatusCode: http.StatusForbidden,
+		banTemplate:                  banTemplate,
+		banTemplateContentType:       "text/html; charset=utf-8",
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			passed = true
 		}),
@@ -98,15 +99,16 @@ func TestServeHTTP_PackedMemoryBanRecordsCrowdsecOrigin(t *testing.T) {
 	}
 	passed := false
 	b := &Bouncer{
-		enabled:                true,
-		crowdsecMode:           configuration.StreamMode,
-		lapiClient:             lapiClient,
-		clientPoolStrategy:     &ip.PoolStrategy{Checker: clientChecker},
-		captchaClient:          &captcha.Client{},
-		log:                    log,
-		remediationStatusCode:  http.StatusForbidden,
-		banTemplate:            banTemplate,
-		banTemplateContentType: "text/html; charset=utf-8",
+		enabled:                      true,
+		lapiMode:                     configuration.StreamMode,
+		lapiEnabled:                  true,
+		lapiClient:                   lapiClient,
+		clientPoolStrategy:           &ip.PoolStrategy{Checker: clientChecker},
+		captchaClient:                &captcha.Client{},
+		log:                          log,
+		bouncerRemediationStatusCode: http.StatusForbidden,
+		banTemplate:                  banTemplate,
+		banTemplateContentType:       "text/html; charset=utf-8",
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			passed = true
 		}),
@@ -145,10 +147,10 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &Bouncer{
-				remediationStatusCode:   http.StatusForbidden,
-				remediationCustomHeader: "X-Test-Remediation",
-				banTemplate:             tt.banTemplate,
-				banTemplateContentType:  "text/html; charset=utf-8",
+				bouncerRemediationStatusCode: http.StatusForbidden,
+				remediationCustomHeader:      "X-Test-Remediation",
+				banTemplate:                  tt.banTemplate,
+				banTemplateContentType:       "text/html; charset=utf-8",
 			}
 			rw := httptest.NewRecorder()
 			req := &http.Request{Method: tt.method}
@@ -192,10 +194,10 @@ func TestHandleBanServeHTTPTrustedTraceID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &Bouncer{
-				remediationStatusCode:  http.StatusForbidden,
-				banTemplate:            banTemplate,
-				banTemplateContentType: "text/html; charset=utf-8",
-				traceCustomHeader:      "X-Request-Id",
+				bouncerRemediationStatusCode: http.StatusForbidden,
+				banTemplate:                  banTemplate,
+				banTemplateContentType:       "text/html; charset=utf-8",
+				traceCustomHeader:            "X-Request-Id",
 			}
 			rw := httptest.NewRecorder()
 			req := &http.Request{Method: http.MethodGet, Header: make(http.Header)}
@@ -226,9 +228,9 @@ func TestHandleBanServeHTTPContentType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &Bouncer{
-				remediationStatusCode:  http.StatusForbidden,
-				banTemplate:            tt.banTemplate,
-				banTemplateContentType: tt.banTemplateContentType,
+				bouncerRemediationStatusCode: http.StatusForbidden,
+				banTemplate:                  tt.banTemplate,
+				banTemplateContentType:       tt.banTemplateContentType,
 			}
 			rw := httptest.NewRecorder()
 			req := &http.Request{Method: http.MethodGet}
@@ -251,13 +253,13 @@ func testBouncerWithAppsec(t *testing.T, handler http.HandlerFunc, banTemplate *
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			t.Error("next handler should not be called")
 		}),
-		appsecEnabled:           true,
-		remediationStatusCode:   http.StatusForbidden,
-		remediationCustomHeader: "X-Remediation",
-		banTemplate:             banTemplate,
-		banTemplateContentType:  "text/html; charset=utf-8",
-		log:                     logger.New("DEBUG", ""),
-		appsecClient:            appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("DEBUG", "")),
+		appsecEnabled:                true,
+		bouncerRemediationStatusCode: http.StatusForbidden,
+		remediationCustomHeader:      "X-Remediation",
+		banTemplate:                  banTemplate,
+		banTemplateContentType:       "text/html; charset=utf-8",
+		log:                          logger.New("DEBUG", ""),
+		appsecClient:                 appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("DEBUG", "")),
 	}, appsecServer
 }
 
@@ -535,13 +537,14 @@ func TestHandleNextServeHTTP_clientDisconnected(t *testing.T) {
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			nextCalled = true
 		}),
-		appsecEnabled:           true,
-		appsecFailureAction:     configuration.FailureActionBan,
-		remediationStatusCode:   http.StatusForbidden,
-		remediationCustomHeader: "X-Remediation",
-		log:                     traceLog,
-		lapiClient:              lapiClient,
-		appsecClient:            appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")),
+		appsecEnabled:                true,
+		appsecFailureAction:          configuration.FailureActionBan,
+		bouncerRemediationStatusCode: http.StatusForbidden,
+		remediationCustomHeader:      "X-Remediation",
+		log:                          traceLog,
+		lapiEnabled:                  true,
+		lapiClient:                   lapiClient,
+		appsecClient:                 appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")),
 	}
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", failingBodyForDisconnectTest{err: context.Canceled})
 	req.ContentLength = 100
@@ -588,6 +591,7 @@ func TestTwoBouncersDistinctLapiFailureActions(t *testing.T) {
 			passthroughCalled = true
 		}),
 		log:               logger.New("ERROR", ""),
+		lapiEnabled:       true,
 		lapiClient:        shared,
 		lapiFailureAction: configuration.FailureActionPassthrough,
 	}
@@ -595,10 +599,11 @@ func TestTwoBouncersDistinctLapiFailureActions(t *testing.T) {
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			t.Error("ban bouncer must not call next")
 		}),
-		remediationStatusCode: http.StatusForbidden,
-		log:                   logger.New("ERROR", ""),
-		lapiClient:            shared,
-		lapiFailureAction:     configuration.FailureActionBan,
+		bouncerRemediationStatusCode: http.StatusForbidden,
+		log:                          logger.New("ERROR", ""),
+		lapiEnabled:                  true,
+		lapiClient:                   shared,
+		lapiFailureAction:            configuration.FailureActionBan,
 	}
 	if !passthrough.SameLapiClient(ban) {
 		t.Fatal("both bouncers must share one Client")
@@ -634,9 +639,9 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 				t.Error("next handler should not be called")
 			}),
-			remediationStatusCode: http.StatusForbidden,
-			log:                   logger.New("ERROR", ""),
-			lapiFailureAction:     configuration.FailureActionBan,
+			bouncerRemediationStatusCode: http.StatusForbidden,
+			log:                          logger.New("ERROR", ""),
+			lapiFailureAction:            configuration.FailureActionBan,
 		}
 		recorder := httptest.NewRecorder()
 		b.applyLapiFailureAction(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
@@ -685,13 +690,13 @@ func TestHandleNextServeHTTPAppsecFailureAction(t *testing.T) {
 	})
 }
 
-func TestNewForwardedHeadersInsecureHeaderName(t *testing.T) {
+func TestNewBouncerForwardedInsecureHeaderName(t *testing.T) {
 	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 	log := logger.New("ERROR", "")
 	t.Run("default custom name becomes X-Real-Ip", func(t *testing.T) {
 		cfg := configuration.New()
-		cfg.CrowdsecMode = configuration.AppsecMode
-		cfg.ForwardedHeadersInsecure = true
+		cfg.LapiMode = "appsec"
+		cfg.BouncerForwardedInsecure = true
 		handler, err := New(next, "test", cfg, nil, nil, log)
 		if err != nil {
 			t.Fatalf("New = %v", err)
@@ -706,9 +711,9 @@ func TestNewForwardedHeadersInsecureHeaderName(t *testing.T) {
 	})
 	t.Run("explicit non-default name is passed through", func(t *testing.T) {
 		cfg := configuration.New()
-		cfg.CrowdsecMode = configuration.AppsecMode
-		cfg.ForwardedHeadersInsecure = true
-		cfg.ForwardedHeadersCustomName = "CF-Connecting-IP"
+		cfg.LapiMode = "appsec"
+		cfg.BouncerForwardedInsecure = true
+		cfg.BouncerForwardedHeader = "CF-Connecting-IP"
 		handler, err := New(next, "test", cfg, nil, nil, log)
 		if err != nil {
 			t.Fatalf("New = %v", err)

@@ -45,15 +45,15 @@ type Client struct {
 	crowdsecScheme       string
 	crowdsecHost         string
 	crowdsecPath         string
-	crowdsecMode         string
+	lapiMode             string
 	crowdsecMachineID    string
 	crowdsecPassword     string
 	crowdsecScenarios    []string
 	updateInterval       int64
 	metricsInterval      int64
-	updateMaxFailure     int64
+	lapiUpdateMaxFailure int64
 	crowdsecStreamRoute  string
-	decisionScopeHeaders map[string]string // write-once first-create residue; not the live union
+	lapiScopeHeaders     map[string]string // write-once first-create residue; not the live union
 	sessionKey           string            // reclaim SessionKey (stream/alone) or Key (live/none)
 	liveHeaderScopes     liveHeaderScopes  // live constructor ctx → normalized header scopes
 
@@ -74,21 +74,21 @@ type Client struct {
 
 // Prepare resolves secrets and CAPI/LAPI routing on cfg. Call before Key and New.
 func Prepare(cfg *configuration.Config, _ *slog.Logger) error {
-	if cfg.CrowdsecMode == configuration.AloneMode {
-		cfg.CrowdsecCapiMachineID, _ = configuration.GetVariable(cfg, "CrowdsecCapiMachineID")
-		cfg.CrowdsecCapiPassword, _ = configuration.GetVariable(cfg, "CrowdsecCapiPassword")
-		cfg.CrowdsecLapiScheme = configuration.HTTPS
-		cfg.CrowdsecLapiHost = crowdsecCapiHost
-		cfg.CrowdsecLapiPath = "/"
-		cfg.UpdateIntervalSeconds = 7200
+	if cfg.LapiMode == configuration.AloneMode {
+		cfg.LapiCapiMachineID, _ = configuration.GetVariable(cfg, "LapiCapiMachineID")
+		cfg.LapiCapiPassword, _ = configuration.GetVariable(cfg, "LapiCapiPassword")
+		cfg.LapiScheme = configuration.HTTPS
+		cfg.LapiHost = crowdsecCapiHost
+		cfg.LapiPath = "/"
+		cfg.LapiUpdateIntervalSeconds = 7200
 	} else {
-		apiKey, errKey := configuration.GetVariable(cfg, "CrowdsecLapiKey")
+		apiKey, errKey := configuration.GetVariable(cfg, "LapiKey")
 		if errKey == nil {
-			cfg.CrowdsecLapiKey = apiKey
+			cfg.LapiKey = apiKey
 		}
 	}
-	if cfg.RedisCacheEnabled {
-		cfg.RedisCachePassword, _ = configuration.GetVariable(cfg, "RedisCachePassword")
+	if cfg.LapiRedisEnabled {
+		cfg.LapiRedisPassword, _ = configuration.GetVariable(cfg, "LapiRedisPassword")
 	}
 	return nil
 }
@@ -97,7 +97,7 @@ func Prepare(cfg *configuration.Config, _ *slog.Logger) error {
 // Call Prepare first. Close stops tickers and HTTP only; it does not Close the shared store.
 func New(config *configuration.Config, log *slog.Logger, pluginVersion string, store *decisionstore.Store) (*Client, error) {
 	crowdsecStreamRoute := crowdsecLapiStreamRoute
-	if config.CrowdsecMode == configuration.AloneMode {
+	if config.LapiMode == configuration.AloneMode {
 		crowdsecStreamRoute = crowdsecCapiStreamRoute
 	}
 	next, err := newTransport(config, log)
@@ -105,9 +105,9 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		log.Error("New:getTLSConfigCrowdsec fail to get tlsConfig", "error", err)
 		return nil, err
 	}
-	if config.CrowdsecMode != configuration.AloneMode && config.CrowdsecLapiKey == "" && next.clientCertCount() == 0 {
-		log.Error("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup")
-		return nil, errors.New("CrowdsecLapiKey is missing")
+	if config.LapiMode != configuration.AloneMode && config.LapiKey == "" && next.clientCertCount() == 0 {
+		log.Error("New:lapiKey fail to get LapiKey and no client certificate setup")
+		return nil, errors.New("LapiKey is missing")
 	}
 	if store == nil {
 		return nil, errors.New("decision store is required")
@@ -119,17 +119,17 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 	}
 
 	client := &Client{
-		crowdsecMode:            config.CrowdsecMode,
-		crowdsecScheme:          config.CrowdsecLapiScheme,
-		crowdsecHost:            config.CrowdsecLapiHost,
-		crowdsecPath:            config.CrowdsecLapiPath,
-		crowdsecMachineID:       config.CrowdsecCapiMachineID,
-		crowdsecPassword:        config.CrowdsecCapiPassword,
-		crowdsecScenarios:       config.CrowdsecCapiScenarios,
-		updateInterval:          config.UpdateIntervalSeconds,
-		metricsInterval:         config.MetricsUpdateIntervalSeconds,
-		updateMaxFailure:        config.UpdateMaxFailure,
-		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
+		lapiMode:                config.LapiMode,
+		crowdsecScheme:          config.LapiScheme,
+		crowdsecHost:            config.LapiHost,
+		crowdsecPath:            config.LapiPath,
+		crowdsecMachineID:       config.LapiCapiMachineID,
+		crowdsecPassword:        config.LapiCapiPassword,
+		crowdsecScenarios:       config.LapiCapiScenarios,
+		updateInterval:          config.LapiUpdateIntervalSeconds,
+		metricsInterval:         config.LapiMetricsIntervalSeconds,
+		lapiUpdateMaxFailure:    config.LapiUpdateMaxFailure,
+		lapiScopeHeaders:        decisionscope.NormalizeLapiScopeHeaders(config.LapiScopeHeaders),
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		sessionKey:              reclaimSessionKey(config),
 		log:                     log,
@@ -145,7 +145,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		return nil, err
 	}
 
-	if config.MetricsUpdateIntervalSeconds > 0 {
+	if config.LapiMetricsIntervalSeconds > 0 {
 		client.metricsReporter.lastMetricsPush = time.Now()
 		go client.handleMetricsTicker()
 		client.metricsStop = startTicker("metrics", client.metricsInterval, log, func() {
@@ -185,6 +185,13 @@ func (c *Client) Close() {
 	c.logInfo(MsgConnectionClosed, "closed")
 }
 
+// Closed is true after Close. Publish replaces a closed slot on Traefik reload.
+func (c *Client) Closed() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.closed
+}
+
 // Sleep stops stream and metrics tickers and keeps HTTP, the DecisionStore, and the LAPI
 // cursor. Reclaim calls this when the last constructor ctx is gone. Not Close.
 // Does not wait for an in-flight stream GET and does not cancel it.
@@ -214,7 +221,7 @@ func (c *Client) Wake() {
 		return
 	}
 	c.sleeping = false
-	resumeStream := c.crowdsecMode == configuration.StreamMode || c.crowdsecMode == configuration.AloneMode
+	resumeStream := c.lapiMode == configuration.StreamMode || c.lapiMode == configuration.AloneMode
 	if resumeStream && c.streamStop == nil {
 		c.streamStop = startTicker("stream", c.updateInterval, c.log, func() {
 			c.handleStreamTicker()
@@ -237,7 +244,7 @@ func (c *Client) logInfo(msg, reason string) {
 	if c.log == nil {
 		return
 	}
-	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
+	c.log.Info(msg, "mode", c.lapiMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
 }
 
 func stopTicker(stop chan bool) {
@@ -269,6 +276,11 @@ func startTicker(name string, updateInterval int64, log *slog.Logger, work func(
 	return stop
 }
 
+// LapiMode is the fetch strategy this Client was opened with (live, stream, none, alone).
+func (c *Client) LapiMode() string {
+	return c.lapiMode
+}
+
 // StreamHealthy is true while stream polling is succeeding.
 func (c *Client) StreamHealthy() bool {
 	return atomic.LoadInt64(&c.isCrowdsecStreamHealthy) != 0
@@ -296,7 +308,7 @@ func (c *Client) snapshotLiveHeaderScopes() map[string]string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if len(c.liveHeaderScopes.headerScopesByCtx) == 0 {
-		return c.decisionScopeHeaders
+		return c.lapiScopeHeaders
 	}
 	return c.liveHeaderScopes.union()
 }

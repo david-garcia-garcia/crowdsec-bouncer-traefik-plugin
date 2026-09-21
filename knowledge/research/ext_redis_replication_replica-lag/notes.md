@@ -18,7 +18,7 @@ Owner: [Redis replication](https://redis.io/docs/latest/operate/oss_and_stack/ma
 
 Owner: [WAIT](https://redis.io/docs/latest/commands/wait/). Extract: `.sources/wait.md`.
 
-This plugin’s cache Client never calls `WAIT`. Inference (`authority: inference`): a Get/MGet on a `RedisCacheReadHosts` replica after a writer Set can miss or return a prior value until that replica applies the replication stream.
+This plugin’s cache Client never calls `WAIT`. Inference (`authority: inference`): a Get/MGet on a `LapiRedisReadHosts` replica after a writer Set can miss or return a prior value until that replica applies the replication stream.
 
 ## What this product does
 

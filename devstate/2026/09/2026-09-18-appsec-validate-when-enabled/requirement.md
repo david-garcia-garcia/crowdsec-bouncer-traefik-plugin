@@ -2,23 +2,23 @@
 IssueKey: 2026-09-18-appsec-validate-when-enabled
 
 ## Problem
-`ValidateParams` validates AppSec URL, key file, and HTTPS CA in live/stream even when `crowdsecAppsecEnabled` is false, so leftover missing `crowdsecAppsecKeyFile` or explicit-https garbage CA can fail a router that has AppSec off. Alone skips the whole LAPI+AppSec validator, so AppSec-on plus garbage CA or missing key file still boots; default AppSec failure action is ban and those requests drop at runtime.
+`ValidateParams` validates AppSec URL, key file, and HTTPS CA in live/stream even when `appsecEnabled` is false, so leftover missing `appsecKeyFile` or explicit-https garbage CA can fail a router that has AppSec off. Alone skips the whole LAPI+AppSec validator, so AppSec-on plus garbage CA or missing key file still boots; default AppSec failure action is ban and those requests drop at runtime.
 
 ## Current (code)
-- `New()` defaults `CrowdsecAppsecEnabled` to false and `CrowdsecAppsecFailureAction` to ban. `pkg/configuration/configuration.go`
+- `New()` defaults `AppsecEnabled` to false and `BouncerAppsecFailureAction` to ban. `pkg/configuration/configuration.go`
 - `ValidateParams` on `AloneMode` checks CAPI machine id and password, then does not call `validateLapiAndAppsecConnection`. `pkg/configuration/configuration.go`
 - Live, stream, none, and appsec take the `else` and always call `validateLapiAndAppsecConnection`. `pkg/configuration/configuration.go`
 - `validateLapiAndAppsecConnection` is LAPI URL/key/TLS then always `validateAppsecURLKeyAndTLS` with no enabled gate. `pkg/configuration/configuration.go`
-- `validateAppsecURLKeyAndTLS` never reads `CrowdsecAppsecEnabled`. It validates AppSec URL (effective scheme), `GetVariable` on `CrowdsecAppsecKey` (reads `CrowdsecAppsecKeyFile` when set), and AppSec CA PEM when scheme is explicit `https` and insecure-verify is false. `pkg/configuration/configuration.go`
-- Missing key file returns `CrowdsecAppsecKey:<path> invalid path`. `pkg/configuration/configuration.go`
+- `validateAppsecURLKeyAndTLS` never reads `AppsecEnabled`. It validates AppSec URL (effective scheme), `GetVariable` on `AppsecKey` (reads `AppsecKeyFile` when set), and AppSec CA PEM when scheme is explicit `https` and insecure-verify is false. `pkg/configuration/configuration.go`
+- Missing key file returns `AppsecKey:<path> invalid path`. `pkg/configuration/configuration.go`
 - Invalid AppSec CA PEM returns `failed parsing pem file`. `pkg/configuration/configuration.go`
 - Table case "AppSec HTTPS with invalid CA while LAPI HTTP" uses `getMinimalConfig()` (AppSec off) and wants an error. `pkg/configuration/zzz_configuration_test.go`
 - No alone+AppSec-on invalid CA / missing key-file case, and no live/stream+AppSec-off leftover-CA success case. `pkg/configuration/zzz_configuration_test.go`
-- Spec AppSec URL and HTTPS CA requirements have no `crowdsecAppsecEnabled` gate. `openspec/specs/core_plugin_middleware_config-validation/spec.md`
+- Spec AppSec URL and HTTPS CA requirements have no `appsecEnabled` gate. `openspec/specs/core_plugin_middleware_config-validation/spec.md`
 - Spec alone MAY skip LAPI URL/key/TLS only. `openspec/specs/core_plugin_middleware_config-validation/spec.md`
 
 ## Desired
-- In all modes: if `config.CrowdsecAppsecEnabled` then `validateAppsecURLKeyAndTLS`.
+- In all modes: if `config.AppsecEnabled` then `validateAppsecURLKeyAndTLS`.
 - Alone still skips LAPI URL/key/TLS; still requires CAPI machine id and password.
 - Live/stream still validate LAPI; AppSec checks only when enabled.
 - Do not validate AppSec host/URL/key/CA when the enabled knob is false, even if leftover fields are set.
@@ -38,7 +38,7 @@ IssueKey: 2026-09-18-appsec-validate-when-enabled
 - Reusing closed PR #80 or branch `2026-09-18-alone-mode-skips-appsec-validation`
 
 ## Unknowns
-- Redis leftover-password analog is the desired rule; dest still always `GetVariable`s `RedisCachePassword`. `pkg/configuration/configuration.go`
+- Redis leftover-password analog is the desired rule; dest still always `GetVariable`s `LapiRedisPassword`. `pkg/configuration/configuration.go`
 - Spec "invalid AppSec host fails" WHEN clause does not name enabled; implement will add the gate, not empty-host shape.
 
 ## Tensions

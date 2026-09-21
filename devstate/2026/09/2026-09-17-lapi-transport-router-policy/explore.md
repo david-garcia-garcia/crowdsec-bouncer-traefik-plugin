@@ -7,7 +7,7 @@ Traefik calls `New` once per router-handler build and cancels that constructor `
 
 CrowdSec LAPI owns the stream cursor on the **bouncer row** selected by SHA-512 of `X-Api-Key` plus the IP LAPI sees (this process’s outbound address). `startup=true` zeros that cursor and returns the full active set (`ext_crowdsec_lapi_stream-cursor`). Two in-process pollers on the same row steal deltas. This plugin’s reclaim key is **not** that cursor: stream/alone `SessionKey` = `SessionPrefix` (URL+key) + FNV of 18-field `streamSettings`; live/none `Key` = `lapi:` + `IdentityHex` of the same knob cluster (`session.go` 71–90, `identity.go` 19–44).
 
-Today those hashes include per-router policy (`lapiFailureAction`, `redisUnreachableBlock`, `defaultDecisionSeconds`, `StreamStartupBlock`) and LAPI HTTP/TLS (`HTTPTimeoutSeconds`, three TLS fields). A Traefik reload that only changes those knobs therefore `Open`s a new `lapi.Client` and pays `startup=true`. `Bouncer` already owns AppSec failure action; it still reads LAPI policy through `Client` accessors (`bouncer.go` 181, 236). Live cache TTL is `c.defaultDecisionTimeout` inside `LiveLookup` (`client_live.go`, `client_decisions.go`).
+Today those hashes include per-router policy (`lapiFailureAction`, `redisUnreachableBlock`, `bouncerLiveTtlSeconds`, `LapiStreamStartupBlock`) and LAPI HTTP/TLS (`HTTPTimeoutSeconds`, three TLS fields). A Traefik reload that only changes those knobs therefore `Open`s a new `lapi.Client` and pays `startup=true`. `Bouncer` already owns AppSec failure action; it still reads LAPI policy through `Client` accessors (`bouncer.go` 181, 236). Live cache TTL is `c.defaultDecisionTimeout` inside `LiveLookup` (`client_live.go`, `client_decisions.go`).
 
 `httpClient` is a plain `*http.Client` built in `New` (TLS + timeout). CAPI `getToken` writes `c.crowdsecKey` (`client_http.go` 71). `rangeMembership` already uses `atomic.Value` (`client.go` 66). Yaegi v0.16 cannot take a generic instantiation from another package as a struct field (`ext_traefik-middleware-utilities_packages`); `atomic.Pointer[T]` is out.
 
@@ -30,10 +30,10 @@ Out of scope stays out: shared `DecisionStore` / cache reclaim, cursor-only key 
 - Reclaim holder stays Traefik `New` `ctx` via `reclaim.OpenWithHooks`. No `sync.Once`, no new package global, no import of published utilities `reclaim`.
 - Move `lapiFailureAction`, `redisUnreachableBlock`, and `defaultDecisionTimeout` onto `Bouncer` from `config` (`lapiFailureAction` via `EffectiveFailureAction`). Delete `Client.LapiFailureAction` / `RedisUnreachableBlock` and `NewTestLapiFailureActionClient`.
 - `LiveLookup` takes the live TTL as an argument; delete `c.defaultDecisionTimeout`. Accepted: two routers on one Client last-write that TTL into the shared live cache.
-- Drop those three plus `StreamStartupBlock`, the three TLS fields, and `HTTPTimeoutSeconds` from `streamSettings` / `settingsFrom` **and** from live/none `identity` / `IdentityHex`.
-- `StreamStartupBlock` stays write-once construct-time on `Client` (`startStream`); first incarnation keeps it. Do not make it mutable; do not put it on `Bouncer`.
+- Drop those three plus `LapiStreamStartupBlock`, the three TLS fields, and `HTTPTimeoutSeconds` from `streamSettings` / `settingsFrom` **and** from live/none `identity` / `IdentityHex`.
+- `LapiStreamStartupBlock` stays write-once construct-time on `Client` (`startStream`); first incarnation keeps it. Do not make it mutable; do not put it on `Bouncer`.
 - Extract LAPI HTTP + auth (including CAPI token) into a `transport` type in `client_http.go`. Store it on `Client` as `atomic.Value`. After `OpenStream` / `OpenLive` bind, `AdoptTransport(cfg)`: Store new, `closeIdle` old. Do not use `atomic.Pointer[T]`. Do not make remaining write-once Client scalars mutable; ticker flags that already mutate stay as they are.
-- Remaining hash fields (intervals, Redis host/auth/db, `updateMaxFailure`, CAPI scenarios, `decisionScopeHeaders`) still first-wins via `PeekLivePrefix` warn-and-wire.
+- Remaining hash fields (intervals, Redis host/auth/db, `lapiUpdateMaxFailure`, CAPI scenarios, `lapiScopeHeaders`) still first-wins via `PeekLivePrefix` warn-and-wire.
 - `logInfo` gains session key + `reason`. New INFO lines for transport replace (named fields) and for a live joiner whose settings differ (`ignored` vs `adopted`). Do not raise `reclaim_put` / `reclaim_reclaim` / `reclaim_dispose` to INFO.
 - Tests: same Client + no extra `startup=true` fetch after failure-action-only reload (`StreamFetches` / mock LAPI hits); same Client + new transport after TLS-only reload; two bouncers apply distinct failure actions; per-router live TTL; existing `waitStreamSessionInGrace` / `waitPluginStreamInGrace` still pass because `SessionKey` no longer moves on those knobs.
 - Propose FindSpecHost: fold hash / last-wins transport into `core_plugin_middleware_instance-reclaim`; fold owner move into existing `core_plugin_lapi_failure-action`; transport file ownership into `core_plugin_lapi_connection`. Do not invent a new per-router-policy leaf.
@@ -58,7 +58,7 @@ Out of scope stays out: shared `DecisionStore` / cache reclaim, cursor-only key 
   Decision: resolved — unexported `transport` in `pkg/lapi/client_http.go`. Field on `Client` is `atomic.Value`. `AdoptTransport` after `OpenStream` / `OpenLive` bind.
   By: implement
 
-- Q: Where does `StreamStartupBlock` live after it leaves the hash?
+- Q: Where does `LapiStreamStartupBlock` live after it leaves the hash?
   Decision: resolved — write-once at `startStream` only. First incarnation keeps it. Not on `Bouncer`. Not a Client field.
   By: implement
 
@@ -67,7 +67,7 @@ Out of scope stays out: shared `DecisionStore` / cache reclaim, cursor-only key 
   By: implement
 
 - Q: `LiveLookup` TTL parameter shape?
-  Decision: resolved — `LiveLookup(..., defaultDecisionSeconds int64)`; Bouncer passes `config.DefaultDecisionSeconds`. No Client field.
+  Decision: resolved — `LiveLookup(..., bouncerLiveTtlSeconds int64)`; Bouncer passes `config.BouncerLiveTtlSeconds`. No Client field.
   By: implement
 
 - Q: Can the transport field be `atomic.Pointer[T]`?

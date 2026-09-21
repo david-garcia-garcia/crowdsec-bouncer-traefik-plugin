@@ -25,13 +25,13 @@ this process (Traefik New per router)
 
 **SessionHex** is this process’s proxy for that row: FNV-64a of mode + LAPI scheme/host/path + lapiKey (CAPI machine+password in alone). It is already the Redis prefix and the DecisionStore stem. It does not reconstruct outbound IP.
 
-**Today’s stream Open key** (`SessionKey`) is `lapi:stream:` + SessionHex + `:` + hash of `streamSettings` (intervals, Redis, `updateMaxFailure`, CAPI scenarios, `decisionScopeHeaders`). A live joiner with a different hash is `PeekLivePrefix(SessionPrefix)` then warn-and-wire onto the sibling slot. A sleeping leftover with a different hash is a new key; `Peek(bindKey)` only retitles `streamOwner` when `Holders == 0`.
+**Today’s stream Open key** (`SessionKey`) is `lapi:stream:` + SessionHex + `:` + hash of `streamSettings` (intervals, Redis, `lapiUpdateMaxFailure`, CAPI scenarios, `lapiScopeHeaders`). A live joiner with a different hash is `PeekLivePrefix(SessionPrefix)` then warn-and-wire onto the sibling slot. A sleeping leftover with a different hash is a new key; `Peek(bindKey)` only retitles `streamOwner` when `Holders == 0`.
 
-**Today’s live/none Open key** (`Key`) is `lapi:` + `IdentityHex`. That payload keeps intervals, CAPI scenarios, `updateMaxFailure`, and Redis, and already omits `decisionScopeHeaders`.
+**Today’s live/none Open key** (`Key`) is `lapi:` + `IdentityHex`. That payload keeps intervals, CAPI scenarios, `lapiUpdateMaxFailure`, and Redis, and already omits `lapiScopeHeaders`.
 
 **DecisionStore key** is already cursor-shaped plus Redis: `decisionstore:` + SessionHex + `:` + hash(`storeParams`). Two Clients that disagree only on intervals or header maps already share one store.
 
-**Write-once `decisionScopeHeaders`** is set in `lapi.New` and read by `streamQuery` / `storeStreamDecision`. Out of scope: turning that scalar into a mutable field, and `atomic.Pointer[T]`.
+**Write-once `lapiScopeHeaders`** is set in `lapi.New` and read by `streamQuery` / `storeStreamDecision`. Out of scope: turning that scalar into a mutable field, and `atomic.Pointer[T]`.
 
 **Peek / View** exist so a sidecar can read unexported table `items`. Upstream utilities `reclaim` v1.0.3 (`950b08d`) has `New`, `Table`, `Open`, `OpenWithHooks`, `OpenTyped` — no Peek. AfterFunc grace (Yaegi `_select` hang) is already in both copies. Sisters (geoblock, modsecurity) import utilities, hold a table, pass Traefik `New` ctx, and do not use `sync.Once` or Peek.
 
@@ -39,13 +39,13 @@ this process (Traefik New per router)
 
 ## Decisions
 
-- Stream Open key becomes cursor + Redis, same payload family as `StoreKey`: SessionHex plus `storeParamsFrom` (enabled/host/read hosts/password/database). Drop intervals, `updateMaxFailure`, CAPI scenarios, and `decisionScopeHeaders` from the Client hash. Align with the store; do not drop Redis (that would share one Client across Redis hosts).
-- Live/none Open key drops the same remaining fields as stream (intervals, CAPI scenarios, `updateMaxFailure`). Keep Redis. Keep `lapi:` prefix. `IdentityHex` stays exported if callers/specs still name it; it is no longer the live Open suffix.
+- Stream Open key becomes cursor + Redis, same payload family as `StoreKey`: SessionHex plus `storeParamsFrom` (enabled/host/read hosts/password/database). Drop intervals, `lapiUpdateMaxFailure`, CAPI scenarios, and `lapiScopeHeaders` from the Client hash. Align with the store; do not drop Redis (that would share one Client across Redis hosts).
+- Live/none Open key drops the same remaining fields as stream (intervals, CAPI scenarios, `lapiUpdateMaxFailure`). Keep Redis. Keep `lapi:` prefix. `IdentityHex` stays exported if callers/specs still name it; it is no longer the live Open suffix.
 - Keep distinct table prefixes: `lapi:stream:`, `lapi:`, `decisionstore:`, `appsec:`. Do not reuse `StoreKey` as the Client key string (one process table, several value types).
 - Delete `Peek`, `PeekLivePrefix`, and `View` (production, shim, `zzz_peek_test.go`). After one cursor+Redis key, `Open` of that key Wakes the sleeper. Keeping `PeekLivePrefix(SessionPrefix)` would warn-and-wire a different-Redis joiner onto the first live slot and break store isolation. Sleeper `streamOwner` retitle has no remaining warn-and-wire job; no replacement API.
-- Interval / CAPI / `updateMaxFailure` mismatch on a live sibling is silent first-wins (create already wrote those scalars). Out of scope to union them. Do not keep Peek only to log `ignored`.
-- `scopes=` and the store header-scope filter read a Client-owned live-router union, not the write-once `decisionScopeHeaders` map. New registry on the Client; register after a successful `OpenStream` bind with this `New` ctx and this router’s normalized headers; drop on ctx Done. Traefik `New` ctx is the holder. Do not use `sync.Once` or a package global.
-- Leave `decisionScopeHeaders` write-once at `New`. Do not convert it. CAPI still omits `scopes=`. Live/none still pass scopes per `LiveLookup` from the Bouncer map. AppSec reclaim key is unchanged.
+- Interval / CAPI / `lapiUpdateMaxFailure` mismatch on a live sibling is silent first-wins (create already wrote those scalars). Out of scope to union them. Do not keep Peek only to log `ignored`.
+- `scopes=` and the store header-scope filter read a Client-owned live-router union, not the write-once `lapiScopeHeaders` map. New registry on the Client; register after a successful `OpenStream` bind with this `New` ctx and this router’s normalized headers; drop on ctx Done. Traefik `New` ctx is the holder. Do not use `sync.Once` or a package global.
+- Leave `lapiScopeHeaders` write-once at `New`. Do not convert it. CAPI still omits `scopes=`. Live/none still pass scopes per `LiveLookup` from the Bouncer map. AppSec reclaim key is unchanged.
 - Import utilities `reclaim` v1.0.3 and delete the local `table.go` fork. Keep the local shim only: `Default`, `ProcessGrace` 30s, `Open` / `OpenWithHooks`, `ResetForTest` / `ResetForTestWith`. Do not take `OpenTyped` (it does not remove hooks-as-funcs). AppSec stays on `OpenWithHooks` + type assert.
 - Upgrade: `SessionHex` and store Redis params do not change. Existing Redis keys stay reachable. Changing the Client Open string only renames an in-process table key. Document that; do not migrate Redis. `#66` already prefixes Redis with `SessionHex`; there is no `CachePrefix`.
 - Specs to rewrite in propose: `core_plugin_lapi_reclaim-key` (first-wins hash, `PeekLivePrefix`, warn-and-wire, sleeping snapshot-change opens a new key), `core_cache_client_decision-store` (first-wins `scopes=` / warn-and-wire stay on the Client key), plus stream-lease / middleware-bouncer only where they still require Peek or a settings-hash sibling. Debt file closes on implement, not prepare.
@@ -62,12 +62,12 @@ this process (Traefik New per router)
   Decision: resolved — not required. `Open` of that same key Wakes the sleeper. Delete Peek. No replacement inspect API. Tests that asserted via Peek use pointer equality on the `Open` return or `ResetForTest`.
   By: explore
 
-- Q: How to hold a live-router `scopes=` union without mutating write-once `decisionScopeHeaders`?
+- Q: How to hold a live-router `scopes=` union without mutating write-once `lapiScopeHeaders`?
   Decision: assumed — new Client-owned registry (scope names from each live `New`’s normalized headers), keyed by that constructor ctx; register after bind; unregister on ctx Done; `streamQuery` and `storeStreamDecision` snapshot the union under the existing Client mutex. Leave the write-once map as first-create residue. Not `atomic.Pointer[T]`. Not a package global.
   By: propose
 
 - Q: Does live/none `Key` drop the same remaining fields as stream (ticket names `identity.go`; store already uses SessionHex + Redis)?
-  Decision: resolved — live/none `Key` keeps `MetricsUpdateIntervalSeconds` on the identity payload so none routers that disagree get sibling Clients and their own write-once ticker. Still drop CAPI scenarios, `updateMaxFailure`, `UpdateIntervalSeconds`, and the other remaining fields already dropped. Stream Open key stays cursor+Redis (no intervals). DecisionStore key stays without intervals. Sharing one none Client cannot both honor write-once `metricsInterval` and publish `/appsec` `metrics=1` within 20s.
+  Decision: resolved — live/none `Key` keeps `LapiMetricsIntervalSeconds` on the identity payload so none routers that disagree get sibling Clients and their own write-once ticker. Still drop CAPI scenarios, `lapiUpdateMaxFailure`, `LapiUpdateIntervalSeconds`, and the other remaining fields already dropped. Stream Open key stays cursor+Redis (no intervals). DecisionStore key stays without intervals. Sharing one none Client cannot both honor write-once `metricsInterval` and publish `/appsec` `metrics=1` within 20s.
   By: implement
 
 - Q: Exact Client key string versus `StoreKey` (`lapi:stream:` vs `decisionstore:` prefix)?

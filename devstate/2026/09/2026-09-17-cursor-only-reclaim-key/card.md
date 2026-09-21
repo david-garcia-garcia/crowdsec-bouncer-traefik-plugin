@@ -4,20 +4,20 @@ IssueKey: 2026-09-17-cursor-only-reclaim-key
 JobName: 2026-09-17-cursor-only-reclaim-key
 
 ## What this changes
-**Operators.** Redis keys stay on `SessionHex`; no cache migration. Two stream routers that share one LAPI URL+key and Redis now share one poller even when intervals or header maps differ. None/live routers that disagree on `metricsUpdateIntervalSeconds` still get sibling Clients (write-once ticker), same as DestBranch `IdentityHex`.
+**Operators.** Redis keys stay on `SessionHex`; no cache migration. Two stream routers that share one LAPI URL+key and Redis now share one poller even when intervals or header maps differ. None/live routers that disagree on `lapiMetricsIntervalSeconds` still get sibling Clients (write-once ticker), same as DestBranch `IdentityHex`.
 
 **Admin users.** None.
 
-**Developers.** Stream Open key is cursor plus Redis (`lapi:stream:` + SessionHex + store-params hash). Live/none `Key` is `lapi:` + SessionHex + identity hash that keeps `MetricsUpdateIntervalSeconds` and still drops CAPI scenarios / `updateMaxFailure` / `UpdateIntervalSeconds`. Live routers union `scopes=` on the Client. `Peek` / `PeekLivePrefix` / `View` are gone. `pkg/reclaim` is a utilities v1.0.3 shim (`OpenTyped` not taken). Debt file deleted. Catalog specs synced; change folder is `openspec/changes/archive/2026-09-17-cursor-only-reclaim-key/`.
+**Developers.** Stream Open key is cursor plus Redis (`lapi:stream:` + SessionHex + store-params hash). Live/none `Key` is `lapi:` + SessionHex + identity hash that keeps `LapiMetricsIntervalSeconds` and still drops CAPI scenarios / `lapiUpdateMaxFailure` / `LapiUpdateIntervalSeconds`. Live routers union `scopes=` on the Client. `Peek` / `PeekLivePrefix` / `View` are gone. `pkg/reclaim` is a utilities v1.0.3 shim (`OpenTyped` not taken). Debt file deleted. Catalog specs synced; change folder is `openspec/changes/archive/2026-09-17-cursor-only-reclaim-key/`.
 
 **End users.** A joiner router’s header scopes now enter the shared stream poll instead of being first-wins ignored.
 
 ## Motivation
-The last debt of this series was the stream Open key still hashing intervals, CAPI scenarios, `updateMaxFailure`, and `decisionScopeHeaders`. On `master`, two live stream routers that share one CrowdSec cursor row but disagree on those knobs warn-and-wire onto the first slot, so `scopes=` and the store filter stay first-wins. Peek existed only for that sibling path, which is why `pkg/reclaim` was still a local table fork.
+The last debt of this series was the stream Open key still hashing intervals, CAPI scenarios, `lapiUpdateMaxFailure`, and `lapiScopeHeaders`. On `master`, two live stream routers that share one CrowdSec cursor row but disagree on those knobs warn-and-wire onto the first slot, so `scopes=` and the store filter stay first-wins. Peek existed only for that sibling path, which is why `pkg/reclaim` was still a local table fork.
 
 Not merging leaves a Country joiner missing streamed Country bans, keeps Peek, and leaves the last series debt file open.
 
-Live/none on DestBranch already hashed `MetricsUpdateIntervalSeconds` into `IdentityHex`. Sharing one none Client cannot both honor write-once `metricsInterval` and publish `/appsec` `metrics=1` within 20s, so this PR keeps that field on the live/none identity payload and does not put intervals back on stream or `StoreKey`.
+Live/none on DestBranch already hashed `LapiMetricsIntervalSeconds` into `IdentityHex`. Sharing one none Client cannot both honor write-once `metricsInterval` and publish `/appsec` `metrics=1` within 20s, so this PR keeps that field on the live/none identity payload and does not put intervals back on stream or `StoreKey`.
 
 ```mermaid
 sequenceDiagram
@@ -71,7 +71,7 @@ Ticket 2026-09-17-cursor-only-reclaim-key is branch `2026-09-17-cursor-only-recl
 ## Decision needed
 | Question | Decision | By |
 | --- | --- | --- |
-| How to hold a live-router `scopes=` union without mutating write-once `decisionScopeHeaders`? | assumed — new Client-owned registry keyed by constructor ctx; register after bind; unregister on ctx Done; snapshot under Client mutex | propose |
+| How to hold a live-router `scopes=` union without mutating write-once `lapiScopeHeaders`? | assumed — new Client-owned registry keyed by constructor ctx; register after bind; unregister on ctx Done; snapshot under Client mutex | propose |
 | Exact Client key string versus `StoreKey`? | assumed — keep `lapi:stream:<SessionHex>:<storeParamsHash>` and `lapi:<SessionHex>:<hash>` | propose |
 | When the live-router union grows after the CrowdSec cursor has advanced, do we send `startup=true`? | assumed — no. Document the miss window | propose |
 | When the union shrinks, do we sweep stale header-scope cache keys? | assumed — no. Bound the ask | propose |
@@ -81,7 +81,7 @@ None.
 
 ## Findings
 - [[P3] nestif flatten after Sync](pkg/configuration/configuration.go) — FIX — Master merge brought a complexity-6 nestif Main Process rejected; extracted `validateEnabledCaptchaSettings`. Path: `pkg/configuration/configuration.go`. Reply none.
-- [[P2] e2e pester AppSec CRS](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35264215571/job/105347192915) — FIX — First apply dropped `MetricsUpdateIntervalSeconds` from live/none `Key`; none `/appsec` `metrics=1` shared the default 600s ticker. Identity payload keeps the interval; stream and `StoreKey` still omit it. Path: `pkg/lapi/identity.go`. Reply none.
+- [[P2] e2e pester AppSec CRS](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35264215571/job/105347192915) — FIX — First apply dropped `LapiMetricsIntervalSeconds` from live/none `Key`; none `/appsec` `metrics=1` shared the default 600s ticker. Identity payload keeps the interval; stream and `StoreKey` still omit it. Path: `pkg/lapi/identity.go`. Reply none.
 
 ## Axis review
 [Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-cursor-only-reclaim-key/devstate/2026/09/2026-09-17-cursor-only-reclaim-key/codereview_standards.md) — 4 total, 0 pending, 4 completed
@@ -104,7 +104,7 @@ None.
 None.
 
 ### Technical review
-Best possible solution: DestBranch hashed remaining settings and Peeked siblings; this change keys stream by the CrowdSec row plus Redis, unions live scopes on the shared Client, and keeps `MetricsUpdateIntervalSeconds` on the live/none identity so write-once tickers stay per Client.
+Best possible solution: DestBranch hashed remaining settings and Peeked siblings; this change keys stream by the CrowdSec row plus Redis, unions live scopes on the shared Client, and keeps `LapiMetricsIntervalSeconds` on the live/none identity so write-once tickers stay per Client.
 
 Do we have a high-confidence way to reproduce? Yes, `go test ./pkg/lapi/` covers stream interval share, none Key split with same `StoreKey`, Redis isolate, header-map share, sleeper Wake, and Country+username union.
 
@@ -116,7 +116,7 @@ What I checked:
 - Archive validators exit 0 (`validate-spec-map --write`, verify, `validate-artifact-names`)
 - Live change folder gone; archive at `openspec/changes/archive/2026-09-17-cursor-only-reclaim-key/`
 - CI on 565d946 in progress (builds 35267579819 / 35267579736)
-- Live/none `Key` hashes `identity` including `MetricsUpdateIntervalSeconds`; `SessionKey` and `StoreKey` omit it (`pkg/lapi/identity.go`, `pkg/lapi/session.go`, `pkg/lapi/decisionstore.go`)
+- Live/none `Key` hashes `identity` including `LapiMetricsIntervalSeconds`; `SessionKey` and `StoreKey` omit it (`pkg/lapi/identity.go`, `pkg/lapi/session.go`, `pkg/lapi/decisionstore.go`)
 - Grep: no `Peek` / `PeekLivePrefix` / `View` in live Go; utilities `reclaim` imported only from the shim
 - `OpenTyped` not taken (`reclaim/opentyped.go` still takes hooks-as-funcs)
 - Debt file deleted; issues.md row Taken

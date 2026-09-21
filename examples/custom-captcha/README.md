@@ -28,19 +28,19 @@ clients never get that passthrough.
     ...
     labels:
       # Choose captcha provider
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaProvider=custom"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaProvider=custom"
       # Define captcha grace period seconds
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=1800"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomJsURL=http://captcha.localhost:8000/fast.js"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaGracePeriodSeconds=1800"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaCustomJsUrl=http://captcha.localhost:8000/fast.js"
       # The widget fetches this from the browser, so it is rendered in captcha.html and passed through to the origin
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomChallengeURL=http://captcha.localhost:8000/v0/challenge"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaCustomChallengeUrl=http://captcha.localhost:8000/v0/challenge"
       # Inside Traefik container the plugin must be able to reach wicketkeeper service so we can go through a Traefik localhost
       # domain which would resolve traefik itself and the port for the dashboard
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomValidateURL=http://wicketkeeper:8080/v0/siteverify"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomKey=wicketkeeper"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomResponse=wicketkeeper_solution"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.BouncerCaptchaCustomValidateURL=http://wicketkeeper:8080/v0/siteverify"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.BouncerCaptchaCustomKey=wicketkeeper"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.BouncerCaptchaCustomResponse=wicketkeeper_solution"
       # Define captcha HTML file path
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaFilePath=/captcha.html"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaFile=/captcha.html"
 ```
 
 ```yaml

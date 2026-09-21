@@ -1,6 +1,6 @@
 # Test coverage
 
-1. [hard] Critical path untested — `pkg/lapi/decisionstore.go:40` — `OpenDecisionStore` passes `countActiveFromMode(cfg.CrowdsecMode)` into `Open`; tests that prove the gauge call `NewMemory`/`NewRedis`/`AttachTestInternStore` with a hardcoded bool. Existing `OpenDecisionStore`+`putBan` tests (`pkg/lapi/zzz_decisionstore_test.go`) assert lookup/prefix only. Reverting `countActiveFromMode` to always false leaves `TestActiveCountsStreamPutDelete` and `TestReportMetricsOfficialLabels` green.
+1. [hard] Critical path untested — `pkg/lapi/decisionstore.go:40` — `OpenDecisionStore` passes `countActiveFromMode(cfg.LapiMode)` into `Open`; tests that prove the gauge call `NewMemory`/`NewRedis`/`AttachTestInternStore` with a hardcoded bool. Existing `OpenDecisionStore`+`putBan` tests (`pkg/lapi/zzz_decisionstore_test.go`) assert lookup/prefix only. Reverting `countActiveFromMode` to always false leaves `TestActiveCountsStreamPutDelete` and `TestReportMetricsOfficialLabels` green.
    → Assert `OpenDecisionStore` with stream Put increments `ActiveCounts`, and live Put leaves the snapshot empty
    Status: done
    Argument: TestOpenDecisionStore_CountActiveFromMode asserts stream Put increments and live Put does not.

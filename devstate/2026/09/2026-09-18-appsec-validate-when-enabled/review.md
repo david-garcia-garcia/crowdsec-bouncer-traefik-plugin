@@ -19,7 +19,7 @@ skipped: no Task subagent used; no research write; no usage write (enabled gate 
 ## implement (2026-09-18)
 phase: implement
 findings: none
-fixed: gated validateAppsecURLKeyAndTLS on CrowdsecAppsecEnabled in every mode; dropped validateLapiAndAppsecConnection; flipped leftover-CA dest test; added alone/live on-fail and off-leftover cases
+fixed: gated validateAppsecURLKeyAndTLS on AppsecEnabled in every mode; dropped validateLapiAndAppsecConnection; flipped leftover-CA dest test; added alone/live on-fail and off-leftover cases
 skipped: no Task subagent used; no new spec folder; usage packet deferred to devdocs-impact; no comments.md FIX rows
 
 ## codereview (2026-09-18)

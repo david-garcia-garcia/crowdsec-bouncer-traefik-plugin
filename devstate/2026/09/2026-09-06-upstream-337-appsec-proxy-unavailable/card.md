@@ -50,7 +50,7 @@ Local spec from upstream #337 assessment on `2026-09-06-upstream-337-appsec-prox
 None.
 
 ## Before merge
-- [ ] Add tests proving HTTP 502/503/504 AppSec responses honor `crowdsecAppsecFailureAction: passthrough`
+- [ ] Add tests proving HTTP 502/503/504 AppSec responses honor `bouncerAppsecFailureAction: passthrough`
 - [x] Stub PR #46 open from `2026-09-06-upstream-337-appsec-proxy-unavailable`
 - [x] Prepare wrote requirement and qualified ticket
 

@@ -18,7 +18,7 @@ IssueKey: 2026-09-18-ip-cache-key-canonicalization
   rewrites. `readRangeIndex` returning `""` for an unreachable read means a poll rebuilds the shared
   document from nothing.
 - **Reads and writes do not use the same Redis connection.** `cache.redisCache.get` uses
-  `nextReader()` (round-robin over `redisCacheReadHosts`), while `acquire` and `set` use `writer`.
+  `nextReader()` (round-robin over `lapiRedisReadHosts`), while `acquire` and `set` use `writer`.
   That is what makes the range-index defect reachable with a healthy writer.
 
 ## Decisions
@@ -41,8 +41,8 @@ IssueKey: 2026-09-18-ip-cache-key-canonicalization
   Decision: resolved — fail the poll. Skipping quietly preserves the index but loses this tick's
   Range delta for good, because later polls run with `startup=false` and never carry it again.
   Failing the poll releases the lease for an immediate retry and leaves `isCrowdsecStreamStartup`
-  set, so the retry asks for the full set. Cost: with the default `updateMaxFailure: 0` a read-replica
-  blip now marks the stream unhealthy and cache misses take `crowdsecLapiFailureAction`. That is the
+  set, so the retry asks for the full set. Cost: with the default `lapiUpdateMaxFailure: 0` a read-replica
+  blip now marks the stream unhealthy and cache misses take `bouncerLapiFailureAction`. That is the
   same posture the surrounding code already takes for a failed stream fetch. Called out on the card.
   By: explore
 

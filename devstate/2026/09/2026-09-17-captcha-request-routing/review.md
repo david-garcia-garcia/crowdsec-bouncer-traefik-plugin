@@ -6,7 +6,7 @@ skipped: Task research subagent (in-tree captcha routing; no third-party investi
 
 ## explore (2026-09-17)
 phase: explore
-findings: 10 open questions (6 assumed, 4 resolved, 0 blocked); Check-true form POST, custom-resource exact-path passthrough, HEAD-on-captcha-path; optional captchaCustomChallengeUrl; no apply
+findings: 10 open questions (6 assumed, 4 resolved, 0 blocked); Check-true form POST, custom-resource exact-path passthrough, HEAD-on-captcha-path; optional bouncerCaptchaCustomChallengeUrl; no apply
 fixed: explore.md; handoff explore pointer
 skipped: research write; template ChallengeURL; pkg/lapi and pkg/reclaim
 
@@ -19,7 +19,7 @@ skipped: product apply; comments.md (none); research write
 ## implement (2026-09-17)
 phase: implement
 findings: applied captcha-kind routing; localTests passed; CI Main Process + e2e binary + e2e docker succeeded; no comments.md
-fixed: handleRemediationServeHTTP routing; captcha owners; optional captchaCustomChallengeUrl; nestif extract; PR #68 summary cites #48 and #50
+fixed: handleRemediationServeHTTP routing; captcha owners; optional bouncerCaptchaCustomChallengeUrl; nestif extract; PR #68 summary cites #48 and #50
 skipped: code review; archive; pkg/lapi; pkg/reclaim; README / example ChallengeURL wiring
 
 ## codereview (2026-09-17)

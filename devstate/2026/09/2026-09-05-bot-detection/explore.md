@@ -34,9 +34,9 @@ Empty or non-JSON non-200 from AppSec. Today's `AppsecQuery` error → `handleBa
 
 - Parse JSON on `CrowdsecConnection.AppsecQuery` (it already owns the AppSec HTTP round-trip). Return `(*AppsecResponse, error)`. Keep the name `Appsec*` to match `AppsecPolicy`.
 - Write to the client on `Bouncer` (it already owns `ResponseWriter`, `banTemplate`, remediation header). Do not let `crowdsecconnection` write HTTP.
-- No new plugin config key. Enable with existing `crowdsecAppsecEnabled`.
+- No new plugin config key. Enable with existing `appsecEnabled`.
 - `action` empty or `allow` → `next`. `action` `ban` → existing `handleBanServeHTTP` (keep operator `banTemplate`). Any other non-allow action → relay AppSec status/headers/cookies/body.
-- Clamp `http_status` to 100–999; else `remediationStatusCode`. If AppSec omits `Content-Type`, use `banTemplateContentType`.
+- Clamp `http_status` to 100–999; else `bouncerRemediationStatusCode`. If AppSec omits `Content-Type`, use `banTemplateContentType`.
 - Cap AppSec response body at 1 MiB (PR 343). Keep draining so idle connections reuse (`appsec_test.go`).
 - Unit tests in `pkg/crowdsecconnection` (parse, oversized OK vs 403) and `pkg/bouncer` (relay challenge, legacy 403, structured ban keeps template).
 - Mock e2e: extend `mocklapi` AppSec to return structured JSON for a dedicated URI (and keep empty 403 for existing probes).

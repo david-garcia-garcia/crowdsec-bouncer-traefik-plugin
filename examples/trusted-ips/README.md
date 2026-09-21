@@ -13,7 +13,7 @@ The "internal" Traefik instance is configured to trust the forward headers
 
 We configure the middleware to trust as well as the IP of the intermediate proxy if needed:
 ```yaml
-    - "traefik.http.middlewares.crowdsec.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
+    - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerForwardedTrustedIps=172.21.0.5"
 ```
 
 Add your IP to the ban list

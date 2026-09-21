@@ -4,7 +4,7 @@
 
 `ValidateParams` has holes that let a broken plugin start:
 
-1. AppSec URL validation uses `CrowdsecLapiScheme`; AppSec HTTPS/TLS is never checked.
+1. AppSec URL validation uses `LapiScheme`; AppSec HTTPS/TLS is never checked.
 2. `alone` mode returns before captcha keys, templates, and log checks.
 3. Missing tests for custom captcha provider, AppSec captcha gate, `appsec`/`none`/`alone` modes, `GetTemplate`, `validateURL`, numeric bounds.
 
@@ -41,16 +41,16 @@ AppSec URL and TLS checks in ValidateParams use LAPI settings or are omitted.
 Operators can configure AppSec on a different scheme or TLS trust material than LAPI, but `ValidateParams` either validates AppSec with the LAPI scheme or skips AppSec TLS entirely.
 
 Evidence:
-- pkg/configuration/configuration.go:339 — `validateURL("CrowdsecAppsec", config.CrowdsecLapiScheme, ...)` passes LAPI scheme, not AppSec scheme.
-- pkg/configuration/configuration.go:378-383 — `validateParamsTLS` runs only when `CrowdsecLapiScheme == HTTPS`.
+- pkg/configuration/configuration.go:339 — `validateURL("CrowdsecAppsec", config.LapiScheme, ...)` passes LAPI scheme, not AppSec scheme.
+- pkg/configuration/configuration.go:378-383 — `validateParamsTLS` runs only when `LapiScheme == HTTPS`.
 - pkg/configuration/configuration.go:438-452 — `validateParamsTLS` reads only LAPI CA fields.
 - pkg/appsec/client.go:38-40 — runtime fills empty AppSec scheme from LAPI scheme after validation.
 
-Desired: Validate AppSec using effective scheme (`CrowdsecAppsecScheme` when set, otherwise `CrowdsecLapiScheme`) and parse AppSec CA/client cert material when HTTPS and insecure verify is false.
+Desired: Validate AppSec using effective scheme (`AppsecScheme` when set, otherwise `LapiScheme`) and parse AppSec CA/client cert material when HTTPS and insecure verify is false.
 
 ## alone-mode-short-circuits-validation
 
-In `crowdsecMode: alone`, `ValidateParams` validates CAPI credentials then returns immediately. Captcha secrets, ban/captcha template files, log level, and log file writability are never checked.
+In `lapiMode: alone`, `ValidateParams` validates CAPI credentials then returns immediately. Captcha secrets, ban/captcha template files, log level, and log file writability are never checked.
 
 Evidence:
 - pkg/configuration/configuration.go:306-313 — alone branch returns before captcha/template/log checks.
@@ -64,6 +64,6 @@ Out of scope: Skipping LAPI URL/LAPI key/TLS validation in alone mode after CAPI
 
 Several validation branches have no direct unit tests.
 
-Desired tests: `validateCaptcha` custom provider missing fields; AppSec failure action `captcha` without provider; `ValidateParams` success for `appsec` mode without LAPI key; `GetTemplate` error paths; `validateURL` with bad host/path; `RemediationStatusCode` 99/600; `UpdateMaxFailure: -1` acceptance.
+Desired tests: `validateCaptcha` custom provider missing fields; AppSec failure action `captcha` without provider; `ValidateParams` success for `appsec` mode without LAPI key; `GetTemplate` error paths; `validateURL` with bad host/path; `BouncerRemediationStatusCode` 99/600; `LapiUpdateMaxFailure: -1` acceptance.
 
 Out of scope: `LogFormat` fallback; header custom name RFC validation.

@@ -24,7 +24,7 @@ _Avoid_: three copy-pasted switches, mapping in `pkg/bouncer`, changing `decisio
 _Avoid_: remap after picking Type==ban (a CAPI ban would hide a later local `crowdsec` ban)
 
 **First-create residue**:
-`BanToCaptchaOrigins` is copied onto `lapi.Client` at `New`. It MUST NOT join `SessionKey` / live `Key` (that would split the stream poller). A second router on the same cursor keeps the first Client's list, same class as `updateMaxFailure` / CAPI scenarios (`core_plugin_lapi_reclaim-key`).
+`BanToCaptchaOrigins` is copied onto `lapi.Client` at `New`. It MUST NOT join `SessionKey` / live `Key` (that would split the stream poller). A second router on the same cursor keeps the first Client's list, same class as `lapiUpdateMaxFailure` / CAPI scenarios (`core_plugin_lapi_reclaim-key`).
 _Avoid_: per-router ServeHTTP remap to dodge sharing, hashing the list into the Open key
 
 Upstream: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/369 — `CaptchaBanOrigins` on Config, `remediationForDecision` on Bouncer, exact `decision.Origin` match, live + stream, empty default, unknown type stays empty. This fork names the field `BanToCaptchaOrigins` and cannot copy `bouncer.go` paths; apply lives in `pkg/lapi`. Per-list matching is the intentional delta.
@@ -48,7 +48,7 @@ LAPI decision (type, origin, scenario)
 - Helper on `lapi.Client`, not Bouncer. Config field on `configuration.Config` + `Client` field set in `New`.
 - Match after `MetricsOrigin`. Do not match raw `decision.Origin`.
 - Live/none remap the same helper; change `strongestLiveDecision` to remapped kind.
-- No ValidateParams enum of origin names. Trim entries; drop blanks. Do not require `captchaProvider` (existing captcha→ban fallback).
+- No ValidateParams enum of origin names. Trim entries; drop blanks. Do not require `bouncerCaptchaProvider` (existing captcha→ban fallback).
 - Do not put the list on the reclaim key.
 - AppSec / failure-action captcha / ticker-stop remain out of scope.
 - Mock e2e: add origin on mock LAPI (default `crowdsec`) and a `captcha-ban-origins` scenario including `lists:<name>` — this fork already has `tests/e2e/mock/`.

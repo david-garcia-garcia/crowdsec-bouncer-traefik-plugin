@@ -9,7 +9,7 @@ On dest `fad36a12`, inserting an IPv4-mapped CIDR such as `::ffff:0:0/96` panics
 - `contains` uses the same `To4()` / bit-96 split and a 32-bit max walk for anything `To4()` accepts (`pkg/iplookup/iplookup.go`).
 - `AddCIDR` / `NewHelper` only return on `net.ParseCIDR` failure; they call `insert` with no recover (`pkg/iplookup/iplookup.go`).
 - `ip.NewChecker` trims each entry, converts a bare IP via `hostCIDR`, otherwise `AddCIDR` as written (`pkg/ip/checker.go`).
-- `validateParamsIPs` builds that Checker for `ForwardedHeadersTrustedIPs` and `ClientTrustedIPs`. A parseable IPv4-mapped CIDR therefore panics at `ValidateParams` (`pkg/configuration/configuration.go`).
+- `validateParamsIPs` builds that Checker for `BouncerForwardedTrustedIPs` and `BouncerClientTrustedIPs`. A parseable IPv4-mapped CIDR therefore panics at `ValidateParams` (`pkg/configuration/configuration.go`).
 - `MembershipFromIndex` skips `AddCIDR` errors and invalid lines; a parseable IPv4-mapped range still reaches `insert` and panics (`pkg/decisionscope/rangemembership.go`).
 - Existing helper tests cover v4, v6, mixed, `/0` family split, invalid prefix, overlap; none insert `::ffff:0:0/96` (`pkg/iplookup/zzz_iplookup_test.go`).
 - Spec already requires trusted-pool membership to follow `net.IPNet.Contains` family rules for `0.0.0.0/0` vs `::/0` (`openspec/specs/core_plugin_ip_radix-lookup/spec.md`).
@@ -33,7 +33,7 @@ On dest `fad36a12`, inserting an IPv4-mapped CIDR such as `::ffff:0:0/96` panics
 
 ## Out of scope
 - Upstream traefik-geoblock
-- `GetRemoteIP`, forwarded-header policy, `ForwardedHeadersInsecure`
+- `GetRemoteIP`, forwarded-header policy, `BouncerForwardedInsecure`
 - `ip.InNetwork` / `pkg/ip/network.go` unless it shares this insert panic
 - Range-index blob format, ban-vs-captcha precedence, live/none LAPI `?ip=`
 - Radix performance, delete API, remediation payload on Helper

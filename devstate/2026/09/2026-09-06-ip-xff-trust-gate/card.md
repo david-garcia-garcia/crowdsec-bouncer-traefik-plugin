@@ -4,7 +4,7 @@ IssueKey: 2026-09-06-ip-xff-trust-gate
 JobName: 2026-09-06-ip-xff-trust-gate
 
 ## What this changes
-**Operators.** When using forwarded headers for client IP, list proxy addresses in `forwardedHeadersTrustedIps`; otherwise the plugin uses the socket peer only.
+**Operators.** When using forwarded headers for client IP, list proxy addresses in `bouncerForwardedTrustedIps`; otherwise the plugin uses the socket peer only.
 
 **Admin users.** None.
 

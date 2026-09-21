@@ -5,7 +5,7 @@ Problem: MetricsReporter keeps activeDecisionSlots (one entry per Ip/header/Rang
 Desired:
 1. DecisionStore owns the active-record group-by: compact {originID uint16, family} → int64, updated inside PutMany/DeleteMany (memory: under the same mu as putSlot/deleteTickLocked; Redis: MGET previous origin then adjust in-process counts). PublishTick memory expiry SHOULD decrement when a slot is swept (free correctness vs today).
 2. MetricsReporter MUST NOT keep activeDecisionSlots or activeDecisionsByOriginIPType. reportMetrics snapshots store counts and emits origin names via OriginName at POST. Dropped window + processed atomics stay on the reporter.
-3. Count only stream/alone Ip and header-scope mutations. Live/none Put memo MUST NOT increment. OpenDecisionStore/New sets a countActive (or equivalent) from crowdsecMode; reporter still omits active_decisions unless stream/alone.
+3. Count only stream/alone Ip and header-scope mutations. Live/none Put memo MUST NOT increment. OpenDecisionStore/New sets a countActive (or equivalent) from lapiMode; reporter still omits active_decisions unless stream/alone.
 4. Do not store usageMetricKey / LAPI item JSON shape in decisionstore.
 5. Do not add a Go interface for the engine (Yaegi: funcs on engine struct only). Store method(s) to read counts for POST are fine.
 6. Remove rememberActiveDecision/forgetActiveDecision from stream apply for Ip/header (store mutations carry the gauge). Range: do not forget/peek membership; Range is out of the gauge until debt is taken (omit Range from counts — not +1 on New with no Deleted).

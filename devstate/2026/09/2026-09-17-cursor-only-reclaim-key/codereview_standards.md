@@ -15,7 +15,7 @@
    Argument: renamed to redisACfg / redisAClient and redisBCfg / redisBClient
    ```
    aCfg := testStreamConfig(parsed.Host, 1)
-   aCfg.RedisCacheHost = "redis-a:6379"
+   aCfg.LapiRedisHost = "redis-a:6379"
    ...
    a, err := OpenStream(ctx, aCfg, log, "a", "test")
    ```
@@ -24,8 +24,8 @@
    Status: done
    Argument: renamed to countryCfg / countryClient and userCfg / userClient
    ```
-   aCfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
-   bCfg.DecisionScopeHeaders = map[string]string{"username": "X-User"}
+   aCfg.LapiScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+   bCfg.LapiScopeHeaders = map[string]string{"username": "X-User"}
    a, err := OpenStream(ctx, aCfg, log, "a", "test")
    ```
 4. [hard] Leave a trail — `pkg/lapi/zzz_session_test.go:429` — helper now waits on `Client.sleeping` but the failure string still says the session did not enter grace

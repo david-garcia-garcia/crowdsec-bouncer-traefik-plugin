@@ -1,30 +1,30 @@
 Developer review: in progress — 2026-09-18T17:49:29Z
 
 ## What this changes
-**Operators.** Set `banFilePath` and `captchaFilePath` only. YAML or labels that still set `banHtmlFilePath` / `captchaHtmlFilePath` (or the HTML-cased twins) are ignored by Traefik and are not copied onto the current fields; those deploys get CreateConfig defaults (`banFilePath` empty, `captchaFilePath` `/captcha.html`).
+**Operators.** Set `bouncerBanFile` and `bouncerCaptchaFile` only. YAML or labels that still set `banHtmlFilePath` / `captchaHtmlFilePath` (or the HTML-cased twins) are ignored by Traefik and are not copied onto the current fields; those deploys get CreateConfig defaults (`bouncerBanFile` empty, `bouncerCaptchaFile` `/captcha.html`).
 
 **Admin users.** None.
 
-**Developers.** `Config` no longer has `BanHTMLFilePath` or `CaptchaHTMLFilePath`. `plugin.New` snapshots Traefik’s decode and does not read the old keys. Live e2e, examples, README, and `build_e2e_pester_crowdsec-stack` name `banFilePath` / `captchaFilePath`.
+**Developers.** `Config` no longer has `BanHTMLFilePath` or `CaptchaHTMLFilePath`. `plugin.New` snapshots Traefik’s decode and does not read the old keys. Live e2e, examples, README, and `build_e2e_pester_crowdsec-stack` name `bouncerBanFile` / `bouncerCaptchaFile`.
 
 **End users.** None.
 
 ## Motivation
-Operators still have two names for the ban and captcha template paths on `master`. The current keys are `banFilePath` and `captchaFilePath`. The old `banHtmlFilePath` and `captchaHtmlFilePath` keys remain on Config as Deprecated fields, and `plugin.New` copies them onto the current fields.
+Operators still have two names for the ban and captcha template paths on `master`. The current keys are `bouncerBanFile` and `bouncerCaptchaFile`. The old `banHtmlFilePath` and `captchaHtmlFilePath` keys remain on Config as Deprecated fields, and `plugin.New` copies them onto the current fields.
 
-On `master`, ban copies the old key only when `banFilePath` is empty. Captcha copies whenever `captchaHtmlFilePath` is non-empty and overwrites `captchaFilePath`. Real e2e labels, including the custom-ban route’s `banhtmlfilepath`, and the mock captcha scenario still set the old keys.
+On `master`, ban copies the old key only when `bouncerBanFile` is empty. Captcha copies whenever `captchaHtmlFilePath` is non-empty and overwrites `bouncerCaptchaFile`. Real e2e labels, including the custom-ban route’s `banhtmlfilepath`, and the mock captcha scenario still set the old keys.
 
 Not merging leaves the captcha overwrite, the extra public keys, and in-tree YAML that silently falls back to defaults once the fields are gone. Closed PR #85’s empty-guard alias is not the fix: the owner wants the keys deleted.
 
 ```mermaid
 flowchart TD
   New[plugin.New]
-  New --> Ban{BanFilePath empty and BanHTMLFilePath set?}
-  Ban -->|yes| CopyBan[Copy onto BanFilePath]
-  Ban -->|no| KeepBan[Keep BanFilePath]
+  New --> Ban{BouncerBanFile empty and BanHTMLFilePath set?}
+  Ban -->|yes| CopyBan[Copy onto BouncerBanFile]
+  Ban -->|no| KeepBan[Keep BouncerBanFile]
   New --> Cap{CaptchaHTMLFilePath non-empty?}
-  Cap -->|yes| Overwrite[Overwrite CaptchaFilePath]
-  Cap -->|no| KeepCap[Keep CaptchaFilePath]
+  Cap -->|yes| Overwrite[Overwrite BouncerCaptchaFile]
+  Cap -->|no| KeepCap[Keep BouncerCaptchaFile]
 ```
 
 ## Merge readiness
@@ -68,7 +68,7 @@ Local ticket `2026-09-18-remove-html-filepath-deprecations` runs on that branch 
 
 ## Before merge
 - [x] [P2] Delete `BanHTMLFilePath` and `CaptchaHTMLFilePath` from Config and both `plugin.New` alias blocks.
-- [x] [P2] Retarget live leftovers (real e2e including custom-ban `banhtmlfilepath`, mock captcha, README sample, captcha / custom-captcha examples, live `build_e2e_pester_crowdsec-stack` WHEN) to `banFilePath` / `captchaFilePath`.
+- [x] [P2] Retarget live leftovers (real e2e including custom-ban `banhtmlfilepath`, mock captcha, README sample, captcha / custom-captcha examples, live `build_e2e_pester_crowdsec-stack` WHEN) to `bouncerBanFile` / `bouncerCaptchaFile`.
 
 ## Findings
 None.
@@ -96,7 +96,7 @@ None.
 ### Technical review
 Best possible solution: Delete both Deprecated fields and both `New` copies. Dest still ships them. Do not reuse declined PR #85 empty-guard.
 
-Do we have a high-confidence way to reproduce? Yes. Dest `plugin.go` copies captcha whenever the old key is set and ban only when the new key is empty. After this apply, leftover `banhtmlfilepath` on the custom-ban e2e was ignored and the suite failed until that label was retargeted to `banFilePath`.
+Do we have a high-confidence way to reproduce? Yes. Dest `plugin.go` copies captcha whenever the old key is set and ban only when the new key is empty. After this apply, leftover `banhtmlfilepath` on the custom-ban e2e was ignored and the suite failed until that label was retargeted to `bouncerBanFile`.
 
 Is this the best way to solve the issue? Yes versus dest. The constraint that matters is deleting both settings with no alias.
 

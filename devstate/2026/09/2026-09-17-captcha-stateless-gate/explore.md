@@ -13,7 +13,7 @@ Payload includes the client address `pkg/ip.GetRemoteIP` already chose (`req.rem
 HMAC + expiry only. IP in the payload is ignored (or omitted). Operator knob.
 
 **Gate secret**:
-Dedicated HMAC key (`captchaGateSecret` / file). Not `CaptchaSecretKey` (provider siteverify).
+Dedicated HMAC key (`bouncerCaptchaGateSecret` / file). Not `BouncerCaptchaSecretKey` (provider siteverify).
 
 ## Decisions
 
@@ -35,11 +35,11 @@ Dedicated HMAC key (`captchaGateSecret` / file). Not `CaptchaSecretKey` (provide
   By: explore
 
 - Q: Public knob for bind-IP vs cookie-only, and dedicated HMAC secret field?
-  Decision: assumed — `captchaGateBindIP` bool default true; `captchaGateSecret` + `captchaGateSecretFile` via existing `GetVariable`. Empty secret when captcha is enabled is rejected at ValidateParams. Do not derive from `CaptchaSecretKey` or LAPI key.
+  Decision: assumed — `captchaGateBindIP` bool default true; `bouncerCaptchaGateSecret` + `bouncerCaptchaGateSecretFile` via existing `GetVariable`. Empty secret when captcha is enabled is rejected at ValidateParams. Do not derive from `BouncerCaptchaSecretKey` or LAPI key.
   By: explore
 
 - Q: Payload encoding and expiry?
-  Decision: assumed — compact `v1.<unix_issued>.<0|1>.<ip>` + `.` + base64url HMAC-SHA256 of that prefix; expiry is `issued + CaptchaGracePeriodSeconds`; 30s clock skew allowed on the low side. Cookie-only still writes `0` and empty ip. Compare HMAC with `hmac.Equal`.
+  Decision: assumed — compact `v1.<unix_issued>.<0|1>.<ip>` + `.` + base64url HMAC-SHA256 of that prefix; expiry is `issued + BouncerCaptchaGracePeriodSeconds`; 30s clock skew allowed on the low side. Cookie-only still writes `0` and empty ip. Compare HMAC with `hmac.Equal`.
   By: explore
 
 - Q: IPv6 normalization when comparing bound IP?

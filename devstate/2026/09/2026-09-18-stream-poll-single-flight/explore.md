@@ -7,7 +7,7 @@ DestBranch `b42860f` stream poll is three spawn sites into one unsynchronized `h
 
 ```
 startTicker (go work every ticker.C)
-startStream  go handleStreamTicker  when StreamStartupBlock=false
+startStream  go handleStreamTicker  when LapiStreamStartupBlock=false
 Wake         go handleStreamTicker  after restarting the ticker
 ```
 

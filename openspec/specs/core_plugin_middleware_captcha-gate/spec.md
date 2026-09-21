@@ -5,7 +5,7 @@ After a captcha provider confirms a solve, the middleware SHALL remember grace i
 ## Requirements
 
 ### Requirement: Gate secret is dedicated and required when captcha is enabled
-When captcha provider configuration is non-empty, the plugin SHALL require a non-empty gate HMAC secret from `captchaGateSecret` or `captchaGateSecretFile` (via existing variable resolution). The gate secret MUST NOT be derived from `CaptchaSecretKey` or the LAPI key.
+When captcha provider configuration is non-empty, the plugin SHALL require a non-empty gate HMAC secret from `bouncerCaptchaGateSecret` or `bouncerCaptchaGateSecretFile` (via existing variable resolution). The gate secret MUST NOT be derived from `BouncerCaptchaSecretKey` or the LAPI key.
 
 #### Scenario: Enabled captcha without gate secret fails validation
 - **WHEN** captcha provider is configured
@@ -21,7 +21,7 @@ The plugin SHALL expose `captchaGateBindIP` as a boolean defaulting to true. Whe
 - **THEN** `Check` returns false
 
 ### Requirement: Successful solve sets signed gate cookie then redirects
-On successful provider verify, the captcha handler SHALL set cookie `crowdsec_captcha_gate` with HttpOnly, Path=/, SameSite=Lax, MaxAge equal to captcha grace seconds, no Domain attribute, and Secure when the request is TLS **or** the request's `X-Forwarded-Proto` (as Traefik's entrypoint left it) equals `https` after trim, compared case-insensitively on the whole value with no comma split. The handler MUST NOT treat `wss`, `Forwarded`, `Front-End-Https`, `X-Forwarded-Protocol`, `X-Scheme`, or `r.URL.Scheme` as grounds for Secure. The cookie value SHALL be `v1.<unix_issued>.<0|1>.<ip>.` plus base64url HMAC-SHA256 of the prefix (bind flag 1 with bound IP string, 0 with empty ip in cookie-only mode). Expiry SHALL be `issued + CaptchaGracePeriodSeconds` with up to 30 seconds clock skew on the low side. HMAC comparison SHALL use constant-time equality.
+On successful provider verify, the captcha handler SHALL set cookie `crowdsec_captcha_gate` with HttpOnly, Path=/, SameSite=Lax, MaxAge equal to captcha grace seconds, no Domain attribute, and Secure when the request is TLS **or** the request's `X-Forwarded-Proto` (as Traefik's entrypoint left it) equals `https` after trim, compared case-insensitively on the whole value with no comma split. The handler MUST NOT treat `wss`, `Forwarded`, `Front-End-Https`, `X-Forwarded-Protocol`, `X-Scheme`, or `r.URL.Scheme` as grounds for Secure. The cookie value SHALL be `v1.<unix_issued>.<0|1>.<ip>.` plus base64url HMAC-SHA256 of the prefix (bind flag 1 with bound IP string, 0 with empty ip in cookie-only mode). Expiry SHALL be `issued + BouncerCaptchaGracePeriodSeconds` with up to 30 seconds clock skew on the low side. HMAC comparison SHALL use constant-time equality.
 
 #### Scenario: Valid cookie passes Check within grace
 - **WHEN** the browser presents a gate cookie whose HMAC and expiry are valid

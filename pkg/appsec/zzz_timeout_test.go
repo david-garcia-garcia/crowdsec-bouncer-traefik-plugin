@@ -22,7 +22,7 @@ func TestOpen_AppsecOverrideAdoptsTimeout(t *testing.T) {
 	firstCfg.HTTPTimeoutSeconds = 10
 	secondCfg := testAppsecConfig("127.0.0.1:1")
 	secondCfg.HTTPTimeoutSeconds = 10
-	secondCfg.CrowdsecAppsecHTTPTimeoutSeconds = 30
+	secondCfg.AppsecHttpTimeoutSeconds = 30
 
 	first, err := Open(ctx, firstCfg, slog.Default(), "first", "test")
 	if err != nil {
@@ -57,8 +57,8 @@ func TestQuery_HangHonorsAppsecOverride(t *testing.T) {
 
 	cfg := testAppsecConfig(listener.Addr().String())
 	cfg.HTTPTimeoutSeconds = 10
-	cfg.CrowdsecAppsecHTTPTimeoutSeconds = 1
-	cfg.CrowdsecAppsecFailureAction = configuration.FailureActionPassthrough
+	cfg.AppsecHttpTimeoutSeconds = 1
+	cfg.BouncerAppsecFailureAction = configuration.FailureActionPassthrough
 	client, err := Open(context.Background(), cfg, slog.Default(), "hang", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -84,7 +84,7 @@ func TestKey_TimeoutKnobsDoNotChangeIdentity(t *testing.T) {
 	base := testAppsecConfig("127.0.0.1:1")
 	timeouts := testAppsecConfig("127.0.0.1:1")
 	timeouts.HTTPTimeoutSeconds = 30
-	timeouts.CrowdsecAppsecHTTPTimeoutSeconds = 1
+	timeouts.AppsecHttpTimeoutSeconds = 1
 	if Key(base) != Key(timeouts) || IdentityHex(base) != IdentityHex(timeouts) {
 		t.Fatal("HTTP timeout knobs must not change AppSec Key or IdentityHex")
 	}

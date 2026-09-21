@@ -7,5 +7,5 @@ change: lapi-transport-router-policy
 - Failure action — pattern — `pkg/bouncer` / Language on `knowledge/devdocs/core_plugin_middleware.md`
 
 ## Findings
-- [x] stale-usage  Middleware New — How-to omits LiveLookup TTL argument and last-write shared cache; Gotcha lifecycle INFO omits sessionKey + reason and joiner/transport INFO; StreamStartupBlock write-once not stated
+- [x] stale-usage  Middleware New — How-to omits LiveLookup TTL argument and last-write shared cache; Gotcha lifecycle INFO omits sessionKey + reason and joiner/transport INFO; LapiStreamStartupBlock write-once not stated
 - [x] missing-packet  LAPI connection — no packet whose heading is this unit; only How-to bullets on `core_plugin_middleware.md`

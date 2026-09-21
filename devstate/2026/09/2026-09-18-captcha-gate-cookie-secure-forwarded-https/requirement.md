@@ -7,14 +7,14 @@ IssueKey: 2026-09-18-captcha-gate-cookie-secure-forwarded-https
 ## Current (code)
 - `setGateCookie` builds `crowdsec_captcha_gate` with Path=/, HttpOnly, SameSite=Lax, and sets `Secure` only when `r.TLS != nil`. `pkg/captcha/gate.go`
 - After siteverify succeeds, `ServeHTTP` calls `setGateCookie(rw, r, value, c.gracePeriodSeconds)` with no trusted-hop or insecure-forwarded inputs. `pkg/captcha/captcha.go`
-- `captcha.Client` / `New` hold gate secret, bind-IP, grace, and template fields. They do not hold `ForwardedHeadersTrustedIPs`, `ForwardedHeadersInsecure`, or a proto trust helper. `pkg/captcha/captcha.go`
+- `captcha.Client` / `New` hold gate secret, bind-IP, grace, and template fields. They do not hold `BouncerForwardedTrustedIPs`, `BouncerForwardedInsecure`, or a proto trust helper. `pkg/captcha/captcha.go`
 - `GetRemoteIP` honors the custom client-IP header only when `insecure` is true or `req.RemoteAddr` is in the trusted-hop pool; otherwise it returns the `RemoteAddr` host. `pkg/ip/checker.go`
 - Captcha-gate spec requires Secure when the request is TLS. `openspec/specs/core_plugin_middleware_captcha-gate/spec.md`
 - `TestHunt_gateCookieSecureWhenForwardedProtoHTTPS` — not found
 - Solve-path test asserts the cookie name is set and does not assert `Secure`. `pkg/captcha/zzz_servehttp_test.go`
 
 ## Desired
-- Set `Secure` when `r.TLS != nil` or the request is client-HTTPS via `X-Forwarded-Proto` from a hop the bouncer already trusts (same trusted-IP / `ForwardedHeadersInsecure` model as `GetRemoteIP`).
+- Set `Secure` when `r.TLS != nil` or the request is client-HTTPS via `X-Forwarded-Proto` from a hop the bouncer already trusts (same trusted-IP / `BouncerForwardedInsecure` model as `GetRemoteIP`).
 - Include a regression test for that forwarded-https case.
 - Bound the ask to this defect only.
 
@@ -32,7 +32,7 @@ IssueKey: 2026-09-18-captcha-gate-cookie-secure-forwarded-https
 - AppSec, LAPI, cache, Redis
 
 ## Unknowns
-- How trust / `ForwardedHeadersInsecure` reach `setGateCookie` (`Client` has no such fields today).
+- How trust / `BouncerForwardedInsecure` reach `setGateCookie` (`Client` has no such fields today).
 - Exact `X-Forwarded-Proto` parse (single value vs list, case). `GetRemoteIP` walks a client-IP header, not proto.
 - Where the named hunt test should live; dest has no `TestHunt_*` functions.
 

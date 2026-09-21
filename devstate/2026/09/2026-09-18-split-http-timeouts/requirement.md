@@ -6,7 +6,7 @@ One public `httpTimeoutSeconds` (default 10) is the transport Timeout for LAPI, 
 
 ## Current (code)
 - Public `HTTPTimeoutSeconds` / `httpTimeoutSeconds`, default 10, `validateParamsRequired` rejects `< 1`. Path: `pkg/configuration/configuration.go`.
-- No `CrowdsecLapiHTTPTimeoutSeconds`, `CrowdsecAppsecHTTPTimeoutSeconds`, or `CaptchaSiteverifyHTTPTimeoutSeconds`. Path: not found.
+- No `LapiHttpTimeoutSeconds`, `AppsecHttpTimeoutSeconds`, or `BouncerCaptchaHttpTimeoutSeconds`. Path: not found.
 - No `EffectiveLapi` / `EffectiveAppsec` / `EffectiveCaptcha` inherit helpers. Only `EffectiveFailureAction`. Path: `pkg/configuration/configuration.go`.
 - LAPI `newTransport` sets `http.Client.Timeout` and `httpTimeoutSeconds` from raw `config.HTTPTimeoutSeconds`. Path: `pkg/lapi/client_http.go`.
 - AppSec `newTransport` does the same from raw `config.HTTPTimeoutSeconds`. Path: `pkg/appsec/client_http.go`.
@@ -22,10 +22,10 @@ One public `httpTimeoutSeconds` (default 10) is the transport Timeout for LAPI, 
 
 ## Desired
 - Keep `HTTPTimeoutSeconds` (default 10). Do not rename it.
-- Add inheriting second knobs: `CrowdsecLapiHTTPTimeoutSeconds` / `crowdsecLapiHttpTimeoutSeconds`, `CrowdsecAppsecHTTPTimeoutSeconds` / `crowdsecAppsecHttpTimeoutSeconds`, `CaptchaSiteverifyHTTPTimeoutSeconds` / `captchaSiteverifyHttpTimeoutSeconds`. Zero or omitted inherits `HTTPTimeoutSeconds`.
+- Add inheriting second knobs: `LapiHttpTimeoutSeconds` / `lapiHttpTimeoutSeconds`, `AppsecHttpTimeoutSeconds` / `appsecHttpTimeoutSeconds`, `BouncerCaptchaHttpTimeoutSeconds` / `bouncerCaptchaHttpTimeoutSeconds`. Zero or omitted inherits `HTTPTimeoutSeconds`.
 - Wire existing clients only: LAPI transport Timeout from EffectiveLapi; AppSec from EffectiveAppsec; captcha siteverify client from EffectiveCaptcha. No second HTTP stack.
 - `AdoptTransport` still last-writes a timeout-only reload on the same Client. Timeout stays out of reclaim identity / `IdentityHex` / `Key`. Timeout-only YAML must Adopt, not Open a new Client.
-- README documents the three knobs. Example: `crowdsecAppsecHttpTimeoutSeconds: 1` with `crowdsecAppsecFailureAction: passthrough`.
+- README documents the three knobs. Example: `appsecHttpTimeoutSeconds: 1` with `bouncerAppsecFailureAction: passthrough`.
 - Tests that fail if wiring still reads raw `HTTPTimeoutSeconds`: LAPI Timeout honors the LAPI override (extend session/adopt); AppSec Query against a hanging listener with override 1s + passthrough returns well under 10s; bouncer captcha siteverify Timeout honors the captcha override; omit/0 inherit 10; identity hex unchanged when only timeout knobs differ.
 
 ## Affected

@@ -190,7 +190,7 @@ func main() {
 	appsecAddr := flag.String("appsec-addr", "127.0.0.1:8092", "address for the AppSec mock")
 	// Redis stand-ins on plain TCP ports, enough to exercise the plugin's redis
 	// cache path. The primary answers every GET with a miss; the replica serves
-	// the hardcoded verdicts, so a scenario pointing redisCacheReadHosts at the
+	// the hardcoded verdicts, so a scenario pointing lapiRedisReadHosts at the
 	// replica proves reads are offloaded to replicas.
 	redisAddr := flag.String("redis-addr", "127.0.0.1:8093", "address for the Redis primary mock (writes; GET always misses)")
 	redisReadAddr := flag.String("redis-read-addr", "127.0.0.1:8094", "address for the Redis replica mock (serves cached verdicts)")
@@ -259,7 +259,7 @@ func main() {
 	mux.HandleFunc("/siteverify", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, map[string]bool{"success": true})
 	})
-	// Empty script for captchaCustomJsUrl (custom provider requires the key).
+	// Empty script for bouncerCaptchaCustomJsUrl (custom provider requires the key).
 	mux.HandleFunc("/dummy.js", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript")
 		_, _ = w.Write([]byte("// e2e dummy captcha\n"))

@@ -10,7 +10,7 @@ client → Traefik → geoblock (enrich) → crowdsec-bouncer → whoami
 
 Geoblock must not block here. CrowdSec owns the Country ban. Use a public client IP: RFC1918 addresses enrich as `PRIVATE`, which this bouncer skips (not ISO 3166-1 alpha-2).
 
-Nested maps (`decisionScopeHeaders`, geoblock `databaseSources`) live in [`dynamic.yml`](dynamic.yml). Docker labels do not decode those maps reliably.
+Nested maps (`lapiScopeHeaders`, geoblock `databaseSources`) live in [`dynamic.yml`](dynamic.yml). Docker labels do not decode those maps reliably.
 
 ## Run
 
@@ -27,7 +27,7 @@ git clone --depth 1 --branch v1.2.0 https://github.com/david-garcia-garcia/traef
 docker compose -f examples/geoenrich-decisions/docker-compose.yml up -d
 ```
 
-The compose file loads **this tree** as a local Traefik plugin so `decisionScopeHeaders` works before it is in a catalog release. Geoblock is also local (`useunsafe` is required). Switch both to catalog plugins after a bouncer release that includes this key; keep geoblock `settings.useunsafe=true`.
+The compose file loads **this tree** as a local Traefik plugin so `lapiScopeHeaders` works before it is in a catalog release. Geoblock is also local (`useunsafe` is required). Switch both to catalog plugins after a bouncer release that includes this key; keep geoblock `settings.useunsafe=true`.
 
 Traefik 3.5+ is required for geoblock.
 
@@ -70,9 +70,9 @@ docker exec crowdsec cscli decisions delete --scope Country --value US
 In [`dynamic.yml`](dynamic.yml):
 
 - Geoblock `mode: enrich`, `allowPrivate: true`, seed BIN from the cloned plugin (no download token).
-- Bouncer `decisionScopeHeaders.Country: X-IPCountry`.
+- Bouncer `lapiScopeHeaders.Country: X-IPCountry`.
 - Chain `geo-enrich` then `crowdsec` on the router (`crowdsec-geo@file`).
 
 Client IP identity stays `X-Forwarded-For`. The entrypoint trusts Docker/LAN CIDRs so that header is not client-spoofable from outside those networks.
 
-See the plugin README `decisionScopeHeaders` section for Country/AS normalize rules (`XX`/`T1` do not match).
+See the plugin README `lapiScopeHeaders` section for Country/AS normalize rules (`XX`/`T1` do not match).

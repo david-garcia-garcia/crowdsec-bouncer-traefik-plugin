@@ -2,7 +2,7 @@
 A DecisionStore SHALL be `pkg/decisionstore.Store`, opened with `reclaim.OpenWithHooks` on the process table using the same Traefik `New` context as `lapi.OpenStream` / `OpenLive`. Callers SHALL Peek that store key before Open (`core_plugin_lapi_reclaim-key`). `lapi.OpenDecisionStore` SHALL take the Traefik name so create() can write `createdBy`. The store SHALL bind engine funcs at `NewMemory` or `NewRedis` (`memoryEngine` / `redisEngine`): BeginTick, PublishTick, PutMany, DeleteMany, ActiveCounts, LookupRemediation, ApplyRangeBatch, RangeIndex, Close. Put and Delete SHALL be one-item wrappers around PutMany and DeleteMany. A constructed Store SHALL always have those callbacks. Store methods MUST NOT nil-check `s` or the engine funcs. Close SHALL be safe to call more than once on a real Redis store; tests MUST NOT Close a nil `*Store`. Dispatch MUST NOT be a backend interface and MUST NOT branch `if mem` / `if red` on every method. Yaegi-safe: the engine MUST NOT put a map-holding type in an interface; `map[string]LiveSlot` SHALL always be non-nil; intern SHALL be `[]string` plus `map[string]uint16`; Store `atomic.Value` SHALL hold only `*RangeMembership` and `string`. Memory published slots SHALL be `atomic.Value` of `*publishedSlots` (not the map). Memory `LookupRemediation` MUST NOT take `mu`; writers still `Lock` to clone and Store. The store SHALL install Sleep and Wake hooks that only log; they MUST NOT drain Redis or drop maps. The package MUST NOT keep a process-wide map or a `sync.Once`. Callers MUST NOT import utilities `reclaim`. There SHALL NOT be a second `liveStore` type: live/none memo is Store Put and Lookup. `pkg/cache` MUST NOT exist as the DecisionStore bag. Client address, when this leaf mentions it, SHALL reuse `pkg/ip.GetRemoteIP`. CrowdSec cursor identity SHALL reuse `SessionHex` / `streamSession`.
 
 #### Scenario: Interval mismatch still shares one store
-- **WHEN** two live `New` calls use the same Traefik name, the same LAPI URL and key, and the same Redis store parameters and differ only on `updateIntervalSeconds`
+- **WHEN** two live `New` calls use the same Traefik name, the same LAPI URL and key, and the same Redis store parameters and differ only on `lapiUpdateIntervalSeconds`
 - **THEN** both expose the same Store incarnation
 - **AND** a ban written by the first is a hit for the second
 
@@ -23,15 +23,15 @@ A DecisionStore SHALL be `pkg/decisionstore.Store`, opened with `reclaim.OpenWit
 - **AND** `reclaim_put` is absent at INFO
 
 ### Requirement: Store key is SessionHex only
-The DecisionStore reclaim key SHALL be `decisionstore:` plus `SessionHex` (mode, LAPI scheme/host/path, lapiKey, CAPI machine+password). That key MUST NOT include a hash of Redis store parameters (`RedisCacheEnabled`, host, read hosts, password, database), `updateIntervalSeconds`, `metricsUpdateIntervalSeconds`, `updateMaxFailure`, `decisionScopeHeaders`, TLS, failure action, `StreamStartupBlock`, live-cache TTL, or middleware name. Stream `scopes=` and the store header-scope filter are owned by `core_plugin_lapi_scope-union`. SessionHex MUST NOT change in this change; existing Redis keys stay reachable. A Redis YAML change (host, enabled, password, database, read hosts) with the same Traefik name SHALL Open the existing store and MUST NOT replace the engine already bound at create() (first-wins memory vs Redis).
+The DecisionStore reclaim key SHALL be `decisionstore:` plus `SessionHex` (mode, LAPI scheme/host/path, lapiKey, CAPI machine+password). That key MUST NOT include a hash of Redis store parameters (`LapiRedisEnabled`, host, read hosts, password, database), `lapiUpdateIntervalSeconds`, `lapiMetricsIntervalSeconds`, `lapiUpdateMaxFailure`, `lapiScopeHeaders`, TLS, failure action, `LapiStreamStartupBlock`, live-cache TTL, or middleware name. Stream `scopes=` and the store header-scope filter are owned by `core_plugin_lapi_scope-union`. SessionHex MUST NOT change in this change; existing Redis keys stay reachable. A Redis YAML change (host, enabled, password, database, read hosts) with the same Traefik name SHALL Open the existing store and MUST NOT replace the engine already bound at create() (first-wins memory vs Redis).
 
 #### Scenario: Different Redis hosts share one store
-- **WHEN** two stream Clients share Traefik name, LAPI URL and key and use different `redisCacheHost`
+- **WHEN** two stream Clients share Traefik name, LAPI URL and key and use different `lapiRedisHost`
 - **THEN** one DecisionStore incarnation exists
 - **AND** a ban written by the first is a hit for the second
 
 #### Scenario: Header-map mismatch still shares remediations
-- **WHEN** two stream Clients share Traefik name, LAPI URL, and key and differ only on `decisionScopeHeaders`
+- **WHEN** two stream Clients share Traefik name, LAPI URL, and key and differ only on `lapiScopeHeaders`
 - **THEN** they Open the same DecisionStore
 - **AND** an IP ban written by the first is a hit for the second
 
@@ -182,15 +182,15 @@ A DecisionStore SHALL own a `pkg/intern.Table` (`names []string` index-is-id, `b
 - **AND** Redis does not store a leftover U+001F string for that overflow
 
 ### Requirement: Stream and live write TTLs stay split
-When stream apply stores a non-Range decision, the store write TTL SHALL be `int64` of the parsed CrowdSec duration in seconds, with no clamp. A sub-second duration SHALL become `0`. Live and none writes SHALL use `liveCacheTTL`: when `durationSecond<=0` or `defaultDecisionSeconds` is smaller than `durationSecond`, the write TTL SHALL be `defaultDecisionSeconds`; otherwise it SHALL be `durationSecond`. Stream MUST NOT use `liveCacheTTL`. Live and none MUST NOT pass raw `Seconds()` without that substitution.
+When stream apply stores a non-Range decision, the store write TTL SHALL be `int64` of the parsed CrowdSec duration in seconds, with no clamp. A sub-second duration SHALL become `0`. Live and none writes SHALL use `liveCacheTTL`: when `durationSecond<=0` or `bouncerLiveTtlSeconds` is smaller than `durationSecond`, the write TTL SHALL be `bouncerLiveTtlSeconds`; otherwise it SHALL be `durationSecond`. Stream MUST NOT use `liveCacheTTL`. Live and none MUST NOT pass raw `Seconds()` without that substitution.
 
 #### Scenario: Stream sub-second duration becomes 0
 - **WHEN** stream apply parses a CrowdSec duration shorter than one second
 - **THEN** the Store Put duration is `0`
 
 #### Scenario: Live non-positive duration uses the default
-- **WHEN** a live write has `durationSecond<=0` and a positive `defaultDecisionSeconds`
-- **THEN** the Store Put duration is `defaultDecisionSeconds`
+- **WHEN** a live write has `durationSecond<=0` and a positive `bouncerLiveTtlSeconds`
+- **THEN** the Store Put duration is `bouncerLiveTtlSeconds`
 
 #### Scenario: Stream does not substitute the live default
 - **WHEN** stream apply parses a duration of `0s`

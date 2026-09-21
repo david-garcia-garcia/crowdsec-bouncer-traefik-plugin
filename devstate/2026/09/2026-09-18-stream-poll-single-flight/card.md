@@ -12,7 +12,7 @@ Developer review: ready for review — 2026-09-18T06:51:45Z
 ## Motivation
 On `master`, the stream ticker starts a new goroutine every interval and never waits for the last poll. Three Client fields that decide `startup=` and whether cache-miss traffic is a LAPI failure are written and read with no synchronization. The shared `updated` lease does not stop that: it can expire before a slow poll finishes, and a lease loser still writes startup. A Traefik reload already `Wake`s while a previous GET can still be in flight.
 
-If this does not land, overlapping polls can flap stream health (default `UpdateMaxFailure=0` then bans cache-miss requests) and can interleave range-blob apply. Nothing in CI ran the race detector, so the next overlap would regress silently.
+If this does not land, overlapping polls can flap stream health (default `LapiUpdateMaxFailure=0` then bans cache-miss requests) and can interleave range-blob apply. Nothing in CI ran the race detector, so the next overlap would regress silently.
 
 ```mermaid
 flowchart TD

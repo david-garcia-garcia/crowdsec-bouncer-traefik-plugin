@@ -1,18 +1,18 @@
 Developer review: ready for review — 2026-09-18T17:10:35Z
 
 ## What this changes
-**Operators.** Leftover invalid AppSec CA or a missing `crowdsecAppsecKeyFile` no longer fail `ValidateParams` when `crowdsecAppsecEnabled` is false. Alone with AppSec on and those same leftovers now fails closed at startup.
+**Operators.** Leftover invalid AppSec CA or a missing `appsecKeyFile` no longer fail `ValidateParams` when `appsecEnabled` is false. Alone with AppSec on and those same leftovers now fails closed at startup.
 
 **Admin users.** None.
 
-**Developers.** `ValidateParams` calls `validateAppsecURLKeyAndTLS` only when `CrowdsecAppsecEnabled` is true, in every mode. Alone still skips LAPI URL, key, and TLS after CAPI credentials. The `validateLapiAndAppsecConnection` wrapper is gone. Catalog spec `core_plugin_middleware_config-validation` now owns the enabled-gate requirements.
+**Developers.** `ValidateParams` calls `validateAppsecURLKeyAndTLS` only when `AppsecEnabled` is true, in every mode. Alone still skips LAPI URL, key, and TLS after CAPI credentials. The `validateLapiAndAppsecConnection` wrapper is gone. Catalog spec `core_plugin_middleware_config-validation` now owns the enabled-gate requirements.
 
 **End users.** None.
 
 ## Motivation
 `ValidateParams` decides whether leftover AppSec URL, key-file, and HTTPS CA knobs can stop a router from booting. Dest splits that by mode: live and stream always run those AppSec checks; alone skips the whole LAPI+AppSec helper after CAPI machine id and password.
 
-On `master`, a live or stream router with `crowdsecAppsecEnabled` false still fails when `crowdsecAppsecKeyFile` is missing or `crowdsecAppsecScheme` is explicit `https` with a garbage CA. Alone with AppSec on and those same leftovers boots. Default AppSec failure action is ban, so later requests on that router drop.
+On `master`, a live or stream router with `appsecEnabled` false still fails when `appsecKeyFile` is missing or `appsecScheme` is explicit `https` with a garbage CA. Alone with AppSec on and those same leftovers boots. Default AppSec failure action is ban, so later requests on that router drop.
 
 Not merging leaves two operator failures: unused AppSec fields in a shared snippet block boot, and an AppSec-on alone router with a bad CA or missing key file does not fail at startup.
 
@@ -65,10 +65,10 @@ Local ticket `2026-09-18-appsec-validate-when-enabled` on branch `2026-09-18-app
 ## Decision needed
 | Question | Decision | By |
 | --- | --- | --- |
-| Do none and appsec modes share the same enabled gate even though the required test list names live/stream/alone? | assumed — yes, all modes. Do not add empty-host (#89) cases. A leftover-CA success under `crowdsecMode: appsec` with AppSec off is allowed if cheap; the existing warn test stays. | propose |
-| Should AppSec CA parse use `effectiveAppsecScheme` (inherit LAPI `https`) instead of explicit `CrowdsecAppsecScheme == https`? | assumed — keep today’s explicit-scheme trigger. Changing inherit-https CA parse would rewrite live/stream validation and is out of scope. | propose |
+| Do none and appsec modes share the same enabled gate even though the required test list names live/stream/alone? | assumed — yes, all modes. Do not add empty-host (#89) cases. A leftover-CA success under `lapiMode: appsec` with AppSec off is allowed if cheap; the existing warn test stays. | propose |
+| Should AppSec CA parse use `effectiveAppsecScheme` (inherit LAPI `https`) instead of explicit `AppsecScheme == https`? | assumed — keep today’s explicit-scheme trigger. Changing inherit-https CA parse would rewrite live/stream validation and is out of scope. | propose |
 | When AppSec is enabled and the key is empty, should `ValidateParams` fail? | assumed — no. Keep the helper’s empty-key pass; `appsec.Prepare` still copies the LAPI key. This ticket only adds the enabled gate around the existing helper. | propose |
-| Should leftover `CrowdsecAppsecFailureAction` / body-limit checks also skip when AppSec is off (Redis leftover-password analog)? | assumed — leave them. Failure-action behavior is out of scope. Dest still always `GetVariable`s `RedisCachePassword`; do not change Redis in this ticket. | propose |
+| Should leftover `BouncerAppsecFailureAction` / body-limit checks also skip when AppSec is off (Redis leftover-password analog)? | assumed — leave them. Failure-action behavior is out of scope. Dest still always `GetVariable`s `LapiRedisPassword`; do not change Redis in this ticket. | propose |
 | Does this change `appsec.Prepare`, reclaim, or `New` process lifetime? | assumed — no. `ValidateParams` is the constructor gate. Runtime AppSec client, reclaim, and failure-action stay out. | propose |
 | Should leftover AppSec fields warn when the knob is false? | assumed — no. Ticket is skip validation, not a new warn. Bound the ask. | propose |
 
@@ -99,7 +99,7 @@ None.
 None.
 
 ### Technical review
-Best possible solution: gate `validateAppsecURLKeyAndTLS` on `CrowdsecAppsecEnabled` in every mode; do not reuse declined PR #80’s always-on AppSec checks in alone.
+Best possible solution: gate `validateAppsecURLKeyAndTLS` on `AppsecEnabled` in every mode; do not reuse declined PR #80’s always-on AppSec checks in alone.
 
 Do we have a high-confidence way to reproduce? Yes — `Test_ValidateParams` leftover-CA and missing-key cases now pass when AppSec is off and fail when it is on (`go test ./pkg/configuration/`).
 

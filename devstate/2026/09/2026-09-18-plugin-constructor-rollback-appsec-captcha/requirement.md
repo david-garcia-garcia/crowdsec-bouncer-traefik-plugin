@@ -5,10 +5,10 @@ IssueKey: 2026-09-18-plugin-constructor-rollback-appsec-captcha
 Five defects, all reproduced on master `87d1084`, rebuilt from open PRs #31 and #33 (to be closed in this
 ticket's favour by the owner) plus three lines salvaged from the closed #22. `New` never releases reclaim
 holders it already opened when a later constructor step fails, so a failed constructor leaks a LAPI stream
-ticker for the process lifetime. `crowdsecMode: appsec` with `crowdsecAppsecEnabled: false` starts a
-middleware that enforces nothing and says nothing. The README never states that `crowdsecMode` and
-`crowdsecAppsecEnabled` are independent axes. In appsec mode the captcha client is never initialised, so
-`crowdsecAppsecFailureAction: captcha` bans instead of challenging — a violation of
+ticker for the process lifetime. `lapiMode: appsec` with `appsecEnabled: false` starts a
+middleware that enforces nothing and says nothing. The README never states that `lapiMode` and
+`appsecEnabled` are independent axes. In appsec mode the captcha client is never initialised, so
+`bouncerAppsecFailureAction: captcha` bans instead of challenging — a violation of
 `core_plugin_appsec_failure-action`. And `New` mutates Traefik's own `*Config`, writing the resolved LAPI
 secret back into the caller's struct.
 
@@ -18,10 +18,10 @@ secret back into the caller's struct.
   `context.AfterFunc`). `New` binds Traefik's own long-lived ctx into `lapi.OpenStream` / `lapi.OpenLive`
   (which also opens the decision store) and `appsec.Open`. `plugin.go:53-76`
 - `New` returns `nil, err` on every failure path with no release of holders opened earlier. `plugin.go:37-77`
-- `ValidateParams` accepts `crowdsecMode: appsec` without requiring `crowdsecAppsecEnabled`.
+- `ValidateParams` accepts `lapiMode: appsec` without requiring `appsecEnabled`.
   `pkg/configuration/configuration.go:623`
 - `plugin.go:59` skips both `OpenStream` and `OpenLive` for appsec mode, `plugin.go:70` opens no AppSec
-  client when `CrowdsecAppsecEnabled` is false, and `Bouncer.ServeHTTP:182` routes straight to
+  client when `AppsecEnabled` is false, and `Bouncer.ServeHTTP:182` routes straight to
   `handleNextServeHTTP`, which with `appsecEnabled` false just calls `next`.
 - `README.md:64-72` lists the five modes; the `appsec` row is accurate but nothing says the WAF leg runs on
   the pass path in *every* mode (`pkg/bouncer/bouncer.go:341`), nor that `appsec` + disabled enforces nothing.
@@ -29,25 +29,25 @@ secret back into the caller's struct.
   initialised, so `captchaClient.Valid` stays false. `applyAppsecServeHTTP:353` raises `ErrFailureCaptcha`,
   `handleRemediationServeHTTP:315` sees `!b.captchaClient.Valid` and bans.
 - `New` writes through Traefik's pointer at `plugin.go:25`, `:29`, `:32`, then hands that pointer to
-  `lapi.Prepare` (`pkg/lapi/client.go:80-96`: resolved `CrowdsecLapiKey`, `RedisCachePassword`, and in alone
-  mode `CrowdsecLapiHost` plus `UpdateIntervalSeconds = 7200`) and `appsec.Prepare`
-  (`pkg/appsec/client.go:27-43`: `CrowdsecAppsecKey`).
-- `Config` carries `[]string` and `map[string]string` fields (`ForwardedHeadersTrustedIPs`,
-  `ClientTrustedIPs`, `RedisCacheReadHosts`, `CrowdsecCapiScenarios`, `DecisionScopeHeaders`) that a shallow
+  `lapi.Prepare` (`pkg/lapi/client.go:80-96`: resolved `LapiKey`, `LapiRedisPassword`, and in alone
+  mode `LapiHost` plus `LapiUpdateIntervalSeconds = 7200`) and `appsec.Prepare`
+  (`pkg/appsec/client.go:27-43`: `AppsecKey`).
+- `Config` carries `[]string` and `map[string]string` fields (`BouncerForwardedTrustedIPs`,
+  `BouncerClientTrustedIPs`, `LapiRedisReadHosts`, `LapiCapiScenarios`, `LapiScopeHeaders`) that a shallow
   copy still shares with the caller.
-- `configuration.New()` defaults `CrowdsecAppsecHost` to `crowdsec:7422` and
-  `CrowdsecAppsecFailureAction` to `ban`. `pkg/configuration/configuration.go:172-174`
+- `configuration.New()` defaults `AppsecHost` to `crowdsec:7422` and
+  `BouncerAppsecFailureAction` to `ban`. `pkg/configuration/configuration.go:172-174`
 
 ## Desired
 1. Derive a bind context inside `New` and release every holder opened so far on any error path. Keep the
    named-`err` `defer`; do not revert to a closure-captured bool. Do not cancel on the success path.
    `bindCtx` stays a child of the constructor ctx so cancelling Traefik's context still releases the holder.
-2. `crowdsecMode: appsec` with `crowdsecAppsecEnabled: false` logs a loud warning and still starts. Owner
+2. `lapiMode: appsec` with `appsecEnabled: false` logs a loud warning and still starts. Owner
    decision: warn, do not reject. Do not imply AppSec on.
-3. README states the two axes explicitly, says that `appsec` + `crowdsecAppsecEnabled: false` enforces
+3. README states the two axes explicitly, says that `appsec` + `appsecEnabled: false` enforces
    nothing, and mentions the warning. Existing style; do not restructure the mode table.
 4. Initialise the captcha client when appsec mode needs it and condition the early return accordingly, so
-   `crowdsecAppsecFailureAction: captcha` serves the challenge in appsec mode.
+   `bouncerAppsecFailureAction: captcha` serves the challenge in appsec mode.
 5. `prepared := *config` plus passing `&prepared`, with a comment at the copy site naming the slice and map
    fields the snapshot does not protect.
 
@@ -67,7 +67,7 @@ secret back into the caller's struct.
   `ValidateParams` rejects the same inputs first and `ip.Checker.ContainsIP` has a nil guard that fails closed.
 - #33's 419-line `servehttp_test.go`: its `testValidCaptchaClient(t, cacheClient)` helper cannot compile
   against master's stateless captcha client.
-- Rejecting the appsec+disabled config, or implying `crowdsecAppsecEnabled` on.
+- Rejecting the appsec+disabled config, or implying `appsecEnabled` on.
 - `pkg/decisionscope` keying and the `ApplyRangeBatch` read-side guard (#34, next ticket).
 - Merging, closing, or commenting on #22, #31, #33.
 

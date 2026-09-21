@@ -6,7 +6,7 @@ IssueKey: 2026-09-18-capi-login-json-escape
 
 ## Current (code)
 - `getToken` interpolates `c.crowdsecMachineID`, `c.crowdsecPassword`, and `strings.Join(c.crowdsecScenarios, `","`)` into a JSON-looking string. `pkg/lapi/client_http.go`
-- `New` copies those three fields from `config.CrowdsecCapiMachineID`, `CrowdsecCapiPassword`, `CrowdsecCapiScenarios`. `pkg/lapi/client.go` `pkg/configuration/configuration.go`
+- `New` copies those three fields from `config.LapiCapiMachineID`, `LapiCapiPassword`, `LapiCapiScenarios`. `pkg/lapi/client.go` `pkg/configuration/configuration.go`
 - Login POST uses that byte slice; `sendQuery(..., false)` so a 401 does not recurse. `pkg/lapi/client_http.go`
 - Response is unmarshaled into `Login` (`code`, `token`, `expire`). Token is stored only when `login.Code == http.StatusOK` and `token` is non-empty. `pkg/lapi/client_http.go`
 - Existing getToken tests use plain `machine` / `password` / `scenario` and do not assert the posted body is JSON. `pkg/lapi/zzz_client_http_test.go`
@@ -28,7 +28,7 @@ IssueKey: 2026-09-18-capi-login-json-escape
 - Changing CAPI host, login route, or token storage on `transport`
 - Config validation, file-backed CAPI secrets, stream poll, live lookup
 - Importing or committing the off-tree hunt file as a whole
-- Other hunt defects (stream apply order, LAPI path join, UpdateMaxFailure)
+- Other hunt defects (stream apply order, LAPI path join, LapiUpdateMaxFailure)
 
 ## Unknowns
 - Official CAPI login schema extras beyond the three fields already posted (ticket names those three only).

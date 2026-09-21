@@ -4,7 +4,7 @@ Close GitHub PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-
 
 New product work (this ticket only):
 
-1. Captcha grace after a successful provider solve MUST be stateless. Issue a signed cookie (HMAC with a server-side secret). The cookie payload MUST include version, issued_at, optional bind-IP flag, and the normalized client IP when bound. Validation: HMAC matches (constant-time), now <= issued_at + CaptchaGracePeriodSeconds, and if bind-IP is on the current GetRemoteIP matches the signed IP (same IPv6 normalization).
+1. Captcha grace after a successful provider solve MUST be stateless. Issue a signed cookie (HMAC with a server-side secret). The cookie payload MUST include version, issued_at, optional bind-IP flag, and the normalized client IP when bound. Validation: HMAC matches (constant-time), now <= issued_at + BouncerCaptchaGracePeriodSeconds, and if bind-IP is on the current GetRemoteIP matches the signed IP (same IPv6 normalization).
 2. Public operator knob: bind the gate to IP+cookie, or cookie-only (no IP bind). Cookie-only still requires valid HMAC + expiry.
 3. Remove captcha's dependency on the cache system. `pkg/captcha` MUST NOT Set/Get `{ip}_captcha` or `{ip}_captcha_{token}` or any other grace key. After this change, leftover cache grace keys do not count as solved.
 4. Do not reuse the captcha provider secretKey as the HMAC secret; derive or add a dedicated plugin secret.

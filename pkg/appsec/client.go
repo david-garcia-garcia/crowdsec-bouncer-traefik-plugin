@@ -4,6 +4,7 @@ package appsec
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -12,7 +13,8 @@ import (
 
 // Client owns the AppSec HTTP round-trip for one listener identity.
 type Client struct {
-	mu sync.Mutex
+	mu     sync.Mutex
+	closed bool
 
 	appsecScheme    string
 	appsecHost      string
@@ -25,20 +27,20 @@ type Client struct {
 
 // Prepare resolves AppSec secrets on cfg. Call lapi.Prepare first so an empty AppSec key can copy the LAPI key.
 func Prepare(cfg *configuration.Config, log *slog.Logger) error {
-	if cfg.CrowdsecAppsecKey == "" {
-		cfg.CrowdsecAppsecKey = cfg.CrowdsecLapiKey
+	if cfg.AppsecEnabled && cfg.AppsecKey == "" && strings.TrimSpace(cfg.AppsecInstance) == "" {
+		cfg.AppsecKey = cfg.LapiKey
 	}
-	if !cfg.CrowdsecAppsecEnabled {
+	if !cfg.AppsecEnabled {
 		return nil
 	}
-	if cfg.CrowdsecAppsecScheme == "" {
-		cfg.CrowdsecAppsecScheme = cfg.CrowdsecLapiScheme
+	if cfg.AppsecScheme == "" {
+		cfg.AppsecScheme = cfg.LapiScheme
 	}
-	apiAppsecKey, errAppsecKey := configuration.GetVariable(cfg, "CrowdsecAppsecKey")
+	apiAppsecKey, errAppsecKey := configuration.GetVariable(cfg, "AppsecKey")
 	if errAppsecKey != nil {
-		log.Info("Prepare:crowdsecAppsecKey fail to get CrowdsecAppsecKey and no client certificate setup", "error", errAppsecKey)
+		log.Info("Prepare:appsecKey fail to get AppsecKey and no client certificate setup", "error", errAppsecKey)
 	} else {
-		cfg.CrowdsecAppsecKey = apiAppsecKey
+		cfg.AppsecKey = apiAppsecKey
 	}
 	return nil
 }
@@ -51,10 +53,10 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		return nil, err
 	}
 	client := &Client{
-		appsecScheme:    config.CrowdsecAppsecScheme,
-		appsecHost:      config.CrowdsecAppsecHost,
-		appsecPath:      config.CrowdsecAppsecPath,
-		appsecBodyLimit: config.CrowdsecAppsecBodyLimit,
+		appsecScheme:    config.AppsecScheme,
+		appsecHost:      config.AppsecHost,
+		appsecPath:      config.AppsecPath,
+		appsecBodyLimit: config.AppsecBodyLimit,
 		log:             log,
 		pluginVersion:   pluginVersion,
 	}
@@ -66,10 +68,18 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 func (c *Client) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.closed = true
 	current := c.currentTransport()
 	if current != nil {
 		closeIdle(current.httpClient)
 	}
+}
+
+// Closed is true after Close. Publish replaces a closed slot on Traefik reload.
+func (c *Client) Closed() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.closed
 }
 
 // Sleep is a reclaim no-op: AppSec has no tickers.

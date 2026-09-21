@@ -44,7 +44,7 @@ Outside facts: Traefik calls `New` per router handler build, map order, `knowled
 - `bouncerHold`: Open, then 503 + log; do not call `next`. Dummy router still needed when no bouncing router Opens.
 - `lapiScopeHeaders` is opener-only (stream fetch). Bouncing subscribers do not union into `scopes=`.
 - Do not add decision remap in this change.
-- Rejected: `crowdsecMode=bouncer` as the only bounce path (human dropped it). Rejected: `"nil"` instance sentinel (YAML null). Rejected: blocking `New` until the slot exists (deadlocks Traefik constructor). Rejected: bouncers as reclaim holders of the Client (would keep a deleted holder’s stream alive).
+- Rejected: `lapiMode=bouncer` as the only bounce path (human dropped it). Rejected: `"nil"` instance sentinel (YAML null). Rejected: blocking `New` until the slot exists (deadlocks Traefik constructor). Rejected: bouncers as reclaim holders of the Client (would keep a deleted holder’s stream alive).
 
 Live contract: fold `core_plugin_middleware_bouncer`, `core_plugin_middleware_config-validation`, `core_plugin_lapi_failure-action`, `core_plugin_appsec_failure-action`, `core_plugin_appsec_client`, `core_plugin_lapi_reclaim-key`, `core_plugin_lapi_scope-union`. New leaf for named instance publish/subscribe.
 

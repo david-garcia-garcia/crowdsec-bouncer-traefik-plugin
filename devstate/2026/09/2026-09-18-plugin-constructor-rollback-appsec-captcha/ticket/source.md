@@ -38,7 +38,7 @@ opened so far. Notes from the verification pass, worth honouring:
 
 ## Deliverable 2 — warn, do not crash, when `appsec` mode has AppSec disabled
 
-`ValidateParams` accepts `crowdsecMode: appsec` without requiring `crowdsecAppsecEnabled`
+`ValidateParams` accepts `lapiMode: appsec` without requiring `appsecEnabled`
 (`pkg/configuration/configuration.go:623`). `plugin.go:59` then skips both `OpenStream` and `OpenLive`,
 `plugin.go:70` opens no AppSec client, and `bouncer.ServeHTTP:182` routes straight to
 `handleNextServeHTTP`, which with `appsecEnabled` false just calls `next`. Reproduced: `New` succeeds
@@ -48,8 +48,8 @@ and the request returns 200 with no CrowdSec enforcement of any kind.
 reasoning is that the plugin doing nothing is not worth refusing to boot over.
 
 Do not "fix" this by implying AppSec on. That was considered and rejected for a concrete reason:
-`CrowdsecAppsecHost` defaults to `crowdsec:7422` (`configuration.go:174`), so implying enabled would
-silently point at a host that may not exist, and with `CrowdsecAppsecFailureAction` defaulting to `ban`
+`AppsecHost` defaults to `crowdsec:7422` (`configuration.go:174`), so implying enabled would
+silently point at a host that may not exist, and with `BouncerAppsecFailureAction` defaulting to `ban`
 an unreachable listener bans every request on that router. Turning a do-nothing config into a
 ban-everything config on upgrade is the worst available outcome.
 
@@ -62,24 +62,24 @@ The owner asked for this directly, because the relationship is currently somethi
 infer from code. `README.md:64-72` already lists the five modes, and its `appsec` row is accurate as
 far as it goes, but nothing states that the mode and the AppSec toggle are **independent axes**:
 
-- `crowdsecMode` selects **where decisions come from**: `none` queries LAPI on every request, `live`
+- `lapiMode` selects **where decisions come from**: `none` queries LAPI on every request, `live`
   queries and caches, `stream` and `alone` poll a stream into the cache, and `appsec` means **no
   decision source at all**.
-- `crowdsecAppsecEnabled` toggles the **WAF leg**, which runs on the pass path in *every* mode
+- `appsecEnabled` toggles the **WAF leg**, which runs on the pass path in *every* mode
   (`bouncer.go:341`), not only in `appsec` mode.
 
-So the ordinary combination is `stream` plus AppSec enabled: decisions from the stream, and WAF on the
+So the ordinary combination is `stream` plus AppSec bouncerEnabled: decisions from the stream, and WAF on the
 requests that survive them. And `appsec` mode is the only way to express "skip decisions, WAF only",
 which is why it is the one mode that depends on the other knob being on.
 
-Say explicitly that `crowdsecMode: appsec` with `crowdsecAppsecEnabled: false` enforces nothing, and
+Say explicitly that `lapiMode: appsec` with `appsecEnabled: false` enforces nothing, and
 mention the warning from deliverable 2. Match the existing README style; do not restructure the table.
 
 ## Deliverable 4 — initialise the captcha client in appsec mode
 
 `bouncer.New` returns early for appsec mode at `pkg/bouncer/bouncer.go:94`, before the captcha client
 is initialised, so `captchaClient.Valid` stays false. When AppSec then fails with
-`crowdsecAppsecFailureAction: captcha`, `applyAppsecServeHTTP:353` raises `ErrFailureCaptcha`,
+`bouncerAppsecFailureAction: captcha`, `applyAppsecServeHTTP:353` raises `ErrFailureCaptcha`,
 `handleRemediationServeHTTP:315` sees `!b.captchaClient.Valid`, and the request is **banned instead of
 challenged**. Reproduced end to end through `plugin.New` with a config `ValidateParams` accepts: AppSec
 returned 500, the operator had asked for captcha, and the client got `X-Remediation: ban` with a 403.
@@ -102,16 +102,16 @@ Port only that. **Do not** bring across the rest of #33:
 - Its branch would nil-deref `lapiClient.Cache()` in appsec mode, where `lapiClient` is nil. Harmless
   on master because the argument is gone, but a reason not to copy from that branch.
 
-One test proving that an AppSec failure with `crowdsecAppsecFailureAction: captcha` serves the
+One test proving that an AppSec failure with `bouncerAppsecFailureAction: captcha` serves the
 challenge in appsec mode is the bar here.
 
 ## Deliverable 5 — snapshot Traefik's Config before mutating it
 
 Salvaged from the closed #22. `New` writes through Traefik's pointer at `plugin.go:25`, `:29` and
 `:32`, then hands the same pointer to `lapi.Prepare` (`pkg/lapi/client.go:80-96`, which writes the
-resolved `CrowdsecLapiKey` and `RedisCachePassword`, and in alone mode rewrites `CrowdsecLapiHost` and
-forces `UpdateIntervalSeconds = 7200`) and `appsec.Prepare` (`pkg/appsec/client.go:27-43`, writing
-`CrowdsecAppsecKey`). Reproduced: after `New`, the caller's struct carries an upper-cased `LogLevel` and
+resolved `LapiKey` and `LapiRedisPassword`, and in alone mode rewrites `LapiHost` and
+forces `LapiUpdateIntervalSeconds = 7200`) and `appsec.Prepare` (`pkg/appsec/client.go:27-43`, writing
+`AppsecKey`). Reproduced: after `New`, the caller's struct carries an upper-cased `LogLevel` and
 the **resolved LAPI secret**.
 
 No observable behaviour changes from fixing this — every mutation is idempotent and the reclaim

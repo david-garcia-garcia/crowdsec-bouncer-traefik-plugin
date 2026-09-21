@@ -18,12 +18,12 @@ applyAppsecServeHTTP
         │
         ▼
   action: captcha (this ticket) is that relay path,
-  not pkg/captcha (LAPI / CrowdsecAppsecFailureAction)
+  not pkg/captcha (LAPI / BouncerAppsecFailureAction)
 ```
 
 **Structured AppSec response** (usage: `knowledge/devdocs/core_plugin_appsec.md`): JSON CrowdSec 1.8 returns (`action`, `http_status`, `user_body_content`, `user_cookies`, `user_headers`). Listener 403 is a verdict, not a transport failure. Owner: `pkg/appsec` parse, `pkg/bouncer` write.
 
-**AppSec `action: captcha`**: a structured envelope action. On this fork it falls through the same relay as challenge HTML (`handleAppsecResponseServeHTTP`). It is not `pkg/captcha` and not `CrowdsecAppsecFailureAction=captcha`. Official protocol names captcha as a bouncer-rendered verdict; this product already chose envelope relay. Research: `knowledge/research/ext_crowdsec_appsec_protocol/`, `knowledge/research/ext_crowdsec_appsec_bot-detection/`.
+**AppSec `action: captcha`**: a structured envelope action. On this fork it falls through the same relay as challenge HTML (`handleAppsecResponseServeHTTP`). It is not `pkg/captcha` and not `BouncerAppsecFailureAction=captcha`. Official protocol names captcha as a bouncer-rendered verdict; this product already chose envelope relay. Research: `knowledge/research/ext_crowdsec_appsec_protocol/`, `knowledge/research/ext_crowdsec_appsec_bot-detection/`.
 
 **Challenge**: `action: challenge` with a non-empty body is relayed; empty body is a ban. Spec: `core_plugin_appsec_bot-detection`. Tests exist (`Test_appsecQuery_challengeJSON`, `TestHandleNextServeHTTPRelaysStructuredAppsecChallenge`). Captcha has the constant and the fall-through, no fixture.
 

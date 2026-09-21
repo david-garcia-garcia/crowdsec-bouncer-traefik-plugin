@@ -36,7 +36,7 @@ Three holes versus Desired:
 
 1. **Solved-form POST.** First-solve POST already 302s inside `ServeHTTP` after `Validate` + gate cookie. The remaining hole is **Check true** (cookie already set) plus a captcha-form POST (second tab). That POST is forwarded as POST. GET-only origins answer 405. `#48` named `IsCaptchaFormPost` / `WriteSolvedRedirect`; dest does not have them. Dest already has unexported `captchaResponseFromRequest` (query / POST form / raw body, restores `Body`, 1MiB cap) used by `Validate`.
 
-2. **Custom challenge resources.** Custom provider stores `CaptchaCustomJsURL` as `infoProvider.js`. Browser-facing dest keys: JsURL only. `CaptchaCustomValidateURL` is server-side siteverify (plugin → provider), not a browser fetch. Built-in hcaptcha/recaptcha/turnstile JS is on vendor CDNs and never hits this middleware. Same-origin custom JS/widget **does**. Those requests are captcha-kind, Check false, so they get captcha HTML instead of the asset. Ban must stay blocked. `#50` matched exact path of JsURL plus optional `captchaCustomChallengeUrl`; dest has no challenge-URL key. `examples/custom-captcha/captcha.html` hardcodes `data-challenge-url=.../v0/challenge` (second path). Default `captcha.html` has no ChallengeURL.
+2. **Custom challenge resources.** Custom provider stores `BouncerCaptchaCustomJsURL` as `infoProvider.js`. Browser-facing dest keys: JsURL only. `BouncerCaptchaCustomValidateURL` is server-side siteverify (plugin → provider), not a browser fetch. Built-in hcaptcha/recaptcha/turnstile JS is on vendor CDNs and never hits this middleware. Same-origin custom JS/widget **does**. Those requests are captcha-kind, Check false, so they get captcha HTML instead of the asset. Ban must stay blocked. `#50` matched exact path of JsURL plus optional `bouncerCaptchaCustomChallengeUrl`; dest has no challenge-URL key. `examples/custom-captcha/captcha.html` hardcodes `data-challenge-url=.../v0/challenge` (second path). Default `captcha.html` has no ChallengeURL.
 
 3. **HEAD.** `Method != HEAD` drops captcha HEAD to ban. `TestCaptchaMethodBasedLogic` expects that. Ticket Desired: treat HEAD like the GET it previews on the captcha path (every captcha URL, not only custom-resource). `#50` assumed only matching custom-resource HEAD passes and other captcha HEAD stays ban — that loses to this ticket.
 
@@ -63,8 +63,8 @@ else
 ## Decisions
 
 - Detect the solved form with a `captcha.Client` predicate that calls existing `captchaResponseFromRequest`. Do not add `#48`'s second 64KiB body reader.
-- Custom-resource match is exact `req.URL.Path` of configured **browser** URLs: required `CaptchaCustomJsURL`, plus optional `captchaCustomChallengeUrl`. Ignore host and query. No prefix. Never `CaptchaCustomValidateURL`. Custom-provider-only (built-in CDN paths are not a match set).
-- Add optional public key `captchaCustomChallengeUrl` so a second widget path (wicketkeeper-style `/fast.js` + `/v0/challenge`) can pass without a prefix bypass. Empty = JsURL path only. Do not require it in custom-provider validation. Do not wire template `ChallengeURL`.
+- Custom-resource match is exact `req.URL.Path` of configured **browser** URLs: required `BouncerCaptchaCustomJsURL`, plus optional `bouncerCaptchaCustomChallengeUrl`. Ignore host and query. No prefix. Never `BouncerCaptchaCustomValidateURL`. Custom-provider-only (built-in CDN paths are not a match set).
+- Add optional public key `bouncerCaptchaCustomChallengeUrl` so a second widget path (wicketkeeper-style `/fast.js` + `/v0/challenge`) can pass without a prefix bypass. Empty = JsURL path only. Do not require it in custom-provider validation. Do not wire template `ChallengeURL`.
 - Remove `Method != HEAD` for the whole captcha kind. Custom-resource HEAD still hits the passthrough first. Other captcha HEAD goes to `ServeHTTP`, not ban.
 - Passthrough and Check-true ordinary requests use `handleNextServeHTTP` (AppSec still runs). Ban kind never passthrough.
 - `Check` stays cookie-only. Reuse `req.remoteIP`. Do not touch `pkg/lapi` or `pkg/reclaim`.
@@ -77,12 +77,12 @@ else
   Decision: resolved — `ip.GetRemoteIP` in bouncer `ServeHTTP`; the string lives on `clientRequest.remoteIP`. Reuse that output. Do not re-parse `RemoteAddr` or rebuild Host/trust hop.
   By: explore
 
-- Q: What is the passthrough match set — `CaptchaCustomJsURL` path only, or also a widget/challenge URL?
-  Decision: assumed — exact path of `CaptchaCustomJsURL` and, when set, exact path of optional `captchaCustomChallengeUrl`. Not `CaptchaCustomValidateURL`. Not a directory prefix.
+- Q: What is the passthrough match set — `BouncerCaptchaCustomJsURL` path only, or also a widget/challenge URL?
+  Decision: assumed — exact path of `BouncerCaptchaCustomJsURL` and, when set, exact path of optional `bouncerCaptchaCustomChallengeUrl`. Not `BouncerCaptchaCustomValidateURL`. Not a directory prefix.
   By: explore
 
 - Q: Does that need a new optional public key?
-  Decision: assumed — yes, optional `captchaCustomChallengeUrl` / `CaptchaCustomChallengeURL`. Empty means no second path. Custom validation still requires the existing four custom fields only.
+  Decision: assumed — yes, optional `bouncerCaptchaCustomChallengeUrl` / `BouncerCaptchaCustomChallengeURL`. Empty means no second path. Custom validation still requires the existing four custom fields only.
   By: explore
 
 - Q: Path vs host vs prefix matching, and why that scope is safe?

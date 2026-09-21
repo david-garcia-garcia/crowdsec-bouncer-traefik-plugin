@@ -79,63 +79,63 @@ While the remediation kind is captcha, a request whose path is an exact match of
 #### Scenario: Custom JS path under captcha reaches origin
 - **WHEN** captcha kind applies
 - **AND** `Check` is false
-- **AND** `req.URL.Path` equals the path of configured `CaptchaCustomJsURL`
+- **AND** `req.URL.Path` equals the path of configured `BouncerCaptchaCustomJsURL`
 - **THEN** the request is passed to origin
 - **AND** the captcha HTML MUST NOT be served for that request
 
 #### Scenario: Same path under ban stays blocked
 - **WHEN** the remediation kind is ban
-- **AND** `req.URL.Path` equals the path of configured `CaptchaCustomJsURL`
+- **AND** `req.URL.Path` equals the path of configured `BouncerCaptchaCustomJsURL`
 - **THEN** the handler applies ban
 - **AND** the request MUST NOT pass to origin as captcha passthrough
 
 ### Requirement: Passthrough match is exact path only
-The match set SHALL be the path of `CaptchaCustomJsURL` plus, when set, the path of optional `captchaCustomChallengeUrl`. Matching SHALL compare `url.Parse` of each configured URL's path to `req.URL.Path`. A configured path MUST be non-empty and start with `/`. Host and query SHALL be ignored. Prefix, directory, and substring matches MUST NOT pass. `CaptchaCustomValidateURL` MUST NOT be in the match set. One owner SHALL derive a resource path from a configured value, so configuration validation and request matching cannot disagree about which values name a path.
+The match set SHALL be the path of `BouncerCaptchaCustomJsURL` plus, when set, the path of optional `bouncerCaptchaCustomChallengeUrl`. Matching SHALL compare `url.Parse` of each configured URL's path to `req.URL.Path`. A configured path MUST be non-empty and start with `/`. Host and query SHALL be ignored. Prefix, directory, and substring matches MUST NOT pass. `BouncerCaptchaCustomValidateURL` MUST NOT be in the match set. One owner SHALL derive a resource path from a configured value, so configuration validation and request matching cannot disagree about which values name a path.
 
 #### Scenario: Absolute JS URL matches same-route path
-- **WHEN** `CaptchaCustomJsURL` is `https://widget.example/fast.js`
+- **WHEN** `BouncerCaptchaCustomJsURL` is `https://widget.example/fast.js`
 - **AND** the request path is `/fast.js`
 - **AND** captcha kind applies
 - **THEN** the request matches and passes to origin
 
 #### Scenario: Prefix of the JS path does not match
-- **WHEN** `CaptchaCustomJsURL` path is `/assets/fast.js`
+- **WHEN** `BouncerCaptchaCustomJsURL` path is `/assets/fast.js`
 - **AND** the request path is `/assets` or `/assets/fast.js/extra`
 - **AND** captcha kind applies
 - **THEN** the request MUST NOT match passthrough
 
 #### Scenario: Siteverify URL is never a match
-- **WHEN** `CaptchaCustomValidateURL` path equals the request path
-- **AND** that path is not also `CaptchaCustomJsURL` or `captchaCustomChallengeUrl`
+- **WHEN** `BouncerCaptchaCustomValidateURL` path equals the request path
+- **AND** that path is not also `BouncerCaptchaCustomJsURL` or `bouncerCaptchaCustomChallengeUrl`
 - **AND** captcha kind applies
 - **THEN** the request MUST NOT match passthrough
 
 ### Requirement: Optional challenge URL is not a required custom field
-The plugin SHALL expose optional `captchaCustomChallengeUrl`. Empty SHALL mean the match set is `CaptchaCustomJsURL` path only. Custom-provider validation MUST still require only the existing four custom fields. When the key is non-empty on a custom provider, configuration validation SHALL reject a value that names no absolute path, because no browser request could ever match it. A built-in provider SHALL ignore the key. The bundled default `captcha.html` MUST NOT gain a `ChallengeURL` placeholder from this change.
+The plugin SHALL expose optional `bouncerCaptchaCustomChallengeUrl`. Empty SHALL mean the match set is `BouncerCaptchaCustomJsURL` path only. Custom-provider validation MUST still require only the existing four custom fields. When the key is non-empty on a custom provider, configuration validation SHALL reject a value that names no absolute path, because no browser request could ever match it. A built-in provider SHALL ignore the key. The bundled default `captcha.html` MUST NOT gain a `ChallengeURL` placeholder from this change.
 
 #### Scenario: Empty challenge URL is valid custom config
 - **WHEN** provider is custom
 - **AND** the four existing custom fields are set
-- **AND** `captchaCustomChallengeUrl` is empty
+- **AND** `bouncerCaptchaCustomChallengeUrl` is empty
 - **THEN** configuration validation accepts the middleware
-- **AND** only the `CaptchaCustomJsURL` path is in the passthrough match set
+- **AND** only the `BouncerCaptchaCustomJsURL` path is in the passthrough match set
 
 #### Scenario: Challenge URL adds a second exact path
-- **WHEN** `captchaCustomChallengeUrl` parses to path `/v0/challenge`
+- **WHEN** `bouncerCaptchaCustomChallengeUrl` parses to path `/v0/challenge`
 - **AND** captcha kind applies
 - **AND** the request path is `/v0/challenge`
 - **THEN** the request matches and passes to origin
 
 #### Scenario: Challenge URL that names no path is rejected
 - **WHEN** provider is custom
-- **AND** `captchaCustomChallengeUrl` is set to a value with no absolute path
+- **AND** `bouncerCaptchaCustomChallengeUrl` is set to a value with no absolute path
 - **THEN** configuration validation returns an error naming the key
 
 ### Requirement: Captcha template renders the configured challenge URL
-The captcha HTML execute data SHALL include `ChallengeURL` beside `SiteKey`, `FrontendJS`, and `FrontendKey`. It SHALL carry `captchaCustomChallengeUrl` for a custom provider and SHALL be empty otherwise, so a self-hosted widget is pointed at its challenge endpoint from configuration instead of a hard-coded template. The `examples/custom-captcha` template SHALL use that variable, and that example's compose labels and README SHALL set the key. `README.md` SHALL document the key alongside the other captcha keys, with its default.
+The captcha HTML execute data SHALL include `ChallengeURL` beside `SiteKey`, `FrontendJS`, and `FrontendKey`. It SHALL carry `bouncerCaptchaCustomChallengeUrl` for a custom provider and SHALL be empty otherwise, so a self-hosted widget is pointed at its challenge endpoint from configuration instead of a hard-coded template. The `examples/custom-captcha` template SHALL use that variable, and that example's compose labels and README SHALL set the key. `README.md` SHALL document the key alongside the other captcha keys, with its default.
 
 #### Scenario: Custom provider renders its challenge URL
-- **WHEN** provider is custom and `captchaCustomChallengeUrl` is set
+- **WHEN** provider is custom and `bouncerCaptchaCustomChallengeUrl` is set
 - **AND** the captcha challenge page is served from a template using `ChallengeURL`
 - **THEN** the rendered page carries the configured challenge URL
 

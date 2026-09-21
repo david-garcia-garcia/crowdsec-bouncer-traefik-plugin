@@ -25,7 +25,7 @@ const (
 	OriginPluginTechStreamFail    = "plugin:tech_streamfail"    // stream unhealthy
 	OriginPluginLapiFailure       = "plugin:lapi_failure"       // live LAPI lookup error
 	OriginPluginAppsecFailure     = "plugin:appsec_failure"     // AppSec failure-action
-	OriginPluginForcedDecision    = "plugin:forced_decision"    // crowdsecDecisionHeader forced b or c
+	OriginPluginForcedDecision    = "plugin:forced_decision"    // bouncerDecisionHeader forced b or c
 )
 
 // crowdsecQueryFunc POSTs through the Client's current LAPI transport.
@@ -40,7 +40,7 @@ type MetricsReporter struct {
 	path          string
 	pluginVersion string
 	startedAt     time.Time
-	crowdsecMode  string
+	lapiMode  string
 	query         crowdsecQueryFunc
 	originName    func(uint16) string
 	log           *slog.Logger
@@ -63,7 +63,7 @@ func newMetricsReporter(client *Client, startedAt time.Time) *MetricsReporter {
 		path:           client.crowdsecPath,
 		pluginVersion:  client.pluginVersion,
 		startedAt:      startedAt,
-		crowdsecMode:   client.crowdsecMode,
+		lapiMode:   client.lapiMode,
 		query:          client.crowdsecQuery,
 		originName:     client.OriginName,
 		log:            client.log,
@@ -270,7 +270,7 @@ func (r *MetricsReporter) restoreMetricsWindow(window map[usageMetricKey]int64, 
 
 // activeDecisionItems is the stream/alone gauge snapshot. Failed POST does not restore these (gauge, not a window).
 func (r *MetricsReporter) activeDecisionItems() []map[string]interface{} {
-	if r.crowdsecMode != configuration.StreamMode && r.crowdsecMode != configuration.AloneMode {
+	if r.lapiMode != configuration.StreamMode && r.lapiMode != configuration.AloneMode {
 		return nil
 	}
 	if r.activeCounts == nil {

@@ -13,7 +13,7 @@
 - **AND** the call does not go through `lapi.Client`
 
 ### Requirement: AppSec is reclaimed by listener identity
-When `crowdsecAppsecEnabled` is true, `New` SHALL reclaim an `appsec.Client` with `reclaim.Open` on the process table (30s grace). The reclaim key SHALL be derived from AppSec scheme, host, path, key, and body limit. AppSec TLS, HTTP timeout, middleware name, `next`, templates, trusted IPs, Enabled, LAPI fields, and per-router AppSec failure action MUST NOT be in that key. The Open call SHALL pass `reclaim.Hooks` for Sleep/Wake/Close. `Close` SHALL release idle AppSec HTTP connections.
+When `appsecEnabled` is true, `New` SHALL reclaim an `appsec.Client` with `reclaim.Open` on the process table (30s grace). The reclaim key SHALL be derived from AppSec scheme, host, path, key, and body limit. AppSec TLS, HTTP timeout, middleware name, `next`, templates, trusted IPs, Enabled, LAPI fields, and per-router AppSec failure action MUST NOT be in that key. The Open call SHALL pass `reclaim.Hooks` for Sleep/Wake/Close. `Close` SHALL release idle AppSec HTTP connections.
 
 #### Scenario: Two routers share one AppSec listener
 - **WHEN** two `New` calls enable AppSec with the same AppSec URL, key, and body limit and live constructor contexts
@@ -37,10 +37,10 @@ When `crowdsecAppsecEnabled` is true, `New` SHALL reclaim an `appsec.Client` wit
 - **AND** an INFO line names the replaced transport fields
 
 ### Requirement: Empty AppSec key falls back to LAPI key
-`appsec.Prepare` SHALL copy `crowdsecLapiKey` into `crowdsecAppsecKey` when the AppSec key is empty, and SHALL copy `crowdsecLapiScheme` into `crowdsecAppsecScheme` when the AppSec scheme is empty. Callers SHALL run `lapi.Prepare` before `appsec.Prepare`.
+`appsec.Prepare` SHALL copy `lapiKey` into `appsecKey` when AppSec is enabled, the AppSec key is empty, and `appsecInstance` is empty, and SHALL copy `lapiScheme` into `appsecScheme` when the AppSec scheme is empty. Callers SHALL run `lapi.Prepare` before `appsec.Prepare`. A named AppSec subscribe MUST NOT inherit the LAPI key.
 
 #### Scenario: Shared bouncer key still works
-- **WHEN** the operator sets `crowdsecLapiKey` and omits `crowdsecAppsecKey` with AppSec enabled
+- **WHEN** the operator sets `lapiKey` and omits `appsecKey` with AppSec enabled
 - **THEN** AppSec authenticates with that LAPI key
 
 ### Requirement: AppSec User-Agent includes plugin version
@@ -58,10 +58,10 @@ When `Query` receives a non-nil AppSec HTTP response, it SHALL drain and close t
 - **THEN** those later requests reuse the keep-alive connection
 
 ### Requirement: Zero body limit forwards the full body
-When `crowdsecAppsecBodyLimit` is `0`, `Query` SHALL treat the cap as unlimited: it SHALL copy the full readable client body to AppSec and restore that body for origin. It MUST NOT apply a zero-byte read cap that yields an empty body. A positive limit SHALL still cap the copy. The omitted default SHALL remain 10485760.
+When `appsecBodyLimit` is `0`, `Query` SHALL treat the cap as unlimited: it SHALL copy the full readable client body to AppSec and restore that body for origin. It MUST NOT apply a zero-byte read cap that yields an empty body. A positive limit SHALL still cap the copy. The omitted default SHALL remain 10485760.
 
 #### Scenario: Zero limit forwards a POST body
-- **WHEN** `crowdsecAppsecBodyLimit` is `0` and the client request has a readable body
+- **WHEN** `appsecBodyLimit` is `0` and the client request has a readable body
 - **THEN** AppSec receives that body as POST
 - **AND** origin can still read the original body
 
@@ -99,28 +99,28 @@ After `Query` chooses the bytes sent to AppSec, it SHALL omit the client's `Cont
 - **AND** an unreadable DELETE body is still not a drop
 
 ### Requirement: AppSec transport Timeout is the effective AppSec seconds
-AppSec HTTP construct SHALL set `http.Client.Timeout` and the stored timeout seconds from `config.EffectiveHTTPTimeoutSeconds(config.CrowdsecAppsecHTTPTimeoutSeconds)`. It MUST NOT read raw `HTTPTimeoutSeconds` when the AppSec override is non-zero. `Query` SHALL use that stored client. `AdoptTransport` SHALL keep last-writing that transport on the same Client. AppSec `IdentityHex` and `Key` MUST still omit `HTTPTimeoutSeconds` and `CrowdsecAppsecHTTPTimeoutSeconds`.
+AppSec HTTP construct SHALL set `http.Client.Timeout` and the stored timeout seconds from `config.EffectiveHTTPTimeoutSeconds(config.AppsecHttpTimeoutSeconds)`. It MUST NOT read raw `HTTPTimeoutSeconds` when the AppSec override is non-zero. `Query` SHALL use that stored client. `AdoptTransport` SHALL keep last-writing that transport on the same Client. AppSec `IdentityHex` and `Key` MUST still omit `HTTPTimeoutSeconds` and `AppsecHttpTimeoutSeconds`.
 
 #### Scenario: AppSec override adopts Timeout
-- **WHEN** a later `New` enables AppSec with the same URL, key, and body limit and `CrowdsecAppsecHTTPTimeoutSeconds` 30
+- **WHEN** a later `New` enables AppSec with the same URL, key, and body limit and `AppsecHttpTimeoutSeconds` 30
 - **THEN** both constructors use the same `appsec.Client` incarnation
 - **AND** the stored transport Timeout is 30 seconds
 
 #### Scenario: Query hang honors the AppSec override
-- **WHEN** AppSec is opened through `New` or `Open` with `HTTPTimeoutSeconds` 10, `CrowdsecAppsecHTTPTimeoutSeconds` 1, and `crowdsecAppsecFailureAction` passthrough
+- **WHEN** AppSec is opened through `New` or `Open` with `HTTPTimeoutSeconds` 10, `AppsecHttpTimeoutSeconds` 1, and `bouncerAppsecFailureAction` passthrough
 - **AND** `Query` hits a listener that never accepts
 - **THEN** `Query` returns a passthrough allow
 - **AND** the call finishes well under 10 seconds
 
 #### Scenario: AppSec timeout knobs do not change Key
-- **WHEN** two AppSec configs share URL, key, and body limit and differ only on `HTTPTimeoutSeconds` or `CrowdsecAppsecHTTPTimeoutSeconds`
+- **WHEN** two AppSec configs share URL, key, and body limit and differ only on `HTTPTimeoutSeconds` or `AppsecHttpTimeoutSeconds`
 - **THEN** `Key` and `IdentityHex` are the same
 
 ### Requirement: Client disconnect while buffering is not an AppSec query
-When `Query` copies a readable POST, PUT, PATCH, or DELETE body and `io.ReadAll` fails with `context.Canceled`, `context.DeadlineExceeded`, or `io.ErrUnexpectedEOF`, `Query` SHALL return `ErrClientDisconnected` and MUST NOT send a request to the AppSec listener. `crowdsecAppsecFailureAction` SHALL NOT change that result. Unclassified body-read errors SHALL keep `appsecQuery:GetBody`. Serving the disconnect (TRACE, optional remediation header, no ban, no origin) is owned by `core_plugin_middleware_bouncer`.
+When `Query` copies a readable POST, PUT, PATCH, or DELETE body and `io.ReadAll` fails with `context.Canceled`, `context.DeadlineExceeded`, or `io.ErrUnexpectedEOF`, `Query` SHALL return `ErrClientDisconnected` and MUST NOT send a request to the AppSec listener. `bouncerAppsecFailureAction` SHALL NOT change that result. Unclassified body-read errors SHALL keep `appsecQuery:GetBody`. Serving the disconnect (TRACE, optional remediation header, no ban, no origin) is owned by `core_plugin_middleware_bouncer`.
 
 #### Scenario: Canceled body does not reach AppSec
 - **WHEN** buffering a readable POST body fails with `context.Canceled`
 - **THEN** `Query` returns `ErrClientDisconnected`
 - **AND** the AppSec listener is not called
-- **AND** `crowdsecAppsecFailureAction: ban` does not change that
+- **AND** `bouncerAppsecFailureAction: ban` does not change that

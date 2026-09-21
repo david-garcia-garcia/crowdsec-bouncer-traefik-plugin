@@ -10,7 +10,7 @@ severity: security
 Related findings (same change, `pkg/ip` only):
 
 ### Forwarded-header client IP is chosen without verifying the socket peer is a trusted proxy
-`GetRemoteIP` walks `X-Forwarded-For` (or the custom header) and returns the first hop not in `ForwardedHeadersTrustedIPs`, but it never checks that `req.RemoteAddr` itself is a trusted proxy before trusting any header value. A client that connects directly to Traefik can supply a forged chain (`victim-ip, trusted-proxy-ip`) and be identified as `victim-ip`. With the default empty trusted-hop list, any single spoofed header value is accepted as the client address whenever the header is present.
+`GetRemoteIP` walks `X-Forwarded-For` (or the custom header) and returns the first hop not in `BouncerForwardedTrustedIPs`, but it never checks that `req.RemoteAddr` itself is a trusted proxy before trusting any header value. A client that connects directly to Traefik can supply a forged chain (`victim-ip, trusted-proxy-ip`) and be identified as `victim-ip`. With the default empty trusted-hop list, any single spoofed header value is accepted as the client address whenever the header is present.
 
 When the forwarded header is `203.0.113.10, 10.0.0.1` and `10.0.0.1` is in the trusted-hop pool, `GetRemoteIP` returns `203.0.113.10` even if `RemoteAddr` is an untrusted address such as `198.51.100.5:443`. When the trusted-hop pool is empty and the header is `203.0.113.10`, the rightmost hop is immediately treated as the client (nothing is trusted, so the first walk iteration wins) instead of falling back to `RemoteAddr`.
 
@@ -32,7 +32,7 @@ Only honor forwarded headers when `RemoteAddr` is in the trusted-proxy set (fail
 ## Out of scope
 - `pkg/iplookup`
 - Traefik entrypoint `forwardedHeaders.trustedIPs` configuration (expected complementary layer per e2e specs)
-- `ClientTrustedIPs` bypass after identity is already chosen
+- `BouncerClientTrustedIPs` bypass after identity is already chosen
 - Whether fail-closed vs skip-unparseable-hop is the better product choice (current code is intentionally fail-closed)
 
 ## Grouped findings

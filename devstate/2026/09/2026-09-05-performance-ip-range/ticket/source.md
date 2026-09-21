@@ -24,7 +24,7 @@ Do not change live/none: those still expand Range via LAPI ?ip= and skip range-i
 
 In-process: reclaim.Open → one CrowdsecConnection → one stream ticker.
 
-Cross-pod, Redis on: each pod still ticks. handleStreamCache GETs cache key "updated". Hit → skip LAPI. Miss → SET "updated" TTL UpdateIntervalSeconds-1 (min 1), then GET /v1/decisions/stream, write IP keys + ApplyRangeBatch to Redis.
+Cross-pod, Redis on: each pod still ticks. handleStreamCache GETs cache key "updated". Hit → skip LAPI. Miss → SET "updated" TTL LapiUpdateIntervalSeconds-1 (min 1), then GET /v1/decisions/stream, write IP keys + ApplyRangeBatch to Redis.
 
 This is best-effort (GET then SET, not SET NX). Followers never see stream.New / stream.Deleted. They stay correct today because ServeHTTP reads Redis.
 

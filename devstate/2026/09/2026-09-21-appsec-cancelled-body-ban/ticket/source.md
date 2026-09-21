@@ -27,7 +27,7 @@ Still present on `main` (`710e888`) — the signature changed to `return nil, fm
 
 1. **None of the fail-open options apply.** `crowdsecAppsecFailureBlock` guards an AppSec `500`; `crowdsecAppsecUnreachableBlock` guards AppSec being unreachable; `crowdsecAppsecUnreadableBodyBlock` guards the *by-design* unreadable case in `isBodyUnreadable` (HTTP/2+ with no `Content-Length`). A mid-stream read failure is none of those, so it fails **closed** with all three set to `false`.
 2. **It is invisible at the default log level.** Every 403 path in `ServeHTTP` / `handleNextServeHTTP` logs at `DEBUG`; only `getRemoteIp`, `checkerContains`, `appsecQuery:unreachable` and the AppSec `500` log above it. At `INFO` a storm of these produces **zero** plugin log lines, which is what sent me looking at CrowdSec first — `cscli decisions list` was empty, `cscli alerts list` showed nothing for the client, and the AppSec container had logged the source as allowlisted and skipped.
-3. **`crowdsecAppsecBodyLimit` defaults to `10485760`, not `0`.** Leaving it unset does not mean "no body inspection" — it puts every POST with a body through the buffering branch. Easy to assume otherwise from the docs.
+3. **`appsecBodyLimit` defaults to `10485760`, not `0`.** Leaving it unset does not mean "no body inspection" — it puts every POST with a body through the buffering branch. Easy to assume otherwise from the docs.
 
 **Expected behavior** 👀
 
@@ -42,7 +42,7 @@ Distinguishing a client-side cancellation (`context.Canceled`, `http2.StreamErro
 
 No CrowdSec decision or AppSec rule needed — the source IP can even be allowlisted.
 
-1. Put the bouncer in front of any backend with `crowdsecAppsecEnabled: true` and `crowdsecAppsecBodyLimit` left at its default.
+1. Put the bouncer in front of any backend with `appsecEnabled: true` and `appsecBodyLimit` left at its default.
 2. Set `logLevel: DEBUG` on the middleware.
 3. Send a large POST over HTTP/2 and abort it mid-body, e.g.
    `curl --max-time 2 --limit-rate 60k -F "f=@5mb.bin" https://<host>/<upload-path>`
@@ -72,15 +72,15 @@ Traefik access log for those three, next to one upload allowed to complete:
 **Relevant config** (redacted)
 
 ```yaml
-crowdsecMode: appsec
-crowdsecAppsecEnabled: true
+lapiMode: appsec
+appsecEnabled: true
 crowdsecAppsecFailureBlock: false
 crowdsecAppsecUnreachableBlock: false
 crowdsecAppsecUnreadableBodyBlock: false
-crowdsecAppsecHost: <appsec-host>:7422
-crowdsecLapiHost: <lapi-host>:8080
-crowdsecLapiScheme: http
-# crowdsecAppsecBodyLimit not set → 10485760
+appsecHost: <appsec-host>:7422
+lapiHost: <lapi-host>:8080
+lapiScheme: http
+# appsecBodyLimit not set → 10485760
 ```
 
 **Version**

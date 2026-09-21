@@ -48,13 +48,13 @@ type infoProvider struct {
 
 //nolint:gochecknoglobals
 var infoProviders = map[string]*infoProvider{
-	configuration.HcaptchaProvider: {
+	configuration.HbouncerCaptchaProvider: {
 		js:       "https://hcaptcha.com/1/api.js",
 		key:      "h-captcha",
 		response: "h-captcha-response",
 		validate: "https://api.hcaptcha.com/siteverify",
 	},
-	configuration.RecaptchaProvider: {
+	configuration.RebouncerCaptchaProvider: {
 		js:       "https://www.google.com/recaptcha/api.js",
 		key:      "g-recaptcha",
 		response: "g-recaptcha-response",
@@ -321,7 +321,7 @@ func captchaResponseFromRequest(r *http.Request, field string) string {
 // Custom+json sends application/json; form/omit and built-ins keep PostForm.
 // remoteip is added on both encodings only when remoteIP is non-empty.
 func (c *Client) postSiteverify(response, remoteIP string) (*http.Response, error) {
-	if c.validateBody == configuration.CaptchaCustomValidateBodyJSON {
+	if c.validateBody == configuration.BouncerCaptchaCustomValidateBodyJSON {
 		payload, err := json.Marshal(siteverifyRequest{Secret: c.secretKey, Response: response, RemoteIP: remoteIP})
 		if err != nil {
 			return nil, err

@@ -27,7 +27,7 @@ const streamSessionKeyPrefix = "lapi:stream:"
 //     the visitor behind Traefik.
 //
 // scopes= on the query string is a filter of the same cursor, not a second
-// cursor. Intervals, CAPI scenarios, updateMaxFailure, and decisionScopeHeaders
+// cursor. Intervals, CAPI scenarios, lapiUpdateMaxFailure, and lapiScopeHeaders
 // are also not how LAPI picks the row. Usage-metrics POST uses that same
 // authenticated row (`generated_by` = bouncer name, not payload name).
 //
@@ -54,13 +54,13 @@ type streamSession struct {
 // sessionFrom copies the CrowdSec-row fields off cfg. Call after Prepare.
 func sessionFrom(cfg *configuration.Config) streamSession {
 	return streamSession{
-		Mode:          cfg.CrowdsecMode,
-		LapiScheme:    cfg.CrowdsecLapiScheme,
-		LapiHost:      cfg.CrowdsecLapiHost,
-		LapiPath:      cfg.CrowdsecLapiPath,
-		LapiKey:       cfg.CrowdsecLapiKey,
-		CapiMachineID: cfg.CrowdsecCapiMachineID,
-		CapiPassword:  cfg.CrowdsecCapiPassword,
+		Mode:          cfg.LapiMode,
+		LapiScheme:    cfg.LapiScheme,
+		LapiHost:      cfg.LapiHost,
+		LapiPath:      cfg.LapiPath,
+		LapiKey:       cfg.LapiKey,
+		CapiMachineID: cfg.LapiCapiMachineID,
+		CapiPassword:  cfg.LapiCapiPassword,
 	}
 }
 
@@ -90,7 +90,7 @@ func SessionKey(cfg *configuration.Config) string {
 
 // reclaimSessionKey is SessionKey for stream/alone and Key for live/none.
 func reclaimSessionKey(cfg *configuration.Config) string {
-	if cfg.CrowdsecMode == configuration.StreamMode || cfg.CrowdsecMode == configuration.AloneMode {
+	if cfg.LapiMode == configuration.StreamMode || cfg.LapiMode == configuration.AloneMode {
 		return SessionKey(cfg)
 	}
 	return Key(cfg)
@@ -131,9 +131,9 @@ func openDecisionStoreExclusive(ctx context.Context, cfg *configuration.Config, 
 //
 // SessionKey is session prefix plus this Redis snapshot’s hash. Same Redis
 // snapshot → Open that key (Sleep/Wake across Traefik’s cancel-then-New gap),
-// even when intervals, CAPI scenarios, updateMaxFailure, or header maps differ.
+// even when intervals, CAPI scenarios, lapiUpdateMaxFailure, or header maps differ.
 // A different Redis host is a different Client key and the same DecisionStore
-// when the Traefik name matches. Interval / CAPI / updateMaxFailure
+// when the Traefik name matches. Interval / CAPI / lapiUpdateMaxFailure
 // mismatch on a live sibling is silent first-wins (create already wrote those
 // scalars). A different Traefik name on the same SessionHex fails before Open.
 // After bind, this constructor registers its header scopes.
@@ -162,7 +162,7 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	if adoptErr != nil {
 		return nil, adoptErr
 	}
-	client.registerLiveHeaderScopes(ctx, decisionscope.NormalizeDecisionScopeHeaders(cfg.DecisionScopeHeaders))
+	client.registerLiveHeaderScopes(ctx, decisionscope.NormalizeLapiScopeHeaders(cfg.LapiScopeHeaders))
 	if replaced {
 		log.Info("lapi session joiner adopted",
 			"sessionKey", bindKey,

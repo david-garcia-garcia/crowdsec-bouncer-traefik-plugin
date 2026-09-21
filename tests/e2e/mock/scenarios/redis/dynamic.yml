@@ -16,14 +16,14 @@ http:
     bouncer:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecMode: live
-          crowdsecLapiScheme: http
-          crowdsecLapiHost: "@@LAPI_HOST@@"
-          crowdsecLapiKey: "@@APIKEY@@"
-          redisCacheEnabled: "true"
-          redisCacheHost: "@@REDIS_HOST@@"
-          redisCacheReadHosts:
+          bouncerEnabled: "true"
+          lapiMode: live
+          lapiScheme: http
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          lapiRedisEnabled: "true"
+          lapiRedisHost: "@@REDIS_HOST@@"
+          lapiRedisReadHosts:
             - "@@REDIS_READ_HOST@@"
-          forwardedHeadersTrustedIps:
+          bouncerForwardedTrustedIps:
             - "127.0.0.1/32"

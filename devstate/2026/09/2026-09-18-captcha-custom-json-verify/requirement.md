@@ -2,7 +2,7 @@
 IssueKey: 2026-09-18-captcha-custom-json-verify
 
 ## Problem
-Cap Standalone / CapJS siteverify wants `POST application/json` `{"secret","response"}`. Dest `Validate` always `PostForm` urlencoded. `captchaCustomResponse` already names the browser field (`cap-token`); the second-hop body encoding is not configurable.
+Cap Standalone / CapJS siteverify wants `POST application/json` `{"secret","response"}`. Dest `Validate` always `PostForm` urlencoded. `bouncerCaptchaCustomResponse` already names the browser field (`cap-token`); the second-hop body encoding is not configurable.
 
 ## Current (code)
 - `Validate(r)` always `url.Values` + `httpClient.PostForm` with `secret` and `response`. No body-encoding knob. Path: `pkg/captcha/captcha.go`.
@@ -10,9 +10,9 @@ Cap Standalone / CapJS siteverify wants `POST application/json` `{"secret","resp
 - `ServeHTTP` already has `remoteIP` for `mintGateValue` / `setGateCookie` after success, then 302. Path: `pkg/captcha/captcha.go`, `pkg/captcha/gate.go`.
 - Custom provider copies `js`, `key`, `response`, `validate` into `infoProvider`. No validate-body field. Path: `pkg/captcha/captcha.go`.
 - Built-in hcaptcha / recaptcha / turnstile share the same `PostForm` path. Path: `pkg/captcha/captcha.go`.
-- Config has `CaptchaCustomJsURL`, `CaptchaCustomValidateURL`, `CaptchaCustomKey`, `CaptchaCustomResponse`, `CaptchaCustomChallengeURL`. No `CaptchaCustomValidateBody`. Path: `pkg/configuration/configuration.go`.
+- Config has `BouncerCaptchaCustomJsURL`, `BouncerCaptchaCustomValidateURL`, `BouncerCaptchaCustomKey`, `BouncerCaptchaCustomResponse`, `BouncerCaptchaCustomChallengeURL`. No `BouncerCaptchaCustomValidateBody`. Path: `pkg/configuration/configuration.go`.
 - `validateCaptcha` requires the four custom strings when provider is `custom`. Does not mention a body encoding. Path: `pkg/configuration/configuration.go`.
-- Built-in providers ignore `CaptchaCustomChallengeURL`. Path: `pkg/configuration/zzz_configuration_test.go`.
+- Built-in providers ignore `BouncerCaptchaCustomChallengeURL`. Path: `pkg/configuration/zzz_configuration_test.go`.
 - README documents custom knobs and Wicketkeeper. No CapJS JSON example. Path: `README.md`.
 - Wicketkeeper example states siteverify is `application/x-www-form-urlencoded`. Path: `examples/custom-captcha/README.md`.
 - Siteverify reply Content-Type uses `strings.HasPrefix(..., "application/json")`. `mime.ParseMediaType` is used on the captcha template, not this hop. Path: `pkg/captcha/captcha.go`.
@@ -22,7 +22,7 @@ Cap Standalone / CapJS siteverify wants `POST application/json` `{"secret","resp
 - CapJS Standalone siteverify JSON contract is not in `knowledge/research/` (indexes consumed; no Task write this phase). Ticket URL: https://trycap.dev/guide/standalone/
 
 ## Desired
-- Optional `captchaCustomValidateBody` / `CaptchaCustomValidateBody`: `""` or `"form"` = today's `PostForm`; `"json"` = `POST application/json` object with `secret` and `response`.
+- Optional `bouncerCaptchaCustomValidateBody` / `BouncerCaptchaCustomValidateBody`: `""` or `"form"` = today's `PostForm`; `"json"` = `POST application/json` object with `secret` and `response`.
 - Knob is custom-only. Built-in providers always `PostForm`. Reject unknown values. Reject `json` when provider is not `custom`.
 - Default omit keeps Wicketkeeper `examples/custom-captcha` working. Do not retarget that official JSON.
 - README: document the knob and a CapJS custom example (validate URL + `cap-token` + json body).
@@ -31,14 +31,14 @@ Cap Standalone / CapJS siteverify wants `POST application/json` `{"secret","resp
 - Tests: custom+json sees JSON Content-Type and `secret`/`response` (plus `remoteip` only if `Validate` has it); custom+form/omit still urlencoded; unknown body fails `ValidateParams`; success still 302 + Set-Cookie; built-in+json per explore (ticket Desired already says reject).
 
 ## Affected
-- `pkg/configuration/configuration.go` (`CaptchaCustomValidateBody`, `validateCaptcha`)
+- `pkg/configuration/configuration.go` (`BouncerCaptchaCustomValidateBody`, `validateCaptcha`)
 - `pkg/captcha/captcha.go` (`Validate` request encoding)
 - `README.md`
 - Captcha / configuration tests
 - Possible later spec leaf for siteverify body encoding (not on dest today)
 
 ## Out of scope
-- `captchaProvider: trycap`, `captchaTrycapInstanceUrl`, `<cap-widget>` template branch
+- `bouncerCaptchaProvider: trycap`, `captchaTrycapInstanceUrl`, `<cap-widget>` template branch
 - Extra verify fields or headers beyond `secret`, `response`, and absorb-only `remoteip`
 - Leftovers: template required, 200-on-retryable (except absorb `remoteip` if dest already has it)
 - Split HTTP timeouts, backendbackoff

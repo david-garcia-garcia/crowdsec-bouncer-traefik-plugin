@@ -14,7 +14,7 @@ However, note that it is not possible to authenticate with TLS client certificat
 ##### Details
 
 Simple HTTPS communication: It is possible to talk to Crowdsec LAPI which is configured with a self-signed certificate
-In that case the setting **crowdsecLapiTLSInsecureVerify** must be set to true.
+In that case the setting **lapiTlsInsecureVerify** must be set to true.
 
 It is recommended to validate the certificate presented by Crowdsec LAPI using the Certificate Authority which created it.
 
@@ -28,7 +28,7 @@ http:
     crowdsec:
       plugin:
         bouncer:
-          crowdsecLapiTlsCertificateAuthorityFile: /etc/traefik/certs/crowdsecCA.pem
+          lapiTlsCaFile: /etc/traefik/certs/crowdsecCA.pem
 ```
 
 - The PEM encoded certificate as a text variable
@@ -41,7 +41,7 @@ http:
     crowdsec:
       plugin:
         bouncer:
-          crowdsecLapiTlsCertificateAuthority: |-
+          lapiTlsCa: |-
             -----BEGIN CERTIFICATE-----
             MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
             MRAwDgYDVQQHDAdTZWF0dGxlMRMwEQYDVQQIDApXYXNoaW5ndG9uMSIwIAYDVQQK
@@ -59,7 +59,7 @@ services:
     image: traefik/whoami
     labels:
       - |
-        traefik.http.middlewares.crowdsec-foo.plugin.bouncer.crowdsecLapiTlsCertificateAuthority=
+        traefik.http.middlewares.crowdsec-foo.plugin.bouncer.lapiTlsCa=
         -----BEGIN CERTIFICATE-----
         MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
         MRAwDgYDVQQHDAdTZWF0dGxlMRMwEQYDVQQIDApXYXNoaW5ndG9uMSIwIAYDVQQK
@@ -109,4 +109,4 @@ Note:
 ## Separate LAPI and Appsec HTTP/S config
 
 To separate TLS config for LAPI and Appsec, you can use all the TLS LAPI variable beginning with `CrowdsecLapi...` into `CrowdsecAppsec...`.
-Don't forget to set `CrowdsecAppsecScheme: HTTP` or `HTTPS` to trigger the separate setup.
+Don't forget to set `AppsecScheme: HTTP` or `HTTPS` to trigger the separate setup.

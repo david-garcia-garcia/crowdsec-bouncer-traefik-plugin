@@ -37,6 +37,6 @@ skipped: none
 ## pullrequest (2026-09-20T17:55:50Z)
 phase: pullrequest
 findings: none
-fixed: title ✨ feat(bouncer): honor crowdsecDecisionHeader forced ban and captcha; CI 35527177104 succeeded
+fixed: title ✨ feat(bouncer): honor bouncerDecisionHeader forced ban and captcha; CI 35527177104 succeeded
 skipped: none
 

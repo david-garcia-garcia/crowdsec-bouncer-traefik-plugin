@@ -6,4 +6,4 @@ change: appsec-proxy-unavailable-tests
 
 ## Findings
 - [x] stale-usage  AppSec query — How-to named “unreachable” without HTTP 502/503/504; those statuses are the apply’s proof
-  Produced: How-to bullet + Gotcha that listener 502/503/504 are unreachable (same `crowdsecAppsecFailureAction` as transport failure)
+  Produced: How-to bullet + Gotcha that listener 502/503/504 are unreachable (same `bouncerAppsecFailureAction` as transport failure)

@@ -12,7 +12,7 @@ Developer review: needs changes — 2026-09-06T15:41:14Z
 **End users.** None.
 
 ## Motivation
-On `master`, no test proves that `updateIntervalSeconds: 1` stores stream poll lease key `updated`. Upstream #370 used TTL 0, which never stores. Without this test a regression polls LAPI every tick on multi-instance deploys.
+On `master`, no test proves that `lapiUpdateIntervalSeconds: 1` stores stream poll lease key `updated`. Upstream #370 used TTL 0, which never stores. Without this test a regression polls LAPI every tick on multi-instance deploys.
 
 ## Merge readiness
 Product tests and spec landed. e2e docker + pester failed twice with no test-results.xml (Pester did not start). Not ready for review until that check is green.

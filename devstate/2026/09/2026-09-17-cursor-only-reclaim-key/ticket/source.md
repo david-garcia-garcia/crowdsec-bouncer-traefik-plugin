@@ -24,7 +24,7 @@ Today the key is still the session prefix plus a first-wins hash of the remainin
 
 ## 2. Union `scopes=` across the live routers instead of first-wins
 
-Today `streamQuery()` in `pkg/lapi/client_decisions.go` builds `&scopes=` from `c.decisionScopeHeaders`, which is whichever router constructed the Client first; `storeStreamDecision` then filters header scopes by that same map. Once routers share one incarnation, first-wins silently drops a second router's scopes. Make the requested scope set the union of the live routers, and make sure the store filter follows the union rather than one router's view.
+Today `streamQuery()` in `pkg/lapi/client_decisions.go` builds `&scopes=` from `c.lapiScopeHeaders`, which is whichever router constructed the Client first; `storeStreamDecision` then filters header scopes by that same map. Once routers share one incarnation, first-wins silently drops a second router's scopes. Make the requested scope set the union of the live routers, and make sure the store filter follows the union rather than one router's view.
 
 ## 3. Delete `Peek`, `PeekLivePrefix` and `View`
 

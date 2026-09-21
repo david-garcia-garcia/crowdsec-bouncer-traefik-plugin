@@ -29,9 +29,9 @@ desired (same package)
 
 ## Concepts
 
-**Trusted-IP Checker** (existing Language): pool from `ForwardedHeadersTrustedIPs` or `ClientTrustedIPs`. Boolean any-match via `pkg/iplookup`.
+**Trusted-IP Checker** (existing Language): pool from `BouncerForwardedTrustedIPs` or `BouncerClientTrustedIPs`. Boolean any-match via `pkg/iplookup`.
 
-**GetRemoteIP**: owner of the client address for every request. Walks the custom forwarded header (default `X-Forwarded-For`) most-recent-first against the **server** pool (`ForwardedHeadersTrustedIPs`). First address **not** in that pool is the client. Empty walk → `net.SplitHostPort(req.RemoteAddr)`. `Bouncer` then asks the **client** pool (`ClientTrustedIPs`) `Contains` on that same string. Do not parse `RemoteAddr` a second time.
+**GetRemoteIP**: owner of the client address for every request. Walks the custom forwarded header (default `X-Forwarded-For`) most-recent-first against the **server** pool (`BouncerForwardedTrustedIPs`). First address **not** in that pool is the client. Empty walk → `net.SplitHostPort(req.RemoteAddr)`. `Bouncer` then asks the **client** pool (`BouncerClientTrustedIPs`) `Contains` on that same string. Do not parse `RemoteAddr` a second time.
 
 **InNetwork**: one address vs one CIDR/bare IP. Range blob lines, not the trusted pool. Stays in `pkg/ip`.
 

@@ -15,6 +15,6 @@ pin: origin/master...HEAD (a57c8485a7ef8af3ec1eee986dd45ddff4cc926c...aca2eb54ef
 ## Findings
 - [x] stale-usage  Middleware New — Language and Gotchas still name PeekLivePrefix, first-wins settings hash, and IdentityHex as the live Open key
 - [x] stale-usage  LAPI connection — Gotchas still first-wins via PeekLivePrefix; How-to still names a live joiner `ignored`
-- [x] stale-usage  Decision scopes — How-to still passes `decisionScopeHeaders` into the Client as stream `scopes=`
+- [x] stale-usage  Decision scopes — How-to still passes `lapiScopeHeaders` into the Client as stream `scopes=`
 - [x] stale-usage  Real-stack e2e — usage-metrics gotcha still names warn-and-wire first-wins
 - [x] language-gap  LAPI live-router scope union — `core_plugin_lapi_scope-union` has How-to, no Language term

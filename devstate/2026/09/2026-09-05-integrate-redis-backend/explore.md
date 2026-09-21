@@ -13,7 +13,7 @@ IssueKey: 2026-09-05-integrate-redis-backend
 
 **Functional Redis-protocol backend** — a real process speaking GET/SET/DEL (and AUTH/SELECT if used) that the plugin cache writes and reads. Not `serveRedis`. Ticket: **Dragonfly**, not Redis.
 
-**Client IP in tests** — same owner as the real-stack suite: Traefik forwarded headers + plugin `forwardedHeadersTrustedIps`. Tests send `X-Forwarded-For`. Cache keys are that IP (`bouncer.go` `cacheClient.Get(remoteIP)`).
+**Client IP in tests** — same owner as the real-stack suite: Traefik forwarded headers + plugin `bouncerForwardedTrustedIps`. Tests send `X-Forwarded-For`. Cache keys are that IP (`bouncer.go` `cacheClient.Get(remoteIP)`).
 
 ```
   X-Forwarded-For
@@ -35,7 +35,7 @@ Store `writer` and `readers` as `*simpleredis.SimpleRedis` so the pool mutex is 
 
 Teach `serveRedis` RESP arrays so mock e2e `redis` still passes; keep inline parsing so older traces stay understandable.
 
-Add Dragonfly to `tests/e2e/real/docker-compose.test.yml` and a live-mode route with `redisCacheEnabled`. Pester under `tests/e2e/real/` proves cache hit/miss against that process. Do not put Dragonfly in `tests/e2e/mock/`.
+Add Dragonfly to `tests/e2e/real/docker-compose.test.yml` and a live-mode route with `lapiRedisEnabled`. Pester under `tests/e2e/real/` proves cache hit/miss against that process. Do not put Dragonfly in `tests/e2e/mock/`.
 
 ## Open questions
 
@@ -60,7 +60,7 @@ Add Dragonfly to `tests/e2e/real/docker-compose.test.yml` and a live-mode route 
   By: implement
 
 - Q: What does “functional redis backend” e2e assert?
-  Decision: assumed — a live-mode (or stream) whoami route with `redisCacheEnabled` + `redisCacheHost=dragonfly:6379`. Prove: cache miss then LAPI allow; cached allow until TTL; ban then block after TTL; Traefik restart still sees the Dragonfly-held value (in-memory map would miss). Client identity only via `X-Forwarded-For`.
+  Decision: assumed — a live-mode (or stream) whoami route with `lapiRedisEnabled` + `lapiRedisHost=dragonfly:6379`. Prove: cache miss then LAPI allow; cached allow until TTL; ban then block after TTL; Traefik restart still sees the Dragonfly-held value (in-memory map would miss). Client identity only via `X-Forwarded-For`.
   By: implement
 
 - Q: Must mock e2e Redis keep passing after RESP?
@@ -68,7 +68,7 @@ Add Dragonfly to `tests/e2e/real/docker-compose.test.yml` and a live-mode route 
   By: implement
 
 - Q: Who already owns the client address the bouncer remediates in these tests?
-  Decision: assumed — Traefik `forwardedHeaders` plus plugin `forwardedHeadersTrustedIps`. Cache key is that IP. Do not parse `RemoteAddr` in the harness.
+  Decision: assumed — Traefik `forwardedHeaders` plus plugin `bouncerForwardedTrustedIps`. Cache key is that IP. Do not parse `RemoteAddr` in the harness.
   By: implement
 
 - Q: Pin Dragonfly in operator examples (`examples/redis-cache/`)?

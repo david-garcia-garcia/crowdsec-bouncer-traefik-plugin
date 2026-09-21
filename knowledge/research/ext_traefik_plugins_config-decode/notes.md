@@ -26,10 +26,10 @@ mapstructure: unmapped source keys are silently ignored unless `ErrorUnused` is 
 
 Traefik v3.7.11 imports `github.com/mitchellh/mapstructure v1.5.1-0.20231216201459-8508981c8b6c`. Owner: `github.com/traefik/traefik@faa1eb590646aed94e561e24a59be0c47353ae95:go.mod`. Extract: `.sources/go.mod.md`.
 
-So a YAML or Docker label that still sets `banHtmlFilePath` / `captchaHtmlFilePath` (or the HTML-cased twins `banHTMLFilePath` / `captchaHTMLFilePath`) after those fields are deleted does not fail plugin construct. The values never reach `New`. `CreateConfig` defaults stay: this plugin’s `BanFilePath` `""`, `CaptchaFilePath` `/captcha.html`.
+So a YAML or Docker label that still sets `banHtmlFilePath` / `captchaHtmlFilePath` (or the HTML-cased twins `banHTMLFilePath` / `captchaHTMLFilePath`) after those fields are deleted does not fail plugin construct. The values never reach `New`. `CreateConfig` defaults stay: this plugin’s `BouncerBanFile` `""`, `BouncerCaptchaFile` `/captcha.html`.
 
 ## Key match is the field name
 
-Traefik does not set `TagName`. mapstructure then matches the field name, case-insensitive, not the `json` tag string as a separate spelling. `captchaHTMLFilePath` and `captchaHtmlFilePath` both map to `CaptchaHTMLFilePath`. Neither maps to `CaptchaFilePath` (`captchahtmlfilepath` ≠ `captchafilepath`). Same for ban: `banHTMLFilePath` / `banHtmlFilePath` ≠ `BanFilePath`.
+Traefik does not set `TagName`. mapstructure then matches the field name, case-insensitive, not the `json` tag string as a separate spelling. `captchaHTMLFilePath` and `captchaHtmlFilePath` both map to `CaptchaHTMLFilePath`. Neither maps to `BouncerCaptchaFile` (`captchahtmlfilepath` ≠ `captchafilepath`). Same for ban: `banHTMLFilePath` / `banHtmlFilePath` ≠ `BouncerBanFile`.
 
-Owner: mapstructure default match plus Traefik `DecoderConfig` above. This plugin’s current tags: `this-repo` `pkg/configuration/configuration.go` (`BanFilePath` `json:"banFilePath,omitempty"`, `CaptchaFilePath` `json:"captchaFilePath,omitempty"`). The removed HTML-path fields no longer exist on Config.
+Owner: mapstructure default match plus Traefik `DecoderConfig` above. This plugin’s current tags: `this-repo` `pkg/configuration/configuration.go` (`BouncerBanFile` `json:"bouncerBanFile,omitempty"`, `BouncerCaptchaFile` `json:"bouncerCaptchaFile,omitempty"`). The removed HTML-path fields no longer exist on Config.

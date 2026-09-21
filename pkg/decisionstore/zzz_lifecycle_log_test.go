@@ -64,11 +64,11 @@ func TestOpenLogsStartedAtInfo(t *testing.T) {
 	var buf bytes.Buffer
 	log := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	cfg := &configuration.Config{
-		CrowdsecMode:       configuration.StreamMode,
-		CrowdsecLapiScheme: "http",
-		CrowdsecLapiHost:   "lapi.example:8080",
-		CrowdsecLapiPath:   "/",
-		CrowdsecLapiKey:    "test-key",
+		LapiMode:       configuration.StreamMode,
+		LapiScheme: "http",
+		LapiHost:   "lapi.example:8080",
+		LapiPath:   "/",
+		LapiKey:    "test-key",
 	}
 	store, err := Open(context.Background(), "decisionstore:open-started", "prefix", cfg, log, "test")
 	if err != nil {

@@ -15,7 +15,7 @@ findings: Standards 0, Spec 2 (both resolved in the apply), Security 1 accepted 
 fixed: the live spec leaf's "lookup keys MUST NOT change" sentence amended instead of silently
   contradicted; `testLeaseRedis` taught `DEL` so the lease assertion is falsifiable
 skipped: nothing; the one accepted finding (a failed range apply can mark the stream unhealthy and
-  so reach `crowdsecLapiFailureAction`) is on the card as a decision for the owner
+  so reach `bouncerLapiFailureAction`) is on the card as a decision for the owner
 
 ## devdocsimpact (2026-09-18)
 phase: devdocsimpact

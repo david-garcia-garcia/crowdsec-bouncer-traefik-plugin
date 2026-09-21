@@ -20,7 +20,7 @@ CrowdSec 1.8.0 AppSec bot-detection returns a structured challenge (HTML body, `
 - Parse a structured AppSec JSON body (`action`, `http_status`, `user_body_content`, `user_cookies`, `user_headers`) when present.
 - `action` empty or `allow` → pass the request to `next` (same as today's 200).
 - `action` `ban` → keep today's ban template path (`handleBanServeHTTP`), not AppSec HTML. Matches PR 343 review intent after rebase (structured ban must not silently drop `banTemplate`).
-- Any other non-allow action (including `challenge`) → write AppSec status, headers, cookies, and body to the client. Clamp `http_status` to 100–999; fall back to `remediationStatusCode` when missing or out of range. Fall back `Content-Type` to `banTemplateContentType` when AppSec omits it.
+- Any other non-allow action (including `challenge`) → write AppSec status, headers, cookies, and body to the client. Clamp `http_status` to 100–999; fall back to `bouncerRemediationStatusCode` when missing or out of range. Fall back `Content-Type` to `banTemplateContentType` when AppSec omits it.
 - Legacy empty/non-JSON non-200 remains a ban (today's behavior).
 - Bound AppSec response body reads (PR 343 used 1 MiB). Keep draining so the AppSec connection stays reusable (`appsec_test.go` reuse case).
 - Unit tests for parse + relay + legacy 403 + structured ban-keeps-template. Mock e2e for structured challenge. Real e2e against a live CrowdSec that can issue bot-detection (engine ≥ 1.8.0, `appsec-bot-*`, challenge path routed through the same middleware).

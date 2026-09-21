@@ -22,10 +22,10 @@ type Stream struct {
 
 // startStream starts the stream ticker and initial poll for stream and alone modes.
 func (c *Client) startStream(config *configuration.Config, log *slog.Logger) error {
-	if config.CrowdsecMode != configuration.StreamMode && config.CrowdsecMode != configuration.AloneMode {
+	if config.LapiMode != configuration.StreamMode && config.LapiMode != configuration.AloneMode {
 		return nil
 	}
-	if config.CrowdsecMode == configuration.AloneMode {
+	if config.LapiMode == configuration.AloneMode {
 		if err := c.getToken(); err != nil {
 			c.log.Error("startStream:getToken", "error", err)
 			return err
@@ -34,12 +34,12 @@ func (c *Client) startStream(config *configuration.Config, log *slog.Logger) err
 	if c.decisionStore != nil {
 		c.decisionStore.HydrateRange()
 	}
-	if config.StreamStartupBlock {
+	if config.LapiStreamStartupBlock {
 		c.handleStreamTicker()
 	} else {
 		go c.handleStreamTicker()
 	}
-	c.streamStop = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
+	c.streamStop = startTicker("stream", config.LapiUpdateIntervalSeconds, log, func() {
 		c.handleStreamTicker()
 	})
 	return nil
@@ -72,7 +72,7 @@ func (c *Client) handleStreamTicker() {
 			"durationMs", time.Since(started).Milliseconds(),
 			"error", err,
 		)
-		if c.updateMaxFailure != -1 && updateFailure >= c.updateMaxFailure && healthy {
+		if c.lapiUpdateMaxFailure != -1 && updateFailure >= c.lapiUpdateMaxFailure && healthy {
 			atomic.StoreInt64(&c.isCrowdsecStreamHealthy, 0)
 			c.logInfo(MsgStreamUnhealthy, "unhealthy")
 			c.log.Error("handleStreamTicker:error", "sessionKey", c.sessionKey, "updateFailure", updateFailure, "error", err)

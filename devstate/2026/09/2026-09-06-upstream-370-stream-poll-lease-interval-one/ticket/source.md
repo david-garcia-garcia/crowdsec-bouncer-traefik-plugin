@@ -1,6 +1,6 @@
 # upstream#370
 
-- title: Stream poll lease is never stored when updateIntervalSeconds is 1
+- title: Stream poll lease is never stored when lapiUpdateIntervalSeconds is 1
 - state: CLOSED
 - url: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/370
 - created: 2026-08-03T11:47:21Z
@@ -11,9 +11,9 @@
 
 ### Summary
 
-With `updateIntervalSeconds: 1`, the stream poll lease is never stored, so the guard that makes a single node poll LAPI per interval silently does nothing and **every** bouncer instance polls LAPI on **every** tick.
+With `lapiUpdateIntervalSeconds: 1`, the stream poll lease is never stored, so the guard that makes a single node poll LAPI per interval silently does nothing and **every** bouncer instance polls LAPI on **every** tick.
 
-`updateIntervalSeconds: 1` is a supported value: `pkg/configuration/configuration.go` validates it as `>= 1`.
+`lapiUpdateIntervalSeconds: 1` is a supported value: `pkg/configuration/configuration.go` validates it as `>= 1`.
 
 ### Details
 

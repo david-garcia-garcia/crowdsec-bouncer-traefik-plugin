@@ -7,10 +7,10 @@ import (
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-func TestValidateOriginBasedDecisionRemap(t *testing.T) {
+func TestValidateBouncerDecisionRemap(t *testing.T) {
 	log := logger.New("ERROR", "")
 	ok := getMinimalConfig()
-	ok.OriginBasedDecisionRemap = map[string]map[string]string{
+	ok.BouncerDecisionRemap = map[string]map[string]string{
 		"CAPI":                 {"ban": "captcha"},
 		"lists:firehol_level1": {"ban": "pass"},
 		"crowdsec":             {"captcha": "pass"},
@@ -62,7 +62,7 @@ func TestValidateOriginBasedDecisionRemap(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := getMinimalConfig()
-			cfg.OriginBasedDecisionRemap = tc.remap
+			cfg.BouncerDecisionRemap = tc.remap
 			err := ValidateParams(cfg, log)
 			if err == nil {
 				t.Fatal("want error")
@@ -74,11 +74,11 @@ func TestValidateOriginBasedDecisionRemap(t *testing.T) {
 	}
 }
 
-func TestValidateOriginBasedDecisionRemap_DoesNotRequireCaptchaProvider(t *testing.T) {
+func TestValidateBouncerDecisionRemap_DoesNotRequireBouncerCaptchaProvider(t *testing.T) {
 	cfg := getMinimalConfig()
-	cfg.CaptchaProvider = ""
-	cfg.OriginBasedDecisionRemap = map[string]map[string]string{"CAPI": {"ban": "captcha"}}
+	cfg.BouncerCaptchaProvider = ""
+	cfg.BouncerDecisionRemap = map[string]map[string]string{"CAPI": {"ban": "captcha"}}
 	if err := ValidateParams(cfg, logger.New("ERROR", "")); err != nil {
-		t.Fatalf("remap must not require captchaProvider: %v", err)
+		t.Fatalf("remap must not require bouncerCaptchaProvider: %v", err)
 	}
 }

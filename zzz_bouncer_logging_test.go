@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -18,45 +19,46 @@ import (
 // Override specific fields by modifying the returned config.
 func getTestConfig() *configuration.Config {
 	return &configuration.Config{
-		Enabled:                              true,
-		LogLevel:                             "INFO",
-		LogFormat:                            "common",
-		LogFilePath:                          "",
-		CrowdsecMode:                         "none",
-		CrowdsecLapiKey:                      "test-key",
-		CrowdsecLapiHost:                     "localhost",
-		CrowdsecLapiScheme:                   "http",
-		UpdateIntervalSeconds:                60,
-		DefaultDecisionSeconds:               60,
-		HTTPTimeoutSeconds:                   10,
-		ForwardedHeadersTrustedIPs:           []string{"127.0.0.1"},
-		ForwardedHeadersCustomName:           "",
-		RemediationStatusCode:                403,
-		BanFilePath:                          "",
-		RemediationHeadersCustomName:         "",
-		CaptchaProvider:                      "",
-		CaptchaSiteKey:                       "",
-		CaptchaSecretKey:                     "",
-		CaptchaGracePeriodSeconds:            1,
-		CaptchaFilePath:                      "",
-		RedisCacheEnabled:                    false,
-		RedisCacheHost:                       "",
-		RedisCachePassword:                   "",
-		RedisCacheDatabase:                   "",
-		RedisCacheUnreachableBlock:           false,
-		CrowdsecAppsecEnabled:                false,
-		CrowdsecAppsecHost:                   "",
-		CrowdsecAppsecPath:                   "",
-		CrowdsecAppsecFailureAction:          configuration.FailureActionBan,
-		CrowdsecLapiFailureAction:            configuration.FailureActionBan,
-		CrowdsecLapiTLSInsecureVerify:        true,
-		CrowdsecLapiTLSCertificateBouncer:    "",
-		CrowdsecLapiTLSCertificateBouncerKey: "",
-		CrowdsecCapiMachineID:                "",
-		CrowdsecCapiPassword:                 "",
-		CrowdsecCapiScenarios:                []string{},
-		UpdateMaxFailure:                     0,
-		MetricsUpdateIntervalSeconds:         0,
+		BouncerEnabled:                   true,
+		LapiEnabled:                      true,
+		LogLevel:                         "INFO",
+		LogFormat:                        "common",
+		LogFilePath:                      "",
+		LapiMode:                         "none",
+		LapiKey:                          "test-key",
+		LapiHost:                         "localhost",
+		LapiScheme:                       "http",
+		LapiUpdateIntervalSeconds:        60,
+		BouncerLiveTtlSeconds:            60,
+		HTTPTimeoutSeconds:               10,
+		BouncerForwardedTrustedIPs:       []string{"127.0.0.1"},
+		BouncerForwardedHeader:           "",
+		BouncerRemediationStatusCode:     403,
+		BouncerBanFile:                   "",
+		BouncerRemediationHeader:         "",
+		BouncerCaptchaProvider:           "",
+		BouncerCaptchaSiteKey:            "",
+		BouncerCaptchaSecretKey:          "",
+		BouncerCaptchaGracePeriodSeconds: 1,
+		BouncerCaptchaFile:               "",
+		LapiRedisEnabled:                 false,
+		LapiRedisHost:                    "",
+		LapiRedisPassword:                "",
+		LapiRedisDatabase:                "",
+		BouncerRedisUnreachableBlock:     false,
+		AppsecEnabled:                    false,
+		AppsecHost:                       "",
+		AppsecPath:                       "",
+		BouncerAppsecFailureAction:       configuration.FailureActionBan,
+		BouncerLapiFailureAction:         configuration.FailureActionBan,
+		LapiTlsInsecureVerify:            true,
+		LapiTlsCert:                      "",
+		LapiTlsKey:                       "",
+		LapiCapiMachineID:                "",
+		LapiCapiPassword:                 "",
+		LapiCapiScenarios:                []string{},
+		LapiUpdateMaxFailure:             0,
+		LapiMetricsIntervalSeconds:       0,
 	}
 }
 
@@ -65,6 +67,7 @@ func getTestConfig() *configuration.Config {
 func newTestLogFile(t *testing.T) string {
 	t.Helper()
 	reclaim.ResetForTestWith(0)
+	instance.ResetForTest()
 	// slog keeps the file open; t.TempDir cleanup fails on Windows (usetesting wants TempDir).
 	f, err := os.CreateTemp("", "bouncer-log-*.log") //nolint:usetesting
 	if err != nil {
@@ -76,6 +79,7 @@ func newTestLogFile(t *testing.T) string {
 	}
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
+		instance.ResetForTest()
 		_ = os.Remove(path)
 	})
 	return path

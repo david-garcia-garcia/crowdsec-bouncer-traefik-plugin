@@ -97,14 +97,14 @@ None.
 ### Technical review
 Best possible solution: one reclaim DecisionStore per cursor plus Redis params, with an atomic `updated` acquire, instead of DestBranch’s per-Client map and Get-then-Set lease.
 
-Do we have a high-confidence way to reproduce? Yes — two live Clients with different `updateIntervalSeconds` share one store; two memory or Redis pollers produce one stream GET; sibling `Close` leaves the Redis pool live.
+Do we have a high-confidence way to reproduce? Yes — two live Clients with different `lapiUpdateIntervalSeconds` share one store; two memory or Redis pollers produce one stream GET; sibling `Close` leaves the Redis pool live.
 
 Is this the best way to solve the issue? Yes — reclaim already owns process lifetime; Eval is the ticketed Redis primitive; memory has no CAS on the vendored heap.
 
 ### Evidence
 What I checked:
 - `cache.Client.Close` is safe to call more than once (`SimpleRedis.Close` CAS; existing `Test_ClientCloseRedis`)
-- `RedisCacheReadHosts` is already in `streamSettings` and live `identity`; `decisionScopeHeaders` is stream-only (no spec-gap disagreement)
+- `LapiRedisReadHosts` is already in `streamSettings` and live `identity`; `lapiScopeHeaders` is stream-only (no spec-gap disagreement)
 - `go test ./...` passed locally; Main Process + both e2e succeeded on c8c1073
 - No `atomic.Pointer[T]` added; `Client.Close` no longer calls `cache.Client.Close`; Peek / PeekLivePrefix / View remain
 

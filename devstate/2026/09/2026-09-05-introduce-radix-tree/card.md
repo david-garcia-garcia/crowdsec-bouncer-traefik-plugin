@@ -10,7 +10,7 @@ Developer review: ready for review — 2026-09-05T13:25:29.196Z
 **End users.** None.
 
 ## Motivation
-On master, trusted-IP and CIDR membership walked every configured network on each request. Large `ForwardedHeadersTrustedIPs` / `ClientTrustedIPs` lists stayed O(n). Without this PR that linear scan remains.
+On master, trusted-IP and CIDR membership walked every configured network on each request. Large `BouncerForwardedTrustedIPs` / `BouncerClientTrustedIPs` lists stayed O(n). Without this PR that linear scan remains.
 
 ## Merge readiness
 Ready for review. 0 items remain.

@@ -4,7 +4,7 @@ IssueKey: 2026-09-06-upstream-319-stream-cache-log-spam
 ## Concepts
 
 ```
-  stream ticker (UpdateIntervalSeconds, default 60s)
+  stream ticker (LapiUpdateIntervalSeconds, default 60s)
             │
             ▼
      handleStreamTicker
@@ -32,7 +32,7 @@ IssueKey: 2026-09-06-upstream-319-stream-cache-log-spam
 
 - **Product code:** none unless a test cannot be honest without a one-line `Debug` vs `Info` fix (current tree already uses Debug).
 - **Test technique:** slog JSON-handler capture on a `bytes.Buffer`, same pattern as `pkg/lapi/session_test.go` `TestClient_LifecycleLogs`. Not static inspection of `log.Debug` call sites (that would not fail if someone switched those strings to `Info`). Do not copy `pkg/reclaim` `recHandler` into lapi; buffer + JSON is the in-package owner.
-- **Coverage:** both messages. Lease-hit (`alreadyUpdated`) via cache key `"updated"` like `TestHandleStreamCacheLeaseHitHydrates`. Lease-miss (`updated`) via `testStreamLAPI` + a Client that can `crowdsecQuery` (reuse session-test mock LAPI; `OpenStream` with `StreamStartupBlock` or a Client with HTTP fields). Two assertions per path: (1) `LevelInfo` handler MUST NOT contain the tick message (operator spam proof); (2) `LevelDebug` handler MUST contain it at debug (the line still exists).
+- **Coverage:** both messages. Lease-hit (`alreadyUpdated`) via cache key `"updated"` like `TestHandleStreamCacheLeaseHitHydrates`. Lease-miss (`updated`) via `testStreamLAPI` + a Client that can `crowdsecQuery` (reuse session-test mock LAPI; `OpenStream` with `LapiStreamStartupBlock` or a Client with HTTP fields). Two assertions per path: (1) `LevelInfo` handler MUST NOT contain the tick message (operator spam proof); (2) `LevelDebug` handler MUST contain it at debug (the line still exists).
 - **File:** new `pkg/lapi/client_stream_log_test.go`. Do not pile this onto `client_range_test.go` (that file owns Range hydrate).
 - **Spec:** fold a stream-tick log-level requirement onto `core_plugin_lapi_connection` (FindSpecHost at propose). Not a new leaf: one invariant of the existing stream ticker, not a new capability.
 - **Devdocs:** no explore write. Middleware gotcha already separates poll ticks from health INFO. Implement/devdocsimpact may add the two DEBUG message names if the apply wants them on that packet.

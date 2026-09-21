@@ -55,8 +55,8 @@ func TestHandleStreamTicker_SlowPollSkipsBusyTicks(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := testStreamConfig(parsed.Host, 0)
-	cfg.UpdateIntervalSeconds = 1
-	cfg.StreamStartupBlock = false
+	cfg.LapiUpdateIntervalSeconds = 1
+	cfg.LapiStreamStartupBlock = false
 	client, err := OpenStream(context.Background(), cfg, logger.New("ERROR", ""), "slow-poll", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -142,8 +142,8 @@ func TestHandleStreamTicker_SleepThenWakeWhileInFlight(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := testStreamConfig(parsed.Host, 0)
-	cfg.UpdateIntervalSeconds = 60
-	cfg.StreamStartupBlock = false
+	cfg.LapiUpdateIntervalSeconds = 60
+	cfg.LapiStreamStartupBlock = false
 	ctx, cancel := context.WithCancel(context.Background())
 	first, err := OpenStream(ctx, cfg, logger.New("ERROR", ""), "inflight-wake", "test")
 	if err != nil {

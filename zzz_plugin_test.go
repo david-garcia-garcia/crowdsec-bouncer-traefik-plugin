@@ -15,6 +15,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
@@ -66,23 +67,23 @@ func liveLAPI(t *testing.T, banned map[string]bool, hits *int64) *httptest.Serve
 
 func cfgLiveAt(host string) *configuration.Config {
 	c := getTestConfig()
-	c.Enabled = true
-	c.CrowdsecMode = configuration.LiveMode
-	c.CrowdsecLapiHost = host
-	c.CrowdsecLapiPath = "/"
-	c.CrowdsecLapiScheme = "http"
-	c.MetricsUpdateIntervalSeconds = 0
-	c.ForwardedHeadersTrustedIPs = []string{"127.0.0.1/32"}
-	c.ForwardedHeadersCustomName = "X-Forwarded-For"
-	c.DefaultDecisionSeconds = 2
+	c.BouncerEnabled = true
+	c.LapiMode = configuration.LiveMode
+	c.LapiHost = host
+	c.LapiPath = "/"
+	c.LapiScheme = "http"
+	c.LapiMetricsIntervalSeconds = 0
+	c.BouncerForwardedTrustedIPs = []string{"127.0.0.1/32"}
+	c.BouncerForwardedHeader = "X-Forwarded-For"
+	c.BouncerLiveTtlSeconds = 2
 	return c
 }
 
 func cfgStreamAt(host string, interval int64) *configuration.Config {
 	c := cfgLiveAt(host)
-	c.CrowdsecMode = configuration.StreamMode
-	c.UpdateIntervalSeconds = interval
-	c.StreamStartupBlock = true
+	c.LapiMode = configuration.StreamMode
+	c.LapiUpdateIntervalSeconds = interval
+	c.LapiStreamStartupBlock = true
 	return c
 }
 
@@ -95,7 +96,7 @@ func reqForIP(ip string) *http.Request {
 
 func TestServeHTTP(t *testing.T) {
 	cfg := CreateConfig()
-	cfg.CrowdsecLapiKey = "test"
+	cfg.LapiKey = "test"
 	ctx := context.Background()
 	handler, err := New(ctx, testNextOK(), cfg, "demo-plugin")
 	if err != nil {
@@ -112,7 +113,8 @@ func TestServeHTTP(t *testing.T) {
 // TestNew_RejectsEmptyCaptchaKeys stops at ValidateParams so New does not open LAPI.
 func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
 
 	var hits int64
 	srv := liveLAPI(t, nil, &hits)
@@ -123,18 +125,18 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 	}
 
 	cfg := cfgLiveAt(u.Host)
-	cfg.CaptchaProvider = configuration.HcaptchaProvider
-	cfg.CaptchaGateSecret = "gate-secret"
-	cfg.CaptchaFilePath = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
+	cfg.BouncerCaptchaProvider = configuration.HbouncerCaptchaProvider
+	cfg.BouncerCaptchaGateSecret = "gate-secret"
+	cfg.BouncerCaptchaFile = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
 
 	handler, err := New(context.Background(), testNextOK(), cfg, "empty-captcha-keys")
 	if err == nil {
-		t.Fatal("New must fail when captchaProvider is set and site key is empty")
+		t.Fatal("New must fail when bouncerCaptchaProvider is set and site key is empty")
 	}
 	if handler != nil {
 		t.Fatal("New must return a nil handler when captcha keys are empty")
 	}
-	if !strings.Contains(err.Error(), "CaptchaSiteKey: cannot be empty when CaptchaProvider is set") {
+	if !strings.Contains(err.Error(), "BouncerCaptchaSiteKey: cannot be empty when BouncerCaptchaProvider is set") {
 		t.Fatalf("error %q", err)
 	}
 	if atomic.LoadInt64(&hits) != 0 {
@@ -142,10 +144,11 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 	}
 }
 
-// TestNew_RejectsEmptyCaptchaFilePath stops at ValidateParams so New does not open LAPI.
-func TestNew_RejectsEmptyCaptchaFilePath(t *testing.T) {
+// TestNew_RejectsEmptyBouncerCaptchaFile stops at ValidateParams so New does not open LAPI.
+func TestNew_RejectsEmptyBouncerCaptchaFile(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
 
 	var hits int64
 	srv := liveLAPI(t, nil, &hits)
@@ -156,20 +159,20 @@ func TestNew_RejectsEmptyCaptchaFilePath(t *testing.T) {
 	}
 
 	cfg := cfgLiveAt(u.Host)
-	cfg.CaptchaProvider = configuration.HcaptchaProvider
-	cfg.CaptchaSiteKey = "site"
-	cfg.CaptchaSecretKey = "secret"
-	cfg.CaptchaGateSecret = "gate-secret"
-	cfg.CaptchaFilePath = ""
+	cfg.BouncerCaptchaProvider = configuration.HbouncerCaptchaProvider
+	cfg.BouncerCaptchaSiteKey = "site"
+	cfg.BouncerCaptchaSecretKey = "secret"
+	cfg.BouncerCaptchaGateSecret = "gate-secret"
+	cfg.BouncerCaptchaFile = ""
 
 	handler, err := New(context.Background(), testNextOK(), cfg, "empty-captcha-path")
 	if err == nil {
-		t.Fatal("New must fail when captchaProvider is set and CaptchaFilePath is empty")
+		t.Fatal("New must fail when bouncerCaptchaProvider is set and BouncerCaptchaFile is empty")
 	}
 	if handler != nil {
-		t.Fatal("New must return a nil handler when CaptchaFilePath is empty")
+		t.Fatal("New must return a nil handler when BouncerCaptchaFile is empty")
 	}
-	if !strings.Contains(err.Error(), "CaptchaFilePath: cannot be empty when CaptchaProvider is set") {
+	if !strings.Contains(err.Error(), "BouncerCaptchaFile: cannot be empty when BouncerCaptchaProvider is set") {
 		t.Fatalf("error %q", err)
 	}
 	if atomic.LoadInt64(&hits) != 0 {
@@ -180,7 +183,8 @@ func TestNew_RejectsEmptyCaptchaFilePath(t *testing.T) {
 // TestNew_LAPIUserAgentUsesVersionGo checks New sends LAPI User-Agent from version.go pluginVersion.
 func TestNew_LAPIUserAgentUsesVersionGo(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
 
 	gotUA := ""
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -213,7 +217,8 @@ func TestNew_LAPIUserAgentUsesVersionGo(t *testing.T) {
 
 func TestNew_DifferentNameOnSameLapiFails(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
 
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
@@ -241,7 +246,8 @@ func TestNew_DifferentNameOnSameLapiFails(t *testing.T) {
 
 func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
 
 	var hitsA, hitsB int64
 	lapiA := liveLAPI(t, map[string]bool{"1.2.3.4": true}, &hitsA)
@@ -335,7 +341,8 @@ func TestNew_DisposeAfterGrace(t *testing.T) {
 
 func TestNew_StreamVsLive_SideBySide(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
 
 	var streamHits, liveHits int64
 	streamSrv := liveLAPI(t, map[string]bool{"9.9.9.9": true}, &streamHits)
@@ -375,7 +382,8 @@ func TestNew_StreamVsLive_SideBySide(t *testing.T) {
 
 func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
 
 	var hits int64
 	srv := liveLAPI(t, map[string]bool{"8.8.8.8": true}, &hits)
@@ -384,7 +392,7 @@ func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
 	ctx := context.Background()
 
 	disabled := cfgLiveAt(u.Host)
-	disabled.Enabled = false
+	disabled.BouncerEnabled = false
 	hOff, err := New(ctx, testNextOK(), disabled, "matrix")
 	if err != nil {
 		t.Fatal(err)
@@ -396,7 +404,7 @@ func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
 	}
 
 	trusted := cfgLiveAt(u.Host)
-	trusted.ClientTrustedIPs = []string{"9.9.9.9/32"}
+	trusted.BouncerClientTrustedIPs = []string{"9.9.9.9/32"}
 	hTrust, err := New(ctx, testNextOK(), trusted, "matrix")
 	if err != nil {
 		t.Fatal(err)
@@ -425,7 +433,8 @@ func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
 
 func TestNew_TwoStreamConnections_BothPoll(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
 
 	var hitsA, hitsB int64
 	a := liveLAPI(t, nil, &hitsA)
@@ -457,7 +466,8 @@ func TestNew_SameStreamKeyDifferentMetrics_SharesConnection(t *testing.T) {
 	// must share one connection: a second ticker would steal stream deltas and
 	// POST a second metrics window for the same bouncer. Interval is first-wins.
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
 
 	var hits int64
 	srv := liveLAPI(t, nil, &hits)
@@ -465,9 +475,9 @@ func TestNew_SameStreamKeyDifferentMetrics_SharesConnection(t *testing.T) {
 	u, _ := url.Parse(srv.URL)
 
 	fast := cfgStreamAt(u.Host, 60)
-	fast.MetricsUpdateIntervalSeconds = 1
+	fast.LapiMetricsIntervalSeconds = 1
 	slow := cfgStreamAt(u.Host, 60)
-	slow.MetricsUpdateIntervalSeconds = 600
+	slow.LapiMetricsIntervalSeconds = 600
 
 	ctx := context.Background()
 	owner, err := New(ctx, testNextOK(), fast, "shared")
@@ -497,7 +507,7 @@ func TestNew_StreamIntervalChangeDuringGrace_WakesSameClient(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	firstCfg := cfgStreamAt(u.Host, 60)
-	firstCfg.MetricsUpdateIntervalSeconds = 1
+	firstCfg.LapiMetricsIntervalSeconds = 1
 	first, err := New(ctx, testNextOK(), firstCfg, "reload")
 	if err != nil {
 		t.Fatal(err)
@@ -507,12 +517,104 @@ func TestNew_StreamIntervalChangeDuringGrace_WakesSameClient(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	reloadCfg := cfgStreamAt(u.Host, 60)
-	reloadCfg.MetricsUpdateIntervalSeconds = 600
+	reloadCfg.LapiMetricsIntervalSeconds = 600
 	reloaded, err := New(context.Background(), testNextOK(), reloadCfg, "reload")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if testRoute(t, reloaded).LapiClient() != oldLapiClient {
 		t.Fatal("sleeping interval change must Wake the same Client")
+	}
+}
+
+func TestNew_HoldReturns503(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
+
+	var hits int64
+	srv := liveLAPI(t, nil, &hits)
+	t.Cleanup(func() { srv.Close() })
+	u, _ := url.Parse(srv.URL)
+
+	cfg := cfgLiveAt(u.Host)
+	cfg.BouncerEnabled = false
+	cfg.BouncerHold = true
+	nextCalled := false
+	h, err := New(context.Background(), http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		nextCalled = true
+	}), cfg, "holder")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rw := httptest.NewRecorder()
+	h.ServeHTTP(rw, reqForIP("203.0.113.1"))
+	if rw.Code != http.StatusServiceUnavailable {
+		t.Fatalf("hold status %d want 503", rw.Code)
+	}
+	if nextCalled {
+		t.Fatal("hold must not call next")
+	}
+}
+
+func TestNew_SubscribeBeforeOpenerThenSeesClient(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
+
+	var hits int64
+	srv := liveLAPI(t, map[string]bool{"8.8.8.8": true}, &hits)
+	t.Cleanup(func() { srv.Close() })
+	u, _ := url.Parse(srv.URL)
+
+	subCfg := cfgLiveAt(u.Host)
+	subCfg.LapiKey = ""
+	subCfg.LapiInstance = "shared"
+	subCfg.BouncerLapiFailureAction = configuration.FailureActionPassthrough
+	bounce, err := New(context.Background(), testNextOK(), subCfg, "bounce")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rw := httptest.NewRecorder()
+	bounce.ServeHTTP(rw, reqForIP("8.8.8.8"))
+	if rw.Code != http.StatusOK {
+		t.Fatalf("peek miss passthrough got %d", rw.Code)
+	}
+
+	openCfg := cfgLiveAt(u.Host)
+	openCfg.LapiInstance = "shared"
+	openCfg.BouncerEnabled = false
+	openCfg.BouncerHold = true
+	if _, err := New(context.Background(), testNextOK(), openCfg, "opener"); err != nil {
+		t.Fatal(err)
+	}
+	rw = httptest.NewRecorder()
+	bounce.ServeHTTP(rw, reqForIP("8.8.8.8"))
+	if rw.Code != http.StatusForbidden {
+		t.Fatalf("after opener publish got %d want 403", rw.Code)
+	}
+}
+
+func TestNew_SameInstanceDifferentHostFails(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
+
+	var hits int64
+	firstSrv := liveLAPI(t, nil, &hits)
+	secondSrv := liveLAPI(t, nil, &hits)
+	t.Cleanup(func() { firstSrv.Close(); secondSrv.Close() })
+	firstURL, _ := url.Parse(firstSrv.URL)
+	secondURL, _ := url.Parse(secondSrv.URL)
+
+	firstCfg := cfgLiveAt(firstURL.Host)
+	firstCfg.LapiInstance = "shared"
+	if _, err := New(context.Background(), testNextOK(), firstCfg, "a"); err != nil {
+		t.Fatal(err)
+	}
+	secondCfg := cfgLiveAt(secondURL.Host)
+	secondCfg.LapiInstance = "shared"
+	if _, err := New(context.Background(), testNextOK(), secondCfg, "b"); err == nil {
+		t.Fatal("second opener of shared with a different LAPI host must fail")
 	}
 }

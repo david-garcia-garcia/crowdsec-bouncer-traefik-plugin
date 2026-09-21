@@ -1,7 +1,7 @@
 Developer review: ready for review — 2026-09-17T08:20:00Z
 
 ## What this changes
-**Operators.** Set `captchaGateSecret` or `captchaGateSecretFile` whenever captcha is enabled; optional `captchaGateBindIP` (default bind client IP) controls whether grace is IP-scoped or cookie-only.
+**Operators.** Set `bouncerCaptchaGateSecret` or `bouncerCaptchaGateSecretFile` whenever captcha is enabled; optional `captchaGateBindIP` (default bind client IP) controls whether grace is IP-scoped or cookie-only.
 
 **Admin users.** None.
 

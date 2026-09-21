@@ -2,11 +2,11 @@
 
 ## Concepts
 
-`ValidateParams` runs in `plugin.New` before `appsec.Open`. Non-alone modes always call `validateAppsecURLKeyAndTLS`, including when AppSec is off. That helper only asks `validateURL` whether `http.NewRequest` accepts `scheme://host/path`. Empty `CrowdsecAppsecHost` becomes `http:///` and returns nil. `CrowdsecAppsecHost` is not in `validateParamsRequired`. `New()` still defaults the host to `crowdsec:7422` and `CrowdsecAppsecFailureAction` to `ban`.
+`ValidateParams` runs in `plugin.New` before `appsec.Open`. Non-alone modes always call `validateAppsecURLKeyAndTLS`, including when AppSec is off. That helper only asks `validateURL` whether `http.NewRequest` accepts `scheme://host/path`. Empty `AppsecHost` becomes `http:///` and returns nil. `AppsecHost` is not in `validateParamsRequired`. `New()` still defaults the host to `crowdsec:7422` and `BouncerAppsecFailureAction` to `ban`.
 
 When AppSec is enabled, `appsec.Open` stores that host on the AppSec Client. `Query` rebuilds the listener URL from the same field. `Do` on the empty-host URL is unreachable; default failure action is an error; `applyAppsecServeHTTP` bans (`ReasonAPPSEC`).
 
-This ticket does not reconstruct request identity. Listener host stays `Config.CrowdsecAppsecHost` (`appsec.identity`, `Query`). Client address stays `pkg/ip.GetRemoteIP`. Request Host stays the inbound header / `X-Crowdsec-Appsec-Host`.
+This ticket does not reconstruct request identity. Listener host stays `Config.AppsecHost` (`appsec.identity`, `Query`). Client address stays `pkg/ip.GetRemoteIP`. Request Host stays the inbound header / `X-Crowdsec-Appsec-Host`.
 
 ```
 operator YAML
@@ -18,12 +18,12 @@ ValidateParams ──► validateAppsecURLKeyAndTLS ──► validateURL
     ▼
 plugin.New / appsec.Open
     ▼
-Query listener URL from CrowdsecAppsecHost
+Query listener URL from AppsecHost
     ▼
 Do unreachable → failure action ban (default)
 ```
 
-Measured (temp `TestRepro_ValidateParams_acceptsEmptyAppsecHost*`, deleted): `ValidateParams` returns nil for empty `CrowdsecAppsecHost` when enabled and when disabled. Measured (`http.NewRequest`): empty host `http:///` accepted; whitespace-only `http://%20%20%20/` already rejected; spaced host already rejected (`Test_validateURL`).
+Measured (temp `TestRepro_ValidateParams_acceptsEmptyAppsecHost*`, deleted): `ValidateParams` returns nil for empty `AppsecHost` when enabled and when disabled. Measured (`http.NewRequest`): empty host `http:///` accepted; whitespace-only `http://%20%20%20/` already rejected; spaced host already rejected (`Test_validateURL`).
 
 No OpenSpec change on this branch (`openspec list --json` empty). Existing spec `core_plugin_middleware_config-validation` covers effective AppSec scheme and “invalid host fails” under that scheme, not “enabled + missing host”.
 
@@ -31,8 +31,8 @@ Consumed: `knowledge/devdocs/index.md` (no `always`), `index_core_plugin.md` →
 
 ## Decisions
 
-1. **Fix site** — reject missing AppSec host in `validateAppsecURLKeyAndTLS` when `CrowdsecAppsecEnabled`, not inside shared `validateURL`. A general host-required change in `validateURL` would also reject disabled-AppSec empty host (out of scope) and is extra versus already-required `CrowdsecLapiHost`.
-2. **What “missing” means** — empty `CrowdsecAppsecHost` and any AppSec URL `http.NewRequest` accepts only because `Host` is missing (the `http:///` case). Do not change LAPI `validateURL` callers.
+1. **Fix site** — reject missing AppSec host in `validateAppsecURLKeyAndTLS` when `AppsecEnabled`, not inside shared `validateURL`. A general host-required change in `validateURL` would also reject disabled-AppSec empty host (out of scope) and is extra versus already-required `LapiHost`.
+2. **What “missing” means** — empty `AppsecHost` and any AppSec URL `http.NewRequest` accepts only because `Host` is missing (the `http:///` case). Do not change LAPI `validateURL` callers.
 3. **Whitespace-only host** — already rejected by `validateURL` (`NewRequest` parse). No extra TrimSpace rule.
 4. **Alone mode** — do not add AppSec URL checks there. `ValidateParams` skips `validateLapiAndAppsecConnection` in alone; that skip is another ticket (`2026-09-18-alone-mode-skips-appsec-validation`).
 5. **Failure action / Query / Bouncer** — do not change defaults or remediations. Startup reject is the fix.
@@ -43,10 +43,10 @@ Consumed: `knowledge/devdocs/index.md` (no `always`), `index_core_plugin.md` →
 ## Open questions
 
 - Q: Who already owns AppSec listener Host (and request Host / client address) so this change does not reconstruct it?
-  Decision: resolved — listener host is `Config.CrowdsecAppsecHost`; `appsec.identity` and `Query` already use that field. Request Host and `X-Crowdsec-Appsec-Host` stay the inbound request. Client address stays `pkg/ip.GetRemoteIP`. Reuse those owners; do not parse `RemoteAddr` or rebuild listener Host from another signal.
+  Decision: resolved — listener host is `Config.AppsecHost`; `appsec.identity` and `Query` already use that field. Request Host and `X-Crowdsec-Appsec-Host` stay the inbound request. Client address stays `pkg/ip.GetRemoteIP`. Reuse those owners; do not parse `RemoteAddr` or rebuild listener Host from another signal.
   By: explore
 
-- Q: Should a whitespace-only `crowdsecAppsecHost` be treated as empty?
+- Q: Should a whitespace-only `appsecHost` be treated as empty?
   Decision: resolved — whitespace-only already fails `validateURL` (`http.NewRequest` parse). This ticket only adds a reject for a missing host that `NewRequest` currently accepts.
   By: explore
 

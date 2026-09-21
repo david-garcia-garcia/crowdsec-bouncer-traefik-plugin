@@ -25,7 +25,7 @@ Intended
     PutMany / DeleteMany adjust (memory: same mu as putSlot / deleteTickLocked)
     Redis: MGET previous KindOriginString, intern name in-process, then adjust
     memory PublishTick expiry decrements
-    countActive from crowdsecMode at Open/New; live/none Put does not increment
+    countActive from lapiMode at Open/New; live/none Put does not increment
     Range omitted (not Peek, not ApplyRangeBatch)
   MetricsReporter drops both maps; reportMetrics snapshots store + OriginName at POST
   usageMetricKey / item JSON stay in pkg/lapi
@@ -33,14 +33,14 @@ Intended
 
 **Reproduced dest (read, not hypothesized)**
 
-- `MetricsReporter` holds `activeDecisionSlots` and `activeDecisionsByOriginIPType`. Remember no-ops unless `crowdsecMode` is stream or alone. Forget has no mode gate. `reportMetrics` copies the group-by map into POST items `name=active_decisions` `unit=ip` and resolves origin via `originName` (`Client.OriginName` → `Store.OriginName`). Dropped window + processed atomics stay on the reporter. `pkg/lapi/client_metrics.go`
+- `MetricsReporter` holds `activeDecisionSlots` and `activeDecisionsByOriginIPType`. Remember no-ops unless `lapiMode` is stream or alone. Forget has no mode gate. `reportMetrics` copies the group-by map into POST items `name=active_decisions` `unit=ip` and resolves origin via `originName` (`Client.OriginName` → `Store.OriginName`). Dropped window + processed atomics stay on the reporter. `pkg/lapi/client_metrics.go`
 - Stream/alone Ip and header New: `rememberActiveDecision(SlotKey, origin, value)` then `PutMany`. Deleted: `forgetActiveDecision(SlotKey)` then `DeleteMany`. `pkg/lapi/client_decisions.go`
 - Stream Range New: `rememberActiveDecision("range:"+cidr, …)` then `ApplyRangeBatch`. Deleted: `forgetActiveDecision("range:"+cidr)`. `pkg/lapi/client_stream.go`
 - Live/none memo is `memoLive` → `Store.Put` and does not call remember/forget. `pkg/lapi/client_live.go` `pkg/lapi/client_decisions.go`
 - Memory `putSlot` overwrites `LiveSlot` under `mu` and does not adjust a gauge. `DeleteMany` / `deleteTickLocked` delete keys only. `PublishTick` deletes expired tick slots and does not decrement any gauge. `pkg/decisionstore/memory.go`
 - Redis `PutMany` is `MSetEX` of `KindOriginString` with no prior GET. `DeleteMany` is DEL with no GET. `PublishTick` is a no-op. `getMany` / `MGet` exist for lookup only. `pkg/decisionstore/redis.go`
 - Memory origin id is packed in `LiveSlot.Word`. Redis origin is the `KindOriginString` string; `Unpack` of a string returns `originID` 0. `pkg/decisionstore/pack.go`
-- `OpenDecisionStore` / `Store.Open` / `NewMemory` / `NewRedis` do not take `crowdsecMode` or a count-active flag. Engine is `type engine struct` of funcs, not a Go interface. `pkg/lapi/decisionstore.go` `pkg/decisionstore/store.go`
+- `OpenDecisionStore` / `Store.Open` / `NewMemory` / `NewRedis` do not take `lapiMode` or a count-active flag. Engine is `type engine struct` of funcs, not a Go interface. `pkg/lapi/decisionstore.go` `pkg/decisionstore/store.go`
 - `Store.Peek` for a slot: not found.
 - Spec requires one forget-map entry per Ip, header, or Range; intern id + family; POST via `OriginName`; overflow id 0 / empty name. `openspec/specs/core_plugin_lapi_usage-metrics/spec.md`
 - DecisionStore spec owns intern/pack/COW/Redis; it does not own an active-record group-by. `openspec/specs/core_plugin_decisionstore_store/spec.md`
@@ -65,7 +65,7 @@ Intended
 
 - Move the group-by onto DecisionStore; delete reporter `activeDecisionSlots` and `activeDecisionsByOriginIPType`.
 - Count only stream/alone Ip and header-scope `PutMany` / `DeleteMany` (and memory `PublishTick` expiry of those slots). Live/none `Put` memo does not increment. Range is out of the gauge (omit, not peek).
-- Reporter still POSTs `active_decisions` only when `crowdsecMode` is stream or alone; dropped window + processed atomics stay on the reporter; `OriginName` at POST; overflow origin id 0 stays empty name.
+- Reporter still POSTs `active_decisions` only when `lapiMode` is stream or alone; dropped window + processed atomics stay on the reporter; `OriginName` at POST; overflow origin id 0 stays empty name.
 - Do not add a Go engine interface. Do not store `usageMetricKey` or LAPI item JSON in decisionstore. Do not add Redis intern table. Do not add `Store.Peek`.
 - Spec fold: `core_plugin_lapi_usage-metrics` (drop per-slot forget map) and `core_plugin_decisionstore_store` (store owns the group-by). Do not silent-rename those packets (`core_plugin_decisionstore.md` vs spec `…_store` stays; not this ticket).
 

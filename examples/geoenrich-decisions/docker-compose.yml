@@ -17,7 +17,7 @@ services:
       - "--providers.file.filename=/etc/traefik/dynamic.yml"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.web.forwardedHeaders.trustedIPs=172.16.0.0/12,192.168.0.0/16,10.0.0.0/8,127.0.0.1/32"
-      # Local bouncer: this tree (decisionScopeHeaders is not in catalog v1.7.1).
+      # Local bouncer: this tree (lapiScopeHeaders is not in catalog v1.7.1).
       - "--experimental.localplugins.bouncer.modulename=github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin"
       # Local geoblock: clone into ./geoblock (see README / make run_geoenrich).
       - "--experimental.localplugins.geoblock.modulename=github.com/david-garcia-garcia/traefik-geoblock"

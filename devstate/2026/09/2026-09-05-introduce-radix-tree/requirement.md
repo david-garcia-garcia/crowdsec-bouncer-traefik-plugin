@@ -10,7 +10,7 @@ Source: caller spec (`ticket/source.md`). Dest `master`.
 ## Current (code)
 
 - `Checker.ContainsIP` loops `authorizedIPs` then `authorizedIPsNet` with `net.IPNet.Contains`. Path: `pkg/ip/ip.go` (`ContainsIP`).
-- `NewChecker` parses bare IPs into a pointer slice and CIDRs into an `*net.IPNet` slice. Path: `pkg/ip/ip.go` (`NewChecker`). Used at bouncer construction for `ForwardedHeadersTrustedIPs` and `ClientTrustedIPs`. Path: `pkg/bouncer/bouncer.go` (`New`). Config validate builds a Checker and discards it. Path: `pkg/configuration/configuration.go` (`validateParamsIPs`).
+- `NewChecker` parses bare IPs into a pointer slice and CIDRs into an `*net.IPNet` slice. Path: `pkg/ip/ip.go` (`NewChecker`). Used at bouncer construction for `BouncerForwardedTrustedIPs` and `BouncerClientTrustedIPs`. Path: `pkg/bouncer/bouncer.go` (`New`). Config validate builds a Checker and discards it. Path: `pkg/configuration/configuration.go` (`validateParamsIPs`).
 - `InNetwork` parses one CIDR or one bare IP per call. Path: `pkg/ip/ip.go` (`InNetwork`). Tests: `pkg/ip/ip_test.go`.
 - Range match walks `cidr=remediation` lines and calls `ip.InNetwork` until ban wins. Path: `pkg/decisionscope/range.go` (`MatchRangeFromIndex`).
 - Range index is one cache blob, not a tree. Path: `pkg/decisionscope/range.go` (`ApplyRangeBatch`, `RangeIndexKey`). Usage packet tells implementers to avoid a radix tree for that blob. Path: `knowledge/devdocs/core_plugin_decisionscope.md` (Language **Range index** Avoid).

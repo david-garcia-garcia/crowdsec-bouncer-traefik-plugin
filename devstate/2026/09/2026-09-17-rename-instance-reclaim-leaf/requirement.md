@@ -7,8 +7,8 @@ The live leaf `openspec/specs/core_plugin_middleware_instance-reclaim` names non
 ## Current (code)
 - Live leaf dumps all four units in one `spec.md`. Path: `openspec/specs/core_plugin_middleware_instance-reclaim/spec.md`.
 - Stream/alone session prefix is mode + LAPI scheme/host/path + key (CAPI machine+password in alone). Path: `pkg/lapi/session.go`.
-- Reclaim `Open` key is that prefix plus a hash of remaining first-wins settings (intervals, Redis host/auth/db, `updateMaxFailure`, CAPI scenarios, `decisionScopeHeaders`). Path: `pkg/lapi/session.go`.
-- Policy, `StreamStartupBlock`, HTTP timeout, and LAPI TLS are off that hash. A live joiner with a different remaining hash is warn-and-wire (`PeekLivePrefix`, first `New` wins those knobs). Path: `pkg/lapi/session.go`.
+- Reclaim `Open` key is that prefix plus a hash of remaining first-wins settings (intervals, Redis host/auth/db, `lapiUpdateMaxFailure`, CAPI scenarios, `lapiScopeHeaders`). Path: `pkg/lapi/session.go`.
+- Policy, `LapiStreamStartupBlock`, HTTP timeout, and LAPI TLS are off that hash. A live joiner with a different remaining hash is warn-and-wire (`PeekLivePrefix`, first `New` wins those knobs). Path: `pkg/lapi/session.go`.
 - After bind, `AdoptTransport` last-wins LAPI HTTP+auth on the same Client. Path: `pkg/lapi/client_http.go`.
 - Bouncer holds per-router LAPI failure action, Redis fail-closed, and live-cache TTL. Path: `pkg/bouncer/bouncer.go`.
 - Yaegi `CreateConfig` / `New` stay on the module-root package. Path: `plugin.go`.

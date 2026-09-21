@@ -131,7 +131,7 @@ Observed on this product’s released plugin (`v1.7.1`) with CrowdSec `1.8.0`: A
 
 ## Traefik bouncer: new option or not
 
-Protocol: no new CrowdSec-side plugin key. Need AppSec enabled (existing `crowdsecAppsecEnabled` + AppSec host) and `/crowdsec-internal/challenge/*` routed through the **same** CrowdSec middleware as the protected app, so the bouncer forwards those paths to AppSec instead of origin. Owners: [challenge protocol](https://docs.crowdsec.net/docs/next/appsec/bot_detection/challenge_protocol.md); PR author on [maxlerebourg/crowdsec-bouncer-traefik-plugin#343](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/343) (CrowdSec staff). Extract: `.sources/pr-343.md`.
+Protocol: no new CrowdSec-side plugin key. Need AppSec enabled (existing `appsecEnabled` + AppSec host) and `/crowdsec-internal/challenge/*` routed through the **same** CrowdSec middleware as the protected app, so the bouncer forwards those paths to AppSec instead of origin. Owners: [challenge protocol](https://docs.crowdsec.net/docs/next/appsec/bot_detection/challenge_protocol.md); PR author on [maxlerebourg/crowdsec-bouncer-traefik-plugin#343](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/343) (CrowdSec staff). Extract: `.sources/pr-343.md`.
 
 PR 343 is the bouncer-side parse of `action` / `http_status` / `user_body_content` / `user_cookies` / `user_headers`. It was open on 2026-09-05; released plugin `v1.7.1` does not relay the envelope. Owner: [#343](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/343); maintainer on [#389](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/389).
 

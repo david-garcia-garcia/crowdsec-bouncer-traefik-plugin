@@ -36,14 +36,14 @@ The repository SHALL keep `tests/e2e/mock/` and `make e2e_mock` as the mock suit
 
 #### Scenario: Live mode re-queries after the cached allow expires
 - **WHEN** live-mode routes are used, a request is allowed, then a ban is added for that `X-Forwarded-For`
-- **THEN** the next request is forbidden only after `defaultDecisionSeconds`, and a different IP still passes
+- **THEN** the next request is forbidden only after `bouncerLiveTtlSeconds`, and a different IP still passes
 
 #### Scenario: Trusted client IP bypasses a ban
 - **WHEN** `clientTrustedIPs` includes the test IP and both that IP and an untrusted IP are banned
 - **THEN** the trusted `X-Forwarded-For` is allowed and the untrusted one is forbidden
 
 #### Scenario: Custom ban page body and Content-Type
-- **WHEN** a ban exists and the route sets `banFilePath` to the suite’s custom HTML
+- **WHEN** a ban exists and the route sets `bouncerBanFile` to the suite’s custom HTML
 - **THEN** the response is forbidden, `Content-Type` is HTML, and the body contains `E2E_CUSTOM_BAN_PAGE_MARKER`
 
 #### Scenario: Real AppSec CRS blocks SQLi
@@ -65,25 +65,25 @@ Scenario requests SHALL identify the client only via `X-Forwarded-For`. The stac
 - **THEN** the plugin remediates that request as that IP
 
 ### Requirement: Real stack includes a Dragonfly Redis-protocol cache
-`tests/e2e/real/docker-compose.test.yml` SHALL start Dragonfly (`docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2`, port 6379, `ulimits.memlock: -1`) in addition to Traefik and Crowdsec. At least one Pester route SHALL set `redisCacheEnabled` and `redisCacheHost` to that Dragonfly service. Pester SHALL prove live-mode cache hit/miss against Dragonfly. Client identity SHALL remain only `X-Forwarded-For` (Traefik forwarded headers plus plugin `forwardedHeadersTrustedIps`).
+`tests/e2e/real/docker-compose.test.yml` SHALL start Dragonfly (`docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2`, port 6379, `ulimits.memlock: -1`) in addition to Traefik and Crowdsec. At least one Pester route SHALL set `lapiRedisEnabled` and `lapiRedisHost` to that Dragonfly service. Pester SHALL prove live-mode cache hit/miss against Dragonfly. Client identity SHALL remain only `X-Forwarded-For` (Traefik forwarded headers plus plugin `bouncerForwardedTrustedIps`).
 
 #### Scenario: Live-mode Redis cache allow then ban after TTL
 - **WHEN** the Dragonfly-backed live-mode route is used, a request is allowed, then a ban is added for that `X-Forwarded-For`
-- **THEN** the next request is still allowed until `defaultDecisionSeconds`, after which the same IP is forbidden and a different IP still passes
+- **THEN** the next request is still allowed until `bouncerLiveTtlSeconds`, after which the same IP is forbidden and a different IP still passes
 
 #### Scenario: Cached ban survives Traefik restart
 - **WHEN** a ban is cached in Dragonfly for the test IP and the Traefik container is restarted
 - **THEN** a request with that `X-Forwarded-For` is still forbidden without waiting for a new LAPI miss (in-memory-only cache would miss)
 
 ### Requirement: Real stack covers Range and header-mapped scopes
-The Pester suite SHALL include cases that inject CrowdSec `Range` decisions with `cscli decisions add --range` and at least one header-mapped scope (`--scope` / `--value`) against the live LAPI. A dedicated compose middleware SHALL set `decisionScopeHeaders`. Range SHALL be proven in stream mode (cache) and none mode (LAPI `?ip=`). Country matching SHALL use a geoenrich Traefik plugin (traefik-geoblock in enrich mode) that writes the mapped country header from a **public** client IP. The suite MUST NOT inject a client-set country header for that Country case. Client IP identity SHALL remain `X-Forwarded-For`. Nested plugin maps (`decisionScopeHeaders`, geoblock `databaseSources`) SHALL be loaded from a file provider.
+The Pester suite SHALL include cases that inject CrowdSec `Range` decisions with `cscli decisions add --range` and at least one header-mapped scope (`--scope` / `--value`) against the live LAPI. A dedicated compose middleware SHALL set `lapiScopeHeaders`. Range SHALL be proven in stream mode (cache) and none mode (LAPI `?ip=`). Country matching SHALL use a geoenrich Traefik plugin (traefik-geoblock in enrich mode) that writes the mapped country header from a **public** client IP. The suite MUST NOT inject a client-set country header for that Country case. Client IP identity SHALL remain `X-Forwarded-For`. Nested plugin maps (`lapiScopeHeaders`, geoblock `databaseSources`) SHALL be loaded from a file provider.
 
 #### Scenario: Range ban contains the test IP
 - **WHEN** a Range ban covers the test client subnet and the request uses that `X-Forwarded-For`
 - **THEN** the real-stack route is forbidden, and an IP outside the Range is allowed
 
 #### Scenario: Header-mapped Country ban via geoenrich
-- **WHEN** geoblock enrich writes `X-IPCountry` for a public `X-Forwarded-For`, `decisionScopeHeaders` maps `Country` to that header, and a Country ban exists for the enriched code
+- **WHEN** geoblock enrich writes `X-IPCountry` for a public `X-Forwarded-For`, `lapiScopeHeaders` maps `Country` to that header, and a Country ban exists for the enriched code
 - **THEN** the real-stack route is forbidden for that public IP, and a private IP (country skipped) is allowed
 
 ### Requirement: Real stack covers AppSec bot-detection challenge
@@ -103,13 +103,13 @@ The Pester suite SHALL boot Crowdsec `v1.8.0` with AppSec bot-detection loaded (
 - **THEN** the request is forbidden
 
 #### Scenario: Appsec mode ignores LAPI bans
-- **WHEN** `crowdsecMode` is `appsec` and AppSec is enabled
+- **WHEN** `lapiMode` is `appsec` and AppSec is enabled
 - **AND** a LAPI IP ban exists for the client
 - **THEN** a benign request is allowed
 - **AND** a SQL-injection query string is still forbidden
 
 ### Requirement: Real stack covers header-mapped custom scopes
-The Pester suite SHALL include a none-mode route whose `decisionScopeHeaders` maps `username`, `AS`, and `Country` to request headers (not geoblock enrich). Username and AS SHALL also be proven on the existing stream scope route.
+The Pester suite SHALL include a none-mode route whose `lapiScopeHeaders` maps `username`, `AS`, and `Country` to request headers (not geoblock enrich). Username and AS SHALL also be proven on the existing stream scope route.
 
 #### Scenario: Username header matches
 - **WHEN** a `username` ban `alice` exists and the request sends `X-User: alice`
@@ -120,26 +120,26 @@ The Pester suite SHALL include a none-mode route whose `decisionScopeHeaders` ma
 - **THEN** the route is allowed
 
 ### Requirement: Real stack covers LAPI and AppSec failure actions
-The Pester suite SHALL include none-mode routes whose LAPI or AppSec host is unreachable, with `crowdsecLapiFailureAction` / `crowdsecAppsecFailureAction` set to `ban` and `passthrough`.
+The Pester suite SHALL include none-mode routes whose LAPI or AppSec host is unreachable, with `bouncerLapiFailureAction` / `bouncerAppsecFailureAction` set to `ban` and `passthrough`.
 
 #### Scenario: Unreachable LAPI passthrough
-- **WHEN** LAPI is unreachable and `crowdsecLapiFailureAction` is `passthrough`
+- **WHEN** LAPI is unreachable and `bouncerLapiFailureAction` is `passthrough`
 - **THEN** the request is allowed
 
 #### Scenario: Unreachable LAPI ban
-- **WHEN** LAPI is unreachable and `crowdsecLapiFailureAction` is `ban`
+- **WHEN** LAPI is unreachable and `bouncerLapiFailureAction` is `ban`
 - **THEN** the request is forbidden
 
 #### Scenario: Unreachable AppSec passthrough
-- **WHEN** AppSec is unreachable and `crowdsecAppsecFailureAction` is `passthrough`
+- **WHEN** AppSec is unreachable and `bouncerAppsecFailureAction` is `passthrough`
 - **THEN** the request is allowed
 
 #### Scenario: Unreachable AppSec ban
-- **WHEN** AppSec is unreachable and `crowdsecAppsecFailureAction` is `ban`
+- **WHEN** AppSec is unreachable and `bouncerAppsecFailureAction` is `ban`
 - **THEN** the request is forbidden
 
 ### Requirement: Real stack covers captcha POST body, grace, and IPv6 bind
-Captcha solve SHALL succeed from the POST body alone (no query-string token). A dedicated short-grace route SHALL challenge again after `captchaGracePeriodSeconds`. Gate bind SHALL accept a different spelling of the same IPv6 address.
+Captcha solve SHALL succeed from the POST body alone (no query-string token). A dedicated short-grace route SHALL challenge again after `bouncerCaptchaGracePeriodSeconds`. Gate bind SHALL accept a different spelling of the same IPv6 address.
 
 #### Scenario: POST-body-only captcha solve
 - **WHEN** a captcha decision exists and the client POSTs `dummy-captcha-response` only in the form body
@@ -147,5 +147,5 @@ Captcha solve SHALL succeed from the POST body alone (no query-string token). A 
 
 #### Scenario: Captcha grace expires
 - **WHEN** the short-grace captcha route is solved
-- **THEN** a GET with the gate cookie after `captchaGracePeriodSeconds` serves the challenge again
+- **THEN** a GET with the gate cookie after `bouncerCaptchaGracePeriodSeconds` serves the challenge again
 

@@ -41,7 +41,7 @@ Consumed: `knowledge/devdocs/index.md` (no `priority: always`), then `core_plugi
 ## Open questions
 
 - Q: Who already owns client address and header identity for this path?
-  Decision: resolved — `pkg/ip.GetRemoteIP` owns the client address. `pkg/bouncer` stores it on `clientRequest.remoteIP` and passes that string into `LiveLookup`. `decisionscope.RequestScopeValues` owns header identity from `decisionScopeHeaders`. `handleNoStreamCache` consumes those outputs. Do not re-parse `RemoteAddr` or re-read headers in `pkg/lapi`. Traefik `RemoteAddr` is the socket peer, not this plugin's client-address owner. A peer library that walks `X-Forwarded-For` again is not the owner.
+  Decision: resolved — `pkg/ip.GetRemoteIP` owns the client address. `pkg/bouncer` stores it on `clientRequest.remoteIP` and passes that string into `LiveLookup`. `decisionscope.RequestScopeValues` owns header identity from `lapiScopeHeaders`. `handleNoStreamCache` consumes those outputs. Do not re-parse `RemoteAddr` or re-read headers in `pkg/lapi`. Traefik `RemoteAddr` is the socket peer, not this plugin's client-address owner. A peer library that walks `X-Forwarded-For` again is not the owner.
   By: explore
 
 - Q: Should a clean IP query write `NoBannedValue` on the IP key when a header scope is remediating?

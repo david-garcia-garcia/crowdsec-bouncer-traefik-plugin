@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// TestPrepare_DisabledRedisSkipsPasswordFile is leftover RedisCachePasswordFile must not load or hash into StoreKey while Redis is off.
+// TestPrepare_DisabledRedisSkipsPasswordFile is leftover LapiRedisPasswordFile must not load or hash into StoreKey while Redis is off.
 func TestPrepare_DisabledRedisSkipsPasswordFile(t *testing.T) {
 	passwordFile := filepath.Join(t.TempDir(), "redis-password")
 	if err := os.WriteFile(passwordFile, []byte("stale-secret"), 0o600); err != nil {
@@ -14,26 +14,26 @@ func TestPrepare_DisabledRedisSkipsPasswordFile(t *testing.T) {
 	}
 
 	staleFileDisabled := testStreamConfig("lapi.example:8080", 1)
-	staleFileDisabled.RedisCacheEnabled = false
-	staleFileDisabled.RedisCachePassword = ""
-	staleFileDisabled.RedisCachePasswordFile = passwordFile
+	staleFileDisabled.LapiRedisEnabled = false
+	staleFileDisabled.LapiRedisPassword = ""
+	staleFileDisabled.LapiRedisPasswordFile = passwordFile
 	if err := Prepare(staleFileDisabled, nil); err != nil {
 		t.Fatal(err)
 	}
-	if staleFileDisabled.RedisCachePassword != "" {
-		t.Fatalf("disabled Redis must not load RedisCachePasswordFile, got %q", staleFileDisabled.RedisCachePassword)
+	if staleFileDisabled.LapiRedisPassword != "" {
+		t.Fatalf("disabled Redis must not load LapiRedisPasswordFile, got %q", staleFileDisabled.LapiRedisPassword)
 	}
 
 	emptyPasswordDisabled := testStreamConfig("lapi.example:8080", 1)
-	emptyPasswordDisabled.RedisCacheEnabled = false
-	emptyPasswordDisabled.RedisCachePassword = ""
-	emptyPasswordDisabled.RedisCachePasswordFile = ""
+	emptyPasswordDisabled.LapiRedisEnabled = false
+	emptyPasswordDisabled.LapiRedisPassword = ""
+	emptyPasswordDisabled.LapiRedisPasswordFile = ""
 	if StoreKey(staleFileDisabled) != StoreKey(emptyPasswordDisabled) {
 		t.Fatal("disabled Redis leftover password file must not change StoreKey")
 	}
 }
 
-// TestPrepare_EnabledRedisLoadsPasswordFile is Redis on must still resolve RedisCachePasswordFile.
+// TestPrepare_EnabledRedisLoadsPasswordFile is Redis on must still resolve LapiRedisPasswordFile.
 func TestPrepare_EnabledRedisLoadsPasswordFile(t *testing.T) {
 	passwordFile := filepath.Join(t.TempDir(), "redis-password")
 	if err := os.WriteFile(passwordFile, []byte("stale-secret"), 0o600); err != nil {
@@ -41,13 +41,13 @@ func TestPrepare_EnabledRedisLoadsPasswordFile(t *testing.T) {
 	}
 
 	staleFileEnabled := testStreamConfig("lapi.example:8080", 1)
-	staleFileEnabled.RedisCacheEnabled = true
-	staleFileEnabled.RedisCachePassword = ""
-	staleFileEnabled.RedisCachePasswordFile = passwordFile
+	staleFileEnabled.LapiRedisEnabled = true
+	staleFileEnabled.LapiRedisPassword = ""
+	staleFileEnabled.LapiRedisPasswordFile = passwordFile
 	if err := Prepare(staleFileEnabled, nil); err != nil {
 		t.Fatal(err)
 	}
-	if staleFileEnabled.RedisCachePassword != "stale-secret" {
-		t.Fatalf("enabled Redis must load RedisCachePasswordFile, got %q", staleFileEnabled.RedisCachePassword)
+	if staleFileEnabled.LapiRedisPassword != "stale-secret" {
+		t.Fatalf("enabled Redis must load LapiRedisPasswordFile, got %q", staleFileEnabled.LapiRedisPassword)
 	}
 }

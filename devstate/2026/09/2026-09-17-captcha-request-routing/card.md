@@ -1,7 +1,7 @@
 Developer review: ready for review — 2026-09-17T20:23:57Z
 
 ## What this changes
-**Operators.** Optional `captchaCustomChallengeUrl` names a second exact browser path for custom-provider widgets. Empty keeps `CaptchaCustomJsURL` path only.
+**Operators.** Optional `bouncerCaptchaCustomChallengeUrl` names a second exact browser path for custom-provider widgets. Empty keeps `BouncerCaptchaCustomJsURL` path only.
 
 **Admin users.** None.
 
@@ -62,8 +62,8 @@ Local ticket → branch `2026-09-17-captcha-request-routing` → PR #68 → read
 ## Decision needed
 | Question | Decision | By |
 | --- | --- | --- |
-| What is the passthrough match set — `CaptchaCustomJsURL` path only, or also a widget/challenge URL? | assumed — exact path of `CaptchaCustomJsURL` and, when set, exact path of optional `captchaCustomChallengeUrl`. Not `CaptchaCustomValidateURL`. Not a directory prefix. | explore |
-| Does that need a new optional public key? | assumed — yes, optional `captchaCustomChallengeUrl` / `CaptchaCustomChallengeURL`. Empty means no second path. Custom validation still requires the existing four custom fields only. | explore |
+| What is the passthrough match set — `BouncerCaptchaCustomJsURL` path only, or also a widget/challenge URL? | assumed — exact path of `BouncerCaptchaCustomJsURL` and, when set, exact path of optional `bouncerCaptchaCustomChallengeUrl`. Not `BouncerCaptchaCustomValidateURL`. Not a directory prefix. | explore |
+| Does that need a new optional public key? | assumed — yes, optional `bouncerCaptchaCustomChallengeUrl` / `BouncerCaptchaCustomChallengeURL`. Empty means no second path. Custom validation still requires the existing four custom fields only. | explore |
 | Path vs host vs prefix matching, and why that scope is safe? | assumed — `url.Parse` the configured URL, compare `parsed.Path` to `req.URL.Path` (must be non-empty and start with `/`). Ignore host and query. Exact path only. | explore |
 | Should the Check-true form POST remint the gate cookie or hit the provider again? | assumed — neither. `WriteSolvedRedirect` only. Do not remint or re-verify. | explore |
 | Should custom-resource passthrough skip AppSec? | assumed — no. Use `handleNextServeHTTP`. | explore |
@@ -92,7 +92,7 @@ None.
 | Reviewed head | 04dbda8b99335cebf70d2c1bbab4f434bea45d30 | Card must match the branch you measured |
 
 ### Stored data model
-- Changed: Traefik plugin Config / `captchaCustomChallengeUrl` — string — sample `` (empty, JsURL-path only) or `https://widget.example/v0/challenge`. Upgrade: old configs still valid.
+- Changed: Traefik plugin Config / `bouncerCaptchaCustomChallengeUrl` — string — sample `` (empty, JsURL-path only) or `https://widget.example/v0/challenge`. Upgrade: old configs still valid.
 
 ### Technical review
 Best possible solution: captcha-kind routing on `handleRemediationServeHTTP` with cookie-only `Check`, exact-path custom-resource match, and no cache grace or stream-lease touch.
@@ -112,5 +112,5 @@ What I checked:
 - Cites #48 and #50
 
 ### Rank-up moves
-- Document `captchaCustomChallengeUrl` on the README captcha key list.
+- Document `bouncerCaptchaCustomChallengeUrl` on the README captcha key list.
 - Set the optional key on `examples/custom-captcha` so the hardcoded `/v0/challenge` path passes.

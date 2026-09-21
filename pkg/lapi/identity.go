@@ -12,12 +12,12 @@ import (
 const keyPrefix = "lapi:"
 
 // identity is the live/none remaining-fields payload hashed into Key and IdentityHex.
-// MetricsUpdateIntervalSeconds stays so none/live routers that disagree get sibling
+// LapiMetricsIntervalSeconds stays so none/live routers that disagree get sibling
 // Clients and each keeps its write-once metrics ticker. CAPI scenarios,
-// updateMaxFailure, and UpdateIntervalSeconds stay omitted. Per-router policy,
-// StreamStartupBlock, HTTP timeout, and LAPI TLS are omitted so a reload of
-// those knobs reuses the Client. Ban/captcha templates, OriginBasedDecisionRemap (Bouncer), trusted IPs, Enabled,
-// middleware name, log path, and decisionScopeHeaders are not included here
+// lapiUpdateMaxFailure, and LapiUpdateIntervalSeconds stay omitted. Per-router policy,
+// LapiStreamStartupBlock, HTTP timeout, and LAPI TLS are omitted so a reload of
+// those knobs reuses the Client. Ban/captcha templates, BouncerDecisionRemap (Bouncer), trusted IPs, Enabled,
+// middleware name, log path, and lapiScopeHeaders are not included here
 // either (stream scopes= is poller-owned; live passes scopes per LiveLookup).
 type identity struct {
 	Mode                         string   `json:"mode"`
@@ -27,30 +27,30 @@ type identity struct {
 	LapiKey                      string   `json:"lapiKey"`
 	CapiMachineID                string   `json:"capiMachineId"`
 	CapiPassword                 string   `json:"capiPassword"`
-	RedisCacheEnabled            bool     `json:"redisCacheEnabled"`
-	RedisCacheHost               string   `json:"redisCacheHost"`
-	RedisCacheReadHosts          []string `json:"redisCacheReadHosts"`
-	RedisCachePassword           string   `json:"redisCachePassword"`
-	RedisCacheDatabase           string   `json:"redisCacheDatabase"`
-	MetricsUpdateIntervalSeconds int64    `json:"metricsUpdateIntervalSeconds"`
+	LapiRedisEnabled            bool     `json:"lapiRedisEnabled"`
+	LapiRedisHost               string   `json:"lapiRedisHost"`
+	LapiRedisReadHosts          []string `json:"lapiRedisReadHosts"`
+	LapiRedisPassword           string   `json:"lapiRedisPassword"`
+	LapiRedisDatabase           string   `json:"lapiRedisDatabase"`
+	LapiMetricsIntervalSeconds int64    `json:"lapiMetricsIntervalSeconds"`
 }
 
 // identityFrom maps configuration.Config into IdentityHex fields.
 func identityFrom(cfg *configuration.Config) identity {
 	return identity{
-		Mode:                         cfg.CrowdsecMode,
-		LapiScheme:                   cfg.CrowdsecLapiScheme,
-		LapiHost:                     cfg.CrowdsecLapiHost,
-		LapiPath:                     cfg.CrowdsecLapiPath,
-		LapiKey:                      cfg.CrowdsecLapiKey,
-		CapiMachineID:                cfg.CrowdsecCapiMachineID,
-		CapiPassword:                 cfg.CrowdsecCapiPassword,
-		RedisCacheEnabled:            cfg.RedisCacheEnabled,
-		RedisCacheHost:               cfg.RedisCacheHost,
-		RedisCacheReadHosts:          cfg.RedisCacheReadHosts,
-		RedisCachePassword:           cfg.RedisCachePassword,
-		RedisCacheDatabase:           cfg.RedisCacheDatabase,
-		MetricsUpdateIntervalSeconds: cfg.MetricsUpdateIntervalSeconds,
+		Mode:                         cfg.LapiMode,
+		LapiScheme:                   cfg.LapiScheme,
+		LapiHost:                     cfg.LapiHost,
+		LapiPath:                     cfg.LapiPath,
+		LapiKey:                      cfg.LapiKey,
+		CapiMachineID:                cfg.LapiCapiMachineID,
+		CapiPassword:                 cfg.LapiCapiPassword,
+		LapiRedisEnabled:            cfg.LapiRedisEnabled,
+		LapiRedisHost:               cfg.LapiRedisHost,
+		LapiRedisReadHosts:          cfg.LapiRedisReadHosts,
+		LapiRedisPassword:           cfg.LapiRedisPassword,
+		LapiRedisDatabase:           cfg.LapiRedisDatabase,
+		LapiMetricsIntervalSeconds: cfg.LapiMetricsIntervalSeconds,
 	}
 }
 
@@ -71,7 +71,7 @@ func IdentityHex(cfg *configuration.Config) string {
 }
 
 // Key is the live/none Open key: SessionHex plus a hash of the identity payload
-// (Redis store params and MetricsUpdateIntervalSeconds). Stream SessionKey and
+// (Redis store params and LapiMetricsIntervalSeconds). Stream SessionKey and
 // StoreKey still omit the metrics interval.
 func Key(cfg *configuration.Config) string {
 	return keyPrefix + SessionHex(cfg) + ":" + hashJSON(identityFrom(cfg))

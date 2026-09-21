@@ -1,6 +1,6 @@
 # CrowdSec modes
 
-How this plugin fetches decisions and what happens on a request. The README lists a one-line summary of each `CrowdsecMode`; this page is the sequence for each path.
+How this plugin fetches decisions and what happens on a request. The README lists a one-line summary of each `LapiMode`; this page is the sequence for each path.
 
 ## none
 
@@ -38,7 +38,7 @@ sequenceDiagram
 
 ## live
 
-Ask LAPI on a cache miss, then store that IP's result for `DefaultDecisionSeconds`.
+Ask LAPI on a cache miss, then store that IP's result for `BouncerLiveTtlSeconds`.
 
 > A ban decision exists in CrowdsecLAPI but not in cache
 
@@ -54,7 +54,7 @@ sequenceDiagram
     TraefikPlugin-->>CrowdsecLAPI: Does the User IP has a crowdsec decision ?
     destroy CrowdsecLAPI
     CrowdsecLAPI-->>TraefikPlugin: Yes a ban Decision
-    TraefikPlugin-->>PluginCache: Store the information for this IP for DefaultDecisionSeconds
+    TraefikPlugin-->>PluginCache: Store the information for this IP for BouncerLiveTtlSeconds
     destroy PluginCache
     PluginCache-->>TraefikPlugin: Done
     TraefikPlugin->>User: No, HTTP 403
@@ -74,7 +74,7 @@ sequenceDiagram
     TraefikPlugin-->>CrowdsecLAPI: Does the User IP has a crowdsec decision ?
     destroy CrowdsecLAPI
     CrowdsecLAPI-->>TraefikPlugin: Nothing, all good!
-    TraefikPlugin-->>PluginCache: Store the information for this IP for DefaultDecisionSeconds
+    TraefikPlugin-->>PluginCache: Store the information for this IP for BouncerLiveTtlSeconds
     destroy PluginCache
     PluginCache-->>TraefikPlugin: Done
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
@@ -83,9 +83,9 @@ sequenceDiagram
 
 ## stream
 
-Sync the decision list from LAPI every `UpdateIntervalSeconds`. The request path hits cache only.
+Sync the decision list from LAPI every `LapiUpdateIntervalSeconds`. The request path hits cache only.
 
-> Cache synchronization every UpdateIntervalSeconds
+> Cache synchronization every LapiUpdateIntervalSeconds
 
 ```mermaid
 sequenceDiagram
@@ -181,9 +181,9 @@ sequenceDiagram
     Webserver->>User: HTTP Response
 ```
 
-## appsec
+## AppSec-only (`lapiEnabled: false`)
 
-Skip IP decisions. Send the HTTP request to CrowdSec AppSec.
+Skip IP decisions. Send the HTTP request to CrowdSec AppSec (`appsecEnabled: true`).
 
 > The request is detected as malicious
 
@@ -218,7 +218,7 @@ sequenceDiagram
 
 ## Captcha
 
-A captcha decision shows a challenge. After the provider accepts it, the IP is clean for `captchaGracePeriodSeconds`.
+A captcha decision shows a challenge. After the provider accepts it, the IP is clean for `bouncerCaptchaGracePeriodSeconds`.
 
 ```mermaid
 sequenceDiagram
@@ -234,7 +234,7 @@ sequenceDiagram
     TraefikPlugin-->>ProviderCaptcha: Is the validation OK ?
     destroy ProviderCaptcha
     ProviderCaptcha-->>TraefikPlugin: Yes
-    TraefikPlugin-->>PluginCache: Set the User IP Clean for captchaGracePeriodSeconds
+    TraefikPlugin-->>PluginCache: Set the User IP Clean for bouncerCaptchaGracePeriodSeconds
     destroy PluginCache
     PluginCache-->>TraefikPlugin: Done
     destroy TraefikPlugin

@@ -79,7 +79,7 @@ func Test_Validate_customJSONPostsJSONSecretAndResponse(t *testing.T) {
 	}))
 	t.Cleanup(siteverify.Close)
 
-	client := newTestCaptchaClient(t, configuration.CustomProvider, configuration.CaptchaCustomValidateBodyJSON, siteverify.URL+"/siteverify", siteverify.Client())
+	client := newTestCaptchaClient(t, configuration.CustomProvider, configuration.BouncerCaptchaCustomValidateBodyJSON, siteverify.URL+"/siteverify", siteverify.Client())
 	ok, err := client.Validate(solverPOST(), "")
 	if err != nil || !ok {
 		t.Fatalf("Validate json want success, got ok=%v err=%v", ok, err)
@@ -112,7 +112,7 @@ func Test_Validate_customJSONPostsRemoteIP(t *testing.T) {
 	}))
 	t.Cleanup(siteverify.Close)
 
-	client := newTestCaptchaClient(t, configuration.CustomProvider, configuration.CaptchaCustomValidateBodyJSON, siteverify.URL+"/siteverify", siteverify.Client())
+	client := newTestCaptchaClient(t, configuration.CustomProvider, configuration.BouncerCaptchaCustomValidateBodyJSON, siteverify.URL+"/siteverify", siteverify.Client())
 	ok, err := client.Validate(solverPOST(), passedRemoteIP)
 	if err != nil || !ok {
 		t.Fatalf("Validate json want success, got ok=%v err=%v", ok, err)
@@ -127,7 +127,7 @@ func Test_Validate_customJSONPostsRemoteIP(t *testing.T) {
 }
 
 func Test_Validate_customFormOrOmitStaysURLEncoded(t *testing.T) {
-	for _, validateBody := range []string{"", configuration.CaptchaCustomValidateBodyForm} {
+	for _, validateBody := range []string{"", configuration.BouncerCaptchaCustomValidateBodyForm} {
 		t.Run("body="+validateBody, func(t *testing.T) {
 			var gotType, gotBody string
 			siteverify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -172,7 +172,7 @@ func Test_Validate_builtinAlwaysURLEncoded(t *testing.T) {
 	}))
 	t.Cleanup(siteverify.Close)
 
-	client := newTestCaptchaClient(t, configuration.HcaptchaProvider, configuration.CaptchaCustomValidateBodyJSON, siteverify.URL+"/siteverify", siteverify.Client())
+	client := newTestCaptchaClient(t, configuration.HbouncerCaptchaProvider, configuration.BouncerCaptchaCustomValidateBodyJSON, siteverify.URL+"/siteverify", siteverify.Client())
 	ok, err := client.Validate(solverPOST(), "")
 	if err != nil || !ok {
 		t.Fatalf("built-in Validate want success, got ok=%v err=%v", ok, err)
@@ -196,7 +196,7 @@ func Test_ServeHTTP_customJSONSuccessIssuesCookieAnd302(t *testing.T) {
 	}))
 	t.Cleanup(siteverify.Close)
 
-	client := newTestCaptchaClient(t, configuration.CustomProvider, configuration.CaptchaCustomValidateBodyJSON, siteverify.URL+"/siteverify", siteverify.Client())
+	client := newTestCaptchaClient(t, configuration.CustomProvider, configuration.BouncerCaptchaCustomValidateBodyJSON, siteverify.URL+"/siteverify", siteverify.Client())
 	rw := httptest.NewRecorder()
 	client.ServeHTTP(rw, solverPOST(), "192.0.2.10")
 	if rw.Code != http.StatusFound {

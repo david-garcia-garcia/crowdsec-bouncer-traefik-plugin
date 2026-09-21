@@ -1,11 +1,16 @@
 ## Purpose
 
-How a shared LAPI Client builds stream `scopes=` and the stream store filter from the union of live routers’ normalized header-scope maps, without mutating write-once `decisionScopeHeaders`.
+How a shared LAPI Client builds stream `scopes=` and the stream store filter from the union of live routers’ normalized header-scope maps, without mutating write-once `lapiScopeHeaders`.
 
 ## Requirements
 
 ### Requirement: Stream scopes are the live-router union
-A stream or alone `lapi.Client` SHALL hold a Client-owned registry of header-scope maps from each live constructor that bound that Client. After a successful `OpenStream` bind, the constructor SHALL register this `New` ctx and this router’s normalized `decisionScopeHeaders`. When that ctx is Done, the Client SHALL drop that registration. `streamQuery` and `storeStreamDecision` SHALL snapshot the union of registered maps under the existing Client mutex. The write-once `decisionScopeHeaders` field set in `New` MUST NOT become mutable and MUST NOT be the live union. Implementations MUST NOT use `atomic.Pointer[T]`, `sync.Once`, or a package global for this registry. CAPI (alone) SHALL still omit `scopes=`. Live and none SHALL keep passing scopes per `LiveLookup` from the bouncer map. AppSec reclaim key is unchanged. Client address, when this leaf mentions it, SHALL reuse `pkg/ip.GetRemoteIP` (do not parse `RemoteAddr`).
+A stream or alone `lapi.Client` SHALL hold a Client-owned registry of header-scope maps from each opener that bound that Client. After a successful `OpenStream` bind, the opener SHALL register this `New` ctx and this router’s normalized `lapiScopeHeaders`. Bouncing subscribers MUST NOT register. When that ctx is Done, the Client SHALL drop that registration. `streamQuery` and `storeStreamDecision` SHALL snapshot the union of registered maps under the existing Client mutex. The write-once `lapiScopeHeaders` field set in `New` MUST NOT become mutable and MUST NOT be the live union. Implementations MUST NOT use `atomic.Pointer[T]`, `sync.Once`, or a package global for this registry. CAPI (alone) SHALL still omit `scopes=`. Live and none SHALL keep passing scopes per `LiveLookup` from the bouncer map. AppSec reclaim key is unchanged. Client address, when this leaf mentions it, SHALL reuse `pkg/ip.GetRemoteIP` (do not parse `RemoteAddr`).
+
+#### Scenario: Subscriber does not add scopes
+- **WHEN** the opener published a stream Client with no `lapiScopeHeaders`
+- **AND** a bouncing subscriber has `lapiScopeHeaders` Country
+- **THEN** stream `scopes=` does not include Country from that subscriber
 
 #### Scenario: Two routers union Country and username
 - **WHEN** two live stream `New` calls share one Client and one maps `Country` while the other maps `username`

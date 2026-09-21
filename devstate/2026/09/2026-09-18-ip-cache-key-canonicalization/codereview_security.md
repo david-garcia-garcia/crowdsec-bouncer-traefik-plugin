@@ -4,9 +4,9 @@ Pin: origin/master...HEAD
 ## Findings
 
 - [accepted] **Behavior change, fail-closed direction.** A stream poll whose Range apply cannot read
-  `range-index` is now a failed poll. With the default `updateMaxFailure: 0` that marks the stream
-  unhealthy, and stream/alone cache misses then take `crowdsecLapiFailureAction`, whose default is
-  `ban`. So a dead `redisCacheReadHosts` replica can turn into bans on cache-miss traffic.
+  `range-index` is now a failed poll. With the default `lapiUpdateMaxFailure: 0` that marks the stream
+  unhealthy, and stream/alone cache misses then take `bouncerLapiFailureAction`, whose default is
+  `ban`. So a dead `lapiRedisReadHosts` replica can turn into bans on cache-miss traffic.
   Argument: the alternative loses enforcement instead. Logging at `Debug` and calling the tick clean
   keeps the index intact but drops this tick's Range bans permanently, because later polls run with
   `startup=false` and never carry them again. The surrounding code already treats a poll that did not

@@ -65,8 +65,8 @@ func TestNormalizeASN(t *testing.T) {
 	}
 }
 
-func TestNormalizeDecisionScopeHeaders(t *testing.T) {
-	got := NormalizeDecisionScopeHeaders(map[string]string{
+func TestNormalizeLapiScopeHeaders(t *testing.T) {
+	got := NormalizeLapiScopeHeaders(map[string]string{
 		"country":  "CF-IPCountry",
 		"AS":       "CF-ASN",
 		"username": "X-User",

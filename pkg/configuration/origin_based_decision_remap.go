@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Operator tokens for OriginBasedDecisionRemap from/to (LAPI types plus pass).
+// Operator tokens for BouncerDecisionRemap from/to (LAPI types plus pass).
 const (
 	originBasedDecisionRemapBan     = "ban"
 	originBasedDecisionRemapCaptcha = "captcha"
@@ -14,26 +14,26 @@ const (
 )
 
 // validateOriginBasedDecisionRemap rejects empty origin keys and from→to edges that are not a weaken.
-// Unknown origin tokens are allowed. captchaProvider is not required.
+// Unknown origin tokens are allowed. bouncerCaptchaProvider is not required.
 func validateOriginBasedDecisionRemap(config *Config) error {
 	if config == nil {
 		return nil
 	}
-	for origin, edges := range config.OriginBasedDecisionRemap {
+	for origin, edges := range config.BouncerDecisionRemap {
 		if strings.TrimSpace(origin) == "" {
-			return errors.New("originBasedDecisionRemap: origin cannot be empty")
+			return errors.New("bouncerDecisionRemap: origin cannot be empty")
 		}
 		if len(edges) == 0 {
-			return fmt.Errorf("originBasedDecisionRemap: %q has no mappings", origin)
+			return fmt.Errorf("bouncerDecisionRemap: %q has no mappings", origin)
 		}
 		for from, to := range edges {
 			fromType := strings.ToLower(strings.TrimSpace(from))
 			toType := strings.ToLower(strings.TrimSpace(to))
 			if fromType != originBasedDecisionRemapBan && fromType != originBasedDecisionRemapCaptcha {
-				return fmt.Errorf("originBasedDecisionRemap: %q from %q must be ban or captcha", origin, from)
+				return fmt.Errorf("bouncerDecisionRemap: %q from %q must be ban or captcha", origin, from)
 			}
 			if !OriginBasedDecisionRemapAllowed(fromType, toType) {
-				return fmt.Errorf("originBasedDecisionRemap: %q cannot map %s to %s", origin, fromType, toType)
+				return fmt.Errorf("bouncerDecisionRemap: %q cannot map %s to %s", origin, fromType, toType)
 			}
 		}
 	}

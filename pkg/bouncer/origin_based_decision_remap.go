@@ -9,7 +9,7 @@ import (
 
 const listsOriginPrefix = "lists:"
 
-const originBasedDecisionRemapToPass = "pass"
+const bouncerDecisionRemapToPass = "pass"
 
 // copyOriginBasedDecisionRemap copies trimmed weaken remaps for Bouncer New.
 // Inner values are applied kind letters (captcha `c`, pass empty). Invalid edges are dropped.
@@ -30,7 +30,7 @@ func copyOriginBasedDecisionRemap(src map[string]map[string]string) map[string]m
 			if !configuration.OriginBasedDecisionRemapAllowed(fromType, toType) {
 				continue
 			}
-			copiedEdges[fromType] = originBasedDecisionRemapAppliedKind(toType)
+			copiedEdges[fromType] = bouncerDecisionRemapAppliedKind(toType)
 		}
 		if len(copiedEdges) == 0 {
 			continue
@@ -43,10 +43,10 @@ func copyOriginBasedDecisionRemap(src map[string]map[string]string) map[string]m
 	return copied
 }
 
-// originBasedDecisionRemapAppliedKind maps an operator to-token to the kind letter ServeHTTP uses.
+// bouncerDecisionRemapAppliedKind maps an operator to-token to the kind letter ServeHTTP uses.
 // pass is NoBannedValue so the request takes the AppSec/next path.
-func originBasedDecisionRemapAppliedKind(to string) string {
-	if to == originBasedDecisionRemapToPass {
+func bouncerDecisionRemapAppliedKind(to string) string {
+	if to == bouncerDecisionRemapToPass {
 		return decisionscope.NoBannedValue
 	}
 	return decisionscope.RemediationValue(to)
@@ -60,19 +60,19 @@ func (b *Bouncer) applyOriginBasedDecisionRemap(kind, metricsOrigin string) stri
 	if b == nil {
 		return kind
 	}
-	fromType := originBasedDecisionRemapFromKind(kind)
+	fromType := bouncerDecisionRemapFromKind(kind)
 	if fromType == "" {
 		return kind
 	}
-	mapped, ok := originBasedDecisionRemapTo(b.originBasedDecisionRemap, metricsOrigin, fromType)
+	mapped, ok := bouncerDecisionRemapTo(b.bouncerDecisionRemap, metricsOrigin, fromType)
 	if !ok {
 		return kind
 	}
 	return mapped
 }
 
-// originBasedDecisionRemapFromKind is the LAPI type token for a stored kind letter.
-func originBasedDecisionRemapFromKind(kind string) string {
+// bouncerDecisionRemapFromKind is the LAPI type token for a stored kind letter.
+func bouncerDecisionRemapFromKind(kind string) string {
 	switch decisionscope.RemediationKind(kind) {
 	case decisionscope.BannedValue:
 		return "ban"
@@ -83,9 +83,9 @@ func originBasedDecisionRemapFromKind(kind string) string {
 	}
 }
 
-// originBasedDecisionRemapTo is the applied kind when metricsOrigin has an edge for fromType.
-func originBasedDecisionRemapTo(table map[string]map[string]string, metricsOrigin, fromType string) (string, bool) {
-	edges := originBasedDecisionRemapEdges(metricsOrigin, table)
+// bouncerDecisionRemapTo is the applied kind when metricsOrigin has an edge for fromType.
+func bouncerDecisionRemapTo(table map[string]map[string]string, metricsOrigin, fromType string) (string, bool) {
+	edges := bouncerDecisionRemapEdges(metricsOrigin, table)
 	if len(edges) == 0 {
 		return "", false
 	}
@@ -93,9 +93,9 @@ func originBasedDecisionRemapTo(table map[string]map[string]string, metricsOrigi
 	return mapped, ok
 }
 
-// originBasedDecisionRemapEdges is the from→kind map for metricsOrigin.
+// bouncerDecisionRemapEdges is the from→kind map for metricsOrigin.
 // Exact key wins; config "lists" also matches any "lists:" prefix.
-func originBasedDecisionRemapEdges(metricsOrigin string, table map[string]map[string]string) map[string]string {
+func bouncerDecisionRemapEdges(metricsOrigin string, table map[string]map[string]string) map[string]string {
 	if metricsOrigin == "" || len(table) == 0 {
 		return nil
 	}
@@ -112,7 +112,7 @@ func originBasedDecisionRemapEdges(metricsOrigin string, table map[string]map[st
 
 // appliedLAPIRemediation remaps a lookup/live LAPI kind for this router and resolves packed origin.
 func (b *Bouncer) appliedLAPIRemediation(kind, origin string, originID uint16) (string, string) {
-	if b == nil || len(b.originBasedDecisionRemap) == 0 {
+	if b == nil || len(b.bouncerDecisionRemap) == 0 {
 		return kind, origin
 	}
 	if origin == "" {

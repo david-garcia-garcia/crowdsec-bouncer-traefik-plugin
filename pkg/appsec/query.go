@@ -19,7 +19,7 @@ import (
 const (
 	crowdsecAppsecIPHeader   = "X-Crowdsec-Appsec-Ip"
 	crowdsecAppsecURIHeader  = "X-Crowdsec-Appsec-Uri"
-	crowdsecAppsecHostHeader = "X-Crowdsec-Appsec-Host"
+	appsecHostHeader = "X-Crowdsec-Appsec-Host"
 	crowdsecAppsecVerbHeader = "X-Crowdsec-Appsec-Verb"
 	crowdsecAppsecHeader     = "X-Crowdsec-Appsec-Api-Key"
 	crowdsecAppsecUserAgent  = "X-Crowdsec-Appsec-User-Agent"
@@ -204,7 +204,7 @@ func (c *Client) newAppsecForwardRequest(ip string, httpReq *http.Request, pol P
 	req.Header.Set(crowdsecAppsecHeader, appsecKey)
 	req.Header.Set(crowdsecAppsecIPHeader, ip)
 	req.Header.Set(crowdsecAppsecVerbHeader, httpReq.Method)
-	req.Header.Set(crowdsecAppsecHostHeader, httpReq.Host)
+	req.Header.Set(appsecHostHeader, httpReq.Host)
 	req.Header.Set(crowdsecAppsecURIHeader, httpReq.URL.String())
 	req.Header.Set(crowdsecAppsecUserAgent, httpReq.Header.Get("User-Agent"))
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+c.pluginVersion)

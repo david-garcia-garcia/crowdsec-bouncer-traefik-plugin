@@ -128,7 +128,7 @@ func TestReportMetricsPluginVersion(t *testing.T) {
 		crowdsecScheme: lapiURL.Scheme,
 		crowdsecHost:   lapiURL.Host,
 		crowdsecPath:   "/",
-		crowdsecMode:   configuration.StreamMode,
+		lapiMode:   configuration.StreamMode,
 		log:            logger.New("ERROR", ""),
 		pluginVersion:  wantVersion,
 	}
@@ -210,7 +210,7 @@ func newUsageMetricsClient(t *testing.T) (*Client, *testMetricsBody) {
 		crowdsecScheme: lapiURL.Scheme,
 		crowdsecHost:   lapiURL.Host,
 		crowdsecPath:   "/",
-		crowdsecMode:   configuration.StreamMode,
+		lapiMode:   configuration.StreamMode,
 		log:            logger.New("ERROR", ""),
 		pluginVersion:  "test",
 	}
@@ -333,7 +333,7 @@ func TestReportMetricsOmitsRange(t *testing.T) {
 
 func TestReportMetricsLiveModeOmitsActive(t *testing.T) {
 	client, body := newUsageMetricsClient(t)
-	client.metricsReporter.crowdsecMode = configuration.LiveMode
+	client.metricsReporter.lapiMode = configuration.LiveMode
 	store := AttachTestInternStore(client)
 	store.Put(decisionstore.Decision{
 		Scope: decisionscope.ScopeIP, Value: "1.2.3.4", Kind: decisionscope.BannedValue, Origin: "crowdsec", DurationSec: 60,
@@ -428,7 +428,7 @@ func TestReportMetricsRestoresOnFailure(t *testing.T) {
 		crowdsecScheme:  lapiURL.Scheme,
 		crowdsecHost:    lapiURL.Host,
 		crowdsecPath:    "/",
-		crowdsecMode:    configuration.StreamMode,
+		lapiMode:    configuration.StreamMode,
 		log:             logger.New("ERROR", ""),
 		pluginVersion:   "test",
 		metricsInterval: 1,
@@ -478,7 +478,7 @@ func TestReportMetricsWindowSurvivesAdoptTransport(t *testing.T) {
 		crowdsecScheme: lapiURL.Scheme,
 		crowdsecHost:   lapiURL.Host,
 		crowdsecPath:   "/",
-		crowdsecMode:   configuration.StreamMode,
+		lapiMode:   configuration.StreamMode,
 		log:            logger.New("ERROR", ""),
 		pluginVersion:  "test",
 	}
@@ -487,8 +487,8 @@ func TestReportMetricsWindowSurvivesAdoptTransport(t *testing.T) {
 	client.IncProcessed("ipv4")
 	client.IncDropped("crowdsec", "ipv4", "ban")
 	adopted := testStreamConfig(lapiURL.Host, 0)
-	adopted.CrowdsecLapiScheme = lapiURL.Scheme
-	adopted.CrowdsecLapiKey = "second-key"
+	adopted.LapiScheme = lapiURL.Scheme
+	adopted.LapiKey = "second-key"
 	adopted.HTTPTimeoutSeconds = 11
 	if _, err := client.AdoptTransport(adopted); err != nil {
 		t.Fatal(err)

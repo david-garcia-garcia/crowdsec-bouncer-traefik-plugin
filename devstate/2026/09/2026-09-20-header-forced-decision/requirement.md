@@ -5,10 +5,10 @@ IssueKey: 2026-09-20-header-forced-decision
 Other Traefik middlewares cannot force this plugin to ban or captcha a client. ServeHTTP always consults the stream cache (or live LAPI) before remediation. There is no config-gated incoming header whose value is ban or captcha and skips that lookup.
 
 ## Current (code)
-- After trusted-IP skip, ServeHTTP reads `decisionScopeHeaders` as CrowdSec identity values, then `LookupRemediation` (live/stream/alone cache) or `LiveLookup` (live/none). No header value forces ban/captcha without that lookup. `pkg/bouncer/bouncer.go`
+- After trusted-IP skip, ServeHTTP reads `lapiScopeHeaders` as CrowdSec identity values, then `LookupRemediation` (live/stream/alone cache) or `LiveLookup` (live/none). No header value forces ban/captcha without that lookup. `pkg/bouncer/bouncer.go`
 - `appsec` mode skips LAPI/stream and goes to the pass path. `pkg/bouncer/bouncer.go`
 - Trusted client IPs skip LAPI and AppSec entirely. `pkg/bouncer/bouncer.go`
-- Config has `decisionScopeHeaders` (scope name → request header for stream/live identity) and `remediationHeadersCustomName` (outgoing response header). No incoming force-decision header field. `pkg/configuration/configuration.go`
+- Config has `lapiScopeHeaders` (scope name → request header for stream/live identity) and `bouncerRemediationHeader` (outgoing response header). No incoming force-decision header field. `pkg/configuration/configuration.go`
 - Cache letters are `t` (ban), `c` (captcha), `f` (none). CrowdSec type `ban` maps to `t`, not `b`. `pkg/decisionscope/lookup.go`
 - Captcha kind still honors the gate: `Check` true and not a captcha-form POST calls `handleNextServeHTTP`. `pkg/bouncer/bouncer.go` `pkg/captcha/captcha.go`
 - Incoming `X-Crowdsec-Decision` (or any config key that reads a request header as `b`/`c` and skips stream): not found.
@@ -26,8 +26,8 @@ Other Traefik middlewares cannot force this plugin to ban or captcha a client. S
 - OpenSpec for middleware request path and config validation (propose chooses fold vs new)
 
 ## Out of scope
-- Changing `decisionScopeHeaders` or header-scope LAPI matching
-- Changing outgoing `remediationHeadersCustomName`
+- Changing `lapiScopeHeaders` or header-scope LAPI matching
+- Changing outgoing `bouncerRemediationHeader`
 - New captcha-gate cookie/HMAC behavior
 - Header values other than ban and captcha
 - Stripping the header before `next`
@@ -47,4 +47,4 @@ Other Traefik middlewares cannot force this plugin to ban or captcha a client. S
 - Ticket names stream skip; dest `ServeHTTP` also has live/none `LiveLookup` on the same path (`pkg/bouncer/bouncer.go`).
 - Captcha-gate pass-through while kind stays captcha is already current for stream captcha (`handleRemediationServeHTTP` + `Check`); the ticket asks to keep that when an upstream middleware still sends `c`.
 - Trusted IPs never reach header or stream logic today; the ticket does not say they should see the force header.
-- `decisionScopeHeaders` is a different incoming-header feature (identity for lookup, not a force letter).
+- `lapiScopeHeaders` is a different incoming-header feature (identity for lookup, not a force letter).

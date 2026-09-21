@@ -39,12 +39,12 @@ services:
   #     # Definition of the service
   #     - "traefik.http.services.service-foo.loadbalancer.server.port=80"
   #     # Definition of the middleware
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.rediscacheenabled=true"
+  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerEnabled=true"
+  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiKey=40796d93c2958f9e58345514e67740e5"
+  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiRedisEnabled=true"
   #     # Contact redis-unsecure without a password
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.rediscachehost=redis-insecure:6379"
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
+  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiRedisHost=redis-insecure:6379"
+  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.logLevel=DEBUG"
 
   whoami-redis-secure:
     image: traefik/whoami
@@ -59,13 +59,13 @@ services:
       # Definition of the service
       - "traefik.http.services.service-bar.loadbalancer.server.port=80"
       # Definition of the middleware
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.rediscacheenabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.rediscachepassword=FIXME"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerEnabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiKey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiRedisEnabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiRedisPassword=FIXME"
       # Contact redis-secure with password
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.rediscachehost=redis-secure:6379"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiRedisHost=redis-secure:6379"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.logLevel=DEBUG"
 
 
   crowdsec:

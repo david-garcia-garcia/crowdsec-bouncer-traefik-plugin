@@ -18,14 +18,14 @@ http:
     crowdsec-whoami: 
       plugin:
         bouncer:
-          enabled: true
+          bouncerEnabled: true
           crowdseclapikey: "whoami-demo"
           updateintervalseconds: 60
           crowdsecmode: live
           loglevel: "DEBUG"
-          crowdsecLapiScheme: https
-          crowdsecLapiHost: localhost:8080
-          crowdsecLapiTLSInsecureVerify: false
+          lapiScheme: https
+          lapiHost: localhost:8080
+          lapiTlsInsecureVerify: false
           crowdsecLapiTLSCertificateAuthorityFile: /etc/traefik/crowdsec-certs/inter.pem
           crowdsecLapiTLSCertificateBouncerFile: /etc/traefik/crowdsec-certs/bouncer.pem
           crowdsecLapiTLSCertificateBouncerKeyFile: /etc/traefik/crowdsec-certs/bouncer-key.pem

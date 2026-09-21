@@ -5,7 +5,7 @@ Developer review: in progress — 2026-09-06T13:11:26Z
 
 **Admin users.** None.
 
-**Developers.** `pkg/crowdsecconnection` is now `pkg/lapi` (`lapi.Client`) plus `pkg/appsec` (`appsec.Client`). Bouncer holds `lapiClient` and `appsecClient`. Neither package imports the other. `crowdsecMode: appsec` skips LAPI Open.
+**Developers.** `pkg/crowdsecconnection` is now `pkg/lapi` (`lapi.Client`) plus `pkg/appsec` (`appsec.Client`). Bouncer holds `lapiClient` and `appsecClient`. Neither package imports the other. `lapiMode: appsec` skips LAPI Open.
 
 **End users.** None.
 

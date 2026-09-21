@@ -1,7 +1,7 @@
 Developer review: in progress — 2026-09-18T11:21:31Z
 
 ## What this changes
-**Operators.** In `live` and `none` mode `crowdsecLapiFailureAction` now also governs a failed `decisionScopeHeaders` query, so under the default `ban` a request whose `Country` or `username` scope query errored is blocked instead of allowed, and that failure is logged at `WARN` instead of `DEBUG` — set `crowdsecLapiFailureAction: passthrough` to keep today's permissive behavior.
+**Operators.** In `live` and `none` mode `bouncerLapiFailureAction` now also governs a failed `lapiScopeHeaders` query, so under the default `ban` a request whose `Country` or `username` scope query errored is blocked instead of allowed, and that failure is logged at `WARN` instead of `DEBUG` — set `bouncerLapiFailureAction: passthrough` to keep today's permissive behavior.
 
 **Admin users.** None.
 
@@ -10,12 +10,12 @@ Developer review: in progress — 2026-09-18T11:21:31Z
 **End users.** A visitor whose header-scope decision could not be checked is now blocked rather than let through, under the default failure action.
 
 ## Behavior change requiring owner ratification (deliverable 1)
-This is the heart of the PR and it changes what happens to live traffic. Row 2 is the change; every other row is stated so the ratification is a decision about one cell, not a leap of faith. `IP query` is the client-address query, `scope query` is one mapped `decisionScopeHeaders` lookup.
+This is the heart of the PR and it changes what happens to live traffic. Row 2 is the change; every other row is stated so the ratification is a decision about one cell, not a leap of faith. `IP query` is the client-address query, `scope query` is one mapped `lapiScopeHeaders` lookup.
 
 | IP query | Scope query | On `master` `0e7dbf0` | On this branch |
 | --- | --- | --- | --- |
 | clean | every scope clean | allow | allow — unchanged |
-| clean | **one scope errors** | **allow**, traced only by a `DEBUG` line | non-active remediation + error → `crowdsecLapiFailureAction` decides (default `ban`), logged at `WARN`, and no negative live-cache entry is written for that client address |
+| clean | **one scope errors** | **allow**, traced only by a `DEBUG` line | non-active remediation + error → `bouncerLapiFailureAction` decides (default `ban`), logged at `WARN`, and no negative live-cache entry is written for that client address |
 | clean | one scope bans | ban | ban — unchanged |
 | active ban | one scope errors | ban | ban — unchanged; the ban is never downgraded and the failure action is never consulted |
 | errors | not reached | non-active remediation + error → failure action | unchanged |
@@ -26,9 +26,9 @@ One test per row lives in `pkg/lapi/zzz_failure_action_test.go`, and each was me
 ## Motivation
 In `none` and `live` mode the bouncer asks LAPI once for the client address and then once per mapped header scope (`Country`, `username`, …). `handleNoStreamCache` overloads its return: an active remediation comes back with a non-nil `handleNoStreamCache:banned` error, so the error alone does not mean failure. `mergeLiveScope` returned `(string, time.Duration)` with no error channel at all, so a scope query that failed logged at `Debug` and handed the previous verdict back unchanged.
 
-On `master` that reads as "this scope has no decision". Measured against a LAPI that answers `ip=` with `null` and `500`s on `scope=`: `LiveLookup` returns `value="f" err=<nil>`, `pkg/bouncer` takes the allow path, `crowdsecLapiFailureAction` never runs, and `handleNoStreamCache` also caches the unverified allow for that client address, so the outage outlives itself. The only trace is a `Debug` line that is off in most deployments.
+On `master` that reads as "this scope has no decision". Measured against a LAPI that answers `ip=` with `null` and `500`s on `scope=`: `LiveLookup` returns `value="f" err=<nil>`, `pkg/bouncer` takes the allow path, `bouncerLapiFailureAction` never runs, and `handleNoStreamCache` also caches the unverified allow for that client address, so the outage outlives itself. The only trace is a `Debug` line that is off in most deployments.
 
-Four smaller defects sit on the same two paths, each reproduced on `master` first. `handleStreamCache` keeps the `updated` lease after a failed stream GET, so no instance re-polls for the rest of `max(updateIntervalSeconds - 1, 1)` while stream/alone cache misses are already taking the failure action. The alone-mode `401` retry reissued a POST as a bodyless GET, and `crowdsecQuery` and `getToken` could call each other without bound — the test for a second `401` exhausted the stack and panicked on `master`. Ten `crowdsecQuery` calls against a `502` opened ten connections, because the early return sat above the `defer` that closed the body. That same return produced `crowdsecQuery:unreachable url:… %!w(<nil>)` and never named the status code.
+Four smaller defects sit on the same two paths, each reproduced on `master` first. `handleStreamCache` keeps the `updated` lease after a failed stream GET, so no instance re-polls for the rest of `max(lapiUpdateIntervalSeconds - 1, 1)` while stream/alone cache misses are already taking the failure action. The alone-mode `401` retry reissued a POST as a bodyless GET, and `crowdsecQuery` and `getToken` could call each other without bound — the test for a second `401` exhausted the stack and panicked on `master`. Ten `crowdsecQuery` calls against a `502` opened ten connections, because the early return sat above the `defer` that closed the body. That same return produced `crowdsecQuery:unreachable url:… %!w(<nil>)` and never named the status code.
 
 Not merging keeps a security control failing open whenever LAPI answers the address query but not a scope query, keeps a failed stream poll parked for a whole interval, and keeps two operator-facing messages wrong.
 
@@ -82,7 +82,7 @@ The ticket source lives in the bus folder as `ticket/source.md`; the branch is o
 ## Decision needed
 | Question | Decision | By |
 | --- | --- | --- |
-| Does the deliverable 1 behavior change need owner sign-off before merge? | blocked — ratify the matrix above. A deployment with a flaky scope path that used to allow silently will now apply `crowdsecLapiFailureAction`, default `ban`. `passthrough` is the documented way back | explore |
+| Does the deliverable 1 behavior change need owner sign-off before merge? | blocked — ratify the matrix above. A deployment with a flaky scope path that used to allow silently will now apply `bouncerLapiFailureAction`, default `ban`. `passthrough` is the documented way back | explore |
 | Should the alone-mode `401` release its response before renewing the token? | assumed — not applied. Bounded at three sockets per renewal, and moving the release out of the `defer` risks a double `Close` logged at `ERROR`; noted as debt for the owner to take or drop | codereview |
 | Who owns identity on these paths (client address, header-scope value)? | assumed — untouched. `pkg/bouncer` resolves the client address through `pkg/ip` and passes `remoteIP` plus `scopes` into `LiveLookup`; neither is re-derived in `pkg/lapi` | explore |
 

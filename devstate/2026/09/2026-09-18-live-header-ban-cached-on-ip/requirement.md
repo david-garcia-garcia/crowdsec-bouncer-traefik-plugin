@@ -2,7 +2,7 @@
 IssueKey: 2026-09-18-live-header-ban-cached-on-ip
 
 ## Problem
-In live mode, `LiveLookup` writes the merged verdict (IP plus header scopes) onto the client-address cache slot. A header-scope ban therefore becomes an IP ban for `defaultDecisionSeconds`. Any later request from the same address with a different header identity inherits that ban. Header results are already stored on `HeaderScopeKey`; the IP slot must keep only the IP query result.
+In live mode, `LiveLookup` writes the merged verdict (IP plus header scopes) onto the client-address cache slot. A header-scope ban therefore becomes an IP ban for `bouncerLiveTtlSeconds`. Any later request from the same address with a different header identity inherits that ban. Header results are already stored on `HeaderScopeKey`; the IP slot must keep only the IP query result.
 
 ## Current (code)
 - After scope merge, any active `chosen` is written to `cacheClient.Set(remoteIP, chosen, …)`. `pkg/lapi/client_live.go:43-46`

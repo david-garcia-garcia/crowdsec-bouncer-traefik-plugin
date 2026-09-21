@@ -11,13 +11,13 @@ AppSec identity today (pkg/appsec/session.go identity)
   query cap: bodyLimit          ← write-once Client scalar; copies req body
   transport: httpTimeoutSeconds ← shared HTTPTimeoutSeconds
              tlsInsecureVerify, tlsCa, tlsCert  ← CrowdsecAppsecTLS* content
-  not hashed: crowdsecAppsecFailureAction (already on Bouncer + appsec.Policy)
+  not hashed: bouncerAppsecFailureAction (already on Bouncer + appsec.Policy)
               middleware name, next, templates, Enabled, LAPI fields
               *File TLS paths (GetTLSConfigCrowdsec resolves into content)
 
 LAPI identity after PR #62 (pkg/lapi/identity.go) — read only
   first-wins: mode, LAPI URL+key, CAPI, intervals, Redis host/auth/db
-  dropped:    HTTP timeout, LAPI TLS, per-router policy, StreamStartupBlock
+  dropped:    HTTP timeout, LAPI TLS, per-router policy, LapiStreamStartupBlock
   extra:      stream vs live keys, PeekLivePrefix warn-and-wire
 ```
 
@@ -55,12 +55,12 @@ Client IP is already owned: `pkg/ip.GetRemoteIP` → `bouncer` `clientRequest` (
 
 ## Open questions
 
-- Q: Does `CrowdsecAppsecBodyLimit` stay on the AppSec reclaim key?
+- Q: Does `AppsecBodyLimit` stay on the AppSec reclaim key?
   Decision: resolved — keep it on identity and as write-once `appsecBodyLimit`. It is the request-copy cap in `newAppsecBodyRequest`, not HTTP transport. Ticket forbade moving it unless explore showed it is transport.
   By: explore
 
 - Q: Is `HTTPTimeoutSeconds` the only timeout, and which TLS knobs are AppSec's?
-  Decision: resolved — yes, the shared `HTTPTimeoutSeconds`. No AppSec-specific timeout field. TLS is `GetTLSConfigCrowdsec(..., true)` from `CrowdsecAppsecTLSInsecureVerify` / `TLSCertificateAuthority` / `TLSCertificateBouncer` (content). `*File` knobs resolve into those strings; they are not hashed today.
+  Decision: resolved — yes, the shared `HTTPTimeoutSeconds`. No AppSec-specific timeout field. TLS is `GetTLSConfigCrowdsec(..., true)` from `AppsecTlsInsecureVerify` / `TLSCertificateAuthority` / `TLSCertificateBouncer` (content). `*File` knobs resolve into those strings; they are not hashed today.
   By: explore
 
 - Q: Can `plugin.go` stay unchanged if `AdoptTransport` lives inside `appsec.Open`?

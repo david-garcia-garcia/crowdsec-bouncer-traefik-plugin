@@ -46,18 +46,19 @@ func testForcedDecisionBouncer(t *testing.T, log *slog.Logger, captchaClient *ca
 	}
 	passed := false
 	b := &Bouncer{
-		enabled:                  true,
-		crowdsecMode:             configuration.StreamMode,
-		forcedDecisionHeader:     testForcedDecisionHeader,
-		forwardedHeadersInsecure: true,
-		forwardedCustomHeader:    "X-Forwarded-For",
-		lapiClient:               lapiClient,
-		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
-		captchaClient:            captchaClient,
-		log:                      log,
-		remediationStatusCode:    http.StatusForbidden,
-		banTemplate:              banTemplate,
-		banTemplateContentType:   "text/html; charset=utf-8",
+		enabled:                      true,
+		lapiMode:                     configuration.StreamMode,
+		forcedDecisionHeader:         testForcedDecisionHeader,
+		bouncerForwardedInsecure:     true,
+		forwardedCustomHeader:        "X-Forwarded-For",
+		lapiEnabled:                  true,
+		lapiClient:                   lapiClient,
+		clientPoolStrategy:           &ip.PoolStrategy{Checker: clientChecker},
+		captchaClient:                captchaClient,
+		log:                          log,
+		bouncerRemediationStatusCode: http.StatusForbidden,
+		banTemplate:                  banTemplate,
+		banTemplateContentType:       "text/html; charset=utf-8",
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			passed = true
 		}),
@@ -82,7 +83,7 @@ func TestServeHTTP_forcedDecisionOffIgnoresHeader(t *testing.T) {
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testForcedDecisionRequest("c"))
 	if *passed {
-		t.Fatal("empty crowdsecDecisionHeader must still apply the stream ban")
+		t.Fatal("empty bouncerDecisionHeader must still apply the stream ban")
 	}
 	if rw.Code != http.StatusForbidden || !strings.Contains(rw.Body.String(), "banned") {
 		t.Fatalf("status=%d body=%q", rw.Code, rw.Body.String())
@@ -210,7 +211,7 @@ func TestServeHTTP_forcedDecisionCaptchaGatePasses(t *testing.T) {
 func TestServeHTTP_forcedDecisionAppsecModeCaptcha(t *testing.T) {
 	client := testCaptchaClient(t, "/fast.js", "", "", nil)
 	b, _, passed := testForcedDecisionBouncer(t, nil, client, nil, false)
-	b.crowdsecMode = configuration.AppsecMode
+	b.lapiEnabled = false
 	b.lapiClient = nil
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testForcedDecisionRequest("c"))
@@ -225,8 +226,9 @@ func TestServeHTTP_forcedDecisionAppsecModeCaptcha(t *testing.T) {
 func TestBouncerNew_trimsForcedDecisionHeader(t *testing.T) {
 	log := logger.New("ERROR", "")
 	cfg := configuration.New()
-	cfg.CrowdsecMode = configuration.AppsecMode
-	cfg.CrowdsecDecisionHeader = "  X-Crowdsec-Decision  "
+	cfg.LapiEnabled = false
+	cfg.LapiKey = ""
+	cfg.BouncerDecisionHeader = "  X-Crowdsec-Decision  "
 	handler, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, nil, nil, log)
 	if err != nil {
 		t.Fatal(err)

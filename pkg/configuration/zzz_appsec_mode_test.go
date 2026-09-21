@@ -1,49 +1,52 @@
 package configuration
 
 import (
-	"bytes"
-	"log/slog"
-	"strings"
 	"testing"
+
+	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-// warnedBy runs ValidateParams against a buffered WARN logger and returns what it wrote.
-func warnedBy(t *testing.T, cfg *Config) string {
-	t.Helper()
-	var logged bytes.Buffer
-	log := slog.New(slog.NewTextHandler(&logged, &slog.HandlerOptions{Level: slog.LevelWarn}))
-	if err := ValidateParams(cfg, log); err != nil {
-		t.Fatalf("ValidateParams must accept this config: %v", err)
-	}
-	return logged.String()
-}
-
-// TestValidateParams_AppsecModeWithoutAppsecWarns pins the owner's decision: appsec mode with
-// AppSec disabled enforces nothing, and that is warned about rather than rejected.
-func TestValidateParams_AppsecModeWithoutAppsecWarns(t *testing.T) {
+func TestValidateParams_SubscribeWithoutLapiKey(t *testing.T) {
 	cfg := getMinimalConfig()
-	cfg.CrowdsecMode = AppsecMode
-	cfg.CrowdsecAppsecEnabled = false
-
-	warned := warnedBy(t, cfg)
-	if warned == "" {
-		t.Fatal("appsec mode with AppSec disabled must warn")
-	}
-	for _, want := range []string{"crowdsecMode", "crowdsecAppsecEnabled"} {
-		if !strings.Contains(warned, want) {
-			t.Fatalf("warning must name %s, got %q", want, warned)
-		}
+	cfg.LapiKey = ""
+	cfg.LapiInstance = "shared"
+	if err := ValidateParams(cfg, logger.New("ERROR", "")); err != nil {
+		t.Fatalf("subscribe without a LAPI key must pass: %v", err)
 	}
 }
 
-// TestValidateParams_AppsecModeWithAppsecIsSilent checks the warning is specific to the
-// do-nothing combination and does not fire on the mode's intended use.
-func TestValidateParams_AppsecModeWithAppsecIsSilent(t *testing.T) {
+func TestValidateParams_OwnLapiMissingKeyFails(t *testing.T) {
 	cfg := getMinimalConfig()
-	cfg.CrowdsecMode = AppsecMode
-	cfg.CrowdsecAppsecEnabled = true
+	cfg.LapiKey = ""
+	if err := ValidateParams(cfg, logger.New("ERROR", "")); err == nil {
+		t.Fatal("own LAPI with empty instance and no secrets must fail")
+	}
+}
 
-	if warned := warnedBy(t, cfg); warned != "" {
-		t.Fatalf("appsec mode with AppSec enabled must not warn, got %q", warned)
+func TestValidateParams_DisabledLapiLeftoverKeyFails(t *testing.T) {
+	cfg := getMinimalConfig()
+	cfg.LapiEnabled = false
+	if err := ValidateParams(cfg, logger.New("ERROR", "")); err == nil {
+		t.Fatal("lapiEnabled false with leftover lapiKey must fail")
+	}
+}
+
+func TestValidateParams_AppsecOnlyWithoutLapiKey(t *testing.T) {
+	cfg := getMinimalConfig()
+	cfg.LapiEnabled = false
+	cfg.LapiKey = ""
+	cfg.AppsecEnabled = true
+	cfg.AppsecKey = "appsec-test"
+	if err := ValidateParams(cfg, logger.New("ERROR", "")); err != nil {
+		t.Fatalf("AppSec-only without LAPI key must pass: %v", err)
+	}
+}
+
+func TestValidateParams_HoldAndBounceFails(t *testing.T) {
+	cfg := getMinimalConfig()
+	cfg.BouncerEnabled = true
+	cfg.BouncerHold = true
+	if err := ValidateParams(cfg, logger.New("ERROR", "")); err == nil {
+		t.Fatal("bouncerHold with bouncerEnabled must fail")
 	}
 }

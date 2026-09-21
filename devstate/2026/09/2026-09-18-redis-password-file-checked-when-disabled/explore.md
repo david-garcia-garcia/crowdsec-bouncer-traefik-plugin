@@ -6,17 +6,17 @@
 plugin.New
   │
   ├─ ValidateParams
-  │    GetVariable(RedisCachePassword)   ← always, no RedisCacheEnabled guard
+  │    GetVariable(LapiRedisPassword)   ← always, no LapiRedisEnabled guard
   │
   ├─ lapi.Prepare
-  │    GetVariable(RedisCachePassword)   ← error discarded (out of scope)
+  │    GetVariable(LapiRedisPassword)   ← error discarded (out of scope)
   │
-  └─ OpenDecisionStore → cache.New(isRedis=RedisCacheEnabled)
+  └─ OpenDecisionStore → cache.New(isRedis=LapiRedisEnabled)
        true  → SimpleRedis(pass)
        false → local TTL map (pass unused)
 ```
 
-`ValidateParams` is the startup gate (`plugin.go` before `lapi.Prepare`). `GetVariable` Stats and reads `<key>File` when that path is non-empty; a missing, directory, or unreadable path is an error. Empty file path uses the string field, including empty. `New()` defaults `RedisCacheEnabled` to false.
+`ValidateParams` is the startup gate (`plugin.go` before `lapi.Prepare`). `GetVariable` Stats and reads `<key>File` when that path is non-empty; a missing, directory, or unreadable path is an error. Empty file path uses the string field, including empty. `New()` defaults `LapiRedisEnabled` to false.
 
 Captcha already gates `GetVariable` behind provider-set (`validateEnabledCaptchaSettings`). Redis password does not. Config-validation spec has no Redis password-file gate. Cited hunt test `TestHunt_ValidateParams_skipsRedisPasswordFileWhenRedisDisabled` is not on dest.
 
@@ -26,8 +26,8 @@ Consumed: `knowledge/devdocs/index.md`, `index_core_cache.md` / `core_cache_redi
 
 ## Decisions
 
-1. **Gate** — wrap only the `ValidateParams` `GetVariable(config, "RedisCachePassword")` call in `if config.RedisCacheEnabled`. Do not change `GetVariable`. Do not validate Redis host, database, or read hosts.
-2. **Enabled path unchanged** — when Redis is on, missing/stale/unreadable `redisCachePasswordFile` still fails startup. Empty password with empty file path stays accepted.
+1. **Gate** — wrap only the `ValidateParams` `GetVariable(config, "LapiRedisPassword")` call in `if config.LapiRedisEnabled`. Do not change `GetVariable`. Do not validate Redis host, database, or read hosts.
+2. **Enabled path unchanged** — when Redis is on, missing/stale/unreadable `lapiRedisPasswordFile` still fails startup. Empty password with empty file path stays accepted.
 3. **Prepare** — leave `lapi.Prepare` unguarded. Noted as follow-up.
 4. **Test** — add `Test_ValidateParams_skipsRedisPasswordFileWhenRedisDisabled` in `pkg/configuration/zzz_configuration_test.go`. No `TestHunt_` prefix. Pair disabled+missing/stale file (accept) with enabled+missing file (reject).
 5. **Spec / docs** — propose folds one requirement onto existing `core_plugin_middleware_config-validation`. No README. No new usage packet.
@@ -43,7 +43,7 @@ Consumed: `knowledge/devdocs/index.md`, `index_core_cache.md` / `core_cache_redi
   Decision: resolved — `pkg/configuration/zzz_configuration_test.go` as `Test_ValidateParams_skipsRedisPasswordFileWhenRedisDisabled`. Do not invent a `TestHunt_` file.
   By: explore
 
-- Q: Should this change also guard `lapi.Prepare`’s `GetVariable` for `RedisCachePassword`?
+- Q: Should this change also guard `lapi.Prepare`’s `GetVariable` for `LapiRedisPassword`?
   Decision: assumed — no. Requirement out of scope. Discarded error means a missing file does not fail Prepare; a leftover valid file can still load into the reclaim hash. Noted in `issues.md`.
   By: explore
 

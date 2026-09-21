@@ -17,7 +17,7 @@ Live/none already get Range hits from LAPI `?ip=` containment. Stream/alone do n
 
 Upstream [PR 383](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/383) (head `newdecisions`) implemented:
 
-- `decisionScopeHeaders` map (public). Empty = header scopes off. `Ip`/`Range` rejected as keys.
+- `lapiScopeHeaders` map (public). Empty = header scopes off. `Ip`/`Range` rejected as keys.
 - Range: one cache key `range-index` (`cidr=remediation` lines). Ban wins overlap. No radix tree.
 - Header scopes: cache key `scope:value`. Country/AS only special in value normalize.
 - Stream `scopes=` includes every mapped header scope (unfiltered stream defaults to `ip,range`).
@@ -31,11 +31,11 @@ In-tree `pkg/simpleredis` already has `MGet`. 383 looped `GET` because CI vendor
 
 Identity: client address is already owned by `pkg/ip.GetRemoteIP`. Country/AS/username are owned by the **mapped request header** (CDN or geoblock). This plugin must not geolocate.
 
-Real-stack e2e (`tests/e2e/real/`) injects only `cscli --ip` and `X-Forwarded-For`. Compose has no `decisionScopeHeaders`. Mock e2e on 383 (`tests/e2e/mock/scenarios/scope-headers/`) is not the real suite the caller asked for.
+Real-stack e2e (`tests/e2e/real/`) injects only `cscli --ip` and `X-Forwarded-For`. Compose has no `lapiScopeHeaders`. Mock e2e on 383 (`tests/e2e/mock/scenarios/scope-headers/`) is not the real suite the caller asked for.
 
 ## Decisions
 
-Port 383's behavior onto the split packages. Shared helpers cannot live in `pkg/bouncer` (`crowdsecconnection` must not import bouncer). New `pkg/decisionscope` owns scope keys, range-index, and ban-over-captcha. `pkg/cache.GetMany` uses `MGet` + prefix. `pkg/ip.InNetwork` is the one-CIDR helper (Checker stays the trusted-IP pool). Real e2e: new Pester file + compose middleware with `decisionScopeHeaders`; `cscli --range` and `--scope`/`--value`; extra headers on `Test-HttpRequest`. Keep mock `scope-headers` for fast CI.
+Port 383's behavior onto the split packages. Shared helpers cannot live in `pkg/bouncer` (`crowdsecconnection` must not import bouncer). New `pkg/decisionscope` owns scope keys, range-index, and ban-over-captcha. `pkg/cache.GetMany` uses `MGet` + prefix. `pkg/ip.InNetwork` is the one-CIDR helper (Checker stays the trusted-IP pool). Real e2e: new Pester file + compose middleware with `lapiScopeHeaders`; `cscli --range` and `--scope`/`--value`; extra headers on `Test-HttpRequest`. Keep mock `scope-headers` for fast CI.
 
 Spec host: MASTER allowlist has `plugin`, not 383's `bouncer`. New spec `core_plugin_decisions_scopes`.
 

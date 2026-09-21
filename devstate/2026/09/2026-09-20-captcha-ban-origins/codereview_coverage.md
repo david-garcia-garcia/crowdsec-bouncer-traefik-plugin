@@ -17,4 +17,4 @@
 3. [judgement] Happy path only — `pkg/lapi/client.go:134` — first-create copy of `BanToCaptchaOrigins` is exercised only via e2e wiring, not a unit test that a second reclaimed `New` keeps the first list (spec scenario)
    → Add a reclaim test asserting the first Client list wins, or skip if e2e + copy helper tests are enough for this change
    Status: skipped
-   Argument: judgement; copyBanToCaptchaOrigins is unit-tested and first-create residue matches updateMaxFailure — not a second Open-key test this change.
+   Argument: judgement; copyBanToCaptchaOrigins is unit-tested and first-create residue matches lapiUpdateMaxFailure — not a second Open-key test this change.

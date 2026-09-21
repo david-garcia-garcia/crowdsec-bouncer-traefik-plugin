@@ -27,14 +27,14 @@ func (s *idleCloseSpy) CloseIdleConnections() {
 
 func testAppsecConfig(host string) *configuration.Config {
 	return &configuration.Config{
-		CrowdsecAppsecEnabled:           true,
-		CrowdsecAppsecScheme:            "http",
-		CrowdsecAppsecHost:              host,
-		CrowdsecAppsecPath:              "/",
-		CrowdsecAppsecKey:               "test-key",
+		AppsecEnabled:           true,
+		AppsecScheme:            "http",
+		AppsecHost:              host,
+		AppsecPath:              "/",
+		AppsecKey:               "test-key",
 		HTTPTimeoutSeconds:              1,
-		CrowdsecAppsecTLSInsecureVerify: true,
-		CrowdsecAppsecBodyLimit:         10485760,
+		AppsecTlsInsecureVerify: true,
+		AppsecBodyLimit:         10485760,
 	}
 }
 
@@ -98,9 +98,9 @@ func TestOpen_TLSOnlyAdoptsTransport(t *testing.T) {
 
 	ctx := context.Background()
 	firstCfg := testAppsecConfig("127.0.0.1:1")
-	firstCfg.CrowdsecAppsecTLSInsecureVerify = true
+	firstCfg.AppsecTlsInsecureVerify = true
 	secondCfg := testAppsecConfig("127.0.0.1:1")
-	secondCfg.CrowdsecAppsecTLSInsecureVerify = false
+	secondCfg.AppsecTlsInsecureVerify = false
 
 	first, err := Open(ctx, firstCfg, slog.Default(), "first", "test")
 	if err != nil {
@@ -143,9 +143,9 @@ func TestOpen_BodyLimitSplitsClient(t *testing.T) {
 
 	ctx := context.Background()
 	firstCfg := testAppsecConfig("127.0.0.1:1")
-	firstCfg.CrowdsecAppsecBodyLimit = 100
+	firstCfg.AppsecBodyLimit = 100
 	secondCfg := testAppsecConfig("127.0.0.1:1")
-	secondCfg.CrowdsecAppsecBodyLimit = 200
+	secondCfg.AppsecBodyLimit = 200
 
 	first, err := Open(ctx, firstCfg, slog.Default(), "first", "test")
 	if err != nil {

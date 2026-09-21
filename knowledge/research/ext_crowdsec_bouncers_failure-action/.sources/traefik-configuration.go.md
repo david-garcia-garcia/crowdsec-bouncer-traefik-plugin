@@ -8,13 +8,13 @@ ref: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin@04d928872df12bdb9d9
 
 New() defaults:
 
-CrowdsecMode: live
+LapiMode: live
 CrowdsecAppsecFailureBlock: true
 CrowdsecAppsecUnreachableBlock: true
 CrowdsecAppsecUnreadableBodyBlock: true  (README at this commit says false)
-UpdateMaxFailure: 0
-StreamStartupBlock: true
+LapiUpdateMaxFailure: 0
+LapiStreamStartupBlock: true
 HTTPTimeoutSeconds: 10
-RedisCacheUnreachableBlock: true
+BouncerRedisUnreachableBlock: true
 
 Two AppSec bools, not an enum. No LAPI failure-action field.

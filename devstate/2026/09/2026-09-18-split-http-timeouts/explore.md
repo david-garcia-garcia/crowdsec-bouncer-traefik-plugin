@@ -23,11 +23,11 @@ Sister reclaim (this `pkg/reclaim`, `std_go_reclaim`, geoblock utilities table, 
   ─────────────────────────────────────────────────────────────────────────
   httpTimeoutSeconds (default 10, <1 invalid)
        │
-       ├─ crowdsecLapiHttpTimeoutSeconds 0/omit → shared
+       ├─ lapiHttpTimeoutSeconds 0/omit → shared
        │         else override  ──────────────► LAPI transport.httpTimeoutSeconds
-       ├─ crowdsecAppsecHttpTimeoutSeconds 0/omit → shared
+       ├─ appsecHttpTimeoutSeconds 0/omit → shared
        │         else override  ──────────────► AppSec transport.httpTimeoutSeconds
-       └─ captchaSiteverifyHttpTimeoutSeconds 0/omit → shared
+       └─ bouncerCaptchaHttpTimeoutSeconds 0/omit → shared
                  else override  ──────────────► Bouncer captcha *http.Client.Timeout
 ```
 
@@ -38,7 +38,7 @@ Sister reclaim (this `pkg/reclaim`, `std_go_reclaim`, geoblock utilities table, 
 - Wire existing clients only. `newTransport` (LAPI and AppSec) and the captcha `http.Client` in `bouncer.New` read the effective seconds. No second HTTP stack. Store **effective** seconds on `transport.httpTimeoutSeconds` so `fieldsDiffer` sees a shared-default change when the override is still 0, and does not replace when override 0 and override 10 both mean 10.
 - `AdoptTransport` stays last-write on the same Client. Two routers that share a LAPI or AppSec Client and disagree on that backend’s timeout: last `New` wins (same as TLS today). Captcha is per-Bouncer; each router keeps its own siteverify client.
 - Timeout stays out of reclaim identity. Reuse the existing owners; do not add knobs or effective seconds to those payloads. Timeout-only YAML must Adopt, not Open. Do not reuse PR #41 / `2026-09-06-upstream-388-split-appsec-timeout`.
-- README rewords `HTTPTimeoutSeconds` from “LAPI only” to the shared default (LAPI, AppSec, captcha siteverify) and documents the three knobs. Example: `crowdsecAppsecHttpTimeoutSeconds: 1` with `crowdsecAppsecFailureAction: passthrough`.
+- README rewords `HTTPTimeoutSeconds` from “LAPI only” to the shared default (LAPI, AppSec, captcha siteverify) and documents the three knobs. Example: `appsecHttpTimeoutSeconds: 1` with `bouncerAppsecFailureAction: passthrough`.
 - Tests that fail if wiring still reads raw `HTTPTimeoutSeconds`: LAPI adopt with LAPI override; AppSec `Query` against a hanging listener with AppSec override 1s + passthrough returns well under 10s; bouncer captcha siteverify Timeout honors the captcha override; omit/0 inherit 10; identity hex / SessionKey / AppSec Key unchanged when only timeout knobs differ.
 - Bound: no backendbackoff, `cache.Set`, captcha gate cookie, Range, module path, or HTML-path deprecations. No `sync.Once` / package-global client. No official 200ms defaults.
 - Usage packets already say last `New` AdoptTransport and timeout-out-of-identity. Do not write Language for unimplemented knobs. After apply, update usage on `core_plugin_lapi_connection`, `core_plugin_appsec`, `core_plugin_middleware_config-validation`, and captcha construct (Bouncer, not `Validate`). Propose folds into existing leaves (`core_plugin_lapi_connection`, `core_plugin_appsec_client`, `core_plugin_lapi_reclaim-key`, `core_plugin_middleware_config-validation`); FindSpecHost at propose.
@@ -58,7 +58,7 @@ Sister reclaim (this `pkg/reclaim`, `std_go_reclaim`, geoblock utilities table, 
   By: explore
 
 - Q: What Go names for the inherit helpers (ticket shorthand `EffectiveLapi` / `EffectiveAppsec` / `EffectiveCaptcha` hides that they return seconds)?
-  Decision: assumed — one `Config.EffectiveHTTPTimeoutSeconds(override int64) int64`. Call sites pass `CrowdsecLapiHTTPTimeoutSeconds`, `CrowdsecAppsecHTTPTimeoutSeconds`, or `CaptchaSiteverifyHTTPTimeoutSeconds`. Do not add three vague `EffectiveLapi` wrappers.
+  Decision: assumed — one `Config.EffectiveHTTPTimeoutSeconds(override int64) int64`. Call sites pass `LapiHttpTimeoutSeconds`, `AppsecHttpTimeoutSeconds`, or `BouncerCaptchaHttpTimeoutSeconds`. Do not add three vague `EffectiveLapi` wrappers.
   By: explore
 
 - Q: Official CrowdSec `lapi_timeout` / `appsec_timeout` default 200ms vs dest default 10 and inherit-from-shared.

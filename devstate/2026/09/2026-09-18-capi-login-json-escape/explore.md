@@ -3,7 +3,7 @@ IssueKey: 2026-09-18-capi-login-json-escape
 
 ## Concepts
 
-Alone-mode token fetch is `getToken` → `sendQuery(loginURL, loginData, false)` on `v2/watchers/login`. Dest builds `loginData` with `fmt.Sprintf` and `strings.Join(c.crowdsecScenarios, `","`)` (`pkg/lapi/client_http.go`). Those three strings already live on `Client` (`crowdsecMachineID`, `crowdsecPassword`, `crowdsecScenarios`), copied in `New` from `config.CrowdsecCapiMachineID` / `CrowdsecCapiPassword` / `CrowdsecCapiScenarios` after `Prepare` `GetVariable`. `getToken` does not reconstruct visitor address, Host, or trust hop.
+Alone-mode token fetch is `getToken` → `sendQuery(loginURL, loginData, false)` on `v2/watchers/login`. Dest builds `loginData` with `fmt.Sprintf` and `strings.Join(c.crowdsecScenarios, `","`)` (`pkg/lapi/client_http.go`). Those three strings already live on `Client` (`crowdsecMachineID`, `crowdsecPassword`, `crowdsecScenarios`), copied in `New` from `config.LapiCapiMachineID` / `LapiCapiPassword` / `LapiCapiScenarios` after `Prepare` `GetVariable`. `getToken` does not reconstruct visitor address, Host, or trust hop.
 
 ```
 config.CrowdsecCapi*  ──Prepare/New──►  Client fields

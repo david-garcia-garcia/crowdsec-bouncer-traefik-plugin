@@ -1,5 +1,5 @@
 # Nested plugin maps belong in a file provider. Docker labels do not decode
-# decisionScopeHeaders or geoblock databaseSources reliably.
+# lapiScopeHeaders or geoblock databaseSources reliably.
 http:
   middlewares:
     geo-enrich:
@@ -24,18 +24,18 @@ http:
     crowdsec:
       plugin:
         bouncer:
-          enabled: true
+          bouncerEnabled: true
           logLevel: DEBUG
-          crowdsecMode: live
-          crowdsecLapiKey: "40796d93c2958f9e58345514e67740e5"
-          crowdsecLapiHost: crowdsec:8080
-          forwardedHeadersTrustedIps:
+          lapiMode: live
+          lapiKey: "40796d93c2958f9e58345514e67740e5"
+          lapiHost: crowdsec:8080
+          bouncerForwardedTrustedIps:
             - "172.16.0.0/12"
             - "192.168.0.0/16"
             - "10.0.0.0/8"
             - "127.0.0.1/32"
-          forwardedHeadersCustomName: X-Forwarded-For
-          decisionScopeHeaders:
+          bouncerForwardedHeader: X-Forwarded-For
+          lapiScopeHeaders:
             Country: X-IPCountry
     crowdsec-geo:
       chain:

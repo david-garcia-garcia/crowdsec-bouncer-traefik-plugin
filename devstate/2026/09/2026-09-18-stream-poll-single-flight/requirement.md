@@ -2,11 +2,11 @@
 IssueKey: 2026-09-18-stream-poll-single-flight
 
 ## Problem
-On master `b42860f8`, `startTicker` launches a new goroutine per tick and never waits for the previous one. Three `Client` fields (`isCrowdsecStreamStartup`, `isCrowdsecStreamHealthy`, `updateFailure`) are written by that work and read from the request path with no synchronization. The stream lease does not prevent intra-instance overlap: it can expire before a slow poll finishes, and a lease loser still writes `isCrowdsecStreamStartup`. Overlapping polls can flap stream health (default `UpdateMaxFailure=0` then routes cache-miss traffic through `CrowdsecLapiFailureAction`, default `ban`) and can interleave range-blob apply. Three deliverables in one PR: the single-flight plus atomic flags; a test-only race fix in `TestSleepDrainsMetrics`; a CI job that runs the race detector.
+On master `b42860f8`, `startTicker` launches a new goroutine per tick and never waits for the previous one. Three `Client` fields (`isCrowdsecStreamStartup`, `isCrowdsecStreamHealthy`, `updateFailure`) are written by that work and read from the request path with no synchronization. The stream lease does not prevent intra-instance overlap: it can expire before a slow poll finishes, and a lease loser still writes `isCrowdsecStreamStartup`. Overlapping polls can flap stream health (default `LapiUpdateMaxFailure=0` then routes cache-miss traffic through `BouncerLapiFailureAction`, default `ban`) and can interleave range-blob apply. Three deliverables in one PR: the single-flight plus atomic flags; a test-only race fix in `TestSleepDrainsMetrics`; a CI job that runs the race detector.
 
 ## Current (code)
 - `startTicker` does `go work()` on every `ticker.C`. `pkg/lapi/client.go`
-- `startStream` with `StreamStartupBlock=false` does `go c.handleStreamTicker()` then starts the ticker. `pkg/lapi/client_stream.go`
+- `startStream` with `LapiStreamStartupBlock=false` does `go c.handleStreamTicker()` then starts the ticker. `pkg/lapi/client_stream.go`
 - `Wake` starts the ticker then `go c.handleStreamTicker()`. `pkg/lapi/client.go`
 - `handleStreamTicker` / `handleStreamCache` write `isCrowdsecStreamHealthy`, `updateFailure`, and `isCrowdsecStreamStartup` with no lock and no atomic. `pkg/lapi/client_stream.go`
 - `StreamHealthy()` is a raw bool read. `pkg/lapi/client.go`

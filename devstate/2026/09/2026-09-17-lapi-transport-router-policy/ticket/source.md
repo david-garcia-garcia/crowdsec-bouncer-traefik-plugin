@@ -67,11 +67,11 @@ Trabajo:
 3. Borrar los accesores `LapiFailureAction()` y `RedisUnreachableBlock()` del `Client`.
 4. Sacar los tres de `streamSettings` (`pkg/lapi/session.go:71-90`) y de `settingsFrom`
    (`session.go:107-126`). Revisar `pkg/lapi/identity.go` por si los replica.
-5. Sacar también `StreamStartupBlock` del hash: **no se guarda en el `Client`**, solo se lee
+5. Sacar también `LapiStreamStartupBlock` del hash: **no se guarda en el `Client`**, solo se lee
    en `pkg/lapi/client_stream.go:37` al construir. Después del nacimiento no significa nada,
    así que tenerlo en la key cuesta un resync a cambio de nada.
 
-Consecuencia aceptada: dos routers sobre el mismo cursor con `defaultDecisionSeconds`
+Consecuencia aceptada: dos routers sobre el mismo cursor con `bouncerLiveTtlSeconds`
 distinto escriben al mismo caché, así que gana el último en el TTL. Es benigno (TTL de un
 lookup cacheado) y es el precio de que el caché sea compartido.
 
@@ -121,7 +121,7 @@ Ya existen cuatro líneas INFO con `mode` y `host` (`pkg/lapi/client.go:20-23`, 
 - Reload que solo cambia un campo TLS: mismo `*lapi.Client`, transporte nuevo, continuidad
   del cursor.
 - Dos routers con `lapiFailureAction` distinto sobre un cursor: cada bouncer aplica el suyo.
-- `defaultDecisionSeconds` per-router en modo live.
+- `bouncerLiveTtlSeconds` per-router en modo live.
 - Los helpers `waitStreamSessionInGrace` (`pkg/lapi/zzz_session_test.go:187-200`) y
   `waitPluginStreamInGrace` (`zzz_plugin_test.go:457-470`) siguen valiendo.
 
@@ -148,7 +148,7 @@ Dejar como follow-up en `knowledge/debt/`, no implementar:
   propósito. Que FindSpecHost decida en propose si se dobla ahí o si la política per-router
   merece hoja propia.
 - Los campos de valor del `Client` son write-once y sus lectores no cogen el mutex
-  (`handleStreamTicker` en `client_stream.go:48-63` lee `updateFailure`, `updateMaxFailure`
+  (`handleStreamTicker` en `client_stream.go:48-63` lee `updateFailure`, `lapiUpdateMaxFailure`
   e `isCrowdsecStreamHealthy` sin lock, y `startTicker` lanza `go work()` en cada tick). Por
   eso este PR **no** hace mutables esos campos: los que se mueven salen del objeto y el
   transporte va por `atomic.Value`. No convertir escalares a mutables aquí.

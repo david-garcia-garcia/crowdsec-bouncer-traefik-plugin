@@ -27,11 +27,11 @@ type identity struct {
 
 func identityFrom(cfg *configuration.Config) identity {
 	return identity{
-		Scheme:    cfg.CrowdsecAppsecScheme,
-		Host:      cfg.CrowdsecAppsecHost,
-		Path:      cfg.CrowdsecAppsecPath,
-		Key:       cfg.CrowdsecAppsecKey,
-		BodyLimit: cfg.CrowdsecAppsecBodyLimit,
+		Scheme:    cfg.AppsecScheme,
+		Host:      cfg.AppsecHost,
+		Path:      cfg.AppsecPath,
+		Key:       cfg.AppsecKey,
+		BodyLimit: cfg.AppsecBodyLimit,
 	}
 }
 

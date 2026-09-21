@@ -5,7 +5,7 @@ IssueKey: 2026-09-18-lapi-scope-failclosed-query-hardening
 
 Two paths on DestBranch `0e7dbf0`, five defects.
 
-**Live lookup (deliverable 1).** `pkg/bouncer` calls `LiveLookup(remoteIP, scopes, defaultDecisionSeconds)` on every `live`/`none` cache miss. `handleNoStreamCache` queries LAPI once for `ip=`, then once per mapped header scope. The return contract is already overloaded: a non-nil error means either "banned" or "LAPI failed", and `pkg/bouncer` separates them by `decisionscope.IsActiveRemediation(kind)` before `applyLapiFailureAction` (`pkg/bouncer/bouncer.go:229-247`). `mergeLiveScope` cannot participate: its signature is `(string, time.Duration)`, so a failed scope query is indistinguishable from "no decision on this scope".
+**Live lookup (deliverable 1).** `pkg/bouncer` calls `LiveLookup(remoteIP, scopes, bouncerLiveTtlSeconds)` on every `live`/`none` cache miss. `handleNoStreamCache` queries LAPI once for `ip=`, then once per mapped header scope. The return contract is already overloaded: a non-nil error means either "banned" or "LAPI failed", and `pkg/bouncer` separates them by `decisionscope.IsActiveRemediation(kind)` before `applyLapiFailureAction` (`pkg/bouncer/bouncer.go:229-247`). `mergeLiveScope` cannot participate: its signature is `(string, time.Duration)`, so a failed scope query is indistinguishable from "no decision on this scope".
 
 ```
 LiveLookup
@@ -26,7 +26,7 @@ Do(req)
 
 There is **no** nil-pointer bug on that line: `||` short-circuits, so `res.StatusCode` is only read when `err == nil`, where `net/http` guarantees a non-nil response. A previous review claimed a panic there and was wrong. Do not add a `res == nil` guard.
 
-**Stream lease (deliverable 2).** `handleStreamCache` acquires `updated` with TTL `max(updateInterval-1, 1)` (`core_plugin_lapi_stream-lease`), then `return err` on a failed GET while still holding it. With the default `UpdateMaxFailure=0` the stream is already unhealthy after that first failure, so stream/alone cache misses take `CrowdsecLapiFailureAction` (default `ban`) for the rest of the lease window, and no instance re-polls.
+**Stream lease (deliverable 2).** `handleStreamCache` acquires `updated` with TTL `max(updateInterval-1, 1)` (`core_plugin_lapi_stream-lease`), then `return err` on a failed GET while still holding it. With the default `LapiUpdateMaxFailure=0` the stream is already unhealthy after that first failure, so stream/alone cache misses take `BouncerLapiFailureAction` (default `ban`) for the rest of the lease window, and no instance re-polls.
 
 Open PR #70 fixes the identical drain defect on the AppSec side by moving `defer c.drainResponse(res)` above a separate `isReverseProxyError` check and extending `Test_appsecQuery_reusesConnection` to 502/503/504. `pkg/appsec` already has `drainResponse` (`io.Copy(io.Discard)` then `Close`, `pkg/appsec/query.go:179-187`). Mirror that name and that test shape in `pkg/lapi` so the siblings match.
 
@@ -49,7 +49,7 @@ Consumed: `core_plugin_lapi_connection.md` (transport is `atomic.Value`, no `ato
 - `mergeLiveScope` grows a third return value, `error`. It returns the caller's current verdict unchanged plus the query error, and logs at `Warn` (the level this package already uses for a recoverable LAPI failure: `getToken statusCode`, `handleStreamTicker updateFailure`). Not `Error` — that level is for terminal/unhealthy transitions here.
 - `handleNoStreamCache` keeps the **first** scope error and checks `IsActiveRemediation(chosen)` **first**, so an active ban always wins and always returns with the existing `handleNoStreamCache:banned` error. A non-active verdict plus a scope error returns `("", scopeErr)` — byte-for-byte the shape an IP-query failure already returns. No `errors.Join`: the package returns one error per call.
 - Make the overloaded error explicit in a doc comment on `LiveLookup` rather than encoding it in a new type. The caller (`pkg/bouncer`) already discriminates on the remediation kind; a new sentinel or error type would be a second classifier for a fact the kind already carries.
-- Do **not** write the negative live cache entry for `remoteIP` when a scope query failed. Caching `NoBannedValue` after an unverified scope would keep allowing for `defaultDecisionSeconds` even after LAPI recovers, and would contradict the error we just returned.
+- Do **not** write the negative live cache entry for `remoteIP` when a scope query failed. Caching `NoBannedValue` after an unverified scope would keep allowing for `bouncerLiveTtlSeconds` even after LAPI recovers, and would contradict the error we just returned.
 - Lease release: extract the fetch+apply body into `fetchAndApplyStreamDecisions` so `handleStreamCache` owns the lease and has exactly one release site (`c.Cache().Delete(cacheTimeoutKey)`). `Delete` reaches both backends (`localCache.delete` → `ttl_map.Del`; `redisCache.delete` → `writer.Del` on the prefixed key). TTL, `Acquire`, and the `!won` branch are untouched.
 - Bound the 401 recursion by threading permission, not by counting: `crowdsecQuery` delegates to `sendQuery(url, data, mayRenewToken=true)`; the replay passes `false`; and `getToken` calls `sendQuery(..., false)` so a 401 on the CAPI login route cannot recurse at all. Dest recurses without bound there today.
 - Add `drainResponse` to `pkg/lapi` with the same body and log strings as its AppSec sibling, and `defer` it immediately after the transport-error check. Closing without draining would not return the connection to the idle pool, so a close-only fix would not fix the leak the ticket names.
@@ -64,7 +64,7 @@ Consumed: `core_plugin_lapi_connection.md` (transport is `atomic.Value`, no `ato
   By: explore
 
 - Q: Should the negative live cache entry for `remoteIP` still be written when a scope query failed?
-  Decision: resolved — no. It would persist the silent allow for `defaultDecisionSeconds` past LAPI recovery, and contradict the error returned on the same call. The ban path still caches, unchanged.
+  Decision: resolved — no. It would persist the silent allow for `bouncerLiveTtlSeconds` past LAPI recovery, and contradict the error returned on the same call. The ban path still caches, unchanged.
   By: explore
 
 - Q: How should several failing scopes be aggregated?
@@ -80,5 +80,5 @@ Consumed: `core_plugin_lapi_connection.md` (transport is `atomic.Value`, no `ato
   By: explore
 
 - Q: Does the deliverable 1 behavior change need owner sign-off before merge?
-  Decision: blocked — the owner must ratify. A deployment with a flaky scope path that silently allowed will now apply `crowdsecLapiFailureAction`, whose default is `ban`. Implement it as specified and surface the matrix on the PR body; do not merge.
+  Decision: blocked — the owner must ratify. A deployment with a flaky scope path that silently allowed will now apply `bouncerLapiFailureAction`, whose default is `ban`. Implement it as specified and surface the matrix on the PR body; do not merge.
   By: explore

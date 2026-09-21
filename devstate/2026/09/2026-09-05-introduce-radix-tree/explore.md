@@ -4,7 +4,7 @@ IssueKey: 2026-09-05-introduce-radix-tree
 ## Concepts
 
 **Trusted-IP Checker**:
-`pkg/ip.Checker` built from `ForwardedHeadersTrustedIPs` and `ClientTrustedIPs`. `Contains` / `ContainsIP` answer whether an address is in that pool. Used at request time for forwarded-hop stripping (`PoolStrategy`) and client bypass (`ServeHTTP` `isTrusted`).
+`pkg/ip.Checker` built from `BouncerForwardedTrustedIPs` and `BouncerClientTrustedIPs`. `Contains` / `ContainsIP` answer whether an address is in that pool. Used at request time for forwarded-hop stripping (`PoolStrategy`) and client bypass (`ServeHTTP` `isTrusted`).
 
 **IP lookup helper**:
 In-tree copy of traefik-geoblock `pkg/iplookup`: a binary radix tree of CIDRs. Insert at construction; `IsContained` is O(32) IPv4 / O(128) IPv6 and returns longest-prefix length. Membership only — no associated remediation.

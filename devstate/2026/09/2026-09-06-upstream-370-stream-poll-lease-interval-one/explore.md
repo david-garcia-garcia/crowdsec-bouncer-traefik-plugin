@@ -5,7 +5,7 @@ IssueKey: 2026-09-06-upstream-370-stream-poll-lease-interval-one
 
 **Stream poll lease**: cache key `updated` (`cacheTimeoutKey` in `pkg/lapi/client_stream.go`). `handleStreamCache` GETs it first. Hit → skip LAPI, hydrate Range membership, return. Miss → SET then GET `/v1/decisions/stream`. Best-effort, not SET NX. Shared Redis (session prefix) is how several bouncer processes skip duplicate polls in one interval.
 
-**Lease duration**: `leaseDuration := c.updateInterval - 1`; if `< 1`, floor to `1`. `c.updateInterval` is `Config.UpdateIntervalSeconds`, validated `>= 1` (`requiredInt1`). Upstream stored `updateInterval - 1` with no floor, so interval 1 yielded TTL 0.
+**Lease duration**: `leaseDuration := c.updateInterval - 1`; if `< 1`, floor to `1`. `c.updateInterval` is `Config.LapiUpdateIntervalSeconds`, validated `>= 1` (`requiredInt1`). Upstream stored `updateInterval - 1` with no floor, so interval 1 yielded TTL 0.
 
 **Zero TTL**: in-tree local cache calls `golang-ttl-map` `Heap.Set`, which returns without storing when `ttl == 0` (`vendor/github.com/leprosus/golang-ttl-map/map.go`). Redis `SET … EX 0` is invalid. Either way the next GET misses and every instance polls.
 

@@ -18,7 +18,7 @@ Desired:
 
 - Range matching is on without new config. CrowdSec `Range` decisions this plugin used to ignore now remediate by CIDR containment (stream and alone).
 - Country, AS, and other scopes stay off until mapped.
-- New public key `decisionScopeHeaders` (CrowdSec scope name → request header). Empty (the default) disables header scopes. `Ip` and `Range` are rejected as keys.
+- New public key `lapiScopeHeaders` (CrowdSec scope name → request header). Empty (the default) disables header scopes. `Ip` and `Range` are rejected as keys.
 - Country (any case): ISO 3166-1 alpha-2; skip `XX` / `T1`.
 - AS (any case): decimal ASN; a leading `AS` / `as` is stripped.
 - Any other key: trimmed exact match. The key must match the scope LAPI stored.

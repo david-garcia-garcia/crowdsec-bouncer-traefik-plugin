@@ -25,7 +25,7 @@ pr: 105
 ## implement (2026-09-18)
 phase: implement
 findings: none
-fixed: CaptchaCustomValidateBody form/json; custom JSON siteverify; README CapJS example; no remoteip (Validate still request-only)
+fixed: BouncerCaptchaCustomValidateBody form/json; custom JSON siteverify; README CapJS example; no remoteip (Validate still request-only)
 skipped: none
 qualify: qualified-with-gaps
 localTests: passed

@@ -62,7 +62,7 @@ func testCaptchaRoutingBouncer(t *testing.T, client *captcha.Client) (*Bouncer, 
 		}),
 		captchaClient:           client,
 		log:                     logger.New("ERROR", ""),
-		remediationStatusCode:   http.StatusForbidden,
+		bouncerRemediationStatusCode:   http.StatusForbidden,
 		remediationCustomHeader: "X-Remediation",
 		banTemplateContentType:  "text/html; charset=utf-8",
 	}, &originCalled
@@ -172,7 +172,7 @@ func TestHandleRemediationServeHTTP_overMaxPostAfterSolveReachesOriginIntact(t *
 		}),
 		captchaClient:           client,
 		log:                     logger.New("ERROR", ""),
-		remediationStatusCode:   http.StatusForbidden,
+		bouncerRemediationStatusCode:   http.StatusForbidden,
 		remediationCustomHeader: "X-Remediation",
 		banTemplateContentType:  "text/html; charset=utf-8",
 	}

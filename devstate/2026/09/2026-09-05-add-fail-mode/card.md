@@ -4,7 +4,7 @@ IssueKey: 2026-09-05-add-fail-mode
 JobName: 2026-09-05-add-fail-mode
 
 ## What this changes
-**Operators.** Set `crowdsecLapiFailureAction` and `crowdsecAppsecFailureAction` (`passthrough` | `ban` | `captcha`, default `ban`). The three AppSec block bools are gone; leftover `false` YAML is ignored — use `crowdsecAppsecFailureAction: passthrough`. Empty strings are rejected at ValidateParams.
+**Operators.** Set `bouncerLapiFailureAction` and `bouncerAppsecFailureAction` (`passthrough` | `ban` | `captcha`, default `ban`). The three AppSec block bools are gone; leftover `false` YAML is ignored — use `bouncerAppsecFailureAction: passthrough`. Empty strings are rejected at ValidateParams.
 
 **Admin users.** None.
 
@@ -13,7 +13,7 @@ JobName: 2026-09-05-add-fail-mode
 **End users.** None.
 
 ## Motivation
-On `master`, LAPI/AppSec unavailability is split across `updateMaxFailure`, live ban-on-error, and three AppSec booleans. Without the two actions, operators cannot set one fallback per backend.
+On `master`, LAPI/AppSec unavailability is split across `lapiUpdateMaxFailure`, live ban-on-error, and three AppSec booleans. Without the two actions, operators cannot set one fallback per backend.
 
 ## Merge readiness
 Code review applied two spec fixes; CI is still running on the new head. 1 item remains.
@@ -48,8 +48,8 @@ Owner decision: None.
 - [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-05-add-fail-mode/openspec/changes/lapi-appsec-failure-action/proposal.md) — modified
 
 ## Follow-up issues
-- [ ] [note] [large] public `crowdsecAppsecFailureBlock` / `crowdsecAppsecUnreachableBlock` / `crowdsecAppsecUnreadableBodyBlock` → `crowdsecAppsecFailureAction`
-- [ ] [note] [large] public `updateMaxFailure` vs new `crowdsecLapiFailureAction`
+- [ ] [note] [large] public `crowdsecAppsecFailureBlock` / `crowdsecAppsecUnreachableBlock` / `crowdsecAppsecUnreadableBodyBlock` → `bouncerAppsecFailureAction`
+- [ ] [note] [large] public `lapiUpdateMaxFailure` vs new `bouncerLapiFailureAction`
 
 ## How this fits together
 Ticket on dest `master`. Stub PR 10. Review applied empty-reject and live `ReasonLAPI`. Devdocs impact next.
@@ -80,10 +80,10 @@ None.
 | Reviewed head | c2d6141ee574052a1ba353295acf6d696e704f68 | Card must match the branch you measured |
 
 ### Stored data model
-Public Traefik plugin config: `crowdsecLapiFailureAction` and `crowdsecAppsecFailureAction` strings; three AppSec block bools removed. Empty values rejected. Reclaim identity includes LAPI failure action. AppSec action is per-router on Bouncer.
+Public Traefik plugin config: `bouncerLapiFailureAction` and `bouncerAppsecFailureAction` strings; three AppSec block bools removed. Empty values rejected. Reclaim identity includes LAPI failure action. AppSec action is per-router on Bouncer.
 
 ### Technical review
-Best possible solution: Crowdsec-prefixed enums plus keeping `UpdateMaxFailure` match dest `master` and the agreed public surface; challenge relay from #9 stays.
+Best possible solution: Crowdsec-prefixed enums plus keeping `LapiUpdateMaxFailure` match dest `master` and the agreed public surface; challenge relay from #9 stays.
 
 Do we have a high-confidence way to reproduce? Yes — unit tests on validate and bouncer failure dispatch.
 

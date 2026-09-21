@@ -58,7 +58,7 @@ A stream poll SHALL emit `handleStreamTicker:poll` when it wins the in-flight CA
 - **AND** the replaced HTTP client’s idle connections are closed
 
 ### Requirement: LiveLookup TTL is passed by the caller
-`LiveLookup` SHALL take `defaultDecisionSeconds` from the caller. `Client` MUST NOT store `defaultDecisionTimeout`. The bouncer SHALL pass `config.DefaultDecisionSeconds`.
+`LiveLookup` SHALL take `bouncerLiveTtlSeconds` from the caller. `Client` MUST NOT store `defaultDecisionTimeout`. The bouncer SHALL pass `config.BouncerLiveTtlSeconds`.
 
 #### Scenario: Bouncer supplies live TTL
 - **WHEN** a live-mode request misses cache and LAPI returns no active remediation
@@ -89,11 +89,11 @@ After the CAPI `watchers/login` exchange returns HTTP 2xx, `getToken` SHALL stor
 - **THEN** `getToken` stores that token on the stored transport
 
 ### Requirement: LAPI transport Timeout is the effective LAPI seconds
-LAPI HTTP construct SHALL set `http.Client.Timeout` and the stored timeout seconds from `config.EffectiveHTTPTimeoutSeconds(config.CrowdsecLapiHTTPTimeoutSeconds)`. It MUST NOT read raw `HTTPTimeoutSeconds` when the LAPI override is non-zero. `AdoptTransport` SHALL keep last-writing that transport on the same Client. A later `New` that changes only the effective LAPI seconds SHALL Adopt, not Open a new Client.
+LAPI HTTP construct SHALL set `http.Client.Timeout` and the stored timeout seconds from `config.EffectiveHTTPTimeoutSeconds(config.LapiHttpTimeoutSeconds)`. It MUST NOT read raw `HTTPTimeoutSeconds` when the LAPI override is non-zero. `AdoptTransport` SHALL keep last-writing that transport on the same Client. A later `New` that changes only the effective LAPI seconds SHALL Adopt, not Open a new Client.
 
 #### Scenario: LAPI override adopts Timeout
 - **WHEN** a live stream Client exists with `HTTPTimeoutSeconds` 10 and LAPI override 0
-- **AND** a later `New` for the same LAPI URL and key sets `CrowdsecLapiHTTPTimeoutSeconds` to 30
+- **AND** a later `New` for the same LAPI URL and key sets `LapiHttpTimeoutSeconds` to 30
 - **THEN** both constructors receive the same Client
 - **AND** the stored transport Timeout is 30 seconds
 - **AND** the stored `httpTimeoutSeconds` is 30
@@ -106,6 +106,6 @@ LAPI HTTP construct SHALL set `http.Client.Timeout` and the stored timeout secon
 
 #### Scenario: Override zero and override equal to shared do not replace
 - **WHEN** a live stream Client exists with `HTTPTimeoutSeconds` 10 and LAPI override 0
-- **AND** a later `New` for the same LAPI URL and key sets `CrowdsecLapiHTTPTimeoutSeconds` to 10
+- **AND** a later `New` for the same LAPI URL and key sets `LapiHttpTimeoutSeconds` to 10
 - **THEN** both constructors receive the same Client
 - **AND** the Client does not replace the HTTP client for a timeout-only no-op

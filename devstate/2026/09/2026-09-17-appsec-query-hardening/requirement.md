@@ -9,13 +9,13 @@ Five contained defects in `pkg/appsec/query.go` (stale PRs #35 and #43, revalida
 - `isReverseProxyError` is 502/503/504. `pkg/appsec/client.go`
 - `drainResponse` copies the body to discard and closes it. Keep-alive reuse is tested for 200/403/500 only. `pkg/appsec/query.go` `pkg/appsec/zzz_query_test.go`
 - Body copy runs only when `appsecBodyLimit > 0` and `Body != nil`; `0` falls through to GET without a body. `pkg/appsec/query.go`
-- ValidateParams allows `CrowdsecAppsecBodyLimit >= 0`; default is 10485760. README does not say zero is unlimited. `pkg/configuration/configuration.go` `README.md`
+- ValidateParams allows `AppsecBodyLimit >= 0`; default is 10485760. README does not say zero is unlimited. `pkg/configuration/configuration.go` `README.md`
 - `readCappedAppsecBody` error returns `nil, err` (`appsecQuery:readBody`); it does not call `resultForFailureAction`. `pkg/appsec/query.go`
 - 500, unreachable, and reverse-proxy statuses do call `resultForFailureAction`. `pkg/appsec/query.go` `pkg/appsec/zzz_failure_action_test.go`
 - Client headers are `Add`ed onto the AppSec request after the body is chosen; `Content-Length` is not rebuilt from the bytes sent. `pkg/appsec/query.go`
 - `isMethodWithBody` is POST, PUT, PATCH, DELETE. Unreadable HTTP/2–3 body on those methods uses `FailureAction` (ban/captcha drop; passthrough headers-only GET). GET unreadable is not dropped. `pkg/appsec/query.go` `pkg/appsec/zzz_query_test.go`
 - Transport is `atomic.Value` (`*transport`); `Query` and the test helper use `currentTransport()` / `transport.Store`. No stored `httpClient` field. `pkg/appsec/client.go` `pkg/appsec/client_http.go` `pkg/appsec/test_client.go`
-- `crowdsecAppsecUnreadableBodyBlock` is removed. One `crowdsecAppsecFailureAction` covers 500, unreachable, and unreadable body on a method that would have sent a body. `openspec/specs/core_plugin_appsec_failure-action/spec.md`
+- `crowdsecAppsecUnreadableBodyBlock` is removed. One `bouncerAppsecFailureAction` covers 500, unreachable, and unreadable body on a method that would have sent a body. `openspec/specs/core_plugin_appsec_failure-action/spec.md`
 - Client spec does not define zero body limit or outbound `Content-Length`. `openspec/specs/core_plugin_appsec_client/spec.md`
 - Devdoc: 502/503/504 are unreachable; unreadable body uses the same failure action; no zero-limit or DELETE exception. `knowledge/devdocs/core_plugin_appsec.md`
 
@@ -36,7 +36,7 @@ Five contained defects in `pkg/appsec/query.go` (stale PRs #35 and #43, revalida
 - `openspec/specs/core_plugin_appsec_failure-action/spec.md`
 - `openspec/specs/core_plugin_appsec_client/spec.md` (zero body limit / Content-Length if that leaf owns them)
 - `knowledge/devdocs/core_plugin_appsec.md`
-- README `CrowdsecAppsecBodyLimit` (zero = unlimited) if explore keeps that meaning
+- README `AppsecBodyLimit` (zero = unlimited) if explore keeps that meaning
 
 ## Out of scope
 - `pkg/lapi`, `pkg/reclaim`, `pkg/bouncer`, `pkg/captcha`

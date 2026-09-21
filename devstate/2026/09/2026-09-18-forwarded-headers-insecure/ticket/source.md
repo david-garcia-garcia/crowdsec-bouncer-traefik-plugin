@@ -1,4 +1,4 @@
-# Ticket source: forwardedHeadersInsecure
+# Ticket source: bouncerForwardedInsecure
 
 Scratch source for the ticket. Copy to `ticket/source.md` in the bus folder and delete this
 file from the repo root.
@@ -10,7 +10,7 @@ cache, lapi or reclaim code.
 ## Problem
 
 An operator behind a CDN cannot tell this plugin "Traefik already decided the client IP, use it".
-`ForwardedHeadersTrustedIPs` does two jobs at once: it gates the socket peer in `GetRemoteIP`
+`BouncerForwardedTrustedIPs` does two jobs at once: it gates the socket peer in `GetRemoteIP`
 (`pkg/ip/checker.go:137-158`) and it skips hops inside the header value in `PoolStrategy.getIP`
 (`pkg/ip/checker.go:102-127`). The two pull in opposite directions, so no value expresses
 "trust any peer, take the header".
@@ -41,11 +41,11 @@ address list.
 Decisions are made. Implement them, do not re-open them.
 
 1. New config field on `Config` (`pkg/configuration/configuration.go`), placed between
-   `ForwardedHeadersCustomName` (line 99) and `ForwardedHeadersTrustedIPs` (line 101):
-   `ForwardedHeadersInsecure bool` with tag `json:"forwardedHeadersInsecure,omitempty"`.
+   `BouncerForwardedHeader` (line 99) and `BouncerForwardedTrustedIPs` (line 101):
+   `BouncerForwardedInsecure bool` with tag `json:"bouncerForwardedInsecure,omitempty"`.
    Default `false`, set explicitly in `New()` beside the other false bools (near line 202).
    Name chosen for parity with Traefik's `forwardedHeaders.insecure` and with the existing
-   `CrowdsecLapiTLSInsecureVerify` / `CrowdsecAppsecTLSInsecureVerify` opt-outs.
+   `LapiTlsInsecureVerify` / `AppsecTlsInsecureVerify` opt-outs.
 
 2. `false` keeps today's behaviour bit for bit. Every existing scenario in
    `openspec/specs/core_plugin_ip_radix-lookup/spec.md:65-91` stays true and every existing case
@@ -63,11 +63,11 @@ Decisions are made. Implement them, do not re-open them.
      a bracketed `[2001:db8::1]`, or garbage: return the raw trimmed string with a nil `net.IP`.
      That fail-closes downstream as `plugin:tech_trustipfail` (`pkg/bouncer/bouncer.go:159-162`),
      matching how `getIP` already treats an unparseable hop (`pkg/ip/checker.go:118-120`).
-   - A non-empty `ForwardedHeadersTrustedIPs` is ignored for `GetRemoteIP`, not a config error.
+   - A non-empty `BouncerForwardedTrustedIPs` is ignored for `GetRemoteIP`, not a config error.
      It is still validated by `validateParamsIPs`, so a bad CIDR still fails startup.
-     `ClientTrustedIPs` is unaffected and still applies to the chosen address.
+     `BouncerClientTrustedIPs` is unaffected and still applies to the chosen address.
 
-4. Effective header name when the flag is on. If `ForwardedHeadersCustomName` still holds the
+4. Effective header name when the flag is on. If `BouncerForwardedHeader` still holds the
    default `"X-Forwarded-For"`, the effective header becomes `"X-Real-Ip"`, because that is the
    header Traefik sanitizes and because `X-Forwarded-For` is a list, which would fail closed on
    every request. Resolve this in `bouncer.New` when populating `forwardedCustomHeader`
@@ -77,7 +77,7 @@ Decisions are made. Implement them, do not re-open them.
    fail-closes per point 3.
 
    Note for the reviewer: an operator who deliberately writes
-   `forwardedHeadersCustomName: X-Forwarded-For` alongside the flag is indistinguishable from one
+   `bouncerForwardedHeader: X-Forwarded-For` alongside the flag is indistinguishable from one
    who left the default, and gets `X-Real-Ip`. That is accepted, and the startup log plus the
    README make it discoverable.
 
@@ -88,13 +88,13 @@ Decisions are made. Implement them, do not re-open them.
    `pkg/bouncer/bouncer.go:146` and the tests.
 
 6. No new `ValidateParams` rejection and no validate-time warning. This matches how
-   `CrowdsecLapiTLSInsecureVerify` is treated: a dangerous but intentional setting is accepted.
+   `LapiTlsInsecureVerify` is treated: a dangerous but intentional setting is accepted.
    The only new log is the one from point 4.
 
 ## Spec and devdoc amendments
 
 - `openspec/specs/core_plugin_ip_radix-lookup/spec.md:62-63` currently asserts the peer gate with
-  no exception. Prefix the existing SHALL with the `ForwardedHeadersInsecure` condition, keep all
+  no exception. Prefix the existing SHALL with the `BouncerForwardedInsecure` condition, keep all
   current scenarios as the default path, and add a separate requirement plus scenarios for the
   insecure path. Do not cram it into that paragraph.
 - `knowledge/devdocs/core_plugin_ip.md:13-15` (the `GetRemoteIP` Language entry) needs the same
@@ -108,10 +108,10 @@ Decisions are made. Implement them, do not re-open them.
 ## README
 
 The docs ship with this ticket. Add the new knob to the option reference near
-`ForwardedHeadersCustomName` and `ForwardedHeadersTrustedIPs`, and add these facts, all verified,
+`BouncerForwardedHeader` and `BouncerForwardedTrustedIPs`, and add these facts, all verified,
 so state them plainly:
 
-1. The named header is only read when the socket peer is inside `ForwardedHeadersTrustedIPs`, and
+1. The named header is only read when the socket peer is inside `BouncerForwardedTrustedIPs`, and
    a non-empty list is still checked per request.
 2. That same list also skips hops inside the header value, right-to-left, first value not in the
    list wins.

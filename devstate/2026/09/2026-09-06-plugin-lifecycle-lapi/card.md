@@ -41,7 +41,7 @@ Owner decision: Required. See Decision needed.
 None.
 
 ## Follow-up issues
-- [ ] [note] [large] OPEN PR #18 identity `decisionScopeHeaders` splitter → fail-on-conflict on the same LAPI URL+key — different scopes still share one LAPI `stream_cursor`. Isolation already uses `BOUNCER_KEY_TRAEFIK_SCOPES`.
+- [ ] [note] [large] OPEN PR #18 identity `lapiScopeHeaders` splitter → fail-on-conflict on the same LAPI URL+key — different scopes still share one LAPI `stream_cursor`. Isolation already uses `BOUNCER_KEY_TRAEFIK_SCOPES`.
 
 ## How this fits together
 Local spec on `2026-09-06-plugin-lifecycle-lapi` from `origin/master`, stub PR #23, explore journal written, stopped for human decisions before propose.
@@ -50,7 +50,7 @@ Local spec on `2026-09-06-plugin-lifecycle-lapi` from `origin/master`, stub PR #
 | Question | Decision | By |
 | --- | --- | --- |
 | Fail `New` on same-session conflicting knobs, or reclaim the first connection and ignore extras? | assumed — fail `New`. Silent ignore is how this bug was born. Share only when the settings snapshot matches. | explore |
-| Are different `decisionScopeHeaders` a different stream session or a conflict on one session (URL+key)? | assumed — conflict on one session. LAPI cursor is the bouncer row, not `scopes=`. Do not land PR #18’s two-poller split. | explore |
+| Are different `lapiScopeHeaders` a different stream session or a conflict on one session (URL+key)? | assumed — conflict on one session. LAPI cursor is the bouncer row, not `scopes=`. Do not land PR #18’s two-poller split. | explore |
 | Does the session key include LAPI TLS client certificate (keyless TLS bouncer) in addition to `lapiKey`? | assumed — yes. That cert is how LAPI selects the bouncer row when the key is empty. | explore |
 | Live/none (and AppSec-only) two usage-metrics tickers on the same bouncer key — fail, share one reporter, or leave as today? | assumed — leave live/none/appsec as today. Stream/alone metrics rides the one session connection. | explore |
 | Relationship to OPEN PR #18 (`2026-09-05-scope-headers-identity`)? | assumed — this ticket supersedes putting scopes in the reclaim hash as a splitter. | explore |

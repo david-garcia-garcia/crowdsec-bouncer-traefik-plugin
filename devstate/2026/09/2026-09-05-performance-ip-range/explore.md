@@ -7,7 +7,7 @@ IssueKey: 2026-09-05-performance-ip-range
 
 **Range membership** (new, in-process): two `pkg/iplookup.Helper`s on the reclaimed `CrowdsecConnection` — ban CIDRs and captcha CIDRs. Stream/alone request lookup asks this pair, not the blob. Ban tree hit wins; else captcha tree; else miss. Not longest-prefix-wins. Not `pkg/ip.Checker`.
 
-**Lease** (unchanged): cache key `updated`. GET hit skips LAPI. GET miss SET TTL `UpdateIntervalSeconds-1` (min 1) then poll stream. Best-effort, not SET NX. Followers never see `stream.New` / `stream.Deleted`.
+**Lease** (unchanged): cache key `updated`. GET hit skips LAPI. GET miss SET TTL `LapiUpdateIntervalSeconds-1` (min 1) then poll stream. Best-effort, not SET NX. Followers never see `stream.New` / `stream.Deleted`.
 
 **Hydrate**: ticker (and stream start) GET the blob and rebuild Range membership when the raw string changed vs last hydrate. Request path does not GET `range-index`.
 
@@ -60,7 +60,7 @@ Measured this phase: `go test ./pkg/decisionscope ./pkg/iplookup` passed. O(n) w
   By: explore
 
 - Q: When is the first hydrate relative to serving?
-  Decision: assumed — `startStream` GETs `range-index` and builds membership before returning (no extra LAPI call). Redis followers match Range on the first request if the blob already exists. No-Redis: empty until this process’s first stream apply (same as empty blob today). `StreamStartupBlock` still controls whether the first LAPI poll is synchronous.
+  Decision: assumed — `startStream` GETs `range-index` and builds membership before returning (no extra LAPI call). Redis followers match Range on the first request if the blob already exists. No-Redis: empty until this process’s first stream apply (same as empty blob today). `LapiStreamStartupBlock` still controls whether the first LAPI poll is synchronous.
   By: explore
 
 - Q: How do request-path reads see a rebuild?

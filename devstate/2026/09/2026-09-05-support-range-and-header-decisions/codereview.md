@@ -15,7 +15,7 @@ Change: honor-range-and-header-decisions
    → Renamed to `strongestLiveDecision`
 6. [judgement] Smallest durable delta — `pkg/configuration/configuration.go:46` — Config struct field realign
    → Add only the new field
-7. [judgement] Duplicated Code — `decisionScopeHeaders` held on bouncer and connection
+7. [judgement] Duplicated Code — `lapiScopeHeaders` held on bouncer and connection
    → Keep one owner
 8. [judgement] Duplicated Code — ban-over-captcha in `strongestLiveDecision` vs `PreferRemediation`
    → Map types then call PreferRemediation once

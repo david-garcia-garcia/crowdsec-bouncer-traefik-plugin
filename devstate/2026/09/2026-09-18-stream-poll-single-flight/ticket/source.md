@@ -80,8 +80,8 @@ read-modify-write of the range blob (`pkg/decisionscope/range.go:23-44`), which 
 therefore produce a wrong allow or ban. That needs a slow or large apply, so it is rare.
 
 More likely to be observed: overlapping success and failure writes flap
-`isCrowdsecStreamHealthy`, and with the default `UpdateMaxFailure=0` the first failure already
-marks the stream unhealthy. Cache-miss requests then get `CrowdsecLapiFailureAction`, which
+`isCrowdsecStreamHealthy`, and with the default `LapiUpdateMaxFailure=0` the first failure already
+marks the stream unhealthy. Cache-miss requests then get `BouncerLapiFailureAction`, which
 defaults to `ban`. Cached hits are unaffected.
 
 Also: duplicate `GET /v1/decisions/stream` load, and `startup=true` versus `startup=false`
@@ -96,7 +96,7 @@ previous one is still running, with no unusual configuration at all.
 
 1. **Skip the tick if a poll is already running.** Guard `handleStreamTicker` with a dedicated
    in-flight flag, released on all paths including panic. This must also cover the two non-ticker
-   spawn sites: `startStream`'s async first poll when `StreamStartupBlock` is false
+   spawn sites: `startStream`'s async first poll when `LapiStreamStartupBlock` is false
    (`client_stream.go:41`) and `Wake` (`client.go:225`). Dropping a tick is the correct stream
    semantic; do not queue polls.
 2. **Publish the three flags atomically, regardless of item 1.** Item 1 removes poller-versus-poller
@@ -146,7 +146,7 @@ for part of the production bug.
 
 Cases that must fail on today's master and pass after:
 
-1. Slow poll longer than the interval: 1s ticker, LAPI sleep above 1s, `StreamStartupBlock=false`.
+1. Slow poll longer than the interval: 1s ticker, LAPI sleep above 1s, `LapiStreamStartupBlock=false`.
    Assert at most one in-flight poll, that fetches do not climb one per tick, and that the detector
    is silent.
 2. Two overlapping polls with the lease still valid (interval 60, short poll). One fetch, and the

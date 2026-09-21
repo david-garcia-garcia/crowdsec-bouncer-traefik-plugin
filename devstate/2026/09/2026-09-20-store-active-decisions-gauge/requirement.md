@@ -6,7 +6,7 @@ Stream/alone `active_decisions` is a second copy of every Ip/header/Range store 
 
 ## Current (code)
 - `MetricsReporter` holds `activeDecisionSlots map[string]activeDecisionSlot` (intern `originID` + family) and `activeDecisionsByOriginIPType map[usageMetricKey]int64`. `pkg/lapi/client_metrics.go`
-- `rememberActiveDecision` / `forgetActiveDecision` live on Client and reporter. Remember no-ops unless `crowdsecMode` is stream or alone. Forget has no mode gate. `pkg/lapi/client_metrics.go`
+- `rememberActiveDecision` / `forgetActiveDecision` live on Client and reporter. Remember no-ops unless `lapiMode` is stream or alone. Forget has no mode gate. `pkg/lapi/client_metrics.go`
 - Stream/alone Ip and header New: `rememberActiveDecision(SlotKey, origin, value)` then `PutMany`. Deleted: `forgetActiveDecision(SlotKey)` then `DeleteMany`. `pkg/lapi/client_decisions.go` `pkg/lapi/client_stream.go`
 - Stream Range New: `rememberActiveDecision("range:"+cidr, …)` then `ApplyRangeBatch`. Deleted: `forgetActiveDecision("range:"+cidr)`. `pkg/lapi/client_stream.go`
 - Live/none memo is `memoLive` → `Store.Put` and does not call remember/forget. `pkg/lapi/client_live.go` `pkg/lapi/client_decisions.go`
@@ -14,7 +14,7 @@ Stream/alone `active_decisions` is a second copy of every Ip/header/Range store 
 - Memory `putSlot` overwrites `LiveSlot` under `mu` and does not adjust a gauge. `DeleteMany` / `deleteTickLocked` delete keys only. `PublishTick` deletes expired tick slots and does not decrement any gauge. `pkg/decisionstore/memory.go`
 - Redis `PutMany` is `MSetEX` of `KindOriginString` with no prior GET. `DeleteMany` is DEL with no GET. `PublishTick` is a no-op. `getMany` / `MGet` exist for lookup only. `pkg/decisionstore/redis.go`
 - Memory origin id is packed in `LiveSlot.Word` (`packWord`). Redis origin is the `KindOriginString` string; `Unpack` of a string returns `originID` 0. `pkg/decisionstore/pack.go` `pkg/decisionstore/liveslot.go`
-- `OpenDecisionStore` / `Store.Open` / `NewMemory` / `NewRedis` do not take `crowdsecMode` or a count-active flag. `pkg/lapi/decisionstore.go` `pkg/decisionstore/store.go`
+- `OpenDecisionStore` / `Store.Open` / `NewMemory` / `NewRedis` do not take `lapiMode` or a count-active flag. `pkg/lapi/decisionstore.go` `pkg/decisionstore/store.go`
 - Engine dispatch is `type engine struct` of funcs (Yaegi). No Go interface for the engine. `pkg/decisionstore/store.go`
 - `Store.Peek` for a slot: not found.
 - Spec: per-slot forget map one entry per Ip, header, or Range; intern id + family; POST via `OriginName`; overflow id 0 / empty name. `openspec/specs/core_plugin_lapi_usage-metrics/spec.md` requirement Active-decision slots store intern id and family
@@ -26,7 +26,7 @@ Stream/alone `active_decisions` is a second copy of every Ip/header/Range store 
 ## Desired
 - DecisionStore owns the active-record group-by: compact `{originID uint16, family} → int64`, updated in one shared Store path on PutMany/DeleteMany (engines Peek previous slots; memory tick while ticking else published; Redis MGET). Memory `PublishTick` expiry MUST NOT decrement (accepted imprecision; TTL debt).
 - MetricsReporter MUST NOT keep `activeDecisionSlots` or `activeDecisionsByOriginIPType`. `reportMetrics` snapshots store counts and emits origin names via `OriginName` at POST. Dropped window + processed atomics stay on the reporter.
-- Count only stream/alone Ip and header-scope mutations. Live/none Put memo MUST NOT increment. `OpenDecisionStore` / New sets `countActive` (or equivalent) from `crowdsecMode`; reporter still omits `active_decisions` unless stream/alone. `countActive` is not an engine field.
+- Count only stream/alone Ip and header-scope mutations. Live/none Put memo MUST NOT increment. `OpenDecisionStore` / New sets `countActive` (or equivalent) from `lapiMode`; reporter still omits `active_decisions` unless stream/alone. `countActive` is not an engine field.
 - Do not store `usageMetricKey` / LAPI item JSON shape in decisionstore.
 - Do not add a Go interface for the engine. Store method(s) to read counts for POST are fine. PeekMany is an engine func, not a public Store Peek.
 - Remove remember/forget from stream apply for Ip/header (store mutations carry the gauge). Range: do not forget/peek membership; omit Range from counts (not +1 on New with no Deleted) until debt is taken.

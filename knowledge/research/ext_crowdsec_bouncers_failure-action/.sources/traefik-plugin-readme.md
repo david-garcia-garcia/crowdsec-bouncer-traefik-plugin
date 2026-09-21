@@ -10,14 +10,14 @@ CrowdsecAppsecFailureBlock bool default true: block when AppSec returns status 5
 
 CrowdsecAppsecUnreachableBlock bool default true: block when AppSec is unreachable.
 
-UpdateMaxFailure int64 default 0: stream and alone only. Maximum number of times we cannot reach Crowdsec before blocking traffic. Set -1 to never block.
+LapiUpdateMaxFailure int64 default 0: stream and alone only. Maximum number of times we cannot reach Crowdsec before blocking traffic. Set -1 to never block.
 
-StreamStartupBlock bool default true: stream and alone. When true, init waits for Crowdsec. When false, all requests bypass remediation until the first stream sync completes.
+LapiStreamStartupBlock bool default true: stream and alone. When true, init waits for Crowdsec. When false, all requests bypass remediation until the first stream sync completes.
 
 HTTPTimeoutSeconds default 10: timeout contacting LAPI.
 
-CrowdsecMode default live: none, live, stream, alone, appsec.
+LapiMode default live: none, live, stream, alone, appsec.
 
-RedisCacheUnreachableBlock bool default true.
+BouncerRedisUnreachableBlock bool default true.
 
 CrowdsecAppsecUnreadableBodyBlock: README says default false. Conflicts with configuration.New() default true at this commit.

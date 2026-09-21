@@ -14,7 +14,7 @@ import (
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-func TestOriginBasedDecisionRemapEdges(t *testing.T) {
+func TestBouncerDecisionRemapEdges(t *testing.T) {
 	table := copyOriginBasedDecisionRemap(map[string]map[string]string{
 		"CAPI":                 {"ban": "captcha"},
 		"lists":                {"ban": "captcha"},
@@ -34,14 +34,14 @@ func TestOriginBasedDecisionRemapEdges(t *testing.T) {
 		{origin: "capi", want: false},
 	}
 	for _, tc := range tests {
-		got := originBasedDecisionRemapEdges(tc.origin, table) != nil
+		got := bouncerDecisionRemapEdges(tc.origin, table) != nil
 		if got != tc.want {
-			t.Errorf("originBasedDecisionRemapEdges(%q) present=%v, want %v", tc.origin, got, tc.want)
+			t.Errorf("bouncerDecisionRemapEdges(%q) present=%v, want %v", tc.origin, got, tc.want)
 		}
 	}
 }
 
-func TestCopyOriginBasedDecisionRemapTrimsBlanks(t *testing.T) {
+func TestCopyBouncerDecisionRemapTrimsBlanks(t *testing.T) {
 	src := make(map[string]map[string]string)
 	paddedFrom := make(map[string]string)
 	paddedFrom[" Ban "] = " Captcha "
@@ -61,8 +61,8 @@ func TestCopyOriginBasedDecisionRemapTrimsBlanks(t *testing.T) {
 	}
 }
 
-func TestApplyOriginBasedDecisionRemap(t *testing.T) {
-	b := &Bouncer{originBasedDecisionRemap: copyOriginBasedDecisionRemap(map[string]map[string]string{
+func TestApplyBouncerDecisionRemap(t *testing.T) {
+	b := &Bouncer{bouncerDecisionRemap: copyOriginBasedDecisionRemap(map[string]map[string]string{
 		"CAPI":                 {"ban": "captcha"},
 		"lists:firehol_level1": {"ban": "captcha"},
 		"crowdsec":             {"captcha": "pass"},
@@ -90,8 +90,8 @@ func TestApplyOriginBasedDecisionRemap(t *testing.T) {
 	}
 }
 
-func TestApplyOriginBasedDecisionRemap_OneHopDoesNotChain(t *testing.T) {
-	b := &Bouncer{originBasedDecisionRemap: copyOriginBasedDecisionRemap(map[string]map[string]string{
+func TestApplyBouncerDecisionRemap_OneHopDoesNotChain(t *testing.T) {
+	b := &Bouncer{bouncerDecisionRemap: copyOriginBasedDecisionRemap(map[string]map[string]string{
 		"CAPI": {"ban": "captcha", "captcha": "pass"},
 	})}
 	if got := b.applyOriginBasedDecisionRemap(decisionscope.BannedValue, "CAPI"); got != decisionscope.CaptchaValue {
@@ -118,16 +118,17 @@ func testRemapStreamBouncer(t *testing.T, lapiClient *lapi.Client, remap map[str
 	}
 	passed := false
 	b := &Bouncer{
-		enabled:                  true,
-		crowdsecMode:             configuration.StreamMode,
-		lapiClient:               lapiClient,
-		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
-		captchaClient:            &captcha.Client{},
-		log:                      log,
-		remediationStatusCode:    http.StatusForbidden,
-		banTemplate:              banTemplate,
-		banTemplateContentType:   "text/html; charset=utf-8",
-		originBasedDecisionRemap: copyOriginBasedDecisionRemap(remap),
+		enabled:                      true,
+		lapiMode:                     configuration.StreamMode,
+		lapiEnabled:                  true,
+		lapiClient:                   lapiClient,
+		clientPoolStrategy:           &ip.PoolStrategy{Checker: clientChecker},
+		captchaClient:                &captcha.Client{},
+		log:                          log,
+		bouncerRemediationStatusCode: http.StatusForbidden,
+		banTemplate:                  banTemplate,
+		banTemplateContentType:       "text/html; charset=utf-8",
+		bouncerDecisionRemap:         copyOriginBasedDecisionRemap(remap),
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			passed = true
 		}),
@@ -135,7 +136,7 @@ func testRemapStreamBouncer(t *testing.T, lapiClient *lapi.Client, remap map[str
 	return b, &passed
 }
 
-func TestServeHTTP_OriginBasedDecisionRemapPassSkipsLAPIBan(t *testing.T) {
+func TestServeHTTP_BouncerDecisionRemapPassSkipsLAPIBan(t *testing.T) {
 	log := logger.New("ERROR", "")
 	lapiClient, store := lapi.NewTestClient(log)
 	lapi.AttachTestMetricsReporter(lapiClient)
@@ -152,7 +153,7 @@ func TestServeHTTP_OriginBasedDecisionRemapPassSkipsLAPIBan(t *testing.T) {
 	}
 }
 
-func TestServeHTTP_OriginBasedDecisionRemapIsPerBouncer(t *testing.T) {
+func TestServeHTTP_BouncerDecisionRemapIsPerBouncer(t *testing.T) {
 	log := logger.New("ERROR", "")
 	lapiClient, store := lapi.NewTestClient(log)
 	lapi.AttachTestMetricsReporter(lapiClient)

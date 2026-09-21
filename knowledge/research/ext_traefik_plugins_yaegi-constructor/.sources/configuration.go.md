@@ -7,6 +7,6 @@ ref: this-repo@99fb8b11e567b4d6d25e242b333373f2e078713e:pkg/configuration/config
 ---
 
 package configuration.
-type Config struct { Enabled, LogLevel, CrowdsecMode, ... json tags }.
+type Config struct { Enabled, LogLevel, LapiMode, ... json tags }.
 func New() *Config — this plugin's default-config helper, not Traefik's plugin New.
 CreateConfig in bouncer.go returns configuration.New().

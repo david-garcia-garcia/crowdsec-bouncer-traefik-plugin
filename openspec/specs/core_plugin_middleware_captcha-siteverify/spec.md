@@ -81,16 +81,16 @@ When siteverify transport fails or JSON decode fails, `Validate` SHALL return `(
 - **AND** no `crowdsec_captcha_gate` cookie is set
 
 ### Requirement: Custom siteverify request body encoding
-When the captcha provider is `custom` and `captchaCustomValidateBody` is `json`, siteverify SHALL POST `application/json` whose object has `secret` and `response` (the solver token) to the configured validate URL. When that knob is empty or `form`, or the provider is hcaptcha, recaptcha, or turnstile, siteverify SHALL POST `application/x-www-form-urlencoded` `secret` and `response` the same way dest does today. Extra verify fields and headers stay out of scope except absorb-only `remoteip`. Reply classification, gate cookie, and 302 stay on the existing requirements in this spec.
+When the captcha provider is `custom` and `bouncerCaptchaCustomValidateBody` is `json`, siteverify SHALL POST `application/json` whose object has `secret` and `response` (the solver token) to the configured validate URL. When that knob is empty or `form`, or the provider is hcaptcha, recaptcha, or turnstile, siteverify SHALL POST `application/x-www-form-urlencoded` `secret` and `response` the same way dest does today. Extra verify fields and headers stay out of scope except absorb-only `remoteip`. Reply classification, gate cookie, and 302 stay on the existing requirements in this spec.
 
 #### Scenario: Custom json posts JSON secret and response
-- **WHEN** the provider is `custom` and `captchaCustomValidateBody` is `json`
+- **WHEN** the provider is `custom` and `bouncerCaptchaCustomValidateBody` is `json`
 - **AND** a solver POST reaches siteverify
 - **THEN** the provider request `Content-Type` is `application/json`
 - **AND** the JSON object has `secret` and `response`
 
 #### Scenario: Custom form or omit stays urlencoded
-- **WHEN** the provider is `custom` and `captchaCustomValidateBody` is empty or `form`
+- **WHEN** the provider is `custom` and `bouncerCaptchaCustomValidateBody` is empty or `form`
 - **AND** a solver POST reaches siteverify
 - **THEN** the provider request is `application/x-www-form-urlencoded` with `secret` and `response`
 
@@ -100,7 +100,7 @@ When the captcha provider is `custom` and `captchaCustomValidateBody` is `json`,
 - **THEN** the provider request is `application/x-www-form-urlencoded` with `secret` and `response`
 
 #### Scenario: Custom json success still issues cookie and 302
-- **WHEN** the provider is `custom` and `captchaCustomValidateBody` is `json`
+- **WHEN** the provider is `custom` and `bouncerCaptchaCustomValidateBody` is `json`
 - **AND** the provider responds with Siteverify JSON and `success` true
 - **THEN** the response status is 302
 - **AND** the response sets `crowdsec_captcha_gate`

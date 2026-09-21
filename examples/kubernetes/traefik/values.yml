@@ -5,7 +5,7 @@ logs:
   general:
     level: DEBUG
   access:
-    enabled: true
+    bouncerEnabled: true
     format: json
     fields:
       headers: 

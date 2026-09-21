@@ -45,6 +45,6 @@ TLS client cert: `lapiTlsCert` / `lapiTlsKey` (not CertificateBouncer).
 
 ## Settings split
 
-Fetch knobs (`lapiUpdateIntervalSeconds`, Redis, `lapiScopeHeaders`, body limit, TLS) live on the opener. Per-route knobs (remediation header/status, failure actions, captcha, trusted IPs) live on bouncing middlewares. Decision remap is not required in this change.
+Fetch knobs (`lapiLapiUpdateIntervalSeconds`, Redis, `lapiScopeHeaders`, body limit, TLS) live on the opener. Per-route knobs (remediation header/status, failure actions, captcha, trusted IPs) live on bouncing middlewares. Decision remap is not required in this change.
 
 Target branch is master.

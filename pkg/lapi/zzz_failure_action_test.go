@@ -26,7 +26,7 @@ func newTestLiveClient(t *testing.T, server *httptest.Server) *Client {
 	client.crowdsecScheme = serverURL.Scheme
 	client.crowdsecHost = serverURL.Host
 	client.crowdsecPath = "/"
-	client.crowdsecMode = configuration.LiveMode
+	client.lapiMode = configuration.LiveMode
 	attachTestTransport(client, server.Client(), "")
 	return client
 }
@@ -127,7 +127,7 @@ func TestLiveLookup_CleanIPAndCleanScopesAllows(t *testing.T) {
 }
 
 // TestLiveLookup_ScopeErrorFailsClosed is matrix row 2: the failure must reach the caller with a
-// non-active kind so pkg/bouncer applies CrowdsecLapiFailureAction instead of allowing.
+// non-active kind so pkg/bouncer applies BouncerLapiFailureAction instead of allowing.
 func TestLiveLookup_ScopeErrorFailsClosed(t *testing.T) {
 	client := newTestLiveClient(t, testLiveScopeLAPI(t, "null", map[string]string{"country": ""}))
 	value, _, err := client.LiveLookup("1.2.3.4", map[string]string{"country": "FR"}, 60)
@@ -198,7 +198,7 @@ func TestLiveLookup_IPSlotKeepsIPQueryResult(t *testing.T) {
 }
 
 // TestLiveLookup_ActiveBanOutranksScopeError is matrix row 4: the ban must not be downgraded or
-// masked, and the request must not be diverted to CrowdsecLapiFailureAction.
+// masked, and the request must not be diverted to BouncerLapiFailureAction.
 func TestLiveLookup_ActiveBanOutranksScopeError(t *testing.T) {
 	client := newTestLiveClient(t, testLiveScopeLAPI(t, testLiveBanBody("ip", "1.2.3.4"), map[string]string{"country": ""}))
 	value, _, err := client.LiveLookup("1.2.3.4", map[string]string{"country": "FR"}, 60)

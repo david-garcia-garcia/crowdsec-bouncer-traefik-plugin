@@ -21,7 +21,7 @@
     {
       "description": "whoami is a throwaway demo backend; leave it on latest",
       "matchPackageNames": ["traefik/whoami"],
-      "enabled": false
+      "bouncerEnabled": false
     }
   ],
   "customManagers": [

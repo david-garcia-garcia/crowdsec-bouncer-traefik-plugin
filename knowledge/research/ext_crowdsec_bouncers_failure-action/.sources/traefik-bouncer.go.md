@@ -8,7 +8,7 @@ ref: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin@04d928872df12bdb9d9
 
 Globals start isCrowdsecStreamHealthy=true, updateFailure=0.
 
-handleStreamTicker: on stream update error, if updateMaxFailure != -1 and updateFailure >= updateMaxFailure and currently healthy, set isCrowdsecStreamHealthy=false. Then increment updateFailure. On success, healthy=true and updateFailure=0. Default updateMaxFailure 0 → first failed poll marks unhealthy.
+handleStreamTicker: on stream update error, if lapiUpdateMaxFailure != -1 and updateFailure >= lapiUpdateMaxFailure and currently healthy, set isCrowdsecStreamHealthy=false. Then increment updateFailure. On success, healthy=true and updateFailure=0. Default lapiUpdateMaxFailure 0 → first failed poll marks unhealthy.
 
 ServeHTTP stream/alone: cache miss + healthy → allow (not in ban list). Cache miss + unhealthy → handleBanServeHTTP ReasonTECH (block all).
 
@@ -18,4 +18,4 @@ crowdsecQuery: transport error or HTTP 502/503/504 → crowdsecQuery:unreachable
 
 appsecQuery: unreachable (error or 502/503/504) gated by appsecUnreachableBlock; 500 gated by appsecFailureBlock; other non-200 including 401/403 → error → ban.
 
-StreamStartupBlock true: New() calls handleStreamTicker synchronously before serving.
+LapiStreamStartupBlock true: New() calls handleStreamTicker synchronously before serving.

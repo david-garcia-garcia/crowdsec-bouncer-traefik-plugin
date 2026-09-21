@@ -7,12 +7,12 @@ Upstream v1.6.0-alpha logged `handleStreamCache:updated` at INFO on every stream
 ## Current (code)
 - `pkg/lapi/client_stream.go:69` — lease hit path logs `handleStreamCache:alreadyUpdated` via `c.log.Debug`.
 - `pkg/lapi/client_stream.go:129` — successful fetch path logs `handleStreamCache:updated` via `c.log.Debug`.
-- `pkg/lapi/client_stream.go:42` — stream ticker uses `config.UpdateIntervalSeconds` (poll interval).
+- `pkg/lapi/client_stream.go:42` — stream ticker uses `config.LapiUpdateIntervalSeconds` (poll interval).
 - `pkg/lapi/client_stream.go:53,59` — operator-visible stream health transitions use `logInfo` (INFO), not the cache tick messages.
 - `pkg/lapi/client.go:276-281` — `logInfo` writes at slog INFO with mode and host attributes.
 - `pkg/logger/logger.go:37-39` — unrecognized or empty `logLevel` defaults to INFO.
 - `pkg/configuration/configuration.go:161` — default `LogLevel` is `LogINFO`.
-- `pkg/configuration/configuration.go:178` — default `UpdateIntervalSeconds` is 60.
+- `pkg/configuration/configuration.go:178` — default `LapiUpdateIntervalSeconds` is 60.
 - `pkg/lapi/client_range_test.go:54-64` — `TestHandleStreamCacheLeaseHitHydrates` exercises lease-hit `handleStreamCache` but uses ERROR log level; no assertion on log level for cache tick messages.
 
 ## Desired

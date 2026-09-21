@@ -4,7 +4,7 @@ IssueKey: 2026-09-20-header-forced-decision
 ## Concepts
 
 **Forced decision header**:
-A config-named incoming request header whose value is a public letter `b` (ban) or `c` (captcha). Empty config name means the feature is off. Not `decisionScopeHeaders` (those headers are CrowdSec identity for stream/live lookup). Not `remediationHeadersCustomName` (outgoing).
+A config-named incoming request header whose value is a public letter `b` (ban) or `c` (captcha). Empty config name means the feature is off. Not `lapiScopeHeaders` (those headers are CrowdSec identity for stream/live lookup). Not `bouncerRemediationHeader` (outgoing).
 
 **Header letter vs cache letter**:
 Public contract is `b`/`c` as the ticket wrote. Dest cache letters stay `t`/`c`/`f` (`BannedValue` / `CaptchaValue` / `NoBannedValue` in `pkg/decisionscope/lookup.go`). Map `b` → `BannedValue` before `handleRemediationServeHTTP`. Do not teach other middlewares `t`.
@@ -14,7 +14,7 @@ After GetRemoteIP + trusted-client skip. Header `b` remediates ban without looku
 
 ```
 GetRemoteIP → trusted skip (unchanged)
-    → crowdsecDecisionHeader = b? → ban (no lookup)
+    → bouncerDecisionHeader = b? → ban (no lookup)
     → else today’s lookup
          lookup ban + header c → ban + WARN
          else header c → captcha (gate still applies)
@@ -30,7 +30,7 @@ The configured header as set by an earlier Traefik middleware (or any hop that c
 ## Decisions
 
 - Insert the force read on `Bouncer.ServeHTTP` after trusted-client skip. Reuse `handleRemediationServeHTTP`. Do not add a parallel captcha/ban router.
-- Empty `crowdsecDecisionHeader` (CreateConfig default) means off: do not read any default header name (clients would spoof `X-Crowdsec-Decision`).
+- Empty `bouncerDecisionHeader` (CreateConfig default) means off: do not read any default header name (clients would spoof `X-Crowdsec-Decision`).
 - Header values: exact trimmed `b` and `c` only. Map `b` to `BannedValue`. Do not accept `t`, `ban`, `captcha`, or case variants.
 - Missing header, empty value, or any other token: ignore and continue today’s lookup. Do not reject `New`. Do not fail the request.
 - Skip `LookupRemediation` and `LiveLookup` only for header `b`. Header `c` still looks up; a ban wins and WARN; otherwise captcha. AppSec still runs only on the pass path after a gated-OK captcha.
@@ -41,7 +41,7 @@ The configured header as set by an earlier Traefik middleware (or any hop that c
 ## Open questions
 
 - Q: What is the public Config JSON/yaml key?
-  Decision: assumed — `crowdsecDecisionHeader` (string; empty = off). Sibling keys are `traceHeadersCustomName` / `decisionScopeHeaders`; this one names a CrowdSec decision letter, not identity or an outgoing remediation header. Example header name in docs: `X-Crowdsec-Decision`.
+  Decision: assumed — `bouncerDecisionHeader` (string; empty = off). Sibling keys are `bouncerTraceHeader` / `lapiScopeHeaders`; this one names a CrowdSec decision letter, not identity or an outgoing remediation header. Example header name in docs: `X-Crowdsec-Decision`.
   By: explore
 
 - Q: Is the header’s ban letter literal `b` or dest cache `t` (`BannedValue`)?

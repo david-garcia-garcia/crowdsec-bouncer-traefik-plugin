@@ -5,7 +5,7 @@
    Status: skipped
    Argument: judgement. `pkg/lapi` unit tests have no Redis fixture and the gates the ticket names do not start one, so adding this would mean standing up a new dependency for one delete. The delete is a single store-agnostic call on a `Delete` that `pkg/cache/zzz_cache_test.go:92` already covers, and this diff did not touch either store implementation.
 
-Ticket job (from `devstate/requirement.md` and the primary SHALL in `core_plugin_lapi_failure-action`): a header-scope LAPI query that errors must stop being read as "no decision" and must reach `crowdsecLapiFailureAction` with a non-active remediation, without ever masking an active ban.
+Ticket job (from `devstate/requirement.md` and the primary SHALL in `core_plugin_lapi_failure-action`): a header-scope LAPI query that errors must stop being read as "no decision" and must reach `bouncerLapiFailureAction` with a non-active remediation, without ever masking an active ban.
 
 That job would fail on revert. Six tests, one per matrix row, in `pkg/lapi/zzz_failure_action_test.go`, each measured red on dest `0e7dbf0` first:
 

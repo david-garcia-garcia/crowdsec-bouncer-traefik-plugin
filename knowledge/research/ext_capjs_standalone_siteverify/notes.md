@@ -24,7 +24,7 @@ Marketing copy says `/siteverify` is compatible with reCAPTCHA's API. Every offi
 
 When the widget sits inside a form, it injects a hidden input named `cap-token` (override: `data-cap-hidden-field-name`). The token is also `e.detail.token` on the `solve` event. ([Quickstart](https://trycap.dev/guide/); [Widget](https://trycap.dev/guide/widget.html), extract `.sources/widget.md`)
 
-That name is the first hop (browser → plugin). It is already `captchaCustomResponse`. It is not a second provider constant.
+That name is the first hop (browser → plugin). It is already `bouncerCaptchaCustomResponse`. It is not a second provider constant.
 
 ## Reply
 

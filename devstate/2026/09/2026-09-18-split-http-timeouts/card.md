@@ -1,7 +1,7 @@
 Developer review: ready for review — 2026-09-18T18:21:40Z
 
 ## What this changes
-**Operators.** Optional YAML knobs `crowdsecLapiHttpTimeoutSeconds`, `crowdsecAppsecHttpTimeoutSeconds`, and `captchaSiteverifyHttpTimeoutSeconds` inherit `httpTimeoutSeconds` (still default 10). Example: `crowdsecAppsecHttpTimeoutSeconds: 1` with `crowdsecAppsecFailureAction: passthrough`.
+**Operators.** Optional YAML knobs `lapiHttpTimeoutSeconds`, `appsecHttpTimeoutSeconds`, and `bouncerCaptchaHttpTimeoutSeconds` inherit `httpTimeoutSeconds` (still default 10). Example: `appsecHttpTimeoutSeconds: 1` with `bouncerAppsecFailureAction: passthrough`.
 
 **Admin users.** None.
 
@@ -10,7 +10,7 @@ Developer review: ready for review — 2026-09-18T18:21:40Z
 **End users.** An AppSec hang can fail open after the AppSec override instead of waiting the shared 10s LAPI budget.
 
 ## Motivation
-On master, one public `httpTimeoutSeconds` (default 10) is the HTTP client Timeout for LAPI stream/live, AppSec Query, and captcha siteverify. An AppSec listener that never answers holds the request for the same ten seconds as a slow LAPI GET. Operators who want AppSec to fail fast (`crowdsecAppsecHttpTimeoutSeconds: 1` plus passthrough) cannot do that without also shortening LAPI.
+On master, one public `httpTimeoutSeconds` (default 10) is the HTTP client Timeout for LAPI stream/live, AppSec Query, and captcha siteverify. An AppSec listener that never answers holds the request for the same ten seconds as a slow LAPI GET. Operators who want AppSec to fail fast (`appsecHttpTimeoutSeconds: 1` plus passthrough) cannot do that without also shortening LAPI.
 
 Dest already last-writes a timeout-only reload through `AdoptTransport` and keeps timeout out of reclaim identity. Closed PR #41 put effective timeout back into that identity; this branch must not. Until inheriting knobs exist and the three clients read effective seconds instead of raw `HTTPTimeoutSeconds`, AppSec hangs stay coupled to the LAPI budget.
 

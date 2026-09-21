@@ -6,8 +6,8 @@ There is no named product gap. The caller wants a GitHub review branch for direc
 
 ## Current (code)
 - Dest for this fork’s plugin work is `origin/master` (`plugin.go`, `pkg/bouncer/`). `origin/HEAD` is `main`; `git ls-tree origin/main` has no `pkg/bouncer` (that tree is 19 commits behind `master`).
-- Per-router handler is `pkg/bouncer/bouncer.go` `ServeHTTP` (trusted IP, `crowdsecMode`, cache, live lookup, stream miss). `plugin.go` `New` opens LAPI/AppSec and returns that bouncer.
-- `crowdsecMode` is `none` | `live` | `stream` | `alone` | `appsec` in `pkg/configuration/configuration.go`. Default is `live`.
+- Per-router handler is `pkg/bouncer/bouncer.go` `ServeHTTP` (trusted IP, `lapiMode`, cache, live lookup, stream miss). `plugin.go` `New` opens LAPI/AppSec and returns that bouncer.
+- `lapiMode` is `none` | `live` | `stream` | `alone` | `appsec` in `pkg/configuration/configuration.go`. Default is `live`.
 - OpenSpec catalog lives under `openspec/specs/`; in-progress changes under `openspec/changes/`. This ticket does not name a spec leaf to change.
 - A specific readability defect or target hunk was not named: not found.
 
@@ -21,7 +21,7 @@ There is no named product gap. The caller wants a GitHub review branch for direc
 
 ## Out of scope
 - OpenSpec propose / openspec-apply-change / archive of a change folder for this bus.
-- New CrowdsecMode values, LAPI/AppSec protocol, or operator keys.
+- New LapiMode values, LAPI/AppSec protocol, or operator keys.
 - A full eight-phase run per small hunk.
 - Switching dest to `main` (`origin/HEAD`).
 

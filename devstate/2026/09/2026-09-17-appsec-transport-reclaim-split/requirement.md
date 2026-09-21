@@ -38,7 +38,7 @@ After PR #62, LAPI reclaim no longer splits on TLS, HTTP timeout, or per-router 
 - Previous run bus `devstate/2026/09/2026-09-17-lapi-transport-router-policy/`.
 - Captcha product work (debt: captcha stays on Bouncer). Fence allows `pkg/captcha/` only if AppSec adopt genuinely needs it.
 - New public JSON/YAML keys.
-- Moving `CrowdsecAppsecBodyLimit` off the key unless explore shows it is transport, not listener identity (ticket did not name it).
+- Moving `AppsecBodyLimit` off the key unless explore shows it is transport, not listener identity (ticket did not name it).
 
 ## Unknowns
 - Whether `bodyLimit` stays on the AppSec key. It is on identity and on a write-once Client scalar today; ticket did not list it.

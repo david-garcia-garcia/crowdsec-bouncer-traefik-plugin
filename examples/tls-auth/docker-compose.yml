@@ -36,11 +36,11 @@ services:
   #     - "traefik.http.routers.router-foo.entrypoints=web"
   #     - "traefik.http.routers.router-foo.middlewares=crowdsec@docker"
   #     - "traefik.http.services.service-foo.loadbalancer.server.port=80"
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapischeme=https"
-  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
+  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerEnabled=true"
+  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.logLevel=DEBUG"
+  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiKey=40796d93c2958f9e58345514e67740e5"
+  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiScheme=https"
+  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiTlsCaFile=/etc/traefik/crowdsec-certs/inter.pem"
 
   # Use HTTPS scheme with TLS cert authentication
   whoami-bar:
@@ -53,21 +53,21 @@ services:
       - "traefik.http.routers.router-bar.entrypoints=web"
       - "traefik.http.routers.router-bar.middlewares=crowdsec@docker"
       - "traefik.http.services.service-bar.loadbalancer.server.port=80"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecMode=none"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapischeme=https"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecscheme=https"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecAppsecTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerEnabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.logLevel=DEBUG"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiMode=none"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiScheme=https"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.appsecScheme=https"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.appsecTlsCaFile=/etc/traefik/crowdsec-certs/inter.pem"
 
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapikey=40796d93c2958f9e58345514e67740e5="
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateBouncerFile=/etc/traefik/crowdsec-certs/bouncer.pem"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateBouncerKeyFile=/etc/traefik/crowdsec-certs/bouncer-key.pem"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiKey=40796d93c2958f9e58345514e67740e5="
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiTlsCaFile=/etc/traefik/crowdsec-certs/inter.pem"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiTlsCertFile=/etc/traefik/crowdsec-certs/bouncer.pem"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiTlsKeyFile=/etc/traefik/crowdsec-certs/bouncer-key.pem"
       # Enable AppSec
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecenabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.appsecEnabled=true"
       # Define AppSec host and port informations
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsechost=crowdsec:7422"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.appsecHost=crowdsec:7422"
   crowdsec:
     image: crowdsecurity/crowdsec:v1.7.8
     container_name: "crowdsec"

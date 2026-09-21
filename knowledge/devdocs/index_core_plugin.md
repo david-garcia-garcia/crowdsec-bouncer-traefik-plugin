@@ -60,7 +60,7 @@ priority: normal
 local: core_plugin_lapi_stream-apply.md
 description: How this plugin writes one CrowdSec stream payload (deleted before new) into the DecisionStore.
 
-## OriginBasedDecisionRemap
+## BouncerDecisionRemap
 priority: normal
 local: core_plugin_lapi_origin-based-decision-remap.md
 description: How each Bouncer remaps origin-keyed LAPI types at request apply, including per-list lists:name matching.

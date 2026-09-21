@@ -2,7 +2,7 @@
 IssueKey: 2026-09-06-ip-xff-trust-gate
 
 ## Concepts
-- **Trusted-hop pool** — `ForwardedHeadersTrustedIPs` compiled into `serverPoolStrategy.Checker` in `bouncer.New`. Used today only to skip hops during the header walk, not to gate whether headers may be read at all.
+- **Trusted-hop pool** — `BouncerForwardedTrustedIPs` compiled into `serverPoolStrategy.Checker` in `bouncer.New`. Used today only to skip hops during the header walk, not to gate whether headers may be read at all.
 - **RemoteAddr gate** — Before walking forwarded headers, `GetRemoteIP` must verify the socket peer host is in the trusted-hop pool. Empty pool means trust no forwarded hops (RemoteAddr only).
 - **Fail-closed unparseable hop** — When a hop cannot be parsed, `getIP` returns `(raw, nil)`; bouncer remediates as `plugin:tech_trustipfail`. Product policy unchanged; add tests only.
 
@@ -16,7 +16,7 @@ IssueKey: 2026-09-06-ip-xff-trust-gate
 
 ## Open questions
 - Q: Does the RemoteAddr trusted-proxy check reuse the same Checker as hop-skipping or need a separate pool?
-  Decision: assumed — reuse `PoolStrategy.Checker` (same `ForwardedHeadersTrustedIPs` list); bouncer already passes one `serverPoolStrategy`.
+  Decision: assumed — reuse `PoolStrategy.Checker` (same `BouncerForwardedTrustedIPs` list); bouncer already passes one `serverPoolStrategy`.
   By: explore
 
 - Q: Who owns the client address fact on the request path?

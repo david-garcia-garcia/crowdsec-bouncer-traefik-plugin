@@ -1,12 +1,12 @@
-Validate AppSec URL, key file, and HTTPS CA only when crowdsecAppsecEnabled is true, in every mode. If AppSec is off, leftover AppSec settings must not fail ValidateParams — unused knobs must not block boot (same rule as Redis-off leftover password file).
+Validate AppSec URL, key file, and HTTPS CA only when appsecEnabled is true, in every mode. If AppSec is off, leftover AppSec settings must not fail ValidateParams — unused knobs must not block boot (same rule as Redis-off leftover password file).
 
 Current master (`pkg/configuration/configuration.go`):
-- live/stream call validateLapiAndAppsecConnection, which always calls validateAppsecURLKeyAndTLS with no enabled gate. Leftover missing crowdsecAppsecKeyFile or explicit-https garbage CA can fail a router that has AppSec off.
+- live/stream call validateLapiAndAppsecConnection, which always calls validateAppsecURLKeyAndTLS with no enabled gate. Leftover missing appsecKeyFile or explicit-https garbage CA can fail a router that has AppSec off.
 - alone skips the whole LAPI+AppSec validator after CAPI credentials, so even AppSec-on + garbage CA / missing key file pass. Default AppSec failure action is ban, so those requests drop at runtime.
-- validateAppsecURLKeyAndTLS itself never checks CrowdsecAppsecEnabled.
+- validateAppsecURLKeyAndTLS itself never checks AppsecEnabled.
 
 Desired:
-- In all modes: if config.CrowdsecAppsecEnabled { validateAppsecURLKeyAndTLS }.
+- In all modes: if config.AppsecEnabled { validateAppsecURLKeyAndTLS }.
 - Alone still skips LAPI URL/key/TLS; still requires CAPI machine id and password.
 - Live/stream still validate LAPI; AppSec checks only when enabled.
 - Do not validate AppSec host/URL/key/CA when the enabled knob is false, even if leftover fields are set.

@@ -29,7 +29,7 @@ A link-local IPv6 peer that Go writes as `fe80::1%eth0` never counts as a truste
 - #77 IP cache-key canonicalization (`IPCacheKey` / `IPLookupCacheKey`, decision-store spelling).
 - `Family` / `FamilyOfHostOrCIDR` still calling `net.ParseIP` on the string (`pkg/ip/network.go`).
 - Zone IDs in `NewChecker` pool entries (those still use `net.ParseIP` on the CIDR list).
-- `ForwardedHeadersInsecure`, captcha, AppSec, cache, LAPI, reclaim.
+- `BouncerForwardedInsecure`, captcha, AppSec, cache, LAPI, reclaim.
 
 ## Unknowns
 - Whether the GetRemoteIP **string** for a zoned RemoteAddr fallback keeps `%eth0` or becomes `fe80::1`. Ticket names only membership, hop walk, and the yielded `net.IP`.
@@ -39,4 +39,4 @@ A link-local IPv6 peer that Go writes as `fe80::1%eth0` never counts as a truste
 ## Tensions
 - Ticket line `pkg/ip/checker.go:84-91` matches dest `parseIP`.
 - Ticket cites `TestHunt_ZonedIPv6RemoteAddrIsTrustedHop` as proven FAIL; that name is not on dest.
-- Dest already has `ForwardedHeadersInsecure`; this ticket does not change that flag.
+- Dest already has `BouncerForwardedInsecure`; this ticket does not change that flag.

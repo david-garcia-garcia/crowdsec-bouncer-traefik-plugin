@@ -6,14 +6,14 @@ Last step of the five-change series. Stream reclaim still keys by session prefix
 
 ## Current (code)
 - CrowdSec stream cursor is the bouncer row for hashed `X-Api-Key` plus LAPI-visible outbound IP, not plugin settings. `knowledge/research/ext_crowdsec_lapi_stream-cursor/notes.md`
-- Stream/alone Open key is `SessionPrefix` + `hashJSON(settingsFrom)` (`SessionKey`). Settings include intervals, Redis, `updateMaxFailure`, CAPI scenarios, `decisionScopeHeaders`. `pkg/lapi/session.go`
-- Live/none Open key is `lapi:` + `IdentityHex` (`identity` includes the same remaining knobs except `decisionScopeHeaders`). `pkg/lapi/identity.go`
+- Stream/alone Open key is `SessionPrefix` + `hashJSON(settingsFrom)` (`SessionKey`). Settings include intervals, Redis, `lapiUpdateMaxFailure`, CAPI scenarios, `lapiScopeHeaders`. `pkg/lapi/session.go`
+- Live/none Open key is `lapi:` + `IdentityHex` (`identity` includes the same remaining knobs except `lapiScopeHeaders`). `pkg/lapi/identity.go`
 - DecisionStore key is `decisionstore:` + `SessionHex` + Redis-params hash. Cache prefix is `SessionHex` for every mode. `pkg/lapi/decisionstore.go`
 - `CachePrefix` is not found. `#66` removed it; live Redis is no longer `IdentityHex`.
 - `OpenStream` uses `PeekLivePrefix(SessionPrefix)` to warn-and-wire a live sibling, then `Peek(bindKey)` to retitle a sleeper with `Holders == 0`. `pkg/lapi/session.go`
-- `streamQuery` appends `&scopes=` from `c.decisionScopeHeaders` (first constructor). CAPI omits it. `pkg/lapi/client_decisions.go`
+- `streamQuery` appends `&scopes=` from `c.lapiScopeHeaders` (first constructor). CAPI omits it. `pkg/lapi/client_decisions.go`
 - `storeStreamDecision` drops header scopes not in that same map. `pkg/lapi/client_decisions.go`
-- `decisionScopeHeaders` is a write-once `Client` field set in `New`. `pkg/lapi/client.go`
+- `lapiScopeHeaders` is a write-once `Client` field set in `New`. `pkg/lapi/client.go`
 - `Peek` / `PeekLivePrefix` / `View` live in `pkg/reclaim/peek.go` and `pkg/reclaim/default.go`. Production: `pkg/lapi/session.go`. Tests: `pkg/lapi/zzz_session_test.go`, `pkg/reclaim/zzz_peek_test.go`, also `zzz_plugin_test.go`.
 - Peek Yaegi notes: one `View` struct (4-value return), key-only map range. `pkg/reclaim/peek.go`
 - Local `pkg/reclaim/table.go` matches utilities `v1.0.3` (`950b08d`) except CRLF. AfterFunc grace (Yaegi `_select` hang) is in both. Upstream has `New`, `Table`, `Open`, `OpenWithHooks`, `OpenTyped`, no Peek. `D:/repositories/traefik-middleware-utilities/reclaim/`
@@ -46,13 +46,13 @@ Last step of the five-change series. Stream reclaim still keys by session prefix
 - Prepare deleting the debt file
 - Edit of `D:/repositories/traefik-middleware-utilities` or a `vendor/` patch CI would re-vendor
 - `atomic.Pointer[T]`; converting existing write-once `Client` scalars into mutable ones
-- Union of intervals, Redis, CAPI scenarios, or `updateMaxFailure` (only `scopes=`)
+- Union of intervals, Redis, CAPI scenarios, or `lapiUpdateMaxFailure` (only `scopes=`)
 - Changing AppSec reclaim key shape
 - CAPI stream `scopes=` (already omitted)
 
 ## Unknowns
 - Whether `Peek(bindKey)` sleeper retitle is still required after one cursor key, and what replaces it.
-- How to hold a live-router scope union without mutating write-once `decisionScopeHeaders`.
+- How to hold a live-router scope union without mutating write-once `lapiScopeHeaders`.
 - Whether live/none `Key` drops the same remaining fields as stream (ticket names `identity.go`; store already uses `SessionHex` + Redis).
 - Exact Client key string versus `StoreKey` (`lapi:stream:` vs `decisionstore:` prefix).
 - Whether Redis stays on the Client key (store alignment) or drops with the CrowdSec-row settings (ticket says none of the hashed settings pick the LAPI row).

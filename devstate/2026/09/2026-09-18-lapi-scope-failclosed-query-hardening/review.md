@@ -19,7 +19,7 @@ skipped: nothing
 ## implement (2026-09-18)
 phase: implement
 findings: every new test failed first on dest `0e7dbf0` and passes on the branch; `TestCrowdsecQuery_SecondUnauthorizedStopsRetrying` panicked with a stack overflow on dest, which is the unbounded `crowdsecQuery`/`getToken` recursion
-fixed: five deliverables landed in `pkg/lapi` plus the `CrowdsecLapiFailureAction` behavior-change note in `README.md`; all 15 tasks in `openspec/changes/lapi-scope-failclosed-query-hardening/tasks.md` checked
+fixed: five deliverables landed in `pkg/lapi` plus the `BouncerLapiFailureAction` behavior-change note in `README.md`; all 15 tasks in `openspec/changes/lapi-scope-failclosed-query-hardening/tasks.md` checked
 skipped: nothing; `origin/master` was still `0e7dbf0` at merge time so task 4.3 was a no-op fast-forward check, not a merge commit
 gates: `go build ./...` pass; `go vet ./...` pass; `go test ./pkg/... -count=1` pass; `go test . -count=1` pass (50.7s); `golangci-lint run ./...` pass; `docker run --rm -v ${PWD}:/src -w /src -e CGO_ENABLED=1 golang:1.22.12 go test -race -count=1 ./pkg/...` pass
 ## codereview (2026-09-18)

@@ -1,7 +1,7 @@
 Developer review: needs changes — 2026-09-17T20:29:58Z
 
 ## What this changes
-**Operators.** `crowdsecAppsecBodyLimit` `0` now forwards the full readable body (README: unlimited; omitted default stays 10485760). `crowdsecAppsecFailureAction` also covers an io error reading the AppSec response body. DELETE is not an unreadable-body drop.
+**Operators.** `appsecBodyLimit` `0` now forwards the full readable body (README: unlimited; omitted default stays 10485760). `bouncerAppsecFailureAction` also covers an io error reading the AppSec response body. DELETE is not an unreadable-body drop.
 
 **Admin users.** None.
 
@@ -10,7 +10,7 @@ Developer review: needs changes — 2026-09-17T20:29:58Z
 **End users.** An HTTP/3 DELETE is no longer banned for a body it never sends. An unhealthy AppSec listener no longer leaks keep-alive. Unlimited body inspection actually forwards the body.
 
 ## Motivation
-On `master`, `Query` still has the five dest defects first recorded in stale PRs #35 and #43. This PR re-implements those defects on current `master` so #35 and #43 can close when this lands. When AppSec answers 502, 503, or 504, the body is not drained, so the keep-alive slot cannot be reused — exactly while AppSec is unhealthy. `crowdsecAppsecBodyLimit` `0` falls through to a GET with no body. A failed read of the AppSec response skips `FailureAction`. Copied client headers leave a stale `Content-Length`. An HTTP/3 DELETE with `ContentLength < 0` is treated as an unreadable-body drop.
+On `master`, `Query` still has the five dest defects first recorded in stale PRs #35 and #43. This PR re-implements those defects on current `master` so #35 and #43 can close when this lands. When AppSec answers 502, 503, or 504, the body is not drained, so the keep-alive slot cannot be reused — exactly while AppSec is unhealthy. `appsecBodyLimit` `0` falls through to a GET with no body. A failed read of the AppSec response skips `FailureAction`. Copied client headers leave a stale `Content-Length`. An HTTP/3 DELETE with `ContentLength < 0` is treated as an unreadable-body drop.
 
 Leaving `master` as-is keeps leaking connections during AppSec outages, silently disables body inspection at the unlimited setting, fail-closes on read errors contrary to `passthrough`/`captcha`, and 403s bodyless HTTP/3 DELETE.
 
@@ -27,7 +27,7 @@ flowchart TD
 ```
 
 ## Merge readiness
-Ready title is on PR #70. Main Process failed dest nestif on CaptchaProvider, not this apply. 1 item remains.
+Ready title is on PR #70. Main Process failed dest nestif on BouncerCaptchaProvider, not this apply. 1 item remains.
 
 Priority: P2 — real operator and end-user pain (connection leaks, wrong WAF body, HTTP/3 DELETE 403) with a contained Query fix
 Reviewed head: a299878
@@ -56,7 +56,7 @@ Owner decision: Required. See Decision needed.
 - [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-appsec-query-hardening/openspec/changes/archive/2026-09-17-appsec-query-hardening/proposal.md) — modified
 
 ## Follow-up issues
-- [Dest nestif on CaptchaProvider validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-appsec-query-hardening/knowledge/debt/2026-09-17-configuration-captcha-nestif.md) — dest Main Process lint fails nestif on CaptchaProvider validation.
+- [Dest nestif on BouncerCaptchaProvider validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-17-appsec-query-hardening/knowledge/debt/2026-09-17-configuration-captcha-nestif.md) — dest Main Process lint fails nestif on BouncerCaptchaProvider validation.
 
 ## How this fits together
 Local ticket `2026-09-17-appsec-query-hardening` → branch of the same name → PR #70 (ready title; requirement originated in #35 and #43) → OpenSpec change archived; Main Process failed dest nestif on `a299878`.
@@ -71,7 +71,7 @@ Local ticket `2026-09-17-appsec-query-hardening` → branch of the same name →
 | Does this run take gRPC / streaming body policy (PR #51)? | assumed — no. Out of scope. A DELETE must not be dropped for a body it never sends, regardless of #51. | explore |
 
 ## Before merge
-- [ ] [P2] Green Main Process (dest nestif on `pkg/configuration/configuration.go` CaptchaProvider — not in this apply)
+- [ ] [P2] Green Main Process (dest nestif on `pkg/configuration/configuration.go` BouncerCaptchaProvider — not in this apply)
 - [x] Cite #35 and #43 on the ready PR body (Motivation)
 - [x] Apply the five Query defects on current #64 transport
 - [x] Local `go test ./pkg/...` and `go test .` passed
@@ -114,7 +114,7 @@ What I checked:
 - Pin `origin/master...HEAD` excluding `devstate/` and `.cursor/`; reviewed head `a299878ef1f8c6cdcba7f5643c9e12ba96f783cf`
 - One OPEN PR #70; title set to ready gitmoji form
 - `comments.md` absent; `comments: none`
-- Main Process failure nestif `if config.CaptchaProvider != ""` complexity 6 https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35270440632/job/105368096478
+- Main Process failure nestif `if config.BouncerCaptchaProvider != ""` complexity 6 https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35270440632/job/105368096478
 - e2e (docker + pester) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35270440552/job/105368460721
 - e2e (binary + mock LAPI) success https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35270440552/job/105368460406
 - `handoff.yaml` `localTests: passed`

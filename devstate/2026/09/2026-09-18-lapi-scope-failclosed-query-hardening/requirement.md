@@ -2,7 +2,7 @@
 IssueKey: 2026-09-18-lapi-scope-failclosed-query-hardening
 
 ## Problem
-Five defects, all inside the live-lookup and LAPI HTTP paths of `pkg/lapi`, extracted from open PR #30 and re-implemented on current master `0e7dbf0` (#30's serialization half already landed via #72; its remaining half predates #62's `transport` rework). Deliverable 1 is a security fix and a behavior change: a header-scope LAPI query that errors is reported to the caller as "this scope has no decision", so `none`/`live` mode allows the request and `crowdsecLapiFailureAction` never applies. Deliverable 2: `handleStreamCache` wins the `updated` lease and returns on a failed stream GET without releasing it, so nothing re-polls until the lease TTL expires. Deliverable 3: the alone-mode 401 retry re-issues a POST as a GET because it drops `data`. Deliverable 4: the response body is never closed when the status is 502/503/504, so the keep-alive slot leaks exactly while LAPI is behind an unhealthy reverse proxy. Deliverable 5: the same early return wraps a nil `err` with `%w`, so the operator sees `%!w(<nil>)` instead of the status that failed.
+Five defects, all inside the live-lookup and LAPI HTTP paths of `pkg/lapi`, extracted from open PR #30 and re-implemented on current master `0e7dbf0` (#30's serialization half already landed via #72; its remaining half predates #62's `transport` rework). Deliverable 1 is a security fix and a behavior change: a header-scope LAPI query that errors is reported to the caller as "this scope has no decision", so `none`/`live` mode allows the request and `bouncerLapiFailureAction` never applies. Deliverable 2: `handleStreamCache` wins the `updated` lease and returns on a failed stream GET without releasing it, so nothing re-polls until the lease TTL expires. Deliverable 3: the alone-mode 401 retry re-issues a POST as a GET because it drops `data`. Deliverable 4: the response body is never closed when the status is 502/503/504, so the keep-alive slot leaks exactly while LAPI is behind an unhealthy reverse proxy. Deliverable 5: the same early return wraps a nil `err` with `%w`, so the operator sees `%!w(<nil>)` instead of the status that failed.
 
 ## Current (code)
 - `mergeLiveScope` returns only `(string, time.Duration)`; a failed scope query logs at `Debug` and returns `chosen, parsedDuration` unchanged. `pkg/lapi/client_decisions.go:130-138`
@@ -10,9 +10,9 @@ Five defects, all inside the live-lookup and LAPI HTTP paths of `pkg/lapi`, extr
 - The IP query's error does propagate, so a fully-down LAPI is still handled. `pkg/lapi/client_live.go:19-22`
 - `handleNoStreamCache` already uses a non-nil error to mean "banned": `errors.New("handleNoStreamCache:banned")`. `pkg/lapi/client_live.go:32-36`
 - `pkg/bouncer` disambiguates by `decisionscope.IsActiveRemediation(kind)` before `applyLapiFailureAction`. `pkg/bouncer/bouncer.go:229-247`
-- `crowdsecLapiFailureAction` accepts `passthrough`, `ban`, `captcha`; empty is `ban`; default is `ban`. `pkg/configuration/configuration.go:42-47,139-157,185`
+- `bouncerLapiFailureAction` accepts `passthrough`, `ban`, `captcha`; empty is `ban`; default is `ban`. `pkg/configuration/configuration.go:42-47,139-157,185`
 - Package levels for a recoverable LAPI failure are `Warn` (`getToken statusCode`, `handleStreamTicker updateFailure`); terminal ones are `Error`. `pkg/lapi/client_http.go:191` `pkg/lapi/client_stream.go:58,62`
-- README documents `CrowdsecLapiFailureAction` as "live/none HTTP or parse error, or a cache miss while stream/alone is unhealthy". It does not mention header-scope queries. `README.md:505-508`
+- README documents `BouncerLapiFailureAction` as "live/none HTTP or parse error, or a cache miss while stream/alone is unhealthy". It does not mention header-scope queries. `README.md:505-508`
 - `handleStreamCache` acquires `updated` with TTL `max(updateInterval-1, 1)`, then `return err` on the stream GET without deleting the key. `pkg/lapi/client_stream.go:74-100`
 - Later failures in the same function also return without releasing: JSON unmarshal. `pkg/lapi/client_stream.go:101-105`
 - `cache.Client.Delete(key)` exists and reaches both backends (`localCache.delete` → `ttl_map.Del`; `redisCache.delete` → `writer.Del` on the prefixed key). `pkg/cache/cache.go:69-71,155-159,213-217`
@@ -28,7 +28,7 @@ Five defects, all inside the live-lookup and LAPI HTTP paths of `pkg/lapi`, extr
 - Test seam is `attachTestTransport(client, httpClient, key)`. `pkg/lapi/zzz_session_test.go:39-41`
 
 ## Desired
-- A scope-query failure SHALL reach `LiveLookup`'s caller and be treated exactly like an IP-query failure, so the operator's `crowdsecLapiFailureAction` decides. Required matrix, one test per row:
+- A scope-query failure SHALL reach `LiveLookup`'s caller and be treated exactly like an IP-query failure, so the operator's `bouncerLapiFailureAction` decides. Required matrix, one test per row:
   - clean IP + all scopes succeed with no decision → allow, no error
   - clean IP + one scope errors → error surfaced with a **non-active** kind so the failure action applies
   - clean IP + one scope returns a ban → ban wins
@@ -37,7 +37,7 @@ Five defects, all inside the live-lookup and LAPI HTTP paths of `pkg/lapi`, extr
   - clean IP + two scopes, one errors and one returns a ban → ban wins
 - Keep the overloaded non-nil error intact: "banned" keeps coming back with an active remediation; a failure comes back with a non-active one. Make the distinction explicit in the code, not implicit.
 - Raise the swallowed `Debug` to `Warn` (the level this package already uses for a recoverable LAPI failure).
-- Document the behavior change in `README.md` next to `crowdsecLapiFailureAction`: scope-query failures now honour it, and `passthrough` restores the permissive behavior.
+- Document the behavior change in `README.md` next to `bouncerLapiFailureAction`: scope-query failures now honour it, and `passthrough` restores the permissive behavior.
 - Release the `updated` lease on every failure path in `handleStreamCache` that got past a won `Acquire`, so the next tick can retry immediately. Do not change the TTL or the acquire semantics.
 - Replay the original request body on the alone-mode 401 retry, and bound the recursion so a second 401 cannot retry forever.
 - Close the response body on the 502/503/504 path (same approach as #70: install the drain/close before the status check).
@@ -49,7 +49,7 @@ Five defects, all inside the live-lookup and LAPI HTTP paths of `pkg/lapi`, extr
 - `pkg/lapi/client_stream.go` (`handleStreamCache` lease release)
 - `pkg/lapi/client_http.go` (`crowdsecQuery`, `getToken`)
 - `pkg/lapi/zzz_*_test.go` (new live-scope, lease-release, and query-hardening tests)
-- `README.md` (`crowdsecLapiFailureAction` description only)
+- `README.md` (`bouncerLapiFailureAction` description only)
 - `openspec/specs/core_plugin_lapi_failure-action/spec.md` and/or new leaves (propose decides the fold)
 - `knowledge/devdocs/core_plugin_lapi_connection.md`, `knowledge/devdocs/core_plugin_lapi_stream-lease.md` if usage text must name the new invariants (devdocsimpact)
 

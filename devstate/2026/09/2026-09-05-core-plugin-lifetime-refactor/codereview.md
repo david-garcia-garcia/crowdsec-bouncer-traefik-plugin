@@ -9,7 +9,7 @@ change: crowdsec-connection-bouncer-split
 2. [hard] Leave a trail — `pkg/crowdsecconnection/connection.go:261` — `startStream` logs `"New:getToken "` after stream startup was extracted out of `New`
  → Rename the prefix to `startStream:getToken` (or `CrowdsecConnection:getToken`)
 
-3. [hard] Leave a trail — `pkg/crowdsecconnection/connection.go:142` — Appsec key resolution failure is logged as `"Prepare:crowdsecLapiKey fail to get CrowdsecAppsecKey..."`
+3. [hard] Leave a trail — `pkg/crowdsecconnection/connection.go:142` — Appsec key resolution failure is logged as `"Prepare:lapiKey fail to get AppsecKey..."`
  → Use a Prepare-scoped prefix that names AppsecKey, not LAPI key
 
 4. [hard] Leave a trail — `pkg/crowdsecconnection/connection.go:433` — `handleNoStreamCache` emits `"handleStreamCache:unknownType "` on unknown decision types
@@ -56,7 +56,7 @@ Performance: 0 findings, worst: none
 ## Applied
 - Standards 1: moved `Version` to `pkg/crowdsecconnection/version.go` with bump comment; release-prepare/publish sed that file
 - Standards 2: `startStream:getToken`
-- Standards 3: `Prepare:crowdsecAppsecKey`
+- Standards 3: `Prepare:appsecKey`
 - Standards 4: `handleNoStreamCache:unknownType`
 - Standards 5: ServeHTTP godoc is “per-router middleware handler”
 - Standards 6: `ServeHTTP:LiveLookup` (and the sibling live-lookup cache-hit log)

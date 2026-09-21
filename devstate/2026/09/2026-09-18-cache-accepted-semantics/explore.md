@@ -25,7 +25,7 @@ Grounded current behavior:
 - `get` / `getMany` call `nextReader` only. No writer retry. No local written-key set.
 - `set` / `delete` use the writer, log Redis errors, and return. `Client.Set` / `Delete` and `cacheInterface` are void.
 - Stream apply passes `int64(duration.Seconds())` into `storeStreamDecision` → `cache.Set`. Sub-second CrowdSec durations become `0`. No stream TTL clamp (`pkg/lapi/client_stream.go`, `pkg/lapi/client_decisions.go`).
-- `liveCacheTTL` substitutes `defaultDecisionSeconds` when `durationSecond<=0`. Live/none writes use that helper (`pkg/lapi/client_decisions.go`, `pkg/lapi/client_live.go`).
+- `liveCacheTTL` substitutes `bouncerLiveTtlSeconds` when `durationSecond<=0`. Live/none writes use that helper (`pkg/lapi/client_decisions.go`, `pkg/lapi/client_live.go`).
 - Utilities SimpleRedis `Set` always sends `SET EX <n>` including `0` (`vendor/.../simpleredis/commands.go`).
 - Memory `Heap.Set` no-ops when `ttl==0` (`vendor/github.com/leprosus/golang-ttl-map/map.go`). Redis and memory stay unaligned.
 - Stream/live Set callers ignore write success. Captcha grace is the HMAC cookie (`pkg/captcha/gate.go`), not a cache key.
@@ -49,7 +49,7 @@ Sibling `2026-09-18-cache-ttl-guard-and-read-your-writes` and closed #38 stay ou
 - Persist current behavior as the contract. No Redis/memory runtime change. No signature change. No test that asserts a new runtime policy.
 - Fold SHALL/MUST NOT + scenarios into existing cache specs. Propose picks ids via FindSpecHost. Likely host for routing / void Set / EX-as-given: `core_cache_redis_utilities-client`. Stream vs live TTL split may fold on `core_cache_client_decision-store` if FindSpecHost says that leaf owns store writes; do not invent a new family unless the librarian says `new`. `core_cache_client_isolated-store` stays isolation-only unless FindSpecHost folds a delta there.
 - Short comments at `nextReader` / `get` / `set` and stream `int64(duration.Seconds())` only if a one-liner earns its keep. No behavior change.
-- README `RedisCacheReadHosts`: **no lag/stale-read sentence**. The knob already names replica-only reads (round-robin), empty-list fallback to the writer, and replica-outage fail-closed with no primary retry. That text does not claim the last write is visible. Live-mode “Traefik replicas reuse LAPI answers” is shared-cache among Traefik processes, not Redis replica consistency.
+- README `LapiRedisReadHosts`: **no lag/stale-read sentence**. The knob already names replica-only reads (round-robin), empty-list fallback to the writer, and replica-outage fail-closed with no primary retry. That text does not claim the last write is visible. Live-mode “Traefik replicas reuse LAPI answers” is shared-cache among Traefik processes, not Redis replica consistency.
 - Devdocs usage/Language: write nothing this phase (Consume: enough to call; ticket defers gotchas).
 - Official Redis `SET EX 0` is invalid (`EX` must be a positive integer; `SETEX` errors on invalid seconds). Vendor still sends `EX` as given. Persist that split; do not align memory `ttl==0` no-op with Redis.
 - Do not reuse closed PR #38 or branch `2026-09-18-cache-ttl-guard-and-read-your-writes`.
@@ -60,7 +60,7 @@ Sibling `2026-09-18-cache-ttl-guard-and-read-your-writes` and closed #38 stay ou
   Decision: resolved — official SET documents EX seconds as a positive integer; SETEX returns an error when seconds is invalid. Persist EX-as-given plus memory ttl==0 no-op; do not align them. See `knowledge/research/ext_redis_commands_set-ex-zero/`.
   By: explore
 
-- Q: Does README RedisCacheReadHosts still imply reads are consistent with the last write?
+- Q: Does README LapiRedisReadHosts still imply reads are consistent with the last write?
   Decision: resolved — no. Knob already names replica-only reads and outage fail-closed. Do not add a lag/stale-read sentence.
   By: explore
 

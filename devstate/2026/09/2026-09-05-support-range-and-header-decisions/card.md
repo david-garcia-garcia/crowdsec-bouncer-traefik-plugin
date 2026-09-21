@@ -52,7 +52,7 @@ Caller asked to repurpose upstream [PR 383](https://github.com/maxlerebourg/crow
 None.
 
 ## Before merge
-- [ ] Explore, propose, and implement Range + `decisionScopeHeaders` on the `pkg/bouncer` layout
+- [ ] Explore, propose, and implement Range + `lapiScopeHeaders` on the `pkg/bouncer` layout
 - [ ] Real-stack e2e for Range and a header-mapped scope
 - [ ] CI succeeded on this PR
 

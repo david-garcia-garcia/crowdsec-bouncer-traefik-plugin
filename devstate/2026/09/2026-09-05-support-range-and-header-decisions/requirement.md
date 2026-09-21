@@ -12,9 +12,9 @@ Source: [upstream #271](https://github.com/maxlerebourg/crowdsec-bouncer-traefik
 - ServeHTTP gets `remoteIP` then `Cache().Get(remoteIP)` only. Path: `pkg/bouncer/bouncer.go` (`ServeHTTP`). No header-scope or Range walk.
 - Stream/alone writes cache with `decision.Value` as key and deletes the same. `Decision.Scope` is parsed on the struct and never used. Path: `pkg/crowdsecconnection/connection.go` (`handleStreamCache`, `Decision.Scope`).
 - Live/none queries LAPI with `?ip=` only and caches under `remoteIP`. Path: `pkg/crowdsecconnection/connection.go` (`handleNoStreamCache`).
-- Config has no `decisionScopeHeaders`. Path: `pkg/configuration/configuration.go` (`Config`).
+- Config has no `lapiScopeHeaders`. Path: `pkg/configuration/configuration.go` (`Config`).
 - Cache client is Get/Set/Delete one key. Path: `pkg/cache/cache.go`. In-tree SimpleRedis already has `MGet`. Path: `pkg/simpleredis/simpleredis.go`. Cache has no `GetMany`.
-- Real e2e injects only `--ip` decisions and sends only `X-Forwarded-For`. Path: `tests/e2e/real/TestUtils.ps1` (`Add-TestDecision`, `Test-HttpRequest`). Compose middlewares do not set `decisionScopeHeaders`. Path: `tests/e2e/real/docker-compose.test.yml`.
+- Real e2e injects only `--ip` decisions and sends only `X-Forwarded-For`. Path: `tests/e2e/real/TestUtils.ps1` (`Add-TestDecision`, `Test-HttpRequest`). Compose middlewares do not set `lapiScopeHeaders`. Path: `tests/e2e/real/docker-compose.test.yml`.
 - Mock e2e has no `scope-headers` scenario on `master`. Path: `tests/e2e/mock/scenarios/` (no `scope-headers/`).
 - `master` has no `decision_scope.go` / `decision_ranges.go`. `not found` at repo root and under `pkg/`.
 - `openspec/specs/` has no `core_bouncer_decisions_scopes`. `not found`.
@@ -22,7 +22,7 @@ Source: [upstream #271](https://github.com/maxlerebourg/crowdsec-bouncer-traefik
 
 ## Desired
 
-- Port PR 383 behavior onto `master`: Range CIDR containment in stream/alone without new config; header-mapped scopes via public `decisionScopeHeaders`; `Ip`/`Range` rejected as map keys; Country/AS value normalize as in 383; ban wins overlap; no GeoIP in this plugin.
+- Port PR 383 behavior onto `master`: Range CIDR containment in stream/alone without new config; header-mapped scopes via public `lapiScopeHeaders`; `Ip`/`Range` rejected as map keys; Country/AS value normalize as in 383; ban wins overlap; no GeoIP in this plugin.
 - Land in this tree's layout (`pkg/bouncer`, `pkg/crowdsecconnection`, `pkg/configuration`, `pkg/cache`), not the upstream-main root `bouncer.go`.
 - Use in-tree SimpleRedis `MGet` for the multi-key lookup (MASTER already has it; do not keep the published-module GET loop from 383).
 - Real-stack e2e covers Range and at least one header-mapped scope (Country or custom) against live Crowdsec, not only mock LAPI.
@@ -32,7 +32,7 @@ Source: [upstream #271](https://github.com/maxlerebourg/crowdsec-bouncer-traefik
 
 - `pkg/bouncer/bouncer.go` — request lookup
 - `pkg/crowdsecconnection/connection.go` — stream insert/delete and live query
-- `pkg/configuration/configuration.go` — `decisionScopeHeaders`
+- `pkg/configuration/configuration.go` — `lapiScopeHeaders`
 - `pkg/cache/cache.go` — multi-key get
 - new decision-scope / range-index units (place per commandments)
 - `tests/e2e/real/` — Pester + TestUtils + compose labels
@@ -52,7 +52,7 @@ Source: [upstream #271](https://github.com/maxlerebourg/crowdsec-bouncer-traefik
 ## Unknowns
 
 - Whether `cscli decisions add --range` / `--scope Country` on Crowdsec `v1.7.8` in `tests/e2e/real` is enough to inject Range and Country, or Country needs `--scope` plus a profile.
-- How real e2e supplies Country/AS without geoblock: likely extra `Test-HttpRequest` headers plus compose `decisionScopeHeaders`, not a new feeder container.
+- How real e2e supplies Country/AS without geoblock: likely extra `Test-HttpRequest` headers plus compose `lapiScopeHeaders`, not a new feeder container.
 - Exact file placement of decision-scope code under Yaegi + the `pkg/bouncer` split (383 kept some files in the plugin package for Yaegi).
 
 ## Tensions

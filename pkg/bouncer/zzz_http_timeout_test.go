@@ -18,14 +18,14 @@ func testCaptchaBouncerConfig(t *testing.T, captchaTimeout int64) *configuration
 		t.Fatal(err)
 	}
 	cfg := configuration.New()
-	cfg.CrowdsecMode = configuration.LiveMode
+	cfg.LapiMode = configuration.LiveMode
 	cfg.HTTPTimeoutSeconds = 10
-	cfg.CaptchaSiteverifyHTTPTimeoutSeconds = captchaTimeout
-	cfg.CaptchaProvider = configuration.HcaptchaProvider
-	cfg.CaptchaSiteKey = "site"
-	cfg.CaptchaSecretKey = "secret"
-	cfg.CaptchaGateSecret = "gate-secret"
-	cfg.CaptchaFilePath = templatePath
+	cfg.BouncerCaptchaHttpTimeoutSeconds = captchaTimeout
+	cfg.BouncerCaptchaProvider = configuration.HbouncerCaptchaProvider
+	cfg.BouncerCaptchaSiteKey = "site"
+	cfg.BouncerCaptchaSecretKey = "secret"
+	cfg.BouncerCaptchaGateSecret = "gate-secret"
+	cfg.BouncerCaptchaFile = templatePath
 	return cfg
 }
 

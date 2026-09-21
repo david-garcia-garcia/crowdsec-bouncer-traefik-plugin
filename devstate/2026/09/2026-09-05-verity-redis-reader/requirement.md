@@ -23,7 +23,7 @@ Prove this tree is not affected by the #381 reader copy. If it is not, add a tes
 - Bumping published `github.com/maxlerebourg/simpleredis` (client is already in-tree `pkg/simpleredis`)
 - Adding `MGet` or changing ranged-decision lookup (already `GetMany` / `MGet`)
 - `Set`/`Del` error-surface follow-up from #381 item 3
-- Operator Redis keys, `redisCacheReadHosts` config shape, go-redis, `useUnsafe`
+- Operator Redis keys, `lapiRedisReadHosts` config shape, go-redis, `useUnsafe`
 
 ## Unknowns
 - The caller named “this issue from another project” without a URL. Slug `verity-redis-reader` plus the mutex/readers copy matches #381 item 2; that is the dump used here.

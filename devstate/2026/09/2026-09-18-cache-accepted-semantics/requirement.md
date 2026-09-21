@@ -9,12 +9,12 @@ Closed #38 asked for Redis read-your-writes, duration<=0 no-op aligned on memory
 - `get` / `getMany` call `nextReader` only. Miss or replica error is not retried on the writer. There is no local set of recently written keys. `pkg/cache/cache.go`
 - `set` / `delete` use the writer, log Redis errors, and return. `Client.Set` / `Delete` and `cacheInterface` are void. `pkg/cache/cache.go`
 - Stream apply passes `int64(duration.Seconds())` into `storeStreamDecision` → `cache.Set`. Sub-second CrowdSec durations become 0. No stream TTL clamp. `pkg/lapi/client_stream.go` `pkg/lapi/client_decisions.go`
-- `liveCacheTTL` substitutes `defaultDecisionSeconds` when `durationSecond<=0`. Live/none writes use that helper. `pkg/lapi/client_decisions.go` `pkg/lapi/client_live.go`
+- `liveCacheTTL` substitutes `bouncerLiveTtlSeconds` when `durationSecond<=0`. Live/none writes use that helper. `pkg/lapi/client_decisions.go` `pkg/lapi/client_live.go`
 - Utilities SimpleRedis `Set` always sends `SET EX <n>` with the duration as given (including 0). `vendor/github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis/commands.go`
 - Memory `Heap.Set` no-ops when `ttl==0` (does not store). Redis and memory are not aligned. `vendor/github.com/leprosus/golang-ttl-map/map.go` `pkg/cache/cache.go`
 - Stream/live Set callers ignore write success. Captcha grace is the HMAC cookie, not a cache key. `pkg/lapi/client_decisions.go` `pkg/captcha/gate.go`
 - Cache specs cover client pointers, prefix, and opaque payloads. They do not state replica-lag reads, void Set, or EX-as-given. `openspec/specs/core_cache_redis_utilities-client/spec.md` `openspec/specs/core_cache_client_decision-store/spec.md` `openspec/specs/core_cache_client_isolated-store/spec.md`
-- README `RedisCacheReadHosts` names round-robin, empty-list fallback to the writer, and replica-outage fail-closed. It does not name replica lag after a primary Set. `README.md`
+- README `LapiRedisReadHosts` names round-robin, empty-list fallback to the writer, and replica-outage fail-closed. It does not name replica lag after a primary Set. `README.md`
 
 ## Desired
 - Persist current behavior as the contract. No Redis/memory runtime change. No signature change. No test that asserts new runtime policy.

@@ -9,7 +9,7 @@ Stream and alone Range matching walks the shared `range-index` blob (`cidr=remed
 
 - Request lookup in stream/alone always includes `RangeIndexKey` in `GetMany` and walks the blob with `ip.InNetwork` per line. Ban wins if several CIDRs contain the IP. Path: `pkg/decisionscope/lookup.go` (`LookupCachedRemediation`, `LookupCacheKeys`), `pkg/decisionscope/range.go` (`MatchRangeFromIndex`).
 - ServeHTTP calls that lookup. Path: `pkg/bouncer/bouncer.go`.
-- Stream ticker: `handleStreamCache` GETs cache key `updated`. Hit → return (skip LAPI, skip range-index). Miss → SET `updated` TTL `UpdateIntervalSeconds-1` (min 1), GET `/v1/decisions/stream`, write IP keys, `ApplyRangeBatch` into `range-index`. Path: `pkg/crowdsecconnection/connection.go`.
+- Stream ticker: `handleStreamCache` GETs cache key `updated`. Hit → return (skip LAPI, skip range-index). Miss → SET `updated` TTL `LapiUpdateIntervalSeconds-1` (min 1), GET `/v1/decisions/stream`, write IP keys, `ApplyRangeBatch` into `range-index`. Path: `pkg/crowdsecconnection/connection.go`.
 - Followers with Redis never see `stream.New` / `stream.Deleted`. They match Range today because the request path reads the Redis blob. Same file, lease-hit return.
 - `CrowdsecConnection` holds `cacheClient`; no in-process Range tree. `Close()` drops the cache with the connection. Path: `pkg/crowdsecconnection/connection.go`.
 - live/none skip `range-index` and expand Range via LAPI `?ip=`. Path: `pkg/decisionscope/lookup.go` (`useRangeIndex`); test `TestLookupCachedRemediationNoneSkipsRangeIndex` in `pkg/decisionscope/range_test.go`.

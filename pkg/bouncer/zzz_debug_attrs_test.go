@@ -27,9 +27,10 @@ func testStreamAllowBouncer(t *testing.T, log *slog.Logger) (*Bouncer, *httptest
 	passed := false
 	b := &Bouncer{
 		enabled:                  true,
-		crowdsecMode:             configuration.StreamMode,
-		forwardedHeadersInsecure: true,
+		lapiMode:                 configuration.StreamMode,
+		bouncerForwardedInsecure: true,
 		forwardedCustomHeader:    "X-Forwarded-For",
+		lapiEnabled:              true,
 		lapiClient:               lapiClient,
 		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
 		captchaClient:            &captcha.Client{},

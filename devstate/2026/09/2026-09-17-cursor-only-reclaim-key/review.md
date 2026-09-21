@@ -24,14 +24,14 @@ skipped: code review; archive; OpenTyped
 
 ## implement (2026-09-17 re-entry)
 phase: implement
-findings: live/none Key keeps MetricsUpdateIntervalSeconds; stream and StoreKey still omit it; e2e docker+pester succeeded
+findings: live/none Key keeps LapiMetricsIntervalSeconds; stream and StoreKey still omit it; e2e docker+pester succeeded
 fixed: identity payload metrics interval; none Key unit test; change artifacts; explore Q
 skipped: code review; AdoptMetricsInterval; second metrics ticker
 
 ## codereview (2026-09-17)
 phase: codereview
 findings: Standards 4 done; Spec/Security/Performance none; Dead 1 skipped (IdentityHex); Coverage 2 done
-fixed: headerScopesByCtx; test names; Sleep trail; UpdateIntervalSeconds proofs; first Country poll
+fixed: headerScopesByCtx; test names; Sleep trail; LapiUpdateIntervalSeconds proofs; first Country poll
 skipped: IdentityHex delete (live spec still names the export)
 
 ## devdocsimpact (2026-09-17)

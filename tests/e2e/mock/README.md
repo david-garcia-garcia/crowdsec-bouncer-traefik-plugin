@@ -19,7 +19,7 @@ the plugin consumes — including a single, deterministic AppSec rule (block any
 URI containing `rpc2`, the probe from [`examples/appsec-enabled`](../../../examples/appsec-enabled)).
 It is not the real WAF engine, so this suite exercises the plugin's AppSec
 *wiring* rather than the detection accuracy of OWASP CRS / virtual patching —
-that lives upstream in Crowdsec. The captcha scenario uses `captchaProvider:
+that lives upstream in Crowdsec. The captcha scenario uses `bouncerCaptchaProvider:
 custom` and mocklapi `POST /siteverify` (always `{"success":true}`) so curl can
 complete solve → `crowdsec_captcha_gate` cookie → backend without a real widget.
 

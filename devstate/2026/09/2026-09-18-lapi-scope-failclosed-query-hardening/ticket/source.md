@@ -33,7 +33,7 @@ because they live in the same function as 3.
 `mergeLiveScope` cannot report failure. Its signature returns only `(string, time.Duration)`:
 
 ```130:138:pkg/lapi/client_decisions.go
-func (c *Client) mergeLiveScope(chosen string, parsedDuration time.Duration, scope, identifier string, isLiveMode bool, defaultDecisionSeconds int64) (string, time.Duration) {
+func (c *Client) mergeLiveScope(chosen string, parsedDuration time.Duration, scope, identifier string, isLiveMode bool, bouncerLiveTtlSeconds int64) (string, time.Duration) {
 	if identifier == "" {
 		return chosen, parsedDuration
 	}
@@ -49,25 +49,25 @@ caller loses the error entirely:
 
 ```23:25:pkg/lapi/client_live.go
 	for scope, identifier := range scopes {
-		chosen, parsedDuration = c.mergeLiveScope(chosen, parsedDuration, scope, identifier, isLiveMode, defaultDecisionSeconds)
+		chosen, parsedDuration = c.mergeLiveScope(chosen, parsedDuration, scope, identifier, isLiveMode, bouncerLiveTtlSeconds)
 	}
 ```
 
 Consequence: in `none` and `live` mode, a LAPI that answers the IP query but errors on a header-scope
 query produces `NoBannedValue, nil`, so `pkg/bouncer` takes the allow path and
-`crowdsecLapiFailureAction` never applies. It is logged at `Debug`, which is off in most deployments,
+`bouncerLapiFailureAction` never applies. It is logged at `Debug`, which is off in most deployments,
 so the allow is silent. The IP query's error does propagate
 (`pkg/lapi/client_live.go:19-21`), so a fully-down LAPI is still handled; the hole is a live LAPI
 failing only the scope call. For a security control this fails the wrong way.
 
 Fix so that a scope-query failure reaches the caller and is treated exactly like an IP-query failure,
-letting the operator's configured `crowdsecLapiFailureAction` decide.
+letting the operator's configured `bouncerLapiFailureAction` decide.
 
 **Beware the overloaded error.** `handleNoStreamCache` already uses a non-nil error to signal a ban:
 
 ```32:36:pkg/lapi/client_live.go
-	if isLiveMode && defaultDecisionSeconds > 0 {
-		c.cacheClient.Set(remoteIP, chosen, liveCacheTTL(parsedDuration, defaultDecisionSeconds))
+	if isLiveMode && bouncerLiveTtlSeconds > 0 {
+		c.cacheClient.Set(remoteIP, chosen, liveCacheTTL(parsedDuration, bouncerLiveTtlSeconds))
 	}
 	return chosen, errors.New("handleNoStreamCache:banned")
 ```
@@ -83,7 +83,7 @@ Required behavior matrix, one test per row, all rows must be asserted:
 | IP query | scope query(s) | expected result |
 |---|---|---|
 | clean | all succeed, no decision | allow, no error |
-| clean | one errors | error surfaced with non-active kind, so `crowdsecLapiFailureAction` applies |
+| clean | one errors | error surfaced with non-active kind, so `bouncerLapiFailureAction` applies |
 | clean | one returns ban | ban wins |
 | active ban | one errors | **ban wins**, the error must not downgrade or mask it |
 | errors | not reached / any | existing behavior unchanged, IP error propagates |
@@ -94,7 +94,7 @@ LAPI failures are logged in this package. Check what the package already uses be
 
 This is operator-visible: a deployment with a flaky scope path that silently allowed will now apply
 the failure action, whose default is **ban**. Document it in `README.md` next to
-`crowdsecLapiFailureAction`, state plainly that scope-query failures now honour it, and say which
+`bouncerLapiFailureAction`, state plainly that scope-query failures now honour it, and say which
 value restores permissive behavior. Verify the accepted values in
 `pkg/configuration` rather than guessing, and mention it prominently in the PR body under a heading
 the owner cannot miss.
@@ -113,9 +113,9 @@ the owner cannot miss.
 ```
 
 Lease TTL is `max(updateInterval-1, 1)`. So after a failed poll nothing retries until it expires,
-neither this instance nor any other. With the default `UpdateMaxFailure=0` the stream is already
+neither this instance nor any other. With the default `LapiUpdateMaxFailure=0` the stream is already
 marked unhealthy on the first failure, so this stretches the window in which stream/alone cache
-misses take `CrowdsecLapiFailureAction`, default **ban**.
+misses take `BouncerLapiFailureAction`, default **ban**.
 
 Release the lease on every failure path that got past a won `Acquire`, so the next tick can retry
 immediately. Deleting `cacheTimeoutKey` is how #30 did it; confirm that matches the cache API on
@@ -126,7 +126,7 @@ change the lease TTL or the acquire semantics. Consider whether a later failure 
 ## Deliverable 3: the alone-mode 401 retry drops the request body
 
 ```218:222:pkg/lapi/client_http.go
-	if res.StatusCode == http.StatusUnauthorized && c.crowdsecMode == configuration.AloneMode {
+	if res.StatusCode == http.StatusUnauthorized && c.lapiMode == configuration.AloneMode {
 		if errToken := c.getToken(); errToken != nil {
 			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, errToken)
 		}

@@ -10,11 +10,11 @@
   store under `StoreKey`, then the client under `SessionKey` / `Key`), and `appsec.Open` opens a third under
   the AppSec listener key. Every one of them binds the context `New` passed down. So one derived context
   cancels all of them, and no per-holder bookkeeping is needed.
-- **Two independent configuration axes** — `crowdsecMode` selects the decision source (`none`/`live` query
+- **Two independent configuration axes** — `lapiMode` selects the decision source (`none`/`live` query
   LAPI per request, `stream`/`alone` poll a stream into the cache, `appsec` means no decision source at all).
-  `crowdsecAppsecEnabled` toggles the WAF leg, which runs on the pass path in every mode
+  `appsecEnabled` toggles the WAF leg, which runs on the pass path in every mode
   (`pkg/bouncer/bouncer.go:341`). `appsec` mode is the only mode that depends on the other knob.
-- **Captcha as a failure action** — `crowdsecAppsecFailureAction: captcha` is served by `pkg/captcha`, not by
+- **Captcha as a failure action** — `bouncerAppsecFailureAction: captcha` is served by `pkg/captcha`, not by
   AppSec JSON `action: captcha` (`core_plugin_appsec_failure-action`). It flows
   `applyAppsecServeHTTP` → `ErrFailureCaptcha` → `handleRemediationServeHTTP`, which needs
   `captchaClient.Valid`.
@@ -48,7 +48,7 @@
   `api.github.com/repos/<owner>/<repo>/commits/<sha>/check-runs` before treating a red result as ours.
   By: implement
 - Q: Should the appsec-plus-disabled combination be rejected instead of warned?
-  Decision: resolved — owner decided warn-and-start. Rejecting is out; implying `crowdsecAppsecEnabled` on is
-  out too, because `CrowdsecAppsecHost` defaults to `crowdsec:7422` and `CrowdsecAppsecFailureAction`
+  Decision: resolved — owner decided warn-and-start. Rejecting is out; implying `appsecEnabled` on is
+  out too, because `AppsecHost` defaults to `crowdsec:7422` and `BouncerAppsecFailureAction`
   defaults to `ban`, so implying would turn a do-nothing config into a ban-everything one on upgrade.
   By: explore

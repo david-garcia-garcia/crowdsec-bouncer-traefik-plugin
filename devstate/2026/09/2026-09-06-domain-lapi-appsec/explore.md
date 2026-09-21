@@ -7,7 +7,7 @@ IssueKey: 2026-09-06-domain-lapi-appsec
 
 **AppSec** is CrowdSec’s HTTP WAF / application-security engine. Different host (default `:7422`), key, TLS, body limit, failure action (`crowdsecAppsec*`). It inspects the request, not the decision list. Official protocol: `knowledge/research/ext_crowdsec_appsec_protocol/`.
 
-**crowdsecAppsecEnabled** is orthogonal to LAPI mode. Stream/live can run AppSec on the pass path. **crowdsecMode: appsec** is a fifth mode that skips LAPI cache/stream and jumps to AppSec only (`bouncer.go` `ServeHTTP`).
+**appsecEnabled** is orthogonal to LAPI mode. Stream/live can run AppSec on the pass path. **lapiMode: appsec** is a fifth mode that skips LAPI cache/stream and jumps to AppSec only (`bouncer.go` `ServeHTTP`).
 
 **CrowdsecConnection** (today) is one reclaim value that holds both products: LAPI/CAPI HTTP, stream/metrics tickers, isolated cache, Range membership, **and** `httpAppsecClient` plus AppSec host/key/TLS (`pkg/crowdsecconnection/connection.go`).
 
@@ -49,7 +49,7 @@ IssueKey: 2026-09-06-domain-lapi-appsec
 - New package `pkg/appsec` owns `AppsecQuery` (as `Query`), `AppsecResponse`, `AppsecPolicy`, `ErrFailureCaptcha`, AppSec HTTP client, and test helper `NewTestClient`.
 - `pkg/bouncer` holds two pointers. `plugin.go` Opens LAPI and, when AppSec is enabled or mode is `appsec`, Opens AppSec. Neither package imports the other.
 - LAPI reclaim identity / stream session MUST NOT include AppSec fields. AppSec reclaim is its own key (`appsec:` + scheme/host/path/key/TLS/bodyLimit/timeout).
-- Operator Traefik keys stay (`crowdsecLapi*`, `crowdsecAppsec*`, `crowdsecMode: appsec`). No config YAML rename.
+- Operator Traefik keys stay (`crowdsecLapi*`, `crowdsecAppsec*`, `lapiMode: appsec`). No config YAML rename.
 - Usage-metrics stay on LAPI (`IncDropped` with `OriginPluginAppsecFailure` still a LAPI label). AppSec does not POST metrics.
 - Spec `core_plugin_connection_source-files` is superseded in this change (it forbids the split).
 - Shared unexported HTTP helpers (`closeIdle`, `isReverseProxyError`) are copied into each package. No third `pkg/httpx`.
@@ -78,11 +78,11 @@ IssueKey: 2026-09-06-domain-lapi-appsec
   Decision: resolved — drop AppSec from `streamSettings`. That is the point of two owners. Verdict protocol unchanged.
   By: explore
 
-- Q: For `crowdsecMode: appsec`, does plugin still Open a LAPI connection?
-  Decision: resolved — no LAPI Open (today `New` already skips cache/stream/metrics). Bouncer stores `crowdsecMode` from config instead of `conn.Mode()`. AppSec Open still runs.
+- Q: For `lapiMode: appsec`, does plugin still Open a LAPI connection?
+  Decision: resolved — no LAPI Open (today `New` already skips cache/stream/metrics). Bouncer stores `lapiMode` from config instead of `conn.Mode()`. AppSec Open still runs.
   By: explore
 
-- Q: Keep `Prepare` copying empty `crowdsecAppsecKey` from `crowdsecLapiKey` (and empty AppSec scheme from LAPI scheme)?
+- Q: Keep `Prepare` copying empty `appsecKey` from `lapiKey` (and empty AppSec scheme from LAPI scheme)?
   Decision: resolved — keep. Official protocol often uses the same bouncer key; this plugin already has a distinct key with that fallback.
   By: explore
 

@@ -59,7 +59,7 @@ type transport struct {
 func newTransport(config *configuration.Config, log *slog.Logger) (*transport, error) {
 	header := crowdsecLapiHeader
 	var tlsConfig *tls.Config
-	if config.CrowdsecMode == configuration.AloneMode {
+	if config.LapiMode == configuration.AloneMode {
 		header = crowdsecCapiHeader
 	} else {
 		var err error
@@ -69,7 +69,7 @@ func newTransport(config *configuration.Config, log *slog.Logger) (*transport, e
 		}
 	}
 	// Store effective seconds so AdoptTransport last-writes a shared-default change when the override is still 0.
-	timeoutSeconds := config.EffectiveHTTPTimeoutSeconds(config.CrowdsecLapiHTTPTimeoutSeconds)
+	timeoutSeconds := config.EffectiveHTTPTimeoutSeconds(config.LapiHttpTimeoutSeconds)
 	return &transport{
 		httpClient: &http.Client{
 			Transport: &http.Transport{
@@ -81,11 +81,11 @@ func newTransport(config *configuration.Config, log *slog.Logger) (*transport, e
 			Timeout: time.Duration(timeoutSeconds) * time.Second,
 		},
 		header:                      header,
-		key:                         config.CrowdsecLapiKey,
+		key:                         config.LapiKey,
 		httpTimeoutSeconds:          timeoutSeconds,
-		lapiTLSInsecureVerify:       config.CrowdsecLapiTLSInsecureVerify,
-		lapiTLSCertificateAuthority: config.CrowdsecLapiTLSCertificateAuthority,
-		lapiTLSCertificateBouncer:   config.CrowdsecLapiTLSCertificateBouncer,
+		lapiTLSInsecureVerify:       config.LapiTlsInsecureVerify,
+		lapiTLSCertificateAuthority: config.LapiTlsCa,
+		lapiTLSCertificateBouncer:   config.LapiTlsCert,
 	}, nil
 }
 
@@ -250,7 +250,7 @@ func (c *Client) sendQuery(stringURL string, data []byte, mayRenewToken bool) ([
 	if isReverseProxyError(res.StatusCode) {
 		return nil, fmt.Errorf("crowdsecQuery:unreachable url:%s statusCode:%d", stringURL, res.StatusCode)
 	}
-	if res.StatusCode == http.StatusUnauthorized && c.crowdsecMode == configuration.AloneMode && mayRenewToken {
+	if res.StatusCode == http.StatusUnauthorized && c.lapiMode == configuration.AloneMode && mayRenewToken {
 		if errToken := c.getToken(); errToken != nil {
 			return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, errToken)
 		}

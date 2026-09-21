@@ -5,8 +5,8 @@ IssueKey: 2026-09-21-bouncer-instance-severance
 Every Traefik middleware `New` both opens LAPI/AppSec clients and bounces this router. Sharing is implicit (identity hash) so every bouncing router must copy LAPI/AppSec YAML. Operators need named shareable clients, per-route bounce policy, optional dummy routers, and a domain-prefixed public config. One middleware must still be able to open both clients and bounce.
 
 ## Current (code)
-- `plugin.go` — every `New` prepares LAPI and AppSec, opens LAPI unless `crowdsecMode` is `appsec`, opens AppSec when `crowdsecAppsecEnabled`, returns `bouncer.New` with those clients.
-- `pkg/configuration/configuration.go` — one `Config`: modes `none|live|stream|alone|appsec`; keys mixed `crowdsec*` / unprefixed (`updateIntervalSeconds`, `captcha*`, `redisCache*`); `Enabled` default false pass-through.
+- `plugin.go` — every `New` prepares LAPI and AppSec, opens LAPI unless `lapiMode` is `appsec`, opens AppSec when `appsecEnabled`, returns `bouncer.New` with those clients.
+- `pkg/configuration/configuration.go` — one `Config`: modes `none|live|stream|alone|appsec`; keys mixed `crowdsec*` / unprefixed (`lapiUpdateIntervalSeconds`, `captcha*`, `redisCache*`); `Enabled` default false pass-through.
 - `pkg/bouncer/bouncer.go` — `ServeHTTP` remediates on every mode when `enabled`; holds `*lapi.Client` and `*appsec.Client` from construct.
 - `pkg/lapi/session.go` — reclaim by URL+key (+ Redis); exclusive Traefik `name` on DecisionStore; no operator instance name.
 - `pkg/appsec/session.go` — reclaim by listener URL+key+bodyLimit.
@@ -37,5 +37,5 @@ Every Traefik middleware `New` both opens LAPI/AppSec clients and bounces this r
 - Whether `lapiScopeHeaders` stays opener-only (no live union from bouncing subscribers).
 
 ## Tensions
-- First dump asked `crowdsecMode=bouncer` as the only bouncing mode and dummy routers always; confirmed spec keeps one-middleware bounce+open and optional hold.
-- First dump left `crowdsecAppsecEnabled` vs `crowdsecMode=appsec` open; confirmed spec uses `lapiEnabled`/`appsecEnabled` and deletes `appsec` mode.
+- First dump asked `lapiMode=bouncer` as the only bouncing mode and dummy routers always; confirmed spec keeps one-middleware bounce+open and optional hold.
+- First dump left `appsecEnabled` vs `lapiMode=appsec` open; confirmed spec uses `lapiEnabled`/`appsecEnabled` and deletes `appsec` mode.

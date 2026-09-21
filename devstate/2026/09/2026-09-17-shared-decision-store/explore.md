@@ -25,11 +25,11 @@
 ## Decisions
 
 - Open the DecisionStore with `reclaim.OpenWithHooks(ctx, storeKey, …)` using the same Traefik `New` ctx as LAPI/AppSec. Process table `Default()` / `ProcessGrace` 30s. Close hook = `cache.Client.Close()`. No Sleep/Wake (no ticker). No `sync.Once`. No package `var` map.
-- Store key = cursor identity (`streamSession` fields) plus Redis store parameters (`RedisCacheEnabled`, host, read hosts, password, database). Prefix = `SessionHex` for every mode that shares this store. Exclude intervals, metrics, `updateMaxFailure`, `decisionScopeHeaders`, TLS, failure action, `StreamStartupBlock`, live-cache TTL, middleware name.
+- Store key = cursor identity (`streamSession` fields) plus Redis store parameters (`LapiRedisEnabled`, host, read hosts, password, database). Prefix = `SessionHex` for every mode that shares this store. Exclude intervals, metrics, `lapiUpdateMaxFailure`, `lapiScopeHeaders`, TLS, failure action, `LapiStreamStartupBlock`, live-cache TTL, middleware name.
 - `lapi.Client` holds the reclaimed store and exposes `Cache()` as today. `Client.Close` / `Sleep` must not `Close` a shared store; only the store’s reclaim Close hook does.
 - Lease: DecisionStore method. Redis = vendored `Eval` (Dragonfly EVAL/EVALSHA fully supported: `ext_dragonfly_scripting_eval`). Memory = mutex + Get/Set of `updated`. Do not use `atomic.Pointer[T]`. Do not turn write-once Client scalars into mutable fields.
 - `pkg/cache.Client` grows a narrow acquire that talks to the writer/prefix (Eval) or the memory mutex. Do not put poller logic on `cache.Client`.
-- Spec `core_plugin_lapi_reclaim-key`: name `RedisCacheReadHosts` in the hashed snapshot (code already hashes it). Explain `decisionScopeHeaders` in stream/alone settings and not in live/none `identity` (stream `scopes=` is poller-owned; live passes scopes per `LiveLookup` call).
+- Spec `core_plugin_lapi_reclaim-key`: name `LapiRedisReadHosts` in the hashed snapshot (code already hashes it). Explain `lapiScopeHeaders` in stream/alone settings and not in live/none `identity` (stream `scopes=` is poller-owned; live passes scopes per `LiveLookup` call).
 - Implement deletes `knowledge/debt/2026-09-17-shared-decision-store.md` and records it on this run’s `issues.md`. Leave `knowledge/debt/2026-09-17-cursor-only-reclaim-key.md`. Do not delete Peek / PeekLivePrefix / View.
 - Do not create a `core_plugin_reclaim` packet. `std_go_reclaim` + `core_plugin_middleware` already own New-ctx reclaim. Update `core_cache_client` usage when the store is shared. Update the utilities research sentence that says this cache does not need EVAL when Eval lands.
 - First-wins `scopes=` and warn-and-wire stay on the Client reclaim key. Out of scope to union header maps.
@@ -68,7 +68,7 @@
   Decision: resolved — Close only. The store has no ticker. Client Sleep already keeps cache warm. Last New-ctx holder of the store key grace-then-Close. Sisters use Close-only hooks for non-ticker cores.
   By: explore
 
-- Q: Does `decisionScopeHeaders` belong on the DecisionStore key?
+- Q: Does `lapiScopeHeaders` belong on the DecisionStore key?
   Decision: resolved — no. It stays off the store key (stream `scopes=` is Client first-wins). Live/none identity still omits it. Header-map mismatch shares remediations.
   By: implement
 

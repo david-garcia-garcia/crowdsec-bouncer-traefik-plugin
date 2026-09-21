@@ -16,7 +16,7 @@ AppSec bot-detection challenge (CrowdSec 1.8.0) is never resolved when routed th
 
 ## Description
 
-After upgrading CrowdSec to 1.8.0 and enabling the new bot-detection collection (`crowdsecurity/appsec-bot-*`) in the AppSec acquisition, all traffic routed through Traefik with the `crowdsecAppsecEnabled: true` middleware starts returning **403** — even though `cscli metrics show appsec` shows `Blocked: 0` (i.e. no actual WAF rule is blocking anything). Accessing the same backend directly (bypassing Traefik/AppSec) works fine.
+After upgrading CrowdSec to 1.8.0 and enabling the new bot-detection collection (`crowdsecurity/appsec-bot-*`) in the AppSec acquisition, all traffic routed through Traefik with the `appsecEnabled: true` middleware starts returning **403** — even though `cscli metrics show appsec` shows `Blocked: 0` (i.e. no actual WAF rule is blocking anything). Accessing the same backend directly (bypassing Traefik/AppSec) works fine.
 
 The CrowdSec engine logs repeated write errors on the AppSec listener while this happens:
 
@@ -51,20 +51,20 @@ The CrowdSec docs explicitly call this out as an expected failure mode for unsup
 my-crowdsec:
   plugin:
     crowdsec:
-      enabled: true
-      crowdsecLapiHost: "crowdsec:8080"
-      crowdsecLapiScheme: http
-      crowdsecLapiKey: "<redacted>"
-      updateIntervalSeconds: 30
-      crowdsecMode: live
-      crowdsecAppsecEnabled: true
-      crowdsecAppsecHost: crowdsec:7422
+      bouncerEnabled: true
+      lapiHost: "crowdsec:8080"
+      lapiScheme: http
+      lapiKey: "<redacted>"
+      lapiUpdateIntervalSeconds: 30
+      lapiMode: live
+      appsecEnabled: true
+      appsecHost: crowdsec:7422
       crowdsecAppsecFailureBlock: true
       crowdsecAppsecUnreachableBlock: true
-      crowdsecAppsecScheme: http
-      crowdsecAppsecPath: "/"
-      crowdsecAppsecBodyLimit: 10485760
-      crowdsecLapiPath: "/"
+      appsecScheme: http
+      appsecPath: "/"
+      appsecBodyLimit: 10485760
+      lapiPath: "/"
       crowdsecLapiTLSInsecureVerify: false
 ```
 
@@ -83,7 +83,7 @@ labels:
 ## Steps to reproduce
 
 1. Run CrowdSec 1.8.0 with `crowdsecurity/appsec-bot-*` loaded in the AppSec acquisition.
-2. Run crowdsec-bouncer-traefik-plugin v1.7.1 with `crowdsecAppsecEnabled: true` pointed at that AppSec listener.
+2. Run crowdsec-bouncer-traefik-plugin v1.7.1 with `appsecEnabled: true` pointed at that AppSec listener.
 3. Send a normal browser request to a route protected by the middleware.
 4. Observe: request is blocked (403), engine logs `unable to write response ... broken pipe`, and `cscli metrics show appsec` shows the bot-detection challenge as requested but never accepted/rejected.
 
@@ -96,7 +96,7 @@ Either:
 Every request is blocked with 403. No indication in the plugin's own logs of *why* — the only clue is on the CrowdSec engine side (broken pipe on the AppSec write).
 
 ## Workaround
-Setting `crowdsecAppsecEnabled: false` in the middleware restores normal access (IP-reputation checks via `crowdsecMode: live` still work; only AppSec/WAF/bot-detection is bypassed for Traefik-routed traffic). We're running the AppSec bot-detection separately via a different (nginx-based) bouncer that seems to handle it correctly.
+Setting `appsecEnabled: false` in the middleware restores normal access (IP-reputation checks via `lapiMode: live` still work; only AppSec/WAF/bot-detection is bypassed for Traefik-routed traffic). We're running the AppSec bot-detection separately via a different (nginx-based) bouncer that seems to handle it correctly.
 
 ## Maintainer note (issue comment)
 

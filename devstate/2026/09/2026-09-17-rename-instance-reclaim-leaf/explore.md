@@ -63,7 +63,7 @@ verdicts:
 - Do not fold onto `core_plugin_lapi_stream-lease` (lease TTL floor, not Open key) or `std_go_reclaim_context-lease` (table contract, not this plugin’s key).
 - Fenced leaves do not cite this id today. Implement must not write them. If Sync later shows a citation, stop `blocked`.
 - AppSec `ProcessGrace` sentence on the dump leaf: do not copy a SHALL into fenced `core_plugin_appsec_*`. `core_plugin_lapi_reclaim-key` states `lapi.Client` waits 30s. AppSec same-table stays where the AppSec leaf already is.
-- Spec-vs-code: do not edit `pkg/` or “fix” DestBranch behaviour. Observed looseness (not treated as a behaviour bug this run): spec summarizes Redis as host/auth/db/enabled while `streamSettings` / `identity` also hash `RedisCacheReadHosts`; live/none `identity` omits `decisionScopeHeaders` while stream hash includes it. Note only.
+- Spec-vs-code: do not edit `pkg/` or “fix” DestBranch behaviour. Observed looseness (not treated as a behaviour bug this run): spec summarizes Redis as host/auth/db/enabled while `streamSettings` / `identity` also hash `LapiRedisReadHosts`; live/none `identity` omits `lapiScopeHeaders` while stream hash includes it. Note only.
 - Client address stays `pkg/ip.GetRemoteIP` (`core_plugin_ip`). The dump’s “Client address SHALL…” line is not a new identity owner. Move it only as a cross-ref if the Open-key leaf still mentions visitor IP; do not re-derive `RemoteAddr`.
 - Usage packets already describe the units. Explore produces no Language and no usage edit. Implement / later `devdocsimpact` cite the new spec ids on those packets and on this run’s `specs.md` only.
 - Archive `openspec/changes/archive/**` keeps `core_plugin_middleware_instance-reclaim`. Delete `knowledge/debt/2026-09-17-rename-core-plugin-middleware-instance-reclaim.md` when implement lands; close this run’s `issues.md` row.
@@ -81,7 +81,7 @@ verdicts:
   By: explore
 
 - Q: Does the live leaf text disagree with `e6cc9ab` / DestBranch code?
-  Decision: assumed — field-list looseness only (`RedisCacheReadHosts` hashed but unnamed in the spec; live `identity` omits `decisionScopeHeaders`). Do not edit spec text to “fix” code or the reverse this run. Behaviour stays `master`.
+  Decision: assumed — field-list looseness only (`LapiRedisReadHosts` hashed but unnamed in the spec; live `identity` omits `lapiScopeHeaders`). Do not edit spec text to “fix” code or the reverse this run. Behaviour stays `master`.
   By: explore
 
 - Q: Does a rename force an edit inside a fenced leaf?

@@ -15,14 +15,14 @@ import (
 // NewTestClient returns an in-memory Client with a memory DecisionStore.
 func NewTestClient(log *slog.Logger) (*Client, *decisionstore.Store) {
 	store := decisionstore.NewMemory(log)
-	return &Client{decisionStore: store, log: log}, store
+	return &Client{decisionStore: store, log: log, lapiMode: configuration.StreamMode}, store
 }
 
 // newTestRangeClient is a stream-mode memory Client plus its DecisionStore.
 func newTestRangeClient(t *testing.T) (*Client, *decisionstore.Store) {
 	t.Helper()
 	client, store := NewTestClient(logger.New("ERROR", ""))
-	client.crowdsecMode = configuration.StreamMode
+	client.lapiMode = configuration.StreamMode
 	return client, store
 }
 
@@ -49,7 +49,7 @@ func SeedLiveSnapshotForTest(store *decisionstore.Store, key, kind, origin strin
 
 // AttachTestMetricsReporter wires a stream-mode reporter so tests can read IncDropped.
 func AttachTestMetricsReporter(client *Client) {
-	client.crowdsecMode = configuration.StreamMode
+	client.lapiMode = configuration.StreamMode
 	client.metricsReporter = newMetricsReporter(client, time.Now())
 }
 

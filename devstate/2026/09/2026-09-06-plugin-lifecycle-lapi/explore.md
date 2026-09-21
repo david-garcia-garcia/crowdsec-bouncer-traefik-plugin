@@ -5,11 +5,11 @@ IssueKey: 2026-09-06-plugin-lifecycle-lapi
 
 **LAPI stream session (CrowdSec):** `GET /v1/decisions/stream` advances `stream_cursor` on the **bouncer database row** (hashed `X-Api-Key` + client IP as LAPI sees it). Not per HTTP client, not per `scopes=` query, not per Traefik middleware name. Two `startup=false` clients on the same row share and race that cursor. Owner: `knowledge/research/ext_crowdsec_lapi_stream-cursor/notes.md`.
 
-**Reclaim identity (this plugin):** FNV of JSON `identityFrom` (`pkg/crowdsecconnection/identity.go`). Includes intervals, Redis, TLS, AppSec, failure action. Does **not** include `decisionScopeHeaders`. `reclaim.Open` is one incarnation per that hash. Traefik `New` ctx is the holder (`pkg/reclaim`, `std_go_reclaim`).
+**Reclaim identity (this plugin):** FNV of JSON `identityFrom` (`pkg/crowdsecconnection/identity.go`). Includes intervals, Redis, TLS, AppSec, failure action. Does **not** include `lapiScopeHeaders`. `reclaim.Open` is one incarnation per that hash. Traefik `New` ctx is the holder (`pkg/reclaim`, `std_go_reclaim`).
 
 **Stream poller:** `startStream` → ticker → `handleStreamCache` → `streamQuery` (`startup=` + `scopes=`). Cache and `range-index` prefix = `IdentityHex`. Separate hashes ⇒ two pollers, two prefixes, one LAPI row.
 
-**Opposite bug:** same hash, different `decisionScopeHeaders` ⇒ first `New` wins `scopes=`. E2e already uses `BOUNCER_KEY_TRAEFIK_SCOPES` because a second poller on the test key would steal deltas.
+**Opposite bug:** same hash, different `lapiScopeHeaders` ⇒ first `New` wins `scopes=`. E2e already uses `BOUNCER_KEY_TRAEFIK_SCOPES` because a second poller on the test key would steal deltas.
 
 ```
   Traefik process
@@ -27,7 +27,7 @@ IssueKey: 2026-09-06-plugin-lifecycle-lapi
 ## Decisions
 
 - Do not key reclaim by middleware name. Do not add `sync.Once`. Keep `reclaim.Open(ctx, …)` and Traefik constructor ctx as the holder.
-- Do not treat matching e2e `metricsUpdateIntervalSeconds` as the product fix.
+- Do not treat matching e2e `lapiMetricsIntervalSeconds` as the product fix.
 - Do not start a second stream poller because two intervals were requested.
 - Do not first-win a second config onto a connection whose Redis prefix or `scopes=` already diverged — fail before bind, or share only when the session snapshot matches.
 - Isolated backends (including different header-scope maps) keep needing a **second bouncer key**. That is already the scopes e2e pattern.
@@ -38,9 +38,9 @@ IssueKey: 2026-09-06-plugin-lifecycle-lapi
 
 Ran throwaway `go test -count=1 -v -run TestRepro_ .` on dest (deleted after; not committed).
 
-- Same LAPI host+key, stream mode, `MetricsUpdateIntervalSeconds` 1 vs 600: `Key()` differs; two `New` with live ctx; two `CrowdsecConnection`; `StreamFetches=1/1`; mock LAPI stream hits=2. **Reproduced.**
-- Same, only `UpdateIntervalSeconds` 5 vs 30: `Key()` differs. **Reproduced.**
-- Same key, `decisionScopeHeaders` empty vs `Country=CF-IPCountry`: `Key()` **equal** today. Opposite bug confirmed.
+- Same LAPI host+key, stream mode, `LapiMetricsIntervalSeconds` 1 vs 600: `Key()` differs; two `New` with live ctx; two `CrowdsecConnection`; `StreamFetches=1/1`; mock LAPI stream hits=2. **Reproduced.**
+- Same, only `LapiUpdateIntervalSeconds` 5 vs 30: `Key()` differs. **Reproduced.**
+- Same key, `lapiScopeHeaders` empty vs `Country=CF-IPCountry`: `Key()` **equal** today. Opposite bug confirmed.
 
 Did not re-run Docker e2e (compose currently forces `/trusted` metrics=1). Unit path is the reclaim split the ticket names.
 
@@ -56,9 +56,9 @@ Keep reclaim grace when the snapshot is **unchanged** (Traefik reload reuse). Ea
 
 Stream **session** (the unique poller resource) = LAPI scheme+host+path + lapiKey, or CAPI machine+password in alone, plus LAPI client-cert identity when that is how the bouncer authenticates.
 
-`scopes=` is **not** a second LAPI session. Different `decisionScopeHeaders` on the same URL+key still share one CrowdSec cursor. Putting scopes in the FNV hash (PR #18) stops first-win by starting a **second poller** — that is the same steal-deltas bug. Treat scopes mismatch as a **conflict** on the existing session (fail `New`), not as two sessions.
+`scopes=` is **not** a second LAPI session. Different `lapiScopeHeaders` on the same URL+key still share one CrowdSec cursor. Putting scopes in the FNV hash (PR #18) stops first-win by starting a **second poller** — that is the same steal-deltas bug. Treat scopes mismatch as a **conflict** on the existing session (fail `New`), not as two sessions.
 
-Settings snapshot on the session (must match or fail): `UpdateIntervalSeconds`, `MetricsUpdateIntervalSeconds`, Redis*, `HTTPTimeoutSeconds`, `LapiFailureAction`, `UpdateMaxFailure`, `StreamStartupBlock`, `DefaultDecisionSeconds`, AppSec client fields, TLS that is not already in the session, `decisionScopeHeaders` (normalized). Error names both middleware names and the fields that differ. Store the first `New` name on the connection for that message.
+Settings snapshot on the session (must match or fail): `LapiUpdateIntervalSeconds`, `LapiMetricsIntervalSeconds`, Redis*, `HTTPTimeoutSeconds`, `LapiFailureAction`, `LapiUpdateMaxFailure`, `LapiStreamStartupBlock`, `BouncerLiveTtlSeconds`, AppSec client fields, TLS that is not already in the session, `lapiScopeHeaders` (normalized). Error names both middleware names and the fields that differ. Store the first `New` name on the connection for that message.
 
 Reclaim key = session (not the leftover extras). Redis / range-index prefix follows the session. Live/none/appsec do not take a stream session; two live connections on one key stay OK for `?ip=` lookups.
 
@@ -84,7 +84,7 @@ Spec `core_plugin_middleware_instance-reclaim`: keep “same session ⇒ one tic
   Decision: resolved — no. TLS extras are the settings snapshot (in SessionKey’s hash, not SessionPrefix). PeekLivePrefix + streamOwner detect another live middleware. Sleeping + different snapshot → Open a new key. Two live middlewares with different certs warn-and-wire.
   By: implement
 
-- Q: Are different `decisionScopeHeaders` a different stream session or a conflict on one session (URL+key)?
+- Q: Are different `lapiScopeHeaders` a different stream session or a conflict on one session (URL+key)?
   Decision: assumed — conflict on one session. LAPI cursor is the bouncer row, not `scopes=`. Second key remains the isolation mechanism. Do not land PR #18’s “scopes in identity ⇒ two pollers” as the product fix.
   By: explore
 

@@ -28,9 +28,9 @@ func TestOpenStream_LiveRoutersUnionCountryAndUsername(t *testing.T) {
 	}
 	log := slog.Default()
 	countryCfg := testStreamConfig(parsed.Host, 1)
-	countryCfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	countryCfg.LapiScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
 	userCfg := testStreamConfig(parsed.Host, 1)
-	userCfg.DecisionScopeHeaders = map[string]string{"username": "X-User"}
+	userCfg.LapiScopeHeaders = map[string]string{"username": "X-User"}
 	countryCtx, countryCancel := context.WithCancel(context.Background())
 	t.Cleanup(countryCancel)
 	userCtx, userCancel := context.WithCancel(context.Background())
@@ -107,7 +107,7 @@ func TestOpenStream_LateCountryJoinUsesStartupFalse(t *testing.T) {
 		t.Fatal("first poll must clear startup")
 	}
 	lateCfg := testStreamConfig(parsed.Host, 1)
-	lateCfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	lateCfg.LapiScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
 	late, err := OpenStream(context.Background(), lateCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -144,7 +144,7 @@ func TestOpenStream_FirstCountryPollIncludesCountryBeforeRegister(t *testing.T) 
 		t.Fatal(err)
 	}
 	countryCfg := testStreamConfig(parsed.Host, 1)
-	countryCfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	countryCfg.LapiScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
 	if _, err := OpenStream(context.Background(), countryCfg, slog.Default(), "country", "test"); err != nil {
 		t.Fatal(err)
 	}

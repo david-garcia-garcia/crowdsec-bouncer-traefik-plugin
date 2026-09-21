@@ -167,7 +167,7 @@ func (c *Client) strongestLiveDecision(items []Decision) *Decision {
 // A query failure is returned alongside the caller's unchanged verdict so the caller can fail
 // closed instead of reading it as "this scope has no decision". It is logged at WARN because an
 // operator must see a scope path that stopped answering.
-func (c *Client) mergeLiveScope(chosen liveResult, scope, identifier string, isLiveMode bool, defaultDecisionSeconds int64) (liveResult, error) {
+func (c *Client) mergeLiveScope(chosen liveResult, scope, identifier string, isLiveMode bool, bouncerLiveTtlSeconds int64) (liveResult, error) {
 	if identifier == "" {
 		return chosen, nil
 	}
@@ -176,20 +176,20 @@ func (c *Client) mergeLiveScope(chosen liveResult, scope, identifier string, isL
 		c.log.Warn("handleNoStreamCache:scopeQuery", "scope", scope, "error", headerErr)
 		return chosen, headerErr
 	}
-	c.cacheLiveScope(scope, identifier, headerChosen, isLiveMode, defaultDecisionSeconds)
+	c.cacheLiveScope(scope, identifier, headerChosen, isLiveMode, bouncerLiveTtlSeconds)
 	return preferLiveResult(chosen, headerChosen), nil
 }
 
 // cacheLiveScope stores a live/none header-scope result when live caching is on.
-func (c *Client) cacheLiveScope(scope, identifier string, result liveResult, isLiveMode bool, defaultDecisionSeconds int64) {
-	if !isLiveMode || defaultDecisionSeconds <= 0 {
+func (c *Client) cacheLiveScope(scope, identifier string, result liveResult, isLiveMode bool, bouncerLiveTtlSeconds int64) {
+	if !isLiveMode || bouncerLiveTtlSeconds <= 0 {
 		return
 	}
 	if !decisionscope.IsActiveRemediation(result.kind) {
-		c.memoLive(scope, identifier, decisionscope.NoBannedValue, "", defaultDecisionSeconds)
+		c.memoLive(scope, identifier, decisionscope.NoBannedValue, "", bouncerLiveTtlSeconds)
 		return
 	}
-	c.memoLive(scope, identifier, result.kind, result.origin, liveCacheTTL(result.duration, defaultDecisionSeconds))
+	c.memoLive(scope, identifier, result.kind, result.origin, liveCacheTTL(result.duration, bouncerLiveTtlSeconds))
 }
 
 // memoLive writes a live/none TTL slot through the decision store.
@@ -202,11 +202,11 @@ func (c *Client) memoLive(scope, value, kind, origin string, durationSec int64) 
 	})
 }
 
-// liveCacheTTL is the live-mode cache TTL: min(decision duration, defaultDecisionSeconds).
-func liveCacheTTL(duration time.Duration, defaultDecisionSeconds int64) int64 {
+// liveCacheTTL is the live-mode cache TTL: min(decision duration, bouncerLiveTtlSeconds).
+func liveCacheTTL(duration time.Duration, bouncerLiveTtlSeconds int64) int64 {
 	durationSecond := int64(duration.Seconds())
-	if durationSecond <= 0 || defaultDecisionSeconds < durationSecond {
-		return defaultDecisionSeconds
+	if durationSecond <= 0 || bouncerLiveTtlSeconds < durationSecond {
+		return bouncerLiveTtlSeconds
 	}
 	return durationSecond
 }

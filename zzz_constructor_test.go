@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -31,24 +32,26 @@ func writeTestFile(t *testing.T, name, content string) string {
 func cfgAppsecCaptchaAt(t *testing.T, appsecHost string) *configuration.Config {
 	t.Helper()
 	c := getTestConfig()
-	c.CrowdsecMode = configuration.AppsecMode
-	c.CrowdsecAppsecEnabled = true
-	c.CrowdsecAppsecScheme = "http"
-	c.CrowdsecAppsecHost = appsecHost
-	c.CrowdsecAppsecPath = "/"
-	c.CrowdsecAppsecFailureAction = configuration.FailureActionCaptcha
-	c.CaptchaProvider = configuration.CustomProvider
-	c.CaptchaCustomJsURL = "/captcha.js"
-	c.CaptchaCustomKey = "dummy-captcha"
-	c.CaptchaCustomResponse = "dummy-captcha-response"
-	c.CaptchaCustomValidateURL = "http://127.0.0.1/siteverify"
-	c.CaptchaSiteKey = "site"
-	c.CaptchaSecretKey = "secret"
-	c.CaptchaGateSecret = "gate-secret"
-	c.CaptchaFilePath = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
-	c.RemediationHeadersCustomName = "X-Remediation"
-	c.ForwardedHeadersTrustedIPs = []string{"127.0.0.1/32"}
-	c.ForwardedHeadersCustomName = "X-Forwarded-For"
+	c.LapiEnabled = false
+	c.LapiKey = ""
+	c.AppsecEnabled = true
+	c.AppsecScheme = "http"
+	c.AppsecHost = appsecHost
+	c.AppsecPath = "/"
+	c.AppsecKey = "appsec-test"
+	c.BouncerAppsecFailureAction = configuration.FailureActionCaptcha
+	c.BouncerCaptchaProvider = configuration.CustomProvider
+	c.BouncerCaptchaCustomJsURL = "/captcha.js"
+	c.BouncerCaptchaCustomKey = "dummy-captcha"
+	c.BouncerCaptchaCustomResponse = "dummy-captcha-response"
+	c.BouncerCaptchaCustomValidateURL = "http://127.0.0.1/siteverify"
+	c.BouncerCaptchaSiteKey = "site"
+	c.BouncerCaptchaSecretKey = "secret"
+	c.BouncerCaptchaGateSecret = "gate-secret"
+	c.BouncerCaptchaFile = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
+	c.BouncerRemediationHeader = "X-Remediation"
+	c.BouncerForwardedTrustedIPs = []string{"127.0.0.1/32"}
+	c.BouncerForwardedHeader = "X-Forwarded-For"
 	return c
 }
 
@@ -57,7 +60,8 @@ func cfgAppsecCaptchaAt(t *testing.T, appsecHost string) *configuration.Config {
 // on an unusable client certificate. Without a rollback the stream ticker polls LAPI forever.
 func TestNew_FailedConstructorReleasesLapiHolder(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
 
 	var hits int64
 	srv := liveLAPI(t, nil, &hits)
@@ -65,13 +69,13 @@ func TestNew_FailedConstructorReleasesLapiHolder(t *testing.T) {
 	u, _ := url.Parse(srv.URL)
 
 	cfg := cfgStreamAt(u.Host, 1)
-	cfg.CrowdsecAppsecEnabled = true
-	cfg.CrowdsecAppsecScheme = "https"
-	cfg.CrowdsecAppsecHost = u.Host
-	cfg.CrowdsecAppsecPath = "/"
-	cfg.CrowdsecAppsecTLSInsecureVerify = true
-	cfg.CrowdsecAppsecTLSCertificateBouncer = "not a certificate"
-	cfg.CrowdsecAppsecTLSCertificateBouncerKey = "not a key"
+	cfg.AppsecEnabled = true
+	cfg.AppsecScheme = "https"
+	cfg.AppsecHost = u.Host
+	cfg.AppsecPath = "/"
+	cfg.AppsecTlsInsecureVerify = true
+	cfg.AppsecTlsCert = "not a certificate"
+	cfg.AppsecTlsKey = "not a key"
 
 	if _, err := New(context.Background(), testNextOK(), cfg, "rollback"); err == nil {
 		t.Fatal("New must fail when the AppSec client certificate cannot be loaded")
@@ -88,7 +92,8 @@ func TestNew_FailedConstructorReleasesLapiHolder(t *testing.T) {
 // zero grace, a rollback that fired on the success path would dispose between these two calls.
 func TestNew_SuccessfulConstructorKeepsItsHolder(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
 
 	var hits int64
 	srv := liveLAPI(t, nil, &hits)
@@ -121,49 +126,30 @@ func TestNew_SuccessfulConstructorKeepsItsHolder(t *testing.T) {
 	}
 }
 
-// TestNew_AppsecModeWithoutAppsecWarns checks the operator gets a warning, in the log they
-// configured, when appsec mode is combined with AppSec disabled — a middleware that enforces
-// nothing. It must still start.
-func TestNew_AppsecModeWithoutAppsecWarns(t *testing.T) {
-	logFile := newTestLogFile(t)
+// TestNew_LapiDisabledStartsWithoutKey checks a middleware with lapiEnabled false
+// and no AppSec starts without a LAPI key.
+func TestNew_LapiDisabledStartsWithoutKey(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
 
 	cfg := getTestConfig()
-	cfg.CrowdsecMode = configuration.AppsecMode
-	cfg.CrowdsecAppsecEnabled = false
-	cfg.LogFormat = "common"
-	cfg.LogFilePath = logFile
+	cfg.LapiEnabled = false
+	cfg.LapiKey = ""
+	cfg.AppsecEnabled = false
 
-	if _, err := New(context.Background(), testNextOK(), cfg, "appsec-no-waf"); err != nil {
-		t.Fatalf("appsec mode with AppSec disabled must still start: %v", err)
-	}
-
-	logged, err := os.ReadFile(logFile) //nolint:gosec // test-generated temp path
-	if err != nil {
-		t.Fatal(err)
-	}
-	line := ""
-	for _, candidate := range strings.Split(string(logged), "\n") {
-		if strings.Contains(candidate, "level=WARN") {
-			line = candidate
-			break
-		}
-	}
-	if line == "" {
-		t.Fatalf("no WARN line for appsec mode without AppSec. log:\n%s", logged)
-	}
-	for _, want := range []string{"crowdsecMode", "crowdsecAppsecEnabled"} {
-		if !strings.Contains(line, want) {
-			t.Fatalf("WARN line must name %s, got %q", want, line)
-		}
+	if _, err := New(context.Background(), testNextOK(), cfg, "no-lapi"); err != nil {
+		t.Fatalf("lapiEnabled false with no AppSec must still start: %v", err)
 	}
 }
 
 // TestNew_AppsecModeCaptchaFailureActionServesChallenge checks that an AppSec failure in appsec
-// mode with crowdsecAppsecFailureAction: captcha serves the challenge. Without the captcha client
+// mode with bouncerAppsecFailureAction: captcha serves the challenge. Without the captcha client
 // the bouncer falls back to a ban, which contradicts core_plugin_appsec_failure-action.
 func TestNew_AppsecModeCaptchaFailureActionServesChallenge(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
 
 	appsecSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -190,7 +176,8 @@ func TestNew_AppsecModeCaptchaFailureActionServesChallenge(t *testing.T) {
 // come back normalised, and must not come back carrying the resolved LAPI secret.
 func TestNew_DoesNotMutateCallerConfig(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	instance.ResetForTest()
+	t.Cleanup(func() { reclaim.ResetForTest(); instance.ResetForTest() })
 
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
@@ -199,8 +186,8 @@ func TestNew_DoesNotMutateCallerConfig(t *testing.T) {
 
 	cfg := cfgLiveAt(u.Host)
 	cfg.LogLevel = "info"
-	cfg.CrowdsecLapiKey = ""
-	cfg.CrowdsecLapiKeyFile = writeTestFile(t, "lapi.key", "resolved-lapi-key")
+	cfg.LapiKey = ""
+	cfg.LapiKeyFile = writeTestFile(t, "lapi.key", "resolved-lapi-key")
 
 	if _, err := New(context.Background(), testNextOK(), cfg, "snapshot"); err != nil {
 		t.Fatal(err)
@@ -208,7 +195,7 @@ func TestNew_DoesNotMutateCallerConfig(t *testing.T) {
 	if cfg.LogLevel != "info" {
 		t.Fatalf("New normalised the caller's logLevel to %q", cfg.LogLevel)
 	}
-	if cfg.CrowdsecLapiKey != "" {
-		t.Fatalf("New wrote the resolved LAPI secret into the caller's config: %q", cfg.CrowdsecLapiKey)
+	if cfg.LapiKey != "" {
+		t.Fatalf("New wrote the resolved LAPI secret into the caller's config: %q", cfg.LapiKey)
 	}
 }

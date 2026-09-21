@@ -24,7 +24,7 @@ The Redis communication layer (`pkg/simpleredis`) should be as performant and re
 - Spec fold: `core_cache_redis_in-tree-client`.
 
 ## Out of scope
-- Cache policy, TTL, replica round-robin, `redisCacheUnreachableBlock`, key prefix.
+- Cache policy, TTL, replica round-robin, `bouncerRedisUnreachableBlock`, key prefix.
 - CrowdSec LAPI/AppSec, captcha, ban pages.
 - Replacing Redis. Taking go-redis. Setting `useUnsafe`.
 - Dragonfly/real-stack e2e (already on dest).

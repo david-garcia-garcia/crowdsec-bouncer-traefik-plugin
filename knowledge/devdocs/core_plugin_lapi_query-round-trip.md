@@ -47,7 +47,7 @@ defer c.drainResponse(res)
 if isReverseProxyError(res.StatusCode) {
 	return nil, fmt.Errorf("crowdsecQuery:unreachable url:%s statusCode:%d", stringURL, res.StatusCode)
 }
-if res.StatusCode == http.StatusUnauthorized && c.crowdsecMode == configuration.AloneMode && mayRenewToken {
+if res.StatusCode == http.StatusUnauthorized && c.lapiMode == configuration.AloneMode && mayRenewToken {
 	if errToken := c.getToken(); errToken != nil {
 		return nil, fmt.Errorf("crowdsecQuery:renewToken url:%s %w", stringURL, errToken)
 	}
