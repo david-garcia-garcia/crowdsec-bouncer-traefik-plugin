@@ -164,7 +164,7 @@ func (c *Client) fetchAndApplyStreamDecisions() (int, int, error) {
 		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
 			cidr := strings.TrimSpace(decision.Value)
 			origin := MetricsOrigin(decision.Origin, decision.Scenario)
-			kind := c.remediationKind(decision.Type, origin)
+			kind := decisionscope.RemediationValue(decision.Type)
 			if kind != "" && cidr != "" {
 				rangeUpserts[cidr] = decisionstore.KindOriginString(kind, origin)
 				newCount++

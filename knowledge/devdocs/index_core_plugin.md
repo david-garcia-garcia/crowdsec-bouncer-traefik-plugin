@@ -63,7 +63,7 @@ description: How this plugin writes one CrowdSec stream payload (deleted before 
 ## OriginBasedDecisionRemap
 priority: normal
 local: core_plugin_lapi_origin-based-decision-remap.md
-description: How origin-keyed LAPI type remaps are stored as a weaker kind, including per-list lists:name matching.
+description: How each Bouncer remaps origin-keyed LAPI types at request apply, including per-list lists:name matching.
 
 ## LAPI connection
 priority: normal

@@ -42,21 +42,20 @@ type Client struct {
 	closed   bool
 	sleeping bool // last reclaim holder gone; tickers stopped until Wake or Close
 
-	crowdsecScheme           string
-	crowdsecHost             string
-	crowdsecPath             string
-	crowdsecMode             string
-	crowdsecMachineID        string
-	crowdsecPassword         string
-	crowdsecScenarios        []string
-	updateInterval           int64
-	metricsInterval          int64
-	updateMaxFailure         int64
-	crowdsecStreamRoute      string
-	decisionScopeHeaders     map[string]string            // write-once first-create residue; not the live union
-	originBasedDecisionRemap map[string]map[string]string // first-create residue; not on the Open key
-	sessionKey               string                       // reclaim SessionKey (stream/alone) or Key (live/none)
-	liveHeaderScopes         liveHeaderScopes             // live constructor ctx → normalized header scopes
+	crowdsecScheme       string
+	crowdsecHost         string
+	crowdsecPath         string
+	crowdsecMode         string
+	crowdsecMachineID    string
+	crowdsecPassword     string
+	crowdsecScenarios    []string
+	updateInterval       int64
+	metricsInterval      int64
+	updateMaxFailure     int64
+	crowdsecStreamRoute  string
+	decisionScopeHeaders map[string]string // write-once first-create residue; not the live union
+	sessionKey           string            // reclaim SessionKey (stream/alone) or Key (live/none)
+	liveHeaderScopes     liveHeaderScopes  // live constructor ctx → normalized header scopes
 
 	transport     atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
 	decisionStore *decisionstore.Store
@@ -120,25 +119,24 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 	}
 
 	client := &Client{
-		crowdsecMode:             config.CrowdsecMode,
-		crowdsecScheme:           config.CrowdsecLapiScheme,
-		crowdsecHost:             config.CrowdsecLapiHost,
-		crowdsecPath:             config.CrowdsecLapiPath,
-		crowdsecMachineID:        config.CrowdsecCapiMachineID,
-		crowdsecPassword:         config.CrowdsecCapiPassword,
-		crowdsecScenarios:        config.CrowdsecCapiScenarios,
-		updateInterval:           config.UpdateIntervalSeconds,
-		metricsInterval:          config.MetricsUpdateIntervalSeconds,
-		updateMaxFailure:         config.UpdateMaxFailure,
-		decisionScopeHeaders:     decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
-		originBasedDecisionRemap: copyOriginBasedDecisionRemap(config.OriginBasedDecisionRemap),
-		crowdsecStreamRoute:      crowdsecStreamRoute,
-		sessionKey:               reclaimSessionKey(config),
-		log:                      log,
-		pluginVersion:            pluginVersion,
-		isCrowdsecStreamStartup:  startup,
-		isCrowdsecStreamHealthy:  1,
-		decisionStore:            store,
+		crowdsecMode:            config.CrowdsecMode,
+		crowdsecScheme:          config.CrowdsecLapiScheme,
+		crowdsecHost:            config.CrowdsecLapiHost,
+		crowdsecPath:            config.CrowdsecLapiPath,
+		crowdsecMachineID:       config.CrowdsecCapiMachineID,
+		crowdsecPassword:        config.CrowdsecCapiPassword,
+		crowdsecScenarios:       config.CrowdsecCapiScenarios,
+		updateInterval:          config.UpdateIntervalSeconds,
+		metricsInterval:         config.MetricsUpdateIntervalSeconds,
+		updateMaxFailure:        config.UpdateMaxFailure,
+		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
+		crowdsecStreamRoute:     crowdsecStreamRoute,
+		sessionKey:              reclaimSessionKey(config),
+		log:                     log,
+		pluginVersion:           pluginVersion,
+		isCrowdsecStreamStartup: startup,
+		isCrowdsecStreamHealthy: 1,
+		decisionStore:           store,
 	}
 	client.metricsReporter = newMetricsReporter(client, time.Now())
 	client.transport.Store(next)

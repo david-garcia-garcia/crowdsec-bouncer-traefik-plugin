@@ -1,38 +1,41 @@
 ## Purpose
 
-Maps selected LAPI decision types to a weaker stored kind using public Config `OriginBasedDecisionRemap` and `MetricsOrigin`, including per-list `lists:<name>` matching.
+Maps selected LAPI decision types to a weaker kind at Bouncer apply using public Config `OriginBasedDecisionRemap` and `MetricsOrigin`, including per-list `lists:<name>` matching. LAPI and the DecisionStore keep the original kind.
 
 ## Requirements
 
 ### Requirement: Empty OriginBasedDecisionRemap leaves kinds unchanged
-Public Config `OriginBasedDecisionRemap` (`json:"originBasedDecisionRemap"`) SHALL default to empty. When the Client table is empty, a LAPI decision type `ban` SHALL store kind `t` (`BannedValue`) and type `captcha` SHALL store kind `c` (`CaptchaValue`) on stream Ip/header, stream Range, and live/none query. `ValidateParams` MUST NOT reject unknown origin tokens and MUST NOT require `captchaProvider` for this table. Blank origin keys SHALL be dropped when copied onto the Client.
+Public Config `OriginBasedDecisionRemap` (`json:"originBasedDecisionRemap"`) SHALL default to empty. When the Bouncer table is empty, a LAPI decision type `ban` SHALL store and apply as kind `t` (`BannedValue`) and type `captcha` SHALL store and apply as kind `c` (`CaptchaValue`). `ValidateParams` MUST NOT reject unknown origin tokens and MUST NOT require `captchaProvider` for this table. Blank origin keys SHALL be dropped when copied onto the Bouncer.
 
 #### Scenario: Default config still bans CAPI
 - **WHEN** `originBasedDecisionRemap` is empty or omitted and LAPI returns type `ban` origin `CAPI`
 - **THEN** the stored kind is ban (`t`)
+- **AND** ServeHTTP remediates as ban
 
-### Requirement: Origin remap is one hop on the original type
-When `MetricsOrigin(origin, scenario)` matches a table key, stream Ip/header Put, stream Range upsert, and live/none query/cache SHALL store the mapped kind for that decision's original LAPI type only. A second edge on the same origin MUST NOT apply to the result of the first. An unknown type SHALL stay empty (skip store), same as `RemediationValue` today. The match key SHALL be `MetricsOrigin`; the plugin MUST NOT match raw `decision.Origin` alone. Origin strings on the Store SHALL remain the metrics origin.
+### Requirement: Origin remap is one hop at Bouncer apply
+`lapi.Client` stream Put, stream Range upsert, live/none query, and live cache SHALL store `RemediationValue` of the LAPI type only. The match key at apply SHALL be `MetricsOrigin` of the looked-up decision. A second edge on the same origin MUST NOT apply to the result of the first. An unknown type SHALL stay empty (skip store), same as `RemediationValue` today.
 
-Allowed edges SHALL be weaken-only: `ban` → `captcha` or `pass`; `captcha` → `pass`. `pass` SHALL be empty stored kind (skip store / live none). `ValidateParams` MUST reject any other from/to pair.
+Allowed edges SHALL be weaken-only: `ban` → `captcha` or `pass`; `captcha` → `pass`. `pass` SHALL apply as no LAPI remediation (`NoBannedValue`) and then AppSec/next. `ValidateParams` MUST reject any other from/to pair.
 
-#### Scenario: CAPI ban stores captcha
+#### Scenario: CAPI ban stores ban and applies captcha
 - **WHEN** `originBasedDecisionRemap` is `{CAPI: {ban: captcha}}` and a stream `ban` has origin `CAPI`
-- **THEN** the Ip slot kind is captcha (`c`)
-- **AND** the stored origin is `CAPI`
+- **THEN** the Ip slot kind is ban (`t`)
+- **AND** ServeHTTP remediates as captcha (`c`)
 
 #### Scenario: Unlisted origin stays ban
 - **WHEN** `originBasedDecisionRemap` is `{CAPI: {ban: captcha}, lists: {ban: captcha}}` and a `ban` has origin `cscli`
 - **THEN** the stored kind is ban (`t`)
+- **AND** ServeHTTP remediates as ban
 
-#### Scenario: Captcha pass skips store
+#### Scenario: Captcha pass keeps the stored captcha
 - **WHEN** `originBasedDecisionRemap` is `{crowdsec: {captcha: pass}}` and a stream `captcha` has origin `crowdsec`
-- **THEN** the decision is not stored
-- **AND** lookup for that IP is no remediation (`f`)
+- **THEN** the Ip slot kind is captcha (`c`)
+- **AND** ServeHTTP does not serve a captcha page
+- **AND** AppSec/next still run
 
 #### Scenario: Ban plus captcha pass on the same origin does not chain
-- **WHEN** `originBasedDecisionRemap` is `{CAPI: {ban: captcha, captcha: pass}}` and a stream `ban` has origin `CAPI`
-- **THEN** the stored kind is captcha (`c`)
+- **WHEN** `originBasedDecisionRemap` is `{CAPI: {ban: captcha, captcha: pass}}` and the stored kind is ban (`t`) origin `CAPI`
+- **THEN** ServeHTTP remediates as captcha (`c`)
 
 #### Scenario: Invalid edge fails validation
 - **WHEN** `originBasedDecisionRemap` is `{CAPI: {captcha: ban}}`
@@ -42,28 +45,28 @@ Allowed edges SHALL be weaken-only: `ban` → `captcha` or `pass`; `captcha` →
 Config key `lists` SHALL match metrics origin `lists` and any origin with prefix `lists:`. Config key `lists:<name>` SHALL match only that exact metrics origin and SHALL win over a `lists` key. Other keys SHALL be exact equality. Match SHALL be case-sensitive.
 
 #### Scenario: One list remaps
-- **WHEN** `originBasedDecisionRemap` is `{lists:firehol_level1: {ban: captcha}}` and a `ban` has origin `lists` and scenario `firehol_level1`
-- **THEN** the stored kind is captcha (`c`)
+- **WHEN** `originBasedDecisionRemap` is `{lists:firehol_level1: {ban: captcha}}` and a stored `ban` has origin `lists:firehol_level1`
+- **THEN** ServeHTTP remediates as captcha (`c`)
 
 #### Scenario: Other list stays ban
-- **WHEN** the same config and a `ban` has origin `lists` and scenario `tor-exit`
-- **THEN** the stored kind is ban (`t`)
+- **WHEN** the same config and a stored `ban` has origin `lists:tor-exit`
+- **THEN** ServeHTTP remediates as ban
 
 #### Scenario: Bare lists key remaps every list
-- **WHEN** `originBasedDecisionRemap` is `{lists: {ban: captcha}}` and a `ban` has origin `lists` and scenario `tor-exit`
-- **THEN** the stored kind is captcha (`c`)
+- **WHEN** `originBasedDecisionRemap` is `{lists: {ban: captcha}}` and a stored `ban` has origin `lists:tor-exit`
+- **THEN** ServeHTTP remediates as captcha (`c`)
 
-### Requirement: Live strongest pick uses remapped kind
-`queryLiveDecisions` SHALL pick among LAPI decisions using the remapped kind: the first still-ban wins, else the first captcha. A `pass` remap MUST NOT be a captcha pick. It MUST NOT pick the first raw `Type=="ban"` and remap afterward.
+### Requirement: Live strongest pick uses LAPI type
+`queryLiveDecisions` SHALL pick among LAPI decisions using the LAPI type: the first ban wins, else the first captcha. It MUST NOT apply `OriginBasedDecisionRemap` when picking or when writing the live cache.
 
-#### Scenario: Local ban beats remapped CAPI
-- **WHEN** live returns a CAPI `ban` (`ban: captcha`) and a later `crowdsec` `ban` (unmapped)
-- **THEN** the cached kind is ban (`t`) from the `crowdsec` decision
+#### Scenario: First live ban is cached as ban
+- **WHEN** live returns a CAPI `ban` then a `crowdsec` `ban`
+- **THEN** the cached kind is ban (`t`) from the CAPI decision
 
-### Requirement: OriginBasedDecisionRemap is first-create residue
-`lapi.New` SHALL copy `OriginBasedDecisionRemap` onto the Client. The table MUST NOT appear in stream `SessionKey` or live/none `Key`. A second `New` that reuses that Client SHALL keep the first copy.
+### Requirement: OriginBasedDecisionRemap is per Bouncer
+`bouncer.New` SHALL copy `OriginBasedDecisionRemap` onto that Bouncer. The table MUST NOT appear in stream `SessionKey` or live/none `Key`. Two Bouncers sharing one Client MAY disagree. Stream apply MUST NOT use the first `New` table.
 
-#### Scenario: Second router does not split the stream
+#### Scenario: Two routers disagree
 - **WHEN** two stream `New` calls share LAPI URL, key, and Redis and disagree only on `originBasedDecisionRemap`
-- **THEN** they reuse one Client
-- **AND** stream apply uses the first `New` table
+- **THEN** they reuse one Client and one Store
+- **AND** each Bouncer applies its own table at ServeHTTP

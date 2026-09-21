@@ -38,7 +38,7 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 // streamPutItem is the Ip/header stream New item to store, or false when the decision is skipped.
 func (c *Client) streamPutItem(item Decision, duration int64) (decisionstore.Decision, bool) {
 	origin := MetricsOrigin(item.Origin, item.Scenario)
-	kind := c.remediationKind(item.Type, origin)
+	kind := decisionscope.RemediationValue(item.Type)
 	if kind == "" {
 		c.log.Debug("handleStreamCache:unknownType", "type", item.Type)
 		return decisionstore.Decision{}, false
@@ -111,7 +111,7 @@ func (c *Client) queryLiveDecisions(rawQuery string) (liveResult, error) {
 		return liveResult{}, fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
 	}
 	origin := MetricsOrigin(picked.Origin, picked.Scenario)
-	kind := c.remediationKind(picked.Type, origin)
+	kind := decisionscope.RemediationValue(picked.Type)
 	if kind == "" {
 		return liveResult{kind: decisionscope.NoBannedValue}, nil
 	}
@@ -148,12 +148,11 @@ func (c *Client) OriginName(id uint16) string {
 	return c.decisionStore.OriginName(id)
 }
 
-// strongestLiveDecision returns the first still-ban after OriginBasedDecisionRemap, else the first captcha.
+// strongestLiveDecision returns the first still-ban by LAPI type, else the first captcha.
 func (c *Client) strongestLiveDecision(items []Decision) *Decision {
 	var fallback *Decision
 	for i := range items {
-		origin := MetricsOrigin(items[i].Origin, items[i].Scenario)
-		kind := c.remediationKind(items[i].Type, origin)
+		kind := decisionscope.RemediationValue(items[i].Type)
 		if kind == decisionscope.BannedValue {
 			return &items[i]
 		}
