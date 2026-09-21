@@ -29,3 +29,8 @@ head: 1b2586d73c6b57711c17b978d9f2c4fca90ba83e
 phase: propose
 verdict: in progress
 head: 1b2586d73c6b57711c17b978d9f2c4fca90ba83e
+
+## implement (2026-09-21)
+phase: implement
+verdict: in progress
+head: 5bc9c7211f99d84d43f57be3027a767b778e6d03
