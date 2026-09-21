@@ -28,4 +28,4 @@ After `io.ReadAll` fails while buffering a forwardable body, read errors classif
 None.
 
 ## Findings
-[P3] OpenSpec task 3.2 (update `knowledge/devdocs/core_plugin_appsec.md` for client-body-dropped versus unreadable versus unclassified `GetBody`) remains unchecked in the change tasks; expect devdocsimpact before merge if that slice is required for this fork.
+None.

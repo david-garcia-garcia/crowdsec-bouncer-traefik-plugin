@@ -6,12 +6,12 @@
 | Explore | done | done | 2m |
 | Propose | done | done | 11m |
 | Implement | done | done | 8m |
-| Code review | done | done | 4m |
-| Devdocs impact | — | — | — |
+| Code review | done | done | 5m |
+| Devdocs impact | done | done | 1m |
 | Archive | — | — | — |
 | Pull request | — | — | — |
 
-Last updated: 2026-09-21 16:55 UTC
+Last updated: 2026-09-21 16:57 UTC
 
 ## Motivation
 With AppSec enabled, the bouncer buffers readable POST, PUT, PATCH, and DELETE bodies before calling the AppSec listener. That path matches normal forwardable requests: known or positive `Content-Length`, body not classified as unreadable under HTTP/2 or HTTP/3 streaming rules.
@@ -39,7 +39,7 @@ After `io.ReadAll` fails while buffering a forwardable body, read errors classif
 In progress. 0 items remain.
 
 Priority: P2 — real operator and end-user pain on client disconnect, with `FailureAction` intended as the control but ineffective on this path today.
-Reviewed head: 233a1508
+Reviewed head: 513b2188
 Owner decision: None.
 
 ## Review scores
@@ -80,7 +80,7 @@ None.
 None.
 
 ## Findings
-[P3] OpenSpec task 3.2 (update `knowledge/devdocs/core_plugin_appsec.md` for client-body-dropped versus unreadable versus unclassified `GetBody`) remains unchecked in the change tasks; expect devdocsimpact before merge if that slice is required for this fork.
+None.
 
 ## Axis review
 [Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-21-appsec-cancelled-body-ban/devstate/2026/09/2026-09-21-appsec-cancelled-body-ban/codereview_standards.md) — 2 total, 0 pending, 1 completed, 1 skipped
@@ -99,7 +99,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 233a1508d67899d0c2e267ecc414c000bcaa905b | Card must match the branch you measured |
+| Reviewed head | 513b2188d83e88bbbb2123f4e50a93cdd3cf7b87 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -113,7 +113,7 @@ Is this the best way to solve the issue? Not yet.
 
 ### Evidence
 What I checked:
-- assembled from the run bus (`deliver_card`, 233a1508d67899d0c2e267ecc414c000bcaa905b)
+- assembled from the run bus (`deliver_card`, 513b2188d83e88bbbb2123f4e50a93cdd3cf7b87)
 
 ### Rank-up moves
 None.

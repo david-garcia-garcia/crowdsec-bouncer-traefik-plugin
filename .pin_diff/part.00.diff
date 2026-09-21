@@ -227,7 +227,7 @@ index 00000000..45d1c4e9
 +- [x] 3.1 Confirm change delta matches folded `core_plugin_appsec_failure-action` scenarios (client body dropped passthrough/ban).
 +- [ ] 3.2 After implement, devdocsimpact: update `knowledge/devdocs/core_plugin_appsec.md` FailureAction section with client-body-dropped vs unreadable vs GetBody unclassified.
 diff --git a/pkg/appsec/query.go b/pkg/appsec/query.go
-index 233e8911..f7b86a3e 100644
+index 233e8911..5eec8c4e 100644
 --- a/pkg/appsec/query.go
 +++ b/pkg/appsec/query.go
 @@ -2,6 +2,7 @@ package appsec
@@ -242,8 +242,8 @@ index 233e8911..f7b86a3e 100644
  // ErrFailureCaptcha tells the bouncer to run pkg/captcha instead of ban or next.
  var ErrFailureCaptcha = errors.New("failureAction captcha")
  
-+// errClientBodyDroppedAllow signals passthrough allow when the client body cannot be buffered.
-+var errClientBodyDroppedAllow = errors.New("appsecQuery:clientBodyDropped allow")
++// errClientBodyDropped is a classified client disconnect while buffering a readable body.
++var errClientBodyDropped = errors.New("appsecQuery:clientBodyDropped")
 +
  // errAppsecReadBody is the io failure from readCappedAppsecBody (not an oversized body).
  var errAppsecReadBody = errors.New("appsecQuery:readBody")
@@ -262,31 +262,29 @@ index 233e8911..f7b86a3e 100644
  // isMethodWithBody reports whether an unreadable body on this method is a drop candidate.
  func isMethodWithBody(method string) bool {
  	switch method {
-@@ -121,6 +132,9 @@ func isHopByHopHeader(name string) bool {
+@@ -121,6 +132,10 @@ func isHopByHopHeader(name string) bool {
  // A structured JSON envelope is returned when AppSec supplies a non-empty action.
  func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response, error) {
  	req, err := c.newAppsecForwardRequest(ip, httpReq, pol)
-+	if errors.Is(err, errClientBodyDroppedAllow) {
-+		return appsecAllow(), nil
++	// Client-gone body drop uses the same FailureAction owner as unreachable / 500 / readBody.
++	if errors.Is(err, errClientBodyDropped) {
++		return resultForFailureAction(pol.FailureAction, "appsecQuery:clientBodyDropped")
 +	}
  	if err != nil {
  		return nil, err
  	}
-@@ -219,6 +233,12 @@ func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol
+@@ -219,6 +234,9 @@ func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol
  		teeReader := io.TeeReader(bodyReader, &bodyBuffer)
  		bodyBytes, err := io.ReadAll(teeReader)
  		if err != nil {
 +			if isClientGoneBodyReadErr(err) {
-+				if faErr := resultForFailureActionErr(pol.FailureAction, "appsecQuery:clientBodyDropped"); faErr != nil {
-+					return nil, faErr
-+				}
-+				return nil, errClientBodyDroppedAllow
++				return nil, errClientBodyDropped
 +			}
  			return nil, fmt.Errorf("appsecQuery:GetBody %w", err)
  		}
  		httpReq.Body = io.NopCloser(io.MultiReader(&bodyBuffer, httpReq.Body))
 diff --git a/pkg/appsec/zzz_query_test.go b/pkg/appsec/zzz_query_test.go
-index 1f797cba..7b341acf 100644
+index 1f797cba..228eaeeb 100644
 --- a/pkg/appsec/zzz_query_test.go
 +++ b/pkg/appsec/zzz_query_test.go
 @@ -1,6 +1,8 @@
@@ -405,12 +403,12 @@ index 1f797cba..7b341acf 100644
 +		{name: "deadline exceeded", err: context.DeadlineExceeded},
 +		{name: "unexpected EOF", err: io.ErrUnexpectedEOF},
 +	}
-+	for _, readErr := range clientGoneErrs {
-+		t.Run(readErr.name+"/passthrough", func(t *testing.T) {
-+			assertClientBodyDroppedPassthrough(t, readErr.err)
++	for _, goneCase := range clientGoneErrs {
++		t.Run(goneCase.name+"/passthrough", func(t *testing.T) {
++			assertClientBodyDroppedPassthrough(t, goneCase.err)
 +		})
-+		t.Run(readErr.name+"/ban", func(t *testing.T) {
-+			assertClientBodyDroppedBan(t, readErr.err)
++		t.Run(goneCase.name+"/ban", func(t *testing.T) {
++			assertClientBodyDroppedBan(t, goneCase.err)
 +		})
 +	}
 +	t.Run("unclassified read error keeps GetBody wrap", assertUnclassifiedBodyReadStillGetBody)

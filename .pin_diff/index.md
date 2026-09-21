@@ -1,10 +1,12 @@
 # Pin
 fixedPoint: origin/master
 destBranch: master
-head: 989ced3db7b61dfe4cad4d7d8afeb8233ebf8ae7
+head: 513b2188d83e88bbbb2123f4e50a93cdd3cf7b87
 emptyThreeDot: false
 usedUnstaged: false
 ## commits
+513b2188 chore(opd): code review card for #395
+233a1508 fix(appsec): map client-body drop through resultForFailureAction
 989ced3d chore(devstate): implement phase card for #395 fix
 5bc9c721 test(appsec): split #395 regression helpers for lint
 000dee96 fix(appsec): honor FailureAction on client body drop
