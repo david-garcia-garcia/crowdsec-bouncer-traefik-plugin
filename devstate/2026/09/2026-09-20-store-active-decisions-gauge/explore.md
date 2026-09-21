@@ -72,32 +72,32 @@ Intended
 ## Open questions
 
 - Q: Who owns active-decision counts vs origin intern vs metrics POST shape?
-  Decision: resolved — DecisionStore owns the compact `{originID, family} → int64` counts (updated inside PutMany/DeleteMany/memory PublishTick expiry). DecisionStore intern.Table already owns origin intern (`OriginID` / `OriginName`); reuse it, including in-process intern of a Redis MGET origin name. MetricsReporter / `pkg/lapi` owns POST shape (`usageMetricKey`, item JSON, `name=active_decisions` `unit=ip`, `OriginName` at emit). Reporter snapshots store counts; it does not keep a forget map. Do not copy intern or POST JSON into a third type.
-  By: explore
+  Decision: resolved — Memory DecisionStore recounts compact `{originID, family} → int64` after PublishTick. DecisionStore intern.Table already owns origin intern (`OriginID` / `OriginName`). Redis does not support the gauge. MetricsReporter / `pkg/lapi` owns POST shape (`usageMetricKey`, item JSON, `name=active_decisions` `unit=ip`, `OriginName` at emit). Reporter snapshots store counts; it does not keep a forget map. Do not copy intern or POST JSON into a third type.
+  By: implement
 
 - Q: Exact Store snapshot method name for POST?
   Decision: resolved — `ActiveCounts()` on `Store` returns a snapshot copy of `map[ActiveCountKey]int64` (`OriginID uint16`, `Family string`). Do not expose `usageMetricKey` or LAPI item structs from decisionstore.
   By: propose
 
 - Q: Redis previous-origin parse — MGET bytes are KindOriginString; Unpack string → originID 0?
-  Decision: resolved — MGET previous value, split `KindOriginString` for the origin name, then `Store.OriginID(name)` in-process. Do not persist intern ids on Redis. Do not add a Redis intern table. Family comes from `FamilyOfHostOrCIDR` on the slot identifier, not from Unpack.
-  By: explore
+  Decision: resolved — Redis does not expose ActiveCounts. No MGET peek for the gauge.
+  By: implement
 
 - Q: Header-scope family — `FamilyOfHostOrCIDR` on the identifier, or a distinct family token?
   Decision: resolved — keep dest: `FamilyOfHostOrCIDR` on the decision value / slot identifier. Country/AS and other non-address identifiers POST empty `ip_type` (cscli still shows the origin row). Do not invent a `header` family token.
   By: explore
 
 - Q: Does a shared DecisionStore let live Put increment a stream gauge?
-  Decision: resolved — no extra isolation needed. SessionHex includes Mode, so stream/alone and live/none already Open different stores. `countActive` is set at create from that Open’s `crowdsecMode` (true only for stream/alone). Live Open keeps `countActive` false so memo `Put` cannot increment. Two live Clients sharing one store stay uncounted. Do not put `countActive` in `StoreKey`. Traefik `New` ctx remains the reclaim holder; no `sync.Once`.
-  By: explore
+  Decision: resolved — no extra isolation needed. SessionHex includes Mode, so stream/alone and live/none already Open different stores. Live Put does not PublishTick, so memory ActiveCounts stays empty. Two live Clients sharing one store stay uncounted. Traefik `New` ctx remains the reclaim holder; no `sync.Once`.
+  By: implement
 
 - Q: Where does the compact map live (Store vs each engine)?
-  Decision: resolved — one compact map on `Store`; memory and Redis hold a pointer (same pattern as memory `origins`). `ActiveCounts` is a Store method (no engine interface). Memory adjust runs under the same `mu` as `putSlot` / `deleteTickLocked` / PublishTick sweep (nested count mutex allowed). Redis adjust is in-process after MGET, under the Store count mutex (redis has no `mu` today). Overwrite of an existing canonical slot decrements the previous group then increments the new. Prior-spelling extra DEL is not a second gauge event (dest counted one `SlotKey`).
-  By: propose
+  Decision: resolved — each engine owns the gauge. Memory recounts `{originID, family}` from the published LiveSlot map after PublishTick builds that snapshot (not incremental Put/Delete/TTL). Redis ActiveCounts is empty (no slot inventory without SCAN or a HASH redesign only for this gauge). `ActiveCounts` stays a Store method bound through engine funcs (no Go interface). Live Put does not PublishTick, so it stays uncounted without a `countActive` flag.
+  By: implement
 
 - Q: Redis TTL expiry — should counts drop when Redis keys expire without DeleteMany?
-  Decision: assumed — no. Dest reporter also never sees Redis TTL. Redis `PublishTick` stays a no-op. Counts drop on DeleteMany / overwrite only. Out of scope: replacing tick maps, Redis intern table.
-  By: explore
+  Decision: resolved — Redis ActiveCounts is empty, so Redis TTL cannot drift a gauge. Memory PublishTick expiry is included in the published-map walk.
+  By: implement
 
 - Q: Range in the store-owned gauge?
   Decision: resolved — omit Range until debt is taken. Do not Peek membership. Do not adjust counts in `ApplyRangeBatch`. Remove dest `remember`/`forget` of `range:` keys in the same change (do not keep the reporter map only for Range). Debt: `knowledge/debt/2026-09-20-range-active-decisions-forget.md` (IssueKey `2026-09-20-store-active-decisions-gauge`); `issues.md` note-large already present.
