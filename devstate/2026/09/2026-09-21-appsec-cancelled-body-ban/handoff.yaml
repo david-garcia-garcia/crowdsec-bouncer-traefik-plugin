@@ -1,0 +1,14 @@
+issueKey: 2026-09-21-appsec-cancelled-body-ban
+jobName: 2026-09-21-appsec-cancelled-body-ban
+issueHost: github
+issueRef: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/395
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: main
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
