@@ -8,10 +8,10 @@
 | Implement | done | done | 8m |
 | Code review | done | done | 5m |
 | Devdocs impact | done | done | 1m |
-| Archive | — | — | — |
+| Archive | done | done | 2m |
 | Pull request | — | — | — |
 
-Last updated: 2026-09-21 16:57 UTC
+Last updated: 2026-09-21 16:59 UTC
 
 ## Motivation
 With AppSec enabled, the bouncer buffers readable POST, PUT, PATCH, and DELETE bodies before calling the AppSec listener. That path matches normal forwardable requests: known or positive `Content-Length`, body not classified as unreadable under HTTP/2 or HTTP/3 streaming rules.
@@ -39,7 +39,7 @@ After `io.ReadAll` fails while buffering a forwardable body, read errors classif
 In progress. 0 items remain.
 
 Priority: P2 — real operator and end-user pain on client disconnect, with `FailureAction` intended as the control but ineffective on this path today.
-Reviewed head: 513b2188
+Reviewed head: fa4a6a60
 Owner decision: None.
 
 ## Review scores
@@ -61,7 +61,7 @@ Owner decision: None.
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-21-appsec-cancelled-body-ban/openspec/changes/2026-09-21-appsec-cancelled-body-ban/proposal.md) — modified
+- core_plugin_appsec_failure-action — modified
 - 2026-09-21-appsec-cancelled-body-ban — added
 
 ## Deviations from the ask
@@ -99,7 +99,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 513b2188d83e88bbbb2123f4e50a93cdd3cf7b87 | Card must match the branch you measured |
+| Reviewed head | fa4a6a6005cb9ba8c9f71889ff9d0f9794520d16 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -113,7 +113,7 @@ Is this the best way to solve the issue? Not yet.
 
 ### Evidence
 What I checked:
-- assembled from the run bus (`deliver_card`, 513b2188d83e88bbbb2123f4e50a93cdd3cf7b87)
+- assembled from the run bus (`deliver_card`, fa4a6a6005cb9ba8c9f71889ff9d0f9794520d16)
 
 ### Rank-up moves
 None.
