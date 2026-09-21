@@ -5,41 +5,43 @@
 | Prepare | done | done | 1m |
 | Explore | done | done | 2h 24m |
 | Propose | done | done | 6m |
-| Implement | done | done | 35m |
-| Code review | — | — | — |
+| Implement | done | done | 36m |
+| Code review | done | done | 3m |
 | Devdocs impact | — | — | — |
 | Archive | — | — | — |
 | Pull request | — | — | — |
 
-Last updated: 2026-09-21 20:57 UTC
+Last updated: 2026-09-21 21:01 UTC
 
 ## Motivation
-Not yet.
+Every Traefik CrowdSec middleware constructor used to open LAPI and AppSec and bounce the same router. Sharing one LAPI stream meant every bouncing router duplicated LAPI and AppSec YAML, and implicit reclaim identity tied `createdBy` to the Traefik middleware name rather than an operator-chosen instance. Operators running several routers against one CrowdSec stream could not designate one opener with secrets and have the rest subscribe by name without copying keys or racing constructor order.
+
+Priority: P2 — real operator pain reconfiguring shared clients; no data loss but heavy YAML duplication and fragile startup order.
 
 ## Implementation
-Not yet.
+Public config is split into `lapi*`, `appsec*`, and `bouncer*` domains with enable flags and instance names. `plugin.New` Opens and publishes into `pkg/instance` when secrets are present, subscribes by name when enabled without secrets, or skips legs when disabled. `bouncerHold` returns a 503 holder without bouncing. The bouncer resolves clients per request via Peek (with construct fallback for openers), applies failure actions on miss, and keeps scope registration on the LAPI opener only.
 
 ## What this changes
-**Operators.** None.
+**Operators.** Must migrate YAML to new key names (`lapiKey`, `bouncerEnabled`, `lapiInstance`, etc.); may use one opener plus named subscribers or optional hold routers instead of duplicating LAPI/AppSec secrets on every bouncing middleware.
 
 **Admin users.** None.
 
-**Developers.** None.
+**Developers.** Traefik plugin config JSON tags and semantics are breaking (beta); named-instance Peek/publish contract and removed `appsec` `lapiMode` are the main integration surface.
 
-**End users.** None.
+**End users.** None unless operators misconfigure subscribe/hold (requests may passthrough or 503 on hold routers).
 
 ## Merge readiness
 In progress. 0 items remain.
 
-Priority: unknown — motivation not written
-Reviewed head: 057e7a3b
+Priority: P2 — real operator pain reconfiguring shared clients; no data loss but heavy YAML duplication and fragile startup order.
+Reviewed head: a0e7255a
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Limited confidence |
-| CI proof | 3/6 | in progress |
+| Overall readiness | 1/6 | Not ready |
+| CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -49,7 +51,7 @@ Owner decision: None.
 | Branch | 2026-09-21-bouncer-instance-severance pushed | `git` |
 | OpenSpec | bouncer-instance-severance | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/135 | pr-host |
-| CI | build 35654218831 in progress | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35654218831 |
+| CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -84,7 +86,7 @@ Owner decision: None.
 None.
 
 ## How this fits together
-Ticket 2026-09-21-bouncer-instance-severance on branch 2026-09-21-bouncer-instance-severance targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/135; CI build 35654218831 in progress.
+Ticket 2026-09-21-bouncer-instance-severance on branch 2026-09-21-bouncer-instance-severance targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/135; CI not seen.
 
 ## Explore Decisions
 None.
@@ -93,10 +95,17 @@ None.
 None.
 
 ## Findings
-None.
+[P2] Breaking YAML rename is intentional beta; upgrade requires rewriting middleware blocks, not aliases.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-21-bouncer-instance-severance/devstate/2026/09/2026-09-21-bouncer-instance-severance/codereview_standards.md) — 1 total, 0 pending, 0 completed, 1 skipped
+[Nitpicks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-21-bouncer-instance-severance/devstate/2026/09/2026-09-21-bouncer-instance-severance/codereview_nitpicks.md) — 0 total, 0 pending, 0 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-21-bouncer-instance-severance/devstate/2026/09/2026-09-21-bouncer-instance-severance/codereview_spec.md) — 1 total, 0 pending, 1 completed
+[Scope](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-21-bouncer-instance-severance/devstate/2026/09/2026-09-21-bouncer-instance-severance/codereview_scope.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-21-bouncer-instance-severance/devstate/2026/09/2026-09-21-bouncer-instance-severance/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-21-bouncer-instance-severance/devstate/2026/09/2026-09-21-bouncer-instance-severance/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-21-bouncer-instance-severance/devstate/2026/09/2026-09-21-bouncer-instance-severance/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-21-bouncer-instance-severance/devstate/2026/09/2026-09-21-bouncer-instance-severance/codereview_coverage.md) — 1 total, 0 pending, 0 completed, 1 skipped
 
 ## Agent review details
 
@@ -105,7 +114,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 22 added / 0 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 057e7a3b425d8c340319bfe92bb46914757f7fde | Card must match the branch you measured |
+| Reviewed head | a0e7255ab7bd787d2ef01b8f3231a2a148e23094 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -119,7 +128,7 @@ Is this the best way to solve the issue? Not yet.
 
 ### Evidence
 What I checked:
-- assembled from the run bus (`deliver_card`, 057e7a3b425d8c340319bfe92bb46914757f7fde)
+- assembled from the run bus (`deliver_card`, a0e7255ab7bd787d2ef01b8f3231a2a148e23094)
 
 ### Rank-up moves
 None.
