@@ -336,6 +336,9 @@ Logs go to `stdout` / `stderr`, or to a file if `LogFilePath` is set. Expected: 
 **MetricsUpdateIntervalSeconds** (int64, default `600`)
 Seconds between metrics updates to CrowdSec. Zero or less disables collection.
 
+**OriginBasedDecisionRemap** (map[string]map[string]string, default `{}`)
+Origin-keyed remap of LAPI decision types to a weaker kind at request apply (per Traefik middleware instance). Outer key is the metrics origin (`MetricsOrigin`): `CAPI` is exact; `lists` matches every CrowdSec list; `lists:<name>` matches one list (the decision scenario). Inner key is the original LAPI type (`ban` or `captcha`). Inner value is `captcha` or `pass`. One hop on the original type: `CAPI: {ban: captcha, captcha: pass}` treats a CAPI ban as captcha and does not chain to pass. `pass` skips LAPI remediation (AppSec still runs). The DecisionStore keeps the LAPI kind. Unmapped origins and types keep the LAPI type. Invalid pairs fail configuration validation. Without a captcha provider, applied captcha still renders as ban. Two routers sharing one LAPI Client may disagree.
+
 **RedisCacheDatabase** (string, default `""`)
 Redis database selection.
 
@@ -525,6 +528,11 @@ http:
           captchaSecretKey: FIXME
           captchaGateSecret: FIXME
           captchaGracePeriodSeconds: 1800
+          originBasedDecisionRemap:
+            CAPI:
+              ban: captcha
+            lists:firehol_level1:
+              ban: captcha
           captchaFilePath: /captcha.html
           banFilePath: /ban.html
           traceHeadersCustomName: X-Request-ID

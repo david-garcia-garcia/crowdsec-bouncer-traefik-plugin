@@ -46,6 +46,7 @@ type Bouncer struct {
 	serverPoolStrategy       *ip.PoolStrategy
 	template                 *template.Template
 	traceCustomHeader        string
+	originBasedDecisionRemap map[string]map[string]string // per-router apply; LAPI/store keep original kinds
 }
 
 // New returns a per-router handler bound to lapiClient and appsecClient.
@@ -92,6 +93,7 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		serverPoolStrategy:       &ip.PoolStrategy{Checker: serverChecker},
 		template:                 template.New("CrowdsecBouncer").Delims("[[", "]]"),
 		traceCustomHeader:        config.TraceHeadersCustomName,
+		originBasedDecisionRemap: copyOriginBasedDecisionRemap(config.OriginBasedDecisionRemap),
 	}
 	// Appsec mode has no LAPI decisions to remediate, but crowdsecAppsecFailureAction: captcha
 	// still serves a challenge through this client (core_plugin_appsec_failure-action), and
@@ -256,8 +258,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		var originID uint16
 		var lookupErr error
 		kind, origin, originID, lookupErr = b.lapiClient.LookupRemediation(req.remoteIP, req.ipAddr, scopes)
-		switch {
-		case lookupErr != nil:
+		if lookupErr != nil {
 			b.log.Debug("ServeHTTP:Get", "ip", req.remoteIP, "cache", lookupErr)
 			if errors.Is(lookupErr, decisionstore.ErrUnreachable) && !b.redisUnreachableBlock {
 				b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "redisUnreachable", true)
@@ -267,9 +268,11 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "error", lookupErr)
 			b.banOrWarnForcedCaptcha(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechCacheFail)
 			return
+		}
+		kind, origin = b.appliedLAPIRemediation(kind, origin, originID)
+		switch {
 		case decisionscope.IsActiveRemediation(kind):
 			logger.Trace(b.log, "ServeHTTP", "ip", req.remoteIP, "cache", "hit", "remediation", kind)
-			// Origin is resolved only on drop; allow-path skips OriginName.
 			b.remediateOrForcedCaptcha(rw, req, kind, b.resolveDroppedOrigin(origin, originID))
 			return
 		case kind == decisionscope.NoBannedValue:
@@ -299,6 +302,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 				return
 			}
 		}
+		kind, origin = b.appliedLAPIRemediation(kind, origin, 0)
 		if kind == decisionscope.NoBannedValue {
 			b.passOrForcedCaptcha(rw, req)
 			return

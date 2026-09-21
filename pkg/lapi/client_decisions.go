@@ -37,12 +37,12 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 
 // streamPutItem is the Ip/header stream New item to store, or false when the decision is skipped.
 func (c *Client) streamPutItem(item Decision, duration int64) (decisionstore.Decision, bool) {
+	origin := MetricsOrigin(item.Origin, item.Scenario)
 	kind := decisionscope.RemediationValue(item.Type)
 	if kind == "" {
 		c.log.Debug("handleStreamCache:unknownType", "type", item.Type)
 		return decisionstore.Decision{}, false
 	}
-	origin := MetricsOrigin(item.Origin, item.Scenario)
 	scope := decisionscope.NormalizeScope(item.Scope)
 	if scope == decisionscope.ScopeRange {
 		return decisionstore.Decision{}, false
@@ -102,7 +102,7 @@ func (c *Client) queryLiveDecisions(rawQuery string) (liveResult, error) {
 	if len(items) == 0 {
 		return liveResult{kind: decisionscope.NoBannedValue}, nil
 	}
-	picked := strongestLiveDecision(items)
+	picked := c.strongestLiveDecision(items)
 	if picked == nil {
 		return liveResult{kind: decisionscope.NoBannedValue}, nil
 	}
@@ -110,13 +110,14 @@ func (c *Client) queryLiveDecisions(rawQuery string) (liveResult, error) {
 	if err != nil {
 		return liveResult{}, fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
 	}
+	origin := MetricsOrigin(picked.Origin, picked.Scenario)
 	kind := decisionscope.RemediationValue(picked.Type)
 	if kind == "" {
 		return liveResult{kind: decisionscope.NoBannedValue}, nil
 	}
 	return liveResult{
 		kind:     kind,
-		origin:   MetricsOrigin(picked.Origin, picked.Scenario),
+		origin:   origin,
 		duration: parsedDuration,
 	}, nil
 }
@@ -147,14 +148,15 @@ func (c *Client) OriginName(id uint16) string {
 	return c.decisionStore.OriginName(id)
 }
 
-// strongestLiveDecision returns the first ban in items, else the first captcha.
-func strongestLiveDecision(items []Decision) *Decision {
+// strongestLiveDecision returns the first still-ban by LAPI type, else the first captcha.
+func (c *Client) strongestLiveDecision(items []Decision) *Decision {
 	var fallback *Decision
 	for i := range items {
-		if items[i].Type == "ban" {
+		kind := decisionscope.RemediationValue(items[i].Type)
+		if kind == decisionscope.BannedValue {
 			return &items[i]
 		}
-		if items[i].Type == "captcha" {
+		if kind == decisionscope.CaptchaValue && fallback == nil {
 			fallback = &items[i]
 		}
 	}

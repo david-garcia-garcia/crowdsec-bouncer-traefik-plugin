@@ -30,6 +30,8 @@ type Decision struct {
 	Value    string `json:"value"`
 	Type     string `json:"type"`
 	Duration string `json:"duration"`
+	Origin   string `json:"origin"`
+	Scenario string `json:"scenario,omitempty"`
 }
 
 var (
@@ -332,7 +334,11 @@ func main() {
 			if duration == "" {
 				duration = "4h"
 			}
-			active[key] = Decision{Scope: scope, Value: value, Type: dtype, Duration: duration}
+			origin := q.Get("origin")
+			if origin == "" {
+				origin = "crowdsec"
+			}
+			active[key] = Decision{Scope: scope, Value: value, Type: dtype, Duration: duration, Origin: origin, Scenario: q.Get("scenario")}
 			delete(deleted, key)
 		case http.MethodDelete:
 			if d, ok := active[key]; ok {

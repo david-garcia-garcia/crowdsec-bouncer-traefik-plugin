@@ -85,6 +85,6 @@ mock/
    template).
 2. In `run.sh`, define a `body` function with the assertions and call
    `run_scenario "<name>" "$HERE" body`.
-3. Drive decisions with `lapi_add_decision <ip> [type] [duration]` and
-   `lapi_delete_decision <ip>`.
+3. Drive decisions with `lapi_add_decision <ip> [type] [duration] [origin] [scenario]` and
+   `lapi_delete_decision <ip>`. Origin defaults to `crowdsec`.
 4. Add `<name>` to `E2E_MOCK_SCENARIOS` in the `Makefile`.

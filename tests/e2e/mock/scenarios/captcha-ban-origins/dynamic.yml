@@ -1,0 +1,43 @@
+http:
+  routers:
+    r:
+      rule: "PathPrefix(`/foo`)"
+      entryPoints:
+        - web
+      service: backend
+      middlewares:
+        - bouncer
+  services:
+    backend:
+      loadBalancer:
+        servers:
+          - url: "@@BACKEND_URL@@"
+  middlewares:
+    bouncer:
+      plugin:
+        bouncer:
+          enabled: "true"
+          crowdsecMode: stream
+          updateIntervalSeconds: "2"
+          crowdsecLapiScheme: http
+          crowdsecLapiHost: "@@LAPI_HOST@@"
+          crowdsecLapiKey: "@@APIKEY@@"
+          forwardedHeadersTrustedIps:
+            - "127.0.0.1/32"
+          captchaProvider: custom
+          captchaCustomJsUrl: "http://@@LAPI_HOST@@/dummy.js"
+          captchaCustomValidateUrl: "http://@@LAPI_HOST@@/siteverify"
+          captchaCustomKey: dummy-captcha
+          captchaCustomResponse: dummy-captcha-response
+          captchaSiteKey: "e2e-dummy-site"
+          captchaSecretKey: "e2e-dummy-secret"
+          captchaGateSecret: "e2e-mock-captcha-gate-secret"
+          captchaGateBindIp: true
+          logLevel: DEBUG
+          captchaFilePath: "@@SCENARIO_DIR@@/captcha.html"
+          captchaGracePeriodSeconds: "10"
+          originBasedDecisionRemap:
+            CAPI:
+              ban: captcha
+            lists:firehol_level1:
+              ban: captcha
