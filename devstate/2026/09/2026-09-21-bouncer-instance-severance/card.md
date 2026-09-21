@@ -3,15 +3,15 @@
 | Phase | Work | Card | Duration |
 | --- | --- | --- | --- |
 | Prepare | done | done | 1m |
-| Explore | done | done | 2h 23m |
-| Propose | — | — | — |
+| Explore | done | done | 2h 24m |
+| Propose | done | done | 6m |
 | Implement | — | — | — |
 | Code review | — | — | — |
 | Devdocs impact | — | — | — |
 | Archive | — | — | — |
 | Pull request | — | — | — |
 
-Last updated: 2026-09-21 20:15 UTC
+Last updated: 2026-09-21 20:22 UTC
 
 ## Motivation
 Not yet.
@@ -32,7 +32,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: f49bdf92
+Reviewed head: 657736f0
 Owner decision: None.
 
 ## Review scores
@@ -47,7 +47,7 @@ Owner decision: None.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-21-bouncer-instance-severance pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | bouncer-instance-severance | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/135 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
@@ -84,7 +84,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | f49bdf92d946ca62f90c01aec47c443d025ced31 | Card must match the branch you measured |
+| Reviewed head | 657736f020c6413aff109bb1339dc7798970e547 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -98,7 +98,7 @@ Is this the best way to solve the issue? Not yet.
 
 ### Evidence
 What I checked:
-- assembled from the run bus (`deliver_card`, f49bdf92d946ca62f90c01aec47c443d025ced31)
+- assembled from the run bus (`deliver_card`, 657736f020c6413aff109bb1339dc7798970e547)
 
 ### Rank-up moves
 None.
