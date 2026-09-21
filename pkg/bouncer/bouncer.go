@@ -49,6 +49,10 @@ type Bouncer struct {
 	originBasedDecisionRemap map[string]map[string]string // per-router apply; LAPI/store keep original kinds
 }
 
+// remediationHeaderClientDisconnected is the RemediationHeadersCustomName value when the client
+// dropped the body during AppSec buffering. Not a ban.
+const remediationHeaderClientDisconnected = "error:client-disconnected"
+
 // New returns a per-router handler bound to lapiClient and appsecClient.
 func New(next http.Handler, name string, config *configuration.Config, lapiClient *lapi.Client, appsecClient *appsec.Client, log *slog.Logger) (http.Handler, error) {
 	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
@@ -366,6 +370,14 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 	}
 }
 
+// handleClientDisconnectedServeHTTP stops the request without a ban when the client dropped the body.
+func (b *Bouncer) handleClientDisconnectedServeHTTP(rw http.ResponseWriter, req clientRequest) {
+	logger.Trace(b.log, "client disconnected while buffering AppSec body", "ip", req.remoteIP)
+	if b.remediationCustomHeader != "" {
+		rw.Header().Set(b.remediationCustomHeader, remediationHeaderClientDisconnected)
+	}
+}
+
 // resolveDroppedOrigin uses a payload origin string, or OriginName(originID) on drop only.
 func (b *Bouncer) resolveDroppedOrigin(origin string, originID uint16) string {
 	if origin != "" {
@@ -424,6 +436,10 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientRequest
 		FailureAction: b.appsecFailureAction,
 	}
 	decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
+	if errors.Is(err, appsec.ErrClientDisconnected) {
+		b.handleClientDisconnectedServeHTTP(rw, req)
+		return true
+	}
 	if errors.Is(err, appsec.ErrFailureCaptcha) {
 		b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginAppsecFailure)
 		return true

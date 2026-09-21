@@ -1,6 +1,8 @@
 package appsec
 
 import (
+	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -25,6 +27,95 @@ func (b blockingBody) Read(_ []byte) (int, error) {
 }
 
 func (blockingBody) Close() error { return nil }
+
+// failingBody simulates a readable POST whose io.ReadAll fails mid-copy (client disconnect).
+type failingBody struct {
+	err error
+}
+
+func (b failingBody) Read(_ []byte) (int, error) {
+	return 0, b.err
+}
+
+func (failingBody) Close() error { return nil }
+
+func newReadablePostWithFailingBody(readErr error) *http.Request {
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/", failingBody{err: readErr})
+	req.ProtoMajor = 1
+	req.ContentLength = 100
+	return req
+}
+
+func assertClientDisconnectedQuery(t *testing.T, readErr error, failureAction string) {
+	t.Helper()
+	var appsecHits int
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		appsecHits++
+		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write([]byte(`{"action":"allow"}`))
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	client := newQueryClient(appsecURL, appsecServer.Client())
+	decision, err := client.Query("1.2.3.4", newReadablePostWithFailingBody(readErr), Policy{FailureAction: failureAction})
+	if !errors.Is(err, ErrClientDisconnected) {
+		t.Fatalf("Query() error %v want ErrClientDisconnected", err)
+	}
+	if decision != nil {
+		t.Fatalf("Query() expected no decision, got %#v", decision)
+	}
+	if appsecHits != 0 {
+		t.Fatalf("AppSec server called %d times, want 0", appsecHits)
+	}
+}
+
+func assertUnclassifiedBodyReadStillGetBody(t *testing.T) {
+	t.Helper()
+	var appsecHits int
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		appsecHits++
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	client := newQueryClient(appsecURL, appsecServer.Client())
+	sentinel := errors.New("disk read fault")
+	_, err := client.Query("1.2.3.4", newReadablePostWithFailingBody(sentinel), Policy{FailureAction: configuration.FailureActionPassthrough})
+	if err == nil {
+		t.Fatal("Query() expected error for unclassified body read failure")
+	}
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("Query() error %v want wrap of %v", err, sentinel)
+	}
+	if !strings.Contains(err.Error(), "appsecQuery:GetBody") {
+		t.Fatalf("Query() error %q want appsecQuery:GetBody prefix", err.Error())
+	}
+	if appsecHits != 0 {
+		t.Fatalf("AppSec server called %d times, want 0", appsecHits)
+	}
+}
+
+// Test_appsecQuery_clientDisconnected is a regression for
+// https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/395
+func Test_appsecQuery_clientDisconnected(t *testing.T) {
+	clientGoneErrs := []struct {
+		name string
+		err  error
+	}{
+		{name: "context canceled", err: context.Canceled},
+		{name: "deadline exceeded", err: context.DeadlineExceeded},
+		{name: "unexpected EOF", err: io.ErrUnexpectedEOF},
+	}
+	for _, goneCase := range clientGoneErrs {
+		t.Run(goneCase.name+"/ban-action-still-disconnects", func(t *testing.T) {
+			assertClientDisconnectedQuery(t, goneCase.err, configuration.FailureActionBan)
+		})
+		t.Run(goneCase.name+"/passthrough-action-still-disconnects", func(t *testing.T) {
+			assertClientDisconnectedQuery(t, goneCase.err, configuration.FailureActionPassthrough)
+		})
+	}
+	t.Run("unclassified read error keeps GetBody wrap", assertUnclassifiedBodyReadStillGetBody)
+}
 
 func Test_isBodyUnreadable(t *testing.T) {
 	realBody := func() io.ReadCloser { return io.NopCloser(strings.NewReader("data")) }

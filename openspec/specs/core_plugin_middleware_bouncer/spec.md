@@ -96,3 +96,12 @@ When `crowdsecMode` is live, stream, or alone, and a configured `crowdsecDecisio
 - **AND** `crowdsecDecisionHeader` is empty or the named header is not exact trimmed `b`
 - **THEN** the bouncer does not use a Store hit as the primary remediation check
 - **AND** it calls `LiveLookup` for kind and origin
+
+### Requirement: Client disconnect during AppSec body buffer is not a ban
+When AppSec `Query` returns `ErrClientDisconnected`, the bouncer SHALL stop without calling origin, SHALL NOT write a ban template or `RemediationStatusCode`, and SHALL NOT increment LAPI dropped-request metrics. It SHALL log the disconnect at TRACE only. When `remediationHeadersCustomName` is set, it SHALL set that response header to `error:client-disconnected` and MUST NOT call `WriteHeader`. `crowdsecAppsecFailureAction` SHALL NOT change this path.
+
+#### Scenario: Canceled upload is not a CrowdSec 403
+- **WHEN** AppSec is enabled and the client disconnects while the readable body is buffered
+- **THEN** origin is not called
+- **AND** the response is not a ban
+- **AND** if `remediationHeadersCustomName` is `X-Remediation` the response header value is `error:client-disconnected`

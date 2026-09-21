@@ -1,0 +1,5 @@
+host: github
+ref: "395"
+title: "[BUG] A client-cancelled request body is turned into a 403 ban, and none of the three *Block options cover it"
+url: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/395
+number: 395

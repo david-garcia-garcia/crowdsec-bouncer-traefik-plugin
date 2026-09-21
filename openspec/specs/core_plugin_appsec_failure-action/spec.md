@@ -16,7 +16,7 @@ Public config `crowdsecAppsecFailureAction` SHALL be one of `passthrough`, `ban`
 - **THEN** each route applies its own AppSec fallback
 
 ### Requirement: One action covers 500, unreachable, and unreadable body
-`CrowdsecAppsecFailureAction` SHALL apply to: AppSec HTTP 500; transport failure or HTTP 502/503/504; an unreadable HTTP/2 or HTTP/3 body on POST, PUT, or PATCH; and an io error while reading the AppSec response body. `ban` SHALL drop the request. `passthrough` on 500, unreachable, or AppSec response-body io error SHALL continue as allow (then `next`). `passthrough` on unreadable body SHALL keep today’s headers-only GET to AppSec. `captcha` SHALL use the configured captcha client (`pkg/captcha`), not AppSec JSON `action: captcha`. HTTP 502, 503, and 504 from the AppSec listener SHALL be unreachable (same fallback as a transport failure), not a generic non-200 ban. DELETE SHALL NOT be treated as a method that would have sent a body. An oversized AppSec response body SHALL NOT use this action: HTTP 200 SHALL allow and non-200 SHALL error as today. A response-body io error SHALL keep the `appsecQuery:readBody` error string (MUST NOT collapse to `appsecQuery:unreachable`).
+`CrowdsecAppsecFailureAction` SHALL apply to: AppSec HTTP 500; transport failure or HTTP 502/503/504; an unreadable HTTP/2 or HTTP/3 body on POST, PUT, or PATCH; and an io error while reading the AppSec response body. `ban` SHALL drop the request. `passthrough` on 500, unreachable, or AppSec response-body io error SHALL continue as allow (then `next`). `passthrough` on unreadable body SHALL keep today’s headers-only GET to AppSec. `captcha` SHALL use the configured captcha client (`pkg/captcha`), not AppSec JSON `action: captcha`. HTTP 502, 503, and 504 from the AppSec listener SHALL be unreachable (same fallback as a transport failure), not a generic non-200 ban. DELETE SHALL NOT be treated as a method that would have sent a body. An oversized AppSec response body SHALL NOT use this action: HTTP 200 SHALL allow and non-200 SHALL error as today. A response-body io error SHALL keep the `appsecQuery:readBody` error string (MUST NOT collapse to `appsecQuery:unreachable`). A classified client disconnect while buffering a readable request body SHALL NOT use this action (`core_plugin_appsec_client`, `core_plugin_middleware_bouncer`). Unclassified errors during client body buffering SHALL keep the `appsecQuery:GetBody` path and today's ban wiring.
 
 #### Scenario: Unreachable passthrough
 - **WHEN** AppSec is unreachable and `crowdsecAppsecFailureAction` is `passthrough`
@@ -53,6 +53,10 @@ Public config `crowdsecAppsecFailureAction` SHALL be one of `passthrough`, `ban`
 #### Scenario: Unreadable DELETE is not dropped
 - **WHEN** an HTTP/2 or HTTP/3 DELETE body cannot be buffered and `crowdsecAppsecFailureAction` is `ban`
 - **THEN** AppSec is queried with headers only (GET) and the request is not dropped
+
+#### Scenario: Client disconnect is not a failure action
+- **WHEN** buffering a readable POST, PUT, PATCH, or DELETE body for AppSec fails because the client disconnected or canceled
+- **THEN** `crowdsecAppsecFailureAction` does not choose ban, passthrough, or captcha
 
 ### Requirement: Structured AppSec verdicts are not failure actions
 HTTP 200 and parseable AppSec JSON `action` values (`allow`, `ban`, `challenge`, AppSec `captcha` HTML) SHALL keep existing bot-detection behavior. `CrowdsecAppsecFailureAction` MUST NOT rewrite those envelopes. Legacy empty/non-JSON non-200 (other than 500/502/503/504) SHALL still ban.

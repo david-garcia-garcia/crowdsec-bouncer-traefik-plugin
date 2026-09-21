@@ -2,6 +2,7 @@ package appsec
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,6 +41,10 @@ type Policy struct {
 
 // ErrFailureCaptcha tells the bouncer to run pkg/captcha instead of ban or next.
 var ErrFailureCaptcha = errors.New("failureAction captcha")
+
+// ErrClientDisconnected is a classified client disconnect while buffering a readable body.
+// Query MUST NOT call AppSec or apply FailureAction; the bouncer stops without a ban.
+var ErrClientDisconnected = errors.New("appsecQuery:clientDisconnected")
 
 // errAppsecReadBody is the io failure from readCappedAppsecBody (not an oversized body).
 var errAppsecReadBody = errors.New("appsecQuery:readBody")
@@ -81,6 +86,13 @@ func appsecAllow() *Response {
 
 func isBodyUnreadable(httpReq *http.Request) bool {
 	return httpReq.Body != nil && httpReq.Body != http.NoBody && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
+}
+
+// isClientGoneBodyReadErr reports disconnect or cancel while buffering a readable client body.
+func isClientGoneBodyReadErr(err error) bool {
+	return errors.Is(err, context.Canceled) ||
+		errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, io.ErrUnexpectedEOF)
 }
 
 // isMethodWithBody reports whether an unreadable body on this method is a drop candidate.
@@ -219,6 +231,9 @@ func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol 
 		teeReader := io.TeeReader(bodyReader, &bodyBuffer)
 		bodyBytes, err := io.ReadAll(teeReader)
 		if err != nil {
+			if isClientGoneBodyReadErr(err) {
+				return nil, ErrClientDisconnected
+			}
 			return nil, fmt.Errorf("appsecQuery:GetBody %w", err)
 		}
 		httpReq.Body = io.NopCloser(io.MultiReader(&bodyBuffer, httpReq.Body))

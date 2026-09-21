@@ -26,3 +26,4 @@ apm.lock.yaml
 # Local agent skills
 .agents/
 .cursor/
+.pin_diff/

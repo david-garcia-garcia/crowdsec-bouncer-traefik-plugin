@@ -1,3 +1,8 @@
+## Request body read errors
+priority: normal
+local: std_go_net-http_body-read-errors/
+description: Errors io.ReadAll returns when a client disconnects mid-body on an HTTP/2 request.
+
 ## Go test _test.go filename suffix
 priority: normal
 local: std_go_go-test_test-filename-suffix/
