@@ -1,6 +1,6 @@
 # Explore
 
-Verdict: **in progress** (ready for propose; no structural incidental escalations).
+Verdict: **ready** (propose complete; decisions carried into change `2026-09-21-appsec-cancelled-body-ban`).
 
 Upstream: [maxlerebourg/crowdsec-bouncer-traefik-plugin#395](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/395). Fork PR [#133](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/133) (base **master**).
 
