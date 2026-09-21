@@ -45,26 +45,25 @@ func TestStoreStreamDecisionPacksMemory(t *testing.T) {
 	}
 }
 
-func TestRememberActiveDecisionForgetCompactSlot(t *testing.T) {
+func TestActiveDecisionDeleteOmitsGauge(t *testing.T) {
 	store := newTestInternStore()
 	client, body := newUsageMetricsClient(t)
 	client.decisionStore = store
-	client.rememberActiveDecision("ip:1.2.3.4", "crowdsec", "1.2.3.4")
-	if len(client.metricsReporter.activeDecisionSlots) != 1 {
-		t.Fatalf("slots %d", len(client.metricsReporter.activeDecisionSlots))
-	}
-	rec := client.metricsReporter.activeDecisionSlots["ip:1.2.3.4"]
-	if rec.originID == 0 || rec.ipType != "ipv4" {
-		t.Fatalf("slot %#v", rec)
-	}
-	client.forgetActiveDecision("ip:1.2.3.4")
+	store.BeginTick()
+	store.Put(decisionstore.Decision{
+		Scope: decisionscope.ScopeIP, Value: "1.2.3.4", Kind: decisionscope.BannedValue, Origin: "crowdsec", DurationSec: 60,
+	})
+	store.PublishTick(0)
+	store.BeginTick()
+	store.Delete(decisionscope.ScopeIP, "1.2.3.4")
+	store.PublishTick(0)
 	if err := client.reportMetrics(); err != nil {
 		t.Fatal(err)
 	}
 	for _, raw := range usageMetricItems(t, body.bytes()) {
 		item := asObject(t, raw)
 		if item["name"] == "active_decisions" {
-			t.Fatalf("forgot slot still posted %#v", item)
+			t.Fatalf("deleted slot still posted %#v", item)
 		}
 	}
 }

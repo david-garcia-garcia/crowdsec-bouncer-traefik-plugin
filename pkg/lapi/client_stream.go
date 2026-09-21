@@ -138,7 +138,6 @@ func (c *Client) fetchAndApplyStreamDecisions() (int, int, error) {
 		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
 			if cidr := strings.TrimSpace(decision.Value); cidr != "" {
 				rangeRemovals = append(rangeRemovals, cidr)
-				c.forgetActiveDecision("range:" + cidr)
 				deletedCount++
 			}
 			continue
@@ -168,7 +167,6 @@ func (c *Client) fetchAndApplyStreamDecisions() (int, int, error) {
 			kind := c.remediationKindForOrigin(decision.Type, origin)
 			if kind != "" && cidr != "" {
 				rangeUpserts[cidr] = decisionstore.KindOriginString(kind, origin)
-				c.rememberActiveDecision("range:"+cidr, origin, cidr)
 				newCount++
 			}
 			continue

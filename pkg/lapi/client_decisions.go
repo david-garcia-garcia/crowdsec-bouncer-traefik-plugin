@@ -56,7 +56,6 @@ func (c *Client) streamPutItem(item Decision, duration int64) (decisionstore.Dec
 	if decisionstore.SlotKey(scope, item.Value) == "" {
 		return decisionstore.Decision{}, false
 	}
-	c.rememberActiveDecision(decisionstore.SlotKey(scope, item.Value), origin, item.Value)
 	return decisionstore.Decision{
 		Scope: scope, Value: item.Value, Kind: kind, Origin: origin, DurationSec: duration,
 	}, true
@@ -77,7 +76,6 @@ func (c *Client) streamDeleteItem(item Decision) (decisionstore.Decision, bool) 
 	if scope == decisionscope.ScopeRange {
 		return decisionstore.Decision{}, false
 	}
-	c.forgetActiveDecision(decisionstore.SlotKey(scope, item.Value))
 	return decisionstore.Decision{Scope: scope, Value: item.Value}, true
 }
 
