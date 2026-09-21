@@ -27,9 +27,9 @@ func copyBanToCaptchaOrigins(entries []string) []string {
 	return copied
 }
 
-// remediationKindForOrigin maps a LAPI decision type plus MetricsOrigin string to the stored kind letter.
-// A ban whose origin is listed in BanToCaptchaOrigins is stored as captcha.
-func (c *Client) remediationKindForOrigin(decisionType, metricsOrigin string) string {
+// remediationKind is the stored kind letter for a LAPI decision after Client rules.
+// Dest RemediationValue maps type only. A ban whose metrics origin is listed in BanToCaptchaOrigins is stored as captcha.
+func (c *Client) remediationKind(decisionType, metricsOrigin string) string {
 	kind := decisionscope.RemediationValue(decisionType)
 	if kind != decisionscope.BannedValue {
 		return kind

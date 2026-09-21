@@ -52,28 +52,28 @@ func TestCopyBanToCaptchaOriginsTrimsBlanks(t *testing.T) {
 	}
 }
 
-func TestRemediationKindForOrigin(t *testing.T) {
+func TestRemediationKind(t *testing.T) {
 	client := &Client{banToCaptchaOrigins: []string{"CAPI", "lists:firehol_level1"}}
-	if got := client.remediationKindForOrigin("ban", "CAPI"); got != decisionscope.CaptchaValue {
+	if got := client.remediationKind("ban", "CAPI"); got != decisionscope.CaptchaValue {
 		t.Fatalf("CAPI ban kind %q", got)
 	}
-	if got := client.remediationKindForOrigin("ban", MetricsOrigin("lists", "firehol_level1")); got != decisionscope.CaptchaValue {
+	if got := client.remediationKind("ban", MetricsOrigin("lists", "firehol_level1")); got != decisionscope.CaptchaValue {
 		t.Fatalf("listed list ban kind %q", got)
 	}
-	if got := client.remediationKindForOrigin("ban", MetricsOrigin("lists", "tor-exit")); got != decisionscope.BannedValue {
+	if got := client.remediationKind("ban", MetricsOrigin("lists", "tor-exit")); got != decisionscope.BannedValue {
 		t.Fatalf("other list ban kind %q", got)
 	}
-	if got := client.remediationKindForOrigin("ban", "cscli"); got != decisionscope.BannedValue {
+	if got := client.remediationKind("ban", "cscli"); got != decisionscope.BannedValue {
 		t.Fatalf("cscli ban kind %q", got)
 	}
-	if got := client.remediationKindForOrigin("captcha", "CAPI"); got != decisionscope.CaptchaValue {
+	if got := client.remediationKind("captcha", "CAPI"); got != decisionscope.CaptchaValue {
 		t.Fatalf("captcha type kind %q", got)
 	}
-	if got := client.remediationKindForOrigin("mfa", "CAPI"); got != "" {
+	if got := client.remediationKind("mfa", "CAPI"); got != "" {
 		t.Fatalf("unknown type kind %q", got)
 	}
 	empty := &Client{}
-	if got := empty.remediationKindForOrigin("ban", "CAPI"); got != decisionscope.BannedValue {
+	if got := empty.remediationKind("ban", "CAPI"); got != decisionscope.BannedValue {
 		t.Fatalf("empty list CAPI ban kind %q", got)
 	}
 }
@@ -109,7 +109,7 @@ func TestStrongestLiveDecisionBanToCaptchaOrigins(t *testing.T) {
 	if onlyCAPI == nil || onlyCAPI.Origin != "CAPI" {
 		t.Fatalf("want CAPI fallback, got %#v", onlyCAPI)
 	}
-	if client.remediationKindForOrigin(onlyCAPI.Type, MetricsOrigin(onlyCAPI.Origin, onlyCAPI.Scenario)) != decisionscope.CaptchaValue {
+	if client.remediationKind(onlyCAPI.Type, MetricsOrigin(onlyCAPI.Origin, onlyCAPI.Scenario)) != decisionscope.CaptchaValue {
 		t.Fatal("listed-only pick must still remap to captcha")
 	}
 }

@@ -10,7 +10,7 @@ JobName: 2026-09-20-captcha-ban-origins
 
 **Admin users.** None.
 
-**Developers.** `lapi.Client.remediationKindForOrigin` remaps after `MetricsOrigin` on stream Ip/header Put, stream Range upsert, and live/none strongest pick; first `New` copy is residue (not on the Open key); spec `core_plugin_lapi_ban-to-captcha-origins` plus usage packet.
+**Developers.** `lapi.Client.remediationKind` remaps after `MetricsOrigin` on stream Ip/header Put, stream Range upsert, and live/none strongest pick; first `New` copy is residue (not on the Open key); spec `core_plugin_lapi_ban-to-captcha-origins` plus usage packet.
 
 **End users.** Visitors whose address is a listed-origin ban see a captcha challenge instead of a 403 when a captcha provider is configured.
 

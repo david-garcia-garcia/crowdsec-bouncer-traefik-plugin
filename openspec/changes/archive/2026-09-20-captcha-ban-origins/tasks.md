@@ -5,7 +5,7 @@
 
 ## 2. Remediation mapping
 
-- [x] 2.1 Add `remediationKindForOrigin` / listed-origin match (`lists` prefix vs `lists:<name>`, exact otherwise)
+- [x] 2.1 Add `remediationKind` / listed-origin match (`lists` prefix vs `lists:<name>`, exact otherwise)
 - [x] 2.2 Use the helper in `streamPutItem`, stream Range upsert, and `queryLiveDecisions`
 - [x] 2.3 Live strongest pick uses remapped kind (still-ban wins)
 

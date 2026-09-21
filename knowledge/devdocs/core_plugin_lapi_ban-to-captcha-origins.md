@@ -12,12 +12,12 @@ _Avoid_: treating `lists:foo` as a prefix of other lists, case-fold match
 
 ## Overview
 
-Upstream https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/369 remaps on raw origin. This fork matches `MetricsOrigin` so operators can remap one CrowdSec list. Stream Ip/header, stream Range, and live/none query share `remediationKindForOrigin`. Live strongest pick uses the remapped kind so a still-ban wins. First `New` wins on a shared Client.
+Upstream https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/369 remaps on raw origin. This fork matches `MetricsOrigin` so operators can remap one CrowdSec list. Stream Ip/header, stream Range, and live/none query share `remediationKind`. Live strongest pick uses the remapped kind so a still-ban wins. First `New` wins on a shared Client.
 
 ## How to use
 
 - Copy trimmed non-empty entries in `lapi.New` (`copyBanToCaptchaOrigins`). Do not hash them into `SessionKey` or live `Key`.
-- Build origin with `MetricsOrigin` then `kind := c.remediationKindForOrigin(type, origin)` on stream Put, Range upsert, and live query.
+- Build origin with `MetricsOrigin` then `kind := c.remediationKind(type, origin)` on stream Put, Range upsert, and live query.
 - Prefer a remapped still-ban in `strongestLiveDecision`. Do not pick the first raw `Type=="ban"` then remap.
 - Empty list: ban stays `t`. Unknown type stays empty (skip store). Captcha type stays captcha.
 - Do not require `captchaProvider` here; missing provider still falls back to ban rendering.
@@ -26,7 +26,7 @@ Upstream https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/36
 
 ```go
 origin := MetricsOrigin(item.Origin, item.Scenario)
-kind := c.remediationKindForOrigin(item.Type, origin)
+kind := c.remediationKind(item.Type, origin)
 ```
 
 ## Key files

@@ -7,4 +7,4 @@ change: captcha-ban-origins
 
 ## Findings
 - [x] missing-packet  BanToCaptchaOrigins — no packet; produced `core_plugin_lapi_ban-to-captcha-origins.md`
-- [x] stale-usage  Stream apply — How-to did not name `remediationKindForOrigin` after `MetricsOrigin`
+- [x] stale-usage  Stream apply — How-to did not name `remediationKind` after `MetricsOrigin`

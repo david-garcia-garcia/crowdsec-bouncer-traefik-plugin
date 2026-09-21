@@ -19,7 +19,7 @@ skipped: n/a
 
 ## implement (2026-09-20)
 phase: implement
-findings: BanToCaptchaOrigins + remediationKindForOrigin on stream Ip/Range and live strongest pick; unit + e2e mock
+findings: BanToCaptchaOrigins + remediationKind on stream Ip/Range and live strongest pick; unit + e2e mock
 fixed: n/a
 skipped: ticker-stop / Traefik reload (out of scope)
 

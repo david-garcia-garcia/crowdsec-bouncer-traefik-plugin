@@ -38,7 +38,7 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 // streamPutItem is the Ip/header stream New item to store, or false when the decision is skipped.
 func (c *Client) streamPutItem(item Decision, duration int64) (decisionstore.Decision, bool) {
 	origin := MetricsOrigin(item.Origin, item.Scenario)
-	kind := c.remediationKindForOrigin(item.Type, origin)
+	kind := c.remediationKind(item.Type, origin)
 	if kind == "" {
 		c.log.Debug("handleStreamCache:unknownType", "type", item.Type)
 		return decisionstore.Decision{}, false
@@ -111,7 +111,7 @@ func (c *Client) queryLiveDecisions(rawQuery string) (liveResult, error) {
 		return liveResult{}, fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
 	}
 	origin := MetricsOrigin(picked.Origin, picked.Scenario)
-	kind := c.remediationKindForOrigin(picked.Type, origin)
+	kind := c.remediationKind(picked.Type, origin)
 	if kind == "" {
 		return liveResult{kind: decisionscope.NoBannedValue}, nil
 	}
@@ -153,7 +153,7 @@ func (c *Client) strongestLiveDecision(items []Decision) *Decision {
 	var fallback *Decision
 	for i := range items {
 		origin := MetricsOrigin(items[i].Origin, items[i].Scenario)
-		kind := c.remediationKindForOrigin(items[i].Type, origin)
+		kind := c.remediationKind(items[i].Type, origin)
 		if kind == decisionscope.BannedValue {
 			return &items[i]
 		}
