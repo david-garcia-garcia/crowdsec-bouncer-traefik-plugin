@@ -7,8 +7,8 @@ A reclaim value (`pkg/decisionstore.Store`) that owns one memory or Redis engine
 _Avoid_: `pkg/cache`, `cache.Client`, `liveStore`, process `ttl_map`, `sync.Once`, utilities `reclaim`
 
 **CreatedBy**:
-The Traefik `New(..., name)` string written once on the create that first put this store. Exclusive ownership of the SessionHex store is this string, not the Client Open key.
-_Avoid_: router name, Host, bouncer API key in the reclaim key, a second middleware-name registry
+The LAPI instance name (`lapiInstance`, or Traefik `New` name when empty) written once on the create that first put this store. Exclusive ownership of the SessionHex store is this string, not the Client Open key.
+_Avoid_: Traefik router name when `lapiInstance` is set, Host, bouncer API key in the reclaim key, a second middleware-name registry
 
 **Engine**:
 Funcs bound at `NewMemory` or `NewRedis` (`memoryEngine` / `redisEngine`): BeginTick, PublishTick, PutMany, DeleteMany, ActiveCounts, LookupRemediation, ApplyRangeBatch, RangeIndex, Close. Put and Delete are one-item wrappers. Memory ActiveCounts is the last PublishTick walk of published Ip/header slots. Redis ActiveCounts is always empty.
@@ -40,7 +40,7 @@ Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx
 
 ## How to use
 
-- Call `lapi.OpenDecisionStore(ctx, cfg, log, name)` then `lapi.New(..., store)` (or `OpenStream` / `OpenLive`, which Peek then Open the store first). `name` is Traefik `New(..., name)`. Reporter still omits `active_decisions` unless stream/alone.
+- Call `lapi.OpenDecisionStore(ctx, cfg, log, lapiInstanceName)` then `lapi.New(..., store)` (or `OpenStream` / `OpenLive`, which Peek then Open the store first). `lapiInstanceName` is `configuration.NamedLapiInstance` (empty `lapiInstance` → Traefik `New` name). Reporter still omits `active_decisions` unless stream/alone.
 - Memory: in-process COW tick/published `map[string]LiveSlot` plus the Range blob. Maps stay non-nil. Each `LiveSlot.ExpiresAt` is int32 elapsed seconds on the package clock (eight-byte `{uint32,int32}` slots). Live PutMany copy-on-writes onto published (one clone, then sweep expired keys with `elapsedNow()`). Published slots are `atomic.Value` of `*publishedSlots`; lookup `Load`s and does not take `mu`. Expiry compare uses the same elapsed clock.
 - Redis: import `github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis` at `v1.0.6`. Prefix is `SessionHex` (cursor), not live `IdentityHex`. Logical keys are the client IP, header-scope key, and `range-index`. Writer plus optional readers; `nextReader` never retries the writer. MSetEX/DEL are void. Do not re-patch `vendor/.../iplookup` (Contains RLock and IPv4 four-byte walk are upstream).
 - Same store key → same Store. Redis YAML change reuses the existing engine (first-wins). Exclusive ownership is write-once `createdBy`, not a Redis hash.

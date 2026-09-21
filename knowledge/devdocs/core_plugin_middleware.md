@@ -38,22 +38,6 @@ _Avoid_: `context.Background()` as the bind parent, a Release API on the table, 
 `lapiMode` is the LAPI fetch strategy (`live` | `stream` | `none` | `alone`). `lapiEnabled` and `appsecEnabled` turn each backend on. AppSec-only is `lapiEnabled: false` plus `appsecEnabled: true`. `bouncerEnabled` is whether this router remediates.
 _Avoid_: `lapiMode: appsec`, implying `appsecEnabled` from the mode
 
-**Failure action**:
-The operator enum (`passthrough` | `ban` | `captcha`) this plugin applies when LAPI or AppSec does not return a usable verdict. LAPI action is per-router on Bouncer; AppSec action is per-router on Bouncer. Default is `ban`.
-_Avoid_: fail mode, FailMode, the three removed AppSec block bools, AppSec JSON `action: captcha`, LAPI Client identity
-
-**Prepared config**:
-`New`'s own shallow copy of the `*configuration.Config` Traefik owns (`prepared`). Everything downstream of `New` reads and writes that copy: normalised `logLevel`, the `Prepare` secret resolution, alone-mode LAPI rewrite. Its slice and map fields still alias the caller's.
-_Avoid_: writing through Traefik's pointer, deep copy, mutating `LapiScopeHeaders` or the trusted-IP slices in place
-
-**Bind context**:
-The `context.WithCancel` child of the constructor `ctx` that every reclaim `Open` in `New` binds. Released on a failed `New` so nothing opened so far stays held; never released on the success path, where Traefik's own `ctx` is what ends the holders.
-_Avoid_: `context.Background()` as the bind parent, a Release API on the table, a closure-captured success bool
-
-**Two configuration axes**:
-`lapiMode` picks the decision source (`appsec` = none at all); `appsecEnabled` toggles the WAF leg, which runs on the pass path in every mode. `appsec` plus `appsecEnabled: false` enforces nothing and is warned about, not rejected.
-_Avoid_: treating `appsec` as "AppSec on", implying `appsecEnabled` from the mode
-
 ## Overview
 
 Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New` snapshots the config Traefik owns and binds every reclaim `Open` to a bind context derived from the constructor `ctx` — that child is the reclaim holder, and releasing it is how a failed constructor hands back what it already opened. Keep `.traefik.yml` `import` equal to the `go.mod` `module` path. Specs: `core_plugin_middleware_bouncer` (Yaegi `New` / Bouncer). Open key: `core_plugin_lapi_reclaim-key.md`.
@@ -133,7 +117,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 - When `appsecEnabled` is true, `ValidateParams` rejects an empty `appsecHost` (`http.NewRequest` accepts `http:///`). Disabled-AppSec empty host still passes. Do not require the host in `validateURL` or `validateParamsRequired`.
 - Do not put middleware name, `next`, ban/captcha templates, trusted IPs, Enabled, AppSec knobs, LAPI failure action, Redis fail-closed, live-cache TTL, `LapiStreamStartupBlock`, HTTP timeout, or LAPI TLS in the LAPI reclaim key. Do not put AppSec TLS or HTTP timeout in the AppSec reclaim key.
 - `bouncerLapiFailureAction` is per-router on Bouncer. `bouncerAppsecFailureAction` stays on Bouncer. Two routers on one Client MAY disagree.
-- Stream/alone: CrowdSec stores one `GET /v1/decisions/stream` cursor per hashed API key plus the IP LAPI sees (this process’s outbound address). Reclaim `Open` key is `lapi:stream:` plus SessionHex plus Redis store params. Peek the DecisionStore key (`decisionstore:` + SessionHex) before Open; a different Traefik `name` fails `New`. Same name on many routers shares. Do not call `PeekLivePrefix`. Do not Peek to retitle a sleeper. Last New `AdoptTransport`s TLS/timeout (INFO `adopted`). Last holder Sleeps tickers; reload with the same Redis snapshot Wakes (`startup=false`); a different Redis host Opens a new Client key and reuses the store when the name matches. Isolated backends need a second bouncer key. Live/none `Key` is `lapi:` plus SessionHex plus Redis and `LapiMetricsIntervalSeconds` (AppSec excluded). `IdentityHex` is not the live Open suffix.
+- Stream/alone: CrowdSec stores one `GET /v1/decisions/stream` cursor per hashed API key plus the IP LAPI sees (this process’s outbound address). Reclaim `Open` key is `lapi:stream:` plus SessionHex plus Redis store params. Peek the DecisionStore key (`decisionstore:` + SessionHex) before Open; a different LAPI instance name on the same SessionHex fails `New`. Same instance name on many Openers shares. Do not call `PeekLivePrefix`. Do not Peek to retitle a sleeper. Last New `AdoptTransport`s TLS/timeout (INFO `adopted`). Last holder Sleeps tickers; reload with the same Redis snapshot Wakes (`startup=false`); a different Redis host Opens a new Client key and reuses the store when the instance name matches. Isolated backends need a second bouncer key. Live/none `Key` is `lapi:` plus SessionHex plus Redis and `LapiMetricsIntervalSeconds` (AppSec excluded). `IdentityHex` is not the live Open suffix.
 - LAPI `Close()` stops tickers and idle LAPI HTTP. It does not Close the shared DecisionStore. AppSec `Close()` releases idle AppSec HTTP. Do not use `sync.Once`.
 - Both puts use `Open` / `OpenWithHooks` on the process table (`ProcessGrace` 30s). Utilities `DefaultGrace` (10s) is only the table’s negative-grace fallback.
 - Lifecycle INFO lines include reclaim `sessionKey` and `reason` (`started|sleeping|waking|closed`). DecisionStore INFO uses the same reasons with `storeKey` and `engine` (`crowdsec decision store started|sleeping|waking|closed`). Stream health transitions: `crowdsec stream became unhealthy|healthy` (not every poll). INFO also names `lapi transport replaced` and a live joiner `adopted` (no `ignored` / warn-and-wire). `reclaim_put`, `reclaim_reclaim`, and `reclaim_dispose` stay DEBUG. Stream poll stems `handleStreamTicker:poll` and `handleStreamCache:updated` are DEBUG. A dropped in-flight tick logs `handleStreamTicker:skip` at WARN. `startup` is an attribute on poll/updated (`true` for the full-set GET). Finish lines carry applied `new`/`deleted` counts.
