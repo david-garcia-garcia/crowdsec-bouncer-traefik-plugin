@@ -213,9 +213,6 @@ File path for `CaptchaGateSecret` (preferred over an inline secret when both are
 **CaptchaGracePeriodSeconds** (int64, default `1800` / 30 minutes)
 How long after a passed captcha before a new challenge, if the CrowdSec decision is still valid.
 
-**BanToCaptchaOrigins** ([]string, default `[]`)
-Decision origins whose `ban` decisions are stored as captcha instead of ban. Empty disables the mapping. Match is on the metrics origin (`MetricsOrigin`): `CAPI` is exact; `lists` matches every CrowdSec list; `lists:<name>` matches one list (the decision scenario). Unlisted origins stay ban. Without a captcha provider, stored captcha still renders as ban. The first middleware `New` for a shared LAPI Client wins (the list is not on the reclaim key).
-
 **CaptchaProvider** (string, no default)
 Captcha validator. Expected: `hcaptcha`, `recaptcha`, `turnstile`, `custom`.
 
@@ -338,6 +335,9 @@ Logs go to `stdout` / `stderr`, or to a file if `LogFilePath` is set. Expected: 
 
 **MetricsUpdateIntervalSeconds** (int64, default `600`)
 Seconds between metrics updates to CrowdSec. Zero or less disables collection.
+
+**OriginBasedDecisionRemap** (map[string]map[string]string, default `{}`)
+Origin-keyed remap of LAPI decision types to a weaker stored kind. Outer key is the metrics origin (`MetricsOrigin`): `CAPI` is exact; `lists` matches every CrowdSec list; `lists:<name>` matches one list (the decision scenario). Inner key is the original LAPI type (`ban` or `captcha`). Inner value is `captcha` or `pass`. One hop on the original type: `CAPI: {ban: captcha, captcha: pass}` stores a CAPI ban as captcha and does not chain to pass. `pass` skips LAPI remediation (AppSec still runs). Unmapped origins and types keep the LAPI type. Invalid pairs fail configuration validation. Without a captcha provider, stored captcha still renders as ban. The first middleware `New` for a shared LAPI Client wins (the table is not on the reclaim key).
 
 **RedisCacheDatabase** (string, default `""`)
 Redis database selection.
@@ -528,9 +528,11 @@ http:
           captchaSecretKey: FIXME
           captchaGateSecret: FIXME
           captchaGracePeriodSeconds: 1800
-          banToCaptchaOrigins:
-            - CAPI
-            - lists:firehol_level1
+          originBasedDecisionRemap:
+            CAPI:
+              ban: captcha
+            lists:firehol_level1:
+              ban: captcha
           captchaFilePath: /captcha.html
           banFilePath: /ban.html
           traceHeadersCustomName: X-Request-ID

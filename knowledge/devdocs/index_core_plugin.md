@@ -60,10 +60,10 @@ priority: normal
 local: core_plugin_lapi_stream-apply.md
 description: How this plugin writes one CrowdSec stream payload (deleted before new) into the DecisionStore.
 
-## BanToCaptchaOrigins
+## OriginBasedDecisionRemap
 priority: normal
-local: core_plugin_lapi_ban-to-captcha-origins.md
-description: How listed LAPI ban origins are stored as captcha, including per-list lists:name matching.
+local: core_plugin_lapi_origin-based-decision-remap.md
+description: How origin-keyed LAPI type remaps are stored as a weaker kind, including per-list lists:name matching.
 
 ## LAPI connection
 priority: normal

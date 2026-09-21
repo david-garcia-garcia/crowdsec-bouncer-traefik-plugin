@@ -148,7 +148,7 @@ func (c *Client) OriginName(id uint16) string {
 	return c.decisionStore.OriginName(id)
 }
 
-// strongestLiveDecision returns the first still-ban after BanToCaptchaOrigins remap, else the first captcha.
+// strongestLiveDecision returns the first still-ban after OriginBasedDecisionRemap, else the first captcha.
 func (c *Client) strongestLiveDecision(items []Decision) *Decision {
 	var fallback *Decision
 	for i := range items {

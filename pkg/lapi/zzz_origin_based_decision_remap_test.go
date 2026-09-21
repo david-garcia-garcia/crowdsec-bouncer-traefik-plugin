@@ -10,8 +10,12 @@ import (
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-func TestBanToCaptchaOriginListed(t *testing.T) {
-	listed := []string{"CAPI", "lists", "lists:firehol_level1"}
+func TestOriginBasedDecisionRemapEdges(t *testing.T) {
+	table := map[string]map[string]string{
+		"CAPI":                 {"ban": decisionscope.CaptchaValue},
+		"lists":                {"ban": decisionscope.CaptchaValue},
+		"lists:firehol_level1": {"ban": decisionscope.CaptchaValue},
+	}
 	tests := []struct {
 		origin string
 		want   bool
@@ -26,34 +30,47 @@ func TestBanToCaptchaOriginListed(t *testing.T) {
 		{origin: "capi", want: false},
 	}
 	for _, tc := range tests {
-		if got := banToCaptchaOriginListed(tc.origin, listed); got != tc.want {
-			t.Errorf("banToCaptchaOriginListed(%q) = %v, want %v", tc.origin, got, tc.want)
+		got := originBasedDecisionRemapEdges(tc.origin, table) != nil
+		if got != tc.want {
+			t.Errorf("originBasedDecisionRemapEdges(%q) present=%v, want %v", tc.origin, got, tc.want)
 		}
 	}
-	if banToCaptchaOriginListed("CAPI", nil) {
-		t.Fatal("empty list must not match")
+	if originBasedDecisionRemapEdges("CAPI", nil) != nil {
+		t.Fatal("empty table must not match")
 	}
-	oneList := []string{"lists:firehol_level1"}
-	if banToCaptchaOriginListed("lists:tor-exit", oneList) {
+	oneList := map[string]map[string]string{"lists:firehol_level1": {"ban": decisionscope.CaptchaValue}}
+	if originBasedDecisionRemapEdges("lists:tor-exit", oneList) != nil {
 		t.Fatal("lists:firehol_level1 must not match lists:tor-exit")
 	}
-	if !banToCaptchaOriginListed("lists:firehol_level1", oneList) {
+	if originBasedDecisionRemapEdges("lists:firehol_level1", oneList) == nil {
 		t.Fatal("lists:firehol_level1 must match itself")
 	}
 }
 
-func TestCopyBanToCaptchaOriginsTrimsBlanks(t *testing.T) {
-	got := copyBanToCaptchaOrigins([]string{" CAPI ", "", "lists:firehol_level1"})
-	if len(got) != 2 || got[0] != "CAPI" || got[1] != "lists:firehol_level1" {
+func TestCopyOriginBasedDecisionRemapTrimsBlanks(t *testing.T) {
+	got := copyOriginBasedDecisionRemap(map[string]map[string]string{
+		" CAPI ": {" Ban ": " Captcha "},
+		"":       {"ban": "captcha"},
+		"cscli":  {"ban": "ban"},
+	})
+	if len(got) != 1 || got["CAPI"]["ban"] != decisionscope.CaptchaValue {
 		t.Fatalf("got %#v", got)
 	}
-	if copyBanToCaptchaOrigins(nil) != nil {
+	if copyOriginBasedDecisionRemap(nil) != nil {
 		t.Fatal("nil in must stay nil")
+	}
+	pass := copyOriginBasedDecisionRemap(map[string]map[string]string{"crowdsec": {"captcha": "pass"}})
+	kind, ok := pass["crowdsec"]["captcha"]
+	if !ok || kind != "" {
+		t.Fatalf("pass must store empty kind, got %#v", pass)
 	}
 }
 
 func TestRemediationKind(t *testing.T) {
-	client := &Client{banToCaptchaOrigins: []string{"CAPI", "lists:firehol_level1"}}
+	client := &Client{originBasedDecisionRemap: copyOriginBasedDecisionRemap(map[string]map[string]string{
+		"CAPI":                 {"ban": "captcha"},
+		"lists:firehol_level1": {"ban": "captcha"},
+	})}
 	if got := client.remediationKind("ban", "CAPI"); got != decisionscope.CaptchaValue {
 		t.Fatalf("CAPI ban kind %q", got)
 	}
@@ -74,13 +91,41 @@ func TestRemediationKind(t *testing.T) {
 	}
 	empty := &Client{}
 	if got := empty.remediationKind("ban", "CAPI"); got != decisionscope.BannedValue {
-		t.Fatalf("empty list CAPI ban kind %q", got)
+		t.Fatalf("empty remap CAPI ban kind %q", got)
 	}
 }
 
-func TestStreamPutItemBanToCaptchaOrigins(t *testing.T) {
+func TestRemediationKind_OneHopDoesNotChain(t *testing.T) {
+	client := &Client{originBasedDecisionRemap: copyOriginBasedDecisionRemap(map[string]map[string]string{
+		"CAPI": {"ban": "captcha", "captcha": "pass"},
+	})}
+	if got := client.remediationKind("ban", "CAPI"); got != decisionscope.CaptchaValue {
+		t.Fatalf("ban must stay captcha, not chain to pass, got %q", got)
+	}
+	if got := client.remediationKind("captcha", "CAPI"); got != "" {
+		t.Fatalf("captcha must remap to pass, got %q", got)
+	}
+}
+
+func TestRemediationKind_CaptchaToPass(t *testing.T) {
+	client := &Client{originBasedDecisionRemap: copyOriginBasedDecisionRemap(map[string]map[string]string{
+		"crowdsec": {"captcha": "pass"},
+	})}
+	if got := client.remediationKind("captcha", "crowdsec"); got != "" {
+		t.Fatalf("captcha pass kind %q", got)
+	}
+	if got := client.remediationKind("ban", "crowdsec"); got != decisionscope.BannedValue {
+		t.Fatalf("ban must stay ban, got %q", got)
+	}
+}
+
+func TestStreamPutItemOriginBasedDecisionRemap(t *testing.T) {
 	client, _ := NewTestClient(logger.New("ERROR", ""))
-	client.banToCaptchaOrigins = []string{"CAPI", "lists:firehol_level1"}
+	client.originBasedDecisionRemap = copyOriginBasedDecisionRemap(map[string]map[string]string{
+		"CAPI":                 {"ban": "captcha"},
+		"lists:firehol_level1": {"ban": "captcha"},
+		"crowdsec":             {"captcha": "pass"},
+	})
 	stored, ok := client.streamPutItem(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.10", Origin: "CAPI"}, 60)
 	if !ok || stored.Kind != decisionscope.CaptchaValue || stored.Origin != "CAPI" {
 		t.Fatalf("CAPI put %#v ok=%v", stored, ok)
@@ -93,10 +138,16 @@ func TestStreamPutItemBanToCaptchaOrigins(t *testing.T) {
 	if !ok || stored.Kind != decisionscope.BannedValue {
 		t.Fatalf("cscli put %#v ok=%v", stored, ok)
 	}
+	_, ok = client.streamPutItem(Decision{Type: "captcha", Scope: "ip", Value: "203.0.113.13", Origin: "crowdsec"}, 60)
+	if ok {
+		t.Fatal("captcha→pass must skip store")
+	}
 }
 
-func TestStrongestLiveDecisionBanToCaptchaOrigins(t *testing.T) {
-	client := &Client{banToCaptchaOrigins: []string{"CAPI"}}
+func TestStrongestLiveDecisionOriginBasedDecisionRemap(t *testing.T) {
+	client := &Client{originBasedDecisionRemap: copyOriginBasedDecisionRemap(map[string]map[string]string{
+		"CAPI": {"ban": "captcha"},
+	})}
 	items := []Decision{
 		{Type: "ban", Origin: "CAPI", Duration: "1h"},
 		{Type: "ban", Origin: "crowdsec", Duration: "1h"},
@@ -112,9 +163,16 @@ func TestStrongestLiveDecisionBanToCaptchaOrigins(t *testing.T) {
 	if client.remediationKind(onlyCAPI.Type, MetricsOrigin(onlyCAPI.Origin, onlyCAPI.Scenario)) != decisionscope.CaptchaValue {
 		t.Fatal("listed-only pick must still remap to captcha")
 	}
+	client.originBasedDecisionRemap = copyOriginBasedDecisionRemap(map[string]map[string]string{
+		"crowdsec": {"captcha": "pass"},
+	})
+	passOnly := client.strongestLiveDecision([]Decision{{Type: "captcha", Origin: "crowdsec", Duration: "1h"}})
+	if passOnly != nil {
+		t.Fatalf("pass-only live pick must be nil, got %#v", passOnly)
+	}
 }
 
-func TestHandleStreamCacheRangeBanToCaptchaOrigins(t *testing.T) {
+func TestHandleStreamCacheRangeOriginBasedDecisionRemap(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		if _, err := rw.Write([]byte(`{"new":[{"id":1,"origin":"CAPI","type":"ban","scope":"Range","value":"10.0.0.0/8","duration":"1h","scenario":"scan"}],"deleted":[]}`)); err != nil {
 			t.Errorf("stream stub write: %v", err)
@@ -122,7 +180,9 @@ func TestHandleStreamCacheRangeBanToCaptchaOrigins(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	client := newTestStreamPoller(t, server)
-	client.banToCaptchaOrigins = []string{"CAPI"}
+	client.originBasedDecisionRemap = copyOriginBasedDecisionRemap(map[string]map[string]string{
+		"CAPI": {"ban": "captcha"},
+	})
 	if err := client.handleStreamCache(); err != nil {
 		t.Fatalf("range poll: %v", err)
 	}
@@ -132,10 +192,12 @@ func TestHandleStreamCacheRangeBanToCaptchaOrigins(t *testing.T) {
 	}
 }
 
-func TestLiveLookupBanToCaptchaOrigins(t *testing.T) {
+func TestLiveLookupOriginBasedDecisionRemap(t *testing.T) {
 	server := testLiveScopeLAPI(t, testLiveBanBody("Ip", "1.2.3.4"), nil)
 	client := newTestLiveClient(t, server)
-	client.banToCaptchaOrigins = []string{"CAPI"}
+	client.originBasedDecisionRemap = copyOriginBasedDecisionRemap(map[string]map[string]string{
+		"CAPI": {"ban": "captcha"},
+	})
 	kind, origin, err := client.LiveLookup("1.2.3.4", nil, 0)
 	if err == nil {
 		t.Fatal("active live remediation returns the banned error")

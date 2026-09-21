@@ -36,6 +36,8 @@ http:
           logLevel: DEBUG
           captchaFilePath: "@@SCENARIO_DIR@@/captcha.html"
           captchaGracePeriodSeconds: "10"
-          banToCaptchaOrigins:
-            - "CAPI"
-            - "lists:firehol_level1"
+          originBasedDecisionRemap:
+            CAPI:
+              ban: captcha
+            lists:firehol_level1:
+              ban: captcha
