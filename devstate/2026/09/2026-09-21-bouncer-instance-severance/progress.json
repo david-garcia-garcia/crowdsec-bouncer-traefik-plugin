@@ -4,14 +4,14 @@
   "startedAt": "2026-09-21T17:51:40.732Z",
   "phases": {
     "prepare": {
-      "work": false,
-      "card": false,
-      "at": null
+      "work": true,
+      "card": true,
+      "at": "2026-09-21T17:53:01.161Z"
     },
     "explore": {
-      "work": false,
-      "card": false,
-      "at": null
+      "work": true,
+      "card": true,
+      "at": "2026-09-21T20:16:36.845Z"
     },
     "propose": {
       "work": false,
