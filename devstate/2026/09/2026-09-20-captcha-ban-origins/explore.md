@@ -3,8 +3,8 @@ IssueKey: 2026-09-20-captcha-ban-origins
 
 ## Concepts
 
-**CaptchaBanOrigins**:
-Public Traefik Config `[]string` (`json:"captchaBanOrigins"`). Empty default is a no-op. A LAPI `ban` whose metrics origin matches an entry is stored as captcha kind `c` instead of ban `t`.
+**BanToCaptchaOrigins**:
+Public Traefik Config `[]string` (`json:"banToCaptchaOrigins"`). Empty default is a no-op. A LAPI `ban` whose metrics origin matches an entry is stored as captcha kind `c` instead of ban `t`.
 _Avoid_: remapping at ServeHTTP, matching raw LAPI `origin` without `MetricsOrigin`, putting this list on the reclaim Open key
 
 **Metrics origin (match key)**:
@@ -24,10 +24,10 @@ _Avoid_: three copy-pasted switches, mapping in `pkg/bouncer`, changing `decisio
 _Avoid_: remap after picking Type==ban (a CAPI ban would hide a later local `crowdsec` ban)
 
 **First-create residue**:
-`CaptchaBanOrigins` is copied onto `lapi.Client` at `New`. It MUST NOT join `SessionKey` / live `Key` (that would split the stream poller). A second router on the same cursor keeps the first Client's list, same class as `updateMaxFailure` / CAPI scenarios (`core_plugin_lapi_reclaim-key`).
+`BanToCaptchaOrigins` is copied onto `lapi.Client` at `New`. It MUST NOT join `SessionKey` / live `Key` (that would split the stream poller). A second router on the same cursor keeps the first Client's list, same class as `updateMaxFailure` / CAPI scenarios (`core_plugin_lapi_reclaim-key`).
 _Avoid_: per-router ServeHTTP remap to dodge sharing, hashing the list into the Open key
 
-Upstream: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/369 — `CaptchaBanOrigins` on Config, `remediationForDecision` on Bouncer, exact `decision.Origin` match, live + stream, empty default, unknown type stays empty. This fork cannot copy `bouncer.go` paths; apply lives in `pkg/lapi`. Per-list matching is the intentional delta.
+Upstream: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/369 — `CaptchaBanOrigins` on Config, `remediationForDecision` on Bouncer, exact `decision.Origin` match, live + stream, empty default, unknown type stays empty. This fork names the field `BanToCaptchaOrigins` and cannot copy `bouncer.go` paths; apply lives in `pkg/lapi`. Per-list matching is the intentional delta.
 
 ```
 LAPI decision (type, origin, scenario)
@@ -36,7 +36,7 @@ LAPI decision (type, origin, scenario)
  MetricsOrigin(origin, scenario)     ← owner of lists:name
         │
         ▼
- kindForDecision(type, metricsOrigin, captchaBanOrigins)
+ kindForDecision(type, metricsOrigin, banToCaptchaOrigins)
         │
         ├── stream Put / Range upsert / live memo  → store letter t|c + origin
         └── live strongest pick                    → prefer still-t over remapped-c
@@ -71,7 +71,7 @@ LAPI decision (type, origin, scenario)
   Decision: assumed — exact equality on the metrics origin (upstream `origin == decision.Origin`). The `lists` entry also matches a `lists:` prefix. `MetricsOrigin` already uses EqualFold only when rewriting the LAPI origin `lists`.
   By: explore
 
-- Q: Can two routers sharing one Client have different CaptchaBanOrigins?
+- Q: Can two routers sharing one Client have different BanToCaptchaOrigins?
   Decision: assumed — no; first `New` wins (silent residue). Do not add the list to the Open key (would duplicate the stream ticker). Operators who need different maps need different LAPI sessions.
   By: explore
 

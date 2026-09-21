@@ -10,7 +10,7 @@ import (
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-func TestCaptchaBanOriginListed(t *testing.T) {
+func TestBanToCaptchaOriginListed(t *testing.T) {
 	listed := []string{"CAPI", "lists", "lists:firehol_level1"}
 	tests := []struct {
 		origin string
@@ -26,34 +26,34 @@ func TestCaptchaBanOriginListed(t *testing.T) {
 		{origin: "capi", want: false},
 	}
 	for _, tc := range tests {
-		if got := captchaBanOriginListed(tc.origin, listed); got != tc.want {
-			t.Errorf("captchaBanOriginListed(%q) = %v, want %v", tc.origin, got, tc.want)
+		if got := banToCaptchaOriginListed(tc.origin, listed); got != tc.want {
+			t.Errorf("banToCaptchaOriginListed(%q) = %v, want %v", tc.origin, got, tc.want)
 		}
 	}
-	if captchaBanOriginListed("CAPI", nil) {
+	if banToCaptchaOriginListed("CAPI", nil) {
 		t.Fatal("empty list must not match")
 	}
 	oneList := []string{"lists:firehol_level1"}
-	if captchaBanOriginListed("lists:tor-exit", oneList) {
+	if banToCaptchaOriginListed("lists:tor-exit", oneList) {
 		t.Fatal("lists:firehol_level1 must not match lists:tor-exit")
 	}
-	if !captchaBanOriginListed("lists:firehol_level1", oneList) {
+	if !banToCaptchaOriginListed("lists:firehol_level1", oneList) {
 		t.Fatal("lists:firehol_level1 must match itself")
 	}
 }
 
-func TestCopyCaptchaBanOriginsTrimsBlanks(t *testing.T) {
-	got := copyCaptchaBanOrigins([]string{" CAPI ", "", "lists:firehol_level1"})
+func TestCopyBanToCaptchaOriginsTrimsBlanks(t *testing.T) {
+	got := copyBanToCaptchaOrigins([]string{" CAPI ", "", "lists:firehol_level1"})
 	if len(got) != 2 || got[0] != "CAPI" || got[1] != "lists:firehol_level1" {
 		t.Fatalf("got %#v", got)
 	}
-	if copyCaptchaBanOrigins(nil) != nil {
+	if copyBanToCaptchaOrigins(nil) != nil {
 		t.Fatal("nil in must stay nil")
 	}
 }
 
 func TestRemediationKindForOrigin(t *testing.T) {
-	client := &Client{captchaBanOrigins: []string{"CAPI", "lists:firehol_level1"}}
+	client := &Client{banToCaptchaOrigins: []string{"CAPI", "lists:firehol_level1"}}
 	if got := client.remediationKindForOrigin("ban", "CAPI"); got != decisionscope.CaptchaValue {
 		t.Fatalf("CAPI ban kind %q", got)
 	}
@@ -78,9 +78,9 @@ func TestRemediationKindForOrigin(t *testing.T) {
 	}
 }
 
-func TestStreamPutItemCaptchaBanOrigins(t *testing.T) {
+func TestStreamPutItemBanToCaptchaOrigins(t *testing.T) {
 	client, _ := NewTestClient(logger.New("ERROR", ""))
-	client.captchaBanOrigins = []string{"CAPI", "lists:firehol_level1"}
+	client.banToCaptchaOrigins = []string{"CAPI", "lists:firehol_level1"}
 	stored, ok := client.streamPutItem(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.10", Origin: "CAPI"}, 60)
 	if !ok || stored.Kind != decisionscope.CaptchaValue || stored.Origin != "CAPI" {
 		t.Fatalf("CAPI put %#v ok=%v", stored, ok)
@@ -95,8 +95,8 @@ func TestStreamPutItemCaptchaBanOrigins(t *testing.T) {
 	}
 }
 
-func TestStrongestLiveDecisionCaptchaBanOrigins(t *testing.T) {
-	client := &Client{captchaBanOrigins: []string{"CAPI"}}
+func TestStrongestLiveDecisionBanToCaptchaOrigins(t *testing.T) {
+	client := &Client{banToCaptchaOrigins: []string{"CAPI"}}
 	items := []Decision{
 		{Type: "ban", Origin: "CAPI", Duration: "1h"},
 		{Type: "ban", Origin: "crowdsec", Duration: "1h"},
@@ -114,7 +114,7 @@ func TestStrongestLiveDecisionCaptchaBanOrigins(t *testing.T) {
 	}
 }
 
-func TestHandleStreamCacheRangeCaptchaBanOrigins(t *testing.T) {
+func TestHandleStreamCacheRangeBanToCaptchaOrigins(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		if _, err := rw.Write([]byte(`{"new":[{"id":1,"origin":"CAPI","type":"ban","scope":"Range","value":"10.0.0.0/8","duration":"1h","scenario":"scan"}],"deleted":[]}`)); err != nil {
 			t.Errorf("stream stub write: %v", err)
@@ -122,7 +122,7 @@ func TestHandleStreamCacheRangeCaptchaBanOrigins(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	client := newTestStreamPoller(t, server)
-	client.captchaBanOrigins = []string{"CAPI"}
+	client.banToCaptchaOrigins = []string{"CAPI"}
 	if err := client.handleStreamCache(); err != nil {
 		t.Fatalf("range poll: %v", err)
 	}
@@ -132,10 +132,10 @@ func TestHandleStreamCacheRangeCaptchaBanOrigins(t *testing.T) {
 	}
 }
 
-func TestLiveLookupCaptchaBanOrigins(t *testing.T) {
+func TestLiveLookupBanToCaptchaOrigins(t *testing.T) {
 	server := testLiveScopeLAPI(t, testLiveBanBody("Ip", "1.2.3.4"), nil)
 	client := newTestLiveClient(t, server)
-	client.captchaBanOrigins = []string{"CAPI"}
+	client.banToCaptchaOrigins = []string{"CAPI"}
 	kind, origin, err := client.LiveLookup("1.2.3.4", nil, 0)
 	if err == nil {
 		t.Fatal("active live remediation returns the banned error")

@@ -6,7 +6,7 @@ See `proposal.md` — Why. On `master`, stream and live call `decisionscope.Reme
 
 **Goals:**
 
-- Empty `captchaBanOrigins` is a complete no-op.
+- Empty `banToCaptchaOrigins` is a complete no-op.
 - Listed-origin bans store captcha kind `c` on Ip, header-scope, and Range stream writes and on live/none query/cache.
 - Config `lists` matches every list metrics origin; `lists:<name>` matches one list.
 - Live strongest pick prefers a decision that still maps to ban.
@@ -34,7 +34,7 @@ See `proposal.md` — Why. On `master`, stream and live call `decisionscope.Reme
 
 ## Migration Plan
 
-Empty default. Existing deploys unchanged until operators set `captchaBanOrigins`. Stored kinds rewrite on the next stream payload / live TTL.
+Empty default. Existing deploys unchanged until operators set `banToCaptchaOrigins`. Stored kinds rewrite on the next stream payload / live TTL.
 
 ## Open Questions
 

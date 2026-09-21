@@ -2,10 +2,10 @@
 IssueKey: 2026-09-20-captcha-ban-origins
 
 ## Problem
-CrowdSec delivers many blocklist decisions as type `ban` (CAPI community blocklist, console-subscribed lists). Operators cannot change that type in console or `profiles.yaml` for those sources. Visitors on shared lists get a hard ban with no captcha path unless the bouncer remaps selected origins at store time. Upstream solved this with `CaptchaBanOrigins` in https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/369; this fork needs the same knob with per-list matching on `MetricsOrigin` strings (`lists` vs `lists:<name>`).
+CrowdSec delivers many blocklist decisions as type `ban` (CAPI community blocklist, console-subscribed lists). Operators cannot change that type in console or `profiles.yaml` for those sources. Visitors on shared lists get a hard ban with no captcha path unless the bouncer remaps selected origins at store time. Upstream solved this with `CaptchaBanOrigins` in https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/369; this fork names the knob `BanToCaptchaOrigins` and matches `MetricsOrigin` strings (`lists` vs `lists:<name>`).
 
 ## Current (code)
-- `CaptchaBanOrigins` config field: not found. `pkg/configuration/configuration.go`
+- `BanToCaptchaOrigins` config field: not found. `pkg/configuration/configuration.go`
 - Stream Ip/header apply maps LAPI `type` via `RemediationValue` only (ban → `t`, captcha → `c`). `pkg/lapi/client_decisions.go` (`streamPutItem`)
 - Stream Range apply uses the same `RemediationValue(decision.Type)` before `KindOriginString`. `pkg/lapi/client_stream.go`
 - Live/none LAPI queries map `picked.Type` through `RemediationValue` only; cached kinds use that letter. `pkg/lapi/client_decisions.go` (`queryLiveDecisions`, `cacheLiveScope`, `memoLive`)
@@ -14,7 +14,7 @@ CrowdSec delivers many blocklist decisions as type `ban` (CAPI community blockli
 - Usage-metrics origin vocabulary for CAPI / `lists:XXX`: documented in `knowledge/research/ext_crowdsec_lapi_usage-metrics/notes.md` and `knowledge/devdocs/core_plugin_lapi_usage-metrics.md`
 
 ## Desired
-- Add `CaptchaBanOrigins []string` (empty default → no-op). When a stream decision has LAPI type `ban` and `MetricsOrigin(origin, scenario)` matches an entry, store captcha remediation (`c`) instead of ban (`t`) for Ip, header-scope, and Range paths — same storage model as today (kind letter + origin on the decision store / range-index).
+- Add `BanToCaptchaOrigins []string` (empty default → no-op). When a stream decision has LAPI type `ban` and `MetricsOrigin(origin, scenario)` matches an entry, store captcha remediation (`c`) instead of ban (`t`) for Ip, header-scope, and Range paths — same storage model as today (kind letter + origin on the decision store / range-index).
 - Matching rules: exact string on the metrics origin after `MetricsOrigin`; entry `lists` matches any `lists:<name>`; entry `lists:<name>` matches only that list. Unlisted origins stay ban.
 - Align behavior with upstream https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/369 except for the per-list origin differentiation above.
 - Without captcha provider, stored captcha still renders as ban (existing fallback).

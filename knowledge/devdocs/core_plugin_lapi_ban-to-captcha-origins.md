@@ -1,9 +1,9 @@
-# CaptchaBanOrigins
+# BanToCaptchaOrigins
 
 ## Language
 
-**CaptchaBanOrigins**:
-Public Traefik Config `[]string` (`captchaBanOrigins`) copied onto `lapi.Client` at `New`. Empty is a no-op. A LAPI `ban` whose metrics origin matches an entry is stored as captcha kind `c`.
+**BanToCaptchaOrigins**:
+Public Traefik Config `[]string` (`banToCaptchaOrigins`) copied onto `lapi.Client` at `New`. Empty is a no-op. A LAPI `ban` whose metrics origin matches an entry is stored as captcha kind `c`.
 _Avoid_: remapping at ServeHTTP, matching raw `decision.Origin` without `MetricsOrigin`, putting this list on the reclaim Open key
 
 **lists prefix match**:
@@ -16,7 +16,7 @@ Upstream https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/36
 
 ## How to use
 
-- Copy trimmed non-empty entries in `lapi.New` (`copyCaptchaBanOrigins`). Do not hash them into `SessionKey` or live `Key`.
+- Copy trimmed non-empty entries in `lapi.New` (`copyBanToCaptchaOrigins`). Do not hash them into `SessionKey` or live `Key`.
 - Build origin with `MetricsOrigin` then `kind := c.remediationKindForOrigin(type, origin)` on stream Put, Range upsert, and live query.
 - Prefer a remapped still-ban in `strongestLiveDecision`. Do not pick the first raw `Type=="ban"` then remap.
 - Empty list: ban stays `t`. Unknown type stays empty (skip store). Captcha type stays captcha.
@@ -31,8 +31,8 @@ kind := c.remediationKindForOrigin(item.Type, origin)
 
 ## Key files
 
-- `pkg/configuration/configuration.go` (`CaptchaBanOrigins`)
-- `pkg/lapi/captcha_ban_origins.go`
+- `pkg/configuration/configuration.go` (`BanToCaptchaOrigins`)
+- `pkg/lapi/ban_to_captcha_origins.go`
 - `pkg/lapi/client.go` (`New` copy)
 - `pkg/lapi/client_decisions.go`
 - `pkg/lapi/client_stream.go`

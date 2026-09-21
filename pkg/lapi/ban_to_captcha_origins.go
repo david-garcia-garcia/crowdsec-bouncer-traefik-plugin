@@ -8,8 +8,8 @@ import (
 
 const listsOriginPrefix = "lists:"
 
-// copyCaptchaBanOrigins copies trimmed non-empty CaptchaBanOrigins entries for Client New.
-func copyCaptchaBanOrigins(entries []string) []string {
+// copyBanToCaptchaOrigins copies trimmed non-empty BanToCaptchaOrigins entries for Client New.
+func copyBanToCaptchaOrigins(entries []string) []string {
 	if len(entries) == 0 {
 		return nil
 	}
@@ -28,21 +28,21 @@ func copyCaptchaBanOrigins(entries []string) []string {
 }
 
 // remediationKindForOrigin maps a LAPI decision type plus MetricsOrigin string to the stored kind letter.
-// A ban whose origin is listed in CaptchaBanOrigins is stored as captcha.
+// A ban whose origin is listed in BanToCaptchaOrigins is stored as captcha.
 func (c *Client) remediationKindForOrigin(decisionType, metricsOrigin string) string {
 	kind := decisionscope.RemediationValue(decisionType)
 	if kind != decisionscope.BannedValue {
 		return kind
 	}
-	if c != nil && captchaBanOriginListed(metricsOrigin, c.captchaBanOrigins) {
+	if c != nil && banToCaptchaOriginListed(metricsOrigin, c.banToCaptchaOrigins) {
 		return decisionscope.CaptchaValue
 	}
 	return decisionscope.BannedValue
 }
 
-// captchaBanOriginListed reports whether metricsOrigin matches a CaptchaBanOrigins entry.
+// banToCaptchaOriginListed reports whether metricsOrigin matches a BanToCaptchaOrigins entry.
 // Exact equality, or config "lists" matching "lists" and any "lists:" prefix.
-func captchaBanOriginListed(metricsOrigin string, entries []string) bool {
+func banToCaptchaOriginListed(metricsOrigin string, entries []string) bool {
 	if metricsOrigin == "" {
 		return false
 	}

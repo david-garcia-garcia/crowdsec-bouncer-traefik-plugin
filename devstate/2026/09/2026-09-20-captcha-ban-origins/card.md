@@ -6,11 +6,11 @@ JobName: 2026-09-20-captcha-ban-origins
 [sgsi-dev-ticket-status:2026-09-20-captcha-ban-origins]
 
 ## What this changes
-**Operators.** Traefik list `captchaBanOrigins` (empty default) stores LAPI `ban` as captcha for matching metrics origins (`CAPI`, `lists`, or `lists:<name>`), adopted from upstream https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/369 with per-list matching; unlisted origins stay ban, and a missing captcha provider still renders ban.
+**Operators.** Traefik list `banToCaptchaOrigins` (empty default) stores LAPI `ban` as captcha for matching metrics origins (`CAPI`, `lists`, or `lists:<name>`), adopted from upstream https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/369 with per-list matching; unlisted origins stay ban, and a missing captcha provider still renders ban.
 
 **Admin users.** None.
 
-**Developers.** `lapi.Client.remediationKindForOrigin` remaps after `MetricsOrigin` on stream Ip/header Put, stream Range upsert, and live/none strongest pick; first `New` copy is residue (not on the Open key); spec `core_plugin_lapi_captcha-ban-origins` plus usage packet.
+**Developers.** `lapi.Client.remediationKindForOrigin` remaps after `MetricsOrigin` on stream Ip/header Put, stream Range upsert, and live/none strongest pick; first `New` copy is residue (not on the Open key); spec `core_plugin_lapi_ban-to-captcha-origins` plus usage packet.
 
 **End users.** Visitors whose address is a listed-origin ban see a captcha challenge instead of a 403 when a captcha provider is configured.
 
@@ -29,7 +29,7 @@ sequenceDiagram
   LAPI->>Plugin: ban / origin lists / scenario firehol_level1
   Note over Plugin: Today: MetricsOrigin lists:firehol_level1, kind t
   Plugin->>Client: 403 ban page
-  Note over Plugin: Desired: captchaBanOrigins lists or lists:firehol_level1 → kind c
+  Note over Plugin: Desired: banToCaptchaOrigins lists or lists:firehol_level1 → kind c
   Plugin->>Client: Captcha page when provider is set
 ```
 
@@ -59,7 +59,7 @@ Owner decision: Required. See Decision needed.
 | PR comments | no comments | comments: none |
 
 ## Specs
-- [core_plugin_lapi_captcha-ban-origins](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-captcha-ban-origins/openspec/changes/archive/2026-09-20-captcha-ban-origins/proposal.md) — added
+- [core_plugin_lapi_ban-to-captcha-origins](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-20-captcha-ban-origins/openspec/changes/archive/2026-09-20-captcha-ban-origins/proposal.md) — added
 
 ## Follow-up issues
 None.
@@ -72,7 +72,7 @@ Local ticket → branch `2026-09-20-captcha-ban-origins` on dest `master` → PR
 | --- | --- | --- |
 | Should ValidateParams reject unknown origin tokens? | assumed — no; trim and ignore empty entries only | explore |
 | Exact vs case-fold match for `CAPI` / `lists`? | assumed — exact equality on the metrics origin; `lists` also matches a `lists:` prefix | explore |
-| Can two routers sharing one Client have different CaptchaBanOrigins? | assumed — no; first `New` wins; do not add the list to the Open key | explore |
+| Can two routers sharing one Client have different BanToCaptchaOrigins? | assumed — no; first `New` wins; do not add the list to the Open key | explore |
 | Does `lists` match a decision whose MetricsOrigin stayed `lists` (empty scenario)? | assumed — yes | explore |
 
 ## Before merge
@@ -105,16 +105,16 @@ None.
 ### Technical review
 Best possible solution: remap at store/query using `MetricsOrigin` plus one Client helper, matching upstream #369 live+stream scope with per-list matching this fork already has the origin string for.
 
-Do we have a high-confidence way to reproduce? Yes, unit tests in `pkg/lapi/zzz_captcha_ban_origins_test.go` and e2e `tests/e2e/mock/scenarios/captcha-ban-origins/`.
+Do we have a high-confidence way to reproduce? Yes, unit tests in `pkg/lapi/zzz_ban_to_captcha_origins_test.go` and e2e `tests/e2e/mock/scenarios/captcha-ban-origins/`.
 
 Is this the best way to solve the issue? Yes versus DestBranch: ServeHTTP remap would break live strongest-pick and Range ban-over-captcha; raw `origin` match cannot distinguish lists.
 
 ### Evidence
 What I checked:
 - Product apply on `origin/master...HEAD` (`da02bc1f`, git)
-- Archive path `openspec/changes/archive/2026-09-20-captcha-ban-origins/` and live spec `openspec/specs/core_plugin_lapi_captcha-ban-origins/spec.md`
+- Archive path `openspec/changes/archive/2026-09-20-captcha-ban-origins/` and live spec `openspec/specs/core_plugin_lapi_ban-to-captcha-origins/spec.md`
 - Coverage axis Range + live lookup tests (`codereview_coverage.md`)
 - CI check runs on PR #130 head `da02bc1f`: Main Process, Race detector, e2e mock/pester/dragonfly all success (GitHub `get_check_runs`)
 
 ### Rank-up moves
-- Unit test that a second reclaim `New` keeps the first `CaptchaBanOrigins` copy
+- Unit test that a second reclaim `New` keeps the first `BanToCaptchaOrigins` copy

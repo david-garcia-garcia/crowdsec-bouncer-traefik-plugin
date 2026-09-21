@@ -1,6 +1,6 @@
 ## 1. Config and Client residue
 
-- [x] 1.1 Add `CaptchaBanOrigins []string` to Config with empty default
+- [x] 1.1 Add `BanToCaptchaOrigins []string` to Config with empty default
 - [x] 1.2 Copy trimmed non-empty entries onto `lapi.Client` in `New` (not on the Open key)
 
 ## 2. Remediation mapping
@@ -13,7 +13,7 @@
 
 - [x] 3.1 Unit tests for match rules, empty default, unlisted ban, captcha type, live strongest pick
 - [x] 3.2 Mock LAPI origin/scenario (default origin `crowdsec`); e2e scenario `captcha-ban-origins`
-- [x] 3.3 README `CaptchaBanOrigins` (cite upstream PR 369 and per-list matching)
+- [x] 3.3 README `BanToCaptchaOrigins` (cite upstream PR 369 and per-list matching)
 
 ## 4. Verification
 

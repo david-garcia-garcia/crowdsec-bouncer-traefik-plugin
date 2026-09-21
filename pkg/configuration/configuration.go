@@ -134,7 +134,7 @@ type Config struct {
 	CaptchaGateSecretFile                      string            `json:"captchaGateSecretFile,omitempty"`
 	CaptchaGateBindIP                          bool              `json:"captchaGateBindIp,omitempty"`
 	CaptchaGracePeriodSeconds                  int64             `json:"captchaGracePeriodSeconds,omitempty"`
-	CaptchaBanOrigins                          []string          `json:"captchaBanOrigins,omitempty"`
+	BanToCaptchaOrigins                        []string          `json:"banToCaptchaOrigins,omitempty"`
 }
 
 func contains(source []string, target string) bool {
@@ -217,7 +217,7 @@ func New() *Config {
 		CaptchaSecretKey:                "",
 		CaptchaGateBindIP:               true,
 		CaptchaGracePeriodSeconds:       1800,
-		CaptchaBanOrigins:               []string{},
+		BanToCaptchaOrigins:             []string{},
 		CaptchaFilePath:                 "/captcha.html",
 		BanFilePath:                     "",
 		CrowdsecDecisionHeader:          "",

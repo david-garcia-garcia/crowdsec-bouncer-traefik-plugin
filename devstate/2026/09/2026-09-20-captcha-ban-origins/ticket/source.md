@@ -2,7 +2,7 @@ Title: Serve captcha for bans from configured decision origins (upstream #369, p
 
 Adopt what upstream developed in https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/369
 
-`CaptchaBanOrigins []string` — a `ban` decision whose origin is listed is stored with the captcha remediation instead of ban.
+`BanToCaptchaOrigins []string` — a `ban` decision whose origin is listed is stored with the captcha remediation instead of ban.
 
 CAPI community blocklist and console-subscribed blocklists always deliver type `ban`; that type cannot be changed in CrowdSec console (community blocklist has no per-subscription remediation) or `profiles.yaml` (local alerts only). Upstream maps purely on `decision.Type`. A legitimate visitor on a shared community blocklist gets a hard 403 with no captcha path.
 

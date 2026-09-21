@@ -7,7 +7,7 @@ source "$HERE/../../lib/common.sh"
 
 SCENARIO=captcha-ban-origins
 
-# captchaBanOrigins: ["CAPI", "lists:firehol_level1"] — listed bans render captcha;
+# banToCaptchaOrigins: ["CAPI", "lists:firehol_level1"] — listed bans render captcha;
 # other list names and unlisted origins stay 403.
 body() {
   local url="http://127.0.0.1:${WEB_PORT}/foo"
