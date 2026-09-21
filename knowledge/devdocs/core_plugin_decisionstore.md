@@ -19,15 +19,15 @@ A `pkg/intern.Table` on one DecisionStore incarnation. Append-only `names` (`[]s
 _Avoid_: package `var`, a table shared across store reclaim keys, leftover origin strings
 
 **Packed word**:
-A memory `uint32` of `kind[0]` in the low byte and intern id in the upper bits. Redis slots and the range-index blob stay `KindOriginString` (kind, optional newline, origin). Overflow Warns and packs origin id 0.
-_Avoid_: leftover U+001F, packing inside a cache bag, intern ids in the range-index blob
+A memory `uint32` of `kind[0]` in bits 0–7, intern id in bits 8–23, and family code in bits 24–25 (`1`=ipv4, `2`=ipv6, `0`=empty). Family is classified at Put with `FamilyOfHostOrCIDR`. Redis slots and the range-index blob stay `KindOriginString` (kind, optional newline, origin). Overflow Warns and packs origin id 0.
+_Avoid_: leftover U+001F, packing inside a cache bag, intern ids in the range-index blob, ParseIP on the ActiveCounts walk
 
 **KindOriginString**:
 The Redis SET value and the Range blob remediation: kind letter, then newline, then origin when origin is present. Letter-only is still a hit.
 _Avoid_: leftover, `RemediationWithOrigin`, U+001F
 
 **Active counts**:
-The compact `{originID, family} → int64` group-by of published memory Ip and header-scope slots. Memory recounts after PublishTick builds the lookup snapshot (easier and lower impact than incrementing on Put/Delete/TTL). Redis does not support this gauge (no slot inventory without SCAN or a second HASH). `ActiveCounts` is a snapshot copy for usage-metrics POST. Live Put does not PublishTick.
+The compact `{originID, family} → int64` group-by of published memory Ip and header-scope slots. Memory recounts after PublishTick by shifting origin id and family out of the packed word (family was classified at Put). Redis does not support this gauge (no slot inventory without SCAN or a second HASH). `ActiveCounts` is a snapshot copy for usage-metrics POST. Live Put does not PublishTick.
 _Avoid_: a reporter forget map, `usageMetricKey` in decisionstore, counting Range, a running Put/Delete peek map
 
 **Elapsed slot clock**:
@@ -46,7 +46,7 @@ Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx
 - Same store key → same Store. Redis YAML change reuses the existing engine (first-wins). Exclusive ownership is write-once `createdBy`, not a Redis hash.
 - `streamReady` / `streamPollInFlight` stay on the store across Client reincarnation. Do not zero them in `lapi.New`. Stream skip is `TryBeginStreamPoll` (`core_plugin_lapi_stream-single-flight.md`).
 - `decisionScopeHeaders` and poller intervals stay off the store key. Stream `scopes=` and the store header-scope filter are the live-router union (`core_plugin_lapi_scope-union.md`).
-- Stream apply calls Store `BeginTick` / `DeleteMany` / `PutMany` / `PublishTick(ElapsedNow())` / `ApplyRangeBatch` (`core_plugin_lapi_stream-apply.md`). Memory `PublishTick(0)` skips expiry sweep; non-zero `now` drops tick slots where `ExpiresAt > 0 && ExpiresAt <= now`, then recounts `ActiveCounts` from the published map. Redis tick methods are no-ops and ignore `now`; Redis PutMany is MSetEX by TTL in `PutManyChunk` batches. Redis `ActiveCounts` is empty.
+- Stream apply calls Store `BeginTick` / `DeleteMany` / `PutMany` / `PublishTick(ElapsedNow())` / `ApplyRangeBatch` (`core_plugin_lapi_stream-apply.md`). Memory `PublishTick(0)` skips expiry sweep; non-zero `now` drops tick slots where `ExpiresAt > 0 && ExpiresAt <= now`, then recounts `ActiveCounts` from packed origin id and family on the published map. Redis tick methods are no-ops and ignore `now`; Redis PutMany is MSetEX by TTL in `PutManyChunk` batches. Redis `ActiveCounts` is empty.
 - Snapshot origin×family counts with `Store.ActiveCounts` at usage-metrics POST. Do not store `usageMetricKey` or LAPI item JSON in decisionstore. `ApplyRangeBatch` is omitted from the walk. Redis does not support this gauge.
 - Captcha grace is the gate cookie (`core_plugin_middleware_captcha-gate.md`), not store keys.
 - Origin intern is a `pkg/intern.Table` field on `Store`. `OriginID` / `OriginName` forward to it. `Name` takes `RLock`. Resolve origin only on drop.

@@ -56,7 +56,7 @@ func TestLookupHitsPackedWord(t *testing.T) {
 	if !ok {
 		t.Fatal("intern crowdsec")
 	}
-	payloads := map[string]any{"203.0.113.10": packWord(decisionscope.BannedValue, originID)}
+	payloads := map[string]any{"203.0.113.10": packWord(decisionscope.BannedValue, originID, "ipv4")}
 	kind, origin, unpackedID := lookupHits(func(key string) any { return payloads[key] }, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
 	if kind != decisionscope.BannedValue || origin != "" || unpackedID != originID {
 		t.Fatalf("kind %q origin %q id %d, want id %d", kind, origin, unpackedID, originID)

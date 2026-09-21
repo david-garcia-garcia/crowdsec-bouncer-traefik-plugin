@@ -141,6 +141,14 @@ func TestActiveCountsHeaderFamilyEmpty(t *testing.T) {
 	}
 }
 
+func TestActiveCountsIPv6Family(t *testing.T) {
+	store := countedMemory(t)
+	publishDecisions(store, Decision{Scope: decisionscope.ScopeIP, Value: "2001:db8::1", Kind: decisionscope.BannedValue, Origin: activeCountOrigin, DurationSec: 60})
+	if got := originCount(store, activeCountOrigin, "ipv6"); got != 1 {
+		t.Fatalf("ipv6 family want 1, got %#v", store.ActiveCounts())
+	}
+}
+
 func TestActiveCountsOverflowOriginIDZero(t *testing.T) {
 	store := countedMemory(t)
 	store.FillUntilMaxForTest()

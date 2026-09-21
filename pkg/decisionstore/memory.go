@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
 // publishedSlots is one immutable lookup map. atomic.Value stores *publishedSlots, not the map (Yaegi).
@@ -120,20 +121,22 @@ func (m *memory) putSlot(slots map[string]LiveSlot, item Decision) {
 	if key == "" {
 		return
 	}
-	slots[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin), item.DurationSec)
+	slots[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin, item.Value), item.DurationSec)
 }
 
-// pack encodes a uint32 word. Intern overflow Warns and uses origin id 0.
-func (m *memory) pack(kind, origin string) uint32 {
+// pack encodes kind, intern origin id, and FamilyOfHostOrCIDR(value) into one uint32.
+// Intern overflow Warns and packs origin id 0; family is still packed.
+func (m *memory) pack(kind, origin, value string) uint32 {
+	family := ip.FamilyOfHostOrCIDR(value)
 	if m.origins != nil {
 		if originID, ok := m.origins.ID(origin); ok {
-			return packWord(kind, originID)
+			return packWord(kind, originID, family)
 		}
 		if m.log != nil {
 			m.log.Warn("decisionstore:intern overflow", "kind", kind, "origin", origin)
 		}
 	}
-	return packWord(kind, 0)
+	return packWord(kind, 0, family)
 }
 
 // DeleteMany drops canonical slots and prior Ip spellings from tick or the published map.

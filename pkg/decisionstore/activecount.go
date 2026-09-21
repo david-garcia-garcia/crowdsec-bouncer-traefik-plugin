@@ -1,7 +1,5 @@
 package decisionstore
 
-import "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
-
 // ActiveCountKey is one compact stream/alone gauge group: intern origin id and address family.
 type ActiveCountKey struct {
 	OriginID uint16
@@ -15,15 +13,12 @@ func (s *Store) ActiveCounts() map[ActiveCountKey]int64 {
 }
 
 // countPublishedSlots walks the published Ip/header snapshot into origin×family totals.
-// Incremental Put/Delete/TTL is possible, but overwrite still needs a previous-origin peek
-// and expiry still walks the same keys. One pass after the snapshot is published is simpler
-// and lower impact, and it matches what lookups currently see. Range is not in this map.
+// Family and origin id come from the packed word (parsed at Put), not ParseIP on the key.
 func countPublishedSlots(slots map[string]LiveSlot) map[ActiveCountKey]int64 {
 	out := make(map[ActiveCountKey]int64)
-	for key, slot := range slots {
-		_, _, originID := unpackWord(slot.Word)
-		family := ip.FamilyOfHostOrCIDR(key)
-		out[ActiveCountKey{OriginID: originID, Family: family}]++
+	for _, slot := range slots {
+		word := slot.Word
+		out[ActiveCountKey{OriginID: packedOriginID(word), Family: packedFamily(word)}]++
 	}
 	return out
 }
