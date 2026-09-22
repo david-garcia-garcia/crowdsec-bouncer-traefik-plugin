@@ -12,6 +12,7 @@ BeforeAll {
     $script:KeyB = "c51a1c70000000000000000000000013"
     $script:AppsecKey = "c51a1c70000000000000000000000005"
     $script:GraceSeconds = 3
+    $script:SevRun = [guid]::NewGuid().ToString('N').Substring(0, 8)
     $script:SevSlot = 0
     $script:Whoami = "http://whoami-test:80"
     $script:Utf8 = New-Object System.Text.UTF8Encoding $false
@@ -125,7 +126,7 @@ $svc
     # File-provider New ctx is not cancelled on YAML replace, so a published
     # name stays held for the Traefik process. One name per It isolates that.
     function Get-SevSlot {
-        return ('sev-slot-{0}' -f $script:SevSlot)
+        return ('sev-{0}-{1}' -f $script:SevRun, $script:SevSlot)
     }
 
     function Get-SevLogs {
