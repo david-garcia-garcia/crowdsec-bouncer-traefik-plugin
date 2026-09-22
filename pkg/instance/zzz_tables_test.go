@@ -190,3 +190,29 @@ func TestUnpublishOnlyWhenStillPublisher(t *testing.T) {
 		t.Fatal("recorded publisher unpublish must clear")
 	}
 }
+
+func TestPublisherRenameClearsOldName(t *testing.T) {
+	ResetForTest()
+	t.Cleanup(ResetForTest)
+
+	owner := &testClient{id: "A"}
+	var oldBound atomic.Value
+	oldBound.Store((*testClient)(nil))
+	Subscribe(LegLAPI, "shared", Subscriber{Value: &oldBound, TraefikName: "admin"})
+	if err := PublishAll([]PublishAttempt{{
+		Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: owner, Empty: (*testClient)(nil),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if oldBound.Load() != owner {
+		t.Fatal("first publish must bind the old name")
+	}
+	if err := PublishAll([]PublishAttempt{{
+		Leg: LegLAPI, InstanceName: "other", Publisher: "cs", Client: owner, Empty: (*testClient)(nil),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if loaded, _ := oldBound.Load().(*testClient); loaded != nil {
+		t.Fatal("rename must unbind subscribers of the previous name")
+	}
+}

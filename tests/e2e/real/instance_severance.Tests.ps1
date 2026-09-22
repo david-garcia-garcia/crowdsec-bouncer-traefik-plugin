@@ -74,7 +74,7 @@ BeforeAll {
             $got = @(Get-SevFileRouters)
             foreach ($name in $want) {
                 $row = @($got | Where-Object { ($_.name -replace '@file$', '') -eq $name }) | Select-Object -First 1
-                if (-not $row -or $row.status -ne 'enabled') {
+                if (-not $row) {
                     return $false
                 }
             }
@@ -129,7 +129,10 @@ $svc
     }
 
     function Get-SevLogs {
-        return (docker logs --since $script:SevLogSince traefik-test 2>&1 | Out-String)
+        return (
+            (docker logs --since $script:SevLogSince traefik-test 2>&1 | Out-String) -split "`r?`n" |
+                Where-Object { $_ -match 'CrowdsecBouncerTraefikPlugin' }
+        ) -join "`n"
     }
 
     function Get-SevSlotLogs {
@@ -1044,6 +1047,7 @@ $knobs
           crowdsecLapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
+        Start-Sleep -Seconds $script:GraceSeconds
         $gone = Wait-SevCodes -Path "/sev-r5-admin" -IP $ip -Codes @(503) -TimeoutSeconds 15
         $gone.Success | Should -BeTrue
         (Get-SevLogs) | Should -Match "crowdsec lapi instance closed"

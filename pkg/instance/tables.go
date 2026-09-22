@@ -128,6 +128,16 @@ func publishLocked(attempt PublishAttempt) error {
 		return fmt.Errorf("crowdsec instance name %q on leg %s is held by %q; release it before %q can publish",
 			attempt.InstanceName, attempt.Leg, named.publisher, attempt.Publisher)
 	}
+	// One publisher holds one name. A rename must drop the previous slot so
+	// subscribers of the old name unbind without waiting for Close.
+	if attempt.Publisher != "" {
+		for otherName, other := range slots {
+			if otherName == attempt.InstanceName || other.publisher != attempt.Publisher {
+				continue
+			}
+			clearSlot(other, attempt.Leg, otherName)
+		}
+	}
 	if named == nil {
 		named = &slot{}
 		slots[attempt.InstanceName] = named
