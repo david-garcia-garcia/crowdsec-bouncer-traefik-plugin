@@ -20,7 +20,7 @@ Priority: P2 — real operator pain with a workaround (copy the full YAML on eve
 In progress. 1 items remain.
 
 Priority: P2 — real operator pain with a workaround (copy the full YAML on every router)
-Reviewed head: 5f5c441a
+Reviewed head: 20344f8c
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -91,7 +91,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 7 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 5f5c441a8c57ef5fae926d24fdc36177a9e27c07 | Card must match the branch you measured |
+| Reviewed head | 20344f8cf09334b048fb36a3a4fd77cad2f61f76 | Card must match the branch you measured |
 
 ### Stored data model
 **Changed**
@@ -108,7 +108,7 @@ Is this the best way to solve the issue? Not yet.
 
 ### Evidence
 What I checked:
-- assembled from the run bus (`deliver_card`, 5f5c441a8c57ef5fae926d24fdc36177a9e27c07)
+- assembled from the run bus (`deliver_card`, 20344f8cf09334b048fb36a3a4fd77cad2f61f76)
 
 ### Rank-up moves
 None.
