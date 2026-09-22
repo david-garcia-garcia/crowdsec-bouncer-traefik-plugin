@@ -85,7 +85,7 @@ Traefik New(name)
 - **Config:** Add `crowdsecLapiEnabled`, instance names, `crowdsecLapiStreamScopes`; default `crowdsecLapiEnabled` false; drop `appsec` mode (map to LAPI off + AppSec on); validation per Open vs subscribe table.
 - **Tests:** Real e2e file `tests/e2e/real/instance_severance.Tests.ps1` + writable dynamic config; go tests S1–S5, P1–P4, I1–I3 replace/adjust named tests in `pkg/lapi/zzz_session_test.go`, `pkg/appsec/zzz_session_test.go`.
 - **Rejected:** `crowdsecMode: bouncer` only bounce path; dummy routers mandatory; block `New` until owner exists; slot name as sole Client reclaim key; channel-based push (requirement).
-- **Live contract:** `no live contract` — no delta spec folder yet for this change.
+- **Live contract:** public config, constructor/reclaim, ServeHTTP bind — seven delta folders under change `bouncer-instance-severance` (see `devstate/specs.md`).
 
 ## Open questions
 
