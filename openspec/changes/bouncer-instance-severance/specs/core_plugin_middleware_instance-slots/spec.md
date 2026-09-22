@@ -26,7 +26,7 @@ Subscribe SHALL append the bouncer's `*atomic.Value` to the named slot under the
 - **AND** the bound field holds a typed nil until a later Publish Stores a client
 
 ### Requirement: Clear is generation-aware on grace Close
-When a client incarnation grace `Close` runs, Clear SHALL iterate slots in that leg's table where `current` is still that dying pointer and the recorded publisher matches that client's middleware. For each such slot, Clear SHALL store a typed nil into every subscriber and clear `current`. When `current` already points at a replacement client, Clear for the dying pointer SHALL be a no-op on that slot.
+When a client incarnation grace `Close` runs, Clear SHALL iterate slots in that leg's table where `current` is still that dying pointer. The dying pointer is the generation; a drifted Traefik name SHALL NOT leave subscribers bound. For each such slot, Clear SHALL store a typed nil into every subscriber and clear `current`. When `current` already points at a replacement client, Clear for the dying pointer SHALL be a no-op on that slot.
 
 #### Scenario: Replacement publish before old Close does not unbind new client
 - **WHEN** slot `shared` published client B while client A is in grace

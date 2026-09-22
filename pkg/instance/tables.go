@@ -21,9 +21,9 @@ const (
 	LegAppSec = "appsec"
 	// MsgTaken is the INFO line when two owners claim the same instance name.
 	MsgTaken = "crowdsec instance name taken"
-	// MsgBound is the DEBUG line when a bouncer subscribes to a slot.
+	// MsgBound is the INFO line when a bouncer receives a published client.
 	MsgBound = "crowdsec bouncer bound"
-	// MsgUnbound is the DEBUG line when a bouncer unsubscribes from a slot.
+	// MsgUnbound is the INFO line when a bouncer's slot is cleared.
 	MsgUnbound = "crowdsec bouncer unbound"
 )
 
@@ -47,6 +47,7 @@ type Subscriber struct {
 	HeaderScopes map[string]string
 }
 
+// slot is one named publish target and its subscriber atomics.
 type slot struct {
 	current      any
 	empty        any
@@ -56,10 +57,12 @@ type slot struct {
 	subscribers  []Subscriber
 }
 
+// table is one leg's instance-name map.
 type table struct {
 	slots map[string]*slot
 }
 
+// registry holds the process-wide LAPI and AppSec tables under one mutex.
 type registry struct {
 	mu     sync.Mutex
 	lapi   table
@@ -261,10 +264,10 @@ func fanout(named *slot, client any, leg, instanceName string) {
 	}
 }
 
-func storeValue(named *slot, sub Subscriber, client any, leg, instanceName string, subscribeEmpty bool) {
+func storeValue(named *slot, sub Subscriber, client any, leg, instanceName string, announceEmptyBind bool) {
 	toStore := client
 	if isNilClient(client) && named.empty == nil {
-		if subscribeEmpty && sub.Log != nil {
+		if announceEmptyBind && sub.Log != nil {
 			sub.Log.Info(MsgUnbound,
 				"traefikName", sub.TraefikName,
 				"leg", leg,
@@ -279,7 +282,7 @@ func storeValue(named *slot, sub Subscriber, client any, leg, instanceName strin
 	}
 	prev := sub.Value.Load()
 	changed := !sameClient(prev, toStore)
-	if !changed && !subscribeEmpty {
+	if !changed && !announceEmptyBind {
 		return
 	}
 	sub.Value.Store(toStore)

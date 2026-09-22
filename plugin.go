@@ -86,6 +86,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	return handler, err
 }
 
+// openAndPublishOwned Opens owned LAPI/AppSec legs, publishes them, and drops leftover slots this middleware no longer owns.
 func openAndPublishOwned(bindCtx context.Context, prepared *configuration.Config, log *slog.Logger, name string) error {
 	var lapiClient *lapi.Client
 	var err error
@@ -98,7 +99,7 @@ func openAndPublishOwned(bindCtx context.Context, prepared *configuration.Config
 		if err != nil {
 			return err
 		}
-		unpublishRenamedLAPI(lapiClient, prepared.CrowdsecLapiInstanceName, name)
+		unpublishRenamed(instance.LegLAPI, lapiClient, prepared.CrowdsecLapiInstanceName, name)
 	}
 
 	var appsecClient *appsec.Client
@@ -107,7 +108,7 @@ func openAndPublishOwned(bindCtx context.Context, prepared *configuration.Config
 		if err != nil {
 			return err
 		}
-		unpublishRenamedAppSec(appsecClient, prepared.CrowdsecAppsecInstanceName, name)
+		unpublishRenamed(instance.LegAppSec, appsecClient, prepared.CrowdsecAppsecInstanceName, name)
 	}
 
 	attempts := make([]instance.PublishAttempt, 0, 2)
@@ -141,18 +142,14 @@ func openAndPublishOwned(bindCtx context.Context, prepared *configuration.Config
 	return nil
 }
 
-func unpublishRenamedLAPI(client *lapi.Client, instanceName, publisher string) {
-	stored := client.LastPublishedName()
-	if stored == "" || stored == instanceName {
-		return
-	}
-	instance.Unpublish(instance.LegLAPI, stored, client, publisher)
+type lastPublishedName interface {
+	LastPublishedName() string
 }
 
-func unpublishRenamedAppSec(client *appsec.Client, instanceName, publisher string) {
+func unpublishRenamed(leg string, client lastPublishedName, instanceName, publisher string) {
 	stored := client.LastPublishedName()
 	if stored == "" || stored == instanceName {
 		return
 	}
-	instance.Unpublish(instance.LegAppSec, stored, client, publisher)
+	instance.Unpublish(leg, stored, client, publisher)
 }

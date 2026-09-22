@@ -293,11 +293,11 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		return
 	}
 
-	if !b.subscribeLAPI || lapiClient == nil {
-		if b.subscribeLAPI && lapiClient == nil {
-			b.applyLapiFailureAction(rw, req, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
-			return
-		}
+	if b.subscribeLAPI && lapiClient == nil {
+		b.applyLapiFailureAction(rw, req, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
+		return
+	}
+	if !b.subscribeLAPI {
 		b.passOrForcedCaptcha(rw, req)
 		return
 	}

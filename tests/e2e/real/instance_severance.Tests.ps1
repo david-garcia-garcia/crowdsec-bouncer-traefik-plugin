@@ -809,6 +809,7 @@ $svc
           httpTimeoutSeconds: "2"
           logLevel: DEBUG
           logFormat: json
+          reclaimGraceSeconds: "2"
           updateIntervalSeconds: "5"
           forwardedHeadersTrustedIps:
             - "127.0.0.1/32"
@@ -1134,6 +1135,7 @@ $svc
           httpTimeoutSeconds: "2"
           logLevel: DEBUG
           logFormat: json
+          reclaimGraceSeconds: "2"
           updateIntervalSeconds: "5"
           forwardedHeadersTrustedIps:
             - "127.0.0.1/32"

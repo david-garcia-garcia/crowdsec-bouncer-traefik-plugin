@@ -32,6 +32,7 @@ type identity struct {
 	MetricsUpdateIntervalSeconds int64    `json:"metricsUpdateIntervalSeconds"`
 }
 
+// ownership is the LAPI Open-key payload: middleware name plus client knobs.
 type ownership struct {
 	MiddlewareName               string   `json:"middlewareName"`
 	Mode                         string   `json:"mode"`
