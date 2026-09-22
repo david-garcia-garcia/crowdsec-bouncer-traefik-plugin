@@ -65,7 +65,8 @@ Describe "CrowdSec Bouncer Stream Mode Tests" {
         }
 
         It "Should drop an expired IP ban without an explicit delete" {
-            Add-TestDecision -IP $script:TestIPs.BannedIP -Type "ban" -Duration "8s"
+            # Duration must outlive bouncer-stream's 10s poll so a Set lands while the ban is live.
+            Add-TestDecision -IP $script:TestIPs.BannedIP -Type "ban" -Duration "25s"
 
             $blocked = Wait-ForCondition -Description "Stream mode to block short-lived $($script:TestIPs.BannedIP)" -TimeoutSeconds 30 -RetryIntervalSeconds 2 -Condition {
                 $response = Test-HttpRequest -Endpoint "/stream" -IP $script:TestIPs.BannedIP -TraefikUrl $script:TraefikUrl

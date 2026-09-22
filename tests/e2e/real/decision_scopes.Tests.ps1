@@ -245,7 +245,8 @@ Describe "CrowdSec Range and header-mapped scopes" {
         }
 
         It "Should drop an expired Range in stream mode without an explicit delete" {
-            Add-TestRangeDecision -Range "10.84.0.0/16" -Type "ban" -Duration "8s"
+            # Duration must outlive bouncer-scope-stream's 5s poll so a Set lands while the ban is live.
+            Add-TestRangeDecision -Range "10.84.0.0/16" -Type "ban" -Duration "15s"
 
             $blocked = Wait-ForCondition -Description "stream to block short-lived Range 10.84.0.0/16" -TimeoutSeconds 15 -RetryIntervalSeconds 0.2 -Condition {
                 $response = Test-HttpRequest -Endpoint "/scope-stream" -IP "10.84.0.8" -TraefikUrl $script:TraefikUrl
