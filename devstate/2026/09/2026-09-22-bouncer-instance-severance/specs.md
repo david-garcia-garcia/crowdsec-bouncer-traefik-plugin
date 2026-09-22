@@ -13,4 +13,4 @@ change: bouncer-instance-severance
 | core_plugin_appsec_client | fold | core_plugin_appsec_client | high | Middleware name in ownership key |
 | build_e2e_pester_crowdsec-stack | fold | build_e2e_pester_crowdsec-stack | high | instance_severance.Tests.ps1 ADDED |
 
-Verdict: in progress
+Verdict: synced — live SHALLs folded into catalog; instance-slots created
