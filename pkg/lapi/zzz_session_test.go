@@ -58,6 +58,17 @@ func testStreamLAPI(t *testing.T) (*httptest.Server, *int64) {
 	return server, &hits
 }
 
+func waitStreamFetches(t *testing.T, client *Client, want int64) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && client.StreamFetches() < want {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := client.StreamFetches(); got < want {
+		t.Fatalf("stream fetches=%d, want >= %d", got, want)
+	}
+}
+
 func TestSessionKey_SameLapiKeySharesCursorAndRedisHash(t *testing.T) {
 	fast := testStreamConfig("lapi.example:8080", 1)
 	fast.UpdateIntervalSeconds = 30
@@ -231,6 +242,14 @@ func TestOpenStream_SleepingIntervalChangeWakesSameSlot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	waitStreamFetches(t, first, 1)
+	readyDeadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(readyDeadline) && first.decisionStore.StreamReady() == 0 {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if first.decisionStore.StreamReady() == 0 {
+		t.Fatal("first stream poll must mark the store ready")
+	}
 	cancel()
 	waitClientSleeping(t, first)
 
@@ -246,8 +265,8 @@ func TestOpenStream_SleepingIntervalChangeWakesSameSlot(t *testing.T) {
 	if SessionHex(firstCfg) != SessionHex(secondCfg) {
 		t.Fatal("interval change must keep SessionHex")
 	}
-	if atomic.LoadInt64(&second.isCrowdsecStreamStartup) != 0 && second.decisionStore.StreamReady() == 0 {
-		t.Fatal("new client on a cold store may start with startup=true")
+	if atomic.LoadInt64(&second.isCrowdsecStreamStartup) != 0 {
+		t.Fatal("new Client on a warm store must not send startup=true")
 	}
 }
 
@@ -441,6 +460,14 @@ func TestOpenStream_FailureActionOnlyKeepsClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	waitStreamFetches(t, first, 1)
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && atomic.LoadInt64(hits) < 1 {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if atomic.LoadInt64(hits) < 1 {
+		t.Fatal("first Open must hit LAPI stream")
+	}
 	fetches := first.StreamFetches()
 	hitsBefore := atomic.LoadInt64(hits)
 	second, err := OpenStream(ctx, secondCfg, log, "shared", "test")
@@ -450,11 +477,15 @@ func TestOpenStream_FailureActionOnlyKeepsClient(t *testing.T) {
 	if first != second {
 		t.Fatal("failure-action-only New must reuse the Client")
 	}
-	if second.StreamFetches() != fetches {
-		t.Fatal("failure-action-only New must not start another stream fetch")
-	}
-	if atomic.LoadInt64(hits) != hitsBefore {
-		t.Fatal("failure-action-only New must not hit LAPI again")
+	quiet := time.Now().Add(100 * time.Millisecond)
+	for time.Now().Before(quiet) {
+		if second.StreamFetches() != fetches {
+			t.Fatal("failure-action-only New must not start another stream fetch")
+		}
+		if atomic.LoadInt64(hits) != hitsBefore {
+			t.Fatal("failure-action-only New must not hit LAPI again")
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
