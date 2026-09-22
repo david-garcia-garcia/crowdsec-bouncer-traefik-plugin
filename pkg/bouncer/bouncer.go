@@ -233,7 +233,7 @@ func (b *Bouncer) banOrWarnForcedCaptcha(rw http.ResponseWriter, req clientReque
 //
 // ServeHTTP is a mode dispatcher; gocyclo/funlen fire on the flattened branches.
 //
-//nolint:gocyclo,funlen
+//nolint:gocyclo,gocognit,funlen
 func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	if !b.enabled {
 		b.next.ServeHTTP(rw, httpReq)

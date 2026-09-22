@@ -13,10 +13,14 @@ import (
 )
 
 const (
-	MsgInstanceStarted  = "crowdsec appsec instance started"
+	// MsgInstanceStarted is the INFO create line for one AppSec Client incarnation.
+	MsgInstanceStarted = "crowdsec appsec instance started"
+	// MsgInstanceSleeping is the DEBUG line when the last subscriber leaves.
 	MsgInstanceSleeping = "crowdsec appsec instance sleeping"
-	MsgInstanceWaking   = "crowdsec appsec instance waking"
-	MsgInstanceClosed   = "crowdsec appsec instance closed"
+	// MsgInstanceWaking is the DEBUG line when a subscriber binds again.
+	MsgInstanceWaking = "crowdsec appsec instance waking"
+	// MsgInstanceClosed is the INFO line when the Client incarnation is closed.
+	MsgInstanceClosed = "crowdsec appsec instance closed"
 )
 
 // Client owns the AppSec HTTP round-trip for one listener identity.

@@ -102,15 +102,15 @@ func TestSessionHex_S3RedisFieldChangeForksStore(t *testing.T) {
 			secondCfg.RedisCachePassword = "pw"
 			secondCfg.RedisCacheDatabase = "1"
 			secondCfg.RedisCacheReadHosts = []string{"r1"}
-			copy := configurationCopy{
+			snapshot := configurationCopy{
 				host: secondCfg.RedisCacheHost, password: secondCfg.RedisCachePassword,
 				database: secondCfg.RedisCacheDatabase, reads: secondCfg.RedisCacheReadHosts,
 			}
-			field.mut(&copy)
-			secondCfg.RedisCacheHost = copy.host
-			secondCfg.RedisCachePassword = copy.password
-			secondCfg.RedisCacheDatabase = copy.database
-			secondCfg.RedisCacheReadHosts = copy.reads
+			field.mut(&snapshot)
+			secondCfg.RedisCacheHost = snapshot.host
+			secondCfg.RedisCachePassword = snapshot.password
+			secondCfg.RedisCacheDatabase = snapshot.database
+			secondCfg.RedisCacheReadHosts = snapshot.reads
 			if SessionHex(firstCfg) == SessionHex(secondCfg) {
 				t.Fatal("S3: redis field change must fork SessionHex")
 			}

@@ -99,7 +99,7 @@ func Test_GetVariable(t *testing.T) {
 	}
 }
 
-func Test_ValidateParams(t *testing.T) {
+func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	log := logger.New("INFO", "")
 	cfg1 := New()
 	cfg1.CrowdsecLapiEnabled = true

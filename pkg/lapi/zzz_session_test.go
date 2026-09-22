@@ -268,12 +268,11 @@ func TestOpenStream_SleepingRedisHostDoesNotOverlapPollers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fetchesBeforeCancel := first.StreamFetches()
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) && first.StreamFetches() < 1 {
 		time.Sleep(10 * time.Millisecond)
 	}
-	fetchesBeforeCancel = first.StreamFetches()
+	fetchesBeforeCancel := first.StreamFetches()
 	cancel()
 	waitClientSleeping(t, first)
 

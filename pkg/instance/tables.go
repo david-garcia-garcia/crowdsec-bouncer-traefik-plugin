@@ -14,12 +14,16 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
-// Leg names used in logs and as table keys.
 const (
-	LegLAPI    = "lapi"
-	LegAppSec  = "appsec"
-	MsgTaken   = "crowdsec instance name taken"
-	MsgBound   = "crowdsec bouncer bound"
+	// LegLAPI is the LAPI slot table key.
+	LegLAPI = "lapi"
+	// LegAppSec is the AppSec slot table key.
+	LegAppSec = "appsec"
+	// MsgTaken is the INFO line when two owners claim the same instance name.
+	MsgTaken = "crowdsec instance name taken"
+	// MsgBound is the DEBUG line when a bouncer subscribes to a slot.
+	MsgBound = "crowdsec bouncer bound"
+	// MsgUnbound is the DEBUG line when a bouncer unsubscribes from a slot.
 	MsgUnbound = "crowdsec bouncer unbound"
 )
 
@@ -62,6 +66,7 @@ type registry struct {
 	appsec table
 }
 
+//nolint:gochecknoglobals // process-wide LAPI and AppSec slot tables for Traefik reload
 var process = newRegistry()
 
 func newRegistry() *registry {
@@ -78,9 +83,13 @@ func (r *registry) tableFor(leg string) *table {
 	return &r.lapi
 }
 
-// ResetForTest drops both slot tables. Tests only.
+// ResetForTest drops both slot tables. Tests only. Mutates in place so
+// concurrent packages do not race on the process pointer.
 func ResetForTest() {
-	process = newRegistry()
+	process.mu.Lock()
+	defer process.mu.Unlock()
+	process.lapi = table{slots: make(map[string]*slot)}
+	process.appsec = table{slots: make(map[string]*slot)}
 }
 
 // PublishAll publishes every attempt under one mutex. A rejected name unpublishes

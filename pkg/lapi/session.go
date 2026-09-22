@@ -42,6 +42,7 @@ type streamOwnerIndex struct {
 	owners map[string]map[string]struct{}
 }
 
+//nolint:gochecknoglobals // process-wide stream collision index for operator logs
 var streamOwners = &streamOwnerIndex{owners: make(map[string]map[string]struct{})}
 
 func sessionFrom(cfg *configuration.Config) streamSession {
@@ -90,10 +91,6 @@ func SessionPrefix(cfg *configuration.Config) string {
 // SessionKey is session prefix plus Redis store-params hash (not the Client Open key).
 func SessionKey(cfg *configuration.Config) string {
 	return SessionPrefix(cfg) + hashJSON(storeParamsFrom(cfg))
-}
-
-func reclaimSessionKey(cfg *configuration.Config, middlewareName string) string {
-	return OwnershipKey(cfg, middlewareName)
 }
 
 func openDecisionStore(ctx context.Context, cfg *configuration.Config, log *slog.Logger, name string) (*decisionstore.Store, error) {
@@ -216,10 +213,4 @@ func dropStreamOwner(host, apiKey, middlewareName string) {
 	if len(names) == 0 {
 		delete(streamOwners.owners, key)
 	}
-}
-
-func resetStreamOwnersForTest() {
-	streamOwners.mu.Lock()
-	streamOwners.owners = make(map[string]map[string]struct{})
-	streamOwners.mu.Unlock()
 }

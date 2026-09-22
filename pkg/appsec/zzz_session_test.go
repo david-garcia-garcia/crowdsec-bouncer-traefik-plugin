@@ -3,25 +3,12 @@ package appsec
 import (
 	"context"
 	"log/slog"
-	"net/http"
 	"testing"
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
-
-type idleCloseSpy struct {
-	closed int
-}
-
-func (s *idleCloseSpy) RoundTrip(*http.Request) (*http.Response, error) {
-	return nil, http.ErrNotSupported
-}
-
-func (s *idleCloseSpy) CloseIdleConnections() {
-	s.closed++
-}
 
 func testAppsecConfig(host string) *configuration.Config {
 	return &configuration.Config{

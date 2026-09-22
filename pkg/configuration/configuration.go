@@ -363,19 +363,8 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		return err
 	}
 
-	if config.CrowdsecLapiEnabled {
-		if config.CrowdsecMode == AloneMode {
-			if _, err := GetVariable(config, "CrowdsecCapiMachineID"); err != nil {
-				return err
-			}
-			if _, err := GetVariable(config, "CrowdsecCapiPassword"); err != nil {
-				return err
-			}
-		} else {
-			if err := validateLapiURLAndKeys(config); err != nil {
-				return err
-			}
-		}
+	if err := validateLapiWhenEnabled(config); err != nil {
+		return err
 	}
 
 	// AppSec URL, key file, and HTTPS CA only when this router will open AppSec.
@@ -510,6 +499,22 @@ func validateCaptchaCredentials(config *Config) error {
 		return errors.New("CaptchaSecretKey: cannot be empty when CaptchaProvider is set")
 	}
 	return nil
+}
+
+func validateLapiWhenEnabled(config *Config) error {
+	if !config.CrowdsecLapiEnabled {
+		return nil
+	}
+	if config.CrowdsecMode == AloneMode {
+		if _, err := GetVariable(config, "CrowdsecCapiMachineID"); err != nil {
+			return err
+		}
+		if _, err := GetVariable(config, "CrowdsecCapiPassword"); err != nil {
+			return err
+		}
+		return nil
+	}
+	return validateLapiURLAndKeys(config)
 }
 
 func validateLapiURLAndKeys(config *Config) error {

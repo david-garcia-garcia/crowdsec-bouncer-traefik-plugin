@@ -60,7 +60,7 @@ func testForcedDecisionBouncer(t *testing.T, log *slog.Logger, captchaClient *ca
 			passed = true
 		}),
 	}
-	bindTestLAPI(b, lapiClient, configuration.StreamMode)
+	bindTestLAPI(b, lapiClient)
 	return b, lapiClient, &passed
 }
 

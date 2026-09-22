@@ -7,7 +7,6 @@ import (
 	"text/template"
 
 	captcha "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
@@ -130,7 +129,7 @@ func testRemapStreamBouncer(t *testing.T, lapiClient *lapi.Client, remap map[str
 			passed = true
 		}),
 	}
-	bindTestLAPI(b, lapiClient, configuration.StreamMode)
+	bindTestLAPI(b, lapiClient)
 	return b, &passed
 }
 

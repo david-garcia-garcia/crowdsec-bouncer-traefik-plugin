@@ -68,7 +68,7 @@ func TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan(t *testing.T) {
 			passed = true
 		}),
 	}
-	bindTestLAPI(b, lapiClient, configuration.StreamMode)
+	bindTestLAPI(b, lapiClient)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	req.RemoteAddr = "127.0.0.1:1"
 	req.Header.Set("X-Forwarded-For", "2001:0db8:0000:0000:0000:0000:0000:0001")
@@ -108,7 +108,7 @@ func TestServeHTTP_PackedMemoryBanRecordsCrowdsecOrigin(t *testing.T) {
 			passed = true
 		}),
 	}
-	bindTestLAPI(b, lapiClient, configuration.StreamMode)
+	bindTestLAPI(b, lapiClient)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	req.RemoteAddr = "203.0.113.10:1"
 	rw := httptest.NewRecorder()
@@ -537,7 +537,7 @@ func TestHandleNextServeHTTP_clientDisconnected(t *testing.T) {
 		remediationCustomHeader: "X-Remediation",
 		log:                     traceLog,
 	}
-	bindTestLAPI(b, lapiClient, configuration.StreamMode)
+	bindTestLAPI(b, lapiClient)
 	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", failingBodyForDisconnectTest{err: context.Canceled})
 	req.ContentLength = 100
@@ -586,7 +586,7 @@ func TestTwoBouncersDistinctLapiFailureActions(t *testing.T) {
 		log:               logger.New("ERROR", ""),
 		lapiFailureAction: configuration.FailureActionPassthrough,
 	}
-	bindTestLAPI(passthrough, shared, configuration.StreamMode)
+	bindTestLAPI(passthrough, shared)
 	ban := &Bouncer{
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			t.Error("ban bouncer must not call next")
@@ -595,7 +595,7 @@ func TestTwoBouncersDistinctLapiFailureActions(t *testing.T) {
 		log:                   logger.New("ERROR", ""),
 		lapiFailureAction:     configuration.FailureActionBan,
 	}
-	bindTestLAPI(ban, shared, configuration.StreamMode)
+	bindTestLAPI(ban, shared)
 	if !passthrough.SameLapiClient(ban) {
 		t.Fatal("both bouncers must share one Client")
 	}

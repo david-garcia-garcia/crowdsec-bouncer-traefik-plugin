@@ -3,6 +3,7 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -50,49 +51,8 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		}
 	}()
 
-	var lapiClient *lapi.Client
-	if prepared.CrowdsecLapiEnabled {
-		if prepared.CrowdsecMode == configuration.StreamMode || prepared.CrowdsecMode == configuration.AloneMode {
-			lapiClient, err = lapi.OpenStream(bindCtx, &prepared, log, name, pluginVersion)
-		} else {
-			lapiClient, err = lapi.OpenLive(bindCtx, &prepared, log, name, pluginVersion)
-		}
-		if err != nil {
-			return nil, err
-		}
-		unpublishRenamedLAPI(lapiClient, prepared.CrowdsecLapiInstanceName, name)
-	}
-
-	var appsecClient *appsec.Client
-	if prepared.CrowdsecAppsecEnabled {
-		appsecClient, err = appsec.Open(bindCtx, &prepared, log, name, pluginVersion)
-		if err != nil {
-			return nil, err
-		}
-		unpublishRenamedAppSec(appsecClient, prepared.CrowdsecAppsecInstanceName, name)
-	}
-
-	attempts := make([]instance.PublishAttempt, 0, 2)
-	if lapiClient != nil {
-		attempts = append(attempts, instance.PublishAttempt{
-			Leg: instance.LegLAPI, InstanceName: prepared.CrowdsecLapiInstanceName,
-			Publisher: name, Client: lapiClient, Log: log,
-		})
-	}
-	if appsecClient != nil {
-		attempts = append(attempts, instance.PublishAttempt{
-			Leg: instance.LegAppSec, InstanceName: prepared.CrowdsecAppsecInstanceName,
-			Publisher: name, Client: appsecClient, Log: log,
-		})
-	}
-	if err = instance.PublishAll(attempts); err != nil {
+	if err = openAndPublishOwned(bindCtx, &prepared, log, name); err != nil {
 		return nil, err
-	}
-	if lapiClient != nil {
-		lapiClient.SetPublishedName(prepared.CrowdsecLapiInstanceName)
-	}
-	if appsecClient != nil {
-		appsecClient.SetPublishedName(prepared.CrowdsecAppsecInstanceName)
 	}
 
 	subscribeLAPI := prepared.Enabled && prepared.CrowdsecLapiInstanceName != ""
@@ -121,6 +81,55 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		}
 	})
 	return handler, err
+}
+
+func openAndPublishOwned(bindCtx context.Context, prepared *configuration.Config, log *slog.Logger, name string) error {
+	var lapiClient *lapi.Client
+	var err error
+	if prepared.CrowdsecLapiEnabled {
+		if prepared.CrowdsecMode == configuration.StreamMode || prepared.CrowdsecMode == configuration.AloneMode {
+			lapiClient, err = lapi.OpenStream(bindCtx, prepared, log, name, pluginVersion)
+		} else {
+			lapiClient, err = lapi.OpenLive(bindCtx, prepared, log, name, pluginVersion)
+		}
+		if err != nil {
+			return err
+		}
+		unpublishRenamedLAPI(lapiClient, prepared.CrowdsecLapiInstanceName, name)
+	}
+
+	var appsecClient *appsec.Client
+	if prepared.CrowdsecAppsecEnabled {
+		appsecClient, err = appsec.Open(bindCtx, prepared, log, name, pluginVersion)
+		if err != nil {
+			return err
+		}
+		unpublishRenamedAppSec(appsecClient, prepared.CrowdsecAppsecInstanceName, name)
+	}
+
+	attempts := make([]instance.PublishAttempt, 0, 2)
+	if lapiClient != nil {
+		attempts = append(attempts, instance.PublishAttempt{
+			Leg: instance.LegLAPI, InstanceName: prepared.CrowdsecLapiInstanceName,
+			Publisher: name, Client: lapiClient, Log: log,
+		})
+	}
+	if appsecClient != nil {
+		attempts = append(attempts, instance.PublishAttempt{
+			Leg: instance.LegAppSec, InstanceName: prepared.CrowdsecAppsecInstanceName,
+			Publisher: name, Client: appsecClient, Log: log,
+		})
+	}
+	if err = instance.PublishAll(attempts); err != nil {
+		return err
+	}
+	if lapiClient != nil {
+		lapiClient.SetPublishedName(prepared.CrowdsecLapiInstanceName)
+	}
+	if appsecClient != nil {
+		appsecClient.SetPublishedName(prepared.CrowdsecAppsecInstanceName)
+	}
+	return nil
 }
 
 func unpublishRenamedLAPI(client *lapi.Client, instanceName, publisher string) {

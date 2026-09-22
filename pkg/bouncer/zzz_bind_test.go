@@ -2,13 +2,14 @@ package bouncer
 
 import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 )
 
-func bindTestLAPI(b *Bouncer, client *lapi.Client, mode string) {
+func bindTestLAPI(b *Bouncer, client *lapi.Client) {
 	b.subscribeLAPI = client != nil
 	if client != nil {
-		client.SetCrowdsecModeForTest(mode)
+		client.SetCrowdsecModeForTest(configuration.StreamMode)
 		b.lapiBound.Store(client)
 		return
 	}
