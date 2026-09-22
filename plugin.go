@@ -111,13 +111,15 @@ func openAndPublishOwned(bindCtx context.Context, prepared *configuration.Config
 	if lapiClient != nil {
 		attempts = append(attempts, instance.PublishAttempt{
 			Leg: instance.LegLAPI, InstanceName: prepared.CrowdsecLapiInstanceName,
-			Publisher: name, Client: lapiClient, Log: log,
+			Publisher: name, Client: lapiClient, Empty: (*lapi.Client)(nil),
+			Incarnation: lapiClient.Incarnation(), StreamScopes: lapiClient.StreamScopes(), Log: log,
 		})
 	}
 	if appsecClient != nil {
 		attempts = append(attempts, instance.PublishAttempt{
 			Leg: instance.LegAppSec, InstanceName: prepared.CrowdsecAppsecInstanceName,
-			Publisher: name, Client: appsecClient, Log: log,
+			Publisher: name, Client: appsecClient, Empty: (*appsec.Client)(nil),
+			Incarnation: appsecClient.Incarnation(), Log: log,
 		})
 	}
 	if err = instance.PublishAll(attempts); err != nil {

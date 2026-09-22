@@ -106,8 +106,6 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 		traceCustomHeader:        config.TraceHeadersCustomName,
 		originBasedDecisionRemap: copyOriginBasedDecisionRemap(config.OriginBasedDecisionRemap),
 	}
-	routeHandler.lapiBound.Store((*lapi.Client)(nil))
-	routeHandler.appsecBound.Store((*appsec.Client)(nil))
 	config.CaptchaSiteKey, _ = configuration.GetVariable(config, "CaptchaSiteKey")
 	config.CaptchaSecretKey, _ = configuration.GetVariable(config, "CaptchaSecretKey")
 	captchaGateSecret, _ := configuration.GetVariable(config, "CaptchaGateSecret")

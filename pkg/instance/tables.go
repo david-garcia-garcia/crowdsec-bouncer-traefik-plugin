@@ -27,17 +27,15 @@ const (
 	MsgUnbound = "crowdsec bouncer unbound"
 )
 
-// Identified is a published client that can name its incarnation for lifecycle logs.
-type Identified interface {
-	Incarnation() string
-}
-
 // PublishAttempt is one leg this constructor wants to publish under the slot mutex.
 type PublishAttempt struct {
 	Leg          string
 	InstanceName string
 	Publisher    string
 	Client       any
+	Empty        any // typed-nil of Client; first atomic.Value Store must keep this type
+	Incarnation  string
+	StreamScopes []string
 	Log          *slog.Logger
 }
 
@@ -50,10 +48,12 @@ type Subscriber struct {
 }
 
 type slot struct {
-	current     any
-	empty       any
-	publisher   string
-	subscribers []Subscriber
+	current      any
+	empty        any
+	publisher    string
+	incarnation  string
+	streamScopes []string
+	subscribers  []Subscriber
 }
 
 type table struct {
@@ -132,11 +132,13 @@ func publishLocked(attempt PublishAttempt) error {
 		named = &slot{}
 		slots[attempt.InstanceName] = named
 	}
-	if named.empty == nil {
-		named.empty = typedNil(attempt.Client)
+	if named.empty == nil && attempt.Empty != nil {
+		named.empty = attempt.Empty
 	}
 	named.current = attempt.Client
 	named.publisher = attempt.Publisher
+	named.incarnation = attempt.Incarnation
+	named.streamScopes = attempt.StreamScopes
 	fanout(named, attempt.Client, attempt.Leg, attempt.InstanceName)
 	return nil
 }
@@ -158,14 +160,10 @@ func Subscribe(leg, instanceName string, sub Subscriber) {
 	named.subscribers = append(named.subscribers, sub)
 	current := named.current
 	if isNilClient(current) {
-		empty := named.empty
-		if empty == nil {
-			empty = current
-		}
-		storeValue(sub, empty, leg, instanceName, true)
+		storeValue(named, sub, named.empty, leg, instanceName, true)
 		return
 	}
-	storeValue(sub, current, leg, instanceName, false)
+	storeValue(named, sub, current, leg, instanceName, false)
 }
 
 // Unsubscribe removes this atomic from the named slot. It does not Close the client.
@@ -224,10 +222,6 @@ func Clear(leg string, dying any, publisher string) {
 
 func clearSlot(named *slot, leg, instanceName string) {
 	empty := named.empty
-	if empty == nil {
-		empty = typedNil(named.current)
-		named.empty = empty
-	}
 	named.current = empty
 	named.publisher = ""
 	fanout(named, empty, leg, instanceName)
@@ -235,20 +229,25 @@ func clearSlot(named *slot, leg, instanceName string) {
 
 func fanout(named *slot, client any, leg, instanceName string) {
 	for _, sub := range named.subscribers {
-		storeValue(sub, client, leg, instanceName, false)
+		storeValue(named, sub, client, leg, instanceName, false)
 	}
 }
 
-func storeValue(sub Subscriber, client any, leg, instanceName string, subscribeEmpty bool) {
+func storeValue(named *slot, sub Subscriber, client any, leg, instanceName string, subscribeEmpty bool) {
 	toStore := client
-	if isNilClient(client) {
-		if prev := sub.Value.Load(); !isNilClient(prev) {
-			toStore = typedNil(prev)
-		} else if prev != nil {
-			toStore = typedNil(prev)
-		} else {
-			return
+	if isNilClient(client) && named.empty == nil {
+		if subscribeEmpty && sub.Log != nil {
+			sub.Log.Info(MsgUnbound,
+				"traefikName", sub.TraefikName,
+				"leg", leg,
+				"instanceName", instanceName,
+				"incarnation", named.incarnation,
+			)
 		}
+		return
+	}
+	if isNilClient(client) {
+		toStore = named.empty
 	}
 	prev := sub.Value.Load()
 	changed := !sameClient(prev, toStore)
@@ -259,11 +258,8 @@ func storeValue(sub Subscriber, client any, leg, instanceName string, subscribeE
 	if sub.Log == nil {
 		return
 	}
-	incarnation := incarnationOf(client)
+	incarnation := named.incarnation
 	if isNilClient(client) {
-		if incarnation == "" {
-			incarnation = incarnationOf(prev)
-		}
 		sub.Log.Info(MsgUnbound,
 			"traefikName", sub.TraefikName,
 			"leg", leg,
@@ -278,22 +274,14 @@ func storeValue(sub Subscriber, client any, leg, instanceName string, subscribeE
 		"instanceName", instanceName,
 		"incarnation", incarnation,
 	)
-	warnMissingScopes(sub, client)
+	warnMissingScopes(sub, named.streamScopes)
 }
 
-type scopeListed interface {
-	StreamScopes() []string
-}
-
-func warnMissingScopes(sub Subscriber, client any) {
+func warnMissingScopes(sub Subscriber, streamScopes []string) {
 	if sub.Log == nil || len(sub.HeaderScopes) == 0 {
 		return
 	}
-	listed, ok := client.(scopeListed)
-	if !ok {
-		return
-	}
-	missing := decisionscope.MissingStreamScopes(sub.HeaderScopes, listed.StreamScopes())
+	missing := decisionscope.MissingStreamScopes(sub.HeaderScopes, streamScopes)
 	if len(missing) == 0 {
 		return
 	}
@@ -301,28 +289,6 @@ func warnMissingScopes(sub Subscriber, client any) {
 		"traefikName", sub.TraefikName,
 		"missing", strings.Join(missing, ","),
 	)
-}
-
-func incarnationOf(value any) string {
-	if isNilClient(value) {
-		return ""
-	}
-	identified, ok := value.(Identified)
-	if !ok {
-		return ""
-	}
-	return identified.Incarnation()
-}
-
-func typedNil(value any) any {
-	if value == nil {
-		return nil
-	}
-	valueType := reflect.TypeOf(value)
-	if valueType == nil || valueType.Kind() != reflect.Ptr {
-		return nil
-	}
-	return reflect.Zero(valueType).Interface()
 }
 
 func isNilClient(value any) bool {

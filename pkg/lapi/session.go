@@ -120,10 +120,7 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	if clientErr != nil {
 		return nil, clientErr
 	}
-	client.middlewareName = middlewareName
-	if client.sessionKey == "" {
-		client.sessionKey = bindKey
-	}
+	client.bindIdentity(middlewareName, bindKey)
 	noteStreamOwner(cfg, middlewareName, log)
 	return client, nil
 }
@@ -151,10 +148,7 @@ func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, 
 	if clientErr != nil {
 		return nil, clientErr
 	}
-	client.middlewareName = middlewareName
-	if client.sessionKey == "" {
-		client.sessionKey = bindKey
-	}
+	client.bindIdentity(middlewareName, bindKey)
 	return client, nil
 }
 

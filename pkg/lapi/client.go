@@ -269,6 +269,17 @@ func (c *Client) Incarnation() string {
 	return c.incarnation
 }
 
+func (c *Client) bindIdentity(middlewareName, bindKey string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.middlewareName == "" {
+		c.middlewareName = middlewareName
+	}
+	if c.sessionKey == "" {
+		c.sessionKey = bindKey
+	}
+}
+
 // StreamScopes are the opener extra names this Client polls (canonical ip,range plus extras).
 func (c *Client) StreamScopes() []string {
 	if c == nil {

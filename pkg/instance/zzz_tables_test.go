@@ -12,10 +12,6 @@ type testClient struct {
 	id string
 }
 
-func (c *testClient) Incarnation() string {
-	return c.id
-}
-
 func testLog() (*slog.Logger, *bytes.Buffer) {
 	var buf bytes.Buffer
 	return slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})), &buf
@@ -40,7 +36,7 @@ func TestPublishSubscribeBeforeOwner(t *testing.T) {
 	owner := &testClient{id: "A"}
 	ownerLog, _ := testLog()
 	if err := PublishAll([]PublishAttempt{{
-		Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: owner, Log: ownerLog,
+		Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: owner, Empty: (*testClient)(nil), Log: ownerLog,
 	}}); err != nil {
 		t.Fatal(err)
 	}
@@ -57,8 +53,8 @@ func TestIndependentLAPIAndAppSecSharedName(t *testing.T) {
 	lapiClient := &testClient{id: "lapi"}
 	appsecClient := &testClient{id: "appsec"}
 	if err := PublishAll([]PublishAttempt{
-		{Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: lapiClient},
-		{Leg: LegAppSec, InstanceName: "shared", Publisher: "cs", Client: appsecClient},
+		{Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: lapiClient, Empty: (*testClient)(nil)},
+		{Leg: LegAppSec, InstanceName: "shared", Publisher: "cs", Client: appsecClient, Empty: (*testClient)(nil)},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +72,7 @@ func TestSecondPublisherRejectedAndRollback(t *testing.T) {
 
 	first := &testClient{id: "first"}
 	if err := PublishAll([]PublishAttempt{{
-		Leg: LegAppSec, InstanceName: "shared", Publisher: "cs-a", Client: first,
+		Leg: LegAppSec, InstanceName: "shared", Publisher: "cs-a", Client: first, Empty: (*testClient)(nil),
 	}}); err != nil {
 		t.Fatal(err)
 	}
@@ -84,8 +80,8 @@ func TestSecondPublisherRejectedAndRollback(t *testing.T) {
 	takenAppSec := &testClient{id: "taken"}
 	ownerLog, buf := testLog()
 	err := PublishAll([]PublishAttempt{
-		{Leg: LegLAPI, InstanceName: "api", Publisher: "cs-b", Client: freeLAPI, Log: ownerLog},
-		{Leg: LegAppSec, InstanceName: "shared", Publisher: "cs-b", Client: takenAppSec, Log: ownerLog},
+		{Leg: LegLAPI, InstanceName: "api", Publisher: "cs-b", Client: freeLAPI, Empty: (*testClient)(nil), Log: ownerLog},
+		{Leg: LegAppSec, InstanceName: "shared", Publisher: "cs-b", Client: takenAppSec, Empty: (*testClient)(nil), Log: ownerLog},
 	})
 	if err == nil {
 		t.Fatal("second publisher on taken AppSec name must fail")
@@ -115,12 +111,12 @@ func TestClearDoesNotUnbindReplacement(t *testing.T) {
 	var bound atomic.Value
 	Subscribe(LegLAPI, "shared", Subscriber{Value: &bound, TraefikName: "cs-admin"})
 	if err := PublishAll([]PublishAttempt{{
-		Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: oldClient,
+		Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: oldClient, Empty: (*testClient)(nil),
 	}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := PublishAll([]PublishAttempt{{
-		Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: newClient,
+		Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: newClient, Empty: (*testClient)(nil),
 	}}); err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +136,7 @@ func TestUnsubscribeRemovesSubscriber(t *testing.T) {
 	Unsubscribe(LegLAPI, "shared", &bound)
 	owner := &testClient{id: "A"}
 	if err := PublishAll([]PublishAttempt{{
-		Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: owner,
+		Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: owner, Empty: (*testClient)(nil),
 	}}); err != nil {
 		t.Fatal(err)
 	}
@@ -157,12 +153,12 @@ func TestSameMiddlewareRepublishAllowed(t *testing.T) {
 	first := &testClient{id: "A"}
 	second := &testClient{id: "B"}
 	if err := PublishAll([]PublishAttempt{{
-		Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: first,
+		Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: first, Empty: (*testClient)(nil),
 	}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := PublishAll([]PublishAttempt{{
-		Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: second,
+		Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: second, Empty: (*testClient)(nil),
 	}}); err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +175,7 @@ func TestUnpublishOnlyWhenStillPublisher(t *testing.T) {
 
 	owner := &testClient{id: "I"}
 	if err := PublishAll([]PublishAttempt{{
-		Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: owner,
+		Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: owner, Empty: (*testClient)(nil),
 	}}); err != nil {
 		t.Fatal(err)
 	}

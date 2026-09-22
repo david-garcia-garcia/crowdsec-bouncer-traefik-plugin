@@ -87,9 +87,6 @@ func Open(ctx context.Context, cfg *configuration.Config, log *slog.Logger, midd
 	if !ok {
 		return nil, fmt.Errorf("%s: reclaim: want *appsec.Client, got %T", middlewareName, stored)
 	}
-	client.middlewareName = middlewareName
-	if client.sessionKey == "" {
-		client.sessionKey = bindKey
-	}
+	client.bindIdentity(middlewareName, bindKey)
 	return client, nil
 }
