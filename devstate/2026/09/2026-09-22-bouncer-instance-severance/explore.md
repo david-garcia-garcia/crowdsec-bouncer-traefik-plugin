@@ -91,8 +91,8 @@ Traefik New(name)
 
 - Q: Which package owns the dual LAPI/AppSec slot tables and Publish/Subscribe API?
   Rank: additive asked — new subsystem in scope (“Named LAPI and AppSec slots”, Late bind); criterion names publish/subscribe
-  Decision: assumed — add a dedicated package under `pkg/` (e.g. `pkg/instance`) colocated with tests; `plugin.go` orchestrates only; propose picks exact name following go house style.
-  By: explore
+  Decision: assumed — `pkg/instance` owns both slot tables and Publish/Subscribe/Clear; `plugin.go` orchestrates only; tests colocated under that package.
+  By: propose
 
 - Q: Should prior branch work `2026-09-21-bouncer-instance-severance` be merged or treated as superseded?
   Rank: additive incidental — no In-scope line; not blocking design

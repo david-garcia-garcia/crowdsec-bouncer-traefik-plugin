@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 25e3fc86
+Reviewed head: 41e6929b
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,7 +32,7 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-22-bouncer-instance-severance pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | bouncer-instance-severance | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/136 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
@@ -53,7 +53,7 @@ Ticket 2026-09-22-bouncer-instance-severance on branch 2026-09-22-bouncer-instan
 ## Explore Decisions
 | Question | Rank | Decision | By |
 | --- | --- | --- | --- |
-| Which package owns the dual LAPI/AppSec slot tables and Publish/Subscribe API? | additive asked — new subsystem in scope (“Named LAPI and AppSec slots”, Late bind); criterion names publish/subscribe | assumed — add a dedicated package under `pkg/` (e.g. `pkg/instance`) colocated with tests; `plugin.go` orchestrates only; propose picks exact name following go house style. | explore |
+| Which package owns the dual LAPI/AppSec slot tables and Publish/Subscribe API? | additive asked — new subsystem in scope (“Named LAPI and AppSec slots”, Late bind); criterion names publish/subscribe | assumed — `pkg/instance` owns both slot tables and Publish/Subscribe/Clear; `plugin.go` orchestrates only; tests colocated under that package. | propose |
 
 ## Before merge
 None.
@@ -71,7 +71,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 25e3fc863d04f69e4094d3505f1f40adbb818a27 | Card must match the branch you measured |
+| Reviewed head | 41e6929b57d308df7641d2eabfe01a1a8c75d037 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -85,7 +85,7 @@ Is this the best way to solve the issue? Not yet.
 
 ### Evidence
 What I checked:
-- assembled from the run bus (`deliver_card`, 25e3fc863d04f69e4094d3505f1f40adbb818a27)
+- assembled from the run bus (`deliver_card`, 41e6929b57d308df7641d2eabfe01a1a8c75d037)
 
 ### Rank-up moves
 None.

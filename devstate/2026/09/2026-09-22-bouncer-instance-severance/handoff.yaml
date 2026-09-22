@@ -12,7 +12,7 @@ qualify: qualified
 src: 12759e0dc9022d298c6d88e83a6723fa019fcc38d2c8053ce6dae301605a205a
 comments: none
 explore: explore.md
-change: none
+change: bouncer-instance-severance
 pr:
   id: 136
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/136
