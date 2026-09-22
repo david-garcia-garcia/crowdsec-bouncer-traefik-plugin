@@ -11,7 +11,7 @@ SCENARIO=redis
 # The primary mock always misses. Reads go only to the replica (redisCacheReadHosts).
 body() {
   echo "[$SCENARIO] cached banned IP must be blocked"
-  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 403 -H "X-Forwarded-For: 1.2.3.5"
+  wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 403 45 -H "X-Forwarded-For: 1.2.3.5"
 
   echo "[$SCENARIO] cached clean IP must pass"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 1.2.3.4"

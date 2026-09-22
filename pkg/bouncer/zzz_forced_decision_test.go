@@ -226,13 +226,9 @@ func TestBouncerNew_trimsForcedDecisionHeader(t *testing.T) {
 	cfg := configuration.New()
 	cfg.CrowdsecMode = configuration.StreamMode
 	cfg.CrowdsecDecisionHeader = "  X-Crowdsec-Decision  "
-	handler, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, true, log)
+	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, true, log)
 	if err != nil {
 		t.Fatal(err)
-	}
-	got, ok := handler.(*Bouncer)
-	if !ok {
-		t.Fatalf("handler type %T", handler)
 	}
 	if got.forcedDecisionHeader != testForcedDecisionHeader {
 		t.Fatalf("forcedDecisionHeader=%q", got.forcedDecisionHeader)

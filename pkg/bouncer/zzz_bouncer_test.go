@@ -687,13 +687,9 @@ func TestNewForwardedHeadersInsecureHeaderName(t *testing.T) {
 		cfg := configuration.New()
 		cfg.CrowdsecMode = configuration.StreamMode
 		cfg.ForwardedHeadersInsecure = true
-		handler, err := New(next, "test", cfg, false, true, log)
+		b, err := New(next, "test", cfg, false, true, log)
 		if err != nil {
 			t.Fatalf("New = %v", err)
-		}
-		b, ok := handler.(*Bouncer)
-		if !ok {
-			t.Fatalf("handler type %T want *Bouncer", handler)
 		}
 		if b.forwardedCustomHeader != "X-Real-Ip" {
 			t.Fatalf("forwardedCustomHeader = %q want X-Real-Ip", b.forwardedCustomHeader)
@@ -704,13 +700,9 @@ func TestNewForwardedHeadersInsecureHeaderName(t *testing.T) {
 		cfg.CrowdsecMode = configuration.StreamMode
 		cfg.ForwardedHeadersInsecure = true
 		cfg.ForwardedHeadersCustomName = "CF-Connecting-IP"
-		handler, err := New(next, "test", cfg, false, true, log)
+		b, err := New(next, "test", cfg, false, true, log)
 		if err != nil {
 			t.Fatalf("New = %v", err)
-		}
-		b, ok := handler.(*Bouncer)
-		if !ok {
-			t.Fatalf("handler type %T want *Bouncer", handler)
 		}
 		if b.forwardedCustomHeader != "CF-Connecting-IP" {
 			t.Fatalf("forwardedCustomHeader = %q want CF-Connecting-IP", b.forwardedCustomHeader)

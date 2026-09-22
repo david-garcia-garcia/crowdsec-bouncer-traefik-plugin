@@ -7,8 +7,8 @@ A reclaim value (`pkg/decisionstore.Store`) that owns one memory or Redis engine
 _Avoid_: `pkg/cache`, `cache.Client`, `liveStore`, process `ttl_map`, `sync.Once`, utilities `reclaim`
 
 **CreatedBy**:
-The Traefik `New(..., name)` string written once on the create that first put this store. Exclusive ownership of the SessionHex store is this string, not the Client Open key.
-_Avoid_: router name, Host, bouncer API key in the reclaim key, a second middleware-name registry
+The Traefik `New(..., name)` string written once on the create that first put this store. Isolation of the store is SessionHex, not this string. Two LAPI ownership keys that share SessionHex share the store.
+_Avoid_: exclusive-name Peek fail that rejects a second Traefik name, router name, Host, bouncer API key in the reclaim key
 
 **Engine**:
 Funcs bound at `NewMemory` or `NewRedis` (`memoryEngine` / `redisEngine`): BeginTick, PublishTick, PutMany, DeleteMany, ActiveCounts, LookupRemediation, ApplyRangeBatch, RangeIndex, Close. Put and Delete are one-item wrappers. Memory ActiveCounts is the last PublishTick walk of published Ip/header slots. Redis ActiveCounts is always empty.
@@ -43,9 +43,9 @@ Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx
 - Call `lapi.OpenDecisionStore(ctx, cfg, log, name)` then `lapi.New(..., store)` (or `OpenStream` / `OpenLive`, which Peek then Open the store first). `name` is Traefik `New(..., name)`. Reporter still omits `active_decisions` unless stream/alone.
 - Memory: in-process COW tick/published `map[string]LiveSlot` plus the Range blob. Maps stay non-nil. Each `LiveSlot.ExpiresAt` is int32 elapsed seconds on the package clock (eight-byte `{uint32,int32}` slots). Live PutMany copy-on-writes onto published (one clone, then sweep expired keys with `elapsedNow()`). Published slots are `atomic.Value` of `*publishedSlots`; lookup `Load`s and does not take `mu`. Expiry compare uses the same elapsed clock.
 - Redis: import `github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis` at `v1.0.6`. Prefix is `SessionHex` (cursor), not live `IdentityHex`. Logical keys are the client IP, header-scope key, and `range-index`. Writer plus optional readers; `nextReader` never retries the writer. MSetEX/DEL are void. Do not re-patch `vendor/.../iplookup` (Contains RLock and IPv4 four-byte walk are upstream).
-- Same store key → same Store. Redis YAML change reuses the existing engine (first-wins). Exclusive ownership is write-once `createdBy`, not a Redis hash.
+- Same SessionHex → same Store. Redis off: leftover host/password/database/read hosts do not fork SessionHex. Redis on: the whole Redis set is in SessionHex (read hosts sorted), so a Redis change is a new store. `createdBy` is write-once metadata, not a `New`-fail lock.
 - `streamReady` / `streamPollInFlight` stay on the store across Client reincarnation. Do not zero them in `lapi.New`. Stream skip is `TryBeginStreamPoll` (`core_plugin_lapi_stream-single-flight.md`).
-- `decisionScopeHeaders` and poller intervals stay off the store key. Stream `scopes=` and the store header-scope filter are the live-router union (`core_plugin_lapi_scope-union.md`).
+- `decisionScopeHeaders` and poller intervals stay off the store key. Stream `scopes=` is opener-only `crowdsecLapiStreamScopes` (`core_plugin_lapi_scope-union.md`). Header extraction stays on the bouncer map.
 - Stream apply calls Store `BeginTick` / `DeleteMany` / `PutMany` / `PublishTick(ElapsedNow())` / `ApplyRangeBatch` (`core_plugin_lapi_stream-apply.md`). Memory `PublishTick(0)` skips expiry sweep; non-zero `now` drops tick slots where `ExpiresAt > 0 && ExpiresAt <= now`, then recounts `ActiveCounts` from packed origin id and family on the published map. Redis tick methods are no-ops and ignore `now`; Redis PutMany is MSetEX by TTL in `PutManyChunk` batches. Redis `ActiveCounts` is empty.
 - Snapshot origin×family counts with `Store.ActiveCounts` at usage-metrics POST. Do not store `usageMetricKey` or LAPI item JSON in decisionstore. `ApplyRangeBatch` is omitted from the walk. Redis does not support this gauge.
 - Captcha grace is the gate cookie (`core_plugin_middleware_captcha-gate.md`), not store keys.
@@ -73,7 +73,7 @@ kind, origin, originID, err := lapiClient.LookupRemediation(remoteIP, ipAddr, sc
 ## Gotchas
 
 - Match miss and unreachable with `errors.Is(err, decisionstore.ErrMiss)` / `errors.Is(err, decisionstore.ErrUnreachable)`. Do not string-compare `err.Error()`.
-- SessionHex stays the Redis `keyPrefix`. StoreKey does not hash Redis params. Existing Redis keys stay reachable. Changing the Client Open string does not migrate Redis keys.
+- SessionHex stays the Redis `keyPrefix`. StoreKey is `decisionstore:` plus SessionHex. Redis params are inside SessionHex only when Redis is on; leftover Redis YAML when Redis is off does not fork the prefix. A Redis-on change is a new prefix and does not migrate old keys.
 - `lapi.Client.Close` / `Sleep` must not Close the shared store. Sleep and Wake keep the DecisionStore warm.
 - Stream store-write TTL is `int64(duration.Seconds())` with no clamp; a sub-second CrowdSec duration becomes `0`.
 - Live and none writes use `liveCacheTTL` (substitute `defaultDecisionSeconds` when duration is empty). Stream must not use `liveCacheTTL`.

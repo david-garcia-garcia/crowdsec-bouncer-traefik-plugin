@@ -3,8 +3,8 @@
 ## Language
 
 **AppSec Client**:
-The reclaim value for one CrowdSec AppSec listener (`pkg/appsec`). Owns JSON parse, host/path/body limit, and replaceable HTTP+auth (`transport` on `atomic.Value`). Not the LAPI Client.
-_Avoid_: CrowdsecConnection, `AppsecQuery` on LAPI, LAPI captcha, `atomic.Pointer[T]`
+The reclaim value for one CrowdSec AppSec listener (`pkg/appsec`). Keyed by middleware name plus host, path, resolved key, body limit, TLS, and effective HTTP timeout. Owns JSON parse and HTTP+auth. Not the LAPI Client.
+_Avoid_: CrowdsecConnection, `AppsecQuery` on LAPI, LAPI captcha, `atomic.Pointer[T]`, Adopt-only timeout or TLS
 
 **Structured AppSec response**:
 JSON CrowdSec 1.8 AppSec returns to the bouncer (`action`, `http_status`, `user_body_content`, `user_cookies`, `user_headers`). Listener HTTP 403 carries a remediation envelope; listener 200 is allow.
@@ -65,4 +65,4 @@ decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
 - Do not strip header names listed in the client's own `Connection` header, even though RFC 7230 tells a proxy to. This forward is an inspection copy, so that rule would let a client hide `Cookie` (or anything else) from the WAF. The static hop-by-hop list is the whole filter.
 - Classify AppSec response-body io failures with `errors.Is` on the package-local sentinel. Do not match the `appsecQuery:readBody` prefix. Oversized AppSec bodies stay a different error and skip FailureAction.
 - Do not pass `0` into `io.LimitReader` (`N <= 0` is immediate EOF).
-- Do not put AppSec TLS, `HTTPTimeoutSeconds`, or `CrowdsecAppsecHTTPTimeoutSeconds` in the AppSec reclaim key. `IdentityHex` and `Key` stay the same when only those knobs differ. Last `New` `AdoptTransport`s those knobs. Concurrent adopt last-writes and idle-closes the replaced `*http.Client`.
+- AppSec TLS, body limit, and effective HTTP timeout live on the ownership key. A change is a new Client. Do not apply those knobs with `AdoptTransport`.

@@ -57,11 +57,11 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 
 	subscribeLAPI := prepared.Enabled && prepared.CrowdsecLapiInstanceName != ""
 	subscribeAppSec := prepared.Enabled && prepared.CrowdsecAppsecInstanceName != ""
-	handler, err = bouncer.New(next, name, &prepared, subscribeLAPI, subscribeAppSec, log)
+	route, err := bouncer.New(next, name, &prepared, subscribeLAPI, subscribeAppSec, log)
 	if err != nil {
 		return nil, err
 	}
-	route, _ := handler.(*bouncer.Bouncer)
+	handler = route
 	if subscribeLAPI {
 		instance.Subscribe(instance.LegLAPI, prepared.CrowdsecLapiInstanceName, instance.Subscriber{
 			Value: route.LAPIBinding(), TraefikName: name, Log: log, HeaderScopes: prepared.DecisionScopeHeaders,

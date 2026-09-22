@@ -102,8 +102,9 @@ func Prepare(cfg *configuration.Config, _ *slog.Logger) error {
 }
 
 // New constructs a Client and starts tickers. store is the reclaimed DecisionStore for this cursor.
-// Call Prepare first. Close stops tickers and HTTP only; it does not Close the shared store.
-func New(config *configuration.Config, log *slog.Logger, pluginVersion string, store *decisionstore.Store) (*Client, error) {
+// Call Prepare first. middlewareName and bindKey are stored before tickers start so stream logs
+// do not race the Open callback. Close stops tickers and HTTP only; it does not Close the shared store.
+func New(config *configuration.Config, log *slog.Logger, pluginVersion string, store *decisionstore.Store, middlewareName, bindKey string) (*Client, error) {
 	crowdsecStreamRoute := crowdsecLapiStreamRoute
 	if config.CrowdsecMode == configuration.AloneMode {
 		crowdsecStreamRoute = crowdsecCapiStreamRoute
@@ -148,6 +149,8 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		streamScopeQuery:        scopeQuery,
 		streamScopeSet:          scopeSet,
+		sessionKey:              bindKey,
+		middlewareName:          middlewareName,
 		instanceName:            config.CrowdsecLapiInstanceName,
 		lapiKey:                 config.CrowdsecLapiKey,
 		log:                     log,
@@ -280,11 +283,19 @@ func (c *Client) bindIdentity(middlewareName, bindKey string) {
 	}
 }
 
+func (c *Client) sessionKeyLocked() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.sessionKey
+}
+
 // StreamScopes are the opener extra names this Client polls (canonical ip,range plus extras).
 func (c *Client) StreamScopes() []string {
 	if c == nil {
 		return nil
 	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	names := make([]string, 0, len(c.streamScopeSet))
 	for name := range c.streamScopeSet {
 		names = append(names, name)
@@ -303,7 +314,6 @@ func (c *Client) LastPublishedName() string {
 func (c *Client) SetPublishedName(name string) {
 	c.mu.Lock()
 	c.lastPublishedName = name
-	c.instanceName = name
 	c.mu.Unlock()
 }
 
@@ -312,7 +322,10 @@ func (c *Client) logInfo(msg, reason string) {
 	if c.log == nil {
 		return
 	}
-	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
+	c.mu.Lock()
+	sessionKey := c.sessionKey
+	c.mu.Unlock()
+	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", sessionKey, "reason", reason)
 }
 
 // logLifecycle writes Create/Close at INFO and Sleep/Wake at DEBUG.
@@ -320,11 +333,15 @@ func (c *Client) logLifecycle(msg, reason string, debug bool) {
 	if c.log == nil {
 		return
 	}
+	c.mu.Lock()
+	instanceName := c.instanceName
+	sessionKey := c.sessionKey
+	c.mu.Unlock()
 	if debug {
-		c.log.Debug(msg, "leg", instance.LegLAPI, "instanceName", c.instanceName, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
+		c.log.Debug(msg, "leg", instance.LegLAPI, "instanceName", instanceName, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", sessionKey, "reason", reason)
 		return
 	}
-	c.log.Info(msg, "leg", instance.LegLAPI, "instanceName", c.instanceName, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
+	c.log.Info(msg, "leg", instance.LegLAPI, "instanceName", instanceName, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", sessionKey, "reason", reason)
 }
 
 func stopTicker(stop chan bool) {

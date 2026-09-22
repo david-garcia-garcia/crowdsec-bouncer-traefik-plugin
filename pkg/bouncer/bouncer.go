@@ -60,7 +60,7 @@ const msgBackendMissing = "crowdsec bouncer backend missing"
 const remediationHeaderClientDisconnected = "error:client-disconnected"
 
 // New returns a per-router handler. Clients arrive later through LAPIBinding/AppSecBinding.
-func New(next http.Handler, name string, config *configuration.Config, subscribeLAPI, subscribeAppSec bool, log *slog.Logger) (http.Handler, error) {
+func New(next http.Handler, name string, config *configuration.Config, subscribeLAPI, subscribeAppSec bool, log *slog.Logger) (*Bouncer, error) {
 	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(log, config.ClientTrustedIPs)
 	forwardedCustomHeader := config.ForwardedHeadersCustomName

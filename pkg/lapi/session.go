@@ -105,12 +105,10 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	}
 	bindKey := OwnershipKey(cfg, middlewareName)
 	stored, openErr := reclaim.OpenWithHooks(ctx, bindKey, log, func() (any, reclaim.Hooks, error) {
-		client, err := New(cfg, log, pluginVersion, store)
+		client, err := New(cfg, log, pluginVersion, store, middlewareName, bindKey)
 		if err != nil {
 			return nil, reclaim.Hooks{}, err
 		}
-		client.middlewareName = middlewareName
-		client.sessionKey = bindKey
 		return client, clientHooks(client), nil
 	})
 	if openErr != nil {
@@ -133,12 +131,10 @@ func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, 
 	}
 	bindKey := OwnershipKey(cfg, middlewareName)
 	stored, openErr := reclaim.OpenWithHooks(ctx, bindKey, log, func() (any, reclaim.Hooks, error) {
-		client, err := New(cfg, log, pluginVersion, store)
+		client, err := New(cfg, log, pluginVersion, store, middlewareName, bindKey)
 		if err != nil {
 			return nil, reclaim.Hooks{}, err
 		}
-		client.middlewareName = middlewareName
-		client.sessionKey = bindKey
 		return client, clientHooks(client), nil
 	})
 	if openErr != nil {

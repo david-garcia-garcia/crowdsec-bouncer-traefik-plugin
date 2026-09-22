@@ -64,7 +64,7 @@ func Prepare(cfg *configuration.Config, log *slog.Logger) error {
 }
 
 // New constructs an AppSec Client. Call Prepare first. Close releases idle HTTP.
-func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (*Client, error) {
+func New(config *configuration.Config, log *slog.Logger, pluginVersion string, middlewareName, bindKey string) (*Client, error) {
 	next, err := newTransport(config, log)
 	if err != nil {
 		log.Error("New:getTLSConfigCrowdsec fail to get tlsAppsecConfig", "error", err)
@@ -75,7 +75,9 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string) (
 		appsecHost:      config.CrowdsecAppsecHost,
 		appsecPath:      config.CrowdsecAppsecPath,
 		appsecBodyLimit: config.CrowdsecAppsecBodyLimit,
+		middlewareName:  middlewareName,
 		instanceName:    config.CrowdsecAppsecInstanceName,
+		sessionKey:      bindKey,
 		log:             log,
 		pluginVersion:   pluginVersion,
 	}
@@ -157,7 +159,6 @@ func (c *Client) LastPublishedName() string {
 func (c *Client) SetPublishedName(name string) {
 	c.mu.Lock()
 	c.lastPublishedName = name
-	c.instanceName = name
 	c.mu.Unlock()
 }
 
@@ -165,11 +166,15 @@ func (c *Client) logLifecycle(msg, reason string, debug bool) {
 	if c.log == nil {
 		return
 	}
+	c.mu.Lock()
+	instanceName := c.instanceName
+	sessionKey := c.sessionKey
+	c.mu.Unlock()
 	if debug {
-		c.log.Debug(msg, "leg", instance.LegAppSec, "instanceName", c.instanceName, "incarnation", c.incarnation, "sessionKey", c.sessionKey, "reason", reason)
+		c.log.Debug(msg, "leg", instance.LegAppSec, "instanceName", instanceName, "incarnation", c.incarnation, "sessionKey", sessionKey, "reason", reason)
 		return
 	}
-	c.log.Info(msg, "leg", instance.LegAppSec, "instanceName", c.instanceName, "incarnation", c.incarnation, "sessionKey", c.sessionKey, "reason", reason)
+	c.log.Info(msg, "leg", instance.LegAppSec, "instanceName", instanceName, "incarnation", c.incarnation, "sessionKey", sessionKey, "reason", reason)
 }
 
 func isReverseProxyError(statusCode int) bool {

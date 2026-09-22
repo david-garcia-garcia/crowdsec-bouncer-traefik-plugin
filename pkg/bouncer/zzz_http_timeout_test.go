@@ -32,13 +32,9 @@ func testCaptchaBouncerConfig(t *testing.T, captchaTimeout int64) *configuration
 func captchaSiteverifyTimeout(t *testing.T, cfg *configuration.Config) time.Duration {
 	t.Helper()
 	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
-	handler, err := New(next, "test", cfg, false, false, logger.New("ERROR", ""))
+	route, err := New(next, "test", cfg, false, false, logger.New("ERROR", ""))
 	if err != nil {
 		t.Fatalf("New = %v", err)
-	}
-	route, ok := handler.(*Bouncer)
-	if !ok {
-		t.Fatalf("handler type %T want *Bouncer", handler)
 	}
 	httpClient := route.captchaClient.HTTPClientForTest()
 	if httpClient == nil {

@@ -72,12 +72,10 @@ func Key(cfg *configuration.Config, middlewareName string) string {
 func Open(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
 	bindKey := Key(cfg, middlewareName)
 	stored, openErr := reclaim.OpenWithHooks(ctx, bindKey, log, func() (any, reclaim.Hooks, error) {
-		client, err := New(cfg, log, pluginVersion)
+		client, err := New(cfg, log, pluginVersion, middlewareName, bindKey)
 		if err != nil {
 			return nil, reclaim.Hooks{}, err
 		}
-		client.middlewareName = middlewareName
-		client.sessionKey = bindKey
 		return client, reclaim.Hooks{Sleep: client.Sleep, Wake: client.Wake, Close: client.Close}, nil
 	})
 	if openErr != nil {

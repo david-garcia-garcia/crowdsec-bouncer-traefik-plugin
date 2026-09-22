@@ -98,7 +98,7 @@ _ = checkFile.Close()
 - Alone still skips LAPI URL/key/TLS after CAPI. Captcha still runs. AppSec helper runs only when `CrowdsecAppsecEnabled`.
 - A set provider with default `ban` actions still needs non-empty site and secret.
 - A set provider with an empty `CaptchaFilePath` fails at `ValidateParams`. Tests that used to blank the path to skip `GetTemplate` need a readable fixture.
-- Leftover invalid AppSec CA or missing key file boots when AppSec is off (live, stream, none, appsec, and alone).
+- Leftover invalid AppSec CA or missing key file boots when AppSec is off (live, stream, none, and alone). `crowdsecMode: appsec` is rejected.
 - Empty AppSec key after a successful lookup still passes; `appsec.Prepare` copies the LAPI key.
 - CA parse still triggers on explicit `CrowdsecAppsecScheme == https`, not inherit-https.
 - `NewWithFormat` warns and uses stdout when the path is not writable. `ValidateParams` must still fail so `plugin.New` does not start.
