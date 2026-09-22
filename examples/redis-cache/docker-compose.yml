@@ -40,6 +40,7 @@ services:
   #     - "traefik.http.services.service-foo.loadbalancer.server.port=80"
   #     # Definition of the middleware
   #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+  - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapienabled=true"
   #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
   #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.rediscacheenabled=true"
   #     # Contact redis-unsecure without a password
@@ -60,6 +61,7 @@ services:
       - "traefik.http.services.service-bar.loadbalancer.server.port=80"
       # Definition of the middleware
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapienabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.rediscacheenabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.rediscachepassword=FIXME"

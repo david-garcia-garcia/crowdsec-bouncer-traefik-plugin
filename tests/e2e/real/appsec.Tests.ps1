@@ -86,15 +86,15 @@ Describe "CrowdSec Bouncer Real AppSec Tests" {
             $response.StatusCode | Should -BeIn @(403, 429) -Because "AppSec enabled does not skip LAPI decisions in none mode"
         }
 
-        It "Should ignore a LAPI ban when crowdsecMode is appsec" {
+        It "Should ignore a LAPI ban when LAPI is disabled" {
             Add-TestDecision -IP $script:ClientIP -Type "ban"
 
             $response = Test-HttpRequest -Endpoint "/waf-only" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl
-            $response.StatusCode | Should -Be 200 -Because "appsec mode has no LAPI client and must not remediate IP bans"
+            $response.StatusCode | Should -Be 200 -Because "AppSec-only has no LAPI client and must not remediate IP bans"
             $response.Content | Should -Match "Hostname:"
         }
 
-        It "Should still block SQLi when crowdsecMode is appsec" {
+        It "Should still block SQLi when LAPI is disabled" {
             $response = Test-HttpRequest -Endpoint "/waf-only?id=1%27%20OR%20%271%27%3D%271" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl
             $response.StatusCode | Should -Be 403
         }

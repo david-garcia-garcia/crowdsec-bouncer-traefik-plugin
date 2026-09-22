@@ -41,7 +41,9 @@ _Avoid_: EffectiveLapi, three inherit wrappers
 - When `CaptchaProvider` is set, reject an empty `CaptchaFilePath` (`CaptchaFilePath: cannot be empty when CaptchaProvider is set`) and fail when `GetTemplate` fails. Ban template stays "when path is set".
 - `captcha.Client.New` returns the `GetTemplate` error. Do not discard it. Do not invent a bundled default template.
 - After CAPI (alone) or LAPI (other modes), call `validateAppsecURLKeyAndTLS` only when `config.CrowdsecAppsecEnabled`. Do not hide that `if` only inside a LAPI wrapper — alone never calls it.
-- Reuse `CrowdsecAppsecEnabled`. Do not re-derive from leftover AppSec fields or `crowdsecMode: appsec`.
+- Reuse `CrowdsecAppsecEnabled`. Do not re-derive from leftover AppSec fields or `crowdsecMode`.
+- Reject `crowdsecMode: appsec` (E4). Gate LAPI URL/keys on `CrowdsecLapiEnabled`. Reject leftover instance name or secret when bounce and owner flags are both false (E2).
+- `CrowdsecLapiEnabled` defaults false. Tests and compose that Open LAPI must set it true.
 - Keep the helper's empty-key pass and explicit-`https` CA parse. Do not fail an empty AppSec key at `ValidateParams`.
 - When the knob is false, skip AppSec host, URL, key, and CA even if leftover fields are set.
 - Leave `New` as `return nil, err` on `ValidateParams` failure.

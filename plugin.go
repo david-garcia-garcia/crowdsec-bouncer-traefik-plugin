@@ -9,6 +9,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
@@ -18,18 +19,13 @@ func CreateConfig() *configuration.Config {
 	return configuration.New()
 }
 
-// New is the Traefik Yaegi constructor. It reclaims LAPI and AppSec backends and returns a per-router Bouncer.
-// Stream/alone: one LAPI client per LAPI URL+key (CrowdSec one stream cursor per
-// hashed key + outbound IP). Live/none: reclaim by LAPI identity. AppSec: reclaim by listener URL+key.
+// New is the Traefik Yaegi constructor. It opens owned LAPI/AppSec legs, publishes
+// named slots, and returns a per-router Bouncer that late-binds via atomic.Value.
 //
-// New works on a snapshot of the config Traefik owns, and binds every reclaim Open to a context
-// derived from the constructor ctx, so a constructor that fails partway releases what earlier steps
-// already opened instead of leaving a LAPI stream ticker polling for the process lifetime.
-//
-// err is named so that defer can see which way New left; a bool would not survive a later return.
+// New works on a snapshot of the config Traefik owns, and binds every reclaim Open to a
+// child of the constructor ctx, so a constructor that fails partway releases what it opened.
 func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (handler http.Handler, err error) {
 	// Shallow copy: Config's []string and map[string]string fields still alias the caller's.
-	// Nothing below mutates them in place, so whoever adds an in-place mutation must copy them too.
 	prepared := *config
 	prepared.LogLevel = strings.ToUpper(prepared.LogLevel)
 	log := logger.NewWithFormat(prepared.LogLevel, prepared.LogFilePath, prepared.LogFormat)
@@ -45,9 +41,8 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	if err = appsec.Prepare(&prepared, log); err != nil {
 		return nil, err
 	}
+	configuration.PrepopulateInstanceNames(&prepared, name)
 
-	// bindCtx holds every incarnation this constructor opens. Releasing it on a failed New hands
-	// them back; it stays a child of ctx, so canceling Traefik's context still releases them.
 	bindCtx, releaseHolders := context.WithCancel(ctx)
 	defer func() {
 		if err != nil {
@@ -56,22 +51,16 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	}()
 
 	var lapiClient *lapi.Client
-	// Stream and alone poll GET /v1/decisions/stream. CrowdSec stores that
-	// cursor on the bouncer row selected by hashed X-Api-Key plus the IP LAPI
-	// sees (this process’s outbound address), not per middleware and not per
-	// metrics interval. OpenStream keeps one ticker per URL+key in this process.
-	if prepared.CrowdsecMode == configuration.StreamMode || prepared.CrowdsecMode == configuration.AloneMode {
-		lapiClient, err = lapi.OpenStream(bindCtx, &prepared, log, name, pluginVersion)
+	if prepared.CrowdsecLapiEnabled {
+		if prepared.CrowdsecMode == configuration.StreamMode || prepared.CrowdsecMode == configuration.AloneMode {
+			lapiClient, err = lapi.OpenStream(bindCtx, &prepared, log, name, pluginVersion)
+		} else {
+			lapiClient, err = lapi.OpenLive(bindCtx, &prepared, log, name, pluginVersion)
+		}
 		if err != nil {
 			return nil, err
 		}
-	} else if prepared.CrowdsecMode != configuration.AppsecMode {
-		// Live/none do not use stream_cursor. Two Clients on one key
-		// stay valid (?ip= lookups). Reclaim by LAPI identity, including intervals.
-		lapiClient, err = lapi.OpenLive(bindCtx, &prepared, log, name, pluginVersion)
-		if err != nil {
-			return nil, err
-		}
+		unpublishRenamedLAPI(lapiClient, prepared.CrowdsecLapiInstanceName, name)
 	}
 
 	var appsecClient *appsec.Client
@@ -80,7 +69,72 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		if err != nil {
 			return nil, err
 		}
+		unpublishRenamedAppSec(appsecClient, prepared.CrowdsecAppsecInstanceName, name)
 	}
-	handler, err = bouncer.New(next, name, &prepared, lapiClient, appsecClient, log)
+
+	attempts := make([]instance.PublishAttempt, 0, 2)
+	if lapiClient != nil {
+		attempts = append(attempts, instance.PublishAttempt{
+			Leg: instance.LegLAPI, InstanceName: prepared.CrowdsecLapiInstanceName,
+			Publisher: name, Client: lapiClient, Log: log,
+		})
+	}
+	if appsecClient != nil {
+		attempts = append(attempts, instance.PublishAttempt{
+			Leg: instance.LegAppSec, InstanceName: prepared.CrowdsecAppsecInstanceName,
+			Publisher: name, Client: appsecClient, Log: log,
+		})
+	}
+	if err = instance.PublishAll(attempts); err != nil {
+		return nil, err
+	}
+	if lapiClient != nil {
+		lapiClient.SetPublishedName(prepared.CrowdsecLapiInstanceName)
+	}
+	if appsecClient != nil {
+		appsecClient.SetPublishedName(prepared.CrowdsecAppsecInstanceName)
+	}
+
+	subscribeLAPI := prepared.Enabled && prepared.CrowdsecLapiInstanceName != ""
+	subscribeAppSec := prepared.Enabled && prepared.CrowdsecAppsecInstanceName != ""
+	handler, err = bouncer.New(next, name, &prepared, subscribeLAPI, subscribeAppSec, log)
+	if err != nil {
+		return nil, err
+	}
+	route, _ := handler.(*bouncer.Bouncer)
+	if subscribeLAPI {
+		instance.Subscribe(instance.LegLAPI, prepared.CrowdsecLapiInstanceName, instance.Subscriber{
+			Value: route.LAPIBinding(), TraefikName: name, Log: log, HeaderScopes: prepared.DecisionScopeHeaders,
+		})
+	}
+	if subscribeAppSec {
+		instance.Subscribe(instance.LegAppSec, prepared.CrowdsecAppsecInstanceName, instance.Subscriber{
+			Value: route.AppSecBinding(), TraefikName: name, Log: log,
+		})
+	}
+	context.AfterFunc(ctx, func() {
+		if subscribeLAPI {
+			instance.Unsubscribe(instance.LegLAPI, prepared.CrowdsecLapiInstanceName, route.LAPIBinding())
+		}
+		if subscribeAppSec {
+			instance.Unsubscribe(instance.LegAppSec, prepared.CrowdsecAppsecInstanceName, route.AppSecBinding())
+		}
+	})
 	return handler, err
+}
+
+func unpublishRenamedLAPI(client *lapi.Client, instanceName, publisher string) {
+	stored := client.LastPublishedName()
+	if stored == "" || stored == instanceName {
+		return
+	}
+	instance.Unpublish(instance.LegLAPI, stored, client, publisher)
+}
+
+func unpublishRenamedAppSec(client *appsec.Client, instanceName, publisher string) {
+	stored := client.LastPublishedName()
+	if stored == "" || stored == instanceName {
+		return
+	}
+	instance.Unpublish(instance.LegAppSec, stored, client, publisher)
 }

@@ -6,7 +6,8 @@ metadata:
 spec:
     plugin:
         bouncer:
-            CrowdsecLapiKey: 40796d93c2958f9e58345514e67740e5
+            crowdsecLapiEnabled: true
+          CrowdsecLapiKey: 40796d93c2958f9e58345514e67740e5
             Enabled: "true"
             logLevel: DEBUG
             crowdsecMode: live

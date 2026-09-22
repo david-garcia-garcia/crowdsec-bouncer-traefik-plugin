@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -21,23 +22,26 @@ import (
 
 // Bouncer is one Traefik router handler. It is not the reclaim value.
 type Bouncer struct {
-	appsecClient             *appsec.Client
-	appsecEnabled            bool
+	appsecBound              atomic.Value // *appsec.Client; typed nil when empty
 	appsecFailureAction      string
 	banTemplate              *template.Template
 	banTemplateContentType   string
 	captchaClient            *captcha.Client
 	clientPoolStrategy       *ip.PoolStrategy
-	crowdsecMode             string
 	decisionScopeHeaders     map[string]string // CrowdSec header scope → request header
 	forcedDecisionHeader     string            // crowdsecDecisionHeader; empty = off
 	enabled                  bool
 	forwardedCustomHeader    string
 	forwardedHeadersInsecure bool
-	lapiClient               *lapi.Client
-	lapiFailureAction        string // per-router LAPI fallback (not on Client identity)
-	redisUnreachableBlock    bool   // per-router Redis fail-closed
-	defaultDecisionSeconds   int64  // per-router live-cache TTL passed into LiveLookup
+	lapiBound                atomic.Value // *lapi.Client; typed nil when empty
+	lapiFailureAction        string       // per-router LAPI fallback (not on Client identity)
+	lapiInstanceName         string
+	appsecInstanceName       string
+	subscribeLAPI            bool
+	subscribeAppSec          bool
+	streamStartupBlock       bool
+	redisUnreachableBlock    bool  // per-router Redis fail-closed
+	defaultDecisionSeconds   int64 // per-router live-cache TTL passed into LiveLookup
 	log                      *slog.Logger
 	name                     string
 	next                     http.Handler
@@ -49,12 +53,14 @@ type Bouncer struct {
 	originBasedDecisionRemap map[string]map[string]string // per-router apply; LAPI/store keep original kinds
 }
 
+const msgBackendMissing = "crowdsec bouncer backend missing"
+
 // remediationHeaderClientDisconnected is the RemediationHeadersCustomName value when the client
 // dropped the body during AppSec buffering. Not a ban.
 const remediationHeaderClientDisconnected = "error:client-disconnected"
 
-// New returns a per-router handler bound to lapiClient and appsecClient.
-func New(next http.Handler, name string, config *configuration.Config, lapiClient *lapi.Client, appsecClient *appsec.Client, log *slog.Logger) (http.Handler, error) {
+// New returns a per-router handler. Clients arrive later through LAPIBinding/AppSecBinding.
+func New(next http.Handler, name string, config *configuration.Config, subscribeLAPI, subscribeAppSec bool, log *slog.Logger) (http.Handler, error) {
 	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(log, config.ClientTrustedIPs)
 	forwardedCustomHeader := config.ForwardedHeadersCustomName
@@ -72,21 +78,22 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 	}
 
 	routeHandler := &Bouncer{
-		appsecClient:             appsecClient,
-		appsecEnabled:            config.CrowdsecAppsecEnabled,
 		appsecFailureAction:      configuration.EffectiveFailureAction(config.CrowdsecAppsecFailureAction),
 		banTemplate:              banTemplate,
 		banTemplateContentType:   banTemplateContentType,
 		captchaClient:            &captcha.Client{},
 		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
-		crowdsecMode:             config.CrowdsecMode,
 		decisionScopeHeaders:     decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
 		forcedDecisionHeader:     strings.TrimSpace(config.CrowdsecDecisionHeader),
 		enabled:                  config.Enabled,
 		forwardedCustomHeader:    forwardedCustomHeader,
 		forwardedHeadersInsecure: config.ForwardedHeadersInsecure,
-		lapiClient:               lapiClient,
 		lapiFailureAction:        configuration.EffectiveFailureAction(config.CrowdsecLapiFailureAction),
+		lapiInstanceName:         config.CrowdsecLapiInstanceName,
+		appsecInstanceName:       config.CrowdsecAppsecInstanceName,
+		subscribeLAPI:            subscribeLAPI,
+		subscribeAppSec:          subscribeAppSec,
+		streamStartupBlock:       config.StreamStartupBlock,
 		redisUnreachableBlock:    config.RedisCacheUnreachableBlock,
 		defaultDecisionSeconds:   config.DefaultDecisionSeconds,
 		log:                      log,
@@ -99,14 +106,8 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 		traceCustomHeader:        config.TraceHeadersCustomName,
 		originBasedDecisionRemap: copyOriginBasedDecisionRemap(config.OriginBasedDecisionRemap),
 	}
-	// Appsec mode has no LAPI decisions to remediate, but crowdsecAppsecFailureAction: captcha
-	// still serves a challenge through this client (core_plugin_appsec_failure-action), and
-	// handleRemediationServeHTTP bans whenever that client is not valid.
-	if config.CrowdsecMode == configuration.AppsecMode &&
-		routeHandler.appsecFailureAction != configuration.FailureActionCaptcha {
-		routeHandler.log.Debug("Bouncer initialized", "name", name)
-		return routeHandler, nil
-	}
+	routeHandler.lapiBound.Store((*lapi.Client)(nil))
+	routeHandler.appsecBound.Store((*appsec.Client)(nil))
 	config.CaptchaSiteKey, _ = configuration.GetVariable(config, "CaptchaSiteKey")
 	config.CaptchaSecretKey, _ = configuration.GetVariable(config, "CaptchaSecretKey")
 	captchaGateSecret, _ := configuration.GetVariable(config, "CaptchaGateSecret")
@@ -139,14 +140,40 @@ func New(next http.Handler, name string, config *configuration.Config, lapiClien
 	return routeHandler, nil
 }
 
-// LapiClient is the reclaimed LAPI backend this route uses.
+// LAPIBinding is the slot Subscribe target for this router's LAPI client.
+func (b *Bouncer) LAPIBinding() *atomic.Value {
+	return &b.lapiBound
+}
+
+// AppSecBinding is the slot Subscribe target for this router's AppSec client.
+func (b *Bouncer) AppSecBinding() *atomic.Value {
+	return &b.appsecBound
+}
+
+func (b *Bouncer) loadedLAPI() *lapi.Client {
+	stored := b.lapiBound.Load()
+	client, _ := stored.(*lapi.Client)
+	return client
+}
+
+func (b *Bouncer) loadedAppSec() *appsec.Client {
+	stored := b.appsecBound.Load()
+	client, _ := stored.(*appsec.Client)
+	return client
+}
+
+func (b *Bouncer) warnBackendMissing(leg, instanceName string) {
+	b.log.Warn(msgBackendMissing, "traefikName", b.name, "leg", leg, "instanceName", instanceName)
+}
+
+// LapiClient is the bound LAPI backend this route uses, or nil.
 func (b *Bouncer) LapiClient() *lapi.Client {
-	return b.lapiClient
+	return b.loadedLAPI()
 }
 
 // SameLapiClient reports whether two routes share one LAPI client pointer.
 func (b *Bouncer) SameLapiClient(other *Bouncer) bool {
-	return other != nil && b.lapiClient == other.lapiClient
+	return other != nil && b.loadedLAPI() == other.loadedLAPI()
 }
 
 // forcedDecisionKind returns BannedValue or CaptchaValue when the configured
@@ -213,6 +240,25 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		return
 	}
 
+	if b.streamStartupBlock {
+		if b.subscribeLAPI && b.loadedLAPI() == nil {
+			b.warnBackendMissing("lapi", b.lapiInstanceName)
+			rw.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		if b.subscribeAppSec && b.loadedAppSec() == nil {
+			b.warnBackendMissing("appsec", b.appsecInstanceName)
+			rw.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+	}
+
+	lapiClient := b.loadedLAPI()
+	crowdsecMode := ""
+	if lapiClient != nil {
+		crowdsecMode = lapiClient.Mode()
+	}
+
 	remoteIP, ipAddr, err := ip.GetRemoteIP(httpReq, b.serverPoolStrategy, b.forwardedCustomHeader, b.forwardedHeadersInsecure)
 	req := clientRequest{
 		Request:  httpReq,
@@ -248,7 +294,11 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		return
 	}
 
-	if b.crowdsecMode == configuration.AppsecMode {
+	if !b.subscribeLAPI || lapiClient == nil {
+		if b.subscribeLAPI && lapiClient == nil {
+			b.applyLapiFailureAction(rw, req, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
+			return
+		}
 		b.passOrForcedCaptcha(rw, req)
 		return
 	}
@@ -257,11 +307,11 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	scopes := decisionscope.RequestScopeValues(b.decisionScopeHeaders, req.Request)
 
 	// live, stream, and alone consult the cache.
-	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
+	if crowdsecMode == configuration.LiveMode || crowdsecMode == configuration.StreamMode || crowdsecMode == configuration.AloneMode {
 		var kind, origin string
 		var originID uint16
 		var lookupErr error
-		kind, origin, originID, lookupErr = b.lapiClient.LookupRemediation(req.remoteIP, req.ipAddr, scopes)
+		kind, origin, originID, lookupErr = lapiClient.LookupRemediation(req.remoteIP, req.ipAddr, scopes)
 		if lookupErr != nil {
 			b.log.Debug("ServeHTTP:Get", "ip", req.remoteIP, "cache", lookupErr)
 			if errors.Is(lookupErr, decisionstore.ErrUnreachable) && !b.redisUnreachableBlock {
@@ -285,8 +335,8 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		}
 	}
 
-	if b.crowdsecMode == configuration.StreamMode || b.crowdsecMode == configuration.AloneMode {
-		if b.lapiClient.StreamHealthy() {
+	if crowdsecMode == configuration.StreamMode || crowdsecMode == configuration.AloneMode {
+		if lapiClient.StreamHealthy() {
 			b.passOrForcedCaptcha(rw, req)
 			// No decision affecting this IP.
 			return
@@ -297,8 +347,8 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		return
 	}
 
-	if b.crowdsecMode == configuration.LiveMode || b.crowdsecMode == configuration.NoneMode {
-		kind, origin, err := b.lapiClient.LiveLookup(req.remoteIP, scopes, b.defaultDecisionSeconds)
+	if crowdsecMode == configuration.LiveMode || crowdsecMode == configuration.NoneMode {
+		kind, origin, err := lapiClient.LiveLookup(req.remoteIP, scopes, b.defaultDecisionSeconds)
 		if err != nil {
 			b.log.Debug("ServeHTTP:LiveLookup", "error", err.Error())
 			if !decisionscope.IsActiveRemediation(kind) {
@@ -330,15 +380,15 @@ func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req clientReque
 
 // recordProcessed counts this request on the connection usage-metrics window.
 func (b *Bouncer) recordProcessed(ipType string) {
-	if b.lapiClient != nil {
-		b.lapiClient.IncProcessed(ipType)
+	if client := b.loadedLAPI(); client != nil {
+		client.IncProcessed(ipType)
 	}
 }
 
 // recordDropped counts a remediating response on the connection usage-metrics window.
 func (b *Bouncer) recordDropped(origin, ipType, remediation string) {
-	if b.lapiClient != nil {
-		b.lapiClient.IncDropped(origin, ipType, remediation)
+	if client := b.loadedLAPI(); client != nil {
+		client.IncDropped(origin, ipType, remediation)
 	}
 }
 
@@ -383,10 +433,13 @@ func (b *Bouncer) resolveDroppedOrigin(origin string, originID uint16) string {
 	if origin != "" {
 		return origin
 	}
-	if originID == 0 || b.lapiClient == nil {
+	if originID == 0 {
 		return ""
 	}
-	return b.lapiClient.OriginName(originID)
+	if client := b.loadedLAPI(); client != nil {
+		return client.OriginName(originID)
+	}
+	return ""
 }
 
 // handleRemediationServeHTTP applies captcha or ban for a cached or live verdict.
@@ -424,7 +477,7 @@ func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientR
 
 // handleNextServeHTTP runs AppSec if enabled, then the next handler.
 func (b *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req clientRequest) {
-	if b.appsecEnabled && b.applyAppsecServeHTTP(rw, req) {
+	if b.subscribeAppSec && b.applyAppsecServeHTTP(rw, req) {
 		return
 	}
 	b.next.ServeHTTP(rw, req.Request)
@@ -432,10 +485,23 @@ func (b *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req clientRequest)
 
 // applyAppsecServeHTTP queries AppSec and writes a remediation when the request must not reach origin.
 func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientRequest) bool {
+	appsecClient := b.loadedAppSec()
+	if appsecClient == nil {
+		switch b.appsecFailureAction {
+		case configuration.FailureActionPassthrough:
+			return false
+		case configuration.FailureActionCaptcha:
+			b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginAppsecFailure)
+			return true
+		default:
+			b.handleBanServeHTTP(rw, req, configuration.ReasonAPPSEC, lapi.OriginPluginAppsecFailure)
+			return true
+		}
+	}
 	pol := appsec.Policy{
 		FailureAction: b.appsecFailureAction,
 	}
-	decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
+	decision, err := appsecClient.Query(req.remoteIP, req.Request, pol)
 	if errors.Is(err, appsec.ErrClientDisconnected) {
 		b.handleClientDisconnectedServeHTTP(rw, req)
 		return true

@@ -74,3 +74,49 @@ func StreamScopeList(headers map[string]string) string {
 	sort.Strings(mapped)
 	return strings.Join(append(parts, mapped...), ",")
 }
+
+// CanonicalStreamScopes is ip, range, then extra opener names (lowercased, sorted, unique).
+func CanonicalStreamScopes(extra []string) []string {
+	seen := map[string]struct{}{"ip": {}, "range": {}}
+	out := []string{"ip", "range"}
+	extras := make([]string, 0, len(extra))
+	for _, raw := range extra {
+		token := strings.ToLower(strings.TrimSpace(raw))
+		if token == "" {
+			continue
+		}
+		if _, exists := seen[token]; exists {
+			continue
+		}
+		seen[token] = struct{}{}
+		extras = append(extras, token)
+	}
+	sort.Strings(extras)
+	return append(out, extras...)
+}
+
+// StreamScopeQuery is the LAPI stream scopes= value from the opener list.
+func StreamScopeQuery(extra []string) string {
+	return strings.Join(CanonicalStreamScopes(extra), ",")
+}
+
+// MissingStreamScopes are decisionScopeHeaders keys the opener list does not cover.
+func MissingStreamScopes(headers map[string]string, extra []string) []string {
+	covered := make(map[string]struct{}, 8)
+	for _, name := range CanonicalStreamScopes(extra) {
+		covered[strings.ToLower(name)] = struct{}{}
+	}
+	missing := make([]string, 0)
+	for scope := range headers {
+		token := strings.ToLower(StreamScopeToken(scope))
+		if _, ok := covered[token]; ok {
+			continue
+		}
+		if _, ok := covered[strings.ToLower(scope)]; ok {
+			continue
+		}
+		missing = append(missing, scope)
+	}
+	sort.Strings(missing)
+	return missing
+}

@@ -2,24 +2,26 @@
 package lapi
 
 import (
-	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance"
 )
 
 // Operator-visible lifecycle and stream-health lines (stable for log grep).
 const (
-	MsgConnectionStarted  = "crowdsec connection started"
-	MsgConnectionSleeping = "crowdsec connection sleeping"
-	MsgConnectionWaking   = "crowdsec connection waking"
-	MsgConnectionClosed   = "crowdsec connection closed"
+	MsgConnectionStarted  = "crowdsec lapi instance started"
+	MsgConnectionSleeping = "crowdsec lapi instance sleeping"
+	MsgConnectionWaking   = "crowdsec lapi instance waking"
+	MsgConnectionClosed   = "crowdsec lapi instance closed"
 	MsgStreamUnhealthy    = "crowdsec stream became unhealthy"
 	MsgStreamHealthy      = "crowdsec stream became healthy"
 )
@@ -54,8 +56,14 @@ type Client struct {
 	updateMaxFailure     int64
 	crowdsecStreamRoute  string
 	decisionScopeHeaders map[string]string // write-once first-create residue; not the live union
-	sessionKey           string            // reclaim SessionKey (stream/alone) or Key (live/none)
-	liveHeaderScopes     liveHeaderScopes  // live constructor ctx → normalized header scopes
+	sessionKey           string            // ownership Open key
+	streamScopeQuery     string            // opener crowdsecLapiStreamScopes plus ip,range
+	streamScopeSet       map[string]struct{}
+	middlewareName       string
+	instanceName         string
+	lastPublishedName    string
+	incarnation          string
+	lapiKey              string
 
 	transport     atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
 	decisionStore *decisionstore.Store
@@ -118,6 +126,13 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		startup = 0
 	}
 
+	scopeQuery := decisionscope.StreamScopeQuery(config.CrowdsecLapiStreamScopes)
+	scopeSet := make(map[string]struct{}, 8)
+	for _, name := range decisionscope.CanonicalStreamScopes(config.CrowdsecLapiStreamScopes) {
+		scopeSet[name] = struct{}{}
+		scopeSet[strings.ToLower(name)] = struct{}{}
+	}
+
 	client := &Client{
 		crowdsecMode:            config.CrowdsecMode,
 		crowdsecScheme:          config.CrowdsecLapiScheme,
@@ -131,13 +146,17 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		updateMaxFailure:        config.UpdateMaxFailure,
 		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
 		crowdsecStreamRoute:     crowdsecStreamRoute,
-		sessionKey:              reclaimSessionKey(config),
+		streamScopeQuery:        scopeQuery,
+		streamScopeSet:          scopeSet,
+		instanceName:            config.CrowdsecLapiInstanceName,
+		lapiKey:                 config.CrowdsecLapiKey,
 		log:                     log,
 		pluginVersion:           pluginVersion,
 		isCrowdsecStreamStartup: startup,
 		isCrowdsecStreamHealthy: 1,
 		decisionStore:           store,
 	}
+	client.incarnation = fmt.Sprintf("%p", client)
 	client.metricsReporter = newMetricsReporter(client, time.Now())
 	client.transport.Store(next)
 
@@ -153,7 +172,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		})
 	}
 
-	client.logInfo(MsgConnectionStarted, "started")
+	client.logLifecycle(MsgConnectionStarted, "started", false)
 	return client, nil
 }
 
@@ -182,7 +201,9 @@ func (c *Client) Close() {
 	if current := c.currentTransport(); current != nil {
 		closeIdle(current.httpClient)
 	}
-	c.logInfo(MsgConnectionClosed, "closed")
+	c.logLifecycle(MsgConnectionClosed, "closed", false)
+	dropStreamOwner(c.crowdsecHost, c.lapiKey, c.middlewareName)
+	instance.Clear(instance.LegLAPI, c, c.middlewareName)
 }
 
 // Sleep stops stream and metrics tickers and keeps HTTP, the DecisionStore, and the LAPI
@@ -201,7 +222,7 @@ func (c *Client) Sleep() {
 	c.streamStop = nil
 	c.metricsStop = nil
 	c.mu.Unlock()
-	c.logInfo(MsgConnectionSleeping, "sleeping")
+	c.logLifecycle(MsgConnectionSleeping, "sleeping", true)
 	go c.drainMetrics()
 }
 
@@ -226,18 +247,73 @@ func (c *Client) Wake() {
 		})
 	}
 	c.mu.Unlock()
-	c.logInfo(MsgConnectionWaking, "waking")
+	c.logLifecycle(MsgConnectionWaking, "waking", true)
 	if resumeStream {
 		go c.handleStreamTicker()
 	}
 }
 
-// logInfo writes an operator-visible line with mode, host, reclaim key, and reason.
+// Mode is the fetch strategy this Client was opened with.
+func (c *Client) Mode() string {
+	if c == nil {
+		return ""
+	}
+	return c.crowdsecMode
+}
+
+// Incarnation is unique per Client create.
+func (c *Client) Incarnation() string {
+	if c == nil {
+		return ""
+	}
+	return c.incarnation
+}
+
+// StreamScopes are the opener extra names this Client polls (canonical ip,range plus extras).
+func (c *Client) StreamScopes() []string {
+	if c == nil {
+		return nil
+	}
+	names := make([]string, 0, len(c.streamScopeSet))
+	for name := range c.streamScopeSet {
+		names = append(names, name)
+	}
+	return names
+}
+
+// LastPublishedName is the slot this Client last published, kept across Sleep.
+func (c *Client) LastPublishedName() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.lastPublishedName
+}
+
+// SetPublishedName records the slot this Client just published.
+func (c *Client) SetPublishedName(name string) {
+	c.mu.Lock()
+	c.lastPublishedName = name
+	c.instanceName = name
+	c.mu.Unlock()
+}
+
+// logInfo writes stream-health lines with host and reclaim key.
 func (c *Client) logInfo(msg, reason string) {
 	if c.log == nil {
 		return
 	}
 	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
+}
+
+// logLifecycle writes Create/Close at INFO and Sleep/Wake at DEBUG.
+func (c *Client) logLifecycle(msg, reason string, debug bool) {
+	if c.log == nil {
+		return
+	}
+	if debug {
+		c.log.Debug(msg, "leg", instance.LegLAPI, "instanceName", c.instanceName, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
+		return
+	}
+	c.log.Info(msg, "leg", instance.LegLAPI, "instanceName", c.instanceName, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
 }
 
 func stopTicker(stop chan bool) {
@@ -279,24 +355,14 @@ func (c *Client) StreamFetches() int64 {
 	return atomic.LoadInt64(&c.streamFetches)
 }
 
-// registerLiveHeaderScopes records this New ctx’s headers and drops them when ctx is Done.
-func (c *Client) registerLiveHeaderScopes(ctx context.Context, headers map[string]string) {
-	c.mu.Lock()
-	c.liveHeaderScopes.register(ctx, headers)
-	c.mu.Unlock()
-	context.AfterFunc(ctx, func() {
-		c.mu.Lock()
-		c.liveHeaderScopes.unregister(ctx)
-		c.mu.Unlock()
-	})
-}
-
-// snapshotLiveHeaderScopes is the live-router union, or first-create residue when none are registered yet.
-func (c *Client) snapshotLiveHeaderScopes() map[string]string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if len(c.liveHeaderScopes.headerScopesByCtx) == 0 {
-		return c.decisionScopeHeaders
+// openerCoversScope reports whether the stream poll asked for this decision scope.
+func (c *Client) openerCoversScope(scope string) bool {
+	if c.streamScopeSet == nil {
+		return false
 	}
-	return c.liveHeaderScopes.union()
+	if _, ok := c.streamScopeSet[scope]; ok {
+		return true
+	}
+	_, ok := c.streamScopeSet[strings.ToLower(scope)]
+	return ok
 }

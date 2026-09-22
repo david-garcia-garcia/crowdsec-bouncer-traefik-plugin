@@ -17,11 +17,13 @@ http:
       plugin:
         bouncer:
           enabled: "true"
+          crowdsecLapiEnabled: "true"
           crowdsecMode: live
           crowdsecLapiScheme: http
           crowdsecLapiHost: "@@LAPI_HOST@@"
           crowdsecLapiKey: "@@APIKEY@@"
-          redisCacheEnabled: "true"
+          redisCacheenabled: "true"
+          crowdsecLapiEnabled: "true"
           redisCacheHost: "@@REDIS_HOST@@"
           redisCacheReadHosts:
             - "@@REDIS_READ_HOST@@"

@@ -26,6 +26,7 @@ http:
       plugin:
         bouncer:
           enabled: "true"
+          crowdsecLapiEnabled: "true"
           crowdsecLapiKey: "c51a1c7000000000000000000000000b"
           crowdsecLapiHost: crowdsec:8080
           httpTimeoutSeconds: "60"
@@ -43,6 +44,7 @@ http:
       plugin:
         bouncer:
           enabled: "true"
+          crowdsecLapiEnabled: "true"
           crowdsecLapiKey: "a1b2c3d4e5f60718293a4b5c6d7e8f90"
           crowdsecLapiHost: crowdsec:8080
           httpTimeoutSeconds: "60"
@@ -50,6 +52,10 @@ http:
           updateIntervalSeconds: "2"
           streamStartupBlock: "false"
           crowdsecMode: stream
+          crowdsecLapiStreamScopes:
+            - country
+            - as
+            - username
           decisionScopeHeaders:
             Country: X-IPCountry
             AS: CF-ASN
@@ -62,6 +68,7 @@ http:
       plugin:
         bouncer:
           enabled: "true"
+          crowdsecLapiEnabled: "true"
           crowdsecLapiKey: "c51a1c7000000000000000000000000c"
           crowdsecLapiHost: crowdsec:8080
           httpTimeoutSeconds: "60"

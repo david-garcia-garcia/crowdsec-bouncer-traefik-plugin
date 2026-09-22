@@ -20,7 +20,9 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 - Keep new cases as `tests/e2e/real/*.Tests.ps1`. Do not put them in `tests/e2e/mock/` or at `tests/` root.
 - Identify the client only with `X-Forwarded-For`. Do not parse `RemoteAddr`.
 - Custom-ban and captcha compose labels set `banFilePath` / `captchaFilePath`. Do not use `banHtmlFilePath` / `captchaHtmlFilePath` or HTML-cased twins.
-- Nested plugin maps (`decisionScopeHeaders`, geoblock `databaseSources`) MUST use the file provider (`tests/e2e/real/dynamic-scopes.yml`). Docker labels do not decode those maps.
+- Nested plugin maps (`decisionScopeHeaders`, geoblock `databaseSources`) MUST use the file provider (`tests/e2e/real/dynamic/dynamic-scopes.yml`). Docker labels do not decode those maps.
+- Instance-severance reload cases write `tests/e2e/real/dynamic/instance-severance.yml` into the watched directory. Compose mounts `./dynamic` read-write with `--providers.file.watch=true`. Probe the route; do not sleep-only.
+- Every LAPI-owning compose label and mock YAML must set `crowdsecLapiEnabled: true`. AppSec-only is `false` plus `crowdsecAppsecEnabled: true` (`/waf-only`, mock `appsec`).
 - Country matching uses traefik-geoblock enrich on a **public** `X-Forwarded-For`. Do not inject a client-set country header for that case.
 - CI job `e2e (docker + pester)` runs this suite; `e2e (binary + mock LAPI)` stays the mock job; `e2e (go + dragonfly)` is DecisionStore `go test` against Dragonfly (`build_e2e_go-redis.md`).
 
@@ -36,7 +38,8 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 
 - `tests/e2e/real/Test-Integration.ps1`
 - `tests/e2e/real/docker-compose.test.yml`
-- `tests/e2e/real/dynamic-scopes.yml`
+- `tests/e2e/real/dynamic/dynamic-scopes.yml`
+- `tests/e2e/real/instance_severance.Tests.ps1`
 - `tests/e2e/real/*.Tests.ps1`
 - `.github/workflows/e2e.yml`
 

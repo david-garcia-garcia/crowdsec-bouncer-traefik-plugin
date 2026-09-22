@@ -119,8 +119,6 @@ func testRemapStreamBouncer(t *testing.T, lapiClient *lapi.Client, remap map[str
 	passed := false
 	b := &Bouncer{
 		enabled:                  true,
-		crowdsecMode:             configuration.StreamMode,
-		lapiClient:               lapiClient,
 		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
 		captchaClient:            &captcha.Client{},
 		log:                      log,
@@ -132,6 +130,7 @@ func testRemapStreamBouncer(t *testing.T, lapiClient *lapi.Client, remap map[str
 			passed = true
 		}),
 	}
+	bindTestLAPI(b, lapiClient, configuration.StreamMode)
 	return b, &passed
 }
 

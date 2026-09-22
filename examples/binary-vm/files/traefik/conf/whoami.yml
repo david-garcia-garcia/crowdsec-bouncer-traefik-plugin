@@ -19,6 +19,7 @@ http:
       plugin:
         bouncer:
           enabled: true
+          crowdsecLapiEnabled: true
           crowdseclapikey: "whoami-demo"
           updateintervalseconds: 60
           crowdsecmode: live

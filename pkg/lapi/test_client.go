@@ -15,7 +15,15 @@ import (
 // NewTestClient returns an in-memory Client with a memory DecisionStore.
 func NewTestClient(log *slog.Logger) (*Client, *decisionstore.Store) {
 	store := decisionstore.NewMemory(log)
-	return &Client{decisionStore: store, log: log}, store
+	return &Client{decisionStore: store, log: log, crowdsecMode: configuration.StreamMode}, store
+}
+
+// SetCrowdsecModeForTest sets crowdsecMode for tests that bind a client onto a bouncer.
+func (c *Client) SetCrowdsecModeForTest(mode string) {
+	if c == nil {
+		return
+	}
+	c.crowdsecMode = mode
 }
 
 // newTestRangeClient is a stream-mode memory Client plus its DecisionStore.

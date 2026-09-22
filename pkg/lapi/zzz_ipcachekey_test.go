@@ -98,6 +98,7 @@ func TestDeleteStreamDecision_ClearsTheSlotAnySpelling(t *testing.T) {
 // Country or AS value must never be pushed through IP parsing.
 func TestStoreStreamDecision_HeaderScopesAreNotAddresses(t *testing.T) {
 	client, _ := newTestRangeClient(t)
+	client.streamScopeSet = map[string]struct{}{"country": {}, "ip": {}, "range": {}}
 	client.decisionScopeHeaders = map[string]string{decisionscope.ScopeCountry: "CF-IPCountry"}
 	applyStreamDecisionForTest(client, Decision{
 		Origin: "crowdsec", Type: "ban", Scope: "Country", Value: "fr", Duration: "1h",

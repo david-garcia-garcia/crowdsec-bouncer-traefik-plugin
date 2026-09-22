@@ -56,10 +56,8 @@ func TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan(t *testing.T) {
 	passed := false
 	b := &Bouncer{
 		enabled:                  true,
-		crowdsecMode:             configuration.StreamMode,
 		forwardedHeadersInsecure: true,
 		forwardedCustomHeader:    "X-Forwarded-For",
-		lapiClient:               lapiClient,
 		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
 		captchaClient:            &captcha.Client{},
 		log:                      log,
@@ -70,6 +68,7 @@ func TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan(t *testing.T) {
 			passed = true
 		}),
 	}
+	bindTestLAPI(b, lapiClient, configuration.StreamMode)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	req.RemoteAddr = "127.0.0.1:1"
 	req.Header.Set("X-Forwarded-For", "2001:0db8:0000:0000:0000:0000:0000:0001")
@@ -99,8 +98,6 @@ func TestServeHTTP_PackedMemoryBanRecordsCrowdsecOrigin(t *testing.T) {
 	passed := false
 	b := &Bouncer{
 		enabled:                true,
-		crowdsecMode:           configuration.StreamMode,
-		lapiClient:             lapiClient,
 		clientPoolStrategy:     &ip.PoolStrategy{Checker: clientChecker},
 		captchaClient:          &captcha.Client{},
 		log:                    log,
@@ -111,6 +108,7 @@ func TestServeHTTP_PackedMemoryBanRecordsCrowdsecOrigin(t *testing.T) {
 			passed = true
 		}),
 	}
+	bindTestLAPI(b, lapiClient, configuration.StreamMode)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	req.RemoteAddr = "203.0.113.10:1"
 	rw := httptest.NewRecorder()
@@ -247,18 +245,18 @@ func testBouncerWithAppsec(t *testing.T, handler http.HandlerFunc, banTemplate *
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &Bouncer{
+	b := &Bouncer{
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			t.Error("next handler should not be called")
 		}),
-		appsecEnabled:           true,
 		remediationStatusCode:   http.StatusForbidden,
 		remediationCustomHeader: "X-Remediation",
 		banTemplate:             banTemplate,
 		banTemplateContentType:  "text/html; charset=utf-8",
 		log:                     logger.New("DEBUG", ""),
-		appsecClient:            appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("DEBUG", "")),
-	}, appsecServer
+	}
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("DEBUG", "")))
+	return b, appsecServer
 }
 
 func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
@@ -482,10 +480,9 @@ func TestHandleNextServeHTTPAllowCallsNext(t *testing.T) {
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			nextCalled = true
 		}),
-		appsecEnabled: true,
-		log:           logger.New("ERROR", ""),
-		appsecClient:  appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")),
+		log: logger.New("ERROR", ""),
 	}
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
 	b.handleNextServeHTTP(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 	if !nextCalled {
 		t.Fatal("next handler should be called for allow")
@@ -535,14 +532,13 @@ func TestHandleNextServeHTTP_clientDisconnected(t *testing.T) {
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			nextCalled = true
 		}),
-		appsecEnabled:           true,
 		appsecFailureAction:     configuration.FailureActionBan,
 		remediationStatusCode:   http.StatusForbidden,
 		remediationCustomHeader: "X-Remediation",
 		log:                     traceLog,
-		lapiClient:              lapiClient,
-		appsecClient:            appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")),
 	}
+	bindTestLAPI(b, lapiClient, configuration.StreamMode)
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", failingBodyForDisconnectTest{err: context.Canceled})
 	req.ContentLength = 100
 	rw := &statusWatchRecorder{ResponseRecorder: httptest.NewRecorder()}
@@ -588,18 +584,18 @@ func TestTwoBouncersDistinctLapiFailureActions(t *testing.T) {
 			passthroughCalled = true
 		}),
 		log:               logger.New("ERROR", ""),
-		lapiClient:        shared,
 		lapiFailureAction: configuration.FailureActionPassthrough,
 	}
+	bindTestLAPI(passthrough, shared, configuration.StreamMode)
 	ban := &Bouncer{
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			t.Error("ban bouncer must not call next")
 		}),
 		remediationStatusCode: http.StatusForbidden,
 		log:                   logger.New("ERROR", ""),
-		lapiClient:            shared,
 		lapiFailureAction:     configuration.FailureActionBan,
 	}
+	bindTestLAPI(ban, shared, configuration.StreamMode)
 	if !passthrough.SameLapiClient(ban) {
 		t.Fatal("both bouncers must share one Client")
 	}
@@ -661,11 +657,10 @@ func TestHandleNextServeHTTPAppsecFailureAction(t *testing.T) {
 			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 				nextCalled = true
 			}),
-			appsecEnabled:       true,
 			appsecFailureAction: configuration.FailureActionPassthrough,
 			log:                 logger.New("ERROR", ""),
-			appsecClient:        appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")),
 		}
+		bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
 		b.handleNextServeHTTP(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 		if !nextCalled {
 			t.Fatal("passthrough on AppSec 500 should call next")
@@ -690,9 +685,9 @@ func TestNewForwardedHeadersInsecureHeaderName(t *testing.T) {
 	log := logger.New("ERROR", "")
 	t.Run("default custom name becomes X-Real-Ip", func(t *testing.T) {
 		cfg := configuration.New()
-		cfg.CrowdsecMode = configuration.AppsecMode
+		cfg.CrowdsecMode = configuration.StreamMode
 		cfg.ForwardedHeadersInsecure = true
-		handler, err := New(next, "test", cfg, nil, nil, log)
+		handler, err := New(next, "test", cfg, false, true, log)
 		if err != nil {
 			t.Fatalf("New = %v", err)
 		}
@@ -706,10 +701,10 @@ func TestNewForwardedHeadersInsecureHeaderName(t *testing.T) {
 	})
 	t.Run("explicit non-default name is passed through", func(t *testing.T) {
 		cfg := configuration.New()
-		cfg.CrowdsecMode = configuration.AppsecMode
+		cfg.CrowdsecMode = configuration.StreamMode
 		cfg.ForwardedHeadersInsecure = true
 		cfg.ForwardedHeadersCustomName = "CF-Connecting-IP"
-		handler, err := New(next, "test", cfg, nil, nil, log)
+		handler, err := New(next, "test", cfg, false, true, log)
 		if err != nil {
 			t.Fatalf("New = %v", err)
 		}

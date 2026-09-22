@@ -94,7 +94,7 @@ func (c *Client) AdoptTransport(cfg *configuration.Config) (bool, error) {
 	}
 	if replaced && c.log != nil {
 		c.log.Info("appsec transport replaced",
-			"sessionKey", Key(cfg),
+			"sessionKey", c.sessionKey,
 			"httpTimeoutSeconds", next.httpTimeoutSeconds,
 			"appsecTlsInsecureVerify", next.appsecTLSInsecureVerify,
 			"appsecTlsCa", next.appsecTLSCertificateAuthority != "",

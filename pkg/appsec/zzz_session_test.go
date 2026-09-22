@@ -1,11 +1,9 @@
 package appsec
 
 import (
-	"bytes"
 	"context"
 	"log/slog"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -38,7 +36,7 @@ func testAppsecConfig(host string) *configuration.Config {
 	}
 }
 
-func TestOpen_ReclaimsSameClient(t *testing.T) {
+func TestOpen_P1MiddlewareNameSplitsClient(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
@@ -52,70 +50,95 @@ func TestOpen_ReclaimsSameClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first != second {
-		t.Fatal("second Open must reclaim the same *Client")
+	if first == second {
+		t.Fatal("P1: distinct middleware names must be two Clients")
 	}
 }
 
-func TestOpen_TimeoutOnlyAdoptsTransport(t *testing.T) {
+func TestOpen_P2KnobChangeSplitsClient(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
-
-	var logBuf bytes.Buffer
-	log := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	ctx := context.Background()
-	firstCfg := testAppsecConfig("127.0.0.1:1")
-	firstCfg.HTTPTimeoutSeconds = 10
-	secondCfg := testAppsecConfig("127.0.0.1:1")
-	secondCfg.HTTPTimeoutSeconds = 30
-
-	first, err := Open(ctx, firstCfg, log, "first", "test")
+	base := testAppsecConfig("127.0.0.1:1")
+	first, err := Open(ctx, base, slog.Default(), "same", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := Open(ctx, secondCfg, log, "second", "test")
-	if err != nil {
-		t.Fatal(err)
+	cases := []struct {
+		name string
+		mut  func(*configuration.Config)
+	}{
+		{name: "scheme", mut: func(c *configuration.Config) { c.CrowdsecAppsecScheme = "https" }},
+		{name: "host", mut: func(c *configuration.Config) { c.CrowdsecAppsecHost = "127.0.0.1:2" }},
+		{name: "path", mut: func(c *configuration.Config) { c.CrowdsecAppsecPath = "/waf" }},
+		{name: "key", mut: func(c *configuration.Config) { c.CrowdsecAppsecKey = "other" }},
+		{name: "bodyLimit", mut: func(c *configuration.Config) { c.CrowdsecAppsecBodyLimit = 200 }},
+		{name: "tls", mut: func(c *configuration.Config) { c.CrowdsecAppsecTLSInsecureVerify = false }},
+		{name: "timeout", mut: func(c *configuration.Config) { c.HTTPTimeoutSeconds = 30 }},
 	}
-	if first != second {
-		t.Fatal("timeout-only New must reuse the Client")
-	}
-	current := second.currentTransport()
-	if current == nil || current.httpTimeoutSeconds != 30 {
-		t.Fatalf("adopted timeout: %+v", current)
-	}
-	if current.httpClient.Timeout != 30*time.Second {
-		t.Fatalf("HTTP timeout %v", current.httpClient.Timeout)
-	}
-	if !strings.Contains(logBuf.String(), "appsec transport replaced") {
-		t.Fatalf("INFO must name transport replace: %s", logBuf.String())
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := testAppsecConfig("127.0.0.1:1")
+			tc.mut(cfg)
+			second, err := Open(ctx, cfg, slog.Default(), "same", "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if first == second {
+				t.Fatalf("P2: %s change must open a new Client", tc.name)
+			}
+		})
 	}
 }
 
-func TestOpen_TLSOnlyAdoptsTransport(t *testing.T) {
-	reclaim.ResetForTestWith(0)
+func TestOpen_P3SameMiddlewareAndKnobsWake(t *testing.T) {
+	reclaim.ResetForTestWith(500 * time.Millisecond)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
-	ctx := context.Background()
-	firstCfg := testAppsecConfig("127.0.0.1:1")
-	firstCfg.CrowdsecAppsecTLSInsecureVerify = true
-	secondCfg := testAppsecConfig("127.0.0.1:1")
-	secondCfg.CrowdsecAppsecTLSInsecureVerify = false
-
-	first, err := Open(ctx, firstCfg, slog.Default(), "first", "test")
+	cfg := testAppsecConfig("127.0.0.1:1")
+	ctx, cancel := context.WithCancel(context.Background())
+	first, err := Open(ctx, cfg, slog.Default(), "same", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := Open(ctx, secondCfg, slog.Default(), "second", "test")
+	cancel()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		first.mu.Lock()
+		sleeping := first.sleeping
+		first.mu.Unlock()
+		if sleeping {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	second, err := Open(context.Background(), testAppsecConfig("127.0.0.1:1"), slog.Default(), "same", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if first != second {
-		t.Fatal("TLS-only New must reuse the Client")
+		t.Fatal("P3: same middleware and knobs must Wake the same Client")
 	}
-	current := second.currentTransport()
-	if current == nil || current.appsecTLSInsecureVerify {
-		t.Fatalf("adopted TLS: %+v", current)
+}
+
+func TestOpen_P4OmittedSchemeFollowsLAPI(t *testing.T) {
+	httpCfg := testAppsecConfig("127.0.0.1:1")
+	httpCfg.CrowdsecAppsecScheme = ""
+	httpCfg.CrowdsecLapiScheme = "http"
+	_ = Prepare(httpCfg, slog.Default())
+	httpsFromLAPI := testAppsecConfig("127.0.0.1:1")
+	httpsFromLAPI.CrowdsecAppsecScheme = ""
+	httpsFromLAPI.CrowdsecLapiScheme = "https"
+	_ = Prepare(httpsFromLAPI, slog.Default())
+	httpsExplicit := testAppsecConfig("127.0.0.1:1")
+	httpsExplicit.CrowdsecAppsecScheme = "https"
+	httpsExplicit.CrowdsecLapiScheme = "http"
+	_ = Prepare(httpsExplicit, slog.Default())
+	if Key(httpCfg, "mw") == Key(httpsFromLAPI, "mw") {
+		t.Fatal("P4: omitted scheme following LAPI https must change the AppSec key")
+	}
+	if Key(httpsFromLAPI, "mw") != Key(httpsExplicit, "mw") {
+		t.Fatal("P4: inherited https and explicit https must share the AppSec key")
 	}
 }
 
@@ -128,7 +151,7 @@ func TestOpen_DifferentHostsIsolate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := Open(ctx, testAppsecConfig("127.0.0.1:2"), slog.Default(), "second", "test")
+	second, err := Open(ctx, testAppsecConfig("127.0.0.1:2"), slog.Default(), "first", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,63 +160,12 @@ func TestOpen_DifferentHostsIsolate(t *testing.T) {
 	}
 }
 
-func TestOpen_BodyLimitSplitsClient(t *testing.T) {
-	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
-
-	ctx := context.Background()
-	firstCfg := testAppsecConfig("127.0.0.1:1")
-	firstCfg.CrowdsecAppsecBodyLimit = 100
-	secondCfg := testAppsecConfig("127.0.0.1:1")
-	secondCfg.CrowdsecAppsecBodyLimit = 200
-
-	first, err := Open(ctx, firstCfg, slog.Default(), "first", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := Open(ctx, secondCfg, slog.Default(), "second", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first == second {
-		t.Fatal("body-limit change must open a new Client")
-	}
-}
-
-func TestOpen_TimeoutOnlyClosesPreviousIdle(t *testing.T) {
-	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
-
-	ctx := context.Background()
-	firstCfg := testAppsecConfig("127.0.0.1:1")
-	firstCfg.HTTPTimeoutSeconds = 10
-	first, err := Open(ctx, firstCfg, slog.Default(), "first", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	current := first.currentTransport()
-	if current == nil {
-		t.Fatal("missing transport")
-	}
-	spy := &idleCloseSpy{}
-	first.transport.Store(&transport{
-		httpClient:                    &http.Client{Transport: spy, Timeout: current.httpClient.Timeout},
-		key:                           current.key,
-		httpTimeoutSeconds:            current.httpTimeoutSeconds,
-		appsecTLSInsecureVerify:       current.appsecTLSInsecureVerify,
-		appsecTLSCertificateAuthority: current.appsecTLSCertificateAuthority,
-		appsecTLSCertificateBouncer:   current.appsecTLSCertificateBouncer,
-	})
-	secondCfg := testAppsecConfig("127.0.0.1:1")
-	secondCfg.HTTPTimeoutSeconds = 30
-	second, err := Open(ctx, secondCfg, slog.Default(), "second", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first != second {
-		t.Fatal("timeout-only New must reuse the Client")
-	}
-	if spy.closed != 1 {
-		t.Fatalf("closeIdle on replaced client: %d", spy.closed)
+func TestKey_TimeoutKnobsChangeIdentity(t *testing.T) {
+	base := testAppsecConfig("127.0.0.1:1")
+	timeouts := testAppsecConfig("127.0.0.1:1")
+	timeouts.HTTPTimeoutSeconds = 30
+	timeouts.CrowdsecAppsecHTTPTimeoutSeconds = 0
+	if Key(base, "mw") == Key(timeouts, "mw") {
+		t.Fatal("HTTP timeout knobs must change AppSec Key")
 	}
 }

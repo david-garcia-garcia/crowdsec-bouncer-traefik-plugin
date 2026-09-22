@@ -27,6 +27,7 @@ http:
           enabled: true
           logLevel: DEBUG
           crowdsecMode: live
+          crowdsecLapiEnabled: true
           crowdsecLapiKey: "40796d93c2958f9e58345514e67740e5"
           crowdsecLapiHost: crowdsec:8080
           forwardedHeadersTrustedIps:

@@ -92,17 +92,17 @@ Traefik New(name)
 - Q: Which package owns the dual LAPI/AppSec slot tables and Publish/Subscribe API?
   Rank: additive asked — new subsystem in scope (“Named LAPI and AppSec slots”, Late bind); criterion names publish/subscribe
   Decision: assumed — `pkg/instance` owns both slot tables and Publish/Subscribe/Clear; `plugin.go` orchestrates only; tests colocated under that package.
-  By: propose
+  By: implement
 
 - Q: Should prior branch work `2026-09-21-bouncer-instance-severance` be merged or treated as superseded?
   Rank: additive incidental — no In-scope line; not blocking design
   Decision: assumed — implement from `requirement.md` on IssueKey branch; do not merge stale branch unless human redirects.
-  By: explore
+  By: implement
 
 - Q: How should README document placeholder vs shared-owner vs all-in-one setups?
   Rank: additive asked — Constraints: “README must explain optional dummy vs bouncing subscribers vs one-middleware all-in-one”
   Decision: assumed — extend existing plugin/middleware configuration README with one severance section and the YAML shapes from requirement (T1–T3, shared owner, AppSec-only, placeholder).
-  By: explore
+  By: implement
 
 - Q: What happens to `liveHeaderScopes` when bouncers no longer register `decisionScopeHeaders` on `OpenStream`?
   Rank: bounded asked — changes existing stream poll contract; 1 registration site (`OpenStream` in `pkg/lapi/session.go`); migrates to opener list + SessionHex scope hash here
@@ -112,4 +112,4 @@ Traefik New(name)
 - Q: Must implement land `knowledge/debt/2026-09-22-stream-startup-block-rethink.md` and `knowledge/debt/2026-09-22-appsec-tls-follows-lapi.md` in the same PR?
   Rank: additive asked — “Assumed technical debt that must be created as part of the scope”
   Decision: assumed — yes, both files in implement before archive; content as requirement table describes.
-  By: explore
+  By: implement

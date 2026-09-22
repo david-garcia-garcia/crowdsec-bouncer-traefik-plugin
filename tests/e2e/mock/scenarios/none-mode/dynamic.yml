@@ -17,6 +17,7 @@ http:
       plugin:
         bouncer:
           enabled: "true"
+          crowdsecLapiEnabled: "true"
           crowdsecMode: none
           crowdsecLapiScheme: http
           crowdsecLapiHost: "@@LAPI_HOST@@"

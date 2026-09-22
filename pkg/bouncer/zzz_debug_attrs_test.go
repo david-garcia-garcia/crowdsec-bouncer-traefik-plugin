@@ -27,10 +27,8 @@ func testStreamAllowBouncer(t *testing.T, log *slog.Logger) (*Bouncer, *httptest
 	passed := false
 	b := &Bouncer{
 		enabled:                  true,
-		crowdsecMode:             configuration.StreamMode,
 		forwardedHeadersInsecure: true,
 		forwardedCustomHeader:    "X-Forwarded-For",
-		lapiClient:               lapiClient,
 		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
 		captchaClient:            &captcha.Client{},
 		log:                      log,
@@ -38,6 +36,7 @@ func testStreamAllowBouncer(t *testing.T, log *slog.Logger) (*Bouncer, *httptest
 			passed = true
 		}),
 	}
+	bindTestLAPI(b, lapiClient, configuration.StreamMode)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	req.RemoteAddr = "127.0.0.1:1"
 	req.Header.Set("X-Forwarded-For", "203.0.113.10")

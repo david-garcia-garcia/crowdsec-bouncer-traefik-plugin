@@ -67,7 +67,10 @@ func TestSessionKey_SameLapiKeySharesCursorAndRedisHash(t *testing.T) {
 		t.Fatal("same LAPI URL+key must share a session prefix even when update intervals differ")
 	}
 	if SessionKey(fast) != SessionKey(slow) {
-		t.Fatal("updateIntervalSeconds must not split the stream Open key")
+		t.Fatal("updateIntervalSeconds must not split SessionKey")
+	}
+	if OwnershipKey(fast, "mw") == OwnershipKey(slow, "mw") {
+		t.Fatal("updateIntervalSeconds must split the ownership Open key")
 	}
 	if SessionHex(fast) != SessionHex(slow) {
 		t.Fatal("stream cache prefix must follow the session, not metrics interval")
@@ -125,11 +128,18 @@ func TestSessionKey_PolicyAndTLSDoNotChangeKey(t *testing.T) {
 	tlsOnly.CrowdsecLapiTLSInsecureVerify = false
 	tlsOnly.CrowdsecLapiTLSCertificateAuthority = "ca"
 	tlsOnly.CrowdsecLapiTLSCertificateBouncer = "cert"
+	if SessionHex(base) == SessionHex(policy) {
+		t.Fatal("defaultDecisionSeconds must change SessionHex")
+	}
+	policy.DefaultDecisionSeconds = base.DefaultDecisionSeconds
 	if SessionKey(base) != SessionKey(policy) || IdentityHex(base) != IdentityHex(policy) {
-		t.Fatal("policy knobs must not change stream or live reclaim keys")
+		t.Fatal("failure-action policy must not change stream or live store keys")
 	}
 	if SessionKey(base) != SessionKey(tlsOnly) || IdentityHex(base) != IdentityHex(tlsOnly) {
-		t.Fatal("HTTP timeout and LAPI TLS must not change stream or live reclaim keys")
+		t.Fatal("HTTP timeout and LAPI TLS must not change SessionHex or IdentityHex")
+	}
+	if OwnershipKey(base, "mw") == OwnershipKey(tlsOnly, "mw") {
+		t.Fatal("HTTP timeout and LAPI TLS must change the ownership Open key")
 	}
 }
 
@@ -140,7 +150,7 @@ func TestClient_ReclaimGrace(t *testing.T) {
 }
 
 func TestClient_LifecycleLogs(t *testing.T) {
-	log, logSink := newTestLogSink(slog.LevelInfo)
+	log, logSink := newTestLogSink(slog.LevelDebug)
 	client := &Client{
 		log:          log,
 		crowdsecMode: configuration.LiveMode,
@@ -167,12 +177,11 @@ func TestOpenStream_LiveMetricsMismatchSharesSilently(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
-	server, hits := testStreamLAPI(t)
+	server, _ := testStreamLAPI(t)
 	parsed, err := url.Parse(server.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	log, logSink := newTestLogSink(slog.LevelDebug)
 	ctx := context.Background()
 
@@ -188,16 +197,17 @@ func TestOpenStream_LiveMetricsMismatchSharesSilently(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if owner != joiner {
-		t.Fatal("interval mismatch must share one Client")
+	if owner == joiner {
+		t.Fatal("interval mismatch must open a new Client")
 	}
-	if owner.StreamFetches() < 1 {
-		t.Fatal("owner must have polled once")
+	if SessionHex(ownerCfg) != SessionHex(joinerCfg) {
+		t.Fatal("interval mismatch must keep SessionHex")
 	}
-	if atomic.LoadInt64(hits) != 1 {
-		t.Fatalf("one ticker must poll once at startup, hits=%d", atomic.LoadInt64(hits))
+	if owner.decisionStore != joiner.decisionStore {
+		t.Fatal("interval mismatch must keep one DecisionStore")
 	}
-	owner.Close() // stop the tickers that log into logSink before reading it
+	owner.Close()
+	joiner.Close()
 	logged := logSink.String()
 	if strings.Contains(logged, "lapi session joiner ignored") || strings.Contains(logged, "wiring this middleware") {
 		t.Fatalf("interval mismatch must not warn-and-wire: %s", logged)
@@ -230,14 +240,14 @@ func TestOpenStream_SleepingIntervalChangeWakesSameSlot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first != second {
-		t.Fatal("sleeping interval change must Wake the same Client")
+	if first == second {
+		t.Fatal("sleeping interval change must Open a new Client")
 	}
-	if first.sessionKey != SessionKey(secondCfg) {
-		t.Fatalf("Wake must keep New sessionKey, got %q", first.sessionKey)
+	if SessionHex(firstCfg) != SessionHex(secondCfg) {
+		t.Fatal("interval change must keep SessionHex")
 	}
-	if atomic.LoadInt64(&first.isCrowdsecStreamStartup) != 0 {
-		t.Fatal("Wake must resume with startup=false")
+	if atomic.LoadInt64(&second.isCrowdsecStreamStartup) != 0 && second.decisionStore.StreamReady() == 0 {
+		t.Fatal("new client on a cold store may start with startup=true")
 	}
 }
 
@@ -259,6 +269,11 @@ func TestOpenStream_SleepingRedisHostDoesNotOverlapPollers(t *testing.T) {
 		t.Fatal(err)
 	}
 	fetchesBeforeCancel := first.StreamFetches()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && first.StreamFetches() < 1 {
+		time.Sleep(10 * time.Millisecond)
+	}
+	fetchesBeforeCancel = first.StreamFetches()
 	cancel()
 	waitClientSleeping(t, first)
 
@@ -453,7 +468,7 @@ func TestOpenStream_TLSOnlyAdoptsTransport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	log, logSink := newTestLogSink(slog.LevelInfo)
+	log := slog.Default()
 	ctx := context.Background()
 	firstCfg := testStreamConfig(parsed.Host, 1)
 	firstCfg.HTTPTimeoutSeconds = 10
@@ -468,24 +483,10 @@ func TestOpenStream_TLSOnlyAdoptsTransport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first != second {
-		t.Fatal("TLS/timeout-only New must reuse the Client")
+	if first == second {
+		t.Fatal("timeout-only New must open a new Client")
 	}
-	current := second.currentTransport()
-	if current == nil || current.httpTimeoutSeconds != 30 {
-		t.Fatalf("adopted timeout: %+v", current)
-	}
-	if current.httpClient.Timeout != 30*time.Second {
-		t.Fatalf("HTTP timeout %v", current.httpClient.Timeout)
-	}
-	second.Close() // stop the tickers that log into logSink before reading it
-	logged := logSink.String()
-	if !strings.Contains(logged, "lapi transport replaced") {
-		t.Fatalf("INFO must name transport replace: %s", logged)
-	}
-	if !strings.Contains(logged, "lapi session joiner adopted") {
-		t.Fatalf("INFO must mark joiner adopted: %s", logged)
-	}
+	second.Close()
 }
 
 func TestOpenStream_LapiOverrideAdoptsTimeout(t *testing.T) {
@@ -512,15 +513,8 @@ func TestOpenStream_LapiOverrideAdoptsTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first != second {
-		t.Fatal("LAPI override-only New must reuse the Client")
-	}
-	current := second.currentTransport()
-	if current == nil || current.httpTimeoutSeconds != 30 {
-		t.Fatalf("adopted timeout: %+v", current)
-	}
-	if current.httpClient.Timeout != 30*time.Second {
-		t.Fatalf("HTTP timeout %v", current.httpClient.Timeout)
+	if first == second {
+		t.Fatal("LAPI override-only New must open a new Client")
 	}
 }
 
@@ -547,15 +541,8 @@ func TestOpenStream_SharedDefaultChangeAdoptsWhenOverrideZero(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first != second {
-		t.Fatal("shared-default timeout New must reuse the Client")
-	}
-	current := second.currentTransport()
-	if current == nil || current.httpTimeoutSeconds != 20 {
-		t.Fatalf("adopted timeout: %+v", current)
-	}
-	if current.httpClient.Timeout != 20*time.Second {
-		t.Fatalf("HTTP timeout %v", current.httpClient.Timeout)
+	if first == second {
+		t.Fatal("shared-default timeout New must open a new Client")
 	}
 }
 
@@ -650,7 +637,7 @@ func TestOpenStream_DifferentNameFailsBeforeStoreOpen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	log, logSink := newTestLogSink(slog.LevelError)
+	log := slog.Default()
 	ctx := context.Background()
 	owner, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "foo", "test")
 	if err != nil {
@@ -661,28 +648,14 @@ func TestOpenStream_DifferentNameFailsBeforeStoreOpen(t *testing.T) {
 		t.Fatal("owner store must Peek Awake")
 	}
 	joiner, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "bar", "test")
-	if err == nil {
-		t.Fatal("different Traefik name must fail OpenStream")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if joiner != nil {
-		t.Fatal("failed OpenStream must not return a Client")
+	if joiner == owner {
+		t.Fatal("different Traefik names must be different Clients")
 	}
-	if !strings.Contains(err.Error(), "foo") || !strings.Contains(err.Error(), "bar") {
-		t.Fatalf("error must name owner and rejected: %v", err)
-	}
-	if !strings.Contains(err.Error(), "Closes") || !strings.Contains(err.Error(), "bouncer API key") {
-		t.Fatalf("error must name Close and isolation: %v", err)
-	}
-	logged := logSink.String()
-	if !strings.Contains(logged, `"owner":"foo"`) || !strings.Contains(logged, `"rejected":"bar"`) {
-		t.Fatalf("Error log must name owner and rejected: %s", logged)
-	}
-	_, afterState, afterOK := reclaim.Peek(StoreKey(testStreamConfig(parsed.Host, 1)))
-	if !afterOK || afterState != reclaim.Awake {
-		t.Fatal("Peek-fail must not bind or Wake the store")
-	}
-	if owner.decisionStore.CreatedBy() != "foo" {
-		t.Fatalf("createdBy: %q", owner.decisionStore.CreatedBy())
+	if owner.decisionStore != joiner.decisionStore {
+		t.Fatal("same SessionHex must share one DecisionStore")
 	}
 }
 
@@ -701,8 +674,12 @@ func TestOpenStream_EmptyNameStillExclusiveOwns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, namedErr := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "named", "test"); namedErr == nil {
-		t.Fatal("non-empty name must fail against empty createdBy")
+	named, namedErr := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "named", "test")
+	if namedErr != nil {
+		t.Fatal(namedErr)
+	}
+	if empty == named {
+		t.Fatal("empty vs named middleware must isolate Clients")
 	}
 	secondEmpty, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "", "test")
 	if err != nil {

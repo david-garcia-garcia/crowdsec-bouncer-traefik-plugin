@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -23,6 +24,7 @@ func getTestConfig() *configuration.Config {
 		LogFormat:                            "common",
 		LogFilePath:                          "",
 		CrowdsecMode:                         "none",
+		CrowdsecLapiEnabled:                  true,
 		CrowdsecLapiKey:                      "test-key",
 		CrowdsecLapiHost:                     "localhost",
 		CrowdsecLapiScheme:                   "http",
@@ -65,6 +67,7 @@ func getTestConfig() *configuration.Config {
 func newTestLogFile(t *testing.T) string {
 	t.Helper()
 	reclaim.ResetForTestWith(0)
+	instance.ResetForTest()
 	// slog keeps the file open; t.TempDir cleanup fails on Windows (usetesting wants TempDir).
 	f, err := os.CreateTemp("", "bouncer-log-*.log") //nolint:usetesting
 	if err != nil {
@@ -76,6 +79,7 @@ func newTestLogFile(t *testing.T) string {
 	}
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
+		instance.ResetForTest()
 		_ = os.Remove(path)
 	})
 	return path

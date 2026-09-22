@@ -47,6 +47,6 @@ stored, err := reclaim.OpenWithHooks(ctx, key, log, func() (any, reclaim.Hooks, 
 - Zero table grace disposes as soon as the last holder’s ctx is done.
 - There is no Release and no unbind. The only way to give a holder back is to end the context that bound it, which is why callers that can fail after an `Open` bind a cancellable child of their own (`core_plugin_middleware.md` bind context).
 - `DefaultGrace` (10s) is the utilities negative-grace fallback. This plugin’s process table uses `ProcessGrace` (30s).
-- Yaegi v0.16 panics on asserting a foreign concrete type to closer/sleeper. Pass Hooks funcs.
+- Yaegi v0.16 panics on asserting a foreign concrete type to closer/sleeper. Pass Hooks funcs. Slot fan-out uses `atomic.Value` in `pkg/instance`, not `atomic.Pointer[T]`.
 - Callers in another package import this shim, not `github.com/david-garcia-garcia/traefik-middleware-utilities/reclaim`.
 - Upstream table uses `time.AfterFunc` for grace so Yaegi v0.16 `interp._select` does not hang.

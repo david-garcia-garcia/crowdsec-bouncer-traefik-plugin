@@ -24,6 +24,7 @@ http:
       plugin:
         bouncer:
           enabled: "true"
+          crowdsecLapiEnabled: "true"
           crowdsecMode: live
           defaultDecisionSeconds: "2"
           crowdsecLapiScheme: http
@@ -35,6 +36,7 @@ http:
       plugin:
         bouncer:
           enabled: "true"
+          crowdsecLapiEnabled: "true"
           crowdsecMode: live
           defaultDecisionSeconds: "2"
           crowdsecLapiScheme: http

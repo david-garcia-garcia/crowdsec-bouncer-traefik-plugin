@@ -1,39 +1,38 @@
-# LAPI live-router scope union
+# LAPI opener stream scopes
 
 ## Language
 
-**Live-router scope union**:
-The Client-owned merge of every live constructor’s normalized `decisionScopeHeaders` map. Stream `scopes=` and the stream store filter snapshot this union. Write-once `decisionScopeHeaders` is first-create residue when no holder is registered yet.
-_Avoid_: PeekLivePrefix sibling, mutating the write-once map, package global, first-wins settings hash
+**Opener stream scopes**:
+The extra CrowdSec scope names the LAPI stream poll follows (`crowdsecLapiStreamScopes`). `ip` and `range` are always on the poll. Omitted or empty is `ip,range` only. Not copied from `decisionScopeHeaders`.
+_Avoid_: live-router scope union, `registerLiveHeaderScopes`, PeekLivePrefix
 
 ## Overview
 
-How a shared stream `lapi.Client` builds `scopes=` and the stream store filter from every live constructor that bound it. Spec: `core_plugin_lapi_scope-union`. Write-once `decisionScopeHeaders` stays the first-create residue; it is not the live union.
+How a stream `lapi.Client` builds `scopes=` from the opener list. Spec: `core_plugin_lapi_scope-union`. Canonical list is part of SessionHex in stream mode (`core_plugin_lapi_reclaim-key.md`). Header extraction stays on the bouncer.
 
 ## How to use
 
-- After a successful `OpenStream` bind, register this `New` ctx and this router’s normalized `decisionScopeHeaders` on the Client.
-- Unregister when that ctx is Done (`context.AfterFunc`). Holder is Traefik `New` ctx.
-- `streamQuery` and `storeStreamDecision` snapshot the union under the existing Client mutex.
+- Pass `cfg.CrowdsecLapiStreamScopes` into `CanonicalStreamScopes` at Open. Do not union bouncer header maps into the poll.
 - CAPI (alone) still omits `scopes=`. Live/none still pass scopes per `LiveLookup`.
-- Do not mutate write-once `decisionScopeHeaders`. Do not use `atomic.Pointer[T]`, `sync.Once`, or a package global.
+- When a bouncing middleware binds, warn once if `decisionScopeHeaders` keys are not covered by the opener list. Warn again when Publish swaps the client.
+- Do not use `atomic.Pointer[T]`, `sync.Once`, or a package global union table.
 
 ## Pattern snippet
 
 ```go
-client.registerLiveHeaderScopes(ctx, decisionscope.NormalizeDecisionScopeHeaders(cfg.DecisionScopeHeaders))
 query := client.streamQuery()
+missing := decisionscope.MissingStreamScopes(client.StreamScopes(), cfg.DecisionScopeHeaders)
 ```
 
 ## Key files
 
-- `pkg/lapi/liveheaderscopes.go`
+- `pkg/decisionscope/lookup.go`
 - `pkg/lapi/session.go`
 - `pkg/lapi/client_decisions.go`
+- `pkg/instance/tables.go` (bind-time coverage WARN)
 
 ## Gotchas
 
-- Growing the union does not send `startup=true`. A newly added scope misses decisions already past the CrowdSec cursor until a later incarnation `startup=true`.
-- Shrinking the union does not sweep header-scope cache keys. Stale Country/AS keys expire with TTL or die with the store incarnation.
-- When no live holder is registered yet (create-time first poll), the snapshot falls back to write-once `decisionScopeHeaders`.
-- Empty live maps stream only `ip,range`.
+- A list change is a new SessionHex and a new store (`startup=true` refill). YAML order does not matter.
+- Empty opener list does not copy Country from `decisionScopeHeaders`.
+- Growing the list does not send `startup=true` on an existing store; change the list to fork the store.

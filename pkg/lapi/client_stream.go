@@ -34,11 +34,7 @@ func (c *Client) startStream(config *configuration.Config, log *slog.Logger) err
 	if c.decisionStore != nil {
 		c.decisionStore.HydrateRange()
 	}
-	if config.StreamStartupBlock {
-		c.handleStreamTicker()
-	} else {
-		go c.handleStreamTicker()
-	}
+	go c.handleStreamTicker()
 	c.streamStop = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
 		c.handleStreamTicker()
 	})
