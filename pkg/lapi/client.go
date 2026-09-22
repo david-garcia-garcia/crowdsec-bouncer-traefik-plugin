@@ -105,6 +105,12 @@ func Prepare(cfg *configuration.Config, _ *slog.Logger) error {
 // Call Prepare first. middlewareName and bindKey are stored before tickers start so stream logs
 // do not race the Open callback. Close stops tickers and HTTP only; it does not Close the shared store.
 func New(config *configuration.Config, log *slog.Logger, pluginVersion string, store *decisionstore.Store, middlewareName, bindKey string) (*Client, error) {
+	log = log.With(
+		"traefikName", middlewareName,
+		"instanceName", config.CrowdsecLapiInstanceName,
+		"leg", instance.LegLAPI,
+		"sessionKey", bindKey,
+	)
 	crowdsecStreamRoute := crowdsecLapiStreamRoute
 	if config.CrowdsecMode == configuration.AloneMode {
 		crowdsecStreamRoute = crowdsecCapiStreamRoute
@@ -309,12 +315,12 @@ func (c *Client) SetPublishedName(name string) {
 	c.mu.Unlock()
 }
 
-// logInfo writes stream-health lines with host and reclaim key.
+// logInfo writes stream-health lines with host.
 func (c *Client) logInfo(msg, reason string) {
 	if c.log == nil {
 		return
 	}
-	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
+	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost, "reason", reason)
 }
 
 // logLifecycle writes Create/Close at INFO and Sleep/Wake at DEBUG.
@@ -323,10 +329,10 @@ func (c *Client) logLifecycle(msg, reason string, debug bool) {
 		return
 	}
 	if debug {
-		c.log.Debug(msg, "leg", instance.LegLAPI, "instanceName", c.instanceName, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
+		c.log.Debug(msg, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "reason", reason)
 		return
 	}
-	c.log.Info(msg, "leg", instance.LegLAPI, "instanceName", c.instanceName, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
+	c.log.Info(msg, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "reason", reason)
 }
 
 func stopTicker(stop chan bool) {

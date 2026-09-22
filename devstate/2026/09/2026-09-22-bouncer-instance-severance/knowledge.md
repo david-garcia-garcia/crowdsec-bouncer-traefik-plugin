@@ -5,4 +5,5 @@
 - updated `knowledge/devdocs/core_plugin_appsec.md`
 - updated `knowledge/devdocs/build_e2e_real.md`
 - updated `knowledge/devdocs/core_plugin_decisionstore.md`
-- updated `knowledge/devdocs/core_plugin_middleware_config-validation.md`
+- updated `knowledge/devdocs/std_go_logger_nested.md`
+- updated `knowledge/devdocs/std_go_logger_debug-attrs.md`

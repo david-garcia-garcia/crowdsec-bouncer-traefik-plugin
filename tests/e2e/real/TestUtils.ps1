@@ -323,7 +323,7 @@ function Wait-ForHttpStatus {
         [hashtable]$Headers = @{},
         [int[]]$ExpectedStatusCodes = @(200),
         [int]$TimeoutSeconds = 15,
-        [int]$RetryIntervalSeconds = 1
+        [double]$RetryIntervalSeconds = 0.2
     )
     
     $elapsed = 0
@@ -375,7 +375,7 @@ function Wait-ForCondition {
         [scriptblock]$Condition,
         [string]$Description = "Condition",
         [int]$TimeoutSeconds = 30,
-        [int]$RetryIntervalSeconds = 1,
+        [double]$RetryIntervalSeconds = 0.2,
         [switch]$Silent
     )
     

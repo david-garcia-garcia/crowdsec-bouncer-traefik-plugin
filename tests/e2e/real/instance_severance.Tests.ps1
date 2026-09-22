@@ -34,6 +34,14 @@ BeforeAll {
         [System.IO.File]::WriteAllText($script:SevFile, $Yaml.TrimStart(), $script:Utf8)
     }
 
+    # Overwrite the watched file. Do not delete it: Docker Desktop bind
+    # mounts often miss create/delete, so Traefik never sees /sev-* routers.
+    function Clear-SevYaml {
+        Write-SevYaml @"
+http: {}
+"@
+    }
+
     function Get-SevLogs {
         return (docker logs traefik-test 2>&1 | Out-String)
     }
@@ -42,9 +50,9 @@ BeforeAll {
         return @"
           logLevel: DEBUG
           httpTimeoutSeconds: "10"
-          updateIntervalSeconds: "2"
+          updateIntervalSeconds: "5"
           forwardedHeadersTrustedIps:
-            - "172.16.0.0/12"
+            - "127.0.0.1/32"
             - "172.28.0.1/32"
           forwardedHeadersCustomName: X-Forwarded-For
 "@
@@ -71,9 +79,9 @@ BeforeAll {
             [string]$Path,
             [string]$IP,
             [int[]]$Codes,
-            [int]$TimeoutSeconds = 45
+            [int]$TimeoutSeconds = 15
         )
-        $waited = Wait-ForHttpStatus -Url "$script:TraefikUrl$Path" -Headers @{ "X-Forwarded-For" = $IP } -ExpectedStatusCodes $Codes -TimeoutSeconds $TimeoutSeconds
+        $waited = Wait-ForHttpStatus -Url "$script:TraefikUrl$Path" -Headers @{ "X-Forwarded-For" = $IP } -ExpectedStatusCodes $Codes -TimeoutSeconds $TimeoutSeconds -RetryIntervalSeconds 0.2
         $outcome = [pscustomobject]@{
             Success    = [bool]$waited.Success
             StatusCode = $waited.StatusCode
@@ -87,9 +95,7 @@ BeforeAll {
 }
 
 AfterAll {
-    if (Test-Path $script:SevFile) {
-        Remove-Item -Force $script:SevFile
-    }
+    Clear-SevYaml
 }
 
 Describe "Instance severance topology" {
@@ -98,9 +104,7 @@ Describe "Instance severance topology" {
     }
 
     AfterEach {
-        if (Test-Path $script:SevFile) {
-            Remove-Item -Force $script:SevFile
-        }
+        Clear-SevYaml
         Remove-AllTestDecisions
     }
 
@@ -129,11 +133,11 @@ $svc
           crowdsecAppsecHost: crowdsec:7422
 $knobs
 "@
-        $ip = "172.19.0.51"
-        $up = Wait-SevCodes -Path "/sev-t1" -IP $ip -Codes @(200) -TimeoutSeconds 45
+        $ip = "10.90.0.51"
+        $up = Wait-SevCodes -Path "/sev-t1" -IP $ip -Codes @(200) -TimeoutSeconds 15
         $up.Success | Should -BeTrue -Because "T1 route must come up"
         Add-TestDecision -IP $ip -Type "ban" -Reason "T1"
-        $blocked = Wait-SevCodes -Path "/sev-t1" -IP $ip -Codes @(403, 429) -TimeoutSeconds 30
+        $blocked = Wait-SevCodes -Path "/sev-t1" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $blocked.Success | Should -BeTrue -Because "T1 banned IP is 403"
     }
 
@@ -177,12 +181,12 @@ $knobs
           remediationHeadersCustomName: x-crowdsec
 $knobs
 "@
-        $ip = "172.19.0.52"
-        $apiUp = Wait-SevCodes -Path "/sev-t2-api" -IP $ip -Codes @(200) -TimeoutSeconds 45
+        $ip = "10.90.0.52"
+        $apiUp = Wait-SevCodes -Path "/sev-t2-api" -IP $ip -Codes @(200) -TimeoutSeconds 15
         $apiUp.Success | Should -BeTrue
         Add-TestDecision -IP $ip -Type "ban" -Reason "T2"
-        $apiBan = Wait-SevCodes -Path "/sev-t2-api" -IP $ip -Codes @(403, 429) -TimeoutSeconds 30
-        $adminBan = Wait-SevCodes -Path "/sev-t2-admin" -IP $ip -Codes @(403, 429) -TimeoutSeconds 30
+        $apiBan = Wait-SevCodes -Path "/sev-t2-api" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
+        $adminBan = Wait-SevCodes -Path "/sev-t2-admin" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $apiBan.Success | Should -BeTrue
         $adminBan.Success | Should -BeTrue
         $logs = Get-SevLogs
@@ -229,11 +233,11 @@ $knobs
           crowdsecAppsecInstanceName: shared
 $knobs
 "@
-        $ip = "172.19.0.53"
-        $hold = Wait-SevCodes -Path "/sev-t3-hold" -IP $ip -Codes @(200) -TimeoutSeconds 45
+        $ip = "10.90.0.53"
+        $hold = Wait-SevCodes -Path "/sev-t3-hold" -IP $ip -Codes @(200) -TimeoutSeconds 15
         $hold.Success | Should -BeTrue -Because "placeholder calls next"
         Add-TestDecision -IP $ip -Type "ban" -Reason "T3"
-        $app = Wait-SevCodes -Path "/sev-t3-app" -IP $ip -Codes @(403, 429) -TimeoutSeconds 30
+        $app = Wait-SevCodes -Path "/sev-t3-app" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $app.Success | Should -BeTrue
     }
 
@@ -260,8 +264,8 @@ $svc
           crowdsecAppsecKey: "$script:AppsecKey"
 $knobs
 "@
-        $ip = "172.19.0.54"
-        $clean = Wait-SevCodes -Path "/sev-t4" -IP $ip -Codes @(200) -TimeoutSeconds 45
+        $ip = "10.90.0.54"
+        $clean = Wait-SevCodes -Path "/sev-t4" -IP $ip -Codes @(200) -TimeoutSeconds 15
         $clean.Success | Should -BeTrue
         $sqli = Test-HttpRequest -Endpoint "/sev-t4?id=1%27%20OR%20%271%27%3D%271" -IP $ip -TraefikUrl $script:TraefikUrl
         $sqli.StatusCode | Should -Be 403
@@ -307,12 +311,12 @@ $knobs
           remediationStatusCode: 429
 $knobs
 "@
-        $ip = "172.19.0.55"
-        $up = Wait-SevCodes -Path "/sev-t5-a" -IP $ip -Codes @(200) -TimeoutSeconds 45
+        $ip = "10.90.0.55"
+        $up = Wait-SevCodes -Path "/sev-t5-a" -IP $ip -Codes @(200) -TimeoutSeconds 15
         $up.Success | Should -BeTrue
         Add-TestDecision -IP $ip -Type "ban" -Reason "T5"
-        $a = Wait-SevCodes -Path "/sev-t5-a" -IP $ip -Codes @(403) -TimeoutSeconds 30
-        $b = Wait-SevCodes -Path "/sev-t5-b" -IP $ip -Codes @(429) -TimeoutSeconds 30
+        $a = Wait-SevCodes -Path "/sev-t5-a" -IP $ip -Codes @(403) -TimeoutSeconds 15
+        $b = Wait-SevCodes -Path "/sev-t5-b" -IP $ip -Codes @(429) -TimeoutSeconds 15
         $a.Success | Should -BeTrue
         $b.Success | Should -BeTrue
     }
@@ -320,16 +324,14 @@ $knobs
 
 Describe "Instance severance late bind" {
     AfterEach {
-        if (Test-Path $script:SevFile) {
-            Remove-Item -Force $script:SevFile
-        }
+        Clear-SevYaml
         Remove-AllTestDecisions
     }
 
     It "L1 subscriber-only first publish is 503 then 403" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.61"
+        $ip = "10.90.0.61"
         Write-SevYaml @"
 http:
   routers:
@@ -348,7 +350,7 @@ $svc
           crowdsecLapiInstanceName: shared
 $knobs
 "@
-        $miss = Wait-SevCodes -Path "/sev-l1" -IP $ip -Codes @(503) -TimeoutSeconds 45
+        $miss = Wait-SevCodes -Path "/sev-l1" -IP $ip -Codes @(503) -TimeoutSeconds 15
         $miss.Success | Should -BeTrue -Because "L1 before owner is 503"
         (Get-SevLogs) | Should -Match "crowdsec bouncer backend missing"
         Add-TestDecision -IP $ip -Type "ban" -Reason "L1"
@@ -385,14 +387,14 @@ $knobs
           crowdsecLapiHost: crowdsec:8080
 $knobs
 "@
-        $hit = Wait-SevCodes -Path "/sev-l1" -IP $ip -Codes @(403, 429) -TimeoutSeconds 45
+        $hit = Wait-SevCodes -Path "/sev-l1" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $hit.Success | Should -BeTrue -Because "L1 after owner uses the decision"
     }
 
     It "L1b startup block off uses failure action" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.62"
+        $ip = "10.90.0.62"
         Write-SevYaml @"
 http:
   routers:
@@ -425,8 +427,8 @@ $knobs
           crowdsecLapiInstanceName: shared
 $knobs
 "@
-        $pass = Wait-SevCodes -Path "/sev-l1b-a" -IP $ip -Codes @(200) -TimeoutSeconds 45
-        $ban = Wait-SevCodes -Path "/sev-l1b-b" -IP $ip -Codes @(403, 429) -TimeoutSeconds 45
+        $pass = Wait-SevCodes -Path "/sev-l1b-a" -IP $ip -Codes @(200) -TimeoutSeconds 15
+        $ban = Wait-SevCodes -Path "/sev-l1b-b" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $pass.Success | Should -BeTrue
         $ban.Success | Should -BeTrue
     }
@@ -434,7 +436,7 @@ $knobs
     It "L2 missing name stays 503 or failure action" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.63"
+        $ip = "10.90.0.63"
         Write-SevYaml @"
 http:
   routers:
@@ -466,8 +468,8 @@ $knobs
           crowdsecLapiInstanceName: missing
 $knobs
 "@
-        $block = Wait-SevCodes -Path "/sev-l2-block" -IP $ip -Codes @(503) -TimeoutSeconds 45
-        $fail = Wait-SevCodes -Path "/sev-l2-fail" -IP $ip -Codes @(403, 429) -TimeoutSeconds 45
+        $block = Wait-SevCodes -Path "/sev-l2-block" -IP $ip -Codes @(503) -TimeoutSeconds 15
+        $fail = Wait-SevCodes -Path "/sev-l2-fail" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $block.Success | Should -BeTrue
         $fail.Success | Should -BeTrue
     }
@@ -475,7 +477,7 @@ $knobs
     It "L3 two subscribed clients one missing is 503" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.64"
+        $ip = "10.90.0.64"
         Write-SevYaml @"
 http:
   routers:
@@ -511,14 +513,14 @@ $knobs
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "L3"
-        $block = Wait-SevCodes -Path "/sev-l3" -IP $ip -Codes @(503) -TimeoutSeconds 45
+        $block = Wait-SevCodes -Path "/sev-l3" -IP $ip -Codes @(503) -TimeoutSeconds 15
         $block.Success | Should -BeTrue
     }
 
     It "L4 AppSec opener added later" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.65"
+        $ip = "10.90.0.65"
         Write-SevYaml @"
 http:
   routers:
@@ -555,7 +557,7 @@ $knobs
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "L4"
-        $ban = Wait-SevCodes -Path "/sev-l4" -IP $ip -Codes @(403, 429) -TimeoutSeconds 45
+        $ban = Wait-SevCodes -Path "/sev-l4" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $ban.Success | Should -BeTrue
         $sqli = Test-HttpRequest -Endpoint "/sev-l4?id=1%27%20OR%20%271%27%3D%271" -IP $ip -TraefikUrl $script:TraefikUrl
         $sqli.StatusCode | Should -BeIn @(403, 429) -Because "LAPI ban still applies while AppSec is missing"
@@ -564,16 +566,14 @@ $knobs
 
 Describe "Instance severance reclaim and names" {
     AfterEach {
-        if (Test-Path $script:SevFile) {
-            Remove-Item -Force $script:SevFile
-        }
+        Clear-SevYaml
         Remove-AllTestDecisions
     }
 
     It "R1 same YAML rewrite stays banned" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.71"
+        $ip = "10.90.0.71"
         $yaml = @"
 http:
   routers:
@@ -596,20 +596,20 @@ $svc
 $knobs
 "@
         Write-SevYaml $yaml
-        $up = Wait-SevCodes -Path "/sev-r1" -IP $ip -Codes @(200) -TimeoutSeconds 45
+        $up = Wait-SevCodes -Path "/sev-r1" -IP $ip -Codes @(200) -TimeoutSeconds 15
         $up.Success | Should -BeTrue
         Add-TestDecision -IP $ip -Type "ban" -Reason "R1"
-        $first = Wait-SevCodes -Path "/sev-r1" -IP $ip -Codes @(403, 429) -TimeoutSeconds 30
+        $first = Wait-SevCodes -Path "/sev-r1" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $first.Success | Should -BeTrue
         Write-SevYaml $yaml
-        $again = Wait-SevCodes -Path "/sev-r1" -IP $ip -Codes @(403, 429) -TimeoutSeconds 30
+        $again = Wait-SevCodes -Path "/sev-r1" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $again.Success | Should -BeTrue
     }
 
     It "R2 host change publishes a new empty client" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.72"
+        $ip = "10.90.0.72"
         Write-SevYaml @"
 http:
   routers:
@@ -644,7 +644,7 @@ $knobs
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "R2"
-        $banned = Wait-SevCodes -Path "/sev-r2-sub" -IP $ip -Codes @(403, 429) -TimeoutSeconds 45
+        $banned = Wait-SevCodes -Path "/sev-r2-sub" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $banned.Success | Should -BeTrue
         Write-SevYaml @"
 http:
@@ -672,9 +672,9 @@ $svc
           crowdsecLapiHost: crowdsec:9
           httpTimeoutSeconds: "2"
           logLevel: DEBUG
-          updateIntervalSeconds: "2"
+          updateIntervalSeconds: "5"
           forwardedHeadersTrustedIps:
-            - "172.16.0.0/12"
+            - "127.0.0.1/32"
             - "172.28.0.1/32"
           forwardedHeadersCustomName: X-Forwarded-For
     sev-r2-sub:
@@ -685,11 +685,11 @@ $svc
           crowdsecLapiInstanceName: shared
           logLevel: DEBUG
           forwardedHeadersTrustedIps:
-            - "172.16.0.0/12"
+            - "127.0.0.1/32"
             - "172.28.0.1/32"
           forwardedHeadersCustomName: X-Forwarded-For
 "@
-        $pass = Wait-SevCodes -Path "/sev-r2-sub" -IP $ip -Codes @(200) -TimeoutSeconds 45
+        $pass = Wait-SevCodes -Path "/sev-r2-sub" -IP $ip -Codes @(200) -TimeoutSeconds 15
         $pass.Success | Should -BeTrue -Because "new empty store plus passthrough is 200"
         Start-Sleep -Seconds $script:GraceSeconds
         $still = Test-HttpRequest -Endpoint "/sev-r2-sub" -IP $ip -TraefikUrl $script:TraefikUrl
@@ -699,7 +699,7 @@ $svc
     It "R3 timeout change keeps the ban and starts a new incarnation" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.73"
+        $ip = "10.90.0.73"
         Write-SevYaml @"
 http:
   routers:
@@ -722,10 +722,10 @@ $svc
           crowdsecLapiHttpTimeoutSeconds: 10
 $knobs
 "@
-        $up = Wait-SevCodes -Path "/sev-r3" -IP $ip -Codes @(200) -TimeoutSeconds 45
+        $up = Wait-SevCodes -Path "/sev-r3" -IP $ip -Codes @(200) -TimeoutSeconds 15
         $up.Success | Should -BeTrue
         Add-TestDecision -IP $ip -Type "ban" -Reason "R3"
-        $banned = Wait-SevCodes -Path "/sev-r3" -IP $ip -Codes @(403, 429) -TimeoutSeconds 30
+        $banned = Wait-SevCodes -Path "/sev-r3" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $banned.Success | Should -BeTrue
         $before = Get-SevLogs
         Write-SevYaml @"
@@ -750,7 +750,7 @@ $svc
           crowdsecLapiHttpTimeoutSeconds: 20
 $knobs
 "@
-        $still = Wait-SevCodes -Path "/sev-r3" -IP $ip -Codes @(403, 429) -TimeoutSeconds 30
+        $still = Wait-SevCodes -Path "/sev-r3" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $still.Success | Should -BeTrue
         Start-Sleep -Seconds 5
         $after = Get-SevLogs
@@ -762,7 +762,7 @@ $knobs
     It "R4 N1 slot rename unbinds the old subscriber" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.74"
+        $ip = "10.90.0.74"
         Write-SevYaml @"
 http:
   routers:
@@ -797,7 +797,7 @@ $knobs
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "R4"
-        $banned = Wait-SevCodes -Path "/sev-r4-admin" -IP $ip -Codes @(403, 429) -TimeoutSeconds 45
+        $banned = Wait-SevCodes -Path "/sev-r4-admin" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $banned.Success | Should -BeTrue
         $before = Get-SevLogs
         Write-SevYaml @"
@@ -844,8 +844,8 @@ $knobs
           crowdsecLapiInstanceName: other
 $knobs
 "@
-        $admin503 = Wait-SevCodes -Path "/sev-r4-admin" -IP $ip -Codes @(503) -TimeoutSeconds 45
-        $other403 = Wait-SevCodes -Path "/sev-r4-other" -IP $ip -Codes @(403, 429) -TimeoutSeconds 45
+        $admin503 = Wait-SevCodes -Path "/sev-r4-admin" -IP $ip -Codes @(503) -TimeoutSeconds 15
+        $other403 = Wait-SevCodes -Path "/sev-r4-other" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $admin503.Success | Should -BeTrue
         $other403.Success | Should -BeTrue
         $after = Get-SevLogs
@@ -864,7 +864,7 @@ $knobs
     It "R5 N2 deleting the opener unbinds after grace" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.75"
+        $ip = "10.90.0.75"
         Write-SevYaml @"
 http:
   routers:
@@ -899,7 +899,7 @@ $knobs
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "R5"
-        $banned = Wait-SevCodes -Path "/sev-r5-admin" -IP $ip -Codes @(403, 429) -TimeoutSeconds 45
+        $banned = Wait-SevCodes -Path "/sev-r5-admin" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $banned.Success | Should -BeTrue
         Write-SevYaml @"
 http:
@@ -920,7 +920,7 @@ $svc
 $knobs
 "@
         Start-Sleep -Seconds $script:GraceSeconds
-        $gone = Wait-SevCodes -Path "/sev-r5-admin" -IP $ip -Codes @(503) -TimeoutSeconds 20
+        $gone = Wait-SevCodes -Path "/sev-r5-admin" -IP $ip -Codes @(503) -TimeoutSeconds 15
         $gone.Success | Should -BeTrue
         (Get-SevLogs) | Should -Match "crowdsec lapi instance closed"
         (Get-SevLogs) | Should -Match "crowdsec bouncer unbound"
@@ -929,7 +929,7 @@ $knobs
     It "N2 new host and new slot name starts a second incarnation" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.76"
+        $ip = "10.90.0.76"
         Write-SevYaml @"
 http:
   routers:
@@ -964,7 +964,7 @@ $knobs
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "N2"
-        $banned = Wait-SevCodes -Path "/sev-n2-admin" -IP $ip -Codes @(403, 429) -TimeoutSeconds 45
+        $banned = Wait-SevCodes -Path "/sev-n2-admin" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $banned.Success | Should -BeTrue
         $before = Get-SevLogs
         Write-SevYaml @"
@@ -998,9 +998,9 @@ $svc
           crowdsecLapiHost: crowdsec:9
           httpTimeoutSeconds: "2"
           logLevel: DEBUG
-          updateIntervalSeconds: "2"
+          updateIntervalSeconds: "5"
           forwardedHeadersTrustedIps:
-            - "172.16.0.0/12"
+            - "127.0.0.1/32"
             - "172.28.0.1/32"
           forwardedHeadersCustomName: X-Forwarded-For
     sev-n2-admin:
@@ -1031,16 +1031,14 @@ $knobs
 
 Describe "Instance severance collision and config errors" {
     AfterEach {
-        if (Test-Path $script:SevFile) {
-            Remove-Item -Force $script:SevFile
-        }
+        Clear-SevYaml
         Remove-AllTestDecisions
     }
 
     It "F1 second publisher is rejected" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.81"
+        $ip = "10.90.0.81"
         Write-SevYaml @"
 http:
   routers:
@@ -1089,7 +1087,7 @@ $knobs
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "F1"
-        $sub = Wait-SevCodes -Path "/sev-f1-sub" -IP $ip -Codes @(403, 429) -TimeoutSeconds 45
+        $sub = Wait-SevCodes -Path "/sev-f1-sub" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $sub.Success | Should -BeTrue
         $logs = Get-SevLogs
         $logs | Should -Match "crowdsec instance name taken"
@@ -1102,7 +1100,7 @@ $knobs
     It "F2 AppSec name taken rolls back the free LAPI name" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.82"
+        $ip = "10.90.0.82"
         Write-SevYaml @"
 http:
   routers:
@@ -1160,14 +1158,14 @@ $knobs
         $logs | Should -Match "leg=appsec"
         $cs = Test-HttpRequest -Endpoint "/sev-f2-cs" -IP $ip -TraefikUrl $script:TraefikUrl
         $cs.StatusCode | Should -Be 404
-        $sub = Wait-SevCodes -Path "/sev-f2-sub" -IP $ip -Codes @(503) -TimeoutSeconds 20
+        $sub = Wait-SevCodes -Path "/sev-f2-sub" -IP $ip -Codes @(503) -TimeoutSeconds 15
         $sub.Success | Should -BeTrue
     }
 
     It "F3 subscribe-only with names and no keys binds" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.83"
+        $ip = "10.90.0.83"
         Write-SevYaml @"
 http:
   routers:
@@ -1205,7 +1203,7 @@ $knobs
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "F3"
-        $admin = Wait-SevCodes -Path "/sev-f3-admin" -IP $ip -Codes @(403, 429) -TimeoutSeconds 45
+        $admin = Wait-SevCodes -Path "/sev-f3-admin" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $admin.Success | Should -BeTrue
         (Get-SevLogs) | Should -Not -Match "crowdsec instance name taken"
     }
@@ -1213,7 +1211,7 @@ $knobs
     It "C1 colliding stream owners both answer" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.84"
+        $ip = "10.90.0.84"
         Write-SevYaml @"
 http:
   routers:
@@ -1248,8 +1246,8 @@ $knobs
           crowdsecLapiHost: crowdsec:8080
 $knobs
 "@
-        $a = Wait-SevCodes -Path "/sev-c1-a" -IP $ip -Codes @(200) -TimeoutSeconds 45
-        $b = Wait-SevCodes -Path "/sev-c1-b" -IP $ip -Codes @(200) -TimeoutSeconds 45
+        $a = Wait-SevCodes -Path "/sev-c1-a" -IP $ip -Codes @(200) -TimeoutSeconds 15
+        $b = Wait-SevCodes -Path "/sev-c1-b" -IP $ip -Codes @(200) -TimeoutSeconds 15
         $a.Success | Should -BeTrue
         $b.Success | Should -BeTrue
         $logs = Get-SevLogs
@@ -1260,7 +1258,7 @@ $knobs
     It "E2 leftover instance name with bounce off fails New" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.85"
+        $ip = "10.90.0.85"
         Write-SevYaml @"
 http:
   routers:
@@ -1292,7 +1290,7 @@ $knobs
           crowdsecLapiInstanceName: shared
 $knobs
 "@
-        $good = Wait-SevCodes -Path "/sev-e2-good" -IP $ip -Codes @(200) -TimeoutSeconds 45
+        $good = Wait-SevCodes -Path "/sev-e2-good" -IP $ip -Codes @(200) -TimeoutSeconds 15
         $good.Success | Should -BeTrue
         Start-Sleep -Seconds 3
         $bad = Test-HttpRequest -Endpoint "/sev-e2-bad" -IP $ip -TraefikUrl $script:TraefikUrl
@@ -1302,7 +1300,7 @@ $knobs
     It "E3 bounce with omitted LAPI name does not subscribe" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.86"
+        $ip = "10.90.0.86"
         Write-SevYaml @"
 http:
   routers:
@@ -1320,7 +1318,7 @@ $svc
           crowdsecLapiEnabled: "false"
 $knobs
 "@
-        $ok = Wait-SevCodes -Path "/sev-e3" -IP $ip -Codes @(200) -TimeoutSeconds 45
+        $ok = Wait-SevCodes -Path "/sev-e3" -IP $ip -Codes @(200) -TimeoutSeconds 15
         $ok.Success | Should -BeTrue
         Add-TestDecision -IP $ip -Type "ban" -Reason "E3"
         $still = Test-HttpRequest -Endpoint "/sev-e3" -IP $ip -TraefikUrl $script:TraefikUrl
@@ -1331,7 +1329,7 @@ $knobs
     It "E4 crowdsecMode appsec fails New" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
-        $ip = "172.19.0.87"
+        $ip = "10.90.0.87"
         Write-SevYaml @"
 http:
   routers:

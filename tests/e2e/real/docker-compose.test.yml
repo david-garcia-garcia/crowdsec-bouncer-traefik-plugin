@@ -45,17 +45,27 @@ services:
       - dragonfly
       - dummy-captcha
 
-  # Test service - basic whoami
+  # Always-pass siteverify so Pester can POST a dummy form and assert the gate cookie.
+  dummy-captcha:
+    image: python:3.12-alpine
+    container_name: "dummy-captcha-test"
+    restart: unless-stopped
+    command: ["python", "/dummy-captcha.py"]
+    volumes:
+      - "./dummy-captcha.py:/dummy-captcha.py:ro"
+
+  # One whoami origin. Routers and middlewares stay distinct; PathPrefix must not nest.
   whoami:
     image: traefik/whoami
     container_name: "whoami-test"
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
+      - "traefik.http.services.whoami.loadbalancer.server.port=80"
+
       - "traefik.http.routers.whoami.rule=PathPrefix(`/whoami`)"
       - "traefik.http.routers.whoami.entrypoints=web"
       - "traefik.http.routers.whoami.middlewares=bouncer-test@docker"
-      - "traefik.http.services.whoami.loadbalancer.server.port=80"
       
       # Bouncer middleware with test configuration
       - "traefik.http.middlewares.bouncer-test.plugin.bouncer.enabled=true"
@@ -70,17 +80,10 @@ services:
       - "traefik.http.middlewares.bouncer-test.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-test.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
-  # Test service - protected endpoint
-  protected:
-    image: traefik/whoami
-    container_name: "protected-test"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
+
       - "traefik.http.routers.protected.rule=PathPrefix(`/protected`)"
       - "traefik.http.routers.protected.entrypoints=web"
       - "traefik.http.routers.protected.middlewares=bouncer-strict@docker"
-      - "traefik.http.services.protected.loadbalancer.server.port=80"
       
       # Strict bouncer middleware for testing blocks
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.enabled=true"
@@ -95,26 +98,10 @@ services:
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-strict.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
-  # Always-pass siteverify so Pester can POST a dummy form and assert the gate cookie.
-  dummy-captcha:
-    image: python:3.12-alpine
-    container_name: "dummy-captcha-test"
-    restart: unless-stopped
-    command: ["python", "/dummy-captcha.py"]
-    volumes:
-      - "./dummy-captcha.py:/dummy-captcha.py:ro"
 
-  # Test service - captcha enabled
-  captcha:
-    image: traefik/whoami
-    container_name: "captcha-test"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
       - "traefik.http.routers.captcha.rule=PathPrefix(`/captcha`)"
       - "traefik.http.routers.captcha.entrypoints=web"
       - "traefik.http.routers.captcha.middlewares=bouncer-captcha@docker"
-      - "traefik.http.services.captcha.loadbalancer.server.port=80"
       
       # Captcha-enabled bouncer middleware
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.enabled=true"
@@ -139,17 +126,10 @@ services:
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-captcha.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
-  # Test service - disabled bouncer
-  disabled:
-    image: traefik/whoami
-    container_name: "disabled-test"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
+
       - "traefik.http.routers.disabled.rule=PathPrefix(`/disabled`)"
       - "traefik.http.routers.disabled.entrypoints=web"
       - "traefik.http.routers.disabled.middlewares=bouncer-disabled@docker"
-      - "traefik.http.services.disabled.loadbalancer.server.port=80"
       
       # Disabled bouncer middleware
       - "traefik.http.middlewares.bouncer-disabled.plugin.bouncer.enabled=false"
@@ -157,17 +137,10 @@ services:
       - "traefik.http.middlewares.bouncer-disabled.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000010"
       - "traefik.http.middlewares.bouncer-disabled.plugin.bouncer.loglevel=DEBUG"
 
-  # Test service - remediation headers
-  remediation-headers:
-    image: traefik/whoami
-    container_name: "remediation-headers-test"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
+
       - "traefik.http.routers.remediation-headers.rule=PathPrefix(`/remediation-headers`)"
       - "traefik.http.routers.remediation-headers.entrypoints=web"
       - "traefik.http.routers.remediation-headers.middlewares=bouncer-remediation-headers@docker"
-      - "traefik.http.services.remediation-headers.loadbalancer.server.port=80"
       
       # Bouncer middleware with custom remediation header
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.enabled=true"
@@ -183,17 +156,10 @@ services:
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-remediation-headers.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
-  # Test service - stream mode
-  stream:
-    image: traefik/whoami
-    container_name: "stream-test"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
+
       - "traefik.http.routers.stream.rule=PathPrefix(`/stream`)"
       - "traefik.http.routers.stream.entrypoints=web"
       - "traefik.http.routers.stream.middlewares=bouncer-stream@docker"
-      - "traefik.http.services.stream.loadbalancer.server.port=80"
       
       # Stream mode bouncer middleware
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.enabled=true"
@@ -202,23 +168,17 @@ services:
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.crowdseclapihost=crowdsec:8080"
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.loglevel=DEBUG"
-      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.updateintervalseconds=5"
-      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.metricsupdateintervalseconds=1"
+      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.updateintervalseconds=10"
+      - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.metricsupdateintervalseconds=10"
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.crowdsecmode=stream"
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-stream.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
-  # Live mode: cache an allow, then re-query after defaultDecisionSeconds (PR 333)
-  live:
-    image: traefik/whoami
-    container_name: "live-test"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
+      # Live mode: cache an allow, then re-query after defaultDecisionSeconds (PR 333)
+
       - "traefik.http.routers.live.rule=PathPrefix(`/live`)"
       - "traefik.http.routers.live.entrypoints=web"
       - "traefik.http.routers.live.middlewares=bouncer-live@docker"
-      - "traefik.http.services.live.loadbalancer.server.port=80"
       - "traefik.http.middlewares.bouncer-live.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-live.plugin.bouncer.crowdseclapienabled=true"
       - "traefik.http.middlewares.bouncer-live.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
@@ -230,17 +190,11 @@ services:
       - "traefik.http.middlewares.bouncer-live.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-live.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
-  # Live mode with Dragonfly as the Redis-protocol cache (not in-process TTL map)
-  redis-cache:
-    image: traefik/whoami
-    container_name: "redis-cache-test"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
+      # Live mode with Dragonfly as the Redis-protocol cache (not in-process TTL map)
+
       - "traefik.http.routers.redis-cache.rule=PathPrefix(`/redis-cache`)"
       - "traefik.http.routers.redis-cache.entrypoints=web"
       - "traefik.http.routers.redis-cache.middlewares=bouncer-redis-cache@docker"
-      - "traefik.http.services.redis-cache.loadbalancer.server.port=80"
       - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.crowdseclapienabled=true"
       - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.crowdseclapikey=c51a1c7000000000000000000000000e"
@@ -254,19 +208,13 @@ services:
       - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-redis-cache.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
-  # Same Dragonfly cache with a longer live TTL so a Traefik restart still hits Redis.
-  # Path must not be under `/redis-cache` — PathPrefix(`/redis-cache`) would steal it
-  # and apply the 2s TTL, so the ban would expire during docker restart.
-  redis-cache-hold:
-    image: traefik/whoami
-    container_name: "redis-cache-hold-test"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
+      # Same Dragonfly cache with a longer live TTL so a Traefik restart still hits Redis.
+      # Path must not be under `/redis-cache` — PathPrefix(`/redis-cache`) would steal it
+      # and apply the 2s TTL, so the ban would expire during docker restart.
+
       - "traefik.http.routers.redis-cache-hold.rule=PathPrefix(`/hold-redis`)"
       - "traefik.http.routers.redis-cache-hold.entrypoints=web"
       - "traefik.http.routers.redis-cache-hold.middlewares=bouncer-redis-cache-hold@docker"
-      - "traefik.http.services.redis-cache-hold.loadbalancer.server.port=80"
       - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.crowdseclapienabled=true"
       - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.crowdseclapikey=c51a1c7000000000000000000000000f"
@@ -280,17 +228,11 @@ services:
       - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-redis-cache-hold.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
-  # Trusted client IPs bypass even when banned (PR 333)
-  trusted:
-    image: traefik/whoami
-    container_name: "trusted-test"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
+      # Trusted client IPs bypass even when banned (PR 333)
+
       - "traefik.http.routers.trusted.rule=PathPrefix(`/trusted`)"
       - "traefik.http.routers.trusted.entrypoints=web"
       - "traefik.http.routers.trusted.middlewares=bouncer-trusted@docker"
-      - "traefik.http.services.trusted.loadbalancer.server.port=80"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.crowdseclapienabled=true"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.crowdseclapikey=c51a1c7000000000000000000000000d"
@@ -298,25 +240,19 @@ services:
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.crowdsecmode=stream"
-      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.updateintervalseconds=5"
-      # Own LAPI key so exclusive DecisionStore New succeeds next to /stream. Metrics=1 so
+      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.updateintervalseconds=10"
+      # Own LAPI key so exclusive DecisionStore New succeeds next to /stream. Metrics=10 so
       # usage-metrics tests still POST within 20s (default is 600).
-      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.metricsupdateintervalseconds=1"
+      - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.metricsupdateintervalseconds=10"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.clienttrustedips=172.19.0.10/32"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-trusted.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
-  # Custom ban HTML body + Content-Type (PR 333)
-  custom-ban:
-    image: traefik/whoami
-    container_name: "custom-ban-test"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
+      # Custom ban HTML body + Content-Type (PR 333)
+
       - "traefik.http.routers.custom-ban.rule=PathPrefix(`/custom-ban`)"
       - "traefik.http.routers.custom-ban.entrypoints=web"
       - "traefik.http.routers.custom-ban.middlewares=bouncer-custom-ban@docker"
-      - "traefik.http.services.custom-ban.loadbalancer.server.port=80"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.crowdseclapienabled=true"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000004"
@@ -329,41 +265,23 @@ services:
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-custom-ban.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
-  # Range + Country via file-provider chain (geoblock enrich then bouncer). Nested maps live in dynamic-scopes.yml.
-  scope-none:
-    image: traefik/whoami
-    container_name: "scope-none-test"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
+      # Range + Country via file-provider chain (geoblock enrich then bouncer). Nested maps live in dynamic-scopes.yml.
+
       - "traefik.http.routers.scope-none.rule=PathPrefix(`/scope-none`)"
       - "traefik.http.routers.scope-none.entrypoints=web"
       - "traefik.http.routers.scope-none.middlewares=chain-scope-none@file"
-      - "traefik.http.services.scope-none.loadbalancer.server.port=80"
 
-  # Range + Country in stream mode (range-index + stream scopes=Country)
-  scope-stream:
-    image: traefik/whoami
-    container_name: "scope-stream-test"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
+      # Range + Country in stream mode (range-index + stream scopes=Country)
+
       - "traefik.http.routers.scope-stream.rule=PathPrefix(`/scope-stream`)"
       - "traefik.http.routers.scope-stream.entrypoints=web"
       - "traefik.http.routers.scope-stream.middlewares=chain-scope-stream@file"
-      - "traefik.http.services.scope-stream.loadbalancer.server.port=80"
 
-  # Real AppSec CRS inband (PR 333), not the mock rpc2 stand-in
-  appsec:
-    image: traefik/whoami
-    container_name: "appsec-test"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
+      # Real AppSec CRS inband (PR 333), not the mock rpc2 stand-in
+
       - "traefik.http.routers.appsec.rule=PathPrefix(`/appsec`)"
       - "traefik.http.routers.appsec.entrypoints=web"
       - "traefik.http.routers.appsec.middlewares=bouncer-appsec@docker"
-      - "traefik.http.services.appsec.loadbalancer.server.port=80"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.crowdseclapienabled=true"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000005"
@@ -371,30 +289,21 @@ services:
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.httptimeoutseconds=${HTTP_TIMEOUT_SECONDS:-30}"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.crowdsecmode=none"
-      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.metricsupdateintervalseconds=1"
+      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.metricsupdateintervalseconds=10"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.crowdsecappsecenabled=true"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.crowdsecappsechost=crowdsec:7422"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
-  # Extra coverage routes on one whoami. Paths must not sit under /appsec, /captcha, or /redis-cache.
-  coverage:
-    image: traefik/whoami
-    container_name: "coverage-test"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.services.coverage.loadbalancer.server.port=80"
+
 
       - "traefik.http.routers.header-none.rule=PathPrefix(`/header-none`)"
       - "traefik.http.routers.header-none.entrypoints=web"
       - "traefik.http.routers.header-none.middlewares=bouncer-header-none@file"
-      - "traefik.http.routers.header-none.service=coverage"
 
       - "traefik.http.routers.lapi-fail-ban.rule=PathPrefix(`/lapi-fail-ban`)"
       - "traefik.http.routers.lapi-fail-ban.entrypoints=web"
       - "traefik.http.routers.lapi-fail-ban.middlewares=bouncer-lapi-fail-ban@docker"
-      - "traefik.http.routers.lapi-fail-ban.service=coverage"
       - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.crowdseclapienabled=true"
       - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
@@ -409,7 +318,6 @@ services:
       - "traefik.http.routers.lapi-fail-pass.rule=PathPrefix(`/lapi-fail-pass`)"
       - "traefik.http.routers.lapi-fail-pass.entrypoints=web"
       - "traefik.http.routers.lapi-fail-pass.middlewares=bouncer-lapi-fail-pass@docker"
-      - "traefik.http.routers.lapi-fail-pass.service=coverage"
       - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.crowdseclapienabled=true"
       - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000011"
@@ -424,7 +332,6 @@ services:
       - "traefik.http.routers.waf-only.rule=PathPrefix(`/waf-only`)"
       - "traefik.http.routers.waf-only.entrypoints=web"
       - "traefik.http.routers.waf-only.middlewares=bouncer-waf-only@docker"
-      - "traefik.http.routers.waf-only.service=coverage"
       - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.crowdseclapienabled=false"
       - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.crowdsecappsecenabled=true"
@@ -437,7 +344,6 @@ services:
       - "traefik.http.routers.waf-fail-ban.rule=PathPrefix(`/waf-fail-ban`)"
       - "traefik.http.routers.waf-fail-ban.entrypoints=web"
       - "traefik.http.routers.waf-fail-ban.middlewares=bouncer-waf-fail-ban@docker"
-      - "traefik.http.routers.waf-fail-ban.service=coverage"
       - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.crowdseclapienabled=true"
       - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000006"
@@ -454,7 +360,6 @@ services:
       - "traefik.http.routers.waf-fail-pass.rule=PathPrefix(`/waf-fail-pass`)"
       - "traefik.http.routers.waf-fail-pass.entrypoints=web"
       - "traefik.http.routers.waf-fail-pass.middlewares=bouncer-waf-fail-pass@docker"
-      - "traefik.http.routers.waf-fail-pass.service=coverage"
       - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.crowdseclapienabled=true"
       - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000007"
@@ -471,7 +376,6 @@ services:
       - "traefik.http.routers.status-429.rule=PathPrefix(`/status-429`)"
       - "traefik.http.routers.status-429.entrypoints=web"
       - "traefik.http.routers.status-429.middlewares=bouncer-status-429@docker"
-      - "traefik.http.routers.status-429.service=coverage"
       - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.crowdseclapienabled=true"
       - "traefik.http.middlewares.bouncer-status-429.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000008"
@@ -486,7 +390,6 @@ services:
       - "traefik.http.routers.short-captcha.rule=PathPrefix(`/short-captcha`)"
       - "traefik.http.routers.short-captcha.entrypoints=web"
       - "traefik.http.routers.short-captcha.middlewares=bouncer-short-captcha@docker"
-      - "traefik.http.routers.short-captcha.service=coverage"
       - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.crowdseclapienabled=true"
       - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.crowdseclapikey=c51a1c70000000000000000000000009"
@@ -508,17 +411,10 @@ services:
       - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-short-captcha.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
 
-  # CrowdSec 1.8 bot-detection on a separate AppSec port so CRS /appsec stays unchallenged
-  bot-detection:
-    image: traefik/whoami
-    container_name: "bot-detection-test"
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
+
       - "traefik.http.routers.bot-detection.rule=PathPrefix(`/bot-detection`)"
       - "traefik.http.routers.bot-detection.entrypoints=web"
       - "traefik.http.routers.bot-detection.middlewares=bouncer-bot@docker"
-      - "traefik.http.services.bot-detection.loadbalancer.server.port=80"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.crowdseclapienabled=true"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.crowdseclapikey=c51a1c7000000000000000000000000a"
@@ -530,6 +426,32 @@ services:
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.crowdsecappsechost=crowdsec:7423"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.forwardedheaderstrustedips=172.28.0.1/32"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.forwardedheaderscustomname=X-Forwarded-For"
+
+
+
+      - "traefik.http.routers.whoami.service=whoami"
+      - "traefik.http.routers.protected.service=whoami"
+      - "traefik.http.routers.captcha.service=whoami"
+      - "traefik.http.routers.disabled.service=whoami"
+      - "traefik.http.routers.remediation-headers.service=whoami"
+      - "traefik.http.routers.stream.service=whoami"
+      - "traefik.http.routers.live.service=whoami"
+      - "traefik.http.routers.redis-cache.service=whoami"
+      - "traefik.http.routers.redis-cache-hold.service=whoami"
+      - "traefik.http.routers.trusted.service=whoami"
+      - "traefik.http.routers.custom-ban.service=whoami"
+      - "traefik.http.routers.scope-none.service=whoami"
+      - "traefik.http.routers.scope-stream.service=whoami"
+      - "traefik.http.routers.appsec.service=whoami"
+      - "traefik.http.routers.header-none.service=whoami"
+      - "traefik.http.routers.lapi-fail-ban.service=whoami"
+      - "traefik.http.routers.lapi-fail-pass.service=whoami"
+      - "traefik.http.routers.waf-only.service=whoami"
+      - "traefik.http.routers.waf-fail-ban.service=whoami"
+      - "traefik.http.routers.waf-fail-pass.service=whoami"
+      - "traefik.http.routers.status-429.service=whoami"
+      - "traefik.http.routers.short-captcha.service=whoami"
+      - "traefik.http.routers.bot-detection.service=whoami"
 
   dragonfly:
     image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2

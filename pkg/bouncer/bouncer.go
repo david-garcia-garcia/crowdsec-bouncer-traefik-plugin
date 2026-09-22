@@ -61,6 +61,7 @@ const remediationHeaderClientDisconnected = "error:client-disconnected"
 
 // New returns a per-router handler. Clients arrive later through LAPIBinding/AppSecBinding.
 func New(next http.Handler, name string, config *configuration.Config, subscribeLAPI, subscribeAppSec bool, log *slog.Logger) (*Bouncer, error) {
+	log = log.With("traefikName", name)
 	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(log, config.ClientTrustedIPs)
 	forwardedCustomHeader := config.ForwardedHeadersCustomName
@@ -134,7 +135,7 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 		log.Error("CaptchaClient not valid", "error", err)
 		return nil, err
 	}
-	routeHandler.log.Debug("Bouncer initialized", "name", name)
+	routeHandler.log.Debug("Bouncer initialized")
 	return routeHandler, nil
 }
 
@@ -161,7 +162,7 @@ func (b *Bouncer) loadedAppSec() *appsec.Client {
 }
 
 func (b *Bouncer) warnBackendMissing(leg, instanceName string) {
-	b.log.Warn(msgBackendMissing, "traefikName", b.name, "leg", leg, "instanceName", instanceName)
+	b.log.Warn(msgBackendMissing, "leg", leg, "instanceName", instanceName)
 }
 
 // LapiClient is the bound LAPI backend this route uses, or nil.

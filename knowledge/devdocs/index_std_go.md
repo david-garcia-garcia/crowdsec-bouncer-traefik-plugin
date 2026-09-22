@@ -19,3 +19,8 @@ description: How an in-repo test captures slog output when the code under test l
 priority: normal
 local: std_go_logger_debug-attrs.md
 description: How request-path Debug passes slog attributes so INFO does not format a string.
+
+## Nested sloggers
+priority: normal
+local: std_go_logger_nested.md
+description: How Bouncer, LAPI, and AppSec constructors call log.With so ticks carry traefikName, instanceName, leg, and sessionKey.

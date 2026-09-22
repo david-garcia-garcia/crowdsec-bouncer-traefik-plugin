@@ -49,7 +49,7 @@ http:
           crowdsecLapiHost: crowdsec:8080
           httpTimeoutSeconds: "60"
           logLevel: DEBUG
-          updateIntervalSeconds: "2"
+          updateIntervalSeconds: "5"
           streamStartupBlock: "false"
           crowdsecMode: stream
           crowdsecLapiStreamScopes:

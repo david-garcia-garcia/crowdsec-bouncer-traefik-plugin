@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 
 # Real-stack proof that this plugin's POST /v1/usage-metrics shows up in
-# `cscli metrics show bouncers`. Stream interval is 1s on /stream and /trusted
+# `cscli metrics show bouncers`. Metrics interval is 10s on /stream and /trusted
 # (separate LAPI keys; exclusive DecisionStore) and on /appsec.
 
 BeforeAll {

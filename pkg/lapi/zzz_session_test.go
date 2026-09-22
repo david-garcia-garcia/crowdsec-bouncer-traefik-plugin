@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -162,6 +163,7 @@ func TestClient_ReclaimGrace(t *testing.T) {
 
 func TestClient_LifecycleLogs(t *testing.T) {
 	log, logSink := newTestLogSink(slog.LevelDebug)
+	log = log.With("leg", instance.LegLAPI, "sessionKey", "lapi:test-key")
 	client := &Client{
 		log:          log,
 		crowdsecMode: configuration.LiveMode,
