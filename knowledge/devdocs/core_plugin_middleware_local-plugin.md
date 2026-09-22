@@ -52,7 +52,7 @@ experimental:
 - `docker-compose.yml`
 - `README.md`
 - `tests/e2e/mock/lib/traefik.yml`
-- `tests/e2e/real/docker-compose.test.yml`
+- `tests/e2e/real/config/docker-compose.test.yml`
 
 ## Gotchas
 

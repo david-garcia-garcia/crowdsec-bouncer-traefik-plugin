@@ -77,7 +77,7 @@ Describe "CrowdSec header-mapped custom scopes" {
         It "Should ban a matching username after the stream poll" {
             Add-TestScopeDecision -Scope "username" -Value "alice" -Type "ban"
 
-            $result = Wait-ForCondition -Description "stream to ban username alice" -TimeoutSeconds 45 -RetryIntervalSeconds 2 -Condition {
+            $result = Wait-ForCondition -Description "stream to ban username alice" -TimeoutSeconds 15 -RetryIntervalSeconds 0.2 -Condition {
                 $response = Test-HttpRequest -Endpoint "/scope-stream" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl `
                     -ExtraHeaders @{ "X-User" = "alice" }
                 return ($response.StatusCode -in @(403, 429))

@@ -16,7 +16,7 @@ The repository SHALL keep `tests/e2e/mock/` and `make e2e_mock` as the mock suit
 - **THEN** Pester cases, the compose file, and `Test-Integration.ps1` are under `tests/e2e/real/` and not at the repository root or mixed into `tests/e2e/mock/`
 
 ### Requirement: Real stack boots Traefik and Crowdsec
-`tests/e2e/real/docker-compose.test.yml` SHALL start Traefik (local plugin bind-mount of the repository root) and Crowdsec. Pester tests SHALL add and delete decisions with `cscli` in the Crowdsec container and send client identity only via `X-Forwarded-For`.
+`tests/e2e/real/config/docker-compose.test.yml` SHALL start Traefik (local plugin bind-mount of the repository root) and Crowdsec. Pester tests SHALL add and delete decisions with `cscli` in the Crowdsec container and send client identity only via `X-Forwarded-For`.
 
 #### Scenario: Ban then unban on whoami
 - **WHEN** the stack is up and a ban decision is added for the test IP
@@ -65,7 +65,7 @@ Scenario requests SHALL identify the client only via `X-Forwarded-For`. The stac
 - **THEN** the plugin remediates that request as that IP
 
 ### Requirement: Real stack includes a Dragonfly Redis-protocol cache
-`tests/e2e/real/docker-compose.test.yml` SHALL start Dragonfly (`docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2`, port 6379, `ulimits.memlock: -1`) in addition to Traefik and Crowdsec. At least one Pester route SHALL set `redisCacheEnabled` and `redisCacheHost` to that Dragonfly service. Pester SHALL prove live-mode cache hit/miss against Dragonfly. Client identity SHALL remain only `X-Forwarded-For` (Traefik forwarded headers plus plugin `forwardedHeadersTrustedIps`).
+`tests/e2e/real/config/docker-compose.test.yml` SHALL start Dragonfly (`docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2`, port 6379, `ulimits.memlock: -1`) in addition to Traefik and Crowdsec. At least one Pester route SHALL set `redisCacheEnabled` and `redisCacheHost` to that Dragonfly service. Pester SHALL prove live-mode cache hit/miss against Dragonfly. Client identity SHALL remain only `X-Forwarded-For` (Traefik forwarded headers plus plugin `forwardedHeadersTrustedIps`).
 
 #### Scenario: Live-mode Redis cache allow then ban after TTL
 - **WHEN** the Dragonfly-backed live-mode route is used, a request is allowed, then a ban is added for that `X-Forwarded-For`

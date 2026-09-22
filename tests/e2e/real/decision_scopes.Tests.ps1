@@ -36,7 +36,7 @@ BeforeAll {
             [int]$TimeoutSeconds = 15
         )
         Add-IpSpellingDecision -Stored $Stored -Reason "Ip-spelling-$Stored"
-        $result = Wait-ForCondition -Description "LAPI/bouncer to ban stored $Stored as $Request on $Endpoint" -TimeoutSeconds $TimeoutSeconds -RetryIntervalSeconds 2 -Condition {
+        $result = Wait-ForCondition -Description "LAPI/bouncer to ban stored $Stored as $Request on $Endpoint" -TimeoutSeconds $TimeoutSeconds -RetryIntervalSeconds 0.2 -Condition {
             $response = Test-HttpRequest -Endpoint $Endpoint -IP $Request -TraefikUrl $script:TraefikUrl
             return ($response.StatusCode -in @(403, 429))
         }
@@ -93,7 +93,7 @@ Describe "CrowdSec Range and header-mapped scopes" {
         It "Should block an IP inside a Range decision after the stream poll" {
             Add-TestRangeDecision -Range $script:StreamRange -Type "ban"
 
-            $result = Wait-ForCondition -Description "Stream mode to block Range $($script:StreamRange)" -TimeoutSeconds 45 -RetryIntervalSeconds 2 -Condition {
+            $result = Wait-ForCondition -Description "Stream mode to block Range $($script:StreamRange)" -TimeoutSeconds 15 -RetryIntervalSeconds 0.2 -Condition {
                 $response = Test-HttpRequest -Endpoint "/scope-stream" -IP $script:StreamInside -TraefikUrl $script:TraefikUrl
                 return ($response.StatusCode -in @(403, 429))
             }
@@ -155,7 +155,7 @@ Describe "CrowdSec Range and header-mapped scopes" {
 
             Add-TestScopeDecision -Scope "Country" -Value $country -Type "ban"
 
-            $result = Wait-ForCondition -Description "Stream mode to block Country $country" -TimeoutSeconds 45 -RetryIntervalSeconds 2 -Condition {
+            $result = Wait-ForCondition -Description "Stream mode to block Country $country" -TimeoutSeconds 15 -RetryIntervalSeconds 0.2 -Condition {
                 $response = Test-HttpRequest -Endpoint "/scope-stream" -IP $script:PublicIP -TraefikUrl $script:TraefikUrl
                 return ($response.StatusCode -in @(403, 429))
             }
@@ -189,15 +189,15 @@ Describe "CrowdSec Range and header-mapped scopes" {
         }
 
         It "Should block an expanded IPv6 ban under a compressed request spelling after the stream poll" {
-            Assert-IpSpellingBan -Endpoint "/scope-stream" -Stored "2001:0db8:0000:0000:0000:0000:00b2:0001" -Request "2001:db8::b2:1" -TimeoutSeconds 45
+            Assert-IpSpellingBan -Endpoint "/scope-stream" -Stored "2001:0db8:0000:0000:0000:0000:00b2:0001" -Request "2001:db8::b2:1" -TimeoutSeconds 15
         }
 
         It "Should block an upper-case IPv6 ban under a lower-case request spelling after the stream poll" {
-            Assert-IpSpellingBan -Endpoint "/scope-stream" -Stored "2001:DB8::B2:2" -Request "2001:db8::b2:2" -TimeoutSeconds 45
+            Assert-IpSpellingBan -Endpoint "/scope-stream" -Stored "2001:DB8::B2:2" -Request "2001:db8::b2:2" -TimeoutSeconds 15
         }
 
         It "Should block an IPv4-mapped ban under a dotted request spelling after the stream poll" {
-            Assert-IpSpellingBan -Endpoint "/scope-stream" -Stored "::ffff:10.59.0.82" -Request "10.59.0.82" -TimeoutSeconds 45
+            Assert-IpSpellingBan -Endpoint "/scope-stream" -Stored "::ffff:10.59.0.82" -Request "10.59.0.82" -TimeoutSeconds 15
         }
     }
 
@@ -220,7 +220,7 @@ Describe "CrowdSec Range and header-mapped scopes" {
         It "Should block an IPv6 inside a Range decision after the stream poll" {
             Add-TestRangeDecision -Range "2001:db8:c::/48" -Type "ban"
 
-            $result = Wait-ForCondition -Description "stream to block IPv6 Range 2001:db8:c::/48" -TimeoutSeconds 45 -RetryIntervalSeconds 2 -Condition {
+            $result = Wait-ForCondition -Description "stream to block IPv6 Range 2001:db8:c::/48" -TimeoutSeconds 15 -RetryIntervalSeconds 0.2 -Condition {
                 $response = Test-HttpRequest -Endpoint "/scope-stream" -IP "2001:db8:c::8" -TraefikUrl $script:TraefikUrl
                 return ($response.StatusCode -in @(403, 429))
             }
@@ -245,9 +245,10 @@ Describe "CrowdSec Range and header-mapped scopes" {
         }
 
         It "Should drop an expired Range in stream mode without an explicit delete" {
-            Add-TestRangeDecision -Range "10.84.0.0/16" -Type "ban" -Duration "8s"
+            # Duration must outlive bouncer-scope-stream's 5s poll so a Set lands while the ban is live.
+            Add-TestRangeDecision -Range "10.84.0.0/16" -Type "ban" -Duration "15s"
 
-            $blocked = Wait-ForCondition -Description "stream to block short-lived Range 10.84.0.0/16" -TimeoutSeconds 45 -RetryIntervalSeconds 2 -Condition {
+            $blocked = Wait-ForCondition -Description "stream to block short-lived Range 10.84.0.0/16" -TimeoutSeconds 15 -RetryIntervalSeconds 0.2 -Condition {
                 $response = Test-HttpRequest -Endpoint "/scope-stream" -IP "10.84.0.8" -TraefikUrl $script:TraefikUrl
                 return ($response.StatusCode -in @(403, 429))
             }
