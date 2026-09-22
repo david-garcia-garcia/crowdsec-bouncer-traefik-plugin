@@ -4,9 +4,9 @@
   "startedAt": "2026-09-22T10:30:55.143Z",
   "phases": {
     "prepare": {
-      "work": false,
-      "card": false,
-      "at": null
+      "work": true,
+      "card": true,
+      "at": "2026-09-22T10:59:25.265Z"
     },
     "explore": {
       "work": false,
