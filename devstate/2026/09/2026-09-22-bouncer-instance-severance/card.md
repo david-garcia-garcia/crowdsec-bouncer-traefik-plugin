@@ -17,7 +17,7 @@ Not yet.
 Needs changes. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 0a9e4c6e
+Reviewed head: b483e97a
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -34,7 +34,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-22-bouncer-instance-severance pushed | `git` |
 | OpenSpec | bouncer-instance-severance | `openspec/` |
 | Pull request | none | pr-host |
-| CI | build 35726475154 failed https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35726475154 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35726475154 |
+| CI | build 35743812953 failed https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35743812953/job/106800088828 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35743812953/job/106800088828 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -48,6 +48,9 @@ Worktree:
 - [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/changes/bouncer-instance-severance/proposal.md) — modified
 - [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/changes/bouncer-instance-severance/proposal.md) — added
 
+Completed:
+- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/specs/build_e2e_pester_crowdsec-stack/spec.md) — modified
+
 ## Deviations from the ask
 - taken:  →  — `` — requirement F3 / T2 subscriber sketch set `crowdsecLapiEnabled: true` with no key, which `ValidateParams` rejects because a true owner flag must Open. Built: `enabled: true`, owner flags false, instance names set (Open-vs-subscribe table).. Requester: not asked.
 
@@ -55,7 +58,7 @@ Worktree:
 - [ ] [Stream startup block still means more than "published"](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/knowledge/debt/2026-09-22-stream-startup-block-rethink.md) — `streamStartupBlock` still names stream startup while ready means subscribed client published.
 
 ## How this fits together
-Ticket 2026-09-22-bouncer-instance-severance on branch 2026-09-22-bouncer-instance-severance targeting master; PR no PR yet; CI build 35726475154 failed https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35726475154.
+Ticket 2026-09-22-bouncer-instance-severance on branch 2026-09-22-bouncer-instance-severance targeting master; PR no PR yet; CI build 35743812953 failed https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35743812953/job/106800088828.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -76,9 +79,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 1 added / 6 modified | Same list as ## Specs |
+| Specs in this PR | 1 added / 7 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 0a9e4c6e11478e8573a61b3d5526e099bec543ef | Card must match the branch you measured |
+| Reviewed head | b483e97a796d13ff59c24a37a97651fd83d78a6e | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -92,7 +95,7 @@ Is this the best way to solve the issue? Not yet.
 
 ### Evidence
 What I checked:
-- assembled from the run bus (`deliver_card`, 0a9e4c6e11478e8573a61b3d5526e099bec543ef)
+- assembled from the run bus (`deliver_card`, b483e97a796d13ff59c24a37a97651fd83d78a6e)
 
 ### Rank-up moves
 None.
