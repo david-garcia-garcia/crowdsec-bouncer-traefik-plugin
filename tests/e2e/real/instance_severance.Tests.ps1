@@ -105,10 +105,10 @@ $svc
     sev-t1:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
-          crowdsecAppsecEnabled: true
+          crowdsecLapiEnabled: "true"
+          crowdsecAppsecEnabled: "true"
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
           crowdsecAppsecHost: crowdsec:7422
@@ -143,10 +143,10 @@ $svc
     sev-t2-cs:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
-          crowdsecAppsecEnabled: true
+          crowdsecLapiEnabled: "true"
+          crowdsecAppsecEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecAppsecInstanceName: shared
           crowdsecLapiKey: "$script:OwnerKey"
@@ -156,7 +156,7 @@ $knobs
     sev-t2-admin:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecAppsecInstanceName: shared
           remediationHeadersCustomName: x-crowdsec
@@ -198,8 +198,8 @@ $svc
         bouncer:
           enabled: false
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
-          crowdsecAppsecEnabled: true
+          crowdsecLapiEnabled: "true"
+          crowdsecAppsecEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecAppsecInstanceName: shared
           crowdsecLapiKey: "$script:OwnerKey"
@@ -209,7 +209,7 @@ $knobs
     sev-t3-app:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecAppsecInstanceName: shared
 $knobs
@@ -238,9 +238,9 @@ $svc
     sev-t4:
       plugin:
         bouncer:
-          enabled: true
-          crowdsecLapiEnabled: false
-          crowdsecAppsecEnabled: true
+          enabled: "true"
+          crowdsecLapiEnabled: "false"
+          crowdsecAppsecEnabled: "true"
           crowdsecAppsecHost: crowdsec:7422
           crowdsecAppsecKey: "$script:AppsecKey"
 $knobs
@@ -276,9 +276,9 @@ $svc
     sev-t5-owner:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
@@ -287,7 +287,7 @@ $knobs
     sev-t5-sub:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecLapiInstanceName: shared
           remediationStatusCode: 429
 $knobs
@@ -328,8 +328,8 @@ $svc
     sev-l1:
       plugin:
         bouncer:
-          enabled: true
-          streamStartupBlock: true
+          enabled: "true"
+          streamStartupBlock: "true"
           crowdsecLapiInstanceName: shared
 $knobs
 "@
@@ -355,8 +355,8 @@ $svc
     sev-l1:
       plugin:
         bouncer:
-          enabled: true
-          streamStartupBlock: true
+          enabled: "true"
+          streamStartupBlock: "true"
           crowdsecLapiInstanceName: shared
 $knobs
     sev-l1-owner:
@@ -364,7 +364,7 @@ $knobs
         bouncer:
           enabled: false
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
@@ -396,16 +396,16 @@ $svc
     sev-l1b-a:
       plugin:
         bouncer:
-          enabled: true
-          streamStartupBlock: false
+          enabled: "true"
+          streamStartupBlock: "false"
           crowdsecLapiFailureAction: passthrough
           crowdsecLapiInstanceName: shared
 $knobs
     sev-l1b-b:
       plugin:
         bouncer:
-          enabled: true
-          streamStartupBlock: false
+          enabled: "true"
+          streamStartupBlock: "false"
           crowdsecLapiFailureAction: ban
           crowdsecLapiInstanceName: shared
 $knobs
@@ -438,15 +438,15 @@ $svc
     sev-l2-block:
       plugin:
         bouncer:
-          enabled: true
-          streamStartupBlock: true
+          enabled: "true"
+          streamStartupBlock: "true"
           crowdsecLapiInstanceName: missing
 $knobs
     sev-l2-fail:
       plugin:
         bouncer:
-          enabled: true
-          streamStartupBlock: false
+          enabled: "true"
+          streamStartupBlock: "false"
           crowdsecLapiFailureAction: ban
           crowdsecLapiInstanceName: missing
 $knobs
@@ -481,7 +481,7 @@ $svc
         bouncer:
           enabled: false
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
@@ -489,8 +489,8 @@ $knobs
     sev-l3:
       plugin:
         bouncer:
-          enabled: true
-          streamStartupBlock: true
+          enabled: "true"
+          streamStartupBlock: "true"
           crowdsecLapiInstanceName: shared
           crowdsecAppsecInstanceName: missing-appsec
 $knobs
@@ -524,7 +524,7 @@ $svc
         bouncer:
           enabled: false
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
@@ -532,8 +532,8 @@ $knobs
     sev-l4:
       plugin:
         bouncer:
-          enabled: true
-          streamStartupBlock: false
+          enabled: "true"
+          streamStartupBlock: "false"
           crowdsecAppsecFailureAction: passthrough
           crowdsecLapiInstanceName: shared
           crowdsecAppsecInstanceName: waf
@@ -572,9 +572,9 @@ $svc
     sev-r1:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
@@ -615,7 +615,7 @@ $svc
         bouncer:
           enabled: false
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
@@ -623,7 +623,7 @@ $knobs
     sev-r2-sub:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecLapiFailureAction: passthrough
           crowdsecLapiInstanceName: shared
 $knobs
@@ -651,7 +651,7 @@ $svc
         bouncer:
           enabled: false
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:9
@@ -665,7 +665,7 @@ $svc
     sev-r2-sub:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecLapiFailureAction: passthrough
           crowdsecLapiInstanceName: shared
           logLevel: DEBUG
@@ -698,9 +698,9 @@ $svc
     sev-r3:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
@@ -726,9 +726,9 @@ $svc
     sev-r3:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
@@ -768,7 +768,7 @@ $svc
         bouncer:
           enabled: false
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
@@ -776,8 +776,8 @@ $knobs
     sev-r4-admin:
       plugin:
         bouncer:
-          enabled: true
-          streamStartupBlock: true
+          enabled: "true"
+          streamStartupBlock: "true"
           crowdsecLapiInstanceName: shared
 $knobs
 "@
@@ -810,7 +810,7 @@ $svc
         bouncer:
           enabled: false
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: other
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
@@ -818,14 +818,14 @@ $knobs
     sev-r4-admin:
       plugin:
         bouncer:
-          enabled: true
-          streamStartupBlock: true
+          enabled: "true"
+          streamStartupBlock: "true"
           crowdsecLapiInstanceName: shared
 $knobs
     sev-r4-other:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecLapiInstanceName: other
 $knobs
 "@
@@ -870,7 +870,7 @@ $svc
         bouncer:
           enabled: false
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
@@ -878,8 +878,8 @@ $knobs
     sev-r5-admin:
       plugin:
         bouncer:
-          enabled: true
-          streamStartupBlock: true
+          enabled: "true"
+          streamStartupBlock: "true"
           crowdsecLapiInstanceName: shared
 $knobs
 "@
@@ -899,8 +899,8 @@ $svc
     sev-r5-admin:
       plugin:
         bouncer:
-          enabled: true
-          streamStartupBlock: true
+          enabled: "true"
+          streamStartupBlock: "true"
           crowdsecLapiInstanceName: shared
 $knobs
 "@
@@ -935,7 +935,7 @@ $svc
         bouncer:
           enabled: false
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
@@ -943,8 +943,8 @@ $knobs
     sev-n2-admin:
       plugin:
         bouncer:
-          enabled: true
-          streamStartupBlock: true
+          enabled: "true"
+          streamStartupBlock: "true"
           crowdsecLapiInstanceName: shared
 $knobs
 "@
@@ -977,7 +977,7 @@ $svc
         bouncer:
           enabled: false
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: other
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:9
@@ -991,14 +991,14 @@ $svc
     sev-n2-admin:
       plugin:
         bouncer:
-          enabled: true
-          streamStartupBlock: true
+          enabled: "true"
+          streamStartupBlock: "true"
           crowdsecLapiInstanceName: shared
 $knobs
     sev-n2-other:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecLapiFailureAction: passthrough
           crowdsecLapiInstanceName: other
 $knobs
@@ -1051,7 +1051,7 @@ $svc
         bouncer:
           enabled: false
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
@@ -1061,7 +1061,7 @@ $knobs
         bouncer:
           enabled: false
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecLapiKey: "$script:KeyB"
           crowdsecLapiHost: crowdsec:8080
@@ -1069,7 +1069,7 @@ $knobs
     sev-f1-sub:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecLapiInstanceName: shared
 $knobs
 "@
@@ -1112,7 +1112,7 @@ $svc
       plugin:
         bouncer:
           enabled: false
-          crowdsecAppsecEnabled: true
+          crowdsecAppsecEnabled: "true"
           crowdsecAppsecInstanceName: waf
           crowdsecAppsecHost: crowdsec:7422
           crowdsecAppsecKey: "$script:AppsecKey"
@@ -1122,8 +1122,8 @@ $knobs
         bouncer:
           enabled: false
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
-          crowdsecAppsecEnabled: true
+          crowdsecLapiEnabled: "true"
+          crowdsecAppsecEnabled: "true"
           crowdsecLapiInstanceName: api
           crowdsecAppsecInstanceName: waf
           crowdsecLapiKey: "$script:OwnerKey"
@@ -1134,8 +1134,8 @@ $knobs
     sev-f2-sub:
       plugin:
         bouncer:
-          enabled: true
-          streamStartupBlock: true
+          enabled: "true"
+          streamStartupBlock: "true"
           crowdsecLapiInstanceName: api
 $knobs
 "@
@@ -1171,10 +1171,10 @@ $svc
     sev-f3-owner:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
-          crowdsecAppsecEnabled: true
+          crowdsecLapiEnabled: "true"
+          crowdsecAppsecEnabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecAppsecInstanceName: shared
           crowdsecLapiKey: "$script:OwnerKey"
@@ -1184,7 +1184,7 @@ $knobs
     sev-f3-admin:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecLapiInstanceName: shared
           crowdsecAppsecInstanceName: shared
 $knobs
@@ -1217,18 +1217,18 @@ $svc
     sev-c1-a:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
 $knobs
     sev-c1-b:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecMode: stream
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
 $knobs
@@ -1264,9 +1264,9 @@ $svc
     sev-e2-good:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecMode: none
-          crowdsecLapiEnabled: true
+          crowdsecLapiEnabled: "true"
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
 $knobs
@@ -1301,8 +1301,8 @@ $svc
     sev-e3:
       plugin:
         bouncer:
-          enabled: true
-          crowdsecLapiEnabled: false
+          enabled: "true"
+          crowdsecLapiEnabled: "false"
 $knobs
 "@
         $ok = Wait-SevCodes -Path "/sev-e3" -IP $ip -Codes @(200) -TimeoutSeconds 45
@@ -1330,9 +1330,9 @@ $svc
     sev-e4:
       plugin:
         bouncer:
-          enabled: true
+          enabled: "true"
           crowdsecMode: appsec
-          crowdsecAppsecEnabled: true
+          crowdsecAppsecEnabled: "true"
           crowdsecAppsecHost: crowdsec:7422
           crowdsecAppsecKey: "$script:AppsecKey"
 $knobs
