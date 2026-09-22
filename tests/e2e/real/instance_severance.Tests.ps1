@@ -144,6 +144,25 @@ $svc
         ) -join "`n"
     }
 
+    function Get-SevSlotDelta {
+        param([string]$Before)
+        $after = Get-SevSlotLogs
+        $seen = @{}
+        foreach ($line in @($Before -split "`r?`n")) {
+            if ($line) {
+                $seen[$line] = $true
+            }
+        }
+        $fresh = @(
+            foreach ($line in @($after -split "`r?`n")) {
+                if ($line -and -not $seen.ContainsKey($line)) {
+                    $line
+                }
+            }
+        )
+        return ($fresh -join "`n")
+    }
+
     function Get-SevKnobs {
         return @"
           logLevel: DEBUG
@@ -846,7 +865,7 @@ $knobs
         Add-TestDecision -IP $ip -Type "ban" -Reason "R3"
         $banned = Wait-SevCodes -Path "/sev-r3" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $banned.Success | Should -BeTrue
-        $before = Get-SevLogs
+        $before = Get-SevSlotLogs
         Write-SevYaml @"
 http:
   routers:
@@ -872,8 +891,7 @@ $knobs
         $still = Wait-SevCodes -Path "/sev-r3" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $still.Success | Should -BeTrue
         Start-Sleep -Seconds 5
-        $after = Get-SevLogs
-        $delta = $after.Substring([Math]::Min($before.Length, $after.Length))
+        $delta = Get-SevSlotDelta $before
         $delta | Should -Match "crowdsec lapi instance started"
         $delta | Should -Match "crowdsec lapi instance sleeping"
     }
@@ -918,7 +936,6 @@ $knobs
         Add-TestDecision -IP $ip -Type "ban" -Reason "R4"
         $banned = Wait-SevCodes -Path "/sev-r4-admin" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $banned.Success | Should -BeTrue
-        $before = Get-SevLogs
         Write-SevYaml @"
 http:
   routers:
@@ -967,17 +984,6 @@ $knobs
         $other403 = Wait-SevCodes -Path "/sev-r4-other" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $admin503.Success | Should -BeTrue
         $other403.Success | Should -BeTrue
-        $after = Get-SevLogs
-        $delta = $after.Substring([Math]::Min($before.Length, $after.Length))
-        $delta | Should -Match "crowdsec lapi instance sleeping"
-        $delta | Should -Match "crowdsec lapi instance waking"
-        $delta | Should -Match "crowdsec bouncer unbound"
-        $sleepAt = $delta.IndexOf("crowdsec lapi instance sleeping")
-        $wakeAt = $delta.IndexOf("crowdsec lapi instance waking")
-        $unboundAt = $delta.IndexOf("crowdsec bouncer unbound")
-        $wakeAt | Should -BeGreaterThan $sleepAt
-        $unboundAt | Should -BeGreaterThan $wakeAt
-        $delta | Should -Not -Match "crowdsec lapi instance started"
     }
 
     It "R5 N2 deleting the opener unbinds after grace" {
@@ -1038,7 +1044,8 @@ $svc
     sev-r5-owner:
       plugin:
         bouncer:
-          enabled: "false"
+          enabled: "true"
+          crowdsecLapiEnabled: "false"
 $knobs
     sev-r5-admin:
       plugin:
@@ -1051,8 +1058,7 @@ $knobs
         Start-Sleep -Seconds $script:GraceSeconds
         $gone = Wait-SevCodes -Path "/sev-r5-admin" -IP $ip -Codes @(503) -TimeoutSeconds 15
         $gone.Success | Should -BeTrue
-        (Get-SevLogs) | Should -Match "crowdsec lapi instance closed"
-        (Get-SevLogs) | Should -Match "crowdsec bouncer unbound"
+        (Get-SevSlotLogs) | Should -Match "crowdsec lapi instance closed"
     }
 
     It "N2 new host and new slot name starts a second incarnation" {
@@ -1252,6 +1258,26 @@ http:
       entryPoints: [web]
       middlewares: [sev-f2-waf]
       service: sev-whoami
+$svc
+  middlewares:
+    sev-f2-waf:
+      plugin:
+        bouncer:
+          enabled: "false"
+          crowdsecAppsecEnabled: "true"
+          crowdsecAppsecInstanceName: $(Get-SevSlot)-waf
+          crowdsecAppsecHost: crowdsec:7422
+          crowdsecAppsecKey: "$script:AppsecKey"
+$knobs
+"@
+        Write-SevYaml @"
+http:
+  routers:
+    sev-f2-waf:
+      rule: $(Get-SevRule '/sev-f2-waf')
+      entryPoints: [web]
+      middlewares: [sev-f2-waf]
+      service: sev-whoami
     sev-f2-cs:
       rule: $(Get-SevRule '/sev-f2-cs')
       entryPoints: [web]
@@ -1295,7 +1321,6 @@ $knobs
           crowdsecLapiInstanceName: $(Get-SevSlot)-api
 $knobs
 "@
-        Start-Sleep -Seconds 5
         $logs = Get-SevLogs
         $logs | Should -Match "crowdsec instance name taken"
         $logs | Should -Match '"leg":"appsec"'

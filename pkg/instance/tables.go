@@ -214,16 +214,34 @@ func unpublishLocked(leg, instanceName string, client any, publisher string) {
 	clearSlot(named, leg, instanceName)
 }
 
-// Clear is generation-aware grace Close: only slots still pointing at dying
-// whose recorded publisher matches.
-func Clear(leg string, dying any, publisher string) {
+// ClearPublisher drops every slot this middleware still holds on this leg.
+// New calls it when this constructor no longer Opens that leg so subscribers
+// do not wait for a Traefik ctx that may never cancel.
+func ClearPublisher(leg, publisher string) {
+	if publisher == "" {
+		return
+	}
+	process.mu.Lock()
+	defer process.mu.Unlock()
+	for instanceName, named := range process.tableFor(leg).slots {
+		if named.publisher != publisher {
+			continue
+		}
+		clearSlot(named, leg, instanceName)
+	}
+}
+
+// Clear is generation-aware grace Close: only slots still pointing at dying.
+// Publisher is accepted for call-site symmetry with Unpublish; the dying
+// pointer is the generation. A drifted Traefik name must not leave subscribers bound.
+func Clear(leg string, dying any, _ string) {
 	if isNilClient(dying) {
 		return
 	}
 	process.mu.Lock()
 	defer process.mu.Unlock()
 	for instanceName, named := range process.tableFor(leg).slots {
-		if named.publisher != publisher || !sameClient(named.current, dying) {
+		if !sameClient(named.current, dying) {
 			continue
 		}
 		clearSlot(named, leg, instanceName)
@@ -315,6 +333,11 @@ func sameClient(left, right any) bool {
 	}
 	if isNilClient(left) || isNilClient(right) {
 		return false
+	}
+	leftValue := reflect.ValueOf(left)
+	rightValue := reflect.ValueOf(right)
+	if leftValue.Kind() == reflect.Ptr && rightValue.Kind() == reflect.Ptr {
+		return leftValue.Pointer() == rightValue.Pointer()
 	}
 	return left == right
 }

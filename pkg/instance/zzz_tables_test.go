@@ -126,6 +126,25 @@ func TestClearDoesNotUnbindReplacement(t *testing.T) {
 	}
 }
 
+func TestClearUnbindsWhenPublisherStringDiffers(t *testing.T) {
+	ResetForTest()
+	t.Cleanup(ResetForTest)
+
+	owner := &testClient{id: "A"}
+	var bound atomic.Value
+	bound.Store((*testClient)(nil))
+	Subscribe(LegLAPI, "shared", Subscriber{Value: &bound, TraefikName: "admin"})
+	if err := PublishAll([]PublishAttempt{{
+		Leg: LegLAPI, InstanceName: "shared", Publisher: "cs@file", Client: owner, Empty: (*testClient)(nil),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	Clear(LegLAPI, owner, "cs")
+	if loaded, _ := bound.Load().(*testClient); loaded != nil {
+		t.Fatal("Close must unbind even when the Traefik name string drifted")
+	}
+}
+
 func TestUnsubscribeRemovesSubscriber(t *testing.T) {
 	ResetForTest()
 	t.Cleanup(ResetForTest)
@@ -214,5 +233,31 @@ func TestPublisherRenameClearsOldName(t *testing.T) {
 	}
 	if loaded, _ := oldBound.Load().(*testClient); loaded != nil {
 		t.Fatal("rename must unbind subscribers of the previous name")
+	}
+}
+
+func TestClearPublisherDropsOwnedSlots(t *testing.T) {
+	ResetForTest()
+	t.Cleanup(ResetForTest)
+
+	owner := &testClient{id: "A"}
+	other := &testClient{id: "B"}
+	var bound atomic.Value
+	bound.Store((*testClient)(nil))
+	Subscribe(LegLAPI, "shared", Subscriber{Value: &bound, TraefikName: "admin"})
+	if err := PublishAll([]PublishAttempt{
+		{Leg: LegLAPI, InstanceName: "shared", Publisher: "cs", Client: owner, Empty: (*testClient)(nil)},
+		{Leg: LegLAPI, InstanceName: "kept", Publisher: "other", Client: other, Empty: (*testClient)(nil)},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	ClearPublisher(LegLAPI, "cs")
+	if loaded, _ := bound.Load().(*testClient); loaded != nil {
+		t.Fatal("dropping the publisher must unbind its subscribers")
+	}
+	var kept atomic.Value
+	Subscribe(LegLAPI, "kept", Subscriber{Value: &kept, TraefikName: "other-sub"})
+	if kept.Load() != other {
+		t.Fatal("ClearPublisher must not touch another middleware's slot")
 	}
 }

@@ -130,9 +130,13 @@ func openAndPublishOwned(bindCtx context.Context, prepared *configuration.Config
 	}
 	if lapiClient != nil {
 		lapiClient.SetPublishedName(prepared.CrowdsecLapiInstanceName)
+	} else {
+		instance.ClearPublisher(instance.LegLAPI, name)
 	}
 	if appsecClient != nil {
 		appsecClient.SetPublishedName(prepared.CrowdsecAppsecInstanceName)
+	} else {
+		instance.ClearPublisher(instance.LegAppSec, name)
 	}
 	return nil
 }
