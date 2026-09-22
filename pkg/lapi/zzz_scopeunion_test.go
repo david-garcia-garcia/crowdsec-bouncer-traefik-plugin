@@ -8,11 +8,25 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
+
+// openStreamForTest opens a stream Client and cancels its bind ctx on cleanup.
+func openStreamForTest(t *testing.T, cfg *configuration.Config, name string) *Client {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	client, err := OpenStream(ctx, cfg, slog.Default(), name, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return client
+}
 
 func TestOpenStream_OpenerScopesOnly(t *testing.T) {
 	reclaim.ResetForTestWith(0)
@@ -26,10 +40,7 @@ func TestOpenStream_OpenerScopesOnly(t *testing.T) {
 	cfg := testStreamConfig(parsed.Host, 1)
 	cfg.CrowdsecLapiStreamScopes = []string{"country", "username"}
 	cfg.DecisionScopeHeaders = map[string]string{"as": "X-ASN"}
-	client, err := OpenStream(context.Background(), cfg, slog.Default(), "opener", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	client := openStreamForTest(t, cfg, "opener")
 	query := client.streamQuery()
 	if !strings.Contains(query, "country") || !strings.Contains(query, "username") {
 		t.Fatalf("opener scopes missing: %s", query)
@@ -50,10 +61,7 @@ func TestOpenStream_EmptyOpenerScopesOmitsCountry(t *testing.T) {
 	}
 	cfg := testStreamConfig(parsed.Host, 1)
 	cfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
-	client, err := OpenStream(context.Background(), cfg, slog.Default(), "empty", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	client := openStreamForTest(t, cfg, "empty")
 	query := client.streamQuery()
 	if strings.Contains(query, "country") {
 		t.Fatalf("empty opener list must omit country: %s", query)
@@ -64,10 +72,10 @@ func TestOpenStream_FirstPollUsesOpenerScopes(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
-	var firstQuery string
+	var firstQuery atomic.Value
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if strings.Contains(req.URL.Path, "stream") && firstQuery == "" {
-			firstQuery = req.URL.RawQuery
+		if strings.Contains(req.URL.Path, "stream") {
+			firstQuery.CompareAndSwap(nil, req.URL.RawQuery)
 		}
 		_ = json.NewEncoder(w).Encode(map[string][]Decision{
 			"new":     {},
@@ -81,14 +89,14 @@ func TestOpenStream_FirstPollUsesOpenerScopes(t *testing.T) {
 	}
 	cfg := testStreamConfig(parsed.Host, 1)
 	cfg.CrowdsecLapiStreamScopes = []string{"Country"}
-	if _, err := OpenStream(context.Background(), cfg, slog.Default(), "country", "test"); err != nil {
-		t.Fatal(err)
-	}
+	_ = openStreamForTest(t, cfg, "country")
 	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) && firstQuery == "" {
+	query, _ := firstQuery.Load().(string)
+	for time.Now().Before(deadline) && query == "" {
 		time.Sleep(10 * time.Millisecond)
+		query, _ = firstQuery.Load().(string)
 	}
-	if !strings.Contains(firstQuery, "country") {
-		t.Fatalf("create-time first poll must include opener country: %s", firstQuery)
+	if !strings.Contains(query, "country") {
+		t.Fatalf("create-time first poll must include opener country: %s", query)
 	}
 }
