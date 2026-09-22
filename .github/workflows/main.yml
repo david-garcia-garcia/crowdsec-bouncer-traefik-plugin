@@ -128,4 +128,9 @@ jobs:
           go test -race -count=1 -p 1 ./pkg/... 2>&1 | tee /tmp/race.log
       - name: Surface race log
         if: failure()
-        run: echo "::error::$(tr '\n' ' ' < /tmp/race.log | head -c 3500)"
+        run: |
+          if grep -q "DATA RACE" /tmp/race.log; then
+            echo "::error::$(awk '/WARNING: DATA RACE/,/^==================$/' /tmp/race.log | tr '\n' ' ' | head -c 3500)"
+          else
+            echo "::error::$(grep -E 'FAIL\s+|panic:|--- FAIL' /tmp/race.log | tr '\n' ' ' | head -c 3500)"
+          fi
