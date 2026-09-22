@@ -1,3 +1,0 @@
-# Overwritten by instance_severance.Tests.ps1. Keep this file so Traefik's
-# file provider has something to watch on Windows bind mounts.
-http: {}

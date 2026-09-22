@@ -22,7 +22,7 @@ How this plugin keys a reclaimed `lapi.Client` versus the store it writes. Spec:
 - `defaultDecisionSeconds` is on both: new Client and new store.
 - Redis off: leftover host/password/database/read hosts do not change SessionHex. Redis on: the whole set is in SessionHex (read hosts sorted).
 - Leave `streamStartupBlock` out of both keys.
-- Pass `reclaim.Hooks` for Sleep/Wake/Close. An unreclaimed `lapi.Client` waits `ProcessGrace` 30s.
+- Pass `reclaim.Hooks` for Sleep/Wake/Close. An unreclaimed `lapi.Client` waits process-table grace (`reclaimGraceSeconds`, default 30).
 
 ## Pattern snippet
 

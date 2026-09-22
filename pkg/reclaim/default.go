@@ -41,7 +41,8 @@ func New(cfg Config) *Table {
 	return utilreclaim.New(cfg)
 }
 
-// Default returns the process-wide table, creating it on first use with ProcessGrace.
+// Default returns the process-wide table, creating it on first use with ProcessGrace
+// unless EnsureProcessGrace already installed one.
 func Default() *Table {
 	defaultMu.Lock()
 	defer defaultMu.Unlock()
@@ -49,6 +50,20 @@ func Default() *Table {
 		defaultTable = New(Config{Grace: ProcessGrace})
 	}
 	return defaultTable
+}
+
+// EnsureProcessGrace installs the process table on first New. Later calls no-op.
+// Negative grace becomes ProcessGrace. Zero disposes as soon as the last holder ends.
+func EnsureProcessGrace(grace time.Duration) {
+	defaultMu.Lock()
+	defer defaultMu.Unlock()
+	if defaultTable != nil {
+		return
+	}
+	if grace < 0 {
+		grace = ProcessGrace
+	}
+	defaultTable = New(Config{Grace: grace})
 }
 
 // OpenWithHooks is Default().OpenWithHooks.

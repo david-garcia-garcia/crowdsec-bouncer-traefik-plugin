@@ -19,7 +19,7 @@ _Avoid_: `PeekLivePrefix`, `View`, a table fork, using Peek to retitle a sleeper
 - `reclaim.OpenWithHooks(ctx, key, logger, create)` on the process table. Last holder `Sleep()`s; Open during grace `Wake()`s.
 - Exact `Peek(key)` before Open when the caller must fail a foreign owner without binding. `ok=false` means miss, gone, or busy — then Open. Do not wait on busy.
 - LAPI Client and AppSec Client create return the concrete client plus Hooks. Tests that need the same incarnation use pointer equality on the `Open` return.
-- Process table grace is 30s (`ProcessGrace`). Tests that need zero/short grace call `ResetForTestWith`.
+- Process table grace is 30s (`ProcessGrace`) unless the first `New` called `EnsureProcessGrace` with `reclaimGraceSeconds`. Tests that need zero/short grace call `ResetForTestWith`.
 - `create` runs only for a first put or after grace Close.
 - Tests: `reclaim.ResetForTest()` / `reclaim.ResetForTestWith(grace)` only.
 

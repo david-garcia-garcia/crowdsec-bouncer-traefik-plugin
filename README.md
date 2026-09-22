@@ -433,6 +433,9 @@ Redis replica hosts for reads (round-robin). Falls back to `RedisCacheHost` when
 **RedisCacheUnreachableBlock** (bool, default `true`)
 Block the request when Redis is unreachable (adds a 1-second delay per request).
 
+**ReclaimGraceSeconds** (int64, default `30`)
+Process-wide wait after the last holder of a LAPI or AppSec client, so a Traefik reload can reuse the same incarnation. First `New` in the process sets it; later middlewares are ignored. Zero disposes as soon as the last holder ends. Not captcha cookie grace.
+
 **RemediationHeadersCustomName** (string, default `""`)
 Response header name when the plugin handles the request. Header value is `ban`, `captcha`, `solved-captcha`, or `error:client-disconnected` (client dropped the body while AppSec was buffering; not a ban). Include this header in Traefik `accessLog.fields.headers` if you want disconnects in access logs. Empty disables the header.
 
@@ -544,6 +547,7 @@ http:
           logFormat: common
           LogFilePath: ""
           updateIntervalSeconds: 60
+          reclaimGraceSeconds: 30
           updateMaxFailure: 0
           crowdsecLapiFailureAction: ban
           crowdsecLapiEnabled: true

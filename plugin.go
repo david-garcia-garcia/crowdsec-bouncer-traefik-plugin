@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
@@ -13,6 +14,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
 // CreateConfig creates the default plugin configuration.
@@ -35,6 +37,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		log.Error("New:validateParams", "error", err)
 		return nil, err
 	}
+	reclaim.EnsureProcessGrace(time.Duration(prepared.ReclaimGraceSeconds) * time.Second)
 
 	if err = lapi.Prepare(&prepared, log); err != nil {
 		return nil, err

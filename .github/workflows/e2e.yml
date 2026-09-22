@@ -99,7 +99,7 @@ jobs:
           if-no-files-found: ignore
       - name: Stop test stack
         if: always()
-        run: docker compose -f tests/e2e/real/docker-compose.test.yml down -v --remove-orphans
+        run: docker compose -f tests/e2e/real/config/docker-compose.test.yml down -v --remove-orphans
 
   e2e-go-redis:
     name: e2e (go + dragonfly)

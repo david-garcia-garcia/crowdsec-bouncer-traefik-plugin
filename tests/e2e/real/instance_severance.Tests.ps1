@@ -1,17 +1,17 @@
 #!/usr/bin/env pwsh
 
 # Named LAPI/AppSec slots, late bind, file-provider reload, collision, leftover config.
-# Drive routes through the writable file provider under tests/e2e/real/dynamic/.
+# Drive routes through the writable file provider under tests/e2e/real/config/dynamic/.
 
 BeforeAll {
     . "$PSScriptRoot/TestUtils.ps1"
 
     $script:TraefikUrl = "http://localhost:8000"
-    $script:SevFile = Join-Path $PSScriptRoot "dynamic/instance-severance.yml"
+    $script:SevFile = Join-Path $PSScriptRoot "config/dynamic/instance-severance.yml"
     $script:OwnerKey = "c51a1c70000000000000000000000012"
     $script:KeyB = "c51a1c70000000000000000000000013"
     $script:AppsecKey = "c51a1c70000000000000000000000005"
-    $script:GraceSeconds = 40
+    $script:GraceSeconds = 3
     $script:Whoami = "http://whoami-test:80"
     $script:Utf8 = New-Object System.Text.UTF8Encoding $false
 
@@ -29,16 +29,60 @@ BeforeAll {
     }
 
     # Pester 5 It blocks cannot see file-scope functions. Define helpers here.
-    function Write-SevYaml {
+    function Get-SevRouterNames {
         param([string]$Yaml)
-        [System.IO.File]::WriteAllText($script:SevFile, $Yaml.TrimStart(), $script:Utf8)
+        $block = [regex]::Match($Yaml, '(?ms)^  routers:\r?\n(.*?)(?=^  [a-z]|\z)').Groups[1].Value
+        return @([regex]::Matches($block, '(?m)^    (sev-[a-z0-9-]+):\s*$') | ForEach-Object { $_.Groups[1].Value })
     }
 
-    # Overwrite the watched file. Do not delete it: Docker Desktop bind
-    # mounts often miss create/delete, so Traefik never sees /sev-* routers.
+    function Wait-SevFileRouters {
+        param([string[]]$Names)
+        $want = @($Names | Where-Object { $_ } | Sort-Object)
+        $desc = "sev file routers $($want -join ',')"
+        return Wait-ForCondition -Description $desc -TimeoutSeconds 15 -RetryIntervalSeconds 0.2 -Condition {
+            try {
+                $routers = Invoke-RestMethod -Uri "http://localhost:8080/api/http/routers" -TimeoutSec 3
+            }
+            catch {
+                return $false
+            }
+            $got = @(
+                $routers |
+                    Where-Object { $_.name -like 'sev-*@file' } |
+                    ForEach-Object { $_.name -replace '@file$', '' } |
+                    Sort-Object
+            )
+            return (($want -join '|') -eq ($got -join '|'))
+        }
+    }
+
+    # Host bind-mount writes often skip inotify. Touch inside the container
+    # so Traefik's file watch fires, then wait for the routers.
+    function Write-SevYaml {
+        param([string]$Yaml)
+        $text = $Yaml.TrimStart()
+        [System.IO.File]::WriteAllText($script:SevFile, $text, $script:Utf8)
+        docker exec traefik-test touch /etc/traefik/dynamic/instance-severance.yml | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "docker exec touch instance-severance.yml failed"
+        }
+        $names = Get-SevRouterNames -Yaml $text
+        $applied = Wait-SevFileRouters -Names $names
+        if (-not $applied.Success) {
+            throw "Traefik file provider did not apply instance-severance.yml ($($names -join ','))"
+        }
+    }
+
     function Clear-SevYaml {
+        $svc = Get-SevService
         Write-SevYaml @"
-http: {}
+http:
+  routers:
+    sev-idle:
+      rule: $(Get-SevRule '/sev-idle')
+      entryPoints: [web]
+      service: sev-whoami
+$svc
 "@
     }
 
@@ -49,6 +93,8 @@ http: {}
     function Get-SevKnobs {
         return @"
           logLevel: DEBUG
+          logFormat: json
+          reclaimGraceSeconds: "2"
           httpTimeoutSeconds: "10"
           updateIntervalSeconds: "5"
           forwardedHeadersTrustedIps:
@@ -672,6 +718,7 @@ $svc
           crowdsecLapiHost: crowdsec:9
           httpTimeoutSeconds: "2"
           logLevel: DEBUG
+          logFormat: json
           updateIntervalSeconds: "5"
           forwardedHeadersTrustedIps:
             - "127.0.0.1/32"
@@ -684,6 +731,7 @@ $svc
           crowdsecLapiFailureAction: passthrough
           crowdsecLapiInstanceName: shared
           logLevel: DEBUG
+          logFormat: json
           forwardedHeadersTrustedIps:
             - "127.0.0.1/32"
             - "172.28.0.1/32"
@@ -919,7 +967,6 @@ $svc
           crowdsecLapiInstanceName: shared
 $knobs
 "@
-        Start-Sleep -Seconds $script:GraceSeconds
         $gone = Wait-SevCodes -Path "/sev-r5-admin" -IP $ip -Codes @(503) -TimeoutSeconds 15
         $gone.Success | Should -BeTrue
         (Get-SevLogs) | Should -Match "crowdsec lapi instance closed"
@@ -998,6 +1045,7 @@ $svc
           crowdsecLapiHost: crowdsec:9
           httpTimeoutSeconds: "2"
           logLevel: DEBUG
+          logFormat: json
           updateIntervalSeconds: "5"
           forwardedHeadersTrustedIps:
             - "127.0.0.1/32"
@@ -1155,7 +1203,7 @@ $knobs
         Start-Sleep -Seconds 5
         $logs = Get-SevLogs
         $logs | Should -Match "crowdsec instance name taken"
-        $logs | Should -Match "leg=appsec"
+        $logs | Should -Match '"leg":"appsec"'
         $cs = Test-HttpRequest -Endpoint "/sev-f2-cs" -IP $ip -TraefikUrl $script:TraefikUrl
         $cs.StatusCode | Should -Be 404
         $sub = Wait-SevCodes -Path "/sev-f2-sub" -IP $ip -Codes @(503) -TimeoutSeconds 15

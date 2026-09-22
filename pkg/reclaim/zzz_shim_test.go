@@ -34,3 +34,26 @@ func TestShim_ProcessGraceAndOpenWithHooks(t *testing.T) {
 		t.Fatalf("grace reclaim: first=%v second=%v creates=%d", first, second, creates)
 	}
 }
+
+func TestEnsureProcessGraceFirstWins(t *testing.T) {
+	ResetForTestWith(ProcessGrace)
+	t.Cleanup(func() { ResetForTest() })
+
+	installed := Default()
+	EnsureProcessGrace(time.Hour)
+	if Default() != installed {
+		t.Fatal("Ensure after Default must keep the table")
+	}
+
+	defaultMu.Lock()
+	installed.Reset()
+	defaultTable = nil
+	defaultMu.Unlock()
+
+	EnsureProcessGrace(0)
+	zero := Default()
+	EnsureProcessGrace(time.Hour)
+	if Default() != zero {
+		t.Fatal("second Ensure must not replace the table")
+	}
+}

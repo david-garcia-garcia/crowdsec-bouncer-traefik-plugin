@@ -46,7 +46,7 @@ param(
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $false
 $exitCode = 1
-$ComposeFile = Join-Path $PSScriptRoot "docker-compose.test.yml"
+$ComposeFile = Join-Path $PSScriptRoot "config/docker-compose.test.yml"
 $runnerLog = Join-Path $PSScriptRoot "runner.log"
 . "$PSScriptRoot/TestUtils.ps1"
 
@@ -203,7 +203,7 @@ try {
     docker compose -f $ComposeFile down -v --remove-orphans 2>$null
 
     # Pin traefik-geoblock for Country e2e (enrich writes X-IPCountry). Not committed.
-    $geoblockDir = Join-Path $PSScriptRoot ".geoblock"
+    $geoblockDir = Join-Path $PSScriptRoot "config/.geoblock"
     Copy-GeoblockSource -Dest $geoblockDir -Tag "v1.2.0"
 
     # Start Docker services
@@ -338,7 +338,7 @@ finally {
         }
     } else {
         Write-ConsoleWarning "Skipping Docker cleanup (services left running for debugging)"
-        Write-Host "To manually stop services, run: docker compose -f tests/e2e/real/docker-compose.test.yml down -v" -ForegroundColor Gray
+        Write-Host "To manually stop services, run: docker compose -f tests/e2e/real/config/docker-compose.test.yml down -v" -ForegroundColor Gray
         Write-Host "Services available at:" -ForegroundColor Gray
         Write-Host "  - Traefik Dashboard: http://localhost:8080" -ForegroundColor Gray
         Write-Host "  - Test Service: http://localhost:8000/whoami" -ForegroundColor Gray

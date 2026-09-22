@@ -137,6 +137,7 @@ type Config struct {
 	CaptchaGateSecretFile                      string                       `json:"captchaGateSecretFile,omitempty"`
 	CaptchaGateBindIP                          bool                         `json:"captchaGateBindIp,omitempty"`
 	CaptchaGracePeriodSeconds                  int64                        `json:"captchaGracePeriodSeconds,omitempty"`
+	ReclaimGraceSeconds                        int64                        `json:"reclaimGraceSeconds,omitempty"`
 	OriginBasedDecisionRemap                   map[string]map[string]string `json:"originBasedDecisionRemap,omitempty"`
 }
 
@@ -220,6 +221,7 @@ func New() *Config {
 		CaptchaSecretKey:                "",
 		CaptchaGateBindIP:               true,
 		CaptchaGracePeriodSeconds:       1800,
+		ReclaimGraceSeconds:             30,
 		OriginBasedDecisionRemap:        map[string]map[string]string{},
 		CrowdsecLapiStreamScopes:        []string{},
 		CaptchaFilePath:                 "/captcha.html",
@@ -725,6 +727,7 @@ func validateParamsRequired(config *Config) error {
 		"CrowdsecLapiHTTPTimeoutSeconds":      config.CrowdsecLapiHTTPTimeoutSeconds,
 		"CrowdsecAppsecHTTPTimeoutSeconds":    config.CrowdsecAppsecHTTPTimeoutSeconds,
 		"CaptchaSiteverifyHTTPTimeoutSeconds": config.CaptchaSiteverifyHTTPTimeoutSeconds,
+		"ReclaimGraceSeconds":                 config.ReclaimGraceSeconds,
 	}
 	for key, val := range requiredInt0 {
 		if val < 0 {
