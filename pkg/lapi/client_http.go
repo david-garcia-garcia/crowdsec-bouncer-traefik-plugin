@@ -156,7 +156,7 @@ func (c *Client) AdoptTransport(cfg *configuration.Config) (bool, error) {
 	}
 	if replaced && c.log != nil {
 		c.log.Info("lapi transport replaced",
-			"sessionKey", c.sessionKeyLocked(),
+			"sessionKey", c.sessionKey,
 			"httpTimeoutSeconds", next.httpTimeoutSeconds,
 			"lapiTlsInsecureVerify", next.lapiTLSInsecureVerify,
 			"lapiTlsCa", next.lapiTLSCertificateAuthority != "",

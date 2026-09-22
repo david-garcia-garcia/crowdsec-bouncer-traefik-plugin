@@ -283,19 +283,11 @@ func (c *Client) bindIdentity(middlewareName, bindKey string) {
 	}
 }
 
-func (c *Client) sessionKeyLocked() string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.sessionKey
-}
-
 // StreamScopes are the opener extra names this Client polls (canonical ip,range plus extras).
 func (c *Client) StreamScopes() []string {
 	if c == nil {
 		return nil
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	names := make([]string, 0, len(c.streamScopeSet))
 	for name := range c.streamScopeSet {
 		names = append(names, name)
@@ -322,10 +314,7 @@ func (c *Client) logInfo(msg, reason string) {
 	if c.log == nil {
 		return
 	}
-	c.mu.Lock()
-	sessionKey := c.sessionKey
-	c.mu.Unlock()
-	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", sessionKey, "reason", reason)
+	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
 }
 
 // logLifecycle writes Create/Close at INFO and Sleep/Wake at DEBUG.
@@ -333,15 +322,11 @@ func (c *Client) logLifecycle(msg, reason string, debug bool) {
 	if c.log == nil {
 		return
 	}
-	c.mu.Lock()
-	instanceName := c.instanceName
-	sessionKey := c.sessionKey
-	c.mu.Unlock()
 	if debug {
-		c.log.Debug(msg, "leg", instance.LegLAPI, "instanceName", instanceName, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", sessionKey, "reason", reason)
+		c.log.Debug(msg, "leg", instance.LegLAPI, "instanceName", c.instanceName, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
 		return
 	}
-	c.log.Info(msg, "leg", instance.LegLAPI, "instanceName", instanceName, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", sessionKey, "reason", reason)
+	c.log.Info(msg, "leg", instance.LegLAPI, "instanceName", c.instanceName, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "sessionKey", c.sessionKey, "reason", reason)
 }
 
 func stopTicker(stop chan bool) {
