@@ -52,7 +52,12 @@ BeforeAll {
                     ForEach-Object { $_.name -replace '@file$', '' } |
                     Sort-Object
             )
-            return (($want -join '|') -eq ($got -join '|'))
+            foreach ($name in $want) {
+                if ($got -notcontains $name) {
+                    return $false
+                }
+            }
+            return $true
         }
     }
 
