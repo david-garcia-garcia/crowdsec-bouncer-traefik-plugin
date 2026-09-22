@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -60,10 +59,8 @@ func cfgAppsecCaptchaAt(t *testing.T, appsecHost string) *configuration.Config {
 // on an unusable client certificate. Without a rollback the stream ticker polls LAPI forever.
 func TestNew_FailedConstructorReleasesLapiHolder(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	instance.ResetForTest()
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
-		instance.ResetForTest()
 	})
 
 	var hits int64
@@ -96,10 +93,8 @@ func TestNew_FailedConstructorReleasesLapiHolder(t *testing.T) {
 // zero grace, a rollback that fired on the success path would dispose between these two calls.
 func TestNew_SuccessfulConstructorKeepsItsHolder(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	instance.ResetForTest()
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
-		instance.ResetForTest()
 	})
 
 	var hits int64
@@ -149,10 +144,8 @@ func TestNew_AppsecOwnedWithoutKeyFails(t *testing.T) {
 
 func TestNew_AppsecCaptchaFailureActionServesChallenge(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	instance.ResetForTest()
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
-		instance.ResetForTest()
 	})
 
 	appsecSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -180,10 +173,8 @@ func TestNew_AppsecCaptchaFailureActionServesChallenge(t *testing.T) {
 // come back normalised, and must not come back carrying the resolved LAPI secret.
 func TestNew_DoesNotMutateCallerConfig(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	instance.ResetForTest()
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
-		instance.ResetForTest()
 	})
 
 	var zero int64

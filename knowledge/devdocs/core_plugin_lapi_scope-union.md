@@ -29,7 +29,7 @@ missing := decisionscope.MissingStreamScopes(client.StreamScopes(), cfg.Decision
 - `pkg/decisionscope/lookup.go`
 - `pkg/lapi/session.go`
 - `pkg/lapi/client_decisions.go`
-- `pkg/instance/tables.go` (bind-time coverage WARN)
+- `plugin.go` (bind-time coverage WARN)
 
 ## Gotchas
 

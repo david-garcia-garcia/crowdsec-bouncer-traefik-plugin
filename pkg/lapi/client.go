@@ -13,7 +13,6 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance"
 )
 
 // Operator-visible lifecycle and stream-health lines (stable for log grep).
@@ -61,7 +60,6 @@ type Client struct {
 	streamScopeSet       map[string]struct{}
 	middlewareName       string
 	instanceName         string
-	lastPublishedName    string
 	incarnation          string
 	lapiKey              string
 
@@ -108,7 +106,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 	log = log.With(
 		"traefikName", middlewareName,
 		"instanceName", config.CrowdsecLapiInstanceName,
-		"leg", instance.LegLAPI,
+		"leg", "lapi",
 		"sessionKey", bindKey,
 	)
 	crowdsecStreamRoute := crowdsecLapiStreamRoute
@@ -212,7 +210,6 @@ func (c *Client) Close() {
 	}
 	c.logLifecycle(MsgConnectionClosed, "closed", false)
 	dropStreamOwner(c.crowdsecHost, c.lapiKey, c.middlewareName)
-	instance.Clear(instance.LegLAPI, c, c.middlewareName)
 }
 
 // Sleep stops stream and metrics tickers and keeps HTTP, the DecisionStore, and the LAPI
@@ -299,20 +296,6 @@ func (c *Client) StreamScopes() []string {
 		names = append(names, name)
 	}
 	return names
-}
-
-// LastPublishedName is the slot this Client last published, kept across Sleep.
-func (c *Client) LastPublishedName() string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.lastPublishedName
-}
-
-// SetPublishedName records the slot this Client just published.
-func (c *Client) SetPublishedName(name string) {
-	c.mu.Lock()
-	c.lastPublishedName = name
-	c.mu.Unlock()
 }
 
 // logInfo writes stream-health lines with host.

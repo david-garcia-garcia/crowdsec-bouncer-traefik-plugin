@@ -6,15 +6,26 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
+)
+
+const (
+	legLAPI         = "lapi"
+	legAppSec       = "appsec"
+	aliasPrefixLAPI = "alias:lapi:"
+	aliasPrefixWAF  = "alias:appsec:"
+	msgTaken        = "crowdsec instance name taken"
+	msgBound        = "crowdsec bouncer bound"
+	msgUnbound      = "crowdsec bouncer unbound"
 )
 
 // CreateConfig creates the default plugin configuration.
@@ -23,7 +34,8 @@ func CreateConfig() *configuration.Config {
 }
 
 // New is the Traefik Yaegi constructor. It opens owned LAPI/AppSec legs, publishes
-// named slots, and returns a per-router Bouncer that late-binds via atomic.Value.
+// named aliases on the reclaim table, and returns a per-router Bouncer that late-binds
+// via atomic.Value.
 //
 // New works on a snapshot of the config Traefik owns, and binds every reclaim Open to a
 // child of the constructor ctx, so a constructor that fails partway releases what it opened.
@@ -54,7 +66,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		}
 	}()
 
-	if err = openAndPublishOwned(bindCtx, &prepared, log, name); err != nil {
+	if err = openAndAliasOwned(bindCtx, &prepared, log, name); err != nil {
 		return nil, err
 	}
 
@@ -66,90 +78,119 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	}
 	handler = route
 	if subscribeLAPI {
-		instance.Subscribe(instance.LegLAPI, prepared.CrowdsecLapiInstanceName, instance.Subscriber{
-			Value: route.LAPIBinding(), TraefikName: name, Log: log, HeaderScopes: prepared.DecisionScopeHeaders,
-		})
+		watchAlias(legLAPI, prepared.CrowdsecLapiInstanceName, name, route.LAPIBinding(), (*lapi.Client)(nil), log, prepared.DecisionScopeHeaders)
 	}
 	if subscribeAppSec {
-		instance.Subscribe(instance.LegAppSec, prepared.CrowdsecAppsecInstanceName, instance.Subscriber{
-			Value: route.AppSecBinding(), TraefikName: name, Log: log,
-		})
+		watchAlias(legAppSec, prepared.CrowdsecAppsecInstanceName, name, route.AppSecBinding(), (*appsec.Client)(nil), log, nil)
 	}
 	context.AfterFunc(ctx, func() {
 		if subscribeLAPI {
-			instance.Unsubscribe(instance.LegLAPI, prepared.CrowdsecLapiInstanceName, route.LAPIBinding())
+			reclaim.Unwatch(aliasKey(legLAPI, prepared.CrowdsecLapiInstanceName), route.LAPIBinding())
 		}
 		if subscribeAppSec {
-			instance.Unsubscribe(instance.LegAppSec, prepared.CrowdsecAppsecInstanceName, route.AppSecBinding())
+			reclaim.Unwatch(aliasKey(legAppSec, prepared.CrowdsecAppsecInstanceName), route.AppSecBinding())
 		}
 	})
 	return handler, err
 }
 
-// openAndPublishOwned Opens owned LAPI/AppSec legs, publishes them, and drops leftover slots this middleware no longer owns.
-func openAndPublishOwned(bindCtx context.Context, prepared *configuration.Config, log *slog.Logger, name string) error {
-	var lapiClient *lapi.Client
-	var err error
+type aliasClaim struct {
+	alias     string
+	publisher string
+}
+
+func openAndAliasOwned(bindCtx context.Context, prepared *configuration.Config, log *slog.Logger, name string) error {
+	var claimed []aliasClaim
 	if prepared.CrowdsecLapiEnabled {
+		var err error
 		if prepared.CrowdsecMode == configuration.StreamMode || prepared.CrowdsecMode == configuration.AloneMode {
-			lapiClient, err = lapi.OpenStream(bindCtx, prepared, log, name, pluginVersion)
+			_, err = lapi.OpenStream(bindCtx, prepared, log, name, pluginVersion)
 		} else {
-			lapiClient, err = lapi.OpenLive(bindCtx, prepared, log, name, pluginVersion)
+			_, err = lapi.OpenLive(bindCtx, prepared, log, name, pluginVersion)
 		}
 		if err != nil {
 			return err
 		}
-		unpublishRenamed(instance.LegLAPI, lapiClient, prepared.CrowdsecLapiInstanceName, name)
+		if err = claimAlias(lapi.OwnershipKey(prepared, name), legLAPI, prepared.CrowdsecLapiInstanceName, name, (*lapi.Client)(nil), log); err != nil {
+			return err
+		}
+		claimed = append(claimed, aliasClaim{alias: aliasKey(legLAPI, prepared.CrowdsecLapiInstanceName), publisher: name})
+	} else {
+		reclaim.ClearPublisher(name, aliasPrefixLAPI)
 	}
 
-	var appsecClient *appsec.Client
 	if prepared.CrowdsecAppsecEnabled {
-		appsecClient, err = appsec.Open(bindCtx, prepared, log, name, pluginVersion)
-		if err != nil {
+		if _, err := appsec.Open(bindCtx, prepared, log, name, pluginVersion); err != nil {
+			clearClaims(claimed)
 			return err
 		}
-		unpublishRenamed(instance.LegAppSec, appsecClient, prepared.CrowdsecAppsecInstanceName, name)
-	}
-
-	attempts := make([]instance.PublishAttempt, 0, 2)
-	if lapiClient != nil {
-		attempts = append(attempts, instance.PublishAttempt{
-			Leg: instance.LegLAPI, InstanceName: prepared.CrowdsecLapiInstanceName,
-			Publisher: name, Client: lapiClient, Empty: (*lapi.Client)(nil),
-			Incarnation: lapiClient.Incarnation(), StreamScopes: lapiClient.StreamScopes(), Log: log,
-		})
-	}
-	if appsecClient != nil {
-		attempts = append(attempts, instance.PublishAttempt{
-			Leg: instance.LegAppSec, InstanceName: prepared.CrowdsecAppsecInstanceName,
-			Publisher: name, Client: appsecClient, Empty: (*appsec.Client)(nil),
-			Incarnation: appsecClient.Incarnation(), Log: log,
-		})
-	}
-	if err = instance.PublishAll(attempts); err != nil {
-		return err
-	}
-	if lapiClient != nil {
-		lapiClient.SetPublishedName(prepared.CrowdsecLapiInstanceName)
+		if err := claimAlias(appsec.Key(prepared, name), legAppSec, prepared.CrowdsecAppsecInstanceName, name, (*appsec.Client)(nil), log); err != nil {
+			clearClaims(claimed)
+			return err
+		}
 	} else {
-		instance.ClearPublisher(instance.LegLAPI, name)
-	}
-	if appsecClient != nil {
-		appsecClient.SetPublishedName(prepared.CrowdsecAppsecInstanceName)
-	} else {
-		instance.ClearPublisher(instance.LegAppSec, name)
+		reclaim.ClearPublisher(name, aliasPrefixWAF)
 	}
 	return nil
 }
 
-type lastPublishedName interface {
-	LastPublishedName() string
+func claimAlias(key, leg, instanceName, publisher string, empty any, log *slog.Logger) error {
+	if instanceName == "" {
+		return nil
+	}
+	err := reclaim.SetAlias(key, aliasKey(leg, instanceName), publisher, empty)
+	if err == nil {
+		return nil
+	}
+	if log != nil {
+		log.Error(msgTaken, "leg", leg, "instanceName", instanceName, "rejected", publisher)
+	}
+	return err
 }
 
-func unpublishRenamed(leg string, client lastPublishedName, instanceName, publisher string) {
-	stored := client.LastPublishedName()
-	if stored == "" || stored == instanceName {
-		return
+func clearClaims(claimed []aliasClaim) {
+	for _, claim := range claimed {
+		reclaim.ClearAlias(claim.alias, claim.publisher)
 	}
-	instance.Unpublish(leg, stored, client, publisher)
+}
+
+func aliasKey(leg, instanceName string) string {
+	return "alias:" + leg + ":" + instanceName
+}
+
+func watchAlias(leg, instanceName, traefikName string, dest *atomic.Value, empty any, log *slog.Logger, headerScopes map[string]string) {
+	reclaim.Watch(aliasKey(leg, instanceName), reclaim.Watcher{
+		Value: dest,
+		Notify: func(current any, bound bool) {
+			if log == nil {
+				return
+			}
+			incarnation := incarnationOf(current)
+			if !bound {
+				log.Info(msgUnbound, "traefikName", traefikName, "leg", leg, "instanceName", instanceName, "incarnation", incarnation)
+				return
+			}
+			if client, ok := current.(*lapi.Client); ok {
+				missing := decisionscope.MissingStreamScopes(headerScopes, client.StreamScopes())
+				if len(missing) > 0 {
+					log.Warn("crowdsec bouncer stream scopes missing",
+						"traefikName", traefikName,
+						"missing", strings.Join(missing, ","),
+					)
+				}
+			}
+			log.Info(msgBound, "traefikName", traefikName, "leg", leg, "instanceName", instanceName, "incarnation", incarnation)
+		},
+	}, empty)
+}
+
+func incarnationOf(current any) string {
+	switch client := current.(type) {
+	case *lapi.Client:
+		return client.Incarnation()
+	case *appsec.Client:
+		return client.Incarnation()
+	default:
+		return ""
+	}
 }

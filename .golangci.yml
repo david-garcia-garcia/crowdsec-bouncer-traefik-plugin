@@ -50,7 +50,6 @@ linters-settings:
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore
-          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance
       Test:
         files:
           - $test
@@ -69,7 +68,6 @@ linters-settings:
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore
-          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance
           - github.com/leprosus/golang-ttl-map
 
 linters:
@@ -117,9 +115,6 @@ issues:
       linters:
         - perfsprint
     - path: pkg/appsec/
-      linters:
-        - perfsprint
-    - path: pkg/instance/
       linters:
         - perfsprint
     - path: plugin.go

@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance"
 )
 
 const (
@@ -36,7 +35,6 @@ type Client struct {
 	pluginVersion     string
 	middlewareName    string
 	instanceName      string
-	lastPublishedName string
 	incarnation       string
 	sessionKey        string
 	closed            bool
@@ -68,7 +66,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, m
 	log = log.With(
 		"traefikName", middlewareName,
 		"instanceName", config.CrowdsecAppsecInstanceName,
-		"leg", instance.LegAppSec,
+		"leg", "appsec",
 		"sessionKey", bindKey,
 	)
 	next, err := newTransport(config, log)
@@ -108,10 +106,6 @@ func (c *Client) Close() {
 		closeIdle(current.httpClient)
 	}
 	c.logLifecycle(MsgInstanceClosed, "closed", false)
-	c.mu.Lock()
-	publisher := c.middlewareName
-	c.mu.Unlock()
-	instance.Clear(instance.LegAppSec, c, publisher)
 }
 
 // Sleep logs DEBUG and marks the incarnation asleep. AppSec has no tickers.
@@ -155,20 +149,6 @@ func (c *Client) bindIdentity(middlewareName, bindKey string) {
 	if c.sessionKey == "" {
 		c.sessionKey = bindKey
 	}
-}
-
-// LastPublishedName is the slot this Client last published, kept across Sleep.
-func (c *Client) LastPublishedName() string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.lastPublishedName
-}
-
-// SetPublishedName records the slot this Client just published.
-func (c *Client) SetPublishedName(name string) {
-	c.mu.Lock()
-	c.lastPublishedName = name
-	c.mu.Unlock()
 }
 
 func (c *Client) logLifecycle(msg, reason string, debug bool) {

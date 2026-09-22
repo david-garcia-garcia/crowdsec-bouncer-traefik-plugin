@@ -28,29 +28,27 @@ Process-wide named slots sit between owner `Open` and bouncer bounce. Spec: `cor
 
 ## How to use
 
-- Put both tables in `pkg/instance`. `plugin.go` Opens owned legs, then `PublishAll`, then `bouncer.New` with subscribe flags, then `Subscribe`.
+- Named slots are aliases on the reclaim table (`alias:<leg>:<name>`), not a second package. `plugin.go` Opens owned legs, then `SetAlias`, then `bouncer.New` with subscribe flags, then `Watch`.
 - Typed nil empty: first `Store` fixes the type. Never `Store(nil)`.
-- Reject a second publisher in the same table. Roll back every slot this `New` already wrote before unlocking, then cancel the holder child.
-- Clear on grace `Close` when `current` is still the dying pointer. Compare clients with `reflect.Value.Pointer` (Yaegi `==` on `any` is not enough).
-- After `PublishAll`, if this `New` did not Open a leg, `ClearPublisher` that leg for this middleware name so leftover slots do not wait for a Traefik ctx that may never cancel.
-- Same publisher, new instance name: `PublishAll` clears the previous name before writing the new one.
-- On Wake rename, unpublish the Client's last published name before publishing the new one.
+- Reject a second publisher on the same alias. Roll back aliases this `New` already wrote, then cancel the holder child.
+- Close / unmap of a dying incarnation clears aliases still pointing at it. Sleep does not.
+- If this `New` did not Open a leg, `ClearPublisher` that alias prefix for this middleware name.
+- Same publisher, new instance name: `SetAlias` clears the previous alias in that leg family.
 
 ## Pattern snippet
 
 ```go
-err := instance.PublishAll(attempts)
-if lapiClient == nil {
-	instance.ClearPublisher(instance.LegLAPI, traefikName)
+err := reclaim.SetAlias(ownershipKey, "alias:lapi:"+instanceName, traefikName, (*lapi.Client)(nil))
+if !openedLAPI {
+	reclaim.ClearPublisher(traefikName, "alias:lapi:")
 }
-instance.Subscribe(instance.LegLAPI, name, instance.Subscriber{
-	Value: route.LAPIBinding(), TraefikName: traefikName, Log: log,
-})
+reclaim.Watch("alias:lapi:"+instanceName, reclaim.Watcher{Value: route.LAPIBinding()}, (*lapi.Client)(nil))
 ```
 
 ## Key files
 
-- `pkg/instance/tables.go`
+- `vendor/github.com/david-garcia-garcia/traefik-middleware-utilities/reclaim/alias.go`
+- `pkg/reclaim/default.go`
 - `plugin.go`
 - `pkg/bouncer/bouncer.go`
 

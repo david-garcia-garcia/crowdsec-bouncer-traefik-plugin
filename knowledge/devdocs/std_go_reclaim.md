@@ -10,9 +10,17 @@ _Avoid_: `sync.Once`, process singleton, middleware-name key
 A look at one reclaim slot that does not bind a holder, Wake, or stop grace. Returns `(value, Awake|Asleep, ok)`. `ok=false` for missing, gone, or busy; do not wait.
 _Avoid_: `PeekLivePrefix`, `View`, a table fork, using Peek to retitle a sleeper
 
+**Holder**:
+A strong reference: `Open` increments it and drops it when that constructor ctx is Done. Last holder Sleeps; grace Close disposes.
+_Avoid_: Bind reclaim from a bouncing subscriber
+
+**Watcher**:
+A weak reference: `Watch` copies the public alias into an `atomic.Value` and does not increment holders, Wake, or stop grace.
+_Avoid_: `atomic.Pointer[T]`, waiting in `New` until SetAlias
+
 ## Overview
 
-`pkg/reclaim` is a thin shim over traefik-middleware-utilities `reclaim` (`Default`, `ProcessGrace` 30s, `Open` / `OpenWithHooks`, exact `Peek`, `ResetForTest` / `ResetForTestWith`). Call `reclaim.Open` / `OpenWithHooks` with a context that ends when the caller no longer wants the value — in `plugin.go` that is a `context.WithCancel` child of Traefik’s `New` ctx, not the ctx itself, because the table has no Release and a constructor that fails later has to hand the holder back somehow. Pass `reclaim.Hooks` as funcs (Yaegi v0.16 panics on asserting a foreign concrete type). Do not take `OpenTyped` (it still takes `func() (any, Hooks, error)`). Do not use `*Wrapped` or `OpenWithGrace`. Export and call exact `Peek` (`Peek(key) (any, State, bool)`). Do not export or call `PeekLivePrefix` / `View`.
+`pkg/reclaim` is a thin shim over the vendored utilities table (`Default`, `ProcessGrace` 30s, `Open` / `OpenWithHooks`, `Peek`, alias `SetAlias` / `Watch` / `Unwatch` / `ClearAlias` / `ClearPublisher`, `ResetForTest`). Call `OpenWithHooks` with a context that ends when the caller no longer wants the value — in `plugin.go` that is a `context.WithCancel` child of Traefik’s `New` ctx. Watchers attach to a public alias (`alias:<leg>:<name>`), not the ownership key. Alias APIs are an ad-hoc vendor override until they land upstream. Pass `reclaim.Hooks` as funcs (Yaegi v0.16 panics on asserting a foreign concrete type). Do not take `OpenTyped`. Do not use `*Wrapped` or `OpenWithGrace`. Do not export `PeekLivePrefix` / `View`.
 
 ## How to use
 
@@ -47,6 +55,7 @@ stored, err := reclaim.OpenWithHooks(ctx, key, log, func() (any, reclaim.Hooks, 
 - Zero table grace disposes as soon as the last holder’s ctx is done.
 - There is no Release and no unbind. The only way to give a holder back is to end the context that bound it, which is why callers that can fail after an `Open` bind a cancellable child of their own (`core_plugin_middleware.md` bind context).
 - `DefaultGrace` (10s) is the utilities negative-grace fallback. This plugin’s process table uses `ProcessGrace` (30s).
-- Yaegi v0.16 panics on asserting a foreign concrete type to closer/sleeper. Pass Hooks funcs. Slot fan-out uses `atomic.Value` in `pkg/instance`, not `atomic.Pointer[T]`.
+- Yaegi v0.16 panics on asserting a foreign concrete type to closer/sleeper. Pass Hooks funcs. Alias fan-out uses `atomic.Value`, not `atomic.Pointer[T]`.
+- Sleep does not clear aliases. Close / unmap of that incarnation does.
 - Callers in another package import this shim, not `github.com/david-garcia-garcia/traefik-middleware-utilities/reclaim`.
 - Upstream table uses `time.AfterFunc` for grace so Yaegi v0.16 `interp._select` does not hang.

@@ -9,8 +9,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance"
 )
 
 // newTestStreamTickClient builds a stream Client that can poll a mock LAPI without starting tickers.
@@ -29,7 +27,7 @@ func newTestStreamTickClient(t *testing.T, log *slog.Logger, host string, httpCl
 	client.log = log.With(
 		"traefikName", "test-mw",
 		"instanceName", "shared",
-		"leg", instance.LegLAPI,
+		"leg", "lapi",
 		"sessionKey", "lapi:test-stream",
 	)
 	client.isCrowdsecStreamStartup = 1

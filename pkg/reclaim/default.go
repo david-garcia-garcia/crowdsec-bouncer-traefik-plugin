@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	utilreclaim "github.com/david-garcia-garcia/traefik-middleware-utilities/reclaim"
@@ -74,6 +75,34 @@ func OpenWithHooks(ctx context.Context, key string, logger *slog.Logger, create 
 // Peek is Default().Peek: look without bind, Wake, or stopping grace.
 func Peek(key string) (any, State, bool) {
 	return Default().Peek(key)
+}
+
+// Watcher is a weak reference: Watch copies the alias without binding a holder.
+type Watcher = utilreclaim.Watcher
+
+// SetAlias publishes the mapped ownership key under a public name.
+func SetAlias(key, alias, publisher string, empty any) error {
+	return Default().SetAlias(key, alias, publisher, empty)
+}
+
+// Watch copies the alias into dest without binding a holder.
+func Watch(alias string, dest Watcher, empty any) {
+	Default().Watch(alias, dest, empty)
+}
+
+// Unwatch removes dest from the alias.
+func Unwatch(alias string, dest *atomic.Value) {
+	Default().Unwatch(alias, dest)
+}
+
+// ClearAlias drops the alias when this publisher still holds it.
+func ClearAlias(alias, publisher string) {
+	Default().ClearAlias(alias, publisher)
+}
+
+// ClearPublisher drops every alias this publisher still holds in prefix.
+func ClearPublisher(publisher, prefix string) {
+	Default().ClearPublisher(publisher, prefix)
 }
 
 // ResetForTest tears down the process table and installs a fresh one with ProcessGrace.

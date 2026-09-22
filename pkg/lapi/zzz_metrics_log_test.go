@@ -4,8 +4,6 @@ import (
 	"log/slog"
 	"strings"
 	"testing"
-
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance"
 )
 
 func TestReportMetricsDebugCarriesNestedBackend(t *testing.T) {
@@ -14,7 +12,7 @@ func TestReportMetricsDebugCarriesNestedBackend(t *testing.T) {
 	client.log = log.With(
 		"traefikName", "bouncer-captcha",
 		"instanceName", "shared",
-		"leg", instance.LegLAPI,
+		"leg", "lapi",
 		"sessionKey", "lapi:owner:abc",
 	)
 	attachTestMetricsReporter(client, client.metricsReporter.startedAt)

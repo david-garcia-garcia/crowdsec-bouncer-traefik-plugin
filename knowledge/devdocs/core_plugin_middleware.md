@@ -45,7 +45,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - Snapshot first: `prepared := *config`, then work on `&prepared` for the rest of `New`. Never write through Traefik's pointer.
 - After the snapshot, do not copy leftover YAML keys or peer aliases into `BanFilePath` / `CaptchaFilePath`. Traefik’s decode of those two fields is the only owner.
 - Derive `bindCtx, releaseHolders := context.WithCancel(ctx)` before the first `Open`, and release it from a `defer` that fires only when the named `err` is non-nil.
-- Call `lapi.Prepare` then `appsec.Prepare` (AppSec key/scheme copy only when AppSec is enabled). `PrepopulateInstanceNames` only when that leg is owned. Stream/alone: `lapi.OpenStream`. Live/none: `lapi.OpenLive`. When `crowdsecAppsecEnabled`: `appsec.Open`. Then `instance.PublishAll`. When this `New` did not Open a leg, `instance.ClearPublisher` that leg for this middleware name. `bouncer.New` takes subscribe flags, not client pointers. Subscribe after New. Open key: `core_plugin_lapi_reclaim-key.md`. Stream `scopes=`: `core_plugin_lapi_scope-union.md`. Slots: `core_plugin_middleware_instance-slots.md`.
+- Call `lapi.Prepare` then `appsec.Prepare` (AppSec key/scheme copy only when AppSec is enabled). `PrepopulateInstanceNames` only when that leg is owned. Stream/alone: `lapi.OpenStream`. Live/none: `lapi.OpenLive`. When `crowdsecAppsecEnabled`: `appsec.Open`. Then `reclaim.SetAlias` on `alias:<leg>:<name>`. When this `New` did not Open a leg, `reclaim.ClearPublisher` that alias prefix. `bouncer.New` takes subscribe flags, not client pointers. `Watch` after New. Open key: `core_plugin_lapi_reclaim-key.md`. Stream `scopes=`: `core_plugin_lapi_scope-union.md`. Slots: `core_plugin_middleware_instance-slots.md`.
 - `ServeHTTP` Loads `atomic.Value` only. `streamStartupBlock` on the request path is “every subscribed backend is published?” — 503 when not. Do not block `New`. Do not put the flag on the client.
 - When `bouncer.New` builds the captcha siteverify `http.Client`, set `Timeout` from `cfg.EffectiveHTTPTimeoutSeconds(cfg.CaptchaSiteverifyHTTPTimeoutSeconds)`. Keep that client per-Bouncer. Do not reclaim it.
 - Put stream tickers, replaceable LAPI HTTP (`transport` on `atomic.Value`), and Range membership on `lapi.Client`. Open the DecisionStore on the same `New` ctx (`core_plugin_decisionstore.md`). Put AppSec HTTP+auth on `appsec.Client`. Put captcha, templates, LAPI failure action, Redis fail-closed, and live-cache TTL on Bouncer. Timeout/TLS changes are a new ownership key, not Adopt-only.
@@ -71,7 +71,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 	if prepared.CrowdsecLapiEnabled {
 		lapiClient, err = lapi.OpenStream(bindCtx, &prepared, log, name, pluginVersion)
 	}
-	err = instance.PublishAll(attempts)
+	err = reclaim.SetAlias(lapi.OwnershipKey(&prepared, name), "alias:lapi:"+prepared.CrowdsecLapiInstanceName, name, (*lapi.Client)(nil))
 	handler, err = bouncer.New(next, name, &prepared, subscribeLAPI, subscribeAppSec, log)
 	return handler, err
 }
@@ -80,7 +80,7 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 ## Key files
 
 - `plugin.go`
-- `pkg/instance/`
+- `pkg/reclaim/default.go`
 - `pkg/lapi/`
 - `pkg/lapi/client_http.go`
 - `pkg/lapi/client_live.go`

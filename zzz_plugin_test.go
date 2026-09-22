@@ -15,7 +15,6 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/instance"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
@@ -114,10 +113,8 @@ func TestServeHTTP(t *testing.T) {
 // TestNew_RejectsEmptyCaptchaKeys stops at ValidateParams so New does not open LAPI.
 func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	instance.ResetForTest()
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
-		instance.ResetForTest()
 	})
 
 	var hits int64
@@ -151,10 +148,8 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 // TestNew_RejectsEmptyCaptchaFilePath stops at ValidateParams so New does not open LAPI.
 func TestNew_RejectsEmptyCaptchaFilePath(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	instance.ResetForTest()
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
-		instance.ResetForTest()
 	})
 
 	var hits int64
@@ -190,10 +185,8 @@ func TestNew_RejectsEmptyCaptchaFilePath(t *testing.T) {
 // TestNew_LAPIUserAgentUsesVersionGo checks New sends LAPI User-Agent from version.go pluginVersion.
 func TestNew_LAPIUserAgentUsesVersionGo(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	instance.ResetForTest()
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
-		instance.ResetForTest()
 	})
 
 	gotUA := ""
@@ -227,10 +220,8 @@ func TestNew_LAPIUserAgentUsesVersionGo(t *testing.T) {
 
 func TestNew_DifferentNameOnSameLapiFails(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	instance.ResetForTest()
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
-		instance.ResetForTest()
 	})
 
 	var zero int64
@@ -253,10 +244,8 @@ func TestNew_DifferentNameOnSameLapiFails(t *testing.T) {
 
 func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	instance.ResetForTest()
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
-		instance.ResetForTest()
 	})
 
 	var hitsA, hitsB int64
@@ -324,10 +313,8 @@ func TestNew_ReclaimWithinGrace(t *testing.T) {
 
 func TestNew_DisposeAfterGrace(t *testing.T) {
 	reclaim.ResetForTest()
-	instance.ResetForTest()
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
-		instance.ResetForTest()
 	})
 
 	var zero int64
@@ -355,10 +342,8 @@ func TestNew_DisposeAfterGrace(t *testing.T) {
 
 func TestNew_StreamVsLive_SideBySide(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	instance.ResetForTest()
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
-		instance.ResetForTest()
 	})
 
 	var streamHits, liveHits int64
@@ -399,10 +384,8 @@ func TestNew_StreamVsLive_SideBySide(t *testing.T) {
 
 func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	instance.ResetForTest()
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
-		instance.ResetForTest()
 	})
 
 	var hits int64
@@ -453,10 +436,8 @@ func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
 
 func TestNew_TwoStreamConnections_BothPoll(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	instance.ResetForTest()
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
-		instance.ResetForTest()
 	})
 
 	var hitsA, hitsB int64
@@ -493,10 +474,8 @@ func TestNew_SameStreamKeyDifferentMetrics_SharesConnection(t *testing.T) {
 	// must share one connection: a second ticker would steal stream deltas and
 	// POST a second metrics window for the same bouncer. Interval is first-wins.
 	reclaim.ResetForTestWith(0)
-	instance.ResetForTest()
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
-		instance.ResetForTest()
 	})
 
 	var hits int64
