@@ -20,7 +20,7 @@ Priority: P2 — real operator pain with a workaround (copy the full YAML on eve
 In progress. 1 items remain.
 
 Priority: P2 — real operator pain with a workaround (copy the full YAML on every router)
-Reviewed head: 20344f8c
+Reviewed head: 07b653d4
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -43,16 +43,22 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/changes/bouncer-instance-severance/proposal.md) — modified
-- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/changes/bouncer-instance-severance/proposal.md) — modified
-- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/changes/bouncer-instance-severance/proposal.md) — modified
-- [core_plugin_lapi_scope-union](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/changes/bouncer-instance-severance/proposal.md) — modified
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/changes/bouncer-instance-severance/proposal.md) — modified
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/changes/bouncer-instance-severance/proposal.md) — modified
-- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/changes/bouncer-instance-severance/proposal.md) — added
+- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/changes/archive/2026-09-22-bouncer-instance-severance/proposal.md) — modified
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/changes/archive/2026-09-22-bouncer-instance-severance/proposal.md) — modified
+- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/changes/archive/2026-09-22-bouncer-instance-severance/proposal.md) — modified
+- [core_plugin_lapi_scope-union](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/changes/archive/2026-09-22-bouncer-instance-severance/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/changes/archive/2026-09-22-bouncer-instance-severance/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/changes/archive/2026-09-22-bouncer-instance-severance/proposal.md) — modified
+- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/changes/archive/2026-09-22-bouncer-instance-severance/proposal.md) — added
 
 Completed:
 - [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/specs/build_e2e_pester_crowdsec-stack/spec.md) — modified
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/specs/core_plugin_appsec_client/spec.md) — modified
+- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/specs/core_plugin_lapi_reclaim-key/spec.md) — modified
+- [core_plugin_lapi_scope-union](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/specs/core_plugin_lapi_scope-union/spec.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/specs/core_plugin_middleware_config-validation/spec.md) — modified
+- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-22-bouncer-instance-severance/openspec/specs/core_plugin_middleware_instance-slots/spec.md) — added
 
 ## Deviations from the ask
 - taken:  →  — `` — requirement F3 / T2 subscriber sketch set `crowdsecLapiEnabled: true` with no key, which `ValidateParams` rejects because a true owner flag must Open. Built: `enabled: true`, owner flags false, instance names set (Open-vs-subscribe table).. Requester: not asked.
@@ -89,9 +95,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 1 added / 7 modified | Same list as ## Specs |
+| Specs in this PR | 2 added / 12 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 20344f8cf09334b048fb36a3a4fd77cad2f61f76 | Card must match the branch you measured |
+| Reviewed head | 07b653d41a2b2b6f05bf58f3e830bc096c879dca | Card must match the branch you measured |
 
 ### Stored data model
 **Changed**
@@ -108,7 +114,7 @@ Is this the best way to solve the issue? Not yet.
 
 ### Evidence
 What I checked:
-- assembled from the run bus (`deliver_card`, 20344f8cf09334b048fb36a3a4fd77cad2f61f76)
+- assembled from the run bus (`deliver_card`, 07b653d41a2b2b6f05bf58f3e830bc096c879dca)
 
 ### Rank-up moves
 None.
