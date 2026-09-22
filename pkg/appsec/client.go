@@ -102,7 +102,10 @@ func (c *Client) Close() {
 		closeIdle(current.httpClient)
 	}
 	c.logLifecycle(MsgInstanceClosed, "closed", false)
-	instance.Clear(instance.LegAppSec, c, c.middlewareName)
+	c.mu.Lock()
+	publisher := c.middlewareName
+	c.mu.Unlock()
+	instance.Clear(instance.LegAppSec, c, publisher)
 }
 
 // Sleep logs DEBUG and marks the incarnation asleep. AppSec has no tickers.

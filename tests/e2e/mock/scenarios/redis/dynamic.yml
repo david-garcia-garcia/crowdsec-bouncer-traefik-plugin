@@ -23,7 +23,6 @@ http:
           crowdsecLapiHost: "@@LAPI_HOST@@"
           crowdsecLapiKey: "@@APIKEY@@"
           redisCacheEnabled: "true"
-          crowdsecLapiEnabled: "true"
           redisCacheHost: "@@REDIS_HOST@@"
           redisCacheReadHosts:
             - "@@REDIS_READ_HOST@@"

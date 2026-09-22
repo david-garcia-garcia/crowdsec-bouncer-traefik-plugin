@@ -121,4 +121,6 @@ jobs:
         run: go env -w GOPATH=${{ github.workspace }}/go
 
       - name: Race tests
-        run: go test -race -count=1 ./pkg/...
+        # Process-wide reclaim and instance tables are ResetForTest per package.
+        # Parallel packages would race those registries; production has one process.
+        run: go test -race -count=1 -p 1 ./pkg/...
