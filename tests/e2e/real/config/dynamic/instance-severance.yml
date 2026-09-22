@@ -1,52 +1,11 @@
 http:
   routers:
-    sev-l3-owner:
-      rule: PathPrefix(`/sev-l3-owner`)
+    sev-idle:
+      rule: PathPrefix(`/sev-idle`)
       entryPoints: [web]
-      middlewares: [sev-l3-owner]
-      service: sev-whoami
-    sev-l3:
-      rule: PathPrefix(`/sev-l3`)
-      entryPoints: [web]
-      middlewares: [sev-l3]
       service: sev-whoami
   services:
     sev-whoami:
       loadBalancer:
         servers:
           - url: "http://whoami-test:80"
-  middlewares:
-    sev-l3-owner:
-      plugin:
-        bouncer:
-          enabled: "false"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: shared
-          crowdsecLapiKey: "c51a1c70000000000000000000000012"
-          crowdsecLapiHost: crowdsec:8080
-          logLevel: DEBUG
-          logFormat: json
-          reclaimGraceSeconds: "2"
-          httpTimeoutSeconds: "10"
-          updateIntervalSeconds: "5"
-          forwardedHeadersTrustedIps:
-            - "127.0.0.1/32"
-            - "172.28.0.1/32"
-          forwardedHeadersCustomName: X-Forwarded-For
-    sev-l3:
-      plugin:
-        bouncer:
-          enabled: "true"
-          streamStartupBlock: "true"
-          crowdsecLapiInstanceName: shared
-          crowdsecAppsecInstanceName: missing-appsec
-          logLevel: DEBUG
-          logFormat: json
-          reclaimGraceSeconds: "2"
-          httpTimeoutSeconds: "10"
-          updateIntervalSeconds: "5"
-          forwardedHeadersTrustedIps:
-            - "127.0.0.1/32"
-            - "172.28.0.1/32"
-          forwardedHeadersCustomName: X-Forwarded-For

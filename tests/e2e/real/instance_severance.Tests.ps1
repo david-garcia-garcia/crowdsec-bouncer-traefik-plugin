@@ -12,6 +12,7 @@ BeforeAll {
     $script:KeyB = "c51a1c70000000000000000000000013"
     $script:AppsecKey = "c51a1c70000000000000000000000005"
     $script:GraceSeconds = 3
+    $script:SevSlot = 0
     $script:Whoami = "http://whoami-test:80"
     $script:Utf8 = New-Object System.Text.UTF8Encoding $false
 
@@ -35,25 +36,45 @@ BeforeAll {
         return @([regex]::Matches($block, '(?m)^    (sev-[a-z0-9-]+):\s*$') | ForEach-Object { $_.Groups[1].Value })
     }
 
+    function Get-SevFileRouters {
+        try {
+            $routers = Invoke-RestMethod -Uri "http://localhost:8080/api/http/routers" -TimeoutSec 3
+        }
+        catch {
+            return @()
+        }
+        return @($routers | Where-Object { $_.name -like 'sev-*@file' })
+    }
+
+    function Format-SevFileRouters {
+        $rows = @(Get-SevFileRouters)
+        if ($rows.Count -eq 0) {
+            return "(none)"
+        }
+        return (
+            $rows |
+                ForEach-Object {
+                    $short = $_.name -replace '@file$', ''
+                    $err = [string]$_.error
+                    if ($err) {
+                        '{0}:{1}:{2}' -f $short, $_.status, $err
+                    }
+                    else {
+                        '{0}:{1}' -f $short, $_.status
+                    }
+                }
+        ) -join ','
+    }
+
     function Wait-SevFileRouters {
         param([string[]]$Names)
         $want = @($Names | Where-Object { $_ } | Sort-Object)
         $desc = "sev file routers $($want -join ',')"
         return Wait-ForCondition -Description $desc -TimeoutSeconds 15 -RetryIntervalSeconds 0.2 -Condition {
-            try {
-                $routers = Invoke-RestMethod -Uri "http://localhost:8080/api/http/routers" -TimeoutSec 3
-            }
-            catch {
-                return $false
-            }
-            $got = @(
-                $routers |
-                    Where-Object { $_.name -like 'sev-*@file' } |
-                    ForEach-Object { $_.name -replace '@file$', '' } |
-                    Sort-Object
-            )
+            $got = @(Get-SevFileRouters)
             foreach ($name in $want) {
-                if ($got -notcontains $name) {
+                $row = @($got | Where-Object { ($_.name -replace '@file$', '') -eq $name }) | Select-Object -First 1
+                if (-not $row -or $row.status -ne 'enabled') {
                     return $false
                 }
             }
@@ -61,20 +82,26 @@ BeforeAll {
         }
     }
 
-    # Host bind-mount writes often skip inotify. Touch inside the container
-    # so Traefik's file watch fires, then wait for the routers.
+    # Bind-mount overwrites often skip inotify. Delete + docker cp so the
+    # container sees a create, then wait for the routers.
     function Write-SevYaml {
         param([string]$Yaml)
         $text = $Yaml.TrimStart()
-        [System.IO.File]::WriteAllText($script:SevFile, $text, $script:Utf8)
-        docker exec traefik-test touch /etc/traefik/dynamic/instance-severance.yml | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            throw "docker exec touch instance-severance.yml failed"
+        if (-not $text.EndsWith("`n")) {
+            $text += "`n"
         }
+        $containerPath = "/etc/traefik/dynamic/instance-severance.yml"
+        docker exec traefik-test rm -f $containerPath | Out-Null
+        [System.IO.File]::WriteAllText($script:SevFile, $text, $script:Utf8)
+        docker cp $script:SevFile "traefik-test:$containerPath"
+        if ($LASTEXITCODE -ne 0) {
+            throw "docker cp instance-severance.yml failed"
+        }
+        docker exec traefik-test touch $containerPath | Out-Null
         $names = Get-SevRouterNames -Yaml $text
         $applied = Wait-SevFileRouters -Names $names
         if (-not $applied.Success) {
-            throw "Traefik file provider did not apply instance-severance.yml ($($names -join ','))"
+            throw "Traefik file provider did not apply instance-severance.yml (want=$($names -join ',') got=$(Format-SevFileRouters))"
         }
     }
 
@@ -91,8 +118,26 @@ $svc
 "@
     }
 
+    function Reset-SevLogCursor {
+        $script:SevLogSince = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+    }
+
+    # File-provider New ctx is not cancelled on YAML replace, so a published
+    # name stays held for the Traefik process. One name per It isolates that.
+    function Get-SevSlot {
+        return ('sev-slot-{0}' -f $script:SevSlot)
+    }
+
     function Get-SevLogs {
-        return (docker logs traefik-test 2>&1 | Out-String)
+        return (docker logs --since $script:SevLogSince traefik-test 2>&1 | Out-String)
+    }
+
+    function Get-SevSlotLogs {
+        $slot = [regex]::Escape((Get-SevSlot))
+        return (
+            (Get-SevLogs) -split "`r?`n" |
+                Where-Object { $_ -match $slot }
+        ) -join "`n"
     }
 
     function Get-SevKnobs {
@@ -143,6 +188,9 @@ $svc
         }
         return $outcome
     }
+
+    Clear-SevYaml
+    Reset-SevLogCursor
 }
 
 AfterAll {
@@ -151,6 +199,8 @@ AfterAll {
 
 Describe "Instance severance topology" {
     BeforeEach {
+        $script:SevSlot++
+        Reset-SevLogCursor
         Remove-AllTestDecisions
     }
 
@@ -217,8 +267,8 @@ $svc
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecAppsecEnabled: "true"
-          crowdsecLapiInstanceName: shared
-          crowdsecAppsecInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
+          crowdsecAppsecInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
           crowdsecAppsecHost: crowdsec:7422
@@ -227,8 +277,8 @@ $knobs
       plugin:
         bouncer:
           enabled: "true"
-          crowdsecLapiInstanceName: shared
-          crowdsecAppsecInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
+          crowdsecAppsecInstanceName: $(Get-SevSlot)
           remediationHeadersCustomName: x-crowdsec
 $knobs
 "@
@@ -270,8 +320,8 @@ $svc
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecAppsecEnabled: "true"
-          crowdsecLapiInstanceName: shared
-          crowdsecAppsecInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
+          crowdsecAppsecInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
           crowdsecAppsecHost: crowdsec:7422
@@ -280,8 +330,8 @@ $knobs
       plugin:
         bouncer:
           enabled: "true"
-          crowdsecLapiInstanceName: shared
-          crowdsecAppsecInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
+          crowdsecAppsecInstanceName: $(Get-SevSlot)
 $knobs
 "@
         $ip = "10.90.0.53"
@@ -349,7 +399,7 @@ $svc
           enabled: "true"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
           remediationStatusCode: 403
@@ -358,7 +408,7 @@ $knobs
       plugin:
         bouncer:
           enabled: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           remediationStatusCode: 429
 $knobs
 "@
@@ -374,6 +424,12 @@ $knobs
 }
 
 Describe "Instance severance late bind" {
+    BeforeEach {
+        $script:SevSlot++
+        Reset-SevLogCursor
+        Remove-AllTestDecisions
+    }
+
     AfterEach {
         Clear-SevYaml
         Remove-AllTestDecisions
@@ -398,7 +454,7 @@ $svc
         bouncer:
           enabled: "true"
           streamStartupBlock: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         $miss = Wait-SevCodes -Path "/sev-l1" -IP $ip -Codes @(503) -TimeoutSeconds 15
@@ -425,7 +481,7 @@ $svc
         bouncer:
           enabled: "true"
           streamStartupBlock: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
 $knobs
     sev-l1-owner:
       plugin:
@@ -433,7 +489,7 @@ $knobs
           enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
 $knobs
@@ -467,7 +523,7 @@ $svc
           enabled: "true"
           streamStartupBlock: "false"
           crowdsecLapiFailureAction: passthrough
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
 $knobs
     sev-l1b-b:
       plugin:
@@ -475,7 +531,7 @@ $knobs
           enabled: "true"
           streamStartupBlock: "false"
           crowdsecLapiFailureAction: ban
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         $pass = Wait-SevCodes -Path "/sev-l1b-a" -IP $ip -Codes @(200) -TimeoutSeconds 15
@@ -550,7 +606,7 @@ $svc
           enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
 $knobs
@@ -559,7 +615,7 @@ $knobs
         bouncer:
           enabled: "true"
           streamStartupBlock: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           crowdsecAppsecInstanceName: missing-appsec
 $knobs
 "@
@@ -593,7 +649,7 @@ $svc
           enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
 $knobs
@@ -603,8 +659,8 @@ $knobs
           enabled: "true"
           streamStartupBlock: "false"
           crowdsecAppsecFailureAction: passthrough
-          crowdsecLapiInstanceName: shared
-          crowdsecAppsecInstanceName: waf
+          crowdsecLapiInstanceName: $(Get-SevSlot)
+          crowdsecAppsecInstanceName: $(Get-SevSlot)-waf
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "L4"
@@ -616,6 +672,12 @@ $knobs
 }
 
 Describe "Instance severance reclaim and names" {
+    BeforeEach {
+        $script:SevSlot++
+        Reset-SevLogCursor
+        Remove-AllTestDecisions
+    }
+
     AfterEach {
         Clear-SevYaml
         Remove-AllTestDecisions
@@ -641,7 +703,7 @@ $svc
           enabled: "true"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
 $knobs
@@ -682,7 +744,7 @@ $svc
           enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
 $knobs
@@ -691,7 +753,7 @@ $knobs
         bouncer:
           enabled: "true"
           crowdsecLapiFailureAction: passthrough
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "R2"
@@ -718,7 +780,7 @@ $svc
           enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:9
           httpTimeoutSeconds: "2"
@@ -734,7 +796,7 @@ $svc
         bouncer:
           enabled: "true"
           crowdsecLapiFailureAction: passthrough
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           logLevel: DEBUG
           logFormat: json
           forwardedHeadersTrustedIps:
@@ -769,7 +831,7 @@ $svc
           enabled: "true"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
           crowdsecLapiHttpTimeoutSeconds: 10
@@ -797,7 +859,7 @@ $svc
           enabled: "true"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
           crowdsecLapiHttpTimeoutSeconds: 20
@@ -837,7 +899,7 @@ $svc
           enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
 $knobs
@@ -846,7 +908,7 @@ $knobs
         bouncer:
           enabled: "true"
           streamStartupBlock: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "R4"
@@ -879,7 +941,7 @@ $svc
           enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: other
+          crowdsecLapiInstanceName: $(Get-SevSlot)-other
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
 $knobs
@@ -888,13 +950,13 @@ $knobs
         bouncer:
           enabled: "true"
           streamStartupBlock: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
 $knobs
     sev-r4-other:
       plugin:
         bouncer:
           enabled: "true"
-          crowdsecLapiInstanceName: other
+          crowdsecLapiInstanceName: $(Get-SevSlot)-other
 $knobs
 "@
         $admin503 = Wait-SevCodes -Path "/sev-r4-admin" -IP $ip -Codes @(503) -TimeoutSeconds 15
@@ -939,7 +1001,7 @@ $svc
           enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
 $knobs
@@ -948,7 +1010,7 @@ $knobs
         bouncer:
           enabled: "true"
           streamStartupBlock: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "R5"
@@ -957,6 +1019,11 @@ $knobs
         Write-SevYaml @"
 http:
   routers:
+    sev-r5-owner:
+      rule: $(Get-SevRule '/sev-r5-owner')
+      entryPoints: [web]
+      middlewares: [sev-r5-owner]
+      service: sev-whoami
     sev-r5-admin:
       rule: $(Get-SevRule '/sev-r5-admin')
       entryPoints: [web]
@@ -964,12 +1031,17 @@ http:
       service: sev-whoami
 $svc
   middlewares:
+    sev-r5-owner:
+      plugin:
+        bouncer:
+          enabled: "false"
+$knobs
     sev-r5-admin:
       plugin:
         bouncer:
           enabled: "true"
           streamStartupBlock: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         $gone = Wait-SevCodes -Path "/sev-r5-admin" -IP $ip -Codes @(503) -TimeoutSeconds 15
@@ -1003,7 +1075,7 @@ $svc
           enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
 $knobs
@@ -1012,7 +1084,7 @@ $knobs
         bouncer:
           enabled: "true"
           streamStartupBlock: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "N2"
@@ -1045,7 +1117,7 @@ $svc
           enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: other
+          crowdsecLapiInstanceName: $(Get-SevSlot)-other
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:9
           httpTimeoutSeconds: "2"
@@ -1061,19 +1133,26 @@ $svc
         bouncer:
           enabled: "true"
           streamStartupBlock: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
 $knobs
     sev-n2-other:
       plugin:
         bouncer:
           enabled: "true"
           crowdsecLapiFailureAction: passthrough
-          crowdsecLapiInstanceName: other
+          crowdsecLapiInstanceName: $(Get-SevSlot)-other
 $knobs
 "@
         Start-Sleep -Seconds 8
-        $after = Get-SevLogs
-        $delta = $after.Substring([Math]::Min($before.Length, $after.Length))
+        $after = Get-SevSlotLogs
+        $beforeSlot = (
+            $before -split "`r?`n" |
+                Where-Object { $_ -match [regex]::Escape((Get-SevSlot)) }
+        ) -join "`n"
+        $delta = $after
+        if ($beforeSlot.Length -gt 0 -and $after.StartsWith($beforeSlot)) {
+            $delta = $after.Substring($beforeSlot.Length)
+        }
         $delta | Should -Match "crowdsec lapi instance sleeping"
         $delta | Should -Match "crowdsec lapi instance started"
         $delta | Should -Not -Match "crowdsec lapi instance waking"
@@ -1083,6 +1162,12 @@ $knobs
 }
 
 Describe "Instance severance collision and config errors" {
+    BeforeEach {
+        $script:SevSlot++
+        Reset-SevLogCursor
+        Remove-AllTestDecisions
+    }
+
     AfterEach {
         Clear-SevYaml
         Remove-AllTestDecisions
@@ -1118,7 +1203,7 @@ $svc
           enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
 $knobs
@@ -1128,7 +1213,7 @@ $knobs
           enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:KeyB"
           crowdsecLapiHost: crowdsec:8080
 $knobs
@@ -1136,7 +1221,7 @@ $knobs
       plugin:
         bouncer:
           enabled: "true"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "F1"
@@ -1179,7 +1264,7 @@ $svc
         bouncer:
           enabled: "false"
           crowdsecAppsecEnabled: "true"
-          crowdsecAppsecInstanceName: waf
+          crowdsecAppsecInstanceName: $(Get-SevSlot)-waf
           crowdsecAppsecHost: crowdsec:7422
           crowdsecAppsecKey: "$script:AppsecKey"
 $knobs
@@ -1190,8 +1275,8 @@ $knobs
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecAppsecEnabled: "true"
-          crowdsecLapiInstanceName: api
-          crowdsecAppsecInstanceName: waf
+          crowdsecLapiInstanceName: $(Get-SevSlot)-api
+          crowdsecAppsecInstanceName: $(Get-SevSlot)-waf
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
           crowdsecAppsecHost: crowdsec:7422
@@ -1202,7 +1287,7 @@ $knobs
         bouncer:
           enabled: "true"
           streamStartupBlock: "true"
-          crowdsecLapiInstanceName: api
+          crowdsecLapiInstanceName: $(Get-SevSlot)-api
 $knobs
 "@
         Start-Sleep -Seconds 5
@@ -1241,8 +1326,8 @@ $svc
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecAppsecEnabled: "true"
-          crowdsecLapiInstanceName: shared
-          crowdsecAppsecInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
+          crowdsecAppsecInstanceName: $(Get-SevSlot)
           crowdsecLapiKey: "$script:OwnerKey"
           crowdsecLapiHost: crowdsec:8080
           crowdsecAppsecHost: crowdsec:7422
@@ -1251,8 +1336,8 @@ $knobs
       plugin:
         bouncer:
           enabled: "true"
-          crowdsecLapiInstanceName: shared
-          crowdsecAppsecInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
+          crowdsecAppsecInstanceName: $(Get-SevSlot)
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "F3"
@@ -1340,7 +1425,7 @@ $knobs
       plugin:
         bouncer:
           enabled: "false"
-          crowdsecLapiInstanceName: shared
+          crowdsecLapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         $good = Wait-SevCodes -Path "/sev-e2-good" -IP $ip -Codes @(200) -TimeoutSeconds 15
