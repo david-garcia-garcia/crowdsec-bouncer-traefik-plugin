@@ -123,4 +123,9 @@ jobs:
       - name: Race tests
         # Process-wide reclaim and instance tables are ResetForTest per package.
         # Parallel packages would race those registries; production has one process.
-        run: go test -race -count=1 -p 1 ./pkg/...
+        run: |
+          set -o pipefail
+          go test -race -count=1 -p 1 ./pkg/... 2>&1 | tee /tmp/race.log
+      - name: Surface race log
+        if: failure()
+        run: echo "::error::$(tr '\n' ' ' < /tmp/race.log | head -c 3500)"
