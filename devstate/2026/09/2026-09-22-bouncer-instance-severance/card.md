@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 7750ce18
-Owner decision: None.
+Reviewed head: 25e3fc86
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -51,7 +51,9 @@ None.
 Ticket 2026-09-22-bouncer-instance-severance on branch 2026-09-22-bouncer-instance-severance targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/136; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Which package owns the dual LAPI/AppSec slot tables and Publish/Subscribe API? | additive asked — new subsystem in scope (“Named LAPI and AppSec slots”, Late bind); criterion names publish/subscribe | assumed — add a dedicated package under `pkg/` (e.g. `pkg/instance`) colocated with tests; `plugin.go` orchestrates only; propose picks exact name following go house style. | explore |
 
 ## Before merge
 None.
@@ -69,7 +71,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 7750ce1854e5843103f0c0bdf5bdaa403a5e41e8 | Card must match the branch you measured |
+| Reviewed head | 25e3fc863d04f69e4094d3505f1f40adbb818a27 | Card must match the branch you measured |
 
 ### Stored data model
 None.
@@ -83,7 +85,7 @@ Is this the best way to solve the issue? Not yet.
 
 ### Evidence
 What I checked:
-- assembled from the run bus (`deliver_card`, 7750ce1854e5843103f0c0bdf5bdaa403a5e41e8)
+- assembled from the run bus (`deliver_card`, 25e3fc863d04f69e4094d3505f1f40adbb818a27)
 
 ### Rank-up moves
 None.
