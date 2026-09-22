@@ -74,6 +74,9 @@ function Wait-SevCodes {
         [int]$TimeoutSeconds = 45
     )
     $result = Wait-ForHttpStatus -Url "$script:TraefikUrl$Path" -Headers @{ "X-Forwarded-For" = $IP } -ExpectedStatusCodes $Codes -TimeoutSeconds $TimeoutSeconds
+    if (-not $result.Success) {
+        Write-Host "Wait-SevCodes $Path last=$($result.StatusCode) err=$($result.Error)" -ForegroundColor Yellow
+    }
     return $result
 }
 
@@ -196,7 +199,7 @@ $svc
     sev-t3-hold:
       plugin:
         bouncer:
-          enabled: false
+          enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecAppsecEnabled: "true"
@@ -362,7 +365,7 @@ $knobs
     sev-l1-owner:
       plugin:
         bouncer:
-          enabled: false
+          enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
@@ -479,7 +482,7 @@ $svc
     sev-l3-owner:
       plugin:
         bouncer:
-          enabled: false
+          enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
@@ -522,7 +525,7 @@ $svc
     sev-l4-lapi:
       plugin:
         bouncer:
-          enabled: false
+          enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
@@ -613,7 +616,7 @@ $svc
     sev-r2:
       plugin:
         bouncer:
-          enabled: false
+          enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
@@ -649,7 +652,7 @@ $svc
     sev-r2:
       plugin:
         bouncer:
-          enabled: false
+          enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
@@ -766,7 +769,7 @@ $svc
     sev-r4-owner:
       plugin:
         bouncer:
-          enabled: false
+          enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
@@ -808,7 +811,7 @@ $svc
     sev-r4-owner:
       plugin:
         bouncer:
-          enabled: false
+          enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: other
@@ -868,7 +871,7 @@ $svc
     sev-r5-owner:
       plugin:
         bouncer:
-          enabled: false
+          enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
@@ -933,7 +936,7 @@ $svc
     sev-n2-owner:
       plugin:
         bouncer:
-          enabled: false
+          enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
@@ -975,7 +978,7 @@ $svc
     sev-n2-owner:
       plugin:
         bouncer:
-          enabled: false
+          enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: other
@@ -1049,7 +1052,7 @@ $svc
     sev-f1-a:
       plugin:
         bouncer:
-          enabled: false
+          enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
@@ -1059,7 +1062,7 @@ $knobs
     sev-f1-b:
       plugin:
         bouncer:
-          enabled: false
+          enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecLapiInstanceName: shared
@@ -1111,7 +1114,7 @@ $svc
     sev-f2-waf:
       plugin:
         bouncer:
-          enabled: false
+          enabled: "false"
           crowdsecAppsecEnabled: "true"
           crowdsecAppsecInstanceName: waf
           crowdsecAppsecHost: crowdsec:7422
@@ -1120,7 +1123,7 @@ $knobs
     sev-f2-cs:
       plugin:
         bouncer:
-          enabled: false
+          enabled: "false"
           crowdsecMode: stream
           crowdsecLapiEnabled: "true"
           crowdsecAppsecEnabled: "true"
@@ -1273,7 +1276,7 @@ $knobs
     sev-e2-bad:
       plugin:
         bouncer:
-          enabled: false
+          enabled: "false"
           crowdsecLapiInstanceName: shared
 $knobs
 "@
