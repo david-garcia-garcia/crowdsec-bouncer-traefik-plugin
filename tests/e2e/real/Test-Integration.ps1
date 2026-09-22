@@ -109,6 +109,26 @@ function Write-StepError {
     Write-Host "❌ $Message" -ForegroundColor $Colors.Error
 }
 
+# Return docker info OSType (linux / windows), or empty when docker is not ready.
+function Get-DockerOsType {
+    $osType = docker info --format "{{.OSType}}" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        return ""
+    }
+    return "$osType".Trim()
+}
+
+# Select Docker Desktop's Linux engine when the current context is not linux.
+function Switch-DockerLinuxContext {
+    Write-Step "Switching Docker context to Desktop-Linux..."
+    docker context use Desktop-Linux
+    if ($LASTEXITCODE -ne 0) {
+        Write-ConsoleWarning "Could not switch Docker context to Desktop-Linux"
+        return
+    }
+    Write-Success "Docker context is Desktop-Linux"
+}
+
 # Main execution
 try {
     Start-Transcript -Path $runnerLog -Force | Out-Null
@@ -146,15 +166,16 @@ try {
 
     # Ensure we are using Linux containers
     Write-Step "Ensuring Linux containers are enabled..."
-    try {
-        $dockerInfo = docker info --format "{{.OSType}}" 2>$null
-        if ($dockerInfo -eq "linux") {
-            Write-Success "Docker is using Linux containers"
-        } else {
-            Write-ConsoleWarning "Docker may not be using Linux containers. Some tests may fail."
-        }
+    $dockerOsType = Get-DockerOsType
+    if ($dockerOsType -ne "linux") {
+        Switch-DockerLinuxContext
+        $dockerOsType = Get-DockerOsType
     }
-    catch {
+    if ($dockerOsType -eq "linux") {
+        Write-Success "Docker is using Linux containers"
+    } elseif ($dockerOsType) {
+        Write-ConsoleWarning "Docker OSType is $dockerOsType; Linux containers are required. Some tests may fail."
+    } else {
         Write-ConsoleWarning "Could not verify Docker container type"
     }
 

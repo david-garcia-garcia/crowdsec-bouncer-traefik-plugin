@@ -27,25 +27,19 @@ BeforeAll {
     if (-not $ready.Success) {
         throw "Traefik failed to become ready for instance severance tests"
     }
-}
 
-AfterAll {
-    if (Test-Path $script:SevFile) {
-        Remove-Item -Force $script:SevFile
+    # Pester 5 It blocks cannot see file-scope functions. Define helpers here.
+    function Write-SevYaml {
+        param([string]$Yaml)
+        [System.IO.File]::WriteAllText($script:SevFile, $Yaml.TrimStart(), $script:Utf8)
     }
-}
 
-function Write-SevYaml {
-    param([string]$Yaml)
-    [System.IO.File]::WriteAllText($script:SevFile, $Yaml.TrimStart(), $script:Utf8)
-}
+    function Get-SevLogs {
+        return (docker logs traefik-test 2>&1 | Out-String)
+    }
 
-function Get-SevLogs {
-    return (docker logs traefik-test 2>&1 | Out-String)
-}
-
-function Get-SevKnobs {
-    return @"
+    function Get-SevKnobs {
+        return @"
           logLevel: DEBUG
           httpTimeoutSeconds: "10"
           updateIntervalSeconds: "2"
@@ -54,41 +48,48 @@ function Get-SevKnobs {
             - "172.28.0.1/32"
           forwardedHeadersCustomName: X-Forwarded-For
 "@
-}
+    }
 
-function Get-SevService {
-    return @"
+    function Get-SevService {
+        return @"
   services:
     sev-whoami:
       loadBalancer:
         servers:
           - url: "$script:Whoami"
 "@
+    }
+
+    # Traefik rule strings need backticks. An expandable here-string would eat them.
+    function Get-SevRule {
+        param([string]$Path)
+        return ('PathPrefix(`{0}`)' -f $Path)
+    }
+
+    function Wait-SevCodes {
+        param(
+            [string]$Path,
+            [string]$IP,
+            [int[]]$Codes,
+            [int]$TimeoutSeconds = 45
+        )
+        $waited = Wait-ForHttpStatus -Url "$script:TraefikUrl$Path" -Headers @{ "X-Forwarded-For" = $IP } -ExpectedStatusCodes $Codes -TimeoutSeconds $TimeoutSeconds
+        $outcome = [pscustomobject]@{
+            Success    = [bool]$waited.Success
+            StatusCode = $waited.StatusCode
+            Error      = $waited.Error
+        }
+        if (-not $outcome.Success) {
+            Write-Host "Wait-SevCodes $Path last=$($outcome.StatusCode) err=$($outcome.Error)" -ForegroundColor Yellow
+        }
+        return $outcome
+    }
 }
 
-# Traefik rule strings need backticks. An expandable here-string would eat them.
-function Get-SevRule {
-    param([string]$Path)
-    return ('PathPrefix(`{0}`)' -f $Path)
-}
-
-function Wait-SevCodes {
-    param(
-        [string]$Path,
-        [string]$IP,
-        [int[]]$Codes,
-        [int]$TimeoutSeconds = 45
-    )
-    $waited = Wait-ForHttpStatus -Url "$script:TraefikUrl$Path" -Headers @{ "X-Forwarded-For" = $IP } -ExpectedStatusCodes $Codes -TimeoutSeconds $TimeoutSeconds
-    $outcome = [pscustomobject]@{
-        Success    = [bool]$waited.Success
-        StatusCode = $waited.StatusCode
-        Error      = $waited.Error
+AfterAll {
+    if (Test-Path $script:SevFile) {
+        Remove-Item -Force $script:SevFile
     }
-    if (-not $outcome.Success) {
-        Write-Host "Wait-SevCodes $Path last=$($outcome.StatusCode) err=$($outcome.Error)" -ForegroundColor Yellow
-    }
-    return $outcome
 }
 
 Describe "Instance severance topology" {

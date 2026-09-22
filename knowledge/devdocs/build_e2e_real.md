@@ -17,6 +17,7 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 ## How to use
 
 - Run `./tests/e2e/real/Test-Integration.ps1` or `make e2e_pester` from the repo root.
+- On Windows, when `docker info` OSType is not `linux`, the runner selects context `Desktop-Linux` and re-checks. It does not fail closed if the switch fails.
 - Keep new cases as `tests/e2e/real/*.Tests.ps1`. Do not put them in `tests/e2e/mock/` or at `tests/` root.
 - Identify the client only with `X-Forwarded-For`. Do not parse `RemoteAddr`.
 - Custom-ban and captcha compose labels set `banFilePath` / `captchaFilePath`. Do not use `banHtmlFilePath` / `captchaHtmlFilePath` or HTML-cased twins.
@@ -46,6 +47,7 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 ## Gotchas
 
 - Compose bind-mounts the **repository root** into Traefik’s local plugin path (`../../..` from this folder).
+- Windows Docker Desktop in Windows-container mode: the runner runs `docker context use Desktop-Linux`. A machine without that context still fails at compose.
 - Redis-cache cases need Dragonfly (`docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2`) on the compose network as `dragonfly:6379`.
 - Do not put a second Redis route under `PathPrefix(`/redis-cache`)` (for example `/redis-cache-hold`). Traefik can apply the short-TTL middleware to that path; the restart proof uses `/hold-redis`.
 - Redis cache keys are the client IP. A long-TTL restart case MUST use a different `X-Forwarded-For` than a short-TTL case, or a cache hit will keep the 2s key and never `SET EX 120`.

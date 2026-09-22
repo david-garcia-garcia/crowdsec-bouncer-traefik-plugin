@@ -1,0 +1,45 @@
+http:
+  routers:
+    sev-l2-block:
+      rule: PathPrefix(`/sev-l2-block`)
+      entryPoints: [web]
+      middlewares: [sev-l2-block]
+      service: sev-whoami
+    sev-l2-fail:
+      rule: PathPrefix(`/sev-l2-fail`)
+      entryPoints: [web]
+      middlewares: [sev-l2-fail]
+      service: sev-whoami
+  services:
+    sev-whoami:
+      loadBalancer:
+        servers:
+          - url: "http://whoami-test:80"
+  middlewares:
+    sev-l2-block:
+      plugin:
+        bouncer:
+          enabled: "true"
+          streamStartupBlock: "true"
+          crowdsecLapiInstanceName: missing
+          logLevel: DEBUG
+          httpTimeoutSeconds: "10"
+          updateIntervalSeconds: "2"
+          forwardedHeadersTrustedIps:
+            - "172.16.0.0/12"
+            - "172.28.0.1/32"
+          forwardedHeadersCustomName: X-Forwarded-For
+    sev-l2-fail:
+      plugin:
+        bouncer:
+          enabled: "true"
+          streamStartupBlock: "false"
+          crowdsecLapiFailureAction: ban
+          crowdsecLapiInstanceName: missing
+          logLevel: DEBUG
+          httpTimeoutSeconds: "10"
+          updateIntervalSeconds: "2"
+          forwardedHeadersTrustedIps:
+            - "172.16.0.0/12"
+            - "172.28.0.1/32"
+          forwardedHeadersCustomName: X-Forwarded-For

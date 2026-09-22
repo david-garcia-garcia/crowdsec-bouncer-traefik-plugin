@@ -83,30 +83,7 @@ jobs:
           fi
           if [ -f tests/e2e/real/test-results.xml ]; then
             cat tests/e2e/real/test-results.xml
-            python3 - <<'PY'
-import xml.etree.ElementTree as ET
-from pathlib import Path
-try:
-    tree = ET.parse(Path("tests/e2e/real/test-results.xml"))
-except Exception as exc:
-    print(f"::error::test-results.xml parse failed: {exc}")
-    raise SystemExit(0)
-shown = 0
-for case in list(tree.iter("test-case")) + list(tree.iter("testcase")):
-    fail = case.find("failure")
-    if fail is None:
-        continue
-    node = fail.find("message")
-    msg = node.text if node is not None and node.text else fail.get("message") or fail.text or ""
-    msg = " ".join(msg.split())[:400]
-    name = case.get("name") or case.get("fullname") or "unknown"
-    print(f"::error::{name} {msg}")
-    shown += 1
-    if shown >= 30:
-        break
-if shown == 0:
-    print("::error::test-results.xml had no parsed failures")
-PY
+            echo "::error::$(tr '\n' ' ' < tests/e2e/real/test-results.xml | head -c 2000)"
           else
             echo "no test-results.xml"
             echo "::error::no test-results.xml (Pester did not write results)"
