@@ -66,6 +66,12 @@ function Get-SevService {
 "@
 }
 
+# Traefik rule strings need backticks. An expandable here-string would eat them.
+function Get-SevRule {
+    param([string]$Path)
+    return ('PathPrefix(`{0}`)' -f $Path)
+}
+
 function Wait-SevCodes {
     param(
         [string]$Path,
@@ -73,11 +79,16 @@ function Wait-SevCodes {
         [int[]]$Codes,
         [int]$TimeoutSeconds = 45
     )
-    $result = Wait-ForHttpStatus -Url "$script:TraefikUrl$Path" -Headers @{ "X-Forwarded-For" = $IP } -ExpectedStatusCodes $Codes -TimeoutSeconds $TimeoutSeconds
-    if (-not $result.Success) {
-        Write-Host "Wait-SevCodes $Path last=$($result.StatusCode) err=$($result.Error)" -ForegroundColor Yellow
+    $waited = Wait-ForHttpStatus -Url "$script:TraefikUrl$Path" -Headers @{ "X-Forwarded-For" = $IP } -ExpectedStatusCodes $Codes -TimeoutSeconds $TimeoutSeconds
+    $outcome = [pscustomobject]@{
+        Success    = [bool]$waited.Success
+        StatusCode = $waited.StatusCode
+        Error      = $waited.Error
     }
-    return $result
+    if (-not $outcome.Success) {
+        Write-Host "Wait-SevCodes $Path last=$($outcome.StatusCode) err=$($outcome.Error)" -ForegroundColor Yellow
+    }
+    return $outcome
 }
 
 Describe "Instance severance topology" {
@@ -99,7 +110,7 @@ Describe "Instance severance topology" {
 http:
   routers:
     sev-t1:
-      rule: PathPrefix(`/sev-t1`)
+      rule: $(Get-SevRule '/sev-t1')
       entryPoints: [web]
       middlewares: [sev-t1]
       service: sev-whoami
@@ -132,12 +143,12 @@ $knobs
 http:
   routers:
     sev-t2-api:
-      rule: PathPrefix(`/sev-t2-api`)
+      rule: $(Get-SevRule '/sev-t2-api')
       entryPoints: [web]
       middlewares: [sev-t2-cs]
       service: sev-whoami
     sev-t2-admin:
-      rule: PathPrefix(`/sev-t2-admin`)
+      rule: $(Get-SevRule '/sev-t2-admin')
       entryPoints: [web]
       middlewares: [sev-t2-admin]
       service: sev-whoami
@@ -185,12 +196,12 @@ $knobs
 http:
   routers:
     sev-t3-hold:
-      rule: PathPrefix(`/sev-t3-hold`)
+      rule: $(Get-SevRule '/sev-t3-hold')
       entryPoints: [web]
       middlewares: [sev-t3-hold]
       service: sev-whoami
     sev-t3-app:
-      rule: PathPrefix(`/sev-t3-app`)
+      rule: $(Get-SevRule '/sev-t3-app')
       entryPoints: [web]
       middlewares: [sev-t3-app]
       service: sev-whoami
@@ -232,7 +243,7 @@ $knobs
 http:
   routers:
     sev-t4:
-      rule: PathPrefix(`/sev-t4`)
+      rule: $(Get-SevRule '/sev-t4')
       entryPoints: [web]
       middlewares: [sev-t4]
       service: sev-whoami
@@ -265,12 +276,12 @@ $knobs
 http:
   routers:
     sev-t5-a:
-      rule: PathPrefix(`/sev-t5-a`)
+      rule: $(Get-SevRule '/sev-t5-a')
       entryPoints: [web]
       middlewares: [sev-t5-owner]
       service: sev-whoami
     sev-t5-b:
-      rule: PathPrefix(`/sev-t5-b`)
+      rule: $(Get-SevRule '/sev-t5-b')
       entryPoints: [web]
       middlewares: [sev-t5-sub]
       service: sev-whoami
@@ -322,7 +333,7 @@ Describe "Instance severance late bind" {
 http:
   routers:
     sev-l1:
-      rule: PathPrefix(`/sev-l1`)
+      rule: $(Get-SevRule '/sev-l1')
       entryPoints: [web]
       middlewares: [sev-l1]
       service: sev-whoami
@@ -344,12 +355,12 @@ $knobs
 http:
   routers:
     sev-l1:
-      rule: PathPrefix(`/sev-l1`)
+      rule: $(Get-SevRule '/sev-l1')
       entryPoints: [web]
       middlewares: [sev-l1]
       service: sev-whoami
     sev-l1-owner:
-      rule: PathPrefix(`/sev-l1-owner`)
+      rule: $(Get-SevRule '/sev-l1-owner')
       entryPoints: [web]
       middlewares: [sev-l1-owner]
       service: sev-whoami
@@ -385,12 +396,12 @@ $knobs
 http:
   routers:
     sev-l1b-a:
-      rule: PathPrefix(`/sev-l1b-a`)
+      rule: $(Get-SevRule '/sev-l1b-a')
       entryPoints: [web]
       middlewares: [sev-l1b-a]
       service: sev-whoami
     sev-l1b-b:
-      rule: PathPrefix(`/sev-l1b-b`)
+      rule: $(Get-SevRule '/sev-l1b-b')
       entryPoints: [web]
       middlewares: [sev-l1b-b]
       service: sev-whoami
@@ -427,12 +438,12 @@ $knobs
 http:
   routers:
     sev-l2-block:
-      rule: PathPrefix(`/sev-l2-block`)
+      rule: $(Get-SevRule '/sev-l2-block')
       entryPoints: [web]
       middlewares: [sev-l2-block]
       service: sev-whoami
     sev-l2-fail:
-      rule: PathPrefix(`/sev-l2-fail`)
+      rule: $(Get-SevRule '/sev-l2-fail')
       entryPoints: [web]
       middlewares: [sev-l2-fail]
       service: sev-whoami
@@ -468,12 +479,12 @@ $knobs
 http:
   routers:
     sev-l3-owner:
-      rule: PathPrefix(`/sev-l3-owner`)
+      rule: $(Get-SevRule '/sev-l3-owner')
       entryPoints: [web]
       middlewares: [sev-l3-owner]
       service: sev-whoami
     sev-l3:
-      rule: PathPrefix(`/sev-l3`)
+      rule: $(Get-SevRule '/sev-l3')
       entryPoints: [web]
       middlewares: [sev-l3]
       service: sev-whoami
@@ -511,12 +522,12 @@ $knobs
 http:
   routers:
     sev-l4:
-      rule: PathPrefix(`/sev-l4`)
+      rule: $(Get-SevRule '/sev-l4')
       entryPoints: [web]
       middlewares: [sev-l4]
       service: sev-whoami
     sev-l4-lapi:
-      rule: PathPrefix(`/sev-l4-lapi`)
+      rule: $(Get-SevRule '/sev-l4-lapi')
       entryPoints: [web]
       middlewares: [sev-l4-lapi]
       service: sev-whoami
@@ -566,7 +577,7 @@ Describe "Instance severance reclaim and names" {
 http:
   routers:
     sev-r1:
-      rule: PathPrefix(`/sev-r1`)
+      rule: $(Get-SevRule '/sev-r1')
       entryPoints: [web]
       middlewares: [sev-r1]
       service: sev-whoami
@@ -602,12 +613,12 @@ $knobs
 http:
   routers:
     sev-r2:
-      rule: PathPrefix(`/sev-r2`)
+      rule: $(Get-SevRule '/sev-r2')
       entryPoints: [web]
       middlewares: [sev-r2]
       service: sev-whoami
     sev-r2-sub:
-      rule: PathPrefix(`/sev-r2-sub`)
+      rule: $(Get-SevRule '/sev-r2-sub')
       entryPoints: [web]
       middlewares: [sev-r2-sub]
       service: sev-whoami
@@ -638,12 +649,12 @@ $knobs
 http:
   routers:
     sev-r2:
-      rule: PathPrefix(`/sev-r2`)
+      rule: $(Get-SevRule '/sev-r2')
       entryPoints: [web]
       middlewares: [sev-r2]
       service: sev-whoami
     sev-r2-sub:
-      rule: PathPrefix(`/sev-r2-sub`)
+      rule: $(Get-SevRule '/sev-r2-sub')
       entryPoints: [web]
       middlewares: [sev-r2-sub]
       service: sev-whoami
@@ -692,7 +703,7 @@ $svc
 http:
   routers:
     sev-r3:
-      rule: PathPrefix(`/sev-r3`)
+      rule: $(Get-SevRule '/sev-r3')
       entryPoints: [web]
       middlewares: [sev-r3]
       service: sev-whoami
@@ -720,7 +731,7 @@ $knobs
 http:
   routers:
     sev-r3:
-      rule: PathPrefix(`/sev-r3`)
+      rule: $(Get-SevRule '/sev-r3')
       entryPoints: [web]
       middlewares: [sev-r3]
       service: sev-whoami
@@ -755,12 +766,12 @@ $knobs
 http:
   routers:
     sev-r4-owner:
-      rule: PathPrefix(`/sev-r4-owner`)
+      rule: $(Get-SevRule '/sev-r4-owner')
       entryPoints: [web]
       middlewares: [sev-r4-owner]
       service: sev-whoami
     sev-r4-admin:
-      rule: PathPrefix(`/sev-r4-admin`)
+      rule: $(Get-SevRule '/sev-r4-admin')
       entryPoints: [web]
       middlewares: [sev-r4-admin]
       service: sev-whoami
@@ -792,17 +803,17 @@ $knobs
 http:
   routers:
     sev-r4-owner:
-      rule: PathPrefix(`/sev-r4-owner`)
+      rule: $(Get-SevRule '/sev-r4-owner')
       entryPoints: [web]
       middlewares: [sev-r4-owner]
       service: sev-whoami
     sev-r4-admin:
-      rule: PathPrefix(`/sev-r4-admin`)
+      rule: $(Get-SevRule '/sev-r4-admin')
       entryPoints: [web]
       middlewares: [sev-r4-admin]
       service: sev-whoami
     sev-r4-other:
-      rule: PathPrefix(`/sev-r4-other`)
+      rule: $(Get-SevRule '/sev-r4-other')
       entryPoints: [web]
       middlewares: [sev-r4-other]
       service: sev-whoami
@@ -857,12 +868,12 @@ $knobs
 http:
   routers:
     sev-r5-owner:
-      rule: PathPrefix(`/sev-r5-owner`)
+      rule: $(Get-SevRule '/sev-r5-owner')
       entryPoints: [web]
       middlewares: [sev-r5-owner]
       service: sev-whoami
     sev-r5-admin:
-      rule: PathPrefix(`/sev-r5-admin`)
+      rule: $(Get-SevRule '/sev-r5-admin')
       entryPoints: [web]
       middlewares: [sev-r5-admin]
       service: sev-whoami
@@ -893,7 +904,7 @@ $knobs
 http:
   routers:
     sev-r5-admin:
-      rule: PathPrefix(`/sev-r5-admin`)
+      rule: $(Get-SevRule '/sev-r5-admin')
       entryPoints: [web]
       middlewares: [sev-r5-admin]
       service: sev-whoami
@@ -922,12 +933,12 @@ $knobs
 http:
   routers:
     sev-n2-owner:
-      rule: PathPrefix(`/sev-n2-owner`)
+      rule: $(Get-SevRule '/sev-n2-owner')
       entryPoints: [web]
       middlewares: [sev-n2-owner]
       service: sev-whoami
     sev-n2-admin:
-      rule: PathPrefix(`/sev-n2-admin`)
+      rule: $(Get-SevRule '/sev-n2-admin')
       entryPoints: [web]
       middlewares: [sev-n2-admin]
       service: sev-whoami
@@ -959,17 +970,17 @@ $knobs
 http:
   routers:
     sev-n2-owner:
-      rule: PathPrefix(`/sev-n2-owner`)
+      rule: $(Get-SevRule '/sev-n2-owner')
       entryPoints: [web]
       middlewares: [sev-n2-owner]
       service: sev-whoami
     sev-n2-admin:
-      rule: PathPrefix(`/sev-n2-admin`)
+      rule: $(Get-SevRule '/sev-n2-admin')
       entryPoints: [web]
       middlewares: [sev-n2-admin]
       service: sev-whoami
     sev-n2-other:
-      rule: PathPrefix(`/sev-n2-other`)
+      rule: $(Get-SevRule '/sev-n2-other')
       entryPoints: [web]
       middlewares: [sev-n2-other]
       service: sev-whoami
@@ -1033,17 +1044,17 @@ Describe "Instance severance collision and config errors" {
 http:
   routers:
     sev-f1-a:
-      rule: PathPrefix(`/sev-f1-a`)
+      rule: $(Get-SevRule '/sev-f1-a')
       entryPoints: [web]
       middlewares: [sev-f1-a]
       service: sev-whoami
     sev-f1-b:
-      rule: PathPrefix(`/sev-f1-b`)
+      rule: $(Get-SevRule '/sev-f1-b')
       entryPoints: [web]
       middlewares: [sev-f1-b]
       service: sev-whoami
     sev-f1-sub:
-      rule: PathPrefix(`/sev-f1-sub`)
+      rule: $(Get-SevRule '/sev-f1-sub')
       entryPoints: [web]
       middlewares: [sev-f1-sub]
       service: sev-whoami
@@ -1095,17 +1106,17 @@ $knobs
 http:
   routers:
     sev-f2-waf:
-      rule: PathPrefix(`/sev-f2-waf`)
+      rule: $(Get-SevRule '/sev-f2-waf')
       entryPoints: [web]
       middlewares: [sev-f2-waf]
       service: sev-whoami
     sev-f2-cs:
-      rule: PathPrefix(`/sev-f2-cs`)
+      rule: $(Get-SevRule '/sev-f2-cs')
       entryPoints: [web]
       middlewares: [sev-f2-cs]
       service: sev-whoami
     sev-f2-sub:
-      rule: PathPrefix(`/sev-f2-sub`)
+      rule: $(Get-SevRule '/sev-f2-sub')
       entryPoints: [web]
       middlewares: [sev-f2-sub]
       service: sev-whoami
@@ -1160,12 +1171,12 @@ $knobs
 http:
   routers:
     sev-f3-owner:
-      rule: PathPrefix(`/sev-f3-owner`)
+      rule: $(Get-SevRule '/sev-f3-owner')
       entryPoints: [web]
       middlewares: [sev-f3-owner]
       service: sev-whoami
     sev-f3-admin:
-      rule: PathPrefix(`/sev-f3-admin`)
+      rule: $(Get-SevRule '/sev-f3-admin')
       entryPoints: [web]
       middlewares: [sev-f3-admin]
       service: sev-whoami
@@ -1206,12 +1217,12 @@ $knobs
 http:
   routers:
     sev-c1-a:
-      rule: PathPrefix(`/sev-c1-a`)
+      rule: $(Get-SevRule '/sev-c1-a')
       entryPoints: [web]
       middlewares: [sev-c1-a]
       service: sev-whoami
     sev-c1-b:
-      rule: PathPrefix(`/sev-c1-b`)
+      rule: $(Get-SevRule '/sev-c1-b')
       entryPoints: [web]
       middlewares: [sev-c1-b]
       service: sev-whoami
@@ -1253,12 +1264,12 @@ $knobs
 http:
   routers:
     sev-e2-good:
-      rule: PathPrefix(`/sev-e2-good`)
+      rule: $(Get-SevRule '/sev-e2-good')
       entryPoints: [web]
       middlewares: [sev-e2-good]
       service: sev-whoami
     sev-e2-bad:
-      rule: PathPrefix(`/sev-e2-bad`)
+      rule: $(Get-SevRule '/sev-e2-bad')
       entryPoints: [web]
       middlewares: [sev-e2-bad]
       service: sev-whoami
@@ -1295,7 +1306,7 @@ $knobs
 http:
   routers:
     sev-e3:
-      rule: PathPrefix(`/sev-e3`)
+      rule: $(Get-SevRule '/sev-e3')
       entryPoints: [web]
       middlewares: [sev-e3]
       service: sev-whoami
@@ -1324,7 +1335,7 @@ $knobs
 http:
   routers:
     sev-e4:
-      rule: PathPrefix(`/sev-e4`)
+      rule: $(Get-SevRule '/sev-e4')
       entryPoints: [web]
       middlewares: [sev-e4]
       service: sev-whoami
