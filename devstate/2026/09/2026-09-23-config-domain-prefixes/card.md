@@ -33,7 +33,7 @@ README, examples, compose labels, `.traefik.yml` testData, mock and real e2e, an
 In progress. 0 items remain.
 
 Priority: P2 — real operator pain with a workaround or limited blast radius
-Reviewed head: 0b35144d
+Reviewed head: 29b3d760
 Owner decision: None.
 
 ## Review scores
@@ -102,7 +102,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 11 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 0b35144dec05d4a0d7e6b8ac51a9f519af1075cb | Card must match the branch you measured |
+| Reviewed head | 29b3d7601a6b76b4fd52f7f4b97ff09603bb0808 | Card must match the branch you measured |
 
 ### Stored data model
 - `redis` — DecisionStore SessionHex key prefix. field `lapiScheme` renamed to `scheme`. migration: missing
