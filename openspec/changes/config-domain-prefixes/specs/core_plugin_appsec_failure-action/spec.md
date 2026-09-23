@@ -72,10 +72,3 @@ HTTP 200 and parseable AppSec JSON `action` values (`allow`, `ban`, `challenge`,
 #### Scenario: AppSec-only with ban action keeps the early return
 - **WHEN** `lapiEnabled` is false, `appsecEnabled` is true, and `bouncerAppsecFailureAction` is `ban` or omitted
 - **THEN** the handler's captcha client is not initialised
-
-### Requirement: Three AppSec block booleans are removed
-`crowdsecAppsecFailureBlock`, `crowdsecAppsecUnreachableBlock`, and `crowdsecAppsecUnreadableBodyBlock` SHALL stay removed from the plugin config struct. Operators who previously set those bools to `false` MUST set `bouncerAppsecFailureAction: passthrough`.
-
-#### Scenario: Old bool fields are gone
-- **WHEN** plugin config is decoded
-- **THEN** those three JSON keys are not fields on `Config` and do not change runtime behavior

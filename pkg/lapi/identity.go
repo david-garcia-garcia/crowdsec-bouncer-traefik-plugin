@@ -17,63 +17,57 @@ const ownerKeyPrefix = "lapi:owner:"
 // identity is the live/none remaining-fields payload hashed into IdentityHex.
 // Middleware name, timeout, and TLS live on OwnershipKey, not here.
 type identity struct {
-	Mode                         string   `json:"mode"`
-	Scheme                       string   `json:"scheme"`
-	Host                         string   `json:"host"`
-	Path                         string   `json:"path"`
-	Key                          string   `json:"key"`
-	CapiMachineID                string   `json:"capiMachineId"`
-	CapiPassword                 string   `json:"capiPassword"`
-	RedisEnabled                 bool     `json:"redisCacheEnabled"`
-	RedisHost                    string   `json:"redisCacheHost"`
-	RedisReadHosts               []string `json:"redisCacheReadHosts"`
-	RedisPassword                string   `json:"redisCachePassword"`
-	RedisDatabase                string   `json:"redisCacheDatabase"`
-	MetricsUpdateIntervalSeconds int64    `json:"metricsUpdateIntervalSeconds"`
+	Mode                         string      `json:"mode"`
+	Scheme                       string      `json:"scheme"`
+	Host                         string      `json:"host"`
+	Path                         string      `json:"path"`
+	Key                          string      `json:"key"`
+	CapiMachineID                string      `json:"capiMachineId"`
+	CapiPassword                 string      `json:"capiPassword"`
+	Redis                        storeParams `json:"redis"`
+	MetricsUpdateIntervalSeconds int64       `json:"metricsUpdateIntervalSeconds"`
 }
 
 // ownership is the LAPI Open-key payload: middleware name plus client knobs.
 type ownership struct {
-	MiddlewareName               string   `json:"middlewareName"`
-	Mode                         string   `json:"mode"`
-	Scheme                       string   `json:"scheme"`
-	Host                         string   `json:"host"`
-	Path                         string   `json:"path"`
-	Key                          string   `json:"key"`
-	TLSInsecureVerify            bool     `json:"tlsInsecureVerify"`
-	TLSCertificateAuthority      string   `json:"tlsCertificateAuthority"`
-	TLSClientCertificate         string   `json:"tlsClientCertificate"`
-	TLSClientKey                 string   `json:"tlsClientKey"`
-	HTTPTimeoutSeconds           int64    `json:"httpTimeoutSeconds"`
-	RedisEnabled                 bool     `json:"redisCacheEnabled"`
-	RedisHost                    string   `json:"redisCacheHost"`
-	RedisReadHosts               []string `json:"redisCacheReadHosts"`
-	RedisPassword                string   `json:"redisCachePassword"`
-	RedisDatabase                string   `json:"redisCacheDatabase"`
-	StreamScopes                 []string `json:"streamScopes"`
-	CapiMachineID                string   `json:"capiMachineId"`
-	CapiPassword                 string   `json:"capiPassword"`
-	UpdateIntervalSeconds        int64    `json:"updateIntervalSeconds"`
-	MetricsUpdateIntervalSeconds int64    `json:"metricsUpdateIntervalSeconds"`
-	UpdateMaxFailure             int64    `json:"updateMaxFailure"`
-	CapiScenarios                []string `json:"capiScenarios"`
-	DefaultDecisionSeconds       int64    `json:"defaultDecisionSeconds"`
+	MiddlewareName               string      `json:"middlewareName"`
+	Mode                         string      `json:"mode"`
+	Scheme                       string      `json:"scheme"`
+	Host                         string      `json:"host"`
+	Path                         string      `json:"path"`
+	Key                          string      `json:"key"`
+	TLSInsecureVerify            bool        `json:"tlsInsecureVerify"`
+	TLSCertificateAuthority      string      `json:"tlsCertificateAuthority"`
+	TLSClientCertificate         string      `json:"tlsClientCertificate"`
+	TLSClientKey                 string      `json:"tlsClientKey"`
+	HTTPTimeoutSeconds           int64       `json:"httpTimeoutSeconds"`
+	Redis                        storeParams `json:"redis"`
+	StreamScopes                 []string    `json:"streamScopes"`
+	CapiMachineID                string      `json:"capiMachineId"`
+	CapiPassword                 string      `json:"capiPassword"`
+	UpdateIntervalSeconds        int64       `json:"updateIntervalSeconds"`
+	MetricsUpdateIntervalSeconds int64       `json:"metricsUpdateIntervalSeconds"`
+	UpdateMaxFailure             int64       `json:"updateMaxFailure"`
+	CapiScenarios                []string    `json:"capiScenarios"`
+	DefaultDecisionSeconds       int64       `json:"defaultDecisionSeconds"`
 }
 
 func identityFrom(cfg *configuration.Config) identity {
 	return identity{
-		Mode:                         cfg.LapiMode,
-		Scheme:                       cfg.LapiScheme,
-		Host:                         cfg.LapiHost,
-		Path:                         cfg.LapiPath,
-		Key:                          cfg.LapiKey,
-		CapiMachineID:                cfg.LapiCapiMachineID,
-		CapiPassword:                 cfg.LapiCapiPassword,
-		RedisEnabled:                 cfg.LapiRedisEnabled,
-		RedisHost:                    cfg.LapiRedisHost,
-		RedisReadHosts:               sortedCopy(cfg.LapiRedisReadHosts),
-		RedisPassword:                cfg.LapiRedisPassword,
-		RedisDatabase:                cfg.LapiRedisDatabase,
+		Mode:          cfg.LapiMode,
+		Scheme:        cfg.LapiScheme,
+		Host:          cfg.LapiHost,
+		Path:          cfg.LapiPath,
+		Key:           cfg.LapiKey,
+		CapiMachineID: cfg.LapiCapiMachineID,
+		CapiPassword:  cfg.LapiCapiPassword,
+		Redis: storeParams{
+			Enabled:   cfg.LapiRedisEnabled,
+			Host:      cfg.LapiRedisHost,
+			ReadHosts: sortedCopy(cfg.LapiRedisReadHosts),
+			Password:  cfg.LapiRedisPassword,
+			Database:  cfg.LapiRedisDatabase,
+		},
 		MetricsUpdateIntervalSeconds: cfg.LapiMetricsUpdateIntervalSeconds,
 	}
 }
@@ -83,22 +77,24 @@ func ownershipFrom(cfg *configuration.Config, middlewareName string) ownership {
 	cert, _ := configuration.GetVariable(cfg, "LapiTLSClientCertificate")
 	certKey, _ := configuration.GetVariable(cfg, "LapiTLSClientKey")
 	return ownership{
-		MiddlewareName:               middlewareName,
-		Mode:                         cfg.LapiMode,
-		Scheme:                       cfg.LapiScheme,
-		Host:                         cfg.LapiHost,
-		Path:                         cfg.LapiPath,
-		Key:                          cfg.LapiKey,
-		TLSInsecureVerify:            cfg.LapiTLSInsecureVerify,
-		TLSCertificateAuthority:      ca,
-		TLSClientCertificate:         cert,
-		TLSClientKey:                 certKey,
-		HTTPTimeoutSeconds:           cfg.LapiHTTPTimeoutSeconds,
-		RedisEnabled:                 cfg.LapiRedisEnabled,
-		RedisHost:                    cfg.LapiRedisHost,
-		RedisReadHosts:               sortedCopy(cfg.LapiRedisReadHosts),
-		RedisPassword:                cfg.LapiRedisPassword,
-		RedisDatabase:                cfg.LapiRedisDatabase,
+		MiddlewareName:          middlewareName,
+		Mode:                    cfg.LapiMode,
+		Scheme:                  cfg.LapiScheme,
+		Host:                    cfg.LapiHost,
+		Path:                    cfg.LapiPath,
+		Key:                     cfg.LapiKey,
+		TLSInsecureVerify:       cfg.LapiTLSInsecureVerify,
+		TLSCertificateAuthority: ca,
+		TLSClientCertificate:    cert,
+		TLSClientKey:            certKey,
+		HTTPTimeoutSeconds:      cfg.LapiHTTPTimeoutSeconds,
+		Redis: storeParams{
+			Enabled:   cfg.LapiRedisEnabled,
+			Host:      cfg.LapiRedisHost,
+			ReadHosts: sortedCopy(cfg.LapiRedisReadHosts),
+			Password:  cfg.LapiRedisPassword,
+			Database:  cfg.LapiRedisDatabase,
+		},
 		StreamScopes:                 decisionscope.CanonicalStreamScopes(cfg.LapiStreamScopes),
 		CapiMachineID:                cfg.LapiCapiMachineID,
 		CapiPassword:                 cfg.LapiCapiPassword,

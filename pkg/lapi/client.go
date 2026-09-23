@@ -122,7 +122,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		return nil, err
 	}
 	if config.LapiMode != configuration.AloneMode && config.LapiKey == "" && next.clientCertCount() == 0 {
-		log.Error("New:crowdsecLapiKey fail to get LapiKey and no client certificate setup")
+		log.Error("New:lapiKey fail to get LapiKey and no client certificate setup")
 		return nil, errors.New("LapiKey is missing")
 	}
 	if store == nil {

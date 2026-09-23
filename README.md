@@ -121,7 +121,7 @@ There are four operating modes (`lapiMode`). Sequence diagrams live in [docs/mod
 | stream | Sync decisions from LAPI on an interval; the request path hits cache only. Recommended. |
 | alone  | Like stream, but pulls the community blocklist from CAPI. No local CrowdSec. |
 
-`stream` is recommended: decisions refresh every 60 seconds by default. The request path does not call LAPI. Usage-metrics still POST to LAPI on `MetricsUpdateIntervalSeconds` unless that interval is zero or less.
+`stream` is recommended: decisions refresh every 60 seconds by default. The request path does not call LAPI. Usage-metrics still POST to LAPI on `lapiMetricsUpdateIntervalSeconds` unless that interval is zero or less.
 
 `lapiMode` is how an **owned** LAPI client fetches decisions. It is not “which pieces this middleware runs.” AppSec-only is `lapiEnabled: false` plus `appsecEnabled: true`. `lapiMode: appsec` is removed.
 
@@ -133,9 +133,9 @@ One Traefik middleware object can run up to three independent pieces:
 | ----- | ---- | --- |
 | LAPI client | `lapiEnabled` | Open one connection to one CrowdSec LAPI (`stream` / `live` / `none` / `alone`). Publish it under `lapiInstanceName`. |
 | AppSec client | `appsecEnabled` | Open one AppSec listener. Publish it under `appsecInstanceName`. |
-| Bouncer | `enabled` | Serve this router: subscribe to those names, apply this route’s remediations (status, header, captcha, trusted IPs, failure action). |
+| Bouncer | `bouncerEnabled` | Serve this router: subscribe to those names, apply this route’s remediations (status, header, captcha, trusted IPs, failure action). |
 
-`enabled` never opens a backend. An omitted instance name is filled with this Traefik middleware name only when that piece’s owner flag is true. LAPI and AppSec use **separate** name tables, so both may be called `shared`. A bouncing subscriber sets `enabled: true` and the instance name, and leaves the owner flag false so it does not Open.
+`bouncerEnabled` never opens a backend. An omitted instance name is filled with this Traefik middleware name only when that piece’s owner flag is true. LAPI and AppSec use **separate** name tables, so both may be called `shared`. A bouncing subscriber sets `bouncerEnabled: true` and the instance name, and leaves the owner flag false so it does not Open.
 
 ```mermaid
 flowchart LR
@@ -311,7 +311,7 @@ make run
 
 ### Variables
 
-**BanFilePath** (string, default `""`)
+**BouncerBanFilePath** (string, default `""`)
 Path to the ban file. Empty disables it. Content-Type is inferred from the extension.
 
 **BouncerCaptchaCustomChallengeUrl** (string, default `""`)

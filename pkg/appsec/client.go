@@ -58,7 +58,7 @@ func Prepare(cfg *configuration.Config, log *slog.Logger, traefikName string) er
 	}
 	apiAppsecKey, errAppsecKey := configuration.GetVariable(cfg, "AppsecKey")
 	if errAppsecKey != nil {
-		log.Info("Prepare:crowdsecAppsecKey fail to get AppsecKey and no client certificate setup", "error", errAppsecKey)
+		log.Info("Prepare:appsecKey fail to get AppsecKey and no client certificate setup", "error", errAppsecKey)
 	} else {
 		cfg.AppsecKey = apiAppsecKey
 	}

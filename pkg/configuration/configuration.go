@@ -510,19 +510,19 @@ func validateLapiURLAndKeys(config *Config) error {
 	if err != nil {
 		return err
 	}
-	certBouncer, err := GetVariable(config, "LapiTLSClientCertificate")
+	clientCertificate, err := GetVariable(config, "LapiTLSClientCertificate")
 	if err != nil {
 		return err
 	}
-	certBouncerKey, err := GetVariable(config, "LapiTLSClientKey")
+	clientKey, err := GetVariable(config, "LapiTLSClientKey")
 	if err != nil {
 		return err
 	}
 
-	if lapiKey == "" && (certBouncer == "" || certBouncerKey == "") {
+	if lapiKey == "" && (clientCertificate == "" || clientKey == "") {
 		return errors.New("LapiKey || (LapiTLSClientCertificate && LapiTLSClientKey): cannot be all empty")
 	}
-	if lapiKey != "" && (certBouncer == "" || certBouncerKey == "") {
+	if lapiKey != "" && (clientCertificate == "" || clientKey == "") {
 		lapiKey = strings.TrimSpace(lapiKey)
 		if err = validateParamsAPIKey(lapiKey, "LapiKey"); err != nil {
 			return err
@@ -544,7 +544,7 @@ func validateAppsecURLKeyAndTLS(config *Config) error {
 		return err
 	}
 
-	// BouncerEnabled AppSec needs a listener host. validateURL only asks NewRequest to
+	// AppsecEnabled AppSec needs a listener host. validateURL only asks NewRequest to
 	// accept scheme://host/path, so an empty host (http:///) still returns nil.
 	if err := rejectMissingEnabledAppsecHost(config, appsecScheme); err != nil {
 		return err
@@ -783,22 +783,22 @@ func getTLSConfig(config *Config, log *slog.Logger, prefix, scheme string, insec
 			log.Debug("getTLSConfig: no CA provided, using system trust store", "prefix", prefix)
 		}
 	}
-	certBouncer, err := GetVariable(config, prefix+"TLSClientCertificate")
+	clientCertificate, err := GetVariable(config, prefix+"TLSClientCertificate")
 	if err != nil {
 		return nil, err
 	}
-	certBouncerKey, err := GetVariable(config, prefix+"TLSClientKey")
+	clientKey, err := GetVariable(config, prefix+"TLSClientKey")
 	if err != nil {
 		return nil, err
 	}
-	if certBouncer == "" || certBouncerKey == "" {
+	if clientCertificate == "" || clientKey == "" {
 		return tlsConfig, nil
 	}
-	clientCert, err := tls.X509KeyPair([]byte(certBouncer), []byte(certBouncerKey))
+	clientCertificatePair, err := tls.X509KeyPair([]byte(clientCertificate), []byte(clientKey))
 	if err != nil {
 		return nil, fmt.Errorf("getTLSClientConfigCrowdsec impossible to generate ClientCert %w", err)
 	}
-	tlsConfig.Certificates = append(tlsConfig.Certificates, clientCert)
+	tlsConfig.Certificates = append(tlsConfig.Certificates, clientCertificatePair)
 
 	return tlsConfig, nil
 }
