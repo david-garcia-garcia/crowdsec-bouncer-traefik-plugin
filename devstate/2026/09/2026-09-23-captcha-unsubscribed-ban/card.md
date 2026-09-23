@@ -17,7 +17,7 @@ Not yet.
 In progress. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: b1279447
+Reviewed head: eb1b2720
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -54,7 +54,7 @@ Ticket 2026-09-23-captcha-unsubscribed-ban on branch 2026-09-23-captcha-unsubscr
 ## Explore Decisions
 | Question | Rank | Decision | By |
 | --- | --- | --- | --- |
-| Exact WARN message text? | additive asked — new log line this change creates; Unknowns “Exact WARN message text”; Desired names a WARN that captcha could not be served due to a misconfiguration | assumed — stem `crowdsec bouncer captcha unsubscribed`, same family as `crowdsec bouncer backend missing` / `crowdsec bouncer stream scopes missing`. Attrs `leg=captcha` and `instanceName` (empty when unsubscribed). Logger already carries `traefikName` from `bouncer.New`. | explore |
+| Exact WARN message text? | additive asked — new log line this change creates; Unknowns Exact WARN message text | assumed — stem crowdsec bouncer captcha unsubscribed; attrs leg=captcha and instanceName (empty when unsubscribed); traefikName already on the logger from bouncer.New | explore |
 
 
 ## Findings
@@ -70,7 +70,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | b12794472ba4c0390a72a5b13c35ff4b7f983c4f | Card must match the branch you measured |
+| Reviewed head | eb1b27205b9fba33a871735a902ae2878b740c83 | Card must match the branch you measured |
 
 ### Stored data model
 None.
