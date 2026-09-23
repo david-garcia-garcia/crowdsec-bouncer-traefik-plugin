@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 531fb917
+Reviewed head: 0400069f
 Owner decision: None.
 
 ## Review scores
@@ -66,7 +66,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 531fb917c09c95ca3fdbc9005731a928c5caa18d | Card must match the branch you measured |
+| Reviewed head | 0400069f854399b77941665900d9cf7564c72b8d | Card must match the branch you measured |
 
 ### Stored data model
 None.
