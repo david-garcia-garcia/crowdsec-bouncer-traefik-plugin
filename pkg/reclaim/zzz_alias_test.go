@@ -104,6 +104,35 @@ func TestSecondPublisherRejected(t *testing.T) {
 	}
 }
 
+func TestGraceCloseClearsWatchers(t *testing.T) {
+	ResetForTestWith(30 * time.Millisecond)
+	t.Cleanup(ResetForTest)
+
+	client := &testClient{id: "A"}
+	var bound atomic.Value
+	ctx, cancel := context.WithCancel(context.Background())
+	if _, err := OpenWithHooks(ctx, "owner", slog.Default(), func() (any, Hooks, error) {
+		return client, Hooks{}, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetAlias("owner", "alias:lapi:shared", "cs", "lapi"); err != nil {
+		t.Fatal(err)
+	}
+	watchInto(context.Background(), "alias:lapi:shared", &bound, (*testClient)(nil), nil)
+	if loaded(&bound) != client {
+		t.Fatal("watch must see the published client")
+	}
+	cancel()
+	deadline := time.Now().Add(time.Second)
+	for loaded(&bound) != nil && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if loaded(&bound) != nil {
+		t.Fatal("grace close must clear the watcher")
+	}
+}
+
 func TestDyingIncarnationDoesNotUnbindReplacement(t *testing.T) {
 	ResetForTestWith(0)
 	t.Cleanup(ResetForTest)

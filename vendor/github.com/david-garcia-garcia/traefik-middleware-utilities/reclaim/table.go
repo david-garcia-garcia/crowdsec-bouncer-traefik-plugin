@@ -758,6 +758,11 @@ func (t *Table) expire(key string, incarnation *slot) {
 		t.endMappedClose(key, incarnation, step.hooks, step.logger)
 	case expireDispose:
 		dispose(key, step.hooks, step.logger)
+		// claimExpire already unmapped the key. Aliases still pointing at this
+		// incarnation are cleared after Close, same as the enforce path.
+		t.mu.Lock()
+		t.unbindIncarnationLocked(incarnation)
+		t.mu.Unlock()
 	}
 }
 

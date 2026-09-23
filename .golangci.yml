@@ -68,6 +68,7 @@ linters-settings:
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/traefikemulator
           - github.com/leprosus/golang-ttl-map
 
 linters:

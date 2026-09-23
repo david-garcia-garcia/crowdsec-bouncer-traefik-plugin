@@ -73,6 +73,26 @@ func (c *Client) SetStreamHealthyForTest(healthy bool) {
 	atomic.StoreInt64(&c.isCrowdsecStreamHealthy, 0)
 }
 
+// ClosedForTest reports whether Close has run on this incarnation.
+func (c *Client) ClosedForTest() bool {
+	if c == nil {
+		return false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.closed
+}
+
+// SleepingForTest reports whether Sleep has run and Close has not.
+func (c *Client) SleepingForTest() bool {
+	if c == nil {
+		return false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.sleeping && !c.closed
+}
+
 // TestDroppedCount is the current window dropped count for origin+ipType+remediation.
 func (c *Client) TestDroppedCount(origin, ipType, remediation string) int64 {
 	if c == nil || c.metricsReporter == nil {
