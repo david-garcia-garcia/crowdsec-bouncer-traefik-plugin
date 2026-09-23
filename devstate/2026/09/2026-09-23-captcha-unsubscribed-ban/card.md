@@ -20,7 +20,7 @@ The remediating handler now checks captcha kind and `subscribeCaptcha` first. Wh
 In progress. 1 items remain.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: 3f006d73
+Reviewed head: 877fe71b
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -83,7 +83,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 3f006d73f94e99e4bd4a4f6d6f23eea7a7723410 | Card must match the branch you measured |
+| Reviewed head | 877fe71bdd4f95a214e7da7af13cfdb1031e4fd7 | Card must match the branch you measured |
 
 ### Stored data model
 None.
