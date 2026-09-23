@@ -113,6 +113,21 @@ Fuzzy (parked, not Language): whether owner captcha settings stay `bouncerCaptch
 
 ## Open questions
 
+- Q: Default of `captchaEnabled` and how existing `bouncerCaptchaProvider`-only YAML migrates?
+  Rank: bounded asked — new own flag plus in-repo operator YAML that today treats provider-set as own; 4 example files and 4 e2e hits (roots: `examples/**`, `tests/**`, `pkg/**`, `*.go` for `bouncerCaptchaProvider`)
+  Decision: assumed — default false, matching `lapiEnabled` / `appsecEnabled`. No implicit own from provider. Single-router operators set `captchaEnabled: true` (empty name fills to the Traefik name). Update those in-repo examples and e2e here.
+  By: explore
+
+- Q: Does captcha need `reclaim.Open` (holder) or only a heap pointer plus `SetAlias`?
+  Rank: bounded asked — “Same axes as the other legs” and holder-with-bounce-off; 2 existing legs in `plugin.go` `openOwned` / `claimOwned` / `Watch`; searched `plugin.go`, `pkg/reclaim`
+  Decision: assumed — Open + SetAlias + Watch like LAPI/AppSec. `SetAlias` maps an ownership key. Holder with `bouncerEnabled: false` still Opens. Ownership key = middleware name plus instance-owned captcha knobs (not the slot name, not bounce/failure/header/startup-block). Sleep/Wake may be no-ops (no ticker).
+  By: explore
+
+- Q: What is the blast radius of sharing one captcha client (siteverify HTTP client, template, grace clock)?
+  Rank: additive asked — “Subscribers of one name share that page, that verifier, those widget paths, and that grace”
+  Decision: assumed — share is safe: `http.Client` is concurrent-safe; `template.Execute` is concurrent-safe; `Check` / `Validate` / `ServeHTTP` do not mutate after `New`; grace uses `time.Now()` per call. One idle pool per instance is intended. Cookie overwrite across two instances on one host stays out of scope.
+  By: explore
+
 - Q: Who already owns which captcha client this router uses (the slot identity)?
   Rank: additive asked — new captcha slot this change creates; “One middleware owns the captcha client and publishes it under a name”
   Decision: resolved — none today (each Bouncer constructs from local `BouncerCaptcha*`). After: reclaim alias group `captcha` is the owner; reuse `SetAlias` / `Watch`. The owner middleware Opens. Subscribers do not re-derive the client from leftover keys.
@@ -121,11 +136,6 @@ Fuzzy (parked, not Language): whether owner captcha settings stay `bouncerCaptch
 - Q: Should `bouncer.New` keep constructing a local captcha client after captcha is a named leg?
   Rank: bounded asked — changes the existing `bouncer.New` contract; 1 production caller (`plugin.go`) and 2 timeout tests (`pkg/bouncer/zzz_http_timeout_test.go`); searched `plugin.go`, `pkg/**/*.go`, `zzz_*.go` for `bouncer.New(`
   Decision: resolved — no local construct on bounce-only. Owner Opens and publishes. Missing published client + captcha verdict = ban when startup block is off (“When captcha is missing”).
-  By: explore
-
-- Q: What is the blast radius of sharing one captcha client (siteverify HTTP client, template, grace clock)?
-  Rank: additive asked — “Subscribers of one name share that page, that verifier, those widget paths, and that grace”
-  Decision: assumed — share is safe: `http.Client` is concurrent-safe; `template.Execute` is concurrent-safe; `Check` / `Validate` / `ServeHTTP` do not mutate after `New`; grace uses `time.Now()` per call. One idle pool per instance is intended. Cookie overwrite across two instances on one host stays out of scope.
   By: explore
 
 - Q: How does a captcha verdict remediate today when `BouncerCaptchaProvider` is empty?
@@ -138,17 +148,8 @@ Fuzzy (parked, not Language): whether owner captcha settings stay `bouncerCaptch
   Decision: resolved — LAPI’s explicit `owned && empty` (AppSec is the same rule: `Prepare` returns before fill when `!AppsecEnabled`). Implement `captcha.Prepare` that way.
   By: explore
 
-- Q: Default of `captchaEnabled` and how existing `bouncerCaptchaProvider`-only YAML migrates?
-  Rank: bounded asked — new own flag plus in-repo operator YAML that today treats provider-set as own; 4 example files and 4 e2e hits (roots: `examples/**`, `tests/**`, `pkg/**`, `*.go` for `bouncerCaptchaProvider`)
-  Decision: assumed — default false, matching `lapiEnabled` / `appsecEnabled`. No implicit own from provider. Single-router operators set `captchaEnabled: true` (empty name fills to the Traefik name). Update those in-repo examples and e2e here.
-  By: explore
-
 - Q: Failure-action `captcha` gate: instance name or provider?
   Rank: bounded asked — “That value is legal only when this router has a captcha instance name”; 2 `validateFailureAction` call sites in `pkg/configuration/configuration.go`; searched `pkg/configuration`, `pkg/bouncer`, `plugin.go`
   Decision: resolved — legal when this router has a captcha instance name (after owner fill). Dest key names stay `bouncerLapiFailureAction` / `bouncerAppsecFailureAction`. A captcha verdict without a subscribe is still a ban at runtime.
   By: explore
 
-- Q: Does captcha need `reclaim.Open` (holder) or only a heap pointer plus `SetAlias`?
-  Rank: bounded asked — “Same axes as the other legs” and holder-with-bounce-off; 2 existing legs in `plugin.go` `openOwned` / `claimOwned` / `Watch`; searched `plugin.go`, `pkg/reclaim`
-  Decision: assumed — Open + SetAlias + Watch like LAPI/AppSec. `SetAlias` maps an ownership key. Holder with `bouncerEnabled: false` still Opens. Ownership key = middleware name plus instance-owned captcha knobs (not the slot name, not bounce/failure/header/startup-block). Sleep/Wake may be no-ops (no ticker).
-  By: explore

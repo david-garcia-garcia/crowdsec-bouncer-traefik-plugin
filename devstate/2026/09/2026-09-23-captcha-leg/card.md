@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: e2351d76
+Reviewed head: 3a1a7a90
 Owner decision: None.
 
 ## Review scores
@@ -42,7 +42,8 @@ Owner decision: None.
 None.
 
 ## Deviations from the ask
-None.
+- taken: knobs table names bounce `enabled` and failure action `crowdsecLapiFailureAction` (AppSec twin). → live dest keys `bouncerEnabled`, `bouncerLapiFailureAction`, `bouncerAppsecFailureAction`. New captcha own-axis keys `captchaEnabled` / `captchaInstanceName`. Owner captcha settings stay `bouncerCaptcha*`. — `pkg/configuration/configuration.go` — dest already renamed those bounce/failure keys in PR 137; honouring the spec spellings would add aliases beside the working surface. Requirement Out of scope already declines renaming dest back.. Requester: not asked.
+
 
 ## Follow-up issues
 None.
@@ -66,7 +67,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | e2351d76b7d147ea03f79f34ec40209fb2cbdc10 | Card must match the branch you measured |
+| Reviewed head | 3a1a7a907902bf1cfbf491e6ca95f3325cc98231 | Card must match the branch you measured |
 
 ### Stored data model
 None.
