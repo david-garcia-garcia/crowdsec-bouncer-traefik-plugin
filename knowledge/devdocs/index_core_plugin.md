@@ -10,6 +10,11 @@ priority: normal
 local: core_plugin_middleware.md
 description: How Traefik New reclaims a LAPI Client and an AppSec Client and returns a per-router Bouncer (`core_plugin_middleware_bouncer`).
 
+## Instance slots
+priority: normal
+local: core_plugin_middleware_instance-slots.md
+description: How named LAPI and AppSec slots Publish and Subscribe through Yaegi-safe atomic.Value.
+
 ## Local plugin
 priority: normal
 local: core_plugin_middleware_local-plugin.md
@@ -43,12 +48,12 @@ description: How this plugin POSTs CrowdSec usage-metrics with origin and ip_typ
 ## LAPI reclaim key
 priority: normal
 local: core_plugin_lapi_reclaim-key.md
-description: How this plugin keys a reclaimed LAPI Client (cursor SessionHex plus Redis store params).
+description: How this plugin keys a reclaimed LAPI Client (ownership key plus SessionHex for the store).
 
 ## LAPI scope union
 priority: normal
 local: core_plugin_lapi_scope-union.md
-description: How a shared stream Client unions live routers' header-scope maps for scopes= and the store filter.
+description: How a stream Client polls opener-only crowdsecLapiStreamScopes (ip,range plus extras).
 
 ## Stream single-flight
 priority: normal

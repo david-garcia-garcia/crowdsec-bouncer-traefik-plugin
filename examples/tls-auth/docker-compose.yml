@@ -38,6 +38,7 @@ services:
   #     - "traefik.http.services.service-foo.loadbalancer.server.port=80"
   #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
   #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
+  #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapienabled=true"
   #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
   #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapischeme=https"
   #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
@@ -60,6 +61,7 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecappsecscheme=https"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecAppsecTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
 
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapienabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapikey=40796d93c2958f9e58345514e67740e5="
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateAuthorityFile=/etc/traefik/crowdsec-certs/inter.pem"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecLapiTLSCertificateBouncerFile=/etc/traefik/crowdsec-certs/bouncer.pem"

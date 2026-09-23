@@ -31,8 +31,10 @@ func writeTestFile(t *testing.T, name, content string) string {
 func cfgAppsecCaptchaAt(t *testing.T, appsecHost string) *configuration.Config {
 	t.Helper()
 	c := getTestConfig()
-	c.CrowdsecMode = configuration.AppsecMode
+	c.CrowdsecLapiEnabled = false
+	c.CrowdsecLapiKey = ""
 	c.CrowdsecAppsecEnabled = true
+	c.CrowdsecAppsecKey = "appsec-key"
 	c.CrowdsecAppsecScheme = "http"
 	c.CrowdsecAppsecHost = appsecHost
 	c.CrowdsecAppsecPath = "/"
@@ -57,7 +59,9 @@ func cfgAppsecCaptchaAt(t *testing.T, appsecHost string) *configuration.Config {
 // on an unusable client certificate. Without a rollback the stream ticker polls LAPI forever.
 func TestNew_FailedConstructorReleasesLapiHolder(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	t.Cleanup(func() {
+		reclaim.ResetForTest()
+	})
 
 	var hits int64
 	srv := liveLAPI(t, nil, &hits)
@@ -76,6 +80,7 @@ func TestNew_FailedConstructorReleasesLapiHolder(t *testing.T) {
 	if _, err := New(context.Background(), testNextOK(), cfg, "rollback"); err == nil {
 		t.Fatal("New must fail when the AppSec client certificate cannot be loaded")
 	}
+	time.Sleep(200 * time.Millisecond)
 	atStart := atomic.LoadInt64(&hits)
 	time.Sleep(2500 * time.Millisecond)
 	if grew := atomic.LoadInt64(&hits) - atStart; grew != 0 {
@@ -88,7 +93,9 @@ func TestNew_FailedConstructorReleasesLapiHolder(t *testing.T) {
 // zero grace, a rollback that fired on the success path would dispose between these two calls.
 func TestNew_SuccessfulConstructorKeepsItsHolder(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	t.Cleanup(func() {
+		reclaim.ResetForTest()
+	})
 
 	var hits int64
 	srv := liveLAPI(t, nil, &hits)
@@ -124,46 +131,22 @@ func TestNew_SuccessfulConstructorKeepsItsHolder(t *testing.T) {
 // TestNew_AppsecModeWithoutAppsecWarns checks the operator gets a warning, in the log they
 // configured, when appsec mode is combined with AppSec disabled — a middleware that enforces
 // nothing. It must still start.
-func TestNew_AppsecModeWithoutAppsecWarns(t *testing.T) {
-	logFile := newTestLogFile(t)
-
+func TestNew_AppsecOwnedWithoutKeyFails(t *testing.T) {
 	cfg := getTestConfig()
-	cfg.CrowdsecMode = configuration.AppsecMode
-	cfg.CrowdsecAppsecEnabled = false
+	cfg.CrowdsecLapiEnabled = false
+	cfg.CrowdsecLapiKey = ""
+	cfg.CrowdsecAppsecEnabled = true
 	cfg.LogFormat = "common"
-	cfg.LogFilePath = logFile
-
-	if _, err := New(context.Background(), testNextOK(), cfg, "appsec-no-waf"); err != nil {
-		t.Fatalf("appsec mode with AppSec disabled must still start: %v", err)
-	}
-
-	logged, err := os.ReadFile(logFile) //nolint:gosec // test-generated temp path
-	if err != nil {
-		t.Fatal(err)
-	}
-	line := ""
-	for _, candidate := range strings.Split(string(logged), "\n") {
-		if strings.Contains(candidate, "level=WARN") {
-			line = candidate
-			break
-		}
-	}
-	if line == "" {
-		t.Fatalf("no WARN line for appsec mode without AppSec. log:\n%s", logged)
-	}
-	for _, want := range []string{"crowdsecMode", "crowdsecAppsecEnabled"} {
-		if !strings.Contains(line, want) {
-			t.Fatalf("WARN line must name %s, got %q", want, line)
-		}
+	if _, err := New(context.Background(), testNextOK(), cfg, "appsec-no-waf"); err == nil {
+		t.Fatal("AppSec owned without a key must fail Open")
 	}
 }
 
-// TestNew_AppsecModeCaptchaFailureActionServesChallenge checks that an AppSec failure in appsec
-// mode with crowdsecAppsecFailureAction: captcha serves the challenge. Without the captcha client
-// the bouncer falls back to a ban, which contradicts core_plugin_appsec_failure-action.
-func TestNew_AppsecModeCaptchaFailureActionServesChallenge(t *testing.T) {
+func TestNew_AppsecCaptchaFailureActionServesChallenge(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	t.Cleanup(func() {
+		reclaim.ResetForTest()
+	})
 
 	appsecSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -190,7 +173,9 @@ func TestNew_AppsecModeCaptchaFailureActionServesChallenge(t *testing.T) {
 // come back normalised, and must not come back carrying the resolved LAPI secret.
 func TestNew_DoesNotMutateCallerConfig(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	t.Cleanup(func() {
+		reclaim.ResetForTest()
+	})
 
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)

@@ -11,7 +11,7 @@ The Config field that means this router will open AppSec. Same field `New` uses 
 _Avoid_: leftover AppSec host/CA/key, `crowdsecMode: appsec`
 
 **Config validation**:
-The `ValidateParams` startup gate `plugin.New` runs on the prepared Config before `lapi.Prepare`.
+The `ValidateParams` startup gate `plugin.New` runs on the config snapshot before `lapi.Prepare`.
 _Avoid_: `GetVariable` as a feature-flag check
 
 **Writability-check handle**:
@@ -28,7 +28,7 @@ _Avoid_: EffectiveLapi, three inherit wrappers
 
 ## How to use
 
-- Run `ValidateParams` on `&prepared` after the snapshot and before `lapi.Prepare`.
+- Run `ValidateParams` on `&config` after the snapshot and before `lapi.Prepare`.
 - Keep `HTTPTimeoutSeconds` in `requiredInt1` (`< 1` invalid). Put `CrowdsecLapiHTTPTimeoutSeconds`, `CrowdsecAppsecHTTPTimeoutSeconds`, and `CaptchaSiteverifyHTTPTimeoutSeconds` in `requiredInt0` (`< 0` invalid). Zero or omitted inherits. Call `cfg.EffectiveHTTPTimeoutSeconds(override)` — do not add three `EffectiveLapi` wrappers.
 - Resolve `RedisCachePassword` / `RedisCachePasswordFile` only when `redisCacheEnabled` is true.
 - When Redis is off, do not Stat or read a leftover `redisCachePasswordFile`.
@@ -41,7 +41,9 @@ _Avoid_: EffectiveLapi, three inherit wrappers
 - When `CaptchaProvider` is set, reject an empty `CaptchaFilePath` (`CaptchaFilePath: cannot be empty when CaptchaProvider is set`) and fail when `GetTemplate` fails. Ban template stays "when path is set".
 - `captcha.Client.New` returns the `GetTemplate` error. Do not discard it. Do not invent a bundled default template.
 - After CAPI (alone) or LAPI (other modes), call `validateAppsecURLKeyAndTLS` only when `config.CrowdsecAppsecEnabled`. Do not hide that `if` only inside a LAPI wrapper — alone never calls it.
-- Reuse `CrowdsecAppsecEnabled`. Do not re-derive from leftover AppSec fields or `crowdsecMode: appsec`.
+- Reuse `CrowdsecAppsecEnabled`. Do not re-derive from leftover AppSec fields or `crowdsecMode`.
+- Reject `crowdsecMode: appsec` (E4). Gate LAPI URL/keys on `CrowdsecLapiEnabled`. Reject leftover instance name or secret when bounce and owner flags are both false (E2).
+- `CrowdsecLapiEnabled` defaults false. Tests and compose that Open LAPI must set it true.
 - Keep the helper's empty-key pass and explicit-`https` CA parse. Do not fail an empty AppSec key at `ValidateParams`.
 - When the knob is false, skip AppSec host, URL, key, and CA even if leftover fields are set.
 - Leave `New` as `return nil, err` on `ValidateParams` failure.
@@ -96,7 +98,7 @@ _ = checkFile.Close()
 - Alone still skips LAPI URL/key/TLS after CAPI. Captcha still runs. AppSec helper runs only when `CrowdsecAppsecEnabled`.
 - A set provider with default `ban` actions still needs non-empty site and secret.
 - A set provider with an empty `CaptchaFilePath` fails at `ValidateParams`. Tests that used to blank the path to skip `GetTemplate` need a readable fixture.
-- Leftover invalid AppSec CA or missing key file boots when AppSec is off (live, stream, none, appsec, and alone).
+- Leftover invalid AppSec CA or missing key file boots when AppSec is off (live, stream, none, and alone). `crowdsecMode: appsec` is rejected.
 - Empty AppSec key after a successful lookup still passes; `appsec.Prepare` copies the LAPI key.
 - CA parse still triggers on explicit `CrowdsecAppsecScheme == https`, not inherit-https.
 - `NewWithFormat` warns and uses stdout when the path is not writable. `ValidateParams` must still fail so `plugin.New` does not start.

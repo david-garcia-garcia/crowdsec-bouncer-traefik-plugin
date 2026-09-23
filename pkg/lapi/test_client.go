@@ -15,7 +15,15 @@ import (
 // NewTestClient returns an in-memory Client with a memory DecisionStore.
 func NewTestClient(log *slog.Logger) (*Client, *decisionstore.Store) {
 	store := decisionstore.NewMemory(log)
-	return &Client{decisionStore: store, log: log}, store
+	return &Client{decisionStore: store, log: log, crowdsecMode: configuration.StreamMode}, store
+}
+
+// SetCrowdsecModeForTest sets crowdsecMode for tests that bind a client onto a bouncer.
+func (c *Client) SetCrowdsecModeForTest(mode string) {
+	if c == nil {
+		return
+	}
+	c.crowdsecMode = mode
 }
 
 // newTestRangeClient is a stream-mode memory Client plus its DecisionStore.
@@ -63,6 +71,26 @@ func (c *Client) SetStreamHealthyForTest(healthy bool) {
 		return
 	}
 	atomic.StoreInt64(&c.isCrowdsecStreamHealthy, 0)
+}
+
+// ClosedForTest reports whether Close has run on this incarnation.
+func (c *Client) ClosedForTest() bool {
+	if c == nil {
+		return false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.closed
+}
+
+// SleepingForTest reports whether Sleep has run and Close has not.
+func (c *Client) SleepingForTest() bool {
+	if c == nil {
+		return false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.sleeping && !c.closed
 }
 
 // TestDroppedCount is the current window dropped count for origin+ipType+remediation.

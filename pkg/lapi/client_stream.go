@@ -34,11 +34,7 @@ func (c *Client) startStream(config *configuration.Config, log *slog.Logger) err
 	if c.decisionStore != nil {
 		c.decisionStore.HydrateRange()
 	}
-	if config.StreamStartupBlock {
-		c.handleStreamTicker()
-	} else {
-		go c.handleStreamTicker()
-	}
+	go c.handleStreamTicker()
 	c.streamStop = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
 		c.handleStreamTicker()
 	})
@@ -49,7 +45,7 @@ func (c *Client) startStream(config *configuration.Config, log *slog.Logger) err
 // Skip is session-scoped on DecisionStore (cursor+applied cache), not this Client.
 func (c *Client) handleStreamTicker() {
 	if c.decisionStore == nil || !c.decisionStore.TryBeginStreamPoll() {
-		c.log.Warn("handleStreamTicker:skip", "sessionKey", c.sessionKey, "reason", "inFlight")
+		c.log.Warn("handleStreamTicker:skip", "reason", "inFlight")
 		return
 	}
 	defer c.decisionStore.EndStreamPoll()
@@ -57,7 +53,6 @@ func (c *Client) handleStreamTicker() {
 	started := time.Now()
 	startup := c.streamStartup()
 	c.log.Debug("handleStreamTicker:poll",
-		"sessionKey", c.sessionKey,
 		"startup", startup,
 		"interval", c.updateInterval,
 	)
@@ -65,7 +60,6 @@ func (c *Client) handleStreamTicker() {
 		updateFailure := atomic.LoadInt64(&c.updateFailure)
 		healthy := atomic.LoadInt64(&c.isCrowdsecStreamHealthy) != 0
 		c.log.Warn("handleStreamTicker",
-			"sessionKey", c.sessionKey,
 			"startup", startup,
 			"updateFailure", updateFailure,
 			"isCrowdsecStreamHealthy", healthy,
@@ -75,7 +69,7 @@ func (c *Client) handleStreamTicker() {
 		if c.updateMaxFailure != -1 && updateFailure >= c.updateMaxFailure && healthy {
 			atomic.StoreInt64(&c.isCrowdsecStreamHealthy, 0)
 			c.logInfo(MsgStreamUnhealthy, "unhealthy")
-			c.log.Error("handleStreamTicker:error", "sessionKey", c.sessionKey, "updateFailure", updateFailure, "error", err)
+			c.log.Error("handleStreamTicker:error", "updateFailure", updateFailure, "error", err)
 		}
 		atomic.AddInt64(&c.updateFailure, 1)
 	} else {
@@ -96,7 +90,6 @@ func (c *Client) handleStreamCache() error {
 		return pollErr
 	}
 	c.log.Debug("handleStreamCache:updated",
-		"sessionKey", c.sessionKey,
 		"startup", startup,
 		"new", newCount,
 		"deleted", deletedCount,

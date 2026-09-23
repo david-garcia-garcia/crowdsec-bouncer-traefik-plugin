@@ -56,8 +56,7 @@ Users are blocked based on:
 
 This plugin is the bouncer: it asks LAPI (and optionally AppSec) on the request path. It does not ingest logs.
 
-> [!WARNING]
-> The LAPI stream has to be unique per LAPI key + bouncer IP. If you need more than one CrowdSec configuration inside the same Traefik instance, provision different API keys.
+How one Traefik process can share a stream, or run several CrowdSec engines, is in [Middleware Architecture](#middleware-architecture).
 
 ## Decisions
 
@@ -113,7 +112,7 @@ More information on appsec in the [Crowdsec Documentation](https://doc.crowdsec.
 
 ## Modes
 
-There are five operating modes (`CrowdsecMode`). Sequence diagrams live in [docs/modes.md](docs/modes.md).
+There are four operating modes (`CrowdsecMode`). Sequence diagrams live in [docs/modes.md](docs/modes.md).
 
 | Mode   | Summary |
 | ------ | ------- |
@@ -121,11 +120,162 @@ There are five operating modes (`CrowdsecMode`). Sequence diagrams live in [docs
 | live   | Same as none, but caches each IP's result. |
 | stream | Sync decisions from LAPI on an interval; the request path hits cache only. Recommended. |
 | alone  | Like stream, but pulls the community blocklist from CAPI. No local CrowdSec. |
-| appsec | Skip IP decisions; send the HTTP request to AppSec. Use when IP checks happen elsewhere. |
 
 `stream` is recommended: decisions refresh every 60 seconds by default. The request path does not call LAPI. Usage-metrics still POST to LAPI on `MetricsUpdateIntervalSeconds` unless that interval is zero or less.
 
-`CrowdsecMode` and `CrowdsecAppsecEnabled` are independent axes. The mode picks where decisions come from; `CrowdsecAppsecEnabled` adds the AppSec (WAF) check, which inspects the requests the decision check allowed, in **every** mode. The usual pair is `stream` plus `crowdsecAppsecEnabled: true`. Because `appsec` mode has no decision source, it is the one mode that needs AppSec enabled to do anything: `crowdsecMode: appsec` with `crowdsecAppsecEnabled: false` enforces nothing and every request reaches your service. The plugin logs a warning at startup for that pair and still starts.
+`crowdsecMode` is how an **owned** LAPI client fetches decisions. It is not “which pieces this middleware runs.” AppSec-only is `crowdsecLapiEnabled: false` plus `crowdsecAppsecEnabled: true`. `crowdsecMode: appsec` is removed.
+
+## Middleware Architecture
+
+One Traefik middleware object can run up to three independent pieces:
+
+| Piece | Flag | Job |
+| ----- | ---- | --- |
+| LAPI client | `crowdsecLapiEnabled` | Open one connection to one CrowdSec LAPI (`stream` / `live` / `none` / `alone`). Publish it under `crowdsecLapiInstanceName`. |
+| AppSec client | `crowdsecAppsecEnabled` | Open one AppSec listener. Publish it under `crowdsecAppsecInstanceName`. |
+| Bouncer | `enabled` | Serve this router: subscribe to those names, apply this route’s remediations (status, header, captcha, trusted IPs, failure action). |
+
+`enabled` never opens a backend. An omitted instance name is filled with this Traefik middleware name only when that piece’s owner flag is true. LAPI and AppSec use **separate** name tables, so both may be called `shared`. A bouncing subscriber sets `enabled: true` and the instance name, and leaves the owner flag false so it does not Open.
+
+```mermaid
+flowchart LR
+  subgraph traefik ["One Traefik process"]
+    B1["Bouncer /api"]
+    B2["Bouncer /admin"]
+    B3["Bouncer /tenant-b"]
+    L1["LAPI client shared"]
+    L2["LAPI client tenant-b"]
+    A1["AppSec client shared"]
+  end
+  CS1["CrowdSec engine A"]
+  CS2["CrowdSec engine B"]
+  B1 --> L1
+  B2 --> L1
+  B1 --> A1
+  B2 --> A1
+  B3 --> L2
+  L1 --> CS1
+  A1 --> CS1
+  L2 --> CS2
+```
+
+`New` never waits for a publisher (that deadlocks Traefik). A missing subscribed backend with `streamStartupBlock: true` is **503** on the request; with the flag false it uses that piece’s failure action.
+
+### One middleware (all-in-one)
+
+Names omitted: this Traefik name is the slot. Same shape as a single-router install.
+
+```yaml
+api-crowdsec:
+  plugin:
+    bouncer:
+      enabled: true
+      crowdsecMode: stream
+      crowdsecLapiEnabled: true
+      crowdsecAppsecEnabled: true
+      crowdsecLapiHost: crowdsec:8080
+      crowdsecLapiKey: "..."
+      crowdsecAppsecKey: "..."
+```
+
+### Shared stream, per-router bounce policy
+
+One middleware owns the LAPI (and optional AppSec) stream. Other routers only bounce: they subscribe by name and keep their own policy. They do not copy host, key, mode, or poll interval.
+
+```yaml
+cs:
+  plugin:
+    bouncer:
+      enabled: true
+      crowdsecMode: stream
+      crowdsecLapiEnabled: true
+      crowdsecAppsecEnabled: true
+      crowdsecLapiInstanceName: shared
+      crowdsecAppsecInstanceName: shared
+      crowdsecLapiHost: crowdsec:8080
+      crowdsecLapiKey: "..."
+      crowdsecAppsecKey: "..."
+cs-admin:
+  plugin:
+    bouncer:
+      enabled: true
+      crowdsecLapiInstanceName: shared
+      crowdsecAppsecInstanceName: shared
+      remediationHeadersCustomName: x-crowdsec
+```
+
+A dummy owner (`enabled: false`) is optional. Use it only when no bouncing route should own the clients. Traefik still needs a router attached so `New` runs.
+
+```yaml
+cs-holders:
+  plugin:
+    bouncer:
+      enabled: false
+      crowdsecMode: stream
+      crowdsecLapiEnabled: true
+      crowdsecAppsecEnabled: true
+      crowdsecLapiInstanceName: shared
+      crowdsecAppsecInstanceName: shared
+      crowdsecLapiHost: crowdsec:8080
+      crowdsecLapiKey: "..."
+      crowdsecAppsecKey: "..."
+```
+
+### Several LAPI streams or CrowdSec engines
+
+CrowdSec still identifies **one stream per LAPI key + the IP this Traefik uses to call LAPI**. Two stream owners that share that pair fight over one cursor. A second isolated decision set needs a **second LAPI key** (and usually a second host if it is another engine).
+
+Give each owner its own instance name. Point each bouncing router at the name it should use.
+
+```yaml
+cs-a:
+  plugin:
+    bouncer:
+      enabled: true
+      crowdsecMode: stream
+      crowdsecLapiEnabled: true
+      crowdsecLapiInstanceName: engine-a
+      crowdsecLapiHost: crowdsec-a:8080
+      crowdsecLapiKey: "key-a"
+cs-b:
+  plugin:
+    bouncer:
+      enabled: true
+      crowdsecMode: stream
+      crowdsecLapiEnabled: true
+      crowdsecLapiInstanceName: engine-b
+      crowdsecLapiHost: crowdsec-b:8080
+      crowdsecLapiKey: "key-b"
+app-a:
+  plugin:
+    bouncer:
+      enabled: true
+      crowdsecLapiInstanceName: engine-a
+app-b:
+  plugin:
+    bouncer:
+      enabled: true
+      crowdsecLapiInstanceName: engine-b
+```
+
+`/app-a` and `/app-b` can sit on the same Traefik. They do not share a decision store. The same pattern works for two streams against one engine (two bouncer API keys) when you want isolated cursors.
+
+### AppSec only
+
+No LAPI client on this middleware. The bouncer subscribes only to AppSec.
+
+```yaml
+waf:
+  plugin:
+    bouncer:
+      enabled: true
+      crowdsecLapiEnabled: false
+      crowdsecAppsecEnabled: true
+      crowdsecAppsecHost: crowdsec:7422
+      crowdsecAppsecKey: "..."
+```
+
+`crowdsecLapiStreamScopes` is opener-only extra stream scopes (`country`, `as`, …). It is not copied from `decisionScopeHeaders`.
 
 ## Cache
 
@@ -133,7 +283,7 @@ The cache remembers CrowdSec remediations so this plugin does not have to ask LA
 
 - **`live`**: stores each client result (banned, captcha, or clean) for `DefaultDecisionSeconds`. This is the mode where a shared Redis cache is useful: several Traefik replicas can reuse the same LAPI answers.
 - **`stream` / `alone`**: stores the decision list locally. Prefer the in-memory store. Redis adds a network hop for a set you already sync on an interval.
-- **`none` / `appsec`**: no decision cache to share.
+- **`none`**: no decision cache to share.
 
 Captcha grace does not use this cache. After a passed challenge, the plugin sets a signed cookie (`crowdsec_captcha_gate`), not a cache key.
 
@@ -150,13 +300,11 @@ make run
 ### Note
 
 > [!IMPORTANT]
-> You can declare many CrowdSec middlewares in one Traefik. Each router keeps its own request policy (enabled, captcha, trusted IPs, failure actions, templates).
+> You can declare many CrowdSec middlewares in one Traefik. Each bouncing router keeps its own request policy (enabled, captcha, trusted IPs, failure actions, templates).
 >
-> CrowdSec LAPI still identifies **one stream per LAPI key + the IP this Traefik uses to call LAPI**. Middlewares that share that pair share the stream and the decision store. A ban on that store applies to every router on that session.
+> Share one LAPI or AppSec client by publishing a name (`crowdsecLapiInstanceName` / `crowdsecAppsecInstanceName`) and subscribing other routers to it. Interval, host, key, and `crowdsecLapiStreamScopes` live on the **owner**. See [Middleware Architecture](#middleware-architecture).
 >
-> A second CrowdSec configuration (isolated decisions or a different stream) needs a **different LAPI key**. Two stream configs on the same key from the same Traefik instance fight over one cursor.
->
-> On a shared session, stream interval, `updateMaxFailure`, and CAPI scenarios are create-time: the first middleware to start keeps those values. `decisionScopeHeaders` is not first-wins: live routers on that Client union their maps into stream `scopes=`. Per-router policy (enabled, captcha, trusted IPs, failure actions, templates) does not have to match.
+> CrowdSec LAPI still identifies **one stream per LAPI key + the IP this Traefik uses to call LAPI**. A second isolated stream or engine needs a different key (and a different instance name). Two stream owners on the same pair fight over one cursor.
 
 > [!WARNING]  
 > **Appsec maximum body limit is defaulted to 10MB** > _Be careful when you upgrade to >1.4.x_
@@ -357,6 +505,9 @@ Redis replica hosts for reads (round-robin). Falls back to `RedisCacheHost` when
 **RedisCacheUnreachableBlock** (bool, default `true`)
 Block the request when Redis is unreachable (adds a 1-second delay per request).
 
+**ReclaimGraceSeconds** (int64, default `30`)
+Process-wide wait after the last holder of a LAPI or AppSec client, so a Traefik reload can reuse the same incarnation. First `New` in the process sets it; later middlewares are ignored. Zero disposes as soon as the last holder ends. Not captcha cookie grace.
+
 **RemediationHeadersCustomName** (string, default `""`)
 Response header name when the plugin handles the request. Header value is `ban`, `captcha`, `solved-captcha`, or `error:client-disconnected` (client dropped the body while AppSec was buffering; not a ban). Include this header in Traefik `accessLog.fields.headers` if you want disconnects in access logs. Empty disables the header.
 
@@ -364,7 +515,16 @@ Response header name when the plugin handles the request. Header value is `ban`,
 HTTP status for a banned user (not captcha).
 
 **StreamStartupBlock** (bool, default `true`)
-`stream` and `alone` only. When `true`, plugin init waits for CrowdSec before serving traffic. When `false`, all requests bypass remediation until the first stream sync — banned IPs are allowed in that window. Only disable when startup availability matters more than blocking at startup.
+On the request path, `true` returns **503** while any backend this bouncer subscribes to is not published yet. `false` uses that leg's failure action. `New` never waits. Ready here means the subscribed client is published, not that the first stream poll finished.
+
+**CrowdsecLapiEnabled** (bool, default `false`)
+This middleware owns a LAPI client (`Open` + publish). Bounce still uses `enabled`.
+
+**CrowdsecLapiInstanceName** / **CrowdsecAppsecInstanceName** (string, default Traefik name when that leg is owned)
+Slot name bouncers subscribe to. LAPI and AppSec are separate tables, so both may be `shared`.
+
+**CrowdsecLapiStreamScopes** ([]string, default empty)
+Extra LAPI stream scopes (`country`, `as`, …). Omitted or empty is `ip,range` only. Opener only; not copied from `decisionScopeHeaders`.
 
 **TraceHeadersCustomName** (string, default `""`)
 Request header whose value is injected into the ban HTML. Empty disables it.
@@ -423,6 +583,7 @@ http:
       plugin:
         bouncer:
           enabled: true
+          crowdsecLapiEnabled: true
           logLevel: DEBUG
           crowdsecMode: live
           crowdsecLapiKey: privateKey-foo
@@ -453,12 +614,18 @@ http:
       plugin:
         bouncer:
           enabled: false
+          crowdsecLapiEnabled: true
           logLevel: DEBUG
           logFormat: common
           LogFilePath: ""
           updateIntervalSeconds: 60
+          reclaimGraceSeconds: 30
           updateMaxFailure: 0
           crowdsecLapiFailureAction: ban
+          crowdsecLapiEnabled: true
+          crowdsecLapiInstanceName: ""
+          crowdsecAppsecInstanceName: ""
+          crowdsecLapiStreamScopes: []
           streamStartupBlock: true
           defaultDecisionSeconds: 60
           remediationStatusCode: 403
@@ -570,6 +737,7 @@ This LAPI key must be set where is noted FIXME-LAPI-KEY in the docker-compose.ym
 ..
 whoami:
   labels:
+    - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapienabled=true"
     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=FIXME-LAPI-KEY"
     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapischeme=http"
     - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapihost=crowdsec:8080"

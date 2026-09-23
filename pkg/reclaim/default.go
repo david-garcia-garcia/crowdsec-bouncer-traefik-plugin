@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	utilreclaim "github.com/david-garcia-garcia/traefik-middleware-utilities/reclaim"
@@ -41,7 +42,8 @@ func New(cfg Config) *Table {
 	return utilreclaim.New(cfg)
 }
 
-// Default returns the process-wide table, creating it on first use with ProcessGrace.
+// Default returns the process-wide table, creating it on first use with ProcessGrace
+// unless EnsureProcessGrace already installed one.
 func Default() *Table {
 	defaultMu.Lock()
 	defer defaultMu.Unlock()
@@ -49,6 +51,20 @@ func Default() *Table {
 		defaultTable = New(Config{Grace: ProcessGrace})
 	}
 	return defaultTable
+}
+
+// EnsureProcessGrace installs the process table on first New. Later calls no-op.
+// Negative grace becomes ProcessGrace. Zero disposes as soon as the last holder ends.
+func EnsureProcessGrace(grace time.Duration) {
+	defaultMu.Lock()
+	defer defaultMu.Unlock()
+	if defaultTable != nil {
+		return
+	}
+	if grace < 0 {
+		grace = ProcessGrace
+	}
+	defaultTable = New(Config{Grace: grace})
 }
 
 // OpenWithHooks is Default().OpenWithHooks.
@@ -59,6 +75,43 @@ func OpenWithHooks(ctx context.Context, key string, logger *slog.Logger, create 
 // Peek is Default().Peek: look without bind, Wake, or stopping grace.
 func Peek(key string) (any, State, bool) {
 	return Default().Peek(key)
+}
+
+// Watcher is a weak reference: Watch copies the alias without binding a holder.
+type Watcher = utilreclaim.Watcher
+
+// Box is the only type stored in a watcher atomic.Value (Yaegi-safe).
+type Box = utilreclaim.Box
+
+// Unbox returns the value Watch stored, or nil when dest is empty.
+func Unbox(dest *atomic.Value) any {
+	if dest == nil {
+		return nil
+	}
+	stored := dest.Load()
+	if boxed, ok := stored.(*Box); ok {
+		return boxed.Value
+	}
+	return stored
+}
+
+// SetAlias publishes the mapped ownership key under a public name in group.
+func SetAlias(key, alias, publisher, group string) error {
+	return Default().SetAlias(key, alias, publisher, group)
+}
+
+// Published is the value a watcher receives when an alias changes.
+type Published = utilreclaim.Published
+
+// Watch registers valueChanged for alias without binding a holder.
+// valueChanged receives Published. Nil skips that call. When ctx is done, the subscriber is dropped.
+func Watch(ctx context.Context, alias string, empty any, valueChanged func(any)) {
+	Default().Watch(ctx, alias, empty, valueChanged)
+}
+
+// ClearPublisher drops every alias this publisher still holds in group.
+func ClearPublisher(publisher, group string) {
+	Default().ClearPublisher(publisher, group)
 }
 
 // ResetForTest tears down the process table and installs a fresh one with ProcessGrace.

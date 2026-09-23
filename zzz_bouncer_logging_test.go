@@ -23,6 +23,7 @@ func getTestConfig() *configuration.Config {
 		LogFormat:                            "common",
 		LogFilePath:                          "",
 		CrowdsecMode:                         "none",
+		CrowdsecLapiEnabled:                  true,
 		CrowdsecLapiKey:                      "test-key",
 		CrowdsecLapiHost:                     "localhost",
 		CrowdsecLapiScheme:                   "http",

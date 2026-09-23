@@ -25,7 +25,6 @@ const (
 	StreamMode        = "stream"
 	LiveMode          = "live"
 	NoneMode          = "none"
-	AppsecMode        = "appsec"
 	HTTPS             = "https"
 	HTTP              = "http"
 	LogTRACE          = "TRACE"
@@ -59,7 +58,11 @@ type Config struct {
 	LogFormat                                  string                       `json:"logFormat,omitempty"`
 	LogFilePath                                string                       `json:"logFilePath,omitempty"`
 	CrowdsecMode                               string                       `json:"crowdsecMode,omitempty"`
+	CrowdsecLapiEnabled                        bool                         `json:"crowdsecLapiEnabled,omitempty"`
+	CrowdsecLapiInstanceName                   string                       `json:"crowdsecLapiInstanceName,omitempty"`
+	CrowdsecLapiStreamScopes                   []string                     `json:"crowdsecLapiStreamScopes,omitempty"`
 	CrowdsecAppsecEnabled                      bool                         `json:"crowdsecAppsecEnabled,omitempty"`
+	CrowdsecAppsecInstanceName                 string                       `json:"crowdsecAppsecInstanceName,omitempty"`
 	CrowdsecAppsecScheme                       string                       `json:"crowdsecAppsecScheme,omitempty"`
 	CrowdsecAppsecHost                         string                       `json:"crowdsecAppsecHost,omitempty"`
 	CrowdsecAppsecPath                         string                       `json:"crowdsecAppsecPath,omitempty"`
@@ -134,6 +137,7 @@ type Config struct {
 	CaptchaGateSecretFile                      string                       `json:"captchaGateSecretFile,omitempty"`
 	CaptchaGateBindIP                          bool                         `json:"captchaGateBindIp,omitempty"`
 	CaptchaGracePeriodSeconds                  int64                        `json:"captchaGracePeriodSeconds,omitempty"`
+	ReclaimGraceSeconds                        int64                        `json:"reclaimGraceSeconds,omitempty"`
 	OriginBasedDecisionRemap                   map[string]map[string]string `json:"originBasedDecisionRemap,omitempty"`
 }
 
@@ -217,7 +221,9 @@ func New() *Config {
 		CaptchaSecretKey:                "",
 		CaptchaGateBindIP:               true,
 		CaptchaGracePeriodSeconds:       1800,
+		ReclaimGraceSeconds:             30,
 		OriginBasedDecisionRemap:        map[string]map[string]string{},
+		CrowdsecLapiStreamScopes:        []string{},
 		CaptchaFilePath:                 "/captcha.html",
 		BanFilePath:                     "",
 		CrowdsecDecisionHeader:          "",
@@ -359,17 +365,8 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		return err
 	}
 
-	if config.CrowdsecMode == AloneMode {
-		if _, err := GetVariable(config, "CrowdsecCapiMachineID"); err != nil {
-			return err
-		}
-		if _, err := GetVariable(config, "CrowdsecCapiPassword"); err != nil {
-			return err
-		}
-	} else {
-		if err := validateLapiURLAndKeys(config); err != nil {
-			return err
-		}
+	if err := validateLapiWhenEnabled(config); err != nil {
+		return err
 	}
 
 	// AppSec URL, key file, and HTTPS CA only when this router will open AppSec.
@@ -379,23 +376,49 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		}
 	}
 
-	warnUnenforcedAppsecMode(config, log)
+	if err := validateOpenVsSubscribe(config); err != nil {
+		return err
+	}
 
 	return validateLogging(config)
 }
 
-// warnUnenforcedAppsecMode reports the one accepted combination that enforces nothing. appsec mode
-// selects no decision source, so with the AppSec leg off the middleware only calls next. This is a
-// warning and not an error on purpose: the plugin doing nothing is not worth refusing to boot over,
-// and implying crowdsecAppsecEnabled would point at the crowdsec:7422 default and, with the default
-// ban failure action, ban every request on that router.
-func warnUnenforcedAppsecMode(config *Config, log *slog.Logger) {
-	if config.CrowdsecMode != AppsecMode || config.CrowdsecAppsecEnabled {
-		return
+// validateOpenVsSubscribe rejects leftover secrets or names when nothing owns or subscribes (E2).
+func validateOpenVsSubscribe(config *Config) error {
+	if err := validateLegOpenVsSubscribe("LAPI", config.Enabled, config.CrowdsecLapiEnabled, config.CrowdsecLapiInstanceName, lapiSecretPresent(config)); err != nil {
+		return err
 	}
-	log.Warn("crowdsecMode is 'appsec' while crowdsecAppsecEnabled is false: " +
-		"this middleware checks nothing at all, no CrowdSec decisions and no AppSec inspection. " +
-		"Set crowdsecAppsecEnabled to true, or pick a crowdsecMode that queries LAPI ('none', 'live', 'stream' or 'alone')")
+	return validateLegOpenVsSubscribe("AppSec", config.Enabled, config.CrowdsecAppsecEnabled, config.CrowdsecAppsecInstanceName, appsecSecretPresent(config))
+}
+
+func validateLegOpenVsSubscribe(leg string, bounceEnabled, owned bool, instanceName string, secretPresent bool) error {
+	if bounceEnabled || owned {
+		return nil
+	}
+	if strings.TrimSpace(instanceName) == "" && !secretPresent {
+		return nil
+	}
+	return fmt.Errorf("%s: leftover instance name, API key, or client certificate while enabled is false and the leg is not owned", leg)
+}
+
+func lapiSecretPresent(config *Config) bool {
+	key, err := GetVariable(config, "CrowdsecLapiKey")
+	if err == nil && strings.TrimSpace(key) != "" {
+		return true
+	}
+	cert, _ := GetVariable(config, "CrowdsecLapiTLSCertificateBouncer")
+	certKey, _ := GetVariable(config, "CrowdsecLapiTLSCertificateBouncerKey")
+	return strings.TrimSpace(cert) != "" && strings.TrimSpace(certKey) != ""
+}
+
+func appsecSecretPresent(config *Config) bool {
+	key, err := GetVariable(config, "CrowdsecAppsecKey")
+	if err == nil && strings.TrimSpace(key) != "" {
+		return true
+	}
+	cert, _ := GetVariable(config, "CrowdsecAppsecTLSCertificateBouncer")
+	certKey, _ := GetVariable(config, "CrowdsecAppsecTLSCertificateBouncerKey")
+	return strings.TrimSpace(cert) != "" && strings.TrimSpace(certKey) != ""
 }
 
 func effectiveAppsecScheme(config *Config) string {
@@ -470,6 +493,22 @@ func validateCaptchaCredentials(config *Config) error {
 	return nil
 }
 
+func validateLapiWhenEnabled(config *Config) error {
+	if !config.CrowdsecLapiEnabled {
+		return nil
+	}
+	if config.CrowdsecMode == AloneMode {
+		if _, err := GetVariable(config, "CrowdsecCapiMachineID"); err != nil {
+			return err
+		}
+		if _, err := GetVariable(config, "CrowdsecCapiPassword"); err != nil {
+			return err
+		}
+		return nil
+	}
+	return validateLapiURLAndKeys(config)
+}
+
 func validateLapiURLAndKeys(config *Config) error {
 	if err := validateURL("CrowdsecLapi", config.CrowdsecLapiScheme, config.CrowdsecLapiHost, config.CrowdsecLapiPath); err != nil {
 		return err
@@ -488,7 +527,7 @@ func validateLapiURLAndKeys(config *Config) error {
 		return err
 	}
 
-	if lapiKey == "" && (certBouncer == "" || certBouncerKey == "") && config.CrowdsecMode != AppsecMode {
+	if lapiKey == "" && (certBouncer == "" || certBouncerKey == "") {
 		return errors.New("CrowdsecLapiKey || (CrowdsecLapiTLSCertificateBouncer && CrowdsecLapiTLSCertificateBouncerKey): cannot be all empty")
 	}
 	if lapiKey != "" && (certBouncer == "" || certBouncerKey == "") {
@@ -678,6 +717,7 @@ func validateParamsRequired(config *Config) error {
 		"CrowdsecLapiHTTPTimeoutSeconds":      config.CrowdsecLapiHTTPTimeoutSeconds,
 		"CrowdsecAppsecHTTPTimeoutSeconds":    config.CrowdsecAppsecHTTPTimeoutSeconds,
 		"CaptchaSiteverifyHTTPTimeoutSeconds": config.CaptchaSiteverifyHTTPTimeoutSeconds,
+		"ReclaimGraceSeconds":                 config.ReclaimGraceSeconds,
 	}
 	for key, val := range requiredInt0 {
 		if val < 0 {
@@ -711,8 +751,8 @@ func validateParamsRequired(config *Config) error {
 		return errors.New("RemediationStatusCode: cannot be less than 100 and more than 600")
 	}
 
-	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode, AppsecMode}, config.CrowdsecMode) {
-		return errors.New("CrowdsecMode: must be one of 'none', 'live', 'stream', 'alone' or 'appsec'")
+	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode}, config.CrowdsecMode) {
+		return errors.New("CrowdsecMode: must be one of 'none', 'live', 'stream' or 'alone'")
 	}
 	if !contains([]string{HTTP, HTTPS}, config.CrowdsecLapiScheme) {
 		return errors.New("CrowdsecLapiScheme: must be one of 'http' or 'https'")

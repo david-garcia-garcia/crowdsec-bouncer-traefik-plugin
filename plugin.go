@@ -1,53 +1,93 @@
-// Package crowdsec_bouncer_traefik_plugin implements a middleware that communicates with crowdsec.
+// Package crowdsec_bouncer_traefik_plugin is the Traefik Yaegi entry (CreateConfig / New).
+//
+// Each New is one middleware. Per leg (LAPI, AppSec) it may own a Client, bounce
+// against a named instance, both, or neither.
+//
+//	Open:          reclaim holder. Keeps that Client alive (stream ticker, HTTP).
+//	               Last holder gone → Sleep, then Close after table grace.
+//	ClearPublisher: this Traefik name no longer owns the leg; drop its aliases
+//	               so watchers unbind. Do not Clear a still-owned reconstruct
+//	               or subscribers flash empty before SetAlias.
+//	SetAlias:      publish the instance name to the Client just Opened.
+//	               Exclusive: a second publisher fails New.
+//	Watch:         subscriber. Copies the current Client (or typed nil) into
+//	               the Bouncer's atomic.Value. Not a holder — does not keep
+//	               the Client alive and does not Close it.
+//	valueChanged:  Watch's func(any). The any is reclaim.Published, whose Value
+//	               is the client, or the typed empty when the alias is clear.
+//	               The bouncer stores that into its own binding and validates it.
+//	               Watch drops the subscriber when its ctx is done. The backend
+//	               stays up if another holder still Opened it.
 package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
+
+const (
+	legLAPI   = "lapi"
+	legAppSec = "appsec"
+)
+
+// instanceAlias is this plugin's opaque reclaim name for one published slot.
+// Reclaim never parses it; SetAlias/ClearPublisher use group for rename and clear.
+func instanceAlias(leg, instanceName string) string {
+	if instanceName == "" {
+		return ""
+	}
+	return "alias:" + leg + ":" + instanceName
+}
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *configuration.Config {
 	return configuration.New()
 }
 
-// New is the Traefik Yaegi constructor. It reclaims LAPI and AppSec backends and returns a per-router Bouncer.
-// Stream/alone: one LAPI client per LAPI URL+key (CrowdSec one stream cursor per
-// hashed key + outbound IP). Live/none: reclaim by LAPI identity. AppSec: reclaim by listener URL+key.
+// New snapshots Traefik's config, Opens owned legs, publishes their instance names,
+// and returns a Bouncer that ServeHTTP-Loads those names via Watch.
 //
-// New works on a snapshot of the config Traefik owns, and binds every reclaim Open to a context
-// derived from the constructor ctx, so a constructor that fails partway releases what earlier steps
-// already opened instead of leaving a LAPI stream ticker polling for the process lifetime.
+// crowdsecLapiEnabled / crowdsecAppsecEnabled = own (Open + SetAlias).
+// enabled + a non-empty instance name = bounce (Watch). Those axes are independent.
 //
-// err is named so that defer can see which way New left; a bool would not survive a later return.
-func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (handler http.Handler, err error) {
+// Open binds bindCtx, a child of Traefik's constructor ctx. The table has no Release:
+// cancel bindCtx on a failed New so a half-built constructor does not leave a stream
+// polling for the process lifetime. Success leaves bindCtx live; Traefik cancel of
+// ctx still ends the holders.
+func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config, name string) (handler http.Handler, err error) {
 	// Shallow copy: Config's []string and map[string]string fields still alias the caller's.
-	// Nothing below mutates them in place, so whoever adds an in-place mutation must copy them too.
-	prepared := *config
-	prepared.LogLevel = strings.ToUpper(prepared.LogLevel)
-	log := logger.NewWithFormat(prepared.LogLevel, prepared.LogFilePath, prepared.LogFormat)
+	config := *rawConfig
+	config.LogLevel = strings.ToUpper(config.LogLevel)
+	log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
 
-	if err = configuration.ValidateParams(&prepared, log); err != nil {
+	if err = configuration.ValidateParams(&config, log); err != nil {
 		log.Error("New:validateParams", "error", err)
 		return nil, err
 	}
+	// TODO: this has to go. Table grace is process-global (first New wins), not per slot.
+	// E2e needed reclaimGraceSeconds=2 instead of ProcessGrace 30s so dispose is not the
+	// production wait. Revisit when grace can be per incarnation or tests do not need this knob.
+	reclaim.EnsureProcessGrace(time.Duration(config.ReclaimGraceSeconds) * time.Second)
 
-	if err = lapi.Prepare(&prepared, log); err != nil {
+	// Secrets plus omitted instance name → Traefik name, only when that leg is owned.
+	if err = lapi.Prepare(&config, log, name); err != nil {
 		return nil, err
 	}
-	if err = appsec.Prepare(&prepared, log); err != nil {
+	if err = appsec.Prepare(&config, log, name); err != nil {
 		return nil, err
 	}
 
-	// bindCtx holds every incarnation this constructor opens. Releasing it on a failed New hands
-	// them back; it stays a child of ctx, so canceling Traefik's context still releases them.
+	// Holder lease for everything this New Opens. Cancel only on error (named err).
 	bindCtx, releaseHolders := context.WithCancel(ctx)
 	defer func() {
 		if err != nil {
@@ -55,32 +95,89 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 		}
 	}()
 
-	var lapiClient *lapi.Client
-	// Stream and alone poll GET /v1/decisions/stream. CrowdSec stores that
-	// cursor on the bouncer row selected by hashed X-Api-Key plus the IP LAPI
-	// sees (this process’s outbound address), not per middleware and not per
-	// metrics interval. OpenStream keeps one ticker per URL+key in this process.
-	if prepared.CrowdsecMode == configuration.StreamMode || prepared.CrowdsecMode == configuration.AloneMode {
-		lapiClient, err = lapi.OpenStream(bindCtx, &prepared, log, name, pluginVersion)
-		if err != nil {
-			return nil, err
-		}
-	} else if prepared.CrowdsecMode != configuration.AppsecMode {
-		// Live/none do not use stream_cursor. Two Clients on one key
-		// stay valid (?ip= lookups). Reclaim by LAPI identity, including intervals.
-		lapiClient, err = lapi.OpenLive(bindCtx, &prepared, log, name, pluginVersion)
-		if err != nil {
-			return nil, err
-		}
+	if err = openOwned(bindCtx, &config, log, name); err != nil {
+		return nil, err
+	}
+	if err = claimOwned(&config, log, name); err != nil {
+		return nil, err
 	}
 
-	var appsecClient *appsec.Client
-	if prepared.CrowdsecAppsecEnabled {
-		appsecClient, err = appsec.Open(bindCtx, &prepared, log, name, pluginVersion)
-		if err != nil {
-			return nil, err
-		}
+	// Bounce: the router is on and an instance name is set. Owning is a different flag.
+	subscribeLAPI := config.Enabled && config.CrowdsecLapiInstanceName != ""
+	subscribeAppSec := config.Enabled && config.CrowdsecAppsecInstanceName != ""
+	route, err := bouncer.New(next, name, &config, subscribeLAPI, subscribeAppSec, log)
+	if err != nil {
+		return nil, err
 	}
-	handler, err = bouncer.New(next, name, &prepared, lapiClient, appsecClient, log)
-	return handler, err
+	if subscribeLAPI {
+		reclaim.Watch(ctx, instanceAlias(legLAPI, config.CrowdsecLapiInstanceName), (*lapi.Client)(nil), route.ReceiveLAPI)
+	}
+	if subscribeAppSec {
+		reclaim.Watch(ctx, instanceAlias(legAppSec, config.CrowdsecAppsecInstanceName), (*appsec.Client)(nil), route.ReceiveAppSec)
+	}
+	return route, nil
+}
+
+// openOwned is the own axis: Open each enabled leg on bindCtx, or ClearPublisher when
+// this reconstruct dropped that flag (leftover alias would keep subscribers bound).
+func openOwned(bindCtx context.Context, config *configuration.Config, log *slog.Logger, name string) error {
+	if err := openOwnedLeg(bindCtx, config, log, name, config.CrowdsecLapiEnabled, legLAPI); err != nil {
+		return err
+	}
+	return openOwnedLeg(bindCtx, config, log, name, config.CrowdsecAppsecEnabled, legAppSec)
+}
+
+func openOwnedLeg(bindCtx context.Context, config *configuration.Config, log *slog.Logger, name string, enabled bool, group string) error {
+	if !enabled {
+		reclaim.ClearPublisher(name, group)
+		return nil
+	}
+	switch group {
+	case legLAPI:
+		if config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode {
+			_, err := lapi.OpenStream(bindCtx, config, log, name, pluginVersion)
+			return err
+		}
+		_, err := lapi.OpenLive(bindCtx, config, log, name, pluginVersion)
+		return err
+	case legAppSec:
+		_, err := appsec.Open(bindCtx, config, log, name, pluginVersion)
+		return err
+	}
+	return nil
+}
+
+// claimOwned publishes each owned instance name (SetAlias) to the Client Open just
+// created. A taken name fails New. If AppSec's claim fails after LAPI published,
+// drop the LAPI alias so we do not leave a half-claimed owner.
+func claimOwned(config *configuration.Config, log *slog.Logger, name string) error {
+	if err := claimOwnedLeg(config, log, name, config.CrowdsecLapiEnabled, legLAPI); err != nil {
+		return err
+	}
+	err := claimOwnedLeg(config, log, name, config.CrowdsecAppsecEnabled, legAppSec)
+	if err != nil && config.CrowdsecLapiEnabled {
+		reclaim.ClearPublisher(name, legLAPI)
+	}
+	return err
+}
+
+func claimOwnedLeg(config *configuration.Config, log *slog.Logger, name string, enabled bool, group string) error {
+	if !enabled {
+		return nil
+	}
+	switch group {
+	case legLAPI:
+		return claimAlias(lapi.OwnershipKey(config, name), group, config.CrowdsecLapiInstanceName, name, log)
+	case legAppSec:
+		return claimAlias(appsec.Key(config, name), group, config.CrowdsecAppsecInstanceName, name, log)
+	}
+	return nil
+}
+
+func claimAlias(key, group, instanceName, publisher string, log *slog.Logger) error {
+	err := reclaim.SetAlias(key, instanceAlias(group, instanceName), publisher, group)
+	if err != nil {
+		log.Error("crowdsec instance name taken", "leg", group, "instanceName", instanceName, "rejected", publisher)
+	}
+	return err
 }

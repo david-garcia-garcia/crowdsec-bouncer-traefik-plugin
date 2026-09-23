@@ -63,9 +63,10 @@ type Hooks struct {
 // A Sleep panic aborts instead: Close and unmap (order follows stored EnforceCloseBeforeOpen), no orphan. Those lines cannot be reordered,
 // because one goroutine writes them in that order.
 type Table struct {
-	mu    sync.Mutex
-	grace time.Duration
-	items map[string]*slot
+	mu      sync.Mutex
+	grace   time.Duration
+	items   map[string]*slot
+	aliases map[string]*aliasEntry
 }
 
 // slotState is what the table may do with a slot right now.
@@ -108,6 +109,9 @@ type slot struct {
 	// never has a finished channel: no holder binds to it.
 	finished chan struct{}
 	logger   *slog.Logger
+	// aliases are the public names currently bound to this incarnation.
+	// Table.aliases is the forward map; this slice is only the reverse link for Close.
+	aliases []*aliasEntry
 }
 
 // Config is the freeze-at-New settings for a Table. New copies Grace onto the table.
@@ -125,8 +129,9 @@ func New(cfg Config) *Table {
 		grace = DefaultGrace
 	}
 	return &Table{
-		grace: grace,
-		items: map[string]*slot{},
+		grace:   grace,
+		items:   map[string]*slot{},
+		aliases: map[string]*aliasEntry{},
 	}
 }
 
@@ -205,6 +210,7 @@ func (t *Table) endBusySlot(key string, incarnation *slot, createErr error) {
 	incarnation.createErr = createErr
 	incarnation.state = slotGone
 	closeFinished(incarnation)
+	t.unbindIncarnationLocked(incarnation)
 	if t.items[key] == incarnation {
 		delete(t.items, key)
 	}
@@ -228,6 +234,7 @@ func (t *Table) unmapLocked(key string, incarnation *slot) chan struct{} {
 	}
 	incarnation.state = slotGone
 	closeFinished(incarnation)
+	t.unbindIncarnationLocked(incarnation)
 	return incarnation.ready
 }
 
@@ -252,6 +259,7 @@ func (t *Table) installCloser(key string, incarnation *slot, logger *slog.Logger
 	incarnation.createErr = createErr
 	incarnation.state = slotGone
 	closeFinished(incarnation)
+	t.unbindIncarnationLocked(incarnation)
 	oldReady := incarnation.ready
 	// Occupy the key for the Close window. Waiters already parked on oldReady replay
 	// createErr from this incarnation; a later Open finds closer and creates after Close.
@@ -750,6 +758,11 @@ func (t *Table) expire(key string, incarnation *slot) {
 		t.endMappedClose(key, incarnation, step.hooks, step.logger)
 	case expireDispose:
 		dispose(key, step.hooks, step.logger)
+		// claimExpire already unmapped the key. Aliases still pointing at this
+		// incarnation are cleared after Close, same as the enforce path.
+		t.mu.Lock()
+		t.unbindIncarnationLocked(incarnation)
+		t.mu.Unlock()
 	}
 }
 
@@ -759,6 +772,10 @@ func (t *Table) takeAll() map[string]*slot {
 	defer t.mu.Unlock()
 	items := t.items
 	t.items = map[string]*slot{}
+	for _, incarnation := range items {
+		t.unbindIncarnationLocked(incarnation)
+	}
+	t.aliases = map[string]*aliasEntry{}
 	for _, incarnation := range items {
 		if incarnation.graceTimer != nil {
 			incarnation.graceTimer.Stop()

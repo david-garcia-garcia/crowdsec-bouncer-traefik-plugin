@@ -32,15 +32,8 @@ func TestOpen_AppsecOverrideAdoptsTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first != second {
-		t.Fatal("AppSec override-only New must reuse the Client")
-	}
-	current := second.currentTransport()
-	if current == nil || current.httpTimeoutSeconds != 30 {
-		t.Fatalf("adopted timeout: %+v", current)
-	}
-	if current.httpClient.Timeout != 30*time.Second {
-		t.Fatalf("HTTP timeout %v", current.httpClient.Timeout)
+	if first == second {
+		t.Fatal("AppSec override-only New must open a new Client")
 	}
 }
 
@@ -77,15 +70,5 @@ func TestQuery_HangHonorsAppsecOverride(t *testing.T) {
 	}
 	if elapsed >= 4*time.Second {
 		t.Fatalf("Query took %v, want well under the 10s shared default", elapsed)
-	}
-}
-
-func TestKey_TimeoutKnobsDoNotChangeIdentity(t *testing.T) {
-	base := testAppsecConfig("127.0.0.1:1")
-	timeouts := testAppsecConfig("127.0.0.1:1")
-	timeouts.HTTPTimeoutSeconds = 30
-	timeouts.CrowdsecAppsecHTTPTimeoutSeconds = 1
-	if Key(base) != Key(timeouts) || IdentityHex(base) != IdentityHex(timeouts) {
-		t.Fatal("HTTP timeout knobs must not change AppSec Key or IdentityHex")
 	}
 }

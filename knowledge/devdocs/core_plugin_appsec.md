@@ -3,8 +3,8 @@
 ## Language
 
 **AppSec Client**:
-The reclaim value for one CrowdSec AppSec listener (`pkg/appsec`). Owns JSON parse, host/path/body limit, and replaceable HTTP+auth (`transport` on `atomic.Value`). Not the LAPI Client.
-_Avoid_: CrowdsecConnection, `AppsecQuery` on LAPI, LAPI captcha, `atomic.Pointer[T]`
+The reclaim value for one CrowdSec AppSec listener (`pkg/appsec`). Keyed by middleware name plus host, path, resolved key, body limit, TLS, and effective HTTP timeout. Owns JSON parse and HTTP+auth. Not the LAPI Client.
+_Avoid_: CrowdsecConnection, `AppsecQuery` on LAPI, LAPI captcha, `atomic.Pointer[T]`, Adopt-only timeout or TLS
 
 **Structured AppSec response**:
 JSON CrowdSec 1.8 AppSec returns to the bouncer (`action`, `http_status`, `user_body_content`, `user_cookies`, `user_headers`). Listener HTTP 403 carries a remediation envelope; listener 200 is allow.
@@ -25,7 +25,7 @@ _Avoid_: GetBody ban, unreadable body, FailureAction passthrough
 ## How to use
 
 - Enable with existing `crowdsecAppsecEnabled`. Do not add a bot-detection plugin key.
-- Open with `appsec.Open` (reclaim by AppSec URL+key+body limit). `Open` calls `AdoptTransport` so last `New` wins TLS/timeout. Do not construct the AppSec client inside `lapi.New`. Do not use `atomic.Pointer[T]`.
+- Open with `appsec.Open` (reclaim by middleware name plus AppSec URL+key+body limit+TLS+effective timeout). A knob change is a new Client. Do not construct the AppSec client inside `lapi.New`. Do not use `atomic.Pointer[T]`.
 - `newTransport` sets `http.Client.Timeout` and stored `httpTimeoutSeconds` from `cfg.EffectiveHTTPTimeoutSeconds(cfg.CrowdsecAppsecHTTPTimeoutSeconds)`. Do not read raw `HTTPTimeoutSeconds` when the AppSec override is non-zero. Store effective seconds so `fieldsDiffer` sees a shared-default change when the override is still 0. Query uses that stored client.
 - `action` allow or empty 200 → `next`. `ban` → `handleBanServeHTTP`. Any other non-allow action (challenge, AppSec captcha HTML) → relay. Empty `challenge` body → ban. Empty `captcha` body still relays `http_status` (not the operator ban page). AppSec `captcha` is not `pkg/captcha`.
 - AppSec HTTP 500, unreachable (transport failure or listener HTTP 502/503/504), AppSec response-body io errors, and an unreadable HTTP/2 or HTTP/3 body on POST, PUT, or PATCH use per-router `crowdsecAppsecFailureAction` (`passthrough` | `ban` | `captcha`), not the three removed block bools. `captcha` here is `pkg/captcha`, not AppSec JSON `action: captcha`. A response-body io error keeps `appsecQuery:readBody`. Oversized AppSec bodies do not use this action. A **client disconnect** while buffering a readable forwardable body is not FailureAction: `Query` returns `ErrClientDisconnected`, AppSec is not called, origin is not called, TRACE only, optional `error:client-disconnected` header. Unclassified client-body read faults keep `appsecQuery:GetBody` and today's ban wiring.
@@ -65,4 +65,4 @@ decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
 - Do not strip header names listed in the client's own `Connection` header, even though RFC 7230 tells a proxy to. This forward is an inspection copy, so that rule would let a client hide `Cookie` (or anything else) from the WAF. The static hop-by-hop list is the whole filter.
 - Classify AppSec response-body io failures with `errors.Is` on the package-local sentinel. Do not match the `appsecQuery:readBody` prefix. Oversized AppSec bodies stay a different error and skip FailureAction.
 - Do not pass `0` into `io.LimitReader` (`N <= 0` is immediate EOF).
-- Do not put AppSec TLS, `HTTPTimeoutSeconds`, or `CrowdsecAppsecHTTPTimeoutSeconds` in the AppSec reclaim key. `IdentityHex` and `Key` stay the same when only those knobs differ. Last `New` `AdoptTransport`s those knobs. Concurrent adopt last-writes and idle-closes the replaced `*http.Client`.
+- AppSec TLS, body limit, and effective HTTP timeout live on the ownership key. A change is a new Client. Do not apply those knobs with `AdoptTransport`.

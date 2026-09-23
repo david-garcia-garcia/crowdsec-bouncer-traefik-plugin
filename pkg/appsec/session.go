@@ -14,24 +14,37 @@ import (
 
 const keyPrefix = "appsec:"
 
-// identity is the reclaim-key payload for one AppSec listener.
-// HTTP timeout and AppSec TLS are omitted so a reload of those knobs
-// reuses the Client. Per-router failure action is not included either.
+// identity is the reclaim-key payload for one AppSec Client: middleware name plus knobs.
 type identity struct {
-	Scheme    string `json:"scheme"`
-	Host      string `json:"host"`
-	Path      string `json:"path"`
-	Key       string `json:"key"`
-	BodyLimit int64  `json:"bodyLimit"`
+	MiddlewareName           string `json:"middlewareName"`
+	Scheme                   string `json:"scheme"`
+	Host                     string `json:"host"`
+	Path                     string `json:"path"`
+	Key                      string `json:"key"`
+	BodyLimit                int64  `json:"bodyLimit"`
+	TLSInsecureVerify        bool   `json:"tlsInsecureVerify"`
+	TLSCertificateAuthority  string `json:"tlsCertificateAuthority"`
+	TLSCertificateBouncer    string `json:"tlsCertificateBouncer"`
+	TLSCertificateBouncerKey string `json:"tlsCertificateBouncerKey"`
+	HTTPTimeoutSeconds       int64  `json:"httpTimeoutSeconds"`
 }
 
-func identityFrom(cfg *configuration.Config) identity {
+func identityFrom(cfg *configuration.Config, middlewareName string) identity {
+	ca, _ := configuration.GetVariable(cfg, "CrowdsecAppsecTLSCertificateAuthority")
+	cert, _ := configuration.GetVariable(cfg, "CrowdsecAppsecTLSCertificateBouncer")
+	certKey, _ := configuration.GetVariable(cfg, "CrowdsecAppsecTLSCertificateBouncerKey")
 	return identity{
-		Scheme:    cfg.CrowdsecAppsecScheme,
-		Host:      cfg.CrowdsecAppsecHost,
-		Path:      cfg.CrowdsecAppsecPath,
-		Key:       cfg.CrowdsecAppsecKey,
-		BodyLimit: cfg.CrowdsecAppsecBodyLimit,
+		MiddlewareName:           middlewareName,
+		Scheme:                   cfg.CrowdsecAppsecScheme,
+		Host:                     cfg.CrowdsecAppsecHost,
+		Path:                     cfg.CrowdsecAppsecPath,
+		Key:                      cfg.CrowdsecAppsecKey,
+		BodyLimit:                cfg.CrowdsecAppsecBodyLimit,
+		TLSInsecureVerify:        cfg.CrowdsecAppsecTLSInsecureVerify,
+		TLSCertificateAuthority:  ca,
+		TLSCertificateBouncer:    cert,
+		TLSCertificateBouncerKey: certKey,
+		HTTPTimeoutSeconds:       cfg.EffectiveHTTPTimeoutSeconds(cfg.CrowdsecAppsecHTTPTimeoutSeconds),
 	}
 }
 
@@ -42,8 +55,8 @@ func hashBytes(payload []byte) string {
 }
 
 // IdentityHex is the hash suffix of Key.
-func IdentityHex(cfg *configuration.Config) string {
-	encoded, err := json.Marshal(identityFrom(cfg))
+func IdentityHex(cfg *configuration.Config, middlewareName string) string {
+	encoded, err := json.Marshal(identityFrom(cfg, middlewareName))
 	if err != nil {
 		return fmt.Sprint(cfg)
 	}
@@ -51,15 +64,15 @@ func IdentityHex(cfg *configuration.Config) string {
 }
 
 // Key is the process reclaim table key for one AppSec Client.
-func Key(cfg *configuration.Config) string {
-	return keyPrefix + IdentityHex(cfg)
+func Key(cfg *configuration.Config, middlewareName string) string {
+	return keyPrefix + IdentityHex(cfg, middlewareName)
 }
 
-// Open reclaims an AppSec Client by listener identity.
+// Open reclaims an AppSec Client by middleware name plus listener knobs.
 func Open(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
-	// OpenWithHooks + type assert: OpenTyped still takes func() (any, Hooks, error).
-	stored, openErr := reclaim.OpenWithHooks(ctx, Key(cfg), log, func() (any, reclaim.Hooks, error) {
-		client, err := New(cfg, log, pluginVersion)
+	bindKey := Key(cfg, middlewareName)
+	stored, openErr := reclaim.OpenWithHooks(ctx, bindKey, log, func() (any, reclaim.Hooks, error) {
+		client, err := New(cfg, log, pluginVersion, middlewareName, bindKey)
 		if err != nil {
 			return nil, reclaim.Hooks{}, err
 		}
@@ -72,9 +85,6 @@ func Open(ctx context.Context, cfg *configuration.Config, log *slog.Logger, midd
 	if !ok {
 		return nil, fmt.Errorf("%s: reclaim: want *appsec.Client, got %T", middlewareName, stored)
 	}
-	_, adoptErr := client.AdoptTransport(cfg)
-	if adoptErr != nil {
-		return nil, adoptErr
-	}
+	client.bindIdentity(middlewareName, bindKey)
 	return client, nil
 }

@@ -36,6 +36,6 @@ defer c.decisionStore.EndStreamPoll()
 
 ## Gotchas
 
-- Single-flight is the only skip. A dropped tick does not GET stream and does not apply. It logs `handleStreamTicker:skip` at WARN.
+- Single-flight is the only skip. A dropped tick does not GET stream and does not apply. It logs `handleStreamTicker:skip` at WARN. Identity (`traefikName`, `instanceName`, `leg`, `sessionKey`) lives on the LAPI constructor `log.With` child (`std_go_logger_nested`).
 - `Sleep` and `Close` only signal the ticker. They do not wait for an in-flight GET and MUST NOT cancel it. `Wake` must hit the same store CAS.
 - Cancelling a stream GET after LAPI wrote the body loses those deltas (`ext_crowdsec_lapi_stream-cursor`).

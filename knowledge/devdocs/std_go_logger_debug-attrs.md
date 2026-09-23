@@ -15,7 +15,7 @@ _Avoid_: Sprintf-then-Trace, concatenating the message before `Trace`, logging p
 - Call `logger.Trace(b.log, "ServeHTTP", "ip", req.remoteIP, "isTrusted", isTrusted)` (or cache-hit `remediation`).
 - Reuse `GetRemoteIP` / `clientRequest.remoteIP` and the trusted-client `ContainsIP` result. Do not re-parse `RemoteAddr`.
 - Keep the stem recognizable. Do not drop fields DestBranch already logged.
-- Leave construct-time, stream-tick, and failure Debug (`Bouncer initialized`, `handleStreamCache:updated`, drain/parse errors) at Debug.
+- Leave construct-time, stream-tick, and failure Debug (`Bouncer initialized`, `handleStreamCache:updated`, drain/parse errors) at Debug. Identity for those lines is on the constructor `log.With` child (`std_go_logger_nested`).
 - Do not change default `logLevel` or file/format (`std_go_logger_slog-output`). Set `logLevel: TRACE` to see per-request breadcrumbs.
 
 ## Pattern snippet

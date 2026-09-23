@@ -26,6 +26,7 @@ Wf86aX6PepsntZv2GYlA5UpabfT2EZICICpJ5h/iI+i341gBmLiAFQOyTDT+/wQc
 
 func getMinimalConfig() *Config {
 	cfg := New()
+	cfg.CrowdsecLapiEnabled = true
 	cfg.CrowdsecLapiKey = "test"
 	return cfg
 }
@@ -98,11 +99,13 @@ func Test_GetVariable(t *testing.T) {
 	}
 }
 
-func Test_ValidateParams(t *testing.T) {
+func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	log := logger.New("INFO", "")
 	cfg1 := New()
+	cfg1.CrowdsecLapiEnabled = true
 	cfg1.CrowdsecLapiKey = "test\n\n"
 	cfg2 := New()
+	cfg2.CrowdsecLapiEnabled = true
 	cfg2.CrowdsecLapiKey = "test@"
 	cfg3 := getMinimalConfig()
 	cfg3.CrowdsecMode = "bad"
@@ -201,15 +204,17 @@ func Test_ValidateParams(t *testing.T) {
 	cfgLiveAppsecOffLeftover.CrowdsecAppsecScheme = HTTPS
 	cfgLiveAppsecOffLeftover.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
 	cfgLiveAppsecOffLeftover.CrowdsecAppsecKeyFile = missingAppsecKeyFile
-	cfgAppsecModeOffLeftover := getMinimalConfig()
-	cfgAppsecModeOffLeftover.CrowdsecMode = AppsecMode
-	cfgAppsecModeOffLeftover.CrowdsecLapiKey = ""
-	cfgAppsecModeOffLeftover.CrowdsecAppsecEnabled = false
-	cfgAppsecModeOffLeftover.CrowdsecAppsecScheme = HTTPS
-	cfgAppsecModeOffLeftover.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
-	cfgAppsecModeNoLapiKey := getMinimalConfig()
-	cfgAppsecModeNoLapiKey.CrowdsecMode = AppsecMode
-	cfgAppsecModeNoLapiKey.CrowdsecLapiKey = ""
+	cfgAppsecOffLeftover := getMinimalConfig()
+	cfgAppsecOffLeftover.CrowdsecLapiEnabled = false
+	cfgAppsecOffLeftover.CrowdsecLapiKey = ""
+	cfgAppsecOffLeftover.CrowdsecAppsecEnabled = false
+	cfgAppsecOffLeftover.CrowdsecAppsecScheme = HTTPS
+	cfgAppsecOffLeftover.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgAppsecOnlyNoLapiKey := getMinimalConfig()
+	cfgAppsecOnlyNoLapiKey.CrowdsecLapiEnabled = false
+	cfgAppsecOnlyNoLapiKey.CrowdsecLapiKey = ""
+	cfgAppsecOnlyNoLapiKey.CrowdsecAppsecEnabled = true
+	cfgAppsecOnlyNoLapiKey.CrowdsecAppsecKey = "appsec-key"
 	cfgNoneMode := getMinimalConfig()
 	cfgNoneMode.CrowdsecMode = NoneMode
 	cfgAloneValid := getMinimalConfig()
@@ -249,7 +254,11 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Validate minimal config", args: args{config: getMinimalConfig()}, wantErr: false},
 		{name: "Validate a non trimed crowdsec lapi key", args: args{config: cfg1}, wantErr: false},
 		{name: "Not validate unauthorized character in crowdsec lapi key", args: args{config: cfg2}, wantErr: true},
-		{name: "Not validate an absent crowdsec lapi key", args: args{config: New()}, wantErr: true},
+		{name: "Not validate an absent crowdsec lapi key", args: args{config: func() *Config {
+			cfg := getMinimalConfig()
+			cfg.CrowdsecLapiKey = ""
+			return cfg
+		}()}, wantErr: true},
 		{name: "Not validate a not listed item", args: args{config: cfg3}, wantErr: true},
 		{name: "Not validate a bad number", args: args{config: cfg4}, wantErr: true},
 		{name: "Not validate a bad clients ips", args: args{config: cfg5}, wantErr: true},
@@ -276,8 +285,8 @@ func Test_ValidateParams(t *testing.T) {
 		{name: "Live AppSec on with invalid CA", args: args{config: cfgLiveAppsecOnInvalidCA}, wantErr: true},
 		{name: "Live AppSec on with missing key file", args: args{config: cfgLiveAppsecOnMissingKey}, wantErr: true, wantErrContains: "CrowdsecAppsecKey"},
 		{name: "Live AppSec off leftover CA and key file", args: args{config: cfgLiveAppsecOffLeftover}, wantErr: false},
-		{name: "Appsec mode off leftover invalid CA", args: args{config: cfgAppsecModeOffLeftover}, wantErr: false},
-		{name: "Appsec mode without LAPI key", args: args{config: cfgAppsecModeNoLapiKey}, wantErr: false},
+		{name: "AppSec off leftover invalid CA", args: args{config: cfgAppsecOffLeftover}, wantErr: false},
+		{name: "AppSec only without LAPI key", args: args{config: cfgAppsecOnlyNoLapiKey}, wantErr: false},
 		{name: "None mode minimal config", args: args{config: cfgNoneMode}, wantErr: false},
 		{name: "Alone mode with CAPI credentials", args: args{config: cfgAloneValid}, wantErr: false},
 		{name: "Alone mode captcha without site/secret keys", args: args{config: cfgAloneMissingCaptchaKeys}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},

@@ -16,7 +16,7 @@ The repository SHALL keep `tests/e2e/mock/` and `make e2e_mock` as the mock suit
 - **THEN** Pester cases, the compose file, and `Test-Integration.ps1` are under `tests/e2e/real/` and not at the repository root or mixed into `tests/e2e/mock/`
 
 ### Requirement: Real stack boots Traefik and Crowdsec
-`tests/e2e/real/docker-compose.test.yml` SHALL start Traefik (local plugin bind-mount of the repository root) and Crowdsec. Pester tests SHALL add and delete decisions with `cscli` in the Crowdsec container and send client identity only via `X-Forwarded-For`.
+`tests/e2e/real/config/docker-compose.test.yml` SHALL start Traefik (local plugin bind-mount of the repository root) and Crowdsec. Pester tests SHALL add and delete decisions with `cscli` in the Crowdsec container and send client identity only via `X-Forwarded-For`.
 
 #### Scenario: Ban then unban on whoami
 - **WHEN** the stack is up and a ban decision is added for the test IP
@@ -65,7 +65,7 @@ Scenario requests SHALL identify the client only via `X-Forwarded-For`. The stac
 - **THEN** the plugin remediates that request as that IP
 
 ### Requirement: Real stack includes a Dragonfly Redis-protocol cache
-`tests/e2e/real/docker-compose.test.yml` SHALL start Dragonfly (`docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2`, port 6379, `ulimits.memlock: -1`) in addition to Traefik and Crowdsec. At least one Pester route SHALL set `redisCacheEnabled` and `redisCacheHost` to that Dragonfly service. Pester SHALL prove live-mode cache hit/miss against Dragonfly. Client identity SHALL remain only `X-Forwarded-For` (Traefik forwarded headers plus plugin `forwardedHeadersTrustedIps`).
+`tests/e2e/real/config/docker-compose.test.yml` SHALL start Dragonfly (`docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2`, port 6379, `ulimits.memlock: -1`) in addition to Traefik and Crowdsec. At least one Pester route SHALL set `redisCacheEnabled` and `redisCacheHost` to that Dragonfly service. Pester SHALL prove live-mode cache hit/miss against Dragonfly. Client identity SHALL remain only `X-Forwarded-For` (Traefik forwarded headers plus plugin `forwardedHeadersTrustedIps`).
 
 #### Scenario: Live-mode Redis cache allow then ban after TTL
 - **WHEN** the Dragonfly-backed live-mode route is used, a request is allowed, then a ban is added for that `X-Forwarded-For`
@@ -148,4 +148,19 @@ Captcha solve SHALL succeed from the POST body alone (no query-string token). A 
 #### Scenario: Captcha grace expires
 - **WHEN** the short-grace captcha route is solved
 - **THEN** a GET with the gate cookie after `captchaGracePeriodSeconds` serves the challenge again
+
+### Requirement: Instance severance real e2e suite
+The repository SHALL provide `tests/e2e/real/instance_severance.Tests.ps1` exercising named LAPI/AppSec slots, late bind, file-provider reload reclaim cases, slot collision, and lifecycle log order from the change requirement matrix (T*, L*, R*, N*, F*, C*, E2/E3). The harness SHALL support rewriting watched dynamic configuration (writable mount or directory) and waiting for Traefik to apply routes without sleep-only synchronization. Lifecycle cases MAY set plugin log level to DEBUG or TRACE and SHALL assert ordered `msg`, `instanceName`, and `incarnation` (and `traefikName` on bouncer lines) in `docker logs traefik-test`. Cases that depend on grace Close SHALL wait at least process reclaim grace plus margin.
+
+#### Scenario: Named share T2 bans both routes
+- **WHEN** an owner publishes `shared` LAPI and AppSec on `/api` and a subscriber bounces `/admin` with the same instance names
+- **THEN** a banned test IP receives 403 on both paths with distinct remediation headers per route
+
+#### Scenario: L1 subscriber-only first publish 503 then 403
+- **WHEN** the dynamic file first contains only subscribers with `streamStartupBlock` true, then adds the owner in a second publish
+- **THEN** requests return 503 before the owner exists and 403 from the decision after the owner publish
+
+#### Scenario: F1 slot collision ERROR
+- **WHEN** two middlewares attempt to publish the same LAPI instance name with distinct API keys
+- **THEN** the second `New` fails and logs `crowdsec instance name taken` at ERROR without the API key
 

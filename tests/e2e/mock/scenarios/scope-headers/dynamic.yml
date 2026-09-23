@@ -17,6 +17,7 @@ http:
       plugin:
         bouncer:
           enabled: "true"
+          crowdsecLapiEnabled: "true"
           crowdsecMode: stream
           updateIntervalSeconds: "2"
           crowdsecLapiScheme: http
@@ -28,3 +29,7 @@ http:
             Country: CF-IPCountry
             AS: CF-ASN
             username: X-User
+          crowdsecLapiStreamScopes:
+            - country
+            - as
+            - username

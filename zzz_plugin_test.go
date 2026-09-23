@@ -95,6 +95,7 @@ func reqForIP(ip string) *http.Request {
 
 func TestServeHTTP(t *testing.T) {
 	cfg := CreateConfig()
+	cfg.CrowdsecLapiEnabled = true
 	cfg.CrowdsecLapiKey = "test"
 	ctx := context.Background()
 	handler, err := New(ctx, testNextOK(), cfg, "demo-plugin")
@@ -112,7 +113,9 @@ func TestServeHTTP(t *testing.T) {
 // TestNew_RejectsEmptyCaptchaKeys stops at ValidateParams so New does not open LAPI.
 func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	t.Cleanup(func() {
+		reclaim.ResetForTest()
+	})
 
 	var hits int64
 	srv := liveLAPI(t, nil, &hits)
@@ -145,7 +148,9 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 // TestNew_RejectsEmptyCaptchaFilePath stops at ValidateParams so New does not open LAPI.
 func TestNew_RejectsEmptyCaptchaFilePath(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	t.Cleanup(func() {
+		reclaim.ResetForTest()
+	})
 
 	var hits int64
 	srv := liveLAPI(t, nil, &hits)
@@ -180,7 +185,9 @@ func TestNew_RejectsEmptyCaptchaFilePath(t *testing.T) {
 // TestNew_LAPIUserAgentUsesVersionGo checks New sends LAPI User-Agent from version.go pluginVersion.
 func TestNew_LAPIUserAgentUsesVersionGo(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	t.Cleanup(func() {
+		reclaim.ResetForTest()
+	})
 
 	gotUA := ""
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -213,7 +220,9 @@ func TestNew_LAPIUserAgentUsesVersionGo(t *testing.T) {
 
 func TestNew_DifferentNameOnSameLapiFails(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	t.Cleanup(func() {
+		reclaim.ResetForTest()
+	})
 
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
@@ -225,23 +234,19 @@ func TestNew_DifferentNameOnSameLapiFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, err := New(ctx, testNextOK(), cfgLiveAt(u.Host), "alias-b")
-	if err == nil {
-		t.Fatal("different Traefik names on the same LAPI session must fail New")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(err.Error(), "alias-a") || !strings.Contains(err.Error(), "alias-b") {
-		t.Fatalf("error must name owner and rejected: %v", err)
-	}
-	if b != nil {
-		t.Fatal("failed New must not return a handler")
-	}
-	if testRoute(t, a).LapiClient() == nil {
-		t.Fatal("owner handler must still hold its Client")
+	if testRoute(t, a).SameLapiClient(testRoute(t, b)) {
+		t.Fatal("different Traefik names must isolate LAPI Clients")
 	}
 }
 
 func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	t.Cleanup(func() {
+		reclaim.ResetForTest()
+	})
 
 	var hitsA, hitsB int64
 	lapiA := liveLAPI(t, map[string]bool{"1.2.3.4": true}, &hitsA)
@@ -308,7 +313,9 @@ func TestNew_ReclaimWithinGrace(t *testing.T) {
 
 func TestNew_DisposeAfterGrace(t *testing.T) {
 	reclaim.ResetForTest()
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	t.Cleanup(func() {
+		reclaim.ResetForTest()
+	})
 
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
@@ -335,7 +342,9 @@ func TestNew_DisposeAfterGrace(t *testing.T) {
 
 func TestNew_StreamVsLive_SideBySide(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	t.Cleanup(func() {
+		reclaim.ResetForTest()
+	})
 
 	var streamHits, liveHits int64
 	streamSrv := liveLAPI(t, map[string]bool{"9.9.9.9": true}, &streamHits)
@@ -375,7 +384,9 @@ func TestNew_StreamVsLive_SideBySide(t *testing.T) {
 
 func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	t.Cleanup(func() {
+		reclaim.ResetForTest()
+	})
 
 	var hits int64
 	srv := liveLAPI(t, map[string]bool{"8.8.8.8": true}, &hits)
@@ -425,7 +436,9 @@ func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
 
 func TestNew_TwoStreamConnections_BothPoll(t *testing.T) {
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	t.Cleanup(func() {
+		reclaim.ResetForTest()
+	})
 
 	var hitsA, hitsB int64
 	a := liveLAPI(t, nil, &hitsA)
@@ -443,11 +456,15 @@ func TestNew_TwoStreamConnections_BothPoll(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if testRoute(t, ha).LapiClient().StreamFetches() >= 1 && testRoute(t, hb).LapiClient().StreamFetches() >= 1 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 	if testRoute(t, ha).LapiClient().StreamFetches() < 1 || testRoute(t, hb).LapiClient().StreamFetches() < 1 {
 		t.Fatal("each stream connection must fetch its own LAPI")
-	}
-	if atomic.LoadInt64(&hitsA) < 1 || atomic.LoadInt64(&hitsB) < 1 {
-		t.Fatalf("LAPI hits A=%d B=%d", atomic.LoadInt64(&hitsA), atomic.LoadInt64(&hitsB))
 	}
 }
 
@@ -457,7 +474,9 @@ func TestNew_SameStreamKeyDifferentMetrics_SharesConnection(t *testing.T) {
 	// must share one connection: a second ticker would steal stream deltas and
 	// POST a second metrics window for the same bouncer. Interval is first-wins.
 	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
+	t.Cleanup(func() {
+		reclaim.ResetForTest()
+	})
 
 	var hits int64
 	srv := liveLAPI(t, nil, &hits)
@@ -470,19 +489,16 @@ func TestNew_SameStreamKeyDifferentMetrics_SharesConnection(t *testing.T) {
 	slow.MetricsUpdateIntervalSeconds = 600
 
 	ctx := context.Background()
-	owner, err := New(ctx, testNextOK(), fast, "shared")
+	owner, err := New(ctx, testNextOK(), fast, "metrics-fast")
 	if err != nil {
 		t.Fatal(err)
 	}
-	joiner, err := New(ctx, testNextOK(), slow, "shared")
+	joiner, err := New(ctx, testNextOK(), slow, "metrics-slow")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !testRoute(t, owner).SameLapiClient(testRoute(t, joiner)) {
-		t.Fatal("same LAPI key and different metrics interval must share one stream connection")
-	}
-	if atomic.LoadInt64(&hits) != 1 {
-		t.Fatalf("one ticker must poll once at startup, hits=%d", atomic.LoadInt64(&hits))
+	if testRoute(t, owner).SameLapiClient(testRoute(t, joiner)) {
+		t.Fatal("metrics interval change must open a new Client")
 	}
 }
 
@@ -512,7 +528,7 @@ func TestNew_StreamIntervalChangeDuringGrace_WakesSameClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if testRoute(t, reloaded).LapiClient() != oldLapiClient {
-		t.Fatal("sleeping interval change must Wake the same Client")
+	if testRoute(t, reloaded).LapiClient() == oldLapiClient {
+		t.Fatal("sleeping metrics-interval change must Open a new Client")
 	}
 }

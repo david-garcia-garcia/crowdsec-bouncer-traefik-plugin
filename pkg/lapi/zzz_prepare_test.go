@@ -17,7 +17,7 @@ func TestPrepare_DisabledRedisSkipsPasswordFile(t *testing.T) {
 	staleFileDisabled.RedisCacheEnabled = false
 	staleFileDisabled.RedisCachePassword = ""
 	staleFileDisabled.RedisCachePasswordFile = passwordFile
-	if err := Prepare(staleFileDisabled, nil); err != nil {
+	if err := Prepare(staleFileDisabled, nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	if staleFileDisabled.RedisCachePassword != "" {
@@ -44,7 +44,7 @@ func TestPrepare_EnabledRedisLoadsPasswordFile(t *testing.T) {
 	staleFileEnabled.RedisCacheEnabled = true
 	staleFileEnabled.RedisCachePassword = ""
 	staleFileEnabled.RedisCachePasswordFile = passwordFile
-	if err := Prepare(staleFileEnabled, nil); err != nil {
+	if err := Prepare(staleFileEnabled, nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	if staleFileEnabled.RedisCachePassword != "stale-secret" {

@@ -41,6 +41,7 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=none"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapienabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
 
       # Choose captcha provider

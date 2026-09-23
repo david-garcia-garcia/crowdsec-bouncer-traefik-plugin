@@ -13,28 +13,26 @@
 - **AND** the call does not go through `lapi.Client`
 
 ### Requirement: AppSec is reclaimed by listener identity
-When `crowdsecAppsecEnabled` is true, `New` SHALL reclaim an `appsec.Client` with `reclaim.Open` on the process table (30s grace). The reclaim key SHALL be derived from AppSec scheme, host, path, key, and body limit. AppSec TLS, HTTP timeout, middleware name, `next`, templates, trusted IPs, Enabled, LAPI fields, and per-router AppSec failure action MUST NOT be in that key. The Open call SHALL pass `reclaim.Hooks` for Sleep/Wake/Close. `Close` SHALL release idle AppSec HTTP connections.
+When `crowdsecAppsecEnabled` is true, the owning middleware SHALL reclaim an `appsec.Client` with `reclaim.Open` on the process table (30s grace). The reclaim **ownership** key SHALL be derived from the Traefik middleware name plus AppSec scheme, host, path, resolved key, body limit, TLS material, and effective HTTP timeout. AppSec instance slot names, `enabled`, bounce knobs, LAPI fields, and per-router AppSec failure action MUST NOT be in that key. Two `Open` calls with different middleware names and otherwise identical AppSec knobs SHALL produce two Clients. Two `Open` calls with the same middleware name and identical knobs SHALL Wake the same Client on reload. A change to any keyed AppSec knob SHALL Open a new Client; `AdoptTransport` MUST NOT be the path that applies timeout or TLS changes.
 
-#### Scenario: Two routers share one AppSec listener
-- **WHEN** two `New` calls enable AppSec with the same AppSec URL, key, and body limit and live constructor contexts
-- **THEN** both bouncers use the same `appsec.Client` incarnation
+#### Scenario: Two middleware names do not share AppSec
+- **WHEN** two owners Open AppSec with different Traefik names and identical URL, key, and body limit
+- **THEN** two AppSec Client incarnations exist
 
-#### Scenario: Different AppSec hosts are isolated
-- **WHEN** two `New` calls enable AppSec with different AppSec hosts
-- **THEN** two AppSec client incarnations exist
+#### Scenario: Timeout change is a new Client
+- **WHEN** a second Open for the same middleware name changes only effective HTTP timeout
+- **THEN** the second Open returns a different Client incarnation than the first
 
-#### Scenario: TLS- or timeout-only reload reuses the Client
-- **WHEN** a later `New` enables AppSec with the same URL, key, and body limit but a different AppSec TLS knob or HTTP timeout
-- **THEN** both constructors use the same `appsec.Client` incarnation
+#### Scenario: Same name same knobs Wake
+- **WHEN** the holder context for an AppSec ownership key is cancelled and a `New` with the same name and knobs runs before grace ends
+- **THEN** the same AppSec Client incarnation is returned
 
 ### Requirement: AppSec HTTP transport is replaceable after Open
-`Client` SHALL store AppSec HTTP+auth (HTTP client, API key, timeout, AppSec TLS extras) as `atomic.Value`. After `Open` bind, the constructor SHALL call `AdoptTransport` with that config: Store the new transport and idle-close the previous HTTP client. Remaining write-once Client scalar fields MUST NOT become mutable. The Client field that holds that transport MUST NOT be `atomic.Pointer[T]`. `Query` SHALL send the API key and HTTP round-trip from the stored transport.
+`AdoptTransport` MAY still replace HTTP for the **same** Client incarnation when the ownership key unchanged; when ownership key changes, a new Client owns its transport. `Query` SHALL send from the stored transport on the loaded Client.
 
-#### Scenario: AdoptTransport replaces HTTP without a new Client
-- **WHEN** a later `New` reuses a live AppSec Client and calls `AdoptTransport` with a different TLS or HTTP timeout
-- **THEN** later AppSec requests use the new HTTP client
-- **AND** the previous HTTP client’s idle connections are closed
-- **AND** an INFO line names the replaced transport fields
+#### Scenario: Same-incarnation TLS adopt still allowed
+- **WHEN** a reload Wake reuses the same AppSec ownership key and calls `AdoptTransport` with updated TLS on that incarnation
+- **THEN** later queries use the adopted transport without a second reclaim Open key
 
 ### Requirement: Empty AppSec key falls back to LAPI key
 `appsec.Prepare` SHALL copy `crowdsecLapiKey` into `crowdsecAppsecKey` when the AppSec key is empty, and SHALL copy `crowdsecLapiScheme` into `crowdsecAppsecScheme` when the AppSec scheme is empty. Callers SHALL run `lapi.Prepare` before `appsec.Prepare`.
@@ -99,12 +97,12 @@ After `Query` chooses the bytes sent to AppSec, it SHALL omit the client's `Cont
 - **AND** an unreadable DELETE body is still not a drop
 
 ### Requirement: AppSec transport Timeout is the effective AppSec seconds
-AppSec HTTP construct SHALL set `http.Client.Timeout` and the stored timeout seconds from `config.EffectiveHTTPTimeoutSeconds(config.CrowdsecAppsecHTTPTimeoutSeconds)`. It MUST NOT read raw `HTTPTimeoutSeconds` when the AppSec override is non-zero. `Query` SHALL use that stored client. `AdoptTransport` SHALL keep last-writing that transport on the same Client. AppSec `IdentityHex` and `Key` MUST still omit `HTTPTimeoutSeconds` and `CrowdsecAppsecHTTPTimeoutSeconds`.
+AppSec HTTP construct SHALL set `http.Client.Timeout` and the stored timeout seconds from `config.EffectiveHTTPTimeoutSeconds(config.CrowdsecAppsecHTTPTimeoutSeconds)`. It MUST NOT read raw `HTTPTimeoutSeconds` when the AppSec override is non-zero. `Query` SHALL use that stored client. `AdoptTransport` SHALL keep last-writing that transport on the same Client only when the ownership key is unchanged. The AppSec ownership key SHALL include effective HTTP timeout.
 
 #### Scenario: AppSec override adopts Timeout
-- **WHEN** a later `New` enables AppSec with the same URL, key, and body limit and `CrowdsecAppsecHTTPTimeoutSeconds` 30
-- **THEN** both constructors use the same `appsec.Client` incarnation
-- **AND** the stored transport Timeout is 30 seconds
+- **WHEN** a later `New` enables AppSec with the same middleware name, URL, key, and body limit and `CrowdsecAppsecHTTPTimeoutSeconds` 30
+- **THEN** the stored transport Timeout is 30 seconds
+- **AND** a later Open that changes only that override is a new Client (ownership key includes effective timeout)
 
 #### Scenario: Query hang honors the AppSec override
 - **WHEN** AppSec is opened through `New` or `Open` with `HTTPTimeoutSeconds` 10, `CrowdsecAppsecHTTPTimeoutSeconds` 1, and `crowdsecAppsecFailureAction` passthrough
@@ -112,9 +110,10 @@ AppSec HTTP construct SHALL set `http.Client.Timeout` and the stored timeout sec
 - **THEN** `Query` returns a passthrough allow
 - **AND** the call finishes well under 10 seconds
 
-#### Scenario: AppSec timeout knobs do not change Key
-- **WHEN** two AppSec configs share URL, key, and body limit and differ only on `HTTPTimeoutSeconds` or `CrowdsecAppsecHTTPTimeoutSeconds`
-- **THEN** `Key` and `IdentityHex` are the same
+#### Scenario: AppSec timeout knobs change the ownership key
+- **WHEN** two AppSec Opens share middleware name, URL, key, and body limit and differ only on `HTTPTimeoutSeconds` or `CrowdsecAppsecHTTPTimeoutSeconds`
+- **THEN** the ownership keys differ
+- **AND** two Client incarnations exist
 
 ### Requirement: Client disconnect while buffering is not an AppSec query
 When `Query` copies a readable POST, PUT, PATCH, or DELETE body and `io.ReadAll` fails with `context.Canceled`, `context.DeadlineExceeded`, or `io.ErrUnexpectedEOF`, `Query` SHALL return `ErrClientDisconnected` and MUST NOT send a request to the AppSec listener. `crowdsecAppsecFailureAction` SHALL NOT change that result. Unclassified body-read errors SHALL keep `appsecQuery:GetBody`. Serving the disconnect (TRACE, optional remediation header, no ban, no origin) is owned by `core_plugin_middleware_bouncer`.

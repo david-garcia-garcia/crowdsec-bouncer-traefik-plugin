@@ -23,7 +23,7 @@ func (c *Client) streamQuery() string {
 	if c.crowdsecStreamRoute != crowdsecLapiStreamRoute {
 		return query
 	}
-	return query + "&scopes=" + decisionscope.StreamScopeList(c.snapshotLiveHeaderScopes())
+	return query + "&scopes=" + c.streamScopeQuery
 }
 
 // storeStreamDecision Puts one non-Range stream decision into the DecisionStore.
@@ -48,7 +48,7 @@ func (c *Client) streamPutItem(item Decision, duration int64) (decisionstore.Dec
 		return decisionstore.Decision{}, false
 	}
 	if scope != decisionscope.ScopeIP && scope != "" {
-		if _, ok := c.snapshotLiveHeaderScopes()[scope]; !ok {
+		if !c.openerCoversScope(scope) && !c.openerCoversScope(decisionscope.StreamScopeToken(scope)) {
 			c.log.Debug("handleStreamCache:ignoredScope", "scope", item.Scope)
 			return decisionstore.Decision{}, false
 		}

@@ -47,11 +47,9 @@ func testForcedDecisionBouncer(t *testing.T, log *slog.Logger, captchaClient *ca
 	passed := false
 	b := &Bouncer{
 		enabled:                  true,
-		crowdsecMode:             configuration.StreamMode,
 		forcedDecisionHeader:     testForcedDecisionHeader,
 		forwardedHeadersInsecure: true,
 		forwardedCustomHeader:    "X-Forwarded-For",
-		lapiClient:               lapiClient,
 		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
 		captchaClient:            captchaClient,
 		log:                      log,
@@ -62,6 +60,7 @@ func testForcedDecisionBouncer(t *testing.T, log *slog.Logger, captchaClient *ca
 			passed = true
 		}),
 	}
+	bindTestLAPI(b, lapiClient)
 	return b, lapiClient, &passed
 }
 
@@ -207,15 +206,15 @@ func TestServeHTTP_forcedDecisionCaptchaGatePasses(t *testing.T) {
 	}
 }
 
-func TestServeHTTP_forcedDecisionAppsecModeCaptcha(t *testing.T) {
+func TestServeHTTP_forcedDecisionAppsecOnlyCaptcha(t *testing.T) {
 	client := testCaptchaClient(t, "/fast.js", "", "", nil)
 	b, _, passed := testForcedDecisionBouncer(t, nil, client, nil, false)
-	b.crowdsecMode = configuration.AppsecMode
-	b.lapiClient = nil
+	b.subscribeLAPI = false
+	b.lapiBound.Store((*lapi.Client)(nil))
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testForcedDecisionRequest("c"))
 	if *passed {
-		t.Fatal("appsec mode forced captcha must not reach origin")
+		t.Fatal("LAPI-off forced captcha must not reach origin")
 	}
 	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
 		t.Fatalf("want captcha page, got %q", rw.Body.String())
@@ -225,15 +224,11 @@ func TestServeHTTP_forcedDecisionAppsecModeCaptcha(t *testing.T) {
 func TestBouncerNew_trimsForcedDecisionHeader(t *testing.T) {
 	log := logger.New("ERROR", "")
 	cfg := configuration.New()
-	cfg.CrowdsecMode = configuration.AppsecMode
+	cfg.CrowdsecMode = configuration.StreamMode
 	cfg.CrowdsecDecisionHeader = "  X-Crowdsec-Decision  "
-	handler, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, nil, nil, log)
+	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, true, log)
 	if err != nil {
 		t.Fatal(err)
-	}
-	got, ok := handler.(*Bouncer)
-	if !ok {
-		t.Fatalf("handler type %T", handler)
 	}
 	if got.forcedDecisionHeader != testForcedDecisionHeader {
 		t.Fatalf("forcedDecisionHeader=%q", got.forcedDecisionHeader)

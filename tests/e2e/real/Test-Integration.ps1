@@ -39,14 +39,14 @@
 param(
     [switch]$SkipDockerCleanup,
     [switch]$SkipWait,
-    [string]$TestPath = "$PSScriptRoot/*.Tests.ps1",
+    [string[]]$TestPath = @("$PSScriptRoot/*.Tests.ps1"),
     [int]$HttpTimeoutSeconds = 30
 )
 
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $false
 $exitCode = 1
-$ComposeFile = Join-Path $PSScriptRoot "docker-compose.test.yml"
+$ComposeFile = Join-Path $PSScriptRoot "config/docker-compose.test.yml"
 $runnerLog = Join-Path $PSScriptRoot "runner.log"
 . "$PSScriptRoot/TestUtils.ps1"
 
@@ -109,6 +109,26 @@ function Write-StepError {
     Write-Host "❌ $Message" -ForegroundColor $Colors.Error
 }
 
+# Return docker info OSType (linux / windows), or empty when docker is not ready.
+function Get-DockerOsType {
+    $osType = docker info --format "{{.OSType}}" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        return ""
+    }
+    return "$osType".Trim()
+}
+
+# Select Docker Desktop's Linux engine when the current context is not linux.
+function Switch-DockerLinuxContext {
+    Write-Step "Switching Docker context to Desktop-Linux..."
+    docker context use Desktop-Linux
+    if ($LASTEXITCODE -ne 0) {
+        Write-ConsoleWarning "Could not switch Docker context to Desktop-Linux"
+        return
+    }
+    Write-Success "Docker context is Desktop-Linux"
+}
+
 # Main execution
 try {
     Start-Transcript -Path $runnerLog -Force | Out-Null
@@ -146,15 +166,16 @@ try {
 
     # Ensure we are using Linux containers
     Write-Step "Ensuring Linux containers are enabled..."
-    try {
-        $dockerInfo = docker info --format "{{.OSType}}" 2>$null
-        if ($dockerInfo -eq "linux") {
-            Write-Success "Docker is using Linux containers"
-        } else {
-            Write-ConsoleWarning "Docker may not be using Linux containers. Some tests may fail."
-        }
+    $dockerOsType = Get-DockerOsType
+    if ($dockerOsType -ne "linux") {
+        Switch-DockerLinuxContext
+        $dockerOsType = Get-DockerOsType
     }
-    catch {
+    if ($dockerOsType -eq "linux") {
+        Write-Success "Docker is using Linux containers"
+    } elseif ($dockerOsType) {
+        Write-ConsoleWarning "Docker OSType is $dockerOsType; Linux containers are required. Some tests may fail."
+    } else {
         Write-ConsoleWarning "Could not verify Docker container type"
     }
 
@@ -182,7 +203,7 @@ try {
     docker compose -f $ComposeFile down -v --remove-orphans 2>$null
 
     # Pin traefik-geoblock for Country e2e (enrich writes X-IPCountry). Not committed.
-    $geoblockDir = Join-Path $PSScriptRoot ".geoblock"
+    $geoblockDir = Join-Path $PSScriptRoot "config/.geoblock"
     Copy-GeoblockSource -Dest $geoblockDir -Tag "v1.2.0"
 
     # Start Docker services
@@ -317,7 +338,7 @@ finally {
         }
     } else {
         Write-ConsoleWarning "Skipping Docker cleanup (services left running for debugging)"
-        Write-Host "To manually stop services, run: docker compose -f tests/e2e/real/docker-compose.test.yml down -v" -ForegroundColor Gray
+        Write-Host "To manually stop services, run: docker compose -f tests/e2e/real/config/docker-compose.test.yml down -v" -ForegroundColor Gray
         Write-Host "Services available at:" -ForegroundColor Gray
         Write-Host "  - Traefik Dashboard: http://localhost:8080" -ForegroundColor Gray
         Write-Host "  - Test Service: http://localhost:8000/whoami" -ForegroundColor Gray

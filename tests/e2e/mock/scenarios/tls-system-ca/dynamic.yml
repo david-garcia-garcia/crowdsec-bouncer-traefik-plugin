@@ -17,6 +17,7 @@ http:
       plugin:
         bouncer:
           enabled: "true"
+          crowdsecLapiEnabled: "true"
           crowdsecMode: live
           defaultDecisionSeconds: "2"
           # HTTPS LAPI with NO custom CA configured: the bouncer must fall back to

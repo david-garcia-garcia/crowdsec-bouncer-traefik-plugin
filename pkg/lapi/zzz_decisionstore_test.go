@@ -61,8 +61,8 @@ func TestStoreKey_DifferentRedisHostsShare(t *testing.T) {
 	redisB := testStreamConfig("lapi.example:8080", 1)
 	redisB.RedisCacheEnabled = true
 	redisB.RedisCacheHost = "redis-b:6379"
-	if StoreKey(redisA) != StoreKey(redisB) {
-		t.Fatal("different redis hosts must share one store key")
+	if StoreKey(redisA) == StoreKey(redisB) {
+		t.Fatal("S3: different redis hosts must fork the store key")
 	}
 }
 
@@ -86,8 +86,8 @@ func TestOpenDecisionStore_DifferentRedisHostsShare(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first != second {
-		t.Fatal("different redis hosts must open one store")
+	if first == second {
+		t.Fatal("S3: different redis hosts must open distinct stores")
 	}
 }
 
@@ -121,6 +121,8 @@ func TestOpenDecisionStore_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.
 		t.Fatalf("IdentityHex prefix lookup kind %q err %v, want empty kind", identKind, identErr)
 	}
 
+	other.RedisCacheEnabled = true
+	other.RedisCacheHost = redisServer.addr()
 	if SessionHex(cfg) != SessionHex(other) {
 		t.Fatal("live SessionHex must ignore updateIntervalSeconds")
 	}
@@ -193,8 +195,8 @@ func TestOpenLive_TwoClientsShareOneStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first != second {
-		t.Fatal("different live intervals must share one Client")
+	if first == second {
+		t.Fatal("I1: different live intervals must open distinct Clients")
 	}
 	if first.decisionStore != second.decisionStore {
 		t.Fatal("those Clients must share one decision store")
