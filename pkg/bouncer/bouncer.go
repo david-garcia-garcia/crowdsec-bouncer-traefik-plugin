@@ -583,10 +583,9 @@ func (b *Bouncer) resolveDroppedOrigin(origin string, originID uint16) string {
 
 // handleRemediationServeHTTP applies captcha or ban for a cached or live verdict.
 //
-// Captcha routing covers every method, HEAD included: a HEAD from a client carrying a
-// captcha remediation gets the captcha challenge page, never the ban page. Only ban kind
-// reaches handleBanServeHTTP from here. Unsubscribed captcha kind WARNs
-// crowdsec bouncer captcha unsubscribed then bans.
+// Captcha kind serves a challenge only when this router subscribed and the
+// client is usable (every method, HEAD included). Unsubscribed captcha kind
+// WARNs crowdsec bouncer captcha unsubscribed then handleBanServeHTTP.
 func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientRequest, remediation, origin string) {
 	kind := decisionscope.RemediationKind(remediation)
 	logger.Trace(b.log, "handleRemediationServeHTTP", "ip", req.remoteIP, "remediation", kind)
