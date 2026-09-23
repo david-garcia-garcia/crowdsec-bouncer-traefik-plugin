@@ -17,7 +17,7 @@ Not yet.
 In progress. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: eb1b2720
+Reviewed head: 68cccfeb
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,14 +32,16 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-23-captcha-unsubscribed-ban pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | unsubscribed-captcha-ban-warn | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/139 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-unsubscribed-ban/openspec/changes/unsubscribed-captcha-ban-warn/proposal.md) — modified
+
 
 ## Deviations from the ask
 None.
@@ -68,9 +70,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | eb1b27205b9fba33a871735a902ae2878b740c83 | Card must match the branch you measured |
+| Reviewed head | 68cccfeb000be8acbef14310957348e645b06f5c | Card must match the branch you measured |
 
 ### Stored data model
 None.
