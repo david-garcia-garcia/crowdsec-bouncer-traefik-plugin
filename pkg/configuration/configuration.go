@@ -383,16 +383,6 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 	return validateLogging(config)
 }
 
-// PrepopulateInstanceNames fills omitted instance names with traefikName when that leg is owned.
-func PrepopulateInstanceNames(config *Config, traefikName string) {
-	if config.CrowdsecLapiEnabled && strings.TrimSpace(config.CrowdsecLapiInstanceName) == "" {
-		config.CrowdsecLapiInstanceName = traefikName
-	}
-	if config.CrowdsecAppsecEnabled && strings.TrimSpace(config.CrowdsecAppsecInstanceName) == "" {
-		config.CrowdsecAppsecInstanceName = traefikName
-	}
-}
-
 // validateOpenVsSubscribe rejects leftover secrets or names when nothing owns or subscribes (E2).
 func validateOpenVsSubscribe(config *Config) error {
 	if err := validateLegOpenVsSubscribe("LAPI", config.Enabled, config.CrowdsecLapiEnabled, config.CrowdsecLapiInstanceName, lapiSecretPresent(config)); err != nil {

@@ -112,15 +112,15 @@ func TestOpen_P4OmittedSchemeFollowsLAPI(t *testing.T) {
 	httpCfg := testAppsecConfig("127.0.0.1:1")
 	httpCfg.CrowdsecAppsecScheme = ""
 	httpCfg.CrowdsecLapiScheme = "http"
-	_ = Prepare(httpCfg, slog.Default())
+	_ = Prepare(httpCfg, slog.Default(), "")
 	httpsFromLAPI := testAppsecConfig("127.0.0.1:1")
 	httpsFromLAPI.CrowdsecAppsecScheme = ""
 	httpsFromLAPI.CrowdsecLapiScheme = "https"
-	_ = Prepare(httpsFromLAPI, slog.Default())
+	_ = Prepare(httpsFromLAPI, slog.Default(), "")
 	httpsExplicit := testAppsecConfig("127.0.0.1:1")
 	httpsExplicit.CrowdsecAppsecScheme = "https"
 	httpsExplicit.CrowdsecLapiScheme = "http"
-	_ = Prepare(httpsExplicit, slog.Default())
+	_ = Prepare(httpsExplicit, slog.Default(), "")
 	if Key(httpCfg, "mw") == Key(httpsFromLAPI, "mw") {
 		t.Fatal("P4: omitted scheme following LAPI https must change the AppSec key")
 	}

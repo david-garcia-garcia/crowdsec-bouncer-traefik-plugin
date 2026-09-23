@@ -22,9 +22,9 @@ _Avoid_: ForRoute, Plugin core, the reclaim value, `atomic.Pointer[T]`
 The operator enum (`passthrough` | `ban` | `captcha`) this plugin applies when LAPI or AppSec does not return a usable verdict. LAPI action is per-router on Bouncer; AppSec action is per-router on Bouncer. Default is `ban`.
 _Avoid_: fail mode, FailMode, the three removed AppSec block bools, AppSec JSON `action: captcha`, LAPI Client identity
 
-**Prepared config**:
-`New`'s own shallow copy of the `*configuration.Config` Traefik owns (`prepared`). Everything downstream of `New` reads and writes that copy: normalised `logLevel`, the `Prepare` secret resolution, alone-mode LAPI rewrite. Its slice and map fields still alias the caller's.
-_Avoid_: writing through Traefik's pointer, deep copy, mutating `DecisionScopeHeaders` or the trusted-IP slices in place
+**Config snapshot**:
+`New`'s own shallow copy of Traefik's `rawConfig` (`config := *rawConfig`). Everything downstream of `New` reads and writes `config`: normalised `logLevel`, the `Prepare` secret resolution, alone-mode LAPI rewrite. Its slice and map fields still alias the caller's.
+_Avoid_: writing through Traefik's pointer, deep copy, mutating `DecisionScopeHeaders` or the trusted-IP slices in place, calling the snapshot `prepared`
 
 **Bind context**:
 The `context.WithCancel` child of the constructor `ctx` that every reclaim `Open` in `New` binds. Released on a failed `New` so nothing opened so far stays held; never released on the success path, where Traefik's own `ctx` is what ends the holders.
@@ -42,10 +42,10 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 
 - Keep `CreateConfig` / `New` on the module root (`plugin.go`).
 - Keep `pluginVersion` in root `version.go` (release workflow bumps it). Pass it into `lapi.New` and `appsec.New`.
-- Snapshot first: `prepared := *config`, then work on `&prepared` for the rest of `New`. Never write through Traefik's pointer.
+- Snapshot first: `config := *rawConfig`, then work on `&config` for the rest of `New`. Never write through Traefik's pointer.
 - After the snapshot, do not copy leftover YAML keys or peer aliases into `BanFilePath` / `CaptchaFilePath`. Traefik’s decode of those two fields is the only owner.
 - Derive `bindCtx, releaseHolders := context.WithCancel(ctx)` before the first `Open`, and release it from a `defer` that fires only when the named `err` is non-nil.
-- Call `lapi.Prepare` then `appsec.Prepare` (AppSec key/scheme copy only when AppSec is enabled). `PrepopulateInstanceNames` only when that leg is owned. Stream/alone: `lapi.OpenStream`. Live/none: `lapi.OpenLive`. When `crowdsecAppsecEnabled`: `appsec.Open`. Then `reclaim.SetAlias` on `alias:<leg>:<name>`. When this `New` did not Open a leg, `reclaim.ClearPublisher` that alias prefix. `bouncer.New` takes subscribe flags, not client pointers. `Watch` after New. Open key: `core_plugin_lapi_reclaim-key.md`. Stream `scopes=`: `core_plugin_lapi_scope-union.md`. Slots: `core_plugin_middleware_instance-slots.md`.
+- Call `lapi.Prepare` then `appsec.Prepare` (each fills an omitted instance name when that leg is owned; AppSec key/scheme copy only when AppSec is enabled). Stream/alone: `lapi.OpenStream`. Live/none: `lapi.OpenLive`. When `crowdsecAppsecEnabled`: `appsec.Open`. Then `reclaim.SetAlias` with group `lapi`/`appsec`. When this `New` did not Open a leg, `reclaim.ClearPublisher(name, group)`. `bouncer.New` takes subscribe flags, not client pointers. `Watch` after New. Open key: `core_plugin_lapi_reclaim-key.md`. Stream `scopes=`: `core_plugin_lapi_scope-union.md`. Slots: `core_plugin_middleware_instance-slots.md`.
 - `ServeHTTP` Loads `atomic.Value` only. `streamStartupBlock` on the request path is “every subscribed backend is published?” — 503 when not. Do not block `New`. Do not put the flag on the client.
 - When `bouncer.New` builds the captcha siteverify `http.Client`, set `Timeout` from `cfg.EffectiveHTTPTimeoutSeconds(cfg.CaptchaSiteverifyHTTPTimeoutSeconds)`. Keep that client per-Bouncer. Do not reclaim it.
 - Put stream tickers, replaceable LAPI HTTP (`transport` on `atomic.Value`), and Range membership on `lapi.Client`. Open the DecisionStore on the same `New` ctx (`core_plugin_decisionstore.md`). Put AppSec HTTP+auth on `appsec.Client`. Put captcha, templates, LAPI failure action, Redis fail-closed, and live-cache TTL on Bouncer. Timeout/TLS changes are a new ownership key, not Adopt-only.
@@ -59,20 +59,21 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 ## Pattern snippet
 
 ```go
-func New(ctx context.Context, next http.Handler, config *configuration.Config, name string) (handler http.Handler, err error) {
-	prepared := *config
-	configuration.PrepopulateInstanceNames(&prepared, name)
+func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config, name string) (handler http.Handler, err error) {
+	config := *rawConfig
+	_ = lapi.Prepare(&config, log, name)
+	_ = appsec.Prepare(&config, log, name)
 	bindCtx, releaseHolders := context.WithCancel(ctx)
 	defer func() {
 		if err != nil {
 			releaseHolders()
 		}
 	}()
-	if prepared.CrowdsecLapiEnabled {
-		lapiClient, err = lapi.OpenStream(bindCtx, &prepared, log, name, pluginVersion)
+	if config.CrowdsecLapiEnabled {
+		lapiClient, err = lapi.OpenStream(bindCtx, &config, log, name, pluginVersion)
 	}
-	err = reclaim.SetAlias(lapi.OwnershipKey(&prepared, name), "alias:lapi:"+prepared.CrowdsecLapiInstanceName, name, (*lapi.Client)(nil))
-	handler, err = bouncer.New(next, name, &prepared, subscribeLAPI, subscribeAppSec, log)
+	err = reclaim.SetAlias(lapi.OwnershipKey(&config, name), instanceAlias("lapi", config.CrowdsecLapiInstanceName), name, "lapi")
+	handler, err = bouncer.New(next, name, &config, subscribeLAPI, subscribeAppSec, log)
 	return handler, err
 }
 ```
@@ -101,4 +102,4 @@ func New(ctx context.Context, next http.Handler, config *configuration.Config, n
 - Stream/alone: CrowdSec stores one `GET /v1/decisions/stream` cursor per hashed API key plus the IP LAPI sees. Two stream owners with the same host and key log `crowdsec lapi stream collision` and both `New` succeed. DecisionStore key is `SessionHex` (canonical stream scopes; Redis block only when enabled). Subscribers must not Bind reclaim. Isolated backends still need a second bouncer key unless they only subscribe.
 - LAPI `Close()` stops tickers and idle LAPI HTTP. It does not Close the shared DecisionStore unless this incarnation still owns it. AppSec `Close()` releases idle AppSec HTTP. Do not use `sync.Once`.
 - Both puts use `Open` / `OpenWithHooks` on the process table. First `New` sets table grace from `reclaimGraceSeconds` (default 30). Utilities `DefaultGrace` (10s) is only the table’s negative-grace fallback.
-- Backend Create/Close at INFO (`crowdsec lapi instance started|closed`); Sleep/Wake at DEBUG. Bouncer bound/unbound at INFO. DecisionStore INFO uses `storeKey` and `engine`. `reclaim_put`, `reclaim_reclaim`, and `reclaim_dispose` stay DEBUG. Stream poll stems are DEBUG. `startup` is an attribute on poll/updated (`true` for the full-set GET).
+- Backend Create/Close at INFO (`crowdsec lapi instance started|closed`); Sleep/Wake at DEBUG. Bouncer bound at INFO; unbound at DEBUG. DecisionStore INFO uses `storeKey` and `engine`. `reclaim_put`, `reclaim_reclaim`, and `reclaim_dispose` stay DEBUG. Stream poll stems are DEBUG. `startup` is an attribute on poll/updated (`true` for the full-set GET).

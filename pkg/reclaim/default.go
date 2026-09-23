@@ -80,13 +80,28 @@ func Peek(key string) (any, State, bool) {
 // Watcher is a weak reference: Watch copies the alias without binding a holder.
 type Watcher = utilreclaim.Watcher
 
-// SetAlias publishes the mapped ownership key under a public name.
-func SetAlias(key, alias, publisher string, empty any) error {
-	return Default().SetAlias(key, alias, publisher, empty)
+// Box is the only type stored in a watcher atomic.Value (Yaegi-safe).
+type Box = utilreclaim.Box
+
+// Unbox returns the value Watch stored, or nil when dest is empty.
+func Unbox(dest *atomic.Value) any {
+	if dest == nil {
+		return nil
+	}
+	stored := dest.Load()
+	if boxed, ok := stored.(*Box); ok {
+		return boxed.Value
+	}
+	return stored
+}
+
+// SetAlias publishes the mapped ownership key under a public name in group.
+func SetAlias(key, alias, publisher, group string) error {
+	return Default().SetAlias(key, alias, publisher, group)
 }
 
 // Watch copies the alias into dest without binding a holder.
-func Watch(alias string, dest Watcher, empty any) {
+func Watch(alias string, dest *atomic.Value, empty any) {
 	Default().Watch(alias, dest, empty)
 }
 
@@ -95,14 +110,9 @@ func Unwatch(alias string, dest *atomic.Value) {
 	Default().Unwatch(alias, dest)
 }
 
-// ClearAlias drops the alias when this publisher still holds it.
-func ClearAlias(alias, publisher string) {
-	Default().ClearAlias(alias, publisher)
-}
-
-// ClearPublisher drops every alias this publisher still holds in prefix.
-func ClearPublisher(publisher, prefix string) {
-	Default().ClearPublisher(publisher, prefix)
+// ClearPublisher drops every alias this publisher still holds in group.
+func ClearPublisher(publisher, group string) {
+	Default().ClearPublisher(publisher, group)
 }
 
 // ResetForTest tears down the process table and installs a fresh one with ProcessGrace.

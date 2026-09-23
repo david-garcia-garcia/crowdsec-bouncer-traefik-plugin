@@ -79,7 +79,10 @@ type Client struct {
 }
 
 // Prepare resolves secrets and CAPI/LAPI routing on cfg. Call before Key and New.
-func Prepare(cfg *configuration.Config, _ *slog.Logger) error {
+func Prepare(cfg *configuration.Config, _ *slog.Logger, traefikName string) error {
+	if cfg.CrowdsecLapiEnabled && strings.TrimSpace(cfg.CrowdsecLapiInstanceName) == "" {
+		cfg.CrowdsecLapiInstanceName = traefikName
+	}
 	if cfg.CrowdsecMode == configuration.AloneMode {
 		cfg.CrowdsecCapiMachineID, _ = configuration.GetVariable(cfg, "CrowdsecCapiMachineID")
 		cfg.CrowdsecCapiPassword, _ = configuration.GetVariable(cfg, "CrowdsecCapiPassword")

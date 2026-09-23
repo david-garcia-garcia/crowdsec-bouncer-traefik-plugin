@@ -18,6 +18,7 @@ import (
 	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
 // Bouncer is one Traefik router handler. It is not the reclaim value.
@@ -150,13 +151,12 @@ func (b *Bouncer) AppSecBinding() *atomic.Value {
 }
 
 func (b *Bouncer) loadedLAPI() *lapi.Client {
-	stored := b.lapiBound.Load()
-	client, _ := stored.(*lapi.Client)
+	client, _ := reclaim.Unbox(&b.lapiBound).(*lapi.Client)
 	return client
 }
 
 func (b *Bouncer) loadedAppSec() *appsec.Client {
-	stored := b.appsecBound.Load()
+	stored := reclaim.Unbox(&b.appsecBound)
 	client, _ := stored.(*appsec.Client)
 	return client
 }

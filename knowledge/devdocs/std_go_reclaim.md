@@ -20,7 +20,7 @@ _Avoid_: `atomic.Pointer[T]`, waiting in `New` until SetAlias
 
 ## Overview
 
-`pkg/reclaim` is a thin shim over the vendored utilities table (`Default`, `ProcessGrace` 30s, `Open` / `OpenWithHooks`, `Peek`, alias `SetAlias` / `Watch` / `Unwatch` / `ClearAlias` / `ClearPublisher`, `ResetForTest`). Call `OpenWithHooks` with a context that ends when the caller no longer wants the value — in `plugin.go` that is a `context.WithCancel` child of Traefik’s `New` ctx. Watchers attach to a public alias (`alias:<leg>:<name>`), not the ownership key. Alias APIs are an ad-hoc vendor override until they land upstream. Pass `reclaim.Hooks` as funcs (Yaegi v0.16 panics on asserting a foreign concrete type). Do not take `OpenTyped`. Do not use `*Wrapped` or `OpenWithGrace`. Do not export `PeekLivePrefix` / `View`.
+`pkg/reclaim` is a thin shim over the vendored utilities table (`Default`, `ProcessGrace` 30s, `Open` / `OpenWithHooks`, `Peek`, alias `SetAlias` / `Watch` / `Unwatch` / `ClearPublisher`, `ResetForTest`). Call `OpenWithHooks` with a context that ends when the caller no longer wants the value — in `plugin.go` that is a `context.WithCancel` child of Traefik’s `New` ctx. Watchers attach to an opaque public alias (this plugin encodes `alias:<leg>:<name>`), not the ownership key. `SetAlias` takes a caller-owned group so rename and Clear stay scoped without parsing the alias. Alias APIs are an ad-hoc vendor override until they land upstream. Pass `reclaim.Hooks` as funcs (Yaegi v0.16 panics on asserting a foreign concrete type). Do not take `OpenTyped`. Do not use `*Wrapped` or `OpenWithGrace`. Do not export `PeekLivePrefix` / `View`.
 
 ## How to use
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -26,25 +27,28 @@ const (
 type Client struct {
 	mu sync.Mutex
 
-	appsecScheme      string
-	appsecHost        string
-	appsecPath        string
-	appsecBodyLimit   int64
-	transport         atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
-	log               *slog.Logger
-	pluginVersion     string
-	middlewareName    string
-	instanceName      string
-	incarnation       string
-	sessionKey        string
-	closed            bool
-	sleeping          bool
+	appsecScheme    string
+	appsecHost      string
+	appsecPath      string
+	appsecBodyLimit int64
+	transport       atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
+	log             *slog.Logger
+	pluginVersion   string
+	middlewareName  string
+	instanceName    string
+	incarnation     string
+	sessionKey      string
+	closed          bool
+	sleeping        bool
 }
 
 // Prepare resolves AppSec secrets on cfg when AppSec is enabled. Empty key/scheme copy from LAPI.
-func Prepare(cfg *configuration.Config, log *slog.Logger) error {
+func Prepare(cfg *configuration.Config, log *slog.Logger, traefikName string) error {
 	if !cfg.CrowdsecAppsecEnabled {
 		return nil
+	}
+	if strings.TrimSpace(cfg.CrowdsecAppsecInstanceName) == "" {
+		cfg.CrowdsecAppsecInstanceName = traefikName
 	}
 	if cfg.CrowdsecAppsecKey == "" {
 		cfg.CrowdsecAppsecKey = cfg.CrowdsecLapiKey

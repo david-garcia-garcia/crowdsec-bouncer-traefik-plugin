@@ -11,7 +11,7 @@ The Config field that means this router will open AppSec. Same field `New` uses 
 _Avoid_: leftover AppSec host/CA/key, `crowdsecMode: appsec`
 
 **Config validation**:
-The `ValidateParams` startup gate `plugin.New` runs on the prepared Config before `lapi.Prepare`.
+The `ValidateParams` startup gate `plugin.New` runs on the config snapshot before `lapi.Prepare`.
 _Avoid_: `GetVariable` as a feature-flag check
 
 **Writability-check handle**:
@@ -28,7 +28,7 @@ _Avoid_: EffectiveLapi, three inherit wrappers
 
 ## How to use
 
-- Run `ValidateParams` on `&prepared` after the snapshot and before `lapi.Prepare`.
+- Run `ValidateParams` on `&config` after the snapshot and before `lapi.Prepare`.
 - Keep `HTTPTimeoutSeconds` in `requiredInt1` (`< 1` invalid). Put `CrowdsecLapiHTTPTimeoutSeconds`, `CrowdsecAppsecHTTPTimeoutSeconds`, and `CaptchaSiteverifyHTTPTimeoutSeconds` in `requiredInt0` (`< 0` invalid). Zero or omitted inherits. Call `cfg.EffectiveHTTPTimeoutSeconds(override)` — do not add three `EffectiveLapi` wrappers.
 - Resolve `RedisCachePassword` / `RedisCachePasswordFile` only when `redisCacheEnabled` is true.
 - When Redis is off, do not Stat or read a leftover `redisCachePasswordFile`.

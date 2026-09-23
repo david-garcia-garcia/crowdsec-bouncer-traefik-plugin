@@ -28,21 +28,21 @@ Process-wide named slots sit between owner `Open` and bouncer bounce. Spec: `cor
 
 ## How to use
 
-- Named slots are aliases on the reclaim table (`alias:<leg>:<name>`), not a second package. `plugin.go` Opens owned legs, then `SetAlias`, then `bouncer.New` with subscribe flags, then `Watch`.
-- Typed nil empty: first `Store` fixes the type. Never `Store(nil)`.
-- Reject a second publisher on the same alias. Roll back aliases this `New` already wrote, then cancel the holder child.
-- Close / unmap of a dying incarnation clears aliases still pointing at it. Sleep does not.
-- If this `New` did not Open a leg, `ClearPublisher` that alias prefix for this middleware name.
-- Same publisher, new instance name: `SetAlias` clears the previous alias in that leg family.
+- Named slots are opaque aliases on the reclaim table. This plugin encodes them as `alias:<leg>:<name>` in `instanceAlias`; the table never parses that string. `plugin.go` Opens owned legs, then `SetAlias` with group `lapi`/`appsec`, then `bouncer.New` with subscribe flags, then `Watch`.
+- Watchers `Store` a `reclaim.Box` only. The inner value is the client or typed nil. Never `Store(nil)` and never change the `atomic.Value` type (Yaegi panics).
+- Reject a second publisher on the same alias. Roll back with `ClearPublisher(name, group)`, then cancel the holder child.
+- Close / unmap of a dying incarnation clears aliases still pointing at it (reverse index on the slot). Sleep does not.
+- If this `New` did not Open a leg, `ClearPublisher(name, group)` for that middleware.
+- Same publisher, new instance name in the same group: `SetAlias` clears the previous alias in that group.
 
 ## Pattern snippet
 
 ```go
-err := reclaim.SetAlias(ownershipKey, "alias:lapi:"+instanceName, traefikName, (*lapi.Client)(nil))
+err := reclaim.SetAlias(ownershipKey, instanceAlias("lapi", instanceName), traefikName, "lapi")
 if !openedLAPI {
-	reclaim.ClearPublisher(traefikName, "alias:lapi:")
+	reclaim.ClearPublisher(traefikName, "lapi")
 }
-reclaim.Watch("alias:lapi:"+instanceName, reclaim.Watcher{Value: route.LAPIBinding()}, (*lapi.Client)(nil))
+reclaim.Watch(instanceAlias("lapi", instanceName), route.LAPIBinding(), (*lapi.Client)(nil))
 ```
 
 ## Key files

@@ -109,6 +109,9 @@ type slot struct {
 	// never has a finished channel: no holder binds to it.
 	finished chan struct{}
 	logger   *slog.Logger
+	// aliases are the public names currently bound to this incarnation.
+	// Table.aliases is the forward map; this slice is only the reverse link for Close.
+	aliases []*aliasEntry
 }
 
 // Config is the freeze-at-New settings for a Table. New copies Grace onto the table.
