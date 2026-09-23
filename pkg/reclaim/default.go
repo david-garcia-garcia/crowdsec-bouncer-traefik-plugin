@@ -100,14 +100,13 @@ func SetAlias(key, alias, publisher, group string) error {
 	return Default().SetAlias(key, alias, publisher, group)
 }
 
-// Watch copies the alias into dest without binding a holder.
-func Watch(alias string, dest *atomic.Value, empty any) {
-	Default().Watch(alias, dest, empty)
-}
+// Published is the value a watcher receives when an alias changes.
+type Published = utilreclaim.Published
 
-// Unwatch removes dest from the alias.
-func Unwatch(alias string, dest *atomic.Value) {
-	Default().Unwatch(alias, dest)
+// Watch registers valueChanged for alias without binding a holder.
+// valueChanged receives Published. Nil skips that call. When ctx is done, the subscriber is dropped.
+func Watch(ctx context.Context, alias string, empty any, valueChanged func(any)) {
+	Default().Watch(ctx, alias, empty, valueChanged)
 }
 
 // ClearPublisher drops every alias this publisher still holds in group.

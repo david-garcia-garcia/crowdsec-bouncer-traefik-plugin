@@ -13,8 +13,11 @@
 //	Watch:         subscriber. Copies the current Client (or typed nil) into
 //	               the Bouncer's atomic.Value. Not a holder — does not keep
 //	               the Client alive and does not Close it.
-//	Unwatch:       drop that subscriber when Traefik cancels this New's ctx.
-//	               The backend stays up if another holder still Opened it.
+//	valueChanged:  Watch's func(any). The any is reclaim.Published, whose Value
+//	               is the client, or the typed empty when the alias is clear.
+//	               The bouncer stores that into its own binding and validates it.
+//	               Watch drops the subscriber when its ctx is done. The backend
+//	               stays up if another holder still Opened it.
 package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
@@ -22,13 +25,11 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
@@ -109,20 +110,11 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 		return nil, err
 	}
 	if subscribeLAPI {
-		watchBinding(legLAPI, config.CrowdsecLapiInstanceName, name, route.LAPIBinding(), (*lapi.Client)(nil), log, config.DecisionScopeHeaders)
+		reclaim.Watch(ctx, instanceAlias(legLAPI, config.CrowdsecLapiInstanceName), (*lapi.Client)(nil), route.ReceiveLAPI)
 	}
 	if subscribeAppSec {
-		watchBinding(legAppSec, config.CrowdsecAppsecInstanceName, name, route.AppSecBinding(), (*appsec.Client)(nil), log, nil)
+		reclaim.Watch(ctx, instanceAlias(legAppSec, config.CrowdsecAppsecInstanceName), (*appsec.Client)(nil), route.ReceiveAppSec)
 	}
-	// Traefik cancel of this middleware: drop our Watchers, not the Opened Clients.
-	context.AfterFunc(ctx, func() {
-		if subscribeLAPI {
-			reclaim.Unwatch(instanceAlias(legLAPI, config.CrowdsecLapiInstanceName), route.LAPIBinding())
-		}
-		if subscribeAppSec {
-			reclaim.Unwatch(instanceAlias(legAppSec, config.CrowdsecAppsecInstanceName), route.AppSecBinding())
-		}
-	})
 	return route, nil
 }
 
@@ -188,37 +180,4 @@ func claimAlias(key, group, instanceName, publisher string, log *slog.Logger) er
 		log.Error("crowdsec instance name taken", "leg", group, "instanceName", instanceName, "rejected", publisher)
 	}
 	return err
-}
-
-// watchBinding is the bounce axis: attach dest to that instance name. ServeHTTP Loads
-// dest; this call only Stores the current value (or typed empty) and logs once.
-func watchBinding(leg, instanceName, traefikName string, dest *atomic.Value, empty any, log *slog.Logger, headerScopes map[string]string) {
-	reclaim.Watch(instanceAlias(leg, instanceName), dest, empty)
-	current := reclaim.Unbox(dest)
-	incarnation := incarnationOf(current)
-	if incarnation == "" {
-		log.Debug("crowdsec bouncer unbound", "traefikName", traefikName, "leg", leg, "instanceName", instanceName)
-		return
-	}
-	if client, ok := current.(*lapi.Client); ok {
-		missing := decisionscope.MissingStreamScopes(headerScopes, client.StreamScopes())
-		if len(missing) > 0 {
-			log.Warn("crowdsec bouncer stream scopes missing",
-				"traefikName", traefikName,
-				"missing", strings.Join(missing, ","),
-			)
-		}
-	}
-	log.Info("crowdsec bouncer bound", "traefikName", traefikName, "leg", leg, "instanceName", instanceName, "incarnation", incarnation)
-}
-
-func incarnationOf(current any) string {
-	switch client := current.(type) {
-	case *lapi.Client:
-		return client.Incarnation()
-	case *appsec.Client:
-		return client.Incarnation()
-	default:
-		return ""
-	}
 }

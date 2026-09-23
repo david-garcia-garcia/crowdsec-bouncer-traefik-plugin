@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"text/template"
 	"time"
@@ -44,6 +45,11 @@ type Bouncer struct {
 	redisUnreachableBlock    bool  // per-router Redis fail-closed
 	defaultDecisionSeconds   int64 // per-router live-cache TTL passed into LiveLookup
 	log                      *slog.Logger
+	bindingMu                sync.Mutex
+	lapiReceived             *lapi.Client
+	appsecReceived           *appsec.Client
+	lapiReceiveSeen          bool
+	appsecReceiveSeen        bool
 	name                     string
 	next                     http.Handler
 	remediationCustomHeader  string
@@ -60,7 +66,7 @@ const msgBackendMissing = "crowdsec bouncer backend missing"
 // dropped the body during AppSec buffering. Not a ban.
 const remediationHeaderClientDisconnected = "error:client-disconnected"
 
-// New returns a per-router handler. Clients arrive later through LAPIBinding/AppSecBinding.
+// New returns a per-router handler. Clients arrive later through ReceiveLAPI and ReceiveAppSec.
 func New(next http.Handler, name string, config *configuration.Config, subscribeLAPI, subscribeAppSec bool, log *slog.Logger) (*Bouncer, error) {
 	log = log.With("traefikName", name)
 	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
@@ -140,16 +146,6 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 	return routeHandler, nil
 }
 
-// LAPIBinding is the slot Subscribe target for this router's LAPI client.
-func (b *Bouncer) LAPIBinding() *atomic.Value {
-	return &b.lapiBound
-}
-
-// AppSecBinding is the slot Subscribe target for this router's AppSec client.
-func (b *Bouncer) AppSecBinding() *atomic.Value {
-	return &b.appsecBound
-}
-
 func (b *Bouncer) loadedLAPI() *lapi.Client {
 	client, _ := reclaim.Unbox(&b.lapiBound).(*lapi.Client)
 	return client
@@ -159,6 +155,116 @@ func (b *Bouncer) loadedAppSec() *appsec.Client {
 	stored := reclaim.Unbox(&b.appsecBound)
 	client, _ := stored.(*appsec.Client)
 	return client
+}
+
+// ReceiveLAPI stores the published LAPI client and validates it.
+// published is a reclaim.Published. The same pointer is a no-op.
+func (b *Bouncer) ReceiveLAPI(published any) {
+	if !b.subscribeLAPI {
+		return
+	}
+	notice, _ := published.(reclaim.Published)
+	b.storeBinding(&b.lapiBound, notice.Value)
+	b.receiveLAPI()
+}
+
+// ReceiveAppSec stores the published AppSec client.
+// published is a reclaim.Published. The same pointer is a no-op.
+func (b *Bouncer) ReceiveAppSec(published any) {
+	if !b.subscribeAppSec {
+		return
+	}
+	notice, _ := published.(reclaim.Published)
+	b.storeBinding(&b.appsecBound, notice.Value)
+	b.receiveAppSec()
+}
+
+func (b *Bouncer) storeBinding(dest *atomic.Value, value any) {
+	prev := dest.Load()
+	if boxed, ok := prev.(*reclaim.Box); ok {
+		boxed.Value = value
+		return
+	}
+	dest.Store(&reclaim.Box{Value: value})
+}
+
+func (b *Bouncer) receiveLAPI() {
+	current := b.loadedLAPI()
+	b.bindingMu.Lock()
+	defer b.bindingMu.Unlock()
+	if b.lapiReceiveSeen && current == b.lapiReceived {
+		return
+	}
+	previous := b.lapiReceived
+	b.lapiReceived = current
+	b.lapiReceiveSeen = true
+	if previous != nil && previous != current {
+		b.log.Debug("crowdsec bouncer unbound",
+			"traefikName", b.name,
+			"leg", "lapi",
+			"instanceName", b.lapiInstanceName,
+			"incarnation", previous.Incarnation(),
+		)
+	}
+	if current == nil {
+		if previous == nil {
+			b.log.Debug("crowdsec bouncer unbound",
+				"traefikName", b.name,
+				"leg", "lapi",
+				"instanceName", b.lapiInstanceName,
+			)
+		}
+		return
+	}
+	missing := decisionscope.MissingStreamScopes(b.decisionScopeHeaders, current.StreamScopes())
+	if len(missing) > 0 {
+		b.log.Warn("crowdsec bouncer stream scopes missing",
+			"traefikName", b.name,
+			"missing", strings.Join(missing, ","),
+		)
+	}
+	b.log.Info("crowdsec bouncer bound",
+		"traefikName", b.name,
+		"leg", "lapi",
+		"instanceName", b.lapiInstanceName,
+		"incarnation", current.Incarnation(),
+	)
+}
+
+func (b *Bouncer) receiveAppSec() {
+	current := b.loadedAppSec()
+	b.bindingMu.Lock()
+	defer b.bindingMu.Unlock()
+	if b.appsecReceiveSeen && current == b.appsecReceived {
+		return
+	}
+	previous := b.appsecReceived
+	b.appsecReceived = current
+	b.appsecReceiveSeen = true
+	if previous != nil && previous != current {
+		b.log.Debug("crowdsec bouncer unbound",
+			"traefikName", b.name,
+			"leg", "appsec",
+			"instanceName", b.appsecInstanceName,
+			"incarnation", previous.Incarnation(),
+		)
+	}
+	if current == nil {
+		if previous == nil {
+			b.log.Debug("crowdsec bouncer unbound",
+				"traefikName", b.name,
+				"leg", "appsec",
+				"instanceName", b.appsecInstanceName,
+			)
+		}
+		return
+	}
+	b.log.Info("crowdsec bouncer bound",
+		"traefikName", b.name,
+		"leg", "appsec",
+		"instanceName", b.appsecInstanceName,
+		"incarnation", current.Incarnation(),
+	)
 }
 
 func (b *Bouncer) warnBackendMissing(leg, instanceName string) {
