@@ -3,8 +3,12 @@
 ## Language
 
 **Captcha request routing**:
-The captcha-kind branch of `handleRemediationServeHTTP` after the gate cookie: custom-resource passthrough, solved-form redirect, origin, or challenge.
+The captcha-kind path of `handleRemediationServeHTTP`: unsubscribed WARN-then-ban, then published-client load, then after the gate cookie custom-resource passthrough, solved-form redirect, origin, or challenge.
 _Avoid_: captcha gate cookie, `{ip}_captcha`, prefix bypass
+
+**Unsubscribed captcha**:
+A captcha-kind remediation on a Bouncer that never subscribed to captcha (`subscribeCaptcha` false: bounce on, empty `CaptchaInstanceName`).
+_Avoid_: subscribed-unpublished, `!Valid`, AppSec JSON `action: captcha`, `crowdsec bouncer backend missing`
 
 **Solved-form POST**:
 A POST whose provider response field is non-empty in a body of at most `captchaFormMaxBytes` (64KiB), read by `IsCaptchaFormPost`. Not a GET with a query token, and not an over-cap upload that happens to contain the field name.
@@ -24,14 +28,16 @@ _Avoid_: `CaptchaCustomValidateURL`, the bundled default `captcha.html`
 
 ## Overview
 
-`handleRemediationServeHTTP` routes captcha-kind requests after cookie grace and first-solve 302. Cookie mint stays on `core_plugin_middleware_captcha-gate`.
+`handleRemediationServeHTTP` first WARNs and bans captcha kind when this router never subscribed. A subscribed, usable client then routes after cookie grace and first-solve 302. Cookie mint stays on `core_plugin_middleware_captcha-gate`.
 
 ## How to use
 
+- When kind is captcha and `subscribeCaptcha` is false, WARN `crowdsec bouncer captcha unsubscribed` with `leg` `captcha` and `instanceName` (empty when unsubscribed), then ban. Do not emit `ip`. Do not call `GetRemoteIP`. Emit on every remediating request.
+- Do not WARN when subscribed. Empty or `!Valid` still ban without this stem. Startup-block stays 503 plus `crowdsec bouncer backend missing`.
 - Load the published captcha Client. Empty or `!Valid` remediates as ban. Do not construct a local client on the request path or in bounce-only `New`.
 - Pass this router's `remediationCustomHeader` into `ServeHTTP` and `WriteSolvedRedirect`. Do not store the header on Client.
 - Sequence a loaded Valid client as: custom-resource path → Check-true form POST 302 → Check-true origin → `captcha.ServeHTTP` (HEAD included). Else ban.
-- HEAD under a captcha remediation gets the challenge page, never the ban page. That is ratified; do not "fix" it back to ban. A HEAD on a custom-resource path still reaches origin.
+- HEAD under a subscribed, usable captcha remediation gets the challenge page, never the ban page. That is ratified; do not "fix" it back to ban. A HEAD on a custom-resource path still reaches origin.
 - Detect form POST with `IsCaptchaFormPost`. It is a reader of its own, not `captchaResponseFromRequest`: routing may still forward the request, so it caps at 64KiB, reads urlencoded and multipart, answers from `PostForm` when the form was already parsed, and restores `Body` plus `ContentLength` when it answers no. Keep the two callers apart.
 - After Check, call `WriteSolvedRedirect`: `302 Found` to `req.URL.String()`, set the remediation header to `solved-captcha` when configured. Do not remint the gate cookie. Do not call siteverify.
 - Match custom assets with `IsCustomResourceRequest`. `configuration.CustomCaptchaResourcePath` is the one owner of which configured value names a browser path; `Client.New` calls it for `CaptchaCustomJsURL` and optional `captchaCustomChallengeUrl` (custom provider only) and compares the stored paths to `req.URL.Path`. Ignore host and query. Never `CaptchaCustomValidateURL`. Never a prefix.
@@ -47,6 +53,7 @@ _Avoid_: `CaptchaCustomValidateURL`, the bundled default `captcha.html`
 
 ## Gotchas
 
+- Unsubscribed captcha WARN is router subscription, not identity. Do not add `ip`. Do not treat AppSec JSON `action: captcha` as this signal.
 - Built-in provider CDN URLs are not a match set, and their `ChallengeURL` renders empty.
 - Empty `bouncerCaptchaCustomChallengeUrl` keeps JsURL-path only; it is not a required custom field. A non-empty custom-provider value that names no absolute path is rejected by `validateEnabledCaptchaSettings` — that is master's owner, not a rival `validateConfiguredCaptcha`.
 - A captcha token hidden inside an over-cap POST is deliberately missed; keeping the upload body intact for origin matters more.
