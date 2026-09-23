@@ -43,7 +43,6 @@ func testCaptchaClient(t *testing.T, jsURL, challengeURL, validateURL string, ht
 		"secret",
 		"gate-secret",
 		true,
-		"X-Remediation",
 		templatePath,
 		3600,
 	)
@@ -56,16 +55,17 @@ func testCaptchaClient(t *testing.T, jsURL, challengeURL, validateURL string, ht
 func testCaptchaRoutingBouncer(t *testing.T, client *captcha.Client) (*Bouncer, *bool) {
 	t.Helper()
 	originCalled := false
-	return &Bouncer{
+	b := &Bouncer{
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			originCalled = true
 		}),
-		captchaClient:           client,
 		log:                     logger.New("ERROR", ""),
 		remediationStatusCode:   http.StatusForbidden,
 		remediationCustomHeader: "X-Remediation",
 		banTemplateContentType:  "text/html; charset=utf-8",
-	}, &originCalled
+	}
+	bindTestCaptcha(b, client)
+	return b, &originCalled
 }
 
 // testCaptchaRemoteIP is the one client address these routing tests solve captcha for.
@@ -78,7 +78,7 @@ func solveTestGateCookie(t *testing.T, client *captcha.Client) string {
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/protected", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, req, testCaptchaRemoteIP)
+	client.ServeHTTP(rw, req, testCaptchaRemoteIP, "")
 	if rw.Code != http.StatusFound {
 		body, _ := io.ReadAll(rw.Result().Body)
 		t.Fatalf("solve want 302, got %d %s", rw.Code, body)
@@ -170,12 +170,12 @@ func TestHandleRemediationServeHTTP_overMaxPostAfterSolveReachesOriginIntact(t *
 			}
 			originBody = string(raw)
 		}),
-		captchaClient:           client,
 		log:                     logger.New("ERROR", ""),
 		remediationStatusCode:   http.StatusForbidden,
 		remediationCustomHeader: "X-Remediation",
 		banTemplateContentType:  "text/html; charset=utf-8",
 	}
+	bindTestCaptcha(b, client)
 
 	payload := "dummy-captcha-response=token&blob=" + strings.Repeat("a", 64<<10)
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", strings.NewReader(payload))

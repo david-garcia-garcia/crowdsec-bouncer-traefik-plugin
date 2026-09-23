@@ -28,6 +28,7 @@ clients never get that passthrough.
     ...
     labels:
       # Choose captcha provider
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaEnabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaProvider=custom"
       # Define captcha grace period seconds
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaGracePeriodSeconds=1800"

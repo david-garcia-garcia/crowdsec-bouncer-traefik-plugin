@@ -13,7 +13,6 @@ import (
 	"text/template"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
@@ -59,7 +58,6 @@ func TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan(t *testing.T) {
 		forwardedHeadersInsecure: true,
 		forwardedCustomHeader:    "X-Forwarded-For",
 		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
-		captchaClient:            &captcha.Client{},
 		log:                      log,
 		remediationStatusCode:    http.StatusForbidden,
 		banTemplate:              banTemplate,
@@ -99,7 +97,6 @@ func TestServeHTTP_PackedMemoryBanRecordsCrowdsecOrigin(t *testing.T) {
 	b := &Bouncer{
 		enabled:                true,
 		clientPoolStrategy:     &ip.PoolStrategy{Checker: clientChecker},
-		captchaClient:          &captcha.Client{},
 		log:                    log,
 		remediationStatusCode:  http.StatusForbidden,
 		banTemplate:            banTemplate,
@@ -687,7 +684,7 @@ func TestNewForwardedHeadersInsecureHeaderName(t *testing.T) {
 		cfg := configuration.New()
 		cfg.LapiMode = configuration.StreamMode
 		cfg.BouncerForwardedHeadersInsecure = true
-		b, err := New(next, "test", cfg, false, true, log)
+		b, err := New(next, "test", cfg, false, true, false, log)
 		if err != nil {
 			t.Fatalf("New = %v", err)
 		}
@@ -700,7 +697,7 @@ func TestNewForwardedHeadersInsecureHeaderName(t *testing.T) {
 		cfg.LapiMode = configuration.StreamMode
 		cfg.BouncerForwardedHeadersInsecure = true
 		cfg.BouncerForwardedHeadersCustomName = "CF-Connecting-IP"
-		b, err := New(next, "test", cfg, false, true, log)
+		b, err := New(next, "test", cfg, false, true, false, log)
 		if err != nil {
 			t.Fatalf("New = %v", err)
 		}

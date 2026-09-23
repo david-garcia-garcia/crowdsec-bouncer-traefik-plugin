@@ -39,6 +39,7 @@ func cfgAppsecCaptchaAt(t *testing.T, appsecHost string) *configuration.Config {
 	c.AppsecHost = appsecHost
 	c.AppsecPath = "/"
 	c.BouncerAppsecFailureAction = configuration.FailureActionCaptcha
+	c.CaptchaEnabled = true
 	c.BouncerCaptchaProvider = configuration.CustomProvider
 	c.BouncerCaptchaCustomJsURL = "/captcha.js"
 	c.BouncerCaptchaCustomKey = "dummy-captcha"
@@ -195,5 +196,129 @@ func TestNew_DoesNotMutateCallerConfig(t *testing.T) {
 	}
 	if cfg.LapiKey != "" {
 		t.Fatalf("New wrote the resolved LAPI secret into the caller's config: %q", cfg.LapiKey)
+	}
+}
+
+func cfgCaptchaOwnerAt(t *testing.T, instanceName string) *configuration.Config {
+	t.Helper()
+	c := getTestConfig()
+	c.LapiEnabled = false
+	c.LapiKey = ""
+	c.BouncerEnabled = true
+	c.CaptchaEnabled = true
+	c.CaptchaInstanceName = instanceName
+	c.BouncerCaptchaProvider = configuration.CustomProvider
+	c.BouncerCaptchaCustomJsURL = "/captcha.js"
+	c.BouncerCaptchaCustomKey = "dummy-captcha"
+	c.BouncerCaptchaCustomResponse = "dummy-captcha-response"
+	c.BouncerCaptchaCustomValidateURL = "http://127.0.0.1/siteverify"
+	c.BouncerCaptchaSiteKey = "site"
+	c.BouncerCaptchaSecretKey = "secret"
+	c.BouncerCaptchaGateSecret = "gate-secret"
+	c.BouncerCaptchaFilePath = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
+	c.BouncerDecisionHeader = "X-Crowdsec-Decision"
+	c.BouncerRemediationHeadersCustomName = "X-Remediation"
+	c.BouncerForwardedHeadersTrustedIPs = []string{"127.0.0.1/32"}
+	c.BouncerForwardedHeadersCustomName = "X-Forwarded-For"
+	return c
+}
+
+func captchaForceReq(ip string) *http.Request {
+	req := reqForIP(ip)
+	req.Header.Set("X-Crowdsec-Decision", "c")
+	return req
+}
+
+func TestNew_CaptchaOwnerServesChallenge(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	h, err := New(context.Background(), testNextOK(), cfgCaptchaOwnerAt(t, "shared"), "cs-owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rw := httptest.NewRecorder()
+	h.ServeHTTP(rw, captchaForceReq("203.0.113.8"))
+	if got := rw.Header().Get("X-Remediation"); got != "captcha" {
+		t.Fatalf("remediation %q want captcha, body: %s", got, rw.Body.String())
+	}
+	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
+		t.Fatalf("owner must serve captcha, body: %s", rw.Body.String())
+	}
+}
+
+func TestNew_CaptchaOwnerOmitFillsTraefikName(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	ownerCfg := cfgCaptchaOwnerAt(t, "")
+	if _, err := New(context.Background(), testNextOK(), ownerCfg, "cs-owner"); err != nil {
+		t.Fatal(err)
+	}
+	sub := cfgCaptchaOwnerAt(t, "cs-owner")
+	sub.CaptchaEnabled = false
+	h, err := New(context.Background(), testNextOK(), sub, "cs-bounce")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rw := httptest.NewRecorder()
+	h.ServeHTTP(rw, captchaForceReq("203.0.113.8"))
+	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
+		t.Fatalf("subscriber of filled Traefik name must serve captcha, body: %s", rw.Body.String())
+	}
+}
+
+func TestNew_CaptchaSubscriberBeforePublishBans(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	sub := cfgCaptchaOwnerAt(t, "shared")
+	sub.CaptchaEnabled = false
+	sub.BouncerStartupBlock = false
+	h, err := New(context.Background(), testNextOK(), sub, "cs-bounce")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rw := httptest.NewRecorder()
+	h.ServeHTTP(rw, captchaForceReq("203.0.113.8"))
+	if rw.Code != http.StatusForbidden {
+		t.Fatalf("unpublished captcha verdict must ban, status=%d body=%s", rw.Code, rw.Body.String())
+	}
+	if strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
+		t.Fatal("unpublished captcha must not serve the challenge")
+	}
+}
+
+func TestNew_CaptchaHolderWithBounceOffStillPublishes(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	holder := cfgCaptchaOwnerAt(t, "shared")
+	holder.BouncerEnabled = false
+	if _, err := New(context.Background(), testNextOK(), holder, "cs-holder"); err != nil {
+		t.Fatal(err)
+	}
+	sub := cfgCaptchaOwnerAt(t, "shared")
+	sub.CaptchaEnabled = false
+	h, err := New(context.Background(), testNextOK(), sub, "cs-bounce")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rw := httptest.NewRecorder()
+	h.ServeHTTP(rw, captchaForceReq("203.0.113.8"))
+	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
+		t.Fatalf("holder with bounce off must still publish, body: %s", rw.Body.String())
+	}
+}
+
+func TestNew_CaptchaInstanceNameCollisionFails(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	if _, err := New(context.Background(), testNextOK(), cfgCaptchaOwnerAt(t, "shared"), "cs-a"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := New(context.Background(), testNextOK(), cfgCaptchaOwnerAt(t, "shared"), "cs-b"); err == nil {
+		t.Fatal("second captcha publisher on the same name must fail")
 	}
 }

@@ -24,7 +24,7 @@ _Avoid_: sharedLogFiles, reclaim value, log owner
 
 ## Overview
 
-`ValidateParams` is `New`'s constructor gate. When it fails, `New` returns a nil handler and that error and does not open LAPI. File-backed secrets go through `GetVariable`, which Stats and reads `<key>File` when that path is non-empty. Gate each `GetVariable` call behind the flag that uses that secret. Captcha site and secret keys are required whenever `bouncerCaptchaProvider` is set, including `lapiMode: alone` and the default `ban` failure action. AppSec URL, key-file, and HTTPS CA run only when `AppsecEnabled` is true. `validateLogging` still `OpenFile`s a non-empty `LogFilePath` even when `logger.NewWithFormat` already holds that path. Close that handle after a successful open.
+`ValidateParams` is `New`'s constructor gate. When it fails, `New` returns a nil handler and that error and does not open LAPI. File-backed secrets go through `GetVariable`, which Stats and reads `<key>File` when that path is non-empty. Gate each `GetVariable` call behind the flag that uses that secret. Captcha site and secret keys are required whenever `captchaEnabled` is true, including `lapiMode: alone` and the default `ban` failure action. AppSec URL, key-file, and HTTPS CA run only when `AppsecEnabled` is true. `validateLogging` still `OpenFile`s a non-empty `LogFilePath` even when `logger.NewWithFormat` already holds that path. Close that handle after a successful open.
 
 ## How to use
 
@@ -33,12 +33,12 @@ _Avoid_: sharedLogFiles, reclaim value, log owner
 - Resolve `LapiRedisPassword` / `LapiRedisPasswordFile` only when `lapiRedisEnabled` is true.
 - When Redis is off, do not Stat or read a leftover `lapiRedisPasswordFile`.
 - When Redis is on, keep today's file-error fail. Accept an empty password with an empty file path.
-- Do not add an enabled check inside `GetVariable`. Captcha already gates `GetVariable` behind provider-set (`validateEnabledCaptchaSettings`).
-- When `BouncerCaptchaProvider` is set, resolve `BouncerCaptchaSiteKey` and `BouncerCaptchaSecretKey` with file-then-field lookup (`GetVariable`). Keep lookup errors.
+- Do not add an enabled check inside `GetVariable`. Captcha already gates `GetVariable` behind `captchaEnabled` (`validateEnabledCaptchaSettings`).
+- When `captchaEnabled` is true, resolve `BouncerCaptchaSiteKey` and `BouncerCaptchaSecretKey` with file-then-field lookup (`GetVariable`). Keep lookup errors. Ignore leftover `bouncerCaptcha*` on a subscriber.
 - After a successful lookup, reject `""` for each field independently, site first.
-- Use the same trigger as `BouncerCaptchaGateSecret`: provider set, not "failure action is captcha".
+- Use the same trigger as `BouncerCaptchaGateSecret`: `captchaEnabled`, not "failure action is captcha" and not a leftover provider.
 - Error text: `BouncerCaptchaSiteKey: cannot be empty when BouncerCaptchaProvider is set` and the secret twin.
-- When `BouncerCaptchaProvider` is set, reject an empty `BouncerCaptchaFilePath` (`BouncerCaptchaFilePath: cannot be empty when BouncerCaptchaProvider is set`) and fail when `GetTemplate` fails. Ban template stays "when path is set".
+- When `captchaEnabled` is true, reject an empty `BouncerCaptchaFilePath` (`BouncerCaptchaFilePath: cannot be empty when BouncerCaptchaProvider is set`) and fail when `GetTemplate` fails. Ban template stays "when path is set".
 - `captcha.Client.New` returns the `GetTemplate` error. Do not discard it. Do not invent a bundled default template.
 - After CAPI (alone) or LAPI (other modes), call `validateAppsecURLKeyAndTLS` only when `config.AppsecEnabled`. Do not hide that `if` only inside a LAPI wrapper — alone never calls it.
 - Reuse `AppsecEnabled`. Do not re-derive from leftover AppSec fields or `lapiMode`.
@@ -96,8 +96,8 @@ _ = checkFile.Close()
 - `lapi.Prepare` resolves `LapiRedisPassword` only when `LapiRedisEnabled` is true. When Redis is off, leftover file paths stay out of the reclaim hash.
 - Whitespace-only keys and an empty key file are empty after trim.
 - Alone still skips LAPI URL/key/TLS after CAPI. Captcha still runs. AppSec helper runs only when `AppsecEnabled`.
-- A set provider with default `ban` actions still needs non-empty site and secret.
-- A set provider with an empty `BouncerCaptchaFilePath` fails at `ValidateParams`. Tests that used to blank the path to skip `GetTemplate` need a readable fixture.
+- An owner (`captchaEnabled`) with default `ban` actions still needs non-empty site and secret.
+- An owner with an empty `BouncerCaptchaFilePath` fails at `ValidateParams`. Tests that used to blank the path to skip `GetTemplate` need a readable fixture. A leftover provider on a subscriber does not.
 - Leftover invalid AppSec CA or missing key file boots when AppSec is off (live, stream, none, and alone). `lapiMode: appsec` is rejected.
 - Empty AppSec key after a successful lookup still passes; `appsec.Prepare` copies the LAPI key.
 - CA parse still triggers on explicit `AppsecScheme == https`, not inherit-https.

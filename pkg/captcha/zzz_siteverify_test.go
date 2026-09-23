@@ -35,7 +35,6 @@ func newTestSiteverifyClient(t *testing.T, siteverifyURL string, httpClient *htt
 		"e2e-dummy-secret",
 		"e2e-gate-secret",
 		true,
-		"",
 		templatePath,
 		3600,
 	); err != nil {
@@ -63,7 +62,7 @@ func Test_ServeHTTP_siteverifyPostsRemoteIP(t *testing.T) {
 
 	client := newTestSiteverifyClient(t, siteverify.URL, siteverify.Client())
 	solveRW := httptest.NewRecorder()
-	client.ServeHTTP(solveRW, solverPOST(), passedRemoteIP)
+	client.ServeHTTP(solveRW, solverPOST(), passedRemoteIP, "")
 	if solveRW.Code != http.StatusFound {
 		body, _ := io.ReadAll(solveRW.Result().Body)
 		t.Fatalf("solve want 302, got %d %s", solveRW.Code, body)
@@ -90,7 +89,7 @@ func Test_ServeHTTP_transportErrorRendersChallenge(t *testing.T) {
 
 	client := newTestSiteverifyClient(t, siteverify.URL, httpClient)
 	solveRW := httptest.NewRecorder()
-	client.ServeHTTP(solveRW, solverPOST(), "1.2.3.4")
+	client.ServeHTTP(solveRW, solverPOST(), "1.2.3.4", "")
 	if solveRW.Code != http.StatusOK {
 		t.Fatalf("transport error want 200 challenge, got %d (must not be 400)", solveRW.Code)
 	}
@@ -114,7 +113,7 @@ func Test_ServeHTTP_jsonDecodeErrorRendersChallenge(t *testing.T) {
 
 	client := newTestSiteverifyClient(t, siteverify.URL, siteverify.Client())
 	solveRW := httptest.NewRecorder()
-	client.ServeHTTP(solveRW, solverPOST(), "1.2.3.4")
+	client.ServeHTTP(solveRW, solverPOST(), "1.2.3.4", "")
 	if solveRW.Code != http.StatusOK {
 		t.Fatalf("decode error want 200 challenge, got %d (must not be 400)", solveRW.Code)
 	}
@@ -146,7 +145,6 @@ func Test_New_returnsGetTemplateError(t *testing.T) {
 			"gate-secret",
 			true,
 			"",
-			"",
 			3600,
 		)
 		if err == nil {
@@ -173,7 +171,6 @@ func Test_New_returnsGetTemplateError(t *testing.T) {
 			"secret",
 			"gate-secret",
 			true,
-			"",
 			missing,
 			3600,
 		)

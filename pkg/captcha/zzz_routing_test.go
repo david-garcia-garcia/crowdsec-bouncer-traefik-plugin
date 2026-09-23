@@ -187,7 +187,6 @@ func Test_IsCustomResourceRequest_exactPathOnly(t *testing.T) {
 		"secret",
 		"gate",
 		true,
-		"",
 		writeRoutingCaptchaTemplate(t),
 		3600,
 	); err != nil {
@@ -227,7 +226,6 @@ func Test_IsCustomResourceRequest_emptyChallengeIsJsOnly(t *testing.T) {
 		"secret",
 		"gate",
 		true,
-		"",
 		writeRoutingCaptchaTemplate(t),
 		3600,
 	); err != nil {
@@ -257,7 +255,6 @@ func Test_IsCustomResourceRequest_builtinCDNNotStored(t *testing.T) {
 		"secret",
 		"gate",
 		true,
-		"",
 		writeRoutingCaptchaTemplate(t),
 		3600,
 	); err != nil {
@@ -290,7 +287,6 @@ func Test_ServeHTTP_rendersChallengeURL(t *testing.T) {
 		"secret",
 		"gate",
 		true,
-		"",
 		templatePath,
 		3600,
 	); err != nil {
@@ -298,7 +294,7 @@ func Test_ServeHTTP_rendersChallengeURL(t *testing.T) {
 	}
 
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "http://app.example/protected", nil), "192.0.2.10")
+	client.ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "http://app.example/protected", nil), "192.0.2.10", "")
 	if !strings.Contains(rw.Body.String(), `data-challenge-url="http://captcha.localhost:8000/v0/challenge"`) {
 		t.Fatalf("captcha page must render the configured challenge URL, got %q", rw.Body.String())
 	}
@@ -320,7 +316,6 @@ func Test_ServeHTTP_challengeURLEmptyForBuiltinProvider(t *testing.T) {
 		"secret",
 		"gate",
 		true,
-		"",
 		templatePath,
 		3600,
 	); err != nil {
@@ -328,17 +323,17 @@ func Test_ServeHTTP_challengeURLEmptyForBuiltinProvider(t *testing.T) {
 	}
 
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "http://app.example/protected", nil), "192.0.2.10")
+	client.ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "http://app.example/protected", nil), "192.0.2.10", "")
 	if !strings.Contains(rw.Body.String(), `data-challenge-url=""`) {
 		t.Fatalf("built-in provider must render an empty challenge URL, got %q", rw.Body.String())
 	}
 }
 
 func Test_WriteSolvedRedirect_noCookieRemint(t *testing.T) {
-	client := &Client{remediationCustomHeader: "X-Remediation"}
+	client := &Client{}
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/protected?x=1", nil)
 	rw := httptest.NewRecorder()
-	client.WriteSolvedRedirect(rw, req)
+	client.WriteSolvedRedirect(rw, req, "X-Remediation")
 	if rw.Code != http.StatusFound {
 		t.Fatalf("want 302, got %d", rw.Code)
 	}

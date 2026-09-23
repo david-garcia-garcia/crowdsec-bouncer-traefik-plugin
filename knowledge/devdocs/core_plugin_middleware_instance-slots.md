@@ -3,8 +3,8 @@
 ## Language
 
 **Slot**:
-One named LAPI or AppSec publish target keyed by leg plus instance name. LAPI and AppSec are separate tables, so both may use the string `shared`. Not the Client reclaim key.
-_Avoid_: ownership key, SessionHex, DecisionStore, Traefik middleware name as the only key
+One named LAPI, AppSec, or captcha publish target keyed by group plus instance name. The three groups are separate, so all may use the string `shared`. Not the Client reclaim key.
+_Avoid_: ownership key, SessionHex, DecisionStore, Traefik middleware name as the only key, a second slot table
 
 **Publish**:
 Store a client pointer as `current` for that slot, record the publishing middleware, and `Store` the same pointer into every subscriber `atomic.Value` before unlocking. Yaegi-safe: `atomic.Value`, not `atomic.Pointer[T]` and not callbacks.
@@ -28,7 +28,7 @@ Process-wide named slots sit between owner `Open` and bouncer bounce. Spec: `cor
 
 ## How to use
 
-- Named slots are opaque aliases on the reclaim table. This plugin encodes them as `alias:<leg>:<name>` in `instanceAlias`; the table never parses that string. `plugin.go` Opens owned legs, then `SetAlias` with group `lapi`/`appsec`, then `bouncer.New` with subscribe flags, then `Watch`. `Watch` drops that subscriber when its ctx is done.
+- Named slots are opaque aliases on the reclaim table. This plugin encodes them as `alias:<leg>:<name>` in `instanceAlias`; the table never parses that string. `plugin.go` Opens owned legs, then `SetAlias` with group `lapi`/`appsec`/`captcha`, then `bouncer.New` with subscribe flags, then `Watch`. `Watch` drops that subscriber when its ctx is done.
 - Watchers `Store` a `reclaim.Box` only. The inner value is the client or typed nil. Never `Store(nil)` and never change the `atomic.Value` type (Yaegi panics).
 - Reject a second publisher on the same alias. Roll back with `ClearPublisher(name, group)`, then cancel the holder child.
 - Close / unmap of a dying incarnation clears aliases still pointing at it (reverse index on the slot). Sleep does not.

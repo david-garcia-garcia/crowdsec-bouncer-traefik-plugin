@@ -43,6 +43,7 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
      
       # Choose captcha provider
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaEnabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaProvider=hcaptcha"
       # Define captcha site key
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaSiteKey=FIXME"

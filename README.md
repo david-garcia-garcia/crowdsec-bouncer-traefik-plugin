@@ -133,9 +133,12 @@ One Traefik middleware object can run up to three independent pieces:
 | ----- | ---- | --- |
 | LAPI client | `lapiEnabled` | Open one connection to one CrowdSec LAPI (`stream` / `live` / `none` / `alone`). Publish it under `lapiInstanceName`. |
 | AppSec client | `appsecEnabled` | Open one AppSec listener. Publish it under `appsecInstanceName`. |
+| Captcha client | `captchaEnabled` | Open one siteverify client, template, and gate. Publish it under `captchaInstanceName`. |
 | Bouncer | `bouncerEnabled` | Serve this router: subscribe to those names, apply this route’s remediations (status, header, captcha, trusted IPs, failure action). |
 
-`bouncerEnabled` never opens a backend. An omitted instance name is filled with this Traefik middleware name only when that piece’s owner flag is true. LAPI and AppSec use **separate** name tables, so both may be called `shared`. A bouncing subscriber sets `bouncerEnabled: true` and the instance name, and leaves the owner flag false so it does not Open.
+`bouncerEnabled` never opens a backend. An omitted instance name is filled with this Traefik middleware name only when that piece’s owner flag is true. LAPI, AppSec, and captcha use **separate** name tables, so all three may be called `shared`. A bouncing subscriber sets `bouncerEnabled: true` and the instance name, and leaves the owner flag false so it does not Open.
+
+**BREAKING:** YAML that only sets `bouncerCaptchaProvider` no longer owns or serves captcha. Set `captchaEnabled: true` on the owner (empty `captchaInstanceName` fills to the Traefik name). `captcha` failure action requires that router’s captcha instance name after fill.
 
 ```mermaid
 flowchart LR
@@ -302,7 +305,7 @@ make run
 > [!IMPORTANT]
 > You can declare many CrowdSec middlewares in one Traefik. Each bouncing router keeps its own request policy (enabled, captcha, trusted IPs, failure actions, templates).
 >
-> Share one LAPI or AppSec client by publishing a name (`lapiInstanceName` / `appsecInstanceName`) and subscribing other routers to it. Interval, host, key, and `lapiStreamScopes` live on the **owner**. See [Middleware Architecture](#middleware-architecture).
+> Share one LAPI, AppSec, or captcha client by publishing a name (`lapiInstanceName` / `appsecInstanceName` / `captchaInstanceName`) and subscribing other routers to it. Interval, host, key, `lapiStreamScopes`, and captcha provider settings live on the **owner**. See [Middleware Architecture](#middleware-architecture).
 >
 > CrowdSec LAPI still identifies **one stream per LAPI key + the IP this Traefik uses to call LAPI**. A second isolated stream or engine needs a different key (and a different instance name). Two stream owners on the same pair fight over one cursor.
 
@@ -332,6 +335,7 @@ Siteverify request encoding. After trim, exact lowercase `""` or `form` POSTs `a
 CapJS / Cap Standalone as `custom` (operator HTML stays yours; no `trycap` provider):
 
 ```yaml
+captchaEnabled: true
 bouncerCaptchaProvider: custom
 bouncerCaptchaCustomJsUrl: https://<instance>/assets/widget.js
 bouncerCaptchaCustomKey: cap
@@ -353,7 +357,7 @@ Path to the captcha template. Content-Type is inferred from the extension.
 When true, the gate cookie binds to the client IP from `GetRemoteIP`. When false, grace is cookie-only (HMAC + expiry).
 
 **bouncerCaptchaGateSecret** (string, no default)
-HMAC secret for the stateless captcha grace cookie (`crowdsec_captcha_gate`). Required when `bouncerCaptchaProvider` is set. Not the same as `bouncerCaptchaSecretKey`.
+HMAC secret for the stateless captcha grace cookie (`crowdsec_captcha_gate`). Required when `captchaEnabled` is true. Not the same as `bouncerCaptchaSecretKey`.
 
 **bouncerCaptchaGateSecretFile** (string, no default)
 File path for `bouncerCaptchaGateSecret` (preferred over an inline secret when both are set).
@@ -383,7 +387,7 @@ Send only the first N bytes to AppSec. `0` is unlimited. Only POST, PUT, PATCH, 
 Enable CrowdSec AppSec (WAF). Independent of `lapiMode`: it inspects the requests the decision check allowed, in every mode. CrowdSec 1.8 bot-detection needs this set, plus a Traefik router `PathPrefix(/crowdsec-internal/challenge)` using this same middleware.
 
 **BouncerAppsecFailureAction** (string, default `ban`)
-What to do when AppSec does not return a usable verdict (HTTP 500, unreachable, body read error, or unreadable HTTP/2 or HTTP/3 body on POST/PUT/PATCH). Expected: `passthrough`, `ban`, `captcha`. `ban` drops the request. `passthrough` lets 500/unreachable/body-io errors continue as allow, and sends a headers-only GET when the body cannot be buffered. `captcha` uses the plugin captcha client (`bouncerCaptchaProvider` must be set). **BREAKING:** replaces `crowdsecAppsecFailureBlock`, `crowdsecAppsecUnreachableBlock`, and `crowdsecAppsecUnreadableBodyBlock`. Operators who had those bools set to `false` MUST set `bouncerAppsecFailureAction: passthrough`.
+What to do when AppSec does not return a usable verdict (HTTP 500, unreachable, body read error, or unreadable HTTP/2 or HTTP/3 body on POST/PUT/PATCH). Expected: `passthrough`, `ban`, `captcha`. `ban` drops the request. `passthrough` lets 500/unreachable/body-io errors continue as allow, and sends a headers-only GET when the body cannot be buffered. `captcha` uses the subscribed published captcha client (`captchaEnabled` or a non-empty `captchaInstanceName` after owner-fill). **BREAKING:** replaces `crowdsecAppsecFailureBlock`, `crowdsecAppsecUnreachableBlock`, and `crowdsecAppsecUnreadableBodyBlock`. Operators who had those bools set to `false` MUST set `bouncerAppsecFailureAction: passthrough`.
 
 **appsecHost** (string, default `"crowdsec:7422"`)
 AppSec host and port.
@@ -419,7 +423,7 @@ Disable verification of the certificate presented by AppSec.
 Incoming request header that forces ban or captcha. Empty disables the feature (the plugin does not read `X-Crowdsec-Decision` unless you set this key). Values are exact trimmed `b` (ban) or `c` (captcha). `b` applies ban without a stream or live lookup. `c` still consults that lookup: a CrowdSec ban wins and the plugin logs WARN `ServeHTTP:forcedCaptchaSuperseded`; otherwise captcha. Any other token, including `t` and `B`, is ignored and lookup continues. Put a Traefik middleware that writes this header *before* the bouncer. Do not expose the header to the internet; any client who can set it can captcha or ban themselves. A `c` value still honors the captcha gate cookie when lookup is not ban: a visitor who already solved captcha reaches origin even while the header is still `c`. Trusted client IPs still skip the whole plugin, including this header.
 
 **BouncerLapiFailureAction** (string, default `ban`)
-What to do when LAPI does not return a usable verdict (live/none HTTP or parse error, or a cache miss while stream/alone is unhealthy after `lapiUpdateMaxFailure`). Expected: `passthrough`, `ban`, `captcha`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled). `captcha` uses the plugin captcha client (`bouncerCaptchaProvider` must be set). **Behavior change:** in `live` and `none`, this action also covers a failed `bouncerDecisionScopeHeaders` query. Previously a LAPI that answered the IP query but errored on a header-scope query was treated as "no decision" and allowed (`DEBUG`). That is now a LAPI failure: default `ban` blocks those requests and logs `WARN`. An active ban still wins. Set `bouncerLapiFailureAction: passthrough` to keep allowing when a header-scope query fails.
+What to do when LAPI does not return a usable verdict (live/none HTTP or parse error, or a cache miss while stream/alone is unhealthy after `lapiUpdateMaxFailure`). Expected: `passthrough`, `ban`, `captcha`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled). `captcha` uses the subscribed published captcha client (`captchaEnabled` or a non-empty `captchaInstanceName` after owner-fill). **Behavior change:** in `live` and `none`, this action also covers a failed `bouncerDecisionScopeHeaders` query. Previously a LAPI that answered the IP query but errored on a header-scope query was treated as "no decision" and allowed (`DEBUG`). That is now a LAPI failure: default `ban` blocks those requests and logs `WARN`. An active ban still wins. Set `bouncerLapiFailureAction: passthrough` to keep allowing when a header-scope query fails.
 
 **lapiHost** (string, default `"crowdsec:8080"`)
 LAPI host and port.
@@ -517,8 +521,11 @@ On the request path, `true` returns **503** while any backend this bouncer subsc
 **lapiEnabled** (bool, default `false`)
 This middleware owns a LAPI client (`Open` + publish). Bounce still uses `bouncerEnabled`.
 
-**LapiInstanceName** / **AppsecInstanceName** (string, default Traefik name when that leg is owned)
-Slot name bouncers subscribe to. LAPI and AppSec are separate tables, so both may be `shared`.
+**captchaEnabled** (bool, default `false`)
+This middleware owns a captcha client (`Open` + publish). Bounce still uses `bouncerEnabled`. A set `bouncerCaptchaProvider` alone does not own captcha.
+
+**LapiInstanceName** / **AppsecInstanceName** / **CaptchaInstanceName** (string, default Traefik name when that leg is owned)
+Slot name bouncers subscribe to. LAPI, AppSec, and captcha are separate tables, so all three may be `shared`.
 
 **LapiStreamScopes** ([]string, default empty)
 Extra LAPI stream scopes (`country`, `as`, …). Omitted or empty is `ip,range` only. Opener only; not copied from `bouncerDecisionScopeHeaders`.
@@ -686,6 +693,7 @@ http:
             ...
             ic5cDRo6/VD3CS3MYzyBcibaGaV34nr0G/pI+KEqkYChzk/PZRA=
             -----END RSA PRIVATE KEY-----
+          captchaEnabled: true
           bouncerCaptchaProvider: hcaptcha
           bouncerCaptchaSiteKey: FIXME
           bouncerCaptchaSecretKey: FIXME

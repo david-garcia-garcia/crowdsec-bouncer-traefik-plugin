@@ -51,7 +51,6 @@ func testForcedDecisionBouncer(t *testing.T, log *slog.Logger, captchaClient *ca
 		forwardedHeadersInsecure: true,
 		forwardedCustomHeader:    "X-Forwarded-For",
 		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
-		captchaClient:            captchaClient,
 		log:                      log,
 		remediationStatusCode:    http.StatusForbidden,
 		banTemplate:              banTemplate,
@@ -61,6 +60,7 @@ func testForcedDecisionBouncer(t *testing.T, log *slog.Logger, captchaClient *ca
 		}),
 	}
 	bindTestLAPI(b, lapiClient)
+	bindTestCaptcha(b, captchaClient)
 	return b, lapiClient, &passed
 }
 
@@ -226,7 +226,7 @@ func TestBouncerNew_trimsForcedDecisionHeader(t *testing.T) {
 	cfg := configuration.New()
 	cfg.LapiMode = configuration.StreamMode
 	cfg.BouncerDecisionHeader = "  X-Crowdsec-Decision  "
-	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, true, log)
+	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, true, false, log)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,7 +17,7 @@ Use this suite for plugin-only CI and for proving two Crowdsec configs in one pr
 ## How to use
 
 - Add a folder under `tests/e2e/mock/scenarios/<name>/`.
-- Captcha scenarios set `bouncerCaptchaFilePath`. Do not use `captchaHtmlFilePath` or HTML-cased twins.
+- Captcha scenarios set `captchaEnabled: true` and `bouncerCaptchaFilePath`. Do not use `captchaHtmlFilePath` or HTML-cased twins. A set `bouncerCaptchaProvider` alone does not own captcha.
 - dual-bouncer: two middlewares, two LAPI ports (`LAPI_PORT_B`), `lapi_add_decision_at`.
 - Header-mapped scopes: `tests/e2e/mock/scenarios/scope-headers/` injects synthetic Country/AS/username headers. Real-stack Country uses geoblock instead.
 - `mocklapi --lapi-only` when AppSec is not under test.

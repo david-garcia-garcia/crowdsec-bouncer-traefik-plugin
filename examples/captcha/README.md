@@ -15,6 +15,7 @@ For now 3 captcha providers are supported:
 ```yaml
   labels:
       # Choose captcha provider
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaEnabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaProvider=hcaptcha"
       # Define captcha site key
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaSiteKey=FIXME"

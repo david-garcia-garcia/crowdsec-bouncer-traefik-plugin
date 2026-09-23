@@ -25,6 +25,7 @@ http:
           lapiKey: "@@APIKEY@@"
           bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
+          captchaEnabled: true
           bouncerCaptchaProvider: custom
           bouncerCaptchaCustomJsUrl: "http://@@LAPI_HOST@@/dummy.js"
           bouncerCaptchaCustomValidateUrl: "http://@@LAPI_HOST@@/siteverify"

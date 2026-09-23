@@ -44,7 +44,6 @@ func newTestCaptchaClient(t *testing.T, provider, validateBody, validateURL stri
 		"secret",
 		"gate-secret",
 		true,
-		"",
 		templatePath,
 		3600,
 	)
@@ -198,7 +197,7 @@ func Test_ServeHTTP_customJSONSuccessIssuesCookieAnd302(t *testing.T) {
 
 	client := newTestCaptchaClient(t, configuration.CustomProvider, configuration.CaptchaCustomValidateBodyJSON, siteverify.URL+"/siteverify", siteverify.Client())
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, solverPOST(), "192.0.2.10")
+	client.ServeHTTP(rw, solverPOST(), "192.0.2.10", "")
 	if rw.Code != http.StatusFound {
 		t.Fatalf("json success want 302, got %d", rw.Code)
 	}

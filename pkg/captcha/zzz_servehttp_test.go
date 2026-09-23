@@ -41,7 +41,6 @@ func Test_ServeHTTP_dummyProviderSolveIssuesGateCookie(t *testing.T) {
 		"e2e-dummy-secret",
 		"e2e-gate-secret",
 		true,
-		"",
 		templatePath,
 		3600,
 	)
@@ -50,7 +49,7 @@ func Test_ServeHTTP_dummyProviderSolveIssuesGateCookie(t *testing.T) {
 	}
 
 	getRW := httptest.NewRecorder()
-	client.ServeHTTP(getRW, httptest.NewRequest(http.MethodGet, "/foo", nil), "1.2.3.4")
+	client.ServeHTTP(getRW, httptest.NewRequest(http.MethodGet, "/foo", nil), "1.2.3.4", "")
 	if getRW.Code != http.StatusOK || !strings.Contains(getRW.Body.String(), "E2E_CAPTCHA_PAGE_MARKER") {
 		t.Fatalf("GET want captcha page, got %d %q", getRW.Code, getRW.Body.String())
 	}
@@ -58,7 +57,7 @@ func Test_ServeHTTP_dummyProviderSolveIssuesGateCookie(t *testing.T) {
 	emptyPOST := httptest.NewRequest(http.MethodPost, "/foo", strings.NewReader(""))
 	emptyPOST.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	emptyRW := httptest.NewRecorder()
-	client.ServeHTTP(emptyRW, emptyPOST, "1.2.3.4")
+	client.ServeHTTP(emptyRW, emptyPOST, "1.2.3.4", "")
 	if emptyRW.Code != http.StatusOK {
 		t.Fatalf("POST without field want 200, got %d", emptyRW.Code)
 	}
@@ -68,7 +67,7 @@ func Test_ServeHTTP_dummyProviderSolveIssuesGateCookie(t *testing.T) {
 	solveReq := httptest.NewRequest(http.MethodPost, "/foo", strings.NewReader(form.Encode()))
 	solveReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	solveRW := httptest.NewRecorder()
-	client.ServeHTTP(solveRW, solveReq, "1.2.3.4")
+	client.ServeHTTP(solveRW, solveReq, "1.2.3.4", "")
 	if solveRW.Code != http.StatusFound {
 		body, _ := io.ReadAll(solveRW.Result().Body)
 		t.Fatalf("solve want 302, got %d %s", solveRW.Code, body)
@@ -116,7 +115,6 @@ func Test_ServeHTTP_queryTokenSolvesWithoutBody(t *testing.T) {
 		"e2e-dummy-secret",
 		"e2e-gate-secret",
 		true,
-		"",
 		templatePath,
 		3600,
 	); err != nil {
@@ -125,7 +123,7 @@ func Test_ServeHTTP_queryTokenSolvesWithoutBody(t *testing.T) {
 
 	solveReq := httptest.NewRequest(http.MethodPost, "/foo?dummy-captcha-response=ok", nil)
 	solveRW := httptest.NewRecorder()
-	client.ServeHTTP(solveRW, solveReq, "1.2.3.4")
+	client.ServeHTTP(solveRW, solveReq, "1.2.3.4", "")
 	if solveRW.Code != http.StatusFound {
 		t.Fatalf("query-token solve want 302, got %d", solveRW.Code)
 	}
@@ -160,7 +158,6 @@ func TestHunt_siteverifyJSONContentTypeIsCaseInsensitive(t *testing.T) {
 		"e2e-dummy-secret",
 		"e2e-gate-secret",
 		true,
-		"",
 		templatePath,
 		3600,
 	); err != nil {
@@ -172,7 +169,7 @@ func TestHunt_siteverifyJSONContentTypeIsCaseInsensitive(t *testing.T) {
 	solveReq := httptest.NewRequest(http.MethodPost, "/foo", strings.NewReader(form.Encode()))
 	solveReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	solveRW := httptest.NewRecorder()
-	client.ServeHTTP(solveRW, solveReq, "1.2.3.4")
+	client.ServeHTTP(solveRW, solveReq, "1.2.3.4", "")
 	if solveRW.Code != http.StatusFound {
 		body, _ := io.ReadAll(solveRW.Result().Body)
 		t.Fatalf("solve want 302, got %d %s", solveRW.Code, body)
@@ -212,7 +209,6 @@ func Test_ServeHTTP_jsonpSiteverifyContentTypeIsNotJSON(t *testing.T) {
 		"e2e-dummy-secret",
 		"e2e-gate-secret",
 		true,
-		"",
 		templatePath,
 		3600,
 	); err != nil {
@@ -224,7 +220,7 @@ func Test_ServeHTTP_jsonpSiteverifyContentTypeIsNotJSON(t *testing.T) {
 	solveReq := httptest.NewRequest(http.MethodPost, "/foo", strings.NewReader(form.Encode()))
 	solveReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	solveRW := httptest.NewRecorder()
-	client.ServeHTTP(solveRW, solveReq, "1.2.3.4")
+	client.ServeHTTP(solveRW, solveReq, "1.2.3.4", "")
 	if solveRW.Code != http.StatusOK {
 		t.Fatalf("jsonp siteverify want 200 challenge, got %d", solveRW.Code)
 	}
