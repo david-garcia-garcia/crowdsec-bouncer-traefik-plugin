@@ -24,7 +24,7 @@ The Bouncer Stores the published pointer and Loads it on the request path. The r
 In progress. 0 items remain.
 
 Priority: P2 — operator pain with a workaround
-Reviewed head: 0ae3c7ce
+Reviewed head: 647a38b0
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -47,13 +47,22 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/changes/captcha-leg/proposal.md) — modified
-- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/changes/captcha-leg/proposal.md) — modified
-- [core_plugin_lapi_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/changes/captcha-leg/proposal.md) — modified
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/changes/captcha-leg/proposal.md) — modified
-- [core_plugin_middleware_captcha-gate](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/changes/captcha-leg/proposal.md) — modified
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/changes/captcha-leg/proposal.md) — modified
-- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/changes/captcha-leg/proposal.md) — modified
+- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/changes/archive/2026-09-23-captcha-leg/proposal.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/changes/archive/2026-09-23-captcha-leg/proposal.md) — modified
+- [core_plugin_lapi_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/changes/archive/2026-09-23-captcha-leg/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/changes/archive/2026-09-23-captcha-leg/proposal.md) — modified
+- [core_plugin_middleware_captcha-gate](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/changes/archive/2026-09-23-captcha-leg/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/changes/archive/2026-09-23-captcha-leg/proposal.md) — modified
+- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/changes/archive/2026-09-23-captcha-leg/proposal.md) — modified
+
+Completed:
+- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/specs/build_e2e_pester_crowdsec-stack/spec.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/specs/core_plugin_appsec_failure-action/spec.md) — modified
+- [core_plugin_lapi_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/specs/core_plugin_lapi_failure-action/spec.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
+- [core_plugin_middleware_captcha-gate](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/specs/core_plugin_middleware_captcha-gate/spec.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/specs/core_plugin_middleware_config-validation/spec.md) — modified
+- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-leg/openspec/specs/core_plugin_middleware_instance-slots/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -91,9 +100,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 7 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 14 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 0ae3c7ce83643f40ae980f13b74307da827ef65a | Card must match the branch you measured |
+| Reviewed head | 647a38b016cf3ce5e7fc260986c23b33ba40eee0 | Card must match the branch you measured |
 
 ### Stored data model
 None.
