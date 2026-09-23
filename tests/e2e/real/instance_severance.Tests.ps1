@@ -168,8 +168,6 @@ $svc
           logLevel: DEBUG
           logFormat: json
           reclaimGraceSeconds: "2"
-          lapiHttpTimeoutSeconds: "10"
-          appsecHttpTimeoutSeconds: "10"
           lapiUpdateIntervalSeconds: "5"
           bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
