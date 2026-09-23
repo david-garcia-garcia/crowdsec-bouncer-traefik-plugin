@@ -20,7 +20,7 @@ The remediating handler now checks captcha kind and `subscribeCaptcha` first. Wh
 In progress. 1 items remain.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: 877fe71b
+Reviewed head: 333a1cac
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -43,7 +43,10 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-unsubscribed-ban/openspec/changes/unsubscribed-captcha-ban-warn/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-unsubscribed-ban/openspec/changes/archive/2026-09-23-unsubscribed-captcha-ban-warn/proposal.md) — modified
+
+Completed:
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-unsubscribed-ban/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -81,9 +84,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 877fe71bdd4f95a214e7da7af13cfdb1031e4fd7 | Card must match the branch you measured |
+| Reviewed head | 333a1cacd95267e9ef4f113ad3f73f96ff6999f9 | Card must match the branch you measured |
 
 ### Stored data model
 None.
