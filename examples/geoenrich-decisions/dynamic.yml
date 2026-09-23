@@ -16,7 +16,7 @@ http:
             X-IPCountry: country
           databaseSources:
             default_ip2location:
-              bouncerEnabled: false
+              enabled: false
             seed:
               path: /plugins-local/src/github.com/david-garcia-garcia/traefik-geoblock/seeds/IP2LOCATION-LITE-DB1.IPV6.BIN
               databaseType: bin
