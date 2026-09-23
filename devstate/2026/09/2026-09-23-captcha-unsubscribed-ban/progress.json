@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-09-23-captcha-unsubscribed-ban",
+  "jobName": "2026-09-23-captcha-unsubscribed-ban",
+  "startedAt": "2026-09-23T20:04:05.128Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-23T20:06:05.431Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-23T20:10:21.922Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-23T20:15:06.294Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-23T20:25:59.596Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-23T20:31:57.101Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-23T20:34:43.687Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-23T20:38:51.987Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-23T20:54:33.622Z"
+    }
+  }
+}

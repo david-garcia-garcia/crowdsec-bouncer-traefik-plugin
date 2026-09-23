@@ -64,6 +64,7 @@ type Bouncer struct {
 }
 
 const msgBackendMissing = "crowdsec bouncer backend missing"
+const msgCaptchaUnsubscribed = "crowdsec bouncer captcha unsubscribed"
 
 // remediationHeaderClientDisconnected is the BouncerRemediationHeadersCustomName value when the client
 // dropped the body during AppSec buffering. Not a ban.
@@ -582,12 +583,18 @@ func (b *Bouncer) resolveDroppedOrigin(origin string, originID uint16) string {
 
 // handleRemediationServeHTTP applies captcha or ban for a cached or live verdict.
 //
-// Captcha routing covers every method, HEAD included: a HEAD from a client carrying a
-// captcha remediation gets the captcha challenge page, never the ban page. Only ban kind
-// reaches handleBanServeHTTP from here.
+// Captcha kind serves a challenge only when this router subscribed and the
+// client is usable (every method, HEAD included). Unsubscribed captcha kind
+// WARNs crowdsec bouncer captcha unsubscribed then handleBanServeHTTP.
 func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientRequest, remediation, origin string) {
 	kind := decisionscope.RemediationKind(remediation)
 	logger.Trace(b.log, "handleRemediationServeHTTP", "ip", req.remoteIP, "remediation", kind)
+	// Captcha kind on a router that never subscribed cannot serve a challenge.
+	if kind == decisionscope.CaptchaValue && !b.subscribeCaptcha {
+		b.log.Warn(msgCaptchaUnsubscribed, "leg", "captcha", "instanceName", b.captchaInstanceName)
+		b.handleBanServeHTTP(rw, req, configuration.ReasonLAPI, origin)
+		return
+	}
 	captchaClient := b.loadedCaptcha()
 	if captchaClient == nil || !captchaClient.Valid || kind != decisionscope.CaptchaValue {
 		b.handleBanServeHTTP(rw, req, configuration.ReasonLAPI, origin)
