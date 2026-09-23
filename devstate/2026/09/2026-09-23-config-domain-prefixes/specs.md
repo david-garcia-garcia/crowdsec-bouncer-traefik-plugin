@@ -18,3 +18,5 @@ Search: `openspec/specs/map.md` families `core_plugin_middleware`, `core_plugin_
 - fold `build_e2e_pester_crowdsec-stack` confidence: high candidates: [build_e2e_pester_crowdsec-stack]
 
 Rename volume across more than three requirements is name-only on those leaves, not a new capability. Explore Decision: no new spec family. `proposal.md` New vs Modified matches (New none, Modified the eleven folds).
+
+Archive FindSpecHost re-run (2026-09-23): all eleven remain fold into the same spec-id as the delta folder. Confidence high. No skip. No new family. Candidates widened (same owner first); verdicts unchanged. Synced live requirements into `openspec/specs/<id>/spec.md`.
