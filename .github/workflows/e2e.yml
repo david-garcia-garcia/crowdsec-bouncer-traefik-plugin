@@ -51,9 +51,13 @@ jobs:
           if-no-files-found: ignore
 
   e2e-pester:
-    name: e2e (docker + pester)
+    name: e2e (docker + pester / ${{ matrix.domain }})
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        domain: [lapi, appsec]
     steps:
       - uses: actions/checkout@v7
       - name: Install Pester
@@ -64,7 +68,13 @@ jobs:
         run: git config --local --unset-all http.https://github.com/.extraheader || true
       - name: Run Pester real-stack tests
         shell: pwsh
-        run: ./tests/e2e/real/Test-Integration.ps1 -HttpTimeoutSeconds 60 -SkipDockerCleanup
+        env:
+          PESTER_DOMAIN: ${{ matrix.domain }}
+        run: |
+          . ./tests/e2e/real/PesterDomains.ps1
+          Assert-PesterDomainPartition
+          $paths = @(Get-PesterDomainPaths -Domain $env:PESTER_DOMAIN)
+          ./tests/e2e/real/Test-Integration.ps1 -HttpTimeoutSeconds 60 -SkipDockerCleanup -TestPath $paths
       - name: Show container logs on failure
         if: failure()
         run: |
@@ -92,7 +102,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: pester-test-results
+          name: pester-test-results-${{ matrix.domain }}
           path: |
             tests/e2e/real/test-results.xml
             tests/e2e/real/runner.log

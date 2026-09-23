@@ -39,7 +39,7 @@
 param(
     [switch]$SkipDockerCleanup,
     [switch]$SkipWait,
-    [string]$TestPath = "$PSScriptRoot/*.Tests.ps1",
+    [string[]]$TestPath = @("$PSScriptRoot/*.Tests.ps1"),
     [int]$HttpTimeoutSeconds = 30
 )
 
