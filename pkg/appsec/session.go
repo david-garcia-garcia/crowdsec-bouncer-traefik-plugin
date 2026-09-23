@@ -16,17 +16,17 @@ const keyPrefix = "appsec:"
 
 // identity is the reclaim-key payload for one AppSec Client: middleware name plus knobs.
 type identity struct {
-	MiddlewareName           string `json:"middlewareName"`
-	Scheme                   string `json:"scheme"`
-	Host                     string `json:"host"`
-	Path                     string `json:"path"`
-	Key                      string `json:"key"`
-	BodyLimit                int64  `json:"bodyLimit"`
-	TLSInsecureVerify        bool   `json:"tlsInsecureVerify"`
-	TLSCertificateAuthority  string `json:"tlsCertificateAuthority"`
+	MiddlewareName          string `json:"middlewareName"`
+	Scheme                  string `json:"scheme"`
+	Host                    string `json:"host"`
+	Path                    string `json:"path"`
+	Key                     string `json:"key"`
+	BodyLimit               int64  `json:"bodyLimit"`
+	TLSInsecureVerify       bool   `json:"tlsInsecureVerify"`
+	TLSCertificateAuthority string `json:"tlsCertificateAuthority"`
 	TLSClientCertificate    string `json:"tlsClientCertificate"`
-	TLSClientKey string `json:"tlsClientKey"`
-	HTTPTimeoutSeconds       int64  `json:"httpTimeoutSeconds"`
+	TLSClientKey            string `json:"tlsClientKey"`
+	HTTPTimeoutSeconds      int64  `json:"httpTimeoutSeconds"`
 }
 
 func identityFrom(cfg *configuration.Config, middlewareName string) identity {
@@ -34,17 +34,17 @@ func identityFrom(cfg *configuration.Config, middlewareName string) identity {
 	cert, _ := configuration.GetVariable(cfg, "AppsecTLSClientCertificate")
 	certKey, _ := configuration.GetVariable(cfg, "AppsecTLSClientKey")
 	return identity{
-		MiddlewareName:           middlewareName,
-		Scheme:                   cfg.AppsecScheme,
-		Host:                     cfg.AppsecHost,
-		Path:                     cfg.AppsecPath,
-		Key:                      cfg.AppsecKey,
-		BodyLimit:                cfg.AppsecBodyLimit,
-		TLSInsecureVerify:        cfg.AppsecTLSInsecureVerify,
-		TLSCertificateAuthority:  ca,
+		MiddlewareName:          middlewareName,
+		Scheme:                  cfg.AppsecScheme,
+		Host:                    cfg.AppsecHost,
+		Path:                    cfg.AppsecPath,
+		Key:                     cfg.AppsecKey,
+		BodyLimit:               cfg.AppsecBodyLimit,
+		TLSInsecureVerify:       cfg.AppsecTLSInsecureVerify,
+		TLSCertificateAuthority: ca,
 		TLSClientCertificate:    cert,
-		TLSClientKey: certKey,
-		HTTPTimeoutSeconds:       cfg.AppsecHTTPTimeoutSeconds,
+		TLSClientKey:            certKey,
+		HTTPTimeoutSeconds:      cfg.AppsecHTTPTimeoutSeconds,
 	}
 }
 

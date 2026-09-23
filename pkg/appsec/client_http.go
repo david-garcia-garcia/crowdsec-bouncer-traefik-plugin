@@ -17,7 +17,7 @@ type transport struct {
 	httpTimeoutSeconds            int64
 	appsecTLSInsecureVerify       bool
 	appsecTLSCertificateAuthority string
-	appsecTLSClientCertificate   string
+	appsecTLSClientCertificate    string
 }
 
 // newTransport builds HTTP+auth from cfg. AppSec TLS uses GetTLSConfigCrowdsec(..., true).
@@ -42,7 +42,7 @@ func newTransport(config *configuration.Config, log *slog.Logger) (*transport, e
 		httpTimeoutSeconds:            timeoutSeconds,
 		appsecTLSInsecureVerify:       config.AppsecTLSInsecureVerify,
 		appsecTLSCertificateAuthority: config.AppsecTLSCertificateAuthority,
-		appsecTLSClientCertificate:   config.AppsecTLSClientCertificate,
+		appsecTLSClientCertificate:    config.AppsecTLSClientCertificate,
 	}, nil
 }
 

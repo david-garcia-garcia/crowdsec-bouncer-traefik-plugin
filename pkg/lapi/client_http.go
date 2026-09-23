@@ -52,7 +52,7 @@ type transport struct {
 	httpTimeoutSeconds          int64
 	lapiTLSInsecureVerify       bool
 	lapiTLSCertificateAuthority string
-	lapiTLSClientCertificate   string
+	lapiTLSClientCertificate    string
 }
 
 // newTransport builds HTTP+auth from cfg. Alone uses the CAPI header and no LAPI TLS.
@@ -85,7 +85,7 @@ func newTransport(config *configuration.Config, log *slog.Logger) (*transport, e
 		httpTimeoutSeconds:          timeoutSeconds,
 		lapiTLSInsecureVerify:       config.LapiTLSInsecureVerify,
 		lapiTLSCertificateAuthority: config.LapiTLSCertificateAuthority,
-		lapiTLSClientCertificate:   config.LapiTLSClientCertificate,
+		lapiTLSClientCertificate:    config.LapiTLSClientCertificate,
 	}, nil
 }
 
