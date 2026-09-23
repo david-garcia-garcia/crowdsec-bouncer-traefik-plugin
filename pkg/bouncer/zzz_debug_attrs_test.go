@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -29,7 +28,6 @@ func testStreamAllowBouncer(t *testing.T, log *slog.Logger) (*Bouncer, *httptest
 		forwardedHeadersInsecure: true,
 		forwardedCustomHeader:    "X-Forwarded-For",
 		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
-		captchaClient:            &captcha.Client{},
 		log:                      log,
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			passed = true

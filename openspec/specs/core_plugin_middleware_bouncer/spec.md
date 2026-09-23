@@ -13,7 +13,7 @@ The plugin SHALL export `CreateConfig` and `New` from the package Traefik loads 
 - **AND** `New` receives a non-ignored context used as the reclaim holder
 
 ### Requirement: Bouncer binds clients through atomic late bind
-The per-router bouncer SHALL hold two optional bound clients as `atomic.Value` fields (LAPI and AppSec), each able to hold a typed nil. `ServeHTTP` SHALL `Load` those fields only and MUST NOT resolve instance names, Peek slot tables, or Open clients on the request path. Subscribers MUST NOT Bind reclaim on those clients. The bouncer SHALL read `lapiMode` from the loaded LAPI client on each request, not from a copy taken at `New`. When `bouncerEnabled` is false the handler SHALL call `next` without applying decisions while owners may still Open and publish.
+The per-router bouncer SHALL hold three optional bound clients as `atomic.Value` fields (LAPI, AppSec, and captcha), each able to hold a typed nil. `ServeHTTP` SHALL `Load` those fields only and MUST NOT resolve instance names, Peek slot tables, or Open clients on the request path. Subscribers MUST NOT Bind reclaim on those clients. The bouncer SHALL read `lapiMode` from the loaded LAPI client on each request, not from a copy taken at `New`. When `bouncerEnabled` is false the handler SHALL call `next` without applying decisions while owners may still Open and publish.
 
 #### Scenario: Nil LAPI client uses failure action for that leg
 - **WHEN** the bouncer subscribed to LAPI but the loaded value is empty and `startupBlock` is false
@@ -24,8 +24,13 @@ The per-router bouncer SHALL hold two optional bound clients as `atomic.Value` f
 - **WHEN** a subscriber's bound LAPI client changes from stream to live via Publish
 - **THEN** the next request branches on the newly loaded client's mode
 
+#### Scenario: Captcha binding is Load-only
+- **WHEN** the bouncer subscribed to captcha
+- **THEN** `ServeHTTP` Loads the captcha `atomic.Value` only
+- **AND** it does not Open or reconstruct a captcha client on the request path
+
 ### Requirement: Stream startup block guards subscribed backends on the request path
-When `bouncerStartupBlock` is true, before calling `next` or applying decisions the bouncer SHALL check every leg it subscribed to (LAPI and/or AppSec independently). For each subscribed leg, if the loaded client is not published (typed nil), `ServeHTTP` SHALL return HTTP 503 and MUST NOT call `next`. When `bouncerStartupBlock` is false, a missing subscribed client SHALL use that leg's failure action instead. The check MUST NOT block `New`. A leg the bouncer did not subscribe to is not part of the guard. The Bouncer field name SHALL be `startupBlock` (not `streamStartupBlock`).
+When `bouncerStartupBlock` is true, before calling `next` or applying decisions the bouncer SHALL check every leg it subscribed to (LAPI, AppSec, and captcha independently). For each subscribed leg, if the loaded client is not published (typed nil), `ServeHTTP` SHALL return HTTP 503 and MUST NOT call `next`. When `bouncerStartupBlock` is false, a missing subscribed LAPI or AppSec client SHALL use that leg's failure action instead, and a missing subscribed captcha client SHALL ban a captcha verdict. The check MUST NOT block `New`. A leg the bouncer did not subscribe to is not part of the guard. The Bouncer field name SHALL be `startupBlock` (not `streamStartupBlock`).
 
 #### Scenario: AppSec-only subscriber does not 503 for missing LAPI
 - **WHEN** the bouncer subscribes only to AppSec and LAPI is not subscribed
@@ -35,6 +40,10 @@ When `bouncerStartupBlock` is true, before calling `next` or applying decisions 
 - **WHEN** the bouncer subscribes to LAPI and AppSec, `bouncerStartupBlock` is true, and AppSec is not published
 - **THEN** every request returns 503 until AppSec is published
 
+#### Scenario: Unpublished subscribed captcha yields 503 when block true
+- **WHEN** the bouncer subscribes to captcha, `bouncerStartupBlock` is true, and captcha is not published
+- **THEN** every request returns 503 until captcha is published
+
 ### Requirement: Bouncer does not own the stream ticker
 The per-router bouncer SHALL handle request policy (trusted IPs, ban/captcha pages, whether AppSec runs on pass, LAPI failure action, Redis fail-closed, and live-cache TTL) and MUST NOT start a process-wide stream ticker. Stream polling remains on the LAPI Client opened by an owner middleware.
 
@@ -43,7 +52,7 @@ The per-router bouncer SHALL handle request policy (trusted IPs, ban/captcha pag
 - **THEN** only one stream ticker runs for that client incarnation
 
 ### Requirement: A failed New releases the holders it already opened
-`New` SHALL bind every reclaim `Open` it makes (decision store, LAPI client, AppSec client) to one context derived from the constructor context, and SHALL release that context on every path where it returns an error. A constructor that fails after an earlier `Open` succeeded MUST NOT leave that incarnation held: with zero table grace its `Close` hook SHALL run, and a stream ticker it started MUST NOT keep polling LAPI. The derived context SHALL stay a child of the constructor context, so cancelling Traefik's context still releases the holders of a `New` that succeeded. The success path MUST NOT release it.
+`New` SHALL bind every reclaim `Open` it makes (decision store, LAPI client, AppSec client, captcha client) to one context derived from the constructor context, and SHALL release that context on every path where it returns an error. A constructor that fails after an earlier `Open` succeeded MUST NOT leave that incarnation held: with zero table grace its `Close` hook SHALL run, and a stream ticker it started MUST NOT keep polling LAPI. The derived context SHALL stay a child of the constructor context, so cancelling Traefik's context still releases the holders of a `New` that succeeded. The success path MUST NOT release it.
 
 #### Scenario: AppSec Open fails after a stream client was opened
 - **WHEN** `lapiMode` is `stream`, the LAPI stream client opens, and `appsec.Open` then fails
@@ -56,6 +65,11 @@ The per-router bouncer SHALL handle request policy (trusted IPs, ban/captcha pag
 - **THEN** the incarnations it opened are still held
 - **AND** cancelling the constructor context releases them
 
+#### Scenario: Captcha Open fails after LAPI was opened
+- **WHEN** LAPI Opens and captcha Open then fails
+- **THEN** `New` returns that error
+- **AND** the LAPI incarnation is no longer held
+
 ### Requirement: New does not mutate the caller's Config
 `New` SHALL snapshot the `*configuration.Config` Traefik passes before it normalises or resolves anything, and SHALL pass that snapshot to `lapi.Prepare`, `appsec.Prepare`, the reclaim `Open` calls, and `bouncer.New`. After `New` returns, the caller's struct MUST NOT carry a normalised `logLevel`, a resolved `lapiKey` or `lapiRedisPassword`, a resolved `appsecKey`, or alone-mode's rewritten `lapiHost` and forced `lapiUpdateIntervalSeconds`. The snapshot is a shallow copy: `Config`'s slice and map fields stay shared with the caller, and the copy site SHALL say so.
 
@@ -64,15 +78,20 @@ The per-router bouncer SHALL handle request policy (trusted IPs, ban/captcha pag
 - **THEN** the caller's `*Config` still holds the unresolved key and the original `logLevel`
 
 ### Requirement: Captcha siteverify Timeout is the effective captcha seconds
-When `bouncer.New` constructs the captcha provider `http.Client`, that client’s `Timeout` SHALL be `config.BouncerCaptchaSiteverifyHTTPTimeoutSeconds` seconds. It MUST NOT read a shared or inherited timeout. The client SHALL stay per-Bouncer. Implementations MUST NOT reclaim a captcha HTTP client and MUST NOT add `sync.Once` or a package-global siteverify client. `pkg/captcha` SHALL keep local parameter names (`siteKey`, `secretKey`, `gateSecret`); the bouncer SHALL pass `BouncerCaptchaSiteKey` into those arguments and MUST NOT grow a `bouncer` field on captcha.
+When an owning middleware constructs the captcha provider `http.Client`, that client’s `Timeout` SHALL be `config.BouncerCaptchaSiteverifyHTTPTimeoutSeconds` seconds. It MUST NOT read a shared or inherited timeout. Subscribers SHALL use the published client and MUST NOT construct a second siteverify client from leftover keys. `pkg/captcha` SHALL keep local parameter names (`siteKey`, `secretKey`, `gateSecret`); the owner SHALL pass `BouncerCaptchaSiteKey` into those arguments and MUST NOT grow a `bouncer` field on captcha.
 
 #### Scenario: Captcha knob sets siteverify Timeout
-- **WHEN** `bouncer.New` runs with a captcha provider set and `BouncerCaptchaSiteverifyHTTPTimeoutSeconds` 1
+- **WHEN** a captcha owner Opens with a captcha provider set and `BouncerCaptchaSiteverifyHTTPTimeoutSeconds` 1
 - **THEN** the stored captcha siteverify `http.Client` Timeout is 1 second
 
 #### Scenario: Captcha omit uses the captcha default
-- **WHEN** `bouncer.New` runs with a captcha provider set and the captcha timeout omitted
+- **WHEN** a captcha owner Opens with a captcha provider set and the captcha timeout omitted
 - **THEN** the stored captcha siteverify `http.Client` Timeout is 10 seconds
+
+#### Scenario: Two subscribers share one siteverify client
+- **WHEN** two bouncing middlewares subscribe to the same published captcha instance
+- **THEN** both use that instance's siteverify `http.Client`
+- **AND** neither constructs a local captcha client
 
 ### Requirement: Live stream and alone lookup uses one Store entry
 When `lapiMode` is live, stream, or alone, and a configured `bouncerDecisionHeader` does not force `b` on this request, the bouncer SHALL resolve memoized remediation through one `lapi.Client.LookupRemediation` that delegates to `Store.LookupRemediation`. It MUST NOT call `UsesLiveSnapshot`, MUST NOT branch between a live snapshot and a cache Client, and MUST NOT duplicate merge semantics in the bouncer. Stream and alone miss SHALL fall through to stream-healthy / failure-action. Live miss SHALL call `LiveLookup`, which returns `(kind, origin, error)` fields. None mode SHALL call `LiveLookup` every request (no memo read) unless that same header forced `b`. Forced `b` or `c` is owned by `core_plugin_middleware_forced-decision`; this leaf MUST NOT restate that owner SHALL. `bouncer.New` SHALL copy `LapiDefaultDecisionSeconds` onto `Bouncer.defaultDecisionSeconds` and pass that into `LiveLookup`; the parameter name SHALL stay `defaultDecisionSeconds`.
@@ -106,3 +125,25 @@ When AppSec `Query` returns `ErrClientDisconnected`, the bouncer SHALL stop with
 - **THEN** origin is not called
 - **AND** the response is not a ban
 - **AND** if `bouncerRemediationHeadersCustomName` is `X-Remediation` the response header value is `error:client-disconnected`
+
+### Requirement: Captcha verdict without a published client is a ban
+When the remediation kind is captcha and the loaded captcha binding is empty or not valid, the bouncer SHALL remediate as a ban. It MUST NOT construct a fallback local captcha client on the request path or in `bouncer.New`. A bounce-only middleware MUST NOT build a captcha client from leftover `bouncerCaptcha*` keys.
+
+#### Scenario: Unpublished captcha with startup block off bans
+- **WHEN** the bouncer subscribed to captcha, `bouncerStartupBlock` is false, the loaded captcha value is empty, and the verdict is captcha
+- **THEN** the response is a ban
+- **AND** no captcha challenge page is served
+
+#### Scenario: Bounce-only leftover keys are not a client
+- **WHEN** `captchaEnabled` is false, `bouncerCaptchaProvider` is set on this router, and no captcha client is published
+- **THEN** `bouncer.New` does not construct a captcha client from those keys
+- **AND** a captcha verdict remediates as a ban when startup block is false
+
+### Requirement: Remediation header is not stored on the shared captcha client
+The remediation header name SHALL stay on the Bouncer (`bouncerRemediationHeadersCustomName`). Challenge page, solved redirect, and captcha-kind responses SHALL write this router's header. The published `captcha.Client` MUST NOT store a remediation header copied from the owner.
+
+#### Scenario: Subscriber uses its own header name
+- **WHEN** the owner sets `bouncerRemediationHeadersCustomName` to `X-Owner` and a subscriber of that captcha name sets `X-Route`
+- **AND** the subscriber serves a captcha challenge
+- **THEN** the response header name is `X-Route`
+- **AND** it is not `X-Owner`

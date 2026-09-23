@@ -126,6 +126,7 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 	}
 
 	cfg := cfgLiveAt(u.Host)
+	cfg.CaptchaEnabled = true
 	cfg.BouncerCaptchaProvider = configuration.HcaptchaProvider
 	cfg.BouncerCaptchaGateSecret = "gate-secret"
 	cfg.BouncerCaptchaFilePath = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
@@ -161,6 +162,7 @@ func TestNew_RejectsEmptyCaptchaFilePath(t *testing.T) {
 	}
 
 	cfg := cfgLiveAt(u.Host)
+	cfg.CaptchaEnabled = true
 	cfg.BouncerCaptchaProvider = configuration.HcaptchaProvider
 	cfg.BouncerCaptchaSiteKey = "site"
 	cfg.BouncerCaptchaSecretKey = "secret"

@@ -1,4 +1,4 @@
-// Package captcha implements utility for captcha management.
+// Package captcha is the reclaim value for one named captcha siteverify client.
 package captcha
 
 import (
@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -18,24 +19,30 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-// Client Captcha client.
+// Client is one published captcha siteverify, template, and gate. Not a Bouncer field.
 type Client struct {
-	Valid                   bool
-	siteKey                 string
-	secretKey               string
-	gateSecret              []byte
-	gateBindIP              bool
-	remediationCustomHeader string
-	gracePeriodSeconds      int64
-	templateContentType     string
-	template                *template.Template
-	httpClient              *http.Client
-	log                     *slog.Logger
-	infoProvider            *infoProvider
+	Valid               bool
+	siteKey             string
+	secretKey           string
+	gateSecret          []byte
+	gateBindIP          bool
+	gracePeriodSeconds  int64
+	templateContentType string
+	template            *template.Template
+	httpClient          *http.Client
+	log                 *slog.Logger
+	infoProvider        *infoProvider
 	// challengeURL and validateBody are custom-only; built-ins leave them empty.
 	challengeURL        string
 	validateBody        string
 	customResourcePaths []string
+	mu                  sync.Mutex
+	middlewareName      string
+	instanceName        string
+	incarnation         string
+	sessionKey          string
+	closed              bool
+	sleeping            bool
 }
 
 // Information for self-hosted provider.
@@ -68,8 +75,8 @@ var infoProviders = map[string]*infoProvider{
 	},
 }
 
-// New Initialize captcha client.
-func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, challengeURL, key, response, validate, validateBody, siteKey, secretKey, gateSecret string, gateBindIP bool, remediationCustomHeader, captchaTemplatePath string, gracePeriodSeconds int64) error {
+// New fills siteverify, template, and gate fields. Empty provider leaves Valid false.
+func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, challengeURL, key, response, validate, validateBody, siteKey, secretKey, gateSecret string, gateBindIP bool, captchaTemplatePath string, gracePeriodSeconds int64) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
@@ -88,7 +95,6 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 	c.secretKey = secretKey
 	c.gateSecret = []byte(gateSecret)
 	c.gateBindIP = gateBindIP
-	c.remediationCustomHeader = remediationCustomHeader
 	challengeTemplate, contentType, err := configuration.GetTemplate(captchaTemplatePath)
 	if err != nil {
 		return err
@@ -106,8 +112,8 @@ func (c *Client) HTTPClientForTest() *http.Client {
 	return c.httpClient
 }
 
-// ServeHTTP Handle captcha html page or validation.
-func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP string) {
+// ServeHTTP handles captcha html page or validation. remediationHeader is this router's name.
+func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP, remediationHeader string) {
 	valid, err := c.Validate(r, remoteIP)
 	// Transport and JSON decode stay classified; the solver retries the challenge.
 	if err != nil {
@@ -117,16 +123,12 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP str
 		logger.Trace(c.log, "captcha:ServeHTTP captcha:valid")
 		value := mintGateValue(c.gateSecret, c.gateBindIP, remoteIP, time.Now())
 		setGateCookie(rw, r, value, c.gracePeriodSeconds)
-		if c.remediationCustomHeader != "" {
-			rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
-		}
+		writeRemediationHeader(rw, remediationHeader, "solved-captcha")
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
 	}
 	rw.Header().Set("Content-Type", c.templateContentType)
-	if c.remediationCustomHeader != "" {
-		rw.Header().Set(c.remediationCustomHeader, "captcha")
-	}
+	writeRemediationHeader(rw, remediationHeader, "captcha")
 	rw.WriteHeader(http.StatusOK)
 	err = c.template.Execute(rw, map[string]string{
 		"SiteKey":      c.siteKey,
@@ -248,11 +250,88 @@ func multipartFieldValue(boundary string, body []byte, field string) string {
 }
 
 // WriteSolvedRedirect issues 302 to the same URL without reminting the gate cookie.
-func (c *Client) WriteSolvedRedirect(rw http.ResponseWriter, r *http.Request) {
-	if c.remediationCustomHeader != "" {
-		rw.Header().Set(c.remediationCustomHeader, "solved-captcha")
-	}
+func (c *Client) WriteSolvedRedirect(rw http.ResponseWriter, r *http.Request, remediationHeader string) {
+	writeRemediationHeader(rw, remediationHeader, "solved-captcha")
 	http.Redirect(rw, r, r.URL.String(), http.StatusFound)
+}
+
+// writeRemediationHeader sets this router's captcha-kind header when a name is configured.
+func writeRemediationHeader(rw http.ResponseWriter, name, value string) {
+	if name == "" {
+		return
+	}
+	rw.Header().Set(name, value)
+}
+
+// Close releases idle siteverify HTTP. Safe to call more than once.
+func (c *Client) Close() {
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return
+	}
+	c.closed = true
+	c.sleeping = false
+	httpClient := c.httpClient
+	c.mu.Unlock()
+	if httpClient != nil {
+		httpClient.CloseIdleConnections()
+	}
+	c.logLifecycle(MsgInstanceClosed, "closed", false)
+}
+
+// Sleep logs DEBUG. Captcha has no ticker.
+func (c *Client) Sleep() {
+	c.mu.Lock()
+	if c.closed || c.sleeping {
+		c.mu.Unlock()
+		return
+	}
+	c.sleeping = true
+	c.mu.Unlock()
+	c.logLifecycle(MsgInstanceSleeping, "sleeping", true)
+}
+
+// Wake logs DEBUG after Sleep. Captcha has no ticker.
+func (c *Client) Wake() {
+	c.mu.Lock()
+	if c.closed || !c.sleeping {
+		c.mu.Unlock()
+		return
+	}
+	c.sleeping = false
+	c.mu.Unlock()
+	c.logLifecycle(MsgInstanceWaking, "waking", true)
+}
+
+// Incarnation is unique per Client create.
+func (c *Client) Incarnation() string {
+	if c == nil {
+		return ""
+	}
+	return c.incarnation
+}
+
+func (c *Client) bindIdentity(middlewareName, bindKey string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.middlewareName == "" {
+		c.middlewareName = middlewareName
+	}
+	if c.sessionKey == "" {
+		c.sessionKey = bindKey
+	}
+}
+
+func (c *Client) logLifecycle(msg, reason string, debug bool) {
+	if c.log == nil {
+		return
+	}
+	if debug {
+		c.log.Debug(msg, "incarnation", c.incarnation, "reason", reason)
+		return
+	}
+	c.log.Info(msg, "incarnation", c.incarnation, "reason", reason)
 }
 
 // storeCustomResourcePaths keeps exact browser asset paths for custom-provider passthrough.

@@ -6,7 +6,6 @@ import (
 	"testing"
 	"text/template"
 
-	captcha "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
@@ -119,7 +118,6 @@ func testRemapStreamBouncer(t *testing.T, lapiClient *lapi.Client, remap map[str
 	b := &Bouncer{
 		enabled:                  true,
 		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
-		captchaClient:            &captcha.Client{},
 		log:                      log,
 		remediationStatusCode:    http.StatusForbidden,
 		banTemplate:              banTemplate,

@@ -120,6 +120,8 @@ type Config struct {
 	LapiRedisDatabase                          string                       `json:"lapiRedisDatabase,omitempty"`
 	BouncerRedisUnreachableBlock               bool                         `json:"bouncerRedisUnreachableBlock,omitempty"`
 	BouncerBanFilePath                         string                       `json:"bouncerBanFilePath,omitempty"`
+	CaptchaEnabled                             bool                         `json:"captchaEnabled,omitempty"`
+	CaptchaInstanceName                        string                       `json:"captchaInstanceName,omitempty"`
 	BouncerCaptchaFilePath                     string                       `json:"bouncerCaptchaFilePath,omitempty"`
 	BouncerCaptchaProvider                     string                       `json:"bouncerCaptchaProvider,omitempty"`
 	BouncerCaptchaCustomJsURL                  string                       `json:"bouncerCaptchaCustomJsUrl,omitempty"`
@@ -150,17 +152,27 @@ func contains(source []string, target string) bool {
 }
 
 // validateFailureAction accepts empty (treated as ban at runtime), passthrough, ban, or captcha.
-func validateFailureAction(name, action, captchaProvider string) error {
+// captcha is legal only when this router has a captcha instance name after owner-fill.
+func validateFailureAction(name, action string, captchaInstanceReady bool) error {
 	if action == "" {
 		return nil
 	}
 	if !contains([]string{FailureActionPassthrough, FailureActionBan, FailureActionCaptcha}, action) {
 		return errors.New(name + ": must be one of 'passthrough', 'ban' or 'captcha'")
 	}
-	if action == FailureActionCaptcha && captchaProvider == "" {
-		return errors.New(name + ": captcha requires BouncerCaptchaProvider")
+	if action == FailureActionCaptcha && !captchaInstanceReady {
+		return errors.New(name + ": captcha requires a captcha instance name")
 	}
 	return nil
+}
+
+// captchaInstanceNameReadyAfterOwnerFill is true when CaptchaInstanceName is set,
+// or when CaptchaEnabled will fill an empty name to the Traefik name.
+func captchaInstanceNameReadyAfterOwnerFill(config *Config) bool {
+	if strings.TrimSpace(config.CaptchaInstanceName) != "" {
+		return true
+	}
+	return config.CaptchaEnabled
 }
 
 // EffectiveFailureAction maps empty config to ban (plugin default).
@@ -201,6 +213,8 @@ func New() *Config {
 		BouncerRemediationStatusCode:     http.StatusForbidden,
 		LapiHTTPTimeoutSeconds:           10,
 		AppsecHTTPTimeoutSeconds:         10,
+		CaptchaEnabled:                   false,
+		CaptchaInstanceName:              "",
 		BouncerCaptchaSiteverifyHTTPTimeoutSeconds: 10,
 		BouncerCaptchaProvider:                     "",
 		BouncerCaptchaCustomJsURL:                  "",
@@ -380,7 +394,11 @@ func validateOpenVsSubscribe(config *Config) error {
 	if err := validateLegOpenVsSubscribe("LAPI", config.BouncerEnabled, config.LapiEnabled, config.LapiInstanceName, lapiSecretPresent(config)); err != nil {
 		return err
 	}
-	return validateLegOpenVsSubscribe("AppSec", config.BouncerEnabled, config.AppsecEnabled, config.AppsecInstanceName, appsecSecretPresent(config))
+	if err := validateLegOpenVsSubscribe("AppSec", config.BouncerEnabled, config.AppsecEnabled, config.AppsecInstanceName, appsecSecretPresent(config)); err != nil {
+		return err
+	}
+	// Captcha E2 is leftover captchaInstanceName only; leftover bouncerCaptcha* is not a secret.
+	return validateLegOpenVsSubscribe("Captcha", config.BouncerEnabled, config.CaptchaEnabled, config.CaptchaInstanceName, false)
 }
 
 func validateLegOpenVsSubscribe(leg string, bounceEnabled, owned bool, instanceName string, secretPresent bool) error {
@@ -434,8 +452,11 @@ func validateCaptchaCredentialsAndTemplates(config *Config) error {
 }
 
 // validateEnabledCaptchaSettings checks provider credentials, the optional custom
-// challenge URL, and a loadable captcha template when a provider is set.
+// challenge URL, and a loadable captcha template when captcha is enabled.
 func validateEnabledCaptchaSettings(config *Config) error {
+	if !config.CaptchaEnabled {
+		return nil
+	}
 	if config.BouncerCaptchaProvider == "" {
 		return nil
 	}
@@ -666,7 +687,11 @@ func validateParamsIPs(log *slog.Logger, listIP []string, key string) error {
 	return nil
 }
 
+// validateCaptcha checks provider, custom-validate body, and custom fields when captcha is enabled.
 func validateCaptcha(config *Config) error {
+	if !config.CaptchaEnabled {
+		return nil
+	}
 	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider}, config.BouncerCaptchaProvider) {
 		return fmt.Errorf("BouncerCaptchaProvider: must be one of '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider)
 	}
@@ -729,10 +754,11 @@ func validateParamsRequired(config *Config) error {
 	if config.LapiUpdateMaxFailure < -1 {
 		return errors.New("LapiUpdateMaxFailure: cannot be less than -1")
 	}
-	if err := validateFailureAction("BouncerLapiFailureAction", config.BouncerLapiFailureAction, config.BouncerCaptchaProvider); err != nil {
+	captchaInstanceReady := captchaInstanceNameReadyAfterOwnerFill(config)
+	if err := validateFailureAction("BouncerLapiFailureAction", config.BouncerLapiFailureAction, captchaInstanceReady); err != nil {
 		return err
 	}
-	if err := validateFailureAction("BouncerAppsecFailureAction", config.BouncerAppsecFailureAction, config.BouncerCaptchaProvider); err != nil {
+	if err := validateFailureAction("BouncerAppsecFailureAction", config.BouncerAppsecFailureAction, captchaInstanceReady); err != nil {
 		return err
 	}
 	if config.AppsecBodyLimit < 0 {

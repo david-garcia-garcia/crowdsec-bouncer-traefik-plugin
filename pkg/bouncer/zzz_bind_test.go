@@ -2,6 +2,7 @@ package bouncer
 
 import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 )
@@ -23,4 +24,13 @@ func bindTestAppSec(b *Bouncer, client *appsec.Client) {
 		return
 	}
 	b.appsecBound.Store((*appsec.Client)(nil))
+}
+
+func bindTestCaptcha(b *Bouncer, client *captcha.Client) {
+	b.subscribeCaptcha = client != nil
+	if client != nil {
+		b.captchaBound.Store(client)
+		return
+	}
+	b.captchaBound.Store((*captcha.Client)(nil))
 }

@@ -45,6 +45,7 @@ services:
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiKey=40796d93c2958f9e58345514e67740e5"
 
       # Choose captcha provider
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaEnabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaProvider=custom"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaCustomJsUrl=http://captcha.localhost:8000/fast.js"
       # The widget fetches this from the browser, so it is rendered in captcha.html and passed through to the origin

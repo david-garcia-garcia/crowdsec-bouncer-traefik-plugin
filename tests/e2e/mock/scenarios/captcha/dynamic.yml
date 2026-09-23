@@ -26,6 +26,7 @@ http:
           bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
           # custom + mocklapi /siteverify: always-pass JSON, no real bot check.
+          captchaEnabled: true
           bouncerCaptchaProvider: custom
           bouncerCaptchaCustomJsUrl: "http://@@LAPI_HOST@@/dummy.js"
           bouncerCaptchaCustomValidateUrl: "http://@@LAPI_HOST@@/siteverify"

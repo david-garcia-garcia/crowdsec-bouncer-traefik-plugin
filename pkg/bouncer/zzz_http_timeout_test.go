@@ -2,56 +2,24 @@ package bouncer
 
 import (
 	"net/http"
-	"os"
-	"path/filepath"
 	"testing"
-	"time"
 
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-func testCaptchaBouncerConfig(t *testing.T, captchaTimeout int64) *configuration.Config {
-	t.Helper()
-	templatePath := filepath.Join(t.TempDir(), "captcha.html")
-	if err := os.WriteFile(templatePath, []byte("captcha"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+func TestNew_BounceOnlyDoesNotConstructCaptcha(t *testing.T) {
+	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 	cfg := configuration.New()
-	cfg.LapiMode = configuration.LiveMode
-	cfg.BouncerCaptchaSiteverifyHTTPTimeoutSeconds = captchaTimeout
 	cfg.BouncerCaptchaProvider = configuration.HcaptchaProvider
 	cfg.BouncerCaptchaSiteKey = "site"
 	cfg.BouncerCaptchaSecretKey = "secret"
 	cfg.BouncerCaptchaGateSecret = "gate-secret"
-	cfg.BouncerCaptchaFilePath = templatePath
-	return cfg
-}
-
-func captchaSiteverifyTimeout(t *testing.T, cfg *configuration.Config) time.Duration {
-	t.Helper()
-	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
-	route, err := New(next, "test", cfg, false, false, logger.New("ERROR", ""))
+	route, err := New(next, "test", cfg, false, false, false, logger.New("ERROR", ""))
 	if err != nil {
 		t.Fatalf("New = %v", err)
 	}
-	httpClient := route.captchaClient.HTTPClientForTest()
-	if httpClient == nil {
-		t.Fatal("captcha siteverify client was not stored")
-	}
-	return httpClient.Timeout
-}
-
-func TestNew_CaptchaSiteverifyTimeoutHonorsOverride(t *testing.T) {
-	got := captchaSiteverifyTimeout(t, testCaptchaBouncerConfig(t, 1))
-	if got != time.Second {
-		t.Fatalf("captcha Timeout = %v want 1s", got)
-	}
-}
-
-func TestNew_CaptchaSiteverifyTimeoutUsesOwnKnob(t *testing.T) {
-	got := captchaSiteverifyTimeout(t, testCaptchaBouncerConfig(t, 10))
-	if got != 10*time.Second {
-		t.Fatalf("captcha Timeout = %v want 10s", got)
+	if route.loadedCaptcha() != nil {
+		t.Fatal("bounce-only New must not construct a captcha client")
 	}
 }

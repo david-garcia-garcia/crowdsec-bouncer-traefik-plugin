@@ -3,8 +3,8 @@
 ## Language
 
 **Slot**:
-One named LAPI or AppSec publish target keyed by leg plus instance name. LAPI and AppSec are separate tables, so both may use the string `shared`. Not the Client reclaim key.
-_Avoid_: ownership key, SessionHex, DecisionStore, Traefik middleware name as the only key
+One named LAPI, AppSec, or captcha publish target keyed by group plus instance name. The three groups are separate, so all may use the string `shared`. Not the Client reclaim key.
+_Avoid_: ownership key, SessionHex, DecisionStore, Traefik middleware name as the only key, a second slot table
 
 **Publish**:
 Store a client pointer as `current` for that slot, record the publishing middleware, and `Store` the same pointer into every subscriber `atomic.Value` before unlocking. Yaegi-safe: `atomic.Value`, not `atomic.Pointer[T]` and not callbacks.
@@ -24,11 +24,11 @@ _Avoid_: Unpublish on Sleep, AfterFunc Unpublish on every constructor ctx cancel
 
 ## Overview
 
-Process-wide named slots sit between owner `Open` and bouncer bounce. Spec: `core_plugin_middleware_instance-slots`. Ownership Open keys live on `core_plugin_lapi_reclaim-key` and AppSec session. Constructor wiring: `core_plugin_middleware.md`.
+Process-wide named slots sit between owner `Open` and bouncer bounce. Spec: `core_plugin_middleware_instance-slots`. Ownership Open keys live on `core_plugin_lapi_reclaim-key`, AppSec session, and captcha `OwnershipKey` (middleware name plus instance-owned knobs; `pkg/captcha/session.go`). Constructor wiring: `core_plugin_middleware.md`.
 
 ## How to use
 
-- Named slots are opaque aliases on the reclaim table. This plugin encodes them as `alias:<leg>:<name>` in `instanceAlias`; the table never parses that string. `plugin.go` Opens owned legs, then `SetAlias` with group `lapi`/`appsec`, then `bouncer.New` with subscribe flags, then `Watch`. `Watch` drops that subscriber when its ctx is done.
+- Named slots are opaque aliases on the reclaim table. This plugin encodes them as `alias:<leg>:<name>` in `instanceAlias`; the table never parses that string. `plugin.go` Opens owned legs, then `SetAlias` with group `lapi`/`appsec`/`captcha`, then `bouncer.New` with subscribe flags, then `Watch`. `Watch` drops that subscriber when its ctx is done.
 - Watchers `Store` a `reclaim.Box` only. The inner value is the client or typed nil. Never `Store(nil)` and never change the `atomic.Value` type (Yaegi panics).
 - Reject a second publisher on the same alias. Roll back with `ClearPublisher(name, group)`, then cancel the holder child.
 - Close / unmap of a dying incarnation clears aliases still pointing at it (reverse index on the slot). Sleep does not.
@@ -43,6 +43,7 @@ if !openedLAPI {
 	reclaim.ClearPublisher(traefikName, "lapi")
 }
 reclaim.Watch(ctx, instanceAlias("lapi", instanceName), (*lapi.Client)(nil), route.ReceiveLAPI)
+reclaim.Watch(ctx, instanceAlias("captcha", captchaName), (*captcha.Client)(nil), route.ReceiveCaptcha)
 ```
 
 ## Key files
@@ -50,6 +51,7 @@ reclaim.Watch(ctx, instanceAlias("lapi", instanceName), (*lapi.Client)(nil), rou
 - `vendor/github.com/david-garcia-garcia/traefik-middleware-utilities/reclaim/alias.go`
 - `pkg/reclaim/default.go`
 - `plugin.go`
+- `pkg/captcha/session.go`
 - `pkg/bouncer/bouncer.go`
 
 ## Gotchas

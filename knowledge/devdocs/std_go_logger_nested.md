@@ -3,12 +3,12 @@
 ## Language
 
 **Nested component logger**:
-A `slog.Logger` child created with `log.With` on the Bouncer, LAPI Client, or AppSec Client so every line from that unit carries its identity.
+A `slog.Logger` child created with `log.With` on the Bouncer, LAPI Client, AppSec Client, or Captcha Client so every line from that unit carries its identity.
 _Avoid_: a helper around `With`; repeating `traefikName` / `instanceName` / `leg` / `sessionKey` on every call site
 
 ## Overview
 
-Three constructors nest. `bouncer.New` sets `traefikName`. `lapi.New` and `appsec.New` set `traefikName`, `instanceName`, `leg`, and `sessionKey`. Stream ticks and `reportMetrics` inherit those fields.
+Four constructors nest. `bouncer.New` sets `traefikName`. `lapi.New`, `appsec.New`, and `captcha.Open` set `traefikName`, `instanceName`, `leg`, and `sessionKey`. Stream ticks and `reportMetrics` inherit those fields.
 
 ## How to use
 
@@ -29,6 +29,7 @@ log.Debug("handleStreamTicker:poll", "startup", startup, "interval", interval)
 - `pkg/bouncer/bouncer.go` — bouncer nest
 - `pkg/lapi/client.go` — LAPI nest
 - `pkg/appsec/client.go` — AppSec nest
+- `pkg/captcha/session.go` — captcha nest
 
 ## Gotchas
 
