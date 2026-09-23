@@ -10,9 +10,13 @@ _Avoid_: env lookup, Getenv
 The Config field that means this router will open AppSec. Same field `New` uses for `appsec.Open`.
 _Avoid_: leftover AppSec host/CA/key, `lapiMode: appsec`, CrowdsecAppsecEnabled
 
+**CaptchaEnabled**:
+The Config field that means this router will open a captcha Client. Same field `New` uses for `captcha.Open`. A set `bouncerCaptchaProvider` is not this field.
+_Avoid_: leftover bouncerCaptcha*, implicit own from provider
+
 **Config domain prefix**:
 The operator label on `configuration.Config` (Go field and JSON tag). It does not travel past the package that owns the value.
-_Avoid_: nested YAML, old-key alias, repeating the prefix inside `pkg/lapi` or `pkg/appsec`
+_Avoid_: nested YAML, old-key alias, repeating the prefix inside `pkg/lapi`, `pkg/appsec`, or `pkg/captcha`
 
 **Config validation**:
 The `ValidateParams` startup gate `plugin.New` runs on the config snapshot before `lapi.Prepare`.
@@ -42,8 +46,10 @@ _Avoid_: sharedLogFiles, reclaim value, log owner
 - `captcha.Client.New` returns the `GetTemplate` error. Do not discard it. Do not invent a bundled default template.
 - After CAPI (alone) or LAPI (other modes), call `validateAppsecURLKeyAndTLS` only when `config.AppsecEnabled`. Do not hide that `if` only inside a LAPI wrapper — alone never calls it.
 - Reuse `AppsecEnabled`. Do not re-derive from leftover AppSec fields or `lapiMode`.
-- Reject `lapiMode: appsec` (E4). Gate LAPI URL/keys on `LapiEnabled`. Reject leftover instance name or secret when bounce and owner flags are both false (E2).
-- `LapiEnabled` defaults false. Tests and compose that Open LAPI must set it true.
+- Reject `lapiMode: appsec` (E4). Gate LAPI URL/keys on `LapiEnabled`. Reject leftover instance name or secret when bounce and owner flags are both false (E2). Captcha E2 is leftover `captchaInstanceName` only; leftover `bouncerCaptcha*` is not a secret.
+- `LapiEnabled` and `CaptchaEnabled` default false. Tests and compose that Open LAPI or own captcha must set the flag true. A set `bouncerCaptchaProvider` does not own captcha.
+- `captcha` on `bouncerLapiFailureAction` / `bouncerAppsecFailureAction` is legal only when this router has a captcha instance name after owner-fill (`captchaEnabled` omit fills to the Traefik name). Error text names `captcha requires a captcha instance name`.
+- Own-axis captcha keys are `captchaEnabled` and `captchaInstanceName`. Owner-read settings stay `bouncerCaptcha*`.
 - Keep the helper's empty-key pass and explicit-`https` CA parse. Do not fail an empty AppSec key at `ValidateParams`.
 - When the knob is false, skip AppSec host, URL, key, and CA even if leftover fields are set.
 - Leave `New` as `return nil, err` on `ValidateParams` failure.

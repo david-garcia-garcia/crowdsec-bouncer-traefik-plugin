@@ -28,7 +28,9 @@ _Avoid_: `CaptchaCustomValidateURL`, the bundled default `captcha.html`
 
 ## How to use
 
-- Sequence captcha + Valid as: custom-resource path → Check-true form POST 302 → Check-true origin → `captcha.ServeHTTP` (HEAD included). Else ban.
+- Load the published captcha Client. Empty or `!Valid` remediates as ban. Do not construct a local client on the request path or in bounce-only `New`.
+- Pass this router's `remediationCustomHeader` into `ServeHTTP` and `WriteSolvedRedirect`. Do not store the header on Client.
+- Sequence a loaded Valid client as: custom-resource path → Check-true form POST 302 → Check-true origin → `captcha.ServeHTTP` (HEAD included). Else ban.
 - HEAD under a captcha remediation gets the challenge page, never the ban page. That is ratified; do not "fix" it back to ban. A HEAD on a custom-resource path still reaches origin.
 - Detect form POST with `IsCaptchaFormPost`. It is a reader of its own, not `captchaResponseFromRequest`: routing may still forward the request, so it caps at 64KiB, reads urlencoded and multipart, answers from `PostForm` when the form was already parsed, and restores `Body` plus `ContentLength` when it answers no. Keep the two callers apart.
 - After Check, call `WriteSolvedRedirect`: `302 Found` to `req.URL.String()`, set the remediation header to `solved-captcha` when configured. Do not remint the gate cookie. Do not call siteverify.

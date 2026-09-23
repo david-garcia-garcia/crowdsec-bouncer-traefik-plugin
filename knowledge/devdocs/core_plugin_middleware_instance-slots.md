@@ -24,7 +24,7 @@ _Avoid_: Unpublish on Sleep, AfterFunc Unpublish on every constructor ctx cancel
 
 ## Overview
 
-Process-wide named slots sit between owner `Open` and bouncer bounce. Spec: `core_plugin_middleware_instance-slots`. Ownership Open keys live on `core_plugin_lapi_reclaim-key` and AppSec session. Constructor wiring: `core_plugin_middleware.md`.
+Process-wide named slots sit between owner `Open` and bouncer bounce. Spec: `core_plugin_middleware_instance-slots`. Ownership Open keys live on `core_plugin_lapi_reclaim-key`, AppSec session, and captcha `OwnershipKey` (middleware name plus instance-owned knobs; `pkg/captcha/session.go`). Constructor wiring: `core_plugin_middleware.md`.
 
 ## How to use
 
@@ -43,6 +43,7 @@ if !openedLAPI {
 	reclaim.ClearPublisher(traefikName, "lapi")
 }
 reclaim.Watch(ctx, instanceAlias("lapi", instanceName), (*lapi.Client)(nil), route.ReceiveLAPI)
+reclaim.Watch(ctx, instanceAlias("captcha", captchaName), (*captcha.Client)(nil), route.ReceiveCaptcha)
 ```
 
 ## Key files
@@ -50,6 +51,7 @@ reclaim.Watch(ctx, instanceAlias("lapi", instanceName), (*lapi.Client)(nil), rou
 - `vendor/github.com/david-garcia-garcia/traefik-middleware-utilities/reclaim/alias.go`
 - `pkg/reclaim/default.go`
 - `plugin.go`
+- `pkg/captcha/session.go`
 - `pkg/bouncer/bouncer.go`
 
 ## Gotchas
