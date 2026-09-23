@@ -14,17 +14,17 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 69a7afc7
+Reviewed head: 20db88e2
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35908481284/job/107342045705 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -34,8 +34,8 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-23-captcha-leg pushed | `git` |
 | OpenSpec | captcha-leg | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/138 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 9e2773dc7b3a65b6a505c8003e25c4fea1e7e10b succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35908481284/job/107342045705 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35908481284/job/107342045705 |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
@@ -57,7 +57,7 @@ Worktree:
 None.
 
 ## How this fits together
-Ticket 2026-09-23-captcha-leg on branch 2026-09-23-captcha-leg targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/138; CI not seen.
+Ticket 2026-09-23-captcha-leg on branch 2026-09-23-captcha-leg targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/138; CI build 9e2773dc7b3a65b6a505c8003e25c4fea1e7e10b succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35908481284/job/107342045705.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -78,7 +78,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 7 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 69a7afc7f923673f9d88f60b44f727459c338ceb | Card must match the branch you measured |
+| Reviewed head | 20db88e24f7ec1666e804ee4ea066dbf51d4ae71 | Card must match the branch you measured |
 
 ### Stored data model
 None.
