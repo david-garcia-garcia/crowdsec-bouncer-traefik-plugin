@@ -13,3 +13,10 @@ verdicts:
 - skip core_plugin_appsec_failure-action — AppSec JSON `action: captcha` stays on `handleAppsecResponseServeHTTP`
 
 counts: fold 1, new 0, skip 4
+
+archive FindSpecHost:
+- fold core_plugin_middleware_bouncer → core_plugin_middleware_bouncer (high)
+  candidates: core_plugin_middleware_bouncer, core_plugin_middleware_captcha-routing, core_plugin_middleware_forced-decision, core_plugin_lapi_failure-action, core_plugin_appsec_failure-action
+  why: one ADDED live remediating-path WARN+ban on !subscribeCaptcha; owner already has "Captcha verdict without a published client is a ban"
+- new: none
+- skip: none this pass (one delta folder)
