@@ -28,7 +28,7 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 - Real-stack compose and file-provider YAML set `reclaimGraceSeconds: 2` so reclaim dispose is not the production 30s. Instance-severance R2/R5 wait 3s, not 40.
 - Every LAPI-owning compose label and mock YAML must set `crowdsecLapiEnabled: true`. AppSec-only is `false` plus `crowdsecAppsecEnabled: true` (`/waf-only`, mock `appsec`).
 - Country matching uses traefik-geoblock enrich on a **public** `X-Forwarded-For`. Do not inject a client-set country header for that case.
-- CI runs this suite as two jobs, `e2e (docker + pester / lapi)` and `e2e (docker + pester / appsec)`, from `tests/e2e/real/PesterDomains.ps1`. Each job boots its own stack. `make e2e_pester` still runs every file. `e2e (binary + mock LAPI)` stays the mock job; `e2e (go + dragonfly)` is DecisionStore `go test` against Dragonfly (`build_e2e_go-redis.md`).
+- CI runs this suite as three jobs, `e2e (docker + pester / lapi)`, `e2e (docker + pester / appsec)`, and `e2e (docker + pester / lifecycle)`, from `tests/e2e/real/PesterDomains.ps1`. Each job boots its own stack. `make e2e_pester` still runs every file. `e2e (binary + mock LAPI)` stays the mock job; `e2e (go + dragonfly)` is DecisionStore `go test` against Dragonfly (`build_e2e_go-redis.md`).
 
 ## Pattern snippet
 

@@ -1,6 +1,7 @@
 # CI partition of tests/e2e/real/*.Tests.ps1.
-# lapi: request decisions from LAPI (modes, ban, scopes, trusted IPs, metrics).
-# appsec: AppSec, captcha, Redis cache, and instance severance.
+# lapi: request decisions from LAPI (stream and live modes, ban, scopes, trusted IPs, metrics).
+# appsec: AppSec, captcha, and the Redis decision cache.
+# lifecycle: instance severance (late bind, reclaim, name collisions).
 # Local `make e2e_pester` still runs every file. Each CI job runs one domain.
 
 $script:PesterDomainFiles = @{
@@ -20,6 +21,8 @@ $script:PesterDomainFiles = @{
         'appsec.Tests.ps1'
         'captcha.Tests.ps1'
         'redis_cache.Tests.ps1'
+    )
+    lifecycle = @(
         'instance_severance.Tests.ps1'
     )
 }

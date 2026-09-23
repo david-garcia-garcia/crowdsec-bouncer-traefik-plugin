@@ -15,7 +15,7 @@ Use this suite when Redis-protocol semantics (MSetEX, EX TTL, prefix isolation, 
 - Add cases as `zzz_e2e_*_test.go` next to the package, with `//go:build realredis` on the file.
 - Start Dragonfly with `tests/e2e/go/docker-compose.yml` (same image as the Pester `dragonfly` service). Dial `REALREDIS_ADDR` or `127.0.0.1:6379`.
 - Run `make test_realredis` from the repo root. Do not add `-tags realredis` to `make test`.
-- CI job `e2e (go + dragonfly)` runs this suite. Real-stack Pester is `e2e (docker + pester / lapi)` and `e2e (docker + pester / appsec)`.
+- CI job `e2e (go + dragonfly)` runs this suite. Real-stack Pester is `e2e (docker + pester / lapi)`, `e2e (docker + pester / appsec)`, and `e2e (docker + pester / lifecycle)`.
 
 ## Pattern snippet
 
