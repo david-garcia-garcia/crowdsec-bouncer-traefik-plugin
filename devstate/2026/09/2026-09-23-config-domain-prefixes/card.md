@@ -33,7 +33,7 @@ README, examples, compose labels, `.traefik.yml` testData, mock and real e2e, an
 In progress. 0 items remain.
 
 Priority: P2 — real operator pain with a workaround or limited blast radius
-Reviewed head: 29b3d760
+Reviewed head: 90327851
 Owner decision: None.
 
 ## Review scores
@@ -56,17 +56,30 @@ Owner decision: None.
 
 ## Specs
 Worktree:
-- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/config-domain-prefixes/proposal.md) — modified
-- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/config-domain-prefixes/proposal.md) — modified
-- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/config-domain-prefixes/proposal.md) — modified
-- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/config-domain-prefixes/proposal.md) — modified
-- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/config-domain-prefixes/proposal.md) — modified
-- [core_plugin_lapi_connection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/config-domain-prefixes/proposal.md) — modified
-- [core_plugin_lapi_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/config-domain-prefixes/proposal.md) — modified
-- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/config-domain-prefixes/proposal.md) — modified
-- [core_plugin_lapi_scope-union](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/config-domain-prefixes/proposal.md) — modified
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/config-domain-prefixes/proposal.md) — modified
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/config-domain-prefixes/proposal.md) — modified
+- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/archive/2026-09-23-config-domain-prefixes/proposal.md) — modified
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/archive/2026-09-23-config-domain-prefixes/proposal.md) — modified
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/archive/2026-09-23-config-domain-prefixes/proposal.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/archive/2026-09-23-config-domain-prefixes/proposal.md) — modified
+- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/archive/2026-09-23-config-domain-prefixes/proposal.md) — modified
+- [core_plugin_lapi_connection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/archive/2026-09-23-config-domain-prefixes/proposal.md) — modified
+- [core_plugin_lapi_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/archive/2026-09-23-config-domain-prefixes/proposal.md) — modified
+- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/archive/2026-09-23-config-domain-prefixes/proposal.md) — modified
+- [core_plugin_lapi_scope-union](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/archive/2026-09-23-config-domain-prefixes/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/archive/2026-09-23-config-domain-prefixes/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/changes/archive/2026-09-23-config-domain-prefixes/proposal.md) — modified
+
+Completed:
+- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/specs/build_e2e_pester_crowdsec-stack/spec.md) — modified
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/specs/core_plugin_appsec_bot-detection/spec.md) — modified
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/specs/core_plugin_appsec_client/spec.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/specs/core_plugin_appsec_failure-action/spec.md) — modified
+- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/specs/core_plugin_decisionstore_store/spec.md) — modified
+- [core_plugin_lapi_connection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/specs/core_plugin_lapi_connection/spec.md) — modified
+- [core_plugin_lapi_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/specs/core_plugin_lapi_failure-action/spec.md) — modified
+- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/specs/core_plugin_lapi_reclaim-key/spec.md) — modified
+- [core_plugin_lapi_scope-union](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/specs/core_plugin_lapi_scope-union/spec.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-config-domain-prefixes/openspec/specs/core_plugin_middleware_config-validation/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -100,9 +113,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 11 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 22 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 29b3d7601a6b76b4fd52f7f4b97ff09603bb0808 | Card must match the branch you measured |
+| Reviewed head | 90327851c0cb650ea858a23320d518c1979bf4cb | Card must match the branch you measured |
 
 ### Stored data model
 - `redis` — DecisionStore SessionHex key prefix. field `lapiScheme` renamed to `scheme`. migration: missing
