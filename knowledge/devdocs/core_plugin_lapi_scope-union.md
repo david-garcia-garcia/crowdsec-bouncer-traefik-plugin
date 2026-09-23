@@ -3,7 +3,7 @@
 ## Language
 
 **Opener stream scopes**:
-The extra CrowdSec scope names the LAPI stream poll follows (`crowdsecLapiStreamScopes`). `ip` and `range` are always on the poll. Omitted or empty is `ip,range` only. Not copied from `decisionScopeHeaders`.
+The extra CrowdSec scope names the LAPI stream poll follows (`lapiStreamScopes`). `ip` and `range` are always on the poll. Omitted or empty is `ip,range` only. Not copied from `bouncerDecisionScopeHeaders`.
 _Avoid_: live-router scope union, `registerLiveHeaderScopes`, PeekLivePrefix
 
 ## Overview
@@ -12,16 +12,16 @@ How a stream `lapi.Client` builds `scopes=` from the opener list. Spec: `core_pl
 
 ## How to use
 
-- Pass `cfg.CrowdsecLapiStreamScopes` into `CanonicalStreamScopes` at Open. Do not union bouncer header maps into the poll.
+- Pass `cfg.LapiStreamScopes` into `CanonicalStreamScopes` at Open. Do not union bouncer header maps into the poll.
 - CAPI (alone) still omits `scopes=`. Live/none still pass scopes per `LiveLookup`.
-- When a bouncing middleware binds, warn once if `decisionScopeHeaders` keys are not covered by the opener list. Warn again when Publish swaps the client.
+- When a bouncing middleware binds, warn once if `bouncerDecisionScopeHeaders` keys are not covered by the opener list. Warn again when Publish swaps the client.
 - Do not use `atomic.Pointer[T]`, `sync.Once`, or a package global union table.
 
 ## Pattern snippet
 
 ```go
 query := client.streamQuery()
-missing := decisionscope.MissingStreamScopes(client.StreamScopes(), cfg.DecisionScopeHeaders)
+missing := decisionscope.MissingStreamScopes(client.StreamScopes(), cfg.BouncerDecisionScopeHeaders)
 ```
 
 ## Key files
@@ -34,5 +34,5 @@ missing := decisionscope.MissingStreamScopes(client.StreamScopes(), cfg.Decision
 ## Gotchas
 
 - A list change is a new SessionHex and a new store (`startup=true` refill). YAML order does not matter.
-- Empty opener list does not copy Country from `decisionScopeHeaders`.
+- Empty opener list does not copy Country from `bouncerDecisionScopeHeaders`.
 - Growing the list does not send `startup=true` on an existing store; change the list to fork the store.

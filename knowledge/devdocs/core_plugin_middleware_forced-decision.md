@@ -3,8 +3,8 @@
 ## Language
 
 **Forced decision header**:
-The Config string `crowdsecDecisionHeader` naming an incoming request header whose exact trimmed values `b` (ban) and `c` (captcha) force that remediation. Ban skips stream/live lookup. Captcha still looks up so an existing ban wins. Empty means the feature is off. Not `decisionScopeHeaders` (CrowdSec identity). Not `remediationHeadersCustomName` (outgoing).
-_Avoid_: BannedValue `t` as a public letter; treating the header as an address or AppSec action
+The Config string `bouncerDecisionHeader` naming an incoming request header whose exact trimmed values `b` (ban) and `c` (captcha) force that remediation. Ban skips stream/live lookup. Captcha still looks up so an existing ban wins. Empty means the feature is off. Not `bouncerDecisionScopeHeaders` (CrowdSec identity). Not `bouncerRemediationHeadersCustomName` (outgoing).
+_Avoid_: BannedValue `t` as a public letter; treating the header as an address or AppSec action; crowdsecDecisionHeader
 
 ## Overview
 
@@ -12,7 +12,7 @@ An earlier Traefik middleware can force this bouncer to ban or captcha. ServeHTT
 
 ## How to use
 
-- Put `crowdsecDecisionHeader` on Config. Empty or whitespace is off; do not default a header name.
+- Put `bouncerDecisionHeader` on Config. Empty or whitespace is off; do not default a header name.
 - Trim the name in `bouncer.New`. Read `Header.Get` after trusted skip, before appsec-mode and lookup.
 - Map public `b` → `BannedValue`, `c` → `CaptchaValue`. Ignore every other token.
 - Header `b`: call `handleRemediationServeHTTP` with origin `plugin:forced_decision` and return.
@@ -31,7 +31,7 @@ if b.forcedDecisionKind(req.Request) == decisionscope.BannedValue {
 
 ## Key files
 
-- `pkg/configuration/configuration.go` (`CrowdsecDecisionHeader`)
+- `pkg/configuration/configuration.go` (`BouncerDecisionHeader`)
 - `pkg/bouncer/bouncer.go` (`forcedDecisionKind`, ServeHTTP)
 - `pkg/lapi/client_metrics.go` (`OriginPluginForcedDecision`)
 
@@ -40,4 +40,4 @@ if b.forcedDecisionKind(req.Request) == decisionscope.BannedValue {
 - Clients who can set the header can captcha or ban themselves. Empty default is the mitigation; put a previous middleware in front.
 - Header `c` MUST NOT override a stream/live ban. Ban wins and WARN `ServeHTTP:forcedCaptchaSuperseded`.
 - Invalid captcha client still bans on `c` when lookup is not ban, same as stream captcha.
-- Trusted `clientTrustedIps` never see the header.
+- Trusted `bouncerClientTrustedIPs` never see the header.

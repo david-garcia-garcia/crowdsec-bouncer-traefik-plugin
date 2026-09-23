@@ -19,12 +19,12 @@ The one canonical spelling an Ip-scoped decision is filed under, `net.IP.String(
 _Avoid_: keying on the raw header text, a second request-path key helper, re-parsing `remoteIP` in lookup or the live memo, pushing a Country or AS value through address parsing
 
 **Header-mapped scope**:
-A CrowdSec scope other than Ip/Range whose value comes from a request header named in `decisionScopeHeaders`. Country and AS are normalized; a missing header skips that scope.
+A CrowdSec scope other than Ip/Range whose value comes from a request header named in `bouncerDecisionScopeHeaders`. Country and AS are normalized; a missing header skips that scope.
 _Avoid_: GeoIP inside this plugin, client-set country as the real-stack proof
 
-**decisionScopeHeaders**:
+**BouncerDecisionScopeHeaders**:
 Public Traefik plugin map from CrowdSec scope name to header name. Empty means header scopes are off. Keys `Ip` and `Range` are rejected.
-_Avoid_: putting Country on the reclaim key, parsing `RemoteAddr` for country
+_Avoid_: putting Country on the reclaim key, parsing `RemoteAddr` for country, decisionScopeHeaders
 
 ## Overview
 
@@ -32,7 +32,7 @@ Use `pkg/decisionscope` for letters, PreferRemediation, RequestScopeValues, Stre
 
 ## How to use
 
-- Pass `decisionScopeHeaders` from config into the bouncer (request headers). Stream `scopes=` and the stream store filter are the live-router union (`core_plugin_lapi_scope-union.md`). Live/none still pass scopes per `LiveLookup`.
+- Pass `bouncerDecisionScopeHeaders` from config into the bouncer (request headers). Stream `scopes=` and the stream store filter are the live-router union (`core_plugin_lapi_scope-union.md`). Live/none still pass scopes per `LiveLookup`.
 - Resolve the client IP with `pkg/ip.GetRemoteIP`. After a successful parse, set `req.remoteIP = req.ipAddr.String()` before lookup, live memo, or captcha bind. Then `lapiClient.LookupRemediation`. Pass `req.remoteIP` as the Ip key and `req.ipAddr` only into Range membership. Matching uses the first letter; origin is for usage-metrics only. Do not put scopes on `clientRequest`.
 - Writing an Ip slot from a LAPI decision value (stream store, stream delete) goes through `IPCacheKey`. The live memo writes `Set(remoteIP)` using the already-canonical request string. Changing one side of that pair on its own is a permanent cache miss, not a partial fix.
 - Stream Range items: collect the tick, then Store `ApplyRangeBatch` (one read, one write) with `KindOriginString`. Removals run before upserts so a same-window CIDR replacement stays (`core_plugin_lapi_stream-apply.md`). It returns an error when it could not read the shared blob; propagate it so the poll counts as failed. Hydrate membership from the blob after apply and at stream start. Do not GET+SET per Range line.
@@ -54,7 +54,7 @@ lapiClient.IncDropped(origin, req.ipType, "ban")
 ## Key files
 
 - `pkg/decisionscope/`
-- `pkg/configuration/configuration.go` (`DecisionScopeHeaders`)
+- `pkg/configuration/configuration.go` (`BouncerDecisionScopeHeaders`)
 - `pkg/bouncer/bouncer.go`
 - `pkg/bouncer/clientrequest.go`
 - `pkg/decisionstore/`
@@ -66,7 +66,7 @@ lapiClient.IncDropped(origin, req.ipType, "ban")
 ## Gotchas
 
 - Do not geolocate. Country/AS/username are the mapped header, or they are skipped.
-- `Ip` and `Range` are not valid `decisionScopeHeaders` keys.
+- `Ip` and `Range` are not valid `bouncerDecisionScopeHeaders` keys.
 - A missing mapped header skips that scope; do not fail closed.
 - Ban wins across Ip, Range, and header hits. Do not return the first active Ip or Range captcha before considering a Country ban.
 - Shared Redis instances GET `range-index` through the Store and rebuild membership; without that hydrate they would miss every Range decision. There is no stream lease.
@@ -75,6 +75,6 @@ lapiClient.IncDropped(origin, req.ipType, "ban")
 - Request lookup is Store `LookupRemediation`. Resolve `OriginName` only on drop.
 - After a cache miss, stream/alone use stream health; live/none call `LiveLookup`. Do not name that split after Range membership.
 - CrowdSec does not canonicalize decision values — measured on v1.8.0, the stream hands back `2001:DB8::2` and `::ffff:192.0.2.4` exactly as submitted. LAPI `?ip=` does match numerically, so the spelling problem is ours alone and needs no LAPI workaround.
-- Redis Get/MGET run on a round-robin `redisCacheReadHosts` replica while SET/DEL run on the writer. A read path can fail on a completely healthy writer; a replica miss must not retry the writer.
+- Redis Get/MGET run on a round-robin `lapiRedisReadHosts` replica while SET/DEL run on the writer. A read path can fail on a completely healthy writer; a replica miss must not retry the writer.
 - Range-index upsert and remove match a line by same network (masked IP + prefix), not raw CIDR text. Persist the incoming spelling. `AddRange(10.1.2.0/8)` then `RemoveRange(10.0.0.0/8)` drops that line. Unparseable text still matches only when the strings are identical.
 - A parseable Range host is stored as `/32` or `/128` (`pkg/ip.HostCIDR`) on upsert and remove so write and delete pair. Membership is ParseCIDR-only; a bare `192.0.2.1=t` line is skipped. Unparseable lines are still skipped.

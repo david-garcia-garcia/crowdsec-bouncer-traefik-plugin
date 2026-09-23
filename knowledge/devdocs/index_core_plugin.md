@@ -53,7 +53,7 @@ description: How this plugin keys a reclaimed LAPI Client (ownership key plus Se
 ## LAPI scope union
 priority: normal
 local: core_plugin_lapi_scope-union.md
-description: How a stream Client polls opener-only crowdsecLapiStreamScopes (ip,range plus extras).
+description: How a stream Client polls opener-only lapiStreamScopes (ip,range plus extras).
 
 ## Stream single-flight
 priority: normal
