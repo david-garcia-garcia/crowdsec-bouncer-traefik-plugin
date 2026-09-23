@@ -110,6 +110,7 @@ func TestGraceCloseClearsWatchers(t *testing.T) {
 
 	client := &testClient{id: "A"}
 	var bound atomic.Value
+	cleared := make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
 	if _, err := OpenWithHooks(ctx, "owner", slog.Default(), func() (any, Hooks, error) {
 		return client, Hooks{}, nil
@@ -119,16 +120,25 @@ func TestGraceCloseClearsWatchers(t *testing.T) {
 	if err := SetAlias("owner", "alias:lapi:shared", "cs", "lapi"); err != nil {
 		t.Fatal(err)
 	}
-	watchInto(context.Background(), "alias:lapi:shared", &bound, (*testClient)(nil), nil)
+	// onChange runs on the goroutine that wrote the binding. The test waits on
+	// cleared and does not read bound again, so the poll does not race that write.
+	watchInto(context.Background(), "alias:lapi:shared", &bound, (*testClient)(nil), func() {
+		if loaded(&bound) != nil {
+			return
+		}
+		select {
+		case <-cleared:
+		default:
+			close(cleared)
+		}
+	})
 	if loaded(&bound) != client {
 		t.Fatal("watch must see the published client")
 	}
 	cancel()
-	deadline := time.Now().Add(time.Second)
-	for loaded(&bound) != nil && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
-	if loaded(&bound) != nil {
+	select {
+	case <-cleared:
+	case <-time.After(time.Second):
 		t.Fatal("grace close must clear the watcher")
 	}
 }

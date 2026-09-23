@@ -51,7 +51,7 @@ func newGeneration(t *testing.T, grace time.Duration) *traefikemulator.Emulator 
 	reclaim.ResetForTestWith(grace)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 	generation := traefikemulator.New(pluginConstructor)
-	t.Cleanup(generation.Stop)
+	t.Cleanup(func() { generation.Stop() })
 	return generation
 }
 
@@ -98,7 +98,7 @@ func waitFor(t *testing.T, timeout time.Duration, ready func() bool) {
 func TestGeneration_SubscriberBeforeOwnerWithinGrace(t *testing.T) {
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	host := mustHost(t, srv.URL)
 	generation := newGeneration(t, time.Second)
 
@@ -115,7 +115,7 @@ func TestGeneration_SubscriberBeforeOwnerWithinGrace(t *testing.T) {
 func TestGeneration_OwnerBeforeSubscriberWithinGrace(t *testing.T) {
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	host := mustHost(t, srv.URL)
 	generation := newGeneration(t, time.Second)
 
@@ -133,7 +133,7 @@ func TestGeneration_ReloadAfterGraceBindsNewClient(t *testing.T) {
 	grace := 200 * time.Millisecond
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	host := mustHost(t, srv.URL)
 	generation := newGeneration(t, grace)
 
@@ -162,7 +162,7 @@ func TestGeneration_OwnerRemovedSubscriberKeptUntilGrace(t *testing.T) {
 	grace := 200 * time.Millisecond
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	host := mustHost(t, srv.URL)
 	generation := newGeneration(t, grace)
 
@@ -185,7 +185,7 @@ func TestGeneration_OwnerRemovedSubscriberKeptUntilGrace(t *testing.T) {
 func TestGeneration_SubscriberRemovedOwnerKept(t *testing.T) {
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	host := mustHost(t, srv.URL)
 	generation := newGeneration(t, time.Second)
 
@@ -207,7 +207,7 @@ func TestGeneration_SubscriberRemovedOwnerKept(t *testing.T) {
 func TestGeneration_SecondPublisherAbsent(t *testing.T) {
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	host := mustHost(t, srv.URL)
 	generation := newGeneration(t, time.Second)
 
@@ -231,7 +231,7 @@ func TestGeneration_SecondPublisherAbsent(t *testing.T) {
 func TestGeneration_OwnerLegDisabledUnbindsSubscriber(t *testing.T) {
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	host := mustHost(t, srv.URL)
 	generation := newGeneration(t, time.Second)
 
@@ -258,7 +258,7 @@ func TestGeneration_OwnerLegDisabledUnbindsSubscriber(t *testing.T) {
 func TestGeneration_TwoHoldersThenOne(t *testing.T) {
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	host := mustHost(t, srv.URL)
 	generation := newGeneration(t, time.Second)
 
@@ -282,7 +282,7 @@ func TestGeneration_AppSecSubscriberBothOrders(t *testing.T) {
 	appsecSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"action":"allow"}`))
 	}))
-	t.Cleanup(appsecSrv.Close)
+	t.Cleanup(func() { appsecSrv.Close() })
 	host := mustHost(t, appsecSrv.URL)
 	generation := newGeneration(t, time.Second)
 
