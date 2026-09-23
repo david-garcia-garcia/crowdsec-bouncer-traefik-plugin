@@ -30,17 +30,17 @@ README, examples, compose labels, `.traefik.yml` testData, mock and real e2e, an
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: P2 — real operator pain with a workaround or limited blast radius
-Reviewed head: 90327851
+Reviewed head: ac0e5987
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/137/checks |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -50,7 +50,7 @@ Owner decision: None.
 | Branch | 2026-09-23-config-domain-prefixes pushed | `git` |
 | OpenSpec | config-domain-prefixes | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/137 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build ac0e59878232f7ec1feda7d81468cd6a4d9d15a8 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/137/checks | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/137/checks |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -89,7 +89,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-09-23-config-domain-prefixes on branch 2026-09-23-config-domain-prefixes targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/137; CI not seen.
+Ticket 2026-09-23-config-domain-prefixes on branch 2026-09-23-config-domain-prefixes targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/137; CI build ac0e59878232f7ec1feda7d81468cd6a4d9d15a8 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/137/checks.
 
 ## Explore Decisions
 None.
@@ -115,7 +115,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 22 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 90327851c0cb650ea858a23320d518c1979bf4cb | Card must match the branch you measured |
+| Reviewed head | ac0e59878232f7ec1feda7d81468cd6a4d9d15a8 | Card must match the branch you measured |
 
 ### Stored data model
 - `redis` — DecisionStore SessionHex key prefix. field `lapiScheme` renamed to `scheme`. migration: missing
