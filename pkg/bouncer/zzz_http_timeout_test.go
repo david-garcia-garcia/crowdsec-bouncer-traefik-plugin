@@ -18,14 +18,13 @@ func testCaptchaBouncerConfig(t *testing.T, captchaTimeout int64) *configuration
 		t.Fatal(err)
 	}
 	cfg := configuration.New()
-	cfg.CrowdsecMode = configuration.LiveMode
-	cfg.HTTPTimeoutSeconds = 10
-	cfg.CaptchaSiteverifyHTTPTimeoutSeconds = captchaTimeout
-	cfg.CaptchaProvider = configuration.HcaptchaProvider
-	cfg.CaptchaSiteKey = "site"
-	cfg.CaptchaSecretKey = "secret"
-	cfg.CaptchaGateSecret = "gate-secret"
-	cfg.CaptchaFilePath = templatePath
+	cfg.LapiMode = configuration.LiveMode
+	cfg.BouncerCaptchaSiteverifyHTTPTimeoutSeconds = captchaTimeout
+	cfg.BouncerCaptchaProvider = configuration.HcaptchaProvider
+	cfg.BouncerCaptchaSiteKey = "site"
+	cfg.BouncerCaptchaSecretKey = "secret"
+	cfg.BouncerCaptchaGateSecret = "gate-secret"
+	cfg.BouncerCaptchaFilePath = templatePath
 	return cfg
 }
 
@@ -50,8 +49,8 @@ func TestNew_CaptchaSiteverifyTimeoutHonorsOverride(t *testing.T) {
 	}
 }
 
-func TestNew_CaptchaSiteverifyTimeoutInheritsShared(t *testing.T) {
-	got := captchaSiteverifyTimeout(t, testCaptchaBouncerConfig(t, 0))
+func TestNew_CaptchaSiteverifyTimeoutUsesOwnKnob(t *testing.T) {
+	got := captchaSiteverifyTimeout(t, testCaptchaBouncerConfig(t, 10))
 	if got != 10*time.Second {
 		t.Fatalf("captcha Timeout = %v want 10s", got)
 	}

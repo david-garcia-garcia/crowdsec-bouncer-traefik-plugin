@@ -24,16 +24,16 @@ body() {
   assert_body_contains "http://127.0.0.1:${WEB_PORT}/foo/challenge" "e2e-challenge" -H "X-Forwarded-For: 1.2.3.4"
   assert_header "http://127.0.0.1:${WEB_PORT}/foo/challenge" "Set-Cookie" "__crowdsec_challenge=e2e; Path=/; HttpOnly" -H "X-Forwarded-For: 1.2.3.4"
 
-  echo "[$SCENARIO] request that return 500 must be blocked (crowdsecAppsecFailureAction=ban) (AppSec 500)"
+  echo "[$SCENARIO] request that return 500 must be blocked (bouncerAppsecFailureAction=ban) (AppSec 500)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo/500" 403 -H "X-Forwarded-For: 1.2.3.4"
 
-  echo "[$SCENARIO] request that return 502 must be blocked (crowdsecAppsecFailureAction=ban) (Proxy error 502)"
+  echo "[$SCENARIO] request that return 502 must be blocked (bouncerAppsecFailureAction=ban) (Proxy error 502)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo/502" 403 -H "X-Forwarded-For: 1.2.3.4"
 
-  echo "[$SCENARIO] request that send bad body after crowdsecAppsecBodyLimit must pass (AppSec 200)"
+  echo "[$SCENARIO] request that send bad body after appsecBodyLimit must pass (AppSec 200)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 1.2.3.4" -X POST -d "______&a=0"
 
-  echo "[$SCENARIO] request that send bad body before crowdsecAppsecBodyLimit must pass (AppSec 403)"
+  echo "[$SCENARIO] request that send bad body before appsecBodyLimit must pass (AppSec 403)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 403 -H "X-Forwarded-For: 1.2.3.4" -X POST -d "a=0&______"
 
   echo "[$SCENARIO] request http2 that send no body GET (AppSec 200)"

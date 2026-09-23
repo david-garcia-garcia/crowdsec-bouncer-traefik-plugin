@@ -22,10 +22,10 @@ type Stream struct {
 
 // startStream starts the stream ticker and initial poll for stream and alone modes.
 func (c *Client) startStream(config *configuration.Config, log *slog.Logger) error {
-	if config.CrowdsecMode != configuration.StreamMode && config.CrowdsecMode != configuration.AloneMode {
+	if config.LapiMode != configuration.StreamMode && config.LapiMode != configuration.AloneMode {
 		return nil
 	}
-	if config.CrowdsecMode == configuration.AloneMode {
+	if config.LapiMode == configuration.AloneMode {
 		if err := c.getToken(); err != nil {
 			c.log.Error("startStream:getToken", "error", err)
 			return err
@@ -35,7 +35,7 @@ func (c *Client) startStream(config *configuration.Config, log *slog.Logger) err
 		c.decisionStore.HydrateRange()
 	}
 	go c.handleStreamTicker()
-	c.streamStop = startTicker("stream", config.UpdateIntervalSeconds, log, func() {
+	c.streamStop = startTicker("stream", config.LapiUpdateIntervalSeconds, log, func() {
 		c.handleStreamTicker()
 	})
 	return nil

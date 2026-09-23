@@ -38,8 +38,8 @@ func TestOpenStream_OpenerScopesOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := testStreamConfig(parsed.Host, 1)
-	cfg.CrowdsecLapiStreamScopes = []string{"country", "username"}
-	cfg.DecisionScopeHeaders = map[string]string{"as": "X-ASN"}
+	cfg.LapiStreamScopes = []string{"country", "username"}
+	cfg.BouncerDecisionScopeHeaders = map[string]string{"as": "X-ASN"}
 	client := openStreamForTest(t, cfg, "opener")
 	query := client.streamQuery()
 	if !strings.Contains(query, "country") || !strings.Contains(query, "username") {
@@ -60,7 +60,7 @@ func TestOpenStream_EmptyOpenerScopesOmitsCountry(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := testStreamConfig(parsed.Host, 1)
-	cfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	cfg.BouncerDecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
 	client := openStreamForTest(t, cfg, "empty")
 	query := client.streamQuery()
 	if strings.Contains(query, "country") {
@@ -88,7 +88,7 @@ func TestOpenStream_FirstPollUsesOpenerScopes(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := testStreamConfig(parsed.Host, 1)
-	cfg.CrowdsecLapiStreamScopes = []string{"Country"}
+	cfg.LapiStreamScopes = []string{"Country"}
 	_ = openStreamForTest(t, cfg, "country")
 	deadline := time.Now().Add(2 * time.Second)
 	query, _ := firstQuery.Load().(string)

@@ -10,7 +10,7 @@ import (
 func TestValidateOriginBasedDecisionRemap(t *testing.T) {
 	log := logger.New("ERROR", "")
 	ok := getMinimalConfig()
-	ok.OriginBasedDecisionRemap = map[string]map[string]string{
+	ok.BouncerOriginBasedDecisionRemap = map[string]map[string]string{
 		"CAPI":                 {"ban": "captcha"},
 		"lists:firehol_level1": {"ban": "pass"},
 		"crowdsec":             {"captcha": "pass"},
@@ -62,7 +62,7 @@ func TestValidateOriginBasedDecisionRemap(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := getMinimalConfig()
-			cfg.OriginBasedDecisionRemap = tc.remap
+			cfg.BouncerOriginBasedDecisionRemap = tc.remap
 			err := ValidateParams(cfg, log)
 			if err == nil {
 				t.Fatal("want error")
@@ -76,8 +76,8 @@ func TestValidateOriginBasedDecisionRemap(t *testing.T) {
 
 func TestValidateOriginBasedDecisionRemap_DoesNotRequireCaptchaProvider(t *testing.T) {
 	cfg := getMinimalConfig()
-	cfg.CaptchaProvider = ""
-	cfg.OriginBasedDecisionRemap = map[string]map[string]string{"CAPI": {"ban": "captcha"}}
+	cfg.BouncerCaptchaProvider = ""
+	cfg.BouncerOriginBasedDecisionRemap = map[string]map[string]string{"CAPI": {"ban": "captcha"}}
 	if err := ValidateParams(cfg, logger.New("ERROR", "")); err != nil {
 		t.Fatalf("remap must not require captchaProvider: %v", err)
 	}

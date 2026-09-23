@@ -12,21 +12,21 @@ const decisionStoreKeyPrefix = "decisionstore:"
 
 // storeParams is the Redis location hashed into the LAPI Client reclaim key.
 type storeParams struct {
-	RedisCacheEnabled   bool     `json:"redisCacheEnabled"`
-	RedisCacheHost      string   `json:"redisCacheHost"`
-	RedisCacheReadHosts []string `json:"redisCacheReadHosts"`
-	RedisCachePassword  string   `json:"redisCachePassword"`
-	RedisCacheDatabase  string   `json:"redisCacheDatabase"`
+	Enabled   bool     `json:"enabled"`
+	Host      string   `json:"host"`
+	ReadHosts []string `json:"readHosts"`
+	Password  string   `json:"password"`
+	Database  string   `json:"database"`
 }
 
 // storeParamsFrom copies Redis store fields off cfg. Call after Prepare (password is resolved there).
 func storeParamsFrom(cfg *configuration.Config) storeParams {
 	return storeParams{
-		RedisCacheEnabled:   cfg.RedisCacheEnabled,
-		RedisCacheHost:      cfg.RedisCacheHost,
-		RedisCacheReadHosts: cfg.RedisCacheReadHosts,
-		RedisCachePassword:  cfg.RedisCachePassword,
-		RedisCacheDatabase:  cfg.RedisCacheDatabase,
+		Enabled:   cfg.LapiRedisEnabled,
+		Host:      cfg.LapiRedisHost,
+		ReadHosts: cfg.LapiRedisReadHosts,
+		Password:  cfg.LapiRedisPassword,
+		Database:  cfg.LapiRedisDatabase,
 	}
 }
 

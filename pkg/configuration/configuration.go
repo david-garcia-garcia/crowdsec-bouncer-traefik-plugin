@@ -53,92 +53,91 @@ const (
 
 // Config the plugin configuration.
 type Config struct {
-	Enabled                                    bool                         `json:"enabled,omitempty"`
+	BouncerEnabled                             bool                         `json:"bouncerEnabled,omitempty"`
 	LogLevel                                   string                       `json:"logLevel,omitempty"`
 	LogFormat                                  string                       `json:"logFormat,omitempty"`
 	LogFilePath                                string                       `json:"logFilePath,omitempty"`
-	CrowdsecMode                               string                       `json:"crowdsecMode,omitempty"`
-	CrowdsecLapiEnabled                        bool                         `json:"crowdsecLapiEnabled,omitempty"`
-	CrowdsecLapiInstanceName                   string                       `json:"crowdsecLapiInstanceName,omitempty"`
-	CrowdsecLapiStreamScopes                   []string                     `json:"crowdsecLapiStreamScopes,omitempty"`
-	CrowdsecAppsecEnabled                      bool                         `json:"crowdsecAppsecEnabled,omitempty"`
-	CrowdsecAppsecInstanceName                 string                       `json:"crowdsecAppsecInstanceName,omitempty"`
-	CrowdsecAppsecScheme                       string                       `json:"crowdsecAppsecScheme,omitempty"`
-	CrowdsecAppsecHost                         string                       `json:"crowdsecAppsecHost,omitempty"`
-	CrowdsecAppsecPath                         string                       `json:"crowdsecAppsecPath,omitempty"`
-	CrowdsecAppsecKey                          string                       `json:"crowdsecAppsecKey,omitempty"`
-	CrowdsecAppsecKeyFile                      string                       `json:"crowdsecAppsecKeyFile,omitempty"`
-	CrowdsecAppsecTLSInsecureVerify            bool                         `json:"crowdsecAppsecTlsInsecureVerify,omitempty"`
-	CrowdsecAppsecTLSCertificateAuthority      string                       `json:"crowdsecAppsecTlsCertificateAuthority,omitempty"`
-	CrowdsecAppsecTLSCertificateAuthorityFile  string                       `json:"crowdsecAppsecTlsCertificateAuthorityFile,omitempty"`
-	CrowdsecAppsecTLSCertificateBouncer        string                       `json:"crowdsecAppsecTlsCertificateBouncer,omitempty"`
-	CrowdsecAppsecTLSCertificateBouncerFile    string                       `json:"crowdsecAppsecTlsCertificateBouncerFile,omitempty"`
-	CrowdsecAppsecTLSCertificateBouncerKey     string                       `json:"crowdsecAppsecTlsCertificateBouncerKey,omitempty"`
-	CrowdsecAppsecTLSCertificateBouncerKeyFile string                       `json:"crowdsecAppsecTlsCertificateBouncerKeyFile,omitempty"`
-	CrowdsecAppsecBodyLimit                    int64                        `json:"crowdsecAppsecBodyLimit,omitempty"`
-	CrowdsecAppsecFailureAction                string                       `json:"crowdsecAppsecFailureAction,omitempty"`
-	CrowdsecLapiScheme                         string                       `json:"crowdsecLapiScheme,omitempty"`
-	CrowdsecLapiHost                           string                       `json:"crowdsecLapiHost,omitempty"`
-	CrowdsecLapiPath                           string                       `json:"crowdsecLapiPath,omitempty"`
-	CrowdsecLapiKey                            string                       `json:"crowdsecLapiKey,omitempty"`
-	CrowdsecLapiKeyFile                        string                       `json:"crowdsecLapiKeyFile,omitempty"`
-	CrowdsecLapiTLSInsecureVerify              bool                         `json:"crowdsecLapiTlsInsecureVerify,omitempty"`
-	CrowdsecLapiTLSCertificateAuthority        string                       `json:"crowdsecLapiTlsCertificateAuthority,omitempty"`
-	CrowdsecLapiTLSCertificateAuthorityFile    string                       `json:"crowdsecLapiTlsCertificateAuthorityFile,omitempty"`
-	CrowdsecLapiTLSCertificateBouncer          string                       `json:"crowdsecLapiTlsCertificateBouncer,omitempty"`
-	CrowdsecLapiTLSCertificateBouncerFile      string                       `json:"crowdsecLapiTlsCertificateBouncerFile,omitempty"`
-	CrowdsecLapiTLSCertificateBouncerKey       string                       `json:"crowdsecLapiTlsCertificateBouncerKey,omitempty"`
-	CrowdsecLapiTLSCertificateBouncerKeyFile   string                       `json:"crowdsecLapiTlsCertificateBouncerKeyFile,omitempty"`
-	CrowdsecCapiMachineID                      string                       `json:"crowdsecCapiMachineId,omitempty"`
-	CrowdsecCapiMachineIDFile                  string                       `json:"crowdsecCapiMachineIdFile,omitempty"`
-	CrowdsecCapiPassword                       string                       `json:"crowdsecCapiPassword,omitempty"`
-	CrowdsecCapiPasswordFile                   string                       `json:"crowdsecCapiPasswordFile,omitempty"`
-	CrowdsecCapiScenarios                      []string                     `json:"crowdsecCapiScenarios,omitempty"`
-	CrowdsecDecisionHeader                     string                       `json:"crowdsecDecisionHeader,omitempty"` // incoming header name; empty = off; values b|c
-	UpdateIntervalSeconds                      int64                        `json:"updateIntervalSeconds,omitempty"`
-	MetricsUpdateIntervalSeconds               int64                        `json:"metricsUpdateIntervalSeconds,omitempty"`
-	UpdateMaxFailure                           int64                        `json:"updateMaxFailure,omitempty"`
-	CrowdsecLapiFailureAction                  string                       `json:"crowdsecLapiFailureAction,omitempty"`
-	StreamStartupBlock                         bool                         `json:"streamStartupBlock,omitempty"`
-	DefaultDecisionSeconds                     int64                        `json:"defaultDecisionSeconds,omitempty"`
-	RemediationStatusCode                      int                          `json:"remediationStatusCode,omitempty"`
-	HTTPTimeoutSeconds                         int64                        `json:"httpTimeoutSeconds,omitempty"`
-	CrowdsecLapiHTTPTimeoutSeconds             int64                        `json:"crowdsecLapiHttpTimeoutSeconds,omitempty"`
-	CrowdsecAppsecHTTPTimeoutSeconds           int64                        `json:"crowdsecAppsecHttpTimeoutSeconds,omitempty"`
-	CaptchaSiteverifyHTTPTimeoutSeconds        int64                        `json:"captchaSiteverifyHttpTimeoutSeconds,omitempty"`
-	TraceHeadersCustomName                     string                       `json:"traceHeadersCustomName,omitempty"`
-	RemediationHeadersCustomName               string                       `json:"remediationHeadersCustomName,omitempty"`
-	ForwardedHeadersCustomName                 string                       `json:"forwardedHeadersCustomName,omitempty"`
-	ForwardedHeadersInsecure                   bool                         `json:"forwardedHeadersInsecure,omitempty"`
-	DecisionScopeHeaders                       map[string]string            `json:"decisionScopeHeaders,omitempty"`
-	ForwardedHeadersTrustedIPs                 []string                     `json:"forwardedHeadersTrustedIps,omitempty"`
-	ClientTrustedIPs                           []string                     `json:"clientTrustedIps,omitempty"`
-	RedisCacheEnabled                          bool                         `json:"redisCacheEnabled,omitempty"`
-	RedisCacheHost                             string                       `json:"redisCacheHost,omitempty"`
-	RedisCacheReadHosts                        []string                     `json:"redisCacheReadHosts,omitempty"`
-	RedisCachePassword                         string                       `json:"redisCachePassword,omitempty"`
-	RedisCachePasswordFile                     string                       `json:"redisCachePasswordFile,omitempty"`
-	RedisCacheDatabase                         string                       `json:"redisCacheDatabase,omitempty"`
-	RedisCacheUnreachableBlock                 bool                         `json:"redisCacheUnreachableBlock,omitempty"`
-	BanFilePath                                string                       `json:"banFilePath,omitempty"`
-	CaptchaFilePath                            string                       `json:"captchaFilePath,omitempty"`
-	CaptchaProvider                            string                       `json:"captchaProvider,omitempty"`
-	CaptchaCustomJsURL                         string                       `json:"captchaCustomJsUrl,omitempty"`
-	CaptchaCustomValidateURL                   string                       `json:"captchaCustomValidateUrl,omitempty"`
-	CaptchaCustomKey                           string                       `json:"captchaCustomKey,omitempty"`
-	CaptchaCustomResponse                      string                       `json:"captchaCustomResponse,omitempty"`
-	CaptchaCustomChallengeURL                  string                       `json:"captchaCustomChallengeUrl,omitempty"`
-	CaptchaCustomValidateBody                  string                       `json:"captchaCustomValidateBody,omitempty"`
-	CaptchaSiteKey                             string                       `json:"captchaSiteKey,omitempty"`
-	CaptchaSiteKeyFile                         string                       `json:"captchaSiteKeyFile,omitempty"`
-	CaptchaSecretKey                           string                       `json:"captchaSecretKey,omitempty"`
-	CaptchaSecretKeyFile                       string                       `json:"captchaSecretKeyFile,omitempty"`
-	CaptchaGateSecret                          string                       `json:"captchaGateSecret,omitempty"`
-	CaptchaGateSecretFile                      string                       `json:"captchaGateSecretFile,omitempty"`
-	CaptchaGateBindIP                          bool                         `json:"captchaGateBindIp,omitempty"`
-	CaptchaGracePeriodSeconds                  int64                        `json:"captchaGracePeriodSeconds,omitempty"`
+	LapiMode                                   string                       `json:"lapiMode,omitempty"`
+	LapiEnabled                                bool                         `json:"lapiEnabled,omitempty"`
+	LapiInstanceName                           string                       `json:"lapiInstanceName,omitempty"`
+	LapiStreamScopes                           []string                     `json:"lapiStreamScopes,omitempty"`
+	AppsecEnabled                              bool                         `json:"appsecEnabled,omitempty"`
+	AppsecInstanceName                         string                       `json:"appsecInstanceName,omitempty"`
+	AppsecScheme                               string                       `json:"appsecScheme,omitempty"`
+	AppsecHost                                 string                       `json:"appsecHost,omitempty"`
+	AppsecPath                                 string                       `json:"appsecPath,omitempty"`
+	AppsecKey                                  string                       `json:"appsecKey,omitempty"`
+	AppsecKeyFile                              string                       `json:"appsecKeyFile,omitempty"`
+	AppsecTLSInsecureVerify                    bool                         `json:"appsecTlsInsecureVerify,omitempty"`
+	AppsecTLSCertificateAuthority              string                       `json:"appsecTlsCertificateAuthority,omitempty"`
+	AppsecTLSCertificateAuthorityFile          string                       `json:"appsecTlsCertificateAuthorityFile,omitempty"`
+	AppsecTLSClientCertificate                 string                       `json:"appsecTlsClientCertificate,omitempty"`
+	AppsecTLSClientCertificateFile             string                       `json:"appsecTlsClientCertificateFile,omitempty"`
+	AppsecTLSClientKey                         string                       `json:"appsecTlsClientKey,omitempty"`
+	AppsecTLSClientKeyFile                     string                       `json:"appsecTlsClientKeyFile,omitempty"`
+	AppsecBodyLimit                            int64                        `json:"appsecBodyLimit,omitempty"`
+	BouncerAppsecFailureAction                 string                       `json:"bouncerAppsecFailureAction,omitempty"`
+	LapiScheme                                 string                       `json:"lapiScheme,omitempty"`
+	LapiHost                                   string                       `json:"lapiHost,omitempty"`
+	LapiPath                                   string                       `json:"lapiPath,omitempty"`
+	LapiKey                                    string                       `json:"lapiKey,omitempty"`
+	LapiKeyFile                                string                       `json:"lapiKeyFile,omitempty"`
+	LapiTLSInsecureVerify                      bool                         `json:"lapiTlsInsecureVerify,omitempty"`
+	LapiTLSCertificateAuthority                string                       `json:"lapiTlsCertificateAuthority,omitempty"`
+	LapiTLSCertificateAuthorityFile            string                       `json:"lapiTlsCertificateAuthorityFile,omitempty"`
+	LapiTLSClientCertificate                   string                       `json:"lapiTlsClientCertificate,omitempty"`
+	LapiTLSClientCertificateFile               string                       `json:"lapiTlsClientCertificateFile,omitempty"`
+	LapiTLSClientKey                           string                       `json:"lapiTlsClientKey,omitempty"`
+	LapiTLSClientKeyFile                       string                       `json:"lapiTlsClientKeyFile,omitempty"`
+	LapiCapiMachineID                          string                       `json:"lapiCapiMachineId,omitempty"`
+	LapiCapiMachineIDFile                      string                       `json:"lapiCapiMachineIdFile,omitempty"`
+	LapiCapiPassword                           string                       `json:"lapiCapiPassword,omitempty"`
+	LapiCapiPasswordFile                       string                       `json:"lapiCapiPasswordFile,omitempty"`
+	LapiCapiScenarios                          []string                     `json:"lapiCapiScenarios,omitempty"`
+	BouncerDecisionHeader                      string                       `json:"bouncerDecisionHeader,omitempty"` // incoming header name; empty = off; values b|c
+	LapiUpdateIntervalSeconds                  int64                        `json:"lapiUpdateIntervalSeconds,omitempty"`
+	LapiMetricsUpdateIntervalSeconds           int64                        `json:"lapiMetricsUpdateIntervalSeconds,omitempty"`
+	LapiUpdateMaxFailure                       int64                        `json:"lapiUpdateMaxFailure,omitempty"`
+	BouncerLapiFailureAction                   string                       `json:"bouncerLapiFailureAction,omitempty"`
+	BouncerStartupBlock                        bool                         `json:"bouncerStartupBlock,omitempty"`
+	LapiDefaultDecisionSeconds                 int64                        `json:"lapiDefaultDecisionSeconds,omitempty"`
+	BouncerRemediationStatusCode               int                          `json:"bouncerRemediationStatusCode,omitempty"`
+	LapiHTTPTimeoutSeconds                     int64                        `json:"lapiHttpTimeoutSeconds,omitempty"`
+	AppsecHTTPTimeoutSeconds                   int64                        `json:"appsecHttpTimeoutSeconds,omitempty"`
+	BouncerCaptchaSiteverifyHTTPTimeoutSeconds int64                        `json:"bouncerCaptchaSiteverifyHttpTimeoutSeconds,omitempty"`
+	BouncerTraceHeadersCustomName              string                       `json:"bouncerTraceHeadersCustomName,omitempty"`
+	BouncerRemediationHeadersCustomName        string                       `json:"bouncerRemediationHeadersCustomName,omitempty"`
+	BouncerForwardedHeadersCustomName          string                       `json:"bouncerForwardedHeadersCustomName,omitempty"`
+	BouncerForwardedHeadersInsecure            bool                         `json:"bouncerForwardedHeadersInsecure,omitempty"`
+	BouncerDecisionScopeHeaders                map[string]string            `json:"bouncerDecisionScopeHeaders,omitempty"`
+	BouncerForwardedHeadersTrustedIPs          []string                     `json:"bouncerForwardedHeadersTrustedIps,omitempty"`
+	BouncerClientTrustedIPs                    []string                     `json:"bouncerClientTrustedIps,omitempty"`
+	LapiRedisEnabled                           bool                         `json:"lapiRedisEnabled,omitempty"`
+	LapiRedisHost                              string                       `json:"lapiRedisHost,omitempty"`
+	LapiRedisReadHosts                         []string                     `json:"lapiRedisReadHosts,omitempty"`
+	LapiRedisPassword                          string                       `json:"lapiRedisPassword,omitempty"`
+	LapiRedisPasswordFile                      string                       `json:"lapiRedisPasswordFile,omitempty"`
+	LapiRedisDatabase                          string                       `json:"lapiRedisDatabase,omitempty"`
+	BouncerRedisUnreachableBlock               bool                         `json:"bouncerRedisUnreachableBlock,omitempty"`
+	BouncerBanFilePath                         string                       `json:"bouncerBanFilePath,omitempty"`
+	BouncerCaptchaFilePath                     string                       `json:"bouncerCaptchaFilePath,omitempty"`
+	BouncerCaptchaProvider                     string                       `json:"bouncerCaptchaProvider,omitempty"`
+	BouncerCaptchaCustomJsURL                  string                       `json:"bouncerCaptchaCustomJsUrl,omitempty"`
+	BouncerCaptchaCustomValidateURL            string                       `json:"bouncerCaptchaCustomValidateUrl,omitempty"`
+	BouncerCaptchaCustomKey                    string                       `json:"bouncerCaptchaCustomKey,omitempty"`
+	BouncerCaptchaCustomResponse               string                       `json:"bouncerCaptchaCustomResponse,omitempty"`
+	BouncerCaptchaCustomChallengeURL           string                       `json:"bouncerCaptchaCustomChallengeUrl,omitempty"`
+	BouncerCaptchaCustomValidateBody           string                       `json:"bouncerCaptchaCustomValidateBody,omitempty"`
+	BouncerCaptchaSiteKey                      string                       `json:"bouncerCaptchaSiteKey,omitempty"`
+	BouncerCaptchaSiteKeyFile                  string                       `json:"bouncerCaptchaSiteKeyFile,omitempty"`
+	BouncerCaptchaSecretKey                    string                       `json:"bouncerCaptchaSecretKey,omitempty"`
+	BouncerCaptchaSecretKeyFile                string                       `json:"bouncerCaptchaSecretKeyFile,omitempty"`
+	BouncerCaptchaGateSecret                   string                       `json:"bouncerCaptchaGateSecret,omitempty"`
+	BouncerCaptchaGateSecretFile               string                       `json:"bouncerCaptchaGateSecretFile,omitempty"`
+	BouncerCaptchaGateBindIP                   bool                         `json:"bouncerCaptchaGateBindIp,omitempty"`
+	BouncerCaptchaGracePeriodSeconds           int64                        `json:"bouncerCaptchaGracePeriodSeconds,omitempty"`
 	ReclaimGraceSeconds                        int64                        `json:"reclaimGraceSeconds,omitempty"`
-	OriginBasedDecisionRemap                   map[string]map[string]string `json:"originBasedDecisionRemap,omitempty"`
+	BouncerOriginBasedDecisionRemap            map[string]map[string]string `json:"bouncerOriginBasedDecisionRemap,omitempty"`
 }
 
 func contains(source []string, target string) bool {
@@ -159,7 +158,7 @@ func validateFailureAction(name, action, captchaProvider string) error {
 		return errors.New(name + ": must be one of 'passthrough', 'ban' or 'captcha'")
 	}
 	if action == FailureActionCaptcha && captchaProvider == "" {
-		return errors.New(name + ": captcha requires CaptchaProvider")
+		return errors.New(name + ": captcha requires BouncerCaptchaProvider")
 	}
 	return nil
 }
@@ -172,74 +171,67 @@ func EffectiveFailureAction(action string) string {
 	return action
 }
 
-// EffectiveHTTPTimeoutSeconds returns override when it is non-zero, otherwise HTTPTimeoutSeconds.
-// Zero inherits. Negative is not coerced; ValidateParams rejects it on the inherit knobs.
-func (c *Config) EffectiveHTTPTimeoutSeconds(override int64) int64 {
-	if override == 0 {
-		return c.HTTPTimeoutSeconds
-	}
-	return override
-}
-
 // New creates the default plugin configuration.
 func New() *Config {
 	return &Config{
-		Enabled:                         false,
-		LogLevel:                        LogINFO,
-		LogFormat:                       "common",
-		LogFilePath:                     "",
-		CrowdsecMode:                    LiveMode,
-		CrowdsecAppsecEnabled:           false,
-		CrowdsecAppsecBodyLimit:         10485760,
-		CrowdsecAppsecFailureAction:     FailureActionBan,
-		CrowdsecAppsecScheme:            "",
-		CrowdsecAppsecHost:              "crowdsec:7422",
-		CrowdsecAppsecPath:              "/",
-		CrowdsecAppsecKey:               "",
-		CrowdsecAppsecTLSInsecureVerify: false,
-		CrowdsecLapiScheme:              HTTP,
-		CrowdsecLapiHost:                "crowdsec:8080",
-		CrowdsecLapiPath:                "/",
-		CrowdsecLapiKey:                 "",
-		CrowdsecLapiTLSInsecureVerify:   false,
-		UpdateIntervalSeconds:           60,
-		MetricsUpdateIntervalSeconds:    600,
-		UpdateMaxFailure:                0,
-		CrowdsecLapiFailureAction:       FailureActionBan,
-		StreamStartupBlock:              true,
-		DefaultDecisionSeconds:          60,
-		RemediationStatusCode:           http.StatusForbidden,
-		HTTPTimeoutSeconds:              10,
-		CaptchaProvider:                 "",
-		CaptchaCustomJsURL:              "",
-		CaptchaCustomValidateURL:        "",
-		CaptchaCustomKey:                "",
-		CaptchaCustomResponse:           "",
-		CaptchaCustomChallengeURL:       "",
-		CaptchaCustomValidateBody:       "",
-		CaptchaSiteKey:                  "",
-		CaptchaSecretKey:                "",
-		CaptchaGateBindIP:               true,
-		CaptchaGracePeriodSeconds:       1800,
-		ReclaimGraceSeconds:             30,
-		OriginBasedDecisionRemap:        map[string]map[string]string{},
-		CrowdsecLapiStreamScopes:        []string{},
-		CaptchaFilePath:                 "/captcha.html",
-		BanFilePath:                     "",
-		CrowdsecDecisionHeader:          "",
-		TraceHeadersCustomName:          "",
-		RemediationHeadersCustomName:    "",
-		ForwardedHeadersCustomName:      "X-Forwarded-For",
-		ForwardedHeadersInsecure:        false,
-		DecisionScopeHeaders:            map[string]string{},
-		ForwardedHeadersTrustedIPs:      []string{},
-		ClientTrustedIPs:                []string{},
-		RedisCacheEnabled:               false,
-		RedisCacheHost:                  "redis:6379",
-		RedisCacheReadHosts:             []string{},
-		RedisCachePassword:              "",
-		RedisCacheDatabase:              "",
-		RedisCacheUnreachableBlock:      true,
+		BouncerEnabled:                   false,
+		LogLevel:                         LogINFO,
+		LogFormat:                        "common",
+		LogFilePath:                      "",
+		LapiMode:                         LiveMode,
+		AppsecEnabled:                    false,
+		AppsecBodyLimit:                  10485760,
+		BouncerAppsecFailureAction:       FailureActionBan,
+		AppsecScheme:                     "",
+		AppsecHost:                       "crowdsec:7422",
+		AppsecPath:                       "/",
+		AppsecKey:                        "",
+		AppsecTLSInsecureVerify:          false,
+		LapiScheme:                       HTTP,
+		LapiHost:                         "crowdsec:8080",
+		LapiPath:                         "/",
+		LapiKey:                          "",
+		LapiTLSInsecureVerify:            false,
+		LapiUpdateIntervalSeconds:        60,
+		LapiMetricsUpdateIntervalSeconds: 600,
+		LapiUpdateMaxFailure:             0,
+		BouncerLapiFailureAction:         FailureActionBan,
+		BouncerStartupBlock:              true,
+		LapiDefaultDecisionSeconds:       60,
+		BouncerRemediationStatusCode:     http.StatusForbidden,
+		LapiHTTPTimeoutSeconds:           10,
+		AppsecHTTPTimeoutSeconds:         10,
+		BouncerCaptchaSiteverifyHTTPTimeoutSeconds: 10,
+		BouncerCaptchaProvider:                     "",
+		BouncerCaptchaCustomJsURL:                  "",
+		BouncerCaptchaCustomValidateURL:            "",
+		BouncerCaptchaCustomKey:                    "",
+		BouncerCaptchaCustomResponse:               "",
+		BouncerCaptchaCustomChallengeURL:           "",
+		BouncerCaptchaCustomValidateBody:           "",
+		BouncerCaptchaSiteKey:                      "",
+		BouncerCaptchaSecretKey:                    "",
+		BouncerCaptchaGateBindIP:                   true,
+		BouncerCaptchaGracePeriodSeconds:           1800,
+		ReclaimGraceSeconds:                        30,
+		BouncerOriginBasedDecisionRemap:            map[string]map[string]string{},
+		LapiStreamScopes:                           []string{},
+		BouncerCaptchaFilePath:                     "/captcha.html",
+		BouncerBanFilePath:                         "",
+		BouncerDecisionHeader:                      "",
+		BouncerTraceHeadersCustomName:              "",
+		BouncerRemediationHeadersCustomName:        "",
+		BouncerForwardedHeadersCustomName:          "X-Forwarded-For",
+		BouncerForwardedHeadersInsecure:            false,
+		BouncerDecisionScopeHeaders:                map[string]string{},
+		BouncerForwardedHeadersTrustedIPs:          []string{},
+		BouncerClientTrustedIPs:                    []string{},
+		LapiRedisEnabled:                           false,
+		LapiRedisHost:                              "redis:6379",
+		LapiRedisReadHosts:                         []string{},
+		LapiRedisPassword:                          "",
+		LapiRedisDatabase:                          "",
+		BouncerRedisUnreachableBlock:               true,
 	}
 }
 
@@ -347,16 +339,16 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		return err
 	}
 
-	if err := validateParamsIPs(log, config.ForwardedHeadersTrustedIPs, "ForwardedHeadersTrustedIPs"); err != nil {
+	if err := validateParamsIPs(log, config.BouncerForwardedHeadersTrustedIPs, "BouncerForwardedHeadersTrustedIPs"); err != nil {
 		return err
 	}
-	if err := validateParamsIPs(log, config.ClientTrustedIPs, "ClientTrustedIPs"); err != nil {
+	if err := validateParamsIPs(log, config.BouncerClientTrustedIPs, "BouncerClientTrustedIPs"); err != nil {
 		return err
 	}
 
 	// Redis password file is unused when Redis is off; skip Stat/read so leftovers do not fail startup.
-	if config.RedisCacheEnabled {
-		if _, err := GetVariable(config, "RedisCachePassword"); err != nil {
+	if config.LapiRedisEnabled {
+		if _, err := GetVariable(config, "LapiRedisPassword"); err != nil {
 			return err
 		}
 	}
@@ -370,7 +362,7 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 	}
 
 	// AppSec URL, key file, and HTTPS CA only when this router will open AppSec.
-	if config.CrowdsecAppsecEnabled {
+	if config.AppsecEnabled {
 		if err := validateAppsecURLKeyAndTLS(config); err != nil {
 			return err
 		}
@@ -385,10 +377,10 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 
 // validateOpenVsSubscribe rejects leftover secrets or names when nothing owns or subscribes (E2).
 func validateOpenVsSubscribe(config *Config) error {
-	if err := validateLegOpenVsSubscribe("LAPI", config.Enabled, config.CrowdsecLapiEnabled, config.CrowdsecLapiInstanceName, lapiSecretPresent(config)); err != nil {
+	if err := validateLegOpenVsSubscribe("LAPI", config.BouncerEnabled, config.LapiEnabled, config.LapiInstanceName, lapiSecretPresent(config)); err != nil {
 		return err
 	}
-	return validateLegOpenVsSubscribe("AppSec", config.Enabled, config.CrowdsecAppsecEnabled, config.CrowdsecAppsecInstanceName, appsecSecretPresent(config))
+	return validateLegOpenVsSubscribe("AppSec", config.BouncerEnabled, config.AppsecEnabled, config.AppsecInstanceName, appsecSecretPresent(config))
 }
 
 func validateLegOpenVsSubscribe(leg string, bounceEnabled, owned bool, instanceName string, secretPresent bool) error {
@@ -398,34 +390,34 @@ func validateLegOpenVsSubscribe(leg string, bounceEnabled, owned bool, instanceN
 	if strings.TrimSpace(instanceName) == "" && !secretPresent {
 		return nil
 	}
-	return fmt.Errorf("%s: leftover instance name, API key, or client certificate while enabled is false and the leg is not owned", leg)
+	return fmt.Errorf("%s: leftover instance name, API key, or client certificate while BouncerEnabled is false and the leg is not owned", leg)
 }
 
 func lapiSecretPresent(config *Config) bool {
-	key, err := GetVariable(config, "CrowdsecLapiKey")
+	key, err := GetVariable(config, "LapiKey")
 	if err == nil && strings.TrimSpace(key) != "" {
 		return true
 	}
-	cert, _ := GetVariable(config, "CrowdsecLapiTLSCertificateBouncer")
-	certKey, _ := GetVariable(config, "CrowdsecLapiTLSCertificateBouncerKey")
+	cert, _ := GetVariable(config, "LapiTLSClientCertificate")
+	certKey, _ := GetVariable(config, "LapiTLSClientKey")
 	return strings.TrimSpace(cert) != "" && strings.TrimSpace(certKey) != ""
 }
 
 func appsecSecretPresent(config *Config) bool {
-	key, err := GetVariable(config, "CrowdsecAppsecKey")
+	key, err := GetVariable(config, "AppsecKey")
 	if err == nil && strings.TrimSpace(key) != "" {
 		return true
 	}
-	cert, _ := GetVariable(config, "CrowdsecAppsecTLSCertificateBouncer")
-	certKey, _ := GetVariable(config, "CrowdsecAppsecTLSCertificateBouncerKey")
+	cert, _ := GetVariable(config, "AppsecTLSClientCertificate")
+	certKey, _ := GetVariable(config, "AppsecTLSClientKey")
 	return strings.TrimSpace(cert) != "" && strings.TrimSpace(certKey) != ""
 }
 
 func effectiveAppsecScheme(config *Config) string {
-	if config.CrowdsecAppsecScheme != "" {
-		return config.CrowdsecAppsecScheme
+	if config.AppsecScheme != "" {
+		return config.AppsecScheme
 	}
-	return config.CrowdsecLapiScheme
+	return config.LapiScheme
 }
 
 // validateCaptchaCredentialsAndTemplates checks captcha credentials and optional HTML templates.
@@ -433,8 +425,8 @@ func validateCaptchaCredentialsAndTemplates(config *Config) error {
 	if err := validateEnabledCaptchaSettings(config); err != nil {
 		return err
 	}
-	if config.BanFilePath != "" {
-		if _, _, err := GetTemplate(config.BanFilePath); err != nil {
+	if config.BouncerBanFilePath != "" {
+		if _, _, err := GetTemplate(config.BouncerBanFilePath); err != nil {
 			return err
 		}
 	}
@@ -444,7 +436,7 @@ func validateCaptchaCredentialsAndTemplates(config *Config) error {
 // validateEnabledCaptchaSettings checks provider credentials, the optional custom
 // challenge URL, and a loadable captcha template when a provider is set.
 func validateEnabledCaptchaSettings(config *Config) error {
-	if config.CaptchaProvider == "" {
+	if config.BouncerCaptchaProvider == "" {
 		return nil
 	}
 	if err := validateCaptchaCredentials(config); err != nil {
@@ -452,22 +444,22 @@ func validateEnabledCaptchaSettings(config *Config) error {
 	}
 	// Empty is valid; it only leaves the challenge path out of the passthrough match set.
 	// A value that names no path would silently never match, so reject it instead.
-	if config.CaptchaProvider == CustomProvider && config.CaptchaCustomChallengeURL != "" &&
-		CustomCaptchaResourcePath(config.CaptchaCustomChallengeURL) == "" {
-		return errors.New("CaptchaCustomChallengeURL: " + config.CaptchaCustomChallengeURL +
+	if config.BouncerCaptchaProvider == CustomProvider && config.BouncerCaptchaCustomChallengeURL != "" &&
+		CustomCaptchaResourcePath(config.BouncerCaptchaCustomChallengeURL) == "" {
+		return errors.New("BouncerCaptchaCustomChallengeURL: " + config.BouncerCaptchaCustomChallengeURL +
 			" has no absolute path, so no browser request could ever match it")
 	}
-	gateSecret, err := GetVariable(config, "CaptchaGateSecret")
+	gateSecret, err := GetVariable(config, "BouncerCaptchaGateSecret")
 	if err != nil {
 		return err
 	}
 	if gateSecret == "" {
-		return errors.New("CaptchaGateSecret: cannot be empty when CaptchaProvider is set")
+		return errors.New("BouncerCaptchaGateSecret: cannot be empty when BouncerCaptchaProvider is set")
 	}
-	if config.CaptchaFilePath == "" {
-		return errors.New("CaptchaFilePath: cannot be empty when CaptchaProvider is set")
+	if config.BouncerCaptchaFilePath == "" {
+		return errors.New("BouncerCaptchaFilePath: cannot be empty when BouncerCaptchaProvider is set")
 	}
-	if _, _, err := GetTemplate(config.CaptchaFilePath); err != nil {
+	if _, _, err := GetTemplate(config.BouncerCaptchaFilePath); err != nil {
 		return err
 	}
 	return nil
@@ -476,32 +468,32 @@ func validateEnabledCaptchaSettings(config *Config) error {
 // validateCaptchaCredentials resolves site and secret keys and rejects an empty
 // trimmed value for each field independently, site first. Lookup errors stay.
 func validateCaptchaCredentials(config *Config) error {
-	siteKey, err := GetVariable(config, "CaptchaSiteKey")
+	siteKey, err := GetVariable(config, "BouncerCaptchaSiteKey")
 	if err != nil {
 		return err
 	}
 	if siteKey == "" {
-		return errors.New("CaptchaSiteKey: cannot be empty when CaptchaProvider is set")
+		return errors.New("BouncerCaptchaSiteKey: cannot be empty when BouncerCaptchaProvider is set")
 	}
-	secretKey, err := GetVariable(config, "CaptchaSecretKey")
+	secretKey, err := GetVariable(config, "BouncerCaptchaSecretKey")
 	if err != nil {
 		return err
 	}
 	if secretKey == "" {
-		return errors.New("CaptchaSecretKey: cannot be empty when CaptchaProvider is set")
+		return errors.New("BouncerCaptchaSecretKey: cannot be empty when BouncerCaptchaProvider is set")
 	}
 	return nil
 }
 
 func validateLapiWhenEnabled(config *Config) error {
-	if !config.CrowdsecLapiEnabled {
+	if !config.LapiEnabled {
 		return nil
 	}
-	if config.CrowdsecMode == AloneMode {
-		if _, err := GetVariable(config, "CrowdsecCapiMachineID"); err != nil {
+	if config.LapiMode == AloneMode {
+		if _, err := GetVariable(config, "LapiCapiMachineID"); err != nil {
 			return err
 		}
-		if _, err := GetVariable(config, "CrowdsecCapiPassword"); err != nil {
+		if _, err := GetVariable(config, "LapiCapiPassword"); err != nil {
 			return err
 		}
 		return nil
@@ -510,35 +502,35 @@ func validateLapiWhenEnabled(config *Config) error {
 }
 
 func validateLapiURLAndKeys(config *Config) error {
-	if err := validateURL("CrowdsecLapi", config.CrowdsecLapiScheme, config.CrowdsecLapiHost, config.CrowdsecLapiPath); err != nil {
+	if err := validateURL("Lapi", config.LapiScheme, config.LapiHost, config.LapiPath); err != nil {
 		return err
 	}
 
-	lapiKey, err := GetVariable(config, "CrowdsecLapiKey")
+	lapiKey, err := GetVariable(config, "LapiKey")
 	if err != nil {
 		return err
 	}
-	certBouncer, err := GetVariable(config, "CrowdsecLapiTLSCertificateBouncer")
+	clientCertificate, err := GetVariable(config, "LapiTLSClientCertificate")
 	if err != nil {
 		return err
 	}
-	certBouncerKey, err := GetVariable(config, "CrowdsecLapiTLSCertificateBouncerKey")
+	clientKey, err := GetVariable(config, "LapiTLSClientKey")
 	if err != nil {
 		return err
 	}
 
-	if lapiKey == "" && (certBouncer == "" || certBouncerKey == "") {
-		return errors.New("CrowdsecLapiKey || (CrowdsecLapiTLSCertificateBouncer && CrowdsecLapiTLSCertificateBouncerKey): cannot be all empty")
+	if lapiKey == "" && (clientCertificate == "" || clientKey == "") {
+		return errors.New("LapiKey || (LapiTLSClientCertificate && LapiTLSClientKey): cannot be all empty")
 	}
-	if lapiKey != "" && (certBouncer == "" || certBouncerKey == "") {
+	if lapiKey != "" && (clientCertificate == "" || clientKey == "") {
 		lapiKey = strings.TrimSpace(lapiKey)
-		if err = validateParamsAPIKey(lapiKey, "CrowdsecLapiKey"); err != nil {
+		if err = validateParamsAPIKey(lapiKey, "LapiKey"); err != nil {
 			return err
 		}
 	}
 
-	if config.CrowdsecLapiScheme == HTTPS && !config.CrowdsecLapiTLSInsecureVerify {
-		if err = validateParamsTLS(config, "CrowdsecLapi"); err != nil {
+	if config.LapiScheme == HTTPS && !config.LapiTLSInsecureVerify {
+		if err = validateParamsTLS(config, "Lapi"); err != nil {
 			return err
 		}
 	}
@@ -548,29 +540,29 @@ func validateLapiURLAndKeys(config *Config) error {
 // validateAppsecURLKeyAndTLS checks the AppSec listener URL, optional key, and HTTPS CA.
 func validateAppsecURLKeyAndTLS(config *Config) error {
 	appsecScheme := effectiveAppsecScheme(config)
-	if err := validateURL("CrowdsecAppsec", appsecScheme, config.CrowdsecAppsecHost, config.CrowdsecAppsecPath); err != nil {
+	if err := validateURL("Appsec", appsecScheme, config.AppsecHost, config.AppsecPath); err != nil {
 		return err
 	}
 
-	// Enabled AppSec needs a listener host. validateURL only asks NewRequest to
+	// AppsecEnabled AppSec needs a listener host. validateURL only asks NewRequest to
 	// accept scheme://host/path, so an empty host (http:///) still returns nil.
 	if err := rejectMissingEnabledAppsecHost(config, appsecScheme); err != nil {
 		return err
 	}
 
-	appsecKey, err := GetVariable(config, "CrowdsecAppsecKey")
+	appsecKey, err := GetVariable(config, "AppsecKey")
 	if err != nil {
 		return err
 	}
 	if appsecKey != "" {
 		appsecKey = strings.TrimSpace(appsecKey)
-		if err = validateParamsAPIKey(appsecKey, "CrowdsecAppsecKey"); err != nil {
+		if err = validateParamsAPIKey(appsecKey, "AppsecKey"); err != nil {
 			return err
 		}
 	}
 
-	if config.CrowdsecAppsecScheme == HTTPS && !config.CrowdsecAppsecTLSInsecureVerify {
-		if err = validateParamsTLS(config, "CrowdsecAppsec"); err != nil {
+	if config.AppsecScheme == HTTPS && !config.AppsecTLSInsecureVerify {
+		if err = validateParamsTLS(config, "Appsec"); err != nil {
 			return err
 		}
 	}
@@ -579,16 +571,16 @@ func validateAppsecURLKeyAndTLS(config *Config) error {
 
 // rejectMissingEnabledAppsecHost fails when AppSec is on and the listener host is missing.
 func rejectMissingEnabledAppsecHost(config *Config, appsecScheme string) error {
-	if !config.CrowdsecAppsecEnabled {
+	if !config.AppsecEnabled {
 		return nil
 	}
-	appsecURL := url.URL{Scheme: appsecScheme, Host: config.CrowdsecAppsecHost, Path: config.CrowdsecAppsecPath}
+	appsecURL := url.URL{Scheme: appsecScheme, Host: config.AppsecHost, Path: config.AppsecPath}
 	appsecReq, err := http.NewRequest(http.MethodGet, appsecURL.String(), nil)
 	if err != nil {
-		return fmt.Errorf("CrowdsecLapiScheme://CrowdsecAppsecHost: '%v://%v%v' must be a valid URL", appsecScheme, config.CrowdsecAppsecHost, config.CrowdsecAppsecPath)
+		return fmt.Errorf("LapiScheme://AppsecHost: '%v://%v%v' must be a valid URL", appsecScheme, config.AppsecHost, config.AppsecPath)
 	}
-	if config.CrowdsecAppsecHost == "" || appsecReq.URL.Host == "" {
-		return errors.New("CrowdsecAppsecHost: cannot be empty when CrowdsecAppsecEnabled is true")
+	if config.AppsecHost == "" || appsecReq.URL.Host == "" {
+		return errors.New("AppsecHost: cannot be empty when AppsecEnabled is true")
 	}
 	return nil
 }
@@ -611,17 +603,17 @@ func validateLogging(config *Config) error {
 
 // validateDecisionScopeHeaders rejects empty names and Ip/Range keys.
 func validateDecisionScopeHeaders(config *Config) error {
-	for rawScope, rawHeader := range config.DecisionScopeHeaders {
+	for rawScope, rawHeader := range config.BouncerDecisionScopeHeaders {
 		scope := strings.TrimSpace(rawScope)
 		if scope == "" {
-			return errors.New("decisionScopeHeaders: scope name cannot be empty")
+			return errors.New("BouncerDecisionScopeHeaders: scope name cannot be empty")
 		}
 		switch strings.ToLower(scope) {
 		case "ip", "range":
-			return fmt.Errorf("decisionScopeHeaders: %q cannot be mapped to a header", scope)
+			return fmt.Errorf("BouncerDecisionScopeHeaders: %q cannot be mapped to a header", scope)
 		}
 		if strings.TrimSpace(rawHeader) == "" {
-			return fmt.Errorf("decisionScopeHeaders: header for %q cannot be empty", scope)
+			return fmt.Errorf("BouncerDecisionScopeHeaders: header for %q cannot be empty", scope)
 		}
 	}
 	return nil
@@ -631,7 +623,7 @@ func validateURL(variable, scheme, host, path string) error {
 	// This only check that the format of the URL scheme://host/path is correct and do not make requests
 	testURL := url.URL{Scheme: scheme, Host: host, Path: path}
 	if _, err := http.NewRequest(http.MethodGet, testURL.String(), nil); err != nil {
-		return fmt.Errorf("CrowdsecLapiScheme://%sHost: '%v://%v%v' must be a valid URL", variable, scheme, host, path)
+		return fmt.Errorf("LapiScheme://%sHost: '%v://%v%v' must be a valid URL", variable, scheme, host, path)
 	}
 	return nil
 }
@@ -675,25 +667,25 @@ func validateParamsIPs(log *slog.Logger, listIP []string, key string) error {
 }
 
 func validateCaptcha(config *Config) error {
-	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider}, config.CaptchaProvider) {
-		return fmt.Errorf("CaptchaProvider: must be one of '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider)
+	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider}, config.BouncerCaptchaProvider) {
+		return fmt.Errorf("BouncerCaptchaProvider: must be one of '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider)
 	}
 	// Accept only empty, form, or json after trim; json is custom-only.
-	validateBody := strings.TrimSpace(config.CaptchaCustomValidateBody)
+	validateBody := strings.TrimSpace(config.BouncerCaptchaCustomValidateBody)
 	if validateBody != "" && validateBody != CaptchaCustomValidateBodyForm && validateBody != CaptchaCustomValidateBodyJSON {
-		return errors.New("CaptchaCustomValidateBody: must be empty, form, or json")
+		return errors.New("BouncerCaptchaCustomValidateBody: must be empty, form, or json")
 	}
-	if validateBody == CaptchaCustomValidateBodyJSON && config.CaptchaProvider != CustomProvider {
-		return errors.New("CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom")
+	if validateBody == CaptchaCustomValidateBodyJSON && config.BouncerCaptchaProvider != CustomProvider {
+		return errors.New("BouncerCaptchaCustomValidateBody: json is only valid when BouncerCaptchaProvider is custom")
 	}
-	if config.CaptchaProvider == CustomProvider {
-		if config.CaptchaCustomKey == "" || config.CaptchaCustomResponse == "" || config.CaptchaCustomValidateURL == "" || config.CaptchaCustomJsURL == "" {
+	if config.BouncerCaptchaProvider == CustomProvider {
+		if config.BouncerCaptchaCustomKey == "" || config.BouncerCaptchaCustomResponse == "" || config.BouncerCaptchaCustomValidateURL == "" || config.BouncerCaptchaCustomJsURL == "" {
 			return fmt.Errorf(
-				"CaptchaProvider: provider is custom, captchaCustom variables must be filled: CaptchaCustomKey:%s, CaptchaCustomResponse:%s, CaptchaCustomValidateURL:%s, CaptchaCustomJsURL:%s",
-				config.CaptchaCustomKey,
-				config.CaptchaCustomResponse,
-				config.CaptchaCustomValidateURL,
-				config.CaptchaCustomJsURL,
+				"BouncerCaptchaProvider: provider is custom, captchaCustom variables must be filled: BouncerCaptchaCustomKey:%s, BouncerCaptchaCustomResponse:%s, BouncerCaptchaCustomValidateURL:%s, BouncerCaptchaCustomJsURL:%s",
+				config.BouncerCaptchaCustomKey,
+				config.BouncerCaptchaCustomResponse,
+				config.BouncerCaptchaCustomValidateURL,
+				config.BouncerCaptchaCustomJsURL,
 			)
 		}
 	}
@@ -702,9 +694,9 @@ func validateCaptcha(config *Config) error {
 
 func validateParamsRequired(config *Config) error {
 	requiredStrings := map[string]string{
-		"CrowdsecLapiScheme": config.CrowdsecLapiScheme,
-		"CrowdsecLapiHost":   config.CrowdsecLapiHost,
-		"CrowdsecMode":       config.CrowdsecMode,
+		"LapiScheme": config.LapiScheme,
+		"LapiHost":   config.LapiHost,
+		"LapiMode":   config.LapiMode,
 	}
 	for key, val := range requiredStrings {
 		if len(val) == 0 {
@@ -712,12 +704,9 @@ func validateParamsRequired(config *Config) error {
 		}
 	}
 	requiredInt0 := map[string]int64{
-		"CrowdsecAppsecBodyLimit":             config.CrowdsecAppsecBodyLimit,
-		"MetricsUpdateIntervalSeconds":        config.MetricsUpdateIntervalSeconds,
-		"CrowdsecLapiHTTPTimeoutSeconds":      config.CrowdsecLapiHTTPTimeoutSeconds,
-		"CrowdsecAppsecHTTPTimeoutSeconds":    config.CrowdsecAppsecHTTPTimeoutSeconds,
-		"CaptchaSiteverifyHTTPTimeoutSeconds": config.CaptchaSiteverifyHTTPTimeoutSeconds,
-		"ReclaimGraceSeconds":                 config.ReclaimGraceSeconds,
+		"AppsecBodyLimit":                  config.AppsecBodyLimit,
+		"LapiMetricsUpdateIntervalSeconds": config.LapiMetricsUpdateIntervalSeconds,
+		"ReclaimGraceSeconds":              config.ReclaimGraceSeconds,
 	}
 	for key, val := range requiredInt0 {
 		if val < 0 {
@@ -725,40 +714,42 @@ func validateParamsRequired(config *Config) error {
 		}
 	}
 	requiredInt1 := map[string]int64{
-		"UpdateIntervalSeconds":     config.UpdateIntervalSeconds,
-		"DefaultDecisionSeconds":    config.DefaultDecisionSeconds,
-		"HTTPTimeoutSeconds":        config.HTTPTimeoutSeconds,
-		"CaptchaGracePeriodSeconds": config.CaptchaGracePeriodSeconds,
+		"LapiUpdateIntervalSeconds":                  config.LapiUpdateIntervalSeconds,
+		"LapiDefaultDecisionSeconds":                 config.LapiDefaultDecisionSeconds,
+		"LapiHTTPTimeoutSeconds":                     config.LapiHTTPTimeoutSeconds,
+		"AppsecHTTPTimeoutSeconds":                   config.AppsecHTTPTimeoutSeconds,
+		"BouncerCaptchaSiteverifyHTTPTimeoutSeconds": config.BouncerCaptchaSiteverifyHTTPTimeoutSeconds,
+		"BouncerCaptchaGracePeriodSeconds":           config.BouncerCaptchaGracePeriodSeconds,
 	}
 	for key, val := range requiredInt1 {
 		if val < 1 {
 			return errors.New(key + ": cannot be less than 1")
 		}
 	}
-	if config.UpdateMaxFailure < -1 {
-		return errors.New("UpdateMaxFailure: cannot be less than -1")
+	if config.LapiUpdateMaxFailure < -1 {
+		return errors.New("LapiUpdateMaxFailure: cannot be less than -1")
 	}
-	if err := validateFailureAction("CrowdsecLapiFailureAction", config.CrowdsecLapiFailureAction, config.CaptchaProvider); err != nil {
+	if err := validateFailureAction("BouncerLapiFailureAction", config.BouncerLapiFailureAction, config.BouncerCaptchaProvider); err != nil {
 		return err
 	}
-	if err := validateFailureAction("CrowdsecAppsecFailureAction", config.CrowdsecAppsecFailureAction, config.CaptchaProvider); err != nil {
+	if err := validateFailureAction("BouncerAppsecFailureAction", config.BouncerAppsecFailureAction, config.BouncerCaptchaProvider); err != nil {
 		return err
 	}
-	if config.CrowdsecAppsecBodyLimit < 0 {
-		return errors.New("CrowdsecAppsecBodyLimit: cannot be less than 0")
+	if config.AppsecBodyLimit < 0 {
+		return errors.New("AppsecBodyLimit: cannot be less than 0")
 	}
-	if config.RemediationStatusCode < 100 || config.RemediationStatusCode >= 600 {
-		return errors.New("RemediationStatusCode: cannot be less than 100 and more than 600")
+	if config.BouncerRemediationStatusCode < 100 || config.BouncerRemediationStatusCode >= 600 {
+		return errors.New("BouncerRemediationStatusCode: cannot be less than 100 and more than 600")
 	}
 
-	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode}, config.CrowdsecMode) {
-		return errors.New("CrowdsecMode: must be one of 'none', 'live', 'stream' or 'alone'")
+	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode}, config.LapiMode) {
+		return errors.New("LapiMode: must be one of 'none', 'live', 'stream' or 'alone'")
 	}
-	if !contains([]string{HTTP, HTTPS}, config.CrowdsecLapiScheme) {
-		return errors.New("CrowdsecLapiScheme: must be one of 'http' or 'https'")
+	if !contains([]string{HTTP, HTTPS}, config.LapiScheme) {
+		return errors.New("LapiScheme: must be one of 'http' or 'https'")
 	}
-	if !contains([]string{HTTP, HTTPS, ""}, config.CrowdsecAppsecScheme) {
-		return errors.New("CrowdsecAppsecScheme: must be one of 'http' or 'https'")
+	if !contains([]string{HTTP, HTTPS, ""}, config.AppsecScheme) {
+		return errors.New("AppsecScheme: must be one of 'http' or 'https'")
 	}
 	return nil
 }
@@ -792,22 +783,22 @@ func getTLSConfig(config *Config, log *slog.Logger, prefix, scheme string, insec
 			log.Debug("getTLSConfig: no CA provided, using system trust store", "prefix", prefix)
 		}
 	}
-	certBouncer, err := GetVariable(config, prefix+"TLSCertificateBouncer")
+	clientCertificate, err := GetVariable(config, prefix+"TLSClientCertificate")
 	if err != nil {
 		return nil, err
 	}
-	certBouncerKey, err := GetVariable(config, prefix+"TLSCertificateBouncerKey")
+	clientKey, err := GetVariable(config, prefix+"TLSClientKey")
 	if err != nil {
 		return nil, err
 	}
-	if certBouncer == "" || certBouncerKey == "" {
+	if clientCertificate == "" || clientKey == "" {
 		return tlsConfig, nil
 	}
-	clientCert, err := tls.X509KeyPair([]byte(certBouncer), []byte(certBouncerKey))
+	clientCertificatePair, err := tls.X509KeyPair([]byte(clientCertificate), []byte(clientKey))
 	if err != nil {
 		return nil, fmt.Errorf("getTLSClientConfigCrowdsec impossible to generate ClientCert %w", err)
 	}
-	tlsConfig.Certificates = append(tlsConfig.Certificates, clientCert)
+	tlsConfig.Certificates = append(tlsConfig.Certificates, clientCertificatePair)
 
 	return tlsConfig, nil
 }
@@ -815,10 +806,10 @@ func getTLSConfig(config *Config, log *slog.Logger, prefix, scheme string, insec
 // GetTLSConfigCrowdsec get TLS config from Config.
 func GetTLSConfigCrowdsec(config *Config, log *slog.Logger, isAppsec bool) (*tls.Config, error) {
 	var prefix string
-	if isAppsec && config.CrowdsecAppsecScheme != "" {
-		prefix = "CrowdsecAppsec"
-		return getTLSConfig(config, log, prefix, config.CrowdsecAppsecScheme, config.CrowdsecAppsecTLSInsecureVerify)
+	if isAppsec && config.AppsecScheme != "" {
+		prefix = "Appsec"
+		return getTLSConfig(config, log, prefix, config.AppsecScheme, config.AppsecTLSInsecureVerify)
 	}
-	prefix = "CrowdsecLapi"
-	return getTLSConfig(config, log, prefix, config.CrowdsecLapiScheme, config.CrowdsecLapiTLSInsecureVerify)
+	prefix = "Lapi"
+	return getTLSConfig(config, log, prefix, config.LapiScheme, config.LapiTLSInsecureVerify)
 }

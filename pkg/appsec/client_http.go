@@ -17,7 +17,7 @@ type transport struct {
 	httpTimeoutSeconds            int64
 	appsecTLSInsecureVerify       bool
 	appsecTLSCertificateAuthority string
-	appsecTLSCertificateBouncer   string
+	TLSClientCertificate          string
 }
 
 // newTransport builds HTTP+auth from cfg. AppSec TLS uses GetTLSConfigCrowdsec(..., true).
@@ -26,8 +26,8 @@ func newTransport(config *configuration.Config, log *slog.Logger) (*transport, e
 	if err != nil {
 		return nil, err
 	}
-	// Store effective seconds so AdoptTransport last-writes a shared-default change when the override is still 0.
-	timeoutSeconds := config.EffectiveHTTPTimeoutSeconds(config.CrowdsecAppsecHTTPTimeoutSeconds)
+	// Store the AppSec timeout so AdoptTransport last-writes a knob change.
+	timeoutSeconds := config.AppsecHTTPTimeoutSeconds
 	return &transport{
 		httpClient: &http.Client{
 			Transport: &http.Transport{
@@ -38,11 +38,11 @@ func newTransport(config *configuration.Config, log *slog.Logger) (*transport, e
 			},
 			Timeout: time.Duration(timeoutSeconds) * time.Second,
 		},
-		key:                           config.CrowdsecAppsecKey,
+		key:                           config.AppsecKey,
 		httpTimeoutSeconds:            timeoutSeconds,
-		appsecTLSInsecureVerify:       config.CrowdsecAppsecTLSInsecureVerify,
-		appsecTLSCertificateAuthority: config.CrowdsecAppsecTLSCertificateAuthority,
-		appsecTLSCertificateBouncer:   config.CrowdsecAppsecTLSCertificateBouncer,
+		appsecTLSInsecureVerify:       config.AppsecTLSInsecureVerify,
+		appsecTLSCertificateAuthority: config.AppsecTLSCertificateAuthority,
+		TLSClientCertificate:          config.AppsecTLSClientCertificate,
 	}, nil
 }
 
@@ -54,7 +54,7 @@ func (t *transport) fieldsDiffer(other *transport) bool {
 	return t.httpTimeoutSeconds != other.httpTimeoutSeconds ||
 		t.appsecTLSInsecureVerify != other.appsecTLSInsecureVerify ||
 		t.appsecTLSCertificateAuthority != other.appsecTLSCertificateAuthority ||
-		t.appsecTLSCertificateBouncer != other.appsecTLSCertificateBouncer
+		t.TLSClientCertificate != other.TLSClientCertificate
 }
 
 type idleCloser interface {
@@ -97,7 +97,7 @@ func (c *Client) AdoptTransport(cfg *configuration.Config) (bool, error) {
 			"httpTimeoutSeconds", next.httpTimeoutSeconds,
 			"appsecTlsInsecureVerify", next.appsecTLSInsecureVerify,
 			"appsecTlsCa", next.appsecTLSCertificateAuthority != "",
-			"appsecTlsCert", next.appsecTLSCertificateBouncer != "",
+			"appsecTlsCert", next.TLSClientCertificate != "",
 		)
 	}
 	return replaced, nil

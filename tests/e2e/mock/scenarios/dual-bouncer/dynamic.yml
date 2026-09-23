@@ -23,24 +23,24 @@ http:
     bouncer-a:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiEnabled: "true"
-          crowdsecMode: live
-          defaultDecisionSeconds: "2"
-          crowdsecLapiScheme: http
-          crowdsecLapiHost: "@@LAPI_HOST@@"
-          crowdsecLapiKey: "@@APIKEY@@"
-          forwardedHeadersTrustedIps:
+          bouncerEnabled: "true"
+          lapiEnabled: "true"
+          lapiMode: live
+          lapiDefaultDecisionSeconds: "2"
+          lapiScheme: http
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
     bouncer-b:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiEnabled: "true"
-          crowdsecMode: live
-          defaultDecisionSeconds: "2"
-          crowdsecLapiScheme: http
-          crowdsecLapiHost: "@@LAPI_HOST_B@@"
-          crowdsecLapiKey: "@@APIKEY@@"
-          forwardedHeadersTrustedIps:
+          bouncerEnabled: "true"
+          lapiEnabled: "true"
+          lapiMode: live
+          lapiDefaultDecisionSeconds: "2"
+          lapiScheme: http
+          lapiHost: "@@LAPI_HOST_B@@"
+          lapiKey: "@@APIKEY@@"
+          bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"

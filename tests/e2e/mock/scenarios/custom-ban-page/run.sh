@@ -23,7 +23,7 @@ body() {
   echo "[$SCENARIO] banned response body contains the IP and reason from templating"
   assert_body_contains "http://127.0.0.1:${WEB_PORT}/foo" "IP: 1.2.3.4, reason: LAPI, trace: 0123456789" -H "X-Forwarded-For: 1.2.3.4" -H "X-Trace: 0123456789"
 
-  echo "[$SCENARIO] banned response carries the custom remediation header (remediationHeadersCustomName)"
+  echo "[$SCENARIO] banned response carries the custom remediation header (bouncerRemediationHeadersCustomName)"
   assert_header "http://127.0.0.1:${WEB_PORT}/foo" X-E2E-Remediation "ban" -H "X-Forwarded-For: 1.2.3.4"
 }
 

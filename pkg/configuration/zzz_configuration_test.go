@@ -26,13 +26,13 @@ Wf86aX6PepsntZv2GYlA5UpabfT2EZICICpJ5h/iI+i341gBmLiAFQOyTDT+/wQc
 
 func getMinimalConfig() *Config {
 	cfg := New()
-	cfg.CrowdsecLapiEnabled = true
-	cfg.CrowdsecLapiKey = "test"
+	cfg.LapiEnabled = true
+	cfg.LapiKey = "test"
 	return cfg
 }
 
 // writeCaptchaTemplateFixture writes a readable captcha.html so tests that used
-// to blank CaptchaFilePath still skip only the key errors they assert.
+// to blank BouncerCaptchaFilePath still skip only the key errors they assert.
 func writeCaptchaTemplateFixture(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "captcha.html")
@@ -66,11 +66,11 @@ func Test_contains(t *testing.T) {
 
 func Test_GetVariable(t *testing.T) {
 	cfg1 := New()
-	cfg1.CrowdsecLapiKey = "test"
+	cfg1.LapiKey = "test"
 	cfg2 := New()
-	cfg2.CrowdsecLapiKeyFile = "../../tests/.keytest"
+	cfg2.LapiKeyFile = "../../tests/.keytest"
 	cfg3 := New()
-	cfg3.CrowdsecLapiKeyFile = "../../tests/.bad"
+	cfg3.LapiKeyFile = "../../tests/.bad"
 	type args struct {
 		config *Config
 		key    string
@@ -81,9 +81,9 @@ func Test_GetVariable(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{name: "Validate a key string", args: args{config: cfg1, key: "CrowdsecLapiKey"}, want: "test", wantErr: false},
-		{name: "Validate a key file", args: args{config: cfg2, key: "CrowdsecLapiKey"}, want: "test", wantErr: false},
-		{name: "Not validate an invalid file", args: args{config: cfg3, key: "CrowdsecLapiKey"}, want: "", wantErr: true},
+		{name: "Validate a key string", args: args{config: cfg1, key: "LapiKey"}, want: "test", wantErr: false},
+		{name: "Validate a key file", args: args{config: cfg2, key: "LapiKey"}, want: "test", wantErr: false},
+		{name: "Not validate an invalid file", args: args{config: cfg3, key: "LapiKey"}, want: "", wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -102,22 +102,22 @@ func Test_GetVariable(t *testing.T) {
 func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	log := logger.New("INFO", "")
 	cfg1 := New()
-	cfg1.CrowdsecLapiEnabled = true
-	cfg1.CrowdsecLapiKey = "test\n\n"
+	cfg1.LapiEnabled = true
+	cfg1.LapiKey = "test\n\n"
 	cfg2 := New()
-	cfg2.CrowdsecLapiEnabled = true
-	cfg2.CrowdsecLapiKey = "test@"
+	cfg2.LapiEnabled = true
+	cfg2.LapiKey = "test@"
 	cfg3 := getMinimalConfig()
-	cfg3.CrowdsecMode = "bad"
+	cfg3.LapiMode = "bad"
 	cfg4 := getMinimalConfig()
-	cfg4.UpdateIntervalSeconds = 0
+	cfg4.LapiUpdateIntervalSeconds = 0
 	cfg5 := getMinimalConfig()
-	cfg5.ClientTrustedIPs = []string{0: "bad"}
+	cfg5.BouncerClientTrustedIPs = []string{0: "bad"}
 	cfg6 := getMinimalConfig()
-	cfg6.CrowdsecLapiScheme = HTTPS
-	cfg6.CrowdsecLapiTLSInsecureVerify = true
+	cfg6.LapiScheme = HTTPS
+	cfg6.LapiTLSInsecureVerify = true
 	cfg7 := getMinimalConfig()
-	cfg7.CrowdsecLapiScheme = HTTPS
+	cfg7.LapiScheme = HTTPS
 	cfg8 := getMinimalConfig()
 	cfg8.LogLevel = LogINFO
 	cfg9 := getMinimalConfig()
@@ -128,120 +128,120 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	cfg10.LogLevel = "Warning"
 	captchaTemplate := writeCaptchaTemplateFixture(t)
 	cfgCaptchaNoProvider := getMinimalConfig()
-	cfgCaptchaNoProvider.CrowdsecLapiFailureAction = FailureActionCaptcha
+	cfgCaptchaNoProvider.BouncerLapiFailureAction = FailureActionCaptcha
 	cfgCaptchaWithProvider := getMinimalConfig()
-	cfgCaptchaWithProvider.CrowdsecLapiFailureAction = FailureActionCaptcha
-	cfgCaptchaWithProvider.CaptchaProvider = HcaptchaProvider
-	cfgCaptchaWithProvider.CaptchaSiteKey = "site"
-	cfgCaptchaWithProvider.CaptchaSecretKey = "secret"
-	cfgCaptchaWithProvider.CaptchaGateSecret = "gate-secret"
-	cfgCaptchaWithProvider.CaptchaFilePath = captchaTemplate
+	cfgCaptchaWithProvider.BouncerLapiFailureAction = FailureActionCaptcha
+	cfgCaptchaWithProvider.BouncerCaptchaProvider = HcaptchaProvider
+	cfgCaptchaWithProvider.BouncerCaptchaSiteKey = "site"
+	cfgCaptchaWithProvider.BouncerCaptchaSecretKey = "secret"
+	cfgCaptchaWithProvider.BouncerCaptchaGateSecret = "gate-secret"
+	cfgCaptchaWithProvider.BouncerCaptchaFilePath = captchaTemplate
 	cfgEmptyKeysDefaultBan := getMinimalConfig()
-	cfgEmptyKeysDefaultBan.CaptchaProvider = HcaptchaProvider
-	cfgEmptyKeysDefaultBan.CaptchaGateSecret = "gate-secret"
-	cfgEmptyKeysDefaultBan.CaptchaFilePath = captchaTemplate
+	cfgEmptyKeysDefaultBan.BouncerCaptchaProvider = HcaptchaProvider
+	cfgEmptyKeysDefaultBan.BouncerCaptchaGateSecret = "gate-secret"
+	cfgEmptyKeysDefaultBan.BouncerCaptchaFilePath = captchaTemplate
 	cfgOnlySiteEmpty := getMinimalConfig()
-	cfgOnlySiteEmpty.CaptchaProvider = HcaptchaProvider
-	cfgOnlySiteEmpty.CaptchaSecretKey = "secret"
-	cfgOnlySiteEmpty.CaptchaGateSecret = "gate-secret"
-	cfgOnlySiteEmpty.CaptchaFilePath = captchaTemplate
+	cfgOnlySiteEmpty.BouncerCaptchaProvider = HcaptchaProvider
+	cfgOnlySiteEmpty.BouncerCaptchaSecretKey = "secret"
+	cfgOnlySiteEmpty.BouncerCaptchaGateSecret = "gate-secret"
+	cfgOnlySiteEmpty.BouncerCaptchaFilePath = captchaTemplate
 	cfgOnlySecretEmpty := getMinimalConfig()
-	cfgOnlySecretEmpty.CaptchaProvider = HcaptchaProvider
-	cfgOnlySecretEmpty.CaptchaSiteKey = "site"
-	cfgOnlySecretEmpty.CaptchaGateSecret = "gate-secret"
-	cfgOnlySecretEmpty.CaptchaFilePath = captchaTemplate
+	cfgOnlySecretEmpty.BouncerCaptchaProvider = HcaptchaProvider
+	cfgOnlySecretEmpty.BouncerCaptchaSiteKey = "site"
+	cfgOnlySecretEmpty.BouncerCaptchaGateSecret = "gate-secret"
+	cfgOnlySecretEmpty.BouncerCaptchaFilePath = captchaTemplate
 	cfgWhitespaceSite := getMinimalConfig()
-	cfgWhitespaceSite.CaptchaProvider = HcaptchaProvider
-	cfgWhitespaceSite.CaptchaSiteKey = "   "
-	cfgWhitespaceSite.CaptchaSecretKey = "secret"
-	cfgWhitespaceSite.CaptchaGateSecret = "gate-secret"
-	cfgWhitespaceSite.CaptchaFilePath = captchaTemplate
+	cfgWhitespaceSite.BouncerCaptchaProvider = HcaptchaProvider
+	cfgWhitespaceSite.BouncerCaptchaSiteKey = "   "
+	cfgWhitespaceSite.BouncerCaptchaSecretKey = "secret"
+	cfgWhitespaceSite.BouncerCaptchaGateSecret = "gate-secret"
+	cfgWhitespaceSite.BouncerCaptchaFilePath = captchaTemplate
 	cfgUnknownAction := getMinimalConfig()
-	cfgUnknownAction.CrowdsecAppsecFailureAction = "block"
+	cfgUnknownAction.BouncerAppsecFailureAction = "block"
 	cfgEmptyAction := getMinimalConfig()
-	cfgEmptyAction.CrowdsecLapiFailureAction = ""
-	cfgEmptyAction.CrowdsecAppsecFailureAction = ""
+	cfgEmptyAction.BouncerLapiFailureAction = ""
+	cfgEmptyAction.BouncerAppsecFailureAction = ""
 	cfgAppsecHTTPS := getMinimalConfig()
-	cfgAppsecHTTPS.CrowdsecLapiScheme = HTTP
-	cfgAppsecHTTPS.CrowdsecAppsecScheme = HTTPS
-	cfgAppsecHTTPS.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgAppsecHTTPS.LapiScheme = HTTP
+	cfgAppsecHTTPS.AppsecScheme = HTTPS
+	cfgAppsecHTTPS.AppsecTLSCertificateAuthority = "not a pem"
 	cfgAppsecDistinctScheme := getMinimalConfig()
-	cfgAppsecDistinctScheme.CrowdsecAppsecEnabled = true
-	cfgAppsecDistinctScheme.CrowdsecLapiScheme = HTTP
-	cfgAppsecDistinctScheme.CrowdsecAppsecScheme = HTTPS
+	cfgAppsecDistinctScheme.AppsecEnabled = true
+	cfgAppsecDistinctScheme.LapiScheme = HTTP
+	cfgAppsecDistinctScheme.AppsecScheme = HTTPS
 	missingAppsecKeyFile := "../../tests/.missing-appsec-key"
 	cfgAloneAppsecOnInvalidCA := getMinimalConfig()
-	cfgAloneAppsecOnInvalidCA.CrowdsecMode = AloneMode
-	cfgAloneAppsecOnInvalidCA.CrowdsecCapiMachineID = "machine"
-	cfgAloneAppsecOnInvalidCA.CrowdsecCapiPassword = "password"
-	cfgAloneAppsecOnInvalidCA.CrowdsecAppsecEnabled = true
-	cfgAloneAppsecOnInvalidCA.CrowdsecAppsecScheme = HTTPS
-	cfgAloneAppsecOnInvalidCA.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgAloneAppsecOnInvalidCA.LapiMode = AloneMode
+	cfgAloneAppsecOnInvalidCA.LapiCapiMachineID = "machine"
+	cfgAloneAppsecOnInvalidCA.LapiCapiPassword = "password"
+	cfgAloneAppsecOnInvalidCA.AppsecEnabled = true
+	cfgAloneAppsecOnInvalidCA.AppsecScheme = HTTPS
+	cfgAloneAppsecOnInvalidCA.AppsecTLSCertificateAuthority = "not a pem"
 	cfgAloneAppsecOnMissingKey := getMinimalConfig()
-	cfgAloneAppsecOnMissingKey.CrowdsecMode = AloneMode
-	cfgAloneAppsecOnMissingKey.CrowdsecCapiMachineID = "machine"
-	cfgAloneAppsecOnMissingKey.CrowdsecCapiPassword = "password"
-	cfgAloneAppsecOnMissingKey.CrowdsecAppsecEnabled = true
-	cfgAloneAppsecOnMissingKey.CrowdsecAppsecKeyFile = missingAppsecKeyFile
+	cfgAloneAppsecOnMissingKey.LapiMode = AloneMode
+	cfgAloneAppsecOnMissingKey.LapiCapiMachineID = "machine"
+	cfgAloneAppsecOnMissingKey.LapiCapiPassword = "password"
+	cfgAloneAppsecOnMissingKey.AppsecEnabled = true
+	cfgAloneAppsecOnMissingKey.AppsecKeyFile = missingAppsecKeyFile
 	cfgAloneAppsecOffLeftover := getMinimalConfig()
-	cfgAloneAppsecOffLeftover.CrowdsecMode = AloneMode
-	cfgAloneAppsecOffLeftover.CrowdsecCapiMachineID = "machine"
-	cfgAloneAppsecOffLeftover.CrowdsecCapiPassword = "password"
-	cfgAloneAppsecOffLeftover.CrowdsecAppsecEnabled = false
-	cfgAloneAppsecOffLeftover.CrowdsecAppsecScheme = HTTPS
-	cfgAloneAppsecOffLeftover.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
-	cfgAloneAppsecOffLeftover.CrowdsecAppsecKeyFile = missingAppsecKeyFile
+	cfgAloneAppsecOffLeftover.LapiMode = AloneMode
+	cfgAloneAppsecOffLeftover.LapiCapiMachineID = "machine"
+	cfgAloneAppsecOffLeftover.LapiCapiPassword = "password"
+	cfgAloneAppsecOffLeftover.AppsecEnabled = false
+	cfgAloneAppsecOffLeftover.AppsecScheme = HTTPS
+	cfgAloneAppsecOffLeftover.AppsecTLSCertificateAuthority = "not a pem"
+	cfgAloneAppsecOffLeftover.AppsecKeyFile = missingAppsecKeyFile
 	cfgLiveAppsecOnInvalidCA := getMinimalConfig()
-	cfgLiveAppsecOnInvalidCA.CrowdsecAppsecEnabled = true
-	cfgLiveAppsecOnInvalidCA.CrowdsecLapiScheme = HTTP
-	cfgLiveAppsecOnInvalidCA.CrowdsecAppsecScheme = HTTPS
-	cfgLiveAppsecOnInvalidCA.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgLiveAppsecOnInvalidCA.AppsecEnabled = true
+	cfgLiveAppsecOnInvalidCA.LapiScheme = HTTP
+	cfgLiveAppsecOnInvalidCA.AppsecScheme = HTTPS
+	cfgLiveAppsecOnInvalidCA.AppsecTLSCertificateAuthority = "not a pem"
 	cfgLiveAppsecOnMissingKey := getMinimalConfig()
-	cfgLiveAppsecOnMissingKey.CrowdsecAppsecEnabled = true
-	cfgLiveAppsecOnMissingKey.CrowdsecAppsecKeyFile = missingAppsecKeyFile
+	cfgLiveAppsecOnMissingKey.AppsecEnabled = true
+	cfgLiveAppsecOnMissingKey.AppsecKeyFile = missingAppsecKeyFile
 	cfgLiveAppsecOffLeftover := getMinimalConfig()
-	cfgLiveAppsecOffLeftover.CrowdsecAppsecEnabled = false
-	cfgLiveAppsecOffLeftover.CrowdsecAppsecScheme = HTTPS
-	cfgLiveAppsecOffLeftover.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
-	cfgLiveAppsecOffLeftover.CrowdsecAppsecKeyFile = missingAppsecKeyFile
+	cfgLiveAppsecOffLeftover.AppsecEnabled = false
+	cfgLiveAppsecOffLeftover.AppsecScheme = HTTPS
+	cfgLiveAppsecOffLeftover.AppsecTLSCertificateAuthority = "not a pem"
+	cfgLiveAppsecOffLeftover.AppsecKeyFile = missingAppsecKeyFile
 	cfgAppsecOffLeftover := getMinimalConfig()
-	cfgAppsecOffLeftover.CrowdsecLapiEnabled = false
-	cfgAppsecOffLeftover.CrowdsecLapiKey = ""
-	cfgAppsecOffLeftover.CrowdsecAppsecEnabled = false
-	cfgAppsecOffLeftover.CrowdsecAppsecScheme = HTTPS
-	cfgAppsecOffLeftover.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgAppsecOffLeftover.LapiEnabled = false
+	cfgAppsecOffLeftover.LapiKey = ""
+	cfgAppsecOffLeftover.AppsecEnabled = false
+	cfgAppsecOffLeftover.AppsecScheme = HTTPS
+	cfgAppsecOffLeftover.AppsecTLSCertificateAuthority = "not a pem"
 	cfgAppsecOnlyNoLapiKey := getMinimalConfig()
-	cfgAppsecOnlyNoLapiKey.CrowdsecLapiEnabled = false
-	cfgAppsecOnlyNoLapiKey.CrowdsecLapiKey = ""
-	cfgAppsecOnlyNoLapiKey.CrowdsecAppsecEnabled = true
-	cfgAppsecOnlyNoLapiKey.CrowdsecAppsecKey = "appsec-key"
+	cfgAppsecOnlyNoLapiKey.LapiEnabled = false
+	cfgAppsecOnlyNoLapiKey.LapiKey = ""
+	cfgAppsecOnlyNoLapiKey.AppsecEnabled = true
+	cfgAppsecOnlyNoLapiKey.AppsecKey = "appsec-key"
 	cfgNoneMode := getMinimalConfig()
-	cfgNoneMode.CrowdsecMode = NoneMode
+	cfgNoneMode.LapiMode = NoneMode
 	cfgAloneValid := getMinimalConfig()
-	cfgAloneValid.CrowdsecMode = AloneMode
-	cfgAloneValid.CrowdsecCapiMachineID = "machine"
-	cfgAloneValid.CrowdsecCapiPassword = "password"
+	cfgAloneValid.LapiMode = AloneMode
+	cfgAloneValid.LapiCapiMachineID = "machine"
+	cfgAloneValid.LapiCapiPassword = "password"
 	cfgAloneMissingCaptchaKeys := getMinimalConfig()
-	cfgAloneMissingCaptchaKeys.CrowdsecMode = AloneMode
-	cfgAloneMissingCaptchaKeys.CrowdsecCapiMachineID = "machine"
-	cfgAloneMissingCaptchaKeys.CrowdsecCapiPassword = "password"
-	cfgAloneMissingCaptchaKeys.CrowdsecLapiFailureAction = FailureActionCaptcha
-	cfgAloneMissingCaptchaKeys.CaptchaProvider = HcaptchaProvider
-	cfgAloneMissingCaptchaKeys.CaptchaGateSecret = "gate-secret"
-	cfgAloneMissingCaptchaKeys.CaptchaFilePath = captchaTemplate
+	cfgAloneMissingCaptchaKeys.LapiMode = AloneMode
+	cfgAloneMissingCaptchaKeys.LapiCapiMachineID = "machine"
+	cfgAloneMissingCaptchaKeys.LapiCapiPassword = "password"
+	cfgAloneMissingCaptchaKeys.BouncerLapiFailureAction = FailureActionCaptcha
+	cfgAloneMissingCaptchaKeys.BouncerCaptchaProvider = HcaptchaProvider
+	cfgAloneMissingCaptchaKeys.BouncerCaptchaGateSecret = "gate-secret"
+	cfgAloneMissingCaptchaKeys.BouncerCaptchaFilePath = captchaTemplate
 	cfgAloneBadLog := getMinimalConfig()
-	cfgAloneBadLog.CrowdsecMode = AloneMode
-	cfgAloneBadLog.CrowdsecCapiMachineID = "machine"
-	cfgAloneBadLog.CrowdsecCapiPassword = "password"
+	cfgAloneBadLog.LapiMode = AloneMode
+	cfgAloneBadLog.LapiCapiMachineID = "machine"
+	cfgAloneBadLog.LapiCapiPassword = "password"
 	cfgAloneBadLog.LogLevel = "Warning"
 	cfgAppsecCaptchaNoProvider := getMinimalConfig()
-	cfgAppsecCaptchaNoProvider.CrowdsecAppsecFailureAction = FailureActionCaptcha
+	cfgAppsecCaptchaNoProvider.BouncerAppsecFailureAction = FailureActionCaptcha
 	cfgRemediationLow := getMinimalConfig()
-	cfgRemediationLow.RemediationStatusCode = 99
+	cfgRemediationLow.BouncerRemediationStatusCode = 99
 	cfgRemediationHigh := getMinimalConfig()
-	cfgRemediationHigh.RemediationStatusCode = 600
+	cfgRemediationHigh.BouncerRemediationStatusCode = 600
 	cfgUpdateMaxFailureNegOne := getMinimalConfig()
-	cfgUpdateMaxFailureNegOne.UpdateMaxFailure = -1
+	cfgUpdateMaxFailureNegOne.LapiUpdateMaxFailure = -1
 	type args struct {
 		config *Config
 	}
@@ -256,7 +256,7 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 		{name: "Not validate unauthorized character in crowdsec lapi key", args: args{config: cfg2}, wantErr: true},
 		{name: "Not validate an absent crowdsec lapi key", args: args{config: func() *Config {
 			cfg := getMinimalConfig()
-			cfg.CrowdsecLapiKey = ""
+			cfg.LapiKey = ""
 			return cfg
 		}()}, wantErr: true},
 		{name: "Not validate a not listed item", args: args{config: cfg3}, wantErr: true},
@@ -271,40 +271,40 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 		{name: "Invalid log level Warning", args: args{config: cfg10}, wantErr: true},
 		{name: "Captcha LAPI action without provider", args: args{config: cfgCaptchaNoProvider}, wantErr: true},
 		{name: "Captcha LAPI action with provider", args: args{config: cfgCaptchaWithProvider}, wantErr: false},
-		{name: "Provider set with empty site and secret", args: args{config: cfgEmptyKeysDefaultBan}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},
-		{name: "Provider set with only site empty", args: args{config: cfgOnlySiteEmpty}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},
-		{name: "Provider set with only secret empty", args: args{config: cfgOnlySecretEmpty}, wantErr: true, wantErrContains: "CaptchaSecretKey: cannot be empty when CaptchaProvider is set"},
-		{name: "Provider set with whitespace-only site", args: args{config: cfgWhitespaceSite}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},
+		{name: "Provider set with empty site and secret", args: args{config: cfgEmptyKeysDefaultBan}, wantErr: true, wantErrContains: "BouncerCaptchaSiteKey: cannot be empty when BouncerCaptchaProvider is set"},
+		{name: "Provider set with only site empty", args: args{config: cfgOnlySiteEmpty}, wantErr: true, wantErrContains: "BouncerCaptchaSiteKey: cannot be empty when BouncerCaptchaProvider is set"},
+		{name: "Provider set with only secret empty", args: args{config: cfgOnlySecretEmpty}, wantErr: true, wantErrContains: "BouncerCaptchaSecretKey: cannot be empty when BouncerCaptchaProvider is set"},
+		{name: "Provider set with whitespace-only site", args: args{config: cfgWhitespaceSite}, wantErr: true, wantErrContains: "BouncerCaptchaSiteKey: cannot be empty when BouncerCaptchaProvider is set"},
 		{name: "Unknown AppSec failure action", args: args{config: cfgUnknownAction}, wantErr: true},
 		{name: "Empty failure actions use default ban", args: args{config: cfgEmptyAction}, wantErr: false},
 		{name: "AppSec HTTPS with invalid CA while LAPI HTTP", args: args{config: cfgAppsecHTTPS}, wantErr: false},
 		{name: "AppSec distinct HTTPS scheme validates URL", args: args{config: cfgAppsecDistinctScheme}, wantErr: false},
 		{name: "Alone AppSec on with invalid CA", args: args{config: cfgAloneAppsecOnInvalidCA}, wantErr: true},
-		{name: "Alone AppSec on with missing key file", args: args{config: cfgAloneAppsecOnMissingKey}, wantErr: true, wantErrContains: "CrowdsecAppsecKey"},
+		{name: "Alone AppSec on with missing key file", args: args{config: cfgAloneAppsecOnMissingKey}, wantErr: true, wantErrContains: "AppsecKey"},
 		{name: "Alone AppSec off leftover CA and key file", args: args{config: cfgAloneAppsecOffLeftover}, wantErr: false},
 		{name: "Live AppSec on with invalid CA", args: args{config: cfgLiveAppsecOnInvalidCA}, wantErr: true},
-		{name: "Live AppSec on with missing key file", args: args{config: cfgLiveAppsecOnMissingKey}, wantErr: true, wantErrContains: "CrowdsecAppsecKey"},
+		{name: "Live AppSec on with missing key file", args: args{config: cfgLiveAppsecOnMissingKey}, wantErr: true, wantErrContains: "AppsecKey"},
 		{name: "Live AppSec off leftover CA and key file", args: args{config: cfgLiveAppsecOffLeftover}, wantErr: false},
 		{name: "AppSec off leftover invalid CA", args: args{config: cfgAppsecOffLeftover}, wantErr: false},
 		{name: "AppSec only without LAPI key", args: args{config: cfgAppsecOnlyNoLapiKey}, wantErr: false},
 		{name: "None mode minimal config", args: args{config: cfgNoneMode}, wantErr: false},
 		{name: "Alone mode with CAPI credentials", args: args{config: cfgAloneValid}, wantErr: false},
-		{name: "Alone mode captcha without site/secret keys", args: args{config: cfgAloneMissingCaptchaKeys}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},
+		{name: "Alone mode captcha without site/secret keys", args: args{config: cfgAloneMissingCaptchaKeys}, wantErr: true, wantErrContains: "BouncerCaptchaSiteKey: cannot be empty when BouncerCaptchaProvider is set"},
 		{name: "Alone mode invalid log level", args: args{config: cfgAloneBadLog}, wantErr: true},
 		{name: "AppSec captcha action without provider", args: args{config: cfgAppsecCaptchaNoProvider}, wantErr: true},
-		{name: "RemediationStatusCode below 100", args: args{config: cfgRemediationLow}, wantErr: true},
-		{name: "RemediationStatusCode 600 or above", args: args{config: cfgRemediationHigh}, wantErr: true},
-		{name: "UpdateMaxFailure -1 accepted", args: args{config: cfgUpdateMaxFailureNegOne}, wantErr: false},
+		{name: "BouncerRemediationStatusCode below 100", args: args{config: cfgRemediationLow}, wantErr: true},
+		{name: "BouncerRemediationStatusCode 600 or above", args: args{config: cfgRemediationHigh}, wantErr: true},
+		{name: "LapiUpdateMaxFailure -1 accepted", args: args{config: cfgUpdateMaxFailureNegOne}, wantErr: false},
 		{name: "Custom json validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "json")}, wantErr: false},
 		{name: "Custom form validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "form")}, wantErr: false},
 		{name: "Custom omit validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "")}, wantErr: false},
 		{name: "Custom whitespace-padded json accepted", args: args{config: newCustomValidateBodyConfig(t, " json ")}, wantErr: false},
-		{name: "Built-in json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(t, HcaptchaProvider, "json")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom"},
-		{name: "Recaptcha json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(t, RecaptchaProvider, "json")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom"},
-		{name: "Turnstile json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(t, TurnstileProvider, "json")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom"},
-		{name: "Unknown JSON token rejected", args: args{config: newCustomValidateBodyConfig(t, "JSON")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: must be empty, form, or json"},
-		{name: "Unknown Form token rejected", args: args{config: newCustomValidateBodyConfig(t, "Form")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: must be empty, form, or json"},
-		{name: "Unknown xml token rejected", args: args{config: newCustomValidateBodyConfig(t, "xml")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: must be empty, form, or json"},
+		{name: "Built-in json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(t, HcaptchaProvider, "json")}, wantErr: true, wantErrContains: "BouncerCaptchaCustomValidateBody: json is only valid when BouncerCaptchaProvider is custom"},
+		{name: "Recaptcha json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(t, RecaptchaProvider, "json")}, wantErr: true, wantErrContains: "BouncerCaptchaCustomValidateBody: json is only valid when BouncerCaptchaProvider is custom"},
+		{name: "Turnstile json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(t, TurnstileProvider, "json")}, wantErr: true, wantErrContains: "BouncerCaptchaCustomValidateBody: json is only valid when BouncerCaptchaProvider is custom"},
+		{name: "Unknown JSON token rejected", args: args{config: newCustomValidateBodyConfig(t, "JSON")}, wantErr: true, wantErrContains: "BouncerCaptchaCustomValidateBody: must be empty, form, or json"},
+		{name: "Unknown Form token rejected", args: args{config: newCustomValidateBodyConfig(t, "Form")}, wantErr: true, wantErrContains: "BouncerCaptchaCustomValidateBody: must be empty, form, or json"},
+		{name: "Unknown xml token rejected", args: args{config: newCustomValidateBodyConfig(t, "xml")}, wantErr: true, wantErrContains: "BouncerCaptchaCustomValidateBody: must be empty, form, or json"},
 		{name: "Built-in form validate body accepted", args: args{config: newBuiltinValidateBodyConfig(t, HcaptchaProvider, "form")}, wantErr: false},
 		{name: "Built-in omit validate body accepted", args: args{config: newBuiltinValidateBodyConfig(t, HcaptchaProvider, "")}, wantErr: false},
 	}
@@ -328,36 +328,36 @@ func Test_ValidateParams_captchaTemplateRequired(t *testing.T) {
 	captchaTemplate := writeCaptchaTemplateFixture(t)
 
 	cfgEmptyCaptchaPath := getMinimalConfig()
-	cfgEmptyCaptchaPath.CaptchaProvider = HcaptchaProvider
-	cfgEmptyCaptchaPath.CaptchaSiteKey = "site"
-	cfgEmptyCaptchaPath.CaptchaSecretKey = "secret"
-	cfgEmptyCaptchaPath.CaptchaGateSecret = "gate-secret"
-	cfgEmptyCaptchaPath.CaptchaFilePath = ""
+	cfgEmptyCaptchaPath.BouncerCaptchaProvider = HcaptchaProvider
+	cfgEmptyCaptchaPath.BouncerCaptchaSiteKey = "site"
+	cfgEmptyCaptchaPath.BouncerCaptchaSecretKey = "secret"
+	cfgEmptyCaptchaPath.BouncerCaptchaGateSecret = "gate-secret"
+	cfgEmptyCaptchaPath.BouncerCaptchaFilePath = ""
 
 	cfgMissingCaptchaFile := getMinimalConfig()
-	cfgMissingCaptchaFile.CaptchaProvider = HcaptchaProvider
-	cfgMissingCaptchaFile.CaptchaSiteKey = "site"
-	cfgMissingCaptchaFile.CaptchaSecretKey = "secret"
-	cfgMissingCaptchaFile.CaptchaGateSecret = "gate-secret"
-	cfgMissingCaptchaFile.CaptchaFilePath = filepath.Join(t.TempDir(), "missing-captcha.html")
+	cfgMissingCaptchaFile.BouncerCaptchaProvider = HcaptchaProvider
+	cfgMissingCaptchaFile.BouncerCaptchaSiteKey = "site"
+	cfgMissingCaptchaFile.BouncerCaptchaSecretKey = "secret"
+	cfgMissingCaptchaFile.BouncerCaptchaGateSecret = "gate-secret"
+	cfgMissingCaptchaFile.BouncerCaptchaFilePath = filepath.Join(t.TempDir(), "missing-captcha.html")
 
 	cfgEmptyBanPath := getMinimalConfig()
-	cfgEmptyBanPath.CaptchaProvider = HcaptchaProvider
-	cfgEmptyBanPath.CaptchaSiteKey = "site"
-	cfgEmptyBanPath.CaptchaSecretKey = "secret"
-	cfgEmptyBanPath.CaptchaGateSecret = "gate-secret"
-	cfgEmptyBanPath.CaptchaFilePath = captchaTemplate
-	cfgEmptyBanPath.BanFilePath = ""
+	cfgEmptyBanPath.BouncerCaptchaProvider = HcaptchaProvider
+	cfgEmptyBanPath.BouncerCaptchaSiteKey = "site"
+	cfgEmptyBanPath.BouncerCaptchaSecretKey = "secret"
+	cfgEmptyBanPath.BouncerCaptchaGateSecret = "gate-secret"
+	cfgEmptyBanPath.BouncerCaptchaFilePath = captchaTemplate
+	cfgEmptyBanPath.BouncerBanFilePath = ""
 
 	cfgAloneEmptyCaptchaPath := getMinimalConfig()
-	cfgAloneEmptyCaptchaPath.CrowdsecMode = AloneMode
-	cfgAloneEmptyCaptchaPath.CrowdsecCapiMachineID = "machine"
-	cfgAloneEmptyCaptchaPath.CrowdsecCapiPassword = "password"
-	cfgAloneEmptyCaptchaPath.CaptchaProvider = HcaptchaProvider
-	cfgAloneEmptyCaptchaPath.CaptchaSiteKey = "site"
-	cfgAloneEmptyCaptchaPath.CaptchaSecretKey = "secret"
-	cfgAloneEmptyCaptchaPath.CaptchaGateSecret = "gate-secret"
-	cfgAloneEmptyCaptchaPath.CaptchaFilePath = ""
+	cfgAloneEmptyCaptchaPath.LapiMode = AloneMode
+	cfgAloneEmptyCaptchaPath.LapiCapiMachineID = "machine"
+	cfgAloneEmptyCaptchaPath.LapiCapiPassword = "password"
+	cfgAloneEmptyCaptchaPath.BouncerCaptchaProvider = HcaptchaProvider
+	cfgAloneEmptyCaptchaPath.BouncerCaptchaSiteKey = "site"
+	cfgAloneEmptyCaptchaPath.BouncerCaptchaSecretKey = "secret"
+	cfgAloneEmptyCaptchaPath.BouncerCaptchaGateSecret = "gate-secret"
+	cfgAloneEmptyCaptchaPath.BouncerCaptchaFilePath = ""
 
 	tests := []struct {
 		name            string
@@ -365,10 +365,10 @@ func Test_ValidateParams_captchaTemplateRequired(t *testing.T) {
 		wantErr         bool
 		wantErrContains string
 	}{
-		{name: "Provider set with empty captcha path", config: cfgEmptyCaptchaPath, wantErr: true, wantErrContains: "CaptchaFilePath: cannot be empty when CaptchaProvider is set"},
+		{name: "Provider set with empty captcha path", config: cfgEmptyCaptchaPath, wantErr: true, wantErrContains: "BouncerCaptchaFilePath: cannot be empty when BouncerCaptchaProvider is set"},
 		{name: "Provider set with missing captcha file", config: cfgMissingCaptchaFile, wantErr: true},
 		{name: "Provider set with empty ban path still accepted", config: cfgEmptyBanPath, wantErr: false},
-		{name: "Alone mode empty captcha path", config: cfgAloneEmptyCaptchaPath, wantErr: true, wantErrContains: "CaptchaFilePath: cannot be empty when CaptchaProvider is set"},
+		{name: "Alone mode empty captcha path", config: cfgAloneEmptyCaptchaPath, wantErr: true, wantErrContains: "BouncerCaptchaFilePath: cannot be empty when BouncerCaptchaProvider is set"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -384,28 +384,28 @@ func Test_ValidateParams_captchaTemplateRequired(t *testing.T) {
 }
 
 // Test_ValidateParams_skipsRedisPasswordFileWhenRedisDisabled pins that
-// RedisCachePasswordFile is Stat/read only when redisCacheEnabled is true.
+// LapiRedisPasswordFile is Stat/read only when redisCacheEnabled is true.
 func Test_ValidateParams_skipsRedisPasswordFileWhenRedisDisabled(t *testing.T) {
 	log := logger.New("INFO", "")
 	missingFile := filepath.Join(t.TempDir(), "missing-redis-password")
 	staleDir := t.TempDir()
 
 	disabledMissing := getMinimalConfig()
-	disabledMissing.RedisCacheEnabled = false
-	disabledMissing.RedisCachePasswordFile = missingFile
+	disabledMissing.LapiRedisEnabled = false
+	disabledMissing.LapiRedisPasswordFile = missingFile
 
 	disabledStale := getMinimalConfig()
-	disabledStale.RedisCacheEnabled = false
-	disabledStale.RedisCachePasswordFile = staleDir
+	disabledStale.LapiRedisEnabled = false
+	disabledStale.LapiRedisPasswordFile = staleDir
 
 	enabledMissing := getMinimalConfig()
-	enabledMissing.RedisCacheEnabled = true
-	enabledMissing.RedisCachePasswordFile = missingFile
+	enabledMissing.LapiRedisEnabled = true
+	enabledMissing.LapiRedisPasswordFile = missingFile
 
 	enabledEmpty := getMinimalConfig()
-	enabledEmpty.RedisCacheEnabled = true
-	enabledEmpty.RedisCachePassword = ""
-	enabledEmpty.RedisCachePasswordFile = ""
+	enabledEmpty.LapiRedisEnabled = true
+	enabledEmpty.LapiRedisPassword = ""
+	enabledEmpty.LapiRedisPasswordFile = ""
 
 	tests := []struct {
 		name    string
@@ -430,9 +430,9 @@ func Test_ValidateParams_skipsRedisPasswordFileWhenRedisDisabled(t *testing.T) {
 func Test_validateParamsTLS(t *testing.T) {
 	cfgEmpty := getMinimalConfig()
 	cfgValid := getMinimalConfig()
-	cfgValid.CrowdsecLapiTLSCertificateAuthority = validPEM
+	cfgValid.LapiTLSCertificateAuthority = validPEM
 	cfgInvalidCA := getMinimalConfig()
-	cfgInvalidCA.CrowdsecLapiTLSCertificateAuthority = "not a pem"
+	cfgInvalidCA.LapiTLSCertificateAuthority = "not a pem"
 
 	tests := []struct {
 		name    string
@@ -445,7 +445,7 @@ func Test_validateParamsTLS(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := validateParamsTLS(tt.config, "CrowdsecLapi"); (err != nil) != tt.wantErr {
+			if err := validateParamsTLS(tt.config, "Lapi"); (err != nil) != tt.wantErr {
 				t.Errorf("validateParamsTLS() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -482,13 +482,13 @@ func Test_validateParamsIPs(t *testing.T) {
 
 func Test_validateParamsRequired(t *testing.T) {
 	cfg2 := getMinimalConfig()
-	cfg2.CrowdsecLapiScheme = "bad"
+	cfg2.LapiScheme = "bad"
 	cfg3 := getMinimalConfig()
-	cfg3.CrowdsecMode = "bad"
+	cfg3.LapiMode = "bad"
 	cfg4 := getMinimalConfig()
-	cfg4.UpdateIntervalSeconds = 0
+	cfg4.LapiUpdateIntervalSeconds = 0
 	cfg5 := getMinimalConfig()
-	cfg5.DefaultDecisionSeconds = 0
+	cfg5.LapiDefaultDecisionSeconds = 0
 	type args struct {
 		config *Config
 	}
@@ -542,22 +542,22 @@ func Test_GetTLSConfigCrowdsec(t *testing.T) {
 	log := logger.New("INFO", "")
 
 	httpCfg := getMinimalConfig()
-	httpCfg.CrowdsecLapiScheme = HTTP
+	httpCfg.LapiScheme = HTTP
 
 	httpsSystemCA := getMinimalConfig()
-	httpsSystemCA.CrowdsecLapiScheme = HTTPS
+	httpsSystemCA.LapiScheme = HTTPS
 
 	httpsCustomCA := getMinimalConfig()
-	httpsCustomCA.CrowdsecLapiScheme = HTTPS
-	httpsCustomCA.CrowdsecLapiTLSCertificateAuthority = validPEM
+	httpsCustomCA.LapiScheme = HTTPS
+	httpsCustomCA.LapiTLSCertificateAuthority = validPEM
 
 	httpsInsecure := getMinimalConfig()
-	httpsInsecure.CrowdsecLapiScheme = HTTPS
-	httpsInsecure.CrowdsecLapiTLSInsecureVerify = true
+	httpsInsecure.LapiScheme = HTTPS
+	httpsInsecure.LapiTLSInsecureVerify = true
 
 	httpsBadCA := getMinimalConfig()
-	httpsBadCA.CrowdsecLapiScheme = HTTPS
-	httpsBadCA.CrowdsecLapiTLSCertificateAuthority = "not a pem"
+	httpsBadCA.LapiScheme = HTTPS
+	httpsBadCA.LapiTLSCertificateAuthority = "not a pem"
 
 	tests := []struct {
 		name             string
@@ -619,23 +619,23 @@ func Test_getContentTypeFromPath(t *testing.T) {
 
 func Test_validateDecisionScopeHeaders(t *testing.T) {
 	cfg := getMinimalConfig()
-	cfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	cfg.BouncerDecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
 	if err := validateDecisionScopeHeaders(cfg); err != nil {
 		t.Fatalf("valid Country map: %v", err)
 	}
-	cfg.DecisionScopeHeaders = map[string]string{"Ip": "X-Real-IP"}
+	cfg.BouncerDecisionScopeHeaders = map[string]string{"Ip": "X-Real-IP"}
 	if err := validateDecisionScopeHeaders(cfg); err == nil {
 		t.Fatal("Ip key must be rejected")
 	}
-	cfg.DecisionScopeHeaders = map[string]string{"RANGE": "X-Range"}
+	cfg.BouncerDecisionScopeHeaders = map[string]string{"RANGE": "X-Range"}
 	if err := validateDecisionScopeHeaders(cfg); err == nil {
 		t.Fatal("Range key must be rejected")
 	}
-	cfg.DecisionScopeHeaders = map[string]string{"": "X-Empty"}
+	cfg.BouncerDecisionScopeHeaders = map[string]string{"": "X-Empty"}
 	if err := validateDecisionScopeHeaders(cfg); err == nil {
 		t.Fatal("empty scope must be rejected")
 	}
-	cfg.DecisionScopeHeaders = map[string]string{"username": "  "}
+	cfg.BouncerDecisionScopeHeaders = map[string]string{"username": "  "}
 	if err := validateDecisionScopeHeaders(cfg); err == nil {
 		t.Fatal("empty header must be rejected")
 	}
@@ -644,41 +644,41 @@ func Test_validateDecisionScopeHeaders(t *testing.T) {
 func newCustomValidateBodyConfig(t *testing.T, validateBody string) *Config {
 	t.Helper()
 	cfg := getMinimalConfig()
-	cfg.CaptchaProvider = CustomProvider
-	cfg.CaptchaCustomKey = "wicketkeeper"
-	cfg.CaptchaCustomResponse = "wicketkeeper_solution"
-	cfg.CaptchaCustomValidateURL = "http://wicketkeeper:8080/v0/siteverify"
-	cfg.CaptchaCustomJsURL = "http://wicketkeeper:8080/fast.js"
-	cfg.CaptchaCustomValidateBody = validateBody
-	cfg.CaptchaSiteKey = "site"
-	cfg.CaptchaSecretKey = "secret"
-	cfg.CaptchaGateSecret = "gate-secret"
-	cfg.CaptchaFilePath = writeCaptchaTemplateFixture(t)
+	cfg.BouncerCaptchaProvider = CustomProvider
+	cfg.BouncerCaptchaCustomKey = "wicketkeeper"
+	cfg.BouncerCaptchaCustomResponse = "wicketkeeper_solution"
+	cfg.BouncerCaptchaCustomValidateURL = "http://wicketkeeper:8080/v0/siteverify"
+	cfg.BouncerCaptchaCustomJsURL = "http://wicketkeeper:8080/fast.js"
+	cfg.BouncerCaptchaCustomValidateBody = validateBody
+	cfg.BouncerCaptchaSiteKey = "site"
+	cfg.BouncerCaptchaSecretKey = "secret"
+	cfg.BouncerCaptchaGateSecret = "gate-secret"
+	cfg.BouncerCaptchaFilePath = writeCaptchaTemplateFixture(t)
 	return cfg
 }
 
 func newBuiltinValidateBodyConfig(t *testing.T, provider, validateBody string) *Config {
 	t.Helper()
 	cfg := getMinimalConfig()
-	cfg.CaptchaProvider = provider
-	cfg.CaptchaCustomValidateBody = validateBody
-	cfg.CaptchaSiteKey = "site"
-	cfg.CaptchaSecretKey = "secret"
-	cfg.CaptchaGateSecret = "gate-secret"
-	cfg.CaptchaFilePath = writeCaptchaTemplateFixture(t)
+	cfg.BouncerCaptchaProvider = provider
+	cfg.BouncerCaptchaCustomValidateBody = validateBody
+	cfg.BouncerCaptchaSiteKey = "site"
+	cfg.BouncerCaptchaSecretKey = "secret"
+	cfg.BouncerCaptchaGateSecret = "gate-secret"
+	cfg.BouncerCaptchaFilePath = writeCaptchaTemplateFixture(t)
 	return cfg
 }
 
 func Test_validateCaptcha(t *testing.T) {
 	cfgCustomMissing := getMinimalConfig()
-	cfgCustomMissing.CaptchaProvider = CustomProvider
+	cfgCustomMissing.BouncerCaptchaProvider = CustomProvider
 	cfgCustomFourFields := getMinimalConfig()
-	cfgCustomFourFields.CaptchaProvider = CustomProvider
-	cfgCustomFourFields.CaptchaCustomKey = "wicketkeeper"
-	cfgCustomFourFields.CaptchaCustomResponse = "wicketkeeper_solution"
-	cfgCustomFourFields.CaptchaCustomValidateURL = "http://wicketkeeper:8080/v0/siteverify"
-	cfgCustomFourFields.CaptchaCustomJsURL = "http://wicketkeeper:8080/fast.js"
-	cfgCustomFourFields.CaptchaCustomChallengeURL = ""
+	cfgCustomFourFields.BouncerCaptchaProvider = CustomProvider
+	cfgCustomFourFields.BouncerCaptchaCustomKey = "wicketkeeper"
+	cfgCustomFourFields.BouncerCaptchaCustomResponse = "wicketkeeper_solution"
+	cfgCustomFourFields.BouncerCaptchaCustomValidateURL = "http://wicketkeeper:8080/v0/siteverify"
+	cfgCustomFourFields.BouncerCaptchaCustomJsURL = "http://wicketkeeper:8080/fast.js"
+	cfgCustomFourFields.BouncerCaptchaCustomChallengeURL = ""
 	tests := []struct {
 		name    string
 		config  *Config
@@ -733,12 +733,12 @@ func Test_validateEnabledCaptchaSettings_customChallengeURL(t *testing.T) {
 	captchaTemplate := writeCaptchaTemplateFixture(t)
 	newCustomConfig := func(challengeURL string) *Config {
 		cfg := getMinimalConfig()
-		cfg.CaptchaProvider = CustomProvider
-		cfg.CaptchaSiteKey = "site"
-		cfg.CaptchaSecretKey = "secret"
-		cfg.CaptchaGateSecret = "gate-secret"
-		cfg.CaptchaFilePath = captchaTemplate
-		cfg.CaptchaCustomChallengeURL = challengeURL
+		cfg.BouncerCaptchaProvider = CustomProvider
+		cfg.BouncerCaptchaSiteKey = "site"
+		cfg.BouncerCaptchaSecretKey = "secret"
+		cfg.BouncerCaptchaGateSecret = "gate-secret"
+		cfg.BouncerCaptchaFilePath = captchaTemplate
+		cfg.BouncerCaptchaCustomChallengeURL = challengeURL
 		return cfg
 	}
 	tests := []struct {
@@ -763,14 +763,14 @@ func Test_validateEnabledCaptchaSettings_customChallengeURL(t *testing.T) {
 
 	// A built-in provider ignores the key, so a stale value must not block startup.
 	builtin := getMinimalConfig()
-	builtin.CaptchaProvider = HcaptchaProvider
-	builtin.CaptchaSiteKey = "site"
-	builtin.CaptchaSecretKey = "secret"
-	builtin.CaptchaGateSecret = "gate-secret"
-	builtin.CaptchaFilePath = captchaTemplate
-	builtin.CaptchaCustomChallengeURL = "v0/challenge"
+	builtin.BouncerCaptchaProvider = HcaptchaProvider
+	builtin.BouncerCaptchaSiteKey = "site"
+	builtin.BouncerCaptchaSecretKey = "secret"
+	builtin.BouncerCaptchaGateSecret = "gate-secret"
+	builtin.BouncerCaptchaFilePath = captchaTemplate
+	builtin.BouncerCaptchaCustomChallengeURL = "v0/challenge"
 	if err := validateEnabledCaptchaSettings(builtin); err != nil {
-		t.Errorf("built-in provider must ignore CaptchaCustomChallengeURL, got %v", err)
+		t.Errorf("built-in provider must ignore BouncerCaptchaCustomChallengeURL, got %v", err)
 	}
 }
 
@@ -834,9 +834,9 @@ func Test_GetTemplate(t *testing.T) {
 
 func Test_validateParamsTLS_appsec(t *testing.T) {
 	cfgValid := getMinimalConfig()
-	cfgValid.CrowdsecAppsecTLSCertificateAuthority = validPEM
+	cfgValid.AppsecTLSCertificateAuthority = validPEM
 	cfgInvalid := getMinimalConfig()
-	cfgInvalid.CrowdsecAppsecTLSCertificateAuthority = "not a pem"
+	cfgInvalid.AppsecTLSCertificateAuthority = "not a pem"
 
 	tests := []struct {
 		name    string
@@ -848,7 +848,7 @@ func Test_validateParamsTLS_appsec(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := validateParamsTLS(tt.config, "CrowdsecAppsec"); (err != nil) != tt.wantErr {
+			if err := validateParamsTLS(tt.config, "Appsec"); (err != nil) != tt.wantErr {
 				t.Errorf("validateParamsTLS() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -911,16 +911,16 @@ func TestValidateParams_EmptyAppsecHost(t *testing.T) {
 	log := logger.New("INFO", "")
 	t.Run("enabled rejects empty host", func(t *testing.T) {
 		cfg := getMinimalConfig()
-		cfg.CrowdsecAppsecEnabled = true
-		cfg.CrowdsecAppsecHost = ""
+		cfg.AppsecEnabled = true
+		cfg.AppsecHost = ""
 		if err := ValidateParams(cfg, log); err == nil {
 			t.Fatal("ValidateParams = nil want error")
 		}
 	})
 	t.Run("disabled accepts empty host", func(t *testing.T) {
 		cfg := getMinimalConfig()
-		cfg.CrowdsecAppsecEnabled = false
-		cfg.CrowdsecAppsecHost = ""
+		cfg.AppsecEnabled = false
+		cfg.AppsecHost = ""
 		if err := ValidateParams(cfg, log); err != nil {
 			t.Fatalf("ValidateParams = %v want nil", err)
 		}
@@ -930,22 +930,22 @@ func TestValidateParams_EmptyAppsecHost(t *testing.T) {
 func TestForwardedHeadersInsecure(t *testing.T) {
 	log := logger.New("INFO", "")
 	t.Run("defaults to false", func(t *testing.T) {
-		if New().ForwardedHeadersInsecure {
-			t.Fatal("ForwardedHeadersInsecure default = true want false")
+		if New().BouncerForwardedHeadersInsecure {
+			t.Fatal("BouncerForwardedHeadersInsecure default = true want false")
 		}
 	})
 	t.Run("flag plus populated trusted list is accepted", func(t *testing.T) {
 		cfg := getMinimalConfig()
-		cfg.ForwardedHeadersInsecure = true
-		cfg.ForwardedHeadersTrustedIPs = []string{"10.0.0.0/8"}
+		cfg.BouncerForwardedHeadersInsecure = true
+		cfg.BouncerForwardedHeadersTrustedIPs = []string{"10.0.0.0/8"}
 		if err := ValidateParams(cfg, log); err != nil {
 			t.Fatalf("ValidateParams = %v want nil", err)
 		}
 	})
 	t.Run("flag plus invalid CIDR still fails", func(t *testing.T) {
 		cfg := getMinimalConfig()
-		cfg.ForwardedHeadersInsecure = true
-		cfg.ForwardedHeadersTrustedIPs = []string{"not-a-cidr"}
+		cfg.BouncerForwardedHeadersInsecure = true
+		cfg.BouncerForwardedHeadersTrustedIPs = []string{"not-a-cidr"}
 		if err := ValidateParams(cfg, log); err == nil {
 			t.Fatal("ValidateParams = nil want error")
 		}

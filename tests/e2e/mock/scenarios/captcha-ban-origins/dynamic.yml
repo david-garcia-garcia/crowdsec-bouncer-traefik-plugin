@@ -16,28 +16,28 @@ http:
     bouncer:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiEnabled: "true"
-          crowdsecMode: stream
-          updateIntervalSeconds: "2"
-          crowdsecLapiScheme: http
-          crowdsecLapiHost: "@@LAPI_HOST@@"
-          crowdsecLapiKey: "@@APIKEY@@"
-          forwardedHeadersTrustedIps:
+          bouncerEnabled: "true"
+          lapiEnabled: "true"
+          lapiMode: stream
+          lapiUpdateIntervalSeconds: "2"
+          lapiScheme: http
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
-          captchaProvider: custom
-          captchaCustomJsUrl: "http://@@LAPI_HOST@@/dummy.js"
-          captchaCustomValidateUrl: "http://@@LAPI_HOST@@/siteverify"
-          captchaCustomKey: dummy-captcha
-          captchaCustomResponse: dummy-captcha-response
-          captchaSiteKey: "e2e-dummy-site"
-          captchaSecretKey: "e2e-dummy-secret"
-          captchaGateSecret: "e2e-mock-captcha-gate-secret"
-          captchaGateBindIp: true
+          bouncerCaptchaProvider: custom
+          bouncerCaptchaCustomJsUrl: "http://@@LAPI_HOST@@/dummy.js"
+          bouncerCaptchaCustomValidateUrl: "http://@@LAPI_HOST@@/siteverify"
+          bouncerCaptchaCustomKey: dummy-captcha
+          bouncerCaptchaCustomResponse: dummy-captcha-response
+          bouncerCaptchaSiteKey: "e2e-dummy-site"
+          bouncerCaptchaSecretKey: "e2e-dummy-secret"
+          bouncerCaptchaGateSecret: "e2e-mock-captcha-gate-secret"
+          bouncerCaptchaGateBindIp: true
           logLevel: DEBUG
-          captchaFilePath: "@@SCENARIO_DIR@@/captcha.html"
-          captchaGracePeriodSeconds: "10"
-          originBasedDecisionRemap:
+          bouncerCaptchaFilePath: "@@SCENARIO_DIR@@/captcha.html"
+          bouncerCaptchaGracePeriodSeconds: "10"
+          bouncerOriginBasedDecisionRemap:
             CAPI:
               ban: captcha
             lists:firehol_level1:

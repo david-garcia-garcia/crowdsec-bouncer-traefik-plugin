@@ -31,26 +31,26 @@ func writeTestFile(t *testing.T, name, content string) string {
 func cfgAppsecCaptchaAt(t *testing.T, appsecHost string) *configuration.Config {
 	t.Helper()
 	c := getTestConfig()
-	c.CrowdsecLapiEnabled = false
-	c.CrowdsecLapiKey = ""
-	c.CrowdsecAppsecEnabled = true
-	c.CrowdsecAppsecKey = "appsec-key"
-	c.CrowdsecAppsecScheme = "http"
-	c.CrowdsecAppsecHost = appsecHost
-	c.CrowdsecAppsecPath = "/"
-	c.CrowdsecAppsecFailureAction = configuration.FailureActionCaptcha
-	c.CaptchaProvider = configuration.CustomProvider
-	c.CaptchaCustomJsURL = "/captcha.js"
-	c.CaptchaCustomKey = "dummy-captcha"
-	c.CaptchaCustomResponse = "dummy-captcha-response"
-	c.CaptchaCustomValidateURL = "http://127.0.0.1/siteverify"
-	c.CaptchaSiteKey = "site"
-	c.CaptchaSecretKey = "secret"
-	c.CaptchaGateSecret = "gate-secret"
-	c.CaptchaFilePath = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
-	c.RemediationHeadersCustomName = "X-Remediation"
-	c.ForwardedHeadersTrustedIPs = []string{"127.0.0.1/32"}
-	c.ForwardedHeadersCustomName = "X-Forwarded-For"
+	c.LapiEnabled = false
+	c.LapiKey = ""
+	c.AppsecEnabled = true
+	c.AppsecKey = "appsec-key"
+	c.AppsecScheme = "http"
+	c.AppsecHost = appsecHost
+	c.AppsecPath = "/"
+	c.BouncerAppsecFailureAction = configuration.FailureActionCaptcha
+	c.BouncerCaptchaProvider = configuration.CustomProvider
+	c.BouncerCaptchaCustomJsURL = "/captcha.js"
+	c.BouncerCaptchaCustomKey = "dummy-captcha"
+	c.BouncerCaptchaCustomResponse = "dummy-captcha-response"
+	c.BouncerCaptchaCustomValidateURL = "http://127.0.0.1/siteverify"
+	c.BouncerCaptchaSiteKey = "site"
+	c.BouncerCaptchaSecretKey = "secret"
+	c.BouncerCaptchaGateSecret = "gate-secret"
+	c.BouncerCaptchaFilePath = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
+	c.BouncerRemediationHeadersCustomName = "X-Remediation"
+	c.BouncerForwardedHeadersTrustedIPs = []string{"127.0.0.1/32"}
+	c.BouncerForwardedHeadersCustomName = "X-Forwarded-For"
 	return c
 }
 
@@ -69,13 +69,13 @@ func TestNew_FailedConstructorReleasesLapiHolder(t *testing.T) {
 	u, _ := url.Parse(srv.URL)
 
 	cfg := cfgStreamAt(u.Host, 1)
-	cfg.CrowdsecAppsecEnabled = true
-	cfg.CrowdsecAppsecScheme = "https"
-	cfg.CrowdsecAppsecHost = u.Host
-	cfg.CrowdsecAppsecPath = "/"
-	cfg.CrowdsecAppsecTLSInsecureVerify = true
-	cfg.CrowdsecAppsecTLSCertificateBouncer = "not a certificate"
-	cfg.CrowdsecAppsecTLSCertificateBouncerKey = "not a key"
+	cfg.AppsecEnabled = true
+	cfg.AppsecScheme = "https"
+	cfg.AppsecHost = u.Host
+	cfg.AppsecPath = "/"
+	cfg.AppsecTLSInsecureVerify = true
+	cfg.AppsecTLSClientCertificate = "not a certificate"
+	cfg.AppsecTLSClientKey = "not a key"
 
 	if _, err := New(context.Background(), testNextOK(), cfg, "rollback"); err == nil {
 		t.Fatal("New must fail when the AppSec client certificate cannot be loaded")
@@ -133,9 +133,9 @@ func TestNew_SuccessfulConstructorKeepsItsHolder(t *testing.T) {
 // nothing. It must still start.
 func TestNew_AppsecOwnedWithoutKeyFails(t *testing.T) {
 	cfg := getTestConfig()
-	cfg.CrowdsecLapiEnabled = false
-	cfg.CrowdsecLapiKey = ""
-	cfg.CrowdsecAppsecEnabled = true
+	cfg.LapiEnabled = false
+	cfg.LapiKey = ""
+	cfg.AppsecEnabled = true
 	cfg.LogFormat = "common"
 	if _, err := New(context.Background(), testNextOK(), cfg, "appsec-no-waf"); err == nil {
 		t.Fatal("AppSec owned without a key must fail Open")
@@ -184,8 +184,8 @@ func TestNew_DoesNotMutateCallerConfig(t *testing.T) {
 
 	cfg := cfgLiveAt(u.Host)
 	cfg.LogLevel = "info"
-	cfg.CrowdsecLapiKey = ""
-	cfg.CrowdsecLapiKeyFile = writeTestFile(t, "lapi.key", "resolved-lapi-key")
+	cfg.LapiKey = ""
+	cfg.LapiKeyFile = writeTestFile(t, "lapi.key", "resolved-lapi-key")
 
 	if _, err := New(context.Background(), testNextOK(), cfg, "snapshot"); err != nil {
 		t.Fatal(err)
@@ -193,7 +193,7 @@ func TestNew_DoesNotMutateCallerConfig(t *testing.T) {
 	if cfg.LogLevel != "info" {
 		t.Fatalf("New normalised the caller's logLevel to %q", cfg.LogLevel)
 	}
-	if cfg.CrowdsecLapiKey != "" {
-		t.Fatalf("New wrote the resolved LAPI secret into the caller's config: %q", cfg.CrowdsecLapiKey)
+	if cfg.LapiKey != "" {
+		t.Fatalf("New wrote the resolved LAPI secret into the caller's config: %q", cfg.LapiKey)
 	}
 }

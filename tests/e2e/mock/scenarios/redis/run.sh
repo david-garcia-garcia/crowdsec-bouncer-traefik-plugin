@@ -8,7 +8,7 @@ source "$HERE/../../lib/common.sh"
 SCENARIO=redis
 
 # The replica mock returns "f" (not banned) for 1.2.3.4 and "t" (banned) for 1.2.3.5.
-# The primary mock always misses. Reads go only to the replica (redisCacheReadHosts).
+# The primary mock always misses. Reads go only to the replica (lapiRedisReadHosts).
 body() {
   echo "[$SCENARIO] cached banned IP must be blocked"
   wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 403 45 -H "X-Forwarded-For: 1.2.3.5"

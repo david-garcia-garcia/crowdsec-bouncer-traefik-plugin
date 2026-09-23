@@ -19,18 +19,18 @@ import (
 // testStreamConfig is a stream-mode config aimed at a mock LAPI host.
 func testStreamConfig(host string, metricsInterval int64) *configuration.Config {
 	return &configuration.Config{
-		CrowdsecMode:                  configuration.StreamMode,
-		CrowdsecLapiScheme:            "http",
-		CrowdsecLapiHost:              host,
-		CrowdsecLapiPath:              "/",
-		CrowdsecLapiKey:               "test-key",
-		CrowdsecLapiTLSInsecureVerify: true,
-		CrowdsecLapiFailureAction:     configuration.FailureActionBan,
-		UpdateIntervalSeconds:         60,
-		MetricsUpdateIntervalSeconds:  metricsInterval,
-		HTTPTimeoutSeconds:            10,
-		DefaultDecisionSeconds:        60,
-		StreamStartupBlock:            true,
+		LapiMode:                         configuration.StreamMode,
+		LapiScheme:                       "http",
+		LapiHost:                         host,
+		LapiPath:                         "/",
+		LapiKey:                          "test-key",
+		LapiTLSInsecureVerify:            true,
+		BouncerLapiFailureAction:         configuration.FailureActionBan,
+		LapiUpdateIntervalSeconds:        60,
+		LapiMetricsUpdateIntervalSeconds: metricsInterval,
+		LapiHTTPTimeoutSeconds:           10,
+		LapiDefaultDecisionSeconds:       60,
+		BouncerStartupBlock:              true,
 	}
 }
 
@@ -71,9 +71,9 @@ func waitStreamFetches(t *testing.T, client *Client, want int64) {
 
 func TestSessionKey_SameLapiKeySharesCursorAndRedisHash(t *testing.T) {
 	fast := testStreamConfig("lapi.example:8080", 1)
-	fast.UpdateIntervalSeconds = 30
+	fast.LapiUpdateIntervalSeconds = 30
 	slow := testStreamConfig("lapi.example:8080", 1)
-	slow.UpdateIntervalSeconds = 120
+	slow.LapiUpdateIntervalSeconds = 120
 	if SessionPrefix(fast) != SessionPrefix(slow) {
 		t.Fatal("same LAPI URL+key must share a session prefix even when update intervals differ")
 	}
@@ -99,7 +99,7 @@ func TestSessionKey_SameLapiKeySharesCursorAndRedisHash(t *testing.T) {
 
 func testNoneConfig(host string, metricsInterval int64) *configuration.Config {
 	cfg := testStreamConfig(host, metricsInterval)
-	cfg.CrowdsecMode = configuration.NoneMode
+	cfg.LapiMode = configuration.NoneMode
 	return cfg
 }
 
@@ -107,10 +107,10 @@ func TestKey_NoneMetricsIntervalSplitsClientKeepsStore(t *testing.T) {
 	fast := testNoneConfig("lapi.example:8080", 1)
 	slow := testNoneConfig("lapi.example:8080", 600)
 	if Key(fast) == Key(slow) {
-		t.Fatal("none Key must include MetricsUpdateIntervalSeconds")
+		t.Fatal("none Key must include LapiMetricsUpdateIntervalSeconds")
 	}
 	if StoreKey(fast) != StoreKey(slow) {
-		t.Fatal("none StoreKey must omit MetricsUpdateIntervalSeconds")
+		t.Fatal("none StoreKey must omit LapiMetricsUpdateIntervalSeconds")
 	}
 	streamFast := testStreamConfig("lapi.example:8080", 1)
 	streamSlow := testStreamConfig("lapi.example:8080", 600)
@@ -130,19 +130,19 @@ func TestSessionKey_DifferentHostsAreDistinct(t *testing.T) {
 func TestSessionKey_PolicyAndTLSDoNotChangeKey(t *testing.T) {
 	base := testStreamConfig("lapi.example:8080", 1)
 	policy := testStreamConfig("lapi.example:8080", 1)
-	policy.CrowdsecLapiFailureAction = configuration.FailureActionPassthrough
-	policy.RedisCacheUnreachableBlock = true
-	policy.DefaultDecisionSeconds = 5
-	policy.StreamStartupBlock = false
+	policy.BouncerLapiFailureAction = configuration.FailureActionPassthrough
+	policy.BouncerRedisUnreachableBlock = true
+	policy.LapiDefaultDecisionSeconds = 5
+	policy.BouncerStartupBlock = false
 	tlsOnly := testStreamConfig("lapi.example:8080", 1)
-	tlsOnly.HTTPTimeoutSeconds = 30
-	tlsOnly.CrowdsecLapiTLSInsecureVerify = false
-	tlsOnly.CrowdsecLapiTLSCertificateAuthority = "ca"
-	tlsOnly.CrowdsecLapiTLSCertificateBouncer = "cert"
+	tlsOnly.LapiHTTPTimeoutSeconds = 30
+	tlsOnly.LapiTLSInsecureVerify = false
+	tlsOnly.LapiTLSCertificateAuthority = "ca"
+	tlsOnly.LapiTLSClientCertificate = "cert"
 	if SessionHex(base) == SessionHex(policy) {
 		t.Fatal("defaultDecisionSeconds must change SessionHex")
 	}
-	policy.DefaultDecisionSeconds = base.DefaultDecisionSeconds
+	policy.LapiDefaultDecisionSeconds = base.LapiDefaultDecisionSeconds
 	if SessionKey(base) != SessionKey(policy) || IdentityHex(base) != IdentityHex(policy) {
 		t.Fatal("failure-action policy must not change stream or live store keys")
 	}
@@ -198,13 +198,13 @@ func TestOpenStream_LiveMetricsMismatchSharesSilently(t *testing.T) {
 	ctx := context.Background()
 
 	ownerCfg := testStreamConfig(parsed.Host, 1)
-	ownerCfg.UpdateIntervalSeconds = 30
+	ownerCfg.LapiUpdateIntervalSeconds = 30
 	owner, err := OpenStream(ctx, ownerCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	joinerCfg := testStreamConfig(parsed.Host, 1)
-	joinerCfg.UpdateIntervalSeconds = 120
+	joinerCfg.LapiUpdateIntervalSeconds = 120
 	joiner, err := OpenStream(ctx, joinerCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -238,7 +238,7 @@ func TestOpenStream_SleepingIntervalChangeWakesSameSlot(t *testing.T) {
 	log := slog.Default()
 	ctx, cancel := context.WithCancel(context.Background())
 	firstCfg := testStreamConfig(parsed.Host, 1)
-	firstCfg.UpdateIntervalSeconds = 30
+	firstCfg.LapiUpdateIntervalSeconds = 30
 	first, err := OpenStream(ctx, firstCfg, log, "reload", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -255,7 +255,7 @@ func TestOpenStream_SleepingIntervalChangeWakesSameSlot(t *testing.T) {
 	waitClientSleeping(t, first)
 
 	secondCfg := testStreamConfig(parsed.Host, 1)
-	secondCfg.UpdateIntervalSeconds = 120
+	secondCfg.LapiUpdateIntervalSeconds = 120
 	second, err := OpenStream(context.Background(), secondCfg, log, "reload", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -282,7 +282,7 @@ func TestOpenStream_SleepingRedisHostDoesNotOverlapPollers(t *testing.T) {
 	}
 	log := slog.Default()
 	firstCfg := testStreamConfig(parsed.Host, 1)
-	firstCfg.RedisCacheHost = "redis-a:6379"
+	firstCfg.LapiRedisHost = "redis-a:6379"
 	ctx, cancel := context.WithCancel(context.Background())
 	first, err := OpenStream(ctx, firstCfg, log, "reload", "test")
 	if err != nil {
@@ -297,7 +297,7 @@ func TestOpenStream_SleepingRedisHostDoesNotOverlapPollers(t *testing.T) {
 	waitClientSleeping(t, first)
 
 	secondCfg := testStreamConfig(parsed.Host, 1)
-	secondCfg.RedisCacheHost = "redis-b:6379"
+	secondCfg.LapiRedisHost = "redis-b:6379"
 	second, err := OpenStream(context.Background(), secondCfg, log, "reload", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -327,7 +327,7 @@ func TestOpenStream_NewClientKeepsStoreStreamFlags(t *testing.T) {
 	}
 	log := slog.Default()
 	firstCfg := testStreamConfig(parsed.Host, 1)
-	firstCfg.RedisCacheHost = "redis-a:6379"
+	firstCfg.LapiRedisHost = "redis-a:6379"
 	first, err := OpenStream(context.Background(), firstCfg, log, "reload", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -353,7 +353,7 @@ func TestOpenStream_NewClientKeepsStoreStreamFlags(t *testing.T) {
 	}
 	hitsBeforeHold := atomic.LoadInt64(hits)
 	secondCfg := testStreamConfig(parsed.Host, 1)
-	secondCfg.RedisCacheHost = "redis-b:6379"
+	secondCfg.LapiRedisHost = "redis-b:6379"
 	second, err := OpenStream(context.Background(), secondCfg, log, "reload", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -389,9 +389,9 @@ func TestOpenStream_DifferentRedisIsolatesClientKeepsStore(t *testing.T) {
 	log := slog.Default()
 	ctx := context.Background()
 	redisACfg := testStreamConfig(parsed.Host, 1)
-	redisACfg.RedisCacheHost = "redis-a:6379"
+	redisACfg.LapiRedisHost = "redis-a:6379"
 	redisBCfg := testStreamConfig(parsed.Host, 1)
-	redisBCfg.RedisCacheHost = "redis-b:6379"
+	redisBCfg.LapiRedisHost = "redis-b:6379"
 	redisAClient, err := OpenStream(ctx, redisACfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -425,9 +425,9 @@ func TestOpenStream_HeaderMapMismatchSharesClient(t *testing.T) {
 	log := slog.Default()
 	ctx := context.Background()
 	countryCfg := testStreamConfig(parsed.Host, 1)
-	countryCfg.DecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
+	countryCfg.BouncerDecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
 	userCfg := testStreamConfig(parsed.Host, 1)
-	userCfg.DecisionScopeHeaders = map[string]string{"username": "X-User"}
+	userCfg.BouncerDecisionScopeHeaders = map[string]string{"username": "X-User"}
 	countryClient, err := OpenStream(ctx, countryCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -453,9 +453,9 @@ func TestOpenStream_FailureActionOnlyKeepsClient(t *testing.T) {
 	log := slog.Default()
 	ctx := context.Background()
 	firstCfg := testStreamConfig(parsed.Host, 1)
-	firstCfg.CrowdsecLapiFailureAction = configuration.FailureActionBan
+	firstCfg.BouncerLapiFailureAction = configuration.FailureActionBan
 	secondCfg := testStreamConfig(parsed.Host, 1)
-	secondCfg.CrowdsecLapiFailureAction = configuration.FailureActionPassthrough
+	secondCfg.BouncerLapiFailureAction = configuration.FailureActionPassthrough
 
 	first, err := OpenStream(ctx, firstCfg, log, "shared", "test")
 	if err != nil {
@@ -502,9 +502,9 @@ func TestOpenStream_TLSOnlyAdoptsTransport(t *testing.T) {
 	log := slog.Default()
 	ctx := context.Background()
 	firstCfg := testStreamConfig(parsed.Host, 1)
-	firstCfg.HTTPTimeoutSeconds = 10
+	firstCfg.LapiHTTPTimeoutSeconds = 10
 	secondCfg := testStreamConfig(parsed.Host, 1)
-	secondCfg.HTTPTimeoutSeconds = 30
+	secondCfg.LapiHTTPTimeoutSeconds = 30
 
 	first, err := OpenStream(ctx, firstCfg, log, "shared", "test")
 	if err != nil {
@@ -531,10 +531,10 @@ func TestOpenStream_LapiOverrideAdoptsTimeout(t *testing.T) {
 	}
 	ctx := context.Background()
 	firstCfg := testStreamConfig(parsed.Host, 1)
-	firstCfg.HTTPTimeoutSeconds = 10
+	firstCfg.LapiHTTPTimeoutSeconds = 10
 	secondCfg := testStreamConfig(parsed.Host, 1)
-	secondCfg.HTTPTimeoutSeconds = 10
-	secondCfg.CrowdsecLapiHTTPTimeoutSeconds = 30
+	secondCfg.LapiHTTPTimeoutSeconds = 10
+	secondCfg.LapiHTTPTimeoutSeconds = 30
 
 	first, err := OpenStream(ctx, firstCfg, slog.Default(), "shared", "test")
 	if err != nil {
@@ -560,9 +560,9 @@ func TestOpenStream_SharedDefaultChangeAdoptsWhenOverrideZero(t *testing.T) {
 	}
 	ctx := context.Background()
 	firstCfg := testStreamConfig(parsed.Host, 1)
-	firstCfg.HTTPTimeoutSeconds = 10
+	firstCfg.LapiHTTPTimeoutSeconds = 10
 	secondCfg := testStreamConfig(parsed.Host, 1)
-	secondCfg.HTTPTimeoutSeconds = 20
+	secondCfg.LapiHTTPTimeoutSeconds = 20
 
 	first, err := OpenStream(ctx, firstCfg, slog.Default(), "shared", "test")
 	if err != nil {
@@ -589,15 +589,15 @@ func TestOpenStream_OverrideEqualSharedDoesNotReplace(t *testing.T) {
 	log, logSink := newTestLogSink(slog.LevelInfo)
 	ctx := context.Background()
 	firstCfg := testStreamConfig(parsed.Host, 1)
-	firstCfg.HTTPTimeoutSeconds = 10
+	firstCfg.LapiHTTPTimeoutSeconds = 10
 	first, err := OpenStream(ctx, firstCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	secondCfg := testStreamConfig(parsed.Host, 1)
-	secondCfg.HTTPTimeoutSeconds = 10
-	secondCfg.CrowdsecLapiHTTPTimeoutSeconds = 10
+	secondCfg.LapiHTTPTimeoutSeconds = 10
+	secondCfg.LapiHTTPTimeoutSeconds = 10
 	second, err := OpenStream(ctx, secondCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -628,10 +628,10 @@ func TestOpenStream_OverrideEqualSharedDoesNotReplace(t *testing.T) {
 func TestSessionKey_TimeoutKnobsDoNotChangeKey(t *testing.T) {
 	base := testStreamConfig("lapi.example:8080", 1)
 	timeouts := testStreamConfig("lapi.example:8080", 1)
-	timeouts.HTTPTimeoutSeconds = 30
-	timeouts.CrowdsecLapiHTTPTimeoutSeconds = 5
-	timeouts.CrowdsecAppsecHTTPTimeoutSeconds = 2
-	timeouts.CaptchaSiteverifyHTTPTimeoutSeconds = 1
+	timeouts.LapiHTTPTimeoutSeconds = 30
+	timeouts.LapiHTTPTimeoutSeconds = 5
+	timeouts.AppsecHTTPTimeoutSeconds = 2
+	timeouts.BouncerCaptchaSiteverifyHTTPTimeoutSeconds = 1
 	if SessionKey(base) != SessionKey(timeouts) {
 		t.Fatal("timeout knobs must not change SessionKey")
 	}

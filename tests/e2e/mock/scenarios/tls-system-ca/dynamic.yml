@@ -16,14 +16,14 @@ http:
     bouncer:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiEnabled: "true"
-          crowdsecMode: live
-          defaultDecisionSeconds: "2"
+          bouncerEnabled: "true"
+          lapiEnabled: "true"
+          lapiMode: live
+          lapiDefaultDecisionSeconds: "2"
           # HTTPS LAPI with NO custom CA configured: the bouncer must fall back to
           # the OS/system trust store (which the scenario controls via SSL_CERT_FILE).
-          crowdsecLapiScheme: https
-          crowdsecLapiHost: "@@LAPI_HOST@@"
-          crowdsecLapiKey: "@@APIKEY@@"
-          forwardedHeadersTrustedIps:
+          lapiScheme: https
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"

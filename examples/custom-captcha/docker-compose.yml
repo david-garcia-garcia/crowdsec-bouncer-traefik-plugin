@@ -39,26 +39,26 @@ services:
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
       # Definition of the middleware
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.enabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdsecmode=none"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapienabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.crowdseclapikey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerEnabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiMode=none"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiEnabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiKey=40796d93c2958f9e58345514e67740e5"
 
       # Choose captcha provider
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaProvider=custom"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomJsURL=http://captcha.localhost:8000/fast.js"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaProvider=custom"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaCustomJsUrl=http://captcha.localhost:8000/fast.js"
       # The widget fetches this from the browser, so it is rendered in captcha.html and passed through to the origin
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomChallengeURL=http://captcha.localhost:8000/v0/challenge"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaCustomChallengeUrl=http://captcha.localhost:8000/v0/challenge"
       # Inside Traefik container the plugin must be able to reach wicketkeeper service so we can go through a Traefik localhost
       # domain which would resolve traefik itself and the port for the dashboard
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomValidateURL=http://wicketkeeper:8080/v0/siteverify"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomKey=wicketkeeper"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomResponse=wicketkeeper_solution"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaCustomValidateUrl=http://wicketkeeper:8080/v0/siteverify"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaCustomKey=wicketkeeper"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaCustomResponse=wicketkeeper_solution"
       # Define captcha grade period seconds
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGateSecret=${CAPTCHA_GATE_SECRET:-change-me-gate-secret}"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=20"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaGateSecret=${CAPTCHA_GATE_SECRET:-change-me-gate-secret}"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaGracePeriodSeconds=20"
       # Define captcha HTML file path
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaFilePath=/captcha.html"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaFilePath=/captcha.html"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.7.8

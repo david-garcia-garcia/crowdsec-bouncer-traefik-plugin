@@ -15,7 +15,7 @@ import (
 // remediation kind, never by the error alone:
 //
 //	active remediation + non-nil error  -> a real decision; remediate it
-//	non-active remediation + non-nil error -> LAPI failed; apply CrowdsecLapiFailureAction
+//	non-active remediation + non-nil error -> LAPI failed; apply BouncerLapiFailureAction
 //
 // Any query this lookup makes can fail that way: the IP query and every header-scope query.
 func (c *Client) LiveLookup(remoteIP string, scopes map[string]string, defaultDecisionSeconds int64) (kind string, origin string, err error) {
@@ -60,7 +60,7 @@ func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, 
 	}
 	// A failed scope query is not "no decision". Report it the way a failed IP query is already
 	// reported - empty remediation plus the error - so the caller applies
-	// CrowdsecLapiFailureAction. Caching the unverified allow would outlive the outage.
+	// BouncerLapiFailureAction. Caching the unverified allow would outlive the outage.
 	if scopeErr != nil {
 		return "", "", scopeErr
 	}

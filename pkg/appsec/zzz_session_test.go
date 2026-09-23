@@ -12,14 +12,14 @@ import (
 
 func testAppsecConfig(host string) *configuration.Config {
 	return &configuration.Config{
-		CrowdsecAppsecEnabled:           true,
-		CrowdsecAppsecScheme:            "http",
-		CrowdsecAppsecHost:              host,
-		CrowdsecAppsecPath:              "/",
-		CrowdsecAppsecKey:               "test-key",
-		HTTPTimeoutSeconds:              1,
-		CrowdsecAppsecTLSInsecureVerify: true,
-		CrowdsecAppsecBodyLimit:         10485760,
+		AppsecEnabled:            true,
+		AppsecScheme:             "http",
+		AppsecHost:               host,
+		AppsecPath:               "/",
+		AppsecKey:                "test-key",
+		AppsecHTTPTimeoutSeconds: 1,
+		AppsecTLSInsecureVerify:  true,
+		AppsecBodyLimit:          10485760,
 	}
 }
 
@@ -55,13 +55,13 @@ func TestOpen_P2KnobChangeSplitsClient(t *testing.T) {
 		name string
 		mut  func(*configuration.Config)
 	}{
-		{name: "scheme", mut: func(c *configuration.Config) { c.CrowdsecAppsecScheme = "https" }},
-		{name: "host", mut: func(c *configuration.Config) { c.CrowdsecAppsecHost = "127.0.0.1:2" }},
-		{name: "path", mut: func(c *configuration.Config) { c.CrowdsecAppsecPath = "/waf" }},
-		{name: "key", mut: func(c *configuration.Config) { c.CrowdsecAppsecKey = "other" }},
-		{name: "bodyLimit", mut: func(c *configuration.Config) { c.CrowdsecAppsecBodyLimit = 200 }},
-		{name: "tls", mut: func(c *configuration.Config) { c.CrowdsecAppsecTLSInsecureVerify = false }},
-		{name: "timeout", mut: func(c *configuration.Config) { c.HTTPTimeoutSeconds = 30 }},
+		{name: "scheme", mut: func(c *configuration.Config) { c.AppsecScheme = "https" }},
+		{name: "host", mut: func(c *configuration.Config) { c.AppsecHost = "127.0.0.1:2" }},
+		{name: "path", mut: func(c *configuration.Config) { c.AppsecPath = "/waf" }},
+		{name: "key", mut: func(c *configuration.Config) { c.AppsecKey = "other" }},
+		{name: "bodyLimit", mut: func(c *configuration.Config) { c.AppsecBodyLimit = 200 }},
+		{name: "tls", mut: func(c *configuration.Config) { c.AppsecTLSInsecureVerify = false }},
+		{name: "timeout", mut: func(c *configuration.Config) { c.AppsecHTTPTimeoutSeconds = 30 }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -110,16 +110,16 @@ func TestOpen_P3SameMiddlewareAndKnobsWake(t *testing.T) {
 
 func TestOpen_P4OmittedSchemeFollowsLAPI(t *testing.T) {
 	httpCfg := testAppsecConfig("127.0.0.1:1")
-	httpCfg.CrowdsecAppsecScheme = ""
-	httpCfg.CrowdsecLapiScheme = "http"
+	httpCfg.AppsecScheme = ""
+	httpCfg.LapiScheme = "http"
 	_ = Prepare(httpCfg, slog.Default(), "")
 	httpsFromLAPI := testAppsecConfig("127.0.0.1:1")
-	httpsFromLAPI.CrowdsecAppsecScheme = ""
-	httpsFromLAPI.CrowdsecLapiScheme = "https"
+	httpsFromLAPI.AppsecScheme = ""
+	httpsFromLAPI.LapiScheme = "https"
 	_ = Prepare(httpsFromLAPI, slog.Default(), "")
 	httpsExplicit := testAppsecConfig("127.0.0.1:1")
-	httpsExplicit.CrowdsecAppsecScheme = "https"
-	httpsExplicit.CrowdsecLapiScheme = "http"
+	httpsExplicit.AppsecScheme = "https"
+	httpsExplicit.LapiScheme = "http"
 	_ = Prepare(httpsExplicit, slog.Default(), "")
 	if Key(httpCfg, "mw") == Key(httpsFromLAPI, "mw") {
 		t.Fatal("P4: omitted scheme following LAPI https must change the AppSec key")
@@ -150,8 +150,7 @@ func TestOpen_DifferentHostsIsolate(t *testing.T) {
 func TestKey_TimeoutKnobsChangeIdentity(t *testing.T) {
 	base := testAppsecConfig("127.0.0.1:1")
 	timeouts := testAppsecConfig("127.0.0.1:1")
-	timeouts.HTTPTimeoutSeconds = 30
-	timeouts.CrowdsecAppsecHTTPTimeoutSeconds = 0
+	timeouts.AppsecHTTPTimeoutSeconds = 30
 	if Key(base, "mw") == Key(timeouts, "mw") {
 		t.Fatal("HTTP timeout knobs must change AppSec Key")
 	}

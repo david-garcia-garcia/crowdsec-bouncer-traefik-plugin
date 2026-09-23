@@ -7,39 +7,32 @@ import (
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-func TestEffectiveHTTPTimeoutSeconds_InheritAndOverride(t *testing.T) {
+func TestNew_TimeoutDefaultsAreTen(t *testing.T) {
 	cfg := New()
-	if cfg.CrowdsecLapiHTTPTimeoutSeconds != 0 || cfg.CrowdsecAppsecHTTPTimeoutSeconds != 0 || cfg.CaptchaSiteverifyHTTPTimeoutSeconds != 0 {
-		t.Fatalf("New must leave inherit knobs at 0, got lapi=%d appsec=%d captcha=%d",
-			cfg.CrowdsecLapiHTTPTimeoutSeconds, cfg.CrowdsecAppsecHTTPTimeoutSeconds, cfg.CaptchaSiteverifyHTTPTimeoutSeconds)
-	}
-	if got := cfg.EffectiveHTTPTimeoutSeconds(0); got != 10 {
-		t.Fatalf("omit/0 inherit: got %d want 10", got)
-	}
-	cfg.CrowdsecAppsecHTTPTimeoutSeconds = 1
-	if got := cfg.EffectiveHTTPTimeoutSeconds(cfg.CrowdsecAppsecHTTPTimeoutSeconds); got != 1 {
-		t.Fatalf("positive override: got %d want 1", got)
+	if cfg.LapiHTTPTimeoutSeconds != 10 || cfg.AppsecHTTPTimeoutSeconds != 10 || cfg.BouncerCaptchaSiteverifyHTTPTimeoutSeconds != 10 {
+		t.Fatalf("New must default each timeout knob to 10, got lapi=%d appsec=%d captcha=%d",
+			cfg.LapiHTTPTimeoutSeconds, cfg.AppsecHTTPTimeoutSeconds, cfg.BouncerCaptchaSiteverifyHTTPTimeoutSeconds)
 	}
 }
 
-func TestValidateParams_HTTPTimeoutInheritKnobs(t *testing.T) {
+func TestValidateParams_HTTPTimeoutKnobs(t *testing.T) {
 	log := logger.New("INFO", "")
 	ok := getMinimalConfig()
 	if err := ValidateParams(ok, log); err != nil {
-		t.Fatalf("zeros inherit: %v", err)
+		t.Fatalf("defaults: %v", err)
+	}
+
+	zero := getMinimalConfig()
+	zero.LapiHTTPTimeoutSeconds = 0
+	err := ValidateParams(zero, log)
+	if err == nil || !strings.Contains(err.Error(), "LapiHTTPTimeoutSeconds") || !strings.Contains(err.Error(), "cannot be less than 1") {
+		t.Fatalf("zero knob: %v", err)
 	}
 
 	negative := getMinimalConfig()
-	negative.CrowdsecLapiHTTPTimeoutSeconds = -1
-	err := ValidateParams(negative, log)
-	if err == nil || !strings.Contains(err.Error(), "CrowdsecLapiHTTPTimeoutSeconds") || !strings.Contains(err.Error(), "cannot be less than 0") {
+	negative.AppsecHTTPTimeoutSeconds = -1
+	err = ValidateParams(negative, log)
+	if err == nil || !strings.Contains(err.Error(), "AppsecHTTPTimeoutSeconds") || !strings.Contains(err.Error(), "cannot be less than 1") {
 		t.Fatalf("negative knob: %v", err)
-	}
-
-	sharedZero := getMinimalConfig()
-	sharedZero.HTTPTimeoutSeconds = 0
-	err = ValidateParams(sharedZero, log)
-	if err == nil || !strings.Contains(err.Error(), "HTTPTimeoutSeconds") || !strings.Contains(err.Error(), "cannot be less than 1") {
-		t.Fatalf("shared timeout 0: %v", err)
 	}
 }

@@ -19,10 +19,10 @@ const msgStreamCollision = "crowdsec lapi stream collision"
 // streamSession is the DecisionStore identity (SessionHex).
 type streamSession struct {
 	Mode                   string        `json:"mode"`
-	LapiScheme             string        `json:"lapiScheme"`
-	LapiHost               string        `json:"lapiHost"`
-	LapiPath               string        `json:"lapiPath"`
-	LapiKey                string        `json:"lapiKey"`
+	Scheme                 string        `json:"scheme"`
+	Host                   string        `json:"host"`
+	Path                   string        `json:"path"`
+	Key                    string        `json:"key"`
 	CapiMachineID          string        `json:"capiMachineId"`
 	CapiPassword           string        `json:"capiPassword"`
 	DefaultDecisionSeconds int64         `json:"defaultDecisionSeconds"`
@@ -47,24 +47,24 @@ var streamOwners = &streamOwnerIndex{owners: make(map[string]map[string]struct{}
 
 func sessionFrom(cfg *configuration.Config) streamSession {
 	session := streamSession{
-		Mode:                   cfg.CrowdsecMode,
-		LapiScheme:             cfg.CrowdsecLapiScheme,
-		LapiHost:               cfg.CrowdsecLapiHost,
-		LapiPath:               cfg.CrowdsecLapiPath,
-		LapiKey:                cfg.CrowdsecLapiKey,
-		CapiMachineID:          cfg.CrowdsecCapiMachineID,
-		CapiPassword:           cfg.CrowdsecCapiPassword,
-		DefaultDecisionSeconds: cfg.DefaultDecisionSeconds,
+		Mode:                   cfg.LapiMode,
+		Scheme:                 cfg.LapiScheme,
+		Host:                   cfg.LapiHost,
+		Path:                   cfg.LapiPath,
+		Key:                    cfg.LapiKey,
+		CapiMachineID:          cfg.LapiCapiMachineID,
+		CapiPassword:           cfg.LapiCapiPassword,
+		DefaultDecisionSeconds: cfg.LapiDefaultDecisionSeconds,
 	}
-	if cfg.CrowdsecMode == configuration.StreamMode {
-		session.StreamScopes = decisionscope.CanonicalStreamScopes(cfg.CrowdsecLapiStreamScopes)
+	if cfg.LapiMode == configuration.StreamMode {
+		session.StreamScopes = decisionscope.CanonicalStreamScopes(cfg.LapiStreamScopes)
 	}
-	if cfg.RedisCacheEnabled {
+	if cfg.LapiRedisEnabled {
 		session.Redis = &sessionRedis{
-			Host:      cfg.RedisCacheHost,
-			ReadHosts: sortedCopy(cfg.RedisCacheReadHosts),
-			Password:  cfg.RedisCachePassword,
-			Database:  cfg.RedisCacheDatabase,
+			Host:      cfg.LapiRedisHost,
+			ReadHosts: sortedCopy(cfg.LapiRedisReadHosts),
+			Password:  cfg.LapiRedisPassword,
+			Database:  cfg.LapiRedisDatabase,
 		}
 	}
 	return session
@@ -165,13 +165,13 @@ func streamOwnerKey(host, apiKey string) string {
 }
 
 func noteStreamOwner(cfg *configuration.Config, middlewareName string, log *slog.Logger) {
-	if cfg.CrowdsecMode != configuration.StreamMode && cfg.CrowdsecMode != configuration.AloneMode {
+	if cfg.LapiMode != configuration.StreamMode && cfg.LapiMode != configuration.AloneMode {
 		return
 	}
-	if cfg.CrowdsecLapiKey == "" {
+	if cfg.LapiKey == "" {
 		return
 	}
-	key := streamOwnerKey(cfg.CrowdsecLapiHost, cfg.CrowdsecLapiKey)
+	key := streamOwnerKey(cfg.LapiHost, cfg.LapiKey)
 	streamOwners.mu.Lock()
 	defer streamOwners.mu.Unlock()
 	if streamOwners.owners[key] == nil {
@@ -183,7 +183,7 @@ func noteStreamOwner(cfg *configuration.Config, middlewareName string, log *slog
 			existing = name
 			break
 		}
-		log.Warn(msgStreamCollision, "host", cfg.CrowdsecLapiHost, "publisher", existing, "other", middlewareName)
+		log.Warn(msgStreamCollision, "host", cfg.LapiHost, "publisher", existing, "other", middlewareName)
 	}
 	streamOwners.owners[key][middlewareName] = struct{}{}
 }
