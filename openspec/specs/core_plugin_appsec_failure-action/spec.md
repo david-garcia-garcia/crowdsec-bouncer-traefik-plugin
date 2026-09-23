@@ -5,7 +5,7 @@ Governs what this plugin does when AppSec does not return a usable verdict: list
 ## Requirements
 
 ### Requirement: CrowdsecAppsecFailureAction is the public AppSec fallback
-Public config `bouncerAppsecFailureAction` SHALL be one of `passthrough`, `ban`, or `captcha`. The default SHALL be `ban`. `captcha` SHALL be rejected at ValidateParams unless a captcha provider is configured. Empty SHALL be treated as `ban` (same as omit). Unknown values SHALL be rejected. This key SHALL be per-router (not on `lapi.Client` identity) so two routes can disagree on AppSec fallback against one LAPI. On `Bouncer` the field SHALL stay `appsecFailureAction`.
+Public config `bouncerAppsecFailureAction` SHALL be one of `passthrough`, `ban`, or `captcha`. The default SHALL be `ban`. `captcha` SHALL be rejected at ValidateParams unless this router has a non-empty captcha instance name after owner-fill rules (`captchaEnabled` and empty name fills to the Traefik name). Empty SHALL be treated as `ban` (same as omit). Unknown values SHALL be rejected. This key SHALL be per-router (not on `lapi.Client` identity) so two routes can disagree on AppSec fallback against one LAPI. On `Bouncer` the field SHALL stay `appsecFailureAction`.
 
 #### Scenario: Default is ban
 - **WHEN** the operator omits `bouncerAppsecFailureAction` and AppSec returns HTTP 500
@@ -14,6 +14,10 @@ Public config `bouncerAppsecFailureAction` SHALL be one of `passthrough`, `ban`,
 #### Scenario: Two routers may differ
 - **WHEN** two middlewares share one `lapi.Client` and set different `bouncerAppsecFailureAction` values
 - **THEN** each route applies its own AppSec fallback
+
+#### Scenario: Captcha without instance name is invalid
+- **WHEN** `bouncerAppsecFailureAction` is `captcha` and `captchaInstanceName` is empty after owner-fill rules
+- **THEN** plugin initialization fails validation
 
 ### Requirement: One action covers 500, unreachable, and unreadable body
 `BouncerAppsecFailureAction` SHALL apply to: AppSec HTTP 500; transport failure or HTTP 502/503/504; an unreadable HTTP/2 or HTTP/3 body on POST, PUT, or PATCH; and an io error while reading the AppSec response body. `ban` SHALL drop the request. `passthrough` on 500, unreachable, or AppSec response-body io error SHALL continue as allow (then `next`). `passthrough` on unreadable body SHALL keep today’s headers-only GET to AppSec. `captcha` SHALL use the configured captcha client (`pkg/captcha`), not AppSec JSON `action: captcha`. HTTP 502, 503, and 504 from the AppSec listener SHALL be unreachable (same fallback as a transport failure), not a generic non-200 ban. DELETE SHALL NOT be treated as a method that would have sent a body. An oversized AppSec response body SHALL NOT use this action: HTTP 200 SHALL allow and non-200 SHALL error as today. A response-body io error SHALL keep the `appsecQuery:readBody` error string (MUST NOT collapse to `appsecQuery:unreachable`). A classified client disconnect while buffering a readable request body SHALL NOT use this action (`core_plugin_appsec_client`, `core_plugin_middleware_bouncer`). Unclassified errors during client body buffering SHALL keep the `appsecQuery:GetBody` path and today's ban wiring.
@@ -66,16 +70,16 @@ HTTP 200 and parseable AppSec JSON `action` values (`allow`, `ban`, `challenge`,
 - **THEN** the bouncer relays that envelope regardless of `bouncerAppsecFailureAction`
 
 ### Requirement: Captcha failure action works in appsec mode
-`bouncerAppsecFailureAction: captcha` SHALL serve the configured captcha challenge in every `lapiMode`, AppSec-only included. `bouncer.New` MUST NOT return an AppSec-only handler whose captcha client is uninitialised while that action is `captcha`, because `handleRemediationServeHTTP` falls back to a ban when the captcha client is not valid. Initialising the captcha client for AppSec-only SHALL be conditional on the effective AppSec failure action, so an AppSec-only router that cannot serve a challenge keeps today's early return.
+`bouncerAppsecFailureAction: captcha` SHALL serve the captcha challenge from the subscribed published captcha client in every `lapiMode`, AppSec-only included. `bouncer.New` MUST NOT construct a local captcha client for that action. `handleRemediationServeHTTP` SHALL ban when the loaded captcha client is empty or not valid. AppSec-only with `captcha` action SHALL subscribe to `captchaInstanceName` the same way any other bouncing router does.
 
 #### Scenario: AppSec failure in AppSec-only with captcha action
-- **WHEN** `lapiEnabled` is false, `appsecEnabled` is true, a captcha provider is configured, `bouncerAppsecFailureAction` is `captcha`, and the AppSec listener returns HTTP 500
+- **WHEN** `lapiEnabled` is false, `appsecEnabled` is true, a captcha instance is published, `bouncerAppsecFailureAction` is `captcha`, and the AppSec listener returns HTTP 500
 - **THEN** the client receives the captcha challenge
 - **AND** the response is not a ban
 
-#### Scenario: AppSec-only with ban action keeps the early return
+#### Scenario: AppSec-only with ban action does not require a captcha subscribe
 - **WHEN** `lapiEnabled` is false, `appsecEnabled` is true, and `bouncerAppsecFailureAction` is `ban` or omitted
-- **THEN** the handler's captcha client is not initialised
+- **THEN** the handler does not subscribe to captcha solely for that action
 
 ### Requirement: Three AppSec block booleans are removed
 `crowdsecAppsecFailureBlock`, `crowdsecAppsecUnreachableBlock`, and `crowdsecAppsecUnreadableBodyBlock` SHALL be removed from the plugin config struct. Operators who previously set those bools to `false` MUST set `crowdsecAppsecFailureAction: passthrough`.

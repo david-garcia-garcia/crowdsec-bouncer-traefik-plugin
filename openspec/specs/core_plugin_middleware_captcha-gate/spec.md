@@ -5,12 +5,17 @@ After a captcha provider confirms a solve, the middleware SHALL remember grace i
 ## Requirements
 
 ### Requirement: Gate secret is dedicated and required when captcha is enabled
-When captcha provider configuration is non-empty, the plugin SHALL require a non-empty gate HMAC secret from `captchaGateSecret` or `captchaGateSecretFile` (via existing variable resolution). The gate secret MUST NOT be derived from `CaptchaSecretKey` or the LAPI key.
+When `captchaEnabled` is true, the plugin SHALL require a non-empty gate HMAC secret from `BouncerCaptchaGateSecret` or `BouncerCaptchaGateSecretFile` (via existing variable resolution). The gate secret MUST NOT be derived from `CaptchaSecretKey` or the LAPI key. A subscriber leftover provider MUST NOT require a gate secret on that router.
 
 #### Scenario: Enabled captcha without gate secret fails validation
-- **WHEN** captcha provider is configured
+- **WHEN** `captchaEnabled` is true
 - **AND** gate secret resolves empty after file/env lookup
 - **THEN** configuration validation rejects the middleware
+
+#### Scenario: Subscriber leftover provider does not require gate secret
+- **WHEN** `captchaEnabled` is false and leftover `bouncerCaptchaProvider` is set
+- **AND** gate secret resolves empty
+- **THEN** configuration validation does not fail from this rule
 
 ### Requirement: Bind-IP mode is configurable
 The plugin SHALL expose `captchaGateBindIP` as a boolean defaulting to true. When true, the gate cookie payload SHALL include the client IP string chosen by `GetRemoteIP` and validation SHALL require an exact string match to the request's `remoteIP`. When false, validation SHALL ignore IP in the payload and only verify HMAC and expiry.

@@ -16,7 +16,7 @@ The repository SHALL keep `tests/e2e/mock/` and `make e2e_mock` as the mock suit
 - **THEN** Pester cases, the compose file, and `Test-Integration.ps1` are under `tests/e2e/real/` and not at the repository root or mixed into `tests/e2e/mock/`
 
 ### Requirement: Real stack boots Traefik and Crowdsec
-`tests/e2e/real/config/docker-compose.test.yml` SHALL start Traefik (local plugin bind-mount of the repository root) and Crowdsec. Pester tests SHALL add and delete decisions with `cscli` in the Crowdsec container and send client identity only via `X-Forwarded-For`. Plugin keys in compose labels and file-provider YAML SHALL use the new public names (`lapiEnabled`, `lapiHost`, `lapiMode`, `appsecEnabled`, `bouncerEnabled`, `lapiDefaultDecisionSeconds`, `bouncerClientTrustedIps`, `bouncerBanFilePath`).
+`tests/e2e/real/config/docker-compose.test.yml` SHALL start Traefik (local plugin bind-mount of the repository root) and Crowdsec. Pester tests SHALL add and delete decisions with `cscli` in the Crowdsec container and send client identity only via `X-Forwarded-For`. Plugin keys in compose labels and file-provider YAML SHALL use the new public names (`lapiEnabled`, `lapiHost`, `lapiMode`, `appsecEnabled`, `bouncerEnabled`, `lapiDefaultDecisionSeconds`, `bouncerClientTrustedIps`, `bouncerBanFilePath`, `captchaEnabled`, `captchaInstanceName`). A captcha-serving route SHALL set `captchaEnabled: true` (empty name fills to the Traefik name). The suite MUST NOT rely on a set `bouncerCaptchaProvider` alone to own captcha.
 
 #### Scenario: Ban then unban on whoami
 - **WHEN** the stack is up and a ban decision is added for the test IP
@@ -32,6 +32,7 @@ The repository SHALL keep `tests/e2e/mock/` and `make e2e_mock` as the mock suit
 
 #### Scenario: Captcha decision serves the captcha page
 - **WHEN** a captcha decision exists for the client
+- **AND** the captcha route sets `captchaEnabled: true`
 - **THEN** the captcha route returns the captcha HTML rather than a plain allow
 
 #### Scenario: Live mode re-queries after the cached allow expires
