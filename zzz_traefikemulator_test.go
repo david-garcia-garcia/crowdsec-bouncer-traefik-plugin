@@ -104,7 +104,8 @@ func TestGeneration_SubscriberBeforeOwnerWithinGrace(t *testing.T) {
 
 	owner := generationRoute("owner", "owner", lapiOwnerConfig(host, "shared"))
 	subscriber := generationRoute("subscriber", "subscriber", lapiSubscriberConfig(host))
-	for range 2 {
+	// yaegi v0.16.1 cannot range over an integer.
+	for attempt := 0; attempt < 2; attempt++ { //nolint:intrange
 		if failed := generation.Apply([]traefikemulator.Route{subscriber, owner}); failed != nil {
 			t.Fatal(failed)
 		}
@@ -121,7 +122,8 @@ func TestGeneration_OwnerBeforeSubscriberWithinGrace(t *testing.T) {
 
 	owner := generationRoute("owner", "owner", lapiOwnerConfig(host, "shared"))
 	subscriber := generationRoute("subscriber", "subscriber", lapiSubscriberConfig(host))
-	for range 2 {
+	// yaegi v0.16.1 cannot range over an integer.
+	for attempt := 0; attempt < 2; attempt++ { //nolint:intrange
 		if failed := generation.Apply([]traefikemulator.Route{owner, subscriber}); failed != nil {
 			t.Fatal(failed)
 		}
