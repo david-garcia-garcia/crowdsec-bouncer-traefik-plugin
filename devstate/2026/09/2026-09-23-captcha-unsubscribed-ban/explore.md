@@ -75,26 +75,27 @@ No hard gap. **Subscribe** / **Captcha Client** / **Failure action** / **Bouncer
 ## Open questions
 
 - Q: Exact WARN message text?
-  Rank: additive asked — new log line this change creates; Unknowns “Exact WARN message text”; Desired names a WARN that captcha could not be served due to a misconfiguration
-  Decision: assumed — stem `crowdsec bouncer captcha unsubscribed`, same family as `crowdsec bouncer backend missing` / `crowdsec bouncer stream scopes missing`. Attrs `leg=captcha` and `instanceName` (empty when unsubscribed). Logger already carries `traefikName` from `bouncer.New`.
+  Rank: additive asked — new log line this change creates; Unknowns Exact WARN message text
+  Decision: assumed — stem crowdsec bouncer captcha unsubscribed; attrs leg=captcha and instanceName (empty when unsubscribed); traefikName already on the logger from bouncer.New
   By: explore
 
 - Q: WARN once per binding or on every remediating request?
-  Rank: additive asked — Unknowns “Whether WARN is once per binding or on every remediating request”
-  Decision: assumed — every remediating request, matching `warnBackendMissing` and `ServeHTTP:forcedCaptchaSuperseded`. Do not add a Once field on Bouncer.
+  Rank: additive asked — Unknowns Whether WARN is once per binding or on every remediating request
+  Decision: assumed — every remediating request, matching warnBackendMissing and ServeHTTP:forcedCaptchaSuperseded; do not add a Once field
   By: explore
 
-- Q: Is “signal” only LAPI captcha kind, or also forced header `c` and captcha failure-action?
-  Rank: bounded asked — Unknowns names those three; they already share `handleRemediationServeHTTP`; **7** production call sites, roots `pkg/bouncer/bouncer.go`, `plugin.go`, `pkg/configuration/configuration.go`
-  Decision: assumed — all captcha-kind remediations that reach `handleRemediationServeHTTP` (LAPI/remap kind `c`, forced `c`, LAPI/AppSec failure-action `captcha`). Failure-action `captcha` without an instance name stays illegal at `ValidateParams` (Out of scope). AppSec JSON `action: captcha` stays on `handleAppsecResponseServeHTTP` and does not get this WARN.
+- Q: Is signal only LAPI captcha kind, or also forced header c and captcha failure-action?
+  Rank: bounded asked — Unknowns names those three; 7 production handleRemediationServeHTTP call sites; roots pkg/bouncer/bouncer.go, plugin.go, pkg/configuration/configuration.go
+  Decision: assumed — all captcha-kind remediations that reach handleRemediationServeHTTP; failure-action captcha without an instance name stays illegal at ValidateParams; AppSec JSON action captcha stays on handleAppsecResponseServeHTTP
   By: explore
 
 - Q: Who already owns the client address if this WARN logs identity?
   Rank: additive incidental — GetRemoteIP is unchanged; requirement does not name an identity reshape
-  Decision: assumed — owner is `pkg/ip.GetRemoteIP` / `clientRequest.remoteIP` (devdocs `core_plugin_middleware.md`). This WARN does not emit `ip` (sibling is `warnBackendMissing`, not `forcedCaptchaSuperseded`). Host / tenant / trust hop are not reconstructed.
+  Decision: assumed — owner is pkg/ip.GetRemoteIP on clientRequest.remoteIP; this WARN does not emit ip; Host, tenant, and trust hop are not reconstructed
   By: explore
 
-- Q: Does subscribed-unpublished (startup-block off) or `!Valid` also WARN?
-  Rank: additive asked — Out of scope “Changing subscribed-but-unpublished behavior”; Tensions “WARN is the gap; treating unpublished-subscribed the same as unsubscribed is not asked”
-  Decision: resolved — no. Gate on `!subscribeCaptcha` only. Subscribed + nil + `startupBlock` stays 503 + `crowdsec bouncer backend missing`. Subscribed + nil/`!Valid` + block off stays silent ban.
+- Q: Does subscribed-unpublished (startup-block off) or invalid client also WARN?
+  Rank: additive asked — Out of scope Changing subscribed-but-unpublished behavior; Tensions WARN is the gap
+  Decision: resolved — no; gate on subscribeCaptcha false only; subscribed plus nil plus startupBlock stays 503 plus crowdsec bouncer backend missing
   By: explore
+

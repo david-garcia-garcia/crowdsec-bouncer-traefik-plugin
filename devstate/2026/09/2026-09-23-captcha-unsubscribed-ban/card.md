@@ -14,11 +14,11 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+In progress. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 4ee1632e
-Owner decision: None.
+Reviewed head: b1279447
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -45,13 +45,17 @@ None.
 None.
 
 ## Follow-up issues
-None.
+- [ ] [Rename `handleRemediationServeHTTP`](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-23-captcha-unsubscribed-ban/knowledge/debt/2026-09-23-rename-handle-remediation-serve-http.md) — `handleRemediationServeHTTP` hides that it owns captcha-kind serve vs ban.
+
 
 ## How this fits together
 Ticket 2026-09-23-captcha-unsubscribed-ban on branch 2026-09-23-captcha-unsubscribed-ban targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/139; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Exact WARN message text? | additive asked — new log line this change creates; Unknowns “Exact WARN message text”; Desired names a WARN that captcha could not be served due to a misconfiguration | assumed — stem `crowdsec bouncer captcha unsubscribed`, same family as `crowdsec bouncer backend missing` / `crowdsec bouncer stream scopes missing`. Attrs `leg=captcha` and `instanceName` (empty when unsubscribed). Logger already carries `traefikName` from `bouncer.New`. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +70,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 4ee1632e2f09f051172735e63d27e68bf3ba5fc4 | Card must match the branch you measured |
+| Reviewed head | b12794472ba4c0390a72a5b13c35ff4b7f983c4f | Card must match the branch you measured |
 
 ### Stored data model
 None.
