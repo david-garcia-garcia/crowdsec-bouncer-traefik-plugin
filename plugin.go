@@ -57,8 +57,8 @@ func CreateConfig() *configuration.Config {
 // New snapshots Traefik's config, Opens owned legs, publishes their instance names,
 // and returns a Bouncer that ServeHTTP-Loads those names via Watch.
 //
-// crowdsecLapiEnabled / crowdsecAppsecEnabled = own (Open + SetAlias).
-// enabled + a non-empty instance name = bounce (Watch). Those axes are independent.
+// lapiEnabled / appsecEnabled = own (Open + SetAlias).
+// bouncerEnabled + a non-empty instance name = bounce (Watch). Those axes are independent.
 //
 // Open binds bindCtx, a child of Traefik's constructor ctx. The table has no Release:
 // cancel bindCtx on a failed New so a half-built constructor does not leave a stream
@@ -103,17 +103,17 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 	}
 
 	// Bounce: the router is on and an instance name is set. Owning is a different flag.
-	subscribeLAPI := config.Enabled && config.CrowdsecLapiInstanceName != ""
-	subscribeAppSec := config.Enabled && config.CrowdsecAppsecInstanceName != ""
+	subscribeLAPI := config.BouncerEnabled && config.LapiInstanceName != ""
+	subscribeAppSec := config.BouncerEnabled && config.AppsecInstanceName != ""
 	route, err := bouncer.New(next, name, &config, subscribeLAPI, subscribeAppSec, log)
 	if err != nil {
 		return nil, err
 	}
 	if subscribeLAPI {
-		reclaim.Watch(ctx, instanceAlias(legLAPI, config.CrowdsecLapiInstanceName), (*lapi.Client)(nil), route.ReceiveLAPI)
+		reclaim.Watch(ctx, instanceAlias(legLAPI, config.LapiInstanceName), (*lapi.Client)(nil), route.ReceiveLAPI)
 	}
 	if subscribeAppSec {
-		reclaim.Watch(ctx, instanceAlias(legAppSec, config.CrowdsecAppsecInstanceName), (*appsec.Client)(nil), route.ReceiveAppSec)
+		reclaim.Watch(ctx, instanceAlias(legAppSec, config.AppsecInstanceName), (*appsec.Client)(nil), route.ReceiveAppSec)
 	}
 	return route, nil
 }
@@ -121,10 +121,10 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 // openOwned is the own axis: Open each enabled leg on bindCtx, or ClearPublisher when
 // this reconstruct dropped that flag (leftover alias would keep subscribers bound).
 func openOwned(bindCtx context.Context, config *configuration.Config, log *slog.Logger, name string) error {
-	if err := openOwnedLeg(bindCtx, config, log, name, config.CrowdsecLapiEnabled, legLAPI); err != nil {
+	if err := openOwnedLeg(bindCtx, config, log, name, config.LapiEnabled, legLAPI); err != nil {
 		return err
 	}
-	return openOwnedLeg(bindCtx, config, log, name, config.CrowdsecAppsecEnabled, legAppSec)
+	return openOwnedLeg(bindCtx, config, log, name, config.AppsecEnabled, legAppSec)
 }
 
 func openOwnedLeg(bindCtx context.Context, config *configuration.Config, log *slog.Logger, name string, enabled bool, group string) error {
@@ -134,7 +134,7 @@ func openOwnedLeg(bindCtx context.Context, config *configuration.Config, log *sl
 	}
 	switch group {
 	case legLAPI:
-		if config.CrowdsecMode == configuration.StreamMode || config.CrowdsecMode == configuration.AloneMode {
+		if config.LapiMode == configuration.StreamMode || config.LapiMode == configuration.AloneMode {
 			_, err := lapi.OpenStream(bindCtx, config, log, name, pluginVersion)
 			return err
 		}
@@ -151,11 +151,11 @@ func openOwnedLeg(bindCtx context.Context, config *configuration.Config, log *sl
 // created. A taken name fails New. If AppSec's claim fails after LAPI published,
 // drop the LAPI alias so we do not leave a half-claimed owner.
 func claimOwned(config *configuration.Config, log *slog.Logger, name string) error {
-	if err := claimOwnedLeg(config, log, name, config.CrowdsecLapiEnabled, legLAPI); err != nil {
+	if err := claimOwnedLeg(config, log, name, config.LapiEnabled, legLAPI); err != nil {
 		return err
 	}
-	err := claimOwnedLeg(config, log, name, config.CrowdsecAppsecEnabled, legAppSec)
-	if err != nil && config.CrowdsecLapiEnabled {
+	err := claimOwnedLeg(config, log, name, config.AppsecEnabled, legAppSec)
+	if err != nil && config.LapiEnabled {
 		reclaim.ClearPublisher(name, legLAPI)
 	}
 	return err
@@ -167,9 +167,9 @@ func claimOwnedLeg(config *configuration.Config, log *slog.Logger, name string, 
 	}
 	switch group {
 	case legLAPI:
-		return claimAlias(lapi.OwnershipKey(config, name), group, config.CrowdsecLapiInstanceName, name, log)
+		return claimAlias(lapi.OwnershipKey(config, name), group, config.LapiInstanceName, name, log)
 	case legAppSec:
-		return claimAlias(appsec.Key(config, name), group, config.CrowdsecAppsecInstanceName, name, log)
+		return claimAlias(appsec.Key(config, name), group, config.AppsecInstanceName, name, log)
 	}
 	return nil
 }

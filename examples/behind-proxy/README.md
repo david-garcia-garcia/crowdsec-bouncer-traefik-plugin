@@ -12,7 +12,7 @@ This helps Traefik choose the right IP of the client: see https://doc.traefik.io
 
 We configure the middleware to trust as well the IP:
 ```yaml
-    - "traefik.http.middlewares.crowdsec1.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
+    - "traefik.http.middlewares.crowdsec1.plugin.bouncer.bouncerForwardedHeadersTrustedIps=172.21.0.5"
 ```
 
 To play the demo environment run:

@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 
 # Live mode from upstream PR 333: first allow is cached, then LAPI is re-queried
-# after defaultDecisionSeconds.
+# after lapiDefaultDecisionSeconds.
 
 BeforeAll {
     . "$PSScriptRoot/TestUtils.ps1"
@@ -28,14 +28,14 @@ Describe "CrowdSec Bouncer Live Mode Tests" {
             Remove-AllTestDecisions
         }
 
-        It "Should keep the first allow cached until defaultDecisionSeconds, then see a new ban" {
+        It "Should keep the first allow cached until lapiDefaultDecisionSeconds, then see a new ban" {
             $allow = Test-HttpRequest -Endpoint "/live" -IP $script:LiveBannedIP -TraefikUrl $script:TraefikUrl
             $allow.StatusCode | Should -Be 200
 
             Add-TestDecision -IP $script:LiveBannedIP -Type "ban"
 
             $stillCached = Test-HttpRequest -Endpoint "/live" -IP $script:LiveBannedIP -TraefikUrl $script:TraefikUrl
-            $stillCached.StatusCode | Should -Be 200 -Because "live mode must keep the cached allow until defaultDecisionSeconds expires"
+            $stillCached.StatusCode | Should -Be 200 -Because "live mode must keep the cached allow until lapiDefaultDecisionSeconds expires"
 
             $blocked = Wait-ForCondition -Description "live mode to re-query LAPI and block $($script:LiveBannedIP)" -TimeoutSeconds 15 -RetryIntervalSeconds 1 -Condition {
                 $response = Test-HttpRequest -Endpoint "/live" -IP $script:LiveBannedIP -TraefikUrl $script:TraefikUrl
@@ -47,7 +47,7 @@ Describe "CrowdSec Bouncer Live Mode Tests" {
             $clean.StatusCode | Should -Be 200
         }
 
-        It "Should keep a cached ban until defaultDecisionSeconds after the decision is deleted" {
+        It "Should keep a cached ban until lapiDefaultDecisionSeconds after the decision is deleted" {
             Add-TestDecision -IP $script:LiveBannedIP -Type "ban"
 
             $blocked = Test-HttpRequest -Endpoint "/live" -IP $script:LiveBannedIP -TraefikUrl $script:TraefikUrl
@@ -56,7 +56,7 @@ Describe "CrowdSec Bouncer Live Mode Tests" {
             Remove-TestDecision -IP $script:LiveBannedIP
 
             $stillCached = Test-HttpRequest -Endpoint "/live" -IP $script:LiveBannedIP -TraefikUrl $script:TraefikUrl
-            $stillCached.StatusCode | Should -BeIn @(403, 429) -Because "live mode caches the ban for defaultDecisionSeconds (2s on /live)"
+            $stillCached.StatusCode | Should -BeIn @(403, 429) -Because "live mode caches the ban for lapiDefaultDecisionSeconds (2s on /live)"
 
             $allowed = Wait-ForCondition -Description "live mode to re-query LAPI and allow $($script:LiveBannedIP)" -TimeoutSeconds 15 -RetryIntervalSeconds 1 -Condition {
                 $response = Test-HttpRequest -Endpoint "/live" -IP $script:LiveBannedIP -TraefikUrl $script:TraefikUrl

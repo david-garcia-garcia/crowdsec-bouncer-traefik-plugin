@@ -44,23 +44,23 @@ type Client struct {
 
 // Prepare resolves AppSec secrets on cfg when AppSec is enabled. Empty key/scheme copy from LAPI.
 func Prepare(cfg *configuration.Config, log *slog.Logger, traefikName string) error {
-	if !cfg.CrowdsecAppsecEnabled {
+	if !cfg.AppsecEnabled {
 		return nil
 	}
-	if strings.TrimSpace(cfg.CrowdsecAppsecInstanceName) == "" {
-		cfg.CrowdsecAppsecInstanceName = traefikName
+	if strings.TrimSpace(cfg.AppsecInstanceName) == "" {
+		cfg.AppsecInstanceName = traefikName
 	}
-	if cfg.CrowdsecAppsecKey == "" {
-		cfg.CrowdsecAppsecKey = cfg.CrowdsecLapiKey
+	if cfg.AppsecKey == "" {
+		cfg.AppsecKey = cfg.LapiKey
 	}
-	if cfg.CrowdsecAppsecScheme == "" {
-		cfg.CrowdsecAppsecScheme = cfg.CrowdsecLapiScheme
+	if cfg.AppsecScheme == "" {
+		cfg.AppsecScheme = cfg.LapiScheme
 	}
-	apiAppsecKey, errAppsecKey := configuration.GetVariable(cfg, "CrowdsecAppsecKey")
+	apiAppsecKey, errAppsecKey := configuration.GetVariable(cfg, "AppsecKey")
 	if errAppsecKey != nil {
-		log.Info("Prepare:crowdsecAppsecKey fail to get CrowdsecAppsecKey and no client certificate setup", "error", errAppsecKey)
+		log.Info("Prepare:crowdsecAppsecKey fail to get AppsecKey and no client certificate setup", "error", errAppsecKey)
 	} else {
-		cfg.CrowdsecAppsecKey = apiAppsecKey
+		cfg.AppsecKey = apiAppsecKey
 	}
 	return nil
 }
@@ -69,7 +69,7 @@ func Prepare(cfg *configuration.Config, log *slog.Logger, traefikName string) er
 func New(config *configuration.Config, log *slog.Logger, pluginVersion string, middlewareName, bindKey string) (*Client, error) {
 	log = log.With(
 		"traefikName", middlewareName,
-		"instanceName", config.CrowdsecAppsecInstanceName,
+		"instanceName", config.AppsecInstanceName,
 		"leg", "appsec",
 		"sessionKey", bindKey,
 	)
@@ -79,12 +79,12 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, m
 		return nil, err
 	}
 	client := &Client{
-		appsecScheme:    config.CrowdsecAppsecScheme,
-		appsecHost:      config.CrowdsecAppsecHost,
-		appsecPath:      config.CrowdsecAppsecPath,
-		appsecBodyLimit: config.CrowdsecAppsecBodyLimit,
+		appsecScheme:    config.AppsecScheme,
+		appsecHost:      config.AppsecHost,
+		appsecPath:      config.AppsecPath,
+		appsecBodyLimit: config.AppsecBodyLimit,
 		middlewareName:  middlewareName,
-		instanceName:    config.CrowdsecAppsecInstanceName,
+		instanceName:    config.AppsecInstanceName,
 		sessionKey:      bindKey,
 		log:             log,
 		pluginVersion:   pluginVersion,

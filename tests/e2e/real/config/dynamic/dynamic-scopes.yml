@@ -1,4 +1,4 @@
-# File provider: nested plugin maps (decisionScopeHeaders, geoblock databaseSources)
+# File provider: nested plugin maps (bouncerDecisionScopeHeaders, geoblock databaseSources)
 # do not decode reliably as Docker labels. Chain geo-enrich then the bouncer so
 # Country matching uses a looked-up header, not a client-set test header.
 http:
@@ -17,7 +17,7 @@ http:
             X-IPCountry: country
           databaseSources:
             default_ip2location:
-              enabled: false
+              bouncerEnabled: false
             seed:
               path: /plugins-local/src/github.com/david-garcia-garcia/traefik-geoblock/seeds/IP2LOCATION-LITE-DB1.IPV6.BIN
               databaseType: bin
@@ -25,69 +25,72 @@ http:
     bouncer-scope-none:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiKey: "c51a1c7000000000000000000000000b"
-          crowdsecLapiHost: crowdsec:8080
-          httpTimeoutSeconds: "60"
+          bouncerEnabled: "true"
+          lapiEnabled: "true"
+          lapiKey: "c51a1c7000000000000000000000000b"
+          lapiHost: crowdsec:8080
+          lapiHttpTimeoutSeconds: "60"
+          appsecHttpTimeoutSeconds: "60"
           logLevel: DEBUG
           logFormat: json
           reclaimGraceSeconds: "2"
-          crowdsecMode: none
-          decisionScopeHeaders:
+          lapiMode: none
+          bouncerDecisionScopeHeaders:
             Country: X-IPCountry
             AS: CF-ASN
             username: X-User
-          forwardedHeadersTrustedIps:
+          bouncerForwardedHeadersTrustedIps:
             - "172.16.0.0/12"
             - "127.0.0.1/32"
-          forwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
     bouncer-scope-stream:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiKey: "a1b2c3d4e5f60718293a4b5c6d7e8f90"
-          crowdsecLapiHost: crowdsec:8080
-          httpTimeoutSeconds: "60"
+          bouncerEnabled: "true"
+          lapiEnabled: "true"
+          lapiKey: "a1b2c3d4e5f60718293a4b5c6d7e8f90"
+          lapiHost: crowdsec:8080
+          lapiHttpTimeoutSeconds: "60"
+          appsecHttpTimeoutSeconds: "60"
           logLevel: DEBUG
           logFormat: json
           reclaimGraceSeconds: "2"
-          updateIntervalSeconds: "5"
-          streamStartupBlock: "false"
-          crowdsecMode: stream
-          crowdsecLapiStreamScopes:
+          lapiUpdateIntervalSeconds: "5"
+          bouncerStartupBlock: "false"
+          lapiMode: stream
+          lapiStreamScopes:
             - country
             - as
             - username
-          decisionScopeHeaders:
+          bouncerDecisionScopeHeaders:
             Country: X-IPCountry
             AS: CF-ASN
             username: X-User
-          forwardedHeadersTrustedIps:
+          bouncerForwardedHeadersTrustedIps:
             - "172.16.0.0/12"
             - "127.0.0.1/32"
-          forwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
     bouncer-header-none:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiKey: "c51a1c7000000000000000000000000c"
-          crowdsecLapiHost: crowdsec:8080
-          httpTimeoutSeconds: "60"
+          bouncerEnabled: "true"
+          lapiEnabled: "true"
+          lapiKey: "c51a1c7000000000000000000000000c"
+          lapiHost: crowdsec:8080
+          lapiHttpTimeoutSeconds: "60"
+          appsecHttpTimeoutSeconds: "60"
           logLevel: DEBUG
           logFormat: json
           reclaimGraceSeconds: "2"
-          crowdsecMode: none
-          decisionScopeHeaders:
+          lapiMode: none
+          bouncerDecisionScopeHeaders:
             Country: CF-IPCountry
             AS: CF-ASN
             username: X-User
-          forwardedHeadersTrustedIps:
+          bouncerForwardedHeadersTrustedIps:
             - "172.16.0.0/12"
             - "127.0.0.1/32"
-          forwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
     chain-scope-none:
       chain:
         middlewares:

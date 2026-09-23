@@ -3,7 +3,7 @@
 
 The plugin must be configured to connect to a redis instance
 ```yaml
-  redisCacheHost: "redis:6379"
+  lapiRedisHost: "redis:6379"
 ```
 Here **redis** is the hostname of a container located in the same network as Traefik and **6379** is the default port of redis
 

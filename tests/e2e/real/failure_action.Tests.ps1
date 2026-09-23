@@ -11,12 +11,12 @@ BeforeAll {
 
 Describe "CrowdSec LAPI and AppSec failure actions" {
     Context "Unreachable LAPI" -Tag "failure-action" {
-        It "Should ban when crowdsecLapiFailureAction is ban" {
+        It "Should ban when bouncerLapiFailureAction is ban" {
             $response = Test-HttpRequest -Endpoint "/lapi-fail-ban" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl -TimeoutSec 8
-            $response.StatusCode | Should -BeIn @(403, 429) -Because "none-mode LiveLookup errors must apply crowdsecLapiFailureAction=ban"
+            $response.StatusCode | Should -BeIn @(403, 429) -Because "none-mode LiveLookup errors must apply bouncerLapiFailureAction=ban"
         }
 
-        It "Should pass when crowdsecLapiFailureAction is passthrough" {
+        It "Should pass when bouncerLapiFailureAction is passthrough" {
             $response = Test-HttpRequest -Endpoint "/lapi-fail-pass" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl -TimeoutSec 8
             $response.StatusCode | Should -Be 200 -Because "passthrough must not remediate an unreachable LAPI"
             $response.Content | Should -Match "Hostname:"
@@ -24,12 +24,12 @@ Describe "CrowdSec LAPI and AppSec failure actions" {
     }
 
     Context "Unreachable AppSec" -Tag "failure-action" {
-        It "Should ban when crowdsecAppsecFailureAction is ban" {
+        It "Should ban when bouncerAppsecFailureAction is ban" {
             $response = Test-HttpRequest -Endpoint "/waf-fail-ban" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl -TimeoutSec 8
             $response.StatusCode | Should -Be 403 -Because "AppSec transport failure with action ban remediates"
         }
 
-        It "Should pass when crowdsecAppsecFailureAction is passthrough" {
+        It "Should pass when bouncerAppsecFailureAction is passthrough" {
             $response = Test-HttpRequest -Endpoint "/waf-fail-pass" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl -TimeoutSec 8
             $response.StatusCode | Should -Be 200 -Because "passthrough must continue when AppSec is unreachable"
             $response.Content | Should -Match "Hostname:"

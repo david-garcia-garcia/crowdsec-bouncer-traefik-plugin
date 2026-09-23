@@ -8,8 +8,8 @@ The Traefik instance just needs to know where appsec engine is located
 ```yaml
   labels:
       
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecappsecenabled=true"
-      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.crowdsecappsechost=crowdsec:7422"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.appsecEnabled=true"
+      - "traefik.http.middlewares.crowdsec-bar.plugin.bouncer.appsecHost=crowdsec:7422"
 ```
 We can try to query normally the whoami server:
 ```bash
@@ -22,7 +22,7 @@ curl http://localhost:8000/foo/rpc2
 ```
 You should get a 403 on http://localhost:8000/foo/rpc2
 
-CrowdSec 1.8 bot-detection uses the same `crowdsecappsecenabled` / `crowdsecappsechost` labels. Add a Traefik router for `PathPrefix(/crowdsec-internal/challenge)` with that middleware, pointing the service at the AppSec listener (port 7422). Install `crowdsecurity/appsec-bot-challenge` on the engine and list `crowdsecurity/appsec-bot-*` in the AppSec acquisition. No extra plugin key.
+CrowdSec 1.8 bot-detection uses the same `appsecEnabled` / `appsecHost` labels. Add a Traefik router for `PathPrefix(/crowdsec-internal/challenge)` with that middleware, pointing the service at the AppSec listener (port 7422). Install `crowdsecurity/appsec-bot-challenge` on the engine and list `crowdsecurity/appsec-bot-*` in the AppSec acquisition. No extra plugin key.
 
 To play the demo environment run:
 ```bash

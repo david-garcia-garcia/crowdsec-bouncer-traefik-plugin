@@ -224,8 +224,8 @@ func TestServeHTTP_forcedDecisionAppsecOnlyCaptcha(t *testing.T) {
 func TestBouncerNew_trimsForcedDecisionHeader(t *testing.T) {
 	log := logger.New("ERROR", "")
 	cfg := configuration.New()
-	cfg.CrowdsecMode = configuration.StreamMode
-	cfg.CrowdsecDecisionHeader = "  X-Crowdsec-Decision  "
+	cfg.LapiMode = configuration.StreamMode
+	cfg.BouncerDecisionHeader = "  X-Crowdsec-Decision  "
 	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, true, log)
 	if err != nil {
 		t.Fatal(err)

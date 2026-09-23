@@ -487,9 +487,9 @@ func TestReportMetricsWindowSurvivesAdoptTransport(t *testing.T) {
 	client.IncProcessed("ipv4")
 	client.IncDropped("crowdsec", "ipv4", "ban")
 	adopted := testStreamConfig(lapiURL.Host, 0)
-	adopted.CrowdsecLapiScheme = lapiURL.Scheme
-	adopted.CrowdsecLapiKey = "second-key"
-	adopted.HTTPTimeoutSeconds = 11
+	adopted.LapiScheme = lapiURL.Scheme
+	adopted.LapiKey = "second-key"
+	adopted.LapiHTTPTimeoutSeconds = 11
 	if _, err := client.AdoptTransport(adopted); err != nil {
 		t.Fatal(err)
 	}

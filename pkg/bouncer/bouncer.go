@@ -41,7 +41,7 @@ type Bouncer struct {
 	appsecInstanceName       string
 	subscribeLAPI            bool
 	subscribeAppSec          bool
-	streamStartupBlock       bool
+	startupBlock             bool
 	redisUnreachableBlock    bool  // per-router Redis fail-closed
 	defaultDecisionSeconds   int64 // per-router live-cache TTL passed into LiveLookup
 	log                      *slog.Logger
@@ -62,81 +62,81 @@ type Bouncer struct {
 
 const msgBackendMissing = "crowdsec bouncer backend missing"
 
-// remediationHeaderClientDisconnected is the RemediationHeadersCustomName value when the client
+// remediationHeaderClientDisconnected is the BouncerRemediationHeadersCustomName value when the client
 // dropped the body during AppSec buffering. Not a ban.
 const remediationHeaderClientDisconnected = "error:client-disconnected"
 
 // New returns a per-router handler. Clients arrive later through ReceiveLAPI and ReceiveAppSec.
 func New(next http.Handler, name string, config *configuration.Config, subscribeLAPI, subscribeAppSec bool, log *slog.Logger) (*Bouncer, error) {
 	log = log.With("traefikName", name)
-	serverChecker, _ := ip.NewChecker(log, config.ForwardedHeadersTrustedIPs)
-	clientChecker, _ := ip.NewChecker(log, config.ClientTrustedIPs)
-	forwardedCustomHeader := config.ForwardedHeadersCustomName
-	if config.ForwardedHeadersInsecure && forwardedCustomHeader == "X-Forwarded-For" {
+	serverChecker, _ := ip.NewChecker(log, config.BouncerForwardedHeadersTrustedIPs)
+	clientChecker, _ := ip.NewChecker(log, config.BouncerClientTrustedIPs)
+	forwardedCustomHeader := config.BouncerForwardedHeadersCustomName
+	if config.BouncerForwardedHeadersInsecure && forwardedCustomHeader == "X-Forwarded-For" {
 		forwardedCustomHeader = "X-Real-Ip"
 	}
-	if config.ForwardedHeadersInsecure {
-		log.Info("ForwardedHeadersInsecure enabled", "header", forwardedCustomHeader)
+	if config.BouncerForwardedHeadersInsecure {
+		log.Info("BouncerForwardedHeadersInsecure enabled", "header", forwardedCustomHeader)
 	}
 
 	var banTemplate *template.Template
 	var banTemplateContentType string
-	if config.BanFilePath != "" {
-		banTemplate, banTemplateContentType, _ = configuration.GetTemplate(config.BanFilePath)
+	if config.BouncerBanFilePath != "" {
+		banTemplate, banTemplateContentType, _ = configuration.GetTemplate(config.BouncerBanFilePath)
 	}
 
 	routeHandler := &Bouncer{
-		appsecFailureAction:      configuration.EffectiveFailureAction(config.CrowdsecAppsecFailureAction),
+		appsecFailureAction:      configuration.EffectiveFailureAction(config.BouncerAppsecFailureAction),
 		banTemplate:              banTemplate,
 		banTemplateContentType:   banTemplateContentType,
 		captchaClient:            &captcha.Client{},
 		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
-		decisionScopeHeaders:     decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
-		forcedDecisionHeader:     strings.TrimSpace(config.CrowdsecDecisionHeader),
-		enabled:                  config.Enabled,
+		decisionScopeHeaders:     decisionscope.NormalizeDecisionScopeHeaders(config.BouncerDecisionScopeHeaders),
+		forcedDecisionHeader:     strings.TrimSpace(config.BouncerDecisionHeader),
+		enabled:                  config.BouncerEnabled,
 		forwardedCustomHeader:    forwardedCustomHeader,
-		forwardedHeadersInsecure: config.ForwardedHeadersInsecure,
-		lapiFailureAction:        configuration.EffectiveFailureAction(config.CrowdsecLapiFailureAction),
-		lapiInstanceName:         config.CrowdsecLapiInstanceName,
-		appsecInstanceName:       config.CrowdsecAppsecInstanceName,
+		forwardedHeadersInsecure: config.BouncerForwardedHeadersInsecure,
+		lapiFailureAction:        configuration.EffectiveFailureAction(config.BouncerLapiFailureAction),
+		lapiInstanceName:         config.LapiInstanceName,
+		appsecInstanceName:       config.AppsecInstanceName,
 		subscribeLAPI:            subscribeLAPI,
 		subscribeAppSec:          subscribeAppSec,
-		streamStartupBlock:       config.StreamStartupBlock,
-		redisUnreachableBlock:    config.RedisCacheUnreachableBlock,
-		defaultDecisionSeconds:   config.DefaultDecisionSeconds,
+		startupBlock:             config.BouncerStartupBlock,
+		redisUnreachableBlock:    config.BouncerRedisUnreachableBlock,
+		defaultDecisionSeconds:   config.LapiDefaultDecisionSeconds,
 		log:                      log,
 		name:                     name,
 		next:                     next,
-		remediationCustomHeader:  config.RemediationHeadersCustomName,
-		remediationStatusCode:    config.RemediationStatusCode,
+		remediationCustomHeader:  config.BouncerRemediationHeadersCustomName,
+		remediationStatusCode:    config.BouncerRemediationStatusCode,
 		serverPoolStrategy:       &ip.PoolStrategy{Checker: serverChecker},
 		template:                 template.New("CrowdsecBouncer").Delims("[[", "]]"),
-		traceCustomHeader:        config.TraceHeadersCustomName,
-		originBasedDecisionRemap: copyOriginBasedDecisionRemap(config.OriginBasedDecisionRemap),
+		traceCustomHeader:        config.BouncerTraceHeadersCustomName,
+		originBasedDecisionRemap: copyOriginBasedDecisionRemap(config.BouncerOriginBasedDecisionRemap),
 	}
-	config.CaptchaSiteKey, _ = configuration.GetVariable(config, "CaptchaSiteKey")
-	config.CaptchaSecretKey, _ = configuration.GetVariable(config, "CaptchaSecretKey")
-	captchaGateSecret, _ := configuration.GetVariable(config, "CaptchaGateSecret")
+	config.BouncerCaptchaSiteKey, _ = configuration.GetVariable(config, "BouncerCaptchaSiteKey")
+	config.BouncerCaptchaSecretKey, _ = configuration.GetVariable(config, "BouncerCaptchaSecretKey")
+	captchaGateSecret, _ := configuration.GetVariable(config, "BouncerCaptchaGateSecret")
 	err := routeHandler.captchaClient.New(
 		log,
 		&http.Client{
 			Transport: &http.Transport{MaxIdleConns: 10, MaxIdleConnsPerHost: 10, IdleConnTimeout: 30 * time.Second},
-			Timeout:   time.Duration(config.EffectiveHTTPTimeoutSeconds(config.CaptchaSiteverifyHTTPTimeoutSeconds)) * time.Second,
+			Timeout:   time.Duration(config.BouncerCaptchaSiteverifyHTTPTimeoutSeconds) * time.Second,
 		},
-		config.CaptchaProvider,
-		config.CaptchaCustomJsURL,
-		config.CaptchaCustomChallengeURL,
-		config.CaptchaCustomKey,
-		config.CaptchaCustomResponse,
-		config.CaptchaCustomValidateURL,
-		config.CaptchaCustomValidateBody,
-		config.CaptchaSiteKey,
-		config.CaptchaSecretKey,
+		config.BouncerCaptchaProvider,
+		config.BouncerCaptchaCustomJsURL,
+		config.BouncerCaptchaCustomChallengeURL,
+		config.BouncerCaptchaCustomKey,
+		config.BouncerCaptchaCustomResponse,
+		config.BouncerCaptchaCustomValidateURL,
+		config.BouncerCaptchaCustomValidateBody,
+		config.BouncerCaptchaSiteKey,
+		config.BouncerCaptchaSecretKey,
 		captchaGateSecret,
-		config.CaptchaGateBindIP,
-		config.RemediationHeadersCustomName,
-		config.CaptchaFilePath,
-		config.CaptchaGracePeriodSeconds,
+		config.BouncerCaptchaGateBindIP,
+		config.BouncerRemediationHeadersCustomName,
+		config.BouncerCaptchaFilePath,
+		config.BouncerCaptchaGracePeriodSeconds,
 	)
 	if err != nil {
 		log.Error("CaptchaClient not valid", "error", err)
@@ -345,7 +345,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		return
 	}
 
-	if b.streamStartupBlock {
+	if b.startupBlock {
 		if b.subscribeLAPI && b.loadedLAPI() == nil {
 			b.warnBackendMissing("lapi", b.lapiInstanceName)
 			rw.WriteHeader(http.StatusServiceUnavailable)

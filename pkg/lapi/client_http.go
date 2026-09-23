@@ -52,14 +52,14 @@ type transport struct {
 	httpTimeoutSeconds          int64
 	lapiTLSInsecureVerify       bool
 	lapiTLSCertificateAuthority string
-	lapiTLSCertificateBouncer   string
+	lapiTLSClientCertificate   string
 }
 
 // newTransport builds HTTP+auth from cfg. Alone uses the CAPI header and no LAPI TLS.
 func newTransport(config *configuration.Config, log *slog.Logger) (*transport, error) {
 	header := crowdsecLapiHeader
 	var tlsConfig *tls.Config
-	if config.CrowdsecMode == configuration.AloneMode {
+	if config.LapiMode == configuration.AloneMode {
 		header = crowdsecCapiHeader
 	} else {
 		var err error
@@ -68,8 +68,8 @@ func newTransport(config *configuration.Config, log *slog.Logger) (*transport, e
 			return nil, err
 		}
 	}
-	// Store effective seconds so AdoptTransport last-writes a shared-default change when the override is still 0.
-	timeoutSeconds := config.EffectiveHTTPTimeoutSeconds(config.CrowdsecLapiHTTPTimeoutSeconds)
+	// Store the LAPI timeout so AdoptTransport last-writes a knob change.
+	timeoutSeconds := config.LapiHTTPTimeoutSeconds
 	return &transport{
 		httpClient: &http.Client{
 			Transport: &http.Transport{
@@ -81,11 +81,11 @@ func newTransport(config *configuration.Config, log *slog.Logger) (*transport, e
 			Timeout: time.Duration(timeoutSeconds) * time.Second,
 		},
 		header:                      header,
-		key:                         config.CrowdsecLapiKey,
+		key:                         config.LapiKey,
 		httpTimeoutSeconds:          timeoutSeconds,
-		lapiTLSInsecureVerify:       config.CrowdsecLapiTLSInsecureVerify,
-		lapiTLSCertificateAuthority: config.CrowdsecLapiTLSCertificateAuthority,
-		lapiTLSCertificateBouncer:   config.CrowdsecLapiTLSCertificateBouncer,
+		lapiTLSInsecureVerify:       config.LapiTLSInsecureVerify,
+		lapiTLSCertificateAuthority: config.LapiTLSCertificateAuthority,
+		lapiTLSClientCertificate:   config.LapiTLSClientCertificate,
 	}, nil
 }
 
@@ -109,7 +109,7 @@ func (t *transport) fieldsDiffer(other *transport) bool {
 	return t.httpTimeoutSeconds != other.httpTimeoutSeconds ||
 		t.lapiTLSInsecureVerify != other.lapiTLSInsecureVerify ||
 		t.lapiTLSCertificateAuthority != other.lapiTLSCertificateAuthority ||
-		t.lapiTLSCertificateBouncer != other.lapiTLSCertificateBouncer
+		t.lapiTLSClientCertificate != other.lapiTLSClientCertificate
 }
 
 func closeIdle(httpClient *http.Client) {
@@ -159,7 +159,7 @@ func (c *Client) AdoptTransport(cfg *configuration.Config) (bool, error) {
 			"httpTimeoutSeconds", next.httpTimeoutSeconds,
 			"lapiTlsInsecureVerify", next.lapiTLSInsecureVerify,
 			"lapiTlsCa", next.lapiTLSCertificateAuthority != "",
-			"lapiTlsCert", next.lapiTLSCertificateBouncer != "",
+			"lapiTlsCert", next.lapiTLSClientCertificate != "",
 		)
 	}
 	return replaced, nil

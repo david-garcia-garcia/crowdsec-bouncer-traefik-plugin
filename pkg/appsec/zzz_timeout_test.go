@@ -19,10 +19,9 @@ func TestOpen_AppsecOverrideAdoptsTimeout(t *testing.T) {
 
 	ctx := context.Background()
 	firstCfg := testAppsecConfig("127.0.0.1:1")
-	firstCfg.HTTPTimeoutSeconds = 10
+	firstCfg.AppsecHTTPTimeoutSeconds = 10
 	secondCfg := testAppsecConfig("127.0.0.1:1")
-	secondCfg.HTTPTimeoutSeconds = 10
-	secondCfg.CrowdsecAppsecHTTPTimeoutSeconds = 30
+	secondCfg.AppsecHTTPTimeoutSeconds = 30
 
 	first, err := Open(ctx, firstCfg, slog.Default(), "first", "test")
 	if err != nil {
@@ -41,7 +40,7 @@ func TestQuery_HangHonorsAppsecOverride(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
-	// Never Accept: Query must use the AppSec override, not the 10s shared default.
+	// Never Accept: Query must use AppsecHTTPTimeoutSeconds.
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -49,9 +48,8 @@ func TestQuery_HangHonorsAppsecOverride(t *testing.T) {
 	t.Cleanup(func() { _ = listener.Close() })
 
 	cfg := testAppsecConfig(listener.Addr().String())
-	cfg.HTTPTimeoutSeconds = 10
-	cfg.CrowdsecAppsecHTTPTimeoutSeconds = 1
-	cfg.CrowdsecAppsecFailureAction = configuration.FailureActionPassthrough
+	cfg.AppsecHTTPTimeoutSeconds = 1
+	cfg.BouncerAppsecFailureAction = configuration.FailureActionPassthrough
 	client, err := Open(context.Background(), cfg, slog.Default(), "hang", "test")
 	if err != nil {
 		t.Fatal(err)
@@ -69,6 +67,6 @@ func TestQuery_HangHonorsAppsecOverride(t *testing.T) {
 		t.Fatalf("passthrough hang: %+v", decision)
 	}
 	if elapsed >= 4*time.Second {
-		t.Fatalf("Query took %v, want well under the 10s shared default", elapsed)
+		t.Fatalf("Query took %v, want well under a 10s timeout", elapsed)
 	}
 }

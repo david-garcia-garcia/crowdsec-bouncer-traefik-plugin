@@ -24,27 +24,27 @@ type identity struct {
 	BodyLimit                int64  `json:"bodyLimit"`
 	TLSInsecureVerify        bool   `json:"tlsInsecureVerify"`
 	TLSCertificateAuthority  string `json:"tlsCertificateAuthority"`
-	TLSCertificateBouncer    string `json:"tlsCertificateBouncer"`
-	TLSCertificateBouncerKey string `json:"tlsCertificateBouncerKey"`
+	TLSClientCertificate    string `json:"tlsClientCertificate"`
+	TLSClientKey string `json:"tlsClientKey"`
 	HTTPTimeoutSeconds       int64  `json:"httpTimeoutSeconds"`
 }
 
 func identityFrom(cfg *configuration.Config, middlewareName string) identity {
-	ca, _ := configuration.GetVariable(cfg, "CrowdsecAppsecTLSCertificateAuthority")
-	cert, _ := configuration.GetVariable(cfg, "CrowdsecAppsecTLSCertificateBouncer")
-	certKey, _ := configuration.GetVariable(cfg, "CrowdsecAppsecTLSCertificateBouncerKey")
+	ca, _ := configuration.GetVariable(cfg, "AppsecTLSCertificateAuthority")
+	cert, _ := configuration.GetVariable(cfg, "AppsecTLSClientCertificate")
+	certKey, _ := configuration.GetVariable(cfg, "AppsecTLSClientKey")
 	return identity{
 		MiddlewareName:           middlewareName,
-		Scheme:                   cfg.CrowdsecAppsecScheme,
-		Host:                     cfg.CrowdsecAppsecHost,
-		Path:                     cfg.CrowdsecAppsecPath,
-		Key:                      cfg.CrowdsecAppsecKey,
-		BodyLimit:                cfg.CrowdsecAppsecBodyLimit,
-		TLSInsecureVerify:        cfg.CrowdsecAppsecTLSInsecureVerify,
+		Scheme:                   cfg.AppsecScheme,
+		Host:                     cfg.AppsecHost,
+		Path:                     cfg.AppsecPath,
+		Key:                      cfg.AppsecKey,
+		BodyLimit:                cfg.AppsecBodyLimit,
+		TLSInsecureVerify:        cfg.AppsecTLSInsecureVerify,
 		TLSCertificateAuthority:  ca,
-		TLSCertificateBouncer:    cert,
-		TLSCertificateBouncerKey: certKey,
-		HTTPTimeoutSeconds:       cfg.EffectiveHTTPTimeoutSeconds(cfg.CrowdsecAppsecHTTPTimeoutSeconds),
+		TLSClientCertificate:    cert,
+		TLSClientKey: certKey,
+		HTTPTimeoutSeconds:       cfg.AppsecHTTPTimeoutSeconds,
 	}
 }
 

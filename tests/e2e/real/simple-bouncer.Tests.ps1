@@ -117,10 +117,10 @@ Describe "Basic CrowdSec Bouncer Integration Test" {
         Remove-TestDecision -IP $script:TestIP
     }
 
-    It "Should return remediationStatusCode 429 when that route is banned" {
+    It "Should return bouncerRemediationStatusCode 429 when that route is banned" {
         Add-TestDecision -IP $script:TestIP -Type "ban" -Reason "status-429"
         $response = Test-HttpRequest -Endpoint "/status-429" -IP $script:TestIP -TraefikUrl $script:TraefikUrl
-        $response.StatusCode | Should -Be 429 -Because "the coverage route sets remediationStatusCode=429"
+        $response.StatusCode | Should -Be 429 -Because "the coverage route sets bouncerRemediationStatusCode=429"
         Remove-TestDecision -IP $script:TestIP
     }
 

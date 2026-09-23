@@ -80,24 +80,24 @@ type Client struct {
 
 // Prepare resolves secrets and CAPI/LAPI routing on cfg. Call before Key and New.
 func Prepare(cfg *configuration.Config, _ *slog.Logger, traefikName string) error {
-	if cfg.CrowdsecLapiEnabled && strings.TrimSpace(cfg.CrowdsecLapiInstanceName) == "" {
-		cfg.CrowdsecLapiInstanceName = traefikName
+	if cfg.LapiEnabled && strings.TrimSpace(cfg.LapiInstanceName) == "" {
+		cfg.LapiInstanceName = traefikName
 	}
-	if cfg.CrowdsecMode == configuration.AloneMode {
-		cfg.CrowdsecCapiMachineID, _ = configuration.GetVariable(cfg, "CrowdsecCapiMachineID")
-		cfg.CrowdsecCapiPassword, _ = configuration.GetVariable(cfg, "CrowdsecCapiPassword")
-		cfg.CrowdsecLapiScheme = configuration.HTTPS
-		cfg.CrowdsecLapiHost = crowdsecCapiHost
-		cfg.CrowdsecLapiPath = "/"
-		cfg.UpdateIntervalSeconds = 7200
+	if cfg.LapiMode == configuration.AloneMode {
+		cfg.LapiCapiMachineID, _ = configuration.GetVariable(cfg, "LapiCapiMachineID")
+		cfg.LapiCapiPassword, _ = configuration.GetVariable(cfg, "LapiCapiPassword")
+		cfg.LapiScheme = configuration.HTTPS
+		cfg.LapiHost = crowdsecCapiHost
+		cfg.LapiPath = "/"
+		cfg.LapiUpdateIntervalSeconds = 7200
 	} else {
-		apiKey, errKey := configuration.GetVariable(cfg, "CrowdsecLapiKey")
+		apiKey, errKey := configuration.GetVariable(cfg, "LapiKey")
 		if errKey == nil {
-			cfg.CrowdsecLapiKey = apiKey
+			cfg.LapiKey = apiKey
 		}
 	}
-	if cfg.RedisCacheEnabled {
-		cfg.RedisCachePassword, _ = configuration.GetVariable(cfg, "RedisCachePassword")
+	if cfg.LapiRedisEnabled {
+		cfg.LapiRedisPassword, _ = configuration.GetVariable(cfg, "LapiRedisPassword")
 	}
 	return nil
 }
@@ -108,12 +108,12 @@ func Prepare(cfg *configuration.Config, _ *slog.Logger, traefikName string) erro
 func New(config *configuration.Config, log *slog.Logger, pluginVersion string, store *decisionstore.Store, middlewareName, bindKey string) (*Client, error) {
 	log = log.With(
 		"traefikName", middlewareName,
-		"instanceName", config.CrowdsecLapiInstanceName,
+		"instanceName", config.LapiInstanceName,
 		"leg", "lapi",
 		"sessionKey", bindKey,
 	)
 	crowdsecStreamRoute := crowdsecLapiStreamRoute
-	if config.CrowdsecMode == configuration.AloneMode {
+	if config.LapiMode == configuration.AloneMode {
 		crowdsecStreamRoute = crowdsecCapiStreamRoute
 	}
 	next, err := newTransport(config, log)
@@ -121,9 +121,9 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		log.Error("New:getTLSConfigCrowdsec fail to get tlsConfig", "error", err)
 		return nil, err
 	}
-	if config.CrowdsecMode != configuration.AloneMode && config.CrowdsecLapiKey == "" && next.clientCertCount() == 0 {
-		log.Error("New:crowdsecLapiKey fail to get CrowdsecLapiKey and no client certificate setup")
-		return nil, errors.New("CrowdsecLapiKey is missing")
+	if config.LapiMode != configuration.AloneMode && config.LapiKey == "" && next.clientCertCount() == 0 {
+		log.Error("New:crowdsecLapiKey fail to get LapiKey and no client certificate setup")
+		return nil, errors.New("LapiKey is missing")
 	}
 	if store == nil {
 		return nil, errors.New("decision store is required")
@@ -134,32 +134,32 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		startup = 0
 	}
 
-	scopeQuery := decisionscope.StreamScopeQuery(config.CrowdsecLapiStreamScopes)
+	scopeQuery := decisionscope.StreamScopeQuery(config.LapiStreamScopes)
 	scopeSet := make(map[string]struct{}, 8)
-	for _, name := range decisionscope.CanonicalStreamScopes(config.CrowdsecLapiStreamScopes) {
+	for _, name := range decisionscope.CanonicalStreamScopes(config.LapiStreamScopes) {
 		scopeSet[name] = struct{}{}
 		scopeSet[strings.ToLower(name)] = struct{}{}
 	}
 
 	client := &Client{
-		crowdsecMode:            config.CrowdsecMode,
-		crowdsecScheme:          config.CrowdsecLapiScheme,
-		crowdsecHost:            config.CrowdsecLapiHost,
-		crowdsecPath:            config.CrowdsecLapiPath,
-		crowdsecMachineID:       config.CrowdsecCapiMachineID,
-		crowdsecPassword:        config.CrowdsecCapiPassword,
-		crowdsecScenarios:       config.CrowdsecCapiScenarios,
-		updateInterval:          config.UpdateIntervalSeconds,
-		metricsInterval:         config.MetricsUpdateIntervalSeconds,
-		updateMaxFailure:        config.UpdateMaxFailure,
-		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.DecisionScopeHeaders),
+		crowdsecMode:            config.LapiMode,
+		crowdsecScheme:          config.LapiScheme,
+		crowdsecHost:            config.LapiHost,
+		crowdsecPath:            config.LapiPath,
+		crowdsecMachineID:       config.LapiCapiMachineID,
+		crowdsecPassword:        config.LapiCapiPassword,
+		crowdsecScenarios:       config.LapiCapiScenarios,
+		updateInterval:          config.LapiUpdateIntervalSeconds,
+		metricsInterval:         config.LapiMetricsUpdateIntervalSeconds,
+		updateMaxFailure:        config.LapiUpdateMaxFailure,
+		decisionScopeHeaders:    decisionscope.NormalizeDecisionScopeHeaders(config.BouncerDecisionScopeHeaders),
 		crowdsecStreamRoute:     crowdsecStreamRoute,
 		streamScopeQuery:        scopeQuery,
 		streamScopeSet:          scopeSet,
 		sessionKey:              bindKey,
 		middlewareName:          middlewareName,
-		instanceName:            config.CrowdsecLapiInstanceName,
-		lapiKey:                 config.CrowdsecLapiKey,
+		instanceName:            config.LapiInstanceName,
+		lapiKey:                 config.LapiKey,
 		log:                     log,
 		pluginVersion:           pluginVersion,
 		isCrowdsecStreamStartup: startup,
@@ -174,7 +174,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		return nil, err
 	}
 
-	if config.MetricsUpdateIntervalSeconds > 0 {
+	if config.LapiMetricsUpdateIntervalSeconds > 0 {
 		client.metricsReporter.lastMetricsPush = time.Now()
 		go client.handleMetricsTicker()
 		client.metricsStop = startTicker("metrics", client.metricsInterval, log, func() {

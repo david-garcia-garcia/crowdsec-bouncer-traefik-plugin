@@ -107,13 +107,13 @@ func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, data
 func Open(ctx context.Context, reclaimKey, keyPrefix string, cfg *configuration.Config, log *slog.Logger, createdBy string) (*Store, error) {
 	stored, err := reclaim.OpenWithHooks(ctx, reclaimKey, log, func() (any, reclaim.Hooks, error) {
 		var store *Store
-		if cfg.RedisCacheEnabled {
+		if cfg.LapiRedisEnabled {
 			store = NewRedis(
 				log,
-				cfg.RedisCacheHost,
-				cfg.RedisCacheReadHosts,
-				cfg.RedisCachePassword,
-				cfg.RedisCacheDatabase,
+				cfg.LapiRedisHost,
+				cfg.LapiRedisReadHosts,
+				cfg.LapiRedisPassword,
+				cfg.LapiRedisDatabase,
 				keyPrefix,
 			)
 		} else {

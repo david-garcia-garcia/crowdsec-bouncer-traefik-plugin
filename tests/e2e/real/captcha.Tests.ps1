@@ -181,7 +181,7 @@ Describe "CrowdSec Bouncer Captcha Remediation Tests" {
             $passed.Content | Should -Match "Hostname:"
         }
 
-        It "Should challenge again after captchaGracePeriodSeconds expires" {
+        It "Should challenge again after bouncerCaptchaGracePeriodSeconds expires" {
             Add-TestDecision -IP $script:TestIPs.CaptchaIP -Type "captcha"
 
             $formHeaders = @{ "Content-Type" = "application/x-www-form-urlencoded" }

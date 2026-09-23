@@ -7,6 +7,6 @@ import: github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
 summary: Middleware plugin which forwards the request IP to local Crowdsec agent, which can be used to allow/deny the request  
 
 testData:
-  Enabled: false
-  CrowdsecLapiKey: 40796d93c2958f9e58345514e67740e5
+  BouncerEnabled: false
+  LapiKey: 40796d93c2958f9e58345514e67740e5
 

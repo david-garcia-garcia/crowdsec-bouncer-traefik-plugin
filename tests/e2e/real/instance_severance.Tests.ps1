@@ -10,7 +10,7 @@ BeforeAll {
     $script:SevFile = Join-Path $PSScriptRoot "config/dynamic/instance-severance.yml"
     $script:OwnerKey = "c51a1c70000000000000000000000012"
     $script:KeyB = "c51a1c70000000000000000000000013"
-    $script:AppsecKey = "c51a1c70000000000000000000000005"
+    $script:appsecKey = "c51a1c70000000000000000000000005"
     $script:GraceSeconds = 3
     $script:SevRun = [guid]::NewGuid().ToString('N').Substring(0, 8)
     $script:SevSlot = 0
@@ -168,12 +168,13 @@ $svc
           logLevel: DEBUG
           logFormat: json
           reclaimGraceSeconds: "2"
-          httpTimeoutSeconds: "10"
-          updateIntervalSeconds: "5"
-          forwardedHeadersTrustedIps:
+          lapiHttpTimeoutSeconds: "10"
+          appsecHttpTimeoutSeconds: "10"
+          lapiUpdateIntervalSeconds: "5"
+          bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
             - "172.28.0.1/32"
-          forwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
 "@
     }
 
@@ -248,13 +249,13 @@ $svc
     sev-t1:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecAppsecEnabled: "true"
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
-          crowdsecAppsecHost: crowdsec:7422
+          bouncerEnabled: "true"
+          lapiMode: stream
+          lapiEnabled: "true"
+          appsecEnabled: "true"
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
+          appsecHost: crowdsec:7422
 $knobs
 "@
         $ip = "10.90.0.51"
@@ -286,23 +287,23 @@ $svc
     sev-t2-cs:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecAppsecEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecAppsecInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
-          crowdsecAppsecHost: crowdsec:7422
+          bouncerEnabled: "true"
+          lapiMode: stream
+          lapiEnabled: "true"
+          appsecEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          appsecInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
+          appsecHost: crowdsec:7422
 $knobs
     sev-t2-admin:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecAppsecInstanceName: $(Get-SevSlot)
-          remediationHeadersCustomName: x-crowdsec
+          bouncerEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          appsecInstanceName: $(Get-SevSlot)
+          bouncerRemediationHeadersCustomName: x-crowdsec
 $knobs
 "@
         $ip = "10.90.0.52"
@@ -339,22 +340,22 @@ $svc
     sev-t3-hold:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecAppsecEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecAppsecInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
-          crowdsecAppsecHost: crowdsec:7422
+          bouncerEnabled: "false"
+          lapiMode: stream
+          lapiEnabled: "true"
+          appsecEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          appsecInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
+          appsecHost: crowdsec:7422
 $knobs
     sev-t3-app:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecAppsecInstanceName: $(Get-SevSlot)
+          bouncerEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          appsecInstanceName: $(Get-SevSlot)
 $knobs
 "@
         $ip = "10.90.0.53"
@@ -381,11 +382,11 @@ $svc
     sev-t4:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiEnabled: "false"
-          crowdsecAppsecEnabled: "true"
-          crowdsecAppsecHost: crowdsec:7422
-          crowdsecAppsecKey: "$script:AppsecKey"
+          bouncerEnabled: "true"
+          lapiEnabled: "false"
+          appsecEnabled: "true"
+          appsecHost: crowdsec:7422
+          appsecKey: "$script:appsecKey"
 $knobs
 "@
         $ip = "10.90.0.54"
@@ -419,20 +420,20 @@ $svc
     sev-t5-owner:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
-          remediationStatusCode: 403
+          bouncerEnabled: "true"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
+          bouncerRemediationStatusCode: 403
 $knobs
     sev-t5-sub:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          remediationStatusCode: 429
+          bouncerEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          bouncerRemediationStatusCode: 429
 $knobs
 "@
         $ip = "10.90.0.55"
@@ -475,9 +476,9 @@ $svc
     sev-l1:
       plugin:
         bouncer:
-          enabled: "true"
-          streamStartupBlock: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
+          bouncerEnabled: "true"
+          bouncerStartupBlock: "true"
+          lapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         $miss = Wait-SevCodes -Path "/sev-l1" -IP $ip -Codes @(503) -TimeoutSeconds 15
@@ -502,19 +503,19 @@ $svc
     sev-l1:
       plugin:
         bouncer:
-          enabled: "true"
-          streamStartupBlock: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
+          bouncerEnabled: "true"
+          bouncerStartupBlock: "true"
+          lapiInstanceName: $(Get-SevSlot)
 $knobs
     sev-l1-owner:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
+          bouncerEnabled: "false"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
 $knobs
 "@
         $hit = Wait-SevCodes -Path "/sev-l1" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
@@ -543,18 +544,18 @@ $svc
     sev-l1b-a:
       plugin:
         bouncer:
-          enabled: "true"
-          streamStartupBlock: "false"
-          crowdsecLapiFailureAction: passthrough
-          crowdsecLapiInstanceName: $(Get-SevSlot)
+          bouncerEnabled: "true"
+          bouncerStartupBlock: "false"
+          bouncerLapiFailureAction: passthrough
+          lapiInstanceName: $(Get-SevSlot)
 $knobs
     sev-l1b-b:
       plugin:
         bouncer:
-          enabled: "true"
-          streamStartupBlock: "false"
-          crowdsecLapiFailureAction: ban
-          crowdsecLapiInstanceName: $(Get-SevSlot)
+          bouncerEnabled: "true"
+          bouncerStartupBlock: "false"
+          bouncerLapiFailureAction: ban
+          lapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         $pass = Wait-SevCodes -Path "/sev-l1b-a" -IP $ip -Codes @(200) -TimeoutSeconds 15
@@ -585,17 +586,17 @@ $svc
     sev-l2-block:
       plugin:
         bouncer:
-          enabled: "true"
-          streamStartupBlock: "true"
-          crowdsecLapiInstanceName: missing
+          bouncerEnabled: "true"
+          bouncerStartupBlock: "true"
+          lapiInstanceName: missing
 $knobs
     sev-l2-fail:
       plugin:
         bouncer:
-          enabled: "true"
-          streamStartupBlock: "false"
-          crowdsecLapiFailureAction: ban
-          crowdsecLapiInstanceName: missing
+          bouncerEnabled: "true"
+          bouncerStartupBlock: "false"
+          bouncerLapiFailureAction: ban
+          lapiInstanceName: missing
 $knobs
 "@
         $block = Wait-SevCodes -Path "/sev-l2-block" -IP $ip -Codes @(503) -TimeoutSeconds 15
@@ -626,20 +627,20 @@ $svc
     sev-l3-owner:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
+          bouncerEnabled: "false"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
 $knobs
     sev-l3:
       plugin:
         bouncer:
-          enabled: "true"
-          streamStartupBlock: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecAppsecInstanceName: missing-appsec
+          bouncerEnabled: "true"
+          bouncerStartupBlock: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          appsecInstanceName: missing-appsec
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "L3"
@@ -669,21 +670,21 @@ $svc
     sev-l4-lapi:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
+          bouncerEnabled: "false"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
 $knobs
     sev-l4:
       plugin:
         bouncer:
-          enabled: "true"
-          streamStartupBlock: "false"
-          crowdsecAppsecFailureAction: passthrough
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecAppsecInstanceName: $(Get-SevSlot)-waf
+          bouncerEnabled: "true"
+          bouncerStartupBlock: "false"
+          bouncerAppsecFailureAction: passthrough
+          lapiInstanceName: $(Get-SevSlot)
+          appsecInstanceName: $(Get-SevSlot)-waf
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "L4"
@@ -723,12 +724,12 @@ $svc
     sev-r1:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
+          bouncerEnabled: "true"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
 $knobs
 "@
         Write-SevYaml $yaml
@@ -764,19 +765,19 @@ $svc
     sev-r2:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
+          bouncerEnabled: "false"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
 $knobs
     sev-r2-sub:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiFailureAction: passthrough
-          crowdsecLapiInstanceName: $(Get-SevSlot)
+          bouncerEnabled: "true"
+          bouncerLapiFailureAction: passthrough
+          lapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "R2"
@@ -800,33 +801,34 @@ $svc
     sev-r2:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:9
-          httpTimeoutSeconds: "2"
+          bouncerEnabled: "false"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:9
+          lapiHttpTimeoutSeconds: "2"
+          appsecHttpTimeoutSeconds: "2"
           logLevel: DEBUG
           logFormat: json
           reclaimGraceSeconds: "2"
-          updateIntervalSeconds: "5"
-          forwardedHeadersTrustedIps:
+          lapiUpdateIntervalSeconds: "5"
+          bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
             - "172.28.0.1/32"
-          forwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
     sev-r2-sub:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiFailureAction: passthrough
-          crowdsecLapiInstanceName: $(Get-SevSlot)
+          bouncerEnabled: "true"
+          bouncerLapiFailureAction: passthrough
+          lapiInstanceName: $(Get-SevSlot)
           logLevel: DEBUG
           logFormat: json
-          forwardedHeadersTrustedIps:
+          bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
             - "172.28.0.1/32"
-          forwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
 "@
         $pass = Wait-SevCodes -Path "/sev-r2-sub" -IP $ip -Codes @(200) -TimeoutSeconds 15
         $pass.Success | Should -BeTrue -Because "new empty store plus passthrough is 200"
@@ -852,13 +854,13 @@ $svc
     sev-r3:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
-          crowdsecLapiHttpTimeoutSeconds: 10
+          bouncerEnabled: "true"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
+          lapiHttpTimeoutSeconds: 10
 $knobs
 "@
         $up = Wait-SevCodes -Path "/sev-r3" -IP $ip -Codes @(200) -TimeoutSeconds 15
@@ -880,13 +882,13 @@ $svc
     sev-r3:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
-          crowdsecLapiHttpTimeoutSeconds: 20
+          bouncerEnabled: "true"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
+          lapiHttpTimeoutSeconds: 20
 $knobs
 "@
         $still = Wait-SevCodes -Path "/sev-r3" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
@@ -919,19 +921,19 @@ $svc
     sev-r4-owner:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
+          bouncerEnabled: "false"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
 $knobs
     sev-r4-admin:
       plugin:
         bouncer:
-          enabled: "true"
-          streamStartupBlock: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
+          bouncerEnabled: "true"
+          bouncerStartupBlock: "true"
+          lapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "R4"
@@ -960,25 +962,25 @@ $svc
     sev-r4-owner:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)-other
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
+          bouncerEnabled: "false"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)-other
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
 $knobs
     sev-r4-admin:
       plugin:
         bouncer:
-          enabled: "true"
-          streamStartupBlock: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
+          bouncerEnabled: "true"
+          bouncerStartupBlock: "true"
+          lapiInstanceName: $(Get-SevSlot)
 $knobs
     sev-r4-other:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)-other
+          bouncerEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)-other
 $knobs
 "@
         $admin503 = Wait-SevCodes -Path "/sev-r4-admin" -IP $ip -Codes @(503) -TimeoutSeconds 15
@@ -1009,19 +1011,19 @@ $svc
     sev-r5-owner:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
+          bouncerEnabled: "false"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
 $knobs
     sev-r5-admin:
       plugin:
         bouncer:
-          enabled: "true"
-          streamStartupBlock: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
+          bouncerEnabled: "true"
+          bouncerStartupBlock: "true"
+          lapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "R5"
@@ -1045,15 +1047,15 @@ $svc
     sev-r5-owner:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiEnabled: "false"
+          bouncerEnabled: "true"
+          lapiEnabled: "false"
 $knobs
     sev-r5-admin:
       plugin:
         bouncer:
-          enabled: "true"
-          streamStartupBlock: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
+          bouncerEnabled: "true"
+          bouncerStartupBlock: "true"
+          lapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         Start-Sleep -Seconds $script:GraceSeconds
@@ -1084,19 +1086,19 @@ $svc
     sev-n2-owner:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
+          bouncerEnabled: "false"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
 $knobs
     sev-n2-admin:
       plugin:
         bouncer:
-          enabled: "true"
-          streamStartupBlock: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
+          bouncerEnabled: "true"
+          bouncerStartupBlock: "true"
+          lapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "N2"
@@ -1126,34 +1128,35 @@ $svc
     sev-n2-owner:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)-other
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:9
-          httpTimeoutSeconds: "2"
+          bouncerEnabled: "false"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)-other
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:9
+          lapiHttpTimeoutSeconds: "2"
+          appsecHttpTimeoutSeconds: "2"
           logLevel: DEBUG
           logFormat: json
           reclaimGraceSeconds: "2"
-          updateIntervalSeconds: "5"
-          forwardedHeadersTrustedIps:
+          lapiUpdateIntervalSeconds: "5"
+          bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
             - "172.28.0.1/32"
-          forwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
     sev-n2-admin:
       plugin:
         bouncer:
-          enabled: "true"
-          streamStartupBlock: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
+          bouncerEnabled: "true"
+          bouncerStartupBlock: "true"
+          lapiInstanceName: $(Get-SevSlot)
 $knobs
     sev-n2-other:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiFailureAction: passthrough
-          crowdsecLapiInstanceName: $(Get-SevSlot)-other
+          bouncerEnabled: "true"
+          bouncerLapiFailureAction: passthrough
+          lapiInstanceName: $(Get-SevSlot)-other
 $knobs
 "@
         Start-Sleep -Seconds 8
@@ -1213,28 +1216,28 @@ $svc
     sev-f1-a:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
+          bouncerEnabled: "false"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
 $knobs
     sev-f1-b:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:KeyB"
-          crowdsecLapiHost: crowdsec:8080
+          bouncerEnabled: "false"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:KeyB"
+          lapiHost: crowdsec:8080
 $knobs
     sev-f1-sub:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
+          bouncerEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "F1"
@@ -1265,11 +1268,11 @@ $svc
     sev-f2-waf:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecAppsecEnabled: "true"
-          crowdsecAppsecInstanceName: $(Get-SevSlot)-waf
-          crowdsecAppsecHost: crowdsec:7422
-          crowdsecAppsecKey: "$script:AppsecKey"
+          bouncerEnabled: "false"
+          appsecEnabled: "true"
+          appsecInstanceName: $(Get-SevSlot)-waf
+          appsecHost: crowdsec:7422
+          appsecKey: "$script:appsecKey"
 $knobs
 "@
         Write-SevYaml @"
@@ -1295,32 +1298,32 @@ $svc
     sev-f2-waf:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecAppsecEnabled: "true"
-          crowdsecAppsecInstanceName: $(Get-SevSlot)-waf
-          crowdsecAppsecHost: crowdsec:7422
-          crowdsecAppsecKey: "$script:AppsecKey"
+          bouncerEnabled: "false"
+          appsecEnabled: "true"
+          appsecInstanceName: $(Get-SevSlot)-waf
+          appsecHost: crowdsec:7422
+          appsecKey: "$script:appsecKey"
 $knobs
     sev-f2-cs:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecAppsecEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)-api
-          crowdsecAppsecInstanceName: $(Get-SevSlot)-waf
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
-          crowdsecAppsecHost: crowdsec:7422
-          crowdsecAppsecKey: "$script:KeyB"
+          bouncerEnabled: "false"
+          lapiMode: stream
+          lapiEnabled: "true"
+          appsecEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)-api
+          appsecInstanceName: $(Get-SevSlot)-waf
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
+          appsecHost: crowdsec:7422
+          appsecKey: "$script:KeyB"
 $knobs
     sev-f2-sub:
       plugin:
         bouncer:
-          enabled: "true"
-          streamStartupBlock: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)-api
+          bouncerEnabled: "true"
+          bouncerStartupBlock: "true"
+          lapiInstanceName: $(Get-SevSlot)-api
 $knobs
 "@
         $logs = Get-SevLogs
@@ -1354,22 +1357,22 @@ $svc
     sev-f3-owner:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecAppsecEnabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecAppsecInstanceName: $(Get-SevSlot)
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
-          crowdsecAppsecHost: crowdsec:7422
+          bouncerEnabled: "true"
+          lapiMode: stream
+          lapiEnabled: "true"
+          appsecEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          appsecInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
+          appsecHost: crowdsec:7422
 $knobs
     sev-f3-admin:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
-          crowdsecAppsecInstanceName: $(Get-SevSlot)
+          bouncerEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          appsecInstanceName: $(Get-SevSlot)
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "F3"
@@ -1400,20 +1403,20 @@ $svc
     sev-c1-a:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
+          bouncerEnabled: "true"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
 $knobs
     sev-c1-b:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecMode: stream
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
+          bouncerEnabled: "true"
+          lapiMode: stream
+          lapiEnabled: "true"
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
 $knobs
 "@
         $a = Wait-SevCodes -Path "/sev-c1-a" -IP $ip -Codes @(200) -TimeoutSeconds 15
@@ -1447,17 +1450,17 @@ $svc
     sev-e2-good:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecMode: none
-          crowdsecLapiEnabled: "true"
-          crowdsecLapiKey: "$script:OwnerKey"
-          crowdsecLapiHost: crowdsec:8080
+          bouncerEnabled: "true"
+          lapiMode: none
+          lapiEnabled: "true"
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
 $knobs
     sev-e2-bad:
       plugin:
         bouncer:
-          enabled: "false"
-          crowdsecLapiInstanceName: $(Get-SevSlot)
+          bouncerEnabled: "false"
+          lapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         $good = Wait-SevCodes -Path "/sev-e2-good" -IP $ip -Codes @(200) -TimeoutSeconds 15
@@ -1484,8 +1487,8 @@ $svc
     sev-e3:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecLapiEnabled: "false"
+          bouncerEnabled: "true"
+          lapiEnabled: "false"
 $knobs
 "@
         $ok = Wait-SevCodes -Path "/sev-e3" -IP $ip -Codes @(200) -TimeoutSeconds 15
@@ -1496,7 +1499,7 @@ $knobs
         (Get-SevLogs) | Should -Not -Match "crowdsec bouncer backend missing"
     }
 
-    It "E4 crowdsecMode appsec fails New" {
+    It "E4 lapiMode appsec fails New" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
         $ip = "10.90.0.87"
@@ -1513,11 +1516,11 @@ $svc
     sev-e4:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecMode: appsec
-          crowdsecAppsecEnabled: "true"
-          crowdsecAppsecHost: crowdsec:7422
-          crowdsecAppsecKey: "$script:AppsecKey"
+          bouncerEnabled: "true"
+          lapiMode: appsec
+          appsecEnabled: "true"
+          appsecHost: crowdsec:7422
+          appsecKey: "$script:appsecKey"
 $knobs
 "@
         Start-Sleep -Seconds 4

@@ -66,23 +66,23 @@ func liveLAPI(t *testing.T, banned map[string]bool, hits *int64) *httptest.Serve
 
 func cfgLiveAt(host string) *configuration.Config {
 	c := getTestConfig()
-	c.Enabled = true
-	c.CrowdsecMode = configuration.LiveMode
-	c.CrowdsecLapiHost = host
-	c.CrowdsecLapiPath = "/"
-	c.CrowdsecLapiScheme = "http"
-	c.MetricsUpdateIntervalSeconds = 0
-	c.ForwardedHeadersTrustedIPs = []string{"127.0.0.1/32"}
-	c.ForwardedHeadersCustomName = "X-Forwarded-For"
-	c.DefaultDecisionSeconds = 2
+	c.BouncerEnabled = true
+	c.LapiMode = configuration.LiveMode
+	c.LapiHost = host
+	c.LapiPath = "/"
+	c.LapiScheme = "http"
+	c.LapiMetricsUpdateIntervalSeconds = 0
+	c.BouncerForwardedHeadersTrustedIPs = []string{"127.0.0.1/32"}
+	c.BouncerForwardedHeadersCustomName = "X-Forwarded-For"
+	c.LapiDefaultDecisionSeconds = 2
 	return c
 }
 
 func cfgStreamAt(host string, interval int64) *configuration.Config {
 	c := cfgLiveAt(host)
-	c.CrowdsecMode = configuration.StreamMode
-	c.UpdateIntervalSeconds = interval
-	c.StreamStartupBlock = true
+	c.LapiMode = configuration.StreamMode
+	c.LapiUpdateIntervalSeconds = interval
+	c.BouncerStartupBlock = true
 	return c
 }
 
@@ -95,8 +95,8 @@ func reqForIP(ip string) *http.Request {
 
 func TestServeHTTP(t *testing.T) {
 	cfg := CreateConfig()
-	cfg.CrowdsecLapiEnabled = true
-	cfg.CrowdsecLapiKey = "test"
+	cfg.LapiEnabled = true
+	cfg.LapiKey = "test"
 	ctx := context.Background()
 	handler, err := New(ctx, testNextOK(), cfg, "demo-plugin")
 	if err != nil {
@@ -126,9 +126,9 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 	}
 
 	cfg := cfgLiveAt(u.Host)
-	cfg.CaptchaProvider = configuration.HcaptchaProvider
-	cfg.CaptchaGateSecret = "gate-secret"
-	cfg.CaptchaFilePath = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
+	cfg.BouncerCaptchaProvider = configuration.HcaptchaProvider
+	cfg.BouncerCaptchaGateSecret = "gate-secret"
+	cfg.BouncerCaptchaFilePath = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
 
 	handler, err := New(context.Background(), testNextOK(), cfg, "empty-captcha-keys")
 	if err == nil {
@@ -137,7 +137,7 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 	if handler != nil {
 		t.Fatal("New must return a nil handler when captcha keys are empty")
 	}
-	if !strings.Contains(err.Error(), "CaptchaSiteKey: cannot be empty when CaptchaProvider is set") {
+	if !strings.Contains(err.Error(), "BouncerCaptchaSiteKey: cannot be empty when BouncerCaptchaProvider is set") {
 		t.Fatalf("error %q", err)
 	}
 	if atomic.LoadInt64(&hits) != 0 {
@@ -161,20 +161,20 @@ func TestNew_RejectsEmptyCaptchaFilePath(t *testing.T) {
 	}
 
 	cfg := cfgLiveAt(u.Host)
-	cfg.CaptchaProvider = configuration.HcaptchaProvider
-	cfg.CaptchaSiteKey = "site"
-	cfg.CaptchaSecretKey = "secret"
-	cfg.CaptchaGateSecret = "gate-secret"
-	cfg.CaptchaFilePath = ""
+	cfg.BouncerCaptchaProvider = configuration.HcaptchaProvider
+	cfg.BouncerCaptchaSiteKey = "site"
+	cfg.BouncerCaptchaSecretKey = "secret"
+	cfg.BouncerCaptchaGateSecret = "gate-secret"
+	cfg.BouncerCaptchaFilePath = ""
 
 	handler, err := New(context.Background(), testNextOK(), cfg, "empty-captcha-path")
 	if err == nil {
-		t.Fatal("New must fail when captchaProvider is set and CaptchaFilePath is empty")
+		t.Fatal("New must fail when captchaProvider is set and BouncerCaptchaFilePath is empty")
 	}
 	if handler != nil {
-		t.Fatal("New must return a nil handler when CaptchaFilePath is empty")
+		t.Fatal("New must return a nil handler when BouncerCaptchaFilePath is empty")
 	}
-	if !strings.Contains(err.Error(), "CaptchaFilePath: cannot be empty when CaptchaProvider is set") {
+	if !strings.Contains(err.Error(), "BouncerCaptchaFilePath: cannot be empty when BouncerCaptchaProvider is set") {
 		t.Fatalf("error %q", err)
 	}
 	if atomic.LoadInt64(&hits) != 0 {
@@ -395,7 +395,7 @@ func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
 	ctx := context.Background()
 
 	disabled := cfgLiveAt(u.Host)
-	disabled.Enabled = false
+	disabled.BouncerEnabled = false
 	hOff, err := New(ctx, testNextOK(), disabled, "matrix")
 	if err != nil {
 		t.Fatal(err)
@@ -407,7 +407,7 @@ func TestBouncer_ServeHTTP_Matrix(t *testing.T) {
 	}
 
 	trusted := cfgLiveAt(u.Host)
-	trusted.ClientTrustedIPs = []string{"9.9.9.9/32"}
+	trusted.BouncerClientTrustedIPs = []string{"9.9.9.9/32"}
 	hTrust, err := New(ctx, testNextOK(), trusted, "matrix")
 	if err != nil {
 		t.Fatal(err)
@@ -484,9 +484,9 @@ func TestNew_SameStreamKeyDifferentMetrics_SharesConnection(t *testing.T) {
 	u, _ := url.Parse(srv.URL)
 
 	fast := cfgStreamAt(u.Host, 60)
-	fast.MetricsUpdateIntervalSeconds = 1
+	fast.LapiMetricsUpdateIntervalSeconds = 1
 	slow := cfgStreamAt(u.Host, 60)
-	slow.MetricsUpdateIntervalSeconds = 600
+	slow.LapiMetricsUpdateIntervalSeconds = 600
 
 	ctx := context.Background()
 	owner, err := New(ctx, testNextOK(), fast, "metrics-fast")
@@ -513,7 +513,7 @@ func TestNew_StreamIntervalChangeDuringGrace_WakesSameClient(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	firstCfg := cfgStreamAt(u.Host, 60)
-	firstCfg.MetricsUpdateIntervalSeconds = 1
+	firstCfg.LapiMetricsUpdateIntervalSeconds = 1
 	first, err := New(ctx, testNextOK(), firstCfg, "reload")
 	if err != nil {
 		t.Fatal(err)
@@ -523,7 +523,7 @@ func TestNew_StreamIntervalChangeDuringGrace_WakesSameClient(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	reloadCfg := cfgStreamAt(u.Host, 60)
-	reloadCfg.MetricsUpdateIntervalSeconds = 600
+	reloadCfg.LapiMetricsUpdateIntervalSeconds = 600
 	reloaded, err := New(context.Background(), testNextOK(), reloadCfg, "reload")
 	if err != nil {
 		t.Fatal(err)

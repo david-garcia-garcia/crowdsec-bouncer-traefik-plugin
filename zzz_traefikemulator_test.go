@@ -35,14 +35,14 @@ func generationRoute(name, middlewareName string, cfg *configuration.Config) tra
 
 func lapiOwnerConfig(host, instanceName string) *configuration.Config {
 	cfg := cfgLiveAt(host)
-	cfg.CrowdsecLapiInstanceName = instanceName
-	cfg.StreamStartupBlock = true
+	cfg.LapiInstanceName = instanceName
+	cfg.BouncerStartupBlock = true
 	return cfg
 }
 
 func lapiSubscriberConfig(host string) *configuration.Config {
 	cfg := lapiOwnerConfig(host, "shared")
-	cfg.CrowdsecLapiEnabled = false
+	cfg.LapiEnabled = false
 	return cfg
 }
 
@@ -244,7 +244,7 @@ func TestGeneration_OwnerLegDisabledUnbindsSubscriber(t *testing.T) {
 		t.Fatal(failed)
 	}
 	client := routeClient(t, generation, "owner")
-	ownerCfg.CrowdsecLapiEnabled = false
+	ownerCfg.LapiEnabled = false
 	if failed := generation.Apply([]traefikemulator.Route{owner, subscriber}); failed != nil {
 		t.Fatal(failed)
 	}
@@ -305,29 +305,30 @@ func TestGeneration_AppSecSubscriberBothOrders(t *testing.T) {
 
 func appsecOwnerConfig(host string) *configuration.Config {
 	cfg := getTestConfig()
-	cfg.Enabled = false
-	cfg.CrowdsecLapiEnabled = false
-	cfg.CrowdsecLapiKey = ""
-	cfg.CrowdsecAppsecEnabled = true
-	cfg.CrowdsecAppsecInstanceName = "shared"
-	cfg.CrowdsecAppsecScheme = "http"
-	cfg.CrowdsecAppsecHost = host
-	cfg.CrowdsecAppsecPath = "/"
-	cfg.CrowdsecAppsecKey = "test-key"
-	cfg.CrowdsecAppsecTLSInsecureVerify = true
-	cfg.CrowdsecAppsecBodyLimit = 10485760
-	cfg.HTTPTimeoutSeconds = 2
+	cfg.BouncerEnabled = false
+	cfg.LapiEnabled = false
+	cfg.LapiKey = ""
+	cfg.AppsecEnabled = true
+	cfg.AppsecInstanceName = "shared"
+	cfg.AppsecScheme = "http"
+	cfg.AppsecHost = host
+	cfg.AppsecPath = "/"
+	cfg.AppsecKey = "test-key"
+	cfg.AppsecTLSInsecureVerify = true
+	cfg.AppsecBodyLimit = 10485760
+	cfg.LapiHTTPTimeoutSeconds = 2
+	cfg.AppsecHTTPTimeoutSeconds = 2
 	return cfg
 }
 
 func appsecSubscriberConfig() *configuration.Config {
 	cfg := getTestConfig()
-	cfg.Enabled = true
-	cfg.CrowdsecLapiEnabled = false
-	cfg.CrowdsecLapiKey = ""
-	cfg.CrowdsecAppsecEnabled = false
-	cfg.CrowdsecAppsecInstanceName = "shared"
-	cfg.StreamStartupBlock = true
+	cfg.BouncerEnabled = true
+	cfg.LapiEnabled = false
+	cfg.LapiKey = ""
+	cfg.AppsecEnabled = false
+	cfg.AppsecInstanceName = "shared"
+	cfg.BouncerStartupBlock = true
 	return cfg
 }
 

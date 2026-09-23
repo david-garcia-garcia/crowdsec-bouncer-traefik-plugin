@@ -685,8 +685,8 @@ func TestNewForwardedHeadersInsecureHeaderName(t *testing.T) {
 	log := logger.New("ERROR", "")
 	t.Run("default custom name becomes X-Real-Ip", func(t *testing.T) {
 		cfg := configuration.New()
-		cfg.CrowdsecMode = configuration.StreamMode
-		cfg.ForwardedHeadersInsecure = true
+		cfg.LapiMode = configuration.StreamMode
+		cfg.BouncerForwardedHeadersInsecure = true
 		b, err := New(next, "test", cfg, false, true, log)
 		if err != nil {
 			t.Fatalf("New = %v", err)
@@ -697,9 +697,9 @@ func TestNewForwardedHeadersInsecureHeaderName(t *testing.T) {
 	})
 	t.Run("explicit non-default name is passed through", func(t *testing.T) {
 		cfg := configuration.New()
-		cfg.CrowdsecMode = configuration.StreamMode
-		cfg.ForwardedHeadersInsecure = true
-		cfg.ForwardedHeadersCustomName = "CF-Connecting-IP"
+		cfg.LapiMode = configuration.StreamMode
+		cfg.BouncerForwardedHeadersInsecure = true
+		cfg.BouncerForwardedHeadersCustomName = "CF-Connecting-IP"
 		b, err := New(next, "test", cfg, false, true, log)
 		if err != nil {
 			t.Fatalf("New = %v", err)

@@ -29,14 +29,14 @@ Describe "CrowdSec Bouncer Dragonfly Redis cache" {
             Remove-AllTestDecisions
         }
 
-        It "Should keep the first allow cached until defaultDecisionSeconds, then see a new ban" {
+        It "Should keep the first allow cached until lapiDefaultDecisionSeconds, then see a new ban" {
             $allow = Test-HttpRequest -Endpoint "/redis-cache" -IP $script:RedisBannedIP -TraefikUrl $script:TraefikUrl
             $allow.StatusCode | Should -Be 200
 
             Add-TestDecision -IP $script:RedisBannedIP -Type "ban"
 
             $stillCached = Test-HttpRequest -Endpoint "/redis-cache" -IP $script:RedisBannedIP -TraefikUrl $script:TraefikUrl
-            $stillCached.StatusCode | Should -Be 200 -Because "live mode must keep the Dragonfly-cached allow until defaultDecisionSeconds expires"
+            $stillCached.StatusCode | Should -Be 200 -Because "live mode must keep the Dragonfly-cached allow until lapiDefaultDecisionSeconds expires"
 
             $blocked = Wait-ForCondition -Description "live Redis cache to re-query LAPI and block $($script:RedisBannedIP)" -TimeoutSeconds 15 -RetryIntervalSeconds 1 -Condition {
                 $response = Test-HttpRequest -Endpoint "/redis-cache" -IP $script:RedisBannedIP -TraefikUrl $script:TraefikUrl
