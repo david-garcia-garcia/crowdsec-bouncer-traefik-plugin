@@ -163,8 +163,9 @@ func openOwnedLeg(bindCtx context.Context, config *configuration.Config, log *sl
 }
 
 // claimOwned publishes each owned instance name (SetAlias) to the Client Open just
-// created. A taken name fails New. If AppSec's claim fails after LAPI published,
-// drop the LAPI alias so we do not leave a half-claimed owner.
+// created. A taken name fails New. A later claim failure clears already-published
+// legs (LAPI and AppSec when captcha's SetAlias fails) so we do not leave a
+// half-claimed owner.
 func claimOwned(config *configuration.Config, log *slog.Logger, name string) error {
 	if err := claimOwnedLeg(config, log, name, config.LapiEnabled, legLAPI); err != nil {
 		return err

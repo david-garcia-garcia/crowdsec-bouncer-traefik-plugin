@@ -127,7 +127,7 @@ There are four operating modes (`lapiMode`). Sequence diagrams live in [docs/mod
 
 ## Middleware Architecture
 
-One Traefik middleware object can run up to three independent pieces:
+One Traefik middleware object can run up to four independent pieces:
 
 | Piece | Flag | Job |
 | ----- | ---- | --- |
