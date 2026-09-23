@@ -24,7 +24,7 @@ The Bouncer Stores the published pointer and Loads it on the request path. The r
 In progress. 0 items remain.
 
 Priority: P2 — operator pain with a workaround
-Reviewed head: 5f0be9a5
+Reviewed head: 0ae3c7ce
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -93,7 +93,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 7 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 5f0be9a5f3d701190fdab02afbf78f707dbc3149 | Card must match the branch you measured |
+| Reviewed head | 0ae3c7ce83643f40ae980f13b74307da827ef65a | Card must match the branch you measured |
 
 ### Stored data model
 None.
