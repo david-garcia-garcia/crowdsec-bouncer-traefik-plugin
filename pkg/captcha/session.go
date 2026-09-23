@@ -37,7 +37,7 @@ type ownership struct {
 	SiteKey                      string `json:"siteKey"`
 	SecretKey                    string `json:"secretKey"`
 	GateSecret                   string `json:"gateSecret"`
-	GateBindIP                   bool   `json:"gateBindIP"`
+	GateBindIP                   bool   `json:"gateBindIp"`
 	CaptchaFilePath              string `json:"captchaFilePath"`
 	GracePeriodSeconds           int64  `json:"gracePeriodSeconds"`
 	SiteverifyHTTPTimeoutSeconds int64  `json:"siteverifyHttpTimeoutSeconds"`

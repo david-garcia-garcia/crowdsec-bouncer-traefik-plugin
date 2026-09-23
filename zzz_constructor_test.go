@@ -223,8 +223,8 @@ func cfgCaptchaOwnerAt(t *testing.T, instanceName string) *configuration.Config 
 	return c
 }
 
-func captchaForceReq(ip string) *http.Request {
-	req := reqForIP(ip)
+func captchaForceReq() *http.Request {
+	req := reqForIP("203.0.113.8")
 	req.Header.Set("X-Crowdsec-Decision", "c")
 	return req
 }
@@ -238,7 +238,7 @@ func TestNew_CaptchaOwnerServesChallenge(t *testing.T) {
 		t.Fatal(err)
 	}
 	rw := httptest.NewRecorder()
-	h.ServeHTTP(rw, captchaForceReq("203.0.113.8"))
+	h.ServeHTTP(rw, captchaForceReq())
 	if got := rw.Header().Get("X-Remediation"); got != "captcha" {
 		t.Fatalf("remediation %q want captcha, body: %s", got, rw.Body.String())
 	}
@@ -262,7 +262,7 @@ func TestNew_CaptchaOwnerOmitFillsTraefikName(t *testing.T) {
 		t.Fatal(err)
 	}
 	rw := httptest.NewRecorder()
-	h.ServeHTTP(rw, captchaForceReq("203.0.113.8"))
+	h.ServeHTTP(rw, captchaForceReq())
 	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
 		t.Fatalf("subscriber of filled Traefik name must serve captcha, body: %s", rw.Body.String())
 	}
@@ -280,7 +280,7 @@ func TestNew_CaptchaSubscriberBeforePublishBans(t *testing.T) {
 		t.Fatal(err)
 	}
 	rw := httptest.NewRecorder()
-	h.ServeHTTP(rw, captchaForceReq("203.0.113.8"))
+	h.ServeHTTP(rw, captchaForceReq())
 	if rw.Code != http.StatusForbidden {
 		t.Fatalf("unpublished captcha verdict must ban, status=%d body=%s", rw.Code, rw.Body.String())
 	}
@@ -305,7 +305,7 @@ func TestNew_CaptchaHolderWithBounceOffStillPublishes(t *testing.T) {
 		t.Fatal(err)
 	}
 	rw := httptest.NewRecorder()
-	h.ServeHTTP(rw, captchaForceReq("203.0.113.8"))
+	h.ServeHTTP(rw, captchaForceReq())
 	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
 		t.Fatalf("holder with bounce off must still publish, body: %s", rw.Body.String())
 	}
