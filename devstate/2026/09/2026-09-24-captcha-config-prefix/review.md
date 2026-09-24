@@ -29,3 +29,8 @@ head: c50af8594dbd3360b4388865550dbfd4602e8fb8
 phase: codereview
 verdict: in progress
 head: a60a1c1f15aae1578ee040b999f75ce6dd5622d2
+
+## devdocsimpact (2026-09-24)
+phase: devdocsimpact
+verdict: in progress
+head: 2bbc87bb586e461e55bf37406637de823a658642

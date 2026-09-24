@@ -29,7 +29,7 @@ README BREAKING names the stem move and the `captchaFilePath` revival. Examples,
 In progress. 0 items remain.
 
 Priority: P3 — spec and public-key naming, no current user or operator harm
-Reviewed head: a60a1c1f
+Reviewed head: 2bbc87bb
 Owner decision: None.
 
 ## Review scores
@@ -92,7 +92,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 5 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | a60a1c1f15aae1578ee040b999f75ce6dd5622d2 | Card must match the branch you measured |
+| Reviewed head | 2bbc87bb586e461e55bf37406637de823a658642 | Card must match the branch you measured |
 
 ### Stored data model
 None.
