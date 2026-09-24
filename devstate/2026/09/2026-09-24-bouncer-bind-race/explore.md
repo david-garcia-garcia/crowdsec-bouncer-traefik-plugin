@@ -68,8 +68,8 @@ Rejected alternatives:
 
 - Q: Does any other in-tree watcher still mutate Box.Value in place?
   Rank: additive asked — requirement Unknowns; search of worktree Go sources for boxed.Value and storeBinding
-  Decision: resolved — production only storeBinding; test helper watchInto also mutates. Include fixing watchInto in this change (Store new Box). No other sites.
-  By: explore
+  Decision: resolved — production only storeBinding; test helper watchInto also mutates. Human override: leave watchInto unbuilt this change (deviations.md remains `[ ] proposed`, Requester not asked). No other production sites.
+  By: implement
 
 - Q: Exact race window under Yaegi vs native Go — measure before deciding the fix?
   Rank: additive asked — requirement Unknowns
