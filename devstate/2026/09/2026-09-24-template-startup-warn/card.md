@@ -18,17 +18,17 @@ Validation no longer fail-closes on captcha or ban template load in `ValidatePar
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: P2 — real operator pain (dead route or silent empty ban) with a workaround (fix template paths before deploy).
-Reviewed head: 26fc63b7
+Reviewed head: e135de6a
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36050525120 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -38,7 +38,7 @@ Owner decision: None.
 | Branch | 2026-09-24-template-startup-warn pushed | `git` |
 | OpenSpec | 2026-09-24-template-startup-warn | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/151 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 36050525120 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36050525120 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36050525120 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -58,7 +58,7 @@ Completed:
 None.
 
 ## How this fits together
-Ticket 2026-09-24-template-startup-warn on branch 2026-09-24-template-startup-warn targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/151; CI not seen.
+Ticket 2026-09-24-template-startup-warn on branch 2026-09-24-template-startup-warn targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/151; CI build 36050525120 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36050525120.
 
 ## Explore Decisions
 None.
@@ -84,7 +84,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 26fc63b7a6f6133fa7d14f57c482c218a72d61cc | Card must match the branch you measured |
+| Reviewed head | e135de6a4020541d1aba060c8b77d80a5a8e163d | Card must match the branch you measured |
 
 ### Stored data model
 None.
