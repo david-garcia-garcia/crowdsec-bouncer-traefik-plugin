@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
@@ -205,5 +207,124 @@ func TestServeHTTP_RedisUnreachableFailureAction(t *testing.T) {
 	blockHandler.ServeHTTP(blockRW, reqForIP("203.0.113.41"))
 	if blockRW.Code != http.StatusForbidden {
 		t.Fatalf("redis unreachable block status = %d", blockRW.Code)
+	}
+}
+
+// waitStreamUnhealthy waits until the constructor's stream poll has failed and flipped healthy off.
+func waitStreamUnhealthy(t *testing.T, handler http.Handler) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		client := testRoute(t, handler).LapiClient()
+		if client != nil && client.StreamFetches() >= 1 && !client.StreamHealthy() {
+			return
+		}
+		time.Sleep(15 * time.Millisecond)
+	}
+	t.Fatal("stream poll did not mark the client unhealthy")
+}
+
+func TestServeHTTP_StreamPollFailureAction(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(func() { srv.Close() })
+	parsed, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("passthrough", func(t *testing.T) {
+		called := false
+		cfg := cfgStreamAt(parsed.Host, 60)
+		cfg.LogLevel = "ERROR"
+		cfg.LapiKey = "stream-pass-key"
+		cfg.BouncerLapiFailureAction = configuration.FailureActionPassthrough
+		handler, err := New(context.Background(), http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			called = true
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("OK"))
+		}), cfg, "stream-fail-pass")
+		if err != nil {
+			t.Fatal(err)
+		}
+		waitStreamUnhealthy(t, handler)
+		rw := httptest.NewRecorder()
+		handler.ServeHTTP(rw, reqForIP("203.0.113.50"))
+		if !called || rw.Code != http.StatusOK || rw.Body.String() != "OK" {
+			t.Fatalf("stream 500 passthrough called=%v status=%d body=%q", called, rw.Code, rw.Body.String())
+		}
+	})
+
+	t.Run("ban", func(t *testing.T) {
+		called := false
+		cfg := cfgStreamAt(parsed.Host, 60)
+		cfg.LogLevel = "ERROR"
+		cfg.LapiKey = "stream-ban-key"
+		cfg.BouncerLapiFailureAction = configuration.FailureActionBan
+		handler, err := New(context.Background(), http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			called = true
+		}), cfg, "stream-fail-ban")
+		if err != nil {
+			t.Fatal(err)
+		}
+		waitStreamUnhealthy(t, handler)
+		rw := httptest.NewRecorder()
+		handler.ServeHTTP(rw, reqForIP("203.0.113.51"))
+		if called || rw.Code != http.StatusForbidden {
+			t.Fatalf("stream 500 ban called=%v status=%d", called, rw.Code)
+		}
+	})
+}
+
+func TestServeHTTP_LiveCaptchaFailureAction(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(func() { srv.Close() })
+	parsed, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := cfgLiveAt(parsed.Host)
+	cfg.LogLevel = "ERROR"
+	cfg.LapiKey = "live-captcha-key"
+	cfg.BouncerLapiFailureAction = configuration.FailureActionCaptcha
+	cfg.CaptchaEnabled = true
+	cfg.CaptchaProvider = configuration.CustomProvider
+	cfg.CaptchaCustomJsURL = "/captcha.js"
+	cfg.CaptchaCustomKey = "dummy-captcha"
+	cfg.CaptchaCustomResponse = "dummy-captcha-response"
+	cfg.CaptchaCustomValidateURL = "http://127.0.0.1/siteverify"
+	cfg.CaptchaSiteKey = "site"
+	cfg.CaptchaSecretKey = "secret"
+	cfg.CaptchaGateSecret = "gate-secret"
+	cfg.CaptchaFilePath = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
+	cfg.BouncerRemediationHeadersCustomName = "X-Remediation"
+
+	called := false
+	handler, err := New(context.Background(), http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		called = true
+	}), cfg, "live-fail-captcha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rw := httptest.NewRecorder()
+	handler.ServeHTTP(rw, reqForIP("203.0.113.60"))
+	if called {
+		t.Fatal("captcha on live LAPI 500 must not call next")
+	}
+	if got := rw.Header().Get("X-Remediation"); got != "captcha" {
+		t.Fatalf("remediation %q want captcha, body: %s", got, rw.Body.String())
+	}
+	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
+		t.Fatalf("captcha challenge not served, body: %s", rw.Body.String())
 	}
 }
