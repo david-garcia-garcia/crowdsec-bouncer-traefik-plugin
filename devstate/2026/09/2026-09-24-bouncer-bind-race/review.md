@@ -29,3 +29,8 @@ head: a6ff19dd3014e903608d5397b2317d723e636733
 phase: implement
 verdict: ready for review
 head: e8ee06b303b8dc0ed45075944cad7c42ce72ea81
+
+## implement (2026-09-24)
+phase: implement
+verdict: ready for review
+head: 26ffd3e8b0255c3835fcbeb6ad0d16d7eb770ae1

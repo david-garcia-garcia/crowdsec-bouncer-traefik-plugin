@@ -17,14 +17,14 @@ Not yet.
 Ready for review. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: e8ee06b3
+Reviewed head: 26ffd3e8
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35971965703 |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35972935288 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -34,7 +34,7 @@ Owner decision: None.
 | Branch | 2026-09-24-bouncer-bind-race pushed | `git` |
 | OpenSpec | bouncer-bind-immutable-box | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/143 | pr-host |
-| CI | build 35971965703 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35971965703 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35971965703 |
+| CI | build 35972935288 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35972935288 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35972935288 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -53,7 +53,7 @@ Implement left task 2.1 / `watchInto` unbuilt per human override (Requester not 
 None.
 
 ## How this fits together
-Ticket 2026-09-24-bouncer-bind-race on branch 2026-09-24-bouncer-bind-race targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/143; CI build 35971965703 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35971965703.
+Ticket 2026-09-24-bouncer-bind-race on branch 2026-09-24-bouncer-bind-race targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/143; CI build 35972935288 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35972935288.
 
 ## Explore Decisions
 None.
@@ -71,7 +71,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | e8ee06b303b8dc0ed45075944cad7c42ce72ea81 | Card must match the branch you measured |
+| Reviewed head | 26ffd3e8b0255c3835fcbeb6ad0d16d7eb770ae1 | Card must match the branch you measured |
 
 ### Stored data model
 None.
