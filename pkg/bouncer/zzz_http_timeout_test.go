@@ -11,10 +11,10 @@ import (
 func TestNew_BounceOnlyDoesNotConstructCaptcha(t *testing.T) {
 	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 	cfg := configuration.New()
-	cfg.BouncerCaptchaProvider = configuration.HcaptchaProvider
-	cfg.BouncerCaptchaSiteKey = "site"
-	cfg.BouncerCaptchaSecretKey = "secret"
-	cfg.BouncerCaptchaGateSecret = "gate-secret"
+	cfg.CaptchaProvider = configuration.HcaptchaProvider
+	cfg.CaptchaSiteKey = "site"
+	cfg.CaptchaSecretKey = "secret"
+	cfg.CaptchaGateSecret = "gate-secret"
 	route, err := New(next, "test", cfg, false, false, false, logger.New("ERROR", ""))
 	if err != nil {
 		t.Fatalf("New = %v", err)

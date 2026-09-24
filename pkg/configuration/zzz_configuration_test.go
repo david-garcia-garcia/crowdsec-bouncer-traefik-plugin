@@ -32,7 +32,7 @@ func getMinimalConfig() *Config {
 }
 
 // writeCaptchaTemplateFixture writes a readable captcha.html so tests that used
-// to blank BouncerCaptchaFilePath still skip only the key errors they assert.
+// to blank CaptchaFilePath still skip only the key errors they assert.
 func writeCaptchaTemplateFixture(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "captcha.html")
@@ -132,46 +132,46 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	cfgCaptchaOwnerOmit := getMinimalConfig()
 	cfgCaptchaOwnerOmit.CaptchaEnabled = true
 	cfgCaptchaOwnerOmit.BouncerLapiFailureAction = FailureActionCaptcha
-	cfgCaptchaOwnerOmit.BouncerCaptchaProvider = HcaptchaProvider
-	cfgCaptchaOwnerOmit.BouncerCaptchaSiteKey = "site"
-	cfgCaptchaOwnerOmit.BouncerCaptchaSecretKey = "secret"
-	cfgCaptchaOwnerOmit.BouncerCaptchaGateSecret = "gate-secret"
-	cfgCaptchaOwnerOmit.BouncerCaptchaFilePath = captchaTemplate
+	cfgCaptchaOwnerOmit.CaptchaProvider = HcaptchaProvider
+	cfgCaptchaOwnerOmit.CaptchaSiteKey = "site"
+	cfgCaptchaOwnerOmit.CaptchaSecretKey = "secret"
+	cfgCaptchaOwnerOmit.CaptchaGateSecret = "gate-secret"
+	cfgCaptchaOwnerOmit.CaptchaFilePath = captchaTemplate
 	cfgEmptyKeysDefaultBan := getMinimalConfig()
 	cfgEmptyKeysDefaultBan.CaptchaEnabled = true
-	cfgEmptyKeysDefaultBan.BouncerCaptchaProvider = HcaptchaProvider
-	cfgEmptyKeysDefaultBan.BouncerCaptchaGateSecret = "gate-secret"
-	cfgEmptyKeysDefaultBan.BouncerCaptchaFilePath = captchaTemplate
+	cfgEmptyKeysDefaultBan.CaptchaProvider = HcaptchaProvider
+	cfgEmptyKeysDefaultBan.CaptchaGateSecret = "gate-secret"
+	cfgEmptyKeysDefaultBan.CaptchaFilePath = captchaTemplate
 	cfgOnlySiteEmpty := getMinimalConfig()
 	cfgOnlySiteEmpty.CaptchaEnabled = true
-	cfgOnlySiteEmpty.BouncerCaptchaProvider = HcaptchaProvider
-	cfgOnlySiteEmpty.BouncerCaptchaSecretKey = "secret"
-	cfgOnlySiteEmpty.BouncerCaptchaGateSecret = "gate-secret"
-	cfgOnlySiteEmpty.BouncerCaptchaFilePath = captchaTemplate
+	cfgOnlySiteEmpty.CaptchaProvider = HcaptchaProvider
+	cfgOnlySiteEmpty.CaptchaSecretKey = "secret"
+	cfgOnlySiteEmpty.CaptchaGateSecret = "gate-secret"
+	cfgOnlySiteEmpty.CaptchaFilePath = captchaTemplate
 	cfgOnlySecretEmpty := getMinimalConfig()
 	cfgOnlySecretEmpty.CaptchaEnabled = true
-	cfgOnlySecretEmpty.BouncerCaptchaProvider = HcaptchaProvider
-	cfgOnlySecretEmpty.BouncerCaptchaSiteKey = "site"
-	cfgOnlySecretEmpty.BouncerCaptchaGateSecret = "gate-secret"
-	cfgOnlySecretEmpty.BouncerCaptchaFilePath = captchaTemplate
+	cfgOnlySecretEmpty.CaptchaProvider = HcaptchaProvider
+	cfgOnlySecretEmpty.CaptchaSiteKey = "site"
+	cfgOnlySecretEmpty.CaptchaGateSecret = "gate-secret"
+	cfgOnlySecretEmpty.CaptchaFilePath = captchaTemplate
 	cfgWhitespaceSite := getMinimalConfig()
 	cfgWhitespaceSite.CaptchaEnabled = true
-	cfgWhitespaceSite.BouncerCaptchaProvider = HcaptchaProvider
-	cfgWhitespaceSite.BouncerCaptchaSiteKey = "   "
-	cfgWhitespaceSite.BouncerCaptchaSecretKey = "secret"
-	cfgWhitespaceSite.BouncerCaptchaGateSecret = "gate-secret"
-	cfgWhitespaceSite.BouncerCaptchaFilePath = captchaTemplate
+	cfgWhitespaceSite.CaptchaProvider = HcaptchaProvider
+	cfgWhitespaceSite.CaptchaSiteKey = "   "
+	cfgWhitespaceSite.CaptchaSecretKey = "secret"
+	cfgWhitespaceSite.CaptchaGateSecret = "gate-secret"
+	cfgWhitespaceSite.CaptchaFilePath = captchaTemplate
 	cfgProviderDoesNotOwn := getMinimalConfig()
-	cfgProviderDoesNotOwn.BouncerCaptchaProvider = HcaptchaProvider
+	cfgProviderDoesNotOwn.CaptchaProvider = HcaptchaProvider
 	cfgSubscriberLeftoverKeys := getMinimalConfig()
 	cfgSubscriberLeftoverKeys.BouncerEnabled = true
 	cfgSubscriberLeftoverKeys.CaptchaInstanceName = "shared"
-	cfgSubscriberLeftoverKeys.BouncerCaptchaProvider = HcaptchaProvider
+	cfgSubscriberLeftoverKeys.CaptchaProvider = HcaptchaProvider
 	cfgCaptchaE2LeftoverName := getMinimalConfig()
 	cfgCaptchaE2LeftoverName.CaptchaInstanceName = "shared"
 	cfgCaptchaE2LeftoverKeysNotSecret := getMinimalConfig()
-	cfgCaptchaE2LeftoverKeysNotSecret.BouncerCaptchaProvider = HcaptchaProvider
-	cfgCaptchaE2LeftoverKeysNotSecret.BouncerCaptchaSiteKey = ""
+	cfgCaptchaE2LeftoverKeysNotSecret.CaptchaProvider = HcaptchaProvider
+	cfgCaptchaE2LeftoverKeysNotSecret.CaptchaSiteKey = ""
 	cfgCaptchaE3BounceNoName := getMinimalConfig()
 	cfgCaptchaE3BounceNoName.BouncerEnabled = true
 	cfgUnknownAction := getMinimalConfig()
@@ -245,9 +245,9 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	cfgAloneMissingCaptchaKeys.LapiCapiPassword = "password"
 	cfgAloneMissingCaptchaKeys.CaptchaEnabled = true
 	cfgAloneMissingCaptchaKeys.BouncerLapiFailureAction = FailureActionCaptcha
-	cfgAloneMissingCaptchaKeys.BouncerCaptchaProvider = HcaptchaProvider
-	cfgAloneMissingCaptchaKeys.BouncerCaptchaGateSecret = "gate-secret"
-	cfgAloneMissingCaptchaKeys.BouncerCaptchaFilePath = captchaTemplate
+	cfgAloneMissingCaptchaKeys.CaptchaProvider = HcaptchaProvider
+	cfgAloneMissingCaptchaKeys.CaptchaGateSecret = "gate-secret"
+	cfgAloneMissingCaptchaKeys.CaptchaFilePath = captchaTemplate
 	cfgAloneBadLog := getMinimalConfig()
 	cfgAloneBadLog.LapiMode = AloneMode
 	cfgAloneBadLog.LapiCapiMachineID = "machine"
@@ -258,11 +258,11 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	cfgAppsecCaptchaOwnerOmit := getMinimalConfig()
 	cfgAppsecCaptchaOwnerOmit.CaptchaEnabled = true
 	cfgAppsecCaptchaOwnerOmit.BouncerAppsecFailureAction = FailureActionCaptcha
-	cfgAppsecCaptchaOwnerOmit.BouncerCaptchaProvider = HcaptchaProvider
-	cfgAppsecCaptchaOwnerOmit.BouncerCaptchaSiteKey = "site"
-	cfgAppsecCaptchaOwnerOmit.BouncerCaptchaSecretKey = "secret"
-	cfgAppsecCaptchaOwnerOmit.BouncerCaptchaGateSecret = "gate-secret"
-	cfgAppsecCaptchaOwnerOmit.BouncerCaptchaFilePath = captchaTemplate
+	cfgAppsecCaptchaOwnerOmit.CaptchaProvider = HcaptchaProvider
+	cfgAppsecCaptchaOwnerOmit.CaptchaSiteKey = "site"
+	cfgAppsecCaptchaOwnerOmit.CaptchaSecretKey = "secret"
+	cfgAppsecCaptchaOwnerOmit.CaptchaGateSecret = "gate-secret"
+	cfgAppsecCaptchaOwnerOmit.CaptchaFilePath = captchaTemplate
 	cfgAppsecCaptchaSubscriber := getMinimalConfig()
 	cfgAppsecCaptchaSubscriber.BouncerEnabled = true
 	cfgAppsecCaptchaSubscriber.CaptchaInstanceName = "shared"
@@ -305,12 +305,12 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 		{name: "Set provider does not own captcha", args: args{config: cfgProviderDoesNotOwn}, wantErr: false},
 		{name: "Subscriber leftover captcha keys do not fail", args: args{config: cfgSubscriberLeftoverKeys}, wantErr: false},
 		{name: "Leftover captcha instance name with nothing enabled fails", args: args{config: cfgCaptchaE2LeftoverName}, wantErr: true},
-		{name: "Leftover bouncerCaptcha keys are not E2 secrets", args: args{config: cfgCaptchaE2LeftoverKeysNotSecret}, wantErr: false},
+		{name: "Leftover captcha keys are not E2 secrets", args: args{config: cfgCaptchaE2LeftoverKeysNotSecret}, wantErr: false},
 		{name: "Bouncer with captcha off and no name succeeds", args: args{config: cfgCaptchaE3BounceNoName}, wantErr: false},
-		{name: "Provider set with empty site and secret", args: args{config: cfgEmptyKeysDefaultBan}, wantErr: true, wantErrContains: "BouncerCaptchaSiteKey: cannot be empty when BouncerCaptchaProvider is set"},
-		{name: "Provider set with only site empty", args: args{config: cfgOnlySiteEmpty}, wantErr: true, wantErrContains: "BouncerCaptchaSiteKey: cannot be empty when BouncerCaptchaProvider is set"},
-		{name: "Provider set with only secret empty", args: args{config: cfgOnlySecretEmpty}, wantErr: true, wantErrContains: "BouncerCaptchaSecretKey: cannot be empty when BouncerCaptchaProvider is set"},
-		{name: "Provider set with whitespace-only site", args: args{config: cfgWhitespaceSite}, wantErr: true, wantErrContains: "BouncerCaptchaSiteKey: cannot be empty when BouncerCaptchaProvider is set"},
+		{name: "Provider set with empty site and secret", args: args{config: cfgEmptyKeysDefaultBan}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},
+		{name: "Provider set with only site empty", args: args{config: cfgOnlySiteEmpty}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},
+		{name: "Provider set with only secret empty", args: args{config: cfgOnlySecretEmpty}, wantErr: true, wantErrContains: "CaptchaSecretKey: cannot be empty when CaptchaProvider is set"},
+		{name: "Provider set with whitespace-only site", args: args{config: cfgWhitespaceSite}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},
 		{name: "Unknown AppSec failure action", args: args{config: cfgUnknownAction}, wantErr: true},
 		{name: "Empty failure actions use default ban", args: args{config: cfgEmptyAction}, wantErr: false},
 		{name: "AppSec HTTPS with invalid CA while LAPI HTTP", args: args{config: cfgAppsecHTTPS}, wantErr: false},
@@ -325,7 +325,7 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 		{name: "AppSec only without LAPI key", args: args{config: cfgAppsecOnlyNoLapiKey}, wantErr: false},
 		{name: "None mode minimal config", args: args{config: cfgNoneMode}, wantErr: false},
 		{name: "Alone mode with CAPI credentials", args: args{config: cfgAloneValid}, wantErr: false},
-		{name: "Alone mode captcha without site/secret keys", args: args{config: cfgAloneMissingCaptchaKeys}, wantErr: true, wantErrContains: "BouncerCaptchaSiteKey: cannot be empty when BouncerCaptchaProvider is set"},
+		{name: "Alone mode captcha without site/secret keys", args: args{config: cfgAloneMissingCaptchaKeys}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},
 		{name: "Alone mode invalid log level", args: args{config: cfgAloneBadLog}, wantErr: true},
 		{name: "AppSec captcha action without instance name", args: args{config: cfgAppsecCaptchaNoInstance}, wantErr: true},
 		{name: "AppSec captcha action with owner omit fills name", args: args{config: cfgAppsecCaptchaOwnerOmit}, wantErr: false},
@@ -337,12 +337,12 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 		{name: "Custom form validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "form")}, wantErr: false},
 		{name: "Custom omit validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "")}, wantErr: false},
 		{name: "Custom whitespace-padded json accepted", args: args{config: newCustomValidateBodyConfig(t, " json ")}, wantErr: false},
-		{name: "Built-in json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(t, HcaptchaProvider, "json")}, wantErr: true, wantErrContains: "BouncerCaptchaCustomValidateBody: json is only valid when BouncerCaptchaProvider is custom"},
-		{name: "Recaptcha json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(t, RecaptchaProvider, "json")}, wantErr: true, wantErrContains: "BouncerCaptchaCustomValidateBody: json is only valid when BouncerCaptchaProvider is custom"},
-		{name: "Turnstile json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(t, TurnstileProvider, "json")}, wantErr: true, wantErrContains: "BouncerCaptchaCustomValidateBody: json is only valid when BouncerCaptchaProvider is custom"},
-		{name: "Unknown JSON token rejected", args: args{config: newCustomValidateBodyConfig(t, "JSON")}, wantErr: true, wantErrContains: "BouncerCaptchaCustomValidateBody: must be empty, form, or json"},
-		{name: "Unknown Form token rejected", args: args{config: newCustomValidateBodyConfig(t, "Form")}, wantErr: true, wantErrContains: "BouncerCaptchaCustomValidateBody: must be empty, form, or json"},
-		{name: "Unknown xml token rejected", args: args{config: newCustomValidateBodyConfig(t, "xml")}, wantErr: true, wantErrContains: "BouncerCaptchaCustomValidateBody: must be empty, form, or json"},
+		{name: "Built-in json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(t, HcaptchaProvider, "json")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom"},
+		{name: "Recaptcha json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(t, RecaptchaProvider, "json")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom"},
+		{name: "Turnstile json validate body rejected", args: args{config: newBuiltinValidateBodyConfig(t, TurnstileProvider, "json")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom"},
+		{name: "Unknown JSON token rejected", args: args{config: newCustomValidateBodyConfig(t, "JSON")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: must be empty, form, or json"},
+		{name: "Unknown Form token rejected", args: args{config: newCustomValidateBodyConfig(t, "Form")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: must be empty, form, or json"},
+		{name: "Unknown xml token rejected", args: args{config: newCustomValidateBodyConfig(t, "xml")}, wantErr: true, wantErrContains: "CaptchaCustomValidateBody: must be empty, form, or json"},
 		{name: "Built-in form validate body accepted", args: args{config: newBuiltinValidateBodyConfig(t, HcaptchaProvider, "form")}, wantErr: false},
 		{name: "Built-in omit validate body accepted", args: args{config: newBuiltinValidateBodyConfig(t, HcaptchaProvider, "")}, wantErr: false},
 	}
@@ -367,27 +367,27 @@ func Test_ValidateParams_captchaTemplateRequired(t *testing.T) {
 
 	cfgEmptyCaptchaPath := getMinimalConfig()
 	cfgEmptyCaptchaPath.CaptchaEnabled = true
-	cfgEmptyCaptchaPath.BouncerCaptchaProvider = HcaptchaProvider
-	cfgEmptyCaptchaPath.BouncerCaptchaSiteKey = "site"
-	cfgEmptyCaptchaPath.BouncerCaptchaSecretKey = "secret"
-	cfgEmptyCaptchaPath.BouncerCaptchaGateSecret = "gate-secret"
-	cfgEmptyCaptchaPath.BouncerCaptchaFilePath = ""
+	cfgEmptyCaptchaPath.CaptchaProvider = HcaptchaProvider
+	cfgEmptyCaptchaPath.CaptchaSiteKey = "site"
+	cfgEmptyCaptchaPath.CaptchaSecretKey = "secret"
+	cfgEmptyCaptchaPath.CaptchaGateSecret = "gate-secret"
+	cfgEmptyCaptchaPath.CaptchaFilePath = ""
 
 	cfgMissingCaptchaFile := getMinimalConfig()
 	cfgMissingCaptchaFile.CaptchaEnabled = true
-	cfgMissingCaptchaFile.BouncerCaptchaProvider = HcaptchaProvider
-	cfgMissingCaptchaFile.BouncerCaptchaSiteKey = "site"
-	cfgMissingCaptchaFile.BouncerCaptchaSecretKey = "secret"
-	cfgMissingCaptchaFile.BouncerCaptchaGateSecret = "gate-secret"
-	cfgMissingCaptchaFile.BouncerCaptchaFilePath = filepath.Join(t.TempDir(), "missing-captcha.html")
+	cfgMissingCaptchaFile.CaptchaProvider = HcaptchaProvider
+	cfgMissingCaptchaFile.CaptchaSiteKey = "site"
+	cfgMissingCaptchaFile.CaptchaSecretKey = "secret"
+	cfgMissingCaptchaFile.CaptchaGateSecret = "gate-secret"
+	cfgMissingCaptchaFile.CaptchaFilePath = filepath.Join(t.TempDir(), "missing-captcha.html")
 
 	cfgEmptyBanPath := getMinimalConfig()
 	cfgEmptyBanPath.CaptchaEnabled = true
-	cfgEmptyBanPath.BouncerCaptchaProvider = HcaptchaProvider
-	cfgEmptyBanPath.BouncerCaptchaSiteKey = "site"
-	cfgEmptyBanPath.BouncerCaptchaSecretKey = "secret"
-	cfgEmptyBanPath.BouncerCaptchaGateSecret = "gate-secret"
-	cfgEmptyBanPath.BouncerCaptchaFilePath = captchaTemplate
+	cfgEmptyBanPath.CaptchaProvider = HcaptchaProvider
+	cfgEmptyBanPath.CaptchaSiteKey = "site"
+	cfgEmptyBanPath.CaptchaSecretKey = "secret"
+	cfgEmptyBanPath.CaptchaGateSecret = "gate-secret"
+	cfgEmptyBanPath.CaptchaFilePath = captchaTemplate
 	cfgEmptyBanPath.BouncerBanFilePath = ""
 
 	cfgAloneEmptyCaptchaPath := getMinimalConfig()
@@ -395,11 +395,11 @@ func Test_ValidateParams_captchaTemplateRequired(t *testing.T) {
 	cfgAloneEmptyCaptchaPath.LapiCapiMachineID = "machine"
 	cfgAloneEmptyCaptchaPath.LapiCapiPassword = "password"
 	cfgAloneEmptyCaptchaPath.CaptchaEnabled = true
-	cfgAloneEmptyCaptchaPath.BouncerCaptchaProvider = HcaptchaProvider
-	cfgAloneEmptyCaptchaPath.BouncerCaptchaSiteKey = "site"
-	cfgAloneEmptyCaptchaPath.BouncerCaptchaSecretKey = "secret"
-	cfgAloneEmptyCaptchaPath.BouncerCaptchaGateSecret = "gate-secret"
-	cfgAloneEmptyCaptchaPath.BouncerCaptchaFilePath = ""
+	cfgAloneEmptyCaptchaPath.CaptchaProvider = HcaptchaProvider
+	cfgAloneEmptyCaptchaPath.CaptchaSiteKey = "site"
+	cfgAloneEmptyCaptchaPath.CaptchaSecretKey = "secret"
+	cfgAloneEmptyCaptchaPath.CaptchaGateSecret = "gate-secret"
+	cfgAloneEmptyCaptchaPath.CaptchaFilePath = ""
 
 	tests := []struct {
 		name            string
@@ -407,10 +407,10 @@ func Test_ValidateParams_captchaTemplateRequired(t *testing.T) {
 		wantErr         bool
 		wantErrContains string
 	}{
-		{name: "Provider set with empty captcha path", config: cfgEmptyCaptchaPath, wantErr: true, wantErrContains: "BouncerCaptchaFilePath: cannot be empty when BouncerCaptchaProvider is set"},
+		{name: "Provider set with empty captcha path", config: cfgEmptyCaptchaPath, wantErr: true, wantErrContains: "CaptchaFilePath: cannot be empty when CaptchaProvider is set"},
 		{name: "Provider set with missing captcha file", config: cfgMissingCaptchaFile, wantErr: true},
 		{name: "Provider set with empty ban path still accepted", config: cfgEmptyBanPath, wantErr: false},
-		{name: "Alone mode empty captcha path", config: cfgAloneEmptyCaptchaPath, wantErr: true, wantErrContains: "BouncerCaptchaFilePath: cannot be empty when BouncerCaptchaProvider is set"},
+		{name: "Alone mode empty captcha path", config: cfgAloneEmptyCaptchaPath, wantErr: true, wantErrContains: "CaptchaFilePath: cannot be empty when CaptchaProvider is set"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -687,16 +687,16 @@ func newCustomValidateBodyConfig(t *testing.T, validateBody string) *Config {
 	t.Helper()
 	cfg := getMinimalConfig()
 	cfg.CaptchaEnabled = true
-	cfg.BouncerCaptchaProvider = CustomProvider
-	cfg.BouncerCaptchaCustomKey = "wicketkeeper"
-	cfg.BouncerCaptchaCustomResponse = "wicketkeeper_solution"
-	cfg.BouncerCaptchaCustomValidateURL = "http://wicketkeeper:8080/v0/siteverify"
-	cfg.BouncerCaptchaCustomJsURL = "http://wicketkeeper:8080/fast.js"
-	cfg.BouncerCaptchaCustomValidateBody = validateBody
-	cfg.BouncerCaptchaSiteKey = "site"
-	cfg.BouncerCaptchaSecretKey = "secret"
-	cfg.BouncerCaptchaGateSecret = "gate-secret"
-	cfg.BouncerCaptchaFilePath = writeCaptchaTemplateFixture(t)
+	cfg.CaptchaProvider = CustomProvider
+	cfg.CaptchaCustomKey = "wicketkeeper"
+	cfg.CaptchaCustomResponse = "wicketkeeper_solution"
+	cfg.CaptchaCustomValidateURL = "http://wicketkeeper:8080/v0/siteverify"
+	cfg.CaptchaCustomJsURL = "http://wicketkeeper:8080/fast.js"
+	cfg.CaptchaCustomValidateBody = validateBody
+	cfg.CaptchaSiteKey = "site"
+	cfg.CaptchaSecretKey = "secret"
+	cfg.CaptchaGateSecret = "gate-secret"
+	cfg.CaptchaFilePath = writeCaptchaTemplateFixture(t)
 	return cfg
 }
 
@@ -704,12 +704,12 @@ func newBuiltinValidateBodyConfig(t *testing.T, provider, validateBody string) *
 	t.Helper()
 	cfg := getMinimalConfig()
 	cfg.CaptchaEnabled = true
-	cfg.BouncerCaptchaProvider = provider
-	cfg.BouncerCaptchaCustomValidateBody = validateBody
-	cfg.BouncerCaptchaSiteKey = "site"
-	cfg.BouncerCaptchaSecretKey = "secret"
-	cfg.BouncerCaptchaGateSecret = "gate-secret"
-	cfg.BouncerCaptchaFilePath = writeCaptchaTemplateFixture(t)
+	cfg.CaptchaProvider = provider
+	cfg.CaptchaCustomValidateBody = validateBody
+	cfg.CaptchaSiteKey = "site"
+	cfg.CaptchaSecretKey = "secret"
+	cfg.CaptchaGateSecret = "gate-secret"
+	cfg.CaptchaFilePath = writeCaptchaTemplateFixture(t)
 	return cfg
 }
 
@@ -721,24 +721,24 @@ func Test_New_captchaEnabledDefaultFalse(t *testing.T) {
 	if cfg.CaptchaInstanceName != "" {
 		t.Fatalf("New must default CaptchaInstanceName empty, got %q", cfg.CaptchaInstanceName)
 	}
-	cfg.BouncerCaptchaProvider = HcaptchaProvider
+	cfg.CaptchaProvider = HcaptchaProvider
 	if cfg.CaptchaEnabled {
-		t.Fatal("a set BouncerCaptchaProvider must not own captcha")
+		t.Fatal("a set CaptchaProvider must not own captcha")
 	}
 }
 
 func Test_validateCaptcha(t *testing.T) {
 	cfgCustomMissing := getMinimalConfig()
 	cfgCustomMissing.CaptchaEnabled = true
-	cfgCustomMissing.BouncerCaptchaProvider = CustomProvider
+	cfgCustomMissing.CaptchaProvider = CustomProvider
 	cfgCustomFourFields := getMinimalConfig()
 	cfgCustomFourFields.CaptchaEnabled = true
-	cfgCustomFourFields.BouncerCaptchaProvider = CustomProvider
-	cfgCustomFourFields.BouncerCaptchaCustomKey = "wicketkeeper"
-	cfgCustomFourFields.BouncerCaptchaCustomResponse = "wicketkeeper_solution"
-	cfgCustomFourFields.BouncerCaptchaCustomValidateURL = "http://wicketkeeper:8080/v0/siteverify"
-	cfgCustomFourFields.BouncerCaptchaCustomJsURL = "http://wicketkeeper:8080/fast.js"
-	cfgCustomFourFields.BouncerCaptchaCustomChallengeURL = ""
+	cfgCustomFourFields.CaptchaProvider = CustomProvider
+	cfgCustomFourFields.CaptchaCustomKey = "wicketkeeper"
+	cfgCustomFourFields.CaptchaCustomResponse = "wicketkeeper_solution"
+	cfgCustomFourFields.CaptchaCustomValidateURL = "http://wicketkeeper:8080/v0/siteverify"
+	cfgCustomFourFields.CaptchaCustomJsURL = "http://wicketkeeper:8080/fast.js"
+	cfgCustomFourFields.CaptchaCustomChallengeURL = ""
 	tests := []struct {
 		name    string
 		config  *Config
@@ -747,14 +747,14 @@ func Test_validateCaptcha(t *testing.T) {
 		{name: "Subscriber leftover provider is ignored", config: getMinimalConfig(), wantErr: false},
 		{name: "Subscriber leftover json body is ignored", config: func() *Config {
 			cfg := getMinimalConfig()
-			cfg.BouncerCaptchaProvider = HcaptchaProvider
-			cfg.BouncerCaptchaCustomValidateBody = "json"
+			cfg.CaptchaProvider = HcaptchaProvider
+			cfg.CaptchaCustomValidateBody = "json"
 			return cfg
 		}(), wantErr: false},
 		{name: "Valid hcaptcha provider", config: func() *Config {
 			cfg := getMinimalConfig()
 			cfg.CaptchaEnabled = true
-			cfg.BouncerCaptchaProvider = HcaptchaProvider
+			cfg.CaptchaProvider = HcaptchaProvider
 			return cfg
 		}(), wantErr: false},
 		{name: "Custom provider missing fields", config: cfgCustomMissing, wantErr: true},
@@ -806,12 +806,12 @@ func Test_validateEnabledCaptchaSettings_customChallengeURL(t *testing.T) {
 	newCustomConfig := func(challengeURL string) *Config {
 		cfg := getMinimalConfig()
 		cfg.CaptchaEnabled = true
-		cfg.BouncerCaptchaProvider = CustomProvider
-		cfg.BouncerCaptchaSiteKey = "site"
-		cfg.BouncerCaptchaSecretKey = "secret"
-		cfg.BouncerCaptchaGateSecret = "gate-secret"
-		cfg.BouncerCaptchaFilePath = captchaTemplate
-		cfg.BouncerCaptchaCustomChallengeURL = challengeURL
+		cfg.CaptchaProvider = CustomProvider
+		cfg.CaptchaSiteKey = "site"
+		cfg.CaptchaSecretKey = "secret"
+		cfg.CaptchaGateSecret = "gate-secret"
+		cfg.CaptchaFilePath = captchaTemplate
+		cfg.CaptchaCustomChallengeURL = challengeURL
 		return cfg
 	}
 	tests := []struct {
@@ -837,14 +837,14 @@ func Test_validateEnabledCaptchaSettings_customChallengeURL(t *testing.T) {
 	// A built-in provider ignores the key, so a stale value must not block startup.
 	builtin := getMinimalConfig()
 	builtin.CaptchaEnabled = true
-	builtin.BouncerCaptchaProvider = HcaptchaProvider
-	builtin.BouncerCaptchaSiteKey = "site"
-	builtin.BouncerCaptchaSecretKey = "secret"
-	builtin.BouncerCaptchaGateSecret = "gate-secret"
-	builtin.BouncerCaptchaFilePath = captchaTemplate
-	builtin.BouncerCaptchaCustomChallengeURL = "v0/challenge"
+	builtin.CaptchaProvider = HcaptchaProvider
+	builtin.CaptchaSiteKey = "site"
+	builtin.CaptchaSecretKey = "secret"
+	builtin.CaptchaGateSecret = "gate-secret"
+	builtin.CaptchaFilePath = captchaTemplate
+	builtin.CaptchaCustomChallengeURL = "v0/challenge"
 	if err := validateEnabledCaptchaSettings(builtin); err != nil {
-		t.Errorf("built-in provider must ignore BouncerCaptchaCustomChallengeURL, got %v", err)
+		t.Errorf("built-in provider must ignore CaptchaCustomChallengeURL, got %v", err)
 	}
 }
 

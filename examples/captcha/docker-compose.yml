@@ -38,16 +38,16 @@ services:
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
       # Definition of the middleware
       # Define captcha HTML file path
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaFilePath=/captcha.html"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaGateSecret=FIXME"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaFilePath=/captcha.html"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGateSecret=FIXME"
       # Define captcha grade period seconds
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaGracePeriodSeconds=20"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=20"
       # Choose captcha provider
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaProvider=hcaptcha"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaProvider=hcaptcha"
       # Define captcha secret key
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaSecretKey=FIXME"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSecretKey=FIXME"
       # Define captcha site key
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaSiteKey=FIXME"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSiteKey=FIXME"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerEnabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaEnabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiEnabled=true"

@@ -16,17 +16,17 @@ http:
     bouncer:
       plugin:
         bouncer:
-          bouncerCaptchaCustomJsUrl: "http://@@LAPI_HOST@@/dummy.js"
-          bouncerCaptchaCustomKey: dummy-captcha
-          bouncerCaptchaCustomResponse: dummy-captcha-response
-          bouncerCaptchaCustomValidateUrl: "http://@@LAPI_HOST@@/siteverify"
-          bouncerCaptchaFilePath: "@@SCENARIO_DIR@@/captcha.html"
-          bouncerCaptchaGateBindIp: true
-          bouncerCaptchaGateSecret: "e2e-mock-captcha-gate-secret"
-          bouncerCaptchaGracePeriodSeconds: "10"
-          bouncerCaptchaProvider: custom
-          bouncerCaptchaSecretKey: "e2e-dummy-secret"
-          bouncerCaptchaSiteKey: "e2e-dummy-site"
+          captchaCustomJsUrl: "http://@@LAPI_HOST@@/dummy.js"
+          captchaCustomKey: dummy-captcha
+          captchaCustomResponse: dummy-captcha-response
+          captchaCustomValidateUrl: "http://@@LAPI_HOST@@/siteverify"
+          captchaFilePath: "@@SCENARIO_DIR@@/captcha.html"
+          captchaGateBindIp: true
+          captchaGateSecret: "e2e-mock-captcha-gate-secret"
+          captchaGracePeriodSeconds: "10"
+          captchaProvider: custom
+          captchaSecretKey: "e2e-dummy-secret"
+          captchaSiteKey: "e2e-dummy-site"
           bouncerEnabled: "true"
           bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"

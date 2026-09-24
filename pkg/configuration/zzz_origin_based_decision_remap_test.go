@@ -76,7 +76,7 @@ func TestValidateOriginBasedDecisionRemap(t *testing.T) {
 
 func TestValidateOriginBasedDecisionRemap_DoesNotRequireCaptchaProvider(t *testing.T) {
 	cfg := getMinimalConfig()
-	cfg.BouncerCaptchaProvider = ""
+	cfg.CaptchaProvider = ""
 	cfg.BouncerOriginBasedDecisionRemap = map[string]map[string]string{"CAPI": {"ban": "captcha"}}
 	if err := ValidateParams(cfg, logger.New("ERROR", "")); err != nil {
 		t.Fatalf("remap must not require captchaProvider: %v", err)

@@ -55,6 +55,6 @@ _Avoid_: `CaptchaCustomValidateURL`, the bundled default `captcha.html`
 
 - Unsubscribed captcha WARN is router subscription, not identity. Do not add `ip`. Do not treat AppSec JSON `action: captcha` as this signal.
 - Built-in provider CDN URLs are not a match set, and their `ChallengeURL` renders empty.
-- Empty `bouncerCaptchaCustomChallengeUrl` keeps JsURL-path only; it is not a required custom field. A non-empty custom-provider value that names no absolute path is rejected by `validateEnabledCaptchaSettings` — that is master's owner, not a rival `validateConfiguredCaptcha`.
+- Empty `captchaCustomChallengeUrl` keeps JsURL-path only; it is not a required custom field. A non-empty custom-provider value that names no absolute path is rejected by `validateEnabledCaptchaSettings` — that is master's owner, not a rival `validateConfiguredCaptcha`.
 - A captcha token hidden inside an over-cap POST is deliberately missed; keeping the upload body intact for origin matters more.
 - Yaegi v0.16: do not put `atomic.Pointer[T]` on a struct consumed from another package.

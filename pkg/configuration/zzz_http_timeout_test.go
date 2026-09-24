@@ -9,9 +9,9 @@ import (
 
 func TestNew_TimeoutDefaultsAreTen(t *testing.T) {
 	cfg := New()
-	if cfg.LapiHTTPTimeoutSeconds != 10 || cfg.AppsecHTTPTimeoutSeconds != 10 || cfg.BouncerCaptchaSiteverifyHTTPTimeoutSeconds != 10 {
+	if cfg.LapiHTTPTimeoutSeconds != 10 || cfg.AppsecHTTPTimeoutSeconds != 10 || cfg.CaptchaSiteverifyHTTPTimeoutSeconds != 10 {
 		t.Fatalf("New must default each timeout knob to 10, got lapi=%d appsec=%d captcha=%d",
-			cfg.LapiHTTPTimeoutSeconds, cfg.AppsecHTTPTimeoutSeconds, cfg.BouncerCaptchaSiteverifyHTTPTimeoutSeconds)
+			cfg.LapiHTTPTimeoutSeconds, cfg.AppsecHTTPTimeoutSeconds, cfg.CaptchaSiteverifyHTTPTimeoutSeconds)
 	}
 }
 

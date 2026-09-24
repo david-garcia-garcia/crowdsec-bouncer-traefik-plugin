@@ -138,7 +138,9 @@ One Traefik middleware object can run up to four independent pieces:
 
 `bouncerEnabled` never opens a backend. An omitted instance name is filled with this Traefik middleware name only when that piece’s owner flag is true. LAPI, AppSec, and captcha use **separate** name tables, so all three may be called `shared`. A bouncing subscriber sets `bouncerEnabled: true` and the instance name, and leaves the owner flag false so it does not Open.
 
-**BREAKING:** YAML that only sets `bouncerCaptchaProvider` no longer owns or serves captcha. Set `captchaEnabled: true` on the owner (empty `captchaInstanceName` fills to the Traefik name). `captcha` failure action requires that router’s captcha instance name after fill.
+**BREAKING:** Owner-read captcha settings moved from `bouncerCaptcha*` / `BouncerCaptcha*` to `captcha*` / `Captcha*`. No old-key aliases. Operators must rename labels and YAML. Leftover `bouncerCaptcha*` is dropped. A leftover pre-prefix `captchaFilePath` starts matching `CaptchaFilePath` again (the captcha stem, not an alias).
+
+**BREAKING:** YAML that only sets `captchaProvider` no longer owns or serves captcha. Set `captchaEnabled: true` on the owner (empty `captchaInstanceName` fills to the Traefik name). `captcha` failure action requires that router’s captcha instance name after fill.
 
 ```mermaid
 flowchart LR
@@ -317,64 +319,64 @@ make run
 **BouncerBanFilePath** (string, default `""`)
 Path to the ban file. Empty disables it. Content-Type is inferred from the extension.
 
-**BouncerCaptchaCustomChallengeUrl** (string, default `""`)
+**CaptchaCustomChallengeUrl** (string, default `""`)
 `custom` only. Origin widget challenge URL (Wicketkeeper: `http://captcha.localhost:8000/v0/challenge`). Rendered as `{{ .ChallengeURL }}`. A captcha-flagged client may request this exact path and it is passed through (banned clients are not). Empty means no challenge passthrough.
 
-**BouncerCaptchaCustomJsUrl** (string, no default)
+**CaptchaCustomJsUrl** (string, no default)
 `custom` only. URL that loads the challenge in HTML (hCaptcha: `https://hcaptcha.com/1/api.js`). When the widget is on the protected router, a captcha-flagged client may request this exact path and it is passed through (banned clients are not).
 
-**BouncerCaptchaCustomKey** (string, no default)
+**CaptchaCustomKey** (string, no default)
 `custom` only. CSS class of the captcha div (hCaptcha: `h-captcha`).
 
-**BouncerCaptchaCustomResponse** (string, no default)
+**CaptchaCustomResponse** (string, no default)
 `custom` only. POST field from `captcha.html` (hCaptcha: `h-captcha-response`).
 
-**BouncerCaptchaCustomValidateBody** (string, default `""`)
+**CaptchaCustomValidateBody** (string, default `""`)
 Siteverify request encoding. After trim, exact lowercase `""` or `form` POSTs `application/x-www-form-urlencoded` `secret` and `response` (same as omit; Wicketkeeper). `json` POSTs `application/json` `{"secret","response"}`. `json` is `custom` only — a built-in plus `json` fails startup. `JSON`, `Form`, and any other token fail for every provider.
 
 CapJS / Cap Standalone as `custom` (operator HTML stays yours; no `trycap` provider):
 
 ```yaml
-bouncerCaptchaCustomJsUrl: https://<instance>/assets/widget.js
-bouncerCaptchaCustomKey: cap
-bouncerCaptchaCustomResponse: cap-token
-bouncerCaptchaCustomValidateBody: json
-bouncerCaptchaCustomValidateUrl: https://<instance>/<site_key>/siteverify
-bouncerCaptchaGateSecret: FIXME
-bouncerCaptchaProvider: custom
-bouncerCaptchaSecretKey: FIXME
-bouncerCaptchaSiteKey: FIXME
+captchaCustomJsUrl: https://<instance>/assets/widget.js
+captchaCustomKey: cap
+captchaCustomResponse: cap-token
+captchaCustomValidateBody: json
+captchaCustomValidateUrl: https://<instance>/<site_key>/siteverify
+captchaGateSecret: FIXME
+captchaProvider: custom
+captchaSecretKey: FIXME
+captchaSiteKey: FIXME
 captchaEnabled: true
 ```
 
-**BouncerCaptchaCustomValidateUrl** (string, no default)
-`custom` only. URL that validates the challenge (hCaptcha: `https://api.hcaptcha.com/siteverify`). Cap Standalone: `https://<instance>/<site_key>/siteverify` with `bouncerCaptchaCustomValidateBody: json`.
+**CaptchaCustomValidateUrl** (string, no default)
+`custom` only. URL that validates the challenge (hCaptcha: `https://api.hcaptcha.com/siteverify`). Cap Standalone: `https://<instance>/<site_key>/siteverify` with `captchaCustomValidateBody: json`.
 
-**BouncerCaptchaFilePath** (string, default `/captcha.html`)
+**CaptchaFilePath** (string, default `/captcha.html`)
 Path to the captcha template. Content-Type is inferred from the extension.
 
-**BouncerCaptchaGateBindIp** (bool, default `true`)
+**CaptchaGateBindIp** (bool, default `true`)
 When true, the gate cookie binds to the client IP from `GetRemoteIP`. When false, grace is cookie-only (HMAC + expiry).
 
-**bouncerCaptchaGateSecret** (string, no default)
-HMAC secret for the stateless captcha grace cookie (`crowdsec_captcha_gate`). Required when `captchaEnabled` is true. Not the same as `bouncerCaptchaSecretKey`.
+**captchaGateSecret** (string, no default)
+HMAC secret for the stateless captcha grace cookie (`crowdsec_captcha_gate`). Required when `captchaEnabled` is true. Not the same as `captchaSecretKey`.
 
-**bouncerCaptchaGateSecretFile** (string, no default)
-File path for `bouncerCaptchaGateSecret` (preferred over an inline secret when both are set).
+**captchaGateSecretFile** (string, no default)
+File path for `captchaGateSecret` (preferred over an inline secret when both are set).
 
-**BouncerCaptchaGracePeriodSeconds** (int64, default `1800` / 30 minutes)
+**CaptchaGracePeriodSeconds** (int64, default `1800` / 30 minutes)
 How long after a passed captcha before a new challenge, if the CrowdSec decision is still valid.
 
-**BouncerCaptchaProvider** (string, no default)
+**CaptchaProvider** (string, no default)
 Captcha validator. Expected: `hcaptcha`, `recaptcha`, `turnstile`, `custom`.
 
-**bouncerCaptchaSecretKey** (string, no default)
+**captchaSecretKey** (string, no default)
 Site secret key for the captcha provider.
 
-**bouncerCaptchaSiteKey** (string, no default)
+**captchaSiteKey** (string, no default)
 Site key for the captcha provider.
 
-**BouncerCaptchaSiteverifyHTTPTimeoutSeconds** (int64, default `10`)
+**CaptchaSiteverifyHTTPTimeoutSeconds** (int64, default `10`)
 Timeout in seconds for the captcha provider siteverify client. MUST be `>= 1`. Independent of the LAPI and AppSec timeouts.
 
 **BouncerClientTrustedIPs** ([]string, default `[]`)
@@ -522,7 +524,7 @@ On the request path, `true` returns **503** while any backend this bouncer subsc
 This middleware owns a LAPI client (`Open` + publish). Bounce still uses `bouncerEnabled`.
 
 **captchaEnabled** (bool, default `false`)
-This middleware owns a captcha client (`Open` + publish). Bounce still uses `bouncerEnabled`. A set `bouncerCaptchaProvider` alone does not own captcha.
+This middleware owns a captcha client (`Open` + publish). Bounce still uses `bouncerEnabled`. A set `captchaProvider` alone does not own captcha.
 
 **LapiInstanceName** / **AppsecInstanceName** / **CaptchaInstanceName** (string, default Traefik name when that leg is owned)
 Slot name bouncers subscribe to. LAPI, AppSec, and captcha are separate tables, so all three may be `shared`.
@@ -626,13 +628,13 @@ http:
           appsecScheme: ""
           bouncerAppsecFailureAction: passthrough
           bouncerBanFilePath: /ban.html
-          bouncerCaptchaFilePath: /captcha.html
-          bouncerCaptchaGateSecret: FIXME
-          bouncerCaptchaGracePeriodSeconds: 1800
-          bouncerCaptchaProvider: hcaptcha
-          bouncerCaptchaSecretKey: FIXME
-          bouncerCaptchaSiteKey: FIXME
-          bouncerCaptchaSiteverifyHttpTimeoutSeconds: 10
+          captchaFilePath: /captcha.html
+          captchaGateSecret: FIXME
+          captchaGracePeriodSeconds: 1800
+          captchaProvider: hcaptcha
+          captchaSecretKey: FIXME
+          captchaSiteKey: FIXME
+          captchaSiteverifyHttpTimeoutSeconds: 10
           bouncerClientTrustedIps:
             - 192.168.1.0/24
           bouncerDecisionHeader: X-Crowdsec-Decision # optional; earlier middleware writes b or c
@@ -711,7 +713,7 @@ http:
 
 #### Fill variable with value of file
 
-`LapiTLSClientKey`, `LapiTLSClientCertificate`, `LapiTLSCertificateAuthority`, `AppsecTLSCertificateAuthority`, `LapiCapiMachineID`, `LapiCapiPassword`, `lapiKey`, `appsecKey`, `bouncerCaptchaSiteKey`, `bouncerCaptchaSecretKey`, `bouncerCaptchaGateSecret` and `LapiRedisPassword` can be provided with the content as raw or through a file path that Traefik can read.  
+`LapiTLSClientKey`, `LapiTLSClientCertificate`, `LapiTLSCertificateAuthority`, `AppsecTLSCertificateAuthority`, `LapiCapiMachineID`, `LapiCapiPassword`, `lapiKey`, `appsecKey`, `captchaSiteKey`, `captchaSecretKey`, `captchaGateSecret` and `LapiRedisPassword` can be provided with the content as raw or through a file path that Traefik can read.  
 The file variable will be used as preference if both content and file are provided for the same variable.
 
 Format is:
