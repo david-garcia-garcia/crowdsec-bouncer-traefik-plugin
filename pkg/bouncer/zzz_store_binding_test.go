@@ -60,9 +60,17 @@ func TestStoreBinding_AlwaysStoresNewBox(t *testing.T) {
 	second := &lapi.Client{}
 
 	b.storeBinding(&dest, first)
-	firstBox := dest.Load().(*reclaim.Box)
+	firstStored := dest.Load()
+	firstBox, ok := firstStored.(*reclaim.Box)
+	if !ok {
+		t.Fatalf("first stored concrete type %T, want *reclaim.Box", firstStored)
+	}
 	b.storeBinding(&dest, second)
-	secondBox := dest.Load().(*reclaim.Box)
+	secondStored := dest.Load()
+	secondBox, ok := secondStored.(*reclaim.Box)
+	if !ok {
+		t.Fatalf("second stored concrete type %T, want *reclaim.Box", secondStored)
+	}
 
 	if firstBox == secondBox {
 		t.Fatal("later publish must Store a new *reclaim.Box, not mutate the prior one")
