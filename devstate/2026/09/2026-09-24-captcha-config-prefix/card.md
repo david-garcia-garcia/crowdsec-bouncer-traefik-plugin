@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 80ff1548
+Reviewed head: ea1ac704
 Owner decision: None.
 
 ## Review scores
@@ -66,7 +66,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 80ff1548f0f0a0ba8f9aea772baa428c0bf31e29 | Card must match the branch you measured |
+| Reviewed head | ea1ac704b015ea2beaecfa7840abce41b7e817cb | Card must match the branch you measured |
 
 ### Stored data model
 None.
