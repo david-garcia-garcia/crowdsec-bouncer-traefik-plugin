@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-09-24-recaptcha-enterprise",
+  "jobName": "2026-09-24-recaptcha-enterprise",
+  "startedAt": "2026-09-24T16:53:13.707Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T16:57:31.917Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T17:05:55.864Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T17:12:48.190Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T17:34:22.796Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T17:56:27.032Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T18:07:51.279Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T18:28:44.487Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T18:38:13.612Z"
+    }
+  }
+}

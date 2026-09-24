@@ -95,6 +95,21 @@ priority: normal
 local: core_plugin_middleware_captcha-siteverify.md
 description: How Validate encodes the provider siteverify request and classifies a JSON success reply.
 
+## Assessment
+priority: normal
+local: core_plugin_middleware_captcha-assessments.md
+description: How recaptcha-enterprise posts a solver token to Cloud assessments and classifies valid, action, and score.
+
+## Widget
+priority: normal
+local: core_plugin_middleware_captcha-widget.md
+description: How captcha construction pairs challenge-page widget data with a verifier and how ServeHTTP renders, retries, or omits boot.
+
+## Captcha enterprise config
+priority: normal
+local: core_plugin_middleware_captcha-enterprise-config.md
+description: How ValidateParams accepts recaptcha-enterprise and gates its key-type, project, API key, action, and min-score knobs.
+
 ## Forced decision header
 priority: normal
 local: core_plugin_middleware_forced-decision.md
