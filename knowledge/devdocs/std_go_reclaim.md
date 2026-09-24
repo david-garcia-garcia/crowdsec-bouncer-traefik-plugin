@@ -56,6 +56,7 @@ stored, err := reclaim.OpenWithHooks(ctx, key, log, func() (any, reclaim.Hooks, 
 - There is no Release and no unbind. The only way to give a holder back is to end the context that bound it, which is why callers that can fail after an `Open` bind a cancellable child of their own (`core_plugin_middleware.md` bind context).
 - `DefaultGrace` (10s) is the utilities negative-grace fallback. This plugin’s process table uses `ProcessGrace` (30s).
 - Yaegi v0.16 panics on asserting a foreign concrete type to closer/sleeper. Pass Hooks funcs. Alias fan-out uses `atomic.Value`, not `atomic.Pointer[T]`.
+- Watcher bindings store `*Box` only. After the first `Store`, publish a new `*Box` on every update — never assign `boxed.Value` in place (races with `Unbox`).
 - Sleep does not clear aliases. Close / unmap of that incarnation does.
 - Callers in another package import this shim, not `github.com/david-garcia-garcia/traefik-middleware-utilities/reclaim`.
 - Upstream table uses `time.AfterFunc` for grace so Yaegi v0.16 `interp._select` does not hang.

@@ -172,12 +172,9 @@ func (b *Bouncer) ReceiveCaptcha(published any) {
 	b.receiveCaptcha()
 }
 
+// storeBinding publishes value as a new immutable *reclaim.Box.
+// Never assign Box.Value in place: concurrent Unbox reads that field without sync.
 func (b *Bouncer) storeBinding(dest *atomic.Value, value any) {
-	prev := dest.Load()
-	if boxed, ok := prev.(*reclaim.Box); ok {
-		boxed.Value = value
-		return
-	}
 	dest.Store(&reclaim.Box{Value: value})
 }
 

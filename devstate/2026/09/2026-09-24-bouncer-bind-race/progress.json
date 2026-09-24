@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-09-24-bouncer-bind-race",
+  "jobName": "2026-09-24-bouncer-bind-race",
+  "startedAt": "2026-09-24T06:33:16.979Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T06:36:00.155Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T06:41:28.901Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T06:45:40.749Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T08:02:16.036Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T08:19:45.172Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T08:22:26.976Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T08:25:10.879Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": false,
+      "at": null
+    }
+  }
+}
