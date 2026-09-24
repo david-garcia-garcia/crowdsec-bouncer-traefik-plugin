@@ -21,18 +21,18 @@ The `custom` provider cannot stand in. Its JSON body is fixed as `secret`, `resp
 - **Widget** — data the challenge page reads: script URL, CSS class, token field name, optional action, boot script, and whether a refused token may render the puzzle again.
 - **Verifier** — `Pass(token, remoteIP) (bool, error)`.
 
-`Validate` returns three outcomes, not one boolean:
+`Validate` returns `(Outcome, error)` with `None`, `Pass`, and `Reject`. Error is the error return. `Verifier.Pass` stays `(bool, error)`.
 
 | Outcome | When |
 | --- | --- |
-| No token | The request is not a POST, or the token field is empty. |
+| None | The request is not a POST, or the token field is empty. |
 | Pass | `verifier.Pass` returns true. |
 | Reject | A token was posted and `verifier.Pass` returns false with no error. |
-| Error | Transport failed, or the body was not decodable JSON. Same classification as siteverify today: `(false, err)`. |
+| Error | Transport failed, or the body was not decodable JSON. Siteverify still returns `(false, err)` from `Pass` for transport and JSON `Decode` only. A siteverify Content-Type miss stays Pass-false with no error. Assessment missing or non-JSON body is Error. |
 
 `ServeHTTP`:
 
-- Error or no token: render the challenge. The boot script runs.
+- Error or None: render the challenge. The boot script runs.
 - Pass: mint `crowdsec_captcha_gate`, set the remediation header to `solved-captcha`, `302` to the request URL. Unchanged.
 - Reject and the widget allows retry: render the challenge again (checkbox).
 - Reject and the widget does not allow retry: render the same page with the boot script omitted (score), so the browser does not call Google again.
@@ -49,18 +49,18 @@ One interface. Two implementations. The form-versus-JSON choice stays inside the
 
 - `event.token` — the posted token
 - `event.siteKey` — the configured site key
-- `event.userIpAddress` — only when the client address is non-empty
-- `event.expectedAction` — only when an action is configured
+- `event.userIpAddress` — only when the client address is non-empty. That address is `GetRemoteIP` / `clientRequest.remoteIP` already passed into `Validate` / `Pass`. Do not parse forwarded headers in captcha.
+- `event.expectedAction` — only when an action is configured (non-empty after trim)
 
-Send the API key as the `X-Goog-Api-Key` header, after one check that this endpoint accepts it. Do not put the key in the query string. Do not log the key. Use the `net/http` client the captcha client already holds and `captchaSiteverifyHTTPTimeoutSeconds`. No Google client library.
+Send the API key as the `X-Goog-Api-Key` header. Do not put the key in the query string. Do not log the key. Use the `net/http` client the captcha client already holds and `captchaSiteverifyHTTPTimeoutSeconds`. No Google client library.
 
 Pass, in order:
 
 1. `tokenProperties.valid` is true.
-2. When an action is configured, `tokenProperties.action` equals it.
+2. When an action is configured, `tokenProperties.action` equals it case-insensitively.
 3. When a minimum score is configured, `riskAnalysis.score` is at least that minimum.
 
-A checkbox key with no minimum passes on `valid` alone. A missing or non-JSON body is an error outcome, not a reject.
+A checkbox key with no minimum passes on `valid` alone. A missing or non-JSON assessment body, a non-2xx response, or a Google error envelope without `tokenProperties` is an error outcome, not a reject. A successful Assessment with `valid` false is Reject.
 
 ## Widgets
 
@@ -76,7 +76,7 @@ A checkbox key with no minimum passes on `valid` alone. A missing or non-JSON bo
 
 The boot script is fixed Go text for that key type. It reads the site key and the action from the page. It is not an operator-supplied string.
 
-The stock `captcha.html` stays one page. Template data gains the boot script, the action, and whether to draw the checkbox. Existing placeholders `SiteKey`, `FrontendJS`, `FrontendKey`, and `ChallengeURL` stay. Operators who replace the template and want a score key must include the boot placeholder. Checkbox keeps working on a template that only has the current `g-recaptcha` div, as long as `FrontendJS` is the enterprise script.
+The stock `captcha.html` stays one page. Template data keeps `SiteKey`, `FrontendJS`, `FrontendKey`, and `ChallengeURL`, and gains `BootScript`, `Action`, and `DrawCheckbox`. The map stays `map[string]string`. `DrawCheckbox` is non-empty when the checkbox div should render. Operators who replace the template and want a score key must include the boot placeholder. Checkbox keeps working on a template that only has the current `g-recaptcha` div, as long as `FrontendJS` is the enterprise script.
 
 ## Config
 
@@ -95,7 +95,7 @@ Optional or conditional:
 | Knob | Checkbox | Score |
 | --- | --- | --- |
 | `captchaEnterpriseAction` | optional. Empty omits `data-action` and `expectedAction` | required |
-| `captchaEnterpriseMinScore` | optional. Empty ignores `riskAnalysis.score` | required, and must be greater than zero |
+| `captchaEnterpriseMinScore` | optional. Empty ignores `riskAnalysis.score`. String on Config; parse at `ValidateParams`. | required. Parsed `float64` greater than zero and at most 1. Zero, negative, 1.1, and non-numeric fail. |
 
 `captchaSecretKey` is the siteverify shared secret. This provider does not use it. `ValidateParams` must not require it when the provider is `recaptcha-enterprise`. The gate secret stays required. The site key stays required.
 
