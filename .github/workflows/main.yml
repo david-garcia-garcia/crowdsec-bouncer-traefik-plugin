@@ -68,17 +68,23 @@ jobs:
           git diff --exit-code go.mod
           # git diff --exit-code go.sum
           go mod download
-          # Keep committed vendor (ad-hoc reclaim Peek). go mod vendor restores
-          # published utilities v1.0.6 which has no Peek. Re-enable with vendor
-          # git-diff after upstream Peek: knowledge/debt/2026-09-20-upstream-reclaim-peek.md
-          # go mod vendor
-          # git diff --exit-code ./vendor/
+          go mod vendor
+          git diff --exit-code ./vendor/
 
       - name: Lint
         run: make lint
 
       - name: Tests
         run: make test
+
+      # Yaegi v0.16 resolves imports from GOPATH/src, not vendor, for a test-only
+      # module path. Copy published utilities so traefikemulator is findable.
+      - name: Expose utilities on GOPATH for Yaegi
+        run: |
+          dest="${{ github.workspace }}/go/src/github.com/david-garcia-garcia/traefik-middleware-utilities"
+          mkdir -p "$(dirname "$dest")"
+          rm -rf "$dest"
+          cp -a vendor/github.com/david-garcia-garcia/traefik-middleware-utilities "$dest"
 
       - name: Run tests with Yaegi
         run: make yaegi_test

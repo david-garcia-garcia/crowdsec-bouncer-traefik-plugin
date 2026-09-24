@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-09-24-adopt-utilities-v1-0-7",
+  "jobName": "2026-09-24-adopt-utilities-v1-0-7",
+  "startedAt": "2026-09-24T08:48:39.170Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T08:51:07.780Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T08:56:47.220Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T09:00:56.068Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T09:23:45.023Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T09:43:47.574Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T09:52:52.463Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T09:56:49.912Z"
+    },
+    "pullrequest": {
+      "work": false,
+      "card": false,
+      "at": null
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # traefikemulator
 
-Test helper at `pkg/traefikemulator`. Test suites import it and pass `New`. The package does not import this module.
+Test helper at `github.com/david-garcia-garcia/traefik-middleware-utilities/traefikemulator`. Test suites import it and pass `New`. The package does not import this module.
 
 It copies `RouterFactory.CreateRouters`: cancel the previous generation, then construct every route on one new context. `Serve(routeName, req)` calls that generation's handler. No host, path, or priority matching.
 

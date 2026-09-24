@@ -13,7 +13,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/traefikemulator"
+	"github.com/david-garcia-garcia/traefik-middleware-utilities/traefikemulator"
 )
 
 func pluginConstructor(ctx context.Context, next http.Handler, config any, name string) (http.Handler, error) {
