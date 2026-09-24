@@ -21,7 +21,7 @@ Validation no longer fail-closes on captcha or ban template load in `ValidatePar
 In progress. 0 items remain.
 
 Priority: P2 — real operator pain (dead route or silent empty ban) with a workaround (fix template paths before deploy).
-Reviewed head: ea195d65
+Reviewed head: 26fc63b7
 Owner decision: None.
 
 ## Review scores
@@ -44,7 +44,10 @@ Owner decision: None.
 
 ## Specs
 Worktree:
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-template-startup-warn/openspec/changes/2026-09-24-template-startup-warn/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-template-startup-warn/openspec/changes/archive/2026-09-24-template-startup-warn/proposal.md) — modified
+
+Completed:
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-template-startup-warn/openspec/specs/core_plugin_middleware_config-validation/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -79,9 +82,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | ea195d6527fde982671130374b24c2c1e71bc2f7 | Card must match the branch you measured |
+| Reviewed head | 26fc63b7a6f6133fa7d14f57c482c218a72d61cc | Card must match the branch you measured |
 
 ### Stored data model
 None.
