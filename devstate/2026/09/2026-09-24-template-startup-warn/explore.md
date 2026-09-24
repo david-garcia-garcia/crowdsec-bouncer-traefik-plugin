@@ -88,8 +88,8 @@ No hard gap. **CaptchaEnabled**, **Captcha Client**, **Bouncer**, **Config valid
 
 - Q: Exact warning text?
   Rank: additive asked — new log lines this change creates; Desired Warn once at startup that captcha responses will fall back to ban
-  Decision: assumed — one-line WARN that names empty vs unloadable and the fallback; exact copy is implement
-  By: explore
+  Decision: resolved — captcha owner WARN `crowdsec captcha template unavailable` with `reason` empty|unloadable; bouncer WARN `crowdsec bouncer ban template unavailable` with the same `reason`. Fallback is the existing ban / empty-body path.
+  By: propose
 
 - Q: Does Client.New leave Valid false so the existing ban fallback fires, or stay Valid and choose ban elsewhere?
   Rank: bounded asked — Client.New Valid already consumed at 1 handleRemediationServeHTTP branch; Unknowns Explore owns that
