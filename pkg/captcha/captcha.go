@@ -53,6 +53,8 @@ type infoProvider struct {
 	validate string
 }
 
+const msgCaptchaTemplateUnavailable = "crowdsec captcha template unavailable"
+
 //nolint:gochecknoglobals
 var infoProviders = map[string]*infoProvider{
 	configuration.HcaptchaProvider: {
@@ -97,7 +99,12 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 	c.gateBindIP = gateBindIP
 	challengeTemplate, contentType, err := configuration.GetTemplate(captchaTemplatePath)
 	if err != nil {
-		return err
+		c.Valid = false
+		c.gracePeriodSeconds = gracePeriodSeconds
+		c.log = log
+		c.httpClient = httpClient
+		c.log.Warn(msgCaptchaTemplateUnavailable, "reason", configuration.TemplateUnavailableReason(captchaTemplatePath, err))
+		return nil
 	}
 	c.template = challengeTemplate
 	c.templateContentType = contentType
