@@ -9,3 +9,5 @@
 - updated knowledge/devdocs/core_plugin_middleware_config-validation.md
 - updated knowledge/devdocs/core_plugin_middleware_captcha-siteverify.md
 - updated knowledge/devdocs/core_plugin_middleware_captcha-assessments.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-gate.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-enterprise-config.md

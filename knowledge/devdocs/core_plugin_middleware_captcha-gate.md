@@ -3,7 +3,7 @@
 ## Language
 
 **Captcha gate cookie**:
-HttpOnly `crowdsec_captcha_gate` issued after provider siteverify succeeds. Payload is versioned, HMAC-SHA256 signed with `captchaGateSecret`. Grace is not stored in the connection cache.
+HttpOnly `crowdsec_captcha_gate` issued after Validate Pass. Payload is versioned, HMAC-SHA256 signed with `captchaGateSecret`. Grace is not stored in the connection cache.
 _Avoid_: `{ip}_captcha`, `CaptchaDoneValue`, reusing `CaptchaSecretKey` for the gate MAC, leftover `bouncerCaptchaGateSecret`
 
 ## Overview
