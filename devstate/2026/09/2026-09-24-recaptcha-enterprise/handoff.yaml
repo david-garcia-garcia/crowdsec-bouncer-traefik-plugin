@@ -6,9 +6,13 @@ prHost: github
 ciHost: github
 repoSlug: crowdsec-bouncer-traefik-plugin
 destBranch: master
+qualify: qualified-with-gaps
+src: 698d123d937747795c114dcb5508766e8cb6631af1a21ebb485898ca454d4dd3
 localTests: none
 requirement: requirement.md
 comments: none
 explore: none
 change: none
-pr: none
+pr:
+  id: 149
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/149
