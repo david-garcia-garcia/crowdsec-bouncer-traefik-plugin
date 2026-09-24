@@ -71,22 +71,23 @@ Seventeen fields (from the prepared ticket list; `CaptchaEnabled` / `CaptchaInst
 
 ## Open questions
 
-- Q: Which in-tree files still spell `bouncerCaptcha*` / `BouncerCaptcha*` as current contract and must move with the fields?
-  Rank: bounded asked — 34 current-contract files enumerated (roots: worktree minus archive and other-run `devstate/`; patterns `BouncerCaptcha` and `bouncerCaptcha`); Desired “Move GetVariable lookup strings, validation error text, README, e2e labels, and tests that name the old keys with the fields”
-  Decision: resolved — migrate those 34. Leave archived OpenSpec folders and other-run `devstate/` alone.
+- Q: Which in-tree files still spell bouncerCaptcha* / BouncerCaptcha* as current contract and must move with the fields?
+  Rank: bounded asked — 34 current-contract files enumerated (roots: worktree minus archive and other-run devstate; patterns BouncerCaptcha and bouncerCaptcha); Desired Move GetVariable, validation errors, README, e2e labels, and tests with the fields
+  Decision: resolved — migrate those 34. Leave archived OpenSpec folders and other-run devstate alone.
   By: explore
 
 - Q: After the stem move, should leftover owner-read captcha settings stay non-E2?
-  Rank: additive incidental — no existing leftover-secret rule is being rewritten at scale; no criterion names leftover-secret classification
-  Decision: assumed — leftover owner-read captcha knobs stay non-E2 (`validateOpenVsSubscribe` still passes `secretPresent=false` for captcha). Leftover `captchaInstanceName` stays E2. Dropped `bouncerCaptcha*` keys never reach `New`.
+  Rank: additive incidental — no leftover-secret rule is rewritten at scale; no criterion names leftover-secret classification
+  Decision: assumed — leftover owner-read captcha knobs stay non-E2 (validateOpenVsSubscribe still passes secretPresent=false for captcha). Leftover captchaInstanceName stays E2. Dropped bouncerCaptcha* keys never reach New.
   By: explore
 
 - Q: What is the operator blast radius outside this tree?
-  Rank: structural asked — callers of the public YAML/label contract outside this tree cannot be enumerated; Problem “Breaking the public contract is accepted” and Desired “Do not keep old-key aliases”
-  Decision: assumed — break the keys; no aliases; README BREAKING names the stem move. Operators must rename labels/YAML. Pre-prefix leftovers that already spelled `captchaFilePath` (before the 2026-09-23 bouncer prefix) start mapping again; current `bouncerCaptcha*` stops. That revival is a consequence of returning to the captcha stem, not an alias.
+  Rank: structural asked — callers of the public YAML/label contract outside this tree cannot be enumerated; Problem Breaking the public contract is accepted and Desired Do not keep old-key aliases
+  Decision: assumed — break the keys; no aliases; README BREAKING names the stem move. Operators must rename labels/YAML. Pre-prefix captchaFilePath leftovers start mapping again; current bouncerCaptcha* stops. That revival is the captcha stem, not an alias.
   By: explore
 
 - Q: Who already owns client address, user, tenant, Host, or trust hop for this change?
   Rank: additive incidental — no criterion names identity reconstruction; this rename does not set those facts
-  Decision: resolved — none. Gate bind still reads `clientRequest.remoteIP` from ServeHTTP (`pkg/ip.GetRemoteIP`). Do not reconstruct identity in configuration or captcha Open.
+  Decision: resolved — none. Gate bind still reads clientRequest.remoteIP from ServeHTTP (pkg/ip.GetRemoteIP). Do not reconstruct identity in configuration or captcha Open.
   By: explore
+

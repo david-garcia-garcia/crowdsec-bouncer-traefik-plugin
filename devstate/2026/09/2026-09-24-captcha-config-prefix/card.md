@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 26dca5a2
+Reviewed head: 80ff1548
 Owner decision: None.
 
 ## Review scores
@@ -66,7 +66,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 26dca5a2b131552704c81b4d96200da4bc795213 | Card must match the branch you measured |
+| Reviewed head | 80ff1548f0f0a0ba8f9aea772baa428c0bf31e29 | Card must match the branch you measured |
 
 ### Stored data model
 None.
