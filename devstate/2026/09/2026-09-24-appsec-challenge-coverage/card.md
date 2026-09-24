@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: a39c67bc
-Owner decision: None.
+Reviewed head: ce6202d9
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -51,7 +51,10 @@ None.
 Ticket 2026-09-24-appsec-challenge-coverage on branch 2026-09-24-appsec-challenge-coverage targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/146; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Does case 1 need a ban-page body assertion plus an explicit empty-string `user_body_content` case, or is `TestHandleNextServeHTTPEmptyChallengeBodyBans` enough? | additive asked — new assertions on the existing AppSec test file; Desired names "operator ban page" and "missing or empty" | assumed — not enough as written (`banTemplate` is nil; only the omitted-field JSON). Add or extend tests for missing and `user_body_content:""` with a non-nil `banTemplate` so the operator ban page is asserted. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | a39c67bcca3f02bd4744d180c44d342144002670 | Card must match the branch you measured |
+| Reviewed head | ce6202d9a122436d1bb7a4f52aec077dbaaebed4 | Card must match the branch you measured |
 
 ### Stored data model
 None.
