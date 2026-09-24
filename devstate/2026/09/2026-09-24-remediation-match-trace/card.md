@@ -20,7 +20,7 @@ On the remediating path, TRACE reuses the `RequestScopeValues` map already in ha
 In progress. 1 items remain.
 
 Priority: P2 — real operator diagnostic pain, with a workaround or limited blast radius
-Reviewed head: 45e2a9cf
+Reviewed head: bec590bc
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -43,7 +43,10 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [std_go_logger_debug-attrs](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-remediation-match-trace/openspec/changes/remediation-match-trace/proposal.md) — modified
+- [std_go_logger_debug-attrs](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-remediation-match-trace/openspec/changes/archive/2026-09-24-remediation-match-trace/proposal.md) — modified
+
+Completed:
+- [std_go_logger_debug-attrs](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-remediation-match-trace/openspec/specs/std_go_logger_debug-attrs/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -81,9 +84,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 45e2a9cf85b40168a6b509cac3b768b5681f5b2c | Card must match the branch you measured |
+| Reviewed head | bec590bc480097fa8a62aa4479f341fb68f7b6a8 | Card must match the branch you measured |
 
 ### Stored data model
 None.
