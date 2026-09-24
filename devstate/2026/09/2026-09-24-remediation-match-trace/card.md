@@ -17,7 +17,7 @@ Not yet.
 In progress. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 6d067b6e
+Reviewed head: b39ef60c
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,14 +32,16 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-24-remediation-match-trace pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | remediation-match-trace | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/152 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [std_go_logger_debug-attrs](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-remediation-match-trace/openspec/changes/remediation-match-trace/proposal.md) — modified
+
 
 ## Deviations from the ask
 None.
@@ -68,9 +70,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 6d067b6e552f716d6b7f62fb8533e25c0fc9a79c | Card must match the branch you measured |
+| Reviewed head | b39ef60c880fc909be292c38ce3c3c5bad8b35c2 | Card must match the branch you measured |
 
 ### Stored data model
 None.
