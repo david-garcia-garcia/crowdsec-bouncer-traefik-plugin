@@ -20,7 +20,7 @@ Construction adds a named `eucaptcha` case next to `recaptcha-enterprise`: the o
 In progress. 1 items remain.
 
 Priority: P2 — operators who need EU CAPTCHA cannot select it, with blast radius limited to that missing choice
-Reviewed head: 99f4a519
+Reviewed head: ad18f541
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -87,7 +87,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 3 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 99f4a519d33de51d153e0154355eab0b7a95c9bd | Card must match the branch you measured |
+| Reviewed head | ad18f5413369ddf1c18add5dcec4daa4349e2869 | Card must match the branch you measured |
 
 ### Stored data model
 None.
