@@ -12,7 +12,7 @@ localTests: none
 requirement: requirement.md
 comments: none
 explore: explore.md
-change: none
+change: appsec-challenge-coverage
 pr:
   id: 146
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/146
