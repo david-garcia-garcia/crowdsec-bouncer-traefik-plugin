@@ -92,7 +92,8 @@ CrowdSec remediations this plugin applies ([CrowdSec bouncers](https://docs.crow
 Captcha providers:
 
 - [hCaptcha](https://www.hcaptcha.com/)
-- [reCAPTCHA](https://www.google.com/recaptcha/about/)
+- [reCAPTCHA](https://www.google.com/recaptcha/about/) (classic `recaptcha`: `api.js` / siteverify)
+- [reCAPTCHA Enterprise](https://cloud.google.com/recaptcha/docs/introduction) (`recaptcha-enterprise`: `enterprise.js` / Cloud assessments)
 - [Turnstile](https://www.cloudflare.com/products/turnstile/)
 - [custom / Wicketkeeper](https://github.com/a-ve/wicketkeeper)
 
@@ -352,6 +353,24 @@ captchaEnabled: true
 **CaptchaCustomValidateUrl** (string, no default)
 `custom` only. URL that validates the challenge (hCaptcha: `https://api.hcaptcha.com/siteverify`). Cap Standalone: `https://<instance>/<site_key>/siteverify` with `captchaCustomValidateBody: json`.
 
+**captchaEnterpriseAction** (string, default `""`)
+`recaptcha-enterprise` only. Assessment `expectedAction` and checkbox `data-action`. Required for `score`. Empty is valid for `checkbox` (omits both).
+
+**captchaEnterpriseApiKey** (string, no default)
+`recaptcha-enterprise` only. Google Cloud API key sent as `X-Goog-Api-Key`. Required when this provider is selected.
+
+**captchaEnterpriseApiKeyFile** (string, no default)
+File path for `captchaEnterpriseApiKey` (preferred over an inline key when both are set).
+
+**captchaEnterpriseKeyType** (string, no default)
+`recaptcha-enterprise` only. Expected: `checkbox` or `score`. Required when this provider is selected.
+
+**captchaEnterpriseMinScore** (string, default `""`)
+`recaptcha-enterprise` only. Minimum `riskAnalysis.score` (`0.0`–`1.0`) as a string. Required for `score` and must parse greater than `0` and at most `1`. Empty is valid for `checkbox` (score is ignored).
+
+**captchaEnterpriseProjectId** (string, no default)
+`recaptcha-enterprise` only. Google Cloud project id in the assessments URL. Required when this provider is selected.
+
 **CaptchaFilePath** (string, default `/captcha.html`)
 Path to the captcha template. Content-Type is inferred from the extension.
 
@@ -368,10 +387,10 @@ File path for `captchaGateSecret` (preferred over an inline secret when both are
 How long after a passed captcha before a new challenge, if the CrowdSec decision is still valid.
 
 **CaptchaProvider** (string, no default)
-Captcha validator. Expected: `hcaptcha`, `recaptcha`, `turnstile`, `custom`.
+Captcha validator. Expected: `hcaptcha`, `recaptcha`, `recaptcha-enterprise`, `turnstile`, `custom`. Classic `recaptcha` stays on `api.js` and siteverify. `recaptcha-enterprise` loads `enterprise.js` and calls Cloud assessments.
 
 **captchaSecretKey** (string, no default)
-Site secret key for the captcha provider.
+Site secret key for the captcha provider. Unused for `recaptcha-enterprise` (not required). Required for `hcaptcha`, `recaptcha`, `turnstile`, and `custom`.
 
 **captchaSiteKey** (string, no default)
 Site key for the captcha provider.
@@ -713,7 +732,7 @@ http:
 
 #### Fill variable with value of file
 
-`LapiTLSClientKey`, `LapiTLSClientCertificate`, `LapiTLSCertificateAuthority`, `AppsecTLSCertificateAuthority`, `LapiCapiMachineID`, `LapiCapiPassword`, `lapiKey`, `appsecKey`, `captchaSiteKey`, `captchaSecretKey`, `captchaGateSecret` and `LapiRedisPassword` can be provided with the content as raw or through a file path that Traefik can read.  
+`LapiTLSClientKey`, `LapiTLSClientCertificate`, `LapiTLSCertificateAuthority`, `AppsecTLSCertificateAuthority`, `LapiCapiMachineID`, `LapiCapiPassword`, `lapiKey`, `appsecKey`, `captchaSiteKey`, `captchaSecretKey`, `captchaEnterpriseApiKey`, `captchaGateSecret` and `LapiRedisPassword` can be provided with the content as raw or through a file path that Traefik can read.  
 The file variable will be used as preference if both content and file are provided for the same variable.
 
 Format is:

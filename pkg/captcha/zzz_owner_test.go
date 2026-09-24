@@ -99,3 +99,13 @@ func TestOwnershipKey_ExcludesSlotAndBounce(t *testing.T) {
 		t.Fatal("slot name, bounce, failure, header, and startup-block must stay off the ownership key")
 	}
 }
+
+func TestOwnershipKey_EnterpriseKnobChangeReclaims(t *testing.T) {
+	left := testOwnerConfig(t, 10)
+	left.CaptchaEnterpriseMinScore = "0.5"
+	right := *left
+	right.CaptchaEnterpriseMinScore = "0.9"
+	if OwnershipKey(left, "mw") == OwnershipKey(&right, "mw") {
+		t.Fatal("enterprise knob change must change the ownership key")
+	}
+}

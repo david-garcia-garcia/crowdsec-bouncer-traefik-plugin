@@ -47,12 +47,18 @@ type ownership struct {
 	CustomResponse               string `json:"customResponse"`
 	CustomValidateURL            string `json:"customValidateUrl"`
 	CustomValidateBody           string `json:"customValidateBody"`
+	EnterpriseAction             string `json:"enterpriseAction"`
+	EnterpriseAPIKey             string `json:"enterpriseApiKey"`
+	EnterpriseKeyType            string `json:"enterpriseKeyType"`
+	EnterpriseMinScore           string `json:"enterpriseMinScore"`
+	EnterpriseProjectID          string `json:"enterpriseProjectId"`
 }
 
 func ownershipFrom(cfg *configuration.Config, middlewareName string) ownership {
 	siteKey, _ := configuration.GetVariable(cfg, "CaptchaSiteKey")
 	secretKey, _ := configuration.GetVariable(cfg, "CaptchaSecretKey")
 	gateSecret, _ := configuration.GetVariable(cfg, "CaptchaGateSecret")
+	enterpriseAPIKey, _ := configuration.GetVariable(cfg, "CaptchaEnterpriseAPIKey")
 	return ownership{
 		MiddlewareName:               middlewareName,
 		Provider:                     cfg.CaptchaProvider,
@@ -69,6 +75,11 @@ func ownershipFrom(cfg *configuration.Config, middlewareName string) ownership {
 		CustomResponse:               cfg.CaptchaCustomResponse,
 		CustomValidateURL:            cfg.CaptchaCustomValidateURL,
 		CustomValidateBody:           cfg.CaptchaCustomValidateBody,
+		EnterpriseAction:             cfg.CaptchaEnterpriseAction,
+		EnterpriseAPIKey:             enterpriseAPIKey,
+		EnterpriseKeyType:            cfg.CaptchaEnterpriseKeyType,
+		EnterpriseMinScore:           cfg.CaptchaEnterpriseMinScore,
+		EnterpriseProjectID:          cfg.CaptchaEnterpriseProjectID,
 	}
 }
 
@@ -125,6 +136,7 @@ func newOwnerClient(cfg *configuration.Config, log *slog.Logger, middlewareName,
 	siteKey, _ := configuration.GetVariable(cfg, "CaptchaSiteKey")
 	secretKey, _ := configuration.GetVariable(cfg, "CaptchaSecretKey")
 	gateSecret, _ := configuration.GetVariable(cfg, "CaptchaGateSecret")
+	enterpriseAPIKey, _ := configuration.GetVariable(cfg, "CaptchaEnterpriseAPIKey")
 	log = log.With(
 		"traefikName", middlewareName,
 		"instanceName", cfg.CaptchaInstanceName,
@@ -151,6 +163,13 @@ func newOwnerClient(cfg *configuration.Config, log *slog.Logger, middlewareName,
 		cfg.CaptchaGateBindIP,
 		cfg.CaptchaFilePath,
 		cfg.CaptchaGracePeriodSeconds,
+		Enterprise{
+			Action:    cfg.CaptchaEnterpriseAction,
+			APIKey:    enterpriseAPIKey,
+			KeyType:   cfg.CaptchaEnterpriseKeyType,
+			MinScore:  cfg.CaptchaEnterpriseMinScore,
+			ProjectID: cfg.CaptchaEnterpriseProjectID,
+		},
 	)
 	if err != nil {
 		return nil, err

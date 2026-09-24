@@ -37,6 +37,7 @@ func newTestSiteverifyClient(t *testing.T, siteverifyURL string, httpClient *htt
 		true,
 		templatePath,
 		3600,
+		Enterprise{},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -146,6 +147,7 @@ func Test_New_returnsGetTemplateError(t *testing.T) {
 			true,
 			"",
 			3600,
+			Enterprise{},
 		)
 		if err == nil {
 			t.Fatal("New must return GetTemplate error for empty path")
@@ -173,6 +175,7 @@ func Test_New_returnsGetTemplateError(t *testing.T) {
 			true,
 			missing,
 			3600,
+			Enterprise{},
 		)
 		if err == nil {
 			t.Fatal("New must return GetTemplate error for a missing file")

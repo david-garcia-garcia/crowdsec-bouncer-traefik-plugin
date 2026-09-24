@@ -43,6 +43,7 @@ func Test_ServeHTTP_dummyProviderSolveIssuesGateCookie(t *testing.T) {
 		true,
 		templatePath,
 		3600,
+		Enterprise{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -117,6 +118,7 @@ func Test_ServeHTTP_queryTokenSolvesWithoutBody(t *testing.T) {
 		true,
 		templatePath,
 		3600,
+		Enterprise{},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -160,6 +162,7 @@ func TestHunt_siteverifyJSONContentTypeIsCaseInsensitive(t *testing.T) {
 		true,
 		templatePath,
 		3600,
+		Enterprise{},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -211,6 +214,7 @@ func Test_ServeHTTP_jsonpSiteverifyContentTypeIsNotJSON(t *testing.T) {
 		true,
 		templatePath,
 		3600,
+		Enterprise{},
 	); err != nil {
 		t.Fatal(err)
 	}

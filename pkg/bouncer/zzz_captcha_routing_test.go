@@ -45,6 +45,7 @@ func testCaptchaClient(t *testing.T, jsURL, challengeURL, validateURL string, ht
 		true,
 		templatePath,
 		3600,
+		captcha.Enterprise{},
 	)
 	if err != nil {
 		t.Fatal(err)
