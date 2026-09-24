@@ -57,13 +57,13 @@ Outside facts used: in-tree. No third-party Open contract. Collision WARN text a
 
 - Q: Do `OpenStream` / `OpenLive` stay as aliases or get removed?
   Rank: bounded asked — existing exported entry points with 54 enumerated consumer calls (roots: worktree minus archive and other-run devstate; patterns OpenStream and OpenLive); Desired One lapi.Open
-  Decision: assumed — remove both. Tests and `plugin.go` call `Open`. `LapiMode` on the `Config` already passed into `New` keeps stream vs live behavior.
-  By: explore
+  Decision: resolved — remove both. Tests and `plugin.go` call `Open`. `LapiMode` on the `Config` already passed into `New` keeps stream vs live behavior.
+  By: propose
 
 - Q: What is the blast radius of renaming the test entry points under pkg/lapi?
   Rank: bounded asked — 52 test call expressions enumerated in five pkg/lapi zzz test files; Unknowns names this blast radius
-  Decision: assumed — retarget those 52 calls to Open. Test function names that mention OpenStream or OpenLive may stay as scenario labels. Do not add a test-only alias.
-  By: explore
+  Decision: resolved — retarget those 52 calls to Open. Test function names that mention OpenStream or OpenLive may stay as scenario labels. Do not add a test-only alias.
+  By: propose
 
 - Q: Does live/none walking through `noteStreamOwner` have any process-global side effect besides the mode gate?
   Rank: additive asked — Unknowns names this walk; Desired The stream-collision log stays inside lapi
