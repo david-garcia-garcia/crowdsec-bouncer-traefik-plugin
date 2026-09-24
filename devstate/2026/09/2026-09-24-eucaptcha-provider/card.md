@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 5edab65e
+Reviewed head: fea30454
 Owner decision: None.
 
 ## Review scores
@@ -49,7 +49,6 @@ None.
 
 ## How this fits together
 Ticket 2026-09-24-eucaptcha-provider on branch 2026-09-24-eucaptcha-provider targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/155; CI not seen.
-Upstream pull request (maxlerebourg tree, not this repo): https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/317
 
 ## Explore Decisions
 None.
@@ -67,7 +66,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 5edab65e62a2f108481d126409318bac7011bf0b | Card must match the branch you measured |
+| Reviewed head | fea30454f513308f6c91f2600fb04f368d3dc287 | Card must match the branch you measured |
 
 ### Stored data model
 None.
