@@ -22,14 +22,14 @@ Re-enable `go mod vendor` and the vendor git-diff on Main Process. Before Yaegi,
 Ready for review. 1 items remain.
 
 Priority: P3 — pin, local copies, and CI vendor skip, no current operator or user harm
-Reviewed head: e8e14deb
+Reviewed head: 1a44864b
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35982417050 |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35983279559 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -39,7 +39,7 @@ Owner decision: None.
 | Branch | 2026-09-24-adopt-utilities-v1-0-7 pushed | `git` |
 | OpenSpec | adopt-utilities-v1-0-7 | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/147 | pr-host |
-| CI | build 35982417050 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35982417050 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35982417050 |
+| CI | build 35983279559 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35983279559 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35983279559 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -63,7 +63,7 @@ None.
 
 
 ## How this fits together
-Ticket 2026-09-24-adopt-utilities-v1-0-7 on branch 2026-09-24-adopt-utilities-v1-0-7 targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/147; CI build 35982417050 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35982417050.
+Ticket 2026-09-24-adopt-utilities-v1-0-7 on branch 2026-09-24-adopt-utilities-v1-0-7 targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/147; CI build 35983279559 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35983279559.
 
 ## Explore Decisions
 None.
@@ -89,7 +89,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 6 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | e8e14debc37c444099ecd188d6878fc4ee474547 | Card must match the branch you measured |
+| Reviewed head | 1a44864b632f69039349fb01f179a65072893991 | Card must match the branch you measured |
 
 ### Stored data model
 None.
