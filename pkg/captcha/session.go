@@ -159,6 +159,6 @@ func newOwnerClient(cfg *configuration.Config, log *slog.Logger, middlewareName,
 	client.instanceName = cfg.CaptchaInstanceName
 	client.sessionKey = bindKey
 	client.incarnation = fmt.Sprintf("%p", client)
-	client.logLifecycle(MsgInstanceStarted, "started", false)
+	client.log.Info(MsgInstanceStarted, "incarnation", client.incarnation, "reason", "started")
 	return client, nil
 }

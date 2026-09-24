@@ -92,7 +92,7 @@ func (c *Client) AdoptTransport(cfg *configuration.Config) (bool, error) {
 	if previous != nil {
 		closeIdle(previous.httpClient)
 	}
-	if replaced && c.log != nil {
+	if replaced {
 		c.log.Info("appsec transport replaced",
 			"httpTimeoutSeconds", next.httpTimeoutSeconds,
 			"appsecTlsInsecureVerify", next.appsecTLSInsecureVerify,

@@ -202,30 +202,30 @@ func (s *Store) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[str
 func (s *Store) bindLifecycle(log *slog.Logger, reclaimKey string) {
 	s.log = log
 	s.reclaimKey = reclaimKey
-	s.logLifecycle("crowdsec decision store started", "started")
-}
-
-// logLifecycle writes one INFO line with storeKey, engine, and reason.
-func (s *Store) logLifecycle(msg, reason string) {
-	if s.log == nil {
-		return
-	}
-	s.log.Info(msg, "storeKey", s.reclaimKey, "engine", s.engineName, "reason", reason)
+	s.log.Info("crowdsec decision store started", "storeKey", s.reclaimKey, "engine", s.engineName, "reason", "started")
 }
 
 // Sleep logs that the last reclaim holder is gone. Does not drain Redis or drop maps.
 func (s *Store) Sleep() {
-	s.logLifecycle("crowdsec decision store sleeping", "sleeping")
+	if s.reclaimKey == "" {
+		return
+	}
+	s.log.Info("crowdsec decision store sleeping", "storeKey", s.reclaimKey, "engine", s.engineName, "reason", "sleeping")
 }
 
 // Wake logs that a later Open reused this incarnation during grace. Maps and Redis stay live.
 func (s *Store) Wake() {
-	s.logLifecycle("crowdsec decision store waking", "waking")
+	if s.reclaimKey == "" {
+		return
+	}
+	s.log.Info("crowdsec decision store waking", "storeKey", s.reclaimKey, "engine", s.engineName, "reason", "waking")
 }
 
 // Close logs closed, then drains the Redis pool. Memory drain is a no-op. Reclaim last-holder hook.
 func (s *Store) Close() {
-	s.logLifecycle("crowdsec decision store closed", "closed")
+	if s.reclaimKey != "" {
+		s.log.Info("crowdsec decision store closed", "storeKey", s.reclaimKey, "engine", s.engineName, "reason", "closed")
+	}
 	s.engine.close()
 }
 

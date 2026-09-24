@@ -68,13 +68,13 @@ func (c *Client) handleStreamTicker() {
 		)
 		if c.updateMaxFailure != -1 && updateFailure >= c.updateMaxFailure && healthy {
 			atomic.StoreInt64(&c.isCrowdsecStreamHealthy, 0)
-			c.logInfo(MsgStreamUnhealthy, "unhealthy")
+			c.log.Info(MsgStreamUnhealthy, "mode", c.crowdsecMode, "host", c.crowdsecHost, "reason", "unhealthy")
 			c.log.Error("handleStreamTicker:error", "updateFailure", updateFailure, "error", err)
 		}
 		atomic.AddInt64(&c.updateFailure, 1)
 	} else {
 		if atomic.LoadInt64(&c.isCrowdsecStreamHealthy) == 0 {
-			c.logInfo(MsgStreamHealthy, "healthy")
+			c.log.Info(MsgStreamHealthy, "mode", c.crowdsecMode, "host", c.crowdsecHost, "reason", "healthy")
 		}
 		atomic.StoreInt64(&c.isCrowdsecStreamHealthy, 1)
 		atomic.StoreInt64(&c.updateFailure, 0)
