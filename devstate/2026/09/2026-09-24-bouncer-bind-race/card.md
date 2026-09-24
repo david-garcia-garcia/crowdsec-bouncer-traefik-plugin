@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 3bfdc50a
+Reviewed head: a6ff19dd
 Owner decision: None.
 
 ## Review scores
@@ -32,14 +32,16 @@ Owner decision: None.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-24-bouncer-bind-race pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | bouncer-bind-immutable-box | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/143 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-bouncer-bind-race/openspec/changes/bouncer-bind-immutable-box/proposal.md) — modified
+
 
 ## Deviations from the ask
 - proposed: Affected lists only `pkg/bouncer/bouncer.go` (`storeBinding` and its three Receive* callers). → also change `pkg/reclaim/zzz_alias_test.go` `watchInto` to `Store` a new `*Box` each update (same publish shape). — `pkg/reclaim/zzz_alias_test.go` — Unknowns asked whether other watchers mutate `Box.Value`; this test helper does, and leaving it teaches the race. Bounded incidental companion to the named fix.. Awaiting the requester.
@@ -65,9 +67,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 3bfdc50ae45fa193e1a206d38ccbfe57774526b9 | Card must match the branch you measured |
+| Reviewed head | a6ff19dd3014e903608d5397b2317d723e636733 | Card must match the branch you measured |
 
 ### Stored data model
 None.
