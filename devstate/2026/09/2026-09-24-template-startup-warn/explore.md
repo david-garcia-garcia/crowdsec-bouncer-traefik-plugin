@@ -86,22 +86,22 @@ No hard gap. **CaptchaEnabled**, **Captcha Client**, **Bouncer**, **Config valid
 
 ## Open questions
 
-- Q: Who emits the captcha-template warning (captcha instance, bouncer at creation, or both) without a false warning on a subscriber whose own path is the unused default `/captcha.html`?
-  Rank: bounded asked — existing owner split already has callers (1 `Client.New`, 1 `captcha.Open`, 1 `bouncer.New`, 2 `ValidateParams` `GetTemplate`s); Open point / Unknowns names who emits
-  Decision: resolved — captcha owner (`Client.New` / `Open`) emits the captcha-file warning; `bouncer.New` emits only the ban-file warning. Bounce-only never `Open`s captcha, so unused default `/captcha.html` is never read. Honouring “check both files when the bouncer is created” would make `bouncer.New` inspect `CaptchaFilePath`.
+- Q: Who emits the captcha-template warning so a bounce-only subscriber is not warned about unused default /captcha.html?
+  Rank: bounded asked — existing owner split already has callers (1 Client.New, 1 captcha.Open, 1 bouncer.New, 2 ValidateParams GetTemplates); Open point / Unknowns names who emits
+  Decision: resolved — captcha owner (Client.New / Open) emits the captcha-file warning; bouncer.New emits only the ban-file warning. Bounce-only never Opens captcha, so unused default /captcha.html is never read.
   By: explore
 
 - Q: Exact warning text?
-  Rank: additive asked — new log lines this change creates; Desired Warn once at startup that captcha responses will fall back to ban / ban responses are served without a body
-  Decision: assumed — one-line WARN that names empty vs unloadable and the fallback (captcha→ban, ban→empty body); exact copy is implement; startup-only, not per request
+  Rank: additive asked — new log lines this change creates; Desired Warn once at startup that captcha responses will fall back to ban
+  Decision: assumed — one-line WARN that names empty vs unloadable and the fallback (captcha to ban, ban to empty body); exact copy is implement; startup-only, not per request
   By: explore
 
-- Q: Does `Client.New` leave `Valid` false so the existing ban fallback fires, or stay `Valid` and choose ban elsewhere?
-  Rank: bounded asked — `Client.New` `Valid` already consumed at 1 `handleRemediationServeHTTP` branch; Unknowns Explore owns that
-  Decision: assumed — succeed and leave `Valid` false when the template is empty or not loadable; do not add a second template-missing flag
+- Q: Does Client.New leave Valid false so the existing ban fallback fires, or stay Valid and choose ban elsewhere?
+  Rank: bounded asked — Client.New Valid already consumed at 1 handleRemediationServeHTTP branch; Unknowns Explore owns that
+  Decision: assumed — succeed and leave Valid false when the template is empty or not loadable; do not add a second template-missing flag
   By: explore
 
-- Q: When `BouncerBanFilePath` is set but unloadable, is that the same warn-and-empty-body path as an empty ban path?
-  Rank: bounded asked — 1 `ValidateParams` ban `GetTemplate` + 1 `bouncer.New` discard; Desired Ban file empty or not loadable
-  Decision: assumed — yes; warn once (empty vs path-not-loadable), do not fail `New`, keep empty body
+- Q: When BouncerBanFilePath is set but unloadable, is that the same warn-and-empty-body path as an empty ban path?
+  Rank: bounded asked — 1 ValidateParams ban GetTemplate plus 1 bouncer.New discard; Desired Ban file empty or not loadable
+  Decision: assumed — yes; warn once (empty vs path-not-loadable), do not fail New, keep empty body
   By: explore

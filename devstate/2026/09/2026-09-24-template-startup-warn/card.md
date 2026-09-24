@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 104da7ae
+Reviewed head: 0f13acde
 Owner decision: None.
 
 ## Review scores
@@ -42,7 +42,8 @@ Owner decision: None.
 None.
 
 ## Deviations from the ask
-None.
+- proposed: Check both files when the bouncer is created. → `captcha.Client.New` / `Open` warns for the captcha template; `bouncer.New` warns for the ban template. — `pkg/captcha/captcha.go Client.New, pkg/bouncer/bouncer.go New` — honouring the wording adds a `CaptchaFilePath` check to `bouncer.New`, a unit that does not own captcha, and would warn a bounce-only subscriber whose unused default is `/captcha.html`.. Awaiting the requester.
+
 
 ## Follow-up issues
 None.
@@ -66,7 +67,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 104da7ae3edddcdf2c19d1f7c8dd58a1a6f81a17 | Card must match the branch you measured |
+| Reviewed head | 0f13acde889043faf96031b787d9c15be2b52498 | Card must match the branch you measured |
 
 ### Stored data model
 None.
