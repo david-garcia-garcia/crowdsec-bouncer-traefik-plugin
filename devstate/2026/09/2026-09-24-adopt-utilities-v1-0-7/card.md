@@ -14,10 +14,10 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+In progress. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: d2bfccf3
+Reviewed head: 03f05811
 Owner decision: None.
 
 ## Review scores
@@ -45,7 +45,8 @@ None.
 None.
 
 ## Follow-up issues
-None.
+- [ ] [Rename `ext_traefik-middleware-utilities_packages` to a leaf that names the object](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-adopt-utilities-v1-0-7/knowledge/debt/2026-09-24-rename-utilities-packages-research.md) — research slug `packages` hides the object (Name for the scope).
+
 
 ## How this fits together
 Ticket 2026-09-24-adopt-utilities-v1-0-7 on branch 2026-09-24-adopt-utilities-v1-0-7 targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/147; CI not seen.
@@ -66,7 +67,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | d2bfccf368919fbeab355ce3e7330199bf90fd13 | Card must match the branch you measured |
+| Reviewed head | 03f058114816c76ddf9a9fcad0228b8bc9e69d2d | Card must match the branch you measured |
 
 ### Stored data model
 None.
