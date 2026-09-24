@@ -127,9 +127,9 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 
 	cfg := cfgLiveAt(u.Host)
 	cfg.CaptchaEnabled = true
-	cfg.BouncerCaptchaProvider = configuration.HcaptchaProvider
-	cfg.BouncerCaptchaGateSecret = "gate-secret"
-	cfg.BouncerCaptchaFilePath = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
+	cfg.CaptchaProvider = configuration.HcaptchaProvider
+	cfg.CaptchaGateSecret = "gate-secret"
+	cfg.CaptchaFilePath = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
 
 	handler, err := New(context.Background(), testNextOK(), cfg, "empty-captcha-keys")
 	if err == nil {
@@ -138,7 +138,7 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 	if handler != nil {
 		t.Fatal("New must return a nil handler when captcha keys are empty")
 	}
-	if !strings.Contains(err.Error(), "BouncerCaptchaSiteKey: cannot be empty when BouncerCaptchaProvider is set") {
+	if !strings.Contains(err.Error(), "CaptchaSiteKey: cannot be empty when CaptchaProvider is set") {
 		t.Fatalf("error %q", err)
 	}
 	if atomic.LoadInt64(&hits) != 0 {
@@ -163,20 +163,20 @@ func TestNew_RejectsEmptyCaptchaFilePath(t *testing.T) {
 
 	cfg := cfgLiveAt(u.Host)
 	cfg.CaptchaEnabled = true
-	cfg.BouncerCaptchaProvider = configuration.HcaptchaProvider
-	cfg.BouncerCaptchaSiteKey = "site"
-	cfg.BouncerCaptchaSecretKey = "secret"
-	cfg.BouncerCaptchaGateSecret = "gate-secret"
-	cfg.BouncerCaptchaFilePath = ""
+	cfg.CaptchaProvider = configuration.HcaptchaProvider
+	cfg.CaptchaSiteKey = "site"
+	cfg.CaptchaSecretKey = "secret"
+	cfg.CaptchaGateSecret = "gate-secret"
+	cfg.CaptchaFilePath = ""
 
 	handler, err := New(context.Background(), testNextOK(), cfg, "empty-captcha-path")
 	if err == nil {
-		t.Fatal("New must fail when captchaProvider is set and BouncerCaptchaFilePath is empty")
+		t.Fatal("New must fail when captchaProvider is set and CaptchaFilePath is empty")
 	}
 	if handler != nil {
-		t.Fatal("New must return a nil handler when BouncerCaptchaFilePath is empty")
+		t.Fatal("New must return a nil handler when CaptchaFilePath is empty")
 	}
-	if !strings.Contains(err.Error(), "BouncerCaptchaFilePath: cannot be empty when BouncerCaptchaProvider is set") {
+	if !strings.Contains(err.Error(), "CaptchaFilePath: cannot be empty when CaptchaProvider is set") {
 		t.Fatalf("error %q", err)
 	}
 	if atomic.LoadInt64(&hits) != 0 {

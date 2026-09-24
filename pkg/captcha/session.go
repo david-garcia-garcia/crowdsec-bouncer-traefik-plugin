@@ -50,25 +50,25 @@ type ownership struct {
 }
 
 func ownershipFrom(cfg *configuration.Config, middlewareName string) ownership {
-	siteKey, _ := configuration.GetVariable(cfg, "BouncerCaptchaSiteKey")
-	secretKey, _ := configuration.GetVariable(cfg, "BouncerCaptchaSecretKey")
-	gateSecret, _ := configuration.GetVariable(cfg, "BouncerCaptchaGateSecret")
+	siteKey, _ := configuration.GetVariable(cfg, "CaptchaSiteKey")
+	secretKey, _ := configuration.GetVariable(cfg, "CaptchaSecretKey")
+	gateSecret, _ := configuration.GetVariable(cfg, "CaptchaGateSecret")
 	return ownership{
 		MiddlewareName:               middlewareName,
-		Provider:                     cfg.BouncerCaptchaProvider,
+		Provider:                     cfg.CaptchaProvider,
 		SiteKey:                      siteKey,
 		SecretKey:                    secretKey,
 		GateSecret:                   gateSecret,
-		GateBindIP:                   cfg.BouncerCaptchaGateBindIP,
-		CaptchaFilePath:              cfg.BouncerCaptchaFilePath,
-		GracePeriodSeconds:           cfg.BouncerCaptchaGracePeriodSeconds,
-		SiteverifyHTTPTimeoutSeconds: cfg.BouncerCaptchaSiteverifyHTTPTimeoutSeconds,
-		CustomJsURL:                  cfg.BouncerCaptchaCustomJsURL,
-		CustomChallengeURL:           cfg.BouncerCaptchaCustomChallengeURL,
-		CustomKey:                    cfg.BouncerCaptchaCustomKey,
-		CustomResponse:               cfg.BouncerCaptchaCustomResponse,
-		CustomValidateURL:            cfg.BouncerCaptchaCustomValidateURL,
-		CustomValidateBody:           cfg.BouncerCaptchaCustomValidateBody,
+		GateBindIP:                   cfg.CaptchaGateBindIP,
+		CaptchaFilePath:              cfg.CaptchaFilePath,
+		GracePeriodSeconds:           cfg.CaptchaGracePeriodSeconds,
+		SiteverifyHTTPTimeoutSeconds: cfg.CaptchaSiteverifyHTTPTimeoutSeconds,
+		CustomJsURL:                  cfg.CaptchaCustomJsURL,
+		CustomChallengeURL:           cfg.CaptchaCustomChallengeURL,
+		CustomKey:                    cfg.CaptchaCustomKey,
+		CustomResponse:               cfg.CaptchaCustomResponse,
+		CustomValidateURL:            cfg.CaptchaCustomValidateURL,
+		CustomValidateBody:           cfg.CaptchaCustomValidateBody,
 	}
 }
 
@@ -122,9 +122,9 @@ func Open(ctx context.Context, cfg *configuration.Config, log *slog.Logger, midd
 
 // newOwnerClient constructs the siteverify client, template, and gate for one owner Open.
 func newOwnerClient(cfg *configuration.Config, log *slog.Logger, middlewareName, bindKey, _ string) (*Client, error) {
-	siteKey, _ := configuration.GetVariable(cfg, "BouncerCaptchaSiteKey")
-	secretKey, _ := configuration.GetVariable(cfg, "BouncerCaptchaSecretKey")
-	gateSecret, _ := configuration.GetVariable(cfg, "BouncerCaptchaGateSecret")
+	siteKey, _ := configuration.GetVariable(cfg, "CaptchaSiteKey")
+	secretKey, _ := configuration.GetVariable(cfg, "CaptchaSecretKey")
+	gateSecret, _ := configuration.GetVariable(cfg, "CaptchaGateSecret")
 	log = log.With(
 		"traefikName", middlewareName,
 		"instanceName", cfg.CaptchaInstanceName,
@@ -136,21 +136,21 @@ func newOwnerClient(cfg *configuration.Config, log *slog.Logger, middlewareName,
 		log,
 		&http.Client{
 			Transport: &http.Transport{MaxIdleConns: 10, MaxIdleConnsPerHost: 10, IdleConnTimeout: 30 * time.Second},
-			Timeout:   time.Duration(cfg.BouncerCaptchaSiteverifyHTTPTimeoutSeconds) * time.Second,
+			Timeout:   time.Duration(cfg.CaptchaSiteverifyHTTPTimeoutSeconds) * time.Second,
 		},
-		cfg.BouncerCaptchaProvider,
-		cfg.BouncerCaptchaCustomJsURL,
-		cfg.BouncerCaptchaCustomChallengeURL,
-		cfg.BouncerCaptchaCustomKey,
-		cfg.BouncerCaptchaCustomResponse,
-		cfg.BouncerCaptchaCustomValidateURL,
-		cfg.BouncerCaptchaCustomValidateBody,
+		cfg.CaptchaProvider,
+		cfg.CaptchaCustomJsURL,
+		cfg.CaptchaCustomChallengeURL,
+		cfg.CaptchaCustomKey,
+		cfg.CaptchaCustomResponse,
+		cfg.CaptchaCustomValidateURL,
+		cfg.CaptchaCustomValidateBody,
 		siteKey,
 		secretKey,
 		gateSecret,
-		cfg.BouncerCaptchaGateBindIP,
-		cfg.BouncerCaptchaFilePath,
-		cfg.BouncerCaptchaGracePeriodSeconds,
+		cfg.CaptchaGateBindIP,
+		cfg.CaptchaFilePath,
+		cfg.CaptchaGracePeriodSeconds,
 	)
 	if err != nil {
 		return nil, err
