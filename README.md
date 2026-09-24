@@ -8,9 +8,17 @@
 
 ## What this plugin is
 
-This plugin aims to implement a Crowdsec Bouncer in a Traefik plugin.
+CrowdSec bouncer for Traefik. It authorizes, bans, or challenges requests from CrowdSec decisions: community lists, local detections, and optional AppSec.
 
-The purpose is to enable Traefik to authorize or block requests from IPs based on their reputation and behavior.
+A rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin). Load it as a local plugin; the catalog module on plugins.traefik.io is the original. What changed for operators:
+
+- **AI-first.** OpenSpec specs, a knowledge base, and intensive test coverage, including mock and real-stack harnesses.
+- **LAPI metrics.** Processed requests by address family, drops by decision origin and remediation, and an active-decisions count for `cscli metrics show bouncers`. The original plugin posts a single dropped counter.
+- **reCAPTCHA Enterprise.** Checkbox and score keys (`recaptcha-enterprise`), plus classic reCAPTCHA, hCaptcha, Turnstile, and custom widgets.
+- **Per-router settings.** Each router keeps its own status code, captcha, trusted IPs, failure action when LAPI or AppSec is down, and an optional remap of a decision origin (a community-list ban can be shown as captcha). The original plugin shares one cache and one set of key settings across every CrowdSec middleware in the process.
+- **Several CrowdSec engines** in one Traefik, each with its own API key, or several routers on one engine. See [Middleware Architecture](#middleware-architecture).
+- **Ip, Range, and other scopes.** Client IP, CIDR containment, and header-mapped scopes such as country and ASN. The original plugin matches the client IP only.
+- **AppSec independent of LAPI mode.** A router can run the WAF, decision lookup, or both. The original `appsec` mode turns IP checks off.
 
 ## What CrowdSec is
 
@@ -881,8 +889,4 @@ Equivalent to
 ```bash
 make run_local
 ```
-
-### About
-
-This plugin is a fork of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin).
 
