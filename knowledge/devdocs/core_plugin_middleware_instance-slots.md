@@ -29,7 +29,7 @@ Process-wide named slots sit between owner `Open` and bouncer bounce. Spec: `cor
 ## How to use
 
 - Named slots are opaque aliases on the reclaim table. This plugin encodes them as `alias:<leg>:<name>` in `instanceAlias`; the table never parses that string. `plugin.go` Opens owned legs, then `SetAlias` with group `lapi`/`appsec`/`captcha`, then `bouncer.New` with subscribe flags, then `Watch`. `Watch` drops that subscriber when its ctx is done.
-- Watchers `Store` a `reclaim.Box` only. The inner value is the client or typed nil. Never `Store(nil)` and never change the `atomic.Value` type (Yaegi panics).
+- Watchers `Store` a `reclaim.Box` only. The inner value is the client or typed nil. Never `Store(nil)` and never change the `atomic.Value` type (Yaegi panics). On each publish, `Store` a **new** `*Box`; do not assign `Box.Value` in place while ServeHTTP may `Unbox` the same pointer.
 - Reject a second publisher on the same alias. Roll back with `ClearPublisher(name, group)`, then cancel the holder child.
 - Close / unmap of a dying incarnation clears aliases still pointing at it (reverse index on the slot). Sleep does not.
 - If this `New` did not Open a leg, `ClearPublisher(name, group)` for that middleware.
@@ -58,4 +58,5 @@ reclaim.Watch(ctx, instanceAlias("captcha", captchaName), (*captcha.Client)(nil)
 
 - Do not wait in Traefik `New` for a publisher.
 - `atomic.Value.Store(untyped nil)` panics. Publish and Clear use the same pointer type.
+- Do not mutate `Box.Value` after that Box is already in an `atomic.Value`. Concurrent `Unbox` reads the field without sync; a torn `any` can panic or show a stale/nil client. Publish with `dest.Store(&reclaim.Box{Value: value})` every time.
 - Dropping the slot mutex before subscriber `Store` lets Clear write nil over a replacement.
