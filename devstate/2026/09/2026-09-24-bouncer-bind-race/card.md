@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 716a71bf
+Reviewed head: 3bfdc50a
 Owner decision: None.
 
 ## Review scores
@@ -67,7 +67,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 716a71bfd7526756e6f47a370f6532e2ababb15a | Card must match the branch you measured |
+| Reviewed head | 3bfdc50ae45fa193e1a206d38ccbfe57774526b9 | Card must match the branch you measured |
 
 ### Stored data model
 None.
