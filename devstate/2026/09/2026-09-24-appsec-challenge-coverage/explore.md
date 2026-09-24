@@ -52,32 +52,32 @@ Client address: these tests do not reconstruct identity. Ban-page `ClientIP` and
 
 ## Open questions
 
-- Q: Does case 1 need a ban-page body assertion plus an explicit empty-string user_body_content case, or is TestHandleNextServeHTTPEmptyChallengeBodyBans enough?
+- Q: Is TestHandleNextServeHTTPEmptyChallengeBodyBans enough for empty challenge coverage?
   Rank: additive asked — new assertions on the existing AppSec test file; Desired names operator ban page and missing or empty
-  Decision: assumed — not enough as written (banTemplate is nil; only the omitted-field JSON). Add or extend tests for missing and empty-string user_body_content with a non-nil banTemplate so the operator ban page is asserted.
+  Decision: assumed — no; add missing and empty-string user_body_content cases with a non-nil banTemplate so the operator ban page is asserted
   By: explore
 
 - Q: Is a pre-set Content-Security-Policy on httptest.ResponseRecorder a fair stand-in for already on the writer?
   Rank: additive asked — test setup only; Desired names CSP already on the writer
-  Decision: assumed — yes. applyAppsecServeHTTP runs before next, so origin cannot have written CSP. recorder.Header().Set before handleNextServeHTTP is the same map the envelope writer mutates. Reproduction used that stand-in and observed replace, not append.
+  Decision: assumed — yes; recorder.Header().Set before handleNextServeHTTP is the same map the envelope writer mutates
   By: explore
 
 - Q: Will a failing new test force a production change?
   Rank: additive asked — Desired: do not change production unless a test shows the protocol is absent
-  Decision: resolved — no. Reproduction passed on dest master for both #397 paths. Propose and implement add tests only.
+  Decision: resolved — no; reproduction passed on dest master for both #397 paths; propose and implement add tests only
   By: explore
 
 - Q: Where do the new tests live?
   Rank: additive asked — Affected names pkg/bouncer/zzz_bouncer_test.go
-  Decision: assumed — that file, next to the existing AppSec envelope tests. Do not add an e2e case for these two protocol edges.
+  Decision: assumed — that file, next to the existing AppSec envelope tests; no e2e case for these two protocol edges
   By: explore
 
 - Q: Should the live spec name CSP replace and multi-cookie scenarios?
   Rank: additive incidental — no In-scope line names a spec edit; adding scenarios to core_plugin_appsec_bot-detection leaves existing callers working
-  Decision: assumed — propose adds those two scenarios to the existing live spec so the new tests have a named contract. Empty-challenge ban is already specified.
+  Decision: assumed — propose adds those two scenarios to the existing live spec; empty-challenge ban is already specified
   By: explore
 
 - Q: Who already owns the client address these tests would show on the ban page?
   Rank: additive asked — live spec Client IP for AppSec is GetRemoteIP; tests reuse that owner
-  Decision: resolved — clientRequest / pkg/ip.GetRemoteIP owns it. Fixtures use testClientRequest. Do not invent a second address.
+  Decision: resolved — clientRequest / pkg/ip.GetRemoteIP owns it; fixtures use testClientRequest; do not invent a second address
   By: explore
