@@ -16,7 +16,7 @@ The repository SHALL keep `tests/e2e/mock/` and `make e2e_mock` as the mock suit
 - **THEN** Pester cases, the compose file, and `Test-Integration.ps1` are under `tests/e2e/real/` and not at the repository root or mixed into `tests/e2e/mock/`
 
 ### Requirement: Real stack boots Traefik and Crowdsec
-`tests/e2e/real/config/docker-compose.test.yml` SHALL start Traefik (local plugin bind-mount of the repository root) and Crowdsec. Pester tests SHALL add and delete decisions with `cscli` in the Crowdsec container and send client identity only via `X-Forwarded-For`. Plugin keys in compose labels and file-provider YAML SHALL use the new public names (`lapiEnabled`, `lapiHost`, `lapiMode`, `appsecEnabled`, `bouncerEnabled`, `lapiDefaultDecisionSeconds`, `bouncerClientTrustedIps`, `bouncerBanFilePath`, `captchaEnabled`, `captchaInstanceName`). A captcha-serving route SHALL set `captchaEnabled: true` (empty name fills to the Traefik name). The suite MUST NOT rely on a set `bouncerCaptchaProvider` alone to own captcha.
+`tests/e2e/real/config/docker-compose.test.yml` SHALL start Traefik (local plugin bind-mount of the repository root) and Crowdsec. Pester tests SHALL add and delete decisions with `cscli` in the Crowdsec container and send client identity only via `X-Forwarded-For`. Plugin keys in compose labels and file-provider YAML SHALL use the new public names (`lapiEnabled`, `lapiHost`, `lapiMode`, `appsecEnabled`, `bouncerEnabled`, `lapiDefaultDecisionSeconds`, `bouncerClientTrustedIps`, `bouncerBanFilePath`, `captchaEnabled`, `captchaInstanceName`). A captcha-serving route SHALL set `captchaEnabled: true` (empty name fills to the Traefik name). The suite MUST NOT rely on a set `captchaProvider` alone to own captcha.
 
 #### Scenario: Ban then unban on whoami
 - **WHEN** the stack is up and a ban decision is added for the test IP
@@ -140,7 +140,7 @@ The Pester suite SHALL include none-mode routes whose LAPI or AppSec host is unr
 - **THEN** the request is forbidden
 
 ### Requirement: Real stack covers captcha POST body, grace, and IPv6 bind
-Captcha solve SHALL succeed from the POST body alone (no query-string token). A dedicated short-grace route SHALL challenge again after `bouncerCaptchaGracePeriodSeconds`. Gate bind SHALL accept a different spelling of the same IPv6 address.
+Captcha solve SHALL succeed from the POST body alone (no query-string token). A dedicated short-grace route SHALL challenge again after `captchaGracePeriodSeconds`. Gate bind SHALL accept a different spelling of the same IPv6 address.
 
 #### Scenario: POST-body-only captcha solve
 - **WHEN** a captcha decision exists and the client POSTs `dummy-captcha-response` only in the form body
@@ -148,7 +148,7 @@ Captcha solve SHALL succeed from the POST body alone (no query-string token). A 
 
 #### Scenario: Captcha grace expires
 - **WHEN** the short-grace captcha route is solved
-- **THEN** a GET with the gate cookie after `bouncerCaptchaGracePeriodSeconds` serves the challenge again
+- **THEN** a GET with the gate cookie after `captchaGracePeriodSeconds` serves the challenge again
 
 ### Requirement: Instance severance real e2e suite
 The repository SHALL provide `tests/e2e/real/instance_severance.Tests.ps1` exercising named LAPI/AppSec slots, late bind, file-provider reload reclaim cases, slot collision, and lifecycle log order from the change requirement matrix (T*, L*, R*, N*, F*, C*, E2/E3). The harness SHALL support rewriting watched dynamic configuration (writable mount or directory) and waiting for Traefik to apply routes without sleep-only synchronization. Lifecycle cases MAY set plugin log level to DEBUG or TRACE and SHALL assert ordered `msg`, `instanceName`, and `incarnation` (and `traefikName` on bouncer lines) in `docker logs traefik-test`. Cases that depend on grace Close SHALL wait at least process reclaim grace plus margin. Dynamic YAML SHALL use `lapiInstanceName`, `appsecInstanceName`, `lapiEnabled`, `appsecEnabled`, `bouncerEnabled`, and `bouncerStartupBlock`.

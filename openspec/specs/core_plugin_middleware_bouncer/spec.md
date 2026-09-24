@@ -78,10 +78,10 @@ The per-router bouncer SHALL handle request policy (trusted IPs, ban/captcha pag
 - **THEN** the caller's `*Config` still holds the unresolved key and the original `logLevel`
 
 ### Requirement: Captcha siteverify Timeout is the effective captcha seconds
-When an owning middleware constructs the captcha provider `http.Client`, that client’s `Timeout` SHALL be `config.BouncerCaptchaSiteverifyHTTPTimeoutSeconds` seconds. It MUST NOT read a shared or inherited timeout. Subscribers SHALL use the published client and MUST NOT construct a second siteverify client from leftover keys. `pkg/captcha` SHALL keep local parameter names (`siteKey`, `secretKey`, `gateSecret`); the owner SHALL pass `BouncerCaptchaSiteKey` into those arguments and MUST NOT grow a `bouncer` field on captcha.
+When an owning middleware constructs the captcha provider `http.Client`, that client’s `Timeout` SHALL be `config.CaptchaSiteverifyHTTPTimeoutSeconds` seconds. It MUST NOT read a shared or inherited timeout. Subscribers SHALL use the published client and MUST NOT construct a second siteverify client from leftover keys. `pkg/captcha` SHALL keep local parameter names (`siteKey`, `secretKey`, `gateSecret`); the owner SHALL pass `CaptchaSiteKey` into those arguments and MUST NOT grow a `bouncer` field on captcha.
 
 #### Scenario: Captcha knob sets siteverify Timeout
-- **WHEN** a captcha owner Opens with a captcha provider set and `BouncerCaptchaSiteverifyHTTPTimeoutSeconds` 1
+- **WHEN** a captcha owner Opens with a captcha provider set and `CaptchaSiteverifyHTTPTimeoutSeconds` 1
 - **THEN** the stored captcha siteverify `http.Client` Timeout is 1 second
 
 #### Scenario: Captcha omit uses the captcha default
@@ -127,7 +127,7 @@ When AppSec `Query` returns `ErrClientDisconnected`, the bouncer SHALL stop with
 - **AND** if `bouncerRemediationHeadersCustomName` is `X-Remediation` the response header value is `error:client-disconnected`
 
 ### Requirement: Captcha verdict without a published client is a ban
-When the remediation kind is captcha and the loaded captcha binding is empty or not valid, the bouncer SHALL remediate as a ban. It MUST NOT construct a fallback local captcha client on the request path or in `bouncer.New`. A bounce-only middleware MUST NOT build a captcha client from leftover `bouncerCaptcha*` keys.
+When the remediation kind is captcha and the loaded captcha binding is empty or not valid, the bouncer SHALL remediate as a ban. It MUST NOT construct a fallback local captcha client on the request path or in `bouncer.New`. A bounce-only middleware MUST NOT build a captcha client from leftover `captcha*` owner-read keys.
 
 #### Scenario: Unpublished captcha with startup block off bans
 - **WHEN** the bouncer subscribed to captcha, `bouncerStartupBlock` is false, the loaded captcha value is empty, and the verdict is captcha
@@ -135,7 +135,7 @@ When the remediation kind is captcha and the loaded captcha binding is empty or 
 - **AND** no captcha challenge page is served
 
 #### Scenario: Bounce-only leftover keys are not a client
-- **WHEN** `captchaEnabled` is false, `bouncerCaptchaProvider` is set on this router, and no captcha client is published
+- **WHEN** `captchaEnabled` is false, `captchaProvider` is set on this router, and no captcha client is published
 - **THEN** `bouncer.New` does not construct a captcha client from those keys
 - **AND** a captcha verdict remediates as a ban when startup block is false
 
