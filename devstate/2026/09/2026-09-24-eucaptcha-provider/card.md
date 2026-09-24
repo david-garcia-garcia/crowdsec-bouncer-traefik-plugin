@@ -17,17 +17,17 @@ Construction adds a named `eucaptcha` case next to `recaptcha-enterprise`: the o
 **End users.** When the operator selects `eucaptcha`, challenged visitors complete the EU CAPTCHA widget instead of another vendor.
 
 ## Merge readiness
-In progress. 1 items remain.
+Ready for review. 1 items remain.
 
 Priority: P2 — operators who need EU CAPTCHA cannot select it, with blast radius limited to that missing choice
-Reviewed head: ded483b8
+Reviewed head: 5ff7a3d0
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/155/checks |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,7 +37,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-24-eucaptcha-provider pushed | `git` |
 | OpenSpec | eucaptcha-provider | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/155 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build c8663e1463473bcaf70806b7938ca7d1c35832dd succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/155/checks | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/155/checks |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -64,7 +64,7 @@ Completed:
 
 
 ## How this fits together
-Ticket 2026-09-24-eucaptcha-provider on branch 2026-09-24-eucaptcha-provider targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/155; CI not seen.
+Ticket 2026-09-24-eucaptcha-provider on branch 2026-09-24-eucaptcha-provider targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/155; CI build c8663e1463473bcaf70806b7938ca7d1c35832dd succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/155/checks.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -93,7 +93,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 2 added / 6 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | ded483b83c5e81237b35e5697a7430c60fcab012 | Card must match the branch you measured |
+| Reviewed head | 5ff7a3d04b3063008012fc17d7ed608b6a8384cc | Card must match the branch you measured |
 
 ### Stored data model
 None.
