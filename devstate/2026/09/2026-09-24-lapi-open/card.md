@@ -14,17 +14,17 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 8b22efa2
+Reviewed head: 7417fb77
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35973777360 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -34,8 +34,8 @@ Owner decision: None.
 | Branch | 2026-09-24-lapi-open pushed | `git` |
 | OpenSpec | one-lapi-open | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/145 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 35973777360 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35973777360 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35973777360 |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
@@ -48,10 +48,11 @@ Worktree:
 None.
 
 ## Follow-up issues
-None.
+- [ ] [Windows range-index read classifies as unsupported-reply](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-lapi-open/knowledge/debt/2026-09-24-windows-range-index-unreachable.md) — dest Windows `go test ./...` fails `TestApplyRangeBatch_UnreachableReadKeepsSharedIndex` (`redis:unsupported-reply` instead of `ErrUnreachable`).
+
 
 ## How this fits together
-Ticket 2026-09-24-lapi-open on branch 2026-09-24-lapi-open targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/145; CI not seen.
+Ticket 2026-09-24-lapi-open on branch 2026-09-24-lapi-open targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/145; CI build 35973777360 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35973777360.
 
 ## Explore Decisions
 None.
@@ -69,7 +70,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 8b22efa290570ff24e6c6cce4b41e2caa10562ce | Card must match the branch you measured |
+| Reviewed head | 7417fb779cda725a5e433a51593c76e876453553 | Card must match the branch you measured |
 
 ### Stored data model
 None.
