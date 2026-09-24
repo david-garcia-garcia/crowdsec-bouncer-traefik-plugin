@@ -31,14 +31,14 @@ The assessments verifier POSTs JSON `event.token`, `event.siteKey`, optional `ev
 Ready for review. 0 items remain.
 
 Priority: P2 — operator pain with a workaround
-Reviewed head: 591ad9f6
+Reviewed head: a8adf4dd
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36036901716 |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36038103494 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -48,7 +48,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-24-recaptcha-enterprise pushed | `git` |
 | OpenSpec | recaptcha-enterprise | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/149 | pr-host |
-| CI | build 36036901716 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36036901716 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36036901716 |
+| CI | build 36038103494 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36038103494 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36038103494 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -70,7 +70,7 @@ Worktree:
 None.
 
 ## How this fits together
-Ticket 2026-09-24-recaptcha-enterprise on branch 2026-09-24-recaptcha-enterprise targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/149; CI build 36036901716 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36036901716.
+Ticket 2026-09-24-recaptcha-enterprise on branch 2026-09-24-recaptcha-enterprise targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/149; CI build 36038103494 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36038103494.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -99,7 +99,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 3 added / 3 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 591ad9f61ad14394c20abbce88b140233f2a3bca | Card must match the branch you measured |
+| Reviewed head | a8adf4dd8c3d595b54c7687e17b5b847d07e4c17 | Card must match the branch you measured |
 
 ### Stored data model
 None.
