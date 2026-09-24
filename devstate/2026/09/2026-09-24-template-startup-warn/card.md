@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 0f13acde
+Reviewed head: 8f7585e2
 Owner decision: None.
 
 ## Review scores
@@ -67,7 +67,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 0f13acde889043faf96031b787d9c15be2b52498 | Card must match the branch you measured |
+| Reviewed head | 8f7585e2ee44a3dff3ccdb4f6c6f7d5a3389afe6 | Card must match the branch you measured |
 
 ### Stored data model
 None.

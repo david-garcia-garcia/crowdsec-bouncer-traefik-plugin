@@ -86,14 +86,9 @@ No hard gap. **CaptchaEnabled**, **Captcha Client**, **Bouncer**, **Config valid
 
 ## Open questions
 
-- Q: Who emits the captcha-template warning so a bounce-only subscriber is not warned about unused default /captcha.html?
-  Rank: bounded asked — existing owner split already has callers (1 Client.New, 1 captcha.Open, 1 bouncer.New, 2 ValidateParams GetTemplates); Open point / Unknowns names who emits
-  Decision: resolved — captcha owner (Client.New / Open) emits the captcha-file warning; bouncer.New emits only the ban-file warning. Bounce-only never Opens captcha, so unused default /captcha.html is never read.
-  By: explore
-
 - Q: Exact warning text?
   Rank: additive asked — new log lines this change creates; Desired Warn once at startup that captcha responses will fall back to ban
-  Decision: assumed — one-line WARN that names empty vs unloadable and the fallback (captcha to ban, ban to empty body); exact copy is implement; startup-only, not per request
+  Decision: assumed — one-line WARN that names empty vs unloadable and the fallback; exact copy is implement
   By: explore
 
 - Q: Does Client.New leave Valid false so the existing ban fallback fires, or stay Valid and choose ban elsewhere?
@@ -103,5 +98,10 @@ No hard gap. **CaptchaEnabled**, **Captcha Client**, **Bouncer**, **Config valid
 
 - Q: When BouncerBanFilePath is set but unloadable, is that the same warn-and-empty-body path as an empty ban path?
   Rank: bounded asked — 1 ValidateParams ban GetTemplate plus 1 bouncer.New discard; Desired Ban file empty or not loadable
-  Decision: assumed — yes; warn once (empty vs path-not-loadable), do not fail New, keep empty body
+  Decision: assumed — yes; warn once for empty or unloadable; do not fail New; keep empty body
+  By: explore
+
+- Q: Who emits the captcha-template warning so a bounce-only subscriber is not warned about unused default /captcha.html?
+  Rank: bounded asked — existing owner split already has callers (1 Client.New, 1 captcha.Open, 1 bouncer.New, 2 ValidateParams GetTemplates); Open point / Unknowns names who emits
+  Decision: resolved — captcha owner (Client.New / Open) emits the captcha-file warning; bouncer.New emits only the ban-file warning. Bounce-only never Opens captcha, so unused default /captcha.html is never read.
   By: explore
