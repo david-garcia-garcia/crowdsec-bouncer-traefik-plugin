@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 528ac9a2
+Reviewed head: 6aa00785
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -53,7 +53,7 @@ Ticket 2026-09-24-lapi-open on branch 2026-09-24-lapi-open targeting master; PR 
 ## Explore Decisions
 | Question | Rank | Decision | By |
 | --- | --- | --- | --- |
-| Do `OpenStream` / `OpenLive` stay as aliases or get removed? | bounded asked — existing exported entry points with 54 enumerated consumer calls (roots: worktree minus archive and other-run devstate; patterns OpenStream( / OpenLive(); Desired One lapi.Open | assumed — remove both. Tests and `plugin.go` call `Open`. `LapiMode` on the `Config` already passed into `New` keeps stream vs live behavior. | explore |
+| Do `OpenStream` / `OpenLive` stay as aliases or get removed? | bounded asked — existing exported entry points with 54 enumerated consumer calls (roots: worktree minus archive and other-run devstate; patterns OpenStream and OpenLive); Desired One lapi.Open | assumed — remove both. Tests and `plugin.go` call `Open`. `LapiMode` on the `Config` already passed into `New` keeps stream vs live behavior. | explore |
 
 
 ## Findings
@@ -69,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 528ac9a23442d02c371148d8eb615b90948312e3 | Card must match the branch you measured |
+| Reviewed head | 6aa0078520c6c951d2587d1868307aa78520ea44 | Card must match the branch you measured |
 
 ### Stored data model
 None.
