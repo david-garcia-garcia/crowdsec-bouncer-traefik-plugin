@@ -17,17 +17,17 @@ Priority: P1 — production is unsafe today on concurrent bind update vs ServeHT
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: P1 — production is unsafe today on concurrent bind update vs ServeHTTP
-Reviewed head: ef718f2c
+Reviewed head: 902c8f28
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions?query=branch%3A2026-09-24-bouncer-bind-race |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,7 +37,7 @@ Owner decision: None.
 | Branch | 2026-09-24-bouncer-bind-race pushed | `git` |
 | OpenSpec | bouncer-bind-immutable-box | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/143 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 35975143573+35975143577 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions?query=branch%3A2026-09-24-bouncer-bind-race | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions?query=branch%3A2026-09-24-bouncer-bind-race |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -57,7 +57,7 @@ Completed:
 None.
 
 ## How this fits together
-Ticket 2026-09-24-bouncer-bind-race on branch 2026-09-24-bouncer-bind-race targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/143; CI not seen.
+Ticket 2026-09-24-bouncer-bind-race on branch 2026-09-24-bouncer-bind-race targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/143; CI build 35975143573+35975143577 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions?query=branch%3A2026-09-24-bouncer-bind-race.
 
 ## Explore Decisions
 None.
@@ -83,7 +83,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | ef718f2c6be786fec69c390c5f8ba5a082a83dac | Card must match the branch you measured |
+| Reviewed head | 902c8f280a16c1799ba1a661371eda83afd39fb2 | Card must match the branch you measured |
 
 ### Stored data model
 None.
