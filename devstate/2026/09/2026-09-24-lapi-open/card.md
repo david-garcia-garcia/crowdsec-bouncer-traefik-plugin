@@ -17,17 +17,17 @@ One exported `lapi.Open` with the same signature as `appsec.Open` and `captcha.O
 **End users.** None.
 
 ## Merge readiness
-In progress. 1 items remain.
+Ready for review. 1 items remain.
 
 Priority: P3 — internal clarity with no current user or operator harm
-Reviewed head: dfc8e846
+Reviewed head: e5a978b8
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35975411356 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,14 +37,18 @@ Owner decision: None.
 | Branch | 2026-09-24-lapi-open pushed | `git` |
 | OpenSpec | one-lapi-open | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/145 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 35975411356 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35975411356 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35975411356 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
 Worktree:
-- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-lapi-open/openspec/changes/one-lapi-open/proposal.md) — modified
-- [core_plugin_lapi_connection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-lapi-open/openspec/changes/one-lapi-open/proposal.md) — modified
+- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-lapi-open/openspec/changes/archive/2026-09-24-one-lapi-open/proposal.md) — modified
+- [core_plugin_lapi_connection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-lapi-open/openspec/changes/archive/2026-09-24-one-lapi-open/proposal.md) — modified
+
+Completed:
+- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-lapi-open/openspec/specs/core_plugin_decisionstore_store/spec.md) — modified
+- [core_plugin_lapi_connection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-lapi-open/openspec/specs/core_plugin_lapi_connection/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -55,7 +59,7 @@ None.
 
 
 ## How this fits together
-Ticket 2026-09-24-lapi-open on branch 2026-09-24-lapi-open targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/145; CI not seen.
+Ticket 2026-09-24-lapi-open on branch 2026-09-24-lapi-open targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/145; CI build 35975411356 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35975411356.
 
 ## Explore Decisions
 None.
@@ -79,9 +83,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | dfc8e84636e98a8eb0d6621b0867ef5f19f2691e | Card must match the branch you measured |
+| Reviewed head | e5a978b829c7ffa18bbc3a8a64e5db889e785bda | Card must match the branch you measured |
 
 ### Stored data model
 None.
