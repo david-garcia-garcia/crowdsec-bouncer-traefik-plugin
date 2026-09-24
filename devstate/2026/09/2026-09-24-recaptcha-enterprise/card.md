@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 028de45c
-Owner decision: None.
+Reviewed head: f769fd77
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -51,7 +51,10 @@ None.
 Ticket 2026-09-24-recaptcha-enterprise on branch 2026-09-24-recaptcha-enterprise targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/149; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| What Go result does Validate expose for None / Pass / Reject / Error without ServeHTTP branching on provider? | bounded asked — changes existing Validate (bool, error); 1 production caller (ServeHTTP) and 4 tests in pkg/captcha/zzz_validate_body_test.go (roots worktree *.go) | assumed — (Outcome, error) with None, Pass, Reject. Error is the error return. Verifier.Pass stays (bool, error). ServeHTTP switches on Outcome plus widget.retry. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 028de45c9bea8ec4e4615f6f8c1cdadc52655a88 | Card must match the branch you measured |
+| Reviewed head | f769fd774ff1b989beddb298f91ea304c6803a84 | Card must match the branch you measured |
 
 ### Stored data model
 None.
