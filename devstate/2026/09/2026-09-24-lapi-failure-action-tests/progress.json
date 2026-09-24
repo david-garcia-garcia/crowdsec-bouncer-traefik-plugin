@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-09-24-lapi-failure-action-tests",
+  "jobName": "2026-09-24-lapi-failure-action-tests",
+  "startedAt": "2026-09-24T17:12:54.247Z",
+  "phases": {
+    "prepare": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "explore": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "propose": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "implement": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "codereview": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "devdocsimpact": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "archive": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "pullrequest": {
+      "work": false,
+      "card": false,
+      "at": null
+    }
+  }
+}
