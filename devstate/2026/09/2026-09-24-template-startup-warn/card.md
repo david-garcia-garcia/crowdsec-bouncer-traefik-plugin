@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 8f7585e2
-Owner decision: None.
+Reviewed head: c46d02f0
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -52,7 +52,10 @@ None.
 Ticket 2026-09-24-template-startup-warn on branch 2026-09-24-template-startup-warn targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/151; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Exact warning text? | additive asked — new log lines this change creates; Desired Warn once at startup that captcha responses will fall back to ban | assumed — one-line WARN that names empty vs unloadable and the fallback; exact copy is implement | explore |
+
 
 ## Findings
 None.
@@ -67,7 +70,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 8f7585e2ee44a3dff3ccdb4f6c6f7d5a3389afe6 | Card must match the branch you measured |
+| Reviewed head | c46d02f00649c7d1677fe44de80e177da3dbf71e | Card must match the branch you measured |
 
 ### Stored data model
 None.
