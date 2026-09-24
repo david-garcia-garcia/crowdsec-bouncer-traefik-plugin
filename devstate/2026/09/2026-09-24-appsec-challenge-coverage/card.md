@@ -20,7 +20,7 @@ The proof sits on the existing AppSec envelope test seam: the same `testBouncerW
 In progress. 0 items remain.
 
 Priority: P3 — a proof and spec gap with no current user or operator harm
-Reviewed head: f7bd00e3
+Reviewed head: 595dc297
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -82,7 +82,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | f7bd00e36d0aabfb6e806f462a7c0c16fe8609ca | Card must match the branch you measured |
+| Reviewed head | 595dc297d5cbd6e651849e40ddca13c917fa6d5a | Card must match the branch you measured |
 
 ### Stored data model
 None.
