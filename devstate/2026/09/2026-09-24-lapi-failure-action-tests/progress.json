@@ -25,16 +25,16 @@
     },
     "codereview": {
       "work": true,
-      "card": false,
-      "at": null
+      "card": true,
+      "at": "2026-09-24T17:45:48.481Z"
     },
     "devdocsimpact": {
-      "work": false,
+      "work": true,
       "card": false,
       "at": null
     },
     "archive": {
-      "work": false,
+      "work": true,
       "card": false,
       "at": null
     },
