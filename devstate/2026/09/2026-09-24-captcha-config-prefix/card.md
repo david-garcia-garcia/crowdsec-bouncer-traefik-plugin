@@ -29,7 +29,7 @@ README BREAKING names the stem move and the `captchaFilePath` revival. Examples,
 In progress. 0 items remain.
 
 Priority: P3 — spec and public-key naming, no current user or operator harm
-Reviewed head: 2bbc87bb
+Reviewed head: 656bca4a
 Owner decision: None.
 
 ## Review scores
@@ -52,11 +52,18 @@ Owner decision: None.
 
 ## Specs
 Worktree:
-- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/openspec/changes/captcha-config-prefix/proposal.md) — modified
-- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/openspec/changes/captcha-config-prefix/proposal.md) — modified
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/openspec/changes/captcha-config-prefix/proposal.md) — modified
-- [core_plugin_middleware_captcha-gate](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/openspec/changes/captcha-config-prefix/proposal.md) — modified
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/openspec/changes/captcha-config-prefix/proposal.md) — modified
+- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/openspec/changes/archive/2026-09-24-captcha-config-prefix/proposal.md) — modified
+- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/openspec/changes/archive/2026-09-24-captcha-config-prefix/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/openspec/changes/archive/2026-09-24-captcha-config-prefix/proposal.md) — modified
+- [core_plugin_middleware_captcha-gate](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/openspec/changes/archive/2026-09-24-captcha-config-prefix/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/openspec/changes/archive/2026-09-24-captcha-config-prefix/proposal.md) — modified
+
+Completed:
+- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/openspec/specs/build_e2e_pester_crowdsec-stack/spec.md) — modified
+- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/openspec/specs/core_plugin_lapi_reclaim-key/spec.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
+- [core_plugin_middleware_captcha-gate](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/openspec/specs/core_plugin_middleware_captcha-gate/spec.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/openspec/specs/core_plugin_middleware_config-validation/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -90,9 +97,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 5 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 10 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 2bbc87bb586e461e55bf37406637de823a658642 | Card must match the branch you measured |
+| Reviewed head | 656bca4a498a5485aca2ef05582bf5962f66f548 | Card must match the branch you measured |
 
 ### Stored data model
 None.
