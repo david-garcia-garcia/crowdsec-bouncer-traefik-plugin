@@ -16,7 +16,7 @@ How this plugin keys a reclaimed `lapi.Client` versus the store it writes. Spec:
 
 ## How to use
 
-- Call `lapi.OwnershipKey(cfg, middlewareName)` from `OpenStream` / `OpenLive`.
+- Call `lapi.OwnershipKey(cfg, middlewareName)` from `Open`.
 - `StoreKey` is `decisionstore:` plus `SessionHex` only.
 - A knob on the ownership key that is not in SessionHex (interval, metrics, `updateMaxFailure`, CAPI scenarios) Opens a new Client and keeps the store.
 - `lapiDefaultDecisionSeconds` is on both: new Client and new store.
@@ -28,7 +28,7 @@ How this plugin keys a reclaimed `lapi.Client` versus the store it writes. Spec:
 
 ```go
 bindKey := lapi.OwnershipKey(cfg, middlewareName)
-lapiClient, err := lapi.OpenStream(ctx, cfg, log, middlewareName, pluginVersion)
+lapiClient, err := lapi.Open(ctx, cfg, log, middlewareName, pluginVersion)
 ```
 
 ## Key files

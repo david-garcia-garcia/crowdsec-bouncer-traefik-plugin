@@ -21,7 +21,7 @@ func openStreamForTest(t *testing.T, cfg *configuration.Config, name string) *Cl
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	client, err := OpenStream(ctx, cfg, slog.Default(), name, "test")
+	client, err := Open(ctx, cfg, slog.Default(), name, "test")
 	if err != nil {
 		t.Fatal(err)
 	}

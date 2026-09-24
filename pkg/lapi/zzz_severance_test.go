@@ -31,7 +31,7 @@ func TestSessionHex_S1RedisOffIgnoresLeftoverFields(t *testing.T) {
 	}
 	firstCfg := testStreamConfig(parsed.Host, 1)
 	ctx, cancel := context.WithCancel(context.Background())
-	first, err := OpenStream(ctx, firstCfg, slog.Default(), "s1", "test")
+	first, err := Open(ctx, firstCfg, slog.Default(), "s1", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestSessionHex_S1RedisOffIgnoresLeftoverFields(t *testing.T) {
 	secondCfg := testStreamConfig(parsed.Host, 1)
 	secondCfg.LapiRedisHost = "redis:6379"
 	secondCfg.LapiRedisPassword = "secret"
-	second, err := OpenStream(context.Background(), secondCfg, slog.Default(), "s1", "test")
+	second, err := Open(context.Background(), secondCfg, slog.Default(), "s1", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestSessionHex_S3RedisFieldChangeForksStore(t *testing.T) {
 			firstCfg.LapiRedisDatabase = "1"
 			firstCfg.LapiRedisReadHosts = []string{"r1"}
 			ctx, cancel := context.WithCancel(context.Background())
-			first, err := OpenStream(ctx, firstCfg, slog.Default(), "s3-"+field.name, "test")
+			first, err := Open(ctx, firstCfg, slog.Default(), "s3-"+field.name, "test")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -114,7 +114,7 @@ func TestSessionHex_S3RedisFieldChangeForksStore(t *testing.T) {
 			if SessionHex(firstCfg) == SessionHex(secondCfg) {
 				t.Fatal("S3: redis field change must fork SessionHex")
 			}
-			second, err := OpenStream(context.Background(), secondCfg, slog.Default(), "s3-"+field.name, "test")
+			second, err := Open(context.Background(), secondCfg, slog.Default(), "s3-"+field.name, "test")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -158,7 +158,7 @@ func TestSessionHex_S5SameRedisReclaims(t *testing.T) {
 	cfg.LapiRedisPassword = "pw"
 	cfg.LapiRedisDatabase = "1"
 	ctx, cancel := context.WithCancel(context.Background())
-	first, err := OpenStream(ctx, cfg, slog.Default(), "s5", "test")
+	first, err := Open(ctx, cfg, slog.Default(), "s5", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +173,7 @@ func TestSessionHex_S5SameRedisReclaims(t *testing.T) {
 	if SessionHex(cfg) != SessionHex(same) {
 		t.Fatal("S5: same redis set must keep SessionHex")
 	}
-	second, err := OpenStream(context.Background(), same, slog.Default(), "s5", "test")
+	second, err := Open(context.Background(), same, slog.Default(), "s5", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,13 +192,13 @@ func TestOwnership_I1IntervalMetricsFailureCAPIForkClient(t *testing.T) {
 	}
 	base := testStreamConfig(parsed.Host, 1)
 	ctx := context.Background()
-	first, err := OpenStream(ctx, base, slog.Default(), "i1", "test")
+	first, err := Open(ctx, base, slog.Default(), "i1", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	secondCfg := testStreamConfig(parsed.Host, 1)
 	secondCfg.LapiUpdateIntervalSeconds = 120
-	second, err := OpenStream(ctx, secondCfg, slog.Default(), "i1", "test")
+	second, err := Open(ctx, secondCfg, slog.Default(), "i1", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +209,7 @@ func TestOwnership_I1IntervalMetricsFailureCAPIForkClient(t *testing.T) {
 		t.Fatal("I1: updateIntervalSeconds must keep SessionHex")
 	}
 	metricsCfg := testStreamConfig(parsed.Host, 600)
-	metrics, err := OpenStream(ctx, metricsCfg, slog.Default(), "i1", "test")
+	metrics, err := Open(ctx, metricsCfg, slog.Default(), "i1", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func TestOwnership_I1IntervalMetricsFailureCAPIForkClient(t *testing.T) {
 	}
 	failCfg := testStreamConfig(parsed.Host, 1)
 	failCfg.LapiUpdateMaxFailure = 3
-	failClient, err := OpenStream(ctx, failCfg, slog.Default(), "i1", "test")
+	failClient, err := Open(ctx, failCfg, slog.Default(), "i1", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +227,7 @@ func TestOwnership_I1IntervalMetricsFailureCAPIForkClient(t *testing.T) {
 	}
 	capiCfg := testStreamConfig(parsed.Host, 1)
 	capiCfg.LapiCapiScenarios = []string{"crowdsecurity/http-probing"}
-	capi, err := OpenStream(ctx, capiCfg, slog.Default(), "i1", "test")
+	capi, err := Open(ctx, capiCfg, slog.Default(), "i1", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +259,7 @@ func TestOwnership_I3StartupBlockIsNeitherKey(t *testing.T) {
 	firstCfg := testStreamConfig(parsed.Host, 1)
 	firstCfg.BouncerStartupBlock = true
 	started := time.Now()
-	first, err := OpenStream(context.Background(), firstCfg, slog.Default(), "i3", "test")
+	first, err := Open(context.Background(), firstCfg, slog.Default(), "i3", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +274,7 @@ func TestOwnership_I3StartupBlockIsNeitherKey(t *testing.T) {
 	if OwnershipKey(firstCfg, "i3") != OwnershipKey(secondCfg, "i3") {
 		t.Fatal("I3: streamStartupBlock must not change the ownership key")
 	}
-	second, err := OpenStream(context.Background(), secondCfg, slog.Default(), "i3", "test")
+	second, err := Open(context.Background(), secondCfg, slog.Default(), "i3", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
