@@ -78,8 +78,9 @@ func testStreamBanBouncer(t *testing.T, log *slog.Logger, scopeHeaders map[strin
 
 // jsonLinesWithMsg are slog JSON lines whose msg equals the stem.
 func jsonLinesWithMsg(logged, msg string) []string {
-	var lines []string
-	for _, line := range strings.Split(logged, "\n") {
+	raw := strings.Split(logged, "\n")
+	lines := make([]string, 0, len(raw))
+	for _, line := range raw {
 		if line == "" {
 			continue
 		}
@@ -164,8 +165,8 @@ func TestHunt_ServeHTTPTraceRemediatingIncludesPresentScopes(t *testing.T) {
 		decisionscope.ScopeCountry: "CF-IPCountry",
 		decisionscope.ScopeAS:      "CF-ASN",
 	})
-	req.Header.Set("CF-IPCountry", "FR")
-	req.Header.Set("CF-ASN", "13335")
+	req.Header.Set("Cf-Ipcountry", "FR")
+	req.Header.Set("Cf-Asn", "13335")
 	b.ServeHTTP(httptest.NewRecorder(), req)
 	if *passed {
 		t.Fatal("origin must not run on store-hit ban")
@@ -282,8 +283,8 @@ func TestHunt_ServeHTTPLiveLookupTraceIncludesScopes(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	req.RemoteAddr = "127.0.0.1:1"
 	req.Header.Set("X-Forwarded-For", "203.0.113.10")
-	req.Header.Set("CF-IPCountry", "FR")
-	req.Header.Set("CF-ASN", "13335")
+	req.Header.Set("Cf-Ipcountry", "FR")
+	req.Header.Set("Cf-Asn", "13335")
 	b.ServeHTTP(httptest.NewRecorder(), req)
 	if passed {
 		t.Fatal("origin must not run on LiveLookup ban")
