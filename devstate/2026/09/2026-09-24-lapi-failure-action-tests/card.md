@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 84820b4d
+Reviewed head: 3a44aab1
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -69,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 84820b4d3f2672d0ab3eb8494fa6f33287e01b91 | Card must match the branch you measured |
+| Reviewed head | 3a44aab126358428125fdf685370c7b9cfde8154 | Card must match the branch you measured |
 
 ### Stored data model
 None.
