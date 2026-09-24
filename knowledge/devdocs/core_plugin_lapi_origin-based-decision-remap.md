@@ -20,7 +20,7 @@ Stream Ip/header, stream Range, and live/none query store `RemediationValue` onl
 - Store with `MetricsOrigin` then `kind := decisionscope.RemediationValue(type)` on stream Put, Range upsert, and live query.
 - After a successful `LookupRemediation` or `LiveLookup`, call `appliedLAPIRemediation` before `IsActiveRemediation`. Resolve packed origin ids when the table is non-empty.
 - Empty table: ban stays `t`, captcha stays `c`. Unknown type stays empty (skip store). `pass` applies as `NoBannedValue`.
-- Reject invalid edges in `ValidateParams`. Do not require `bouncerCaptchaProvider`; missing provider still falls back to ban rendering for applied captcha.
+- Reject invalid edges in `ValidateParams`. Do not require `captchaProvider`; missing provider still falls back to ban rendering for applied captcha.
 
 ## Pattern snippet
 
