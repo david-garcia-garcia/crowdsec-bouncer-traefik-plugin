@@ -14,17 +14,17 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 399d04e4
+Reviewed head: 9686458b
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36035567735 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -34,8 +34,8 @@ Owner decision: None.
 | Branch | 2026-09-24-lapi-failure-action-tests pushed | `git` |
 | OpenSpec | lapi-failure-action-request-tests | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/150 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 36035567735 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36035567735 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36035567735 |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
@@ -48,7 +48,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-09-24-lapi-failure-action-tests on branch 2026-09-24-lapi-failure-action-tests targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/150; CI not seen.
+Ticket 2026-09-24-lapi-failure-action-tests on branch 2026-09-24-lapi-failure-action-tests targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/150; CI build 36035567735 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36035567735.
 
 ## Explore Decisions
 None.
@@ -66,7 +66,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 399d04e4d3eea8853f9bbc65f452ae2b14130081 | Card must match the branch you measured |
+| Reviewed head | 9686458b1e14c57640194b219509394756c60a77 | Card must match the branch you measured |
 
 ### Stored data model
 None.
