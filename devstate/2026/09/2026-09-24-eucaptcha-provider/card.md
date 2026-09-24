@@ -14,10 +14,10 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+In progress. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 174070cd
+Reviewed head: 7e454f14
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,20 +32,27 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-24-eucaptcha-provider pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | eucaptcha-provider | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/155 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_middleware_captcha-enterprise-config](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/openspec/changes/eucaptcha-provider/proposal.md) — modified
+- [core_plugin_middleware_captcha-eucaptcha-verify](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/openspec/changes/eucaptcha-provider/proposal.md) — added
+- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/openspec/changes/eucaptcha-provider/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/openspec/changes/eucaptcha-provider/proposal.md) — modified
+
 
 ## Deviations from the ask
-None.
+- taken: eucaptcha beside hcaptcha, recaptcha, turnstile, and custom. → those tokens plus dest's recaptcha-enterprise. — `pkg/configuration/configuration.go validateCaptcha` — dest already owns that token; dropping it would distort the allowlist this change extends.. Requester: not asked.
+
 
 ## Follow-up issues
-None.
+- [ ] [Provider allowlist lives on captcha-enterprise-config](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/knowledge/debt/2026-09-24-allowlist-on-captcha-enterprise-config.md) — provider allowlist lives on leaf `captcha-enterprise-config`.
+
 
 ## How this fits together
 Ticket 2026-09-24-eucaptcha-provider on branch 2026-09-24-eucaptcha-provider targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/155; CI not seen.
@@ -55,8 +62,6 @@ Upstream pull request (maxlerebourg tree, not this repo): https://github.com/max
 | Question | Rank | Decision | By |
 | --- | --- | --- | --- |
 | Is an empty User-Agent a rejection the same way as an empty client address? | additive asked — new verifier this change creates; Unknowns on requirement.md; Desired names empty address as rejection only | assumed — no. Forward r.UserAgent() including empty string. Do not local-reject empty UA. Official field is necessary but the owner does not state HTTP for empty or missing UA. Empty client address stays a local reject on this verifier. Source knowledge/research/ext_eucaptcha_verify/. | explore |
-| How is train encoded when absent vs explicit false vs JSON null? | additive asked — Desired names mint only when success is true and train is false or null | assumed — Pass-true only when success is true and train is JSON false or JSON null. Explicit true is Pass-false. Omitted key: Go pointer-to-bool cannot tell omit from null; treat nil as the false-or-null case (mint if success). Official examples always include train false or train true. Source knowledge/research/ext_eucaptcha_verify/. | explore |
-| Should empty client address reject on every Pass implementer, or only eucaptcha? | additive asked — Desired names empty client address as a rejection; Affected Pass surface; siteverify live spec says omit remoteip when empty | assumed — eucaptcha verifier only. Siteverify and assessments keep omit-when-empty. Do not rewrite those specs for this ticket. | explore |
 
 
 ## Findings
@@ -70,9 +75,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 1 added / 3 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 174070cd2abc7afb4b7c5839610e7100b80a1eee | Card must match the branch you measured |
+| Reviewed head | 7e454f14ec5bbac92c1dba8a6198b4d6255cb427 | Card must match the branch you measured |
 
 ### Stored data model
 None.

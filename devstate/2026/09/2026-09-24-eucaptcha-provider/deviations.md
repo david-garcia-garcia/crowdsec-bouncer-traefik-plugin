@@ -11,7 +11,7 @@
 - [x] taken  keep stock captcha.html without a hardcoded eu-captcha-response input
   Asked: pairing supplies hidden field eu-captcha-response on the stock page.
   Instead: Widget TokenField is eu-captcha-response; official verify.js injects the input; captcha.html stays unchanged.
-  Owner: `captcha.html` / `pkg/captcha/widget.go` `Widget.TokenField`
+  Owner: `captcha.html`
   Why: changing the stock page is out of scope; the widget already writes the field.
   By: propose
   Requester: not asked
