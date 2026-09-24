@@ -24,7 +24,7 @@ func writeRoutingCaptchaTemplate(t *testing.T) string {
 }
 
 func Test_IsCaptchaFormPost(t *testing.T) {
-	client := &Client{infoProvider: &infoProvider{response: "dummy-captcha-response"}}
+	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
 
 	formPOST := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader("dummy-captcha-response=token"))
 	formPOST.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -45,7 +45,7 @@ func Test_IsCaptchaFormPost(t *testing.T) {
 }
 
 func Test_IsCaptchaFormPost_ordinaryPostKeepsItsBody(t *testing.T) {
-	client := &Client{infoProvider: &infoProvider{response: "dummy-captcha-response"}}
+	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
 	payload := "comment=hello&other=1"
 	req := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader(payload))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -65,7 +65,7 @@ func Test_IsCaptchaFormPost_ordinaryPostKeepsItsBody(t *testing.T) {
 }
 
 func Test_IsCaptchaFormPost_overMaxBodyReachesOriginIntact(t *testing.T) {
-	client := &Client{infoProvider: &infoProvider{response: "dummy-captcha-response"}}
+	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
 	// A token cannot be this big, so the upload must pass through untouched even
 	// though it does contain the provider field name.
 	payload := "dummy-captcha-response=token&blob=" + strings.Repeat("a", captchaFormMaxBytes)
@@ -84,7 +84,7 @@ func Test_IsCaptchaFormPost_overMaxBodyReachesOriginIntact(t *testing.T) {
 }
 
 func Test_IsCaptchaFormPost_unknownContentLength(t *testing.T) {
-	client := &Client{infoProvider: &infoProvider{response: "dummy-captcha-response"}}
+	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
 
 	small := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader("dummy-captcha-response=token"))
 	small.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -110,7 +110,7 @@ func Test_IsCaptchaFormPost_unknownContentLength(t *testing.T) {
 }
 
 func Test_IsCaptchaFormPost_multipartForm(t *testing.T) {
-	client := &Client{infoProvider: &infoProvider{response: "dummy-captcha-response"}}
+	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
 
 	var solved bytes.Buffer
 	writer := multipart.NewWriter(&solved)
@@ -150,7 +150,7 @@ func Test_IsCaptchaFormPost_multipartForm(t *testing.T) {
 }
 
 func Test_IsCaptchaFormPost_alreadyParsedPostForm(t *testing.T) {
-	client := &Client{infoProvider: &infoProvider{response: "dummy-captcha-response"}}
+	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
 	req := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader("dummy-captcha-response=token"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if err := req.ParseForm(); err != nil {
@@ -189,6 +189,7 @@ func Test_IsCustomResourceRequest_exactPathOnly(t *testing.T) {
 		true,
 		writeRoutingCaptchaTemplate(t),
 		3600,
+		Enterprise{},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -228,6 +229,7 @@ func Test_IsCustomResourceRequest_emptyChallengeIsJsOnly(t *testing.T) {
 		true,
 		writeRoutingCaptchaTemplate(t),
 		3600,
+		Enterprise{},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -257,6 +259,7 @@ func Test_IsCustomResourceRequest_builtinCDNNotStored(t *testing.T) {
 		true,
 		writeRoutingCaptchaTemplate(t),
 		3600,
+		Enterprise{},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -289,6 +292,7 @@ func Test_ServeHTTP_rendersChallengeURL(t *testing.T) {
 		true,
 		templatePath,
 		3600,
+		Enterprise{},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -318,6 +322,7 @@ func Test_ServeHTTP_challengeURLEmptyForBuiltinProvider(t *testing.T) {
 		true,
 		templatePath,
 		3600,
+		Enterprise{},
 	); err != nil {
 		t.Fatal(err)
 	}

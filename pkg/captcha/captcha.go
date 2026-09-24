@@ -1,9 +1,8 @@
-// Package captcha is the reclaim value for one named captcha siteverify client.
+// Package captcha is the reclaim value for one named captcha Client that holds a widget and a verifier.
 package captcha
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
 	"log/slog"
 	"mime"
@@ -19,11 +18,10 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-// Client is one published captcha siteverify, template, and gate. Not a Bouncer field.
+// Client is one published captcha widget, verifier, template, and gate. Not a Bouncer field.
 type Client struct {
 	Valid               bool
 	siteKey             string
-	secretKey           string
 	gateSecret          []byte
 	gateBindIP          bool
 	gracePeriodSeconds  int64
@@ -31,10 +29,10 @@ type Client struct {
 	template            *template.Template
 	httpClient          *http.Client
 	log                 *slog.Logger
-	infoProvider        *infoProvider
-	// challengeURL and validateBody are custom-only; built-ins leave them empty.
+	widget              Widget
+	verifier            Verifier
+	// challengeURL is custom-only; built-ins leave it empty.
 	challengeURL        string
-	validateBody        string
 	customResourcePaths []string
 	mu                  sync.Mutex
 	middlewareName      string
@@ -77,26 +75,32 @@ var infoProviders = map[string]*infoProvider{
 	},
 }
 
-// New fills siteverify, template, and gate fields. Empty provider leaves Valid false.
-func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, challengeURL, key, response, validate, validateBody, siteKey, secretKey, gateSecret string, gateBindIP bool, captchaTemplatePath string, gracePeriodSeconds int64) error {
+// New fills widget, verifier, template, and gate fields. Empty provider leaves Valid false.
+// New is the only provider and key-type switch. enterprise is the named recaptcha-enterprise construction value.
+func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, challengeURL, key, response, validate, validateBody, siteKey, secretKey, gateSecret string, gateBindIP bool, captchaTemplatePath string, gracePeriodSeconds int64, enterprise Enterprise) error {
 	c.Valid = provider != ""
 	if !c.Valid {
 		return nil
 	}
-	var info *infoProvider
-	if provider == configuration.CustomProvider {
-		info = &infoProvider{js: js, key: key, response: response, validate: validate}
-		c.challengeURL = challengeURL
-		c.validateBody = strings.TrimSpace(validateBody)
-		c.storeCustomResourcePaths(js, challengeURL)
-	} else {
-		info = infoProviders[provider]
-	}
-	c.infoProvider = info
 	c.siteKey = siteKey
-	c.secretKey = secretKey
 	c.gateSecret = []byte(gateSecret)
 	c.gateBindIP = gateBindIP
+	c.log = log
+	c.httpClient = httpClient
+	// Pair widget and verifier from the provider name and enterprise key type only.
+	switch provider {
+	case configuration.CustomProvider:
+		c.challengeURL = challengeURL
+		c.storeCustomResourcePaths(js, challengeURL)
+		c.widget = Widget{ScriptURL: js, Class: key, TokenField: response, RetryAfterReject: true}
+		c.verifier = newSiteverifyVerifier(httpClient, secretKey, validate, strings.TrimSpace(validateBody), log)
+	case configuration.RecaptchaEnterpriseProvider:
+		c.widget, c.verifier = pairEnterprise(httpClient, siteKey, enterprise)
+	default:
+		info := infoProviders[provider]
+		c.widget = Widget{ScriptURL: info.js, Class: info.key, TokenField: info.response, RetryAfterReject: true}
+		c.verifier = newSiteverifyVerifier(httpClient, secretKey, info.validate, "", log)
+	}
 	challengeTemplate, contentType, err := configuration.GetTemplate(captchaTemplatePath)
 	if err != nil {
 		c.Valid = false
@@ -109,24 +113,22 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 	c.template = challengeTemplate
 	c.templateContentType = contentType
 	c.gracePeriodSeconds = gracePeriodSeconds
-	c.log = log
-	c.httpClient = httpClient
 	return nil
 }
 
-// HTTPClientForTest returns the stored siteverify client. Tests only.
+// HTTPClientForTest returns the HTTP client the captcha Client uses for its verifier. Tests only.
 func (c *Client) HTTPClientForTest() *http.Client {
 	return c.httpClient
 }
 
 // ServeHTTP handles captcha html page or validation. remediationHeader is this router's name.
 func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP, remediationHeader string) {
-	valid, err := c.Validate(r, remoteIP)
+	outcome, err := c.Validate(r, remoteIP)
 	// Transport and JSON decode stay classified; the solver retries the challenge.
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP:validate", "error", err)
 	}
-	if valid {
+	if outcome == Pass {
 		logger.Trace(c.log, "captcha:ServeHTTP captcha:valid")
 		value := mintGateValue(c.gateSecret, c.gateBindIP, remoteIP, time.Now())
 		setGateCookie(rw, r, value, c.gracePeriodSeconds)
@@ -134,14 +136,21 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP, re
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
 	}
+	bootScript := c.widget.BootScript
+	if outcome == Reject && !c.widget.RetryAfterReject {
+		bootScript = ""
+	}
 	rw.Header().Set("Content-Type", c.templateContentType)
 	writeRemediationHeader(rw, remediationHeader, "captcha")
 	rw.WriteHeader(http.StatusOK)
 	err = c.template.Execute(rw, map[string]string{
 		"SiteKey":      c.siteKey,
-		"FrontendJS":   c.infoProvider.js,
-		"FrontendKey":  c.infoProvider.key,
+		"FrontendJS":   c.widget.ScriptURL,
+		"FrontendKey":  c.widget.Class,
 		"ChallengeURL": c.challengeURL,
+		"BootScript":   bootScript,
+		"Action":       c.widget.Action,
+		"DrawCheckbox": c.widget.drawCheckbox(),
 	})
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP captchaTemplateServe", "error", err)
@@ -178,10 +187,10 @@ const captchaFormMaxBytes = 64 << 10
 // turns out not to be a captcha form reaches origin intact. Validate uses
 // captchaResponseFromRequest instead, which is free to consume the body.
 func (c *Client) IsCaptchaFormPost(r *http.Request) bool {
-	if r == nil || r.Method != http.MethodPost || c.infoProvider == nil || c.infoProvider.response == "" {
+	if r == nil || r.Method != http.MethodPost || c.widget.TokenField == "" {
 		return false
 	}
-	field := c.infoProvider.response
+	field := c.widget.TokenField
 	// Something upstream already parsed the form; rereading Body would find nothing.
 	if r.PostForm != nil {
 		return r.PostForm.Get(field) != ""
@@ -342,18 +351,6 @@ func (c *Client) storeCustomResourcePaths(jsURL, challengeURL string) {
 	}
 }
 
-type responseProvider struct {
-	Success bool `json:"success"`
-}
-
-// siteverifyRequest is the JSON body custom+json POSTs to the provider validate URL.
-// RemoteIP is omitempty so an empty Validate address does not invent the field.
-type siteverifyRequest struct {
-	Secret   string `json:"secret"`
-	Response string `json:"response"`
-	RemoteIP string `json:"remoteip,omitempty"`
-}
-
 // captchaResponseFromRequest reads the provider token from query, POST form, or
 // raw urlencoded body. Traefik's Yaegi request wrapper often leaves Form empty
 // after FormValue, so the body is parsed directly when ParseForm yields nothing.
@@ -392,61 +389,25 @@ func captchaResponseFromRequest(r *http.Request, field string) string {
 	return values.Get(field)
 }
 
-// postSiteverify POSTs secret and response to the provider validate URL.
-// Custom+json sends application/json; form/omit and built-ins keep PostForm.
-// remoteip is added on both encodings only when remoteIP is non-empty.
-func (c *Client) postSiteverify(response, remoteIP string) (*http.Response, error) {
-	if c.validateBody == configuration.CaptchaCustomValidateBodyJSON {
-		payload, err := json.Marshal(siteverifyRequest{Secret: c.secretKey, Response: response, RemoteIP: remoteIP})
-		if err != nil {
-			return nil, err
-		}
-		req, err := http.NewRequest(http.MethodPost, c.infoProvider.validate, bytes.NewReader(payload))
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Set("Content-Type", "application/json")
-		return c.httpClient.Do(req)
-	}
-	body := url.Values{}
-	body.Add("secret", c.secretKey)
-	body.Add("response", response)
-	if remoteIP != "" {
-		body.Add("remoteip", remoteIP)
-	}
-	return c.httpClient.PostForm(c.infoProvider.validate, body)
-}
-
-// Validate Verify the captcha from provider API.
-func (c *Client) Validate(r *http.Request, remoteIP string) (bool, error) {
+// Validate classifies the challenge request as None, Pass, or Reject.
+// Empty token is None and does not call the verifier. Error is the error return.
+func (c *Client) Validate(r *http.Request, remoteIP string) (Outcome, error) {
 	if r.Method != http.MethodPost {
 		logger.Trace(c.log, "captcha:Validate invalid method", "method", r.Method)
-		return false, nil
+		return None, nil
 	}
-	response := captchaResponseFromRequest(r, c.infoProvider.response)
-	if response == "" {
+	token := captchaResponseFromRequest(r, c.widget.TokenField)
+	if token == "" {
 		logger.Trace(c.log, "captcha:Validate no captcha response found in request")
-		return false, nil
+		return None, nil
 	}
-	res, err := c.postSiteverify(response, remoteIP)
+	passed, err := c.verifier.Pass(token, remoteIP)
 	if err != nil {
-		c.log.Error("captcha:Validate", "error", err)
-		return false, err
+		c.log.Debug("captcha:Validate", "error", err)
+		return None, err
 	}
-	defer func() {
-		_ = res.Body.Close()
-	}()
-	// Classify siteverify as JSON when the type token equals application/json.
-	mediaType, _, err := mime.ParseMediaType(res.Header.Get("Content-Type"))
-	if err != nil || mediaType != "application/json" {
-		logger.Trace(c.log, "captcha:Validate responseType:noJson")
-		return false, nil
+	if passed {
+		return Pass, nil
 	}
-	var captchaResponse responseProvider
-	err = json.NewDecoder(res.Body).Decode(&captchaResponse)
-	if err != nil {
-		return false, err
-	}
-	logger.Trace(c.log, "captcha:Validate", "success", captchaResponse.Success)
-	return captchaResponse.Success, nil
+	return Reject, nil
 }

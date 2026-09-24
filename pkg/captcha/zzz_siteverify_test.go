@@ -37,6 +37,7 @@ func newTestSiteverifyClient(t *testing.T, siteverifyURL string, httpClient *htt
 		true,
 		templatePath,
 		3600,
+		Enterprise{},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -71,9 +72,13 @@ func Test_ServeHTTP_siteverifyPostsRemoteIP(t *testing.T) {
 	if !strings.Contains(cookie, gateCookieName+"=") {
 		t.Fatalf("solve missing gate cookie: %s", cookie)
 	}
-	if gotSecret != client.secretKey || gotResponse != "ok-token" || gotRemoteIP != passedRemoteIP {
+	formVerifier, ok := client.verifier.(*siteverifyVerifier)
+	if !ok {
+		t.Fatalf("verifier type %T", client.verifier)
+	}
+	if gotSecret != formVerifier.secretKey || gotResponse != "ok-token" || gotRemoteIP != passedRemoteIP {
 		t.Fatalf("siteverify form secret=%q response=%q remoteip=%q, want secret=%q response=ok-token remoteip=%s",
-			gotSecret, gotResponse, gotRemoteIP, client.secretKey, passedRemoteIP)
+			gotSecret, gotResponse, gotRemoteIP, formVerifier.secretKey, passedRemoteIP)
 	}
 }
 
@@ -147,6 +152,7 @@ func Test_New_warnsWhenCaptchaTemplateUnavailable(t *testing.T) {
 			true,
 			"",
 			3600,
+			Enterprise{},
 		)
 		if err != nil {
 			t.Fatalf("New() error = %v", err)
@@ -182,6 +188,7 @@ func Test_New_warnsWhenCaptchaTemplateUnavailable(t *testing.T) {
 			true,
 			missing,
 			3600,
+			Enterprise{},
 		)
 		if err != nil {
 			t.Fatalf("New() error = %v", err)

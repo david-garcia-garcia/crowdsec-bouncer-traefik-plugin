@@ -1,0 +1,51 @@
+# Review
+
+## prepare (2026-09-24)
+phase: prepare
+verdict: in progress
+head: 93c0db6be456e8a950f126290fcc7f563f8cc622
+
+## explore (2026-09-24)
+phase: explore
+verdict: in progress
+head: cc9bd8da8140fd0a82171b66ee29e6ee3ed44783
+
+## explore (2026-09-24)
+phase: explore
+verdict: in progress
+head: 028de45c9bea8ec4e4615f6f8c1cdadc52655a88
+
+## explore (2026-09-24)
+phase: explore
+verdict: in progress
+head: f769fd774ff1b989beddb298f91ea304c6803a84
+
+## propose (2026-09-24)
+phase: propose
+verdict: in progress
+head: 3b9f106639801475172320551fc133389700f8df
+
+## implement (2026-09-24)
+phase: implement
+verdict: ready for review
+head: e474e96f5afa5d2f3ba877f896b71dedeb1fc0c7
+
+## codereview (2026-09-24)
+phase: codereview
+verdict: ready for review
+head: 591ad9f61ad14394c20abbce88b140233f2a3bca
+
+## devdocsimpact (2026-09-24)
+phase: devdocsimpact
+verdict: ready for review
+head: a8adf4dd8c3d595b54c7687e17b5b847d07e4c17
+
+## archive (2026-09-24)
+phase: archive
+verdict: ready for review
+head: 1fcdf975baf3a18637f71a520041d501613c9bf9
+
+## pullrequest (2026-09-24)
+phase: pullrequest
+verdict: ready for review
+head: 89139860067cfaf19a36e55c6b22b27b8b8ff8d5

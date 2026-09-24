@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -21,28 +22,33 @@ import (
 
 // Enums for crowdsec mode.
 const (
-	AloneMode         = "alone"
-	StreamMode        = "stream"
-	LiveMode          = "live"
-	NoneMode          = "none"
-	HTTPS             = "https"
-	HTTP              = "http"
-	LogTRACE          = "TRACE"
-	LogDEBUG          = "DEBUG"
-	LogINFO           = "INFO"
-	LogWARN           = "WARN"
-	LogERROR          = "ERROR"
-	ReasonTECH        = "TECHNICAL_ISSUE"
-	ReasonLAPI        = "LAPI"
-	ReasonAPPSEC      = "APPSEC"
-	HcaptchaProvider  = "hcaptcha"
-	RecaptchaProvider = "recaptcha"
-	TurnstileProvider = "turnstile"
-	CustomProvider    = "custom"
+	AloneMode                   = "alone"
+	StreamMode                  = "stream"
+	LiveMode                    = "live"
+	NoneMode                    = "none"
+	HTTPS                       = "https"
+	HTTP                        = "http"
+	LogTRACE                    = "TRACE"
+	LogDEBUG                    = "DEBUG"
+	LogINFO                     = "INFO"
+	LogWARN                     = "WARN"
+	LogERROR                    = "ERROR"
+	ReasonTECH                  = "TECHNICAL_ISSUE"
+	ReasonLAPI                  = "LAPI"
+	ReasonAPPSEC                = "APPSEC"
+	HcaptchaProvider            = "hcaptcha"
+	RecaptchaProvider           = "recaptcha"
+	RecaptchaEnterpriseProvider = "recaptcha-enterprise"
+	TurnstileProvider           = "turnstile"
+	CustomProvider              = "custom"
 	// CaptchaCustomValidateBodyForm is urlencoded siteverify secret+response (same as omit).
 	CaptchaCustomValidateBodyForm = "form"
 	// CaptchaCustomValidateBodyJSON is POST application/json secret+response (custom only).
 	CaptchaCustomValidateBodyJSON = "json"
+	// CaptchaEnterpriseKeyTypeCheckbox is a Cloud reCAPTCHA Enterprise checkbox key.
+	CaptchaEnterpriseKeyTypeCheckbox = "checkbox"
+	// CaptchaEnterpriseKeyTypeScore is a Cloud reCAPTCHA Enterprise score key.
+	CaptchaEnterpriseKeyTypeScore = "score"
 	// FailureActionPassthrough lets the request continue when LAPI or AppSec is down.
 	FailureActionPassthrough = "passthrough"
 	// FailureActionBan remediates as a ban when LAPI or AppSec is down.
@@ -93,6 +99,12 @@ type Config struct {
 	CaptchaCustomValidateBody           string                       `json:"captchaCustomValidateBody,omitempty"`
 	CaptchaCustomValidateURL            string                       `json:"captchaCustomValidateUrl,omitempty"`
 	CaptchaEnabled                      bool                         `json:"captchaEnabled,omitempty"`
+	CaptchaEnterpriseAction             string                       `json:"captchaEnterpriseAction,omitempty"`
+	CaptchaEnterpriseAPIKey             string                       `json:"captchaEnterpriseApiKey,omitempty"`
+	CaptchaEnterpriseAPIKeyFile         string                       `json:"captchaEnterpriseApiKeyFile,omitempty"`
+	CaptchaEnterpriseKeyType            string                       `json:"captchaEnterpriseKeyType,omitempty"`
+	CaptchaEnterpriseMinScore           string                       `json:"captchaEnterpriseMinScore,omitempty"`
+	CaptchaEnterpriseProjectID          string                       `json:"captchaEnterpriseProjectId,omitempty"`
 	CaptchaFilePath                     string                       `json:"captchaFilePath,omitempty"`
 	CaptchaGateBindIP                   bool                         `json:"captchaGateBindIp,omitempty"`
 	CaptchaGateSecret                   string                       `json:"captchaGateSecret,omitempty"`
@@ -218,6 +230,11 @@ func New() *Config {
 		CaptchaCustomValidateBody:           "",
 		CaptchaCustomValidateURL:            "",
 		CaptchaEnabled:                      false,
+		CaptchaEnterpriseAction:             "",
+		CaptchaEnterpriseAPIKey:             "",
+		CaptchaEnterpriseKeyType:            "",
+		CaptchaEnterpriseMinScore:           "",
+		CaptchaEnterpriseProjectID:          "",
 		CaptchaFilePath:                     "/captcha.html",
 		CaptchaGateBindIP:                   true,
 		CaptchaGracePeriodSeconds:           1800,
@@ -498,7 +515,7 @@ func validateCaptchaCredentials(config *Config) error {
 	if err != nil {
 		return err
 	}
-	if secretKey == "" {
+	if secretKey == "" && config.CaptchaProvider != RecaptchaEnterpriseProvider {
 		return errors.New("CaptchaSecretKey: cannot be empty when CaptchaProvider is set")
 	}
 	return nil
@@ -685,13 +702,13 @@ func validateParamsIPs(log *slog.Logger, listIP []string, key string) error {
 	return nil
 }
 
-// validateCaptcha checks provider, custom-validate body, and custom fields when captcha is enabled.
+// validateCaptcha checks provider, custom-validate body, custom fields, and enterprise knobs when captcha is enabled.
 func validateCaptcha(config *Config) error {
 	if !config.CaptchaEnabled {
 		return nil
 	}
-	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider}, config.CaptchaProvider) {
-		return fmt.Errorf("CaptchaProvider: must be one of '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider)
+	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, RecaptchaEnterpriseProvider, TurnstileProvider, CustomProvider}, config.CaptchaProvider) {
+		return fmt.Errorf("CaptchaProvider: must be one of '%s', '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, RecaptchaEnterpriseProvider, TurnstileProvider, CustomProvider)
 	}
 	// Accept only empty, form, or json after trim; json is custom-only.
 	validateBody := strings.TrimSpace(config.CaptchaCustomValidateBody)
@@ -711,6 +728,43 @@ func validateCaptcha(config *Config) error {
 				config.CaptchaCustomJsURL,
 			)
 		}
+	}
+	if config.CaptchaProvider == RecaptchaEnterpriseProvider {
+		return validateEnterpriseCaptcha(config)
+	}
+	return nil
+}
+
+// validateEnterpriseCaptcha requires enterprise knobs only for recaptcha-enterprise.
+func validateEnterpriseCaptcha(config *Config) error {
+	keyType := strings.TrimSpace(config.CaptchaEnterpriseKeyType)
+	if keyType != CaptchaEnterpriseKeyTypeCheckbox && keyType != CaptchaEnterpriseKeyTypeScore {
+		return errors.New("CaptchaEnterpriseKeyType: must be checkbox or score")
+	}
+	if strings.TrimSpace(config.CaptchaEnterpriseProjectID) == "" {
+		return errors.New("CaptchaEnterpriseProjectID: cannot be empty")
+	}
+	apiKey, err := GetVariable(config, "CaptchaEnterpriseAPIKey")
+	if err != nil {
+		return err
+	}
+	if apiKey == "" {
+		return errors.New("CaptchaEnterpriseAPIKey: cannot be empty")
+	}
+	action := strings.TrimSpace(config.CaptchaEnterpriseAction)
+	minScore := strings.TrimSpace(config.CaptchaEnterpriseMinScore)
+	if keyType == CaptchaEnterpriseKeyTypeScore && action == "" {
+		return errors.New("CaptchaEnterpriseAction: cannot be empty")
+	}
+	if minScore == "" {
+		if keyType == CaptchaEnterpriseKeyTypeScore {
+			return errors.New("CaptchaEnterpriseMinScore: cannot be empty")
+		}
+		return nil
+	}
+	parsed, err := strconv.ParseFloat(minScore, 64)
+	if err != nil || parsed <= 0 || parsed > 1 {
+		return errors.New("CaptchaEnterpriseMinScore: must be greater than 0 and at most 1")
 	}
 	return nil
 }
