@@ -17,17 +17,17 @@ On the remediating path, TRACE reuses the `RequestScopeValues` map already in ha
 **End users.** None.
 
 ## Merge readiness
-In progress. 1 items remain.
+Ready for review. 1 items remain.
 
 Priority: P2 — real operator diagnostic pain, with a workaround or limited blast radius
-Reviewed head: bec590bc
+Reviewed head: 694bc427
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36058195026 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,7 +37,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-24-remediation-match-trace pushed | `git` |
 | OpenSpec | remediation-match-trace | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/152 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 36058195026 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36058195026 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36058195026 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -57,7 +57,7 @@ None.
 
 
 ## How this fits together
-Ticket 2026-09-24-remediation-match-trace on branch 2026-09-24-remediation-match-trace targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/152; CI not seen.
+Ticket 2026-09-24-remediation-match-trace on branch 2026-09-24-remediation-match-trace targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/152; CI build 36058195026 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36058195026.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -86,7 +86,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | bec590bc480097fa8a62aa4479f341fb68f7b6a8 | Card must match the branch you measured |
+| Reviewed head | 694bc427056296922d8f16e6a156bcd6136d3532 | Card must match the branch you measured |
 
 ### Stored data model
 None.
