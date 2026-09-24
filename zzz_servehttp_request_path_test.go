@@ -117,13 +117,16 @@ func TestServeHTTP_NoneModeQueriesEveryRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for range 2 {
+	// Yaegi v0.16.1 panics while typing "for range <integer>".
+	allowNone := func() {
 		rw := httptest.NewRecorder()
 		handler.ServeHTTP(rw, reqForIP("203.0.113.30"))
 		if rw.Code != http.StatusOK {
 			t.Fatalf("none-mode allow status = %d", rw.Code)
 		}
 	}
+	allowNone()
+	allowNone()
 	if got := atomic.LoadInt64(&hits); got != 2 {
 		t.Fatalf("none mode hits = %d, want 2 (no live memo)", got)
 	}
