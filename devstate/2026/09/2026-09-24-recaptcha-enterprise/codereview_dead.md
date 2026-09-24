@@ -16,4 +16,4 @@
       ```
    Fix: Delete `Client.secretKey`; assert the posted secret via `siteverifyVerifier` or the value passed to `New`
    Status: done
-   Argument: deleted Client.secretKey; siteverify test asserts the New secret.
+   Argument: deleted Client.secretKey; siteverify test asserts via siteverifyVerifier.secretKey.
