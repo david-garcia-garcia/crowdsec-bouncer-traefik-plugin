@@ -60,9 +60,9 @@ Outside facts used: in-tree. No third-party Open contract. Collision WARN text a
   Decision: assumed — remove both. Tests and `plugin.go` call `Open`. `LapiMode` on the `Config` already passed into `New` keeps stream vs live behavior.
   By: explore
 
-- Q: What is the blast radius of renaming the test entry points under `pkg/lapi/`?
-  Rank: bounded asked — 52 test call expressions enumerated in five `pkg/lapi/zzz_*.go` files; Unknowns names this blast radius
-  Decision: assumed — retarget those 52 calls to `Open`. `TestOpenStream_*` / `TestOpenLive_*` names may stay (they label the mode scenario). Do not add a test-only alias.
+- Q: What is the blast radius of renaming the test entry points under pkg/lapi?
+  Rank: bounded asked — 52 test call expressions enumerated in five pkg/lapi zzz test files; Unknowns names this blast radius
+  Decision: assumed — retarget those 52 calls to Open. Test function names that mention OpenStream or OpenLive may stay as scenario labels. Do not add a test-only alias.
   By: explore
 
 - Q: Does live/none walking through `noteStreamOwner` have any process-global side effect besides the mode gate?
