@@ -31,14 +31,14 @@ The assessments verifier POSTs JSON `event.token`, `event.siteKey`, optional `ev
 Ready for review. 0 items remain.
 
 Priority: P2 — operator pain with a workaround
-Reviewed head: a8adf4dd
+Reviewed head: 1fcdf975
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36038103494 |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36040447631 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -48,18 +48,26 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-24-recaptcha-enterprise pushed | `git` |
 | OpenSpec | recaptcha-enterprise | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/149 | pr-host |
-| CI | build 36038103494 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36038103494 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36038103494 |
+| CI | build 36040447631 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36040447631 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36040447631 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
 Worktree:
-- [core_plugin_middleware_captcha-assessments](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/changes/recaptcha-enterprise/proposal.md) — added
-- [core_plugin_middleware_captcha-enterprise-config](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/changes/recaptcha-enterprise/proposal.md) — added
-- [core_plugin_middleware_captcha-siteverify](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/changes/recaptcha-enterprise/proposal.md) — modified
-- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/changes/recaptcha-enterprise/proposal.md) — added
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/changes/recaptcha-enterprise/proposal.md) — modified
-- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/changes/recaptcha-enterprise/proposal.md) — modified
+- [core_plugin_middleware_captcha-assessments](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/changes/archive/2026-09-24-recaptcha-enterprise/proposal.md) — added
+- [core_plugin_middleware_captcha-enterprise-config](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/changes/archive/2026-09-24-recaptcha-enterprise/proposal.md) — added
+- [core_plugin_middleware_captcha-siteverify](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/changes/archive/2026-09-24-recaptcha-enterprise/proposal.md) — modified
+- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/changes/archive/2026-09-24-recaptcha-enterprise/proposal.md) — added
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/changes/archive/2026-09-24-recaptcha-enterprise/proposal.md) — modified
+- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/changes/archive/2026-09-24-recaptcha-enterprise/proposal.md) — modified
+
+Completed:
+- [core_plugin_middleware_captcha-assessments](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/specs/core_plugin_middleware_captcha-assessments/spec.md) — added
+- [core_plugin_middleware_captcha-enterprise-config](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/specs/core_plugin_middleware_captcha-enterprise-config/spec.md) — added
+- [core_plugin_middleware_captcha-siteverify](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/specs/core_plugin_middleware_captcha-siteverify/spec.md) — modified
+- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/specs/core_plugin_middleware_captcha-widget/spec.md) — added
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/specs/core_plugin_middleware_config-validation/spec.md) — modified
+- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-recaptcha-enterprise/openspec/specs/core_plugin_middleware_instance-slots/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -70,7 +78,7 @@ Worktree:
 None.
 
 ## How this fits together
-Ticket 2026-09-24-recaptcha-enterprise on branch 2026-09-24-recaptcha-enterprise targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/149; CI build 36038103494 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36038103494.
+Ticket 2026-09-24-recaptcha-enterprise on branch 2026-09-24-recaptcha-enterprise targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/149; CI build 36040447631 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36040447631.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -97,9 +105,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 3 added / 3 modified | Same list as ## Specs |
+| Specs in this PR | 6 added / 6 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | a8adf4dd8c3d595b54c7687e17b5b847d07e4c17 | Card must match the branch you measured |
+| Reviewed head | 1fcdf975baf3a18637f71a520041d501613c9bf9 | Card must match the branch you measured |
 
 ### Stored data model
 None.
