@@ -85,3 +85,5 @@ Rejected alternatives:
   Rank: additive asked — explore rule when work would set or reconstruct identity
   Decision: resolved — none; Finding 1 does not set or reconstruct client address, user, tenant, or Host. Reuse existing ServeHTTP / pkg/ip ownership unchanged.
   By: explore
+
+Verdict: in progress
