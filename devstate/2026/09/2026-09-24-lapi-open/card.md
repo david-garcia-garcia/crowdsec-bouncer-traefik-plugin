@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 63120d82
+Reviewed head: 528ac9a2
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -69,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 63120d820651c8088c3f88059e1eafab9cc8e229 | Card must match the branch you measured |
+| Reviewed head | 528ac9a23442d02c371148d8eb615b90948312e3 | Card must match the branch you measured |
 
 ### Stored data model
 None.

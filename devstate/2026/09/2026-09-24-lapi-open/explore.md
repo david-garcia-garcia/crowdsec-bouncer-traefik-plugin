@@ -56,7 +56,7 @@ Outside facts used: in-tree. No third-party Open contract. Collision WARN text a
 ## Open questions
 
 - Q: Do `OpenStream` / `OpenLive` stay as aliases or get removed?
-  Rank: bounded asked — existing exported entry points with 54 enumerated consumer calls (roots: worktree minus archive and other-run devstate; patterns OpenStream( / OpenLive(); Desired One lapi.Open
+  Rank: bounded asked — existing exported entry points with 54 enumerated consumer calls (roots: worktree minus archive and other-run devstate; patterns OpenStream and OpenLive); Desired One lapi.Open
   Decision: assumed — remove both. Tests and `plugin.go` call `Open`. `LapiMode` on the `Config` already passed into `New` keeps stream vs live behavior.
   By: explore
 
