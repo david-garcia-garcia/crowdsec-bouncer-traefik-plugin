@@ -76,14 +76,14 @@ Outside facts used:
 
 ## Open questions
 
-- Q: Who already owns the client address used as event.userIpAddress?
-  Rank: additive asked — new assessment field this change creates; Request path / Verifiers say send the client address when non-empty
-  Decision: resolved — owner is GetRemoteIP / clientRequest.remoteIP (pkg/ip/checker.go, pkg/bouncer/bouncer.go). Reuse the remoteIP already passed into Validate / Pass. Do not parse X-Forwarded-For, X-Real-Ip, or RemoteAddr in captcha.
-  By: explore
-
 - Q: What Go result does Validate expose for None / Pass / Reject / Error without ServeHTTP branching on provider?
   Rank: bounded asked — changes existing Validate (bool, error); 1 production caller (ServeHTTP) and 4 tests in pkg/captcha/zzz_validate_body_test.go (roots worktree *.go)
   Decision: assumed — (Outcome, error) with None, Pass, Reject. Error is the error return. Verifier.Pass stays (bool, error). ServeHTTP switches on Outcome plus widget.retry.
+  By: explore
+
+- Q: Who already owns the client address used as event.userIpAddress?
+  Rank: additive asked — new assessment field this change creates; Request path / Verifiers say send the client address when non-empty
+  Decision: resolved — owner is GetRemoteIP / clientRequest.remoteIP (pkg/ip/checker.go, pkg/bouncer/bouncer.go). Reuse the remoteIP already passed into Validate / Pass. Do not parse X-Forwarded-For, X-Real-Ip, or RemoteAddr in captcha.
   By: explore
 
 - Q: Does assessments accept X-Goog-Api-Key, or only ?key=?

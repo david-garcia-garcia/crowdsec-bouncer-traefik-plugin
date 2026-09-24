@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: cc9bd8da
+Reviewed head: 028de45c
 Owner decision: None.
 
 ## Review scores
@@ -66,7 +66,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | cc9bd8da8140fd0a82171b66ee29e6ee3ed44783 | Card must match the branch you measured |
+| Reviewed head | 028de45c9bea8ec4e4615f6f8c1cdadc52655a88 | Card must match the branch you measured |
 
 ### Stored data model
 None.
