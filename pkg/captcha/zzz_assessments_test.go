@@ -224,6 +224,14 @@ func Test_Validate_assessmentsPassOrder(t *testing.T) {
 			t.Fatalf("got outcome=%v err=%v", outcome, err)
 		}
 	})
+	t.Run("missing riskAnalysis with minScore rejects", func(t *testing.T) {
+		trip := &assessmentsTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":true,"action":"login"}}`}
+		client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeScore, Enterprise{Action: "login", MinScore: "0.5"}, &http.Client{Transport: trip})
+		outcome, err := client.Validate(enterpriseSolverPOST(), "")
+		if err != nil || outcome != Reject {
+			t.Fatalf("got outcome=%v err=%v", outcome, err)
+		}
+	})
 }
 
 func Test_Validate_assessmentsErrorVersusReject(t *testing.T) {
@@ -347,5 +355,76 @@ func Test_ServeHTTP_assessmentsErrorRendersWithBoot(t *testing.T) {
 	}
 	if strings.Contains(rw.Result().Header.Get("Set-Cookie"), gateCookieName+"=") {
 		t.Fatal("error must not mint the gate")
+	}
+}
+
+func stockCaptchaTemplatePath(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join("..", "..", "captcha.html")
+	if _, err := os.Stat(path); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func newTestEnterpriseClientStock(t *testing.T, keyType string, enterprise Enterprise) *Client {
+	t.Helper()
+	enterprise.KeyType = keyType
+	if enterprise.ProjectID == "" {
+		enterprise.ProjectID = "my-project"
+	}
+	if enterprise.APIKey == "" {
+		enterprise.APIKey = "cloud-api-key"
+	}
+	client := &Client{}
+	err := client.New(
+		slog.Default(),
+		http.DefaultClient,
+		configuration.RecaptchaEnterpriseProvider,
+		"", "", "", "", "", "",
+		"site-key",
+		"",
+		"gate-secret",
+		true,
+		stockCaptchaTemplatePath(t),
+		3600,
+		enterprise,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return client
+}
+
+func Test_ServeHTTP_stockTemplateCheckboxAndScore(t *testing.T) {
+	checkbox := newTestEnterpriseClientStock(t, configuration.CaptchaEnterpriseKeyTypeCheckbox, Enterprise{})
+	checkboxRW := httptest.NewRecorder()
+	checkbox.ServeHTTP(checkboxRW, httptest.NewRequest(http.MethodGet, "/foo", nil), "192.0.2.10", "")
+	if checkboxRW.Code != http.StatusOK {
+		t.Fatalf("checkbox GET want 200, got %d", checkboxRW.Code)
+	}
+	checkboxBody := checkboxRW.Body.String()
+	if !strings.Contains(checkboxBody, `class="g-recaptcha"`) || !strings.Contains(checkboxBody, `data-sitekey="site-key"`) {
+		t.Fatalf("checkbox stock page must draw g-recaptcha: %s", checkboxBody)
+	}
+	if strings.Contains(checkboxBody, `type="hidden" name="g-recaptcha-response"`) {
+		t.Fatal("checkbox stock page must not render the score hidden field")
+	}
+
+	score := newTestEnterpriseClientStock(t, configuration.CaptchaEnterpriseKeyTypeScore, Enterprise{Action: "login", MinScore: "0.5"})
+	scoreRW := httptest.NewRecorder()
+	score.ServeHTTP(scoreRW, httptest.NewRequest(http.MethodGet, "/foo", nil), "192.0.2.10", "")
+	if scoreRW.Code != http.StatusOK {
+		t.Fatalf("score GET want 200, got %d", scoreRW.Code)
+	}
+	scoreBody := scoreRW.Body.String()
+	if !strings.Contains(scoreBody, `type="hidden" name="g-recaptcha-response"`) {
+		t.Fatalf("score stock page must render the hidden field: %s", scoreBody)
+	}
+	if strings.Contains(scoreBody, `class="g-recaptcha"`) {
+		t.Fatal("score stock page must not draw the checkbox")
+	}
+	if !strings.Contains(scoreBody, "grecaptcha.enterprise.ready") || !strings.Contains(scoreBody, "grecaptcha.enterprise.execute") {
+		t.Fatalf("score stock page must include the boot script: %s", scoreBody)
 	}
 }

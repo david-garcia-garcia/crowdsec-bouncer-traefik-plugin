@@ -12,13 +12,13 @@ _Avoid_: lowercase `application/json` prefix, `application/jsonp`, treating a mi
 
 ## Overview
 
-`Client.Validate(r, remoteIP)` returns `(Outcome, error)`: `None` when the request is not a POST or the token field is empty (no provider POST). A non-empty token calls the siteverify verifier `Pass`. Encode from `Client.validateBody` (custom-only). Classify the provider body as JSON from the response media type, then decode `success`. Transport and JSON-decode errors stay the error return; `ServeHTTP` logs and re-renders the 200 challenge with boot. Cookie format stays on `core_plugin_middleware_captcha-gate`. Routing after the cookie stays on `core_plugin_middleware_captcha-routing`. Config tokens stay on `core_plugin_middleware_config-validation`. This packet is the siteverify verifier only.
+`Client.Validate(r, remoteIP)` returns `(Outcome, error)`: `None` when the request is not a POST or the token field is empty (no provider POST). A non-empty token calls the siteverify verifier `Pass`. Encode from `siteverifyVerifier.validateBody` (custom-only). Classify the provider body as JSON from the response media type, then decode `success`. Transport and JSON-decode errors stay the error return; `ServeHTTP` logs and re-renders the 200 challenge with boot. Cookie format stays on `core_plugin_middleware_captcha-gate`. Routing after the cookie stays on `core_plugin_middleware_captcha-routing`. Config tokens stay on `core_plugin_middleware_config-validation`. This packet is the siteverify verifier only.
 
 ## How to use
 
 - Thread `ServeHTTP`'s `remoteIP` into `Validate(r, remoteIP)`. Include `remoteip` with `secret` and `response` on both encodings when `remoteIP` is non-empty. Do not re-parse `X-Forwarded-For`.
 - Empty token or non-POST is `None`. Do not call the verifier.
-- Encode the provider request from `Client.validateBody` (custom-only, filled in `New` from `CaptchaCustomValidateBody`). `json` POSTs `application/json` `{"secret","response"}` (and `remoteip` when given). Empty or `form`, and every built-in, keep `PostForm`.
+- Encode the provider request from `siteverifyVerifier.validateBody` (custom-only, filled in `New` from `CaptchaCustomValidateBody`). `json` POSTs `application/json` `{"secret","response"}` (and `remoteip` when given). Empty or `form`, and every built-in, keep `PostForm`.
 - Do not put the encoding on `infoProviders`. Do not invent `remoteip` when `Validate` is given an empty client address.
 - Classify with `mime.ParseMediaType` on the siteverify `Content-Type`. Compare the returned type token to `application/json`.
 - Do not match the raw header with `strings.HasPrefix`.
@@ -30,6 +30,7 @@ _Avoid_: lowercase `application/json` prefix, `application/jsonp`, treating a mi
 ## Key files
 
 - `pkg/captcha/captcha.go` (`Validate`)
+- `pkg/captcha/siteverify.go`
 - `pkg/captcha/gate.go`
 
 ## Gotchas

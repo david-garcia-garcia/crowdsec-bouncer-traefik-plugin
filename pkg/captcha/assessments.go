@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	assessmentsURLPrefix    = "https://recaptchaenterprise.googleapis.com/v1/projects/"
-	assessmentsAPIKeyHeader = "X-Goog-Api-Key" //nolint:gosec // header name, not a credential
+	assessmentsURLPrefix         = "https://recaptchaenterprise.googleapis.com/v1/projects/"
+	assessmentsAPIKeyHeader      = "X-Goog-Api-Key" //nolint:gosec // header name, not a credential
+	assessmentsResponseBodyLimit = 64 << 10
 )
 
 // assessmentsVerifier POSTs a solver token to Cloud reCAPTCHA Enterprise assessments.
@@ -101,9 +102,12 @@ func (v *assessmentsVerifier) Pass(token, remoteIP string) (bool, error) {
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		return false, fmt.Errorf("assessments: status %d", res.StatusCode)
 	}
-	body, err := io.ReadAll(res.Body)
+	body, err := io.ReadAll(io.LimitReader(res.Body, assessmentsResponseBodyLimit+1))
 	if err != nil {
 		return false, err
+	}
+	if len(body) > assessmentsResponseBodyLimit {
+		return false, errors.New("assessments: response body too large")
 	}
 	if len(bytes.TrimSpace(body)) == 0 {
 		return false, errors.New("assessments: empty body")

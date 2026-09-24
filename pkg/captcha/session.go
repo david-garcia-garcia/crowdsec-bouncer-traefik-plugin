@@ -131,7 +131,7 @@ func Open(ctx context.Context, cfg *configuration.Config, log *slog.Logger, midd
 	return client, nil
 }
 
-// newOwnerClient constructs the siteverify client, template, and gate for one owner Open.
+// newOwnerClient constructs the captcha Client (widget, verifier, template, gate) for one owner Open.
 func newOwnerClient(cfg *configuration.Config, log *slog.Logger, middlewareName, bindKey, _ string) (*Client, error) {
 	siteKey, _ := configuration.GetVariable(cfg, "CaptchaSiteKey")
 	secretKey, _ := configuration.GetVariable(cfg, "CaptchaSecretKey")

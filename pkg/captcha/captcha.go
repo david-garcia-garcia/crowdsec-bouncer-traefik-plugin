@@ -1,4 +1,4 @@
-// Package captcha is the reclaim value for one named captcha siteverify client.
+// Package captcha is the reclaim value for one named captcha Client that holds a widget and a verifier.
 package captcha
 
 import (
@@ -22,7 +22,6 @@ import (
 type Client struct {
 	Valid               bool
 	siteKey             string
-	secretKey           string
 	gateSecret          []byte
 	gateBindIP          bool
 	gracePeriodSeconds  int64
@@ -82,7 +81,6 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 		return nil
 	}
 	c.siteKey = siteKey
-	c.secretKey = secretKey
 	c.gateSecret = []byte(gateSecret)
 	c.gateBindIP = gateBindIP
 	c.log = log
@@ -111,7 +109,7 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 	return nil
 }
 
-// HTTPClientForTest returns the stored siteverify client. Tests only.
+// HTTPClientForTest returns the HTTP client the captcha Client uses for its verifier. Tests only.
 func (c *Client) HTTPClientForTest() *http.Client {
 	return c.httpClient
 }
@@ -398,7 +396,7 @@ func (c *Client) Validate(r *http.Request, remoteIP string) (Outcome, error) {
 	}
 	passed, err := c.verifier.Pass(token, remoteIP)
 	if err != nil {
-		c.log.Error("captcha:Validate", "error", err)
+		c.log.Debug("captcha:Validate", "error", err)
 		return None, err
 	}
 	if passed {

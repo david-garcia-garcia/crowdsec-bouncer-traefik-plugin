@@ -72,9 +72,10 @@ func Test_ServeHTTP_siteverifyPostsRemoteIP(t *testing.T) {
 	if !strings.Contains(cookie, gateCookieName+"=") {
 		t.Fatalf("solve missing gate cookie: %s", cookie)
 	}
-	if gotSecret != client.secretKey || gotResponse != "ok-token" || gotRemoteIP != passedRemoteIP {
+	const wantSecret = "e2e-dummy-secret"
+	if gotSecret != wantSecret || gotResponse != "ok-token" || gotRemoteIP != passedRemoteIP {
 		t.Fatalf("siteverify form secret=%q response=%q remoteip=%q, want secret=%q response=ok-token remoteip=%s",
-			gotSecret, gotResponse, gotRemoteIP, client.secretKey, passedRemoteIP)
+			gotSecret, gotResponse, gotRemoteIP, wantSecret, passedRemoteIP)
 	}
 }
 
