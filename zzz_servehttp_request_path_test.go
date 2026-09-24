@@ -26,7 +26,7 @@ func TestServeHTTP_LiveFailureAction(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	parsed, err := url.Parse(srv.URL)
 	if err != nil {
 		t.Fatal(err)
@@ -77,7 +77,7 @@ func TestServeHTTP_LiveBanOutranksScopeError(t *testing.T) {
 			Value: query.Get("ip"), Type: "ban", Duration: "1h", Origin: "CAPI", Scope: "ip",
 		}})
 	}))
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	parsed, err := url.Parse(srv.URL)
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +105,7 @@ func TestServeHTTP_NoneModeQueriesEveryRequest(t *testing.T) {
 
 	var hits int64
 	srv := liveLAPI(t, map[string]bool{}, &hits)
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	parsed, err := url.Parse(srv.URL)
 	if err != nil {
 		t.Fatal(err)
@@ -129,7 +129,7 @@ func TestServeHTTP_NoneModeQueriesEveryRequest(t *testing.T) {
 	}
 
 	banSrv := liveLAPI(t, map[string]bool{"203.0.113.31": true}, &hits)
-	t.Cleanup(banSrv.Close)
+	t.Cleanup(func() { banSrv.Close() })
 	banParsed, err := url.Parse(banSrv.URL)
 	if err != nil {
 		t.Fatal(err)
@@ -163,7 +163,7 @@ func TestServeHTTP_RedisUnreachableFailureAction(t *testing.T) {
 	}
 	var hits int64
 	srv := liveLAPI(t, map[string]bool{"203.0.113.40": true}, &hits)
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	parsed, err := url.Parse(srv.URL)
 	if err != nil {
 		t.Fatal(err)
