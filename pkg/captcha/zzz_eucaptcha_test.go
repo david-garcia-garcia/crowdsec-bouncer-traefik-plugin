@@ -113,27 +113,36 @@ func Test_Validate_eucaptchaURLAndJSONFields(t *testing.T) {
 	if trip.lastReq == nil {
 		t.Fatal("verify was not called")
 	}
-	if got := trip.lastReq.URL.String(); got != eucaptchaVerifyURL {
+	if got := trip.lastReq.URL.String(); got != "https://api.eu-captcha.eu/v1/verify" {
 		t.Fatalf("URL %q", got)
 	}
 	if trip.lastReq.Header.Get("Content-Type") != "application/json" {
 		t.Fatalf("Content-Type=%q", trip.lastReq.Header.Get("Content-Type"))
 	}
-	var payload eucaptchaVerifyRequest
-	if err := json.Unmarshal(trip.lastBody, &payload); err != nil {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(trip.lastBody, &raw); err != nil {
 		t.Fatalf("body %s: %v", trip.lastBody, err)
 	}
-	if payload.SiteKey != "site-key" || payload.Secret != "site-secret" {
-		t.Fatalf("sitekey/secret %+v", payload)
+	wantKeys := []string{"sitekey", "secret", "client_ip", "client_token", "client_user_agent"}
+	if len(raw) != len(wantKeys) {
+		t.Fatalf("JSON keys %v", raw)
 	}
-	if payload.ClientToken != "ok-token" {
-		t.Fatalf("client_token=%q", payload.ClientToken)
+	for _, key := range wantKeys {
+		if _, ok := raw[key]; !ok {
+			t.Fatalf("missing JSON key %q in %s", key, trip.lastBody)
+		}
 	}
-	if payload.ClientIP != "203.0.113.9" {
-		t.Fatalf("client_ip=%q", payload.ClientIP)
+	if string(raw["sitekey"]) != `"site-key"` || string(raw["secret"]) != `"site-secret"` {
+		t.Fatalf("sitekey/secret %s", trip.lastBody)
 	}
-	if payload.ClientUserAgent != "TestAgent/1.0" {
-		t.Fatalf("client_user_agent=%q", payload.ClientUserAgent)
+	if string(raw["client_token"]) != `"ok-token"` {
+		t.Fatalf("client_token=%s", raw["client_token"])
+	}
+	if string(raw["client_ip"]) != `"203.0.113.9"` {
+		t.Fatalf("client_ip=%s", raw["client_ip"])
+	}
+	if string(raw["client_user_agent"]) != `"TestAgent/1.0"` {
+		t.Fatalf("client_user_agent=%s", raw["client_user_agent"])
 	}
 }
 
@@ -213,6 +222,15 @@ func Test_Validate_eucaptchaErrorVersusReject(t *testing.T) {
 	})
 	t.Run("non-JSON body is error", func(t *testing.T) {
 		trip := &eucaptchaTrip{status: http.StatusOK, body: "not-json"}
+		client := newTestEucaptchaClient(t, &http.Client{Transport: trip})
+		outcome, err := client.Validate(eucaptchaSolverPOST(), "203.0.113.9")
+		if err == nil || outcome != None {
+			t.Fatalf("got outcome=%v err=%v", outcome, err)
+		}
+	})
+	t.Run("body larger than 64KiB is error", func(t *testing.T) {
+		oversized := `{"success":true,"train":false,"pad":"` + strings.Repeat("x", 64<<10) + `"}`
+		trip := &eucaptchaTrip{status: http.StatusOK, body: oversized}
 		client := newTestEucaptchaClient(t, &http.Client{Transport: trip})
 		outcome, err := client.Validate(eucaptchaSolverPOST(), "203.0.113.9")
 		if err == nil || outcome != None {
