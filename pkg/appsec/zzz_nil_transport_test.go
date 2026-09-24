@@ -27,7 +27,8 @@ func TestQuery_NilTransportUsesFailureAction(t *testing.T) {
 		t.Fatalf("passthrough nil transport decision = %+v, want allow", decision)
 	}
 
-	if _, err := client.Query("1.2.3.4", req, Policy{FailureAction: configuration.FailureActionBan}); err == nil {
+	_, err = client.Query("1.2.3.4", req, Policy{FailureAction: configuration.FailureActionBan})
+	if err == nil {
 		t.Fatal("ban nil transport must return an error")
 	}
 	_, err = client.Query("1.2.3.4", req, Policy{FailureAction: configuration.FailureActionCaptcha})

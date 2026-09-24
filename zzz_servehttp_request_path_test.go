@@ -91,7 +91,7 @@ func TestServeHTTP_LiveBanOutranksScopeError(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := reqForIP("203.0.113.20")
-	req.Header.Set("CF-IPCountry", "FR")
+	req.Header.Set("Cf-Ipcountry", "FR")
 	rw := httptest.NewRecorder()
 	handler.ServeHTTP(rw, req)
 	if rw.Code != http.StatusForbidden {
@@ -158,8 +158,8 @@ func TestServeHTTP_RedisUnreachableFailureAction(t *testing.T) {
 		t.Fatal(err)
 	}
 	redisAddr := listener.Addr().String()
-	if err := listener.Close(); err != nil {
-		t.Fatal(err)
+	if closeErr := listener.Close(); closeErr != nil {
+		t.Fatal(closeErr)
 	}
 	var hits int64
 	srv := liveLAPI(t, map[string]bool{"203.0.113.40": true}, &hits)
