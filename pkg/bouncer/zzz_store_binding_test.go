@@ -22,7 +22,7 @@ func TestStoreBinding_ConcurrentUnboxVsStore(t *testing.T) {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < iterations; i++ {
+		for i := range iterations {
 			if i%2 == 0 {
 				b.storeBinding(&b.lapiBound, first)
 			} else {
@@ -32,7 +32,7 @@ func TestStoreBinding_ConcurrentUnboxVsStore(t *testing.T) {
 	}()
 	go func() {
 		defer wg.Done()
-		for i := 0; i < iterations; i++ {
+		for range iterations {
 			loaded := b.loadedLAPI()
 			if loaded != first && loaded != second && loaded != nil {
 				t.Errorf("torn or unexpected client pointer %p", loaded)
