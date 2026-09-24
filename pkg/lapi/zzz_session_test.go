@@ -292,6 +292,13 @@ func TestOpenStream_SleepingRedisHostDoesNotOverlapPollers(t *testing.T) {
 	for time.Now().Before(deadline) && first.StreamFetches() < 1 {
 		time.Sleep(10 * time.Millisecond)
 	}
+	readyDeadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(readyDeadline) && first.decisionStore.StreamReady() == 0 {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if first.decisionStore.StreamReady() == 0 {
+		t.Fatal("first stream poll must mark the store ready")
+	}
 	fetchesBeforeCancel := first.StreamFetches()
 	cancel()
 	waitClientSleeping(t, first)
