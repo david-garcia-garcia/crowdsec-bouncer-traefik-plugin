@@ -17,17 +17,17 @@ One exported `lapi.Open` with the same signature as `appsec.Open` and `captcha.O
 **End users.** None.
 
 ## Merge readiness
-Ready for review. 1 items remain.
+In progress. 1 items remain.
 
 Priority: P3 — internal clarity with no current user or operator harm
-Reviewed head: 90158e91
+Reviewed head: dfc8e846
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35973777360 |
+| Overall readiness | 1/6 | Not ready |
+| CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,7 +37,7 @@ Owner decision: None.
 | Branch | 2026-09-24-lapi-open pushed | `git` |
 | OpenSpec | one-lapi-open | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/145 | pr-host |
-| CI | build 35973777360 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35973777360 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35973777360 |
+| CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -55,7 +55,7 @@ None.
 
 
 ## How this fits together
-Ticket 2026-09-24-lapi-open on branch 2026-09-24-lapi-open targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/145; CI build 35973777360 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35973777360.
+Ticket 2026-09-24-lapi-open on branch 2026-09-24-lapi-open targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/145; CI not seen.
 
 ## Explore Decisions
 None.
@@ -81,7 +81,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 90158e917610aa519621ea4b8b1c7e1787d2c24e | Card must match the branch you measured |
+| Reviewed head | dfc8e84636e98a8eb0d6621b0867ef5f19f2691e | Card must match the branch you measured |
 
 ### Stored data model
 None.
