@@ -61,27 +61,27 @@ Rejected alternatives:
 
 ## Open questions
 
-- Q: Does every bind update Store a new immutable `*reclaim.Box` (no in-place `Box.Value` write)?
-  Rank: bounded asked — enumerated 3 Receive* callers + Unbox readers under `pkg/bouncer` + `pkg/reclaim`; Desired names `dest.Store(&reclaim.Box{Value: value})`
+- Q: Does every bind update Store a new immutable *reclaim.Box (no in-place Box.Value write)?
+  Rank: bounded asked — enumerated 3 Receive* callers + Unbox readers under pkg/bouncer + pkg/reclaim; Desired names Store new Box each update
   Decision: resolved — yes; that is the Finding 1 fix shape.
   By: explore
 
-- Q: Does any other in-tree watcher still mutate `Box.Value` in place?
-  Rank: additive asked — requirement Unknowns; search of worktree `**/*.go` for `boxed.Value` / `storeBinding`
-  Decision: resolved — production only `storeBinding`; test helper `watchInto` also mutates. Include fixing `watchInto` in this change (Store new Box). No other sites.
+- Q: Does any other in-tree watcher still mutate Box.Value in place?
+  Rank: additive asked — requirement Unknowns; search of worktree Go sources for boxed.Value and storeBinding
+  Decision: resolved — production only storeBinding; test helper watchInto also mutates. Include fixing watchInto in this change (Store new Box). No other sites.
   By: explore
 
 - Q: Exact race window under Yaegi vs native Go — measure before deciding the fix?
   Rank: additive asked — requirement Unknowns
-  Decision: assumed — same immutable Box publish for both runtimes; Yaegi still needs type-stable `*Box` Stores and Unbox still reads `Value` without sync. Implement measures with `go test -race` where cgo exists; explore host could not.
+  Decision: assumed — same immutable Box publish for both runtimes; Yaegi still needs type-stable *Box Stores and Unbox still reads Value without sync. Implement measures with go test -race where cgo exists; explore host could not.
   By: explore
 
-- Q: Change reclaim `Watch` / `Unbox` API as part of Finding 1?
+- Q: Change reclaim Watch / Unbox API as part of Finding 1?
   Rank: additive asked — requirement Out of scope forbids API reshape beyond Finding 1
-  Decision: resolved — no; only `storeBinding` (and matching test helper) publish shape.
+  Decision: resolved — no; only storeBinding (and matching test helper) publish shape.
   By: explore
 
 - Q: Who owns client identity / address / Host for this change?
   Rank: additive asked — explore rule when work would set or reconstruct identity
-  Decision: resolved — none; Finding 1 does not set or reconstruct client address, user, tenant, or Host. Reuse existing `ServeHTTP` / `pkg/ip` ownership unchanged.
+  Decision: resolved — none; Finding 1 does not set or reconstruct client address, user, tenant, or Host. Reuse existing ServeHTTP / pkg/ip ownership unchanged.
   By: explore
