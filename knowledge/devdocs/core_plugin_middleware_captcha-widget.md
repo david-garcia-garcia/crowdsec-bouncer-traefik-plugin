@@ -16,13 +16,15 @@ _Avoid_: `(bool, error)` as the `Validate` result, `(None, err)`
 
 ## Overview
 
-`Client.New` is the only provider and key-type switch. It stores one Widget and one Verifier. `ServeHTTP` and `Validate` read those fields only. Siteverify encoding stays on `core_plugin_middleware_captcha-siteverify`. Assessments stay on `core_plugin_middleware_captcha-assessments`. Gate mint stays on `core_plugin_middleware_captcha-gate`.
+`Client.New` is the only provider and key-type switch. It stores one Widget and one Verifier. `ServeHTTP` and `Validate` read those fields only. Siteverify encoding stays on `core_plugin_middleware_captcha-siteverify`. Assessments stay on `core_plugin_middleware_captcha-assessments`. Eucaptcha verify stays on `core_plugin_middleware_captcha-eucaptcha-verify`. Gate mint stays on `core_plugin_middleware_captcha-gate`.
 
 ## How to use
 
 - Pair widget and verifier in `New`. Do not mention a provider name or key type in `ServeHTTP` or `Validate`.
 - `Validate` returns `(Outcome, error)`. Non-POST or empty token is `None` (no `Pass` call). Verifier true is `Pass`. Verifier false with no error is `Reject`. Transport or undecodable provider body is the error return.
-- `Verifier.Pass` stays `(bool, error)`.
+- `Validate` calls `Pass(token, remoteIP, r.UserAgent())`. Siteverify and assessments ignore `userAgent`. Do not put User-Agent on `clientRequest`.
+- `Verifier.Pass` stays `(bool, error)` as the return.
+- Eucaptcha: script `https://cdn.eu-captcha.eu/verify.js`, class `eu-captcha`, field `eu-captcha-response`, retry true. Pair the eucaptcha verifier. Do not put `eucaptcha` in `infoProviders`. Verify HTTP stays on `core_plugin_middleware_captcha-eucaptcha-verify`.
 - On `Pass`: mint `crowdsec_captcha_gate`, set `solved-captcha` when configured, 302 to the request URL.
 - On `None` or error: render the challenge with the stored boot script.
 - On `Reject` with `RetryAfterReject`: render with boot. On `Reject` without retry: render and omit boot.
@@ -44,6 +46,7 @@ if outcome == Reject && !c.widget.RetryAfterReject {
 - `pkg/captcha/outcome.go`
 - `pkg/captcha/verifier.go`
 - `pkg/captcha/enterprise.go`
+- `pkg/captcha/eucaptcha.go`
 - `pkg/captcha/captcha.go` (`New`, `ServeHTTP`, `Validate`)
 - `captcha.html`
 
@@ -52,3 +55,4 @@ if outcome == Reject && !c.widget.RetryAfterReject {
 - A replaced checkbox template that omits the new keys still works when `FrontendJS` is `enterprise.js`. Score needs `BootScript`.
 - Both enterprise key types keep field name `g-recaptcha-response`.
 - Omit-boot after score reject is a product choice so the page does not auto-`execute` again.
+- Eucaptcha TokenField is `eu-captcha-response`. Stock `captcha.html` does not hardcode that input; `verify.js` injects it.

@@ -757,6 +757,12 @@ func Test_validateCaptcha(t *testing.T) {
 			cfg.CaptchaProvider = HcaptchaProvider
 			return cfg
 		}(), wantErr: false},
+		{name: "Valid eucaptcha provider", config: func() *Config {
+			cfg := getMinimalConfig()
+			cfg.CaptchaEnabled = true
+			cfg.CaptchaProvider = EucaptchaProvider
+			return cfg
+		}(), wantErr: false},
 		{name: "Custom provider missing fields", config: cfgCustomMissing, wantErr: true},
 		{name: "Custom provider four fields empty challenge URL", config: cfgCustomFourFields, wantErr: false},
 		{name: "Custom json", config: newCustomValidateBodyConfig(t, "json"), wantErr: false},

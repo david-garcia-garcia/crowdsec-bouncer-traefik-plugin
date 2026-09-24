@@ -75,6 +75,7 @@ var infoProviders = map[string]*infoProvider{
 
 // New fills widget, verifier, template, and gate fields. Empty provider leaves Valid false.
 // New is the only provider and key-type switch. enterprise is the named recaptcha-enterprise construction value.
+// eucaptcha is a named pairing case, not an infoProviders siteverify entry.
 func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, challengeURL, key, response, validate, validateBody, siteKey, secretKey, gateSecret string, gateBindIP bool, captchaTemplatePath string, gracePeriodSeconds int64, enterprise Enterprise) error {
 	c.Valid = provider != ""
 	if !c.Valid {
@@ -94,6 +95,8 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 		c.verifier = newSiteverifyVerifier(httpClient, secretKey, validate, strings.TrimSpace(validateBody), log)
 	case configuration.RecaptchaEnterpriseProvider:
 		c.widget, c.verifier = pairEnterprise(httpClient, siteKey, enterprise)
+	case configuration.EucaptchaProvider:
+		c.widget, c.verifier = pairEucaptcha(httpClient, siteKey, secretKey)
 	default:
 		info := infoProviders[provider]
 		c.widget = Widget{ScriptURL: info.js, Class: info.key, TokenField: info.response, RetryAfterReject: true}
@@ -394,7 +397,7 @@ func (c *Client) Validate(r *http.Request, remoteIP string) (Outcome, error) {
 		logger.Trace(c.log, "captcha:Validate no captcha response found in request")
 		return None, nil
 	}
-	passed, err := c.verifier.Pass(token, remoteIP)
+	passed, err := c.verifier.Pass(token, remoteIP, r.UserAgent())
 	if err != nil {
 		c.log.Debug("captcha:Validate", "error", err)
 		return None, err

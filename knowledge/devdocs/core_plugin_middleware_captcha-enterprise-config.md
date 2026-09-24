@@ -16,7 +16,7 @@ _Avoid_: requiring them on hCaptcha, classic `recaptcha`, Turnstile, or `custom`
 
 ## How to use
 
-- Allow `captchaProvider` values empty, `hcaptcha`, `recaptcha`, `recaptcha-enterprise`, `turnstile`, and `custom`.
+- Allow `captchaProvider` values empty, `hcaptcha`, `recaptcha`, `recaptcha-enterprise`, `turnstile`, `custom`, and `eucaptcha`.
 - When the provider is `recaptcha-enterprise`, require `captchaEnterpriseKeyType` `checkbox` or `score`, a non-empty `captchaEnterpriseProjectId` after trim, and a non-empty Cloud API key from `CaptchaEnterpriseAPIKey` / `CaptchaEnterpriseAPIKeyFile` via file-then-field lookup.
 - Do not require those knobs on any other provider. Leftover empty enterprise fields on classic `recaptcha` are ignored.
 - Checkbox: action and min score MAY be empty after trim (omit `expectedAction` / `data-action` and ignore score).
@@ -41,4 +41,4 @@ if config.CaptchaProvider == RecaptchaEnterpriseProvider {
 
 - `GetVariable` for the API key uses the same file-then-field lookup as other secrets.
 - Empty min score after trim is omit and is valid only for checkbox. Score empty fails.
-- `CaptchaSecretKey` stays required for hCaptcha, classic `recaptcha`, Turnstile, and `custom`.
+- `CaptchaSecretKey` stays required for hCaptcha, classic `recaptcha`, Turnstile, `custom`, and `eucaptcha`.

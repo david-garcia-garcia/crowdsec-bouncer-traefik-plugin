@@ -74,7 +74,9 @@ func (v *assessmentsVerifier) assessmentsURL() string {
 }
 
 // Pass POSTs token to assessments and applies valid, then action, then score.
-func (v *assessmentsVerifier) Pass(token, remoteIP string) (bool, error) {
+// userAgent is unused; assessments does not send it.
+func (v *assessmentsVerifier) Pass(token, remoteIP, userAgent string) (bool, error) {
+	_ = userAgent
 	event := assessmentEvent{Token: token, SiteKey: v.siteKey}
 	if remoteIP != "" {
 		event.UserIPAddress = remoteIP

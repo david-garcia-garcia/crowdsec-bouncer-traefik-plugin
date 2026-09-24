@@ -17,6 +17,7 @@ _Avoid_: score-first, treating a Google error envelope as reject
 ## How to use
 
 - POST JSON to `https://recaptchaenterprise.googleapis.com/v1/projects/{project}/assessments` on the captcha `http.Client` (`captchaSiteverifyHTTPTimeoutSeconds`).
+- `Pass` takes `userAgent` and ignores it.
 - Send the Cloud API key as `X-Goog-Api-Key`. Do not put it on the query string. Do not log it.
 - Body always has `event.token` and `event.siteKey`. Add `event.userIpAddress` only when `remoteIP` is non-empty. Add `event.expectedAction` only when action is non-empty after trim.
 - Do not parse `X-Forwarded-For`, `X-Real-Ip`, or `RemoteAddr` in captcha.

@@ -17,6 +17,7 @@ _Avoid_: lowercase `application/json` prefix, `application/jsonp`, treating a mi
 ## How to use
 
 - Thread `ServeHTTP`'s `remoteIP` into `Validate(r, remoteIP)`. Include `remoteip` with `secret` and `response` on both encodings when `remoteIP` is non-empty. Do not re-parse `X-Forwarded-For`.
+- `Pass` takes `userAgent` and ignores it.
 - Empty token or non-POST is `None`. Do not call the verifier.
 - Encode the provider request from `siteverifyVerifier.validateBody` (custom-only, filled in `New` from `CaptchaCustomValidateBody`). `json` POSTs `application/json` `{"secret","response"}` (and `remoteip` when given). Empty or `form`, and every built-in, keep `PostForm`.
 - Do not put the encoding on `infoProviders`. Do not invent `remoteip` when `Validate` is given an empty client address.

@@ -110,6 +110,11 @@ priority: normal
 local: core_plugin_middleware_captcha-enterprise-config.md
 description: How ValidateParams accepts recaptcha-enterprise and gates its key-type, project, API key, action, and min-score knobs.
 
+## Eucaptcha verify
+priority: normal
+local: core_plugin_middleware_captcha-eucaptcha-verify.md
+description: How eucaptcha posts a solver token to EU CAPTCHA /v1/verify and classifies success and train.
+
 ## Forced decision header
 priority: normal
 local: core_plugin_middleware_forced-decision.md

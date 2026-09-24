@@ -71,8 +71,10 @@ func (v *siteverifyVerifier) postSiteverify(response, remoteIP string) (*http.Re
 }
 
 // Pass posts the token to siteverify and returns the decoded success bit.
+// userAgent is unused; siteverify does not send it.
 // A Content-Type miss is Pass-false with no error. Transport and JSON decode are the error return.
-func (v *siteverifyVerifier) Pass(token, remoteIP string) (bool, error) {
+func (v *siteverifyVerifier) Pass(token, remoteIP, userAgent string) (bool, error) {
+	_ = userAgent
 	res, err := v.postSiteverify(token, remoteIP)
 	if err != nil {
 		return false, err
