@@ -20,12 +20,12 @@ func testOwnerConfig(t *testing.T, timeout int64) *configuration.Config {
 	}
 	cfg := configuration.New()
 	cfg.CaptchaEnabled = true
-	cfg.BouncerCaptchaProvider = configuration.HcaptchaProvider
-	cfg.BouncerCaptchaSiteKey = "site"
-	cfg.BouncerCaptchaSecretKey = "secret"
-	cfg.BouncerCaptchaGateSecret = "gate-secret"
-	cfg.BouncerCaptchaFilePath = templatePath
-	cfg.BouncerCaptchaSiteverifyHTTPTimeoutSeconds = timeout
+	cfg.CaptchaProvider = configuration.HcaptchaProvider
+	cfg.CaptchaSiteKey = "site"
+	cfg.CaptchaSecretKey = "secret"
+	cfg.CaptchaGateSecret = "gate-secret"
+	cfg.CaptchaFilePath = templatePath
+	cfg.CaptchaSiteverifyHTTPTimeoutSeconds = timeout
 	return cfg
 }
 

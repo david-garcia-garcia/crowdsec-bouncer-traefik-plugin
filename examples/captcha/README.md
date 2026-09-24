@@ -16,15 +16,15 @@ For now 3 captcha providers are supported:
   labels:
       # Choose captcha provider
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaEnabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaProvider=hcaptcha"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaProvider=hcaptcha"
       # Define captcha site key
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaSiteKey=FIXME"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSiteKey=FIXME"
       # Define captcha secret key
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaSecretKey=FIXME"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSecretKey=FIXME"
       # Define captcha grace period seconds
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaGracePeriodSeconds=1800"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=1800"
       # Define captcha HTML file path
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaFilePath=/captcha.html"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaFilePath=/captcha.html"
 ```
 
 The captcha HTML file must be present in the Traefik container (bind mounted or added during a custom build).  
@@ -124,7 +124,7 @@ sequenceDiagram
     TraefikPlugin-->>ProviderCaptcha: Is the validation OK ?
     destroy ProviderCaptcha    
     ProviderCaptcha-->>TraefikPlugin: Yes
-    TraefikPlugin-->>PluginCache: Set the User IP Clean for bouncerCaptchaGracePeriodSeconds
+    TraefikPlugin-->>PluginCache: Set the User IP Clean for captchaGracePeriodSeconds
     destroy PluginCache
     PluginCache-->>TraefikPlugin: Done
     destroy TraefikPlugin

@@ -79,12 +79,12 @@ Seventeen fields (from the prepared ticket list; `CaptchaEnabled` / `CaptchaInst
 - Q: After the stem move, should leftover owner-read captcha settings stay non-E2?
   Rank: additive incidental — no leftover-secret rule is rewritten at scale; no criterion names leftover-secret classification
   Decision: assumed — leftover owner-read captcha knobs stay non-E2 (validateOpenVsSubscribe still passes secretPresent=false for captcha). Leftover captchaInstanceName stays E2. Dropped bouncerCaptcha* keys never reach New.
-  By: explore
+  By: implement
 
 - Q: What is the operator blast radius outside this tree?
   Rank: structural asked — callers of the public YAML/label contract outside this tree cannot be enumerated; Problem Breaking the public contract is accepted and Desired Do not keep old-key aliases
   Decision: assumed — break the keys; no aliases; README BREAKING names the stem move. Operators must rename labels/YAML. Pre-prefix captchaFilePath leftovers start mapping again; current bouncerCaptcha* stops. That revival is the captcha stem, not an alias.
-  By: explore
+  By: implement
 
 - Q: Who already owns client address, user, tenant, Host, or trust hop for this change?
   Rank: additive incidental — no criterion names identity reconstruction; this rename does not set those facts

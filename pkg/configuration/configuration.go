@@ -72,23 +72,6 @@ type Config struct {
 	AppsecTLSInsecureVerify                    bool                         `json:"appsecTlsInsecureVerify,omitempty"`
 	BouncerAppsecFailureAction                 string                       `json:"bouncerAppsecFailureAction,omitempty"`
 	BouncerBanFilePath                         string                       `json:"bouncerBanFilePath,omitempty"`
-	BouncerCaptchaCustomChallengeURL           string                       `json:"bouncerCaptchaCustomChallengeUrl,omitempty"`
-	BouncerCaptchaCustomJsURL                  string                       `json:"bouncerCaptchaCustomJsUrl,omitempty"`
-	BouncerCaptchaCustomKey                    string                       `json:"bouncerCaptchaCustomKey,omitempty"`
-	BouncerCaptchaCustomResponse               string                       `json:"bouncerCaptchaCustomResponse,omitempty"`
-	BouncerCaptchaCustomValidateBody           string                       `json:"bouncerCaptchaCustomValidateBody,omitempty"`
-	BouncerCaptchaCustomValidateURL            string                       `json:"bouncerCaptchaCustomValidateUrl,omitempty"`
-	BouncerCaptchaFilePath                     string                       `json:"bouncerCaptchaFilePath,omitempty"`
-	BouncerCaptchaGateBindIP                   bool                         `json:"bouncerCaptchaGateBindIp,omitempty"`
-	BouncerCaptchaGateSecret                   string                       `json:"bouncerCaptchaGateSecret,omitempty"`
-	BouncerCaptchaGateSecretFile               string                       `json:"bouncerCaptchaGateSecretFile,omitempty"`
-	BouncerCaptchaGracePeriodSeconds           int64                        `json:"bouncerCaptchaGracePeriodSeconds,omitempty"`
-	BouncerCaptchaProvider                     string                       `json:"bouncerCaptchaProvider,omitempty"`
-	BouncerCaptchaSecretKey                    string                       `json:"bouncerCaptchaSecretKey,omitempty"`
-	BouncerCaptchaSecretKeyFile                string                       `json:"bouncerCaptchaSecretKeyFile,omitempty"`
-	BouncerCaptchaSiteKey                      string                       `json:"bouncerCaptchaSiteKey,omitempty"`
-	BouncerCaptchaSiteKeyFile                  string                       `json:"bouncerCaptchaSiteKeyFile,omitempty"`
-	BouncerCaptchaSiteverifyHTTPTimeoutSeconds int64                        `json:"bouncerCaptchaSiteverifyHttpTimeoutSeconds,omitempty"`
 	BouncerClientTrustedIPs                    []string                     `json:"bouncerClientTrustedIps,omitempty"`
 	BouncerDecisionHeader                      string                       `json:"bouncerDecisionHeader,omitempty"` // incoming header name; empty = off; values b|c
 	BouncerDecisionScopeHeaders                map[string]string            `json:"bouncerDecisionScopeHeaders,omitempty"`
@@ -103,8 +86,25 @@ type Config struct {
 	BouncerRemediationStatusCode               int                          `json:"bouncerRemediationStatusCode,omitempty"`
 	BouncerStartupBlock                        bool                         `json:"bouncerStartupBlock,omitempty"`
 	BouncerTraceHeadersCustomName              string                       `json:"bouncerTraceHeadersCustomName,omitempty"`
+	CaptchaCustomChallengeURL                  string                       `json:"captchaCustomChallengeUrl,omitempty"`
+	CaptchaCustomJsURL                         string                       `json:"captchaCustomJsUrl,omitempty"`
+	CaptchaCustomKey                           string                       `json:"captchaCustomKey,omitempty"`
+	CaptchaCustomResponse                      string                       `json:"captchaCustomResponse,omitempty"`
+	CaptchaCustomValidateBody                  string                       `json:"captchaCustomValidateBody,omitempty"`
+	CaptchaCustomValidateURL                   string                       `json:"captchaCustomValidateUrl,omitempty"`
 	CaptchaEnabled                             bool                         `json:"captchaEnabled,omitempty"`
+	CaptchaFilePath                            string                       `json:"captchaFilePath,omitempty"`
+	CaptchaGateBindIP                          bool                         `json:"captchaGateBindIp,omitempty"`
+	CaptchaGateSecret                          string                       `json:"captchaGateSecret,omitempty"`
+	CaptchaGateSecretFile                      string                       `json:"captchaGateSecretFile,omitempty"`
+	CaptchaGracePeriodSeconds                  int64                        `json:"captchaGracePeriodSeconds,omitempty"`
 	CaptchaInstanceName                        string                       `json:"captchaInstanceName,omitempty"`
+	CaptchaProvider                            string                       `json:"captchaProvider,omitempty"`
+	CaptchaSecretKey                           string                       `json:"captchaSecretKey,omitempty"`
+	CaptchaSecretKeyFile                       string                       `json:"captchaSecretKeyFile,omitempty"`
+	CaptchaSiteKey                             string                       `json:"captchaSiteKey,omitempty"`
+	CaptchaSiteKeyFile                         string                       `json:"captchaSiteKeyFile,omitempty"`
+	CaptchaSiteverifyHTTPTimeoutSeconds        int64                        `json:"captchaSiteverifyHttpTimeoutSeconds,omitempty"`
 	LapiCapiMachineID                          string                       `json:"lapiCapiMachineId,omitempty"`
 	LapiCapiMachineIDFile                      string                       `json:"lapiCapiMachineIdFile,omitempty"`
 	LapiCapiPassword                           string                       `json:"lapiCapiPassword,omitempty"`
@@ -197,19 +197,6 @@ func New() *Config {
 		AppsecTLSInsecureVerify:                    false,
 		BouncerAppsecFailureAction:                 FailureActionBan,
 		BouncerBanFilePath:                         "",
-		BouncerCaptchaCustomChallengeURL:           "",
-		BouncerCaptchaCustomJsURL:                  "",
-		BouncerCaptchaCustomKey:                    "",
-		BouncerCaptchaCustomResponse:               "",
-		BouncerCaptchaCustomValidateBody:           "",
-		BouncerCaptchaCustomValidateURL:            "",
-		BouncerCaptchaFilePath:                     "/captcha.html",
-		BouncerCaptchaGateBindIP:                   true,
-		BouncerCaptchaGracePeriodSeconds:           1800,
-		BouncerCaptchaProvider:                     "",
-		BouncerCaptchaSecretKey:                    "",
-		BouncerCaptchaSiteKey:                      "",
-		BouncerCaptchaSiteverifyHTTPTimeoutSeconds: 10,
 		BouncerClientTrustedIPs:                    []string{},
 		BouncerDecisionHeader:                      "",
 		BouncerDecisionScopeHeaders:                map[string]string{},
@@ -224,8 +211,21 @@ func New() *Config {
 		BouncerRemediationStatusCode:               http.StatusForbidden,
 		BouncerStartupBlock:                        true,
 		BouncerTraceHeadersCustomName:              "",
+		CaptchaCustomChallengeURL:                  "",
+		CaptchaCustomJsURL:                         "",
+		CaptchaCustomKey:                           "",
+		CaptchaCustomResponse:                      "",
+		CaptchaCustomValidateBody:                  "",
+		CaptchaCustomValidateURL:                   "",
 		CaptchaEnabled:                             false,
+		CaptchaFilePath:                            "/captcha.html",
+		CaptchaGateBindIP:                          true,
+		CaptchaGracePeriodSeconds:                  1800,
 		CaptchaInstanceName:                        "",
+		CaptchaProvider:                            "",
+		CaptchaSecretKey:                           "",
+		CaptchaSiteKey:                             "",
+		CaptchaSiteverifyHTTPTimeoutSeconds:        10,
 		LapiDefaultDecisionSeconds:                 60,
 		LapiHost:                                   "crowdsec:8080",
 		LapiHTTPTimeoutSeconds:                     10,
@@ -398,7 +398,7 @@ func validateOpenVsSubscribe(config *Config) error {
 	if err := validateLegOpenVsSubscribe("AppSec", config.BouncerEnabled, config.AppsecEnabled, config.AppsecInstanceName, appsecSecretPresent(config)); err != nil {
 		return err
 	}
-	// Captcha E2 is leftover captchaInstanceName only; leftover bouncerCaptcha* is not a secret.
+	// Captcha E2 is leftover captchaInstanceName only; leftover captcha* is not a secret.
 	return validateLegOpenVsSubscribe("Captcha", config.BouncerEnabled, config.CaptchaEnabled, config.CaptchaInstanceName, false)
 }
 
@@ -458,7 +458,7 @@ func validateEnabledCaptchaSettings(config *Config) error {
 	if !config.CaptchaEnabled {
 		return nil
 	}
-	if config.BouncerCaptchaProvider == "" {
+	if config.CaptchaProvider == "" {
 		return nil
 	}
 	if err := validateCaptchaCredentials(config); err != nil {
@@ -466,22 +466,22 @@ func validateEnabledCaptchaSettings(config *Config) error {
 	}
 	// Empty is valid; it only leaves the challenge path out of the passthrough match set.
 	// A value that names no path would silently never match, so reject it instead.
-	if config.BouncerCaptchaProvider == CustomProvider && config.BouncerCaptchaCustomChallengeURL != "" &&
-		CustomCaptchaResourcePath(config.BouncerCaptchaCustomChallengeURL) == "" {
-		return errors.New("BouncerCaptchaCustomChallengeURL: " + config.BouncerCaptchaCustomChallengeURL +
+	if config.CaptchaProvider == CustomProvider && config.CaptchaCustomChallengeURL != "" &&
+		CustomCaptchaResourcePath(config.CaptchaCustomChallengeURL) == "" {
+		return errors.New("CaptchaCustomChallengeURL: " + config.CaptchaCustomChallengeURL +
 			" has no absolute path, so no browser request could ever match it")
 	}
-	gateSecret, err := GetVariable(config, "BouncerCaptchaGateSecret")
+	gateSecret, err := GetVariable(config, "CaptchaGateSecret")
 	if err != nil {
 		return err
 	}
 	if gateSecret == "" {
-		return errors.New("BouncerCaptchaGateSecret: cannot be empty when BouncerCaptchaProvider is set")
+		return errors.New("CaptchaGateSecret: cannot be empty when CaptchaProvider is set")
 	}
-	if config.BouncerCaptchaFilePath == "" {
-		return errors.New("BouncerCaptchaFilePath: cannot be empty when BouncerCaptchaProvider is set")
+	if config.CaptchaFilePath == "" {
+		return errors.New("CaptchaFilePath: cannot be empty when CaptchaProvider is set")
 	}
-	if _, _, err := GetTemplate(config.BouncerCaptchaFilePath); err != nil {
+	if _, _, err := GetTemplate(config.CaptchaFilePath); err != nil {
 		return err
 	}
 	return nil
@@ -490,19 +490,19 @@ func validateEnabledCaptchaSettings(config *Config) error {
 // validateCaptchaCredentials resolves site and secret keys and rejects an empty
 // trimmed value for each field independently, site first. Lookup errors stay.
 func validateCaptchaCredentials(config *Config) error {
-	siteKey, err := GetVariable(config, "BouncerCaptchaSiteKey")
+	siteKey, err := GetVariable(config, "CaptchaSiteKey")
 	if err != nil {
 		return err
 	}
 	if siteKey == "" {
-		return errors.New("BouncerCaptchaSiteKey: cannot be empty when BouncerCaptchaProvider is set")
+		return errors.New("CaptchaSiteKey: cannot be empty when CaptchaProvider is set")
 	}
-	secretKey, err := GetVariable(config, "BouncerCaptchaSecretKey")
+	secretKey, err := GetVariable(config, "CaptchaSecretKey")
 	if err != nil {
 		return err
 	}
 	if secretKey == "" {
-		return errors.New("BouncerCaptchaSecretKey: cannot be empty when BouncerCaptchaProvider is set")
+		return errors.New("CaptchaSecretKey: cannot be empty when CaptchaProvider is set")
 	}
 	return nil
 }
@@ -693,25 +693,25 @@ func validateCaptcha(config *Config) error {
 	if !config.CaptchaEnabled {
 		return nil
 	}
-	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider}, config.BouncerCaptchaProvider) {
-		return fmt.Errorf("BouncerCaptchaProvider: must be one of '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider)
+	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider}, config.CaptchaProvider) {
+		return fmt.Errorf("CaptchaProvider: must be one of '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, TurnstileProvider, CustomProvider)
 	}
 	// Accept only empty, form, or json after trim; json is custom-only.
-	validateBody := strings.TrimSpace(config.BouncerCaptchaCustomValidateBody)
+	validateBody := strings.TrimSpace(config.CaptchaCustomValidateBody)
 	if validateBody != "" && validateBody != CaptchaCustomValidateBodyForm && validateBody != CaptchaCustomValidateBodyJSON {
-		return errors.New("BouncerCaptchaCustomValidateBody: must be empty, form, or json")
+		return errors.New("CaptchaCustomValidateBody: must be empty, form, or json")
 	}
-	if validateBody == CaptchaCustomValidateBodyJSON && config.BouncerCaptchaProvider != CustomProvider {
-		return errors.New("BouncerCaptchaCustomValidateBody: json is only valid when BouncerCaptchaProvider is custom")
+	if validateBody == CaptchaCustomValidateBodyJSON && config.CaptchaProvider != CustomProvider {
+		return errors.New("CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom")
 	}
-	if config.BouncerCaptchaProvider == CustomProvider {
-		if config.BouncerCaptchaCustomKey == "" || config.BouncerCaptchaCustomResponse == "" || config.BouncerCaptchaCustomValidateURL == "" || config.BouncerCaptchaCustomJsURL == "" {
+	if config.CaptchaProvider == CustomProvider {
+		if config.CaptchaCustomKey == "" || config.CaptchaCustomResponse == "" || config.CaptchaCustomValidateURL == "" || config.CaptchaCustomJsURL == "" {
 			return fmt.Errorf(
-				"BouncerCaptchaProvider: provider is custom, captchaCustom variables must be filled: BouncerCaptchaCustomKey:%s, BouncerCaptchaCustomResponse:%s, BouncerCaptchaCustomValidateURL:%s, BouncerCaptchaCustomJsURL:%s",
-				config.BouncerCaptchaCustomKey,
-				config.BouncerCaptchaCustomResponse,
-				config.BouncerCaptchaCustomValidateURL,
-				config.BouncerCaptchaCustomJsURL,
+				"CaptchaProvider: provider is custom, captchaCustom variables must be filled: CaptchaCustomKey:%s, CaptchaCustomResponse:%s, CaptchaCustomValidateURL:%s, CaptchaCustomJsURL:%s",
+				config.CaptchaCustomKey,
+				config.CaptchaCustomResponse,
+				config.CaptchaCustomValidateURL,
+				config.CaptchaCustomJsURL,
 			)
 		}
 	}
@@ -744,8 +744,8 @@ func validateParamsRequired(config *Config) error {
 		"LapiDefaultDecisionSeconds":                 config.LapiDefaultDecisionSeconds,
 		"LapiHTTPTimeoutSeconds":                     config.LapiHTTPTimeoutSeconds,
 		"AppsecHTTPTimeoutSeconds":                   config.AppsecHTTPTimeoutSeconds,
-		"BouncerCaptchaSiteverifyHTTPTimeoutSeconds": config.BouncerCaptchaSiteverifyHTTPTimeoutSeconds,
-		"BouncerCaptchaGracePeriodSeconds":           config.BouncerCaptchaGracePeriodSeconds,
+		"CaptchaSiteverifyHTTPTimeoutSeconds": config.CaptchaSiteverifyHTTPTimeoutSeconds,
+		"CaptchaGracePeriodSeconds":           config.CaptchaGracePeriodSeconds,
 	}
 	for key, val := range requiredInt1 {
 		if val < 1 {

@@ -631,7 +631,7 @@ func TestSessionKey_TimeoutKnobsDoNotChangeKey(t *testing.T) {
 	timeouts.LapiHTTPTimeoutSeconds = 30
 	timeouts.LapiHTTPTimeoutSeconds = 5
 	timeouts.AppsecHTTPTimeoutSeconds = 2
-	timeouts.BouncerCaptchaSiteverifyHTTPTimeoutSeconds = 1
+	timeouts.CaptchaSiteverifyHTTPTimeoutSeconds = 1
 	if SessionKey(base) != SessionKey(timeouts) {
 		t.Fatal("timeout knobs must not change SessionKey")
 	}
