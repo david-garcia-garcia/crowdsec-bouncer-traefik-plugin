@@ -13,7 +13,7 @@ The plugin SHALL export `CreateConfig` and `New` from the package Traefik loads 
 - **AND** `New` receives a non-ignored context used as the reclaim holder
 
 ### Requirement: Bouncer binds clients through atomic late bind
-The per-router bouncer SHALL hold three optional bound clients as `atomic.Value` fields (LAPI, AppSec, and captcha), each able to hold a typed nil. `ServeHTTP` SHALL `Load` those fields only and MUST NOT resolve instance names, Peek slot tables, or Open clients on the request path. Subscribers MUST NOT Bind reclaim on those clients. The bouncer SHALL read `lapiMode` from the loaded LAPI client on each request, not from a copy taken at `New`. When `bouncerEnabled` is false the handler SHALL call `next` without applying decisions while owners may still Open and publish.
+The per-router bouncer SHALL hold three optional bound clients as `atomic.Value` fields (LAPI, AppSec, and captcha), each able to hold a typed nil. Each field's stored concrete type SHALL stay `*reclaim.Box` (Yaegi). On every Watch publish into a bound field, the bouncer SHALL `Store` a new `*reclaim.Box{Value: …}` and MUST NOT assign `Box.Value` in place on a Box already published in that field. `ServeHTTP` SHALL `Load` those fields only and MUST NOT resolve instance names, Peek slot tables, or Open clients on the request path. Subscribers MUST NOT Bind reclaim on those clients. The bouncer SHALL read `lapiMode` from the loaded LAPI client on each request, not from a copy taken at `New`. When `bouncerEnabled` is false the handler SHALL call `next` without applying decisions while owners may still Open and publish.
 
 #### Scenario: Nil LAPI client uses failure action for that leg
 - **WHEN** the bouncer subscribed to LAPI but the loaded value is empty and `startupBlock` is false
@@ -28,6 +28,12 @@ The per-router bouncer SHALL hold three optional bound clients as `atomic.Value`
 - **WHEN** the bouncer subscribed to captcha
 - **THEN** `ServeHTTP` Loads the captcha `atomic.Value` only
 - **AND** it does not Open or reconstruct a captcha client on the request path
+
+#### Scenario: Bind update publishes a new Box
+- **WHEN** a Watch notice updates an already-bound LAPI, AppSec, or captcha field
+- **THEN** the field's `atomic.Value` Stores a new `*reclaim.Box`
+- **AND** the previous Box's `Value` field is not written in place
+- **AND** concurrent ServeHTTP Unbox of that field does not panic from a torn `any`
 
 ### Requirement: Stream startup block guards subscribed backends on the request path
 When `bouncerStartupBlock` is true, before calling `next` or applying decisions the bouncer SHALL check every leg it subscribed to (LAPI, AppSec, and captcha independently). For each subscribed leg, if the loaded client is not published (typed nil), `ServeHTTP` SHALL return HTTP 503 and MUST NOT call `next`. When `bouncerStartupBlock` is false, a missing subscribed LAPI or AppSec client SHALL use that leg's failure action instead, and a missing subscribed captcha client SHALL ban a captcha verdict. The check MUST NOT block `New`. A leg the bouncer did not subscribe to is not part of the guard. The Bouncer field name SHALL be `startupBlock` (not `streamStartupBlock`).
