@@ -182,7 +182,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		})
 	}
 
-	client.logLifecycle(MsgConnectionStarted, "started", false)
+	client.log.Info(MsgConnectionStarted, "incarnation", client.incarnation, "mode", client.crowdsecMode, "host", client.crowdsecHost, "reason", "started")
 	return client, nil
 }
 
@@ -211,7 +211,7 @@ func (c *Client) Close() {
 	if current := c.currentTransport(); current != nil {
 		closeIdle(current.httpClient)
 	}
-	c.logLifecycle(MsgConnectionClosed, "closed", false)
+	c.log.Info(MsgConnectionClosed, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "reason", "closed")
 	dropStreamOwner(c.crowdsecHost, c.lapiKey, c.middlewareName)
 }
 
@@ -231,7 +231,7 @@ func (c *Client) Sleep() {
 	c.streamStop = nil
 	c.metricsStop = nil
 	c.mu.Unlock()
-	c.logLifecycle(MsgConnectionSleeping, "sleeping", true)
+	c.log.Debug(MsgConnectionSleeping, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "reason", "sleeping")
 	go c.drainMetrics()
 }
 
@@ -256,7 +256,7 @@ func (c *Client) Wake() {
 		})
 	}
 	c.mu.Unlock()
-	c.logLifecycle(MsgConnectionWaking, "waking", true)
+	c.log.Debug(MsgConnectionWaking, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "reason", "waking")
 	if resumeStream {
 		go c.handleStreamTicker()
 	}
@@ -299,26 +299,6 @@ func (c *Client) StreamScopes() []string {
 		names = append(names, name)
 	}
 	return names
-}
-
-// logInfo writes stream-health lines with host.
-func (c *Client) logInfo(msg, reason string) {
-	if c.log == nil {
-		return
-	}
-	c.log.Info(msg, "mode", c.crowdsecMode, "host", c.crowdsecHost, "reason", reason)
-}
-
-// logLifecycle writes Create/Close at INFO and Sleep/Wake at DEBUG.
-func (c *Client) logLifecycle(msg, reason string, debug bool) {
-	if c.log == nil {
-		return
-	}
-	if debug {
-		c.log.Debug(msg, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "reason", reason)
-		return
-	}
-	c.log.Info(msg, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "reason", reason)
 }
 
 func stopTicker(stop chan bool) {

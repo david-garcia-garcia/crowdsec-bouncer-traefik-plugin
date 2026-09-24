@@ -91,7 +91,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, m
 	}
 	client.incarnation = fmt.Sprintf("%p", client)
 	client.transport.Store(next)
-	client.logLifecycle(MsgInstanceStarted, "started", false)
+	client.log.Info(MsgInstanceStarted, "incarnation", client.incarnation, "reason", "started")
 	return client, nil
 }
 
@@ -109,7 +109,7 @@ func (c *Client) Close() {
 	if current != nil {
 		closeIdle(current.httpClient)
 	}
-	c.logLifecycle(MsgInstanceClosed, "closed", false)
+	c.log.Info(MsgInstanceClosed, "incarnation", c.incarnation, "reason", "closed")
 }
 
 // Sleep logs DEBUG and marks the incarnation asleep. AppSec has no tickers.
@@ -121,7 +121,7 @@ func (c *Client) Sleep() {
 	}
 	c.sleeping = true
 	c.mu.Unlock()
-	c.logLifecycle(MsgInstanceSleeping, "sleeping", true)
+	c.log.Debug(MsgInstanceSleeping, "incarnation", c.incarnation, "reason", "sleeping")
 }
 
 // Wake logs DEBUG after Sleep. AppSec has no tickers.
@@ -133,7 +133,7 @@ func (c *Client) Wake() {
 	}
 	c.sleeping = false
 	c.mu.Unlock()
-	c.logLifecycle(MsgInstanceWaking, "waking", true)
+	c.log.Debug(MsgInstanceWaking, "incarnation", c.incarnation, "reason", "waking")
 }
 
 // Incarnation is unique per Client create.
@@ -153,17 +153,6 @@ func (c *Client) bindIdentity(middlewareName, bindKey string) {
 	if c.sessionKey == "" {
 		c.sessionKey = bindKey
 	}
-}
-
-func (c *Client) logLifecycle(msg, reason string, debug bool) {
-	if c.log == nil {
-		return
-	}
-	if debug {
-		c.log.Debug(msg, "incarnation", c.incarnation, "reason", reason)
-		return
-	}
-	c.log.Info(msg, "incarnation", c.incarnation, "reason", reason)
 }
 
 func isReverseProxyError(statusCode int) bool {

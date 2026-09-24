@@ -277,7 +277,7 @@ func (c *Client) Close() {
 	if httpClient != nil {
 		httpClient.CloseIdleConnections()
 	}
-	c.logLifecycle(MsgInstanceClosed, "closed", false)
+	c.log.Info(MsgInstanceClosed, "incarnation", c.incarnation, "reason", "closed")
 }
 
 // Sleep logs DEBUG. Captcha has no ticker.
@@ -289,7 +289,7 @@ func (c *Client) Sleep() {
 	}
 	c.sleeping = true
 	c.mu.Unlock()
-	c.logLifecycle(MsgInstanceSleeping, "sleeping", true)
+	c.log.Debug(MsgInstanceSleeping, "incarnation", c.incarnation, "reason", "sleeping")
 }
 
 // Wake logs DEBUG after Sleep. Captcha has no ticker.
@@ -301,7 +301,7 @@ func (c *Client) Wake() {
 	}
 	c.sleeping = false
 	c.mu.Unlock()
-	c.logLifecycle(MsgInstanceWaking, "waking", true)
+	c.log.Debug(MsgInstanceWaking, "incarnation", c.incarnation, "reason", "waking")
 }
 
 // Incarnation is unique per Client create.
@@ -321,17 +321,6 @@ func (c *Client) bindIdentity(middlewareName, bindKey string) {
 	if c.sessionKey == "" {
 		c.sessionKey = bindKey
 	}
-}
-
-func (c *Client) logLifecycle(msg, reason string, debug bool) {
-	if c.log == nil {
-		return
-	}
-	if debug {
-		c.log.Debug(msg, "incarnation", c.incarnation, "reason", reason)
-		return
-	}
-	c.log.Info(msg, "incarnation", c.incarnation, "reason", reason)
 }
 
 // storeCustomResourcePaths keeps exact browser asset paths for custom-provider passthrough.
