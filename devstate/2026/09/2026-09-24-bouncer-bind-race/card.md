@@ -20,7 +20,7 @@ Priority: P1 — production is unsafe today on concurrent bind update vs ServeHT
 In progress. 0 items remain.
 
 Priority: P1 — production is unsafe today on concurrent bind update vs ServeHTTP
-Reviewed head: 7163688a
+Reviewed head: ef718f2c
 Owner decision: None.
 
 ## Review scores
@@ -43,7 +43,10 @@ Owner decision: None.
 
 ## Specs
 Worktree:
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-bouncer-bind-race/openspec/changes/bouncer-bind-immutable-box/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-bouncer-bind-race/openspec/changes/archive/2026-09-24-bouncer-bind-immutable-box/proposal.md) — modified
+
+Completed:
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-bouncer-bind-race/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -78,9 +81,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 7163688ad52acce1f5798f55cdefebc045c97b81 | Card must match the branch you measured |
+| Reviewed head | ef718f2c6be786fec69c390c5f8ba5a082a83dac | Card must match the branch you measured |
 
 ### Stored data model
 None.
