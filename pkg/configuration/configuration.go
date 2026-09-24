@@ -299,11 +299,8 @@ func getContentTypeFromPath(path string) string {
 }
 
 // TemplateUnavailableReason reports empty or unloadable for template load failures.
-func TemplateUnavailableReason(path string, err error) string {
+func TemplateUnavailableReason(path string, _ error) string {
 	if path == "" {
-		return "empty"
-	}
-	if err != nil && err.Error() == "no template file provided" {
 		return "empty"
 	}
 	return "unloadable"

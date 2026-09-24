@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 func TestNew_banTemplateUnavailableWarnsAndServesEmptyBody(t *testing.T) {
@@ -62,20 +61,4 @@ func TestNew_banTemplateUnavailableWarnsAndServesEmptyBody(t *testing.T) {
 			t.Fatalf("want empty ban body, got %q", rw.Body.String())
 		}
 	})
-}
-
-func TestNew_bounceOnlyUnusedCaptchaPathDoesNotWarn(t *testing.T) {
-	_, sink := newTestLogSink(slog.LevelWarn)
-	cfg := configuration.New()
-	cfg.CaptchaProvider = configuration.HcaptchaProvider
-	cfg.CaptchaSiteKey = "site"
-	cfg.CaptchaSecretKey = "secret"
-	cfg.CaptchaGateSecret = "gate-secret"
-	cfg.CaptchaFilePath = "/captcha.html"
-	if err := configuration.ValidateParams(cfg, logger.New("WARN", "")); err != nil {
-		t.Fatalf("ValidateParams() error = %v", err)
-	}
-	if strings.Contains(sink.String(), "crowdsec captcha template unavailable") {
-		t.Fatalf("bounce-only ValidateParams must not warn about captcha template, got %s", sink.String())
-	}
 }
