@@ -24,20 +24,20 @@ http:
     crowdsec:
       plugin:
         bouncer:
+          bouncerDecisionScopeHeaders:
+            Country: X-IPCountry
           bouncerEnabled: true
-          logLevel: DEBUG
-          lapiMode: live
-          lapiEnabled: true
-          lapiKey: "40796d93c2958f9e58345514e67740e5"
-          lapiHost: crowdsec:8080
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
           bouncerForwardedHeadersTrustedIps:
             - "172.16.0.0/12"
             - "192.168.0.0/16"
             - "10.0.0.0/8"
             - "127.0.0.1/32"
-          bouncerForwardedHeadersCustomName: X-Forwarded-For
-          bouncerDecisionScopeHeaders:
-            Country: X-IPCountry
+          lapiEnabled: true
+          lapiHost: crowdsec:8080
+          lapiKey: "40796d93c2958f9e58345514e67740e5"
+          lapiMode: live
+          logLevel: DEBUG
     crowdsec-geo:
       chain:
         middlewares:

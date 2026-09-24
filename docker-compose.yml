@@ -50,14 +50,14 @@ services:
       # Definition of the service
       - "traefik.http.services.service-bar.loadbalancer.server.port=80"
       # Definitin of the middleware
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerEnabled=true"
-      # lapiKey is the key to authenticate to crowdsec
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiEnabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiKey=FIXME-LAPI-KEY-1="
       # enable AppSec real time check
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.appsecEnabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerEnabled=true"
       # bouncerForwardedHeadersTrustedIps should be the IP of the proxy that is in front of traefik (if any)
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerForwardedHeadersTrustedIps=172.21.0.5"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiEnabled=true"
+      # lapiKey is the key to authenticate to crowdsec
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiKey=FIXME-LAPI-KEY-1="
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.7.8

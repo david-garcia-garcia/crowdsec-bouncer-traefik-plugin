@@ -37,12 +37,12 @@ services:
       # Definition of the service
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
       # Definition of the middleware
+      # Define ban file path
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerBanFilePath=/ban.html"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerEnabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiEnabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiKey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
-      # Define ban file path
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerBanFilePath=/ban.html"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.7.8

@@ -172,13 +172,13 @@ Names omitted: this Traefik name is the slot. Same shape as a single-router inst
 api-crowdsec:
   plugin:
     bouncer:
-      bouncerEnabled: true
-      lapiMode: stream
-      lapiEnabled: true
       appsecEnabled: true
+      appsecKey: "..."
+      bouncerEnabled: true
+      lapiEnabled: true
       lapiHost: crowdsec:8080
       lapiKey: "..."
-      appsecKey: "..."
+      lapiMode: stream
 ```
 
 ### Shared stream, per-router bounce policy
@@ -189,22 +189,22 @@ One middleware owns the LAPI (and optional AppSec) stream. Other routers only bo
 cs:
   plugin:
     bouncer:
-      bouncerEnabled: true
-      lapiMode: stream
-      lapiEnabled: true
       appsecEnabled: true
-      lapiInstanceName: shared
       appsecInstanceName: shared
-      lapiHost: crowdsec:8080
-      lapiKey: "..."
       appsecKey: "..."
+      bouncerEnabled: true
+      lapiEnabled: true
+      lapiHost: crowdsec:8080
+      lapiInstanceName: shared
+      lapiKey: "..."
+      lapiMode: stream
 cs-admin:
   plugin:
     bouncer:
-      bouncerEnabled: true
-      lapiInstanceName: shared
       appsecInstanceName: shared
+      bouncerEnabled: true
       bouncerRemediationHeadersCustomName: x-crowdsec
+      lapiInstanceName: shared
 ```
 
 A dummy owner (`enabled: false`) is optional. Use it only when no bouncing route should own the clients. Traefik still needs a router attached so `New` runs.
@@ -213,15 +213,15 @@ A dummy owner (`enabled: false`) is optional. Use it only when no bouncing route
 cs-holders:
   plugin:
     bouncer:
-      bouncerEnabled: false
-      lapiMode: stream
-      lapiEnabled: true
       appsecEnabled: true
-      lapiInstanceName: shared
       appsecInstanceName: shared
-      lapiHost: crowdsec:8080
-      lapiKey: "..."
       appsecKey: "..."
+      bouncerEnabled: false
+      lapiEnabled: true
+      lapiHost: crowdsec:8080
+      lapiInstanceName: shared
+      lapiKey: "..."
+      lapiMode: stream
 ```
 
 ### Several LAPI streams or CrowdSec engines
@@ -235,20 +235,20 @@ cs-a:
   plugin:
     bouncer:
       bouncerEnabled: true
-      lapiMode: stream
       lapiEnabled: true
-      lapiInstanceName: engine-a
       lapiHost: crowdsec-a:8080
+      lapiInstanceName: engine-a
       lapiKey: "key-a"
+      lapiMode: stream
 cs-b:
   plugin:
     bouncer:
       bouncerEnabled: true
-      lapiMode: stream
       lapiEnabled: true
-      lapiInstanceName: engine-b
       lapiHost: crowdsec-b:8080
+      lapiInstanceName: engine-b
       lapiKey: "key-b"
+      lapiMode: stream
 app-a:
   plugin:
     bouncer:
@@ -271,11 +271,11 @@ No LAPI client on this middleware. The bouncer subscribes only to AppSec.
 waf:
   plugin:
     bouncer:
-      bouncerEnabled: true
-      lapiEnabled: false
       appsecEnabled: true
       appsecHost: crowdsec:7422
       appsecKey: "..."
+      bouncerEnabled: true
+      lapiEnabled: false
 ```
 
 `lapiStreamScopes` is opener-only extra stream scopes (`country`, `as`, …). It is not copied from `bouncerDecisionScopeHeaders`.
@@ -335,16 +335,16 @@ Siteverify request encoding. After trim, exact lowercase `""` or `form` POSTs `a
 CapJS / Cap Standalone as `custom` (operator HTML stays yours; no `trycap` provider):
 
 ```yaml
-captchaEnabled: true
-bouncerCaptchaProvider: custom
 bouncerCaptchaCustomJsUrl: https://<instance>/assets/widget.js
 bouncerCaptchaCustomKey: cap
 bouncerCaptchaCustomResponse: cap-token
-bouncerCaptchaCustomValidateUrl: https://<instance>/<site_key>/siteverify
 bouncerCaptchaCustomValidateBody: json
-bouncerCaptchaSiteKey: FIXME
-bouncerCaptchaSecretKey: FIXME
+bouncerCaptchaCustomValidateUrl: https://<instance>/<site_key>/siteverify
 bouncerCaptchaGateSecret: FIXME
+bouncerCaptchaProvider: custom
+bouncerCaptchaSecretKey: FIXME
+bouncerCaptchaSiteKey: FIXME
+captchaEnabled: true
 ```
 
 **BouncerCaptchaCustomValidateUrl** (string, no default)
@@ -588,10 +588,10 @@ http:
         bouncer:
           bouncerEnabled: true
           lapiEnabled: true
-          logLevel: DEBUG
-          lapiMode: live
-          lapiKey: privateKey-foo
           lapiHost: crowdsec:8080
+          lapiKey: privateKey-foo
+          lapiMode: live
+          logLevel: DEBUG
 ```
 
 ```yaml
@@ -617,63 +617,70 @@ http:
     crowdsec:
       plugin:
         bouncer:
-          bouncerEnabled: false
-          lapiEnabled: true
-          logLevel: DEBUG
-          logFormat: common
-          LogFilePath: ""
-          lapiUpdateIntervalSeconds: 60
-          reclaimGraceSeconds: 30
-          lapiUpdateMaxFailure: 0
-          bouncerLapiFailureAction: ban
-          lapiEnabled: true
-          lapiInstanceName: ""
-          appsecInstanceName: ""
-          lapiStreamScopes: []
-          bouncerStartupBlock: true
-          lapiDefaultDecisionSeconds: 60
-          bouncerRemediationStatusCode: 403
-          lapiHttpTimeoutSeconds: 10
-          appsecHttpTimeoutSeconds: 1
-          bouncerCaptchaSiteverifyHttpTimeoutSeconds: 10
-          lapiMode: live
-          appsecEnabled: false
-          appsecScheme: ""
-          appsecHost: crowdsec:7422
-          appsecPath: "/"
-          bouncerAppsecFailureAction: passthrough
           appsecBodyLimit: 10485760
-          lapiKey: privateKey-foo
-          lapiScheme: http
-          lapiHost: crowdsec:8080
-          lapiPath: "/"
-          lapiTlsInsecureVerify: false
+          appsecEnabled: false
+          appsecHost: crowdsec:7422
+          appsecHttpTimeoutSeconds: 1
+          appsecInstanceName: ""
+          appsecPath: "/"
+          appsecScheme: ""
+          bouncerAppsecFailureAction: passthrough
+          bouncerBanFilePath: /ban.html
+          bouncerCaptchaFilePath: /captcha.html
+          bouncerCaptchaGateSecret: FIXME
+          bouncerCaptchaGracePeriodSeconds: 1800
+          bouncerCaptchaProvider: hcaptcha
+          bouncerCaptchaSecretKey: FIXME
+          bouncerCaptchaSiteKey: FIXME
+          bouncerCaptchaSiteverifyHttpTimeoutSeconds: 10
+          bouncerClientTrustedIps:
+            - 192.168.1.0/24
+          bouncerDecisionHeader: X-Crowdsec-Decision # optional; earlier middleware writes b or c
+          bouncerDecisionScopeHeaders: {}
+            # Country: X-IPCountry    # key Country (any case) → ISO country matcher (CDN or geoenrich)
+            # AS: CF-ASN             # key AS (any case) → ASN matcher
+            # username: X-User       # any other key → trimmed exact match
+          bouncerEnabled: false
+          bouncerForwardedHeadersCustomName: X-Custom-Header
+          bouncerForwardedHeadersTrustedIps:
+            - 10.0.10.23/32
+            - 10.0.20.0/24
+          bouncerLapiFailureAction: ban
+          bouncerOriginBasedDecisionRemap:
+            CAPI:
+              ban: captcha
+            lists:firehol_level1:
+              ban: captcha
+          bouncerRedisUnreachableBlock: true
+          bouncerRemediationHeadersCustomName: cs-remediation
+          bouncerRemediationStatusCode: 403
+          bouncerStartupBlock: true
+          bouncerTraceHeadersCustomName: X-Request-ID
+          captchaEnabled: true
           lapiCapiMachineId: login
           lapiCapiPassword: password
           lapiCapiScenarios:
             - crowdsecurity/http-path-traversal-probing
             - crowdsecurity/http-xss-probing
             - crowdsecurity/http-generic-bf
-          bouncerForwardedHeadersTrustedIps:
-            - 10.0.10.23/32
-            - 10.0.20.0/24
-          bouncerClientTrustedIps:
-            - 192.168.1.0/24
-          bouncerForwardedHeadersCustomName: X-Custom-Header
-          bouncerDecisionScopeHeaders: {}
-            # Country: X-IPCountry    # key Country (any case) → ISO country matcher (CDN or geoenrich)
-            # AS: CF-ASN             # key AS (any case) → ASN matcher
-            # username: X-User       # any other key → trimmed exact match
-          bouncerDecisionHeader: X-Crowdsec-Decision # optional; earlier middleware writes b or c
-          bouncerRemediationHeadersCustomName: cs-remediation
+          lapiDefaultDecisionSeconds: 60
+          lapiEnabled: true
+          lapiHost: crowdsec:8080
+          lapiHttpTimeoutSeconds: 10
+          lapiInstanceName: ""
+          lapiKey: privateKey-foo
+          lapiMetricsUpdateIntervalSeconds: 600
+          lapiMode: live
+          lapiPath: "/"
+          lapiRedisDatabase: "5"
           lapiRedisEnabled: false
           lapiRedisHost: "redis-primary:6379"
+          lapiRedisPassword: password
           lapiRedisReadHosts:
             - "redis-replica-1:6379"
             - "redis-replica-2:6379"
-          lapiRedisPassword: password
-          lapiRedisDatabase: "5"
-          bouncerRedisUnreachableBlock: true
+          lapiScheme: http
+          lapiStreamScopes: []
           lapiTlsCertificateAuthority: |-
             -----BEGIN CERTIFICATE-----
             MIIEBzCCAu+gAwIBAgICEAAwDQYJKoZIhvcNAQELBQAwgZQxCzAJBgNVBAYTAlVT
@@ -693,21 +700,13 @@ http:
             ...
             ic5cDRo6/VD3CS3MYzyBcibaGaV34nr0G/pI+KEqkYChzk/PZRA=
             -----END RSA PRIVATE KEY-----
-          captchaEnabled: true
-          bouncerCaptchaProvider: hcaptcha
-          bouncerCaptchaSiteKey: FIXME
-          bouncerCaptchaSecretKey: FIXME
-          bouncerCaptchaGateSecret: FIXME
-          bouncerCaptchaGracePeriodSeconds: 1800
-          bouncerOriginBasedDecisionRemap:
-            CAPI:
-              ban: captcha
-            lists:firehol_level1:
-              ban: captcha
-          bouncerCaptchaFilePath: /captcha.html
-          bouncerBanFilePath: /ban.html
-          bouncerTraceHeadersCustomName: X-Request-ID
-          lapiMetricsUpdateIntervalSeconds: 600
+          lapiTlsInsecureVerify: false
+          lapiUpdateIntervalSeconds: 60
+          lapiUpdateMaxFailure: 0
+          logFilePath: ""
+          logFormat: common
+          logLevel: DEBUG
+          reclaimGraceSeconds: 30
 ```
 
 #### Fill variable with value of file

@@ -6,10 +6,10 @@ metadata:
 spec:
     plugin:
         bouncer:
-            lapiEnabled: true
-            lapiKey: 40796d93c2958f9e58345514e67740e5
             bouncerEnabled: "true"
-            logLevel: DEBUG
-            lapiMode: live
+            lapiEnabled: true
             lapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080
+            lapiKey: 40796d93c2958f9e58345514e67740e5
+            lapiMode: live
             lapiScheme: http
+            logLevel: DEBUG

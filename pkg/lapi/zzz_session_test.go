@@ -19,18 +19,18 @@ import (
 // testStreamConfig is a stream-mode config aimed at a mock LAPI host.
 func testStreamConfig(host string, metricsInterval int64) *configuration.Config {
 	return &configuration.Config{
-		LapiMode:                         configuration.StreamMode,
-		LapiScheme:                       "http",
-		LapiHost:                         host,
-		LapiPath:                         "/",
-		LapiKey:                          "test-key",
-		LapiTLSInsecureVerify:            true,
 		BouncerLapiFailureAction:         configuration.FailureActionBan,
-		LapiUpdateIntervalSeconds:        60,
-		LapiMetricsUpdateIntervalSeconds: metricsInterval,
-		LapiHTTPTimeoutSeconds:           10,
-		LapiDefaultDecisionSeconds:       60,
 		BouncerStartupBlock:              true,
+		LapiDefaultDecisionSeconds:       60,
+		LapiHost:                         host,
+		LapiHTTPTimeoutSeconds:           10,
+		LapiKey:                          "test-key",
+		LapiMetricsUpdateIntervalSeconds: metricsInterval,
+		LapiMode:                         configuration.StreamMode,
+		LapiPath:                         "/",
+		LapiScheme:                       "http",
+		LapiTLSInsecureVerify:            true,
+		LapiUpdateIntervalSeconds:        60,
 	}
 }
 

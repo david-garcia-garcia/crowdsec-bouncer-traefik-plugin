@@ -16,15 +16,15 @@ http:
     bouncer:
       plugin:
         bouncer:
+          bouncerBanFilePath: "@@SCENARIO_DIR@@/ban.json"
           bouncerEnabled: "true"
-          lapiEnabled: "true"
-          lapiMode: stream
-          lapiUpdateIntervalSeconds: "2"
-          lapiScheme: http
-          lapiHost: "@@LAPI_HOST@@"
-          lapiKey: "@@APIKEY@@"
           bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
-          bouncerBanFilePath: "@@SCENARIO_DIR@@/ban.json"
           bouncerRemediationHeadersCustomName: "X-E2E-Remediation"
           bouncerTraceHeadersCustomName: x-trace
+          lapiEnabled: "true"
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          lapiMode: stream
+          lapiScheme: http
+          lapiUpdateIntervalSeconds: "2"

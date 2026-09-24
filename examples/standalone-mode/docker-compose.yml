@@ -32,9 +32,9 @@ services:
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
 
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerEnabled=true"
-      # - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiMode=alone"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.LapiCapiMachineID=FIXME"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.LapiCapiPassword=FIXME"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapicapiscenarios=crowdsecurity/sshd,crowdsecurity/asterisk_bf,crowdsecurity/asterisk_user_enum,crowdsecurity/base-http-scenarios"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiMode=alone"
+      # - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
 

@@ -17,14 +17,14 @@ http:
       plugin:
         bouncer:
           bouncerEnabled: "true"
+          bouncerForwardedHeadersTrustedIps:
+            - "127.0.0.1/32"
           lapiEnabled: "true"
-          lapiMode: live
-          lapiScheme: http
           lapiHost: "@@LAPI_HOST@@"
           lapiKey: "@@APIKEY@@"
+          lapiMode: live
           lapiRedisEnabled: "true"
           lapiRedisHost: "@@REDIS_HOST@@"
           lapiRedisReadHosts:
             - "@@REDIS_READ_HOST@@"
-          bouncerForwardedHeadersTrustedIps:
-            - "127.0.0.1/32"
+          lapiScheme: http

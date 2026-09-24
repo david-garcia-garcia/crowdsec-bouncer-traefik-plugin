@@ -17,13 +17,13 @@ http:
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          lapiEnabled: "true"
-          lapiMode: live
+          bouncerForwardedHeadersTrustedIps:
+            - "127.0.0.1/32"
           lapiDefaultDecisionSeconds: "2"
+          lapiEnabled: "true"
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          lapiMode: live
           # HTTPS LAPI with NO custom CA configured: the bouncer must fall back to
           # the OS/system trust store (which the scenario controls via SSL_CERT_FILE).
           lapiScheme: https
-          lapiHost: "@@LAPI_HOST@@"
-          lapiKey: "@@APIKEY@@"
-          bouncerForwardedHeadersTrustedIps:
-            - "127.0.0.1/32"
