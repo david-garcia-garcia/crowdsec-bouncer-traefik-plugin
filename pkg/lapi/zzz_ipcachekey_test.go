@@ -174,6 +174,21 @@ func TestLiveLookup_MemoHitsAcrossSpellings(t *testing.T) {
 	}
 }
 
+// closedTestReaderAddr is a local TCP address with no listener. Dest used 127.0.0.1:1, which
+// can be LISTEN on a workstation and then GET returns redis:unsupported-reply, not unreachable.
+func closedTestReaderAddr(t *testing.T) string {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := listener.Addr().String()
+	if err := listener.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return addr
+}
+
 // splitStoreOnDeadReader builds the production shape that reaches the range-index defect:
 // writes go to a healthy writer, reads round-robin onto a read replica that is down.
 func splitStoreOnDeadReader(t *testing.T) (*decisionstore.Store, *testLeaseRedis) {
@@ -183,7 +198,7 @@ func splitStoreOnDeadReader(t *testing.T) (*decisionstore.Store, *testLeaseRedis
 	if err := seed.ApplyRangeBatch(map[string]string{"10.0.0.0/8": decisionscope.BannedValue}, nil); err != nil {
 		t.Fatal(err)
 	}
-	store := newTestRedisStore(t, writer.addr(), []string{"127.0.0.1:1"}, "sess")
+	store := newTestRedisStore(t, writer.addr(), []string{closedTestReaderAddr(t)}, "sess")
 	return store, writer
 }
 

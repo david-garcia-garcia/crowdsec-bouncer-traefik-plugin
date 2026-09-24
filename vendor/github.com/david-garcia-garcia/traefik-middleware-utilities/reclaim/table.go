@@ -459,7 +459,7 @@ func (t *Table) Peek(key string) (value any, state State, ok bool) {
 	if !mapped {
 		return nil, 0, false
 	}
-	switch incarnation.state {
+	switch incarnation.state { //nolint:exhaustive // busy and gone are not peekable states
 	case slotAwake:
 		return incarnation.value, Awake, true
 	case slotAsleep:

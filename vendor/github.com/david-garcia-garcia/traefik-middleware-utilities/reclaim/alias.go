@@ -1,5 +1,6 @@
-// Ad-hoc vendor override: holders (Open) are strong refs; watchers (Watch) are
-// weak refs on a public alias. Propose these APIs upstream after they prove out.
+// SetAlias, Watch, and ClearPublisher expose a public alias for a mapped key.
+// Open holders stay on the ownership key; Watch subscribers are weak and receive
+// Published when the alias binding changes.
 package reclaim
 
 import (

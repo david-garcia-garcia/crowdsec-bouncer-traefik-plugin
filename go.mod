@@ -4,4 +4,4 @@ go 1.22.12
 
 require github.com/leprosus/golang-ttl-map v1.1.7
 
-require github.com/david-garcia-garcia/traefik-middleware-utilities v1.0.6
+require github.com/david-garcia-garcia/traefik-middleware-utilities v1.0.7
