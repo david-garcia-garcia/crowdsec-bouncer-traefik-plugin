@@ -19,17 +19,17 @@ Re-enable `go mod vendor` and the vendor git-diff on Main Process. Before Yaegi,
 **End users.** None.
 
 ## Merge readiness
-Ready for review. 1 items remain.
+In progress. 1 items remain.
 
 Priority: P3 — pin, local copies, and CI vendor skip, no current operator or user harm
-Reviewed head: 1a44864b
+Reviewed head: 3fd6d3c0
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35983279559 |
+| Overall readiness | 1/6 | Not ready |
+| CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -39,15 +39,15 @@ Owner decision: None.
 | Branch | 2026-09-24-adopt-utilities-v1-0-7 pushed | `git` |
 | OpenSpec | adopt-utilities-v1-0-7 | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/147 | pr-host |
-| CI | build 35983279559 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35983279559 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35983279559 |
+| CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
 Worktree:
-- [core_plugin_decisions_scopes](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-adopt-utilities-v1-0-7/openspec/changes/adopt-utilities-v1-0-7/proposal.md) — modified
-- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-adopt-utilities-v1-0-7/openspec/changes/adopt-utilities-v1-0-7/proposal.md) — modified
-- [std_go_reclaim_context-lease](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-adopt-utilities-v1-0-7/openspec/changes/adopt-utilities-v1-0-7/proposal.md) — modified
+- [core_plugin_decisions_scopes](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-adopt-utilities-v1-0-7/openspec/changes/archive/2026-09-24-adopt-utilities-v1-0-7/proposal.md) — modified
+- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-adopt-utilities-v1-0-7/openspec/changes/archive/2026-09-24-adopt-utilities-v1-0-7/proposal.md) — modified
+- [std_go_reclaim_context-lease](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-adopt-utilities-v1-0-7/openspec/changes/archive/2026-09-24-adopt-utilities-v1-0-7/proposal.md) — modified
 
 Completed:
 - [core_plugin_decisions_scopes](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-adopt-utilities-v1-0-7/openspec/specs/core_plugin_decisions_scopes/spec.md) — modified
@@ -63,7 +63,7 @@ None.
 
 
 ## How this fits together
-Ticket 2026-09-24-adopt-utilities-v1-0-7 on branch 2026-09-24-adopt-utilities-v1-0-7 targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/147; CI build 35983279559 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35983279559.
+Ticket 2026-09-24-adopt-utilities-v1-0-7 on branch 2026-09-24-adopt-utilities-v1-0-7 targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/147; CI not seen.
 
 ## Explore Decisions
 None.
@@ -89,7 +89,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 6 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 1a44864b632f69039349fb01f179a65072893991 | Card must match the branch you measured |
+| Reviewed head | 3fd6d3c05125ae21207623e8243959365718a9f9 | Card must match the branch you measured |
 
 ### Stored data model
 None.
