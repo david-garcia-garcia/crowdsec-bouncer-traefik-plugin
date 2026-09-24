@@ -76,62 +76,62 @@ Outside facts used:
 
 ## Open questions
 
-- Q: Who already owns the client address used as `event.userIpAddress`?
+- Q: Who already owns the client address used as event.userIpAddress?
   Rank: additive asked — new assessment field this change creates; Request path / Verifiers say send the client address when non-empty
-  Decision: resolved — owner is `GetRemoteIP` / `clientRequest.remoteIP` (`pkg/ip/checker.go`, `pkg/bouncer/bouncer.go`). Reuse the `remoteIP` already passed into `Validate` / `Pass`. Do not parse `X-Forwarded-For`, `X-Real-Ip`, or `RemoteAddr` in captcha.
+  Decision: resolved — owner is GetRemoteIP / clientRequest.remoteIP (pkg/ip/checker.go, pkg/bouncer/bouncer.go). Reuse the remoteIP already passed into Validate / Pass. Do not parse X-Forwarded-For, X-Real-Ip, or RemoteAddr in captcha.
   By: explore
 
-- Q: What Go result does `Validate` expose for None / Pass / Reject / Error without `ServeHTTP` branching on provider?
-  Rank: bounded asked — changes `Validate` `(bool, error)`; 1 production caller (`ServeHTTP`) and 4 tests in `pkg/captcha/zzz_validate_body_test.go`; roots: worktree `*.go` for `.Validate(` and `func (c *Client) Validate`; Request path names the four outcomes
-  Decision: assumed — `(Outcome, error)` with `None`, `Pass`, `Reject`; Error is the error return. `Verifier.Pass` stays `(bool, error)`. `ServeHTTP` switches on Outcome + `widget.retry`.
+- Q: What Go result does Validate expose for None / Pass / Reject / Error without ServeHTTP branching on provider?
+  Rank: bounded asked — changes existing Validate (bool, error); 1 production caller (ServeHTTP) and 4 tests in pkg/captcha/zzz_validate_body_test.go (roots worktree *.go)
+  Decision: assumed — (Outcome, error) with None, Pass, Reject. Error is the error return. Verifier.Pass stays (bool, error). ServeHTTP switches on Outcome plus widget.retry.
   By: explore
 
-- Q: Does assessments accept `X-Goog-Api-Key`, or only `?key=`?
+- Q: Does assessments accept X-Goog-Api-Key, or only ?key=?
   Rank: additive asked — new assessment request this change creates; Verifiers require the header after one check
-  Decision: assumed — send `X-Goog-Api-Key` only; do not put the key in the query string; do not log it. Delegated notes: `knowledge/research/ext_recaptcha_enterprise_assessments/`. If those notes show the endpoint rejects the header, blocked (query string and OAuth are out of scope).
+  Decision: assumed — send X-Goog-Api-Key only. Do not put the key in the query string. Do not log it. Delegated notes at knowledge/research/ext_recaptcha_enterprise_assessments/. If those notes show the endpoint rejects the header, blocked (query string and OAuth are out of scope).
   By: explore
 
 - Q: What are the assessment JSON names, score type/range, and HTTP status for an invalid token vs a bad API key?
-  Rank: additive asked — new decoder this change creates; Verifiers name `tokenProperties.valid`, action, and `riskAnalysis.score`
-  Decision: assumed — request `event.token`, `event.siteKey`, optional `event.userIpAddress`, optional `event.expectedAction`. Pass order: `tokenProperties.valid`, then action equality when configured, then `riskAnalysis.score` (float 0.0–1.0) when a minimum is set. Non-2xx or Google `error` envelope → Error. 2xx `valid: false` → Reject. Confirm from `ext_recaptcha_enterprise_assessments/`.
+  Rank: additive asked — new decoder this change creates; Verifiers name tokenProperties.valid, action, and riskAnalysis.score
+  Decision: assumed — request event.token, event.siteKey, optional event.userIpAddress, optional event.expectedAction. Pass order is tokenProperties.valid, then action equality when configured, then riskAnalysis.score (float 0.0-1.0) when a minimum is set. Non-2xx or a Google error envelope is Error. 2xx with valid false is Reject. Confirm from ext_recaptcha_enterprise_assessments/.
   By: explore
 
-- Q: Does enterprise checkbox still use `g-recaptcha`, `g-recaptcha-response`, and `data-callback` on `enterprise.js`?
+- Q: Does enterprise checkbox still use g-recaptcha, g-recaptcha-response, and data-callback on enterprise.js?
   Rank: additive asked — new checkbox widget this change creates; Widgets table names those tokens
-  Decision: assumed — yes: script `https://www.google.com/recaptcha/enterprise.js`, class `g-recaptcha`, field `g-recaptcha-response`, existing `data-callback` submit, retry after reject. Confirm from `ext_recaptcha_enterprise_widget/`.
+  Decision: assumed — yes. Script https://www.google.com/recaptcha/enterprise.js, class g-recaptcha, field g-recaptcha-response, existing data-callback submit, retry after reject. Confirm from ext_recaptcha_enterprise_widget/.
   By: explore
 
-- Q: What is the score-key boot, and must a refused token omit the script to avoid another `execute`?
-  Rank: additive asked — new score widget this change creates; Widgets + ServeHTTP name `grecaptcha.enterprise.ready` / `execute` and omit boot on reject
-  Decision: assumed — script `enterprise.js?render={siteKey}`; boot is fixed Go text: `grecaptcha.enterprise.ready` then `execute(siteKey, {action})`, write `g-recaptcha-response`, submit. Reject omits the boot (and does not re-include the execute script). Confirm from `ext_recaptcha_enterprise_widget/`.
+- Q: What is the score-key boot, and must a refused token omit the script to avoid another execute?
+  Rank: additive asked — new score widget this change creates; Widgets and ServeHTTP name grecaptcha.enterprise.ready / execute and omit boot on reject
+  Decision: assumed — script enterprise.js?render={siteKey}. Boot is fixed Go text (grecaptcha.enterprise.ready then execute(siteKey, {action}), write g-recaptcha-response, submit). Reject omits the boot. Confirm from ext_recaptcha_enterprise_widget/.
   By: explore
 
-- Q: How is `captchaEnterpriseMinScore` typed, and what does “greater than zero” mean at the boundary?
-  Rank: additive asked — new Config knob this change creates; Config table names the knob and “greater than zero”
-  Decision: assumed — `string` on `Config` (no existing float knobs; Traefik `WeaklyTypedInput` will coerce a YAML number). Empty after trim = omit (checkbox only). Score: parse `float64`, require `> 0` and `<= 1`. `0`, negative, `1.1`, and non-numeric fail `ValidateParams`.
+- Q: How is captchaEnterpriseMinScore typed, and what does greater than zero mean at the boundary?
+  Rank: additive asked — new Config knob this change creates; Config table names the knob and greater than zero
+  Decision: assumed — string on Config (no existing float knobs; Traefik WeaklyTypedInput will coerce a YAML number). Empty after trim means omit (checkbox only). Score parses float64 and requires greater than 0 and at most 1. Zero, negative, 1.1, and non-numeric fail ValidateParams.
   By: explore
 
-- Q: How does action string equality work (case, empty vs omitted `expectedAction`)?
+- Q: How does action string equality work (case, empty vs omitted expectedAction)?
   Rank: additive asked — new assessment check this change creates; Verifiers say compare when an action is configured
-  Decision: assumed — exact, case-sensitive equality with the configured string. Empty after trim omits `event.expectedAction` and skips the check (checkbox). Score requires a non-empty action at `ValidateParams`.
+  Decision: assumed — exact, case-sensitive equality with the configured string. Empty after trim omits event.expectedAction and skips the check (checkbox). Score requires a non-empty action at ValidateParams.
   By: explore
 
-- Q: What is the operator blast radius of dropping the live SHALL that always requires `CaptchaSecretKey`?
-  Rank: bounded asked — changes `validateCaptchaCredentials` (1 production caller) and live `core_plugin_middleware_config-validation`; Config says do not require the secret for this provider; roots: `pkg/configuration`
-  Decision: assumed — skip the empty-secret reject only when `captchaProvider` is `recaptcha-enterprise`. hCaptcha, classic `recaptcha`, Turnstile, and `custom` still require it. Site key and gate secret stay required. Operators on those providers are unchanged; enterprise operators are not forced to set a dummy siteverify secret.
+- Q: What is the operator blast radius of dropping the live SHALL that always requires CaptchaSecretKey?
+  Rank: bounded asked — changes validateCaptchaCredentials (1 production caller) and live core_plugin_middleware_config-validation (roots pkg/configuration); Config says do not require the secret for this provider
+  Decision: assumed — skip the empty-secret reject only when captchaProvider is recaptcha-enterprise. hCaptcha, classic recaptcha, Turnstile, and custom still require it. Site key and gate secret stay required. Operators on those providers are unchanged.
   By: explore
 
-- Q: When a missing or non-JSON assessment body arrives, is that Error or the siteverify Content-Type miss (`false, nil`)?
+- Q: When a missing or non-JSON assessment body arrives, is that Error or the siteverify Content-Type miss (false, nil)?
   Rank: additive asked — new assessment classify this change creates; Verifiers say missing/non-JSON is Error; Tensions flag the siteverify clash
-  Decision: assumed — assessment: Error. Siteverify keeps today's Content-Type miss as Pass-false with no error (out of scope to change). “Same as siteverify `(false, err)`” applies to transport and JSON `Decode` only.
+  Decision: assumed — assessment is Error. Siteverify keeps today's Content-Type miss as Pass-false with no error (out of scope to change). Same as siteverify (false, err) applies to transport and JSON Decode only.
   By: explore
 
 - Q: What names do Widget, Verifier, and Assessment keep?
   Rank: additive asked — new units this change creates; Request path / Verifiers / Widgets name them
-  Decision: assumed — keep those three names. Do not write Language until the types exist on a path (`skill:opd-devdocs`). Usage packet `core_plugin_middleware_captcha-siteverify` stays the siteverify owner; assessments get their own packet later.
+  Decision: assumed — keep those three names. Do not write Language until the types exist on a path. Usage packet core_plugin_middleware_captcha-siteverify stays the siteverify owner; assessments get their own packet later.
   By: explore
 
 - Q: What placeholder names does the stock template gain?
   Rank: additive asked — template data this change creates; Widgets name boot, action, and whether to draw the checkbox
-  Decision: assumed — `BootScript`, `Action`, `DrawCheckbox` next to the existing `SiteKey`, `FrontendJS`, `FrontendKey`, `ChallengeURL`. Map stays `map[string]string`; `DrawCheckbox` is non-empty when the checkbox div should render.
+  Decision: assumed — BootScript, Action, DrawCheckbox next to the existing SiteKey, FrontendJS, FrontendKey, ChallengeURL. Map stays map[string]string. DrawCheckbox is non-empty when the checkbox div should render.
   By: explore
