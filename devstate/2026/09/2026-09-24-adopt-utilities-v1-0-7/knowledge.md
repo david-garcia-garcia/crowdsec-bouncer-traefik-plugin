@@ -7,3 +7,4 @@
 - created knowledge/debt/2026-09-24-rename-utilities-packages-research.md
 - updated knowledge/devdocs/build_ci_github.md
 - deleted knowledge/debt/2026-09-20-upstream-reclaim-peek.md
+- updated knowledge/devdocs/core_plugin_decisionstore.md
