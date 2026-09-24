@@ -167,6 +167,7 @@ func TestNew_EmptyCaptchaFilePathWarnsAndBans(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// #nosec G304 - logFile is a test-generated temporary file path
 		logged, err := os.ReadFile(logFile)
 		if err != nil {
 			t.Fatal(err)
@@ -208,6 +209,7 @@ func TestNew_EmptyCaptchaFilePathWarnsAndBans(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// #nosec G304 - logFile is a test-generated temporary file path
 		logged, err := os.ReadFile(logFile)
 		if err != nil {
 			t.Fatal(err)

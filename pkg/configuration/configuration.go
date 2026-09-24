@@ -298,9 +298,7 @@ func getContentTypeFromPath(path string) string {
 	return "text/html; charset=utf-8"
 }
 
-// GetTemplate get compiled template with {{ and }} delimiters.
-// Uses text/template for all file types to avoid HTML escaping issues.
-// TemplateUnavailableReason is empty when the path is unset or GetTemplate reports no file.
+// TemplateUnavailableReason reports empty or unloadable for template load failures.
 func TemplateUnavailableReason(path string, err error) string {
 	if path == "" {
 		return "empty"
@@ -311,6 +309,8 @@ func TemplateUnavailableReason(path string, err error) string {
 	return "unloadable"
 }
 
+// GetTemplate get compiled template with {{ and }} delimiters.
+// Uses text/template for all file types to avoid HTML escaping issues.
 func GetTemplate(path string) (*template.Template, string, error) {
 	if path == "" {
 		return nil, "", errors.New("no template file provided")
