@@ -61,6 +61,21 @@ Outside facts: `knowledge/research/ext_eucaptcha_verify/`, `knowledge/research/e
 
 ## Open questions
 
+- Q: Is an empty User-Agent a rejection the same way as an empty client address?
+  Rank: additive asked — new verifier this change creates; Unknowns on requirement.md; Desired names empty address as rejection only
+  Decision: assumed — no. Forward r.UserAgent() including empty string. Do not local-reject empty UA. Official field is necessary but the owner does not state HTTP for empty or missing UA. Empty client address stays a local reject on this verifier. Source knowledge/research/ext_eucaptcha_verify/.
+  By: explore
+
+- Q: How is train encoded when absent vs explicit false vs JSON null?
+  Rank: additive asked — Desired names mint only when success is true and train is false or null
+  Decision: assumed — Pass-true only when success is true and train is JSON false or JSON null. Explicit true is Pass-false. Omitted key: Go pointer-to-bool cannot tell omit from null; treat nil as the false-or-null case (mint if success). Official examples always include train false or train true. Source knowledge/research/ext_eucaptcha_verify/.
+  By: explore
+
+- Q: Should empty client address reject on every Pass implementer, or only eucaptcha?
+  Rank: additive asked — Desired names empty client address as a rejection; Affected Pass surface; siteverify live spec says omit remoteip when empty
+  Decision: assumed — eucaptcha verifier only. Siteverify and assessments keep omit-when-empty. Do not rewrite those specs for this ticket.
+  By: explore
+
 - Q: Who already owns client address and User-Agent for the eucaptcha verify POST?
   Rank: additive asked — new JSON fields this provider would emit; Desired names forwarding the address Validate already receives and the request User-Agent
   Decision: resolved — client address owner is GetRemoteIP / clientRequest.remoteIP (pkg/ip/checker.go, pkg/bouncer/clientrequest.go, written in pkg/bouncer/bouncer.go). Reuse that remoteIP; captcha must not re-parse forwarded headers. User-Agent owner is the inbound http.Request the host already built (r.UserAgent()). Reuse that header. Not Traefik ipstrategy, not a second XFF walk, not LAPI Crowdsec-Bouncer-Traefik-Plugin User-Agent (pkg/lapi/client_http.go). User-Agent stays off clientRequest.
@@ -81,16 +96,6 @@ Outside facts: `knowledge/research/ext_eucaptcha_verify/`, `knowledge/research/e
   Decision: resolved — five necessary string fields (sitekey, secret, client_ip, client_token, client_user_agent) on JSON POST to https://api.eu-captcha.eu/v1/verify. HTTP 200 body success boolean, train boolean or null, error-codes array only with success false. Statuses 200, 400, 429, 500. Non-2xx or undecodable JSON is the error return. Source knowledge/research/ext_eucaptcha_verify/.
   By: explore
 
-- Q: Is an empty User-Agent a rejection the same way as an empty client address?
-  Rank: additive asked — new verifier this change creates; Unknowns on requirement.md; Desired names empty address as rejection only
-  Decision: assumed — no. Forward r.UserAgent() including empty string. Do not local-reject empty UA. Official field is necessary but the owner does not state HTTP for empty or missing UA. Empty client address stays a local reject on this verifier. Source knowledge/research/ext_eucaptcha_verify/.
-  By: explore
-
-- Q: How is train encoded when absent vs explicit false vs JSON null?
-  Rank: additive asked — Desired names mint only when success is true and train is false or null
-  Decision: assumed — Pass-true only when success is true and train is JSON false or JSON null. Explicit true is Pass-false. Omitted key: Go pointer-to-bool cannot tell omit from null; treat nil as the false-or-null case (mint if success). Official examples always include train false or train true. Source knowledge/research/ext_eucaptcha_verify/.
-  By: explore
-
 - Q: What is the blast radius on live specs that freeze the current provider list?
   Rank: bounded asked — existing allowlist contract with enumerated callers; Unknowns blast radius; Affected names config-validation, captcha-widget, captcha-siteverify
   Decision: resolved — migrate the enumerated sites above in this change. Fold widget, config-validation, and enterprise-config allowlist (keep recaptcha-enterprise, add eucaptcha). New verify spec leaf. Siteverify spec stays the three urlencoded built-ins; do not list eucaptcha there.
@@ -99,10 +104,5 @@ Outside facts: `knowledge/research/ext_eucaptcha_verify/`, `knowledge/research/e
 - Q: Does dest drop recaptcha-enterprise because the ticket listed eucaptcha beside hcaptcha, recaptcha, turnstile, and custom only?
   Rank: additive asked — Tension on requirement.md; Desired lists those tokens and does not ask to drop enterprise
   Decision: resolved — keep recaptcha-enterprise. Add eucaptcha to the allowlist. Secret stays required for eucaptcha (not the enterprise empty-secret exception).
-  By: explore
-
-- Q: Should empty client address reject on every Pass implementer, or only eucaptcha?
-  Rank: additive asked — Desired names empty client address as a rejection; Affected Pass surface; siteverify live spec says omit remoteip when empty
-  Decision: assumed — eucaptcha verifier only. Siteverify and assessments keep omit-when-empty. Do not rewrite those specs for this ticket.
   By: explore
 

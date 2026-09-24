@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: fea30454
+Reviewed head: 3cbb7986
 Owner decision: None.
 
 ## Review scores
@@ -66,7 +66,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | fea30454f513308f6c91f2600fb04f368d3dc287 | Card must match the branch you measured |
+| Reviewed head | 3cbb79867e80492e87e6d10dc6a1276eef48739e | Card must match the branch you measured |
 
 ### Stored data model
 None.
