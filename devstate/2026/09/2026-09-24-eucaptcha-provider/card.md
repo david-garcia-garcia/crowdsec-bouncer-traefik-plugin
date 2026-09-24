@@ -20,7 +20,7 @@ Construction adds a named `eucaptcha` case next to `recaptcha-enterprise`: the o
 In progress. 1 items remain.
 
 Priority: P2 — operators who need EU CAPTCHA cannot select it, with blast radius limited to that missing choice
-Reviewed head: ad18f541
+Reviewed head: ded483b8
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -43,10 +43,16 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [core_plugin_middleware_captcha-enterprise-config](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/openspec/changes/eucaptcha-provider/proposal.md) — modified
-- [core_plugin_middleware_captcha-eucaptcha-verify](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/openspec/changes/eucaptcha-provider/proposal.md) — added
-- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/openspec/changes/eucaptcha-provider/proposal.md) — modified
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/openspec/changes/eucaptcha-provider/proposal.md) — modified
+- [core_plugin_middleware_captcha-enterprise-config](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/openspec/changes/archive/2026-09-25-eucaptcha-provider/proposal.md) — modified
+- [core_plugin_middleware_captcha-eucaptcha-verify](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/openspec/changes/archive/2026-09-25-eucaptcha-provider/proposal.md) — added
+- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/openspec/changes/archive/2026-09-25-eucaptcha-provider/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/openspec/changes/archive/2026-09-25-eucaptcha-provider/proposal.md) — modified
+
+Completed:
+- [core_plugin_middleware_captcha-enterprise-config](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/openspec/specs/core_plugin_middleware_captcha-enterprise-config/spec.md) — modified
+- [core_plugin_middleware_captcha-eucaptcha-verify](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/openspec/specs/core_plugin_middleware_captcha-eucaptcha-verify/spec.md) — added
+- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/openspec/specs/core_plugin_middleware_captcha-widget/spec.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-eucaptcha-provider/openspec/specs/core_plugin_middleware_config-validation/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -85,9 +91,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 1 added / 3 modified | Same list as ## Specs |
+| Specs in this PR | 2 added / 6 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | ad18f5413369ddf1c18add5dcec4daa4349e2869 | Card must match the branch you measured |
+| Reviewed head | ded483b83c5e81237b35e5697a7430c60fcab012 | Card must match the branch you measured |
 
 ### Stored data model
 None.
