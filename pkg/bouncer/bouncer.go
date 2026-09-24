@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -354,6 +355,24 @@ func (b *Bouncer) banOrWarnForcedCaptcha(rw http.ResponseWriter, req clientReque
 	b.handleBanServeHTTP(rw, req, reason, origin)
 }
 
+// withPresentScopes appends slog group scopes from RequestScopeValues already in hand.
+func withPresentScopes(args []any, scopes map[string]string) []any {
+	if len(scopes) == 0 {
+		return args
+	}
+	// Sort CrowdSec scope names so TRACE and tests see a stable group.
+	names := make([]string, 0, len(scopes))
+	for name := range scopes {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	groupArgs := make([]any, 0, len(names)*2)
+	for _, name := range names {
+		groupArgs = append(groupArgs, name, scopes[name])
+	}
+	return append(args, slog.Group("scopes", groupArgs...))
+}
+
 // ServeHTTP is the per-router middleware handler.
 //
 // none: no stream, no cache; LiveLookup every request.
@@ -462,7 +481,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		kind, origin = b.appliedLAPIRemediation(kind, origin, originID)
 		switch {
 		case decisionscope.IsActiveRemediation(kind):
-			logger.Trace(b.log, "ServeHTTP", "ip", req.remoteIP, "cache", "hit", "remediation", kind)
+			logger.Trace(b.log, "ServeHTTP", withPresentScopes([]any{"ip", req.remoteIP, "remediation", kind}, scopes)...)
 			b.remediateOrForcedCaptcha(rw, req, kind, b.resolveDroppedOrigin(origin, originID))
 			return
 		case kind == decisionscope.NoBannedValue:
@@ -497,7 +516,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			b.passOrForcedCaptcha(rw, req)
 			return
 		}
-		logger.Trace(b.log, "ServeHTTP:LiveLookup", "ip", req.remoteIP, "isBanned", kind)
+		logger.Trace(b.log, "ServeHTTP:LiveLookup", withPresentScopes([]any{"ip", req.remoteIP, "isBanned", kind}, scopes)...)
 		b.remediateOrForcedCaptcha(rw, req, kind, origin)
 	}
 }
