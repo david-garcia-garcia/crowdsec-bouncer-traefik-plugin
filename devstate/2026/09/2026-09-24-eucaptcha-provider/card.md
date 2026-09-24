@@ -14,17 +14,17 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-In progress. 1 items remain.
+Ready for review. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 7e454f14
+Reviewed head: b170f7e6
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36066689093 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -34,8 +34,8 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-24-eucaptcha-provider pushed | `git` |
 | OpenSpec | eucaptcha-provider | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/155 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 36066689093 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36066689093 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36066689093 |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
@@ -55,7 +55,7 @@ Worktree:
 
 
 ## How this fits together
-Ticket 2026-09-24-eucaptcha-provider on branch 2026-09-24-eucaptcha-provider targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/155; CI not seen.
+Ticket 2026-09-24-eucaptcha-provider on branch 2026-09-24-eucaptcha-provider targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/155; CI build 36066689093 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36066689093.
 Upstream pull request (maxlerebourg tree, not this repo): https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/317
 
 ## Explore Decisions
@@ -77,7 +77,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 3 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 7e454f14ec5bbac92c1dba8a6198b4d6255cb427 | Card must match the branch you measured |
+| Reviewed head | b170f7e6c986b0504942475c5a1f0d22788e8d25 | Card must match the branch you measured |
 
 ### Stored data model
 None.
