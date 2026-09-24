@@ -81,5 +81,5 @@ Live contract: `std_go_reclaim_context-lease` (shim + Peek owner), `core_plugin_
 
 - Q: How should live specs that still name v1.0.6 or ad-hoc vendored Peek be updated?
   Rank: bounded asked — 3 catalog files enumerated; Desired go.mod / go.sum require v1.0.7
-  Decision: assumed — propose MODIFIED pin v1.0.6 to v1.0.7 on core_plugin_decisionstore_store and core_plugin_decisions_scopes; on std_go_reclaim_context-lease say Peek is the published table method at the pin, still re-exported by the shim. Keep callers import the shim.
-  By: explore
+  Decision: resolved — MODIFIED pin v1.0.6 to v1.0.7 on core_plugin_decisionstore_store and core_plugin_decisions_scopes; on std_go_reclaim_context-lease Peek is the published table method at the pin, still re-exported by the shim. Callers import the shim. Emulator delete is cleanup — no spec folder.
+  By: propose

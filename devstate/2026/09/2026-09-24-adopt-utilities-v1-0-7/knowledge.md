@@ -1,4 +1,5 @@
 # Knowledge
+- updated knowledge/devdocs/std_go_reclaim.md
 - created knowledge/research/ext_traefik-middleware-utilities_traefikemulator/
 - created knowledge/research/ext_traefik-middleware-utilities_reclaim_alias/
 - updated knowledge/research/ext_traefik-middleware-utilities_packages/
