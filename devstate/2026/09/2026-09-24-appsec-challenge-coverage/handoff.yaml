@@ -1,0 +1,14 @@
+issueKey: 2026-09-24-appsec-challenge-coverage
+jobName: 2026-09-24-appsec-challenge-coverage
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
