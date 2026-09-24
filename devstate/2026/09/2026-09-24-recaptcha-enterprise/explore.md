@@ -53,7 +53,7 @@ Reproduce: no claimed failure (feature add). not reproduced.
 Outside facts used:
 
 - In-tree: `knowledge/research/ext_recaptcha_siteverify/`, `knowledge/research/ext_traefik_plugins_config-decode/`, `knowledge/devdocs/core_plugin_middleware_captcha-siteverify.md`, `core_plugin_middleware_captcha-routing.md`, `core_plugin_middleware_captcha-gate.md`, `core_plugin_ip.md`.
-- Delegated (not yet on disk at write time): `knowledge/research/ext_recaptcha_enterprise_assessments/`, `knowledge/research/ext_recaptcha_enterprise_widget/`. Assessment and widget rows stay `assumed` until those notes land.
+- Research: `knowledge/research/ext_recaptcha_enterprise_assessments/`, `knowledge/research/ext_recaptcha_enterprise_widget/`.
 
 ## Decisions
 
@@ -62,7 +62,7 @@ Outside facts used:
 - Assessment is the second `Pass` implementation: `POST` JSON to `https://recaptchaenterprise.googleapis.com/v1/projects/{project}/assessments` on the existing siteverify `http.Client` and timeout. No Google client library.
 - Auth: `X-Goog-Api-Key` header, never the query string, never logged. If the delegated assessments notes later show the endpoint rejects that header, stop (query string and OAuth are out of scope).
 - `Validate` result is `(Outcome, error)`: `None` (not POST or empty token), `Pass`, `Reject`. Error stays the error return (`(None, err)` is unused — return `(_, err)`). `Verifier.Pass` stays `(bool, error)`.
-- Assessment classify: non-2xx, missing/non-JSON body, or a Google error envelope without `tokenProperties` → Error. 2xx Assessment with `tokenProperties.valid == false` → Reject (Pass bit false, no error). Do not treat a 403 API-key body as Reject.
+- Assessment classify: non-2xx, missing/non-JSON body, or a Google error envelope without `tokenProperties` → Error. Successful Assessment with `tokenProperties.valid == false` → Reject. Do not treat a Google error envelope as Reject. Action compare is case-insensitive.
 - Siteverify Content-Type miss stays `(false, nil)` inside Pass (live siteverify spec). “Same as siteverify `(false, err)`” is JSON `Decode` / transport only.
 - Stock `captcha.html` stays one file. Template map keeps `SiteKey`, `FrontendJS`, `FrontendKey`, `ChallengeURL` and gains `BootScript`, `Action`, `DrawCheckbox`. Checkbox operators who omit the new keys still work if `FrontendJS` is `enterprise.js`.
 - `captchaEnterpriseMinScore` is a `string` on `Config` (this plugin has no `float64` knobs; Traefik decode is weakly typed). Parse at `ValidateParams`. Empty = omit (checkbox). Score requires a parsed value `> 0` and `<= 1`.
@@ -88,22 +88,22 @@ Outside facts used:
 
 - Q: Does assessments accept X-Goog-Api-Key, or only ?key=?
   Rank: additive asked — new assessment request this change creates; Verifiers require the header after one check
-  Decision: assumed — send X-Goog-Api-Key only. Do not put the key in the query string. Do not log it. Delegated notes at knowledge/research/ext_recaptcha_enterprise_assessments/. If those notes show the endpoint rejects the header, blocked (query string and OAuth are out of scope).
+  Decision: resolved — send X-Goog-Api-Key only. Cloud system parameters list that header as the HTTP form of key across Google REST APIs (knowledge/research/ext_recaptcha_enterprise_assessments/). The reCAPTCHA sample only shows ?key=. Do not put the key in the query string. Do not log it.
   By: explore
 
 - Q: What are the assessment JSON names, score type/range, and HTTP status for an invalid token vs a bad API key?
   Rank: additive asked — new decoder this change creates; Verifiers name tokenProperties.valid, action, and riskAnalysis.score
-  Decision: assumed — request event.token, event.siteKey, optional event.userIpAddress, optional event.expectedAction. Pass order is tokenProperties.valid, then action equality when configured, then riskAnalysis.score (float 0.0-1.0) when a minimum is set. Non-2xx or a Google error envelope is Error. 2xx with valid false is Reject. Confirm from ext_recaptcha_enterprise_assessments/.
+  Decision: resolved — request event.token, event.siteKey, optional event.userIpAddress, optional event.expectedAction. Pass order is tokenProperties.valid, then action when configured, then riskAnalysis.score (JSON number 0.0-1.0) when a minimum is set. Invalid token is a successful Assessment with valid false (Reject), not an HTTP error. Bad API key status is not stated by Google; treat non-2xx or a Google error envelope as Error. Source ext_recaptcha_enterprise_assessments/.
   By: explore
 
 - Q: Does enterprise checkbox still use g-recaptcha, g-recaptcha-response, and data-callback on enterprise.js?
   Rank: additive asked — new checkbox widget this change creates; Widgets table names those tokens
-  Decision: assumed — yes. Script https://www.google.com/recaptcha/enterprise.js, class g-recaptcha, field g-recaptcha-response, existing data-callback submit, retry after reject. Confirm from ext_recaptcha_enterprise_widget/.
+  Decision: resolved — yes. Script https://www.google.com/recaptcha/enterprise.js (no render=), class g-recaptcha, data-sitekey, optional data-action, field g-recaptcha-response. JS API names data-callback on successful response. Retry after reject. Source ext_recaptcha_enterprise_widget/.
   By: explore
 
 - Q: What is the score-key boot, and must a refused token omit the script to avoid another execute?
   Rank: additive asked — new score widget this change creates; Widgets and ServeHTTP name grecaptcha.enterprise.ready / execute and omit boot on reject
-  Decision: assumed — script enterprise.js?render={siteKey}. Boot is fixed Go text (grecaptcha.enterprise.ready then execute(siteKey, {action}), write g-recaptcha-response, submit). Reject omits the boot. Confirm from ext_recaptcha_enterprise_widget/.
+  Decision: resolved — script enterprise.js?render={siteKey}. Boot is fixed Go text (grecaptcha.enterprise.ready then execute(siteKey, {action}), write g-recaptcha-response, submit). Official docs do not say to omit the script after a refused score; this change still omits the boot on Reject so the page does not auto-execute again. Source ext_recaptcha_enterprise_widget/.
   By: explore
 
 - Q: How is captchaEnterpriseMinScore typed, and what does greater than zero mean at the boundary?
@@ -113,7 +113,7 @@ Outside facts used:
 
 - Q: How does action string equality work (case, empty vs omitted expectedAction)?
   Rank: additive asked — new assessment check this change creates; Verifiers say compare when an action is configured
-  Decision: assumed — exact, case-sensitive equality with the configured string. Empty after trim omits event.expectedAction and skips the check (checkbox). Score requires a non-empty action at ValidateParams.
+  Decision: resolved — compare tokenProperties.action to the configured action case-insensitively (official action names are not case-sensitive). Empty after trim omits event.expectedAction and skips the check (checkbox). Score requires a non-empty action at ValidateParams. Source ext_recaptcha_enterprise_assessments/ (Action names).
   By: explore
 
 - Q: What is the operator blast radius of dropping the live SHALL that always requires CaptchaSecretKey?
