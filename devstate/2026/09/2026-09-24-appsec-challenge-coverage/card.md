@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: de9b09c2
+Reviewed head: 56d131d1
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -53,7 +53,7 @@ Ticket 2026-09-24-appsec-challenge-coverage on branch 2026-09-24-appsec-challeng
 ## Explore Decisions
 | Question | Rank | Decision | By |
 | --- | --- | --- | --- |
-| Does case 1 need a ban-page body assertion plus an explicit empty-string user_body_content case, or is TestHandleNextServeHTTPEmptyChallengeBodyBans enough? | additive asked — new assertions on the existing AppSec test file; Desired names operator ban page and missing or empty | assumed — not enough as written (banTemplate is nil; only the omitted-field JSON). Add or extend tests for missing and empty-string user_body_content with a non-nil banTemplate so the operator ban page is asserted. | explore |
+| Is TestHandleNextServeHTTPEmptyChallengeBodyBans enough for empty challenge coverage? | additive asked — new assertions on the existing AppSec test file; Desired names operator ban page and missing or empty | assumed — no; add missing and empty-string user_body_content cases with a non-nil banTemplate so the operator ban page is asserted | explore |
 
 
 ## Findings
@@ -69,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | de9b09c29995fa9943ccbe91b3928422794e2805 | Card must match the branch you measured |
+| Reviewed head | 56d131d14275452c79e9f6713145d2ddc80bd626 | Card must match the branch you measured |
 
 ### Stored data model
 None.
