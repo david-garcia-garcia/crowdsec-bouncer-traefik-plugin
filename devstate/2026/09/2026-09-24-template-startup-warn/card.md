@@ -18,17 +18,17 @@ Validation no longer fail-closes on captcha or ban template load in `ValidatePar
 **End users.** None.
 
 ## Merge readiness
-Ready for review. 0 items remain.
+In progress. 0 items remain.
 
 Priority: P2 — real operator pain (dead route or silent empty ban) with a workaround (fix template paths before deploy).
-Reviewed head: 75d29fca
+Reviewed head: ea195d65
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36049120977 |
+| Overall readiness | 1/6 | Not ready |
+| CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -38,7 +38,7 @@ Owner decision: None.
 | Branch | 2026-09-24-template-startup-warn pushed | `git` |
 | OpenSpec | 2026-09-24-template-startup-warn | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/151 | pr-host |
-| CI | build 36049120977 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36049120977 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36049120977 |
+| CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -55,7 +55,7 @@ Worktree:
 None.
 
 ## How this fits together
-Ticket 2026-09-24-template-startup-warn on branch 2026-09-24-template-startup-warn targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/151; CI build 36049120977 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36049120977.
+Ticket 2026-09-24-template-startup-warn on branch 2026-09-24-template-startup-warn targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/151; CI not seen.
 
 ## Explore Decisions
 None.
@@ -81,7 +81,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 75d29fca88b006a2a0f1183a43cef290df25ce11 | Card must match the branch you measured |
+| Reviewed head | ea195d6527fde982671130374b24c2c1e71bc2f7 | Card must match the branch you measured |
 
 ### Stored data model
 None.
