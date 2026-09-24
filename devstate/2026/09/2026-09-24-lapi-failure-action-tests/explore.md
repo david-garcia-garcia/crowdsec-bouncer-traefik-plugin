@@ -37,6 +37,7 @@ Outside facts: in-tree. Usage packet `knowledge/devdocs/core_plugin_middleware.m
   Rank: additive asked — a new test; existing callers stay; Desired names a real failed stream GET
   Decision: assumed — `New` against a 500 stream, wait until `StreamHealthy` is false, then `ServeHTTP` for `passthrough` and `ban`.
   By: explore
+
 - Q: Which LAPI failure should serve the captcha challenge?
   Rank: additive asked — a new test; Desired names a LAPI failure with `captcha`
   Decision: assumed — live HTTP 500 through `New` and `ServeHTTP`, assert the captcha page. Do not add a stream captcha twin.
