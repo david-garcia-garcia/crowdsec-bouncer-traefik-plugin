@@ -49,7 +49,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - Snapshot first: `config := *rawConfig`, then work on `&config` for the rest of `New`. Never write through Traefik's pointer.
 - After the snapshot, do not copy leftover YAML keys or peer aliases into `BouncerBanFilePath` / `CaptchaFilePath`. Traefik’s decode of those two fields is the only owner.
 - Derive `bindCtx, releaseHolders := context.WithCancel(ctx)` before the first `Open`, and release it from a `defer` that fires only when the named `err` is non-nil.
-- Call `lapi.Prepare` then `appsec.Prepare` then `captcha.Prepare` (each fills an omitted instance name when that leg is owned; AppSec key/scheme copy only when AppSec is enabled). Stream/alone: `lapi.OpenStream`. Live/none: `lapi.OpenLive`. When `appsecEnabled`: `appsec.Open`. When `captchaEnabled`: `captcha.Open`. Then `reclaim.SetAlias` with group `lapi`/`appsec`/`captcha`. When this `New` did not Open a leg, `reclaim.ClearPublisher(name, group)`. `bouncer.New` takes subscribe flags, not client pointers. `Watch` after New. Open key: `core_plugin_lapi_reclaim-key.md`. Stream `scopes=`: `core_plugin_lapi_scope-union.md`. Slots: `core_plugin_middleware_instance-slots.md`.
+- Call `lapi.Prepare` then `appsec.Prepare` then `captcha.Prepare` (each fills an omitted instance name when that leg is owned; AppSec key/scheme copy only when AppSec is enabled). When `lapiEnabled`: `lapi.Open` (do not read `lapiMode` to pick an entry point; mode stays on `Config`). When `appsecEnabled`: `appsec.Open`. When `captchaEnabled`: `captcha.Open`. Then `reclaim.SetAlias` with group `lapi`/`appsec`/`captcha`. When this `New` did not Open a leg, `reclaim.ClearPublisher(name, group)`. `bouncer.New` takes subscribe flags, not client pointers. `Watch` after New. Open key: `core_plugin_lapi_reclaim-key.md`. Stream `scopes=`: `core_plugin_lapi_scope-union.md`. Slots: `core_plugin_middleware_instance-slots.md`.
 - `ServeHTTP` Loads `atomic.Value` only. `startupBlock` (`bouncerStartupBlock`) on the request path is “every subscribed backend is published?” — 503 when not. Do not block `New`. Do not put the flag on the client.
 - When a captcha owner Opens the siteverify `http.Client`, set `Timeout` from `cfg.CaptchaSiteverifyHTTPTimeoutSeconds`. Publish it. Do not construct captcha on bounce-only.
 - Put stream tickers, replaceable LAPI HTTP (`transport` on `atomic.Value`), and Range membership on `lapi.Client`. Open the DecisionStore on the same `New` ctx (`core_plugin_decisionstore.md`). Put AppSec HTTP+auth on `appsec.Client`. Put captcha siteverify, template, and gate on `captcha.Client`. Put ban templates, LAPI failure action, Redis fail-closed, live-cache TTL, and this router’s remediation header on Bouncer. Timeout/TLS changes are a new ownership key, not Adopt-only.
@@ -75,7 +75,7 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 		}
 	}()
 	if config.LapiEnabled {
-		lapiClient, err = lapi.OpenStream(bindCtx, &config, log, name, pluginVersion)
+		lapiClient, err = lapi.Open(bindCtx, &config, log, name, pluginVersion)
 	}
 	err = reclaim.SetAlias(lapi.OwnershipKey(&config, name), instanceAlias("lapi", config.LapiInstanceName), name, "lapi")
 	handler, err = bouncer.New(next, name, &config, subscribeLAPI, subscribeAppSec, subscribeCaptcha, log)
@@ -100,7 +100,7 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 ## Gotchas
 
 - Unused keys (`banHtmlFilePath`, `captchaHtmlFilePath`, leftover `bouncerCaptcha*`, HTML-cased twins) never reach `New` (Traefik v3.7.11 drops them). Operators who set only those keys get CreateConfig defaults (`BouncerBanFilePath` empty, `CaptchaFilePath` `/captcha.html`). Do not re-add Config fields or `New` copies to catch leftovers. A leftover pre-prefix `captchaFilePath` binds `CaptchaFilePath` again (the captcha stem, not an alias).
-- The reclaim table has no Release: a holder goes away only when the context it bound is Done (`std_go_reclaim.md`). That is why `New` opens on `bindCtx` — with Traefik's own long-lived ctx, a constructor that failed after `OpenStream` left the stream ticker polling LAPI for the process lifetime.
+- The reclaim table has no Release: a holder goes away only when the context it bound is Done (`std_go_reclaim.md`). That is why `New` opens on `bindCtx` — with Traefik's own long-lived ctx, a constructor that failed after `Open` left the stream ticker polling LAPI for the process lifetime.
 - Do not release `bindCtx` on the success path, and do not parent it on `context.Background()`: the first disposes the incarnation the handler is about to use, the second survives a Traefik shutdown.
 - `lapiMode: appsec` is invalid (E4). AppSec-only is `lapiEnabled: false` plus `appsecEnabled: true`.
 - When `appsecEnabled` is true, `ValidateParams` rejects an empty `appsecHost` (`http.NewRequest` accepts `http:///`). Disabled-AppSec empty host still passes. Do not require the host in `validateURL` or `validateParamsRequired`.

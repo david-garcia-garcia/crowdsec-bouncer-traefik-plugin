@@ -8,12 +8,12 @@ _Avoid_: `atomic.Pointer[T]`, a write-once Client `httpClient` field, CrowdsecCo
 
 ## Overview
 
-`package lapi` keeps construct/close in `client.go` and LAPI/CAPI HTTP in `client_http.go`. HTTP+auth lives as unexported `transport`. After `OpenStream` / `OpenLive` bind, `AdoptTransport` last-wins TLS/timeout on the same Client. Specs: `core_plugin_lapi_connection` (concurrent `AdoptTransport` last-write). Open key: `core_plugin_lapi_reclaim-key.md`.
+`package lapi` keeps construct/close in `client.go` and LAPI/CAPI HTTP in `client_http.go`. HTTP+auth lives as unexported `transport`. After `Open` bind, `AdoptTransport` last-wins TLS/timeout on the same Client. Specs: `core_plugin_lapi_connection` (concurrent `AdoptTransport` last-write). Open key: `core_plugin_lapi_reclaim-key.md`.
 
 ## How to use
 
 - Declare `transport` in `client_http.go`. Store it on Client as `atomic.Value`. Do not use `atomic.Pointer[T]` (Yaegi v0.16).
-- After `OpenStream` / `OpenLive` bind, call `AdoptTransport(cfg)`: Store the new transport and idle-close the previous `*http.Client`. Last `New` wins.
+- After `Open` bind, call `AdoptTransport(cfg)`: Store the new transport and idle-close the previous `*http.Client`. Last `New` wins.
 - `newTransport` sets `http.Client.Timeout` and stored `httpTimeoutSeconds` from `cfg.LapiHTTPTimeoutSeconds`. Do not inherit from a shared default. Store the knob so `fieldsDiffer` sees a timeout change.
 - Write the CAPI token on the stored transport (`getToken`). Do not keep a write-once Client key field beside it.
 - Pass `defaultDecisionSeconds` into `LiveLookup`. Do not store that TTL on Client.

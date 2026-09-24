@@ -97,8 +97,8 @@ func openDecisionStore(ctx context.Context, cfg *configuration.Config, log *slog
 	return OpenDecisionStore(ctx, cfg, log, name)
 }
 
-// OpenStream reclaims one Client per ownership key (middleware name plus knobs).
-func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
+// Open reclaims one Client per ownership key (middleware name plus knobs).
+func Open(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
 	store, storeErr := openDecisionStore(ctx, cfg, log, middlewareName)
 	if storeErr != nil {
 		return nil, storeErr
@@ -120,31 +120,6 @@ func OpenStream(ctx context.Context, cfg *configuration.Config, log *slog.Logger
 	}
 	client.bindIdentity(middlewareName, bindKey)
 	noteStreamOwner(cfg, middlewareName, log)
-	return client, nil
-}
-
-// OpenLive reclaims a Client by ownership key (live/none).
-func OpenLive(ctx context.Context, cfg *configuration.Config, log *slog.Logger, middlewareName, pluginVersion string) (*Client, error) {
-	store, storeErr := openDecisionStore(ctx, cfg, log, middlewareName)
-	if storeErr != nil {
-		return nil, storeErr
-	}
-	bindKey := OwnershipKey(cfg, middlewareName)
-	stored, openErr := reclaim.OpenWithHooks(ctx, bindKey, log, func() (any, reclaim.Hooks, error) {
-		client, err := New(cfg, log, pluginVersion, store, middlewareName, bindKey)
-		if err != nil {
-			return nil, reclaim.Hooks{}, err
-		}
-		return client, clientHooks(client), nil
-	})
-	if openErr != nil {
-		return nil, openErr
-	}
-	client, clientErr := clientFromStored(middlewareName, stored)
-	if clientErr != nil {
-		return nil, clientErr
-	}
-	client.bindIdentity(middlewareName, bindKey)
 	return client, nil
 }
 

@@ -199,13 +199,13 @@ func TestOpenStream_LiveMetricsMismatchSharesSilently(t *testing.T) {
 
 	ownerCfg := testStreamConfig(parsed.Host, 1)
 	ownerCfg.LapiUpdateIntervalSeconds = 30
-	owner, err := OpenStream(ctx, ownerCfg, log, "shared", "test")
+	owner, err := Open(ctx, ownerCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	joinerCfg := testStreamConfig(parsed.Host, 1)
 	joinerCfg.LapiUpdateIntervalSeconds = 120
-	joiner, err := OpenStream(ctx, joinerCfg, log, "shared", "test")
+	joiner, err := Open(ctx, joinerCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +239,7 @@ func TestOpenStream_SleepingIntervalChangeWakesSameSlot(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	firstCfg := testStreamConfig(parsed.Host, 1)
 	firstCfg.LapiUpdateIntervalSeconds = 30
-	first, err := OpenStream(ctx, firstCfg, log, "reload", "test")
+	first, err := Open(ctx, firstCfg, log, "reload", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestOpenStream_SleepingIntervalChangeWakesSameSlot(t *testing.T) {
 
 	secondCfg := testStreamConfig(parsed.Host, 1)
 	secondCfg.LapiUpdateIntervalSeconds = 120
-	second, err := OpenStream(context.Background(), secondCfg, log, "reload", "test")
+	second, err := Open(context.Background(), secondCfg, log, "reload", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,7 +284,7 @@ func TestOpenStream_SleepingRedisHostDoesNotOverlapPollers(t *testing.T) {
 	firstCfg := testStreamConfig(parsed.Host, 1)
 	firstCfg.LapiRedisHost = "redis-a:6379"
 	ctx, cancel := context.WithCancel(context.Background())
-	first, err := OpenStream(ctx, firstCfg, log, "reload", "test")
+	first, err := Open(ctx, firstCfg, log, "reload", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,13 +292,20 @@ func TestOpenStream_SleepingRedisHostDoesNotOverlapPollers(t *testing.T) {
 	for time.Now().Before(deadline) && first.StreamFetches() < 1 {
 		time.Sleep(10 * time.Millisecond)
 	}
+	readyDeadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(readyDeadline) && first.decisionStore.StreamReady() == 0 {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if first.decisionStore.StreamReady() == 0 {
+		t.Fatal("first stream poll must mark the store ready")
+	}
 	fetchesBeforeCancel := first.StreamFetches()
 	cancel()
 	waitClientSleeping(t, first)
 
 	secondCfg := testStreamConfig(parsed.Host, 1)
 	secondCfg.LapiRedisHost = "redis-b:6379"
-	second, err := OpenStream(context.Background(), secondCfg, log, "reload", "test")
+	second, err := Open(context.Background(), secondCfg, log, "reload", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +335,7 @@ func TestOpenStream_NewClientKeepsStoreStreamFlags(t *testing.T) {
 	log := slog.Default()
 	firstCfg := testStreamConfig(parsed.Host, 1)
 	firstCfg.LapiRedisHost = "redis-a:6379"
-	first, err := OpenStream(context.Background(), firstCfg, log, "reload", "test")
+	first, err := Open(context.Background(), firstCfg, log, "reload", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -354,7 +361,7 @@ func TestOpenStream_NewClientKeepsStoreStreamFlags(t *testing.T) {
 	hitsBeforeHold := atomic.LoadInt64(hits)
 	secondCfg := testStreamConfig(parsed.Host, 1)
 	secondCfg.LapiRedisHost = "redis-b:6379"
-	second, err := OpenStream(context.Background(), secondCfg, log, "reload", "test")
+	second, err := Open(context.Background(), secondCfg, log, "reload", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -392,11 +399,11 @@ func TestOpenStream_DifferentRedisIsolatesClientKeepsStore(t *testing.T) {
 	redisACfg.LapiRedisHost = "redis-a:6379"
 	redisBCfg := testStreamConfig(parsed.Host, 1)
 	redisBCfg.LapiRedisHost = "redis-b:6379"
-	redisAClient, err := OpenStream(ctx, redisACfg, log, "shared", "test")
+	redisAClient, err := Open(ctx, redisACfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	redisBClient, err := OpenStream(ctx, redisBCfg, log, "shared", "test")
+	redisBClient, err := Open(ctx, redisBCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -428,11 +435,11 @@ func TestOpenStream_HeaderMapMismatchSharesClient(t *testing.T) {
 	countryCfg.BouncerDecisionScopeHeaders = map[string]string{"Country": "CF-IPCountry"}
 	userCfg := testStreamConfig(parsed.Host, 1)
 	userCfg.BouncerDecisionScopeHeaders = map[string]string{"username": "X-User"}
-	countryClient, err := OpenStream(ctx, countryCfg, log, "shared", "test")
+	countryClient, err := Open(ctx, countryCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	userClient, err := OpenStream(ctx, userCfg, log, "shared", "test")
+	userClient, err := Open(ctx, userCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -457,7 +464,7 @@ func TestOpenStream_FailureActionOnlyKeepsClient(t *testing.T) {
 	secondCfg := testStreamConfig(parsed.Host, 1)
 	secondCfg.BouncerLapiFailureAction = configuration.FailureActionPassthrough
 
-	first, err := OpenStream(ctx, firstCfg, log, "shared", "test")
+	first, err := Open(ctx, firstCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -471,7 +478,7 @@ func TestOpenStream_FailureActionOnlyKeepsClient(t *testing.T) {
 	}
 	fetches := first.StreamFetches()
 	hitsBefore := atomic.LoadInt64(hits)
-	second, err := OpenStream(ctx, secondCfg, log, "shared", "test")
+	second, err := Open(ctx, secondCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -506,11 +513,11 @@ func TestOpenStream_TLSOnlyAdoptsTransport(t *testing.T) {
 	secondCfg := testStreamConfig(parsed.Host, 1)
 	secondCfg.LapiHTTPTimeoutSeconds = 30
 
-	first, err := OpenStream(ctx, firstCfg, log, "shared", "test")
+	first, err := Open(ctx, firstCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenStream(ctx, secondCfg, log, "shared", "test")
+	second, err := Open(ctx, secondCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -536,11 +543,11 @@ func TestOpenStream_LapiOverrideAdoptsTimeout(t *testing.T) {
 	secondCfg.LapiHTTPTimeoutSeconds = 10
 	secondCfg.LapiHTTPTimeoutSeconds = 30
 
-	first, err := OpenStream(ctx, firstCfg, slog.Default(), "shared", "test")
+	first, err := Open(ctx, firstCfg, slog.Default(), "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenStream(ctx, secondCfg, slog.Default(), "shared", "test")
+	second, err := Open(ctx, secondCfg, slog.Default(), "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -564,11 +571,11 @@ func TestOpenStream_SharedDefaultChangeAdoptsWhenOverrideZero(t *testing.T) {
 	secondCfg := testStreamConfig(parsed.Host, 1)
 	secondCfg.LapiHTTPTimeoutSeconds = 20
 
-	first, err := OpenStream(ctx, firstCfg, slog.Default(), "shared", "test")
+	first, err := Open(ctx, firstCfg, slog.Default(), "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenStream(ctx, secondCfg, slog.Default(), "shared", "test")
+	second, err := Open(ctx, secondCfg, slog.Default(), "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -590,7 +597,7 @@ func TestOpenStream_OverrideEqualSharedDoesNotReplace(t *testing.T) {
 	ctx := context.Background()
 	firstCfg := testStreamConfig(parsed.Host, 1)
 	firstCfg.LapiHTTPTimeoutSeconds = 10
-	first, err := OpenStream(ctx, firstCfg, log, "shared", "test")
+	first, err := Open(ctx, firstCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -598,7 +605,7 @@ func TestOpenStream_OverrideEqualSharedDoesNotReplace(t *testing.T) {
 	secondCfg := testStreamConfig(parsed.Host, 1)
 	secondCfg.LapiHTTPTimeoutSeconds = 10
 	secondCfg.LapiHTTPTimeoutSeconds = 10
-	second, err := OpenStream(ctx, secondCfg, log, "shared", "test")
+	second, err := Open(ctx, secondCfg, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -670,7 +677,7 @@ func TestOpenStream_DifferentNameFailsBeforeStoreOpen(t *testing.T) {
 	}
 	log := slog.Default()
 	ctx := context.Background()
-	owner, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "foo", "test")
+	owner, err := Open(ctx, testStreamConfig(parsed.Host, 1), log, "foo", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -678,7 +685,7 @@ func TestOpenStream_DifferentNameFailsBeforeStoreOpen(t *testing.T) {
 	if !peekOK || peekState != reclaim.Awake {
 		t.Fatal("owner store must Peek Awake")
 	}
-	joiner, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "bar", "test")
+	joiner, err := Open(ctx, testStreamConfig(parsed.Host, 1), log, "bar", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -701,18 +708,18 @@ func TestOpenStream_EmptyNameStillExclusiveOwns(t *testing.T) {
 	}
 	ctx := context.Background()
 	log := slog.Default()
-	empty, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "", "test")
+	empty, err := Open(ctx, testStreamConfig(parsed.Host, 1), log, "", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	named, namedErr := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "named", "test")
+	named, namedErr := Open(ctx, testStreamConfig(parsed.Host, 1), log, "named", "test")
 	if namedErr != nil {
 		t.Fatal(namedErr)
 	}
 	if empty == named {
 		t.Fatal("empty vs named middleware must isolate Clients")
 	}
-	secondEmpty, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "", "test")
+	secondEmpty, err := Open(ctx, testStreamConfig(parsed.Host, 1), log, "", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -732,7 +739,7 @@ func TestOpenStream_SameNameDuringGraceWakesStore(t *testing.T) {
 	}
 	log := slog.Default()
 	ctx, cancel := context.WithCancel(context.Background())
-	first, err := OpenStream(ctx, testStreamConfig(parsed.Host, 1), log, "foo", "test")
+	first, err := Open(ctx, testStreamConfig(parsed.Host, 1), log, "foo", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -743,7 +750,7 @@ func TestOpenStream_SameNameDuringGraceWakesStore(t *testing.T) {
 	if !ok || state != reclaim.Asleep {
 		t.Fatalf("store must Peek Asleep during grace: ok=%v state=%v", ok, state)
 	}
-	second, err := OpenStream(context.Background(), testStreamConfig(parsed.Host, 1), log, "foo", "test")
+	second, err := Open(context.Background(), testStreamConfig(parsed.Host, 1), log, "foo", "test")
 	if err != nil {
 		t.Fatal(err)
 	}

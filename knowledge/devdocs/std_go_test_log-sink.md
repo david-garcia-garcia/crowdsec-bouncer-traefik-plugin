@@ -13,7 +13,7 @@ A background goroutine of a component a test started and never stopped, still lo
 
 ```go
 log, sink := newTestLogSink(slog.LevelInfo)
-client, err := OpenStream(ctx, cfg, log, "first", "test")
+client, err := Open(ctx, cfg, log, "first", "test")
 ...
 client.Close()               // stop the tickers that log into sink
 logged := sink.String()      // read only through the sink
@@ -47,6 +47,6 @@ func (s *syncLogSink) Write(record []byte) (int, error) {
 ## Gotchas
 
 - `bytes.Buffer` is not safe for concurrent use, and `slog`'s handler serializes only its own work, not the writer's. A handler with a bare buffer plus any background logger is a data race.
-- `lapi.New` spawns `go client.handleMetricsTicker()` before it returns, and `OpenStream` reaches `New` through the reclaim open hook. That goroutine cannot be joined from a test, so `Close()` alone does not make a bare buffer safe — the sink is what does.
+- `lapi.New` spawns `go client.handleMetricsTicker()` before it returns, and `Open` reaches `New` through the reclaim open hook. That goroutine cannot be joined from a test, so `Close()` alone does not make a bare buffer safe — the sink is what does.
 - `slog` drops a `Debug` record before the writer when the handler level is `Info`, so a capture at `LevelDebug` has strictly more concurrent writers than one at `LevelInfo`. Do not conclude from a green `LevelInfo` test that the shape is safe.
 - The failure this prevents blames a different test on each run and always passes under `-run <name>`, because the victim is whichever test reads while a live ticker logs. Reproduce with the whole package, repeatedly.
