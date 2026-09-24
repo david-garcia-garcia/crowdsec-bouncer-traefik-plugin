@@ -187,11 +187,11 @@ func TestOpenLive_TwoClientsShareOneStore(t *testing.T) {
 	log := logger.New("ERROR", "")
 	fast := testLiveConfig(1)
 	slow := testLiveConfig(60)
-	first, err := OpenLive(ctx, fast, log, "shared", "test")
+	first, err := Open(ctx, fast, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenLive(ctx, slow, log, "shared", "test")
+	second, err := Open(ctx, slow, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,11 +216,11 @@ func TestClientClose_LeavesSiblingCacheLive(t *testing.T) {
 	log := logger.New("ERROR", "")
 	fast := testLiveConfig(1)
 	slow := testLiveConfig(60)
-	first, err := OpenLive(ctx, fast, log, "shared", "test")
+	first, err := Open(ctx, fast, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenLive(ctx, slow, log, "shared", "test")
+	second, err := Open(ctx, slow, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,11 +245,11 @@ func TestClientClose_LeavesSiblingRedisPoolLive(t *testing.T) {
 	fast.LapiRedisHost = redisServer.addr()
 	slow.LapiRedisEnabled = true
 	slow.LapiRedisHost = redisServer.addr()
-	first, err := OpenLive(ctx, fast, log, "shared", "test")
+	first, err := Open(ctx, fast, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := OpenLive(ctx, slow, log, "shared", "test")
+	second, err := Open(ctx, slow, log, "shared", "test")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -146,11 +146,7 @@ func openOwnedLeg(bindCtx context.Context, config *configuration.Config, log *sl
 	}
 	switch group {
 	case legLAPI:
-		if config.LapiMode == configuration.StreamMode || config.LapiMode == configuration.AloneMode {
-			_, err := lapi.OpenStream(bindCtx, config, log, name, pluginVersion)
-			return err
-		}
-		_, err := lapi.OpenLive(bindCtx, config, log, name, pluginVersion)
+		_, err := lapi.Open(bindCtx, config, log, name, pluginVersion)
 		return err
 	case legAppSec:
 		_, err := appsec.Open(bindCtx, config, log, name, pluginVersion)
