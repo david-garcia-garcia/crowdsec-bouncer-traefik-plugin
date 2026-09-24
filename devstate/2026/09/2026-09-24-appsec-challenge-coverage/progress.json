@@ -35,8 +35,8 @@
     },
     "archive": {
       "work": true,
-      "card": false,
-      "at": null
+      "card": true,
+      "at": "2026-09-24T08:52:47.605Z"
     },
     "pullrequest": {
       "work": false,

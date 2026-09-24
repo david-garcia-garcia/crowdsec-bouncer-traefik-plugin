@@ -20,7 +20,7 @@ The proof sits on the existing AppSec envelope test seam: the same `testBouncerW
 In progress. 0 items remain.
 
 Priority: P3 — a proof and spec gap with no current user or operator harm
-Reviewed head: 595dc297
+Reviewed head: b66d22d8
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -43,7 +43,10 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-appsec-challenge-coverage/openspec/changes/appsec-challenge-coverage/proposal.md) — modified
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-appsec-challenge-coverage/openspec/changes/archive/2026-09-24-appsec-challenge-coverage/proposal.md) — modified
+
+Completed:
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-appsec-challenge-coverage/openspec/specs/core_plugin_appsec_bot-detection/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -80,9 +83,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 595dc297d5cbd6e651849e40ddca13c917fa6d5a | Card must match the branch you measured |
+| Reviewed head | b66d22d84b768c83abf20359906b19fb833d1b5d | Card must match the branch you measured |
 
 ### Stored data model
 None.
