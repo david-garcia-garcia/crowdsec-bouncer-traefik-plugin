@@ -1,30 +1,42 @@
 ## Motivation
-Not yet.
+After the domain-prefix rename, `configuration.Config` keys start with the piece that reads them. Own-axis captcha already uses `captchaEnabled` / `captchaInstanceName`. Bounce-decision fields stay on the bouncer stem even when a value is the word `captcha`.
+
+The seventeen owner-read captcha knobs still sit on `BouncerCaptcha*` / `bouncerCaptcha*`: provider, site and secret keys (and files), gate secret (and file), gate bind, template path, custom widget URLs and validate body, grace seconds, and siteverify timeout. `pkg/captcha` is the piece that reads them — `ownershipFrom` and `newOwnerClient` look up `GetVariable("BouncerCaptchaSiteKey")`, `BouncerCaptchaSecretKey`, and `BouncerCaptchaGateSecret`. The live config-validation spec froze that spelling as the current contract.
+
+Left alone, the prefix rule lies about ownership. Operators and the catalog keep teaching captcha knobs as bouncer knobs. Every new owner-read captcha setting keeps the stale syllable, and the live SHALL keeps that freeze.
+
+Priority: P3 — spec and public-key naming, no current user or operator harm
 
 ## Implementation
-Not yet.
+Rename the seventeen `Config` Go fields `BouncerCaptcha*` → `Captcha*` and JSON tags `bouncerCaptcha*` → `captcha*`. Reorder the struct so the new block sits with `CaptchaEnabled` / `CaptchaInstanceName` (alphabetical by json tag). No old-key aliases. Leave bounce-decision `Bouncer*` fields and the two own-axis captcha keys.
+
+`GetVariable` production strings and `ValidateParams` error text use the new Go names (`CaptchaSiteKey`, `CaptchaSecretKey`, `CaptchaGateSecret`, `CaptchaFilePath`, `CaptchaCustomValidateBody`, `CaptchaProvider`). Leftover owner-read `captcha*` stays non-E2; leftover `captchaInstanceName` stays E2. Dropped `bouncerCaptcha*` never reaches `New`. A leftover pre-prefix `captchaFilePath` binds `CaptchaFilePath` again (field-name match, not an alias).
+
+`pkg/captcha` `ownershipFrom` and `newOwnerClient` read the new `GetVariable` strings and `cfg.Captcha*` knobs. Local argument names stay `siteKey` / `secretKey` / `gateSecret`. Defaults stay the same: template `/captcha.html`, gate bind true, grace 1800, siteverify timeout 10.
+
+README BREAKING names the stem move and the `captchaFilePath` revival. Examples, compose labels, mock and real e2e, unit tests, and the five change-folder spec leaves ship the new names in the same apply.
 
 ## What this changes
-**Operators.** None.
+**Operators.** Rewrite plugin YAML and Traefik labels from `bouncerCaptcha*` to `captcha*` (`captchaProvider`, `captchaSiteKey`, `captchaSecretKey`, `captchaGateSecret`, `captchaFilePath`, and the other twelve); leftover `bouncerCaptcha*` is dropped, and a leftover pre-prefix `captchaFilePath` binds again.
 
 **Admin users.** None.
 
-**Developers.** None.
+**Developers.** `configuration.Config` fields and JSON tags are `Captcha*` / `captcha*`; `GetVariable` takes `CaptchaSiteKey`, `CaptchaSecretKey`, and `CaptchaGateSecret`; validation errors name those fields.
 
 **End users.** None.
 
 ## Merge readiness
-Ready for review. 0 items remain.
+In progress. 0 items remain.
 
-Priority: unknown — motivation not written
-Reviewed head: c50af859
+Priority: P3 — spec and public-key naming, no current user or operator harm
+Reviewed head: a60a1c1f
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35965465033 |
+| Overall readiness | 1/6 | Not ready |
+| CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -34,7 +46,7 @@ Owner decision: None.
 | Branch | 2026-09-24-captcha-config-prefix pushed | `git` |
 | OpenSpec | captcha-config-prefix | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/142 | pr-host |
-| CI | build 35965465033 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35965465033 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35965465033 |
+| CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -54,7 +66,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-09-24-captcha-config-prefix on branch 2026-09-24-captcha-config-prefix targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/142; CI build 35965465033 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/35965465033.
+Ticket 2026-09-24-captcha-config-prefix on branch 2026-09-24-captcha-config-prefix targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/142; CI not seen.
 
 ## Explore Decisions
 None.
@@ -63,7 +75,15 @@ None.
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/devstate/2026/09/2026-09-24-captcha-config-prefix/codereview_standards.md) — 0 total, 0 pending, 0 completed
+[Nitpicks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/devstate/2026/09/2026-09-24-captcha-config-prefix/codereview_nitpicks.md) — 0 total, 0 pending, 0 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/devstate/2026/09/2026-09-24-captcha-config-prefix/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Scope](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/devstate/2026/09/2026-09-24-captcha-config-prefix/codereview_scope.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/devstate/2026/09/2026-09-24-captcha-config-prefix/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/devstate/2026/09/2026-09-24-captcha-config-prefix/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/devstate/2026/09/2026-09-24-captcha-config-prefix/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-24-captcha-config-prefix/devstate/2026/09/2026-09-24-captcha-config-prefix/codereview_coverage.md) — 0 total, 0 pending, 0 completed
+
 
 ## Agent review details
 
@@ -72,7 +92,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 5 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | c50af8594dbd3360b4388865550dbfd4602e8fb8 | Card must match the branch you measured |
+| Reviewed head | a60a1c1f15aae1578ee040b999f75ce6dd5622d2 | Card must match the branch you measured |
 
 ### Stored data model
 None.
