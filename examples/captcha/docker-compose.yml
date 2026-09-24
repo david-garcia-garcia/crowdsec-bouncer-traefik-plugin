@@ -37,23 +37,22 @@ services:
       # Definition of the service
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
       # Definition of the middleware
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerEnabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiEnabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiKey=40796d93c2958f9e58345514e67740e5"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
-     
-      # Choose captcha provider
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaEnabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaProvider=hcaptcha"
-      # Define captcha site key
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaSiteKey=FIXME"
-      # Define captcha secret key
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaSecretKey=FIXME"
+      # Define captcha HTML file path
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaFilePath=/captcha.html"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaGateSecret=FIXME"
       # Define captcha grade period seconds
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaGracePeriodSeconds=20"
-      # Define captcha HTML file path
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaFilePath=/captcha.html"
+      # Choose captcha provider
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaProvider=hcaptcha"
+      # Define captcha secret key
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaSecretKey=FIXME"
+      # Define captcha site key
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerCaptchaSiteKey=FIXME"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerEnabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaEnabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiEnabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiKey=40796d93c2958f9e58345514e67740e5"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.7.8

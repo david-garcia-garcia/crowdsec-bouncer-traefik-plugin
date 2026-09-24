@@ -57,10 +57,10 @@ services:
       - "traefik.http.services.service-foo.loadbalancer.server.port=80"
       # Definition of the middleware
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerEnabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerForwardedHeadersTrustedIps=172.21.0.5"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiEnabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiKey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiMode=live"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerForwardedHeadersTrustedIps=172.21.0.5"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
   
   whoami-bar:

@@ -12,14 +12,14 @@ import (
 
 func testAppsecConfig(host string) *configuration.Config {
 	return &configuration.Config{
-		AppsecEnabled:            true,
-		AppsecScheme:             "http",
-		AppsecHost:               host,
-		AppsecPath:               "/",
-		AppsecKey:                "test-key",
-		AppsecHTTPTimeoutSeconds: 1,
-		AppsecTLSInsecureVerify:  true,
 		AppsecBodyLimit:          10485760,
+		AppsecEnabled:            true,
+		AppsecHost:               host,
+		AppsecHTTPTimeoutSeconds: 1,
+		AppsecKey:                "test-key",
+		AppsecPath:               "/",
+		AppsecScheme:             "http",
+		AppsecTLSInsecureVerify:  true,
 	}
 }
 

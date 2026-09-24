@@ -16,16 +16,16 @@ http:
     bouncer:
       plugin:
         bouncer:
-          bouncerEnabled: "true"
-          # IP bouncing disabled — this scenario exercises AppSec only.
-          lapiEnabled: "false"
-          lapiScheme: http
-          lapiHost: "@@LAPI_HOST@@"
-          lapiKey: "@@APIKEY@@"
-          appsecEnabled: "true"
-          bouncerAppsecFailureAction: ban
           appsecBodyLimit: 4
-          appsecScheme: http
+          appsecEnabled: "true"
           appsecHost: "@@APPSEC_HOST@@"
+          appsecScheme: http
+          bouncerAppsecFailureAction: ban
+          bouncerEnabled: "true"
           bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
+          # IP bouncing disabled — this scenario exercises AppSec only.
+          lapiEnabled: "false"
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          lapiScheme: http

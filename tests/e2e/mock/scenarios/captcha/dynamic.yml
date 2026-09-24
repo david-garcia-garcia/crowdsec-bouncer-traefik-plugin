@@ -16,26 +16,26 @@ http:
     bouncer:
       plugin:
         bouncer:
-          bouncerEnabled: "true"
-          lapiEnabled: "true"
-          lapiMode: stream
-          lapiUpdateIntervalSeconds: "2"
-          lapiScheme: http
-          lapiHost: "@@LAPI_HOST@@"
-          lapiKey: "@@APIKEY@@"
-          bouncerForwardedHeadersTrustedIps:
-            - "127.0.0.1/32"
           # custom + mocklapi /siteverify: always-pass JSON, no real bot check.
-          captchaEnabled: true
-          bouncerCaptchaProvider: custom
           bouncerCaptchaCustomJsUrl: "http://@@LAPI_HOST@@/dummy.js"
-          bouncerCaptchaCustomValidateUrl: "http://@@LAPI_HOST@@/siteverify"
           bouncerCaptchaCustomKey: dummy-captcha
           bouncerCaptchaCustomResponse: dummy-captcha-response
-          bouncerCaptchaSiteKey: "e2e-dummy-site"
-          bouncerCaptchaSecretKey: "e2e-dummy-secret"
-          bouncerCaptchaGateSecret: "e2e-mock-captcha-gate-secret"
-          bouncerCaptchaGateBindIp: true
-          logLevel: DEBUG
+          bouncerCaptchaCustomValidateUrl: "http://@@LAPI_HOST@@/siteverify"
           bouncerCaptchaFilePath: "@@SCENARIO_DIR@@/captcha.html"
+          bouncerCaptchaGateBindIp: true
+          bouncerCaptchaGateSecret: "e2e-mock-captcha-gate-secret"
           bouncerCaptchaGracePeriodSeconds: "10"
+          bouncerCaptchaProvider: custom
+          bouncerCaptchaSecretKey: "e2e-dummy-secret"
+          bouncerCaptchaSiteKey: "e2e-dummy-site"
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersTrustedIps:
+            - "127.0.0.1/32"
+          captchaEnabled: true
+          lapiEnabled: "true"
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          lapiMode: stream
+          lapiScheme: http
+          lapiUpdateIntervalSeconds: "2"
+          logLevel: DEBUG

@@ -17,10 +17,10 @@ http:
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          lapiEnabled: "true"
-          lapiMode: none
-          lapiScheme: http
-          lapiHost: "@@LAPI_HOST@@"
-          lapiKey: "@@APIKEY@@"
           bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
+          lapiEnabled: "true"
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          lapiMode: none
+          lapiScheme: http

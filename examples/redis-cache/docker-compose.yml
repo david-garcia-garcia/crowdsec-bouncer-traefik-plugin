@@ -64,9 +64,9 @@ services:
       #     - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiEnabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiKey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiredisenabled=true"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiredispassword=FIXME"
       # Contact redis-secure with password
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiredishost=redis-secure:6379"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.lapiredispassword=FIXME"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.loglevel=DEBUG"
 
 

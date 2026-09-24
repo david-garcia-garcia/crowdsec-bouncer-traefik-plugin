@@ -25,72 +25,72 @@ http:
     bouncer-scope-none:
       plugin:
         bouncer:
-          bouncerEnabled: "true"
-          lapiEnabled: "true"
-          lapiKey: "c51a1c7000000000000000000000000b"
-          lapiHost: crowdsec:8080
-          lapiHttpTimeoutSeconds: "60"
           appsecHttpTimeoutSeconds: "60"
-          logLevel: DEBUG
-          logFormat: json
-          reclaimGraceSeconds: "2"
-          lapiMode: none
           bouncerDecisionScopeHeaders:
             Country: X-IPCountry
             AS: CF-ASN
             username: X-User
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
           bouncerForwardedHeadersTrustedIps:
             - "172.16.0.0/12"
             - "127.0.0.1/32"
-          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          lapiEnabled: "true"
+          lapiHost: crowdsec:8080
+          lapiHttpTimeoutSeconds: "60"
+          lapiKey: "c51a1c7000000000000000000000000b"
+          lapiMode: none
+          logFormat: json
+          logLevel: DEBUG
+          reclaimGraceSeconds: "2"
     bouncer-scope-stream:
       plugin:
         bouncer:
+          appsecHttpTimeoutSeconds: "60"
+          bouncerDecisionScopeHeaders:
+            Country: X-IPCountry
+            AS: CF-ASN
+            username: X-User
           bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.16.0.0/12"
+            - "127.0.0.1/32"
+          bouncerStartupBlock: "false"
           lapiEnabled: "true"
-          lapiKey: "a1b2c3d4e5f60718293a4b5c6d7e8f90"
           lapiHost: crowdsec:8080
           lapiHttpTimeoutSeconds: "60"
-          appsecHttpTimeoutSeconds: "60"
-          logLevel: DEBUG
-          logFormat: json
-          reclaimGraceSeconds: "2"
-          lapiUpdateIntervalSeconds: "5"
-          bouncerStartupBlock: "false"
+          lapiKey: "a1b2c3d4e5f60718293a4b5c6d7e8f90"
           lapiMode: stream
           lapiStreamScopes:
             - country
             - as
             - username
-          bouncerDecisionScopeHeaders:
-            Country: X-IPCountry
-            AS: CF-ASN
-            username: X-User
-          bouncerForwardedHeadersTrustedIps:
-            - "172.16.0.0/12"
-            - "127.0.0.1/32"
-          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          lapiUpdateIntervalSeconds: "5"
+          logFormat: json
+          logLevel: DEBUG
+          reclaimGraceSeconds: "2"
     bouncer-header-none:
       plugin:
         bouncer:
-          bouncerEnabled: "true"
-          lapiEnabled: "true"
-          lapiKey: "c51a1c7000000000000000000000000c"
-          lapiHost: crowdsec:8080
-          lapiHttpTimeoutSeconds: "60"
           appsecHttpTimeoutSeconds: "60"
-          logLevel: DEBUG
-          logFormat: json
-          reclaimGraceSeconds: "2"
-          lapiMode: none
           bouncerDecisionScopeHeaders:
             Country: CF-IPCountry
             AS: CF-ASN
             username: X-User
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
           bouncerForwardedHeadersTrustedIps:
             - "172.16.0.0/12"
             - "127.0.0.1/32"
-          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          lapiEnabled: "true"
+          lapiHost: crowdsec:8080
+          lapiHttpTimeoutSeconds: "60"
+          lapiKey: "c51a1c7000000000000000000000000c"
+          lapiMode: none
+          logFormat: json
+          logLevel: DEBUG
+          reclaimGraceSeconds: "2"
     chain-scope-none:
       chain:
         middlewares:

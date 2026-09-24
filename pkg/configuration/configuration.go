@@ -51,95 +51,96 @@ const (
 	FailureActionCaptcha = "captcha"
 )
 
-// Config the plugin configuration.
+// Config the plugin configuration. Fields are alphabetical by json tag so
+// appsec / bouncer / captcha / lapi / log / reclaim form one visible block each.
 type Config struct {
-	BouncerEnabled                             bool                         `json:"bouncerEnabled,omitempty"`
-	LogLevel                                   string                       `json:"logLevel,omitempty"`
-	LogFormat                                  string                       `json:"logFormat,omitempty"`
-	LogFilePath                                string                       `json:"logFilePath,omitempty"`
-	LapiMode                                   string                       `json:"lapiMode,omitempty"`
-	LapiEnabled                                bool                         `json:"lapiEnabled,omitempty"`
-	LapiInstanceName                           string                       `json:"lapiInstanceName,omitempty"`
-	LapiStreamScopes                           []string                     `json:"lapiStreamScopes,omitempty"`
+	AppsecBodyLimit                            int64                        `json:"appsecBodyLimit,omitempty"`
 	AppsecEnabled                              bool                         `json:"appsecEnabled,omitempty"`
-	AppsecInstanceName                         string                       `json:"appsecInstanceName,omitempty"`
-	AppsecScheme                               string                       `json:"appsecScheme,omitempty"`
 	AppsecHost                                 string                       `json:"appsecHost,omitempty"`
-	AppsecPath                                 string                       `json:"appsecPath,omitempty"`
+	AppsecHTTPTimeoutSeconds                   int64                        `json:"appsecHttpTimeoutSeconds,omitempty"`
+	AppsecInstanceName                         string                       `json:"appsecInstanceName,omitempty"`
 	AppsecKey                                  string                       `json:"appsecKey,omitempty"`
 	AppsecKeyFile                              string                       `json:"appsecKeyFile,omitempty"`
-	AppsecTLSInsecureVerify                    bool                         `json:"appsecTlsInsecureVerify,omitempty"`
+	AppsecPath                                 string                       `json:"appsecPath,omitempty"`
+	AppsecScheme                               string                       `json:"appsecScheme,omitempty"`
 	AppsecTLSCertificateAuthority              string                       `json:"appsecTlsCertificateAuthority,omitempty"`
 	AppsecTLSCertificateAuthorityFile          string                       `json:"appsecTlsCertificateAuthorityFile,omitempty"`
 	AppsecTLSClientCertificate                 string                       `json:"appsecTlsClientCertificate,omitempty"`
 	AppsecTLSClientCertificateFile             string                       `json:"appsecTlsClientCertificateFile,omitempty"`
 	AppsecTLSClientKey                         string                       `json:"appsecTlsClientKey,omitempty"`
 	AppsecTLSClientKeyFile                     string                       `json:"appsecTlsClientKeyFile,omitempty"`
-	AppsecBodyLimit                            int64                        `json:"appsecBodyLimit,omitempty"`
+	AppsecTLSInsecureVerify                    bool                         `json:"appsecTlsInsecureVerify,omitempty"`
 	BouncerAppsecFailureAction                 string                       `json:"bouncerAppsecFailureAction,omitempty"`
-	LapiScheme                                 string                       `json:"lapiScheme,omitempty"`
+	BouncerBanFilePath                         string                       `json:"bouncerBanFilePath,omitempty"`
+	BouncerCaptchaCustomChallengeURL           string                       `json:"bouncerCaptchaCustomChallengeUrl,omitempty"`
+	BouncerCaptchaCustomJsURL                  string                       `json:"bouncerCaptchaCustomJsUrl,omitempty"`
+	BouncerCaptchaCustomKey                    string                       `json:"bouncerCaptchaCustomKey,omitempty"`
+	BouncerCaptchaCustomResponse               string                       `json:"bouncerCaptchaCustomResponse,omitempty"`
+	BouncerCaptchaCustomValidateBody           string                       `json:"bouncerCaptchaCustomValidateBody,omitempty"`
+	BouncerCaptchaCustomValidateURL            string                       `json:"bouncerCaptchaCustomValidateUrl,omitempty"`
+	BouncerCaptchaFilePath                     string                       `json:"bouncerCaptchaFilePath,omitempty"`
+	BouncerCaptchaGateBindIP                   bool                         `json:"bouncerCaptchaGateBindIp,omitempty"`
+	BouncerCaptchaGateSecret                   string                       `json:"bouncerCaptchaGateSecret,omitempty"`
+	BouncerCaptchaGateSecretFile               string                       `json:"bouncerCaptchaGateSecretFile,omitempty"`
+	BouncerCaptchaGracePeriodSeconds           int64                        `json:"bouncerCaptchaGracePeriodSeconds,omitempty"`
+	BouncerCaptchaProvider                     string                       `json:"bouncerCaptchaProvider,omitempty"`
+	BouncerCaptchaSecretKey                    string                       `json:"bouncerCaptchaSecretKey,omitempty"`
+	BouncerCaptchaSecretKeyFile                string                       `json:"bouncerCaptchaSecretKeyFile,omitempty"`
+	BouncerCaptchaSiteKey                      string                       `json:"bouncerCaptchaSiteKey,omitempty"`
+	BouncerCaptchaSiteKeyFile                  string                       `json:"bouncerCaptchaSiteKeyFile,omitempty"`
+	BouncerCaptchaSiteverifyHTTPTimeoutSeconds int64                        `json:"bouncerCaptchaSiteverifyHttpTimeoutSeconds,omitempty"`
+	BouncerClientTrustedIPs                    []string                     `json:"bouncerClientTrustedIps,omitempty"`
+	BouncerDecisionHeader                      string                       `json:"bouncerDecisionHeader,omitempty"` // incoming header name; empty = off; values b|c
+	BouncerDecisionScopeHeaders                map[string]string            `json:"bouncerDecisionScopeHeaders,omitempty"`
+	BouncerEnabled                             bool                         `json:"bouncerEnabled,omitempty"`
+	BouncerForwardedHeadersCustomName          string                       `json:"bouncerForwardedHeadersCustomName,omitempty"`
+	BouncerForwardedHeadersInsecure            bool                         `json:"bouncerForwardedHeadersInsecure,omitempty"`
+	BouncerForwardedHeadersTrustedIPs          []string                     `json:"bouncerForwardedHeadersTrustedIps,omitempty"`
+	BouncerLapiFailureAction                   string                       `json:"bouncerLapiFailureAction,omitempty"`
+	BouncerOriginBasedDecisionRemap            map[string]map[string]string `json:"bouncerOriginBasedDecisionRemap,omitempty"`
+	BouncerRedisUnreachableBlock               bool                         `json:"bouncerRedisUnreachableBlock,omitempty"`
+	BouncerRemediationHeadersCustomName        string                       `json:"bouncerRemediationHeadersCustomName,omitempty"`
+	BouncerRemediationStatusCode               int                          `json:"bouncerRemediationStatusCode,omitempty"`
+	BouncerStartupBlock                        bool                         `json:"bouncerStartupBlock,omitempty"`
+	BouncerTraceHeadersCustomName              string                       `json:"bouncerTraceHeadersCustomName,omitempty"`
+	CaptchaEnabled                             bool                         `json:"captchaEnabled,omitempty"`
+	CaptchaInstanceName                        string                       `json:"captchaInstanceName,omitempty"`
+	LapiCapiMachineID                          string                       `json:"lapiCapiMachineId,omitempty"`
+	LapiCapiMachineIDFile                      string                       `json:"lapiCapiMachineIdFile,omitempty"`
+	LapiCapiPassword                           string                       `json:"lapiCapiPassword,omitempty"`
+	LapiCapiPasswordFile                       string                       `json:"lapiCapiPasswordFile,omitempty"`
+	LapiCapiScenarios                          []string                     `json:"lapiCapiScenarios,omitempty"`
+	LapiDefaultDecisionSeconds                 int64                        `json:"lapiDefaultDecisionSeconds,omitempty"`
+	LapiEnabled                                bool                         `json:"lapiEnabled,omitempty"`
 	LapiHost                                   string                       `json:"lapiHost,omitempty"`
-	LapiPath                                   string                       `json:"lapiPath,omitempty"`
+	LapiHTTPTimeoutSeconds                     int64                        `json:"lapiHttpTimeoutSeconds,omitempty"`
+	LapiInstanceName                           string                       `json:"lapiInstanceName,omitempty"`
 	LapiKey                                    string                       `json:"lapiKey,omitempty"`
 	LapiKeyFile                                string                       `json:"lapiKeyFile,omitempty"`
-	LapiTLSInsecureVerify                      bool                         `json:"lapiTlsInsecureVerify,omitempty"`
+	LapiMetricsUpdateIntervalSeconds           int64                        `json:"lapiMetricsUpdateIntervalSeconds,omitempty"`
+	LapiMode                                   string                       `json:"lapiMode,omitempty"`
+	LapiPath                                   string                       `json:"lapiPath,omitempty"`
+	LapiRedisDatabase                          string                       `json:"lapiRedisDatabase,omitempty"`
+	LapiRedisEnabled                           bool                         `json:"lapiRedisEnabled,omitempty"`
+	LapiRedisHost                              string                       `json:"lapiRedisHost,omitempty"`
+	LapiRedisPassword                          string                       `json:"lapiRedisPassword,omitempty"`
+	LapiRedisPasswordFile                      string                       `json:"lapiRedisPasswordFile,omitempty"`
+	LapiRedisReadHosts                         []string                     `json:"lapiRedisReadHosts,omitempty"`
+	LapiScheme                                 string                       `json:"lapiScheme,omitempty"`
+	LapiStreamScopes                           []string                     `json:"lapiStreamScopes,omitempty"`
 	LapiTLSCertificateAuthority                string                       `json:"lapiTlsCertificateAuthority,omitempty"`
 	LapiTLSCertificateAuthorityFile            string                       `json:"lapiTlsCertificateAuthorityFile,omitempty"`
 	LapiTLSClientCertificate                   string                       `json:"lapiTlsClientCertificate,omitempty"`
 	LapiTLSClientCertificateFile               string                       `json:"lapiTlsClientCertificateFile,omitempty"`
 	LapiTLSClientKey                           string                       `json:"lapiTlsClientKey,omitempty"`
 	LapiTLSClientKeyFile                       string                       `json:"lapiTlsClientKeyFile,omitempty"`
-	LapiCapiMachineID                          string                       `json:"lapiCapiMachineId,omitempty"`
-	LapiCapiMachineIDFile                      string                       `json:"lapiCapiMachineIdFile,omitempty"`
-	LapiCapiPassword                           string                       `json:"lapiCapiPassword,omitempty"`
-	LapiCapiPasswordFile                       string                       `json:"lapiCapiPasswordFile,omitempty"`
-	LapiCapiScenarios                          []string                     `json:"lapiCapiScenarios,omitempty"`
-	BouncerDecisionHeader                      string                       `json:"bouncerDecisionHeader,omitempty"` // incoming header name; empty = off; values b|c
+	LapiTLSInsecureVerify                      bool                         `json:"lapiTlsInsecureVerify,omitempty"`
 	LapiUpdateIntervalSeconds                  int64                        `json:"lapiUpdateIntervalSeconds,omitempty"`
-	LapiMetricsUpdateIntervalSeconds           int64                        `json:"lapiMetricsUpdateIntervalSeconds,omitempty"`
 	LapiUpdateMaxFailure                       int64                        `json:"lapiUpdateMaxFailure,omitempty"`
-	BouncerLapiFailureAction                   string                       `json:"bouncerLapiFailureAction,omitempty"`
-	BouncerStartupBlock                        bool                         `json:"bouncerStartupBlock,omitempty"`
-	LapiDefaultDecisionSeconds                 int64                        `json:"lapiDefaultDecisionSeconds,omitempty"`
-	BouncerRemediationStatusCode               int                          `json:"bouncerRemediationStatusCode,omitempty"`
-	LapiHTTPTimeoutSeconds                     int64                        `json:"lapiHttpTimeoutSeconds,omitempty"`
-	AppsecHTTPTimeoutSeconds                   int64                        `json:"appsecHttpTimeoutSeconds,omitempty"`
-	BouncerCaptchaSiteverifyHTTPTimeoutSeconds int64                        `json:"bouncerCaptchaSiteverifyHttpTimeoutSeconds,omitempty"`
-	BouncerTraceHeadersCustomName              string                       `json:"bouncerTraceHeadersCustomName,omitempty"`
-	BouncerRemediationHeadersCustomName        string                       `json:"bouncerRemediationHeadersCustomName,omitempty"`
-	BouncerForwardedHeadersCustomName          string                       `json:"bouncerForwardedHeadersCustomName,omitempty"`
-	BouncerForwardedHeadersInsecure            bool                         `json:"bouncerForwardedHeadersInsecure,omitempty"`
-	BouncerDecisionScopeHeaders                map[string]string            `json:"bouncerDecisionScopeHeaders,omitempty"`
-	BouncerForwardedHeadersTrustedIPs          []string                     `json:"bouncerForwardedHeadersTrustedIps,omitempty"`
-	BouncerClientTrustedIPs                    []string                     `json:"bouncerClientTrustedIps,omitempty"`
-	LapiRedisEnabled                           bool                         `json:"lapiRedisEnabled,omitempty"`
-	LapiRedisHost                              string                       `json:"lapiRedisHost,omitempty"`
-	LapiRedisReadHosts                         []string                     `json:"lapiRedisReadHosts,omitempty"`
-	LapiRedisPassword                          string                       `json:"lapiRedisPassword,omitempty"`
-	LapiRedisPasswordFile                      string                       `json:"lapiRedisPasswordFile,omitempty"`
-	LapiRedisDatabase                          string                       `json:"lapiRedisDatabase,omitempty"`
-	BouncerRedisUnreachableBlock               bool                         `json:"bouncerRedisUnreachableBlock,omitempty"`
-	BouncerBanFilePath                         string                       `json:"bouncerBanFilePath,omitempty"`
-	CaptchaEnabled                             bool                         `json:"captchaEnabled,omitempty"`
-	CaptchaInstanceName                        string                       `json:"captchaInstanceName,omitempty"`
-	BouncerCaptchaFilePath                     string                       `json:"bouncerCaptchaFilePath,omitempty"`
-	BouncerCaptchaProvider                     string                       `json:"bouncerCaptchaProvider,omitempty"`
-	BouncerCaptchaCustomJsURL                  string                       `json:"bouncerCaptchaCustomJsUrl,omitempty"`
-	BouncerCaptchaCustomValidateURL            string                       `json:"bouncerCaptchaCustomValidateUrl,omitempty"`
-	BouncerCaptchaCustomKey                    string                       `json:"bouncerCaptchaCustomKey,omitempty"`
-	BouncerCaptchaCustomResponse               string                       `json:"bouncerCaptchaCustomResponse,omitempty"`
-	BouncerCaptchaCustomChallengeURL           string                       `json:"bouncerCaptchaCustomChallengeUrl,omitempty"`
-	BouncerCaptchaCustomValidateBody           string                       `json:"bouncerCaptchaCustomValidateBody,omitempty"`
-	BouncerCaptchaSiteKey                      string                       `json:"bouncerCaptchaSiteKey,omitempty"`
-	BouncerCaptchaSiteKeyFile                  string                       `json:"bouncerCaptchaSiteKeyFile,omitempty"`
-	BouncerCaptchaSecretKey                    string                       `json:"bouncerCaptchaSecretKey,omitempty"`
-	BouncerCaptchaSecretKeyFile                string                       `json:"bouncerCaptchaSecretKeyFile,omitempty"`
-	BouncerCaptchaGateSecret                   string                       `json:"bouncerCaptchaGateSecret,omitempty"`
-	BouncerCaptchaGateSecretFile               string                       `json:"bouncerCaptchaGateSecretFile,omitempty"`
-	BouncerCaptchaGateBindIP                   bool                         `json:"bouncerCaptchaGateBindIp,omitempty"`
-	BouncerCaptchaGracePeriodSeconds           int64                        `json:"bouncerCaptchaGracePeriodSeconds,omitempty"`
+	LogFilePath                                string                       `json:"logFilePath,omitempty"`
+	LogFormat                                  string                       `json:"logFormat,omitempty"`
+	LogLevel                                   string                       `json:"logLevel,omitempty"`
 	ReclaimGraceSeconds                        int64                        `json:"reclaimGraceSeconds,omitempty"`
-	BouncerOriginBasedDecisionRemap            map[string]map[string]string `json:"bouncerOriginBasedDecisionRemap,omitempty"`
 }
 
 func contains(source []string, target string) bool {
@@ -186,66 +187,66 @@ func EffectiveFailureAction(action string) string {
 // New creates the default plugin configuration.
 func New() *Config {
 	return &Config{
-		BouncerEnabled:                   false,
-		LogLevel:                         LogINFO,
-		LogFormat:                        "common",
-		LogFilePath:                      "",
-		LapiMode:                         LiveMode,
-		AppsecEnabled:                    false,
-		AppsecBodyLimit:                  10485760,
-		BouncerAppsecFailureAction:       FailureActionBan,
-		AppsecScheme:                     "",
-		AppsecHost:                       "crowdsec:7422",
-		AppsecPath:                       "/",
-		AppsecKey:                        "",
-		AppsecTLSInsecureVerify:          false,
-		LapiScheme:                       HTTP,
-		LapiHost:                         "crowdsec:8080",
-		LapiPath:                         "/",
-		LapiKey:                          "",
-		LapiTLSInsecureVerify:            false,
-		LapiUpdateIntervalSeconds:        60,
-		LapiMetricsUpdateIntervalSeconds: 600,
-		LapiUpdateMaxFailure:             0,
-		BouncerLapiFailureAction:         FailureActionBan,
-		BouncerStartupBlock:              true,
-		LapiDefaultDecisionSeconds:       60,
-		BouncerRemediationStatusCode:     http.StatusForbidden,
-		LapiHTTPTimeoutSeconds:           10,
-		AppsecHTTPTimeoutSeconds:         10,
-		CaptchaEnabled:                   false,
-		CaptchaInstanceName:              "",
-		BouncerCaptchaSiteverifyHTTPTimeoutSeconds: 10,
-		BouncerCaptchaProvider:                     "",
+		AppsecBodyLimit:                            10485760,
+		AppsecEnabled:                              false,
+		AppsecHost:                                 "crowdsec:7422",
+		AppsecHTTPTimeoutSeconds:                   10,
+		AppsecKey:                                  "",
+		AppsecPath:                                 "/",
+		AppsecScheme:                               "",
+		AppsecTLSInsecureVerify:                    false,
+		BouncerAppsecFailureAction:                 FailureActionBan,
+		BouncerBanFilePath:                         "",
+		BouncerCaptchaCustomChallengeURL:           "",
 		BouncerCaptchaCustomJsURL:                  "",
-		BouncerCaptchaCustomValidateURL:            "",
 		BouncerCaptchaCustomKey:                    "",
 		BouncerCaptchaCustomResponse:               "",
-		BouncerCaptchaCustomChallengeURL:           "",
 		BouncerCaptchaCustomValidateBody:           "",
-		BouncerCaptchaSiteKey:                      "",
-		BouncerCaptchaSecretKey:                    "",
+		BouncerCaptchaCustomValidateURL:            "",
+		BouncerCaptchaFilePath:                     "/captcha.html",
 		BouncerCaptchaGateBindIP:                   true,
 		BouncerCaptchaGracePeriodSeconds:           1800,
-		ReclaimGraceSeconds:                        30,
-		BouncerOriginBasedDecisionRemap:            map[string]map[string]string{},
-		LapiStreamScopes:                           []string{},
-		BouncerCaptchaFilePath:                     "/captcha.html",
-		BouncerBanFilePath:                         "",
+		BouncerCaptchaProvider:                     "",
+		BouncerCaptchaSecretKey:                    "",
+		BouncerCaptchaSiteKey:                      "",
+		BouncerCaptchaSiteverifyHTTPTimeoutSeconds: 10,
+		BouncerClientTrustedIPs:                    []string{},
 		BouncerDecisionHeader:                      "",
-		BouncerTraceHeadersCustomName:              "",
-		BouncerRemediationHeadersCustomName:        "",
+		BouncerDecisionScopeHeaders:                map[string]string{},
+		BouncerEnabled:                             false,
 		BouncerForwardedHeadersCustomName:          "X-Forwarded-For",
 		BouncerForwardedHeadersInsecure:            false,
-		BouncerDecisionScopeHeaders:                map[string]string{},
 		BouncerForwardedHeadersTrustedIPs:          []string{},
-		BouncerClientTrustedIPs:                    []string{},
+		BouncerLapiFailureAction:                   FailureActionBan,
+		BouncerOriginBasedDecisionRemap:            map[string]map[string]string{},
+		BouncerRedisUnreachableBlock:               true,
+		BouncerRemediationHeadersCustomName:        "",
+		BouncerRemediationStatusCode:               http.StatusForbidden,
+		BouncerStartupBlock:                        true,
+		BouncerTraceHeadersCustomName:              "",
+		CaptchaEnabled:                             false,
+		CaptchaInstanceName:                        "",
+		LapiDefaultDecisionSeconds:                 60,
+		LapiHost:                                   "crowdsec:8080",
+		LapiHTTPTimeoutSeconds:                     10,
+		LapiKey:                                    "",
+		LapiMetricsUpdateIntervalSeconds:           600,
+		LapiMode:                                   LiveMode,
+		LapiPath:                                   "/",
+		LapiRedisDatabase:                          "",
 		LapiRedisEnabled:                           false,
 		LapiRedisHost:                              "redis:6379",
-		LapiRedisReadHosts:                         []string{},
 		LapiRedisPassword:                          "",
-		LapiRedisDatabase:                          "",
-		BouncerRedisUnreachableBlock:               true,
+		LapiRedisReadHosts:                         []string{},
+		LapiScheme:                                 HTTP,
+		LapiStreamScopes:                           []string{},
+		LapiTLSInsecureVerify:                      false,
+		LapiUpdateIntervalSeconds:                  60,
+		LapiUpdateMaxFailure:                       0,
+		LogFilePath:                                "",
+		LogFormat:                                  "common",
+		LogLevel:                                   LogINFO,
+		ReclaimGraceSeconds:                        30,
 	}
 }
 
