@@ -17,7 +17,7 @@ Not yet.
 In progress. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 03f05811
+Reviewed head: 791a6323
 Owner decision: None.
 
 ## Review scores
@@ -67,7 +67,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 03f058114816c76ddf9a9fcad0228b8bc9e69d2d | Card must match the branch you measured |
+| Reviewed head | 791a6323fe9e738a5f84f50d66da076dd40a6218 | Card must match the branch you measured |
 
 ### Stored data model
 None.
