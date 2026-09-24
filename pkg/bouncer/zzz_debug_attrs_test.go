@@ -107,6 +107,18 @@ func remediatingServeHTTPTrace(t *testing.T, logged string) string {
 	return ""
 }
 
+// remediatingLiveLookupTrace is the LiveLookup TRACE that carries isBanned.
+func remediatingLiveLookupTrace(t *testing.T, logged string) string {
+	t.Helper()
+	for _, line := range jsonLinesWithMsg(logged, "ServeHTTP:LiveLookup") {
+		if strings.Contains(line, `"isBanned"`) {
+			return line
+		}
+	}
+	t.Fatalf("want ServeHTTP:LiveLookup TRACE, got %s", logged)
+	return ""
+}
+
 // TestHunt_ServeHTTPInfoAllowOmitsDebug fails if INFO stream allow emits Debug or Trace records.
 func TestHunt_ServeHTTPInfoAllowOmitsDebug(t *testing.T) {
 	log, sink := newTestLogSink(slog.LevelInfo)
@@ -244,7 +256,7 @@ func TestHunt_ServeHTTPLiveLookupTraceIncludesScopes(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := decisionstore.NewMemory(log)
-	client, err := lapi.New(&configuration.Config{
+	lapiClient, err := lapi.New(&configuration.Config{
 		LapiHTTPTimeoutSeconds:           10,
 		LapiHost:                         parsed.Host,
 		LapiKey:                          "test-key",
@@ -257,7 +269,7 @@ func TestHunt_ServeHTTPLiveLookupTraceIncludesScopes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(client.Close)
+	t.Cleanup(lapiClient.Close)
 	clientChecker, err := ip.NewChecker(log, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -279,7 +291,7 @@ func TestHunt_ServeHTTPLiveLookupTraceIncludesScopes(t *testing.T) {
 			passed = true
 		}),
 	}
-	b.lapiBound.Store(client)
+	b.lapiBound.Store(lapiClient)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	req.RemoteAddr = "127.0.0.1:1"
 	req.Header.Set("X-Forwarded-For", "203.0.113.10")
@@ -289,16 +301,8 @@ func TestHunt_ServeHTTPLiveLookupTraceIncludesScopes(t *testing.T) {
 	if passed {
 		t.Fatal("origin must not run on LiveLookup ban")
 	}
-	var record string
-	for _, line := range jsonLinesWithMsg(sink.String(), "ServeHTTP:LiveLookup") {
-		if strings.Contains(line, `"isBanned"`) {
-			record = line
-			break
-		}
-	}
-	if record == "" {
-		t.Fatalf("want ServeHTTP:LiveLookup TRACE, got %s", sink.String())
-	}
+	lapiClient.Close()
+	record := remediatingLiveLookupTrace(t, sink.String())
 	if !strings.Contains(record, `"ip":"203.0.113.10"`) {
 		t.Fatalf("want ip attribute, got %s", record)
 	}
