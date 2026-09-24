@@ -13,6 +13,7 @@
 - recaptcha
 - cloudflare
 - capjs
+- eucaptcha
 
 ## std
 - go
