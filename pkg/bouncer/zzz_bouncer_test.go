@@ -292,6 +292,42 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 	}
 }
 
+// TestHandleNextServeHTTPChallengeCSPReplacesAndCookiesStaySeparate proves
+// https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/397:
+// AppSec user_headers of the same name replace (including CSP), and each user_cookies value is its own Set-Cookie.
+func TestHandleNextServeHTTPChallengeCSPReplacesAndCookiesStaySeparate(t *testing.T) {
+	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{
+			"action":"challenge",
+			"http_status":200,
+			"user_body_content":"<html>challenge</html>",
+			"user_cookies":["first=one; Path=/","second=two; Path=/"],
+			"user_headers":{
+				"Content-Security-Policy":["script-src 'none'"]
+			}
+		}`))
+	}, nil)
+	defer appsecServer.Close()
+
+	// Pre-set CSP so replace (not append) is observable on the same writer map.
+	recorder := httptest.NewRecorder()
+	recorder.Header().Set("Content-Security-Policy", "default-src 'self'")
+	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+
+	csp := recorder.Header().Values("Content-Security-Policy")
+	if len(csp) != 1 || csp[0] != "script-src 'none'" {
+		t.Fatalf("expected one AppSec CSP, got %q", csp)
+	}
+	cookies := recorder.Header().Values("Set-Cookie")
+	if len(cookies) != 2 {
+		t.Fatalf("expected two Set-Cookie values, got %q", cookies)
+	}
+	if cookies[0] != "first=one; Path=/" || cookies[1] != "second=two; Path=/" {
+		t.Fatalf("expected each user_cookies value as its own Set-Cookie, got %q", cookies)
+	}
+}
+
 func TestHandleNextServeHTTPRelaysStructuredAppsecCaptcha(t *testing.T) {
 	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
@@ -444,6 +480,46 @@ func TestHandleNextServeHTTPEmptyChallengeBodyBans(t *testing.T) {
 	}
 	if got := recorder.Header().Get("X-Remediation"); got != "ban" {
 		t.Fatalf("expected ban header, got %q", got)
+	}
+}
+
+// TestHandleNextServeHTTPEmptyChallengeBodyBansWithBanPage proves
+// https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/397:
+// missing or empty-string challenge user_body_content fail-closes to the operator ban page.
+func TestHandleNextServeHTTPEmptyChallengeBodyBansWithBanPage(t *testing.T) {
+	banTemplate, err := template.New("ban").Parse("<html>operator ban for {{.ClientIP}}</html>")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name string
+		body string
+	}{
+		{name: "missing", body: `{"action":"challenge","http_status":200}`},
+		{name: "empty-string", body: `{"action":"challenge","http_status":200,"user_body_content":""}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(tc.body))
+			}, banTemplate)
+			defer appsecServer.Close()
+
+			recorder := httptest.NewRecorder()
+			b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+
+			if recorder.Code != http.StatusForbidden {
+				t.Fatalf("expected ban status 403, got %d", recorder.Code)
+			}
+			if got := recorder.Header().Get("X-Remediation"); got != "ban" {
+				t.Fatalf("expected ban header, got %q", got)
+			}
+			want := "<html>operator ban for 192.0.2.10</html>"
+			if got := recorder.Body.String(); got != want {
+				t.Fatalf("expected operator ban page, got %q", got)
+			}
+		})
 	}
 }
 
