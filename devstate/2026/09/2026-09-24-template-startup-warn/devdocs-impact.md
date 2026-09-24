@@ -9,5 +9,3 @@ change: 2026-09-24-template-startup-warn
 
 ## Findings
 - [x] stale-usage  Config validation — `core_plugin_middleware_config-validation` How-to and Gotchas still required empty/unloadable captcha paths and ban paths to fail `ValidateParams`, and `Client.New` to return `GetTemplate` errors
-
-none beyond the row above.
