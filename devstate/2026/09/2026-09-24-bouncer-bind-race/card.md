@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 9fc5f637
+Reviewed head: 716a71bf
 Owner decision: None.
 
 ## Review scores
@@ -42,7 +42,8 @@ Owner decision: None.
 None.
 
 ## Deviations from the ask
-None.
+- proposed: Affected lists only `pkg/bouncer/bouncer.go` (`storeBinding` and its three Receive* callers). → also change `pkg/reclaim/zzz_alias_test.go` `watchInto` to `Store` a new `*Box` each update (same publish shape). — `pkg/reclaim/zzz_alias_test.go` — Unknowns asked whether other watchers mutate `Box.Value`; this test helper does, and leaving it teaches the race. Bounded incidental companion to the named fix.. Awaiting the requester.
+
 
 ## Follow-up issues
 None.
@@ -66,7 +67,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 9fc5f637d4fdecdfe5b95f6193e5d6b580e9db94 | Card must match the branch you measured |
+| Reviewed head | 716a71bfd7526756e6f47a370f6532e2ababb15a | Card must match the branch you measured |
 
 ### Stored data model
 None.

@@ -73,7 +73,7 @@ Rejected alternatives:
 
 - Q: Exact race window under Yaegi vs native Go — measure before deciding the fix?
   Rank: additive asked — requirement Unknowns
-  Decision: assumed — same immutable Box publish for both runtimes; Yaegi still needs type-stable *Box Stores and Unbox still reads Value without sync. Implement measures with go test -race where cgo exists; explore host could not.
+  Decision: assumed - same immutable Box publish for both runtimes; Yaegi still needs type-stable *Box Stores and Unbox still reads Value without sync. Implement measures with go test -race where cgo exists; explore host could not.
   By: explore
 
 - Q: Change reclaim Watch / Unbox API as part of Finding 1?
