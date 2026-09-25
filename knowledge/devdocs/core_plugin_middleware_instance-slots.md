@@ -24,11 +24,12 @@ _Avoid_: Unpublish on Sleep, AfterFunc Unpublish on every constructor ctx cancel
 
 ## Overview
 
-Process-wide named slots sit between owner `Open` and bouncer bounce. Spec: `core_plugin_middleware_instance-slots`. Ownership Open keys live on `core_plugin_lapi_reclaim-key`, AppSec session, and captcha `OwnershipKey` (middleware name plus instance-owned knobs including the recaptcha-enterprise knobs; `pkg/captcha/session.go`). Constructor wiring: `core_plugin_middleware.md`.
+Process-wide named slots sit between owner `Open` and bouncer bounce. Spec: `core_plugin_middleware_instance-slots`. Ownership Open keys live on `core_plugin_lapi_reclaim-key`, AppSec session, and captcha `OwnershipKey` (middleware name plus instance-owned knobs including the recaptcha-enterprise knobs and `logLevel`, `logFilePath`, `logFormat`; `pkg/captcha/session.go`). Constructor wiring: `core_plugin_middleware.md`.
 
 ## How to use
 
 - Named slots are opaque aliases on the reclaim table. This plugin encodes them as `alias:<leg>:<name>` in `instanceAlias`; the table never parses that string. `plugin.go` Opens owned legs, then `SetAlias` with group `lapi`/`appsec`/`captcha`, then `bouncer.New` with subscribe flags, then `Watch`. `Watch` drops that subscriber when its ctx is done.
+- Hash captcha `OwnershipKey` from middleware name plus instance-owned captcha knobs including `logLevel`, `logFilePath`, and `logFormat`. Slot name, bounce, failure actions, remediation header, and `bouncerStartupBlock` stay off it.
 - Watchers `Store` a `reclaim.Box` only. The inner value is the client or typed nil. Never `Store(nil)` and never change the `atomic.Value` type (Yaegi panics). On each publish, `Store` a **new** `*Box`; do not assign `Box.Value` in place while ServeHTTP may `Unbox` the same pointer.
 - Reject a second publisher on the same alias. Roll back with `ClearPublisher(name, group)`, then cancel the holder child.
 - Close / unmap of a dying incarnation clears aliases still pointing at it (reverse index on the slot). Sleep does not.
@@ -57,6 +58,7 @@ reclaim.Watch(ctx, instanceAlias("captcha", captchaName), (*captcha.Client)(nil)
 ## Gotchas
 
 - Do not wait in Traefik `New` for a publisher.
+- A `logLevel`, `logFilePath`, or `logFormat`-only rebuild forks captcha `OwnershipKey`. Create stores the constructor logger. Do not rewrite `Client.log` on reclaim.
 - `atomic.Value.Store(untyped nil)` panics. Publish and Clear use the same pointer type.
 - Do not mutate `Box.Value` after that Box is already in an `atomic.Value`. Concurrent `Unbox` reads the field without sync; a torn `any` can panic or show a stale/nil client. Publish with `dest.Store(&reclaim.Box{Value: value})` every time.
 - Dropping the slot mutex before subscriber `Store` lets Clear write nil over a replacement.
