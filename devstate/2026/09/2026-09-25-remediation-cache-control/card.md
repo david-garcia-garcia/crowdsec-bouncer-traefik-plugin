@@ -1,30 +1,33 @@
 ## Motivation
-Not yet.
+Captcha challenge HTML is the 200 this plugin writes on the original URL: Content-Type from the template, optional remediation header, then the template. That path does not Set-Cookie; the gate cookie is only on Pass before the 302. Ban HTML is the same pattern from the ban writer: Content-Type, optional remediation header, then the remediation status. AppSec challenge relay already copies engine `user_headers`, including `Cache-Control` when the engine sends it.
+
+A CDN in front of Traefik stored that captcha HTML — HTTP 200 on the original URL, Content-Type only, no Set-Cookie. After the captcha decision was cleared, the CDN kept serving the stored page. Both writers omit `Cache-Control`. Ban HTML is the same cacheable remediation body with no cache header.
+
+Left alone, clearing a captcha decision does not clear the cached HTML. Visitors keep solving a challenge CrowdSec has already dropped. Ban pages can stay stored the same way. CDN cache keys and TTLs are not in this tree; the plugin sent nothing a cache is required to treat as unstoreable.
+
+Priority: P2 — real end-user pain, with a workaround or limited blast radius
 
 ## Implementation
-Not yet.
+On each writer this plugin owns, set `Cache-Control: no-cache, no-store` next to Content-Type and before WriteHeader. Challenge HTML gets it on the non-Pass 200 path only. The ban writer sets it once, so HEAD and nil-template bans carry it the same way Content-Type already does. The string is exactly that value — HAProxy SPOA captcha/ban returns and the AppSec challenge protocol example, no extra directives. Pass 302 and AppSec envelope relay stay unchanged. Existing challenge 200 and ban header tests assert the header; the solve 302 still has empty `Cache-Control`.
 
 ## What this changes
-**Operators.** None.
-
+**Operators.** No new plugin or Traefik key; after deploy, captcha challenge 200 and ban remediations send `Cache-Control: no-cache, no-store`.
 **Admin users.** None.
-
-**Developers.** None.
-
-**End users.** None.
+**Developers.** Challenge HTML at 200 and ban responses must set `Cache-Control: no-cache, no-store` before WriteHeader; Pass 302 must not gain this header.
+**End users.** A cache in front of Traefik that honors Cache-Control should stop serving a stored captcha page after the decision is cleared; ban HTML should not stay stored either.
 
 ## Merge readiness
-Ready for review. 0 items remain.
+In progress. 0 items remain.
 
-Priority: unknown — motivation not written
-Reviewed head: 332fec51
+Priority: P2 — real end-user pain, with a workaround or limited blast radius
+Reviewed head: 1bb296df
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36161987918/job/108160520235 |
+| Overall readiness | 1/6 | Not ready |
+| CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -34,7 +37,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-25-remediation-cache-control pushed | `git` |
 | OpenSpec | remediation-cache-control | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/164 | pr-host |
-| CI | build 36161987918 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36161987918/job/108160520235 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36161987918/job/108160520235 |
+| CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -51,7 +54,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-09-25-remediation-cache-control on branch 2026-09-25-remediation-cache-control targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/164; CI build 36161987918 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36161987918/job/108160520235.
+Ticket 2026-09-25-remediation-cache-control on branch 2026-09-25-remediation-cache-control targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/164; CI not seen.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -63,7 +66,15 @@ Ticket 2026-09-25-remediation-cache-control on branch 2026-09-25-remediation-cac
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-remediation-cache-control/devstate/2026/09/2026-09-25-remediation-cache-control/codereview_standards.md) — 0 total, 0 pending, 0 completed
+[Nitpicks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-remediation-cache-control/devstate/2026/09/2026-09-25-remediation-cache-control/codereview_nitpicks.md) — 0 total, 0 pending, 0 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-remediation-cache-control/devstate/2026/09/2026-09-25-remediation-cache-control/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Scope](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-remediation-cache-control/devstate/2026/09/2026-09-25-remediation-cache-control/codereview_scope.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-remediation-cache-control/devstate/2026/09/2026-09-25-remediation-cache-control/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-remediation-cache-control/devstate/2026/09/2026-09-25-remediation-cache-control/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-remediation-cache-control/devstate/2026/09/2026-09-25-remediation-cache-control/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-remediation-cache-control/devstate/2026/09/2026-09-25-remediation-cache-control/codereview_coverage.md) — 0 total, 0 pending, 0 completed
+
 
 ## Agent review details
 
@@ -72,7 +83,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 332fec51324b6c2fb40ac98589a8ec2cae8e227b | Card must match the branch you measured |
+| Reviewed head | 1bb296dfdb3ced46016a780cb1463c6ff1ae1521 | Card must match the branch you measured |
 
 ### Stored data model
 None.
