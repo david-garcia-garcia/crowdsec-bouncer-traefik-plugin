@@ -50,6 +50,7 @@ linters-settings:
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule
       Test:
         files:
           - $test
@@ -68,6 +69,7 @@ linters-settings:
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule
           - github.com/david-garcia-garcia/traefik-middleware-utilities/traefikemulator
           - github.com/leprosus/golang-ttl-map
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/yaegitest

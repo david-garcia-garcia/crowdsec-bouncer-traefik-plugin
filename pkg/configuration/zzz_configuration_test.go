@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
@@ -273,18 +274,24 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	cfgRemediationHigh.BouncerRemediationStatusCode = 600
 	cfgUpdateMaxFailureNegOne := getMinimalConfig()
 	cfgUpdateMaxFailureNegOne.LapiUpdateMaxFailure = -1
-	cfgEmptyExclude := getMinimalConfig()
-	cfgWhitespaceExclude := getMinimalConfig()
-	cfgWhitespaceExclude.BouncerLapiExcludeRegex = "   "
-	cfgWhitespaceAppsecExclude := getMinimalConfig()
-	cfgWhitespaceAppsecExclude.BouncerAppsecExcludeRegex = " \t "
-	cfgInvalidAppsecExclude := getMinimalConfig()
-	cfgInvalidAppsecExclude.BouncerAppsecExcludeRegex = "("
-	cfgInvalidLapiExclude := getMinimalConfig()
-	cfgInvalidLapiExclude.BouncerLapiExcludeRegex = "("
-	cfgValidExclude := getMinimalConfig()
-	cfgValidExclude.BouncerAppsecExcludeRegex = `example\.com://health`
-	cfgValidExclude.BouncerLapiExcludeRegex = `^ok/`
+	cfgEmptyBypass := getMinimalConfig()
+	cfgEmptyRule := getMinimalConfig()
+	cfgEmptyRule.BouncerLapiBypassRules = []httprule.Rule{{}}
+	cfgMatchEverythingMethod := getMinimalConfig()
+	cfgMatchEverythingMethod.BouncerAppsecBypassRules = []httprule.Rule{{Method: ".*"}}
+	cfgMethodOnly := getMinimalConfig()
+	cfgMethodOnly.BouncerLapiBypassRules = []httprule.Rule{{Method: "^OPTIONS$"}}
+	cfgDoubleBang := getMinimalConfig()
+	cfgDoubleBang.BouncerLapiBypassRules = []httprule.Rule{{Method: "!!POST"}}
+	cfgEmptyNegation := getMinimalConfig()
+	cfgEmptyNegation.BouncerLapiBypassRules = []httprule.Rule{{Method: "!"}}
+	cfgInvalidAppsecBypass := getMinimalConfig()
+	cfgInvalidAppsecBypass.BouncerAppsecBypassRules = []httprule.Rule{{Path: "("}}
+	cfgInvalidLapiBypass := getMinimalConfig()
+	cfgInvalidLapiBypass.BouncerLapiBypassRules = []httprule.Rule{{Method: "("}}
+	cfgValidBypass := getMinimalConfig()
+	cfgValidBypass.BouncerAppsecBypassRules = []httprule.Rule{{Path: "^/healthz$"}}
+	cfgValidBypass.BouncerLapiBypassRules = []httprule.Rule{{Method: "!POST", Path: "^/admin/"}}
 	type args struct {
 		config *Config
 	}
@@ -345,12 +352,15 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 		{name: "BouncerRemediationStatusCode below 100", args: args{config: cfgRemediationLow}, wantErr: true},
 		{name: "BouncerRemediationStatusCode 600 or above", args: args{config: cfgRemediationHigh}, wantErr: true},
 		{name: "LapiUpdateMaxFailure -1 accepted", args: args{config: cfgUpdateMaxFailureNegOne}, wantErr: false},
-		{name: "Empty exclude strings pass", args: args{config: cfgEmptyExclude}, wantErr: false},
-		{name: "Whitespace-only LAPI exclude is off", args: args{config: cfgWhitespaceExclude}, wantErr: false},
-		{name: "Whitespace-only AppSec exclude is off", args: args{config: cfgWhitespaceAppsecExclude}, wantErr: false},
-		{name: "Invalid AppSec exclude regex fails", args: args{config: cfgInvalidAppsecExclude}, wantErr: true, wantErrContains: "BouncerAppsecExcludeRegex"},
-		{name: "Invalid LAPI exclude regex fails", args: args{config: cfgInvalidLapiExclude}, wantErr: true, wantErrContains: "BouncerLapiExcludeRegex"},
-		{name: "Valid exclude regexes pass", args: args{config: cfgValidExclude}, wantErr: false},
+		{name: "Empty bypass lists pass", args: args{config: cfgEmptyBypass}, wantErr: false},
+		{name: "Fully empty LAPI bypass rule fails", args: args{config: cfgEmptyRule}, wantErr: true, wantErrContains: "BouncerLapiBypassRules"},
+		{name: "Match-everything AppSec method fails", args: args{config: cfgMatchEverythingMethod}, wantErr: true, wantErrContains: "BouncerAppsecBypassRules"},
+		{name: "Method-only LAPI bypass rule passes", args: args{config: cfgMethodOnly}, wantErr: false},
+		{name: "Double bang LAPI method fails", args: args{config: cfgDoubleBang}, wantErr: true, wantErrContains: "BouncerLapiBypassRules"},
+		{name: "Bang with empty pattern fails", args: args{config: cfgEmptyNegation}, wantErr: true, wantErrContains: "BouncerLapiBypassRules"},
+		{name: "Invalid AppSec bypass path regex fails", args: args{config: cfgInvalidAppsecBypass}, wantErr: true, wantErrContains: "BouncerAppsecBypassRules"},
+		{name: "Invalid LAPI bypass method regex fails", args: args{config: cfgInvalidLapiBypass}, wantErr: true, wantErrContains: "BouncerLapiBypassRules"},
+		{name: "Valid bypass rules pass", args: args{config: cfgValidBypass}, wantErr: false},
 		{name: "Custom json validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "json")}, wantErr: false},
 		{name: "Custom form validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "form")}, wantErr: false},
 		{name: "Custom omit validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "")}, wantErr: false},
@@ -1046,36 +1056,6 @@ func TestForwardedHeadersInsecure(t *testing.T) {
 		cfg.BouncerForwardedHeadersTrustedIPs = []string{"not-a-cidr"}
 		if err := ValidateParams(cfg, log); err == nil {
 			t.Fatal("ValidateParams = nil want error")
-		}
-	})
-}
-
-func TestCompileExcludeRegex(t *testing.T) {
-	t.Run("empty is off", func(t *testing.T) {
-		compiled, err := CompileExcludeRegex("")
-		if err != nil || compiled != nil {
-			t.Fatalf("empty: compiled=%v err=%v", compiled, err)
-		}
-	})
-	t.Run("whitespace-only is off", func(t *testing.T) {
-		compiled, err := CompileExcludeRegex("  \t ")
-		if err != nil || compiled != nil {
-			t.Fatalf("whitespace: compiled=%v err=%v", compiled, err)
-		}
-	})
-	t.Run("invalid RE2 fails", func(t *testing.T) {
-		compiled, err := CompileExcludeRegex("(")
-		if err == nil || compiled != nil {
-			t.Fatalf("invalid: compiled=%v err=%v", compiled, err)
-		}
-	})
-	t.Run("valid pattern compiles", func(t *testing.T) {
-		compiled, err := CompileExcludeRegex(`example\.com/health`)
-		if err != nil || compiled == nil {
-			t.Fatalf("valid: compiled=%v err=%v", compiled, err)
-		}
-		if !compiled.MatchString("example.com/health") {
-			t.Fatal("compiled regex must match example.com/health")
 		}
 	})
 }

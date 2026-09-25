@@ -16,6 +16,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
@@ -147,7 +148,7 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 	}
 }
 
-func TestNew_RejectsInvalidExcludeRegex(t *testing.T) {
+func TestNew_RejectsInvalidBypassRules(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
@@ -162,15 +163,15 @@ func TestNew_RejectsInvalidExcludeRegex(t *testing.T) {
 	}
 
 	cfg := cfgLiveAt(u.Host)
-	cfg.BouncerLapiExcludeRegex = "("
-	handler, err := New(context.Background(), testNextOK(), cfg, "invalid-lapi-exclude")
+	cfg.BouncerLapiBypassRules = []httprule.Rule{{Path: "("}}
+	handler, err := New(context.Background(), testNextOK(), cfg, "invalid-lapi-bypass")
 	if err == nil {
-		t.Fatal("New must fail when BouncerLapiExcludeRegex is invalid RE2")
+		t.Fatal("New must fail when BouncerLapiBypassRules is invalid RE2")
 	}
 	if handler != nil {
-		t.Fatal("New must return a nil handler when exclude regex is invalid")
+		t.Fatal("New must return a nil handler when bypass rules are invalid")
 	}
-	if !strings.Contains(err.Error(), "BouncerLapiExcludeRegex") {
+	if !strings.Contains(err.Error(), "BouncerLapiBypassRules") {
 		t.Fatalf("error %q", err)
 	}
 	if atomic.LoadInt64(&hits) != 0 {
@@ -179,15 +180,15 @@ func TestNew_RejectsInvalidExcludeRegex(t *testing.T) {
 
 	hits = 0
 	cfg = cfgLiveAt(u.Host)
-	cfg.BouncerAppsecExcludeRegex = "("
-	handler, err = New(context.Background(), testNextOK(), cfg, "invalid-appsec-exclude")
+	cfg.BouncerAppsecBypassRules = []httprule.Rule{{}}
+	handler, err = New(context.Background(), testNextOK(), cfg, "invalid-appsec-bypass")
 	if err == nil {
-		t.Fatal("New must fail when BouncerAppsecExcludeRegex is invalid RE2")
+		t.Fatal("New must fail when BouncerAppsecBypassRules contains a fully empty rule")
 	}
 	if handler != nil {
-		t.Fatal("New must return a nil handler when exclude regex is invalid")
+		t.Fatal("New must return a nil handler when bypass rules are invalid")
 	}
-	if !strings.Contains(err.Error(), "BouncerAppsecExcludeRegex") {
+	if !strings.Contains(err.Error(), "BouncerAppsecBypassRules") {
 		t.Fatalf("error %q", err)
 	}
 	if atomic.LoadInt64(&hits) != 0 {
