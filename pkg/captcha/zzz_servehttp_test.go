@@ -54,6 +54,9 @@ func Test_ServeHTTP_dummyProviderSolveIssuesGateCookie(t *testing.T) {
 	if getRW.Code != http.StatusOK || !strings.Contains(getRW.Body.String(), "E2E_CAPTCHA_PAGE_MARKER") {
 		t.Fatalf("GET want captcha page, got %d %q", getRW.Code, getRW.Body.String())
 	}
+	if got := getRW.Header().Get("Cache-Control"); got != "no-cache, no-store" {
+		t.Fatalf("GET Cache-Control=%q want no-cache, no-store", got)
+	}
 
 	emptyPOST := httptest.NewRequest(http.MethodPost, "/foo", strings.NewReader(""))
 	emptyPOST.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -72,6 +75,9 @@ func Test_ServeHTTP_dummyProviderSolveIssuesGateCookie(t *testing.T) {
 	if solveRW.Code != http.StatusFound {
 		body, _ := io.ReadAll(solveRW.Result().Body)
 		t.Fatalf("solve want 302, got %d %s", solveRW.Code, body)
+	}
+	if got := solveRW.Header().Get("Cache-Control"); got != "" {
+		t.Fatalf("solve Cache-Control=%q want empty", got)
 	}
 	cookie := solveRW.Result().Header.Get("Set-Cookie")
 	if !strings.Contains(cookie, gateCookieName+"=") {

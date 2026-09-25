@@ -115,6 +115,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP, re
 		bootScript = ""
 	}
 	rw.Header().Set("Content-Type", c.templateContentType)
+	rw.Header().Set("Cache-Control", "no-cache, no-store")
 	writeRemediationHeader(rw, remediationHeader, "captcha")
 	rw.WriteHeader(http.StatusOK)
 	err = c.template.Execute(rw, map[string]string{

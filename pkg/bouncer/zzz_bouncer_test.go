@@ -154,6 +154,9 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 			if headerValue := rw.Header().Get("X-Test-Remediation"); headerValue != "ban" {
 				t.Errorf("Expected header X-Test-Remediation to be 'ban', got %s", headerValue)
 			}
+			if got := rw.Header().Get("Cache-Control"); got != "no-cache, no-store" {
+				t.Errorf("Expected Cache-Control no-cache, no-store, got %q", got)
+			}
 			body := rw.Body.String()
 			hasBodyContent := len(body) > 0
 			if hasBodyContent != tt.expectBodyContent {
@@ -230,6 +233,9 @@ func TestHandleBanServeHTTPContentType(t *testing.T) {
 			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
 			if got := rw.Header().Get("Content-Type"); got != tt.banTemplateContentType {
 				t.Errorf("Expected Content-Type %q, got %q", tt.banTemplateContentType, got)
+			}
+			if got := rw.Header().Get("Cache-Control"); got != "no-cache, no-store" {
+				t.Errorf("Expected Cache-Control no-cache, no-store, got %q", got)
 			}
 		})
 	}
