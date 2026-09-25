@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 18e05002
-Owner decision: None.
+Reviewed head: c601ad50
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -51,7 +51,10 @@ None.
 Ticket 2026-09-25-remediation-cache-control on branch 2026-09-25-remediation-cache-control targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/164; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Must existing header tests gain Cache-Control assertions, or is a new neighbor test the right place? | additive asked — Affected names pkg/captcha/zzz_servehttp_test.go and pkg/bouncer/zzz_bouncer_test.go | assumed — extend those existing header tests (challenge 200 body case and TestHandleBanServeHTTPContentType / method table); do not add a new zzz_ file | explore |
+
 
 ## Findings
 None.
@@ -66,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 18e05002148271be19870c2631efa0d6272bdfa7 | Card must match the branch you measured |
+| Reviewed head | c601ad50ff5cd60df6c2bddec057c04753be921e | Card must match the branch you measured |
 
 ### Stored data model
 None.
