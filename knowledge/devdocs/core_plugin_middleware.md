@@ -26,6 +26,10 @@ _Avoid_: ForRoute, Plugin core, the reclaim value, `atomic.Pointer[T]`
 The operator enum (`passthrough` | `ban` | `captcha`) this plugin applies when LAPI or AppSec does not return a usable verdict. LAPI action is per-router on Bouncer; AppSec action is per-router on Bouncer. Default is `ban`.
 _Avoid_: fail mode, FailMode, the three removed AppSec block bools, AppSec JSON `action: captcha`, LAPI Client identity
 
+**Exclude match string**:
+The `host://path` value ServeHTTP matches against the compiled `bouncerLapiExcludeRegex` and `bouncerAppsecExcludeRegex`. Host is `req.Host` after `net.SplitHostPort` when that succeeds; path is `req.URL.Path` with one leading `/` removed (empty Path or `/` → `host://`). Example: `example.com` + `/health` → `example.com://health`.
+_Avoid_: AppSec forwarded Host/URI, `captcha.RequestDomain`, `URL.String()`, `RequestURI`, `EscapedPath`, `example.com/health` without `://`, three slashes (`example.com:///health`)
+
 **Config snapshot**:
 `New`'s own shallow copy of Traefik's `rawConfig` (`config := *rawConfig`). Everything downstream of `New` reads and writes `config`: normalised `logLevel`, the `Prepare` secret resolution, alone-mode LAPI rewrite. Its slice and map fields still alias the caller's.
 _Avoid_: writing through Traefik's pointer, deep copy, mutating `DecisionScopeHeaders` or the trusted-IP slices in place, calling the snapshot `prepared`
@@ -55,8 +59,8 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - Put stream tickers, replaceable LAPI HTTP (`transport` on `atomic.Value`), and Range membership on `lapi.Client`. Open the DecisionStore on the same `New` ctx (`core_plugin_decisionstore.md`). Put AppSec HTTP+auth on `appsec.Client`. Put captcha widget, verifier, template, and gate on `captcha.Client`. Put ban templates, LAPI failure action, Redis fail-closed, live-cache TTL, and this router’s remediation header on Bouncer. Timeout/TLS changes are a new ownership key, not Adopt-only.
 - Do not pass `config.LapiDefaultDecisionSeconds` from the bouncer into `LiveLookup`; the bound client already has it.
 - Resolve client IP with `pkg/ip.GetRemoteIP`. Fold `remoteIP`, parsed `net.IP`, and `ipType` into `clientRequest`. Keep the name `req`.
-- After the trusted-client skip, a non-empty `bouncerDecisionHeader` with exact `b` remediates without lookup; `c` still looks up so a ban wins (`core_plugin_middleware_forced-decision.md`).
-- After trusted-IP skip and forced `b`, `bouncerLapiExcludeRegex` / `bouncerAppsecExcludeRegex` skip that CrowdSec leg when the compiled RE2 matches `host://path` (`example.com://health`). Host is `req.Host` (port stripped with `net.SplitHostPort` when that succeeds). Path is `req.URL.Path` with one leading `/` removed (empty or `/` → `host://`). Empty after trim is off. Unanchored `MatchString`. Do not hash these strings into LAPI ownership or AppSec identity. Do not call `captcha.RequestDomain` or rebuild Host.
+- After the trusted-client skip, a non-empty `bouncerDecisionHeader` with exact `b` remediates without lookup; `c` still looks up so a ban wins unless LAPI exclude already skipped lookup (`core_plugin_middleware_forced-decision.md`).
+- Compile `bouncerLapiExcludeRegex` / `bouncerAppsecExcludeRegex` once in `bouncer.New` via `configuration.CompileExcludeRegex` (nil = off). Do not compile on the request path. After trusted-IP skip and forced `b`, skip that CrowdSec leg when unanchored `MatchString` is true against the Exclude match string. A LAPI match continues at `passOrForcedCaptcha` (AppSec may still Query; forced `c` still applies). An AppSec match in `handleNextServeHTTP` skips `applyAppsecServeHTTP` and calls `next`. Do not hash these strings into LAPI ownership or AppSec identity. Do not call `captcha.RequestDomain` or rebuild Host.
 - Range and header-mapped CrowdSec scopes live in `pkg/decisionscope`. Do not geolocate in `New` or `ServeHTTP`.
 - Live LAPI error and stream-unhealthy cache miss use `bouncerLapiFailureAction`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled).
 - Watch logs `reclaim_put|bind|orphan|reclaim|dispose` and `crowdsec lapi instance|crowdsec appsec instance|crowdsec captcha instance|crowdsec bouncer bound|crowdsec bouncer unbound`.
