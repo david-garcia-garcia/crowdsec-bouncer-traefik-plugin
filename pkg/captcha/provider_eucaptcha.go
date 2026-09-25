@@ -34,7 +34,9 @@ func newEucaptchaVerifier(httpClient *http.Client, siteKey, secretKey string) *e
 }
 
 // pairEucaptcha builds the official widget pairing and the verify verifier.
-func pairEucaptcha(httpClient *http.Client, siteKey, secretKey string) (Widget, *eucaptchaVerifier) {
+//
+//nolint:ireturn // Yaegi v0.16.1 panics when New assigns a concrete verifier in one multi-value assignment.
+func pairEucaptcha(httpClient *http.Client, siteKey, secretKey string) (Widget, Verifier) {
 	return Widget{
 		ScriptURL:        eucaptchaScriptURL,
 		Class:            eucaptchaClass,

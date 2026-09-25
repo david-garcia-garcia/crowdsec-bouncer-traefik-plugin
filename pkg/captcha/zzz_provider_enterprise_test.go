@@ -108,7 +108,7 @@ func Test_New_enterpriseCheckboxAndScoreWidgets(t *testing.T) {
 	if score.widget.RetryAfterReject {
 		t.Fatal("score must not retry after reject")
 	}
-	if !strings.Contains(score.widget.BootScript, "grecaptcha.enterprise.ready") || !strings.Contains(score.widget.BootScript, "execute") {
+	if !strings.Contains(score.widget.BootScript, "window.grecaptcha") || !strings.Contains(score.widget.BootScript, "grecaptcha.enterprise.ready") || !strings.Contains(score.widget.BootScript, "execute") || !strings.Contains(score.widget.BootScript, ",2000)") {
 		t.Fatalf("score boot %q", score.widget.BootScript)
 	}
 }
@@ -404,6 +404,9 @@ func Test_ServeHTTP_stockTemplateCheckboxAndScore(t *testing.T) {
 		t.Fatalf("checkbox GET want 200, got %d", checkboxRW.Code)
 	}
 	checkboxBody := checkboxRW.Body.String()
+	if !strings.Contains(checkboxBody, "<em>example.com</em> needs to review the security of your connection") {
+		t.Fatalf("checkbox stock page must name the request host: %s", checkboxBody)
+	}
 	if !strings.Contains(checkboxBody, `class="g-recaptcha"`) || !strings.Contains(checkboxBody, `data-sitekey="site-key"`) {
 		t.Fatalf("checkbox stock page must draw g-recaptcha: %s", checkboxBody)
 	}

@@ -5,3 +5,5 @@ go 1.22.12
 require github.com/leprosus/golang-ttl-map v1.1.7
 
 require github.com/david-garcia-garcia/traefik-middleware-utilities v1.0.7
+
+require github.com/traefik/yaegi v0.16.1

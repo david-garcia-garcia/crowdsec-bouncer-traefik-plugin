@@ -10,13 +10,13 @@
 
 CrowdSec bouncer for Traefik. It authorizes, bans, or challenges requests from CrowdSec decisions: community lists, local detections, and optional AppSec.
 
-A rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin). Load it as a local plugin; the catalog module on plugins.traefik.io is the original. What changed:
+A rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin). What changed:
 
 - **AI-first.** OpenSpec specs, a knowledge base, and intensive test coverage, including mock and real-stack harnesses.
 - **LAPI metrics.** Processed requests by address family, drops by decision origin and remediation, and an active-decisions count for `cscli metrics show bouncers`. The original plugin posts a single dropped counter.
 - **reCAPTCHA Enterprise.** Checkbox and score keys (`recaptcha-enterprise`), plus classic reCAPTCHA, hCaptcha, Turnstile, and custom widgets.
 - **EU CAPTCHA.** Provider `eucaptcha`.
-- **Stateless Captcha Gate.** A passed challenge is a cookie on the client that solved it, and can also be bound to that client's IP. The original plugin stores a server-side IP whitelist, so one solve covers every browser behind that address, and the pass exists only where that cache is reachable.
+- **Stateless Captcha Gate.** A passed challenge is now a cookie on the client that solved it, and can also be bound to that client's IP. The original plugin stores a server-side IP whitelist, so one solve covers every browser behind that address, and the pass exists only where that cache is reachable (it required redis backend to support distributed systems).
 - **Zero dependency on Redis.** Captcha does not need Redis. The recommended setup is an in-memory `stream`, and the recommended deployment does not include Redis. Redis remains only for the historical `alone` and `live` modes.
 - **Per-router settings.** Each router keeps its own status code, captcha, trusted IPs, failure action when LAPI or AppSec is down, and an optional remap of a decision origin (a community-list ban can be shown as captcha). The original plugin shares one cache and one set of key settings across every CrowdSec middleware in the process.
 - **Several CrowdSec engines** in one Traefik, each with its own API key, or several routers on one engine. See [Middleware Architecture](#middleware-architecture).

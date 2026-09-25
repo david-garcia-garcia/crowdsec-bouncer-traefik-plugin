@@ -2,8 +2,11 @@
 package captcha
 
 import (
+	"html"
 	"log/slog"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"text/template"
 	"time"
@@ -51,20 +54,25 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 	c.gateBindIP = gateBindIP
 	c.log = log
 	c.httpClient = httpClient
-	// Each named provider returns its widget and verifier.
+	// Pair functions return Verifier. Yaegi v0.16.1 panics if this multi-value
+	// assignment receives the concrete verifier instead.
+	var widget Widget
+	var verifier Verifier
 	switch provider {
 	case configuration.CustomProvider:
-		c.widget, c.verifier = pairCustom(httpClient, secretKey, js, key, response, validate, validateBody, log)
+		widget, verifier = pairCustom(httpClient, secretKey, js, key, response, validate, validateBody, log)
 		// Challenge URL and asset paths are custom-only. The other providers have none.
 		c.challengeURL = challengeURL
 		c.storeCustomResourcePaths(js, challengeURL)
 	case configuration.RecaptchaEnterpriseProvider:
-		c.widget, c.verifier = pairEnterprise(httpClient, siteKey, enterprise)
+		widget, verifier = pairEnterprise(httpClient, siteKey, enterprise)
 	case configuration.EucaptchaProvider:
-		c.widget, c.verifier = pairEucaptcha(httpClient, siteKey, secretKey)
+		widget, verifier = pairEucaptcha(httpClient, siteKey, secretKey)
 	case configuration.HcaptchaProvider, configuration.RecaptchaProvider, configuration.TurnstileProvider:
-		c.widget, c.verifier = pairSiteverify(httpClient, provider, secretKey, log)
+		widget, verifier = pairSiteverify(httpClient, provider, secretKey, log)
 	}
+	c.widget = widget
+	c.verifier = verifier
 	challengeTemplate, contentType, err := configuration.GetTemplate(captchaTemplatePath)
 	if err != nil {
 		return err
@@ -110,10 +118,24 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP, re
 		"BootScript":   bootScript,
 		"Action":       c.widget.Action,
 		"DrawCheckbox": c.widget.drawCheckbox(),
+		"Domain":       html.EscapeString(RequestDomain(r.Host)),
 	})
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP captchaTemplateServe", "error", err)
 	}
+}
+
+// RequestDomain is the hostname the browser showed, without a port.
+func RequestDomain(host string) string {
+	name := host
+	if parsed, _, err := net.SplitHostPort(host); err == nil {
+		name = parsed
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "This site"
+	}
+	return name
 }
 
 // Check Verify if the captcha is already done via gate cookie.

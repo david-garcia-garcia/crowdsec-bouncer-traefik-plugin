@@ -32,7 +32,9 @@ type Enterprise struct {
 }
 
 // pairEnterprise builds the recaptcha-enterprise widget and enterprise verifier.
-func pairEnterprise(httpClient *http.Client, siteKey string, enterprise Enterprise) (Widget, *enterpriseVerifier) {
+//
+//nolint:ireturn // Yaegi v0.16.1 panics when New assigns a concrete verifier in one multi-value assignment.
+func pairEnterprise(httpClient *http.Client, siteKey string, enterprise Enterprise) (Widget, Verifier) {
 	action := strings.TrimSpace(enterprise.Action)
 	minScore := parseEnterpriseMinScore(enterprise.MinScore)
 	verifier := newEnterpriseVerifier(httpClient, enterprise.ProjectID, enterprise.APIKey, siteKey, action, minScore)
@@ -77,13 +79,16 @@ func enterpriseScoreWidget(siteKey, action string) Widget {
 	}
 }
 
-// scoreBootScript is the fixed score-key boot: ready, execute, write the token, submit.
+// scoreBootScript is the fixed score-key boot: wait until the library exists, pause so the
+// page is visible, then ready, execute, write the token, and submit.
+// captcha.html loads the vendor script with async defer, so grecaptcha may not exist yet.
 func scoreBootScript(siteKey, action string) string {
 	quotedSiteKey := quoteJSString(siteKey)
 	quotedAction := quoteJSString(action)
-	return "grecaptcha.enterprise.ready(function(){grecaptcha.enterprise.execute(" +
+	return "(function crowdsecScoreBoot(){if(!window.grecaptcha||!window.grecaptcha.enterprise){setTimeout(crowdsecScoreBoot,50);return;}" +
+		"setTimeout(function(){grecaptcha.enterprise.ready(function(){grecaptcha.enterprise.execute(" +
 		quotedSiteKey + ",{action:" + quotedAction +
-		"}).then(function(token){document.getElementById(\"g-recaptcha-response\").value=token;document.getElementById(\"captcha-form\").submit();});});"
+		"}).then(function(token){document.getElementById(\"g-recaptcha-response\").value=token;document.getElementById(\"captcha-form\").submit();});});},2000);})();"
 }
 
 // quoteJSString JSON-quotes value so it is safe inside the fixed boot script.

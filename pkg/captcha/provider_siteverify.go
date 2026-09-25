@@ -54,14 +54,18 @@ var siteverifyBuiltins = map[string]siteverifyBuiltin{
 
 // pairSiteverify builds the built-in siteverify widget and form verifier.
 // provider is hcaptcha, recaptcha, or turnstile. The validate body stays empty.
-func pairSiteverify(httpClient *http.Client, provider, secretKey string, log *slog.Logger) (Widget, *siteverifyVerifier) {
+//
+//nolint:ireturn // Yaegi v0.16.1 panics when New assigns a concrete verifier in one multi-value assignment.
+func pairSiteverify(httpClient *http.Client, provider, secretKey string, log *slog.Logger) (Widget, Verifier) {
 	builtin := siteverifyBuiltins[provider]
 	return builtin.widget, newSiteverifyVerifier(httpClient, secretKey, builtin.validateURL, "", log)
 }
 
 // pairCustom builds the operator-supplied siteverify widget and verifier.
 // validateBody may be form, json, or empty. Built-ins use pairSiteverify.
-func pairCustom(httpClient *http.Client, secretKey, scriptURL, className, tokenField, validateURL, validateBody string, log *slog.Logger) (Widget, *siteverifyVerifier) {
+//
+//nolint:ireturn // Yaegi v0.16.1 panics when New assigns a concrete verifier in one multi-value assignment.
+func pairCustom(httpClient *http.Client, secretKey, scriptURL, className, tokenField, validateURL, validateBody string, log *slog.Logger) (Widget, Verifier) {
 	return Widget{
 		ScriptURL:        scriptURL,
 		Class:            className,
