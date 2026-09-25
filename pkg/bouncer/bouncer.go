@@ -5,9 +5,7 @@ import (
 	"errors"
 	"html"
 	"log/slog"
-	"net"
 	"net/http"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -19,6 +17,7 @@ import (
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
 	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -27,8 +26,8 @@ import (
 
 // Bouncer is one Traefik router handler. It is not the reclaim value.
 type Bouncer struct {
-	appsecBound              atomic.Value   // *appsec.Client; typed nil when empty
-	appsecExcludeRegex       *regexp.Regexp // nil = no AppSec exclude
+	appsecBound              atomic.Value // *appsec.Client; typed nil when empty
+	appsecBypassRules        *httprule.Set
 	appsecFailureAction      string
 	banTemplate              *template.Template
 	banTemplateContentType   string
@@ -39,9 +38,9 @@ type Bouncer struct {
 	enabled                  bool
 	forwardedCustomHeader    string
 	forwardedHeadersInsecure bool
-	lapiBound                atomic.Value   // *lapi.Client; typed nil when empty
-	lapiExcludeRegex         *regexp.Regexp // nil = no LAPI exclude
-	lapiFailureAction        string         // per-router LAPI fallback (not on Client identity)
+	lapiBound                atomic.Value // *lapi.Client; typed nil when empty
+	lapiBypassRules          *httprule.Set
+	lapiFailureAction        string // per-router LAPI fallback (not on Client identity)
 	lapiInstanceName         string
 	appsecInstanceName       string
 	captchaInstanceName      string
@@ -90,11 +89,11 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 		log.Info("BouncerForwardedHeadersInsecure enabled", "header", forwardedCustomHeader)
 	}
 
-	appsecExcludeRegex, err := configuration.CompileExcludeRegex(config.BouncerAppsecExcludeRegex)
+	appsecBypassRules, err := httprule.New(config.BouncerAppsecBypassRules)
 	if err != nil {
 		return nil, err
 	}
-	lapiExcludeRegex, err := configuration.CompileExcludeRegex(config.BouncerLapiExcludeRegex)
+	lapiBypassRules, err := httprule.New(config.BouncerLapiBypassRules)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +113,7 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 	}
 
 	routeHandler := &Bouncer{
-		appsecExcludeRegex:       appsecExcludeRegex,
+		appsecBypassRules:        appsecBypassRules,
 		appsecFailureAction:      configuration.EffectiveFailureAction(config.BouncerAppsecFailureAction),
 		banTemplate:              banTemplate,
 		banTemplateContentType:   banTemplateContentType,
@@ -124,7 +123,7 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 		enabled:                  config.BouncerEnabled,
 		forwardedCustomHeader:    forwardedCustomHeader,
 		forwardedHeadersInsecure: config.BouncerForwardedHeadersInsecure,
-		lapiExcludeRegex:         lapiExcludeRegex,
+		lapiBypassRules:          lapiBypassRules,
 		lapiFailureAction:        configuration.EffectiveFailureAction(config.BouncerLapiFailureAction),
 		lapiInstanceName:         config.LapiInstanceName,
 		appsecInstanceName:       config.AppsecInstanceName,
@@ -360,27 +359,6 @@ func (b *Bouncer) forcedDecisionKind(httpReq *http.Request) string {
 	}
 }
 
-// excludeMatchString is host://path for exclude regexes. Host is req.Host;
-// SplitHostPort strips a port when that call succeeds. Path is req.URL.Path
-// with one leading slash removed (empty or "/" → host://).
-func excludeMatchString(httpReq *http.Request) string {
-	host := httpReq.Host
-	if hostOnly, _, err := net.SplitHostPort(host); err == nil {
-		host = hostOnly
-	}
-	path := ""
-	if httpReq.URL != nil {
-		path = httpReq.URL.Path
-	}
-	path = strings.TrimPrefix(path, "/")
-	return host + "://" + path
-}
-
-// excludedBy reports whether excludeRegex matches this request's host://path.
-func excludedBy(excludeRegex *regexp.Regexp, httpReq *http.Request) bool {
-	return excludeRegex != nil && excludeRegex.MatchString(excludeMatchString(httpReq))
-}
-
 // passOrForcedCaptcha passes to next, or captcha when the header forced c.
 func (b *Bouncer) passOrForcedCaptcha(rw http.ResponseWriter, req clientRequest) {
 	if b.forcedDecisionKind(req.Request) == decisionscope.CaptchaValue {
@@ -506,7 +484,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		return
 	}
 
-	if excludedBy(b.lapiExcludeRegex, req.Request) {
+	if b.lapiBypassRules.Match(req.Request) {
 		b.passOrForcedCaptcha(rw, req)
 		return
 	}
@@ -701,9 +679,9 @@ func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientR
 	captchaClient.ServeHTTP(rw, req.Request, req.remoteIP, b.remediationCustomHeader)
 }
 
-// handleNextServeHTTP runs AppSec if enabled and not excluded, then the next handler.
+// handleNextServeHTTP runs AppSec if enabled and not bypassed, then the next handler.
 func (b *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req clientRequest) {
-	if excludedBy(b.appsecExcludeRegex, req.Request) {
+	if b.appsecBypassRules.Match(req.Request) {
 		b.next.ServeHTTP(rw, req.Request)
 		return
 	}

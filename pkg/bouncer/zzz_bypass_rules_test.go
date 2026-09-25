@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -15,30 +14,35 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-const testExcludeHealthPath = "/health"
+const testBypassHealthPath = "/health"
 
-func mustCompileExclude(t *testing.T, pattern string) *regexp.Regexp {
+func mustCompileBypass(t *testing.T, rules []httprule.Rule) *httprule.Set {
 	t.Helper()
-	compiled, err := configuration.CompileExcludeRegex(pattern)
+	set, err := httprule.New(rules)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return compiled
+	return set
 }
 
-func testExcludeHealthRequest() *http.Request {
-	req := httptest.NewRequest(http.MethodGet, "http://example.com"+testExcludeHealthPath, nil)
+func pathBypass(path string) []httprule.Rule {
+	return []httprule.Rule{{Path: path}}
+}
+
+func testBypassHealthRequest() *http.Request {
+	req := httptest.NewRequest(http.MethodGet, "http://example.com"+testBypassHealthPath, nil)
 	req.Host = "example.com"
 	req.RemoteAddr = "203.0.113.10:1"
 	return req
 }
 
-func testExcludeOriginBouncer(t *testing.T) (*Bouncer, *bool) {
+func testBypassOriginBouncer(t *testing.T) (*Bouncer, *bool) {
 	t.Helper()
 	log := logger.New("ERROR", "")
 	clientChecker, err := ip.NewChecker(log, nil)
@@ -64,130 +68,122 @@ func testExcludeOriginBouncer(t *testing.T) (*Bouncer, *bool) {
 	return b, &passed
 }
 
-func TestExcludeMatchString(t *testing.T) {
-	tests := []struct {
-		name string
-		host string
-		url  string
-		want string
-	}{
-		{name: "port stripped", host: "example.com:443", url: "http://example.com/health", want: "example.com://health"},
-		{name: "query ignored", host: "example.com", url: "http://example.com/health?a=1", want: "example.com://health"},
-		{name: "empty path", host: "example.com", url: "http://example.com", want: "example.com://"},
-		{name: "root path", host: "example.com", url: "http://example.com/", want: "example.com://"},
-		{name: "nested path keeps inner slashes", host: "example.com", url: "http://example.com/v2/blobs", want: "example.com://v2/blobs"},
-		{name: "ipv6 with port loses brackets", host: "[::1]:443", url: "http://[::1]/health", want: "::1://health"},
-		{name: "bare ipv6 stays as Host wrote it", host: "[::1]", url: "http://[::1]/health", want: "[::1]://health"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, tt.url, nil)
-			req.Host = tt.host
-			if got := excludeMatchString(req); got != tt.want {
-				t.Fatalf("excludeMatchString=%q want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestBouncerNew_compilesExcludeRegex(t *testing.T) {
+func TestBouncerNew_compilesBypassRules(t *testing.T) {
 	log := logger.New("ERROR", "")
 	cfg := configuration.New()
-	cfg.BouncerAppsecExcludeRegex = `example\.com://health`
-	cfg.BouncerLapiExcludeRegex = `^ok/`
+	cfg.BouncerAppsecBypassRules = pathBypass("^/healthz$")
+	cfg.BouncerLapiBypassRules = pathBypass("^/ok/")
 	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, false, false, log)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.appsecExcludeRegex == nil || !got.appsecExcludeRegex.MatchString("example.com://health") {
-		t.Fatal("appsecExcludeRegex must compile")
+	appsecReq := httptest.NewRequest(http.MethodGet, "http://example.com/healthz", nil)
+	if !got.appsecBypassRules.Match(appsecReq) {
+		t.Fatal("appsecBypassRules must compile")
 	}
-	if got.lapiExcludeRegex == nil || !got.lapiExcludeRegex.MatchString("ok/") {
-		t.Fatal("lapiExcludeRegex must compile")
+	lapiReq := httptest.NewRequest(http.MethodGet, "http://example.com/ok/x", nil)
+	if !got.lapiBypassRules.Match(lapiReq) {
+		t.Fatal("lapiBypassRules must compile")
 	}
 }
 
-func TestBouncerNew_emptyExcludeRegexIsNil(t *testing.T) {
+func TestBouncerNew_emptyBypassRulesMatchNothing(t *testing.T) {
 	log := logger.New("ERROR", "")
 	cfg := configuration.New()
-	cfg.BouncerLapiExcludeRegex = "  "
 	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, false, false, log)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.lapiExcludeRegex != nil || got.appsecExcludeRegex != nil {
-		t.Fatal("empty exclude must stay nil")
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/health", nil)
+	if got.lapiBypassRules.Match(req) || got.appsecBypassRules.Match(req) {
+		t.Fatal("empty bypass lists must match nothing")
 	}
 }
 
-func TestBouncerNew_invalidExcludeRegex(t *testing.T) {
+func TestBouncerNew_invalidBypassRules(t *testing.T) {
 	log := logger.New("ERROR", "")
 	cfg := configuration.New()
-	cfg.BouncerLapiExcludeRegex = "("
+	cfg.BouncerLapiBypassRules = pathBypass("(")
 	_, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, false, false, log)
 	if err == nil {
-		t.Fatal("invalid LAPI exclude must fail New")
+		t.Fatal("invalid LAPI bypass must fail New")
 	}
 	cfg = configuration.New()
-	cfg.BouncerAppsecExcludeRegex = "("
+	cfg.BouncerAppsecBypassRules = pathBypass("(")
 	_, err = New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, false, false, log)
 	if err == nil {
-		t.Fatal("invalid AppSec exclude must fail New")
+		t.Fatal("invalid AppSec bypass must fail New")
 	}
 }
 
-func TestServeHTTP_emptyLapiExcludeStillLooksUp(t *testing.T) {
-	b, passed := testExcludeOriginBouncer(t)
+func TestServeHTTP_emptyLapiBypassStillLooksUp(t *testing.T) {
+	b, passed := testBypassOriginBouncer(t)
 	lapiClient, store := lapi.NewTestClient(b.log)
 	store.Put(decisionstore.Decision{
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
 	})
 	bindTestLAPI(b, lapiClient)
 	rw := httptest.NewRecorder()
-	b.ServeHTTP(rw, testExcludeHealthRequest())
+	b.ServeHTTP(rw, testBypassHealthRequest())
 	if *passed {
-		t.Fatal("empty exclude must still apply the store ban")
+		t.Fatal("empty bypass must still apply the store ban")
 	}
 	if rw.Code != http.StatusForbidden {
 		t.Fatalf("status=%d", rw.Code)
 	}
 }
 
-func TestServeHTTP_nonMatchingLapiExcludeStillLooksUp(t *testing.T) {
-	b, passed := testExcludeOriginBouncer(t)
+func TestServeHTTP_nonMatchingLapiBypassStillLooksUp(t *testing.T) {
+	b, passed := testBypassOriginBouncer(t)
 	lapiClient, store := lapi.NewTestClient(b.log)
 	store.Put(decisionstore.Decision{
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
 	})
 	bindTestLAPI(b, lapiClient)
-	b.lapiExcludeRegex = mustCompileExclude(t, `^nomatch$`)
+	b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/nomatch$"))
 	rw := httptest.NewRecorder()
-	b.ServeHTTP(rw, testExcludeHealthRequest())
+	b.ServeHTTP(rw, testBypassHealthRequest())
 	if *passed {
-		t.Fatal("non-matching LAPI exclude must still apply the store ban")
+		t.Fatal("non-matching LAPI bypass must still apply the store ban")
 	}
 	if rw.Code != http.StatusForbidden {
 		t.Fatalf("status=%d", rw.Code)
 	}
 }
 
-func TestServeHTTP_lapiExcludeSkipsStreamStoreAndUnhealthy(t *testing.T) {
-	b, passed := testExcludeOriginBouncer(t)
+func TestServeHTTP_lapiBypassSkipsUnboundLAPIFailure(t *testing.T) {
+	b, passed := testBypassOriginBouncer(t)
+	b.subscribeLAPI = true
+	b.startupBlock = false
+	b.lapiFailureAction = configuration.FailureActionBan
+	b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/health$"))
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, testBypassHealthRequest())
+	if !*passed {
+		t.Fatal("LAPI bypass must skip missing-subscribed-LAPI failure")
+	}
+	if rw.Code != http.StatusOK {
+		t.Fatalf("status=%d", rw.Code)
+	}
+}
+
+func TestServeHTTP_lapiBypassSkipsStreamStoreAndUnhealthy(t *testing.T) {
+	b, passed := testBypassOriginBouncer(t)
 	lapiClient, store := lapi.NewTestClient(b.log)
 	store.Put(decisionstore.Decision{
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
 	})
 	lapiClient.SetStreamHealthyForTest(false)
 	bindTestLAPI(b, lapiClient)
-	b.lapiExcludeRegex = mustCompileExclude(t, `example\.com://health`)
+	b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/health$"))
 	rw := httptest.NewRecorder()
-	b.ServeHTTP(rw, testExcludeHealthRequest())
+	b.ServeHTTP(rw, testBypassHealthRequest())
 	if !*passed {
-		t.Fatal("LAPI exclude must skip store hit and stream-unhealthy failure")
+		t.Fatal("LAPI bypass must skip store hit and stream-unhealthy failure")
 	}
 }
 
-func TestServeHTTP_lapiExcludeSkipsLiveAndNoneLookup(t *testing.T) {
+func TestServeHTTP_lapiBypassSkipsLiveAndNoneLookup(t *testing.T) {
 	for _, mode := range []string{configuration.LiveMode, configuration.NoneMode} {
 		t.Run(mode, func(t *testing.T) {
 			var hits int64
@@ -217,18 +213,18 @@ func TestServeHTTP_lapiExcludeSkipsLiveAndNoneLookup(t *testing.T) {
 				LapiPath:                         "/",
 				LapiScheme:                       parsed.Scheme,
 				LapiTLSInsecureVerify:            true,
-			}, log, "test", store, "exclude-live", "exclude-live")
+			}, log, "test", store, "bypass-live", "bypass-live")
 			if err != nil {
 				t.Fatal(err)
 			}
 			t.Cleanup(lapiClient.Close)
-			b, passed := testExcludeOriginBouncer(t)
+			b, passed := testBypassOriginBouncer(t)
 			b.subscribeLAPI = true
 			b.lapiBound.Store(lapiClient)
-			b.lapiExcludeRegex = mustCompileExclude(t, `example\.com://health`)
-			b.ServeHTTP(httptest.NewRecorder(), testExcludeHealthRequest())
+			b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/health$"))
+			b.ServeHTTP(httptest.NewRecorder(), testBypassHealthRequest())
 			if !*passed {
-				t.Fatal("LAPI exclude must skip LiveLookup")
+				t.Fatal("LAPI bypass must skip LiveLookup")
 			}
 			if atomic.LoadInt64(&hits) != 0 {
 				t.Fatalf("LiveLookup hits=%d want 0", hits)
@@ -237,7 +233,7 @@ func TestServeHTTP_lapiExcludeSkipsLiveAndNoneLookup(t *testing.T) {
 	}
 }
 
-func TestServeHTTP_appsecExcludeSkipsQuery(t *testing.T) {
+func TestServeHTTP_appsecBypassSkipsQuery(t *testing.T) {
 	var hits int64
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt64(&hits, 1)
@@ -249,19 +245,19 @@ func TestServeHTTP_appsecExcludeSkipsQuery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, passed := testExcludeOriginBouncer(t)
+	b, passed := testBypassOriginBouncer(t)
 	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
-	b.appsecExcludeRegex = mustCompileExclude(t, `^example\.com://health$`)
-	b.ServeHTTP(httptest.NewRecorder(), testExcludeHealthRequest())
+	b.appsecBypassRules = mustCompileBypass(t, pathBypass("^/health$"))
+	b.ServeHTTP(httptest.NewRecorder(), testBypassHealthRequest())
 	if !*passed {
-		t.Fatal("AppSec exclude must call next")
+		t.Fatal("AppSec bypass must call next")
 	}
 	if atomic.LoadInt64(&hits) != 0 {
 		t.Fatalf("AppSec Query hits=%d want 0", hits)
 	}
 }
 
-func TestServeHTTP_nonMatchingAppsecExcludeStillQueries(t *testing.T) {
+func TestServeHTTP_nonMatchingAppsecBypassStillQueries(t *testing.T) {
 	var hits int64
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt64(&hits, 1)
@@ -273,19 +269,19 @@ func TestServeHTTP_nonMatchingAppsecExcludeStillQueries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, passed := testExcludeOriginBouncer(t)
+	b, passed := testBypassOriginBouncer(t)
 	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
-	b.appsecExcludeRegex = mustCompileExclude(t, `^nomatch$`)
-	b.ServeHTTP(httptest.NewRecorder(), testExcludeHealthRequest())
+	b.appsecBypassRules = mustCompileBypass(t, pathBypass("^/nomatch$"))
+	b.ServeHTTP(httptest.NewRecorder(), testBypassHealthRequest())
 	if !*passed {
-		t.Fatal("non-matching AppSec exclude must call next")
+		t.Fatal("non-matching AppSec bypass must call next")
 	}
 	if atomic.LoadInt64(&hits) != 1 {
 		t.Fatalf("AppSec Query hits=%d want 1", hits)
 	}
 }
 
-func TestServeHTTP_lapiExcludeDoesNotSkipAppsec(t *testing.T) {
+func TestServeHTTP_lapiBypassDoesNotSkipAppsec(t *testing.T) {
 	var hits int64
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt64(&hits, 1)
@@ -297,26 +293,44 @@ func TestServeHTTP_lapiExcludeDoesNotSkipAppsec(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, passed := testExcludeOriginBouncer(t)
+	b, passed := testBypassOriginBouncer(t)
 	lapiClient, store := lapi.NewTestClient(b.log)
 	store.Put(decisionstore.Decision{
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
 	})
 	bindTestLAPI(b, lapiClient)
 	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
-	b.lapiExcludeRegex = mustCompileExclude(t, `example\.com://health`)
-	b.ServeHTTP(httptest.NewRecorder(), testExcludeHealthRequest())
+	b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/health$"))
+	b.ServeHTTP(httptest.NewRecorder(), testBypassHealthRequest())
 	if !*passed {
-		t.Fatal("LAPI exclude still reaches the pass path")
+		t.Fatal("LAPI bypass still reaches the pass path")
 	}
 	if atomic.LoadInt64(&hits) != 1 {
 		t.Fatalf("AppSec Query hits=%d want 1", hits)
 	}
 }
 
-func TestServeHTTP_forcedBStillBansBeforeLapiExclude(t *testing.T) {
+func TestServeHTTP_appsecBypassDoesNotSkipLapi(t *testing.T) {
+	b, passed := testBypassOriginBouncer(t)
+	lapiClient, store := lapi.NewTestClient(b.log)
+	store.Put(decisionstore.Decision{
+		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
+	})
+	bindTestLAPI(b, lapiClient)
+	b.appsecBypassRules = mustCompileBypass(t, pathBypass("^/health$"))
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, testBypassHealthRequest())
+	if *passed {
+		t.Fatal("AppSec bypass must not skip LAPI lookup")
+	}
+	if rw.Code != http.StatusForbidden {
+		t.Fatalf("status=%d", rw.Code)
+	}
+}
+
+func TestServeHTTP_forcedBStillBansBeforeLapiBypass(t *testing.T) {
 	b, lapiClient, passed := testForcedDecisionBouncer(t, nil, nil, nil, true)
-	b.lapiExcludeRegex = mustCompileExclude(t, `example\.com://protected`)
+	b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/protected$"))
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testForcedDecisionRequest("b"))
 	if *passed {
@@ -330,17 +344,17 @@ func TestServeHTTP_forcedBStillBansBeforeLapiExclude(t *testing.T) {
 	}
 }
 
-func TestServeHTTP_forcedCStillCaptchasAfterLapiExclude(t *testing.T) {
+func TestServeHTTP_forcedCStillCaptchasAfterLapiBypass(t *testing.T) {
 	client := testCaptchaClient(t, "/fast.js", "", "", nil)
 	b, _, passed := testForcedDecisionBouncer(t, nil, client, nil, true)
-	b.lapiExcludeRegex = mustCompileExclude(t, `example\.com://protected`)
+	b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/protected$"))
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testForcedDecisionRequest("c"))
 	if *passed {
-		t.Fatal("forced c after LAPI exclude must not reach origin")
+		t.Fatal("forced c after LAPI bypass must not reach origin")
 	}
 	if rw.Body.String() == "banned" {
-		t.Fatal("store ban must not apply after LAPI exclude")
+		t.Fatal("store ban must not apply after LAPI bypass")
 	}
 	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
 		t.Fatalf("want captcha page, got %q", rw.Body.String())
@@ -348,7 +362,7 @@ func TestServeHTTP_forcedCStillCaptchasAfterLapiExclude(t *testing.T) {
 }
 
 func TestServeHTTP_trustedIPStillSkipsPlugin(t *testing.T) {
-	b, passed := testExcludeOriginBouncer(t)
+	b, passed := testBypassOriginBouncer(t)
 	trusted, err := ip.NewChecker(b.log, []string{"203.0.113.10"})
 	if err != nil {
 		t.Fatal(err)
@@ -359,30 +373,49 @@ func TestServeHTTP_trustedIPStillSkipsPlugin(t *testing.T) {
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
 	})
 	bindTestLAPI(b, lapiClient)
-	b.lapiExcludeRegex = mustCompileExclude(t, `^nomatch$`)
-	b.ServeHTTP(httptest.NewRecorder(), testExcludeHealthRequest())
+	b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/nomatch$"))
+	b.ServeHTTP(httptest.NewRecorder(), testBypassHealthRequest())
 	if !*passed {
 		t.Fatal("trusted client must skip the whole plugin")
 	}
 }
 
-func TestServeHTTP_portStrippedFromHost(t *testing.T) {
-	b, passed := testExcludeOriginBouncer(t)
+func TestServeHTTP_unanchoredPathMatchesSubstring(t *testing.T) {
+	b, passed := testBypassOriginBouncer(t)
 	lapiClient, store := lapi.NewTestClient(b.log)
 	store.Put(decisionstore.Decision{
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
 	})
 	bindTestLAPI(b, lapiClient)
-	b.lapiExcludeRegex = mustCompileExclude(t, `^example\.com://health$`)
-	req := testExcludeHealthRequest()
-	req.Host = "example.com:443"
+	b.lapiBypassRules = mustCompileBypass(t, pathBypass("health"))
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/unhealthy", nil)
+	req.Host = "example.com"
+	req.RemoteAddr = "203.0.113.10:1"
 	b.ServeHTTP(httptest.NewRecorder(), req)
 	if !*passed {
-		t.Fatal("port-stripped host must match LAPI exclude")
+		t.Fatal("unanchored health must skip LAPI on /unhealthy")
 	}
 }
 
-func TestServeHTTP_queryStringNotInMatchString(t *testing.T) {
+func TestServeHTTP_hostIsNotInPathMatch(t *testing.T) {
+	b, passed := testBypassOriginBouncer(t)
+	lapiClient, store := lapi.NewTestClient(b.log)
+	store.Put(decisionstore.Decision{
+		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
+	})
+	bindTestLAPI(b, lapiClient)
+	b.lapiBypassRules = mustCompileBypass(t, pathBypass("example.com://health"))
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, testBypassHealthRequest())
+	if *passed {
+		t.Fatal("host://path must not match req.URL.Path /health")
+	}
+	if rw.Code != http.StatusForbidden {
+		t.Fatalf("status=%d", rw.Code)
+	}
+}
+
+func TestServeHTTP_queryStringNotInPath(t *testing.T) {
 	var hits int64
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt64(&hits, 1)
@@ -394,15 +427,15 @@ func TestServeHTTP_queryStringNotInMatchString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, passed := testExcludeOriginBouncer(t)
+	b, passed := testBypassOriginBouncer(t)
 	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
-	b.appsecExcludeRegex = mustCompileExclude(t, `^example\.com://health$`)
+	b.appsecBypassRules = mustCompileBypass(t, pathBypass("^/health$"))
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/health?a=1", nil)
 	req.Host = "example.com"
 	req.RemoteAddr = "203.0.113.10:1"
 	b.ServeHTTP(httptest.NewRecorder(), req)
 	if !*passed {
-		t.Fatal("query must not be in the match string")
+		t.Fatal("query must not be in the path")
 	}
 	if atomic.LoadInt64(&hits) != 0 {
 		t.Fatalf("AppSec Query hits=%d want 0", hits)

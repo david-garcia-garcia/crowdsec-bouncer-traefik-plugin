@@ -1,0 +1,18 @@
+issueKey: 2026-09-25-request-bypass-rules
+jobName: 2026-09-25-request-bypass-rules
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: e2ebb6eb19e7cb6da3fdeddf59926d41bf845cc3ec4a8f8868e814391148083a
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: request-bypass-rules
+pr:
+  id: 163
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/163

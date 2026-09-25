@@ -17,6 +17,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
 	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
@@ -77,7 +78,7 @@ type Config struct {
 	AppsecTLSClientKey                  string                       `json:"appsecTlsClientKey,omitempty"`
 	AppsecTLSClientKeyFile              string                       `json:"appsecTlsClientKeyFile,omitempty"`
 	AppsecTLSInsecureVerify             bool                         `json:"appsecTlsInsecureVerify,omitempty"`
-	BouncerAppsecExcludeRegex           string                       `json:"bouncerAppsecExcludeRegex,omitempty"` // RE2; empty = off; match host://path
+	BouncerAppsecBypassRules            []httprule.Rule              `json:"bouncerAppsecBypassRules,omitempty"`
 	BouncerAppsecFailureAction          string                       `json:"bouncerAppsecFailureAction,omitempty"`
 	BouncerBanFilePath                  string                       `json:"bouncerBanFilePath,omitempty"`
 	BouncerClientTrustedIPs             []string                     `json:"bouncerClientTrustedIps,omitempty"`
@@ -87,7 +88,7 @@ type Config struct {
 	BouncerForwardedHeadersCustomName   string                       `json:"bouncerForwardedHeadersCustomName,omitempty"`
 	BouncerForwardedHeadersInsecure     bool                         `json:"bouncerForwardedHeadersInsecure,omitempty"`
 	BouncerForwardedHeadersTrustedIPs   []string                     `json:"bouncerForwardedHeadersTrustedIps,omitempty"`
-	BouncerLapiExcludeRegex             string                       `json:"bouncerLapiExcludeRegex,omitempty"` // RE2; empty = off; match host://path
+	BouncerLapiBypassRules              []httprule.Rule              `json:"bouncerLapiBypassRules,omitempty"`
 	BouncerLapiFailureAction            string                       `json:"bouncerLapiFailureAction,omitempty"`
 	BouncerOriginBasedDecisionRemap     map[string]map[string]string `json:"bouncerOriginBasedDecisionRemap,omitempty"`
 	BouncerRedisUnreachableBlock        bool                         `json:"bouncerRedisUnreachableBlock,omitempty"`
@@ -199,15 +200,6 @@ func EffectiveFailureAction(action string) string {
 	return action
 }
 
-// CompileExcludeRegex trims pattern and compiles it as Go RE2. Empty after trim is off (nil, nil).
-func CompileExcludeRegex(pattern string) (*regexp.Regexp, error) {
-	pattern = strings.TrimSpace(pattern)
-	if pattern == "" {
-		return nil, nil //nolint:nilnil // empty after trim is off, not a failure
-	}
-	return regexp.Compile(pattern)
-}
-
 // New creates the default plugin configuration.
 func New() *Config {
 	return &Config{
@@ -219,7 +211,7 @@ func New() *Config {
 		AppsecPath:                          "/",
 		AppsecScheme:                        "",
 		AppsecTLSInsecureVerify:             false,
-		BouncerAppsecExcludeRegex:           "",
+		BouncerAppsecBypassRules:            []httprule.Rule{},
 		BouncerAppsecFailureAction:          FailureActionBan,
 		BouncerBanFilePath:                  "",
 		BouncerClientTrustedIPs:             []string{},
@@ -229,7 +221,7 @@ func New() *Config {
 		BouncerForwardedHeadersCustomName:   "X-Forwarded-For",
 		BouncerForwardedHeadersInsecure:     false,
 		BouncerForwardedHeadersTrustedIPs:   []string{},
-		BouncerLapiExcludeRegex:             "",
+		BouncerLapiBypassRules:              []httprule.Rule{},
 		BouncerLapiFailureAction:            FailureActionBan,
 		BouncerOriginBasedDecisionRemap:     map[string]map[string]string{},
 		BouncerRedisUnreachableBlock:        true,
@@ -827,11 +819,11 @@ func validateParamsRequired(config *Config) error {
 	if err := validateFailureAction("BouncerAppsecFailureAction", config.BouncerAppsecFailureAction, captchaInstanceReady); err != nil {
 		return err
 	}
-	if _, err := CompileExcludeRegex(config.BouncerAppsecExcludeRegex); err != nil {
-		return fmt.Errorf("BouncerAppsecExcludeRegex: %w", err)
+	if _, err := httprule.New(config.BouncerAppsecBypassRules); err != nil {
+		return fmt.Errorf("BouncerAppsecBypassRules: %w", err)
 	}
-	if _, err := CompileExcludeRegex(config.BouncerLapiExcludeRegex); err != nil {
-		return fmt.Errorf("BouncerLapiExcludeRegex: %w", err)
+	if _, err := httprule.New(config.BouncerLapiBypassRules); err != nil {
+		return fmt.Errorf("BouncerLapiBypassRules: %w", err)
 	}
 	if config.AppsecBodyLimit < 0 {
 		return errors.New("AppsecBodyLimit: cannot be less than 0")
