@@ -1,0 +1,18 @@
+issueKey: 2026-09-25-remediation-cache-control
+jobName: 2026-09-25-remediation-cache-control
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: b26b666ed5ccbe5d7fe79911c8a32a5fb5f03d8151daa7e4bf5cbd48b0f6a281
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: remediation-cache-control
+pr:
+  id: 164
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/164
