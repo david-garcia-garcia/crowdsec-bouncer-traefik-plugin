@@ -14,10 +14,10 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+In progress. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 39f40751
+Reviewed head: 16798942
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,21 +32,25 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-25-init-log-component pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | init-log-component | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/160 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [std_go_logger_debug-attrs](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-init-log-component/openspec/changes/init-log-component/proposal.md) — modified
+- [std_go_logger_slog-output](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-init-log-component/openspec/changes/init-log-component/proposal.md) — modified
+
 
 ## Deviations from the ask
 - taken: rename `component=CrowdsecBouncerTraefikPlugin` to something shorter like CrowdsecBounder. → `CrowdsecBouncer`, the existing type and HTML template name in `pkg/bouncer/bouncer.go`. — `pkg/logger/logger.go` — honouring the typed example would add a misspelled third identity next to the unit already named CrowdsecBouncer; the job is a shorter component, and that name already exists.. Requester: not asked.
 
 
 ## Follow-up issues
-None.
+- [ ] [Rename `std_go_logger_debug-attrs` to a Trace-named leaf](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-init-log-component/knowledge/debt/2026-09-24-rename-std-go-logger-debug-attrs.md) — domain `debug-attrs` hides Request-path Trace; this run still folds construct-time `Bouncer initialized` attrs onto that leaf.
+
 
 ## How this fits together
 Ticket 2026-09-25-init-log-component on branch 2026-09-25-init-log-component targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/160; CI not seen.
@@ -68,9 +72,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 39f407515b4458cbb8e21f1113a1a2f9dc29da67 | Card must match the branch you measured |
+| Reviewed head | 16798942d0e10a6ee070f3b0c488b89e2186996a | Card must match the branch you measured |
 
 ### Stored data model
 None.
