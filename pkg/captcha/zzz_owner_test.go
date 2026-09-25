@@ -110,18 +110,22 @@ func TestOwnershipKey_EnterpriseKnobChangeReclaims(t *testing.T) {
 	}
 }
 
+// TestOwnershipKey_LogConfigChangeReclaims proves OwnershipKey forks when logLevel, logFilePath, or logFormat changes.
 func TestOwnershipKey_LogConfigChangeReclaims(t *testing.T) {
 	left := testOwnerConfig(t, 10)
+	// logLevel-only Config change must change OwnershipKey.
 	rightLevel := *left
 	rightLevel.LogLevel = "DEBUG"
 	if OwnershipKey(left, "mw") == OwnershipKey(&rightLevel, "mw") {
 		t.Fatal("logLevel change must change the ownership key")
 	}
+	// logFilePath-only Config change must change OwnershipKey.
 	rightPath := *left
 	rightPath.LogFilePath = "/tmp/bouncer.log"
 	if OwnershipKey(left, "mw") == OwnershipKey(&rightPath, "mw") {
 		t.Fatal("logFilePath change must change the ownership key")
 	}
+	// logFormat-only Config change must change OwnershipKey.
 	rightFormat := *left
 	rightFormat.LogFormat = "json"
 	if OwnershipKey(left, "mw") == OwnershipKey(&rightFormat, "mw") {
