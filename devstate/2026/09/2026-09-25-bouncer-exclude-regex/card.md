@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: bc0346e8
+Reviewed head: 87e644d4
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,14 +32,17 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-25-bouncer-exclude-regex pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | bouncer-exclude-regex | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/158 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-bouncer-exclude-regex/openspec/changes/bouncer-exclude-regex/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-bouncer-exclude-regex/openspec/changes/bouncer-exclude-regex/proposal.md) — modified
+
 
 ## Deviations from the ask
 None.
@@ -67,9 +70,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | bc0346e809e90e446b96d473bc71004968794463 | Card must match the branch you measured |
+| Reviewed head | 87e644d4d002b824d3d86824c23a6f3dd28753ec | Card must match the branch you measured |
 
 ### Stored data model
 None.
