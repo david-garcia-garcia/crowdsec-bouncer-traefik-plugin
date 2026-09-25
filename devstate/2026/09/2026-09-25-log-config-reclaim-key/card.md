@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: c4493633
+Reviewed head: b3e94b75
 Owner decision: None.
 
 ## Review scores
@@ -32,14 +32,16 @@ Owner decision: None.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-25-log-config-reclaim-key pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | include-log-config-in-captcha-reclaim-key | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/162 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-log-config-reclaim-key/openspec/changes/include-log-config-in-captcha-reclaim-key/proposal.md) — modified
+
 
 ## Deviations from the ask
 None.
@@ -64,9 +66,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | c4493633ddfb30fdc634baaad54f19721977d7f7 | Card must match the branch you measured |
+| Reviewed head | b3e94b751df16c22d725ece89704d9597a829112 | Card must match the branch you measured |
 
 ### Stored data model
 None.
