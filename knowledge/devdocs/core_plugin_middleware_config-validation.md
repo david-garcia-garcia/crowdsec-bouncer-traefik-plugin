@@ -46,8 +46,9 @@ _Avoid_: sharedLogFiles, reclaim value, log owner
 - After a successful lookup, reject `""` for the site key. Reject an empty secret only when the provider is not `recaptcha-enterprise`. `eucaptcha` stays on the secret-required list. Site first.
 - Use the same trigger as `CaptchaGateSecret`: `captchaEnabled`, not "failure action is captcha" and not a leftover provider.
 - Error text: `CaptchaSiteKey: cannot be empty when CaptchaProvider is set` and the secret twin.
-- When `captchaEnabled` is true, reject an empty `CaptchaFilePath` (`CaptchaFilePath: cannot be empty when CaptchaProvider is set`) and fail when `GetTemplate` fails. Ban template stays "when path is set".
-- `captcha.Client.New` returns the `GetTemplate` error. Do not discard it. Do not invent a bundled default template.
+- When `captchaEnabled` is true, keep site, secret, and gate secret required. Do not fail `ValidateParams` because `CaptchaFilePath` is empty or `GetTemplate` fails, or because `BouncerBanFilePath` is unloadable. Empty ban path stays accepted at validation.
+- The captcha owner (`captcha.Client.New` when `captchaEnabled`) warns once at startup with `crowdsec captcha template unavailable` and `reason` `empty` or `unloadable` (`configuration.TemplateUnavailableReason`), returns nil, and leaves `Valid` false so captcha remediations use the existing ban path. Bounce-only never Opens captcha, so unused default `/captcha.html` is never read and must not emit this WARN.
+- `bouncer.New` warns once with `crowdsec bouncer ban template unavailable` and the same `reason` values when the ban file is empty or not loadable, keeps `banTemplate` nil, and succeeds. Ban GET stays status with an empty body. Do not warn from `bouncer.New` about `CaptchaFilePath`. Do not invent bundled default templates.
 - After CAPI (alone) or LAPI (other modes), call `validateAppsecURLKeyAndTLS` only when `config.AppsecEnabled`. Do not hide that `if` only inside a LAPI wrapper — alone never calls it.
 - Reuse `AppsecEnabled`. Do not re-derive from leftover AppSec fields or `lapiMode`.
 - Reject `lapiMode: appsec` (E4). Gate LAPI URL/keys on `LapiEnabled`. Reject leftover instance name or secret when bounce and owner flags are both false (E2). Captcha E2 is leftover `captchaInstanceName` only; leftover owner-read `captcha*` is not a secret. Leftover `bouncerCaptcha*` never reaches `New`.
@@ -97,7 +98,9 @@ _ = checkFile.Close()
 
 ## Key files
 
-- `pkg/configuration/configuration.go` (`ValidateParams`, `validateAppsecURLKeyAndTLS`, `validateCaptchaCredentials`, `GetVariable`, `validateLogging`)
+- `pkg/configuration/configuration.go` (`ValidateParams`, `validateEnabledCaptchaSettings`, `validateCaptchaCredentialsAndTemplates`, `GetTemplate`, `TemplateUnavailableReason`, `GetVariable`, `validateLogging`)
+- `pkg/captcha/captcha.go` (`Client.New` captcha-template WARN)
+- `pkg/bouncer/bouncer.go` (`New` ban-template WARN)
 - `plugin.go` (`New` returns `nil, err` before LAPI Open; `appsec.Open` when `AppsecEnabled`; `NewWithFormat` then `ValidateParams`)
 
 ## Gotchas
@@ -107,7 +110,8 @@ _ = checkFile.Close()
 - Whitespace-only keys and an empty key file are empty after trim.
 - Alone still skips LAPI URL/key/TLS after CAPI. Captcha still runs. AppSec helper runs only when `AppsecEnabled`.
 - An owner (`captchaEnabled`) with default `ban` actions still needs a non-empty site key. Secret is required except when the provider is `recaptcha-enterprise`. `eucaptcha` requires the secret.
-- An owner with an empty `CaptchaFilePath` fails at `ValidateParams`. Tests that used to blank the path to skip `GetTemplate` need a readable fixture. A leftover provider on a subscriber does not.
+- An owner with an empty or unloadable captcha template still passes `ValidateParams` when keys and gate resolve; the captcha WARN and `!Valid` ban fallback happen at `Client.New`. A leftover provider on a subscriber does not Open captcha.
+- Default `BouncerBanFilePath` is empty, so expect one ban-template WARN at `bouncer.New` when no ban file is configured.
 - Leftover invalid AppSec CA or missing key file boots when AppSec is off (live, stream, none, and alone). `lapiMode: appsec` is rejected.
 - Empty AppSec key after a successful lookup still passes; `appsec.Prepare` copies the LAPI key.
 - CA parse still triggers on explicit `AppsecScheme == https`, not inherit-https.

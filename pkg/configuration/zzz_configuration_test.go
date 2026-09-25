@@ -359,7 +359,7 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	}
 }
 
-// Test_ValidateParams_captchaTemplateRequired fails empty or missing captcha
+// Test_ValidateParams_captchaTemplateRequired accepts empty or missing captcha
 // templates when a provider is set, and keeps ban template optional.
 func Test_ValidateParams_captchaTemplateRequired(t *testing.T) {
 	log := logger.New("INFO", "")
@@ -407,10 +407,10 @@ func Test_ValidateParams_captchaTemplateRequired(t *testing.T) {
 		wantErr         bool
 		wantErrContains string
 	}{
-		{name: "Provider set with empty captcha path", config: cfgEmptyCaptchaPath, wantErr: true, wantErrContains: "CaptchaFilePath: cannot be empty when CaptchaProvider is set"},
-		{name: "Provider set with missing captcha file", config: cfgMissingCaptchaFile, wantErr: true},
+		{name: "Provider set with empty captcha path", config: cfgEmptyCaptchaPath, wantErr: false},
+		{name: "Provider set with missing captcha file", config: cfgMissingCaptchaFile, wantErr: false},
 		{name: "Provider set with empty ban path still accepted", config: cfgEmptyBanPath, wantErr: false},
-		{name: "Alone mode empty captcha path", config: cfgAloneEmptyCaptchaPath, wantErr: true, wantErrContains: "CaptchaFilePath: cannot be empty when CaptchaProvider is set"},
+		{name: "Alone mode empty captcha path", config: cfgAloneEmptyCaptchaPath, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

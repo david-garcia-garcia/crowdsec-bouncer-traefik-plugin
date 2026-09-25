@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-09-24-template-startup-warn",
+  "jobName": "2026-09-24-template-startup-warn",
+  "startedAt": "2026-09-24T18:39:45.684Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T18:43:15.190Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T18:52:14.617Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T18:56:39.206Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T19:31:15.633Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T19:43:35.590Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T19:45:34.275Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T19:47:18.980Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T19:55:27.527Z"
+    }
+  }
+}

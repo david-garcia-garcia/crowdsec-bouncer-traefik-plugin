@@ -316,6 +316,14 @@ func getContentTypeFromPath(path string) string {
 	return "text/html; charset=utf-8"
 }
 
+// TemplateUnavailableReason reports empty or unloadable for template load failures.
+func TemplateUnavailableReason(path string, _ error) string {
+	if path == "" {
+		return "empty"
+	}
+	return "unloadable"
+}
+
 // GetTemplate get compiled template with {{ and }} delimiters.
 // Uses text/template for all file types to avoid HTML escaping issues.
 func GetTemplate(path string) (*template.Template, string, error) {
@@ -462,16 +470,11 @@ func validateCaptchaCredentialsAndTemplates(config *Config) error {
 	if err := validateEnabledCaptchaSettings(config); err != nil {
 		return err
 	}
-	if config.BouncerBanFilePath != "" {
-		if _, _, err := GetTemplate(config.BouncerBanFilePath); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
-// validateEnabledCaptchaSettings checks provider credentials, the optional custom
-// challenge URL, and a loadable captcha template when captcha is enabled.
+// validateEnabledCaptchaSettings checks provider credentials and the optional custom
+// challenge URL when captcha is enabled.
 func validateEnabledCaptchaSettings(config *Config) error {
 	if !config.CaptchaEnabled {
 		return nil
@@ -495,12 +498,6 @@ func validateEnabledCaptchaSettings(config *Config) error {
 	}
 	if gateSecret == "" {
 		return errors.New("CaptchaGateSecret: cannot be empty when CaptchaProvider is set")
-	}
-	if config.CaptchaFilePath == "" {
-		return errors.New("CaptchaFilePath: cannot be empty when CaptchaProvider is set")
-	}
-	if _, _, err := GetTemplate(config.CaptchaFilePath); err != nil {
-		return err
 	}
 	return nil
 }

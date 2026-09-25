@@ -40,6 +40,8 @@ type Client struct {
 	sleeping            bool
 }
 
+const msgCaptchaTemplateUnavailable = "crowdsec captcha template unavailable"
+
 // New fills widget, verifier, template, and gate fields. Empty provider leaves Valid false.
 // New is the only provider switch. Each named provider calls its pair function.
 // enterprise is the recaptcha-enterprise construction value. Custom also stores the
@@ -75,7 +77,12 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 	c.verifier = verifier
 	challengeTemplate, contentType, err := configuration.GetTemplate(captchaTemplatePath)
 	if err != nil {
-		return err
+		c.Valid = false
+		c.gracePeriodSeconds = gracePeriodSeconds
+		c.log = log
+		c.httpClient = httpClient
+		c.log.Warn(msgCaptchaTemplateUnavailable, "reason", configuration.TemplateUnavailableReason(captchaTemplatePath, err))
+		return nil
 	}
 	c.template = challengeTemplate
 	c.templateContentType = contentType

@@ -131,12 +131,13 @@ func Test_ServeHTTP_jsonDecodeErrorRendersChallenge(t *testing.T) {
 	}
 }
 
-// Test_New_returnsGetTemplateError proves Client.New surfaces GetTemplate.
-func Test_New_returnsGetTemplateError(t *testing.T) {
+// Test_New_warnsWhenCaptchaTemplateUnavailable leaves Valid false and returns nil.
+func Test_New_warnsWhenCaptchaTemplateUnavailable(t *testing.T) {
 	t.Run("empty path", func(t *testing.T) {
+		log, sink := newTestLogSink(slog.LevelWarn)
 		client := &Client{}
 		err := client.New(
-			slog.Default(),
+			log,
 			http.DefaultClient,
 			"hcaptcha",
 			"",
@@ -153,18 +154,26 @@ func Test_New_returnsGetTemplateError(t *testing.T) {
 			3600,
 			Enterprise{},
 		)
-		if err == nil {
-			t.Fatal("New must return GetTemplate error for empty path")
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
 		}
-		if !strings.Contains(err.Error(), "no template file provided") {
-			t.Fatalf("error %q", err)
+		if client.Valid {
+			t.Fatal("New must leave Valid false when the captcha template is empty")
+		}
+		logged := sink.String()
+		if strings.Count(logged, msgCaptchaTemplateUnavailable) != 1 {
+			t.Fatalf("want one captcha template WARN, got %s", logged)
+		}
+		if !strings.Contains(logged, `"reason":"empty"`) {
+			t.Fatalf("want reason empty, got %s", logged)
 		}
 	})
 	t.Run("missing file", func(t *testing.T) {
+		log, sink := newTestLogSink(slog.LevelWarn)
 		client := &Client{}
 		missing := filepath.Join(t.TempDir(), "missing-captcha.html")
 		err := client.New(
-			slog.Default(),
+			log,
 			http.DefaultClient,
 			"hcaptcha",
 			"",
@@ -181,8 +190,18 @@ func Test_New_returnsGetTemplateError(t *testing.T) {
 			3600,
 			Enterprise{},
 		)
-		if err == nil {
-			t.Fatal("New must return GetTemplate error for a missing file")
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+		if client.Valid {
+			t.Fatal("New must leave Valid false when the captcha template is unloadable")
+		}
+		logged := sink.String()
+		if strings.Count(logged, msgCaptchaTemplateUnavailable) != 1 {
+			t.Fatalf("want one captcha template WARN, got %s", logged)
+		}
+		if !strings.Contains(logged, `"reason":"unloadable"`) {
+			t.Fatalf("want reason unloadable, got %s", logged)
 		}
 	})
 }

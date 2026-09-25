@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -146,42 +147,83 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 	}
 }
 
-// TestNew_RejectsEmptyCaptchaFilePath stops at ValidateParams so New does not open LAPI.
-func TestNew_RejectsEmptyCaptchaFilePath(t *testing.T) {
+// TestNew_EmptyCaptchaFilePathWarnsAndBans returns a handler, warns once, and bans captcha remediations.
+func TestNew_EmptyCaptchaFilePathWarnsAndBans(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
 	})
 
-	var hits int64
-	srv := liveLAPI(t, nil, &hits)
-	t.Cleanup(func() { srv.Close() })
-	u, err := url.Parse(srv.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Run("owner empty captcha path", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+		logFile := newTestLogFile(t)
+		cfg := cfgCaptchaOwnerAt(t, "shared")
+		cfg.CaptchaFilePath = ""
+		cfg.LogLevel = "WARN"
+		cfg.LogFilePath = logFile
 
-	cfg := cfgLiveAt(u.Host)
-	cfg.CaptchaEnabled = true
-	cfg.CaptchaProvider = configuration.HcaptchaProvider
-	cfg.CaptchaSiteKey = "site"
-	cfg.CaptchaSecretKey = "secret"
-	cfg.CaptchaGateSecret = "gate-secret"
-	cfg.CaptchaFilePath = ""
+		h, err := New(ctx, testNextOK(), cfg, "cs-owner")
+		if err != nil {
+			t.Fatal(err)
+		}
+		// #nosec G304 - logFile is a test-generated temporary file path
+		logged, err := os.ReadFile(logFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		logText := string(logged)
+		if strings.Count(logText, "crowdsec captcha template unavailable") != 1 {
+			t.Fatalf("want one captcha template WARN, got %s", logText)
+		}
+		if !strings.Contains(logText, "reason=empty") {
+			t.Fatalf("want reason empty, got %s", logText)
+		}
 
-	handler, err := New(context.Background(), testNextOK(), cfg, "empty-captcha-path")
-	if err == nil {
-		t.Fatal("New must fail when captchaProvider is set and CaptchaFilePath is empty")
-	}
-	if handler != nil {
-		t.Fatal("New must return a nil handler when CaptchaFilePath is empty")
-	}
-	if !strings.Contains(err.Error(), "CaptchaFilePath: cannot be empty when CaptchaProvider is set") {
-		t.Fatalf("error %q", err)
-	}
-	if atomic.LoadInt64(&hits) != 0 {
-		t.Fatalf("New opened LAPI (%d hits)", hits)
-	}
+		rw := httptest.NewRecorder()
+		h.ServeHTTP(rw, captchaForceReq())
+		if got := rw.Header().Get("X-Remediation"); got != "ban" {
+			t.Fatalf("remediation %q want ban, body: %s", got, rw.Body.String())
+		}
+		if rw.Body.Len() != 0 {
+			t.Fatalf("captcha remediation must use empty ban body, got %q", rw.Body.String())
+		}
+	})
+
+	t.Run("bounce-only unused default captcha path", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+		logFile := newTestLogFile(t)
+		ownerCfg := cfgCaptchaOwnerAt(t, "shared")
+		ownerCfg.LogLevel = "ERROR"
+		if _, err := New(ctx, testNextOK(), ownerCfg, "cs-owner"); err != nil {
+			t.Fatal(err)
+		}
+		sub := cfgCaptchaOwnerAt(t, "shared")
+		sub.CaptchaEnabled = false
+		sub.CaptchaFilePath = "/captcha.html"
+		sub.LogLevel = "WARN"
+		sub.LogFilePath = logFile
+
+		h, err := New(ctx, testNextOK(), sub, "cs-bounce")
+		if err != nil {
+			t.Fatal(err)
+		}
+		// #nosec G304 - logFile is a test-generated temporary file path
+		logged, err := os.ReadFile(logFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		logText := string(logged)
+		if strings.Contains(logText, "crowdsec captcha template unavailable") {
+			t.Fatalf("bounce-only must not warn about unused captcha template, got %s", logText)
+		}
+		rw := httptest.NewRecorder()
+		h.ServeHTTP(rw, captchaForceReq())
+		if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
+			t.Fatalf("subscriber must still serve owner captcha, body: %s", rw.Body.String())
+		}
+	})
 }
 
 // TestNew_LAPIUserAgentUsesVersionGo checks New sends LAPI User-Agent from version.go pluginVersion.

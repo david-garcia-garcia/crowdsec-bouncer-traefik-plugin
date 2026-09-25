@@ -66,6 +66,7 @@ type Bouncer struct {
 }
 
 const msgBackendMissing = "crowdsec bouncer backend missing"
+const msgBanTemplateUnavailable = "crowdsec bouncer ban template unavailable"
 const msgCaptchaUnsubscribed = "crowdsec bouncer captcha unsubscribed"
 
 // remediationHeaderClientDisconnected is the BouncerRemediationHeadersCustomName value when the client
@@ -87,8 +88,16 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 
 	var banTemplate *template.Template
 	var banTemplateContentType string
-	if config.BouncerBanFilePath != "" {
-		banTemplate, banTemplateContentType, _ = configuration.GetTemplate(config.BouncerBanFilePath)
+	if config.BouncerBanFilePath == "" {
+		log.Warn(msgBanTemplateUnavailable, "reason", "empty")
+	} else {
+		var err error
+		banTemplate, banTemplateContentType, err = configuration.GetTemplate(config.BouncerBanFilePath)
+		if err != nil {
+			log.Warn(msgBanTemplateUnavailable, "reason", configuration.TemplateUnavailableReason(config.BouncerBanFilePath, err))
+			banTemplate = nil
+			banTemplateContentType = ""
+		}
 	}
 
 	routeHandler := &Bouncer{
