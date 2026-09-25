@@ -145,7 +145,9 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 		traceCustomHeader:        config.BouncerTraceHeadersCustomName,
 		originBasedDecisionRemap: copyOriginBasedDecisionRemap(config.BouncerOriginBasedDecisionRemap),
 	}
-	routeHandler.log.Debug("Bouncer initialized")
+	routeHandler.log.Debug("Bouncer initialized",
+		"forwardedHeadersTrustedIPs", config.BouncerForwardedHeadersTrustedIPs,
+		"clientTrustedIPs", config.BouncerClientTrustedIPs)
 	return routeHandler, nil
 }
 

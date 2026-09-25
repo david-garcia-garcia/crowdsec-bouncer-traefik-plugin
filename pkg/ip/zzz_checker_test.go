@@ -1,10 +1,12 @@
 package ip
 
 import (
+	"bytes"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -502,6 +504,22 @@ func TestGetRemoteIPInsecure(t *testing.T) {
 			wantErr:    true,
 		},
 	})
+}
+
+func TestNewCheckerDoesNotLogInsert(t *testing.T) {
+	var buf bytes.Buffer
+	log := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	checker, err := NewChecker(log, []string{"10.0.0.0/8", "192.168.0.0/16", "192.0.2.1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checker == nil {
+		t.Fatal("expected checker")
+	}
+	logged := buf.String()
+	if strings.Contains(logged, `"msg":"IP is trusted"`) || strings.Contains(logged, `"msg":"IP network is trusted"`) {
+		t.Fatalf("want no insert DEBUG, got %s", logged)
+	}
 }
 
 // newTestTrustRequest builds a request with RemoteAddr and an optional forwarded header.

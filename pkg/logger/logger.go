@@ -94,7 +94,7 @@ func NewWithFormat(logLevel, logFilePath, logFormat string) *slog.Logger {
 	}
 
 	// Create logger with component attribute
-	return slog.New(handler).With("component", "CrowdsecBouncerTraefikPlugin")
+	return slog.New(handler).With("component", "CrowdsecBouncer")
 }
 
 // logOutput returns stdout or a process-lifetime shared file for logFilePath.

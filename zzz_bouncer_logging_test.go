@@ -173,8 +173,8 @@ func validateLogEntry(t *testing.T, logEntry map[string]interface{}) {
 	if logEntry["msg"] == nil {
 		t.Error("Log entry missing 'msg' field")
 	}
-	if logEntry["component"] != "CrowdsecBouncerTraefikPlugin" {
-		t.Errorf("Expected component 'CrowdsecBouncerTraefikPlugin', got %v", logEntry["component"])
+	if logEntry["component"] != "CrowdsecBouncer" {
+		t.Errorf("Expected component 'CrowdsecBouncer', got %v", logEntry["component"])
 	}
 }
 
@@ -332,7 +332,7 @@ func TestBouncerFileLoggingCommonFormat(t *testing.T) {
 		if strings.Contains(line, "level=DEBUG") {
 			foundDebug = true
 		}
-		if !strings.Contains(line, "component=CrowdsecBouncerTraefikPlugin") {
+		if !strings.Contains(line, "component=CrowdsecBouncer") {
 			t.Errorf("Log line missing component field: %s", line)
 		}
 	}

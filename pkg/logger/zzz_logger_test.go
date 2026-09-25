@@ -43,7 +43,7 @@ func TestJSONLogFormat(t *testing.T) {
 
 	// Create a logger with JSON handler to capture output
 	handler := slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})
-	logger := slog.New(handler).With("component", "CrowdsecBouncerTraefikPlugin")
+	logger := slog.New(handler).With("component", "CrowdsecBouncer")
 
 	testMessage := "json test message"
 	logger.Info(testMessage)
@@ -72,8 +72,8 @@ func TestJSONLogFormat(t *testing.T) {
 	if logEntry["time"] == nil {
 		t.Error("Expected timestamp to be set")
 	}
-	if logEntry["component"] != "CrowdsecBouncerTraefikPlugin" {
-		t.Errorf("Expected component 'CrowdsecBouncerTraefikPlugin', got '%v'", logEntry["component"])
+	if logEntry["component"] != "CrowdsecBouncer" {
+		t.Errorf("Expected component 'CrowdsecBouncer', got '%v'", logEntry["component"])
 	}
 }
 
@@ -82,7 +82,7 @@ func TestCommonLogFormat(t *testing.T) {
 
 	// Create a logger with text handler to capture output
 	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})
-	logger := slog.New(handler).With("component", "CrowdsecBouncerTraefikPlugin")
+	logger := slog.New(handler).With("component", "CrowdsecBouncer")
 
 	testMessage := "common test message"
 	logger.Info(testMessage)
@@ -96,7 +96,7 @@ func TestCommonLogFormat(t *testing.T) {
 	if !strings.Contains(output, testMessage) {
 		t.Error("Expected test message in common format")
 	}
-	if !strings.Contains(output, "component=CrowdsecBouncerTraefikPlugin") {
+	if !strings.Contains(output, "component=CrowdsecBouncer") {
 		t.Error("Expected component field in common format")
 	}
 
@@ -113,7 +113,7 @@ func TestErrorLevel(t *testing.T) {
 
 	// Create a logger with ERROR level to capture output
 	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelError})
-	logger := slog.New(handler).With("component", "CrowdsecBouncerTraefikPlugin")
+	logger := slog.New(handler).With("component", "CrowdsecBouncer")
 
 	testMessage := "error only test"
 
@@ -179,7 +179,7 @@ func TestNewWithFormatJSONCaseInsensitive(t *testing.T) {
 			if logEntry["msg"] != testMessage {
 				t.Errorf("expected msg %q, got %v", testMessage, logEntry["msg"])
 			}
-			if logEntry["component"] != "CrowdsecBouncerTraefikPlugin" {
+			if logEntry["component"] != "CrowdsecBouncer" {
 				t.Errorf("expected component, got %v", logEntry["component"])
 			}
 		})

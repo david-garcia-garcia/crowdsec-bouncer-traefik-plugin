@@ -19,7 +19,7 @@ type Checker struct {
 }
 
 // NewChecker builds a new Checker given a list of CIDR-Strings to trusted IPs.
-func NewChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
+func NewChecker(_ *slog.Logger, trustedIPs []string) (*Checker, error) {
 	trustedCIDRs := iplookup.New()
 
 	for _, ipMaskRaw := range trustedIPs {
@@ -29,7 +29,6 @@ func NewChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
 			if err := trustedCIDRs.AddCIDR(HostCIDR(ipAddr), ""); err != nil {
 				return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipMask, err)
 			}
-			log.Debug("IP is trusted", "ip", ipAddr)
 			continue
 		}
 
@@ -37,7 +36,6 @@ func NewChecker(log *slog.Logger, trustedIPs []string) (*Checker, error) {
 		if err := trustedCIDRs.AddCIDR(ipMask, ""); err != nil {
 			return nil, fmt.Errorf("parsing CIDR trusted IPs %s: %w", ipMask, err)
 		}
-		log.Debug("IP network is trusted", "network", ipMask)
 	}
 
 	return &Checker{trustedCIDRs: trustedCIDRs}, nil
