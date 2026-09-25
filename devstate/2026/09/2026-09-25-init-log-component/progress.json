@@ -9,7 +9,7 @@
       "at": "2026-09-25T11:00:18.453Z"
     },
     "explore": {
-      "work": false,
+      "work": true,
       "card": false,
       "at": null
     },
