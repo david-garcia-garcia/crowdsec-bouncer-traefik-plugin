@@ -14,17 +14,17 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 87e644d4
+Reviewed head: e508cba8
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36120876750 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -34,8 +34,8 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-25-bouncer-exclude-regex pushed | `git` |
 | OpenSpec | bouncer-exclude-regex | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/158 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 36120876750 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36120876750 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36120876750 |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
@@ -51,7 +51,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-09-25-bouncer-exclude-regex on branch 2026-09-25-bouncer-exclude-regex targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/158; CI not seen.
+Ticket 2026-09-25-bouncer-exclude-regex on branch 2026-09-25-bouncer-exclude-regex targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/158; CI build 36120876750 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36120876750.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -72,7 +72,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 87e644d4d002b824d3d86824c23a6f3dd28753ec | Card must match the branch you measured |
+| Reviewed head | e508cba856630994c11719ce4c225f56e9a48629 | Card must match the branch you measured |
 
 ### Stored data model
 None.
