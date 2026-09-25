@@ -25,6 +25,11 @@ priority: normal
 local: ext_crowdsec_bouncers_failure-action/
 description: How CrowdSec bouncers behave when LAPI or AppSec is down, times out, or returns 500.
 
+## Remediation Cache-Control
+priority: normal
+local: ext_crowdsec_bouncers_cache-control/
+description: How official CrowdSec HAProxy SPOA remediations and the AppSec challenge protocol set Cache-Control on captcha, ban, and challenge responses.
+
 ## Stream apply order
 priority: normal
 local: ext_crowdsec_bouncers_stream-apply/
