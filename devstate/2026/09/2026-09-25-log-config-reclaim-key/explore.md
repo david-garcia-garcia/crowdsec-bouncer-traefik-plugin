@@ -64,9 +64,9 @@ Outside facts used: in-tree. Reclaim alias remap and Sleep/Wake/Close are dest `
   Decision: resolved — yes. Fork the key; do not rebind `c.log`. New Open creates; old incarnation Sleeps, waits process-table grace, then Close. `SetAlias` remaps the captcha instance alias; `Watch` subscribers get the new Client. Same as today’s enterprise-knob reclaim.
   By: explore
 
-- Q: Whether “log config” is `LogLevel` only or also `LogFilePath` and `LogFormat`.
-  Rank: additive asked — adding fields to unexported `ownership` this change edits; Desired “the log config” and Current names all three omitted knobs
-  Decision: assumed — hash all three Config fields as stored. `plugin.go` already uppercases `LogLevel` before `Open` and `SetAlias`. `logger.NewWithFormat` freezes the three together on `c.log`.
+- Q: Whether log config is LogLevel only or also LogFilePath and LogFormat.
+  Rank: additive asked — adding fields to unexported ownership this change edits; Desired names the log config; Current names all three omitted knobs
+  Decision: assumed — hash all three Config fields as stored. plugin.go already uppercases LogLevel before Open and SetAlias. logger.NewWithFormat freezes the three together on Client.log.
   By: explore
 
 - Q: Whether LAPI and AppSec owners keep a stale log level under the same rebuild.
