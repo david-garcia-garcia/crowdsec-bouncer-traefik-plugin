@@ -34,3 +34,8 @@ head: 65053ac37f03b78514147e35f96acefd953dccfd
 phase: devdocsimpact
 verdict: ready for review
 head: 02ec4f0986023fab559a54da2b5c8cf2cf1d1f67
+
+## archive (2026-09-25)
+phase: archive
+verdict: in progress
+head: f1758455968a6cbccef5dc1b3eb8e31fab12dff3

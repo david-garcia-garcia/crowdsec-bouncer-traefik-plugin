@@ -17,17 +17,17 @@ The captcha ownership payload now hashes `LogLevel`, `LogFilePath`, and `LogForm
 **End users.** None.
 
 ## Merge readiness
-Ready for review. 0 items remain.
+In progress. 0 items remain.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: 02ec4f09
+Reviewed head: f1758455
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36134927230 |
+| Overall readiness | 1/6 | Not ready |
+| CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,13 +37,16 @@ Owner decision: None.
 | Branch | 2026-09-25-log-config-reclaim-key pushed | `git` |
 | OpenSpec | include-log-config-in-captcha-reclaim-key | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/162 | pr-host |
-| CI | build 36134927230 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36134927230 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36134927230 |
+| CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
 Worktree:
-- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-log-config-reclaim-key/openspec/changes/include-log-config-in-captcha-reclaim-key/proposal.md) — modified
+- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-log-config-reclaim-key/openspec/changes/archive/2026-09-25-include-log-config-in-captcha-reclaim-key/proposal.md) — modified
+
+Completed:
+- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-log-config-reclaim-key/openspec/specs/core_plugin_middleware_instance-slots/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -53,7 +56,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-09-25-log-config-reclaim-key on branch 2026-09-25-log-config-reclaim-key targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/162; CI build 36134927230 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36134927230.
+Ticket 2026-09-25-log-config-reclaim-key on branch 2026-09-25-log-config-reclaim-key targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/162; CI not seen.
 
 ## Explore Decisions
 None.
@@ -77,9 +80,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 02ec4f0986023fab559a54da2b5c8cf2cf1d1f67 | Card must match the branch you measured |
+| Reviewed head | f1758455968a6cbccef5dc1b3eb8e31fab12dff3 | Card must match the branch you measured |
 
 ### Stored data model
 None.
