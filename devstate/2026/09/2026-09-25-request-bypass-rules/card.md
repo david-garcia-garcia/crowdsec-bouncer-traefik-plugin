@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 2c175dd5
+Reviewed head: a02a73ee
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,17 +32,21 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-25-request-bypass-rules pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | request-bypass-rules | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/163 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-request-bypass-rules/openspec/changes/request-bypass-rules/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-request-bypass-rules/openspec/changes/request-bypass-rules/proposal.md) — modified
+
 
 ## Deviations from the ask
-None.
+- taken: method is a case-insensitive HTTP method token; a block with no path, no headers, and no cookies (method-only or nothing) fails plugin construction. → method is unanchored Go RE2 on `req.Method` with optional leading `!`; no silent case-fold and no forced `(?i)`. A method-only rule is valid. Construction fails only when path, headers, and cookies are absent AND method is any (omitted, empty, or a match-everything pattern such as `.*`). — `pkg/httprule` — honouring an exact case-insensitive token would add a second match family beside path RE2; treating a set method predicate as fully empty would reject `method: ^OPTIONS$`. Human correction already resolved method as RE2 same family as path.. Requester: confirmed.
+
 
 ## Follow-up issues
 None.
@@ -67,9 +71,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 2c175dd5dac569fbd307b25002678f9b5f810208 | Card must match the branch you measured |
+| Reviewed head | a02a73eee178480c192308db2b6b645835f46a1e | Card must match the branch you measured |
 
 ### Stored data model
 None.
