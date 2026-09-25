@@ -351,4 +351,7 @@ func Test_WriteSolvedRedirect_noCookieRemint(t *testing.T) {
 	if got := rw.Header().Get("Set-Cookie"); got != "" {
 		t.Fatalf("must not remint gate cookie, got %q", got)
 	}
+	if got := rw.Header().Get("Cache-Control"); got != "no-cache, no-store" {
+		t.Fatalf("Cache-Control=%q want no-cache, no-store", got)
+	}
 }

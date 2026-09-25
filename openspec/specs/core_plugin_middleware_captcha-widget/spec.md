@@ -109,7 +109,7 @@ When the provider is `eucaptcha`, captcha construction SHALL pair a Widget with 
 - **AND** the verifier is not called
 
 ### Requirement: Challenge HTML sets Cache-Control
-When ServeHTTP renders the captcha challenge at HTTP 200, the response SHALL set `Cache-Control` to `no-cache, no-store`. It MUST set that header before `WriteHeader`. The Pass 302 MUST NOT gain this header from this requirement.
+When ServeHTTP renders the captcha challenge at HTTP 200, the response SHALL set `Cache-Control` to `no-cache, no-store`. The Pass 302 and `WriteSolvedRedirect` SHALL set the same value. The header MUST be set before `WriteHeader`.
 
 #### Scenario: GET challenge includes Cache-Control
 - **WHEN** `Validate` returns `None`
@@ -121,7 +121,13 @@ When ServeHTTP renders the captcha challenge at HTTP 200, the response SHALL set
 - **THEN** the solver receives the captcha challenge at 200
 - **AND** `Cache-Control` is `no-cache, no-store`
 
-#### Scenario: Pass redirect does not set this header
+#### Scenario: Pass redirect sets Cache-Control
 - **WHEN** `Validate` returns `Pass`
 - **THEN** the response status is 302
-- **AND** `Cache-Control` is empty
+- **AND** `Cache-Control` is `no-cache, no-store`
+
+#### Scenario: Second-tab redirect sets Cache-Control
+- **WHEN** `WriteSolvedRedirect` answers a captcha-form POST that already has a valid gate cookie
+- **THEN** the response status is 302
+- **AND** `Cache-Control` is `no-cache, no-store`
+- **AND** no new gate cookie is set

@@ -76,8 +76,8 @@ func Test_ServeHTTP_dummyProviderSolveIssuesGateCookie(t *testing.T) {
 		body, _ := io.ReadAll(solveRW.Result().Body)
 		t.Fatalf("solve want 302, got %d %s", solveRW.Code, body)
 	}
-	if got := solveRW.Header().Get("Cache-Control"); got != "" {
-		t.Fatalf("solve Cache-Control=%q want empty", got)
+	if got := solveRW.Header().Get("Cache-Control"); got != "no-cache, no-store" {
+		t.Fatalf("solve Cache-Control=%q want no-cache, no-store", got)
 	}
 	cookie := solveRW.Result().Header.Get("Set-Cookie")
 	if !strings.Contains(cookie, gateCookieName+"=") {
