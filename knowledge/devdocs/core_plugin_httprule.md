@@ -3,7 +3,7 @@
 ## Language
 
 **Rule**:
-One authoring exemption in `pkg/httprule`: optional method, path, headers map, and cookies map. An omitted field means any. Set fields AND. Not a trusted-IP skip, not the forced-decision header, not a captcha-leg list.
+One authoring exemption in `pkg/httprule`: optional method, path, host, headers map, and cookies map. An omitted field means any. Set fields AND. Not a trusted-IP skip, not the forced-decision header, not a captcha-leg list.
 _Avoid_: exclude regex, `host://path`, packed `headerRegexp`, `target: header:Name`
 
 **Set**:
@@ -20,10 +20,11 @@ Compile request exemptions once with `httprule.New`. Config holds `[]Rule`; Boun
 - Do not import this plugin's other packages from `pkg/httprule`.
 - Method: unanchored Go RE2 `MatchString` on `req.Method`. Do not insert `^` or `$`. Do not lowercase. Do not force `(?i)`. Omit or empty after trim is any. Optional single leading `!` (outside the pattern) negates (`!POST`, `!^POST$`). `!!` and `!` with an empty pattern fail `New`.
 - Path: unanchored `MatchString` on `req.URL.Path` as `net/http` decoded it. Do not rebuild from `RequestURI`, `EscapedPath`, or AppSec forwarded URI. Host is not in the path. Query is not in the path.
+- Host: unanchored `MatchString` on the hostname of `req.Host`. When `net.SplitHostPort` succeeds, match that host (`example.com:443` → `example.com`, `[::1]:443` → `::1`). When it fails, match `req.Host` unchanged. Do not read the Host header map. Do not include scheme, port, or path. Omit or empty after trim is any. No leading `!`. A host-only rule is valid.
 - Headers: compile names with `textproto.CanonicalMIMEHeaderKey`. AND across names. Empty pattern means the header is present. Otherwise RE2 against each value; one hit is enough. Use `req.Header[canonical]`, not `Header.Get`.
 - Cookies: same predicate shape; names are case-sensitive. Parse the Cookie header once per request only when this Set has a cookie predicate.
-- Reject a fully empty rule (path, headers, and cookies absent AND method any — omitted, empty after trim, or `.*`). A method-only rule is valid.
-- Invalid RE2 on method, path, header, or cookie fails `New`.
+- Reject a fully empty rule (path, host, headers, and cookies absent AND method any — omitted, empty after trim, or `.*`). A method-only or host-only rule is valid.
+- Invalid RE2 on method, path, host, header, or cookie fails `New`. The host error names `host`.
 
 ## Pattern snippet
 
@@ -47,6 +48,7 @@ if set.Match(httpReq) {
 ## Gotchas
 
 - Unanchored `health` matches `/unhealthy`. Operators who want an exact path write `^/health$`.
+- Host match text is the hostname only. `example.com:443` matches `^example.com$`. `[::1]:443` matches `^::1$`, not `^\[::1\]$`.
 - Method `^post$` does not match `POST`. Write `(?i)` or `^POST$`.
 - `example.com://health` does not match path `/health`.
 - Empty lists pass `New` and match nothing. A list with one fully empty rule fails.

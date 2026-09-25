@@ -22,7 +22,7 @@ ServeHTTP keeps the exclude skip sites: after forced `b`, a LAPI match goes to `
 In progress. 0 items remain.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: b38a9fa6
+Reviewed head: 8d1302eb
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -45,8 +45,12 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-request-bypass-rules/openspec/changes/request-bypass-rules/proposal.md) — modified
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-request-bypass-rules/openspec/changes/request-bypass-rules/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-request-bypass-rules/openspec/changes/archive/2026-09-25-request-bypass-rules/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-request-bypass-rules/openspec/changes/archive/2026-09-25-request-bypass-rules/proposal.md) — modified
+
+Completed:
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-request-bypass-rules/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-request-bypass-rules/openspec/specs/core_plugin_middleware_config-validation/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -84,9 +88,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | b38a9fa664a1821f96cdee488b1c1ec687d98961 | Card must match the branch you measured |
+| Reviewed head | 8d1302ebef8e2a2cf4f432d700e756f2faeb17b7 | Card must match the branch you measured |
 
 ### Stored data model
 None.

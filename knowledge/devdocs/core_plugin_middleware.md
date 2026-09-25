@@ -27,7 +27,7 @@ The operator enum (`passthrough` | `ban` | `captcha`) this plugin applies when L
 _Avoid_: fail mode, FailMode, the three removed AppSec block bools, AppSec JSON `action: captcha`, LAPI Client identity
 
 **Bypass rule**:
-One exemption block (optional method, path, headers map, cookies map) on `bouncerAppsecBypassRules` or `bouncerLapiBypassRules`. Omitted field = any. Set fields AND. List OR, first match wins. Method and path are Go RE2 on `req.Method` and `req.URL.Path`. Not a trusted-IP skip, not the forced-decision header, not a captcha-leg list.
+One exemption block (optional method, path, host, headers map, cookies map) on `bouncerAppsecBypassRules` or `bouncerLapiBypassRules`. Omitted field = any. Set fields AND. List OR, first match wins. Method, path, and host are Go RE2 on `req.Method`, `req.URL.Path`, and the hostname of `req.Host` (port stripped). Not a trusted-IP skip, not the forced-decision header, not a captcha-leg list.
 _Avoid_: Exclude match string, `host://path`, `bouncerAppsecExcludeRegex`, `bouncerLapiExcludeRegex`
 
 **Config snapshot**:
@@ -60,7 +60,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - Do not pass `config.LapiDefaultDecisionSeconds` from the bouncer into `LiveLookup`; the bound client already has it.
 - Resolve client IP with `pkg/ip.GetRemoteIP`. Fold `remoteIP`, parsed `net.IP`, and `ipType` into `clientRequest`. Keep the name `req`.
 - After the trusted-client skip, a non-empty `bouncerDecisionHeader` with exact `b` remediates without lookup; `c` still looks up so a ban wins unless a LAPI bypass rule already skipped lookup (`core_plugin_middleware_forced-decision.md`).
-- Compile `bouncerLapiBypassRules` / `bouncerAppsecBypassRules` once in `bouncer.New` via `httprule.New` (`core_plugin_httprule.md`). Do not compile on the request path. After trusted-IP skip and forced `b`, skip that CrowdSec leg when `Set.Match` is true. Path owner is `req.URL.Path` as `net/http` decoded it; do not rebuild from `RequestURI`, `EscapedPath`, or AppSec forwarded URI. Host is not part of the path match. A LAPI match continues at `passOrForcedCaptcha` (AppSec may still Query; forced `c` still applies). An AppSec match in `handleNextServeHTTP` skips `applyAppsecServeHTTP` and calls `next`. Do not hash these lists into LAPI ownership or AppSec identity.
+- Compile `bouncerLapiBypassRules` / `bouncerAppsecBypassRules` once in `bouncer.New` via `httprule.New` (`core_plugin_httprule.md`). Do not compile on the request path. After trusted-IP skip and forced `b`, skip that CrowdSec leg when `Set.Match` is true. Path owner is `req.URL.Path` as `net/http` decoded it; do not rebuild from `RequestURI`, `EscapedPath`, or AppSec forwarded URI. Host owner is the hostname of `req.Host` (`net.SplitHostPort` when that succeeds). A LAPI match continues at `passOrForcedCaptcha` (AppSec may still Query; forced `c` still applies). An AppSec match in `handleNextServeHTTP` skips `applyAppsecServeHTTP` and calls `next`. Do not hash these lists into LAPI ownership or AppSec identity.
 - Range and header-mapped CrowdSec scopes live in `pkg/decisionscope`. Do not geolocate in `New` or `ServeHTTP`.
 - Live LAPI error and stream-unhealthy cache miss use `bouncerLapiFailureAction`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled).
 - Watch logs `reclaim_put|bind|orphan|reclaim|dispose` and `crowdsec lapi instance|crowdsec appsec instance|crowdsec captcha instance|crowdsec bouncer bound|crowdsec bouncer unbound`.

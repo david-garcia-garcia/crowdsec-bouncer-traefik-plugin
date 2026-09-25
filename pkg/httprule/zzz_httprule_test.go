@@ -85,6 +85,9 @@ func TestNew_rejectsInvalidRE2(t *testing.T) {
 	if _, err := New([]Rule{{Cookies: map[string]string{"session": "("}}}); err == nil {
 		t.Fatal("invalid cookie RE2 must fail New")
 	}
+	if _, err := New([]Rule{{Host: "("}}); err == nil || !strings.Contains(err.Error(), "host") {
+		t.Fatalf("invalid host RE2 must fail New naming host, got %v", err)
+	}
 }
 
 func TestMatch_methodAndPathAreAnd(t *testing.T) {
@@ -153,5 +156,49 @@ func TestMatch_firstRuleWins(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/ab", nil)
 	if !set.Match(req) {
 		t.Fatal("first matching rule must win")
+	}
+}
+
+func TestNew_hostOnly(t *testing.T) {
+	set := mustNew(t, []Rule{{Host: "^example.com$"}})
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+	if !set.Match(req) {
+		t.Fatal("host-only must match a bare example.com")
+	}
+}
+
+func TestMatch_hostPortIsStripped(t *testing.T) {
+	set := mustNew(t, []Rule{{Host: "^example.com$"}})
+	req := httptest.NewRequest(http.MethodGet, "http://example.com:443/", nil)
+	if !set.Match(req) {
+		t.Fatal("host must match example.com after stripping :443")
+	}
+}
+
+func TestMatch_ipv6HostPortIsStripped(t *testing.T) {
+	set := mustNew(t, []Rule{{Host: "^::1$"}})
+	req := httptest.NewRequest(http.MethodGet, "http://[::1]:443/", nil)
+	if !set.Match(req) {
+		t.Fatal("host must match ::1 after stripping port from [::1]:443")
+	}
+}
+
+func TestMatch_hostAndPathAreAnd(t *testing.T) {
+	set := mustNew(t, []Rule{{Host: "^example.com$", Path: "^/healthz$"}})
+	wrongPath := httptest.NewRequest(http.MethodGet, "http://example.com/other", nil)
+	if set.Match(wrongPath) {
+		t.Fatal("host+path AND must fail when the path misses")
+	}
+	ok := httptest.NewRequest(http.MethodGet, "http://example.com/healthz", nil)
+	if !set.Match(ok) {
+		t.Fatal("host+path AND must match example.com /healthz")
+	}
+}
+
+func TestMatch_nonMatchingHostDoesNotBypass(t *testing.T) {
+	set := mustNew(t, []Rule{{Host: "^probe.example$"}})
+	req := httptest.NewRequest(http.MethodGet, "http://other.example/", nil)
+	if set.Match(req) {
+		t.Fatal("non-matching host must not match")
 	}
 }

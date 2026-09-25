@@ -17,6 +17,9 @@ body() {
   echo "[$SCENARIO] banned IP on a LAPI-matching path must reach origin (HTTP 200)"
   assert_status "http://127.0.0.1:${WEB_PORT}/healthz" 200 -H "X-Forwarded-For: 1.2.3.4"
 
+  echo "[$SCENARIO] banned IP on a host-matching request must reach origin (HTTP 200)"
+  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 1.2.3.4" -H "Host: probe.example"
+
   echo "[$SCENARIO] AppSec 403 URI must be blocked when no AppSec rule matches (HTTP 403)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo/403" 403 -H "X-Forwarded-For: 5.6.7.8"
 

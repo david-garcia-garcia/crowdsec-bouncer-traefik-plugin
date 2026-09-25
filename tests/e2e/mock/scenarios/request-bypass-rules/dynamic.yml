@@ -28,6 +28,7 @@ http:
           bouncerLapiBypassRules:
             - path: ^/healthz$
             - path: ^/lapi-skip
+            - host: ^probe\.example$
           lapiEnabled: "true"
           lapiHost: "@@LAPI_HOST@@"
           lapiKey: "@@APIKEY@@"

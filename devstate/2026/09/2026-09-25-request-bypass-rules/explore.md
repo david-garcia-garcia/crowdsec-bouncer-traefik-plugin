@@ -6,7 +6,7 @@ Human correction this run: the new lists **replace and remove** `BouncerAppsecEx
 ## Concepts
 
 **Bypass rule**:
-One exemption block (optional method, path, headers map, cookies map). Omitted field = any. Set fields AND. List OR, first match wins. Method is a Go RE2 regexp against `req.Method`, same family as path — not an exact method token. Not a trusted-IP skip, not the forced-decision header, not a captcha-leg list.
+One exemption block (optional method, path, host, headers map, cookies map). Omitted field = any. Set fields AND. List OR, first match wins. Method is a Go RE2 regexp against `req.Method`, same family as path — not an exact method token. Host is a Go RE2 regexp against the hostname of `req.Host` (port stripped). Not a trusted-IP skip, not the forced-decision header, not a captcha-leg list.
 
 **Exclude match string** (dest, removed by this change):
 `host://path` from `excludeMatchString` (`pkg/bouncer/bouncer.go`). Host is `req.Host` after `net.SplitHostPort` when that succeeds; path is `req.URL.Path` with one leading `/` stripped. This change does not keep that owner.
@@ -87,7 +87,8 @@ E2e in this repo: **mock** = `tests/e2e/mock/` (Traefik binary + mock LAPI, `mak
 - Chosen: delete `BouncerAppsecExcludeRegex` / `BouncerLapiExcludeRegex`, `CompileExcludeRegex`, `excludeMatchString`, `excludedBy`. Public config may break; Traefik will silently drop leftover keys. No alias, no `host://path` converter.
 - Chosen seam: same ServeHTTP sites as dest exclude (`bouncer.go` after forced `b`; `handleNextServeHTTP` before AppSec). LAPI match → `passOrForcedCaptcha`. AppSec match → `next` with no buffer and no Query.
 - Chosen matcher path: `pkg/httprule` (HTTP request rules, not a CrowdSec noun). `configuration` and `bouncer` import it; it imports only stdlib.
-- Chosen compile owner: `httprule.New([]Rule) (*Set, error)` rejects invalid RE2 (path or method) and fully empty rules. Fully empty = path, headers, and cookies all absent AND method omitted, empty, or only a negate flag with no pattern. A method-only rule (`method: ^OPTIONS$`) is valid. A method pattern that matches every method (`.*`) with no other predicate is still rejected (every predicate is any). `ValidateParams` calls it so `plugin.New` fails before LAPI Open (error text names the Go field). `bouncer.New` compiles again to store `*httprule.Set` (same split as dest `CompileExcludeRegex`).
+- Chosen compile owner: `httprule.New([]Rule) (*Set, error)` rejects invalid RE2 (path, host, or method) and fully empty rules. Fully empty = path, host, headers, and cookies all absent AND method omitted, empty, or only a negate flag with no pattern. A method-only rule (`method: ^OPTIONS$`) or host-only rule is valid. A method pattern that matches every method (`.*`) with no other predicate is still rejected (every predicate is any). `ValidateParams` calls it so `plugin.New` fails before LAPI Open (error text names the Go field). `bouncer.New` compiles again to store `*httprule.Set` (same split as dest `CompileExcludeRegex`).
+- Chosen host: Go RE2, unanchored `MatchString` on the hostname of `req.Host`. When `net.SplitHostPort` succeeds, match that host (`example.com:443` → `example.com`, `[::1]:443` → `::1`). When it fails, match `req.Host` unchanged. Omit or empty = any. No leading `!`. Do not read the Host header map. Invalid regexp fails `New` and names `host`. Human correction 2026-09-25: operators must be able to filter by host.
 - Chosen method: Go RE2, unanchored `MatchString` against `req.Method`. Plugin does not insert `^` or `$`. Omit or empty = any method. Do not lowercase the method and do not force `(?i)` — operators write `(?i)` when they need it. Optional single leading `!` outside the pattern, stripped before compile, negates the match (`!POST`, `!^POST$`). `!!` is invalid. `!` with an empty pattern is invalid. Invalid method regexp fails construction the same way as an invalid path regexp.
 - Chosen path text: unanchored `MatchString` on `req.URL.Path` as written. Plugin does not insert `^`/`$`. Percent-decoded, not slash-normalized, not the query. Do not use `excludeMatchString`.
 - Chosen headers: compile with `CanonicalMIMEHeaderKey`; AND across names; empty pattern = header present (any value); RE2 against each value, one hit enough.
@@ -106,7 +107,7 @@ E2e in this repo: **mock** = `tests/e2e/mock/` (Traefik binary + mock LAPI, `mak
 
 - Q: Where does the matcher package live under pkg/?
   Rank: additive asked — new package this change creates; criterion Implement the matcher as its own package
-  Decision: assumed — pkg/httprule. Authoring type Rule with json method, path, headers, cookies. Compiled Set. No imports of this plugin.
+  Decision: assumed — pkg/httprule. Authoring type Rule with json method, path, host, headers, cookies. Compiled Set. No imports of this plugin.
   By: explore
 
 - Q: Does a LAPI bypass also skip missing-subscribed-LAPI failure and stream/alone unhealthy failure?
@@ -131,8 +132,8 @@ E2e in this repo: **mock** = `tests/e2e/mock/` (Traefik binary + mock LAPI, `mak
 
 - Q: Where is fully-empty-rule rejection owned (ValidateParams, matcher New, or bouncer.New)?
   Rank: additive asked — new constructor reject this change creates; Desired Plugin construction must reject that fully empty rule
-  Decision: assumed — httprule.New is the owner. ValidateParams calls it (fail plugin.New before LAPI Open, error names BouncerAppsecBypassRules / BouncerLapiBypassRules). bouncer.New calls it again to store the set. Fully empty is path, headers, and cookies all absent AND method is any (omitted, empty after trim, or a match-everything pattern such as .*). A method-only rule is valid. !! and ! with an empty pattern are invalid syntax (fail construction, name the field), not the fully-empty case.
-  By: propose
+  Decision: assumed — httprule.New is the owner. ValidateParams calls it (fail plugin.New before LAPI Open, error names BouncerAppsecBypassRules / BouncerLapiBypassRules). bouncer.New calls it again to store the set. Fully empty is path, host, headers, and cookies all absent AND method is any (omitted, empty after trim, or a match-everything pattern such as .*). A method-only or host-only rule is valid. !! and ! with an empty pattern are invalid syntax (fail construction, name the field), not the fully-empty case.
+  By: implement
 
 - Q: Is method an exact case-insensitive HTTP token, or a Go RE2 regexp?
   Rank: additive asked — new method predicate this change creates; human correction this session names method as RE2 same family as path
@@ -156,5 +157,5 @@ E2e in this repo: **mock** = `tests/e2e/mock/` (Traefik binary + mock LAPI, `mak
 
 - Q: Who already owns client address, path, and Host for matching?
   Rank: additive asked — new match reads request identity fields; commandments One job, one owner
-  Decision: resolved — client address stays ip.GetRemoteIP / clientRequest (bypass does not parse XFF). Path owner is req.URL.Path as net/http already decoded it; do not rebuild from RequestURI, EscapedPath, or AppSec forwarded URI. Host is not part of the path match; a Host header rule reads req.Header (canonical). Do not reconstruct Host with SplitHostPort (that was dest exclude).
+  Decision: resolved — client address stays ip.GetRemoteIP / clientRequest (bypass does not parse XFF). Path owner is req.URL.Path as net/http already decoded it; do not rebuild from RequestURI, EscapedPath, or AppSec forwarded URI. Host is an optional httprule predicate: Go RE2 unanchored MatchString on the hostname of req.Host (SplitHostPort when that succeeds; otherwise req.Host unchanged). Do not read the Host header map. Do not include scheme, port, or path. Omit or empty = any. No leading !. A host-only rule is valid. Fully empty also requires no host. Supersedes the prior decision that Host is not part of the match (operators must be able to filter by host; human correction 2026-09-25).
   By: explore

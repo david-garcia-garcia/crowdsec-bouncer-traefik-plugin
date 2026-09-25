@@ -281,6 +281,10 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	cfgMatchEverythingMethod.BouncerAppsecBypassRules = []httprule.Rule{{Method: ".*"}}
 	cfgMethodOnly := getMinimalConfig()
 	cfgMethodOnly.BouncerLapiBypassRules = []httprule.Rule{{Method: "^OPTIONS$"}}
+	cfgHostOnly := getMinimalConfig()
+	cfgHostOnly.BouncerLapiBypassRules = []httprule.Rule{{Host: "^probe\\.example$"}}
+	cfgInvalidHostBypass := getMinimalConfig()
+	cfgInvalidHostBypass.BouncerLapiBypassRules = []httprule.Rule{{Host: "("}}
 	cfgDoubleBang := getMinimalConfig()
 	cfgDoubleBang.BouncerLapiBypassRules = []httprule.Rule{{Method: "!!POST"}}
 	cfgEmptyNegation := getMinimalConfig()
@@ -356,6 +360,8 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 		{name: "Fully empty LAPI bypass rule fails", args: args{config: cfgEmptyRule}, wantErr: true, wantErrContains: "BouncerLapiBypassRules"},
 		{name: "Match-everything AppSec method fails", args: args{config: cfgMatchEverythingMethod}, wantErr: true, wantErrContains: "BouncerAppsecBypassRules"},
 		{name: "Method-only LAPI bypass rule passes", args: args{config: cfgMethodOnly}, wantErr: false},
+		{name: "Host-only LAPI bypass rule passes", args: args{config: cfgHostOnly}, wantErr: false},
+		{name: "Invalid LAPI bypass host regex fails", args: args{config: cfgInvalidHostBypass}, wantErr: true, wantErrContains: "BouncerLapiBypassRules"},
 		{name: "Double bang LAPI method fails", args: args{config: cfgDoubleBang}, wantErr: true, wantErrContains: "BouncerLapiBypassRules"},
 		{name: "Bang with empty pattern fails", args: args{config: cfgEmptyNegation}, wantErr: true, wantErrContains: "BouncerLapiBypassRules"},
 		{name: "Invalid AppSec bypass path regex fails", args: args{config: cfgInvalidAppsecBypass}, wantErr: true, wantErrContains: "BouncerAppsecBypassRules"},

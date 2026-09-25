@@ -197,9 +197,11 @@ When the remediation kind is captcha and this bouncer did not subscribe to captc
 - **AND** the log MUST NOT contain `crowdsec bouncer captcha unsubscribed`
 
 ### Requirement: Per-leg request bypass rules skip that CrowdSec leg
-The bouncer SHALL expose public Config lists `bouncerAppsecBypassRules` and `bouncerLapiBypassRules` (same rule shape). Default empty (omit or empty list) SHALL skip nothing for that leg. Each rule MAY set `method`, `path`, `headers`, and `cookies`. An omitted field, or `path` / `method` empty after trim, or an empty `headers` / `cookies` map, SHALL mean any for that predicate. Set predicates on one rule SHALL all match (AND). Rules in one list SHALL be OR; the first matching rule wins. A LAPI match SHALL skip `LookupRemediation`, `LiveLookup`, missing-subscribed-LAPI failure action, and stream/alone unhealthy failure action, and SHALL continue at `passOrForcedCaptcha`. An AppSec match SHALL skip AppSec `Query` and the AppSec body buffer and SHALL call `next`. The two lists SHALL be independent. Bypass SHALL run after startup block, GetRemoteIP, trusted-IP skip, and forced `b`. Forced `c` SHALL still apply on the pass path after a LAPI match. These lists MUST NOT enter LAPI ownership or AppSec identity keys. The plugin MUST NOT compile rules on the request path. `recordProcessed` SHALL still run for a bypassed request. A WebSocket handshake GET SHALL be inspected like any other GET.
+The bouncer SHALL expose public Config lists `bouncerAppsecBypassRules` and `bouncerLapiBypassRules` (same rule shape). Default empty (omit or empty list) SHALL skip nothing for that leg. Each rule MAY set `method`, `path`, `host`, `headers`, and `cookies`. An omitted field, or `path` / `host` / `method` empty after trim, or an empty `headers` / `cookies` map, SHALL mean any for that predicate. Set predicates on one rule SHALL all match (AND). Rules in one list SHALL be OR; the first matching rule wins. A LAPI match SHALL skip `LookupRemediation`, `LiveLookup`, missing-subscribed-LAPI failure action, and stream/alone unhealthy failure action, and SHALL continue at `passOrForcedCaptcha`. An AppSec match SHALL skip AppSec `Query` and the AppSec body buffer and SHALL call `next`. The two lists SHALL be independent. Bypass SHALL run after startup block, GetRemoteIP, trusted-IP skip, and forced `b`. Forced `c` SHALL still apply on the pass path after a LAPI match. These lists MUST NOT enter LAPI ownership or AppSec identity keys. The plugin MUST NOT compile rules on the request path. `recordProcessed` SHALL still run for a bypassed request. A WebSocket handshake GET SHALL be inspected like any other GET.
 
 Path SHALL be Go RE2, unanchored `MatchString` against `req.URL.Path` (percent-decoded, not slash-normalized, not the query). The plugin MUST NOT insert `^` or `$`. The plugin MUST NOT rebuild path from `RequestURI`, `EscapedPath`, or AppSec forwarded URI. Host SHALL NOT be part of the path match. A Host header rule SHALL read `req.Header`.
+
+Host SHALL be optional Go RE2, unanchored `MatchString` against the hostname of `req.Host`. When `net.SplitHostPort(req.Host)` succeeds, the match text SHALL be that host (`example.com:443` → `example.com`, `[::1]:443` → `::1`). When it fails, the match text SHALL be `req.Host` unchanged. The plugin MUST NOT insert `^` or `$`. The plugin MUST NOT read the Host header map. The plugin MUST NOT include scheme, port, or path in the match text. Omit or empty after trim SHALL match any host. There is no leading `!` negation on host. A host-only rule SHALL be valid.
 
 Method SHALL be Go RE2, unanchored `MatchString` against `req.Method`. The plugin MUST NOT insert `^` or `$`, MUST NOT lowercase the method, and MUST NOT force `(?i)`. Omit or empty after trim SHALL match any method. An optional single leading `!` outside the pattern, stripped before compile, SHALL negate the match (`!POST`, `!^POST$`). Go RE2 only (no lookahead).
 
@@ -279,6 +281,31 @@ Cookies SHALL use the same predicate shape as headers against that cookie's valu
 - **AND** `bouncerDecisionHeader` forces `c`
 - **AND** lookup is skipped
 - **THEN** the pass path still applies forced captcha
+
+#### Scenario: Host-only rule matches that hostname
+- **WHEN** `bouncerLapiBypassRules` contains `{host: "^probe\\.example$"}`
+- **AND** `req.Host` is `probe.example`
+- **THEN** the LAPI leg is skipped
+
+#### Scenario: Host port is stripped
+- **WHEN** `bouncerLapiBypassRules` contains `{host: "^example.com$"}`
+- **AND** `req.Host` is `example.com:443`
+- **THEN** the LAPI leg is skipped
+
+#### Scenario: IPv6 host with port is stripped
+- **WHEN** `bouncerLapiBypassRules` contains `{host: "^::1$"}`
+- **AND** `req.Host` is `[::1]:443`
+- **THEN** the LAPI leg is skipped
+
+#### Scenario: Host and path are AND
+- **WHEN** `bouncerLapiBypassRules` contains `{host: "^example.com$", path: "^/healthz$"}`
+- **AND** `req.Host` is `example.com` and `req.URL.Path` is `/other`
+- **THEN** the LAPI leg is not skipped for that rule
+
+#### Scenario: Non-matching host does not skip
+- **WHEN** `bouncerLapiBypassRules` contains `{host: "^probe\\.example$"}`
+- **AND** `req.Host` is `other.example`
+- **THEN** the LAPI leg is not skipped for that rule
 
 #### Scenario: Method-only rule matches that method
 - **WHEN** `bouncerLapiBypassRules` contains `{method: "^OPTIONS$"}`

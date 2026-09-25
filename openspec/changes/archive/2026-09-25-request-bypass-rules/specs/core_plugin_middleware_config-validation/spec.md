@@ -7,7 +7,7 @@
 ## ADDED Requirements
 
 ### Requirement: Invalid bypass rules fail ValidateParams
-`ValidateParams` SHALL compile `BouncerAppsecBypassRules` and `BouncerLapiBypassRules` with the shared matcher constructor (`httprule.New`). An omitted or empty list SHALL pass (that setting is off). A rule SHALL fail when path, headers, and cookies are all absent (omitted or empty after trim / empty map) AND method is any (omitted, empty after trim, or a match-everything pattern such as `.*`). A method-only rule SHALL pass. `!!` SHALL fail. A leading `!` with an empty pattern SHALL fail. A method, path, header, or cookie pattern that Go `regexp.Compile` rejects SHALL fail. Error text SHALL name the Go field (`BouncerAppsecBypassRules` or `BouncerLapiBypassRules`). A `ValidateParams` failure from this rule SHALL cause `plugin.New` to return a nil handler and that error without opening LAPI. `bouncer.New` SHALL compile again to store the compiled set; ValidateParams discards the compiled value. The plugin MUST NOT ignore an invalid pattern.
+`ValidateParams` SHALL compile `BouncerAppsecBypassRules` and `BouncerLapiBypassRules` with the shared matcher constructor (`httprule.New`). An omitted or empty list SHALL pass (that setting is off). A rule SHALL fail when path, host, headers, and cookies are all absent (omitted or empty after trim / empty map) AND method is any (omitted, empty after trim, or a match-everything pattern such as `.*`). A method-only or host-only rule SHALL pass. `!!` SHALL fail. A leading `!` with an empty pattern SHALL fail. A method, path, host, header, or cookie pattern that Go `regexp.Compile` rejects SHALL fail. Error text SHALL name the Go field (`BouncerAppsecBypassRules` or `BouncerLapiBypassRules`). A `ValidateParams` failure from this rule SHALL cause `plugin.New` to return a nil handler and that error without opening LAPI. `bouncer.New` SHALL compile again to store the compiled set; ValidateParams discards the compiled value. The plugin MUST NOT ignore an invalid pattern.
 
 #### Scenario: Empty lists pass
 - **WHEN** `bouncerAppsecBypassRules` and `bouncerLapiBypassRules` are omitted or empty
@@ -27,6 +27,15 @@
 #### Scenario: Method-only rule passes
 - **WHEN** `bouncerLapiBypassRules` contains `{method: "^OPTIONS$"}`
 - **THEN** `ValidateParams` returns no error from that field
+
+#### Scenario: Host-only rule passes
+- **WHEN** `bouncerLapiBypassRules` contains `{host: "^probe\\.example$"}`
+- **THEN** `ValidateParams` returns no error from that field
+
+#### Scenario: Invalid host regexp fails New
+- **WHEN** `bouncerLapiBypassRules` contains `{host: "("}`
+- **THEN** `ValidateParams` returns an error that names `BouncerLapiBypassRules`
+- **AND** `New` returns a nil handler and that error
 
 #### Scenario: Double bang fails
 - **WHEN** `bouncerLapiBypassRules` contains `{method: "!!POST"}`
@@ -54,7 +63,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: ValidateParams test coverage for mode and helper gaps
-The configuration package SHALL include unit tests covering: custom captcha provider missing fields; AppSec failure action `captcha` without a captcha instance name; **LAPI disabled AppSec-only path (replaces appsec mode without LAPI key)**; alone mode captcha key failures; empty or unloadable captcha and ban templates that warn and do not fail `New`; `GetTemplate` error paths; `validateURL` bad host; `BouncerRemediationStatusCode` bounds 99/600; `LapiUpdateMaxFailure: -1` acceptance; **instance name E2/E3 cases including captcha**; invalid `BouncerAppsecBypassRules` / `BouncerLapiBypassRules` that fail `ValidateParams`; empty lists that pass; fully empty rules and `.*` method-only-as-any that fail; method-only rules that pass.
+The configuration package SHALL include unit tests covering: custom captcha provider missing fields; AppSec failure action `captcha` without a captcha instance name; **LAPI disabled AppSec-only path (replaces appsec mode without LAPI key)**; alone mode captcha key failures; empty or unloadable captcha and ban templates that warn and do not fail `New`; `GetTemplate` error paths; `validateURL` bad host; `BouncerRemediationStatusCode` bounds 99/600; `LapiUpdateMaxFailure: -1` acceptance; **instance name E2/E3 cases including captcha**; invalid `BouncerAppsecBypassRules` / `BouncerLapiBypassRules` that fail `ValidateParams`; empty lists that pass; fully empty rules and `.*` method-only-as-any that fail; method-only and host-only rules that pass.
 
 #### Scenario: AppSec captcha without instance name rejected
 - **WHEN** `bouncerAppsecFailureAction` is `captcha` and `captchaInstanceName` is empty after owner-fill rules

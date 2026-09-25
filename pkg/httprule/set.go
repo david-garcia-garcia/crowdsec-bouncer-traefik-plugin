@@ -1,9 +1,10 @@
-// Package httprule compiles HTTP request exemption rules (method, path, headers, cookies).
+// Package httprule compiles HTTP request exemption rules (method, path, host, headers, cookies).
 package httprule
 
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/textproto"
 	"regexp"
@@ -22,6 +23,7 @@ type Set struct {
 type compiledRule struct {
 	cookies   []valuePredicate
 	headers   []valuePredicate
+	hostRe    *regexp.Regexp
 	methodAny bool
 	methodNeg bool
 	methodRe  *regexp.Regexp
@@ -80,6 +82,10 @@ func compileRule(rule Rule) (compiledRule, error) {
 	if err != nil {
 		return compiledRule{}, fmt.Errorf("path: %w", err)
 	}
+	hostRe, err := compileOptionalRegexp(rule.Host)
+	if err != nil {
+		return compiledRule{}, fmt.Errorf("host: %w", err)
+	}
 	headers, err := compileValuePredicates(rule.Headers, true)
 	if err != nil {
 		return compiledRule{}, fmt.Errorf("headers: %w", err)
@@ -88,12 +94,13 @@ func compileRule(rule Rule) (compiledRule, error) {
 	if err != nil {
 		return compiledRule{}, fmt.Errorf("cookies: %w", err)
 	}
-	if methodAny && pathRe == nil && len(headers) == 0 && len(cookies) == 0 {
+	if methodAny && pathRe == nil && hostRe == nil && len(headers) == 0 && len(cookies) == 0 {
 		return compiledRule{}, errors.New("empty")
 	}
 	return compiledRule{
 		cookies:   cookies,
 		headers:   headers,
+		hostRe:    hostRe,
 		methodAny: methodAny,
 		methodNeg: methodNeg,
 		methodRe:  methodRe,
@@ -159,7 +166,7 @@ func compileValuePredicates(raw map[string]string, canonicalize bool) ([]valuePr
 	return predicates, nil
 }
 
-// match is AND of method, path, headers, then cookies.
+// match is AND of method, path, host, headers, then cookies.
 func (rule compiledRule) match(httpReq *http.Request, cookies []*http.Cookie) bool {
 	if !rule.matchMethod(httpReq.Method) {
 		return false
@@ -171,10 +178,21 @@ func (rule compiledRule) match(httpReq *http.Request, cookies []*http.Cookie) bo
 	if rule.pathRe != nil && !rule.pathRe.MatchString(path) {
 		return false
 	}
+	if rule.hostRe != nil && !rule.hostRe.MatchString(requestHostname(httpReq)) {
+		return false
+	}
 	if !matchValuePredicates(rule.headers, httpReq.Header) {
 		return false
 	}
 	return matchCookies(rule.cookies, cookies)
+}
+
+// requestHostname is the hostname of req.Host. SplitHostPort success drops the port.
+func requestHostname(httpReq *http.Request) string {
+	if hostname, _, err := net.SplitHostPort(httpReq.Host); err == nil {
+		return hostname
+	}
+	return httpReq.Host
 }
 
 // matchMethod applies unanchored RE2 on req.Method. Any always matches. methodNeg inverts.

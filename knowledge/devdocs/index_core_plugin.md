@@ -43,7 +43,7 @@ description: How this plugin stores trusted hop and client CIDRs and answers mem
 ## HTTP request rules
 priority: normal
 local: core_plugin_httprule.md
-description: How this plugin compiles method, path, header, and cookie request rules once and matches them on *http.Request.
+description: How this plugin compiles method, path, host, header, and cookie request rules once and matches them on *http.Request.
 
 ## LAPI usage-metrics
 priority: normal

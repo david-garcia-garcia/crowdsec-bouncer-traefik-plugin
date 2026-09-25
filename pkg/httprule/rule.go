@@ -4,6 +4,7 @@ package httprule
 type Rule struct {
 	Method  string            `json:"method,omitempty"`
 	Path    string            `json:"path,omitempty"`
+	Host    string            `json:"host,omitempty"`
 	Headers map[string]string `json:"headers,omitempty"`
 	Cookies map[string]string `json:"cookies,omitempty"`
 }
