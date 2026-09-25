@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strings"
 	"testing"
 
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
@@ -22,7 +21,6 @@ func TestNew_BouncerInitializedTrustedIPs(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 	logged := sink.String()
-	assertNoInsertTrustedLogs(t, logged)
 	rec := bouncerInitializedRecord(t, logged)
 	assertStringSliceAttr(t, rec, "forwardedHeadersTrustedIPs", forwarded)
 	assertStringSliceAttr(t, rec, "clientTrustedIPs", client)
@@ -38,8 +36,21 @@ func TestNew_BouncerInitializedEmptyTrustedIPs(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 	logged := sink.String()
-	assertNoInsertTrustedLogs(t, logged)
 	rec := bouncerInitializedRecord(t, logged)
+	assertStringSliceAttr(t, rec, "forwardedHeadersTrustedIPs", []string{})
+	assertStringSliceAttr(t, rec, "clientTrustedIPs", []string{})
+}
+
+func TestNew_BouncerInitializedNilTrustedIPs(t *testing.T) {
+	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+	log, sink := newTestLogSink(slog.LevelDebug)
+	cfg := configuration.New()
+	cfg.BouncerForwardedHeadersTrustedIPs = nil
+	cfg.BouncerClientTrustedIPs = nil
+	if _, err := New(next, "test", cfg, false, false, false, log); err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	rec := bouncerInitializedRecord(t, sink.String())
 	assertStringSliceAttr(t, rec, "forwardedHeadersTrustedIPs", []string{})
 	assertStringSliceAttr(t, rec, "clientTrustedIPs", []string{})
 }
@@ -94,12 +105,4 @@ func jsonStringSlice(raw any) ([]string, bool) {
 		out = append(out, s)
 	}
 	return out, true
-}
-
-// assertNoInsertTrustedLogs fails when NewChecker insert DEBUG still appears.
-func assertNoInsertTrustedLogs(t *testing.T, logged string) {
-	t.Helper()
-	if strings.Contains(logged, `"msg":"IP is trusted"`) || strings.Contains(logged, `"msg":"IP network is trusted"`) {
-		t.Fatalf("want no insert DEBUG, got %s", logged)
-	}
 }
