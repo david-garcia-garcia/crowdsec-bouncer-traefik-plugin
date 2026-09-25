@@ -20,7 +20,7 @@ Stop the two insert Debug calls in `NewChecker` and leave the logger parameter u
 In progress. 1 items remain.
 
 Priority: P3 — operator-log clarity with no current user or operator harm
-Reviewed head: dec1a28d
+Reviewed head: fb1bf72c
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -37,7 +37,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-25-init-log-component pushed | `git` |
 | OpenSpec | init-log-component | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/160 | pr-host |
-| CI | in progress | ci-host |
+| CI | build 36132080906 in progress | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36132080906/job/108061522676 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -56,7 +56,7 @@ Worktree:
 
 
 ## How this fits together
-Ticket 2026-09-25-init-log-component on branch 2026-09-25-init-log-component targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/160; CI in progress.
+Ticket 2026-09-25-init-log-component on branch 2026-09-25-init-log-component targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/160; CI build 36132080906 in progress.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -85,7 +85,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | dec1a28da8b2536603868be426533badb64d8196 | Card must match the branch you measured |
+| Reviewed head | fb1bf72c712a8a9152075f98394c8b4f06a0f9a3 | Card must match the branch you measured |
 
 ### Stored data model
 None.
