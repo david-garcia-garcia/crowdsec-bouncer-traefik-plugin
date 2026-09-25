@@ -39,13 +39,7 @@ func TestYaegi_Open_eachProvider(t *testing.T) {
 	}
 	for _, providerCase := range yaegiProviderCases() {
 		t.Run(providerCase.name, func(t *testing.T) {
-			interpreter := yaegitest.New(t, goPath)
-			if _, err := interpreter.Eval(providerCase.source(templatePath)); err != nil {
-				t.Fatal(err)
-			}
-			if err := interpreter.EvalError("construct()"); err != nil {
-				t.Fatalf("Open: %v", err)
-			}
+			yaegitest.Run(t, goPath, providerCase.source(templatePath))
 		})
 	}
 }
@@ -89,15 +83,19 @@ func yaegiProviderCases() []yaegiProviderCase {
 // source is the interpreted program that calls Open for this provider.
 // Open builds the HTTP client and logger inside the captcha package, as the bouncer does.
 func (c yaegiProviderCase) source(templatePath string) string {
-	return fmt.Sprintf(`import (
+	return fmt.Sprintf(`package main
+
+import (
 	"context"
+	"fmt"
+	"os"
 
 	captcha %q
 	configuration %q
 	logger %q
 )
 
-func construct() error {
+func main() {
 	cfg := configuration.New()
 	cfg.CaptchaEnabled = true
 	cfg.CaptchaProvider = %q
@@ -117,7 +115,10 @@ func construct() error {
 	cfg.CaptchaEnterpriseMinScore = %q
 	cfg.CaptchaEnterpriseProjectID = %q
 	_, err := captcha.Open(context.Background(), cfg, logger.New("ERROR", ""), "crowdsec", "test")
-	return err
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
 `, yaegitest.ModulePath+"/pkg/captcha",
 		yaegitest.ModulePath+"/pkg/configuration",

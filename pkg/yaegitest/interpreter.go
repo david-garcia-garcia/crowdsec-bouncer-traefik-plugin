@@ -1,29 +1,20 @@
-// Package yaegitest builds a Yaegi v0.16.1 interpreter that loads this module
-// the way Traefik does: GOPATH/src plus the vendored middleware utilities.
+// Package yaegitest runs a program under the yaegi v0.16.1 binary the way Traefik
+// loads this module: GOPATH/src plus the vendored middleware utilities.
+// The binary is not a module dependency. CI installs it before the test suite.
 package yaegitest
 
 import (
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"testing"
-
-	"github.com/traefik/yaegi/interp"
-	"github.com/traefik/yaegi/stdlib"
 )
 
 // ModulePath is this plugin's Go module path.
 const ModulePath = "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin"
 
 const utilitiesModulePath = "github.com/david-garcia-garcia/traefik-middleware-utilities"
-
-// Interpreter is one Yaegi v0.16.1 session whose imports resolve from a GoPath.
-type Interpreter struct {
-	session *interp.Interpreter
-}
 
 // GoPath is a GOPATH whose src tree is this module plus vendored utilities.
 // Yaegi v0.16 resolves imports from GOPATH/src, the same way Traefik loads the plugin.
@@ -37,47 +28,24 @@ func GoPath(t *testing.T) string {
 	return goPath
 }
 
-// New starts an interpreter that loads source from goPath.
-// goPath comes from GoPath. Each New is its own session.
-func New(t *testing.T, goPath string) *Interpreter {
+// Run executes source with the yaegi binary. source is a package main program.
+// The test skips when the binary is not on PATH. A non-zero exit fails the test.
+func Run(t *testing.T, goPath, source string) {
 	t.Helper()
-	session := interp.New(interp.Options{
-		GoPath: goPath,
-		Env:    os.Environ(),
-		Stdout: io.Discard,
-		Stderr: io.Discard,
-	})
-	if err := session.Use(stdlib.Symbols); err != nil {
+	bin, err := exec.LookPath("yaegi")
+	if err != nil {
+		t.Skip("yaegi binary not on PATH")
+	}
+	file := filepath.Join(t.TempDir(), "main.go")
+	if err := os.WriteFile(file, []byte(source), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	return &Interpreter{session: session}
-}
-
-// Eval evaluates source in this session.
-func (i *Interpreter) Eval(source string) (reflect.Value, error) {
-	return i.session.Eval(source)
-}
-
-// EvalError evaluates an expression that returns error and returns that error.
-// A panic during the expression is returned as the error. A nil error is success.
-func (i *Interpreter) EvalError(expression string) error {
-	result, err := i.session.Eval(expression)
+	cmd := exec.Command(bin, file)
+	cmd.Env = append(os.Environ(), "GOPATH="+goPath)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return err
+		t.Fatalf("yaegi: %v\n%s", err, out)
 	}
-	return errorResult(result)
-}
-
-// errorResult is the error value an interpreted call returned. A nil interface is success.
-func errorResult(result reflect.Value) error {
-	if !result.IsValid() || result.IsNil() {
-		return nil
-	}
-	returned, ok := result.Interface().(error)
-	if !ok || returned == nil {
-		return nil
-	}
-	return returned
 }
 
 // moduleRoot is the directory that contains this module's go.mod.

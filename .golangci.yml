@@ -35,7 +35,6 @@ linters-settings:
         files:
           - $all
           - "!$test"
-          - "!**/yaegitest/**"
         allow:
           - $gostd
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger
@@ -71,14 +70,7 @@ linters-settings:
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore
           - github.com/david-garcia-garcia/traefik-middleware-utilities/traefikemulator
           - github.com/leprosus/golang-ttl-map
-          - github.com/traefik/yaegi
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/yaegitest
-      YaegiTest:
-        files:
-          - "**/yaegitest/**"
-        allow:
-          - $gostd
-          - github.com/traefik/yaegi
 
 linters:
   enable-all: true
