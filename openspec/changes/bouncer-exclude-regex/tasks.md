@@ -7,8 +7,8 @@
 ## 2. Bouncer compile and match
 
 - [x] 2.1 `bouncer.New` calls `CompileExcludeRegex` for both knobs, stores `appsecExcludeRegex` and `lapiExcludeRegex` (`*regexp.Regexp`; nil = off), returns the compile error. Do not compile on the request path
-- [x] 2.2 Add `excludeMatchString(httpReq *http.Request) string` in `pkg/bouncer`: Host is `req.Host`; use `net.SplitHostPort` when it succeeds; path is `req.URL.Path`; empty or nil URL Path → `/`; concatenate. Do not call `captcha.RequestDomain`. Do not use AppSec forwarded Host/URI, `URL.String()`, `RequestURI`, or `EscapedPath`
-- [x] 2.3 Tests for match string: `example.com:443` + `/health` → `example.com/health`; query ignored; empty Path → `host/`; IPv6 with port loses brackets; bare `[::1]` stays as Host wrote it
+- [x] 2.2 Add `excludeMatchString(httpReq *http.Request) string` in `pkg/bouncer`: Host is `req.Host`; use `net.SplitHostPort` when it succeeds; path is `req.URL.Path`; empty or nil URL Path → `/`; concatenate host + `://` + path. Do not strip the path's leading slash. Do not call `captcha.RequestDomain`. Do not use AppSec forwarded Host/URI, `URL.String()`, `RequestURI`, or `EscapedPath`
+- [x] 2.3 Tests for match string: `example.com:443` + `/health` → `example.com:///health`; query ignored; empty Path → `example.com:///`; IPv6 with port loses brackets; bare `[::1]` stays as Host wrote it
 
 ## 3. ServeHTTP skip
 
@@ -19,7 +19,7 @@
 
 ## 4. Docs
 
-- [x] 4.1 README: document both knobs (empty = off; `{host}/path`; unanchored RE2; `^...$` to anchor; port and query stripped; invalid pattern fails `New`). Place next to the related `BouncerAppsecFailureAction` / `BouncerLapiFailureAction` entries
+- [x] 4.1 README: document both knobs (empty = off; host + `://` + path; unanchored RE2; `^...$` to anchor; port and query stripped; invalid pattern fails `New`). Place next to the related `BouncerAppsecFailureAction` / `BouncerLapiFailureAction` entries
 - [x] 4.2 Usage `knowledge/devdocs/core_plugin_middleware.md`: request-policy exclude sits after trusted-IP and forced `b`; match reuses `req.Host` / `req.URL.Path`; knobs stay off reclaim keys. `knowledge/devdocs/core_plugin_middleware_config-validation.md`: invalid RE2 fails `ValidateParams`
 
 ## 5. Verify

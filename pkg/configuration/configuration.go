@@ -77,7 +77,7 @@ type Config struct {
 	AppsecTLSClientKey                  string                       `json:"appsecTlsClientKey,omitempty"`
 	AppsecTLSClientKeyFile              string                       `json:"appsecTlsClientKeyFile,omitempty"`
 	AppsecTLSInsecureVerify             bool                         `json:"appsecTlsInsecureVerify,omitempty"`
-	BouncerAppsecExcludeRegex           string                       `json:"bouncerAppsecExcludeRegex,omitempty"` // RE2; empty = off; match {host}/path
+	BouncerAppsecExcludeRegex           string                       `json:"bouncerAppsecExcludeRegex,omitempty"` // RE2; empty = off; match host://path
 	BouncerAppsecFailureAction          string                       `json:"bouncerAppsecFailureAction,omitempty"`
 	BouncerBanFilePath                  string                       `json:"bouncerBanFilePath,omitempty"`
 	BouncerClientTrustedIPs             []string                     `json:"bouncerClientTrustedIps,omitempty"`
@@ -87,7 +87,7 @@ type Config struct {
 	BouncerForwardedHeadersCustomName   string                       `json:"bouncerForwardedHeadersCustomName,omitempty"`
 	BouncerForwardedHeadersInsecure     bool                         `json:"bouncerForwardedHeadersInsecure,omitempty"`
 	BouncerForwardedHeadersTrustedIPs   []string                     `json:"bouncerForwardedHeadersTrustedIps,omitempty"`
-	BouncerLapiExcludeRegex             string                       `json:"bouncerLapiExcludeRegex,omitempty"` // RE2; empty = off; match {host}/path
+	BouncerLapiExcludeRegex             string                       `json:"bouncerLapiExcludeRegex,omitempty"` // RE2; empty = off; match host://path
 	BouncerLapiFailureAction            string                       `json:"bouncerLapiFailureAction,omitempty"`
 	BouncerOriginBasedDecisionRemap     map[string]map[string]string `json:"bouncerOriginBasedDecisionRemap,omitempty"`
 	BouncerRedisUnreachableBlock        bool                         `json:"bouncerRedisUnreachableBlock,omitempty"`

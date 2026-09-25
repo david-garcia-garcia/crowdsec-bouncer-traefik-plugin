@@ -23,7 +23,7 @@
 - **AND** `New` returns a nil handler and that error
 
 #### Scenario: Valid regex passes
-- **WHEN** `bouncerAppsecExcludeRegex` is `example\.com/health` and `bouncerLapiExcludeRegex` is `^ok/`
+- **WHEN** `bouncerAppsecExcludeRegex` is `example\.com:///health` and `bouncerLapiExcludeRegex` is `^ok/`
 - **THEN** `ValidateParams` returns no error from those fields
 
 ## MODIFIED Requirements

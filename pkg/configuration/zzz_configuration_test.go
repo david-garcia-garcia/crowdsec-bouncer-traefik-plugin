@@ -283,7 +283,7 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	cfgInvalidLapiExclude := getMinimalConfig()
 	cfgInvalidLapiExclude.BouncerLapiExcludeRegex = "("
 	cfgValidExclude := getMinimalConfig()
-	cfgValidExclude.BouncerAppsecExcludeRegex = `example\.com/health`
+	cfgValidExclude.BouncerAppsecExcludeRegex = `example\.com:///health`
 	cfgValidExclude.BouncerLapiExcludeRegex = `^ok/`
 	type args struct {
 		config *Config
