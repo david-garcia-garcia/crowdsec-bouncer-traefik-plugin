@@ -93,8 +93,8 @@ func Test_New_eucaptchaWidgetAndVerifier(t *testing.T) {
 	if _, ok := client.verifier.(*eucaptchaVerifier); !ok {
 		t.Fatalf("verifier type %T, want *eucaptchaVerifier", client.verifier)
 	}
-	if _, inSiteverify := infoProviders[configuration.EucaptchaProvider]; inSiteverify {
-		t.Fatal("eucaptcha must not be in infoProviders")
+	if _, inSiteverify := siteverifyBuiltins[configuration.EucaptchaProvider]; inSiteverify {
+		t.Fatal("eucaptcha must not be a siteverify builtin")
 	}
 }
 

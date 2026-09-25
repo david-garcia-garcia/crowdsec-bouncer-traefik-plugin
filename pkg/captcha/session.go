@@ -17,18 +17,6 @@ import (
 
 const ownerKeyPrefix = "captcha:owner:"
 
-// MsgInstanceStarted is the INFO create line for one captcha Client incarnation.
-const MsgInstanceStarted = "crowdsec captcha instance started"
-
-// MsgInstanceSleeping is the DEBUG line when the last holder leaves.
-const MsgInstanceSleeping = "crowdsec captcha instance sleeping"
-
-// MsgInstanceWaking is the DEBUG line when a holder binds again.
-const MsgInstanceWaking = "crowdsec captcha instance waking"
-
-// MsgInstanceClosed is the INFO line when the Client incarnation is closed.
-const MsgInstanceClosed = "crowdsec captcha instance closed"
-
 // ownership is the captcha Open-key payload: middleware name plus instance-owned knobs.
 // Slot name, bounce, failure actions, remediation header, and startup-block stay off it.
 type ownership struct {
@@ -178,6 +166,6 @@ func newOwnerClient(cfg *configuration.Config, log *slog.Logger, middlewareName,
 	client.instanceName = cfg.CaptchaInstanceName
 	client.sessionKey = bindKey
 	client.incarnation = fmt.Sprintf("%p", client)
-	client.log.Info(MsgInstanceStarted, "incarnation", client.incarnation, "reason", "started")
+	client.log.Info("crowdsec captcha instance started", "incarnation", client.incarnation, "reason", "started")
 	return client, nil
 }

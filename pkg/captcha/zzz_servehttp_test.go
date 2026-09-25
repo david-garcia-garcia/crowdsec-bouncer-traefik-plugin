@@ -234,10 +234,10 @@ func Test_ServeHTTP_jsonpSiteverifyContentTypeIsNotJSON(t *testing.T) {
 	}
 }
 
-func Test_captchaResponseFromRequest_rawBodyWithoutContentType(t *testing.T) {
+func Test_readFieldFromRequest_rawBodyWithoutContentType(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/foo", strings.NewReader("dummy-captcha-response=ok"))
 	// No Content-Type: ParseForm skips the body; the raw ParseQuery path must still win.
-	got := captchaResponseFromRequest(req, "dummy-captcha-response")
+	got := readFieldFromRequest(req, "dummy-captcha-response")
 	if got != "ok" {
 		t.Fatalf("got %q, want ok", got)
 	}
