@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: d97af6b7
+Reviewed head: bc0346e8
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -53,7 +53,7 @@ Ticket 2026-09-25-bouncer-exclude-regex on branch 2026-09-25-bouncer-exclude-reg
 ## Explore Decisions
 | Question | Rank | Decision | By |
 | --- | --- | --- | --- |
-| Invalid regex: fail `ValidateParams` / `bouncer.New`, or ignore the setting? | additive asked — new validation of new Config strings this change creates; Unknowns "Invalid regex: fail ValidateParams / bouncer.New, or ignore the setting" | assumed — trim; empty after trim is off (no compile). Non-empty invalid RE2 fails `ValidateParams` and `bouncer.New` so `plugin.New` returns that error. Do not ignore. | explore |
+| Is upstream https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/393 a second product requirement? | additive asked — Problem "Upstream https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/393 is citation-only for this run's delivery card, not a second product ask" | assumed — no. Citation only (maxlerebourg/crowdsec-bouncer-traefik-plugin#393). Do not adopt location-list / EXCLUDE_LOCATION. Remaining assumed rows stay on explore.md. | explore |
 
 
 ## Findings
@@ -69,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | d97af6b788c140c588ef4b597414ed811163aa77 | Card must match the branch you measured |
+| Reviewed head | bc0346e809e90e446b96d473bc71004968794463 | Card must match the branch you measured |
 
 ### Stored data model
 None.
