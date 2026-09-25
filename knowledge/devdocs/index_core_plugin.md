@@ -10,6 +10,11 @@ priority: normal
 local: core_plugin_middleware.md
 description: How Traefik New reclaims a LAPI Client, an AppSec Client, and a captcha Client and returns a per-router Bouncer (`core_plugin_middleware_bouncer`).
 
+## Ban page
+priority: normal
+local: core_plugin_middleware_ban-page.md
+description: How handleBanServeHTTP writes the operator ban response (status, Content-Type, Cache-Control, optional template).
+
 ## Instance slots
 priority: normal
 local: core_plugin_middleware_instance-slots.md

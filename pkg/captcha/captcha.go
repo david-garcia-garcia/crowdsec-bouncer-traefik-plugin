@@ -107,6 +107,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP, re
 		value := mintGateValue(c.gateSecret, c.gateBindIP, remoteIP, time.Now())
 		setGateCookie(rw, r, value, c.gracePeriodSeconds)
 		writeRemediationHeader(rw, remediationHeader, "solved-captcha")
+		rw.Header().Set("Cache-Control", "no-cache, no-store")
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
 	}
@@ -115,6 +116,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP, re
 		bootScript = ""
 	}
 	rw.Header().Set("Content-Type", c.templateContentType)
+	rw.Header().Set("Cache-Control", "no-cache, no-store")
 	writeRemediationHeader(rw, remediationHeader, "captcha")
 	rw.WriteHeader(http.StatusOK)
 	err = c.template.Execute(rw, map[string]string{
@@ -193,6 +195,7 @@ func (c *Client) IsCaptchaFormPost(r *http.Request) bool {
 // WriteSolvedRedirect issues 302 to the same URL without reminting the gate cookie.
 func (c *Client) WriteSolvedRedirect(rw http.ResponseWriter, r *http.Request, remediationHeader string) {
 	writeRemediationHeader(rw, remediationHeader, "solved-captcha")
+	rw.Header().Set("Cache-Control", "no-cache, no-store")
 	http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 }
 

@@ -595,6 +595,7 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 		rw.Header().Set(b.remediationCustomHeader, "ban")
 	}
 	rw.Header().Set("Content-Type", b.banTemplateContentType)
+	rw.Header().Set("Cache-Control", "no-cache, no-store")
 	rw.WriteHeader(b.remediationStatusCode)
 	if b.banTemplate == nil || req.Method == http.MethodHead {
 		return
