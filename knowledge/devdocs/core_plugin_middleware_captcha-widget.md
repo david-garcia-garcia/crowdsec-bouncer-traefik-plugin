@@ -25,9 +25,9 @@ _Avoid_: `(bool, error)` as the `Validate` result, `(None, err)`
 - `Validate` calls `Pass(token, remoteIP, r.UserAgent())`. Siteverify and assessments ignore `userAgent`. Do not put User-Agent on `clientRequest`.
 - `Verifier.Pass` stays `(bool, error)` as the return.
 - Eucaptcha: script `https://cdn.eu-captcha.eu/verify.js`, class `eu-captcha`, field `eu-captcha-response`, retry true. Pair the eucaptcha verifier. Do not put `eucaptcha` in `infoProviders`. Verify HTTP stays on `core_plugin_middleware_captcha-eucaptcha-verify`.
-- On `Pass`: mint `crowdsec_captcha_gate`, set `solved-captcha` when configured, 302 to the request URL.
-- On `None` or error: render the challenge with the stored boot script.
-- On `Reject` with `RetryAfterReject`: render with boot. On `Reject` without retry: render and omit boot.
+- On `Pass`: mint `crowdsec_captcha_gate`, set `solved-captcha` when configured, 302 to the request URL. Do not set `Cache-Control`.
+- On `None` or error: set `Cache-Control: no-cache, no-store` next to `Content-Type` before `WriteHeader(200)`, then render the challenge with the stored boot script.
+- On `Reject` with `RetryAfterReject`: same 200 headers and render with boot. On `Reject` without retry: same 200 headers, render, omit boot.
 - Enterprise checkbox: `enterprise.js` with no `render=`, class `g-recaptcha`, field `g-recaptcha-response`, retry true.
 - Enterprise score: `enterprise.js?render={siteKey}`, no checkbox class, same token field, retry false. Boot is fixed Go text (`grecaptcha.enterprise.ready` then `execute`, write the token, submit). Do not take boot from config.
 - Stock `captcha.html` stays one file. Template map keeps `SiteKey`, `FrontendJS`, `FrontendKey`, `ChallengeURL` and adds `BootScript`, `Action`, `DrawCheckbox` (non-empty when the checkbox div should render).
@@ -38,6 +38,9 @@ _Avoid_: `(bool, error)` as the `Validate` result, `(None, err)`
 if outcome == Reject && !c.widget.RetryAfterReject {
 	bootScript = ""
 }
+rw.Header().Set("Content-Type", c.templateContentType)
+rw.Header().Set("Cache-Control", "no-cache, no-store")
+rw.WriteHeader(http.StatusOK)
 ```
 
 ## Key files
@@ -52,6 +55,7 @@ if outcome == Reject && !c.widget.RetryAfterReject {
 
 ## Gotchas
 
+- Challenge HTML at 200 uses exactly `no-cache, no-store`. Pass 302 stays without `Cache-Control`. Do not add `private`, `max-age`, or `Pragma`. Ban-page Cache-Control lives on `core_plugin_middleware_ban-page`.
 - A replaced checkbox template that omits the new keys still works when `FrontendJS` is `enterprise.js`. Score needs `BootScript`.
 - Both enterprise key types keep field name `g-recaptcha-response`.
 - Omit-boot after score reject is a product choice so the page does not auto-`execute` again.
