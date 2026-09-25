@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 789c4ded
+Reviewed head: 24b89394
 Owner decision: None.
 
 ## Review scores
@@ -66,7 +66,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 789c4ded74b47d11dc6870249f6bbc8e9f95492a | Card must match the branch you measured |
+| Reviewed head | 24b893940aacde4cc30b8cf139ac08259fb36d25 | Card must match the branch you measured |
 
 ### Stored data model
 None.

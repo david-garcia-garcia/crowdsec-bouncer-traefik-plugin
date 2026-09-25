@@ -103,52 +103,52 @@ E2e in this repo: **mock** = `tests/e2e/mock/` (Traefik binary + mock LAPI, `mak
 
 ## Open questions
 
-- Q: Do we delete dest’s exclude-regex strings, `CompileExcludeRegex`, `excludeMatchString`, live SHALL rows, README, and unit tests in this change?
-  Rank: bounded asked — existing public Config contract with 11 enumerated files (roots above); Desired “Public config may break; no migration”; Out of scope “Aliases or migration from `bouncerAppsecExcludeRegex` / `bouncerLapiExcludeRegex`”; human correction REPLACE AND REMOVE
-  Decision: resolved — yes. Remove both fields and every in-tree caller listed above. No shim. Leftover operator YAML is dropped by Traefik unused-key decode.
-  By: explore
-
-- Q: Where does the matcher package live under `pkg/`?
-  Rank: additive asked — new package this change creates; criterion “Implement the matcher as its own package”
-  Decision: assumed — `pkg/httprule`. Authoring type `Rule` with json `method`, `path`, `headers`, `cookies`. Compiled `Set`. No imports of this plugin.
+- Q: Where does the matcher package live under pkg/?
+  Rank: additive asked — new package this change creates; criterion Implement the matcher as its own package
+  Decision: assumed — pkg/httprule. Authoring type Rule with json method, path, headers, cookies. Compiled Set. No imports of this plugin.
   By: explore
 
 - Q: Does a LAPI bypass also skip missing-subscribed-LAPI failure and stream/alone unhealthy failure?
-  Rank: bounded asked — same ServeHTTP site as dest LAPI exclude (`bouncer.go` `excludedBy` then `passOrForcedCaptcha`, 1 production call); Desired “skip the LAPI decision lookup”; dest SHALL already skips those failures
-  Decision: assumed — yes, by keeping that site. Do not look up and then ignore. Forced `c` still applies on the pass path.
+  Rank: bounded asked — same ServeHTTP site as dest LAPI exclude (bouncer.go excludedBy then passOrForcedCaptcha, 1 production call); Desired skip the LAPI decision lookup
+  Decision: assumed — yes, by keeping that site. Do not look up and then ignore. Forced c still applies on the pass path.
   By: explore
 
-- Q: Which e2e suite is “real” (`tests/e2e/real/` vs `tests/e2e/mock/`)?
-  Rank: additive asked — new scenario this change creates; Desired “Real end-to-end tests, not only unit tests”
-  Decision: assumed — mock (`tests/e2e/mock/scenarios/<name>/`). That is this repo’s Traefik-plugin e2e. Nested rule lists go in `dynamic.yml`. Pester/Docker CrowdSec is not required.
+- Q: Which e2e suite is real (tests/e2e/real/ vs tests/e2e/mock/)?
+  Rank: additive asked — new scenario this change creates; Desired Real end-to-end tests, not only unit tests
+  Decision: assumed — mock tests/e2e/mock/scenarios/. That is this repo's Traefik-plugin e2e. Nested rule lists go in dynamic.yml. Pester/Docker CrowdSec is not required.
   By: explore
 
 - Q: Are cookie names case-insensitive like headers, or RFC cookie-name case-sensitive?
   Rank: additive asked — new cookie predicate this change creates; Unknowns on requirement.md
-  Decision: assumed — case-sensitive names (`net/http` cookie parse). Headers stay case-insensitive via `CanonicalMIMEHeaderKey`. “Same” means AND / empty = present / RE2 on value, not header canonicalization on cookie names.
+  Decision: assumed — case-sensitive names (net/http cookie parse). Headers stay case-insensitive via CanonicalMIMEHeaderKey. Same means AND / empty = present / RE2 on value, not header canonicalization on cookie names.
   By: explore
 
-- Q: What “canonical header names” means at compile?
-  Rank: additive asked — new compile step this change creates; Desired “canonical header names with compiled patterns”
-  Decision: assumed — `textproto.CanonicalMIMEHeaderKey`. Request check uses `req.Header[canonical]` values (every value, not `Header.Get`).
+- Q: What canonical header names means at compile?
+  Rank: additive asked — new compile step this change creates; Desired canonical header names with compiled patterns
+  Decision: assumed — textproto.CanonicalMIMEHeaderKey. Request check uses req.Header[canonical] values (every value, not Header.Get).
   By: explore
 
-- Q: Where is fully-empty-rule rejection owned (`ValidateParams`, matcher New, or `bouncer.New`)?
-  Rank: additive asked — new constructor reject this change creates; Desired “Plugin construction must reject that fully empty rule”
-  Decision: assumed — `httprule.New` is the owner. `ValidateParams` calls it (fail `plugin.New` before LAPI Open, error names `BouncerAppsecBypassRules` / `BouncerLapiBypassRules`). `bouncer.New` calls it again to store the set.
+- Q: Where is fully-empty-rule rejection owned (ValidateParams, matcher New, or bouncer.New)?
+  Rank: additive asked — new constructor reject this change creates; Desired Plugin construction must reject that fully empty rule
+  Decision: assumed — httprule.New is the owner. ValidateParams calls it (fail plugin.New before LAPI Open, error names BouncerAppsecBypassRules / BouncerLapiBypassRules). bouncer.New calls it again to store the set.
   By: explore
 
-- Q: Does bypass still increment LAPI `processed` (dest counts before exclude)?
-  Rank: bounded asked — existing `recordProcessed` at `ServeHTTP` before trusted skip (`bouncer.go`); Unknowns on requirement.md
-  Decision: assumed — yes. Leave `recordProcessed` where it is. Bypass is still a handled request, like dest exclude.
+- Q: Does bypass still increment LAPI processed (dest counts before exclude)?
+  Rank: bounded asked — existing recordProcessed at ServeHTTP before trusted skip (bouncer.go); Unknowns on requirement.md
+  Decision: assumed — yes. Leave recordProcessed where it is. Bypass is still a handled request, like dest exclude.
+  By: explore
+
+- Q: What is the operator blast of dropping host://path for path-only RE2?
+  Rank: bounded asked — dest match-string owner with enumerated tests/docs (same 11 files); Desired path on req.URL.Path; human correction public may break
+  Decision: assumed — accept the break. Document path-only unanchored RE2. health matches /unhealthy. example.com://health will not match path /health. No converter.
+  By: explore
+
+- Q: Do we delete dest's exclude-regex strings, CompileExcludeRegex, excludeMatchString, live SHALL rows, README, and unit tests in this change?
+  Rank: bounded asked — existing public Config contract with 11 enumerated files (roots above); Desired Public config may break, no migration; Out of scope Aliases or migration; human correction REPLACE AND REMOVE
+  Decision: resolved — yes. Remove both fields and every in-tree caller listed above. No shim. Leftover operator YAML is dropped by Traefik unused-key decode.
   By: explore
 
 - Q: Who already owns client address, path, and Host for matching?
   Rank: additive asked — new match reads request identity fields; commandments One job, one owner
-  Decision: resolved — client address stays `ip.GetRemoteIP` / `clientRequest` (bypass does not parse XFF). Path owner is `req.URL.Path` as `net/http` already decoded it; do not rebuild from `RequestURI`, `EscapedPath`, or AppSec forwarded URI. Host is not part of the path match; a Host header rule reads `req.Header` (canonical). Do not reconstruct Host with `SplitHostPort` (that was dest exclude).
-  By: explore
-
-- Q: What is the operator blast of dropping `host://path` for path-only RE2?
-  Rank: bounded asked — dest match-string owner with enumerated tests/docs (same 11 files); Desired path on `req.URL.Path`; human correction public may break
-  Decision: assumed — accept the break. Document path-only unanchored RE2. `health` matches `/unhealthy`. `example.com://health` will not match path `/health`. No converter.
+  Decision: resolved — client address stays ip.GetRemoteIP / clientRequest (bypass does not parse XFF). Path owner is req.URL.Path as net/http already decoded it; do not rebuild from RequestURI, EscapedPath, or AppSec forwarded URI. Host is not part of the path match; a Host header rule reads req.Header (canonical). Do not reconstruct Host with SplitHostPort (that was dest exclude).
   By: explore
