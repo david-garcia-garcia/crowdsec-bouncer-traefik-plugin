@@ -1,0 +1,6 @@
+host: local
+ref: none
+title: Owned captcha keeps the old log level after the middleware is rebuilt
+url: none
+number: none
+source: caller spec
