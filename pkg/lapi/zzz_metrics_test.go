@@ -26,6 +26,35 @@ func TestMetricsOriginListsRewrite(t *testing.T) {
 	}
 }
 
+// TestReportMetricsOmitsScenarioLabel proves
+// https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/286:
+// a drop is labeled by origin, a blocklist becomes lists:<name>, and the scenario is not a label.
+func TestReportMetricsOmitsScenarioLabel(t *testing.T) {
+	client, body := newUsageMetricsClient(t)
+	client.IncDropped(MetricsOrigin("crowdsec", "crowdsecurity/http-probing"), "ipv4", "ban")
+	client.IncDropped(MetricsOrigin("lists", "firehol_level1"), "ipv6", "captcha")
+	if err := client.reportMetrics(); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, raw := range usageMetricItems(t, body.bytes()) {
+		item := asObject(t, raw)
+		if item["name"] != "dropped" {
+			continue
+		}
+		labels := asObject(t, item["labels"])
+		if _, ok := labels["scenario"]; ok {
+			t.Fatalf("scenario label %#v", labels)
+		}
+		origin, _ := labels["origin"].(string)
+		remediation, _ := labels["remediation"].(string)
+		got[origin] = remediation
+	}
+	if got["crowdsec"] != "ban" || got["lists:firehol_level1"] != "captcha" {
+		t.Fatalf("dropped %#v", got)
+	}
+}
+
 func TestReportMetricsPluginFailClosedOrigins(t *testing.T) {
 	client, body := newUsageMetricsClient(t)
 	origins := []string{
