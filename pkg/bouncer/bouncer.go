@@ -3,6 +3,7 @@ package bouncer
 
 import (
 	"errors"
+	"html"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -562,6 +563,7 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 	templateData := map[string]string{
 		"RemediationReason": reason,
 		"ClientIP":          req.remoteIP,
+		"Domain":            html.EscapeString(captcha.RequestDomain(req.Host)),
 	}
 
 	if b.traceCustomHeader != "" {

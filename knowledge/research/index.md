@@ -64,3 +64,8 @@ description: Official Cloudflare Turnstile siteverify behavior this product reli
 priority: normal
 local: index_ext_capjs.md
 description: Official Cap Standalone (trycap.dev / CapJS) siteverify behavior this product relies on.
+
+## eucaptcha
+priority: normal
+local: index_ext_eucaptcha.md
+description: Official Myra EU CAPTCHA verify API and browser widget this product relies on.

@@ -7,10 +7,72 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
+
+// siteverifyBuiltin is the widget and siteverify URL for one built-in provider.
+type siteverifyBuiltin struct {
+	widget      Widget
+	validateURL string
+}
+
+// siteverifyBuiltins holds hCaptcha, classic reCAPTCHA, and Turnstile.
+//
+//nolint:gochecknoglobals
+var siteverifyBuiltins = map[string]siteverifyBuiltin{
+	configuration.HcaptchaProvider: {
+		widget: Widget{
+			ScriptURL:        "https://hcaptcha.com/1/api.js",
+			Class:            "h-captcha",
+			TokenField:       "h-captcha-response",
+			RetryAfterReject: true,
+		},
+		validateURL: "https://api.hcaptcha.com/siteverify",
+	},
+	configuration.RecaptchaProvider: {
+		widget: Widget{
+			ScriptURL:        "https://www.google.com/recaptcha/api.js",
+			Class:            "g-recaptcha",
+			TokenField:       "g-recaptcha-response",
+			RetryAfterReject: true,
+		},
+		validateURL: "https://www.google.com/recaptcha/api/siteverify",
+	},
+	configuration.TurnstileProvider: {
+		widget: Widget{
+			ScriptURL:        "https://challenges.cloudflare.com/turnstile/v0/api.js",
+			Class:            "cf-turnstile",
+			TokenField:       "cf-turnstile-response",
+			RetryAfterReject: true,
+		},
+		validateURL: "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+	},
+}
+
+// pairSiteverify builds the built-in siteverify widget and form verifier.
+// provider is hcaptcha, recaptcha, or turnstile. The validate body stays empty.
+//
+//nolint:ireturn // Yaegi v0.16.1 panics when New assigns a concrete verifier in one multi-value assignment.
+func pairSiteverify(httpClient *http.Client, provider, secretKey string, log *slog.Logger) (Widget, Verifier) {
+	builtin := siteverifyBuiltins[provider]
+	return builtin.widget, newSiteverifyVerifier(httpClient, secretKey, builtin.validateURL, "", log)
+}
+
+// pairCustom builds the operator-supplied siteverify widget and verifier.
+// validateBody may be form, json, or empty. Built-ins use pairSiteverify.
+//
+//nolint:ireturn // Yaegi v0.16.1 panics when New assigns a concrete verifier in one multi-value assignment.
+func pairCustom(httpClient *http.Client, secretKey, scriptURL, className, tokenField, validateURL, validateBody string, log *slog.Logger) (Widget, Verifier) {
+	return Widget{
+		ScriptURL:        scriptURL,
+		Class:            className,
+		TokenField:       tokenField,
+		RetryAfterReject: true,
+	}, newSiteverifyVerifier(httpClient, secretKey, validateURL, strings.TrimSpace(validateBody), log)
+}
 
 // siteverifyVerifier posts secret+response to a siteverify URL and reads success.
 type siteverifyVerifier struct {
@@ -71,8 +133,10 @@ func (v *siteverifyVerifier) postSiteverify(response, remoteIP string) (*http.Re
 }
 
 // Pass posts the token to siteverify and returns the decoded success bit.
+// userAgent is unused; siteverify does not send it.
 // A Content-Type miss is Pass-false with no error. Transport and JSON decode are the error return.
-func (v *siteverifyVerifier) Pass(token, remoteIP string) (bool, error) {
+func (v *siteverifyVerifier) Pass(token, remoteIP, userAgent string) (bool, error) {
+	_ = userAgent
 	res, err := v.postSiteverify(token, remoteIP)
 	if err != nil {
 		return false, err

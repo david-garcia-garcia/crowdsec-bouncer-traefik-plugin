@@ -24,6 +24,9 @@ apm_modules/
 apm.yml
 apm.lock.yaml
 
+# Local throwaway stacks (keys and secrets)
+tmp/
+
 # Local agent skills
 .agents/
 .cursor/

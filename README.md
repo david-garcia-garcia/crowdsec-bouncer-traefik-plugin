@@ -10,11 +10,14 @@
 
 CrowdSec bouncer for Traefik. It authorizes, bans, or challenges requests from CrowdSec decisions: community lists, local detections, and optional AppSec.
 
-A rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin). Load it as a local plugin; the catalog module on plugins.traefik.io is the original. What changed:
+A rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin). What changed:
 
 - **AI-first.** OpenSpec specs, a knowledge base, and intensive test coverage, including mock and real-stack harnesses.
 - **LAPI metrics.** Processed requests by address family, drops by decision origin and remediation, and an active-decisions count for `cscli metrics show bouncers`. The original plugin posts a single dropped counter.
 - **reCAPTCHA Enterprise.** Checkbox and score keys (`recaptcha-enterprise`), plus classic reCAPTCHA, hCaptcha, Turnstile, and custom widgets.
+- **EU CAPTCHA.** Provider `eucaptcha`.
+- **Stateless Captcha Gate.** A passed challenge is now a cookie on the client that solved it, and can also be bound to that client's IP. The original plugin stores a server-side IP whitelist, so one solve covers every browser behind that address, and the pass exists only where that cache is reachable (it required redis backend to support distributed systems).
+- **Zero dependency on Redis.** Captcha does not need Redis. The recommended setup is an in-memory `stream`, and the recommended deployment does not include Redis. Redis remains only for the historical `alone` and `live` modes.
 - **Per-router settings.** Each router keeps its own status code, captcha, trusted IPs, failure action when LAPI or AppSec is down, and an optional remap of a decision origin (a community-list ban can be shown as captcha). The original plugin shares one cache and one set of key settings across every CrowdSec middleware in the process.
 - **Several CrowdSec engines** in one Traefik, each with its own API key, or several routers on one engine. See [Middleware Architecture](#middleware-architecture).
 - **Reload applies settings.** A Traefik router reload applies a new LAPI stream (host, key, mode, poll interval, scopes) and the rest of the middleware settings. The original plugin keeps the first stream, and the first values for interval, AppSec, metrics, and similar settings, until the Traefik process restarts.
@@ -104,6 +107,7 @@ Captcha providers:
 - [reCAPTCHA](https://www.google.com/recaptcha/about/) (classic `recaptcha`: `api.js` / siteverify)
 - [reCAPTCHA Enterprise](https://cloud.google.com/recaptcha/docs/introduction) (`recaptcha-enterprise`: `enterprise.js` / Cloud assessments)
 - [Turnstile](https://www.cloudflare.com/products/turnstile/)
+- [EU CAPTCHA](https://eu-captcha.eu/) (`eucaptcha`: `verify.js` / `POST /v1/verify`; site key and secret required)
 - [custom / Wicketkeeper](https://github.com/a-ve/wicketkeeper)
 
 ## AppSec
@@ -396,10 +400,10 @@ File path for `captchaGateSecret` (preferred over an inline secret when both are
 How long after a passed captcha before a new challenge, if the CrowdSec decision is still valid.
 
 **CaptchaProvider** (string, no default)
-Captcha validator. Expected: `hcaptcha`, `recaptcha`, `recaptcha-enterprise`, `turnstile`, `custom`. Classic `recaptcha` stays on `api.js` and siteverify. `recaptcha-enterprise` loads `enterprise.js` and calls Cloud assessments.
+Captcha validator. Expected: `hcaptcha`, `recaptcha`, `recaptcha-enterprise`, `turnstile`, `custom`, `eucaptcha`. Classic `recaptcha` stays on `api.js` and siteverify. `recaptcha-enterprise` loads `enterprise.js` and calls Cloud assessments. `eucaptcha` loads `verify.js` and POSTs JSON to EU CAPTCHA `/v1/verify`.
 
 **captchaSecretKey** (string, no default)
-Site secret key for the captcha provider. Unused for `recaptcha-enterprise` (not required). Required for `hcaptcha`, `recaptcha`, `turnstile`, and `custom`.
+Site secret key for the captcha provider. Unused for `recaptcha-enterprise` (not required). Required for `hcaptcha`, `recaptcha`, `turnstile`, `custom`, and `eucaptcha`.
 
 **captchaSiteKey** (string, no default)
 Site key for the captcha provider.

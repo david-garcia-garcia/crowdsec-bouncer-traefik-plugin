@@ -2,13 +2,10 @@
 package captcha
 
 import (
-	"bytes"
-	"io"
+	"html"
 	"log/slog"
-	"mime"
-	"mime/multipart"
+	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"sync"
 	"text/template"
@@ -43,38 +40,10 @@ type Client struct {
 	sleeping            bool
 }
 
-// Information for self-hosted provider.
-type infoProvider struct {
-	js       string
-	key      string
-	response string
-	validate string
-}
-
-//nolint:gochecknoglobals
-var infoProviders = map[string]*infoProvider{
-	configuration.HcaptchaProvider: {
-		js:       "https://hcaptcha.com/1/api.js",
-		key:      "h-captcha",
-		response: "h-captcha-response",
-		validate: "https://api.hcaptcha.com/siteverify",
-	},
-	configuration.RecaptchaProvider: {
-		js:       "https://www.google.com/recaptcha/api.js",
-		key:      "g-recaptcha",
-		response: "g-recaptcha-response",
-		validate: "https://www.google.com/recaptcha/api/siteverify",
-	},
-	configuration.TurnstileProvider: {
-		js:       "https://challenges.cloudflare.com/turnstile/v0/api.js",
-		key:      "cf-turnstile",
-		response: "cf-turnstile-response",
-		validate: "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-	},
-}
-
 // New fills widget, verifier, template, and gate fields. Empty provider leaves Valid false.
-// New is the only provider and key-type switch. enterprise is the named recaptcha-enterprise construction value.
+// New is the only provider switch. Each named provider calls its pair function.
+// enterprise is the recaptcha-enterprise construction value. Custom also stores the
+// challenge URL and the asset paths the bouncer lets through.
 func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, challengeURL, key, response, validate, validateBody, siteKey, secretKey, gateSecret string, gateBindIP bool, captchaTemplatePath string, gracePeriodSeconds int64, enterprise Enterprise) error {
 	c.Valid = provider != ""
 	if !c.Valid {
@@ -85,20 +54,25 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 	c.gateBindIP = gateBindIP
 	c.log = log
 	c.httpClient = httpClient
-	// Pair widget and verifier from the provider name and enterprise key type only.
+	// Pair functions return Verifier. Yaegi v0.16.1 panics if this multi-value
+	// assignment receives the concrete verifier instead.
+	var widget Widget
+	var verifier Verifier
 	switch provider {
 	case configuration.CustomProvider:
+		widget, verifier = pairCustom(httpClient, secretKey, js, key, response, validate, validateBody, log)
+		// Challenge URL and asset paths are custom-only. The other providers have none.
 		c.challengeURL = challengeURL
 		c.storeCustomResourcePaths(js, challengeURL)
-		c.widget = Widget{ScriptURL: js, Class: key, TokenField: response, RetryAfterReject: true}
-		c.verifier = newSiteverifyVerifier(httpClient, secretKey, validate, strings.TrimSpace(validateBody), log)
 	case configuration.RecaptchaEnterpriseProvider:
-		c.widget, c.verifier = pairEnterprise(httpClient, siteKey, enterprise)
-	default:
-		info := infoProviders[provider]
-		c.widget = Widget{ScriptURL: info.js, Class: info.key, TokenField: info.response, RetryAfterReject: true}
-		c.verifier = newSiteverifyVerifier(httpClient, secretKey, info.validate, "", log)
+		widget, verifier = pairEnterprise(httpClient, siteKey, enterprise)
+	case configuration.EucaptchaProvider:
+		widget, verifier = pairEucaptcha(httpClient, siteKey, secretKey)
+	case configuration.HcaptchaProvider, configuration.RecaptchaProvider, configuration.TurnstileProvider:
+		widget, verifier = pairSiteverify(httpClient, provider, secretKey, log)
 	}
+	c.widget = widget
+	c.verifier = verifier
 	challengeTemplate, contentType, err := configuration.GetTemplate(captchaTemplatePath)
 	if err != nil {
 		return err
@@ -144,10 +118,24 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP, re
 		"BootScript":   bootScript,
 		"Action":       c.widget.Action,
 		"DrawCheckbox": c.widget.drawCheckbox(),
+		"Domain":       html.EscapeString(RequestDomain(r.Host)),
 	})
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP captchaTemplateServe", "error", err)
 	}
+}
+
+// RequestDomain is the hostname the browser showed, without a port.
+func RequestDomain(host string) string {
+	name := host
+	if parsed, _, err := net.SplitHostPort(host); err == nil {
+		name = parsed
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "This site"
+	}
+	return name
 }
 
 // Check Verify if the captcha is already done via gate cookie.
@@ -171,14 +159,10 @@ func (c *Client) IsCustomResourceRequest(r *http.Request) bool {
 	return false
 }
 
-// captchaFormMaxBytes is the largest POST body inspected for a provider token.
-// Provider tokens are small, so a bigger body is origin traffic and is left alone.
-const captchaFormMaxBytes = 64 << 10
-
 // IsCaptchaFormPost reports whether this POST carries a non-empty provider response field.
 // Its caller may still forward the request, so it never consumes the body: a POST that
 // turns out not to be a captcha form reaches origin intact. Validate uses
-// captchaResponseFromRequest instead, which is free to consume the body.
+// readFieldFromRequest instead, which is free to consume the body.
 func (c *Client) IsCaptchaFormPost(r *http.Request) bool {
 	if r == nil || r.Method != http.MethodPost || c.widget.TokenField == "" {
 		return false
@@ -199,65 +183,6 @@ func (c *Client) IsCaptchaFormPost(r *http.Request) bool {
 	return formFieldValue(r.Header.Get("Content-Type"), body, field) != ""
 }
 
-// peekCaptchaFormBody reads up to captchaFormMaxBytes and always leaves r.Body readable.
-// It reports the buffered body, and false when the body exceeds the cap or could not be
-// read — which also covers a request whose Content-Length is unknown and whose body turns
-// out to be large.
-func peekCaptchaFormBody(r *http.Request) ([]byte, bool) {
-	if r.Body == nil {
-		return nil, false
-	}
-	peeked, err := io.ReadAll(io.LimitReader(r.Body, captchaFormMaxBytes+1))
-	if err != nil || len(peeked) > captchaFormMaxBytes {
-		r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(peeked), r.Body))
-		return nil, false
-	}
-	_ = r.Body.Close()
-	r.Body = io.NopCloser(bytes.NewReader(peeked))
-	r.ContentLength = int64(len(peeked))
-	return peeked, true
-}
-
-// formFieldValue returns one field of an already-buffered urlencoded or multipart body.
-// A body with no usable Content-Type is read as urlencoded, which is what the bundled
-// captcha form sends.
-func formFieldValue(contentType string, body []byte, field string) string {
-	mediaType, params, err := mime.ParseMediaType(contentType)
-	if err != nil {
-		mediaType = "application/x-www-form-urlencoded"
-	}
-	switch mediaType {
-	case "application/x-www-form-urlencoded":
-		values, parseErr := url.ParseQuery(string(body))
-		if parseErr != nil {
-			return ""
-		}
-		return values.Get(field)
-	case "multipart/form-data":
-		return multipartFieldValue(params["boundary"], body, field)
-	default:
-		return ""
-	}
-}
-
-// multipartFieldValue reads one form value out of a buffered multipart body.
-func multipartFieldValue(boundary string, body []byte, field string) string {
-	if boundary == "" {
-		return ""
-	}
-	// The body is already capped, so this parse never spills to a temporary file.
-	form, err := multipart.NewReader(bytes.NewReader(body), boundary).ReadForm(captchaFormMaxBytes)
-	if err != nil {
-		return ""
-	}
-	defer func() { _ = form.RemoveAll() }()
-	values := form.Value[field]
-	if len(values) == 0 {
-		return ""
-	}
-	return values[0]
-}
-
 // WriteSolvedRedirect issues 302 to the same URL without reminting the gate cookie.
 func (c *Client) WriteSolvedRedirect(rw http.ResponseWriter, r *http.Request, remediationHeader string) {
 	writeRemediationHeader(rw, remediationHeader, "solved-captcha")
@@ -270,6 +195,18 @@ func writeRemediationHeader(rw http.ResponseWriter, name, value string) {
 		return
 	}
 	rw.Header().Set(name, value)
+}
+
+// storeCustomResourcePaths keeps exact browser asset paths for custom-provider passthrough.
+func (c *Client) storeCustomResourcePaths(jsURL, challengeURL string) {
+	c.customResourcePaths = nil
+	for _, rawURL := range []string{jsURL, challengeURL} {
+		resourcePath := configuration.CustomCaptchaResourcePath(rawURL)
+		if resourcePath == "" {
+			continue
+		}
+		c.customResourcePaths = append(c.customResourcePaths, resourcePath)
+	}
 }
 
 // Close releases idle siteverify HTTP. Safe to call more than once.
@@ -286,7 +223,7 @@ func (c *Client) Close() {
 	if httpClient != nil {
 		httpClient.CloseIdleConnections()
 	}
-	c.log.Info(MsgInstanceClosed, "incarnation", c.incarnation, "reason", "closed")
+	c.log.Info("crowdsec captcha instance closed", "incarnation", c.incarnation, "reason", "closed")
 }
 
 // Sleep logs DEBUG. Captcha has no ticker.
@@ -298,7 +235,7 @@ func (c *Client) Sleep() {
 	}
 	c.sleeping = true
 	c.mu.Unlock()
-	c.log.Debug(MsgInstanceSleeping, "incarnation", c.incarnation, "reason", "sleeping")
+	c.log.Debug("crowdsec captcha instance sleeping", "incarnation", c.incarnation, "reason", "sleeping")
 }
 
 // Wake logs DEBUG after Sleep. Captcha has no ticker.
@@ -310,7 +247,7 @@ func (c *Client) Wake() {
 	}
 	c.sleeping = false
 	c.mu.Unlock()
-	c.log.Debug(MsgInstanceWaking, "incarnation", c.incarnation, "reason", "waking")
+	c.log.Debug("crowdsec captcha instance waking", "incarnation", c.incarnation, "reason", "waking")
 }
 
 // Incarnation is unique per Client create.
@@ -321,6 +258,7 @@ func (c *Client) Incarnation() string {
 	return c.incarnation
 }
 
+// bindIdentity records the middleware name and reclaim key the first time Open binds this Client.
 func (c *Client) bindIdentity(middlewareName, bindKey string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -332,56 +270,6 @@ func (c *Client) bindIdentity(middlewareName, bindKey string) {
 	}
 }
 
-// storeCustomResourcePaths keeps exact browser asset paths for custom-provider passthrough.
-func (c *Client) storeCustomResourcePaths(jsURL, challengeURL string) {
-	c.customResourcePaths = nil
-	for _, rawURL := range []string{jsURL, challengeURL} {
-		resourcePath := configuration.CustomCaptchaResourcePath(rawURL)
-		if resourcePath == "" {
-			continue
-		}
-		c.customResourcePaths = append(c.customResourcePaths, resourcePath)
-	}
-}
-
-// captchaResponseFromRequest reads the provider token from query, POST form, or
-// raw urlencoded body. Traefik's Yaegi request wrapper often leaves Form empty
-// after FormValue, so the body is parsed directly when ParseForm yields nothing.
-//
-// This is the first-verify reader, used only by Validate on a request the plugin
-// answers itself. It parses the form and truncates a body over 1MiB, which is safe
-// only because that request is never forwarded. Routing decisions on a request that
-// may still reach origin use IsCaptchaFormPost.
-func captchaResponseFromRequest(r *http.Request, field string) string {
-	if field == "" {
-		return ""
-	}
-	if token := r.URL.Query().Get(field); token != "" {
-		return token
-	}
-
-	var raw []byte
-	if r.Body != nil {
-		raw, _ = io.ReadAll(io.LimitReader(r.Body, 1<<20))
-		r.Body = io.NopCloser(bytes.NewReader(raw))
-	}
-
-	if err := r.ParseForm(); err == nil {
-		if token := r.PostForm.Get(field); token != "" {
-			return token
-		}
-		if token := r.Form.Get(field); token != "" {
-			return token
-		}
-	}
-
-	values, err := url.ParseQuery(string(raw))
-	if err != nil {
-		return ""
-	}
-	return values.Get(field)
-}
-
 // Validate classifies the challenge request as None, Pass, or Reject.
 // Empty token is None and does not call the verifier. Error is the error return.
 func (c *Client) Validate(r *http.Request, remoteIP string) (Outcome, error) {
@@ -389,12 +277,12 @@ func (c *Client) Validate(r *http.Request, remoteIP string) (Outcome, error) {
 		logger.Trace(c.log, "captcha:Validate invalid method", "method", r.Method)
 		return None, nil
 	}
-	token := captchaResponseFromRequest(r, c.widget.TokenField)
+	token := readFieldFromRequest(r, c.widget.TokenField)
 	if token == "" {
 		logger.Trace(c.log, "captcha:Validate no captcha response found in request")
 		return None, nil
 	}
-	passed, err := c.verifier.Pass(token, remoteIP)
+	passed, err := c.verifier.Pass(token, remoteIP, r.UserAgent())
 	if err != nil {
 		c.log.Debug("captcha:Validate", "error", err)
 		return None, err

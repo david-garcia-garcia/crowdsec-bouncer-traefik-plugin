@@ -1,0 +1,105 @@
+# Stock captcha.html for each built-in provider. Dummy site key and secret.
+# The Pester case only GETs the page; it does not call a vendor.
+x-captcha-page: &captcha-page
+  appsecHttpTimeoutSeconds: "30"
+  bouncerEnabled: "true"
+  bouncerForwardedHeadersCustomName: X-Forwarded-For
+  bouncerForwardedHeadersTrustedIps:
+    - "172.28.0.1/32"
+  captchaEnabled: "true"
+  captchaFilePath: /captcha.html
+  captchaGateBindIp: "true"
+  captchaGateSecret: test-gate-secret
+  captchaSecretKey: e2e-dummy-secret
+  captchaSiteKey: e2e-dummy-site
+  lapiEnabled: "true"
+  lapiHost: crowdsec:8080
+  lapiHttpTimeoutSeconds: "30"
+  lapiMode: none
+  lapiUpdateIntervalSeconds: "5"
+  logFormat: json
+  logLevel: DEBUG
+  reclaimGraceSeconds: "2"
+
+http:
+  routers:
+    provider-hcaptcha:
+      rule: PathPrefix(`/provider-hcaptcha`)
+      entryPoints: [web]
+      middlewares: [bouncer-provider-hcaptcha]
+      service: provider-whoami
+    provider-recaptcha:
+      rule: PathPrefix(`/provider-recaptcha`)
+      entryPoints: [web]
+      middlewares: [bouncer-provider-recaptcha]
+      service: provider-whoami
+    provider-turnstile:
+      rule: PathPrefix(`/provider-turnstile`)
+      entryPoints: [web]
+      middlewares: [bouncer-provider-turnstile]
+      service: provider-whoami
+    provider-eucaptcha:
+      rule: PathPrefix(`/provider-eucaptcha`)
+      entryPoints: [web]
+      middlewares: [bouncer-provider-eucaptcha]
+      service: provider-whoami
+    provider-enterprise:
+      rule: PathPrefix(`/provider-enterprise`)
+      entryPoints: [web]
+      middlewares: [bouncer-provider-enterprise]
+      service: provider-whoami
+    provider-enterprise-score:
+      rule: PathPrefix(`/provider-enterprise-score`)
+      entryPoints: [web]
+      middlewares: [bouncer-provider-enterprise-score]
+      service: provider-whoami
+  middlewares:
+    bouncer-provider-hcaptcha:
+      plugin:
+        bouncer:
+          <<: *captcha-page
+          captchaProvider: hcaptcha
+          lapiKey: "c51a1c70000000000000000000000014"
+    bouncer-provider-recaptcha:
+      plugin:
+        bouncer:
+          <<: *captcha-page
+          captchaProvider: recaptcha
+          lapiKey: "c51a1c70000000000000000000000015"
+    bouncer-provider-turnstile:
+      plugin:
+        bouncer:
+          <<: *captcha-page
+          captchaProvider: turnstile
+          lapiKey: "c51a1c70000000000000000000000016"
+    bouncer-provider-eucaptcha:
+      plugin:
+        bouncer:
+          <<: *captcha-page
+          captchaProvider: eucaptcha
+          lapiKey: "c51a1c70000000000000000000000017"
+    bouncer-provider-enterprise:
+      plugin:
+        bouncer:
+          <<: *captcha-page
+          captchaProvider: recaptcha-enterprise
+          captchaEnterpriseApiKey: e2e-api-key
+          captchaEnterpriseKeyType: checkbox
+          captchaEnterpriseProjectId: e2e-project
+          lapiKey: "c51a1c70000000000000000000000018"
+    bouncer-provider-enterprise-score:
+      plugin:
+        bouncer:
+          <<: *captcha-page
+          captchaProvider: recaptcha-enterprise
+          captchaEnterpriseAction: login
+          captchaEnterpriseApiKey: e2e-api-key
+          captchaEnterpriseKeyType: score
+          captchaEnterpriseMinScore: "0.5"
+          captchaEnterpriseProjectId: e2e-project
+          lapiKey: "c51a1c70000000000000000000000019"
+  services:
+    provider-whoami:
+      loadBalancer:
+        servers:
+          - url: "http://whoami-test:80"
