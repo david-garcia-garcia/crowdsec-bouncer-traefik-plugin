@@ -20,14 +20,14 @@ Stop the two insert Debug calls in `NewChecker` and leave the logger parameter u
 Ready for review. 1 items remain.
 
 Priority: P3 — operator-log clarity with no current user or operator harm
-Reviewed head: cc40735e
+Reviewed head: 343bfa5c
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36133266393/job/108065240354 |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36133900631/job/108067265853 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,7 +37,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-25-init-log-component pushed | `git` |
 | OpenSpec | init-log-component | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/160 | pr-host |
-| CI | build 36133266393 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36133266393/job/108065240354 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36133266393/job/108065240354 |
+| CI | build 36133900631 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36133900631/job/108067265853 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36133900631/job/108067265853 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -60,7 +60,7 @@ Completed:
 
 
 ## How this fits together
-Ticket 2026-09-25-init-log-component on branch 2026-09-25-init-log-component targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/160; CI build 36133266393 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36133266393/job/108065240354.
+Ticket 2026-09-25-init-log-component on branch 2026-09-25-init-log-component targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/160; CI build 36133900631 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36133900631/job/108067265853.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -89,7 +89,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | cc40735e83fd6ea127e1d006920fc13691478579 | Card must match the branch you measured |
+| Reviewed head | 343bfa5cd47f6b2b3ab33e6abe409ddeb7c97f8d | Card must match the branch you measured |
 
 ### Stored data model
 None.
