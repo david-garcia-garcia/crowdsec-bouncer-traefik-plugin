@@ -116,12 +116,12 @@ When `captchaEnabled` is true, `ValidateParams` SHALL resolve `CaptchaSiteKey` a
 - **THEN** `ValidateParams` returns `CaptchaSiteKey: cannot be empty when CaptchaProvider is set`
 
 #### Scenario: Only secret empty
-- **WHEN** `captchaEnabled` is true, `captchaProvider` is `hcaptcha`, `recaptcha`, `turnstile`, or `custom`, site is non-empty, and secret resolves empty
+- **WHEN** `captchaEnabled` is true, `captchaProvider` is `hcaptcha`, `recaptcha`, `turnstile`, `custom`, or `eucaptcha`, site is non-empty, and secret resolves empty
 - **THEN** `ValidateParams` returns `CaptchaSecretKey: cannot be empty when CaptchaProvider is set`
 
 #### Scenario: Enterprise empty secret is accepted
 - **WHEN** `captchaEnabled` is true, `captchaProvider` is `recaptcha-enterprise`, site is non-empty, gate is set, required enterprise knobs are set, and secret resolves empty
-- **THEN** `ValidateParams` returns no error from the secret`
+- **THEN** `ValidateParams` returns no error from the secret
 
 #### Scenario: Whitespace-only site is empty
 - **WHEN** `captchaEnabled` is true, `captchaProvider` is set, and site is only whitespace
@@ -302,5 +302,5 @@ When `BouncerBanFilePath` is empty or `GetTemplate` fails for that path, `Valida
 - **THEN** `ValidateParams` returns an error that names the empty key
 
 #### Scenario: Owner missing secret fails except enterprise
-- **WHEN** `captchaEnabled` is true, the provider is `hcaptcha`, `recaptcha`, `turnstile`, or `custom`, and secret resolves empty
+- **WHEN** `captchaEnabled` is true, the provider is `hcaptcha`, `recaptcha`, `turnstile`, `custom`, or `eucaptcha`, and secret resolves empty
 - **THEN** `ValidateParams` returns an error that names the empty secret

@@ -224,6 +224,25 @@ Describe "CrowdSec Bouncer Captcha Remediation Tests" {
             $passed.StatusCode | Should -Be 200
             $passed.Content | Should -Match "Hostname:" -Because "gate bind compares canonical remoteIP"
         }
+
+        # Stock captcha.html. Dummy keys only; the vendor is not called.
+        It "Should serve the <Name> challenge page" -TestCases @(
+            @{ Name = "hcaptcha"; Endpoint = "/provider-hcaptcha"; Script = "https://hcaptcha.com/1/api.js"; Marker = 'class="h-captcha"' }
+            @{ Name = "recaptcha"; Endpoint = "/provider-recaptcha"; Script = "https://www.google.com/recaptcha/api.js"; Marker = 'class="g-recaptcha"' }
+            @{ Name = "turnstile"; Endpoint = "/provider-turnstile"; Script = "https://challenges.cloudflare.com/turnstile/v0/api.js"; Marker = 'class="cf-turnstile"' }
+            @{ Name = "eucaptcha"; Endpoint = "/provider-eucaptcha"; Script = "https://cdn.eu-captcha.eu/verify.js"; Marker = 'class="eu-captcha"' }
+            @{ Name = "recaptcha-enterprise checkbox"; Endpoint = "/provider-enterprise"; Script = "https://www.google.com/recaptcha/enterprise.js"; Marker = 'class="g-recaptcha"' }
+            @{ Name = "recaptcha-enterprise score"; Endpoint = "/provider-enterprise-score"; Script = "https://www.google.com/recaptcha/enterprise.js?render=e2e-dummy-site"; Marker = "grecaptcha.enterprise.execute" }
+        ) {
+            Add-TestDecision -IP $script:TestIPs.CaptchaIP -Type "captcha"
+
+            $response = Test-HttpRequest -Endpoint $Endpoint -IP $script:TestIPs.CaptchaIP -TraefikUrl $script:TraefikUrl
+            $response.StatusCode | Should -Be 200
+            $response.Content | Should -Match "needs to review the security of your connection"
+            $response.Content | Should -Match ([regex]::Escape($Script))
+            $response.Content | Should -Match "e2e-dummy-site"
+            $response.Content | Should -Match ([regex]::Escape($Marker))
+        }
     }
 }
 

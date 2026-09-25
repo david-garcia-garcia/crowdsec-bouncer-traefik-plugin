@@ -41,6 +41,7 @@ const (
 	RecaptchaEnterpriseProvider = "recaptcha-enterprise"
 	TurnstileProvider           = "turnstile"
 	CustomProvider              = "custom"
+	EucaptchaProvider           = "eucaptcha"
 	// CaptchaCustomValidateBodyForm is urlencoded siteverify secret+response (same as omit).
 	CaptchaCustomValidateBodyForm = "form"
 	// CaptchaCustomValidateBodyJSON is POST application/json secret+response (custom only).
@@ -707,8 +708,8 @@ func validateCaptcha(config *Config) error {
 	if !config.CaptchaEnabled {
 		return nil
 	}
-	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, RecaptchaEnterpriseProvider, TurnstileProvider, CustomProvider}, config.CaptchaProvider) {
-		return fmt.Errorf("CaptchaProvider: must be one of '%s', '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, RecaptchaEnterpriseProvider, TurnstileProvider, CustomProvider)
+	if !contains([]string{"", HcaptchaProvider, RecaptchaProvider, RecaptchaEnterpriseProvider, TurnstileProvider, CustomProvider, EucaptchaProvider}, config.CaptchaProvider) {
+		return fmt.Errorf("CaptchaProvider: must be one of '%s', '%s', '%s', '%s', '%s' or '%s'", HcaptchaProvider, RecaptchaProvider, RecaptchaEnterpriseProvider, TurnstileProvider, CustomProvider, EucaptchaProvider)
 	}
 	// Accept only empty, form, or json after trim; json is custom-only.
 	validateBody := strings.TrimSpace(config.CaptchaCustomValidateBody)

@@ -43,7 +43,7 @@ _Avoid_: sharedLogFiles, reclaim value, log owner
 - When Redis is on, keep today's file-error fail. Accept an empty password with an empty file path.
 - Do not add an enabled check inside `GetVariable`. Captcha already gates `GetVariable` behind `captchaEnabled` (`validateEnabledCaptchaSettings`).
 - When `captchaEnabled` is true, resolve `CaptchaSiteKey` and `CaptchaSecretKey` with file-then-field lookup (`GetVariable`). Keep lookup errors. Ignore leftover owner-read `captcha*` on a subscriber.
-- After a successful lookup, reject `""` for the site key. Reject an empty secret only when the provider is not `recaptcha-enterprise`. Site first.
+- After a successful lookup, reject `""` for the site key. Reject an empty secret only when the provider is not `recaptcha-enterprise`. `eucaptcha` stays on the secret-required list. Site first.
 - Use the same trigger as `CaptchaGateSecret`: `captchaEnabled`, not "failure action is captcha" and not a leftover provider.
 - Error text: `CaptchaSiteKey: cannot be empty when CaptchaProvider is set` and the secret twin.
 - When `captchaEnabled` is true, keep site, secret, and gate secret required. Do not fail `ValidateParams` because `CaptchaFilePath` is empty or `GetTemplate` fails, or because `BouncerBanFilePath` is unloadable. Empty ban path stays accepted at validation.
@@ -109,7 +109,7 @@ _ = checkFile.Close()
 - `lapi.Prepare` resolves `LapiRedisPassword` only when `LapiRedisEnabled` is true. When Redis is off, leftover file paths stay out of the reclaim hash.
 - Whitespace-only keys and an empty key file are empty after trim.
 - Alone still skips LAPI URL/key/TLS after CAPI. Captcha still runs. AppSec helper runs only when `AppsecEnabled`.
-- An owner (`captchaEnabled`) with default `ban` actions still needs a non-empty site key. Secret is required except when the provider is `recaptcha-enterprise`.
+- An owner (`captchaEnabled`) with default `ban` actions still needs a non-empty site key. Secret is required except when the provider is `recaptcha-enterprise`. `eucaptcha` requires the secret.
 - An owner with an empty or unloadable captcha template still passes `ValidateParams` when keys and gate resolve; the captcha WARN and `!Valid` ban fallback happen at `Client.New`. A leftover provider on a subscriber does not Open captcha.
 - Default `BouncerBanFilePath` is empty, so expect one ban-template WARN at `bouncer.New` when no ban file is configured.
 - Leftover invalid AppSec CA or missing key file boots when AppSec is off (live, stream, none, and alone). `lapiMode: appsec` is rejected.
