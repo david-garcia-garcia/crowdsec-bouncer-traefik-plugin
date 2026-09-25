@@ -12,3 +12,10 @@ Search: `openspec/specs/map.md` families `core_plugin_middleware`, `build_e2e_mo
 - skip `build_e2e_mock_dual-bouncer` — mock scenario is verification, not a production-path SHALL
 
 `proposal.md` New vs Modified matches (New none, Modified the two folds).
+
+Archive FindSpecHost (Search then verdict). Same two delta folders. Live catalog: request-policy skip and constructor compile/empty/invalid remain live promises. REMOVED of dest exclude SHALL is fold, not skip. Cleanup/absence ADDED: none.
+
+Search: `openspec/specs/map.md` family `core_plugin_middleware`. Walked live `openspec/specs/*/spec.md` and `openspec/changes/request-bypass-rules/specs/`. Matcher still not a catalog leaf.
+
+- fold `core_plugin_middleware_bouncer` → `core_plugin_middleware_bouncer` confidence: high candidates: [core_plugin_middleware_bouncer, core_plugin_middleware_forced-decision, core_plugin_lapi_failure-action, core_plugin_appsec_client, core_plugin_middleware_captcha-routing, core_plugin_ip_radix-lookup]
+- fold `core_plugin_middleware_config-validation` → `core_plugin_middleware_config-validation` confidence: high candidates: [core_plugin_middleware_config-validation, core_plugin_middleware_bouncer]
