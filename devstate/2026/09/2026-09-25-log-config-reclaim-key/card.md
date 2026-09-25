@@ -20,7 +20,7 @@ The captcha ownership payload now hashes `LogLevel`, `LogFilePath`, and `LogForm
 Ready for review. 0 items remain.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: 65053ac3
+Reviewed head: 02ec4f09
 Owner decision: None.
 
 ## Review scores
@@ -79,7 +79,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 65053ac37f03b78514147e35f96acefd953dccfd | Card must match the branch you measured |
+| Reviewed head | 02ec4f0986023fab559a54da2b5c8cf2cf1d1f67 | Card must match the branch you measured |
 
 ### Stored data model
 None.
