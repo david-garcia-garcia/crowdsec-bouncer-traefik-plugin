@@ -22,7 +22,7 @@ ServeHTTP keeps the exclude skip sites: after forced `b`, a LAPI match goes to `
 In progress. 0 items remain.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: adeb6635
+Reviewed head: b38a9fa6
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -86,7 +86,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | adeb66352decc1e7e37dd87bf841a3e36bdfd60b | Card must match the branch you measured |
+| Reviewed head | b38a9fa664a1821f96cdee488b1c1ec687d98961 | Card must match the branch you measured |
 
 ### Stored data model
 None.
