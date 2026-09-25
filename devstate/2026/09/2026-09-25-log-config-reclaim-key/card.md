@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 707b3fbb
+Reviewed head: c4493633
 Owner decision: None.
 
 ## Review scores
@@ -66,7 +66,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 707b3fbbab27afa6b24c467ca83c8a7248afa809 | Card must match the branch you measured |
+| Reviewed head | c4493633ddfb30fdc634baaad54f19721977d7f7 | Card must match the branch you measured |
 
 ### Stored data model
 None.
