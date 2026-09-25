@@ -39,3 +39,8 @@ head: b38a9fa664a1821f96cdee488b1c1ec687d98961
 phase: archive
 verdict: in progress
 head: 8d1302ebef8e2a2cf4f432d700e756f2faeb17b7
+
+## implement (2026-09-25)
+phase: implement
+verdict: ready for review
+head: b3ca00c9a7781386503bea35e365223141070dde

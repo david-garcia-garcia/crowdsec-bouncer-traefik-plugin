@@ -19,17 +19,17 @@ ServeHTTP keeps the exclude skip sites: after forced `b`, a LAPI match goes to `
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: 8d1302eb
+Reviewed head: b3ca00c9
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36164718930 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -39,7 +39,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-25-request-bypass-rules pushed | `git` |
 | OpenSpec | request-bypass-rules | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/163 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 36164718930 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36164718930 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36164718930 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -61,12 +61,12 @@ Completed:
 None.
 
 ## How this fits together
-Ticket 2026-09-25-request-bypass-rules on branch 2026-09-25-request-bypass-rules targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/163; CI not seen.
+Ticket 2026-09-25-request-bypass-rules on branch 2026-09-25-request-bypass-rules targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/163; CI build 36164718930 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36164718930.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
 | --- | --- | --- | --- |
-| Where does the matcher package live under pkg/? | additive asked — new package this change creates; criterion Implement the matcher as its own package | assumed — pkg/httprule. Authoring type Rule with json method, path, headers, cookies. Compiled Set. No imports of this plugin. | explore |
+| Where does the matcher package live under pkg/? | additive asked — new package this change creates; criterion Implement the matcher as its own package | assumed — pkg/httprule. Authoring type Rule with json method, path, host, headers, cookies. Compiled Set. No imports of this plugin. | explore |
 
 
 ## Findings
@@ -90,7 +90,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 8d1302ebef8e2a2cf4f432d700e756f2faeb17b7 | Card must match the branch you measured |
+| Reviewed head | b3ca00c9a7781386503bea35e365223141070dde | Card must match the branch you measured |
 
 ### Stored data model
 None.
