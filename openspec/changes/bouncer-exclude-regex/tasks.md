@@ -7,8 +7,8 @@
 ## 2. Bouncer compile and match
 
 - [x] 2.1 `bouncer.New` calls `CompileExcludeRegex` for both knobs, stores `appsecExcludeRegex` and `lapiExcludeRegex` (`*regexp.Regexp`; nil = off), returns the compile error. Do not compile on the request path
-- [x] 2.2 Add `excludeMatchString(httpReq *http.Request) string` in `pkg/bouncer`: Host is `req.Host`; use `net.SplitHostPort` when it succeeds; path is `req.URL.Path`; empty or nil URL Path → `/`; concatenate host + `://` + path. Do not strip the path's leading slash. Do not call `captcha.RequestDomain`. Do not use AppSec forwarded Host/URI, `URL.String()`, `RequestURI`, or `EscapedPath`
-- [x] 2.3 Tests for match string: `example.com:443` + `/health` → `example.com:///health`; query ignored; empty Path → `example.com:///`; IPv6 with port loses brackets; bare `[::1]` stays as Host wrote it
+- [x] 2.2 Add `excludeMatchString(httpReq *http.Request) string` in `pkg/bouncer`: Host is `req.Host`; use `net.SplitHostPort` when it succeeds; path is `req.URL.Path` with one leading `/` removed; empty, nil, or `/` Path → `host://`. Do not call `captcha.RequestDomain`. Do not use AppSec forwarded Host/URI, `URL.String()`, `RequestURI`, or `EscapedPath`
+- [x] 2.3 Tests for match string: `example.com:443` + `/health` → `example.com://health`; query ignored; empty or `/` Path → `example.com://`; `/v2/blobs` → `example.com://v2/blobs`; IPv6 with port loses brackets; bare `[::1]` stays as Host wrote it
 
 ## 3. ServeHTTP skip
 

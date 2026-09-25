@@ -349,18 +349,19 @@ func (b *Bouncer) forcedDecisionKind(httpReq *http.Request) string {
 	}
 }
 
-// excludeMatchString is host + "://" + path for exclude regexes. Host is req.Host;
+// excludeMatchString is host://path for exclude regexes. Host is req.Host;
 // SplitHostPort strips a port when that call succeeds. Path is req.URL.Path
-// (empty → /). The path's leading slash is kept.
+// with one leading slash removed (empty or "/" → host://).
 func excludeMatchString(httpReq *http.Request) string {
 	host := httpReq.Host
 	if hostOnly, _, err := net.SplitHostPort(host); err == nil {
 		host = hostOnly
 	}
-	path := "/"
-	if httpReq.URL != nil && httpReq.URL.Path != "" {
+	path := ""
+	if httpReq.URL != nil {
 		path = httpReq.URL.Path
 	}
+	path = strings.TrimPrefix(path, "/")
 	return host + "://" + path
 }
 

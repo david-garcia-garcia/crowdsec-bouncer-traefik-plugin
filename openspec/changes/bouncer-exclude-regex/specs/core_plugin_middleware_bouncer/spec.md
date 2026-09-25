@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Host+path exclude regexes skip that CrowdSec leg
-The bouncer SHALL expose public Config strings `bouncerAppsecExcludeRegex` and `bouncerLapiExcludeRegex` (one string each, default empty). Empty after trim SHALL exclude nothing for that leg. `bouncer.New` SHALL compile each non-empty trimmed string once with Go `regexp.Compile` and store the compiled value; empty SHALL stay unset (no exclude). ServeHTTP SHALL treat a stored regex as a match when unanchored `MatchString` is true against host + `://` + path with no scheme, no port, and no query. `host` SHALL be `req.Host` after `net.SplitHostPort` when that call succeeds, otherwise `req.Host` as Traefik/`net/http` already set it. `path` SHALL be `req.URL.Path` (decoded); empty Path SHALL be `/`. The plugin MUST NOT strip the path's leading slash. Concatenate host, then the literal `://`, then path (`example.com` + `/health` → `example.com:///health`). The plugin MUST NOT rebuild Host from `X-Forwarded-Host`, AppSec `X-Crowdsec-Appsec-Host` / `X-Crowdsec-Appsec-Uri`, `URL.Host`, or `captcha.RequestDomain`. The plugin MUST NOT use `URL.String()`, `RequestURI`, or `EscapedPath` as the path. A LAPI match SHALL skip `LookupRemediation`, `LiveLookup`, missing-subscribed-LAPI failure action, and stream/alone unhealthy failure action, and SHALL continue at `passOrForcedCaptcha`. An AppSec match SHALL skip AppSec `Query` and call `next`. Exclude SHALL run after startup block, GetRemoteIP, trusted-IP skip, and forced `b`. Forced `c` SHALL still apply on the pass path after a LAPI exclude. The two regexes SHALL be independent. These strings MUST NOT enter LAPI ownership or AppSec identity keys. The plugin MUST NOT compile on the request path.
+The bouncer SHALL expose public Config strings `bouncerAppsecExcludeRegex` and `bouncerLapiExcludeRegex` (one string each, default empty). Empty after trim SHALL exclude nothing for that leg. `bouncer.New` SHALL compile each non-empty trimmed string once with Go `regexp.Compile` and store the compiled value; empty SHALL stay unset (no exclude). ServeHTTP SHALL treat a stored regex as a match when unanchored `MatchString` is true against `host://path` with no scheme, no port, and no query. `host` SHALL be `req.Host` after `net.SplitHostPort` when that call succeeds, otherwise `req.Host` as Traefik/`net/http` already set it. `path` SHALL be `req.URL.Path` (decoded) with one leading `/` removed; empty Path or `/` SHALL yield `host://`. Concatenate host, then the literal `://`, then that path (`example.com` + `/health` → `example.com://health`). The plugin MUST NOT append the path's leading slash after `://`. The plugin MUST NOT rebuild Host from `X-Forwarded-Host`, AppSec `X-Crowdsec-Appsec-Host` / `X-Crowdsec-Appsec-Uri`, `URL.Host`, or `captcha.RequestDomain`. The plugin MUST NOT use `URL.String()`, `RequestURI`, or `EscapedPath` as the path. A LAPI match SHALL skip `LookupRemediation`, `LiveLookup`, missing-subscribed-LAPI failure action, and stream/alone unhealthy failure action, and SHALL continue at `passOrForcedCaptcha`. An AppSec match SHALL skip AppSec `Query` and call `next`. Exclude SHALL run after startup block, GetRemoteIP, trusted-IP skip, and forced `b`. Forced `c` SHALL still apply on the pass path after a LAPI exclude. The two regexes SHALL be independent. These strings MUST NOT enter LAPI ownership or AppSec identity keys. The plugin MUST NOT compile on the request path.
 
 #### Scenario: Empty LAPI exclude still looks up
 - **WHEN** `bouncerLapiExcludeRegex` is empty or whitespace-only
@@ -10,7 +10,7 @@ The bouncer SHALL expose public Config strings `bouncerAppsecExcludeRegex` and `
 - **THEN** ServeHTTP still consults `LookupRemediation` or `LiveLookup` as today
 
 #### Scenario: LAPI exclude skips stream store and unhealthy failure
-- **WHEN** `bouncerLapiExcludeRegex` is `example\.com:///health`
+- **WHEN** `bouncerLapiExcludeRegex` is `example\.com://health`
 - **AND** `req.Host` is `example.com` and `req.URL.Path` is `/health`
 - **AND** `lapiMode` is stream or alone
 - **THEN** ServeHTTP does not call `LookupRemediation`
@@ -19,14 +19,14 @@ The bouncer SHALL expose public Config strings `bouncerAppsecExcludeRegex` and `
 - **AND** it continues at `passOrForcedCaptcha`
 
 #### Scenario: LAPI exclude skips live and none lookup
-- **WHEN** `bouncerLapiExcludeRegex` is `example\.com:///health`
+- **WHEN** `bouncerLapiExcludeRegex` is `example\.com://health`
 - **AND** `req.Host` is `example.com` and `req.URL.Path` is `/health`
 - **AND** `lapiMode` is live or none
 - **THEN** ServeHTTP does not call `LiveLookup`
 - **AND** it continues at `passOrForcedCaptcha`
 
 #### Scenario: AppSec exclude skips Query on the pass path
-- **WHEN** `bouncerAppsecExcludeRegex` is `example\.com:///health`
+- **WHEN** `bouncerAppsecExcludeRegex` is `example\.com://health`
 - **AND** `req.Host` is `example.com` and `req.URL.Path` is `/health`
 - **AND** the bouncer subscribed to AppSec
 - **AND** the request reaches `handleNextServeHTTP`
@@ -53,14 +53,14 @@ The bouncer SHALL expose public Config strings `bouncerAppsecExcludeRegex` and `
 
 #### Scenario: Port is stripped from Host
 - **WHEN** `req.Host` is `example.com:443` and `req.URL.Path` is `/health`
-- **AND** `bouncerLapiExcludeRegex` is `^example\.com:///health$`
-- **THEN** the match string is `example.com:///health`
+- **AND** `bouncerLapiExcludeRegex` is `^example\.com://health$`
+- **THEN** the match string is `example.com://health`
 - **AND** the LAPI leg is skipped
 
 #### Scenario: Query string is not in the match string
 - **WHEN** `req.Host` is `example.com`, `req.URL.Path` is `/health`, and the request has query `a=1`
-- **AND** `bouncerAppsecExcludeRegex` is `^example\.com:///health$`
-- **THEN** the match string is `example.com:///health`
+- **AND** `bouncerAppsecExcludeRegex` is `^example\.com://health$`
+- **THEN** the match string is `example.com://health`
 - **AND** AppSec `Query` is skipped
 
 ## MODIFIED Requirements

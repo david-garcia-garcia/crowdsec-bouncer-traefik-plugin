@@ -71,11 +71,13 @@ func TestExcludeMatchString(t *testing.T) {
 		url  string
 		want string
 	}{
-		{name: "port stripped", host: "example.com:443", url: "http://example.com/health", want: "example.com:///health"},
-		{name: "query ignored", host: "example.com", url: "http://example.com/health?a=1", want: "example.com:///health"},
-		{name: "empty path is slash", host: "example.com", url: "http://example.com", want: "example.com:///"},
-		{name: "ipv6 with port loses brackets", host: "[::1]:443", url: "http://[::1]/health", want: "::1:///health"},
-		{name: "bare ipv6 stays as Host wrote it", host: "[::1]", url: "http://[::1]/health", want: "[::1]:///health"},
+		{name: "port stripped", host: "example.com:443", url: "http://example.com/health", want: "example.com://health"},
+		{name: "query ignored", host: "example.com", url: "http://example.com/health?a=1", want: "example.com://health"},
+		{name: "empty path", host: "example.com", url: "http://example.com", want: "example.com://"},
+		{name: "root path", host: "example.com", url: "http://example.com/", want: "example.com://"},
+		{name: "nested path keeps inner slashes", host: "example.com", url: "http://example.com/v2/blobs", want: "example.com://v2/blobs"},
+		{name: "ipv6 with port loses brackets", host: "[::1]:443", url: "http://[::1]/health", want: "::1://health"},
+		{name: "bare ipv6 stays as Host wrote it", host: "[::1]", url: "http://[::1]/health", want: "[::1]://health"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -91,13 +93,13 @@ func TestExcludeMatchString(t *testing.T) {
 func TestBouncerNew_compilesExcludeRegex(t *testing.T) {
 	log := logger.New("ERROR", "")
 	cfg := configuration.New()
-	cfg.BouncerAppsecExcludeRegex = `example\.com:///health`
+	cfg.BouncerAppsecExcludeRegex = `example\.com://health`
 	cfg.BouncerLapiExcludeRegex = `^ok/`
 	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, false, false, log)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.appsecExcludeRegex == nil || !got.appsecExcludeRegex.MatchString("example.com:///health") {
+	if got.appsecExcludeRegex == nil || !got.appsecExcludeRegex.MatchString("example.com://health") {
 		t.Fatal("appsecExcludeRegex must compile")
 	}
 	if got.lapiExcludeRegex == nil || !got.lapiExcludeRegex.MatchString("ok/") {
@@ -159,7 +161,7 @@ func TestServeHTTP_lapiExcludeSkipsStreamStoreAndUnhealthy(t *testing.T) {
 	})
 	lapiClient.SetStreamHealthyForTest(false)
 	bindTestLAPI(b, lapiClient)
-	b.lapiExcludeRegex = mustCompileExclude(t, `example\.com:///health`)
+	b.lapiExcludeRegex = mustCompileExclude(t, `example\.com://health`)
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testExcludeHealthRequest())
 	if !*passed {
@@ -205,7 +207,7 @@ func TestServeHTTP_lapiExcludeSkipsLiveAndNoneLookup(t *testing.T) {
 			b, passed := testExcludeOriginBouncer(t)
 			b.subscribeLAPI = true
 			b.lapiBound.Store(lapiClient)
-			b.lapiExcludeRegex = mustCompileExclude(t, `example\.com:///health`)
+			b.lapiExcludeRegex = mustCompileExclude(t, `example\.com://health`)
 			b.ServeHTTP(httptest.NewRecorder(), testExcludeHealthRequest())
 			if !*passed {
 				t.Fatal("LAPI exclude must skip LiveLookup")
@@ -231,7 +233,7 @@ func TestServeHTTP_appsecExcludeSkipsQuery(t *testing.T) {
 	}
 	b, passed := testExcludeOriginBouncer(t)
 	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
-	b.appsecExcludeRegex = mustCompileExclude(t, `^example\.com:///health$`)
+	b.appsecExcludeRegex = mustCompileExclude(t, `^example\.com://health$`)
 	b.ServeHTTP(httptest.NewRecorder(), testExcludeHealthRequest())
 	if !*passed {
 		t.Fatal("AppSec exclude must call next")
@@ -260,7 +262,7 @@ func TestServeHTTP_lapiExcludeDoesNotSkipAppsec(t *testing.T) {
 	})
 	bindTestLAPI(b, lapiClient)
 	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
-	b.lapiExcludeRegex = mustCompileExclude(t, `example\.com:///health`)
+	b.lapiExcludeRegex = mustCompileExclude(t, `example\.com://health`)
 	b.ServeHTTP(httptest.NewRecorder(), testExcludeHealthRequest())
 	if !*passed {
 		t.Fatal("LAPI exclude still reaches the pass path")
@@ -272,7 +274,7 @@ func TestServeHTTP_lapiExcludeDoesNotSkipAppsec(t *testing.T) {
 
 func TestServeHTTP_forcedBStillBansBeforeLapiExclude(t *testing.T) {
 	b, lapiClient, passed := testForcedDecisionBouncer(t, nil, nil, nil, true)
-	b.lapiExcludeRegex = mustCompileExclude(t, `example\.com:///protected`)
+	b.lapiExcludeRegex = mustCompileExclude(t, `example\.com://protected`)
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testForcedDecisionRequest("b"))
 	if *passed {
@@ -289,7 +291,7 @@ func TestServeHTTP_forcedBStillBansBeforeLapiExclude(t *testing.T) {
 func TestServeHTTP_forcedCStillCaptchasAfterLapiExclude(t *testing.T) {
 	client := testCaptchaClient(t, "/fast.js", "", "", nil)
 	b, _, passed := testForcedDecisionBouncer(t, nil, client, nil, true)
-	b.lapiExcludeRegex = mustCompileExclude(t, `example\.com:///protected`)
+	b.lapiExcludeRegex = mustCompileExclude(t, `example\.com://protected`)
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testForcedDecisionRequest("c"))
 	if *passed {
@@ -329,7 +331,7 @@ func TestServeHTTP_portStrippedFromHost(t *testing.T) {
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
 	})
 	bindTestLAPI(b, lapiClient)
-	b.lapiExcludeRegex = mustCompileExclude(t, `^example\.com:///health$`)
+	b.lapiExcludeRegex = mustCompileExclude(t, `^example\.com://health$`)
 	req := testExcludeHealthRequest()
 	req.Host = "example.com:443"
 	b.ServeHTTP(httptest.NewRecorder(), req)
@@ -352,7 +354,7 @@ func TestServeHTTP_queryStringNotInMatchString(t *testing.T) {
 	}
 	b, passed := testExcludeOriginBouncer(t)
 	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
-	b.appsecExcludeRegex = mustCompileExclude(t, `^example\.com:///health$`)
+	b.appsecExcludeRegex = mustCompileExclude(t, `^example\.com://health$`)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/health?a=1", nil)
 	req.Host = "example.com"
 	req.RemoteAddr = "203.0.113.10:1"

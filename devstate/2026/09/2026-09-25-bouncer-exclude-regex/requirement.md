@@ -18,7 +18,7 @@ Operators cannot skip AppSec or LAPI for a host+path on a bouncing router. There
 - Public config `bouncerAppsecExcludeRegex` and `bouncerLapiExcludeRegex`. Each is one string, not a list.
 - The bouncer package reads them (request policy). They are not AppSec-client or LAPI-client reclaim-key knobs.
 - Compile each regex once, not on every request.
-- Match a normalized incoming path of host + `://` + path (`example.com:///health`) with no scheme, no port, no query string. Do not strip the path's leading slash. Empty Path is `/` (`example.com:///`).
+- Match a normalized incoming path `host://path` (`example.com://health`) with no scheme, no port, no query string. Strip one leading `/` from the path. Empty Path or `/` is `example.com://`.
 - Empty setting: nothing is excluded for that leg.
 
 ## Affected
@@ -43,6 +43,6 @@ Operators cannot skip AppSec or LAPI for a host+path on a bouncing router. There
 - Compile/validate owner: `ValidateParams` vs `bouncer.New` only.
 
 ## Tensions
-- Requester: match host + `://` + path (`example.com:///health`) with no port and no query. Dest AppSec already forwards `Host` and `URL.String()` that may include both (`pkg/appsec/query.go`). That is not an exclude gate.
+- Requester: match `host://path` (`example.com://health`) with no port and no query. Dest AppSec already forwards `Host` and `URL.String()` that may include both (`pkg/appsec/query.go`). That is not an exclude gate.
 - Ticket: the bouncer reads the knobs. Dest AppSec `Query` lives in `pkg/appsec`; a skip must happen in `pkg/bouncer` before `Query` / before LAPI lookup, not as a client-identity field.
 - Upstream #393 title is AppSec-only location list. Ticket desired is two independent one-regex settings, including LAPI, and forbids adopting that list.
