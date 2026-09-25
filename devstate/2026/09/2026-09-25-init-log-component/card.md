@@ -17,17 +17,17 @@ Stop the two insert Debug calls in `NewChecker` and leave the logger parameter u
 **End users.** None.
 
 ## Merge readiness
-In progress. 1 items remain.
+Ready for review. 1 items remain.
 
 Priority: P3 — operator-log clarity with no current user or operator harm
-Reviewed head: fb1bf72c
+Reviewed head: cc40735e
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 3/6 | Limited confidence |
-| CI proof | 3/6 | in progress |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36133266393/job/108065240354 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,14 +37,18 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-25-init-log-component pushed | `git` |
 | OpenSpec | init-log-component | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/160 | pr-host |
-| CI | build 36132080906 in progress | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36132080906/job/108061522676 |
+| CI | build 36133266393 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36133266393/job/108065240354 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36133266393/job/108065240354 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
 Worktree:
-- [std_go_logger_debug-attrs](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-init-log-component/openspec/changes/init-log-component/proposal.md) — modified
-- [std_go_logger_slog-output](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-init-log-component/openspec/changes/init-log-component/proposal.md) — modified
+- [std_go_logger_debug-attrs](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-init-log-component/openspec/changes/archive/2026-09-25-init-log-component/proposal.md) — modified
+- [std_go_logger_slog-output](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-init-log-component/openspec/changes/archive/2026-09-25-init-log-component/proposal.md) — modified
+
+Completed:
+- [std_go_logger_debug-attrs](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-init-log-component/openspec/specs/std_go_logger_debug-attrs/spec.md) — modified
+- [std_go_logger_slog-output](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-init-log-component/openspec/specs/std_go_logger_slog-output/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -56,7 +60,7 @@ Worktree:
 
 
 ## How this fits together
-Ticket 2026-09-25-init-log-component on branch 2026-09-25-init-log-component targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/160; CI build 36132080906 in progress.
+Ticket 2026-09-25-init-log-component on branch 2026-09-25-init-log-component targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/160; CI build 36133266393 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36133266393/job/108065240354.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -83,9 +87,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | fb1bf72c712a8a9152075f98394c8b4f06a0f9a3 | Card must match the branch you measured |
+| Reviewed head | cc40735e83fd6ea127e1d006920fc13691478579 | Card must match the branch you measured |
 
 ### Stored data model
 None.
