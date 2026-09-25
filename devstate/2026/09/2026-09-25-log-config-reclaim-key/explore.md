@@ -66,8 +66,8 @@ Outside facts used: in-tree. Reclaim alias remap and Sleep/Wake/Close are dest `
 
 - Q: Whether log config is LogLevel only or also LogFilePath and LogFormat.
   Rank: additive asked — adding fields to unexported ownership this change edits; Desired names the log config; Current names all three omitted knobs
-  Decision: assumed — hash all three Config fields as stored. plugin.go already uppercases LogLevel before Open and SetAlias. logger.NewWithFormat freezes the three together on Client.log.
-  By: explore
+  Decision: resolved — hash all three Config fields as stored (`LogLevel`, `LogFilePath`, `LogFormat`). plugin.go already uppercases LogLevel before Open and SetAlias. logger.NewWithFormat freezes the three together on Client.log. Spec SHALL lists those three knobs.
+  By: propose
 
 - Q: Whether LAPI and AppSec owners keep a stale log level under the same rebuild.
   Rank: additive asked — Unknowns names observe-only; Out of scope “Changing LAPI or AppSec reclaim keys”
