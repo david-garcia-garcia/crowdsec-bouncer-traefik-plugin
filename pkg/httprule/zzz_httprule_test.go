@@ -87,6 +87,19 @@ func TestNew_rejectsInvalidRE2(t *testing.T) {
 	}
 }
 
+func TestMatch_methodAndPathAreAnd(t *testing.T) {
+	set := mustNew(t, []Rule{{Method: "^GET$", Path: "^/healthz$"}})
+	if set.Match(httptest.NewRequest(http.MethodGet, "http://example.com/other", nil)) {
+		t.Fatal("GET /other must not match method+path AND")
+	}
+	if !set.Match(httptest.NewRequest(http.MethodGet, "http://example.com/healthz", nil)) {
+		t.Fatal("GET /healthz must match method+path AND")
+	}
+	if set.Match(httptest.NewRequest(http.MethodPost, "http://example.com/healthz", nil)) {
+		t.Fatal("POST /healthz must not match method+path AND")
+	}
+}
+
 func TestMatch_unanchoredPath(t *testing.T) {
 	set := mustNew(t, []Rule{{Path: "health"}})
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/unhealthy", nil)

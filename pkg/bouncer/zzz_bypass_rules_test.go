@@ -151,6 +151,22 @@ func TestServeHTTP_nonMatchingLapiBypassStillLooksUp(t *testing.T) {
 	}
 }
 
+func TestServeHTTP_lapiBypassSkipsUnboundLAPIFailure(t *testing.T) {
+	b, passed := testBypassOriginBouncer(t)
+	b.subscribeLAPI = true
+	b.startupBlock = false
+	b.lapiFailureAction = configuration.FailureActionBan
+	b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/health$"))
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, testBypassHealthRequest())
+	if !*passed {
+		t.Fatal("LAPI bypass must skip missing-subscribed-LAPI failure")
+	}
+	if rw.Code != http.StatusOK {
+		t.Fatalf("status=%d", rw.Code)
+	}
+}
+
 func TestServeHTTP_lapiBypassSkipsStreamStoreAndUnhealthy(t *testing.T) {
 	b, passed := testBypassOriginBouncer(t)
 	lapiClient, store := lapi.NewTestClient(b.log)

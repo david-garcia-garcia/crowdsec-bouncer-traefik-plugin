@@ -51,14 +51,17 @@ func New(rules []Rule) (*Set, error) {
 }
 
 // Match reports whether any compiled rule matches httpReq. First match wins.
+// Cookie is parsed once only when this set has a cookie predicate.
 func (set *Set) Match(httpReq *http.Request) bool {
 	if set == nil || httpReq == nil {
 		return false
 	}
+	// Parse Cookie once when hasCookiePredicate.
 	var cookies []*http.Cookie
 	if set.hasCookiePredicate {
 		cookies = httpReq.Cookies()
 	}
+	// First matching rule wins.
 	for i := range set.rules {
 		if set.rules[i].match(httpReq, cookies) {
 			return true
