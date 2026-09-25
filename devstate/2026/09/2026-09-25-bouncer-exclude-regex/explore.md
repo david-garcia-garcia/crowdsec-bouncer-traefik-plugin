@@ -108,6 +108,11 @@ No hard gap. **Bouncer**, **Failure action**, **Config validation**, **AppSec Cl
 
 ## Open questions
 
+- Q: Is upstream https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/393 a second product requirement?
+  Rank: additive asked — Problem "Upstream https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/393 is citation-only for this run's delivery card, not a second product ask"
+  Decision: assumed — no. Citation only (maxlerebourg/crowdsec-bouncer-traefik-plugin#393). Do not adopt location-list / EXCLUDE_LOCATION. Remaining assumed rows stay on explore.md.
+  By: explore
+
 - Q: Invalid regex: fail `ValidateParams` / `bouncer.New`, or ignore the setting?
   Rank: additive asked — new validation of new Config strings this change creates; Unknowns "Invalid regex: fail ValidateParams / bouncer.New, or ignore the setting"
   Decision: assumed — trim; empty after trim is off (no compile). Non-empty invalid RE2 fails `ValidateParams` and `bouncer.New` so `plugin.New` returns that error. Do not ignore.

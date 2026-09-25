@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 9f9a59a6
-Owner decision: None.
+Reviewed head: d97af6b7
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -48,10 +48,13 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-09-25-bouncer-exclude-regex on branch 2026-09-25-bouncer-exclude-regex targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/158; CI not seen. Upstream context (citation only, not desired behavior): https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/393 "[FEATURE] Exclude host+path routes from the AppSec query".
+Ticket 2026-09-25-bouncer-exclude-regex on branch 2026-09-25-bouncer-exclude-regex targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/158; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Invalid regex: fail `ValidateParams` / `bouncer.New`, or ignore the setting? | additive asked — new validation of new Config strings this change creates; Unknowns "Invalid regex: fail ValidateParams / bouncer.New, or ignore the setting" | assumed — trim; empty after trim is off (no compile). Non-empty invalid RE2 fails `ValidateParams` and `bouncer.New` so `plugin.New` returns that error. Do not ignore. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 9f9a59a685939c9413fc81285d66f378cfab92d4 | Card must match the branch you measured |
+| Reviewed head | d97af6b788c140c588ef4b597414ed811163aa77 | Card must match the branch you measured |
 
 ### Stored data model
 None.
