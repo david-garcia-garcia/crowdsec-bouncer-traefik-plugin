@@ -20,7 +20,7 @@ On each writer this plugin owns, set `Cache-Control: no-cache, no-store` next to
 In progress. 0 items remain.
 
 Priority: P2 — real end-user pain, with a workaround or limited blast radius
-Reviewed head: c4b3a4bf
+Reviewed head: 6a1715b6
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -43,8 +43,12 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-remediation-cache-control/openspec/changes/remediation-cache-control/proposal.md) — modified
-- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-remediation-cache-control/openspec/changes/remediation-cache-control/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-remediation-cache-control/openspec/changes/archive/2026-09-25-remediation-cache-control/proposal.md) — modified
+- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-remediation-cache-control/openspec/changes/archive/2026-09-25-remediation-cache-control/proposal.md) — modified
+
+Completed:
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-remediation-cache-control/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
+- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-remediation-cache-control/openspec/specs/core_plugin_middleware_captcha-widget/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -81,9 +85,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | c4b3a4bf17b743760005b56056178b6aeb8e46a9 | Card must match the branch you measured |
+| Reviewed head | 6a1715b6a454999527702a0d9e54e53108f627f8 | Card must match the branch you measured |
 
 ### Stored data model
 None.
