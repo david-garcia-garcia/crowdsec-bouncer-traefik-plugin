@@ -49,8 +49,9 @@ make run_custom_ban_page
 ## Another thing to note
 In the html of the ban page, you can use:  
 - {{ .ClientIP }} to display the IP used to ban the request.  
+- {{ .Domain }} the request host.  
 - {{ .RemediationReason }} that convert on runtime into why the ban page is served. It's an enum with "APPSEC", "LAPI", "TECHNICAL_ISSUE" and it is useful to help user understand why the request is blocked.  
-- {{ .CustomHeader }} value of the specified Request Header (for example X-Request-ID)
+- {{ .TraceID }} value of the request header named by `bouncerTraceHeadersCustomName` (for example X-Request-ID). Omitted unless that value is letters, digits, `_`, `.`, `:`, `-`, length 1–200.
 ```
 <script>var remediation = "{{ .RemediationReason }}"</script>
 <script>var clientIp = "{{ .ClientIP }}"</script>
