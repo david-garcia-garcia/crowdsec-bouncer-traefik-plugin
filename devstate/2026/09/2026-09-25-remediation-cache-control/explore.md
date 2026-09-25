@@ -55,14 +55,14 @@ This work does not reconstruct identity. Ban-page `ClientIP` stays `req.remoteIP
 
 ## Open questions
 
-- Q: Do live HAProxy SPOA and the AppSec protocol example use exactly `no-cache, no-store`, or extra directives?
-  Rank: additive asked — new header on two writers this change owns; Desired names match CrowdSec `no-cache, no-store`
-  Decision: resolved — exactly `no-cache, no-store`; HAProxy SPOA docs/config/Go writer and AppSec challenge protocol example plus engine `setChallengeResponse` agree; no extra directives
-  By: explore
-
 - Q: Must existing header tests gain Cache-Control assertions, or is a new neighbor test the right place?
   Rank: additive asked — Affected names pkg/captcha/zzz_servehttp_test.go and pkg/bouncer/zzz_bouncer_test.go
   Decision: assumed — extend those existing header tests (challenge 200 body case and TestHandleBanServeHTTPContentType / method table); do not add a new zzz_ file
+  By: explore
+
+- Q: Do live HAProxy SPOA and the AppSec protocol example use exactly `no-cache, no-store`, or extra directives?
+  Rank: additive asked — new header on two writers this change owns; Desired names match CrowdSec `no-cache, no-store`
+  Decision: resolved — exactly `no-cache, no-store`; HAProxy SPOA docs/config/Go writer and AppSec challenge protocol example plus engine `setChallengeResponse` agree; no extra directives
   By: explore
 
 - Q: What is the CDN cache-key / TTL behaviour in the reported deployment?

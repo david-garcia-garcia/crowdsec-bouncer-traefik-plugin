@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: c2a19118
+Reviewed head: 18e05002
 Owner decision: None.
 
 ## Review scores
@@ -66,7 +66,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | c2a19118fa1d1688a1eaabef107e994eaac299e8 | Card must match the branch you measured |
+| Reviewed head | 18e05002148271be19870c2631efa0d6272bdfa7 | Card must match the branch you measured |
 
 ### Stored data model
 None.
