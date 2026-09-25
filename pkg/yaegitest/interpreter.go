@@ -32,15 +32,14 @@ func GoPath(t *testing.T) string {
 // The test skips when the binary is not on PATH. A non-zero exit fails the test.
 func Run(t *testing.T, goPath, source string) {
 	t.Helper()
-	bin, err := exec.LookPath("yaegi")
-	if err != nil {
+	if _, err := exec.LookPath("yaegi"); err != nil {
 		t.Skip("yaegi binary not on PATH")
 	}
 	file := filepath.Join(t.TempDir(), "main.go")
 	if err := os.WriteFile(file, []byte(source), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(bin, file)
+	cmd := exec.Command("yaegi", file) //nolint:gosec // G204 executable is the fixed name yaegi; file is a temp program this test wrote.
 	cmd.Env = append(os.Environ(), "GOPATH="+goPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
