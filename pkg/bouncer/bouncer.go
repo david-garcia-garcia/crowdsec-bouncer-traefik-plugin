@@ -365,9 +365,9 @@ func excludeMatchString(httpReq *http.Request) string {
 	return host + "://" + path
 }
 
-// excludedBy reports whether compiled matches this request's host://path.
-func excludedBy(compiled *regexp.Regexp, httpReq *http.Request) bool {
-	return compiled != nil && compiled.MatchString(excludeMatchString(httpReq))
+// excludedBy reports whether excludeRegex matches this request's host://path.
+func excludedBy(excludeRegex *regexp.Regexp, httpReq *http.Request) bool {
+	return excludeRegex != nil && excludeRegex.MatchString(excludeMatchString(httpReq))
 }
 
 // passOrForcedCaptcha passes to next, or captcha when the header forced c.

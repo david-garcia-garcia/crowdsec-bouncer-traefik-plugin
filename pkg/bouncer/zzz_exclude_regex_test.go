@@ -153,6 +153,24 @@ func TestServeHTTP_emptyLapiExcludeStillLooksUp(t *testing.T) {
 	}
 }
 
+func TestServeHTTP_nonMatchingLapiExcludeStillLooksUp(t *testing.T) {
+	b, passed := testExcludeOriginBouncer(t)
+	lapiClient, store := lapi.NewTestClient(b.log)
+	store.Put(decisionstore.Decision{
+		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
+	})
+	bindTestLAPI(b, lapiClient)
+	b.lapiExcludeRegex = mustCompileExclude(t, `^nomatch$`)
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, testExcludeHealthRequest())
+	if *passed {
+		t.Fatal("non-matching LAPI exclude must still apply the store ban")
+	}
+	if rw.Code != http.StatusForbidden {
+		t.Fatalf("status=%d", rw.Code)
+	}
+}
+
 func TestServeHTTP_lapiExcludeSkipsStreamStoreAndUnhealthy(t *testing.T) {
 	b, passed := testExcludeOriginBouncer(t)
 	lapiClient, store := lapi.NewTestClient(b.log)
@@ -240,6 +258,30 @@ func TestServeHTTP_appsecExcludeSkipsQuery(t *testing.T) {
 	}
 	if atomic.LoadInt64(&hits) != 0 {
 		t.Fatalf("AppSec Query hits=%d want 0", hits)
+	}
+}
+
+func TestServeHTTP_nonMatchingAppsecExcludeStillQueries(t *testing.T) {
+	var hits int64
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"action":"allow"}`))
+	}))
+	t.Cleanup(appsecServer.Close)
+	appsecURL, err := url.Parse(appsecServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, passed := testExcludeOriginBouncer(t)
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	b.appsecExcludeRegex = mustCompileExclude(t, `^nomatch$`)
+	b.ServeHTTP(httptest.NewRecorder(), testExcludeHealthRequest())
+	if !*passed {
+		t.Fatal("non-matching AppSec exclude must call next")
+	}
+	if atomic.LoadInt64(&hits) != 1 {
+		t.Fatalf("AppSec Query hits=%d want 1", hits)
 	}
 }
 

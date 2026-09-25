@@ -199,9 +199,9 @@ func EffectiveFailureAction(action string) string {
 	return action
 }
 
-// CompileExcludeRegex trims s and compiles it as Go RE2. Empty after trim is off (nil, nil).
-func CompileExcludeRegex(s string) (*regexp.Regexp, error) {
-	pattern := strings.TrimSpace(s)
+// CompileExcludeRegex trims pattern and compiles it as Go RE2. Empty after trim is off (nil, nil).
+func CompileExcludeRegex(pattern string) (*regexp.Regexp, error) {
+	pattern = strings.TrimSpace(pattern)
 	if pattern == "" {
 		return nil, nil //nolint:nilnil // empty after trim is off, not a failure
 	}
