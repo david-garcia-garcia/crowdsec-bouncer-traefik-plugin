@@ -22,7 +22,7 @@ Two additive Config strings `bouncerAppsecExcludeRegex` and `bouncerLapiExcludeR
 In progress. 0 items remain.
 
 Priority: P2 — real operator pain, with a workaround (trusted IPs skip both legs)
-Reviewed head: 566aff0d
+Reviewed head: ca52c00e
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -45,8 +45,12 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-bouncer-exclude-regex/openspec/changes/bouncer-exclude-regex/proposal.md) — modified
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-bouncer-exclude-regex/openspec/changes/bouncer-exclude-regex/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-bouncer-exclude-regex/openspec/changes/archive/2026-09-25-bouncer-exclude-regex/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-bouncer-exclude-regex/openspec/changes/archive/2026-09-25-bouncer-exclude-regex/proposal.md) — modified
+
+Completed:
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-bouncer-exclude-regex/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-25-bouncer-exclude-regex/openspec/specs/core_plugin_middleware_config-validation/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -83,9 +87,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 566aff0d768ebb0d29a11beb7bdb805d092a459f | Card must match the branch you measured |
+| Reviewed head | ca52c00e98cfd9dac1fcad1ee972760a9ffe9d13 | Card must match the branch you measured |
 
 ### Stored data model
 None.
