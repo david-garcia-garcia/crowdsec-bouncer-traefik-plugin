@@ -24,6 +24,23 @@ A rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github.com/m
 - **Ip, Range, and other scopes.** Client IP, CIDR containment, and header-mapped scopes such as country and ASN. The original plugin matches the client IP only.
 - **AppSec independent of LAPI mode.** A router can run the WAF, decision lookup, or both. The original `appsec` mode turns IP checks off.
 
+> [!TIP]
+>
+> **Traefik Security**
+>
+> The basic middlewares you need to secure your Traefik ingress:
+>
+> 🌍 **Geoblock**: [david-garcia-garcia/traefik-geoblock](https://github.com/david-garcia-garcia/traefik-geoblock) - Block or allow requests based on IP geolocation
+> 🛡️ **CrowdSec**: [david-garcia-garcia/crowdsec-bouncer-traefik-plugin](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin) - Real-time threat intelligence and automated blocking
+> 🔒 **ModSecurity CRS**: [david-garcia-garcia/traefik-modsecurity](https://github.com/david-garcia-garcia/traefik-modsecurity) - Web Application Firewall with OWASP Core Rule Set
+> 🚦 **Ratelimit**: [Traefik Rate Limit](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/ratelimit/) - Control request rates and prevent abuse
+
+> [!WARNING]
+>
+> **Do not run middlewares as Yaegi plugins in production.**
+>
+> Traefik's catalog loads plugins with [Yaegi](https://github.com/traefik/yaegi), a Go interpreter. A middleware runs on every request, so that cost is on the hot path: memory, CPU, and observability ([Yaegi #1712](https://github.com/traefik/yaegi/pull/1712)). For real traffic, compile the middleware into the Traefik binary, for example [traefik-with-plugins](https://github.com/david-garcia-garcia/traefik-with-plugins). Discussion: [Traefik #12213](https://github.com/traefik/traefik/issues/12213).
+
 ## What CrowdSec is
 
 <img src="https://docs.crowdsec.net/img/crowdsec_logo.png" alt="CrowdSec" height="80">
