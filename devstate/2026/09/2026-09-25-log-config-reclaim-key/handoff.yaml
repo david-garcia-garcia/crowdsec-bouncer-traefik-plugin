@@ -3,11 +3,16 @@ jobName: 2026-09-25-log-config-reclaim-key
 issueHost: local
 issueRef: none
 prHost: github
+ciHost: github
 repoSlug: crowdsec-bouncer-traefik-plugin
 destBranch: master
+qualify: qualified
+src: fcf3de58869dd37e9c5dc129239121b563886a663c0714216ed7032d8955f3db
 localTests: none
 requirement: requirement.md
 comments: none
 explore: none
 change: none
-pr: none
+pr:
+  id: 162
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/162
