@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 24b89394
-Owner decision: None.
+Reviewed head: 2c175dd5
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -51,7 +51,10 @@ None.
 Ticket 2026-09-25-request-bypass-rules on branch 2026-09-25-request-bypass-rules targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/163; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Where does the matcher package live under pkg/? | additive asked — new package this change creates; criterion Implement the matcher as its own package | assumed — pkg/httprule. Authoring type Rule with json method, path, headers, cookies. Compiled Set. No imports of this plugin. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 24b893940aacde4cc30b8cf139ac08259fb36d25 | Card must match the branch you measured |
+| Reviewed head | 2c175dd5dac569fbd307b25002678f9b5f810208 | Card must match the branch you measured |
 
 ### Stored data model
 None.
