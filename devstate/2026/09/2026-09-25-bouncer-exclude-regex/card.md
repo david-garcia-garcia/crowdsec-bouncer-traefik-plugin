@@ -19,17 +19,17 @@ Two additive Config strings `bouncerAppsecExcludeRegex` and `bouncerLapiExcludeR
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: P2 — real operator pain, with a workaround (trusted IPs skip both legs)
-Reviewed head: ca52c00e
+Reviewed head: 074f59ab
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/158/checks |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -39,7 +39,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-25-bouncer-exclude-regex pushed | `git` |
 | OpenSpec | bouncer-exclude-regex | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/158 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 36123494561,36123494608 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/158/checks | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/158/checks |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -60,7 +60,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-09-25-bouncer-exclude-regex on branch 2026-09-25-bouncer-exclude-regex targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/158; CI not seen.
+Ticket 2026-09-25-bouncer-exclude-regex on branch 2026-09-25-bouncer-exclude-regex targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/158; CI build 36123494561,36123494608 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/158/checks.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -89,7 +89,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | ca52c00e98cfd9dac1fcad1ee972760a9ffe9d13 | Card must match the branch you measured |
+| Reviewed head | 074f59abbf8852602df0bf6dba38c40719c6e5f8 | Card must match the branch you measured |
 
 ### Stored data model
 None.
