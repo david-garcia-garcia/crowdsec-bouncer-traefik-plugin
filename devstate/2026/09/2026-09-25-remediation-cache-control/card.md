@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 9a738995
+Reviewed head: c2a19118
 Owner decision: None.
 
 ## Review scores
@@ -66,7 +66,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 9a738995acde5776b19d08b166ba07d9f19b1767 | Card must match the branch you measured |
+| Reviewed head | c2a19118fa1d1688a1eaabef107e994eaac299e8 | Card must match the branch you measured |
 
 ### Stored data model
 None.
