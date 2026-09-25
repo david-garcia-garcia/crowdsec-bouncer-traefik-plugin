@@ -40,6 +40,11 @@ priority: normal
 local: core_plugin_ip.md
 description: How this plugin stores trusted hop and client CIDRs and answers membership.
 
+## HTTP request rules
+priority: normal
+local: core_plugin_httprule.md
+description: How this plugin compiles method, path, header, and cookie request rules once and matches them on *http.Request.
+
 ## LAPI usage-metrics
 priority: normal
 local: core_plugin_lapi_usage-metrics.md
