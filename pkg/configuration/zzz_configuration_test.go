@@ -273,6 +273,18 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	cfgRemediationHigh.BouncerRemediationStatusCode = 600
 	cfgUpdateMaxFailureNegOne := getMinimalConfig()
 	cfgUpdateMaxFailureNegOne.LapiUpdateMaxFailure = -1
+	cfgEmptyExclude := getMinimalConfig()
+	cfgWhitespaceExclude := getMinimalConfig()
+	cfgWhitespaceExclude.BouncerLapiExcludeRegex = "   "
+	cfgWhitespaceAppsecExclude := getMinimalConfig()
+	cfgWhitespaceAppsecExclude.BouncerAppsecExcludeRegex = " \t "
+	cfgInvalidAppsecExclude := getMinimalConfig()
+	cfgInvalidAppsecExclude.BouncerAppsecExcludeRegex = "("
+	cfgInvalidLapiExclude := getMinimalConfig()
+	cfgInvalidLapiExclude.BouncerLapiExcludeRegex = "("
+	cfgValidExclude := getMinimalConfig()
+	cfgValidExclude.BouncerAppsecExcludeRegex = `example\.com://health`
+	cfgValidExclude.BouncerLapiExcludeRegex = `^ok/`
 	type args struct {
 		config *Config
 	}
@@ -333,6 +345,12 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 		{name: "BouncerRemediationStatusCode below 100", args: args{config: cfgRemediationLow}, wantErr: true},
 		{name: "BouncerRemediationStatusCode 600 or above", args: args{config: cfgRemediationHigh}, wantErr: true},
 		{name: "LapiUpdateMaxFailure -1 accepted", args: args{config: cfgUpdateMaxFailureNegOne}, wantErr: false},
+		{name: "Empty exclude strings pass", args: args{config: cfgEmptyExclude}, wantErr: false},
+		{name: "Whitespace-only LAPI exclude is off", args: args{config: cfgWhitespaceExclude}, wantErr: false},
+		{name: "Whitespace-only AppSec exclude is off", args: args{config: cfgWhitespaceAppsecExclude}, wantErr: false},
+		{name: "Invalid AppSec exclude regex fails", args: args{config: cfgInvalidAppsecExclude}, wantErr: true, wantErrContains: "BouncerAppsecExcludeRegex"},
+		{name: "Invalid LAPI exclude regex fails", args: args{config: cfgInvalidLapiExclude}, wantErr: true, wantErrContains: "BouncerLapiExcludeRegex"},
+		{name: "Valid exclude regexes pass", args: args{config: cfgValidExclude}, wantErr: false},
 		{name: "Custom json validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "json")}, wantErr: false},
 		{name: "Custom form validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "form")}, wantErr: false},
 		{name: "Custom omit validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "")}, wantErr: false},
@@ -1028,6 +1046,36 @@ func TestForwardedHeadersInsecure(t *testing.T) {
 		cfg.BouncerForwardedHeadersTrustedIPs = []string{"not-a-cidr"}
 		if err := ValidateParams(cfg, log); err == nil {
 			t.Fatal("ValidateParams = nil want error")
+		}
+	})
+}
+
+func TestCompileExcludeRegex(t *testing.T) {
+	t.Run("empty is off", func(t *testing.T) {
+		compiled, err := CompileExcludeRegex("")
+		if err != nil || compiled != nil {
+			t.Fatalf("empty: compiled=%v err=%v", compiled, err)
+		}
+	})
+	t.Run("whitespace-only is off", func(t *testing.T) {
+		compiled, err := CompileExcludeRegex("  \t ")
+		if err != nil || compiled != nil {
+			t.Fatalf("whitespace: compiled=%v err=%v", compiled, err)
+		}
+	})
+	t.Run("invalid RE2 fails", func(t *testing.T) {
+		compiled, err := CompileExcludeRegex("(")
+		if err == nil || compiled != nil {
+			t.Fatalf("invalid: compiled=%v err=%v", compiled, err)
+		}
+	})
+	t.Run("valid pattern compiles", func(t *testing.T) {
+		compiled, err := CompileExcludeRegex(`example\.com/health`)
+		if err != nil || compiled == nil {
+			t.Fatalf("valid: compiled=%v err=%v", compiled, err)
+		}
+		if !compiled.MatchString("example.com/health") {
+			t.Fatal("compiled regex must match example.com/health")
 		}
 	})
 }

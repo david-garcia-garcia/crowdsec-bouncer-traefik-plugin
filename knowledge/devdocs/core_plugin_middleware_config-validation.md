@@ -54,6 +54,7 @@ _Avoid_: sharedLogFiles, reclaim value, log owner
 - Reject `lapiMode: appsec` (E4). Gate LAPI URL/keys on `LapiEnabled`. Reject leftover instance name or secret when bounce and owner flags are both false (E2). Captcha E2 is leftover `captchaInstanceName` only; leftover owner-read `captcha*` is not a secret. Leftover `bouncerCaptcha*` never reaches `New`.
 - `LapiEnabled` and `CaptchaEnabled` default false. Tests and compose that Open LAPI or own captcha must set the flag true. A set `captchaProvider` does not own captcha.
 - `captcha` on `bouncerLapiFailureAction` / `bouncerAppsecFailureAction` is legal only when this router has a captcha instance name after owner-fill (`captchaEnabled` omit fills to the Traefik name). Error text names `captcha requires a captcha instance name`.
+- Trim `BouncerAppsecExcludeRegex` and `BouncerLapiExcludeRegex`. Empty after trim passes (that setting is off; do not compile). A non-empty string that `regexp.Compile` rejects fails `ValidateParams`; error text names the Go field. `plugin.New` returns a nil handler and that error without opening LAPI. Do not ignore an invalid pattern.
 - Own-axis captcha keys are `captchaEnabled` and `captchaInstanceName`. Owner-read settings are `captcha*` / `Captcha*`.
 - Keep the helper's empty-key pass and explicit-`https` CA parse. Do not fail an empty AppSec key at `ValidateParams`.
 - When the knob is false, skip AppSec host, URL, key, and CA even if leftover fields are set.
@@ -79,6 +80,15 @@ if config.AppsecEnabled {
 ```
 
 ```go
+if _, err := CompileExcludeRegex(config.BouncerAppsecExcludeRegex); err != nil {
+	return fmt.Errorf("BouncerAppsecExcludeRegex: %w", err)
+}
+if _, err := CompileExcludeRegex(config.BouncerLapiExcludeRegex); err != nil {
+	return fmt.Errorf("BouncerLapiExcludeRegex: %w", err)
+}
+```
+
+```go
 siteKey, err := GetVariable(config, "CaptchaSiteKey")
 if err != nil {
 	return err
@@ -98,7 +108,7 @@ _ = checkFile.Close()
 
 ## Key files
 
-- `pkg/configuration/configuration.go` (`ValidateParams`, `validateEnabledCaptchaSettings`, `validateCaptchaCredentialsAndTemplates`, `GetTemplate`, `TemplateUnavailableReason`, `GetVariable`, `validateLogging`)
+- `pkg/configuration/configuration.go` (`ValidateParams`, `CompileExcludeRegex`, `validateEnabledCaptchaSettings`, `validateCaptchaCredentialsAndTemplates`, `GetTemplate`, `TemplateUnavailableReason`, `GetVariable`, `validateLogging`)
 - `pkg/captcha/captcha.go` (`Client.New` captcha-template WARN)
 - `pkg/bouncer/bouncer.go` (`New` ban-template WARN)
 - `plugin.go` (`New` returns `nil, err` before LAPI Open; `appsec.Open` when `AppsecEnabled`; `NewWithFormat` then `ValidateParams`)
@@ -115,5 +125,6 @@ _ = checkFile.Close()
 - Leftover invalid AppSec CA or missing key file boots when AppSec is off (live, stream, none, and alone). `lapiMode: appsec` is rejected.
 - Empty AppSec key after a successful lookup still passes; `appsec.Prepare` copies the LAPI key.
 - CA parse still triggers on explicit `AppsecScheme == https`, not inherit-https.
+- Whitespace-only exclude strings are off. A non-empty invalid RE2 fails `ValidateParams` with the Go field name; do not ignore it.
 - `NewWithFormat` warns and uses stdout when the path is not writable. `ValidateParams` must still fail so `plugin.New` does not start.
 - Do not put the writability-check handle on `pkg/reclaim` or add `sync.Once` / a package global for this close. `sharedLogFiles` is the process-lifetime owner.

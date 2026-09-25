@@ -147,6 +147,54 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 	}
 }
 
+func TestNew_RejectsInvalidExcludeRegex(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() {
+		reclaim.ResetForTest()
+	})
+
+	var hits int64
+	srv := liveLAPI(t, nil, &hits)
+	t.Cleanup(func() { srv.Close() })
+	u, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := cfgLiveAt(u.Host)
+	cfg.BouncerLapiExcludeRegex = "("
+	handler, err := New(context.Background(), testNextOK(), cfg, "invalid-lapi-exclude")
+	if err == nil {
+		t.Fatal("New must fail when BouncerLapiExcludeRegex is invalid RE2")
+	}
+	if handler != nil {
+		t.Fatal("New must return a nil handler when exclude regex is invalid")
+	}
+	if !strings.Contains(err.Error(), "BouncerLapiExcludeRegex") {
+		t.Fatalf("error %q", err)
+	}
+	if atomic.LoadInt64(&hits) != 0 {
+		t.Fatalf("New opened LAPI (%d hits)", hits)
+	}
+
+	hits = 0
+	cfg = cfgLiveAt(u.Host)
+	cfg.BouncerAppsecExcludeRegex = "("
+	handler, err = New(context.Background(), testNextOK(), cfg, "invalid-appsec-exclude")
+	if err == nil {
+		t.Fatal("New must fail when BouncerAppsecExcludeRegex is invalid RE2")
+	}
+	if handler != nil {
+		t.Fatal("New must return a nil handler when exclude regex is invalid")
+	}
+	if !strings.Contains(err.Error(), "BouncerAppsecExcludeRegex") {
+		t.Fatalf("error %q", err)
+	}
+	if atomic.LoadInt64(&hits) != 0 {
+		t.Fatalf("New opened LAPI (%d hits)", hits)
+	}
+}
+
 // TestNew_EmptyCaptchaFilePathWarnsAndBans returns a handler, warns once, and bans captcha remediations.
 func TestNew_EmptyCaptchaFilePathWarnsAndBans(t *testing.T) {
 	reclaim.ResetForTestWith(0)
