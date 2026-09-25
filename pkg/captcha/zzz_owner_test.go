@@ -109,3 +109,22 @@ func TestOwnershipKey_EnterpriseKnobChangeReclaims(t *testing.T) {
 		t.Fatal("enterprise knob change must change the ownership key")
 	}
 }
+
+func TestOwnershipKey_LogConfigChangeReclaims(t *testing.T) {
+	left := testOwnerConfig(t, 10)
+	rightLevel := *left
+	rightLevel.LogLevel = "DEBUG"
+	if OwnershipKey(left, "mw") == OwnershipKey(&rightLevel, "mw") {
+		t.Fatal("logLevel change must change the ownership key")
+	}
+	rightPath := *left
+	rightPath.LogFilePath = "/tmp/bouncer.log"
+	if OwnershipKey(left, "mw") == OwnershipKey(&rightPath, "mw") {
+		t.Fatal("logFilePath change must change the ownership key")
+	}
+	rightFormat := *left
+	rightFormat.LogFormat = "json"
+	if OwnershipKey(left, "mw") == OwnershipKey(&rightFormat, "mw") {
+		t.Fatal("logFormat change must change the ownership key")
+	}
+}

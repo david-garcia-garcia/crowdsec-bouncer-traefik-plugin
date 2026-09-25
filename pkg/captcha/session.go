@@ -17,7 +17,7 @@ import (
 
 const ownerKeyPrefix = "captcha:owner:"
 
-// ownership is the captcha Open-key payload: middleware name plus instance-owned knobs.
+// ownership is the captcha Open-key payload: middleware name plus instance-owned knobs, including log config.
 // Slot name, bounce, failure actions, remediation header, and startup-block stay off it.
 type ownership struct {
 	MiddlewareName               string `json:"middlewareName"`
@@ -40,6 +40,9 @@ type ownership struct {
 	EnterpriseKeyType            string `json:"enterpriseKeyType"`
 	EnterpriseMinScore           string `json:"enterpriseMinScore"`
 	EnterpriseProjectID          string `json:"enterpriseProjectId"`
+	LogFilePath                  string `json:"logFilePath"`
+	LogFormat                    string `json:"logFormat"`
+	LogLevel                     string `json:"logLevel"`
 }
 
 func ownershipFrom(cfg *configuration.Config, middlewareName string) ownership {
@@ -68,6 +71,9 @@ func ownershipFrom(cfg *configuration.Config, middlewareName string) ownership {
 		EnterpriseKeyType:            cfg.CaptchaEnterpriseKeyType,
 		EnterpriseMinScore:           cfg.CaptchaEnterpriseMinScore,
 		EnterpriseProjectID:          cfg.CaptchaEnterpriseProjectID,
+		LogFilePath:                  cfg.LogFilePath,
+		LogFormat:                    cfg.LogFormat,
+		LogLevel:                     cfg.LogLevel,
 	}
 }
 
