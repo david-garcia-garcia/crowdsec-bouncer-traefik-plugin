@@ -131,8 +131,8 @@ E2e in this repo: **mock** = `tests/e2e/mock/` (Traefik binary + mock LAPI, `mak
 
 - Q: Where is fully-empty-rule rejection owned (ValidateParams, matcher New, or bouncer.New)?
   Rank: additive asked — new constructor reject this change creates; Desired Plugin construction must reject that fully empty rule
-  Decision: assumed — httprule.New is the owner. ValidateParams calls it (fail plugin.New before LAPI Open, error names BouncerAppsecBypassRules / BouncerLapiBypassRules). bouncer.New calls it again to store the set. Fully empty is path, headers, and cookies all absent AND method omitted, empty, or only a negate flag with no pattern. A method-only rule is valid.
-  By: explore
+  Decision: assumed — httprule.New is the owner. ValidateParams calls it (fail plugin.New before LAPI Open, error names BouncerAppsecBypassRules / BouncerLapiBypassRules). bouncer.New calls it again to store the set. Fully empty is path, headers, and cookies all absent AND method is any (omitted, empty after trim, or a match-everything pattern such as .*). A method-only rule is valid. !! and ! with an empty pattern are invalid syntax (fail construction, name the field), not the fully-empty case.
+  By: propose
 
 - Q: Is method an exact case-insensitive HTTP token, or a Go RE2 regexp?
   Rank: additive asked — new method predicate this change creates; human correction this session names method as RE2 same family as path
