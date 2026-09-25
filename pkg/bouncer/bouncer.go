@@ -145,7 +145,18 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 		traceCustomHeader:        config.BouncerTraceHeadersCustomName,
 		originBasedDecisionRemap: copyOriginBasedDecisionRemap(config.BouncerOriginBasedDecisionRemap),
 	}
-	routeHandler.log.Debug("Bouncer initialized")
+	// JSON slog prints a nil []string as null; empty lists stay lists.
+	forwardedHeadersTrustedIPs := config.BouncerForwardedHeadersTrustedIPs
+	if forwardedHeadersTrustedIPs == nil {
+		forwardedHeadersTrustedIPs = []string{}
+	}
+	clientTrustedIPs := config.BouncerClientTrustedIPs
+	if clientTrustedIPs == nil {
+		clientTrustedIPs = []string{}
+	}
+	routeHandler.log.Debug("Bouncer initialized",
+		"forwardedHeadersTrustedIPs", forwardedHeadersTrustedIPs,
+		"clientTrustedIPs", clientTrustedIPs)
 	return routeHandler, nil
 }
 

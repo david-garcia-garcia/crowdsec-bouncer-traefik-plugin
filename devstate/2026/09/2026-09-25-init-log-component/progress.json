@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-09-25-init-log-component",
+  "jobName": "2026-09-25-init-log-component",
+  "startedAt": "2026-09-25T10:53:43.376Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T11:00:18.453Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T11:06:52.508Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T11:14:15.899Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T11:43:35.159Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T11:55:38.639Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T12:01:51.167Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T12:15:21.387Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T12:23:06.083Z"
+    }
+  }
+}

@@ -132,7 +132,7 @@ $svc
     function Get-SevLogs {
         return (
             (docker logs --since $script:SevLogSince traefik-test 2>&1 | Out-String) -split "`r?`n" |
-                Where-Object { $_ -match 'CrowdsecBouncerTraefikPlugin' }
+                Where-Object { $_ -match 'CrowdsecBouncer' }
         ) -join "`n"
     }
 
