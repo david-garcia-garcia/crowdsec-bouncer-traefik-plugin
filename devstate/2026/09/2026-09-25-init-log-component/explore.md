@@ -43,37 +43,37 @@ Identity (request client address / trust hop): GetRemoteIP already owns the per-
 
 ## Open questions
 
-- Q: What shorter slog `component` string do we use (`CrowdsecBounder` vs `CrowdsecBouncer`)?
-  Rank: bounded asked — 9 `.go` occurrences enumerated (1 producer, 8 test locks); roots `pkg/logger` and module-root `zzz_bouncer_logging_test.go`; Desired names the rename
-  Decision: assumed — `CrowdsecBouncer`. The ticket typed `CrowdsecBounder` as an example; the existing type and template name is `CrowdsecBouncer`. Do not invent a third name. Job (shorter component) survives.
+- Q: What shorter slog component string do we use (CrowdsecBounder vs CrowdsecBouncer)?
+  Rank: bounded asked — 9 go-file occurrences enumerated (1 producer, 8 test locks); roots pkg/logger and module-root zzz_bouncer_logging_test.go; Desired names the rename
+  Decision: assumed — CrowdsecBouncer. The ticket typed CrowdsecBounder as an example; the existing type and template name is CrowdsecBouncer. Do not invent a third name. Job (shorter component) survives.
   By: explore
 
 - Q: Are forwarded-headers vs client trusted pools two attrs or one combined list, and what are the attr names?
-  Rank: additive asked — new fields on the existing `Bouncer initialized` line; Desired prefers attaching ranges to that line
-  Decision: assumed — two attrs on that same line: `forwardedHeadersTrustedIPs` and `clientTrustedIPs`. Values are the config slice strings as written (bare hosts stay bare, not rewritten to `/32`/`/128`). One combined list would hide which pool.
+  Rank: additive asked — new fields on the existing Bouncer initialized line; Desired prefers attaching ranges to that line
+  Decision: assumed — two attrs on that same line: forwardedHeadersTrustedIPs and clientTrustedIPs. Values are the config slice strings as written (bare hosts stay bare, not rewritten to /32 or /128). One combined list would hide which pool.
   By: explore
 
-- Q: Must `validateParamsIPs` stop constructing `NewChecker`?
+- Q: Must validateParamsIPs stop constructing NewChecker?
   Rank: additive incidental — no criterion names a validate rewrite; Unknown on requirement.md
-  Decision: assumed — keep constructing `NewChecker` to reject bad CIDRs. After insert DEBUG is removed, validate no longer emits per-entry lines.
+  Decision: assumed — keep constructing NewChecker to reject bad CIDRs. After insert DEBUG is removed, validate no longer emits per-entry lines.
   By: explore
 
-- Q: Must bare-host `IP is trusted` lines fold the same way as CIDR `IP network is trusted`?
-  Rank: bounded asked — both Debug calls live in `pkg/ip/checker.go` (lines 32 and 40); Desired "All trusted IP ranges appear on one DEBUG line"
+- Q: Must bare-host IP is trusted lines fold the same way as CIDR IP network is trusted?
+  Rank: bounded asked — both Debug calls live in pkg/ip/checker.go (lines 32 and 40); Desired All trusted IP ranges appear on one DEBUG line
   Decision: assumed — fold both. The sample showed only CIDRs; both enter the same pools.
   By: explore
 
-- Q: Do empty trusted lists still emit `Bouncer initialized` with empty network attrs?
+- Q: Do empty trusted lists still emit Bouncer initialized with empty network attrs?
   Rank: additive asked — attrs on the existing construct-time DEBUG line; Desired is that init shows how the bouncer is configured
-  Decision: assumed — still emit `Bouncer initialized` with both attrs; nil or empty slices log as empty lists.
+  Decision: assumed — still emit Bouncer initialized with both attrs; nil or empty slices log as empty lists.
   By: explore
 
 - Q: Who already owns client address and trust-hop identity for this change?
-  Rank: additive asked — `core_plugin_ip_radix-lookup` names GetRemoteIP as owner; Out of scope leaves those keys unchanged
-  Decision: resolved — GetRemoteIP owns the per-request client address; Checker owns pool membership. Log the Config slices already in `bouncer.New`. Do not re-derive hops or client IP.
+  Rank: additive asked — core_plugin_ip_radix-lookup names GetRemoteIP as owner; Out of scope leaves those keys unchanged
+  Decision: resolved — GetRemoteIP owns the per-request client address; Checker owns pool membership. Log the Config slices already in bouncer.New. Do not re-derive hops or client IP.
   By: explore
 
-- Q: Must `NewChecker` drop its `log` parameter once insert DEBUG is gone?
-  Rank: bounded incidental — 26 `NewChecker(` call sites enumerated in `pkg/ip`, `pkg/bouncer`, `pkg/configuration`; requirement does not name a signature change
-  Decision: assumed — keep the signature; stop the two Debug calls; name the param `_` only if unused-parameter fails. Do not migrate 26 call sites.
+- Q: Must NewChecker drop its log parameter once insert DEBUG is gone?
+  Rank: bounded incidental — 26 NewChecker call sites enumerated in pkg/ip, pkg/bouncer, pkg/configuration; requirement does not name a signature change
+  Decision: assumed — keep the signature; stop the two Debug calls; name the param _ only if unused-parameter fails. Do not migrate 26 call sites.
   By: explore

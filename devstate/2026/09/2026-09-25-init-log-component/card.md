@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 9406dee9
-Owner decision: None.
+Reviewed head: ef82f84a
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -42,7 +42,8 @@ Owner decision: None.
 None.
 
 ## Deviations from the ask
-None.
+- taken: rename `component=CrowdsecBouncerTraefikPlugin` to something shorter like CrowdsecBounder. → `CrowdsecBouncer`, the existing type and HTML template name in `pkg/bouncer/bouncer.go`. — `pkg/logger/logger.go` — honouring the typed example would add a misspelled third identity next to the unit already named CrowdsecBouncer; the job is a shorter component, and that name already exists.. Requester: not asked.
+
 
 ## Follow-up issues
 None.
@@ -51,7 +52,10 @@ None.
 Ticket 2026-09-25-init-log-component on branch 2026-09-25-init-log-component targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/160; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| What shorter slog `component` string do we use (`CrowdsecBounder` vs `CrowdsecBouncer`)? | bounded asked — 9 `.go` occurrences enumerated (1 producer, 8 test locks); roots `pkg/logger` and module-root `zzz_bouncer_logging_test.go`; Desired names the rename | assumed — `CrowdsecBouncer`. The ticket typed `CrowdsecBounder` as an example; the existing type and template name is `CrowdsecBouncer`. Do not invent a third name. Job (shorter component) survives. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +70,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 9406dee9599daf806a9cb91fb0e984043d990614 | Card must match the branch you measured |
+| Reviewed head | ef82f84afa3b6a38322c0fea69f53bcf2d124f63 | Card must match the branch you measured |
 
 ### Stored data model
 None.
