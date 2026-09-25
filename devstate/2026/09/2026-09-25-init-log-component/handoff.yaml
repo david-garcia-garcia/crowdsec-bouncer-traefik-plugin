@@ -1,0 +1,18 @@
+issueKey: 2026-09-25-init-log-component
+jobName: 2026-09-25-init-log-component
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 342db2e34b3e106e51d5fe44e4bdc3fe579fcd4cd51fbe4add9618bd3e85d74f
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: init-log-component
+pr:
+  id: 160
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/160
