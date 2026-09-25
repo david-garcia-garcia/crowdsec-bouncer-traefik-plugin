@@ -20,7 +20,7 @@ On each writer this plugin owns, set `Cache-Control: no-cache, no-store` next to
 In progress. 0 items remain.
 
 Priority: P2 — real end-user pain, with a workaround or limited blast radius
-Reviewed head: 1bb296df
+Reviewed head: c4b3a4bf
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -83,7 +83,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 1bb296dfdb3ced46016a780cb1463c6ff1ae1521 | Card must match the branch you measured |
+| Reviewed head | c4b3a4bf17b743760005b56056178b6aeb8e46a9 | Card must match the branch you measured |
 
 ### Stored data model
 None.
