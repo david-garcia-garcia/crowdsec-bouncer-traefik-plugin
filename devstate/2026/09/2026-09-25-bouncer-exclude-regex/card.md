@@ -22,7 +22,7 @@ Two additive Config strings `bouncerAppsecExcludeRegex` and `bouncerLapiExcludeR
 In progress. 0 items remain.
 
 Priority: P2 — real operator pain, with a workaround (trusted IPs skip both legs)
-Reviewed head: f95ac4e7
+Reviewed head: 566aff0d
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -85,7 +85,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | f95ac4e7e56c5a095c25f93b932d188b6ca64d49 | Card must match the branch you measured |
+| Reviewed head | 566aff0d768ebb0d29a11beb7bdb805d092a459f | Card must match the branch you measured |
 
 ### Stored data model
 None.
