@@ -8,19 +8,19 @@ Left alone, clearing a captcha decision does not clear the cached HTML. Visitors
 Priority: P2 — real end-user pain, with a workaround or limited blast radius
 
 ## Implementation
-On each writer this plugin owns, set `Cache-Control: no-cache, no-store` next to Content-Type and before WriteHeader. Challenge HTML gets it on the non-Pass 200 path only. The ban writer sets it once, so HEAD and nil-template bans carry it the same way Content-Type already does. The string is exactly that value — HAProxy SPOA captcha/ban returns and the AppSec challenge protocol example, no extra directives. Pass 302 and AppSec envelope relay stay unchanged. Existing challenge 200 and ban header tests assert the header; the solve 302 still has empty `Cache-Control`.
+On each writer this plugin owns, set `Cache-Control: no-cache, no-store` before WriteHeader. Challenge HTML gets it on the 200 path. The Pass 302 and the second-tab `WriteSolvedRedirect` set the same value, so a proxy cannot store a redirect to the same URL. The ban writer sets it once, so HEAD and nil-template bans carry it the same way Content-Type already does. The string is exactly that value — HAProxy SPOA captcha/ban returns and the AppSec challenge protocol example, no extra directives. AppSec envelope relay stays unchanged. Challenge 200, both solve 302s, and ban header tests assert the header.
 
 ## What this changes
-**Operators.** No new plugin or Traefik key; after deploy, captcha challenge 200 and ban remediations send `Cache-Control: no-cache, no-store`.
+**Operators.** No new plugin or Traefik key; after deploy, captcha challenge 200s, both solve redirects, and ban remediations send `Cache-Control: no-cache, no-store`.
 **Admin users.** None.
-**Developers.** Challenge HTML at 200 and ban responses must set `Cache-Control: no-cache, no-store` before WriteHeader; Pass 302 must not gain this header.
-**End users.** A cache in front of Traefik that honors Cache-Control should stop serving a stored captcha page after the decision is cleared; ban HTML should not stay stored either.
+**Developers.** Challenge HTML at 200, the Pass 302, `WriteSolvedRedirect`, and ban responses must set `Cache-Control: no-cache, no-store` before WriteHeader.
+**End users.** A cache in front of Traefik that honors Cache-Control should stop serving a stored captcha page or a stored solve redirect after the decision is cleared; ban HTML should not stay stored either.
 
 ## Merge readiness
 In progress. 0 items remain.
 
 Priority: P2 — real end-user pain, with a workaround or limited blast radius
-Reviewed head: 6a1715b6
+Reviewed head: 651cd097
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -29,14 +29,14 @@ Owner decision: Required. See Explore Decisions.
 | Overall readiness | 1/6 | Not ready |
 | CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
-| Review resolution | 6/6 | no open PR comments |
+| Review resolution | N/A | no OPEN PR |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-25-remediation-cache-control pushed | `git` |
 | OpenSpec | remediation-cache-control | `openspec/` |
-| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/164 | pr-host |
+| Pull request | none | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
@@ -58,7 +58,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-09-25-remediation-cache-control on branch 2026-09-25-remediation-cache-control targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/164; CI not seen.
+Ticket 2026-09-25-remediation-cache-control on branch 2026-09-25-remediation-cache-control targeting master; PR no PR yet; CI not seen.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -87,7 +87,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 6a1715b6a454999527702a0d9e54e53108f627f8 | Card must match the branch you measured |
+| Reviewed head | 651cd097268a10563c7d36265ca021645e3fb229 | Card must match the branch you measured |
 
 ### Stored data model
 None.

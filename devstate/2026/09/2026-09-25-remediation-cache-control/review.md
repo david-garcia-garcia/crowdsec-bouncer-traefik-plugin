@@ -44,3 +44,13 @@ head: c4b3a4bf17b743760005b56056178b6aeb8e46a9
 phase: archive
 verdict: in progress
 head: 6a1715b6a454999527702a0d9e54e53108f627f8
+
+## pullrequest (2026-09-25)
+phase: pullrequest
+verdict: in progress
+head: 5648b0ed6a5aa9b73c8a07cc90ed766bb1c00571
+
+## pullrequest (2026-09-25)
+phase: pullrequest
+verdict: in progress
+head: 651cd097268a10563c7d36265ca021645e3fb229
