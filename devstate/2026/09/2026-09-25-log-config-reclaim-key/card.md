@@ -17,17 +17,17 @@ The captcha ownership payload now hashes `LogLevel`, `LogFilePath`, and `LogForm
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: f1758455
+Reviewed head: 81a98ed1
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36137395007 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,7 +37,7 @@ Owner decision: None.
 | Branch | 2026-09-25-log-config-reclaim-key pushed | `git` |
 | OpenSpec | include-log-config-in-captcha-reclaim-key | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/162 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 36137395007 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36137395007 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36137395007 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -56,7 +56,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-09-25-log-config-reclaim-key on branch 2026-09-25-log-config-reclaim-key targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/162; CI not seen.
+Ticket 2026-09-25-log-config-reclaim-key on branch 2026-09-25-log-config-reclaim-key targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/162; CI build 36137395007 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36137395007.
 
 ## Explore Decisions
 None.
@@ -82,7 +82,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | f1758455968a6cbccef5dc1b3eb8e31fab12dff3 | Card must match the branch you measured |
+| Reviewed head | 81a98ed1037348b022fc0470f1edb4c68bf972fe | Card must match the branch you measured |
 
 ### Stored data model
 None.
