@@ -102,7 +102,7 @@ Describe "Basic CrowdSec Bouncer Integration Test" {
         # Find log entry for remediation-headers endpoint with ban remediation header
         $result = Find-TraefikLogEntry -LogEntries $logResult.LogEntries -Description "remediation-headers log entry with ban header" -Condition {
             param($logEntry)
-            return ($logEntry.RequestPath -eq "/remediation-headers" -and $logEntry.'downstream_X-Crowdsec-Remediation' -eq "ban")
+            return ($logEntry.RequestPath -eq "/remediation-headers" -and $logEntry.'downstream_X-Crowdsec-Remediation' -eq "ban:lapi:cscli")
         }
         
         $result.Found | Should -Be $true -Because "Custom remediation header should appear in Traefik access logs when blocking requests"

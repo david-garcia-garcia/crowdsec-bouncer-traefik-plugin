@@ -321,8 +321,8 @@ func TestServeHTTP_LiveCaptchaFailureAction(t *testing.T) {
 	if called {
 		t.Fatal("captcha on live LAPI 500 must not call next")
 	}
-	if got := rw.Header().Get("X-Remediation"); got != "captcha" {
-		t.Fatalf("remediation %q want captcha, body: %s", got, rw.Body.String())
+	if got := rw.Header().Get("X-Remediation"); got != "captcha:lapi-failure" {
+		t.Fatalf("remediation %q want captcha:lapi-failure, body: %s", got, rw.Body.String())
 	}
 	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
 		t.Fatalf("captcha challenge not served, body: %s", rw.Body.String())

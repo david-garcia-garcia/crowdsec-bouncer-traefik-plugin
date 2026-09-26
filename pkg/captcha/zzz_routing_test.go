@@ -298,7 +298,7 @@ func Test_ServeHTTP_rendersChallengeURL(t *testing.T) {
 	}
 
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "http://app.example/protected", nil), "192.0.2.10", "")
+	client.ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "http://app.example/protected", nil), "192.0.2.10", "", "")
 	if !strings.Contains(rw.Body.String(), `data-challenge-url="http://captcha.localhost:8000/v0/challenge"`) {
 		t.Fatalf("captcha page must render the configured challenge URL, got %q", rw.Body.String())
 	}
@@ -328,7 +328,7 @@ func Test_ServeHTTP_challengeURLEmptyForBuiltinProvider(t *testing.T) {
 	}
 
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "http://app.example/protected", nil), "192.0.2.10", "")
+	client.ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "http://app.example/protected", nil), "192.0.2.10", "", "")
 	if !strings.Contains(rw.Body.String(), `data-challenge-url=""`) {
 		t.Fatalf("built-in provider must render an empty challenge URL, got %q", rw.Body.String())
 	}
@@ -345,8 +345,8 @@ func Test_WriteSolvedRedirect_noCookieRemint(t *testing.T) {
 	if got := rw.Header().Get("Location"); got != "http://example.com/protected?x=1" {
 		t.Fatalf("want same URL, got %q", got)
 	}
-	if got := rw.Header().Get("X-Remediation"); got != "solved-captcha" {
-		t.Fatalf("want solved-captcha header, got %q", got)
+	if got := rw.Header().Get("X-Remediation"); got != "captcha:solved" {
+		t.Fatalf("want captcha:solved header, got %q", got)
 	}
 	if got := rw.Header().Get("Set-Cookie"); got != "" {
 		t.Fatalf("must not remint gate cookie, got %q", got)

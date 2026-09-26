@@ -79,7 +79,7 @@ func solveTestGateCookie(t *testing.T, client *captcha.Client) string {
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/protected", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, req, testCaptchaRemoteIP, "")
+	client.ServeHTTP(rw, req, testCaptchaRemoteIP, "", "")
 	if rw.Code != http.StatusFound {
 		body, _ := io.ReadAll(rw.Result().Body)
 		t.Fatalf("solve want 302, got %d %s", rw.Code, body)
@@ -279,8 +279,8 @@ func TestHandleRemediationServeHTTP_captchaHEADServesChallengePage(t *testing.T)
 	if rw.Code != http.StatusOK {
 		t.Fatalf("captcha HEAD want challenge 200, got %d", rw.Code)
 	}
-	if got := rw.Header().Get("X-Remediation"); got != "captcha" {
-		t.Fatalf("captcha HEAD want captcha header, got %q", got)
+	if got := rw.Header().Get("X-Remediation"); got != "captcha:lapi:cscli" {
+		t.Fatalf("captcha HEAD want captcha:lapi:cscli header, got %q", got)
 	}
 	if got := rw.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
 		t.Fatalf("captcha HEAD want the captcha template content type, got %q", got)
@@ -294,8 +294,8 @@ func TestHandleRemediationServeHTTP_captchaHEADServesChallengePage(t *testing.T)
 	if banRW.Code != http.StatusForbidden {
 		t.Fatalf("ban HEAD want 403, got %d", banRW.Code)
 	}
-	if got := banRW.Header().Get("X-Remediation"); got != "ban" {
-		t.Fatalf("ban HEAD want ban header, got %q", got)
+	if got := banRW.Header().Get("X-Remediation"); got != "ban:lapi:cscli" {
+		t.Fatalf("ban HEAD want ban:lapi:cscli header, got %q", got)
 	}
 }
 

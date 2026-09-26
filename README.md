@@ -366,21 +366,39 @@ Do not leave a client-writable header on a public route. Anyone who can set it c
 
 ### See the verdict in access logs
 
-`bouncerRemediationHeadersCustomName` is a response header the plugin sets when it handles the request. Empty disables it.
+`bouncerRemediationHeadersCustomName` is a response header the plugin sets when it handles the request. Empty disables it. Colon is the field separator (`kind:reason` or `kind:reason:origin`). Split at most three fields. There is no space after `:`.
 
 ```yaml
 bouncerRemediationHeadersCustomName: cs-remediation
 ```
 
-Include that name in Traefik `accessLog.fields.headers`. The value is:
+Include that name in Traefik `accessLog.fields.headers`. **BREAKING:** values that used to be a single token (`ban`, `captcha`, `solved-captcha`, or a raw AppSec `action`) are now structured. Operators who panel on those strings must update queries. `error:client-disconnected` is unchanged.
 
 | Value | Meaning |
 | ----- | ------- |
-| `ban` | Ban page (or empty ban body). |
-| `captcha` | Challenge page. |
-| `solved-captcha` | Challenge just passed (the 302). |
+| `ban:decision-header` | Incoming `bouncerDecisionHeader` is `b`. |
+| `ban:lapi` | CrowdSec ban, empty metrics origin. |
+| `ban:lapi:<origin>` | CrowdSec ban. Third field is header-safe `MetricsOrigin` (prefix `lists:` becomes `lists_` only; CR/LF/TAB stripped). |
+| `ban:lapi-failure` | LAPI down / unpublished, fail-closed ban. |
+| `ban:stream-unhealthy` | Stream miss + unhealthy, fail-closed ban. |
+| `ban:cache-fail` | Redis/cache fail-closed. |
+| `ban:unparseable-request` | `GetRemoteIP` failed or the client IP would not parse. |
+| `ban:appsec` | AppSec JSON `action: ban`. |
+| `ban:appsec-challenge-empty` | AppSec `action: challenge` with empty body (fail-closed to the ban page). |
+| `ban:appsec-failure` | AppSec down / unusable verdict, fail-closed ban. |
+| `ban:captcha-downgrade` | Kind was captcha; this router served a ban page (unsubscribed / unpublished / invalid captcha client). |
+| `captcha:decision-header` | Incoming `bouncerDecisionHeader` is `c`. |
+| `captcha:lapi` / `captcha:lapi:<origin>` | CrowdSec captcha (same origin encoding). |
+| `captcha:lapi-failure` | LAPI fail-closed captcha. |
+| `captcha:stream-unhealthy` | Stream fail-closed captcha. |
+| `captcha:appsec-failure` | AppSec fail-closed captcha. |
+| `captcha:appsec` | AppSec JSON `action: captcha` (envelope relay, not this plugin's captcha). |
+| `captcha:challenge` | AppSec bot-detection `action: challenge` with a non-empty body. |
+| `captcha:solved` | 302 after a successful solve (token pass or second-tab captcha-form POST). |
 | `error:client-disconnected` | The client dropped the body while AppSec was reading it. This is not a ban. |
-| an AppSec `action` | Whatever AppSec returned (`ban`, `captcha`, `challenge`, …). |
+| `{action}:appsec` | Any other AppSec JSON action (trimmed; CR/LF/TAB stripped; `:` in the action becomes `_`). |
+
+Pass, bypass, trusted IP, failure-action passthrough, remap-to-pass, widget-asset passthrough, valid gate-cookie origin GET, disabled bouncer, and startup 503 do not set this header. The plugin does not emit `allow: pass`.
 
 ### Put a request id on the ban page
 
@@ -718,7 +736,7 @@ When true, a Redis lookup that cannot reach Redis is a ban. When false, that loo
 Process-wide wait after the last holder of a LAPI or AppSec client, so a Traefik reload can reuse the same incarnation. First `New` in the process sets it; later middlewares are ignored. Zero disposes as soon as the last holder ends. Not captcha cookie grace.
 
 **BouncerRemediationHeadersCustomName** (string, default `""`)
-Response header name when the plugin handles the request. Header value is `ban`, `captcha`, `solved-captcha`, or `error:client-disconnected` (client dropped the body while AppSec was buffering; not a ban). Include this header in Traefik `accessLog.fields.headers` if you want disconnects in access logs. Empty disables the header.
+Response header name when the plugin handles the request. Header value is structured `kind:reason` or `kind:reason:origin` (see [See the verdict in access logs](#see-the-verdict-in-access-logs)). Empty disables the header. Include this header in Traefik `accessLog.fields.headers` if you want disconnects (`error:client-disconnected`) and other remediations in access logs. Operators who matched single-token `ban` / `captcha` / `solved-captcha` / raw AppSec action must update those queries.
 
 **BouncerRemediationStatusCode** (int, default `403`)
 HTTP status for a banned user (not captcha).
