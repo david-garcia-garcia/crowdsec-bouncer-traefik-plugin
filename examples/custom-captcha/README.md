@@ -31,7 +31,7 @@ clients never get that passthrough.
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaEnabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaProvider=custom"
       # Define captcha grace period seconds
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=1800"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=86400"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomJsUrl=http://captcha.localhost:8000/fast.js"
       # The widget fetches this from the browser, so it is rendered in captcha.html and passed through to the origin
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomChallengeUrl=http://captcha.localhost:8000/v0/challenge"

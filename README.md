@@ -555,7 +555,7 @@ HMAC secret for the stateless captcha grace cookie (`crowdsec_captcha_gate`). Re
 **captchaGateSecretFile** (string, no default)
 File path for `captchaGateSecret` (preferred over an inline secret when both are set).
 
-**CaptchaGracePeriodSeconds** (int64, default `1800` / 30 minutes)
+**CaptchaGracePeriodSeconds** (int64, default `86400` / 24 hours)
 How long after a passed captcha before a new challenge, if the CrowdSec decision is still valid.
 
 **CaptchaProvider** (string, no default)
@@ -836,7 +836,7 @@ http:
           bouncerBanFilePath: /ban.html
           captchaFilePath: /captcha.html
           captchaGateSecret: FIXME
-          captchaGracePeriodSeconds: 1800
+          captchaGracePeriodSeconds: 86400
           captchaProvider: hcaptcha
           captchaSecretKey: FIXME
           captchaSiteKey: FIXME
