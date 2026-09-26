@@ -57,19 +57,19 @@ Usage packets `core_plugin_lapi_stream-single-flight` and `core_plugin_lapi_usag
 - Q: What loop shape is yaegi-safe and still stops when Sleep/Close call stopTicker?
   Rank: bounded asked — 8 existing startTicker/stopTicker call sites in pkg/lapi, all migratable here; Desired names a yaegi-safe ticker loop that still stops on Sleep/Close
   Decision: resolved — two distinct function bodies, each `select` on that loop’s `ticker.C` and buffered stop; `stopTicker` unchanged; `work()` stays inline on the ticker goroutine. Do not range-without-stop.
-  By: explore
+  By: propose
 
 - Q: Where does the isolation test live, and how does it fail under yaegi with the shared select and pass with the fix?
   Rank: additive asked — new test this change creates; Desired names coverage that each loop receives only its own ticks
-  Decision: assumed — `pkg/lapi/zzz_ticker_own_channel_test.go` calling production helpers; yaegi must see the shared-select failure and the two-function pass (upstream name is a reference only).
-  By: explore
+  Decision: resolved — `pkg/lapi/zzz_ticker_own_channel_test.go` calling production helpers; yaegi must see the shared-select failure and the two-function pass (upstream name is a reference only).
+  By: propose
 
 - Q: Is native go test in addition to the yaegi isolation test?
   Rank: additive asked — Desired names test coverage; Unknowns ask whether native go test can show the race
   Decision: resolved — yes, native tests for Sleep/Close stop. Native isolation is not proof of the yaegi bug (20_000-send harness was isolated under `go run`).
-  By: explore
+  By: propose
 
 - Q: Live contract or no live contract for each loop staying on its own channel and Sleep/Close still stopping them?
   Rank: additive asked — Desired names an OpenSpec change for that runtime promise
   Decision: resolved — fold into `core_plugin_lapi_stream-single-flight` and `core_plugin_lapi_usage-metrics`. Not `none — no live contract`. Not a new ticker leaf.
-  By: explore
+  By: propose
