@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 6d379cfc
+Reviewed head: 4aab4ed8
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -34,8 +34,8 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-26-remediation-header-reasons pushed | `git` |
 | OpenSpec | remediation-header-reasons | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/166 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
-| Local tests | none | handoff.yaml localTests |
+| CI | not seen | ci-host |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
@@ -75,7 +75,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 6d379cfc70a910bb1b532616b9d4f09ba2af96ff | Card must match the branch you measured |
+| Reviewed head | 4aab4ed8c5aeccfe7b9ec5e5694f958561662a0e | Card must match the branch you measured |
 
 ### Stored data model
 None.
