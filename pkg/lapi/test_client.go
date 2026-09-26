@@ -93,6 +93,16 @@ func (c *Client) SleepingForTest() bool {
 	return c.sleeping && !c.closed
 }
 
+// RunStreamTickerForTest runs the production stream ticker loop so a Yaegi program can drive it.
+func RunStreamTickerForTest(ticks <-chan time.Time, stop <-chan bool, work func()) {
+	runStreamTicker(ticks, stop, work)
+}
+
+// RunMetricsTickerForTest runs the production metrics ticker loop so a Yaegi program can drive it.
+func RunMetricsTickerForTest(ticks <-chan time.Time, stop <-chan bool, work func()) {
+	runMetricsTicker(ticks, stop, work)
+}
+
 // TestDroppedCount is the current window dropped count for origin+ipType+remediation.
 func (c *Client) TestDroppedCount(origin, ipType, remediation string) int64 {
 	if c == nil || c.metricsReporter == nil {
