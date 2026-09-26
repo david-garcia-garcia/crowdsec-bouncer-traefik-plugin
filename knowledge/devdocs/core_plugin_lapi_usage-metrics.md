@@ -31,7 +31,7 @@ Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. S
 - Construct one `MetricsReporter` in `New` (`newMetricsReporter`). Bind `query` to `crowdsecQuery`. Do not store `*http.Client` on the reporter. The reporter logger is the LAPI constructor `log.With` child (`std_go_logger_nested`); do not pass `sessionKey` on `reportMetrics`.
 - Stamp `utc_startup_timestamp` once on the reporter at construct. Do not use `time.Now()` at each push. `feature_flags` must marshal as `[]`, not `{}`.
 - Keep `IncProcessed` / `IncDropped` as `Client` methods (thin forwards). A Client literal without a reporter no-ops those methods.
-- Keep `metricsInterval` on Client. Start and stop the existing metrics ticker with `startTicker` in `New` / `Sleep` / `Wake` / `Close`. Do not open a second reclaim entry or a second metrics ticker.
+- Keep `metricsInterval` on Client. Start the existing metrics ticker with `startMetricsTicker` in `New` / `Wake`. Stop it with `stopTicker` in `Sleep` / `Close`. Do not share one `select` statement with the stream ticker. Do not open a second reclaim entry or a second metrics ticker.
 - In `zzz_metrics_test.go`, call `attachTestMetricsReporter` after `attachTestTransport`. Stamp `startedAt` on the reporter, not on Client.
 
 ## Pattern snippet
@@ -59,5 +59,6 @@ lapiClient.IncDropped(origin, req.ipType, "ban")
 - `processed` is `ip_type` only and is incremented with `atomic.AddInt64` (no `metricsMu`). `dropped` may add `origin` and `remediation` and uses `metricsMu`. `active_decisions` is stream/alone only and counts records, not hosts in a CIDR. Range CIDRs stay out of the gauge. Memory recounts after PublishTick (expired slots drop). Redis posts an empty gauge.
 - HTTP success from LAPI is 201.
 - Sleep and Close POST the remaining window (`drainMetrics`) so a Traefik reload does not drop counters. Sleep drains in a goroutine (reclaim holds the table lock). Close drains synchronously before idle HTTP is closed. A failed POST restores the window for the next drain or ticker. `metricsInterval == 0` skips drain.
+- Yaegi v0.16.1 `_select` shares one case slice per statement across goroutines. Keep the metrics `select` a distinct statement from the stream `select` (`runMetricsTicker` vs `runStreamTicker`). Do not extract a helper that contains the `select`. Do not `for range ticker.C`. Sleep and Close still `stopTicker`.
 - The reporter POSTs through the injected query (`crowdsecQuery` loads `currentTransport()`). Window counters survive `AdoptTransport`. Do not put `*http.Client` on the reporter.
 - `New` always sets the reporter. Client literals in other packages may have a nil reporter; forwards return without counting.
