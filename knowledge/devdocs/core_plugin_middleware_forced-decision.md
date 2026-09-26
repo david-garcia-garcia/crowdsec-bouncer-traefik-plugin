@@ -19,6 +19,7 @@ An earlier Traefik middleware can force this bouncer to ban or captcha. ServeHTT
 - Header `c`: still look up so a ban wins, unless a LAPI bypass rule already matched this request. On that skip, `passOrForcedCaptcha` applies captcha without store or live lookup. If lookup (or fail-closed ban) is ban, WARN `ServeHTTP:forcedCaptchaSuperseded` and apply that ban. Otherwise captcha with origin `plugin:forced_decision`.
 - Do not strip the header.
 - Do not put the letter on `clientRequest`. Client address stays `GetRemoteIP`.
+- When `bouncerRemediationHeadersCustomName` is set, forced `b` emits `ban:decision-header` and applied forced `c` emits `captcha:decision-header`. `OriginPluginForcedDecision` stays the metrics origin, not a third field.
 
 ## Pattern snippet
 
