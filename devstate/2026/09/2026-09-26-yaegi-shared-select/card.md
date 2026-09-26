@@ -29,7 +29,7 @@ Keep `stopTicker` and the buffered stop. Split the loop into two source function
 In progress. 0 items remain.
 
 Priority: P2 — real operator and end-user pain when stream poll stalls, with a disable-metrics workaround and a rare race
-Reviewed head: 4f677c86
+Reviewed head: 57a24a6c
 Owner decision: None.
 
 ## Review scores
@@ -52,8 +52,12 @@ Owner decision: None.
 
 ## Specs
 Worktree:
-- [core_plugin_lapi_stream-single-flight](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-yaegi-shared-select/openspec/changes/yaegi-safe-ticker-loop/proposal.md) — modified
-- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-yaegi-shared-select/openspec/changes/yaegi-safe-ticker-loop/proposal.md) — modified
+- [core_plugin_lapi_stream-single-flight](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-yaegi-shared-select/openspec/changes/archive/2026-09-26-yaegi-safe-ticker-loop/proposal.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-yaegi-shared-select/openspec/changes/archive/2026-09-26-yaegi-safe-ticker-loop/proposal.md) — modified
+
+Completed:
+- [core_plugin_lapi_stream-single-flight](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-yaegi-shared-select/openspec/specs/core_plugin_lapi_stream-single-flight/spec.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-yaegi-shared-select/openspec/specs/core_plugin_lapi_usage-metrics/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -87,9 +91,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 4f677c86cd7c221024077edb10b7984bbd48771b | Card must match the branch you measured |
+| Reviewed head | 57a24a6caa7622cec4583bf31b2c12481ec7ecf6 | Card must match the branch you measured |
 
 ### Stored data model
 None.
