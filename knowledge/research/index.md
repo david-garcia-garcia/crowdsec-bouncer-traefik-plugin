@@ -69,3 +69,8 @@ description: Official Cap Standalone (trycap.dev / CapJS) siteverify behavior th
 priority: normal
 local: index_ext_eucaptcha.md
 description: Official Myra EU CAPTCHA verify API and browser widget this product relies on.
+
+## yaegi
+priority: normal
+local: index_ext_yaegi.md
+description: Official yaegi interpreter behavior this product relies on.
