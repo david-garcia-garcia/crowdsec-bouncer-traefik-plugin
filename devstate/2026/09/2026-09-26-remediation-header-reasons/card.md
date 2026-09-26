@@ -1,23 +1,26 @@
 ## Motivation
-Not yet.
+`bouncerRemediationHeadersCustomName` is an optional response header so Traefik JSON access logs (`downstream_<Name>`) can tell a plugin bounce from an origin 403. Drop origin is already known internally for usage-metrics (`MetricsOrigin`, `OriginPlugin*`). The header stays off when the name is empty.
+
+When the name is set, the value is only a kind token: `ban`, `captcha`, `solved-captcha`, `error:client-disconnected`, or a raw AppSec `action`. Every ban page writes `ban` whether the cause was a CrowdSec decision, fail-closed LAPI or cache, AppSec `action: ban`, an empty-body AppSec challenge that fell through to the ban page, an unparseable client IP, or a captcha kind on a router that cannot serve a challenge. Challenge pages write `captcha`; a successful solve writes `solved-captcha`; AppSec envelope relay copies the action as-is. LAPI origin (`crowdsec`, `lists:firehol_level1`, empty intern overflow) never appears on the header.
+
+Operators who panel on those Traefik fields cannot tell a CrowdSec decision from fail-closed or AppSec, and cannot split list vs crowdsec origin without leaving the access log. The only access-log signal stays “plugin handled it,” not why.
+
+Priority: P2 — real operator pain, with a workaround or limited blast radius
 
 ## Implementation
-Not yet.
+An unexported formatter in `pkg/bouncer` joins `kind:reason`, or `kind:reason:origin` when reason is `lapi` and origin is non-empty. Ban, AppSec, disconnect, and captcha-downgrade writers pass an explicit closed reason token; plugin origins stay a reason, never a third field. LAPI third field is header-safe `MetricsOrigin` (strip CR/LF/TAB; prefix `lists:` becomes `lists_` only). Captcha stays a setter: `ServeHTTP` takes the already-formatted challenge value plus the header name; Pass 302 and `WriteSolvedRedirect` write `captcha:solved`. Unknown AppSec actions become `{sanitized-action}:appsec`. Same config key; empty still disables.
 
 ## What this changes
-**Operators.** None.
-
+**Operators.** When `bouncerRemediationHeadersCustomName` is set, Traefik `downstream_<Name>` values become `kind:reason` or `kind:reason:origin`, so queries matching `ban`, `captcha`, `solved-captcha`, or a raw AppSec action must change (`error:client-disconnected` unchanged; no new key; empty still disables).
 **Admin users.** None.
-
-**Developers.** None.
-
+**Developers.** `captcha.Client.ServeHTTP` takes a fifth argument (already-formatted challenge-page header value); header consumers split at most three `:` fields on the closed vocabulary.
 **End users.** None.
 
 ## Merge readiness
 In progress. 0 items remain.
 
-Priority: unknown — motivation not written
-Reviewed head: 4aab4ed8
+Priority: P2 — real operator pain, with a workaround or limited blast radius
+Reviewed head: 10429b4a
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -34,7 +37,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-26-remediation-header-reasons pushed | `git` |
 | OpenSpec | remediation-header-reasons | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/166 | pr-host |
-| CI | not seen | ci-host |
+| CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -66,7 +69,15 @@ Ticket 2026-09-26-remediation-header-reasons on branch 2026-09-26-remediation-he
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/devstate/2026/09/2026-09-26-remediation-header-reasons/codereview_standards.md) — 0 total, 0 pending, 0 completed
+[Nitpicks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/devstate/2026/09/2026-09-26-remediation-header-reasons/codereview_nitpicks.md) — 0 total, 0 pending, 0 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/devstate/2026/09/2026-09-26-remediation-header-reasons/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Scope](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/devstate/2026/09/2026-09-26-remediation-header-reasons/codereview_scope.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/devstate/2026/09/2026-09-26-remediation-header-reasons/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/devstate/2026/09/2026-09-26-remediation-header-reasons/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/devstate/2026/09/2026-09-26-remediation-header-reasons/codereview_dead.md) — 1 total, 0 pending, 1 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/devstate/2026/09/2026-09-26-remediation-header-reasons/codereview_coverage.md) — 5 total, 0 pending, 5 completed
+
 
 ## Agent review details
 
@@ -75,7 +86,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 4aab4ed8c5aeccfe7b9ec5e5694f958561662a0e | Card must match the branch you measured |
+| Reviewed head | 10429b4aef8703a64b16ead6f4f6822542db6e4e | Card must match the branch you measured |
 
 ### Stored data model
 None.
