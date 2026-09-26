@@ -20,7 +20,7 @@ An unexported formatter in `pkg/bouncer` joins `kind:reason`, or `kind:reason:or
 In progress. 0 items remain.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: 10429b4a
+Reviewed head: 07f61e4e
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -86,7 +86,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 10429b4aef8703a64b16ead6f4f6822542db6e4e | Card must match the branch you measured |
+| Reviewed head | 07f61e4e7c00c3c2d66ecaf1434b7189c0c58437 | Card must match the branch you measured |
 
 ### Stored data model
 None.
