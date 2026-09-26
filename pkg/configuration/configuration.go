@@ -243,7 +243,7 @@ func New() *Config {
 		CaptchaEnterpriseProjectID:          "",
 		CaptchaFilePath:                     "/captcha.html",
 		CaptchaGateBindIP:                   true,
-		CaptchaGracePeriodSeconds:           1800,
+		CaptchaGracePeriodSeconds:           86400,
 		CaptchaInstanceName:                 "",
 		CaptchaProvider:                     "",
 		CaptchaSecretKey:                    "",
