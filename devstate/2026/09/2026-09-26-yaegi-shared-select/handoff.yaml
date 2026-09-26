@@ -1,0 +1,16 @@
+issueKey: 2026-09-26-yaegi-shared-select
+jobName: 2026-09-26-yaegi-shared-select
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: pending
+src: ""
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
