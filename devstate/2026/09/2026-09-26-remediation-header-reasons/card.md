@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: cae7824e
-Owner decision: None.
+Reviewed head: e97ba0d7
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -52,7 +52,10 @@ None.
 Ticket 2026-09-26-remediation-header-reasons on branch 2026-09-26-remediation-header-reasons targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/166; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Where should the emit helper live? | additive asked — Unknowns names helper location; Desired requires structured values at the existing writers | assumed — unexported formatRemediationHeader in pkg/bouncer/remediation_header.go; ban, AppSec, and disconnect call it; captcha does not import the table | explore |
+
 
 ## Findings
 None.
@@ -67,7 +70,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | cae7824e56386cd654544762b93f474afe89f365 | Card must match the branch you measured |
+| Reviewed head | e97ba0d73e906250bab475ff534b067b610534df | Card must match the branch you measured |
 
 ### Stored data model
 None.
