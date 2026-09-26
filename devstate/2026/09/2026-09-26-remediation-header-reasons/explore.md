@@ -143,20 +143,8 @@ Outside facts used: `knowledge/research/ext_crowdsec_appsec_protocol/` (403 JSON
   By: explore
 
 - Q: Which tests, README, live specs, and e2e assertions pin the old strings, and what do they become?
-  Rank: bounded asked — Desired Breaking plus Ground names the files; call sites enumerated here
-  Decision: assumed — update in place (no new e2e suite). Files and target values:
-  - `pkg/bouncer/zzz_bouncer_test.go` — direct ban `"ban"` → `ban:lapi` (empty origin in those fixtures); AppSec challenge → `captcha:challenge`; AppSec captcha → `captcha:appsec`; AppSec ban / empty-challenge → `ban:appsec` / `ban:appsec-challenge-empty`; disconnect stays `error:client-disconnected`
-  - `pkg/bouncer/zzz_captcha_routing_test.go` — HEAD captcha origin `cscli` → `captcha:lapi:cscli`; HEAD ban → `ban:lapi:cscli`
-  - `pkg/captcha/zzz_routing_test.go` — `solved-captcha` → `captcha:solved`
-  - `zzz_constructor_test.go` — `captchaForceReq` (`X-Crowdsec-Decision: c`) → `captcha:decision-header`; AppSec failure-action captcha → `captcha:appsec-failure`
-  - `zzz_plugin_test.go` — empty captcha template + forced `c` → `ban:captcha-downgrade`
-  - `zzz_servehttp_request_path_test.go` — live LAPI failure captcha → `captcha:lapi-failure`
-  - `tests/e2e/real/simple-bouncer.Tests.ps1` — `downstream_X-Crowdsec-Remediation` `"ban"` → `"ban:lapi:cscli"`
-  - `tests/e2e/real/captcha.Tests.ps1` — captcha hit `"captcha"` → `"captcha:lapi:cscli"`; whoami captcha fallback `"ban"` → `"ban:captcha-downgrade"`; captcha endpoint with ban decision `"ban"` → `"ban:lapi:cscli"`
-  - `tests/e2e/mock/scenarios/custom-ban-page/run.sh` — `X-E2E-Remediation` `"ban"` → `"ban:lapi:crowdsec"`
-  - `README.md` (access-log table + `BouncerRemediationHeadersCustomName`) — replace the old token table with the closed vocabulary + origin encoding
-  - `docs/recaptcha-enterprise.md` — `solved-captcha` → `captcha:solved`
-  - live specs listed under Decisions
+  Rank: bounded asked — Desired Breaking plus Ground names the files; call sites enumerated under Concepts
+  Decision: assumed — update those files in place (no new e2e suite). Real Pester `cscli` origin becomes `ban:lapi:cscli` / `captcha:lapi:cscli`; captcha fallback without a client is `ban:captcha-downgrade`; mock custom-ban-page default origin becomes `ban:lapi:crowdsec`; AppSec relay becomes `captcha:challenge` / `captcha:appsec`; disconnect stays `error:client-disconnected`; `solved-captcha` becomes `captcha:solved`. File list is under Decisions.
   By: explore
 
 - Q: New spec family for the vocabulary, or fold into the four live contracts?

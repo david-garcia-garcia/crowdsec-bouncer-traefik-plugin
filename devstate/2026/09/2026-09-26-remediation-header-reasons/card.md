@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 8d0816ab
+Reviewed head: da82f02c
 Owner decision: None.
 
 ## Review scores
@@ -42,7 +42,8 @@ Owner decision: None.
 None.
 
 ## Deviations from the ask
-None.
+- taken: Ground names `pkg/captcha/captcha.go` `writeRemediationHeader(..., "captcha")` on the challenge page, so captcha would have to know `captcha:lapi[:origin]` / `captcha:decision-header` / failure reasons. → `ServeHTTP` takes the already-formatted challenge-page value from the Bouncer; captcha only writes `captcha:solved` on Pass 302 and `WriteSolvedRedirect`. — `pkg/captcha/captcha.go writeRemediationHeader` — honouring captcha-owned origin mapping would add `MetricsOrigin` / `OriginPlugin*` to a Client whose job is widget and verify; the header name was already lifted off Client for that reason (`core_plugin_middleware_bouncer`).. Requester: not asked.
+
 
 ## Follow-up issues
 None.
@@ -66,7 +67,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 8d0816ab9aeded463a241cb9a536116bd2f173bf | Card must match the branch you measured |
+| Reviewed head | da82f02cd1e5dfce4b5b783ebc001a0cc13f470b | Card must match the branch you measured |
 
 ### Stored data model
 None.
