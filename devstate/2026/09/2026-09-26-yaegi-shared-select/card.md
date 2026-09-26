@@ -17,14 +17,14 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 4f0fe2c1
+Reviewed head: 032b9243
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36244681387 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | N/A | no OPEN PR |
 
@@ -34,8 +34,8 @@ Owner decision: None.
 | Branch | 2026-09-26-yaegi-shared-select pushed | `git` |
 | OpenSpec | yaegi-safe-ticker-loop | `openspec/` |
 | Pull request | none | pr-host |
-| CI | not seen | caller omitted CI snapshot |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 36244681387 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36244681387 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36244681387 |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
@@ -51,7 +51,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-09-26-yaegi-shared-select on branch 2026-09-26-yaegi-shared-select targeting master; PR no PR yet; CI not seen.
+Ticket 2026-09-26-yaegi-shared-select on branch 2026-09-26-yaegi-shared-select targeting master; PR no PR yet; CI build 36244681387 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36244681387.
 
 ## Explore Decisions
 None.
@@ -69,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 4f0fe2c1cac8d4e7bfaa2ae976125e481a00ca42 | Card must match the branch you measured |
+| Reviewed head | 032b924326aa92882d3d3445870b2b222b712b09 | Card must match the branch you measured |
 
 ### Stored data model
 None.
