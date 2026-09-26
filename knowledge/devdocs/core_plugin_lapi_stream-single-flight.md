@@ -13,11 +13,11 @@ _Avoid_: Client IO cancel context, queueing mutex, `atomic.Pointer[T]`, `atomic.
 ## How to use
 
 - Put the in-flight CAS at the top of `handleStreamTicker`. Release on every path, including panic.
-- Do not add a second `go` around the ticker `work()`. `startTicker` runs `work()` on the ticker goroutine. `stop` stays buffered.
+- Do not add a second `go` around the ticker `work()`. `startStreamTicker` runs `work()` on the ticker goroutine. `stop` stays buffered.
 - Publish `isCrowdsecStreamStartup`, `isCrowdsecStreamHealthy`, and `updateFailure` with `atomic.LoadInt64` / `StoreInt64` (and `AddInt64` for the failure count). Mirror `streamFetches`.
 - Do not hold `Client.mu` across `crowdsecQuery`. That mutex is lifecycle plus the live header-scope registry.
 - Do not use `atomic.Pointer[T]`, `atomic.Bool`, or `atomic.Int64` as a struct field (Yaegi v0.16.1).
-- Do not add a new `select` on a timer. Yaegi `interp._select` can lose a timer wake (`std_go_reclaim.md`).
+- Do not add a new `select` on a timer. Two copies of this ticker helper (`runStreamTicker` / `runMetricsTicker`) are not a third poll loop. Yaegi `interp._select` can lose a timer wake (`std_go_reclaim.md`).
 
 ## Pattern snippet
 
@@ -38,4 +38,5 @@ defer c.decisionStore.EndStreamPoll()
 
 - Single-flight is the only skip. A dropped tick does not GET stream and does not apply. It logs `handleStreamTicker:skip` at WARN. Identity (`traefikName`, `instanceName`, `leg`, `sessionKey`) lives on the LAPI constructor `log.With` child (`std_go_logger_nested`).
 - `Sleep` and `Close` only signal the ticker. They do not wait for an in-flight GET and MUST NOT cancel it. `Wake` must hit the same store CAS.
+- Yaegi v0.16.1 `_select` shares one case slice per statement across goroutines. Keep the stream `select` a distinct statement from the metrics `select` (`runStreamTicker` vs `runMetricsTicker`). Do not extract a helper that contains the `select`. Do not `for range ticker.C` (`Ticker.Stop` does not close `C`). Sleep and Close still `stopTicker`.
 - Cancelling a stream GET after LAPI wrote the body loses those deltas (`ext_crowdsec_lapi_stream-cursor`).

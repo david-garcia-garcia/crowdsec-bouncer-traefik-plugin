@@ -177,7 +177,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 	if config.LapiMetricsUpdateIntervalSeconds > 0 {
 		client.metricsReporter.lastMetricsPush = time.Now()
 		go client.handleMetricsTicker()
-		client.metricsStop = startTicker("metrics", client.metricsInterval, log, func() {
+		client.metricsStop = startMetricsTicker(client.metricsInterval, log, func() {
 			client.handleMetricsTicker()
 		})
 	}
@@ -246,12 +246,12 @@ func (c *Client) Wake() {
 	c.sleeping = false
 	resumeStream := c.crowdsecMode == configuration.StreamMode || c.crowdsecMode == configuration.AloneMode
 	if resumeStream && c.streamStop == nil {
-		c.streamStop = startTicker("stream", c.updateInterval, c.log, func() {
+		c.streamStop = startStreamTicker(c.updateInterval, c.log, func() {
 			c.handleStreamTicker()
 		})
 	}
 	if c.metricsInterval > 0 && c.metricsStop == nil {
-		c.metricsStop = startTicker("metrics", c.metricsInterval, c.log, func() {
+		c.metricsStop = startMetricsTicker(c.metricsInterval, c.log, func() {
 			c.handleMetricsTicker()
 		})
 	}
@@ -311,23 +311,60 @@ func stopTicker(stop chan bool) {
 	}
 }
 
-func startTicker(name string, updateInterval int64, log *slog.Logger, work func()) chan bool {
+// startStreamTicker starts the stream poll loop and returns its stop channel.
+func startStreamTicker(updateInterval int64, log *slog.Logger, work func()) chan bool {
 	ticker := time.NewTicker(time.Duration(updateInterval) * time.Second)
 	stop := make(chan bool, 1)
 	go func() {
-		log.Debug("ticker:started", "name", name, "interval", updateInterval)
-		defer log.Debug("ticker:stopped", "name", name)
-		for {
-			select {
-			case <-ticker.C:
-				work()
-			case <-stop:
-				ticker.Stop()
-				return
-			}
-		}
+		log.Debug("ticker:started", "name", "stream", "interval", updateInterval)
+		defer log.Debug("ticker:stopped", "name", "stream")
+		// Stop the ticker when the loop returns on the stop channel.
+		defer ticker.Stop()
+		runStreamTicker(ticker.C, stop, work)
 	}()
 	return stop
+}
+
+// startMetricsTicker starts the usage-metrics loop and returns its stop channel.
+func startMetricsTicker(updateInterval int64, log *slog.Logger, work func()) chan bool {
+	ticker := time.NewTicker(time.Duration(updateInterval) * time.Second)
+	stop := make(chan bool, 1)
+	go func() {
+		log.Debug("ticker:started", "name", "metrics", "interval", updateInterval)
+		defer log.Debug("ticker:stopped", "name", "metrics")
+		// Stop the ticker when the loop returns on the stop channel.
+		defer ticker.Stop()
+		runMetricsTicker(ticker.C, stop, work)
+	}()
+	return stop
+}
+
+// runStreamTicker waits on this stream loop's tick channel and buffered stop.
+// The select must stay a distinct statement from runMetricsTicker: yaegi v0.16.1
+// shares one _select case slice per statement across goroutines.
+func runStreamTicker(ticks <-chan time.Time, stop <-chan bool, work func()) {
+	for {
+		select {
+		case <-ticks:
+			work()
+		case <-stop:
+			return
+		}
+	}
+}
+
+// runMetricsTicker waits on this metrics loop's tick channel and buffered stop.
+// The select must stay a distinct statement from runStreamTicker: yaegi v0.16.1
+// shares one _select case slice per statement across goroutines.
+func runMetricsTicker(ticks <-chan time.Time, stop <-chan bool, work func()) {
+	for {
+		select {
+		case <-ticks:
+			work()
+		case <-stop:
+			return
+		}
+	}
 }
 
 // StreamHealthy is true while stream polling is succeeding.

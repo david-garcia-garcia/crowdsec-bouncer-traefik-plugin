@@ -14,6 +14,7 @@
 - cloudflare
 - capjs
 - eucaptcha
+- yaegi
 
 ## std
 - go
