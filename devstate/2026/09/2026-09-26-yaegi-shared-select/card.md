@@ -29,7 +29,7 @@ Keep `stopTicker` and the buffered stop. Split the loop into two source function
 In progress. 0 items remain.
 
 Priority: P2 — real operator and end-user pain when stream poll stalls, with a disable-metrics workaround and a rare race
-Reviewed head: 222a6667
+Reviewed head: 6a23709f
 Owner decision: None.
 
 ## Review scores
@@ -46,7 +46,7 @@ Owner decision: None.
 | Branch | 2026-09-26-yaegi-shared-select pushed | `git` |
 | OpenSpec | yaegi-safe-ticker-loop | `openspec/` |
 | Pull request | none | pr-host |
-| CI | build 36246331510 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/171/checks | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/171/checks |
+| CI | build 36246681997 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/171/checks | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/171/checks |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -67,7 +67,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-09-26-yaegi-shared-select on branch 2026-09-26-yaegi-shared-select targeting master; PR no PR yet; CI build 36246331510 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/171/checks.
+Ticket 2026-09-26-yaegi-shared-select on branch 2026-09-26-yaegi-shared-select targeting master; PR no PR yet; CI build 36246681997 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/171/checks.
 
 ## Explore Decisions
 None.
@@ -93,7 +93,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 222a6667fc9957e160a421abd6ed37c9c67e7c2d | Card must match the branch you measured |
+| Reviewed head | 6a23709f52c2d446f8e38fb8b4b614dd0f7bbae3 | Card must match the branch you measured |
 
 ### Stored data model
 None.
