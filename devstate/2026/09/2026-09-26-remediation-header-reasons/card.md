@@ -20,7 +20,7 @@ An unexported formatter in `pkg/bouncer` joins `kind:reason`, or `kind:reason:or
 In progress. 0 items remain.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: 07f61e4e
+Reviewed head: 7429b33b
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -43,10 +43,16 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/openspec/changes/remediation-header-reasons/proposal.md) — modified
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/openspec/changes/remediation-header-reasons/proposal.md) — modified
-- [core_plugin_middleware_captcha-routing](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/openspec/changes/remediation-header-reasons/proposal.md) — modified
-- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/openspec/changes/remediation-header-reasons/proposal.md) — modified
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/openspec/changes/archive/2026-09-26-remediation-header-reasons/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/openspec/changes/archive/2026-09-26-remediation-header-reasons/proposal.md) — modified
+- [core_plugin_middleware_captcha-routing](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/openspec/changes/archive/2026-09-26-remediation-header-reasons/proposal.md) — modified
+- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/openspec/changes/archive/2026-09-26-remediation-header-reasons/proposal.md) — modified
+
+Completed:
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/openspec/specs/core_plugin_appsec_bot-detection/spec.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
+- [core_plugin_middleware_captcha-routing](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/openspec/specs/core_plugin_middleware_captcha-routing/spec.md) — modified
+- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-26-remediation-header-reasons/openspec/specs/core_plugin_middleware_captcha-widget/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -84,9 +90,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 8 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 07f61e4e7c00c3c2d66ecaf1434b7189c0c58437 | Card must match the branch you measured |
+| Reviewed head | 7429b33b2c75a25da6497de49d223191c24c7b87 | Card must match the branch you measured |
 
 ### Stored data model
 None.
