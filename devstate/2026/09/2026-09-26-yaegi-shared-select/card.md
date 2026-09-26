@@ -29,7 +29,7 @@ Keep `stopTicker` and the buffered stop. Split the loop into two source function
 In progress. 0 items remain.
 
 Priority: P2 — real operator and end-user pain when stream poll stalls, with a disable-metrics workaround and a rare race
-Reviewed head: d3529c73
+Reviewed head: 4f677c86
 Owner decision: None.
 
 ## Review scores
@@ -89,7 +89,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | d3529c734b7be0a9806acb121e98dd948a9aae6b | Card must match the branch you measured |
+| Reviewed head | 4f677c86cd7c221024077edb10b7984bbd48771b | Card must match the branch you measured |
 
 ### Stored data model
 None.
