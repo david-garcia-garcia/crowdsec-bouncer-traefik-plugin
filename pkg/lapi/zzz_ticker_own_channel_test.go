@@ -91,7 +91,7 @@ func Test_startTicker_stopEndsBothLoops(t *testing.T) {
 
 // sendTickerOwnChannelTicks pushes count values so each loop can receive its own channel.
 func sendTickerOwnChannelTicks(ticks chan time.Time, count int) {
-	for i := 0; i < count; i++ {
+	for range count {
 		ticks <- time.Time{}
 	}
 }
