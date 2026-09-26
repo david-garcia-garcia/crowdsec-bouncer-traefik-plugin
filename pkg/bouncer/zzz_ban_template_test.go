@@ -29,7 +29,7 @@ func TestNew_banTemplateUnavailableWarnsAndServesEmptyBody(t *testing.T) {
 			t.Fatalf("want reason empty, got %s", logged)
 		}
 		rw := httptest.NewRecorder()
-		b.handleBanServeHTTP(rw, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.1"), "TEST", "")
+		b.handleBanServeHTTP(rw, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.1"), "TEST", headerReasonLAPI, "")
 		if rw.Code != http.StatusForbidden {
 			t.Fatalf("status = %d", rw.Code)
 		}
@@ -53,7 +53,7 @@ func TestNew_banTemplateUnavailableWarnsAndServesEmptyBody(t *testing.T) {
 			t.Fatalf("want reason unloadable, got %s", logged)
 		}
 		rw := httptest.NewRecorder()
-		b.handleBanServeHTTP(rw, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.1"), "TEST", "")
+		b.handleBanServeHTTP(rw, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.1"), "TEST", headerReasonLAPI, "")
 		if rw.Code != http.StatusForbidden {
 			t.Fatalf("status = %d", rw.Code)
 		}

@@ -162,8 +162,8 @@ func TestNew_AppsecCaptchaFailureActionServesChallenge(t *testing.T) {
 	rw := httptest.NewRecorder()
 	h.ServeHTTP(rw, reqForIP("203.0.113.7"))
 
-	if got := rw.Header().Get("X-Remediation"); got != "captcha" {
-		t.Fatalf("remediation %q want captcha, body: %s", got, rw.Body.String())
+	if got := rw.Header().Get("X-Remediation"); got != "captcha:appsec-failure" {
+		t.Fatalf("remediation %q want captcha:appsec-failure, body: %s", got, rw.Body.String())
 	}
 	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
 		t.Fatalf("captcha challenge not served, body: %s", rw.Body.String())
@@ -239,8 +239,8 @@ func TestNew_CaptchaOwnerServesChallenge(t *testing.T) {
 	}
 	rw := httptest.NewRecorder()
 	h.ServeHTTP(rw, captchaForceReq())
-	if got := rw.Header().Get("X-Remediation"); got != "captcha" {
-		t.Fatalf("remediation %q want captcha, body: %s", got, rw.Body.String())
+	if got := rw.Header().Get("X-Remediation"); got != "captcha:decision-header" {
+		t.Fatalf("remediation %q want captcha:decision-header, body: %s", got, rw.Body.String())
 	}
 	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
 		t.Fatalf("owner must serve captcha, body: %s", rw.Body.String())
@@ -325,8 +325,8 @@ func TestNew_CaptchaSubscriberUsesRouterHeader(t *testing.T) {
 	}
 	rw := httptest.NewRecorder()
 	h.ServeHTTP(rw, captchaForceReq())
-	if got := rw.Header().Get("X-Route"); got != "captcha" {
-		t.Fatalf("subscriber remediation %q want captcha on X-Route, body: %s", got, rw.Body.String())
+	if got := rw.Header().Get("X-Route"); got != "captcha:decision-header" {
+		t.Fatalf("subscriber remediation %q want captcha:decision-header on X-Route, body: %s", got, rw.Body.String())
 	}
 	if got := rw.Header().Get("X-Owner"); got != "" {
 		t.Fatalf("subscriber must not write owner's X-Owner, got %q", got)

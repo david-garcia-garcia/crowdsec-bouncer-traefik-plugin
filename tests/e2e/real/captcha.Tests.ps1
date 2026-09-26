@@ -57,7 +57,7 @@ Describe "CrowdSec Bouncer Captcha Remediation Tests" {
             # Find log entry for captcha endpoint with remediation header
             $result = Find-TraefikLogEntry -LogEntries $logResult.LogEntries -Description "captcha log entry with remediation header" -Condition {
                 param($logEntry)
-                return ($logEntry.RequestPath -eq "/captcha" -and $logEntry.'downstream_X-Crowdsec-Remediation' -eq "captcha")
+                return ($logEntry.RequestPath -eq "/captcha" -and $logEntry.'downstream_X-Crowdsec-Remediation' -eq "captcha:lapi:cscli")
             }
             
             $result.Found | Should -Be $true -Because "Custom remediation header should appear in Traefik access logs for captcha decisions"
@@ -84,7 +84,7 @@ Describe "CrowdSec Bouncer Captcha Remediation Tests" {
             # Find log entry for whoami endpoint with ban remediation header (fallback)
             $result = Find-TraefikLogEntry -LogEntries $logResult.LogEntries -Description "whoami log entry with ban fallback header" -Condition {
                 param($logEntry)
-                return ($logEntry.RequestPath -eq "/whoami" -and $logEntry.'downstream_X-Crowdsec-Remediation' -eq "ban")
+                return ($logEntry.RequestPath -eq "/whoami" -and $logEntry.'downstream_X-Crowdsec-Remediation' -eq "ban:captcha-downgrade")
             }
             
             $result.Found | Should -Be $true -Because "Should fallback to ban remediation when captcha is not configured"
@@ -111,7 +111,7 @@ Describe "CrowdSec Bouncer Captcha Remediation Tests" {
             # Find log entry for captcha endpoint with ban remediation header
             $result = Find-TraefikLogEntry -LogEntries $logResult.LogEntries -Description "captcha endpoint log entry with ban header" -Condition {
                 param($logEntry)
-                return ($logEntry.RequestPath -eq "/captcha" -and $logEntry.'downstream_X-Crowdsec-Remediation' -eq "ban")
+                return ($logEntry.RequestPath -eq "/captcha" -and $logEntry.'downstream_X-Crowdsec-Remediation' -eq "ban:lapi:cscli")
             }
             
             $result.Found | Should -Be $true -Because "Ban decision should result in ban remediation even on captcha-configured endpoint"

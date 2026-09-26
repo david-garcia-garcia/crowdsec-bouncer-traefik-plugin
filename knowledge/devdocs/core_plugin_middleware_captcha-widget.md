@@ -21,13 +21,14 @@ _Avoid_: `(bool, error)` as the `Validate` result, `(None, err)`
 ## How to use
 
 - Pair widget and verifier in `New`. Do not mention a provider name or key type in `ServeHTTP` or `Validate`.
+- `ServeHTTP` takes this router's header name plus the caller-formatted challenge-page value. Do not hard-code `captcha` or `solved-captcha`. Do not import plugin origins or the closed reason table.
 - `Validate` returns `(Outcome, error)`. Non-POST or empty token is `None` (no `Pass` call). Verifier true is `Pass`. Verifier false with no error is `Reject`. Transport or undecodable provider body is the error return.
 - `Validate` calls `Pass(token, remoteIP, r.UserAgent())`. Siteverify and assessments ignore `userAgent`. Do not put User-Agent on `clientRequest`.
 - `Verifier.Pass` stays `(bool, error)` as the return.
 - Eucaptcha: script `https://cdn.eu-captcha.eu/verify.js`, class `eu-captcha`, field `eu-captcha-response`, retry true. Pair the eucaptcha verifier. Do not put `eucaptcha` in `infoProviders`. Verify HTTP stays on `core_plugin_middleware_captcha-eucaptcha-verify`.
-- On `Pass`: mint `crowdsec_captcha_gate`, set `solved-captcha` when configured, set `Cache-Control: no-cache, no-store`, 302 to the request URL.
-- On `None` or error: set `Cache-Control: no-cache, no-store` next to `Content-Type` before `WriteHeader(200)`, then render the challenge with the stored boot script.
-- On `Reject` with `RetryAfterReject`: same 200 headers and render with boot. On `Reject` without retry: same 200 headers, render, omit boot.
+- On `Pass`: mint `crowdsec_captcha_gate`, set `captcha:solved` when configured (no third field), set `Cache-Control: no-cache, no-store`, 302 to the request URL.
+- On `None` or error: set `Cache-Control: no-cache, no-store` next to `Content-Type` before `WriteHeader(200)`, write the caller-supplied challenge-page header value when configured, then render the challenge with the stored boot script.
+- On `Reject` with `RetryAfterReject`: same 200 headers (including the caller-supplied challenge-page value) and render with boot. On `Reject` without retry: same 200 headers, render, omit boot.
 - Enterprise checkbox: `enterprise.js` with no `render=`, class `g-recaptcha`, field `g-recaptcha-response`, retry true.
 - Enterprise score: `enterprise.js?render={siteKey}`, no checkbox class, same token field, retry false. Boot is fixed Go text (`grecaptcha.enterprise.ready` then `execute`, write the token, submit). Do not take boot from config.
 - Stock `captcha.html` stays one file. Template map keeps `SiteKey`, `FrontendJS`, `FrontendKey`, `ChallengeURL` and adds `BootScript`, `Action`, `DrawCheckbox` (non-empty when the checkbox div should render).

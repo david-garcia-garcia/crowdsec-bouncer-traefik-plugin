@@ -27,7 +27,8 @@ _Avoid_: GetBody ban, unreadable body, FailureAction passthrough
 - Enable with existing `appsecEnabled`. Do not add a bot-detection plugin key.
 - Open with `appsec.Open` (reclaim by middleware name plus AppSec URL+key+body limit+TLS+`appsecHttpTimeoutSeconds`). A knob change is a new Client. Do not construct the AppSec client inside `lapi.New`. Do not use `atomic.Pointer[T]`.
 - `newTransport` sets `http.Client.Timeout` and stored `httpTimeoutSeconds` from `cfg.AppsecHTTPTimeoutSeconds`. Do not inherit from a shared default. Store the knob so `fieldsDiffer` sees a timeout change. Query uses that stored client.
-- `action` allow or empty 200 → `next`. `ban` → `handleBanServeHTTP`. Any other non-allow action (challenge, AppSec captcha HTML) → relay. Missing or empty-string `challenge` `user_body_content` → `handleBanServeHTTP` (operator ban page) before `WriteHeader`. Empty `captcha` body still relays `http_status` (not the operator ban page). AppSec `captcha` is not `pkg/captcha`.
+- `action` allow or empty 200 → `next`. `ban` → `handleBanServeHTTP` with `headerReason` `appsec` (`ban:appsec` when the remediation header is set). Any other non-allow action (challenge, AppSec captcha HTML) → relay. Missing or empty-string `challenge` `user_body_content` → `handleBanServeHTTP` with `headerReason` `appsec-challenge-empty` (`ban:appsec-challenge-empty`) before `WriteHeader`. Empty `captcha` body still relays `http_status` (not the operator ban page). AppSec `captcha` is not `pkg/captcha`.
+- On relay, when `bouncerRemediationHeadersCustomName` is set, write `formatAppsecRelayHeader(decision.Action)`: `captcha` → `captcha:appsec`, `challenge` → `captcha:challenge`, any other action → `{sanitized-action}:appsec` (trim; strip CR/LF/TAB; `:` → `_`). Do not copy raw `decision.Action`. AppSec unpublished / Query error / unusable verdict fail-closed through `headerReason` `appsec-failure` (`ban:appsec-failure` or `captcha:appsec-failure`).
 - On relay, assign `user_headers` onto the writer (`rw.Header()[canonical] = values`): same name replaces, including CSP. Skip hop-by-hop names and `Set-Cookie` in that map. `Header().Add("Set-Cookie")` once per `user_cookies` entry. Do not append a second same-name header and do not join cookies with commas.
 - AppSec HTTP 500, unreachable (transport failure or listener HTTP 502/503/504), AppSec response-body io errors, and an unreadable HTTP/2 or HTTP/3 body on POST, PUT, or PATCH use per-router `bouncerAppsecFailureAction` (`passthrough` | `ban` | `captcha`), not the three removed block bools. `captcha` here is `pkg/captcha`, not AppSec JSON `action: captcha`. A response-body io error keeps `appsecQuery:readBody`. Oversized AppSec bodies do not use this action. A **client disconnect** while buffering a readable forwardable body is not FailureAction: `Query` returns `ErrClientDisconnected`, AppSec is not called, origin is not called, TRACE only, optional `error:client-disconnected` header. Unclassified client-body read faults keep `appsecQuery:GetBody` and today's ban wiring.
 - `appsecBodyLimit` `0` is unlimited: skip `io.LimitReader` and `io.ReadAll` the readable client body. A positive limit still caps the copy. Omitted default stays 10485760.
@@ -50,6 +51,7 @@ decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
 - `pkg/appsec/client_http.go`
 - `pkg/appsec/session.go`
 - `pkg/bouncer/bouncer.go`
+- `pkg/bouncer/remediation_header.go`
 - `pkg/bouncer/clientrequest.go`
 
 ## Gotchas

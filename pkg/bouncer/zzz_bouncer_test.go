@@ -147,12 +147,12 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 			}
 			rw := httptest.NewRecorder()
 			req := &http.Request{Method: tt.method}
-			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
+			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", headerReasonLAPI, "")
 			if rw.Code != http.StatusForbidden {
 				t.Errorf("Expected status code 403, got %d", rw.Code)
 			}
-			if headerValue := rw.Header().Get("X-Test-Remediation"); headerValue != "ban" {
-				t.Errorf("Expected header X-Test-Remediation to be 'ban', got %s", headerValue)
+			if headerValue := rw.Header().Get("X-Test-Remediation"); headerValue != "ban:lapi" {
+				t.Errorf("Expected header X-Test-Remediation to be 'ban:lapi', got %s", headerValue)
 			}
 			if got := rw.Header().Get("Cache-Control"); got != "no-cache, no-store" {
 				t.Errorf("Expected Cache-Control no-cache, no-store, got %q", got)
@@ -200,7 +200,7 @@ func TestHandleBanServeHTTPTrustedTraceID(t *testing.T) {
 			if tt.headerValue != "" {
 				req.Header.Set("X-Request-Id", tt.headerValue)
 			}
-			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
+			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", headerReasonLAPI, "")
 			body := rw.Body.String()
 			if body != tt.wantBody {
 				t.Errorf("body=%q want %q", body, tt.wantBody)
@@ -230,7 +230,7 @@ func TestHandleBanServeHTTPContentType(t *testing.T) {
 			}
 			rw := httptest.NewRecorder()
 			req := &http.Request{Method: http.MethodGet}
-			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", "")
+			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", headerReasonLAPI, "")
 			if got := rw.Header().Get("Content-Type"); got != tt.banTemplateContentType {
 				t.Errorf("Expected Content-Type %q, got %q", tt.banTemplateContentType, got)
 			}
@@ -293,8 +293,8 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 	if got := recorder.Header().Get("Set-Cookie"); got != "__crowdsec_challenge=value; Path=/; HttpOnly" {
 		t.Fatalf("expected Set-Cookie relayed, got %q", got)
 	}
-	if got := recorder.Header().Get("X-Remediation"); got != appsec.ActionChallenge {
-		t.Fatalf("expected custom remediation header challenge, got %q", got)
+	if got := recorder.Header().Get("X-Remediation"); got != "captcha:challenge" {
+		t.Fatalf("expected custom remediation header captcha:challenge, got %q", got)
 	}
 }
 
@@ -365,8 +365,8 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecCaptcha(t *testing.T) {
 	if got := recorder.Header().Get("Set-Cookie"); got != "captcha=pending; Path=/; HttpOnly" {
 		t.Fatalf("expected Set-Cookie relayed, got %q", got)
 	}
-	if got := recorder.Header().Get("X-Remediation"); got != appsec.ActionCaptcha {
-		t.Fatalf("expected custom remediation header captcha, got %q", got)
+	if got := recorder.Header().Get("X-Remediation"); got != "captcha:appsec" {
+		t.Fatalf("expected custom remediation header captcha:appsec, got %q", got)
 	}
 }
 
@@ -390,8 +390,8 @@ func TestHandleNextServeHTTPEmptyCaptchaBodyRelaysStatus(t *testing.T) {
 	if got := recorder.Body.String(); got != "" {
 		t.Fatalf("expected empty captcha body, got %q", got)
 	}
-	if got := recorder.Header().Get("X-Remediation"); got != appsec.ActionCaptcha {
-		t.Fatalf("expected custom remediation header captcha, got %q", got)
+	if got := recorder.Header().Get("X-Remediation"); got != "captcha:appsec" {
+		t.Fatalf("expected custom remediation header captcha:appsec, got %q", got)
 	}
 }
 
@@ -407,8 +407,8 @@ func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("expected fallback ban status 403, got %d", recorder.Code)
 	}
-	if got := recorder.Header().Get("X-Remediation"); got != "ban" {
-		t.Fatalf("expected fallback remediation header ban, got %q", got)
+	if got := recorder.Header().Get("X-Remediation"); got != "ban:appsec-failure" {
+		t.Fatalf("expected fallback remediation header ban:appsec-failure, got %q", got)
 	}
 }
 
@@ -433,8 +433,8 @@ func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
 	if got := recorder.Body.String(); got != want {
 		t.Fatalf("appsec ban must keep the configured ban template, got %q want %q", got, want)
 	}
-	if got := recorder.Header().Get("X-Remediation"); got != "ban" {
-		t.Fatalf("expected remediation header ban, got %q", got)
+	if got := recorder.Header().Get("X-Remediation"); got != "ban:appsec" {
+		t.Fatalf("expected remediation header ban:appsec, got %q", got)
 	}
 }
 
@@ -484,8 +484,8 @@ func TestHandleNextServeHTTPEmptyChallengeBodyBans(t *testing.T) {
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("expected ban for empty challenge body, got %d", recorder.Code)
 	}
-	if got := recorder.Header().Get("X-Remediation"); got != "ban" {
-		t.Fatalf("expected ban header, got %q", got)
+	if got := recorder.Header().Get("X-Remediation"); got != "ban:appsec-challenge-empty" {
+		t.Fatalf("expected ban:appsec-challenge-empty header, got %q", got)
 	}
 }
 
@@ -518,8 +518,8 @@ func TestHandleNextServeHTTPEmptyChallengeBodyBansWithBanPage(t *testing.T) {
 			if recorder.Code != http.StatusForbidden {
 				t.Fatalf("expected ban status 403, got %d", recorder.Code)
 			}
-			if got := recorder.Header().Get("X-Remediation"); got != "ban" {
-				t.Fatalf("expected ban header, got %q", got)
+			if got := recorder.Header().Get("X-Remediation"); got != "ban:appsec-challenge-empty" {
+				t.Fatalf("expected ban:appsec-challenge-empty header, got %q", got)
 			}
 			want := "<html>operator ban for 192.0.2.10</html>"
 			if got := recorder.Body.String(); got != want {
@@ -631,8 +631,8 @@ func TestHandleNextServeHTTP_clientDisconnected(t *testing.T) {
 	if rw.wroteStatus {
 		t.Fatalf("must not WriteHeader; got status %d", rw.Code)
 	}
-	if got := rw.Header().Get("X-Remediation"); got != remediationHeaderClientDisconnected {
-		t.Fatalf("header=%q want %q", got, remediationHeaderClientDisconnected)
+	if got := rw.Header().Get("X-Remediation"); got != "error:client-disconnected" {
+		t.Fatalf("header=%q want %q", got, "error:client-disconnected")
 	}
 	if got := lapiClient.TestDroppedCount(lapi.OriginPluginAppsecFailure, "ipv4", "ban"); got != 0 {
 		t.Fatalf("dropped ban count=%d want 0", got)

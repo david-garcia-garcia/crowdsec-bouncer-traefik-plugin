@@ -62,10 +62,14 @@ func TestServeHTTP_UnboundLAPIUsesFailureAction(t *testing.T) {
 		bindTestLAPI(b, nil)
 		b.subscribeLAPI = true
 		b.lapiFailureAction = configuration.FailureActionBan
+		b.remediationCustomHeader = "X-Remediation"
 		rw := httptest.NewRecorder()
 		b.ServeHTTP(rw, testForcedDecisionRequest(""))
 		if *passed || rw.Code != http.StatusForbidden {
 			t.Fatalf("unbound LAPI ban passed=%v status=%d", *passed, rw.Code)
+		}
+		if got := rw.Header().Get("X-Remediation"); got != "ban:lapi-failure" {
+			t.Fatalf("remediation %q want ban:lapi-failure", got)
 		}
 	})
 	t.Run("passthrough", func(t *testing.T) {
@@ -86,10 +90,14 @@ func TestServeHTTP_StreamUnhealthyUsesFailureAction(t *testing.T) {
 		b, client, passed := testForcedDecisionBouncer(t, nil, nil, nil, false)
 		client.SetStreamHealthyForTest(false)
 		b.lapiFailureAction = configuration.FailureActionBan
+		b.remediationCustomHeader = "X-Remediation"
 		rw := httptest.NewRecorder()
 		b.ServeHTTP(rw, testForcedDecisionRequest(""))
 		if *passed || rw.Code != http.StatusForbidden {
 			t.Fatalf("unhealthy stream ban passed=%v status=%d", *passed, rw.Code)
+		}
+		if got := rw.Header().Get("X-Remediation"); got != "ban:stream-unhealthy" {
+			t.Fatalf("remediation %q want ban:stream-unhealthy", got)
 		}
 	})
 	t.Run("passthrough", func(t *testing.T) {
@@ -106,6 +114,7 @@ func TestServeHTTP_StreamUnhealthyUsesFailureAction(t *testing.T) {
 
 func TestServeHTTP_BadRemoteAddrBans(t *testing.T) {
 	b, _, passed := testForcedDecisionBouncer(t, nil, nil, nil, false)
+	b.remediationCustomHeader = "X-Remediation"
 	req := testForcedDecisionRequest("")
 	req.RemoteAddr = "not-a-socket"
 	rw := httptest.NewRecorder()
@@ -116,16 +125,23 @@ func TestServeHTTP_BadRemoteAddrBans(t *testing.T) {
 	if !strings.Contains(rw.Body.String(), "banned") {
 		t.Fatalf("body = %q, want ban template", rw.Body.String())
 	}
+	if got := rw.Header().Get("X-Remediation"); got != "ban:unparseable-request" {
+		t.Fatalf("remediation %q want ban:unparseable-request", got)
+	}
 }
 
 func TestServeHTTP_UnparseableClientIPBans(t *testing.T) {
 	b, _, passed := testForcedDecisionBouncer(t, nil, nil, nil, false)
+	b.remediationCustomHeader = "X-Remediation"
 	req := testForcedDecisionRequest("")
 	req.Header.Set("X-Forwarded-For", "not-an-ip")
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, req)
 	if *passed || rw.Code != http.StatusForbidden {
 		t.Fatalf("unparseable client passed=%v status=%d", *passed, rw.Code)
+	}
+	if got := rw.Header().Get("X-Remediation"); got != "ban:unparseable-request" {
+		t.Fatalf("remediation %q want ban:unparseable-request", got)
 	}
 }
 

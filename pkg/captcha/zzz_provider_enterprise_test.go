@@ -295,7 +295,7 @@ func Test_ServeHTTP_enterprisePassMintsGateAnd302(t *testing.T) {
 	trip := &enterpriseTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":true}}`}
 	client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeCheckbox, Enterprise{}, &http.Client{Transport: trip})
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, enterpriseSolverPOST(), "192.0.2.10", "")
+	client.ServeHTTP(rw, enterpriseSolverPOST(), "192.0.2.10", "", "")
 	if rw.Code != http.StatusFound {
 		t.Fatalf("pass want 302, got %d", rw.Code)
 	}
@@ -309,7 +309,7 @@ func Test_ServeHTTP_scoreRejectOmitsBoot(t *testing.T) {
 	trip := &enterpriseTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":true,"action":"login"},"riskAnalysis":{"score":0.1}}`}
 	client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeScore, Enterprise{Action: "login", MinScore: "0.5"}, &http.Client{Transport: trip})
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, enterpriseSolverPOST(), "192.0.2.10", "")
+	client.ServeHTTP(rw, enterpriseSolverPOST(), "192.0.2.10", "", "")
 	if rw.Code != http.StatusOK {
 		t.Fatalf("score reject want 200, got %d", rw.Code)
 	}
@@ -326,7 +326,7 @@ func Test_ServeHTTP_checkboxRejectKeepsBoot(t *testing.T) {
 	trip := &enterpriseTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":false}}`}
 	client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeCheckbox, Enterprise{}, &http.Client{Transport: trip})
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, enterpriseSolverPOST(), "192.0.2.10", "")
+	client.ServeHTTP(rw, enterpriseSolverPOST(), "192.0.2.10", "", "")
 	if rw.Code != http.StatusOK {
 		t.Fatalf("checkbox reject want 200, got %d", rw.Code)
 	}
@@ -346,7 +346,7 @@ func Test_ServeHTTP_enterpriseErrorRendersWithBoot(t *testing.T) {
 	trip := &enterpriseTrip{status: http.StatusInternalServerError, body: `{"error":{"message":"denied"}}`}
 	client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeScore, Enterprise{Action: "login", MinScore: "0.5"}, &http.Client{Transport: trip})
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, enterpriseSolverPOST(), "192.0.2.10", "")
+	client.ServeHTTP(rw, enterpriseSolverPOST(), "192.0.2.10", "", "")
 	if rw.Code != http.StatusOK {
 		t.Fatalf("error want 200, got %d", rw.Code)
 	}
@@ -399,7 +399,7 @@ func newTestEnterpriseClientStock(t *testing.T, keyType string, enterprise Enter
 func Test_ServeHTTP_stockTemplateCheckboxAndScore(t *testing.T) {
 	checkbox := newTestEnterpriseClientStock(t, configuration.CaptchaEnterpriseKeyTypeCheckbox, Enterprise{})
 	checkboxRW := httptest.NewRecorder()
-	checkbox.ServeHTTP(checkboxRW, httptest.NewRequest(http.MethodGet, "/foo", nil), "192.0.2.10", "")
+	checkbox.ServeHTTP(checkboxRW, httptest.NewRequest(http.MethodGet, "/foo", nil), "192.0.2.10", "", "")
 	if checkboxRW.Code != http.StatusOK {
 		t.Fatalf("checkbox GET want 200, got %d", checkboxRW.Code)
 	}
@@ -416,7 +416,7 @@ func Test_ServeHTTP_stockTemplateCheckboxAndScore(t *testing.T) {
 
 	score := newTestEnterpriseClientStock(t, configuration.CaptchaEnterpriseKeyTypeScore, Enterprise{Action: "login", MinScore: "0.5"})
 	scoreRW := httptest.NewRecorder()
-	score.ServeHTTP(scoreRW, httptest.NewRequest(http.MethodGet, "/foo", nil), "192.0.2.10", "")
+	score.ServeHTTP(scoreRW, httptest.NewRequest(http.MethodGet, "/foo", nil), "192.0.2.10", "", "")
 	if scoreRW.Code != http.StatusOK {
 		t.Fatalf("score GET want 200, got %d", scoreRW.Code)
 	}

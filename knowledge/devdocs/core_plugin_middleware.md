@@ -22,6 +22,10 @@ _Avoid_: slot name, IdentityHex as the Open suffix, `bouncerDecisionScopeHeaders
 The per-router `http.Handler` Traefik gets back from `New`. Holds `next`, request policy, and three optional `atomic.Value` bindings (LAPI, AppSec, and captcha). `ServeHTTP` only Loads those fields. Mode comes from the loaded LAPI client.
 _Avoid_: ForRoute, Plugin core, the reclaim value, `atomic.Pointer[T]`
 
+**Remediation header**:
+The optional outgoing response header named by `bouncerRemediationHeadersCustomName`. When the name is non-empty, remediating writers set `kind:reason` or `kind:reason:origin`. Colon is the field separator; consumers split at most three fields. Empty name omits the header. Not the incoming forced-decision header.
+_Avoid_: solved-captcha, single-token `ban`/`captcha`, copying raw AppSec `action`, storing the name on captcha.Client
+
 **Failure action**:
 The operator enum (`passthrough` | `ban` | `captcha`) this plugin applies when LAPI or AppSec does not return a usable verdict. LAPI action is per-router on Bouncer; AppSec action is per-router on Bouncer. Default is `ban`.
 _Avoid_: fail mode, FailMode, the three removed AppSec block bools, AppSec JSON `action: captcha`, LAPI Client identity
@@ -57,6 +61,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - `ServeHTTP` Loads `atomic.Value` only. `startupBlock` (`bouncerStartupBlock`) on the request path is “every subscribed backend is published?” — 503 when not. Do not block `New`. Do not put the flag on the client.
 - When a captcha owner Opens the captcha `http.Client`, set `Timeout` from `cfg.CaptchaSiteverifyHTTPTimeoutSeconds`. Siteverify and assessments share that client. Publish it. Do not construct captcha on bounce-only.
 - Put stream tickers, replaceable LAPI HTTP (`transport` on `atomic.Value`), and Range membership on `lapi.Client`. Open the DecisionStore on the same `New` ctx (`core_plugin_decisionstore.md`). Put AppSec HTTP+auth on `appsec.Client`. Put captcha widget, verifier, template, and gate on `captcha.Client`. Put ban templates, LAPI failure action, Redis fail-closed, live-cache TTL, and this router’s remediation header on Bouncer. Timeout/TLS changes are a new ownership key, not Adopt-only.
+- Format the remediation header in `pkg/bouncer/remediation_header.go` (`formatRemediationHeader`). Join `kind:reason`; append encoded origin only when reason is `lapi` and origin is non-empty. Strip CR/LF/TAB from origin; rewrite only the prefix `lists:` → `lists_`. Map plugin `OriginPlugin*` and AppSec specials to closed reason tokens, never a third field. Empty kind or reason MUST NOT invent `allow: pass`. Pass the already-formatted challenge-page value into `captcha.Client.ServeHTTP`; Pass 302 and `WriteSolvedRedirect` write `captcha:solved` inside captcha. Do not emit this header on pass, bypass, trusted, passthrough, remap-to-pass, widget-asset, valid gate-cookie origin GET, disabled, or startup 503.
 - Do not pass `config.LapiDefaultDecisionSeconds` from the bouncer into `LiveLookup`; the bound client already has it.
 - Resolve client IP with `pkg/ip.GetRemoteIP`. Fold `remoteIP`, parsed `net.IP`, and `ipType` into `clientRequest`. Keep the name `req`.
 - After the trusted-client skip, a non-empty `bouncerDecisionHeader` with exact `b` remediates without lookup; `c` still looks up so a ban wins unless a LAPI bypass rule already skipped lookup (`core_plugin_middleware_forced-decision.md`).
@@ -99,6 +104,7 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 - `pkg/captcha/captcha.go`
 - `pkg/captcha/session.go`
 - `pkg/bouncer/bouncer.go`
+- `pkg/bouncer/remediation_header.go`
 - `pkg/bouncer/clientrequest.go`
 - `pkg/httprule/`
 - `.traefik.yml`

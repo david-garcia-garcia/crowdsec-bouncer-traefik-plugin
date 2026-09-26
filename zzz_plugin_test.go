@@ -231,8 +231,8 @@ func TestNew_EmptyCaptchaFilePathWarnsAndBans(t *testing.T) {
 
 		rw := httptest.NewRecorder()
 		h.ServeHTTP(rw, captchaForceReq())
-		if got := rw.Header().Get("X-Remediation"); got != "ban" {
-			t.Fatalf("remediation %q want ban, body: %s", got, rw.Body.String())
+		if got := rw.Header().Get("X-Remediation"); got != "ban:captcha-downgrade" {
+			t.Fatalf("remediation %q want ban:captcha-downgrade, body: %s", got, rw.Body.String())
 		}
 		if rw.Body.Len() != 0 {
 			t.Fatalf("captcha remediation must use empty ban body, got %q", rw.Body.String())

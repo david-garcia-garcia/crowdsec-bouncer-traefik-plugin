@@ -15,6 +15,9 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
+// remediationHeaderCaptchaSolved is the Pass 302 and WriteSolvedRedirect header value. No third field.
+const remediationHeaderCaptchaSolved = "captcha:solved"
+
 // Client is one published captcha widget, verifier, template, and gate. Not a Bouncer field.
 type Client struct {
 	Valid               bool
@@ -95,8 +98,9 @@ func (c *Client) HTTPClientForTest() *http.Client {
 	return c.httpClient
 }
 
-// ServeHTTP handles captcha html page or validation. remediationHeader is this router's name.
-func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP, remediationHeader string) {
+// ServeHTTP handles captcha html page or validation.
+// remediationHeader is this router's name. challengeValue is the already-formatted challenge-page header.
+func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP, remediationHeader, challengeValue string) {
 	outcome, err := c.Validate(r, remoteIP)
 	// Transport and JSON decode stay classified; the solver retries the challenge.
 	if err != nil {
@@ -106,7 +110,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP, re
 		logger.Trace(c.log, "captcha:ServeHTTP captcha:valid")
 		value := mintGateValue(c.gateSecret, c.gateBindIP, remoteIP, time.Now())
 		setGateCookie(rw, r, value, c.gracePeriodSeconds)
-		writeRemediationHeader(rw, remediationHeader, "solved-captcha")
+		writeRemediationHeader(rw, remediationHeader, remediationHeaderCaptchaSolved)
 		rw.Header().Set("Cache-Control", "no-cache, no-store")
 		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 		return
@@ -117,7 +121,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP, re
 	}
 	rw.Header().Set("Content-Type", c.templateContentType)
 	rw.Header().Set("Cache-Control", "no-cache, no-store")
-	writeRemediationHeader(rw, remediationHeader, "captcha")
+	writeRemediationHeader(rw, remediationHeader, challengeValue)
 	rw.WriteHeader(http.StatusOK)
 	err = c.template.Execute(rw, map[string]string{
 		"SiteKey":      c.siteKey,
@@ -194,7 +198,7 @@ func (c *Client) IsCaptchaFormPost(r *http.Request) bool {
 
 // WriteSolvedRedirect issues 302 to the same URL without reminting the gate cookie.
 func (c *Client) WriteSolvedRedirect(rw http.ResponseWriter, r *http.Request, remediationHeader string) {
-	writeRemediationHeader(rw, remediationHeader, "solved-captcha")
+	writeRemediationHeader(rw, remediationHeader, remediationHeaderCaptchaSolved)
 	rw.Header().Set("Cache-Control", "no-cache, no-store")
 	http.Redirect(rw, r, r.URL.String(), http.StatusFound)
 }
