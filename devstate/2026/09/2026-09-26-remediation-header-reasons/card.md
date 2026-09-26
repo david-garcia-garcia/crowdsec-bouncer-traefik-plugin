@@ -17,17 +17,17 @@ An unexported formatter in `pkg/bouncer` joins `kind:reason`, or `kind:reason:or
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: 7429b33b
+Reviewed head: fc499b86
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36230530425 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,7 +37,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-26-remediation-header-reasons pushed | `git` |
 | OpenSpec | remediation-header-reasons | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/166 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 36230530425 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36230530425 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36230530425 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -63,7 +63,7 @@ Completed:
 None.
 
 ## How this fits together
-Ticket 2026-09-26-remediation-header-reasons on branch 2026-09-26-remediation-header-reasons targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/166; CI not seen.
+Ticket 2026-09-26-remediation-header-reasons on branch 2026-09-26-remediation-header-reasons targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/166; CI build 36230530425 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36230530425.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -92,7 +92,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 8 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 7429b33b2c75a25da6497de49d223191c24c7b87 | Card must match the branch you measured |
+| Reviewed head | fc499b864084bf98ced5cd2ca05f2886a2f53a28 | Card must match the branch you measured |
 
 ### Stored data model
 None.
