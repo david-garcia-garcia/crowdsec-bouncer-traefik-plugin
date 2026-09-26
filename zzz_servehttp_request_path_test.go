@@ -199,6 +199,7 @@ func TestServeHTTP_RedisUnreachableFailureAction(t *testing.T) {
 	blockCfg.LapiRedisEnabled = true
 	blockCfg.LapiRedisHost = redisAddr
 	blockCfg.BouncerRedisUnreachableBlock = true
+	blockCfg.BouncerRemediationHeadersCustomName = "X-Remediation"
 	blockHandler, err := New(context.Background(), testNextOK(), blockCfg, "redis-block")
 	if err != nil {
 		t.Fatal(err)
@@ -207,6 +208,9 @@ func TestServeHTTP_RedisUnreachableFailureAction(t *testing.T) {
 	blockHandler.ServeHTTP(blockRW, reqForIP("203.0.113.41"))
 	if blockRW.Code != http.StatusForbidden {
 		t.Fatalf("redis unreachable block status = %d", blockRW.Code)
+	}
+	if got := blockRW.Header().Get("X-Remediation"); got != "ban:cache-fail" {
+		t.Fatalf("remediation %q want ban:cache-fail", got)
 	}
 }
 

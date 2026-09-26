@@ -147,6 +147,7 @@ func TestServeHTTP_forcedDecisionTrimmedHeaderValues(t *testing.T) {
 
 func TestServeHTTP_forcedDecisionBanSkipsStream(t *testing.T) {
 	b, lapiClient, passed := testForcedDecisionBouncer(t, nil, nil, nil, false)
+	b.remediationCustomHeader = "X-Remediation"
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testForcedDecisionRequest("b"))
 	if *passed {
@@ -154,6 +155,9 @@ func TestServeHTTP_forcedDecisionBanSkipsStream(t *testing.T) {
 	}
 	if rw.Code != http.StatusForbidden || !strings.Contains(rw.Body.String(), "banned") {
 		t.Fatalf("status=%d body=%q", rw.Code, rw.Body.String())
+	}
+	if got := rw.Header().Get("X-Remediation"); got != "ban:decision-header" {
+		t.Fatalf("remediation %q want ban:decision-header", got)
 	}
 	if got := lapiClient.TestDroppedCount(lapi.OriginPluginForcedDecision, "ipv4", "ban"); got != 1 {
 		t.Fatalf("dropped origin=%d", got)

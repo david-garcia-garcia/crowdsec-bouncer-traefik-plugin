@@ -71,10 +71,13 @@ func Test_ServeHTTP_dummyProviderSolveIssuesGateCookie(t *testing.T) {
 	solveReq := httptest.NewRequest(http.MethodPost, "/foo", strings.NewReader(form.Encode()))
 	solveReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	solveRW := httptest.NewRecorder()
-	client.ServeHTTP(solveRW, solveReq, "1.2.3.4", "", "")
+	client.ServeHTTP(solveRW, solveReq, "1.2.3.4", "X-Remediation", "captcha:lapi")
 	if solveRW.Code != http.StatusFound {
 		body, _ := io.ReadAll(solveRW.Result().Body)
 		t.Fatalf("solve want 302, got %d %s", solveRW.Code, body)
+	}
+	if got := solveRW.Header().Get("X-Remediation"); got != "captcha:solved" {
+		t.Fatalf("solve remediation %q want captcha:solved", got)
 	}
 	if got := solveRW.Header().Get("Cache-Control"); got != "no-cache, no-store" {
 		t.Fatalf("solve Cache-Control=%q want no-cache, no-store", got)

@@ -61,10 +61,6 @@ func headerReasonFromOrigin(origin string) string {
 		return headerReasonLAPIFailure
 	case lapi.OriginPluginTechStreamFail:
 		return headerReasonStreamUnhealthy
-	case lapi.OriginPluginTechCacheFail:
-		return headerReasonCacheFail
-	case lapi.OriginPluginTechGetRemoteFail, lapi.OriginPluginTechTrustIPFail:
-		return headerReasonUnparseableRequest
 	case lapi.OriginPluginAppsecFailure:
 		return headerReasonAppsecFailure
 	default:
