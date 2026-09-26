@@ -65,13 +65,18 @@ Captcha-form detection runs on requests that may still be forwarded, so it SHALL
 - **THEN** detection answers from the parsed values without rereading the body
 
 ### Requirement: Solved-form redirect does not remint or re-verify
-The Check-true form-POST redirect SHALL set the configured remediation header to `solved-captcha` when that header name is configured. It MUST NOT remint the gate cookie. It MUST NOT call the captcha provider. First-solve cookie mint and 302 stay on the captcha challenge handler.
+The Check-true form-POST redirect SHALL set the configured remediation header to `captcha:solved` when that header name is configured. `captcha:solved` SHALL NOT take a third field. It MUST NOT remint the gate cookie. It MUST NOT call the captcha provider. First-solve cookie mint and 302 stay on the captcha challenge handler.
 
 #### Scenario: Check-true form POST keeps the existing cookie
 - **WHEN** a captcha-form POST is redirected because `Check` is true
 - **THEN** the response is `302 Found`
 - **AND** no new gate cookie is issued
 - **AND** the provider siteverify endpoint is not called
+
+#### Scenario: Check-true form POST header is captcha:solved
+- **WHEN** a captcha-form POST is redirected because `Check` is true
+- **AND** the remediation header name is configured
+- **THEN** that header value is `captcha:solved`
 
 ### Requirement: Custom challenge resources pass to origin under captcha only
 While the remediation kind is captcha, a request whose path is an exact match of a configured browser challenge-resource path SHALL pass to origin. Ban kind MUST NOT pass those paths. Passthrough SHALL use the same pass path as other allowed requests so AppSec still runs when enabled. Built-in provider CDN URLs are not a match set.
