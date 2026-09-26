@@ -87,92 +87,93 @@ Outside facts used: `knowledge/research/ext_crowdsec_appsec_protocol/` (403 JSON
 
 ## Open questions
 
-- Q: Structured grammar `kind:reason` / `kind:reason:origin`, no space after `:`?
-  Rank: additive asked — Desired Closed vocabulary and “No space after `:`”
-  Decision: resolved — yes; `:` is the field separator; split at most three fields
-  By: explore
-
-- Q: Closed vocabulary table (decision-header, lapi, lapi-failure, stream-unhealthy, cache-fail, unparseable-request, appsec, appsec-challenge-empty, appsec-failure, captcha-downgrade, captcha:*, error:client-disconnected)?
-  Rank: additive asked — Desired Closed vocabulary table
-  Decision: resolved — emit only those rows (plus unknown AppSec `{action}:appsec` below); closed reasons never take a third field
-  By: explore
-
-- Q: LAPI third field encoding?
-  Rank: additive asked — Desired Origin encoding
-  Decision: resolved — third field is header-safe `MetricsOrigin`; prefix `lists:` → `lists_` only; empty origin omits the third field; strip CR/LF/TAB; do not change `MetricsOrigin` or DecisionStore packing
-  By: explore
-
-- Q: Header on pass / bypass / trusted / passthrough / remap-to-pass / widget / gate-cookie / disabled / startup 503?
-  Rank: additive asked — Out of scope names those paths
-  Decision: resolved — no header; do not add `allow: pass`
-  By: explore
-
-- Q: Persist CrowdSec `Decision.Scenario` on DecisionStore, or add a public config key, or emit when the header name is empty?
-  Rank: additive asked — Out of scope names all three
-  Decision: resolved — no persist except the existing lists rewrite; no new key; empty name still disables
-  By: explore
-
-- Q: Keep `error:client-disconnected` exact despite Breaking listing it among values that change?
-  Rank: additive asked — Desired row `error:client-disconnected`; Tensions already notes the query split
-  Decision: resolved — keep the exact string (`kind` `error`, `reason` `client-disconnected`); operators matching the full string do not change queries
-  By: explore
-
 - Q: Where should the emit helper live?
   Rank: additive asked — Unknowns names helper location; Desired requires structured values at the existing writers
-  Decision: assumed — unexported `formatRemediationHeader` in `pkg/bouncer/remediation_header.go`; `handleBanServeHTTP` / AppSec / disconnect call it; captcha does not import the table
+  Decision: assumed — unexported formatRemediationHeader in pkg/bouncer/remediation_header.go; ban, AppSec, and disconnect call it; captcha does not import the table
   By: explore
 
-- Q: Does `captcha.Client` learn the closed vocabulary, or only set a value the bouncer already formatted?
-  Rank: bounded incidental — `ServeHTTP` already has callers; 1 production + 10 tests enumerated under Concepts; Unknowns names helper location, not a captcha API
-  Decision: assumed — bouncer passes the formatted challenge-page value into `ServeHTTP`; Pass 302 and `WriteSolvedRedirect` write `captcha:solved` inside captcha (constant, no origin). Do not put `OriginPlugin*` on the captcha Client
+- Q: Does captcha.Client learn the closed vocabulary, or only set a value the bouncer already formatted?
+  Rank: bounded incidental — ServeHTTP already has callers; 1 production plus 10 tests enumerated under Concepts; Unknowns names helper location, not a captcha API
+  Decision: assumed — bouncer passes the formatted challenge-page value into ServeHTTP; Pass 302 and WriteSolvedRedirect write captcha:solved inside captcha (constant, no origin). Do not put OriginPlugin constants on the captcha Client
   By: explore
 
-- Q: What header value for AppSec JSON `action` other than `ban` / `captcha` / `challenge`?
-  Rank: additive asked — Unknowns names unknown AppSec actions; protocol allows “any other action”
-  Decision: assumed — `{sanitized-action}:appsec` after trim, CR/LF/TAB strip, and `:` → `_` in the action token; `allow` / empty never reach relay
+- Q: What header value for AppSec JSON action other than ban, captcha, or challenge?
+  Rank: additive asked — Unknowns names unknown AppSec actions; protocol allows any other action
+  Decision: assumed — sanitized-action:appsec after trim, CR/LF/TAB strip, and colon to underscore in the action token; allow or empty never reach relay
   By: explore
 
 - Q: How often does a live stream Range hit still have empty origin?
-  Rank: additive asked — Unknowns names letter-only vs `KindOriginString`; Desired already specifies `ban:lapi` / `captcha:lapi` when empty
-  Decision: assumed — new stream Range upserts use `KindOriginString` with `MetricsOrigin` (`pkg/lapi/client_stream.go`); empty origin remains intern overflow (`originID == 0`) and letter-only Range blobs (`TestLookupHitsRangeLetterOnlyStillBans`). Header omits the third field. Do not persist scenario to close the gap
-  By: explore
-
-- Q: Who already owns client address and the header’s third field?
-  Rank: additive asked — commandment One job, one owner; header third field is origin, not a new identity
-  Decision: resolved — client address owner is `pkg/ip.GetRemoteIP` on `clientRequest.remoteIP` (reuse; do not parse `RemoteAddr`). Third field owner is `LookupRemediation` / `LiveLookup` `MetricsOrigin` plus `resolveDroppedOrigin` on drop. Forced / fail-closed reasons use `OriginPlugin*` as the **reason**, not as a third field
+  Rank: additive asked — Unknowns names letter-only vs KindOriginString; Desired already specifies ban:lapi / captcha:lapi when empty
+  Decision: assumed — new stream Range upserts use KindOriginString with MetricsOrigin (pkg/lapi/client_stream.go); empty origin remains intern overflow (originID 0) and letter-only Range blobs (TestLookupHitsRangeLetterOnlyStillBans). Header omits the third field. Do not persist scenario to close the gap
   By: explore
 
 - Q: Which tests, README, live specs, and e2e assertions pin the old strings, and what do they become?
   Rank: bounded asked — Desired Breaking plus Ground names the files; call sites enumerated under Concepts
-  Decision: assumed — update those files in place (no new e2e suite). Real Pester `cscli` origin becomes `ban:lapi:cscli` / `captcha:lapi:cscli`; captcha fallback without a client is `ban:captcha-downgrade`; mock custom-ban-page default origin becomes `ban:lapi:crowdsec`; AppSec relay becomes `captcha:challenge` / `captcha:appsec`; disconnect stays `error:client-disconnected`; `solved-captcha` becomes `captcha:solved`. File list is under Decisions.
+  Decision: assumed — update those files in place (no new e2e suite). Real Pester cscli origin becomes ban:lapi:cscli / captcha:lapi:cscli; captcha fallback without a client is ban:captcha-downgrade; mock custom-ban-page default origin becomes ban:lapi:crowdsec; AppSec relay becomes captcha:challenge / captcha:appsec; disconnect stays error:client-disconnected; solved-captcha becomes captcha:solved. File list is under Decisions.
   By: explore
 
 - Q: New spec family for the vocabulary, or fold into the four live contracts?
   Rank: additive asked — live specs already SHALL the old values; librarian Live catalog is fold for remaining behavior
-  Decision: assumed — fold; no new `openspec/specs/` folder
+  Decision: assumed — fold; no new openspec/specs folder
   By: explore
 
 - Q: Own test file for the formatter, or only extend existing header tests?
   Rank: additive asked — Ground/Unknowns name blast radius; new helper is a unit this change creates
-  Decision: assumed — both: `pkg/bouncer/zzz_remediation_header_test.go` (`std_go_test_zzz-prefix`) for encode/classify, and migrate the assertion files above
+  Decision: assumed — both: pkg/bouncer/zzz_remediation_header_test.go (std_go_test_zzz-prefix) for encode/classify, and migrate the assertion files above
   By: explore
 
-- Q: If a non-lists `MetricsOrigin` still contains `:`, rewrite remaining colons?
-  Rank: additive asked — Desired says rewrite only the `lists:` prefix, do not globally replace
-  Decision: assumed — follow the letter: only `lists:` → `lists_`. Consumers split at most three fields, so a leftover colon stays inside origin. Official origins besides lists do not use `:` (`ext_crowdsec_lapi_usage-metrics`)
+- Q: If a non-lists MetricsOrigin still contains a colon, rewrite remaining colons?
+  Rank: additive asked — Desired says rewrite only the lists: prefix, do not globally replace
+  Decision: assumed — follow the letter: only lists: becomes lists_. Consumers split at most three fields, so a leftover colon stays inside origin. Official origins besides lists do not use a colon (ext_crowdsec_lapi_usage-metrics)
   By: explore
 
-- Q: Must operators who panel on `error:client-disconnected` change queries?
-  Rank: additive asked — Unknowns / Tensions
-  Decision: resolved — no; the full string is unchanged. Operators matching single-token `ban` / `captcha` / `solved-captcha` / raw AppSec `action` must update
-  By: explore
-
-- Q: Should `captcha:solved` carry a third-field origin from the captcha that was just solved?
-  Rank: additive incidental — Desired row is `captcha:solved` with no third field
+- Q: Should captcha:solved carry a third-field origin from the captcha that was just solved?
+  Rank: additive incidental — Desired row is captcha:solved with no third field
   Decision: assumed — no third field
   By: explore
 
-- Q: LAPI decision type `throttle` (cscli) on the header?
-  Rank: additive incidental — `decisionscope.RemediationValue` returns empty for non-ban/non-captcha; Out of scope does not name throttle; no header today
+- Q: LAPI decision type throttle (cscli) on the header?
+  Rank: additive incidental — decisionscope.RemediationValue returns empty for non-ban/non-captcha; Out of scope does not name throttle; no header today
   Decision: assumed — leave; still no remediation header
   By: explore
+
+- Q: Structured grammar kind:reason / kind:reason:origin, no space after the colon?
+  Rank: additive asked — Desired Closed vocabulary and no space after colon
+  Decision: resolved — yes; colon is the field separator; split at most three fields
+  By: explore
+
+- Q: Closed vocabulary table from Desired (decision-header, lapi, failures, appsec, captcha-downgrade, captcha:*, error:client-disconnected)?
+  Rank: additive asked — Desired Closed vocabulary table
+  Decision: resolved — emit only those rows (plus unknown AppSec action:appsec below); closed reasons never take a third field
+  By: explore
+
+- Q: LAPI third field encoding?
+  Rank: additive asked — Desired Origin encoding
+  Decision: resolved — third field is header-safe MetricsOrigin; prefix lists: becomes lists_ only; empty origin omits the third field; strip CR/LF/TAB; do not change MetricsOrigin or DecisionStore packing
+  By: explore
+
+- Q: Header on pass / bypass / trusted / passthrough / remap-to-pass / widget / gate-cookie / disabled / startup 503?
+  Rank: additive asked — Out of scope names those paths
+  Decision: resolved — no header; do not add allow: pass
+  By: explore
+
+- Q: Persist CrowdSec Decision.Scenario on DecisionStore, or add a public config key, or emit when the header name is empty?
+  Rank: additive asked — Out of scope names all three
+  Decision: resolved — no persist except the existing lists rewrite; no new key; empty name still disables
+  By: explore
+
+- Q: Keep error:client-disconnected exact despite Breaking listing it among values that change?
+  Rank: additive asked — Desired row error:client-disconnected; Tensions already notes the query split
+  Decision: resolved — keep the exact string (kind error, reason client-disconnected); operators matching the full string do not change queries
+  By: explore
+
+- Q: Who already owns client address and the header third field?
+  Rank: additive asked — commandment One job, one owner; header third field is origin, not a new identity
+  Decision: resolved — client address owner is pkg/ip.GetRemoteIP on clientRequest.remoteIP (reuse; do not parse RemoteAddr). Third field owner is LookupRemediation / LiveLookup MetricsOrigin plus resolveDroppedOrigin on drop. Forced / fail-closed reasons use OriginPlugin constants as the reason, not as a third field
+  By: explore
+
+- Q: Must operators who panel on error:client-disconnected change queries?
+  Rank: additive asked — Unknowns / Tensions
+  Decision: resolved — no; the full string is unchanged. Operators matching single-token ban / captcha / solved-captcha / raw AppSec action must update
+  By: explore
+

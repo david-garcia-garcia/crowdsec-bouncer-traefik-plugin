@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: da82f02c
+Reviewed head: cae7824e
 Owner decision: None.
 
 ## Review scores
@@ -67,7 +67,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | da82f02cd1e5dfce4b5b783ebc001a0cc13f470b | Card must match the branch you measured |
+| Reviewed head | cae7824e56386cd654544762b93f474afe89f365 | Card must match the branch you measured |
 
 ### Stored data model
 None.
