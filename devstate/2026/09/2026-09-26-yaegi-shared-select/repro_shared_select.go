@@ -1,3 +1,5 @@
+//go:build ignore
+
 // Throwaway reproduction for explore 2026-09-26-yaegi-shared-select.
 // Mirrors pkg/lapi startTicker: one select on ticker.C and a stop chan, two goroutines.
 // Expected under yaegi v0.16.1: shared select — both loops wait on the first caller's cases.

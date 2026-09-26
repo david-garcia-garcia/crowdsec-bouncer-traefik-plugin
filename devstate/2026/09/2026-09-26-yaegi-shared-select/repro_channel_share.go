@@ -1,3 +1,5 @@
+//go:build ignore
+
 // Reproduction cited by explore.md: yaegi v0.16.1 shared select case list.
 // Shape matches upstream ticker_test.go (PR 399) but uses the current fork's
 // select loop (ticker channel + stop), not range. Native go run stays isolated.
