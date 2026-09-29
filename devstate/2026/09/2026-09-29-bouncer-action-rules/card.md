@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 0c91ec60
+Reviewed head: 59a2d866
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -69,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 0c91ec60eb54ed5cbf697c224ef23c2308c33103 | Card must match the branch you measured |
+| Reviewed head | 59a2d8664f14795ac5f6e06b1a84c3b8f3701280 | Card must match the branch you measured |
 
 ### Stored data model
 None.
