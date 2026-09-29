@@ -144,13 +144,22 @@ In stream and alone modes, DecisionStore SHALL keep compact origin-id × family 
 - **WHEN** intern overflowed and stream applies an Ip ban
 - **THEN** `active_decisions` origin for that slot is empty
 
-### Requirement: Forced-decision drops use plugin origin
-When the bouncer remediates because a configured `crowdsecDecisionHeader` forced `b` or `c`, the `dropped` item SHALL send `origin=plugin:forced_decision`. It MUST NOT reuse `crowdsec`, `cscli`, `CAPI`, `appsec`, `lists:`, or the tech/lapi/appsec failure origins. Ban and captcha remediations still send `remediation=ban` or `remediation=captcha`. A gated-OK captcha that reaches the next handler MUST NOT increment `dropped` for that force.
+### Requirement: Action-rule drops use plugin origin
+When the bouncer remediates because a matching `bouncerActionRules` row applied ban or captcha, the `dropped` item SHALL send `origin=plugin:rules:<name>` of the first matching row of that winning kind. It MUST NOT reuse `crowdsec`, `cscli`, `CAPI`, `appsec`, `lists:`, `plugin:forced_decision`, or the tech/lapi/appsec failure origins. Ban and captcha remediations still send `remediation=ban` or `remediation=captcha`. A skip-to-next MUST NOT increment `dropped`. A gated-OK captcha that reaches the next handler MUST NOT increment `dropped` for that rule. LAPI, AppSec, and fail-closed drops that prevail over a captcha rule SHALL keep that leg's origin, not `plugin:rules:`. An unusable captcha client on a captcha rule SHALL still send `origin=plugin:rules:<name>` with `remediation=ban`.
 
-#### Scenario: Forced ban drop uses plugin origin
-- **WHEN** a non-trusted client is banned because `crowdsecDecisionHeader` forced `b`
-- **THEN** the `dropped` item has `origin=plugin:forced_decision` and `remediation=ban`
+#### Scenario: Action-rule ban drop uses plugin origin
+- **WHEN** a non-trusted client is banned because a matching action rule applied ban
+- **THEN** the `dropped` item has `origin=plugin:rules:<name>` of that ban row and `remediation=ban`
 
-#### Scenario: Forced captcha drop uses plugin origin
-- **WHEN** a non-trusted client is shown captcha because `crowdsecDecisionHeader` forced `c` and the gate cookie is not valid
-- **THEN** the `dropped` item has `origin=plugin:forced_decision` and `remediation=captcha`
+#### Scenario: Action-rule captcha drop uses plugin origin
+- **WHEN** a non-trusted client is shown captcha because a matching action rule applied captcha and the gate cookie is not valid
+- **THEN** the `dropped` item has `origin=plugin:rules:<name>` of that captcha row and `remediation=captcha`
+
+#### Scenario: Skip does not drop
+- **WHEN** a matching action rule skips both legs and no captcha or ban is applied
+- **THEN** the next usage-metrics POST does not include a `dropped` item for that skip
+
+#### Scenario: Captcha rule lost to LAPI keeps LAPI origin
+- **WHEN** a captcha rule matched and LAPI lookup is ban
+- **THEN** the `dropped` item has the LAPI origin and `remediation=ban`
+- **AND** it does not use `plugin:rules:`
