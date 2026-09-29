@@ -611,6 +611,54 @@ func Test_appsecQuery_stripsHopByHopHeaders(t *testing.T) {
 	}
 }
 
+func Test_appsecQuery_originalAbsoluteURI(t *testing.T) {
+	tests := []struct {
+		name      string
+		target    string
+		host      string
+		forwarded string
+		clearTLS  bool
+		want      string
+	}{
+		{name: "HTTPS server request", target: "https://ignored.example/protected/a?x=1&y=two", host: "public.example:443", want: "https://public.example:443/protected/a?x=1&y=two"},
+		{name: "HTTP server request", target: "http://ignored.example/plain?q=yes", host: "public.example", clearTLS: true, want: "http://public.example/plain?q=yes"},
+		{name: "forwarded proto cannot upgrade HTTP", target: "http://ignored.example/plain?q=yes", host: "public.example", forwarded: httpsScheme, clearTLS: true, want: "http://public.example/plain?q=yes"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			capture := &forwardCaptureRoundTripper{}
+			req := httptest.NewRequest(http.MethodGet, tt.target, nil)
+			req.URL.Scheme = ""
+			req.URL.Host = ""
+			req.Host = tt.host
+			if tt.clearTLS {
+				req.TLS = nil
+			}
+			if tt.forwarded != "" {
+				req.Header.Set("X-Forwarded-Proto", tt.forwarded)
+			}
+			req.Header.Set(crowdsecAppsecURIHeader, "https://attacker.invalid/override")
+			if _, err := newForwardCaptureClient(capture).Query("1.2.3.4", req, Policy{}); err != nil {
+				t.Fatalf("Query() returned error: %v", err)
+			}
+			if got := capture.header.Get(crowdsecAppsecURIHeader); got != tt.want {
+				t.Errorf("%s %q want %q", crowdsecAppsecURIHeader, got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_originalRequestURL_preservesAbsoluteURL(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "http://server.invalid/unused", nil)
+	req.URL, _ = url.Parse("https://absolute.example:8443/a/b?x=1%202&x=3")
+	req.Host = "different.example"
+	req.TLS = nil
+	req.Header.Set("X-Forwarded-Proto", "http")
+	if got, want := originalRequestURL(req), "https://absolute.example:8443/a/b?x=1%202&x=3"; got != want {
+		t.Errorf("originalRequestURL() %q want %q", got, want)
+	}
+}
+
 // Test_isHopByHopHeader checks the RFC 7230 section 6.1 set and that end-to-end headers pass.
 func Test_isHopByHopHeader(t *testing.T) {
 	tests := []struct {

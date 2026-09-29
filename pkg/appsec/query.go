@@ -24,6 +24,7 @@ const (
 	crowdsecAppsecHeader     = "X-Crowdsec-Appsec-Api-Key"
 	crowdsecAppsecUserAgent  = "X-Crowdsec-Appsec-User-Agent"
 	appsecResponseBodyLimit  = 1 << 20 // 1 MiB
+	httpsScheme              = "https"
 )
 
 // Structured AppSec JSON action values CrowdSec 1.8 puts in the envelope body.
@@ -205,10 +206,29 @@ func (c *Client) newAppsecForwardRequest(ip string, httpReq *http.Request, pol P
 	req.Header.Set(crowdsecAppsecIPHeader, ip)
 	req.Header.Set(crowdsecAppsecVerbHeader, httpReq.Method)
 	req.Header.Set(crowdsecAppsecHostHeader, httpReq.Host)
-	req.Header.Set(crowdsecAppsecURIHeader, httpReq.URL.String())
+	req.Header.Set(crowdsecAppsecURIHeader, originalRequestURL(httpReq))
 	req.Header.Set(crowdsecAppsecUserAgent, httpReq.Header.Get("User-Agent"))
 	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+c.pluginVersion)
 	return req, nil
+}
+
+// originalRequestURL returns the client-facing absolute URI AppSec needs to
+// reconstruct the original request. Server requests normally carry only a
+// path in URL; TLS state, not client-controlled forwarding headers, determines
+// the missing scheme.
+func originalRequestURL(req *http.Request) string {
+	u := *req.URL
+	if u.Scheme == "" {
+		if req.TLS != nil {
+			u.Scheme = httpsScheme
+		} else {
+			u.Scheme = "http"
+		}
+	}
+	if u.Host == "" {
+		u.Host = req.Host
+	}
+	return u.String()
 }
 
 // newAppsecBodyRequest chooses GET (no, unreadable, or non-body-method body) or POST (copied client
