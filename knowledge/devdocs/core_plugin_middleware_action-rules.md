@@ -13,6 +13,7 @@ Compile `bouncerActionRules` once into `*httprule.ActionSet`. After trusted-IP, 
 ## How to use
 
 - Store `BouncerActionRules` on Config. Default `[]`. Compile with `httprule.NewActionSet` in `ValidateParams` (wrap `BouncerActionRules: %w`, discard) and again in `bouncer.New` (store). Do not compile on the request path.
+- Tokens: `ban`, `bypass`, `bypassLapi`, `bypassAppsec`, `captcha`. Array order does not matter. `bypass` sets skipLapi and skipAppsec. `ban` must be the only token on that row.
 - After trusted-IP, call `Matching` then fold. Any ban → `handleRemediationServeHTTP` ban with `lapi.OriginPluginRules(firstBanName)` and return.
 - Else OR skipLapi / skipAppsec / captchaFlag. SkipLapi uses `passOrCaptchaRule`. SkipAppsec is checked again in `handleNextServeHTTP` and `applyCaptchaRuleServeHTTP`.
 - Captcha flag still runs remaining legs. LAPI/AppSec ban (including fail-closed) prevails; WARN `ServeHTTP:forcedCaptchaSuperseded` with attrs `ip` and `name` (the captcha rule). Non-empty AppSec challenge does not override the captcha rule; empty challenge body stays dest fail-closed ban.
@@ -35,6 +36,7 @@ if match.banName != "" {
 - `pkg/httprule/action.go` (`ActionRule`, `NewActionSet`)
 - `pkg/configuration/configuration.go` (`BouncerActionRules`)
 - `pkg/bouncer/bouncer.go` (`foldActionRules`, ServeHTTP)
+- `pkg/bouncer/remediation_header.go` (`headerReasonFromOrigin` prefix `plugin:rules:`)
 - `pkg/lapi/client_metrics.go` (`OriginPluginRules`)
 
 ## Gotchas
