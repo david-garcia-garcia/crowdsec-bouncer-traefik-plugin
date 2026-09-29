@@ -25,7 +25,7 @@ After trusted-IP, `foldActionRules` ORs every match: any `ban` remediates immedi
 Ready for review. 0 items remain.
 
 Priority: P2 — operators cannot compose skip, ban, and captcha on one matcher; leftover old keys are a documented break, not a live outage
-Reviewed head: 6f433927
+Reviewed head: 9daeb7cf
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -90,7 +90,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 6f43392791a8e7f08b1259ae8e0e1a18997726ee | Card must match the branch you measured |
+| Reviewed head | 9daeb7cf3290d367eb5c7c585437a0135ce13b18 | Card must match the branch you measured |
 
 ### Stored data model
 None.

@@ -29,3 +29,8 @@ head: 37c6dfeda8d736206c91005b02a87fca0112e8f1
 phase: codereview
 verdict: ready for review
 head: 6f43392791a8e7f08b1259ae8e0e1a18997726ee
+
+## devdocsimpact (2026-09-29)
+phase: devdocsimpact
+verdict: ready for review
+head: 9daeb7cf3290d367eb5c7c585437a0135ce13b18
