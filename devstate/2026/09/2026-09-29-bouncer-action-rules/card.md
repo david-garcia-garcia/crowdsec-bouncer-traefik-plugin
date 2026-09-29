@@ -1,30 +1,38 @@
 ## Motivation
-Not yet.
+Operators cannot compose skip, ban, and captcha on one request matcher. Dest splits that job across two first-match-wins bypass lists (`bouncerLapiBypassRules`, `bouncerAppsecBypassRules`) plus `bouncerDecisionHeader` exact trimmed `b`/`c` that still merges after lookup.
+
+A healthz skip, a header force-ban, and a captcha-without-lookup cannot live on one row. Forced `c` still consults LAPI unless a separate LAPI bypass also matches. Metrics origin for the header path is `plugin:forced_decision`, not a rule name.
+
+Left alone, the two lists and the secret header freeze as the public contract. Operators keep three knobs for one fold, and leftover YAML after a later rename is silent the same way Traefik unused-key decode already drops retired keys.
+
+Priority: P2 — operators cannot compose skip, ban, and captcha on one matcher; leftover old keys are a documented break, not a live outage
 
 ## Implementation
-Not yet.
+One public list `bouncerActionRules` replaces the two bypass lists and the force header. Each row is `httprule.ActionRule` (unique `name`, `action` tokens, embedded predicates). `httprule.NewActionSet` validates names and tokens, then compiles predicates with `httprule.New`. `ValidateParams` wraps `BouncerActionRules: %w` and discards; `bouncer.New` compiles again and stores `*ActionSet`. `Set.Match` stays first-wins boolean; `Matching` returns every hit.
+
+After trusted-IP, `foldActionRules` ORs every match: any `ban` remediates immediately with origin `plugin:rules:<first ban name>` and closed header reason `rules`. Else skip-LAPI / skip-AppSec add, and a `captcha` token is a flag. Remaining legs still run. LAPI or AppSec (including fail-closed) bans keep that leg's origin and WARN `ServeHTTP:forcedCaptchaSuperseded` with `name`. Non-empty AppSec `challenge` does not relay over a captcha rule; empty challenge body stays dest fail-closed ban. Force-header helpers and `plugin:forced_decision` are gone. Leftover old YAML never reaches `New`.
 
 ## What this changes
-**Operators.** None.
+**Operators.** Rewrite `bouncerAppsecBypassRules`, `bouncerLapiBypassRules`, and `bouncerDecisionHeader` onto `bouncerActionRules` (unique `name`, `action` tokens, same predicates; write `^b$` / `^c$` for the old header); leftover old keys are ignored.
 
 **Admin users.** None.
 
-**Developers.** None.
+**Developers.** Public Config is `BouncerActionRules` (`[]httprule.ActionRule`); applied plugin ban/captcha origin is `plugin:rules:<name>`; closed remediation reason is `rules`; `httprule.Matching` returns every hit.
 
 **End users.** None.
 
 ## Merge readiness
 Ready for review. 0 items remain.
 
-Priority: unknown — motivation not written
-Reviewed head: 37c6dfed
+Priority: P2 — operators cannot compose skip, ban, and captcha on one matcher; leftover old keys are a documented break, not a live outage
+Reviewed head: 6f433927
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36604311892 |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36607549074 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -34,7 +42,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-29-bouncer-action-rules pushed | `git` |
 | OpenSpec | bouncer-action-rules | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/175 | pr-host |
-| CI | build 36604311892 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36604311892 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36604311892 |
+| CI | build 36607549074 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36607549074 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36607549074 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -53,7 +61,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-09-29-bouncer-action-rules on branch 2026-09-29-bouncer-action-rules targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/175; CI build 36604311892 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36604311892.
+Ticket 2026-09-29-bouncer-action-rules on branch 2026-09-29-bouncer-action-rules targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/175; CI build 36607549074 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36607549074.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -65,7 +73,15 @@ Ticket 2026-09-29-bouncer-action-rules on branch 2026-09-29-bouncer-action-rules
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/devstate/2026/09/2026-09-29-bouncer-action-rules/codereview_standards.md) — 1 total, 0 pending, 0 completed, 1 skipped
+[Nitpicks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/devstate/2026/09/2026-09-29-bouncer-action-rules/codereview_nitpicks.md) — 0 total, 0 pending, 0 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/devstate/2026/09/2026-09-29-bouncer-action-rules/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Scope](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/devstate/2026/09/2026-09-29-bouncer-action-rules/codereview_scope.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/devstate/2026/09/2026-09-29-bouncer-action-rules/codereview_security.md) — 1 total, 0 pending, 0 completed, 1 skipped
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/devstate/2026/09/2026-09-29-bouncer-action-rules/codereview_performance.md) — 1 total, 0 pending, 0 completed, 1 skipped
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/devstate/2026/09/2026-09-29-bouncer-action-rules/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/devstate/2026/09/2026-09-29-bouncer-action-rules/codereview_coverage.md) — 4 total, 0 pending, 4 completed
+
 
 ## Agent review details
 
@@ -74,7 +90,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 37c6dfeda8d736206c91005b02a87fca0112e8f1 | Card must match the branch you measured |
+| Reviewed head | 6f43392791a8e7f08b1259ae8e0e1a18997726ee | Card must match the branch you measured |
 
 ### Stored data model
 None.
