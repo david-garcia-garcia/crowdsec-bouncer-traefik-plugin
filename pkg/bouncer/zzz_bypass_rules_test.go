@@ -2,6 +2,7 @@ package bouncer
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -454,5 +455,152 @@ func TestServeHTTP_allMatchingSkipsLapiAndAppsec(t *testing.T) {
 	}
 	if atomic.LoadInt64(&hits) != 0 {
 		t.Fatalf("AppSec Query hits=%d want 0", hits)
+	}
+}
+
+func TestServeHTTP_captchaPlusBypassSkipsBothThenCaptchas(t *testing.T) {
+	var hits int64
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"action":"ban"}`))
+	}))
+	t.Cleanup(appsecServer.Close)
+	appsecURL, err := url.Parse(appsecServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := testCaptchaClient(t, "/fast.js", "", "", nil)
+	b, passed := testBypassOriginBouncer(t)
+	lapiClient, store := lapi.NewTestClient(b.log)
+	lapi.AttachTestMetricsReporter(lapiClient)
+	store.Put(decisionstore.Decision{
+		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
+	})
+	bindTestLAPI(b, lapiClient)
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	bindTestCaptcha(b, client)
+	b.actionRules = mustPathAction(t, "challenge-health", "^/health$", httprule.ActionCaptcha, httprule.ActionBypass)
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, testBypassHealthRequest())
+	if *passed {
+		t.Fatal("captcha plus bypass must not reach origin")
+	}
+	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
+		t.Fatalf("want captcha page, got %q", rw.Body.String())
+	}
+	if atomic.LoadInt64(&hits) != 0 {
+		t.Fatalf("AppSec Query hits=%d want 0", hits)
+	}
+	if got := lapiClient.TestDroppedCount(lapi.OriginPluginRules("challenge-health"), "ipv4", "captcha"); got != 1 {
+		t.Fatalf("dropped origin=%d", got)
+	}
+}
+
+func TestServeHTTP_captchaPlusBypassLapiStillAllowsAppsecBan(t *testing.T) {
+	log, sink := newTestLogSink(slog.LevelWarn)
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"action":"ban","http_status":403,"user_body_content":"appsec default page"}`))
+	}))
+	t.Cleanup(appsecServer.Close)
+	appsecURL, err := url.Parse(appsecServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := testCaptchaClient(t, "/fast.js", "", "", nil)
+	b, passed := testBypassOriginBouncer(t)
+	b.log = log
+	lapiClient, store := lapi.NewTestClient(log)
+	lapi.AttachTestMetricsReporter(lapiClient)
+	store.Put(decisionstore.Decision{
+		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
+	})
+	bindTestLAPI(b, lapiClient)
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), log))
+	bindTestCaptcha(b, client)
+	b.actionRules = mustPathAction(t, "c", "^/health$", httprule.ActionCaptcha, httprule.ActionBypassLapi)
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, testBypassHealthRequest())
+	if *passed {
+		t.Fatal("AppSec ban must not reach origin")
+	}
+	if rw.Code != http.StatusForbidden || !strings.Contains(rw.Body.String(), "banned") {
+		t.Fatalf("status=%d body=%q", rw.Code, rw.Body.String())
+	}
+	logged := sink.String()
+	if !strings.Contains(logged, "ServeHTTP:forcedCaptchaSuperseded") {
+		t.Fatalf("want WARN forcedCaptchaSuperseded, got %s", logged)
+	}
+	if !strings.Contains(logged, `"name":"c"`) {
+		t.Fatalf("want name=c, got %s", logged)
+	}
+	if got := lapiClient.TestDroppedCount("appsec", "ipv4", "ban"); got != 1 {
+		t.Fatalf("dropped origin=%d", got)
+	}
+}
+
+func TestServeHTTP_nonEmptyAppsecChallengeDoesNotOverrideCaptchaRule(t *testing.T) {
+	var hits int64
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"action":"challenge","http_status":200,"user_body_content":"<html>challenge</html>"}`))
+	}))
+	t.Cleanup(appsecServer.Close)
+	appsecURL, err := url.Parse(appsecServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := testCaptchaClient(t, "/fast.js", "", "", nil)
+	b, passed := testBypassOriginBouncer(t)
+	lapiClient, _ := lapi.NewTestClient(b.log)
+	lapi.AttachTestMetricsReporter(lapiClient)
+	lapiClient.SetStreamHealthyForTest(true)
+	bindTestLAPI(b, lapiClient)
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	bindTestCaptcha(b, client)
+	b.actionRules = mustPathAction(t, "challenge-health", "^/health$", httprule.ActionCaptcha)
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, testBypassHealthRequest())
+	if *passed {
+		t.Fatal("captcha rule must not reach origin")
+	}
+	if atomic.LoadInt64(&hits) != 1 {
+		t.Fatalf("AppSec Query hits=%d want 1", hits)
+	}
+	if strings.Contains(rw.Body.String(), "<html>challenge</html>") {
+		t.Fatal("must not relay the AppSec challenge envelope")
+	}
+	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
+		t.Fatalf("want plugin captcha page, got %q", rw.Body.String())
+	}
+	if got := lapiClient.TestDroppedCount(lapi.OriginPluginRules("challenge-health"), "ipv4", "captcha"); got != 1 {
+		t.Fatalf("dropped origin=%d", got)
+	}
+}
+
+func TestServeHTTP_firstMatchingBanNameWins(t *testing.T) {
+	b, passed := testBypassOriginBouncer(t)
+	lapiClient, _ := lapi.NewTestClient(b.log)
+	lapi.AttachTestMetricsReporter(lapiClient)
+	bindTestLAPI(b, lapiClient)
+	b.actionRules = mustCompileActions(t, []httprule.ActionRule{
+		{Name: "first", Action: []string{httprule.ActionBan}, Rule: httprule.Rule{Path: "^/health$"}},
+		{Name: "second", Action: []string{httprule.ActionBan}, Rule: httprule.Rule{Path: "^/health$"}},
+	})
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, testBypassHealthRequest())
+	if *passed {
+		t.Fatal("matching ban must not reach origin")
+	}
+	if rw.Code != http.StatusForbidden || !strings.Contains(rw.Body.String(), "banned") {
+		t.Fatalf("status=%d body=%q", rw.Code, rw.Body.String())
+	}
+	if got := lapiClient.TestDroppedCount(lapi.OriginPluginRules("first"), "ipv4", "ban"); got != 1 {
+		t.Fatalf("dropped origin=%d", got)
+	}
+	if got := lapiClient.TestDroppedCount(lapi.OriginPluginRules("second"), "ipv4", "ban"); got != 0 {
+		t.Fatalf("second ban name dropped=%d", got)
 	}
 }

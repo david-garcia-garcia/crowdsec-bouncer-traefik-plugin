@@ -300,3 +300,17 @@ func TestNewActionSet_zipsTokensWithMatching(t *testing.T) {
 		t.Fatalf("names %q %q", set.Name(0), set.Name(1))
 	}
 }
+
+func TestNewActionSet_bypassTokenSkipsBothLegs(t *testing.T) {
+	set := mustNewActionSet(t, []ActionRule{
+		{Name: "challenge-health", Action: []string{ActionCaptcha, ActionBypass}, Rule: Rule{Path: "^/healthz$"}},
+	})
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/healthz", nil)
+	hits := set.Matching(req)
+	if len(hits) != 1 || hits[0] != 0 {
+		t.Fatalf("Matching=%v want [0]", hits)
+	}
+	if !set.SkipLapi(0) || !set.SkipAppsec(0) || !set.Captcha(0) || set.Ban(0) {
+		t.Fatal("bypass must skip both legs and keep captcha")
+	}
+}
