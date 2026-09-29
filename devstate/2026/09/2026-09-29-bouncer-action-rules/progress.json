@@ -19,9 +19,9 @@
       "at": "2026-09-29T17:00:45.865Z"
     },
     "implement": {
-      "work": false,
-      "card": false,
-      "at": null
+      "work": true,
+      "card": true,
+      "at": "2026-09-29T17:27:55.560Z"
     },
     "codereview": {
       "work": false,

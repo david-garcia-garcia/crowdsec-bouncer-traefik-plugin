@@ -19,3 +19,8 @@ head: 59a2d8664f14795ac5f6e06b1a84c3b8f3701280
 phase: propose
 verdict: in progress
 head: e8a2944520bfa5a7b5985e141ba9f96d2c4b5b4d
+
+## implement (2026-09-29)
+phase: implement
+verdict: ready for review
+head: 37c6dfeda8d736206c91005b02a87fca0112e8f1
