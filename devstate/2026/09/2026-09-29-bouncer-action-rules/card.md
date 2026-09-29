@@ -25,14 +25,14 @@ After trusted-IP, `foldActionRules` ORs every match: any `ban` remediates immedi
 Ready for review. 0 items remain.
 
 Priority: P2 — operators cannot compose skip, ban, and captcha on one matcher; leftover old keys are a documented break, not a live outage
-Reviewed head: 9daeb7cf
+Reviewed head: d812866c
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36607549074 |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36609846966 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -42,16 +42,21 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-29-bouncer-action-rules pushed | `git` |
 | OpenSpec | bouncer-action-rules | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/175 | pr-host |
-| CI | build 36607549074 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36607549074 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36607549074 |
+| CI | build 36609846966 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36609846966 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36609846966 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
 Worktree:
-- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/openspec/changes/bouncer-action-rules/proposal.md) — modified
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/openspec/changes/bouncer-action-rules/proposal.md) — modified
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/openspec/changes/bouncer-action-rules/proposal.md) — modified
-- [core_plugin_middleware_forced-decision](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/openspec/changes/bouncer-action-rules/proposal.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/openspec/changes/archive/2026-09-29-bouncer-action-rules/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/openspec/changes/archive/2026-09-29-bouncer-action-rules/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/openspec/changes/archive/2026-09-29-bouncer-action-rules/proposal.md) — modified
+- [core_plugin_middleware_forced-decision](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/openspec/changes/archive/2026-09-29-bouncer-action-rules/proposal.md) — modified
+
+Completed:
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/openspec/specs/core_plugin_lapi_usage-metrics/spec.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-29-bouncer-action-rules/openspec/specs/core_plugin_middleware_config-validation/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -61,7 +66,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-09-29-bouncer-action-rules on branch 2026-09-29-bouncer-action-rules targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/175; CI build 36607549074 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36607549074.
+Ticket 2026-09-29-bouncer-action-rules on branch 2026-09-29-bouncer-action-rules targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/175; CI build 36609846966 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36609846966.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -88,9 +93,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 7 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 9daeb7cf3290d367eb5c7c585437a0135ce13b18 | Card must match the branch you measured |
+| Reviewed head | d812866c3cade8ef09d37145cdadf623d8c37231 | Card must match the branch you measured |
 
 ### Stored data model
 None.
