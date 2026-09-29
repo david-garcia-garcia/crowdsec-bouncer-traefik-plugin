@@ -107,7 +107,7 @@ Bypass lists are not on LAPI `ownership` / `identity` (`pkg/lapi/identity.go`) o
   By: explore
 
 - Q: Whether `Set.Match` stays first-wins boolean and a new collector folds all hits, or httprule grows a multi-match API that replaces `Match`?
-  Rank: additive asked — new all-matching fold; Effects All matching rules contribute. This is not first-match-wins. `Match` callers enumerated: 2 production (`pkg/bouncer/bouncer.go`) plus httprule/bouncer tests; roots `pkg/**/*.go` for `func (set *Set) Match` and `.Match(`
+  Rank: additive asked — new all-matching fold; Effects All matching rules contribute. This is not first-match-wins. Match callers enumerated: 2 production in pkg/bouncer/bouncer.go plus httprule/bouncer tests; roots pkg (not vendor) for Set.Match
   Decision: assumed — keep `Match` as dest boolean first-wins. Add `Matching` that returns every matching index in list order. Bouncer folds name/action from those indices. Do not change `Match`'s contract.
   By: explore
 

@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: b278293c
-Owner decision: None.
+Reviewed head: 0c91ec60
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -51,7 +51,10 @@ None.
 Ticket 2026-09-29-bouncer-action-rules on branch 2026-09-29-bouncer-action-rules targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/175; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Whether `name` / `action` land on `httprule.Rule` or a wrapper type beside `pkg/httprule`? | additive asked — new authoring fields this change creates; requirement Add `name` and `action` while keeping today's predicates | assumed — wrapper (Name, Action, embedded `httprule.Rule` predicates). `Rule` stays predicates-only. Config slice type carries the wrapper. httprule does not interpret action tokens. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | b278293c729eba77349e862055da5eb888a4c525 | Card must match the branch you measured |
+| Reviewed head | 0c91ec60eb54ed5cbf697c224ef23c2308c33103 | Card must match the branch you measured |
 
 ### Stored data model
 None.
