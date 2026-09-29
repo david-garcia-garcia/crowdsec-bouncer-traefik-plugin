@@ -25,14 +25,14 @@ After trusted-IP, `foldActionRules` ORs every match: any `ban` remediates immedi
 Ready for review. 0 items remain.
 
 Priority: P2 — operators cannot compose skip, ban, and captcha on one matcher; leftover old keys are a documented break, not a live outage
-Reviewed head: d812866c
+Reviewed head: 5056e0ce
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36609846966 |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36610683310 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -42,7 +42,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-29-bouncer-action-rules pushed | `git` |
 | OpenSpec | bouncer-action-rules | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/175 | pr-host |
-| CI | build 36609846966 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36609846966 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36609846966 |
+| CI | build 36610683310 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36610683310 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36610683310 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -66,7 +66,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-09-29-bouncer-action-rules on branch 2026-09-29-bouncer-action-rules targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/175; CI build 36609846966 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36609846966.
+Ticket 2026-09-29-bouncer-action-rules on branch 2026-09-29-bouncer-action-rules targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/175; CI build 36610683310 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36610683310.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -95,7 +95,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 7 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | d812866c3cade8ef09d37145cdadf623d8c37231 | Card must match the branch you measured |
+| Reviewed head | 5056e0ce77dfafbd9a4e096212a7edfdef72db40 | Card must match the branch you measured |
 
 ### Stored data model
 None.
