@@ -78,17 +78,15 @@ type Config struct {
 	AppsecTLSClientKey                  string                       `json:"appsecTlsClientKey,omitempty"`
 	AppsecTLSClientKeyFile              string                       `json:"appsecTlsClientKeyFile,omitempty"`
 	AppsecTLSInsecureVerify             bool                         `json:"appsecTlsInsecureVerify,omitempty"`
-	BouncerAppsecBypassRules            []httprule.Rule              `json:"bouncerAppsecBypassRules,omitempty"`
+	BouncerActionRules                  []httprule.ActionRule        `json:"bouncerActionRules,omitempty"`
 	BouncerAppsecFailureAction          string                       `json:"bouncerAppsecFailureAction,omitempty"`
 	BouncerBanFilePath                  string                       `json:"bouncerBanFilePath,omitempty"`
 	BouncerClientTrustedIPs             []string                     `json:"bouncerClientTrustedIps,omitempty"`
-	BouncerDecisionHeader               string                       `json:"bouncerDecisionHeader,omitempty"` // incoming header name; empty = off; values b|c
 	BouncerDecisionScopeHeaders         map[string]string            `json:"bouncerDecisionScopeHeaders,omitempty"`
 	BouncerEnabled                      bool                         `json:"bouncerEnabled,omitempty"`
 	BouncerForwardedHeadersCustomName   string                       `json:"bouncerForwardedHeadersCustomName,omitempty"`
 	BouncerForwardedHeadersInsecure     bool                         `json:"bouncerForwardedHeadersInsecure,omitempty"`
 	BouncerForwardedHeadersTrustedIPs   []string                     `json:"bouncerForwardedHeadersTrustedIps,omitempty"`
-	BouncerLapiBypassRules              []httprule.Rule              `json:"bouncerLapiBypassRules,omitempty"`
 	BouncerLapiFailureAction            string                       `json:"bouncerLapiFailureAction,omitempty"`
 	BouncerOriginBasedDecisionRemap     map[string]map[string]string `json:"bouncerOriginBasedDecisionRemap,omitempty"`
 	BouncerRedisUnreachableBlock        bool                         `json:"bouncerRedisUnreachableBlock,omitempty"`
@@ -211,17 +209,15 @@ func New() *Config {
 		AppsecPath:                          "/",
 		AppsecScheme:                        "",
 		AppsecTLSInsecureVerify:             false,
-		BouncerAppsecBypassRules:            []httprule.Rule{},
+		BouncerActionRules:                  []httprule.ActionRule{},
 		BouncerAppsecFailureAction:          FailureActionBan,
 		BouncerBanFilePath:                  "",
 		BouncerClientTrustedIPs:             []string{},
-		BouncerDecisionHeader:               "",
 		BouncerDecisionScopeHeaders:         map[string]string{},
 		BouncerEnabled:                      false,
 		BouncerForwardedHeadersCustomName:   "X-Forwarded-For",
 		BouncerForwardedHeadersInsecure:     false,
 		BouncerForwardedHeadersTrustedIPs:   []string{},
-		BouncerLapiBypassRules:              []httprule.Rule{},
 		BouncerLapiFailureAction:            FailureActionBan,
 		BouncerOriginBasedDecisionRemap:     map[string]map[string]string{},
 		BouncerRedisUnreachableBlock:        true,
@@ -819,11 +815,8 @@ func validateParamsRequired(config *Config) error {
 	if err := validateFailureAction("BouncerAppsecFailureAction", config.BouncerAppsecFailureAction, captchaInstanceReady); err != nil {
 		return err
 	}
-	if _, err := httprule.New(config.BouncerAppsecBypassRules); err != nil {
-		return fmt.Errorf("BouncerAppsecBypassRules: %w", err)
-	}
-	if _, err := httprule.New(config.BouncerLapiBypassRules); err != nil {
-		return fmt.Errorf("BouncerLapiBypassRules: %w", err)
+	if _, err := httprule.NewActionSet(config.BouncerActionRules); err != nil {
+		return fmt.Errorf("BouncerActionRules: %w", err)
 	}
 	if config.AppsecBodyLimit < 0 {
 		return errors.New("AppsecBodyLimit: cannot be less than 0")

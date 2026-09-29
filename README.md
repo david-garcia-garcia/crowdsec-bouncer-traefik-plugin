@@ -329,10 +329,18 @@ These are the settings that change what a visitor, a tester, or an access log se
 
 ### Test a ban or a captcha from the browser
 
-`bouncerDecisionHeader` names an incoming request header. Empty (the default) turns the feature off: the plugin does not look for `X-Crowdsec-Decision` unless you set that name.
+`bouncerActionRules` can match an incoming header. There is no dedicated `bouncerDecisionHeader` key. Leftover `bouncerDecisionHeader` YAML is ignored. Header match is unanchored Go RE2 against each value, so write `^b$` and `^c$` (a bare `b` also matches `abc`).
 
 ```yaml
-bouncerDecisionHeader: X-Crowdsec-Decision
+bouncerActionRules:
+  - name: decision-ban
+    headers:
+      X-Crowdsec-Decision: "^b$"
+    action: [ban]
+  - name: decision-captcha
+    headers:
+      X-Crowdsec-Decision: "^c$"
+    action: [captcha]
 captchaEnabled: true
 captchaProvider: hcaptcha
 captchaSiteKey: FIXME
@@ -350,15 +358,13 @@ curl -D - -H "X-Crowdsec-Decision: c" https://app.example/
 
 | Value | What you get |
 | ----- | ------------ |
-| `b`   | Ban immediately. No LAPI or stream lookup. Status is `bouncerRemediationStatusCode` (default 403). |
-| `c`   | Captcha, after a lookup. A real CrowdSec ban still wins (log `ServeHTTP:forcedCaptchaSuperseded`). |
-| anything else (`B`, `t`, empty) | Ignored. Normal lookup continues. |
+| `b` (matches `^b$`) | Ban immediately. No LAPI or AppSec. Status is `bouncerRemediationStatusCode` (default 403). |
+| `c` (matches `^c$`) | Captcha flag. Remaining legs still run. A CrowdSec or fail-closed ban still wins (log `ServeHTTP:forcedCaptchaSuperseded`). Use `[captcha, bypass]` to skip both legs then captcha. |
+| anything else (`B`, `t`, empty, padded ` b `) | No header rule matches. Normal lookup continues. |
 
-Values are exact after trim: `b` and `c` only.
+A visitor who already solved the captcha still has `crowdsec_captcha_gate`. While that cookie is valid, a captcha rule reaches the app. Delete the cookie to see the challenge again. A ban rule does not care about the cookie.
 
-A visitor who already solved the captcha still has `crowdsec_captcha_gate`. While that cookie is valid, `c` reaches the app. Delete the cookie to see the challenge again. `b` does not care about the cookie.
-
-Clients in `bouncerClientTrustedIps` skip the plugin, including this header. Test from an address that is not in that list.
+Clients in `bouncerClientTrustedIps` skip the plugin, including these rules. Test from an address that is not in that list.
 
 Do not leave a client-writable header on a public route. Anyone who can set it can ban or captcha their own requests. Prefer an earlier middleware that sets the header only for traffic you control, or use it on a staging router and remove it afterward.
 
@@ -376,7 +382,7 @@ Include that name in Traefik `accessLog.fields.headers`. **BREAKING:** values th
 
 | Value | Meaning |
 | ----- | ------- |
-| `ban:decision-header` | Incoming `bouncerDecisionHeader` is `b`. |
+| `ban:rules` | A matching `bouncerActionRules` row applied `ban`. |
 | `ban:lapi` | CrowdSec ban, empty metrics origin. |
 | `ban:lapi:<origin>` | CrowdSec ban. Third field is header-safe `MetricsOrigin` (prefix `lists:` becomes `lists_` only; CR/LF/TAB stripped). |
 | `ban:lapi-failure` | LAPI down / unpublished, fail-closed ban. |
@@ -387,7 +393,7 @@ Include that name in Traefik `accessLog.fields.headers`. **BREAKING:** values th
 | `ban:appsec-challenge-empty` | AppSec `action: challenge` with empty body (fail-closed to the ban page). |
 | `ban:appsec-failure` | AppSec down / unusable verdict, fail-closed ban. |
 | `ban:captcha-downgrade` | Kind was captcha; this router served a ban page (unsubscribed / unpublished / invalid captcha client). |
-| `captcha:decision-header` | Incoming `bouncerDecisionHeader` is `c`. |
+| `captcha:rules` | A matching `bouncerActionRules` row applied `captcha`. |
 | `captcha:lapi` / `captcha:lapi:<origin>` | CrowdSec captcha (same origin encoding). |
 | `captcha:lapi-failure` | LAPI fail-closed captcha. |
 | `captcha:stream-unhealthy` | Stream fail-closed captcha. |
@@ -597,8 +603,8 @@ Send only the first N bytes to AppSec. `0` is unlimited. Only POST, PUT, PATCH, 
 **appsecEnabled** (bool, default `false`)
 Enable CrowdSec AppSec (WAF). Independent of `lapiMode`: it inspects the requests the decision check allowed, in every mode. CrowdSec 1.8 bot-detection needs this set, plus a Traefik router `PathPrefix(/crowdsec-internal/challenge)` using this same middleware.
 
-**BouncerAppsecBypassRules** ([]object, default `[]`)
-Per-request rules that skip the AppSec hop (no body buffer, no AppSec query) on the pass path. Same rule shape as `bouncerLapiBypassRules`. Each rule may set `method`, `path`, `host`, `headers`, and `cookies`. Omit a field (or empty `path` / `host` / `method` after trim, or an empty map) to mean any. Set fields AND; rules in the list OR; first match wins. `path` is unanchored Go RE2 on `req.URL.Path` (percent-decoded, not the query; the plugin does not insert `^` or `$`). `host` is unanchored Go RE2 on the hostname of `req.Host` (port stripped: `example.com:443` → `example.com`, `[::1]:443` → `::1`). `method` is unanchored Go RE2 on `req.Method`; optional leading `!` negates (`!POST`). Do not lowercase and do not force `(?i)`. Empty header or cookie pattern means that name is present. Header names are case-insensitive; cookie names are case-sensitive. A fully empty rule (every predicate is any) fails `New`. Invalid RE2 fails `New`. Leftover `bouncerAppsecExcludeRegex` YAML is ignored. Not part of LAPI or AppSec reclaim keys.
+**BouncerActionRules** ([]object, default `[]`)
+Per-request rules that skip LAPI, skip AppSec, ban, and/or captcha. **BREAKING:** replaces `bouncerAppsecBypassRules`, `bouncerLapiBypassRules`, and `bouncerDecisionHeader`. Leftover old keys are ignored (Traefik unused-key decode). Each rule needs a unique `name` (no `:`) and a non-empty `action` array. Tokens: `bypass`, `bypassLapi`, `bypassAppsec`, `ban`, `captcha`. `bypass` skips both legs. `ban` must be the only token on that row. Predicates are the httprule shape: `method`, `path`, `host`, `headers`, `cookies`. Omit a field (or empty `path` / `host` / `method` after trim, or an empty map) to mean any. Set fields AND. All matching rules contribute (not first-match-wins). `path` is unanchored Go RE2 on `req.URL.Path` (percent-decoded, not the query; the plugin does not insert `^` or `$`). `host` is unanchored Go RE2 on the hostname of `req.Host` (port stripped: `example.com:443` → `example.com`, `[::1]:443` → `::1`). `method` is unanchored Go RE2 on `req.Method`; optional leading `!` negates (`!POST`). Do not lowercase and do not force `(?i)`. Empty header or cookie pattern means that name is present. Header names are case-insensitive; cookie names are case-sensitive. Header values are not trimmed; write `^b$` / `^c$` for an exact letter. A fully empty rule (every predicate is any) fails `New`. Invalid RE2, empty/duplicate/colon names, and invalid action arrays fail `New`. After trusted IPs: any matching `ban` remediates immediately (`plugin:rules:<name>`); otherwise skipLapi / skipAppsec OR together and a captcha token is a flag (remaining legs still run). Not part of LAPI or AppSec reclaim keys.
 
 **BouncerAppsecFailureAction** (string, default `ban`)
 What to do when AppSec does not return a usable verdict (HTTP 500, unreachable, body read error, or unreadable HTTP/2 or HTTP/3 body on POST/PUT/PATCH). Expected: `passthrough`, `ban`, `captcha`. `ban` drops the request. `passthrough` lets 500/unreachable/body-io errors continue as allow, and sends a headers-only GET when the body cannot be buffered. `captcha` uses the subscribed published captcha client (`captchaEnabled` or a non-empty `captchaInstanceName` after owner-fill). **BREAKING:** replaces `crowdsecAppsecFailureBlock`, `crowdsecAppsecUnreachableBlock`, and `crowdsecAppsecUnreadableBodyBlock`. Operators who had those bools set to `false` MUST set `bouncerAppsecFailureAction: passthrough`.
@@ -641,12 +647,6 @@ File path for `appsecTlsCertificateAuthority`. The file wins when both are set.
 
 **LapiCapiScenarios** ([]string, no default)
 `alone` only. CAPI scenarios.
-
-**BouncerDecisionHeader** (string, default `""`)
-Incoming request header that forces ban or captcha. Empty disables the feature (the plugin does not read `X-Crowdsec-Decision` unless you set this key). Values are exact trimmed `b` (ban) or `c` (captcha). `b` applies ban without a stream or live lookup. `c` still consults that lookup: a CrowdSec ban wins and the plugin logs WARN `ServeHTTP:forcedCaptchaSuperseded`; otherwise captcha. Any other token, including `t` and `B`, is ignored and lookup continues. Put a Traefik middleware that writes this header *before* the bouncer, or send it yourself to test. See [Test a ban or a captcha from the browser](#test-a-ban-or-a-captcha-from-the-browser). Do not expose the header to the internet; any client who can set it can captcha or ban themselves. A `c` value still honors the captcha gate cookie when lookup is not ban: a visitor who already solved captcha reaches origin even while the header is still `c`. Trusted client IPs still skip the whole plugin, including this header.
-
-**BouncerLapiBypassRules** ([]object, default `[]`)
-Per-request rules that skip the LAPI decision path (`LookupRemediation`, `LiveLookup`, missing-LAPI failure action, and stream/alone unhealthy failure action) and continue on the pass path (AppSec may still run). Same rule shape as `bouncerAppsecBypassRules`. Bypass runs after trusted IPs and forced `b`; forced `c` still applies on the pass path. Leftover `bouncerLapiExcludeRegex` YAML is ignored. Not part of LAPI or AppSec reclaim keys.
 
 **BouncerLapiFailureAction** (string, default `ban`)
 What to do when LAPI does not return a usable verdict (live/none HTTP or parse error, or a cache miss while stream/alone is unhealthy after `lapiUpdateMaxFailure`). Expected: `passthrough`, `ban`, `captcha`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled). `captcha` uses the subscribed published captcha client (`captchaEnabled` or a non-empty `captchaInstanceName` after owner-fill). **Behavior change:** in `live` and `none`, this action also covers a failed `bouncerDecisionScopeHeaders` query. Previously a LAPI that answered the IP query but errored on a header-scope query was treated as "no decision" and allowed (`DEBUG`). That is now a LAPI failure: default `ban` blocks those requests and logs `WARN`. An active ban still wins. Set `bouncerLapiFailureAction: passthrough` to keep allowing when a header-scope query fails.
@@ -861,7 +861,15 @@ http:
           captchaSiteverifyHttpTimeoutSeconds: 10
           bouncerClientTrustedIps:
             - 192.168.1.0/24
-          bouncerDecisionHeader: X-Crowdsec-Decision # optional; earlier middleware writes b or c
+          bouncerActionRules:
+            - name: decision-ban
+              headers:
+                X-Crowdsec-Decision: "^b$"
+              action: [ban]
+            - name: decision-captcha
+              headers:
+                X-Crowdsec-Decision: "^c$"
+              action: [captcha]
           bouncerDecisionScopeHeaders: {}
             # Country: X-IPCountry    # key Country (any case) → ISO country matcher (CDN or geoenrich)
             # AS: CF-ASN             # key AS (any case) → ASN matcher

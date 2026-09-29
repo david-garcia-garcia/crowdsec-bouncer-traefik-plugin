@@ -6,14 +6,14 @@ import (
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-func TestCrowdsecDecisionHeaderDefaultsEmpty(t *testing.T) {
+func TestBouncerActionRulesDefaultEmpty(t *testing.T) {
 	cfg := New()
-	if cfg.BouncerDecisionHeader != "" {
-		t.Fatalf("default BouncerDecisionHeader=%q, want empty", cfg.BouncerDecisionHeader)
+	if len(cfg.BouncerActionRules) != 0 {
+		t.Fatalf("default BouncerActionRules=%v, want empty", cfg.BouncerActionRules)
 	}
 	cfg = getMinimalConfig()
-	cfg.BouncerDecisionHeader = "   "
+	cfg.BouncerActionRules = nil
 	if err := ValidateParams(cfg, logger.New("ERROR", "")); err != nil {
-		t.Fatalf("whitespace BouncerDecisionHeader must not fail ValidateParams: %v", err)
+		t.Fatalf("omitted BouncerActionRules must not fail ValidateParams: %v", err)
 	}
 }

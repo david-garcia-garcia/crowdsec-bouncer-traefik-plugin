@@ -31,6 +31,9 @@ body() {
 
   echo "[$SCENARIO] AppSec match must not skip LAPI (HTTP 403)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo/403-skip" 403 -H "X-Forwarded-For: 1.2.3.4"
+
+  echo "[$SCENARIO] ban action rule must block a clean IP (HTTP 403)"
+  assert_status "http://127.0.0.1:${WEB_PORT}/foo" 403 -H "X-Forwarded-For: 5.6.7.8" -H "X-Crowdsec-Decision: b"
 }
 
 run_scenario "$SCENARIO" "$HERE" body

@@ -12,6 +12,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -47,7 +48,7 @@ func testForcedDecisionBouncer(t *testing.T, log *slog.Logger, captchaClient *ca
 	passed := false
 	b := &Bouncer{
 		enabled:                  true,
-		forcedDecisionHeader:     testForcedDecisionHeader,
+		actionRules:              mustCompileActions(t, decisionHeaderRules()),
 		forwardedHeadersInsecure: true,
 		forwardedCustomHeader:    "X-Forwarded-For",
 		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
@@ -77,11 +78,11 @@ func testForcedDecisionRequest(headerValue string) *http.Request {
 
 func TestServeHTTP_forcedDecisionOffIgnoresHeader(t *testing.T) {
 	b, _, passed := testForcedDecisionBouncer(t, nil, nil, nil, true)
-	b.forcedDecisionHeader = ""
+	b.actionRules = mustCompileActions(t, nil)
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testForcedDecisionRequest("c"))
 	if *passed {
-		t.Fatal("empty crowdsecDecisionHeader must still apply the stream ban")
+		t.Fatal("empty action list must still apply the stream ban")
 	}
 	if rw.Code != http.StatusForbidden || !strings.Contains(rw.Body.String(), "banned") {
 		t.Fatalf("status=%d body=%q", rw.Code, rw.Body.String())
@@ -99,7 +100,7 @@ func TestServeHTTP_forcedDecisionCaptchaWhenLookupIsNotBan(t *testing.T) {
 	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
 		t.Fatalf("want captcha page, got %q", rw.Body.String())
 	}
-	if got := lapiClient.TestDroppedCount(lapi.OriginPluginForcedDecision, "ipv4", "captcha"); got != 1 {
+	if got := lapiClient.TestDroppedCount(lapi.OriginPluginRules("decision-captcha"), "ipv4", "captcha"); got != 1 {
 		t.Fatalf("dropped origin=%d", got)
 	}
 }
@@ -116,32 +117,51 @@ func TestServeHTTP_forcedDecisionCaptchaDoesNotOverrideBan(t *testing.T) {
 	if rw.Code != http.StatusForbidden || !strings.Contains(rw.Body.String(), "banned") {
 		t.Fatalf("status=%d body=%q", rw.Code, rw.Body.String())
 	}
-	if !strings.Contains(sink.String(), "ServeHTTP:forcedCaptchaSuperseded") {
-		t.Fatalf("want WARN forcedCaptchaSuperseded, got %s", sink.String())
+	logged := sink.String()
+	if !strings.Contains(logged, "ServeHTTP:forcedCaptchaSuperseded") {
+		t.Fatalf("want WARN forcedCaptchaSuperseded, got %s", logged)
+	}
+	if !strings.Contains(logged, `"name":"decision-captcha"`) {
+		t.Fatalf("want name=decision-captcha, got %s", logged)
 	}
 }
 
-// TestServeHTTP_forcedDecisionTrimmedHeaderValues fails if Header.Get values are matched without TrimSpace.
-func TestServeHTTP_forcedDecisionTrimmedHeaderValues(t *testing.T) {
+// TestServeHTTP_anchoredHeaderDoesNotMatchPaddedValues fails if ^b$ / ^c$ match padded Header.Get values.
+func TestServeHTTP_anchoredHeaderDoesNotMatchPaddedValues(t *testing.T) {
 	client := testCaptchaClient(t, "/fast.js", "", "", nil)
 	captchaBouncer, _, captchaPassed := testForcedDecisionBouncer(t, nil, client, nil, false)
 	captchaRW := httptest.NewRecorder()
 	captchaBouncer.ServeHTTP(captchaRW, testForcedDecisionRequest(" c "))
-	if *captchaPassed {
-		t.Fatal("padded c must still captcha")
-	}
-	if !strings.Contains(captchaRW.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
-		t.Fatalf("padded c want captcha page, got %q", captchaRW.Body.String())
+	if !*captchaPassed {
+		t.Fatal("padded c must not match ^c$")
 	}
 
 	banBouncer, _, banPassed := testForcedDecisionBouncer(t, nil, nil, nil, false)
 	banRW := httptest.NewRecorder()
 	banBouncer.ServeHTTP(banRW, testForcedDecisionRequest(" b "))
-	if *banPassed {
-		t.Fatal("padded b must still ban")
+	if !*banPassed {
+		t.Fatal("padded b must not match ^b$")
 	}
-	if banRW.Code != http.StatusForbidden || !strings.Contains(banRW.Body.String(), "banned") {
+	if banRW.Code != http.StatusOK {
 		t.Fatalf("padded b status=%d body=%q", banRW.Code, banRW.Body.String())
+	}
+}
+
+func TestServeHTTP_unanchoredHeaderMatchesSubstring(t *testing.T) {
+	b, lapiClient, passed := testForcedDecisionBouncer(t, nil, nil, nil, false)
+	b.actionRules = mustCompileActions(t, []httprule.ActionRule{
+		headerAction("bare-ban", testForcedDecisionHeader, "b", httprule.ActionBan),
+	})
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, testForcedDecisionRequest("abc"))
+	if *passed {
+		t.Fatal("unanchored b must ban abc")
+	}
+	if rw.Code != http.StatusForbidden || !strings.Contains(rw.Body.String(), "banned") {
+		t.Fatalf("status=%d body=%q", rw.Code, rw.Body.String())
+	}
+	if got := lapiClient.TestDroppedCount(lapi.OriginPluginRules("bare-ban"), "ipv4", "ban"); got != 1 {
+		t.Fatalf("dropped origin=%d", got)
 	}
 }
 
@@ -156,10 +176,10 @@ func TestServeHTTP_forcedDecisionBanSkipsStream(t *testing.T) {
 	if rw.Code != http.StatusForbidden || !strings.Contains(rw.Body.String(), "banned") {
 		t.Fatalf("status=%d body=%q", rw.Code, rw.Body.String())
 	}
-	if got := rw.Header().Get("X-Remediation"); got != "ban:decision-header" {
-		t.Fatalf("remediation %q want ban:decision-header", got)
+	if got := rw.Header().Get("X-Remediation"); got != "ban:rules" {
+		t.Fatalf("remediation %q want ban:rules", got)
 	}
-	if got := lapiClient.TestDroppedCount(lapi.OriginPluginForcedDecision, "ipv4", "ban"); got != 1 {
+	if got := lapiClient.TestDroppedCount(lapi.OriginPluginRules("decision-ban"), "ipv4", "ban"); got != 1 {
 		t.Fatalf("dropped origin=%d", got)
 	}
 }
@@ -225,16 +245,21 @@ func TestServeHTTP_forcedDecisionAppsecOnlyCaptcha(t *testing.T) {
 	}
 }
 
-func TestBouncerNew_trimsForcedDecisionHeader(t *testing.T) {
+func TestBouncerNew_compilesActionHeaderRules(t *testing.T) {
 	log := logger.New("ERROR", "")
 	cfg := configuration.New()
 	cfg.LapiMode = configuration.StreamMode
-	cfg.BouncerDecisionHeader = "  X-Crowdsec-Decision  "
+	cfg.BouncerActionRules = decisionHeaderRules()
 	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, true, false, log)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.forcedDecisionHeader != testForcedDecisionHeader {
-		t.Fatalf("forcedDecisionHeader=%q", got.forcedDecisionHeader)
+	banReq := testForcedDecisionRequest("b")
+	if hits := got.actionRules.Matching(banReq); len(hits) != 1 || !got.actionRules.Ban(hits[0]) {
+		t.Fatal("ban header rule must compile")
+	}
+	captchaReq := testForcedDecisionRequest("c")
+	if hits := got.actionRules.Matching(captchaReq); len(hits) != 1 || !got.actionRules.Captcha(hits[0]) {
+		t.Fatal("captcha header rule must compile")
 	}
 }

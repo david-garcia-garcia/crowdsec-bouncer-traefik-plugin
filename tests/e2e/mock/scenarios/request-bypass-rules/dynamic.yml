@@ -19,16 +19,32 @@ http:
           appsecEnabled: "true"
           appsecHost: "@@APPSEC_HOST@@"
           appsecScheme: http
-          bouncerAppsecBypassRules:
-            - path: ^/foo/403-skip$
+          bouncerActionRules:
+            - name: appsec-skip
+              path: ^/foo/403-skip$
+              action:
+                - bypassAppsec
+            - name: healthz
+              path: ^/healthz$
+              action:
+                - bypassLapi
+            - name: lapi-skip
+              path: ^/lapi-skip
+              action:
+                - bypassLapi
+            - name: probe
+              host: ^probe\.example$
+              action:
+                - bypassLapi
+            - name: decision-ban
+              headers:
+                X-Crowdsec-Decision: "^b$"
+              action:
+                - ban
           bouncerAppsecFailureAction: ban
           bouncerEnabled: "true"
           bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
-          bouncerLapiBypassRules:
-            - path: ^/healthz$
-            - path: ^/lapi-skip
-            - host: ^probe\.example$
           lapiEnabled: "true"
           lapiHost: "@@LAPI_HOST@@"
           lapiKey: "@@APIKEY@@"

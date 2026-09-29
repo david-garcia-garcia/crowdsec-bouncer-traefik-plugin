@@ -276,26 +276,48 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	cfgUpdateMaxFailureNegOne.LapiUpdateMaxFailure = -1
 	cfgEmptyBypass := getMinimalConfig()
 	cfgEmptyRule := getMinimalConfig()
-	cfgEmptyRule.BouncerLapiBypassRules = []httprule.Rule{{}}
+	cfgEmptyRule.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBypass}}}
 	cfgMatchEverythingMethod := getMinimalConfig()
-	cfgMatchEverythingMethod.BouncerAppsecBypassRules = []httprule.Rule{{Method: ".*"}}
+	cfgMatchEverythingMethod.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBypass}, Rule: httprule.Rule{Method: ".*"}}}
 	cfgMethodOnly := getMinimalConfig()
-	cfgMethodOnly.BouncerLapiBypassRules = []httprule.Rule{{Method: "^OPTIONS$"}}
+	cfgMethodOnly.BouncerActionRules = []httprule.ActionRule{{Name: "options", Action: []string{httprule.ActionBypass}, Rule: httprule.Rule{Method: "^OPTIONS$"}}}
 	cfgHostOnly := getMinimalConfig()
-	cfgHostOnly.BouncerLapiBypassRules = []httprule.Rule{{Host: "^probe\\.example$"}}
+	cfgHostOnly.BouncerActionRules = []httprule.ActionRule{{Name: "probe", Action: []string{httprule.ActionBypass}, Rule: httprule.Rule{Host: "^probe\\.example$"}}}
 	cfgInvalidHostBypass := getMinimalConfig()
-	cfgInvalidHostBypass.BouncerLapiBypassRules = []httprule.Rule{{Host: "("}}
+	cfgInvalidHostBypass.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBypass}, Rule: httprule.Rule{Host: "("}}}
 	cfgDoubleBang := getMinimalConfig()
-	cfgDoubleBang.BouncerLapiBypassRules = []httprule.Rule{{Method: "!!POST"}}
+	cfgDoubleBang.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBypass}, Rule: httprule.Rule{Method: "!!POST"}}}
 	cfgEmptyNegation := getMinimalConfig()
-	cfgEmptyNegation.BouncerLapiBypassRules = []httprule.Rule{{Method: "!"}}
+	cfgEmptyNegation.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBypass}, Rule: httprule.Rule{Method: "!"}}}
 	cfgInvalidAppsecBypass := getMinimalConfig()
-	cfgInvalidAppsecBypass.BouncerAppsecBypassRules = []httprule.Rule{{Path: "("}}
+	cfgInvalidAppsecBypass.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBypass}, Rule: httprule.Rule{Path: "("}}}
 	cfgInvalidLapiBypass := getMinimalConfig()
-	cfgInvalidLapiBypass.BouncerLapiBypassRules = []httprule.Rule{{Method: "("}}
+	cfgInvalidLapiBypass.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBypass}, Rule: httprule.Rule{Method: "("}}}
 	cfgValidBypass := getMinimalConfig()
-	cfgValidBypass.BouncerAppsecBypassRules = []httprule.Rule{{Path: "^/healthz$"}}
-	cfgValidBypass.BouncerLapiBypassRules = []httprule.Rule{{Method: "!POST", Path: "^/admin/"}}
+	cfgValidBypass.BouncerActionRules = []httprule.ActionRule{
+		{Name: "healthz", Action: []string{httprule.ActionBypass}, Rule: httprule.Rule{Path: "^/healthz$"}},
+		{Name: "decision-ban", Action: []string{httprule.ActionBan}, Rule: httprule.Rule{Headers: map[string]string{"X-Crowdsec-Decision": "^b$"}}},
+	}
+	cfgEmptyName := getMinimalConfig()
+	cfgEmptyName.BouncerActionRules = []httprule.ActionRule{{Action: []string{httprule.ActionBypass}, Rule: httprule.Rule{Path: "^/x$"}}}
+	cfgColonName := getMinimalConfig()
+	cfgColonName.BouncerActionRules = []httprule.ActionRule{{Name: "a:b", Action: []string{httprule.ActionBypass}, Rule: httprule.Rule{Path: "^/x$"}}}
+	cfgDuplicateName := getMinimalConfig()
+	cfgDuplicateName.BouncerActionRules = []httprule.ActionRule{
+		{Name: "healthz", Action: []string{httprule.ActionBypass}, Rule: httprule.Rule{Path: "^/a$"}},
+		{Name: "healthz", Action: []string{httprule.ActionBypass}, Rule: httprule.Rule{Path: "^/b$"}},
+	}
+	cfgEmptyActionTokens := getMinimalConfig()
+	cfgEmptyActionTokens.BouncerActionRules = []httprule.ActionRule{{Name: "x", Rule: httprule.Rule{Path: "^/x$"}}}
+	cfgUnknownActionToken := getMinimalConfig()
+	cfgUnknownActionToken.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{"pass"}, Rule: httprule.Rule{Path: "^/x$"}}}
+	cfgDuplicateAction := getMinimalConfig()
+	cfgDuplicateAction.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBypass, httprule.ActionBypass}, Rule: httprule.Rule{Path: "^/x$"}}}
+	cfgBanWithSkip := getMinimalConfig()
+	cfgBanWithSkip.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBan, httprule.ActionBypass}, Rule: httprule.Rule{Path: "^/x$"}}}
+	cfgCaptchaNoClient := getMinimalConfig()
+	cfgCaptchaNoClient.CaptchaEnabled = false
+	cfgCaptchaNoClient.BouncerActionRules = []httprule.ActionRule{{Name: "c", Action: []string{httprule.ActionCaptcha}, Rule: httprule.Rule{Path: "^/x$"}}}
 	type args struct {
 		config *Config
 	}
@@ -356,17 +378,25 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 		{name: "BouncerRemediationStatusCode below 100", args: args{config: cfgRemediationLow}, wantErr: true},
 		{name: "BouncerRemediationStatusCode 600 or above", args: args{config: cfgRemediationHigh}, wantErr: true},
 		{name: "LapiUpdateMaxFailure -1 accepted", args: args{config: cfgUpdateMaxFailureNegOne}, wantErr: false},
-		{name: "Empty bypass lists pass", args: args{config: cfgEmptyBypass}, wantErr: false},
-		{name: "Fully empty LAPI bypass rule fails", args: args{config: cfgEmptyRule}, wantErr: true, wantErrContains: "BouncerLapiBypassRules"},
-		{name: "Match-everything AppSec method fails", args: args{config: cfgMatchEverythingMethod}, wantErr: true, wantErrContains: "BouncerAppsecBypassRules"},
-		{name: "Method-only LAPI bypass rule passes", args: args{config: cfgMethodOnly}, wantErr: false},
-		{name: "Host-only LAPI bypass rule passes", args: args{config: cfgHostOnly}, wantErr: false},
-		{name: "Invalid LAPI bypass host regex fails", args: args{config: cfgInvalidHostBypass}, wantErr: true, wantErrContains: "BouncerLapiBypassRules"},
-		{name: "Double bang LAPI method fails", args: args{config: cfgDoubleBang}, wantErr: true, wantErrContains: "BouncerLapiBypassRules"},
-		{name: "Bang with empty pattern fails", args: args{config: cfgEmptyNegation}, wantErr: true, wantErrContains: "BouncerLapiBypassRules"},
-		{name: "Invalid AppSec bypass path regex fails", args: args{config: cfgInvalidAppsecBypass}, wantErr: true, wantErrContains: "BouncerAppsecBypassRules"},
-		{name: "Invalid LAPI bypass method regex fails", args: args{config: cfgInvalidLapiBypass}, wantErr: true, wantErrContains: "BouncerLapiBypassRules"},
-		{name: "Valid bypass rules pass", args: args{config: cfgValidBypass}, wantErr: false},
+		{name: "Empty action lists pass", args: args{config: cfgEmptyBypass}, wantErr: false},
+		{name: "Fully empty action-rule predicates fail", args: args{config: cfgEmptyRule}, wantErr: true, wantErrContains: "BouncerActionRules"},
+		{name: "Match-everything AppSec method fails", args: args{config: cfgMatchEverythingMethod}, wantErr: true, wantErrContains: "BouncerActionRules"},
+		{name: "Method-only action rule passes", args: args{config: cfgMethodOnly}, wantErr: false},
+		{name: "Host-only action rule passes", args: args{config: cfgHostOnly}, wantErr: false},
+		{name: "Invalid action-rule host regex fails", args: args{config: cfgInvalidHostBypass}, wantErr: true, wantErrContains: "BouncerActionRules"},
+		{name: "Double bang action-rule method fails", args: args{config: cfgDoubleBang}, wantErr: true, wantErrContains: "BouncerActionRules"},
+		{name: "Bang with empty pattern fails", args: args{config: cfgEmptyNegation}, wantErr: true, wantErrContains: "BouncerActionRules"},
+		{name: "Invalid action-rule path regex fails", args: args{config: cfgInvalidAppsecBypass}, wantErr: true, wantErrContains: "BouncerActionRules"},
+		{name: "Invalid action-rule method regex fails", args: args{config: cfgInvalidLapiBypass}, wantErr: true, wantErrContains: "BouncerActionRules"},
+		{name: "Valid action rules pass", args: args{config: cfgValidBypass}, wantErr: false},
+		{name: "Empty action-rule name fails", args: args{config: cfgEmptyName}, wantErr: true, wantErrContains: "name: empty"},
+		{name: "Action-rule name with colon fails", args: args{config: cfgColonName}, wantErr: true, wantErrContains: "name: contains colon"},
+		{name: "Duplicate action-rule names fail", args: args{config: cfgDuplicateName}, wantErr: true, wantErrContains: "name: duplicate"},
+		{name: "Empty action fails", args: args{config: cfgEmptyActionTokens}, wantErr: true, wantErrContains: "action: empty"},
+		{name: "Unknown action token fails", args: args{config: cfgUnknownActionToken}, wantErr: true, wantErrContains: "action: unknown"},
+		{name: "Duplicate action token fails", args: args{config: cfgDuplicateAction}, wantErr: true, wantErrContains: "action: duplicate"},
+		{name: "Ban mixed with skip fails", args: args{config: cfgBanWithSkip}, wantErr: true, wantErrContains: "action: ban must be alone"},
+		{name: "Captcha without captcha client still passes ValidateParams", args: args{config: cfgCaptchaNoClient}, wantErr: false},
 		{name: "Custom json validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "json")}, wantErr: false},
 		{name: "Custom form validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "form")}, wantErr: false},
 		{name: "Custom omit validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "")}, wantErr: false},

@@ -72,6 +72,24 @@ func (set *Set) Match(httpReq *http.Request) bool {
 	return false
 }
 
+// Matching returns every matching index in list order. Cookie is parsed once when this set has a cookie predicate.
+func (set *Set) Matching(httpReq *http.Request) []int {
+	if set == nil || httpReq == nil {
+		return nil
+	}
+	var cookies []*http.Cookie
+	if set.hasCookiePredicate {
+		cookies = httpReq.Cookies()
+	}
+	var hits []int
+	for i := range set.rules {
+		if set.rules[i].match(httpReq, cookies) {
+			hits = append(hits, i)
+		}
+	}
+	return hits
+}
+
 // compileRule rejects invalid syntax and a rule whose every predicate is any.
 func compileRule(rule Rule) (compiledRule, error) {
 	methodAny, methodNeg, methodRe, err := compileMethod(rule.Method)

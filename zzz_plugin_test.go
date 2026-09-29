@@ -148,7 +148,7 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 	}
 }
 
-func TestNew_RejectsInvalidBypassRules(t *testing.T) {
+func TestNew_RejectsInvalidActionRules(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
@@ -163,15 +163,15 @@ func TestNew_RejectsInvalidBypassRules(t *testing.T) {
 	}
 
 	cfg := cfgLiveAt(u.Host)
-	cfg.BouncerLapiBypassRules = []httprule.Rule{{Path: "("}}
-	handler, err := New(context.Background(), testNextOK(), cfg, "invalid-lapi-bypass")
+	cfg.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBypassLapi}, Rule: httprule.Rule{Path: "("}}}
+	handler, err := New(context.Background(), testNextOK(), cfg, "invalid-lapi-action")
 	if err == nil {
-		t.Fatal("New must fail when BouncerLapiBypassRules is invalid RE2")
+		t.Fatal("New must fail when BouncerActionRules is invalid RE2")
 	}
 	if handler != nil {
-		t.Fatal("New must return a nil handler when bypass rules are invalid")
+		t.Fatal("New must return a nil handler when action rules are invalid")
 	}
-	if !strings.Contains(err.Error(), "BouncerLapiBypassRules") {
+	if !strings.Contains(err.Error(), "BouncerActionRules") {
 		t.Fatalf("error %q", err)
 	}
 	if atomic.LoadInt64(&hits) != 0 {
@@ -180,15 +180,15 @@ func TestNew_RejectsInvalidBypassRules(t *testing.T) {
 
 	hits = 0
 	cfg = cfgLiveAt(u.Host)
-	cfg.BouncerAppsecBypassRules = []httprule.Rule{{}}
-	handler, err = New(context.Background(), testNextOK(), cfg, "invalid-appsec-bypass")
+	cfg.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBypassAppsec}}}
+	handler, err = New(context.Background(), testNextOK(), cfg, "invalid-empty-action")
 	if err == nil {
-		t.Fatal("New must fail when BouncerAppsecBypassRules contains a fully empty rule")
+		t.Fatal("New must fail when BouncerActionRules contains a fully empty rule")
 	}
 	if handler != nil {
-		t.Fatal("New must return a nil handler when bypass rules are invalid")
+		t.Fatal("New must return a nil handler when action rules are invalid")
 	}
-	if !strings.Contains(err.Error(), "BouncerAppsecBypassRules") {
+	if !strings.Contains(err.Error(), "BouncerActionRules") {
 		t.Fatalf("error %q", err)
 	}
 	if atomic.LoadInt64(&hits) != 0 {

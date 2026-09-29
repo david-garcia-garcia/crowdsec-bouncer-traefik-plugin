@@ -14,7 +14,7 @@ const (
 	headerKindError   = "error"
 
 	headerReasonLAPI                 = "lapi"
-	headerReasonDecisionHeader       = "decision-header"
+	headerReasonRules                = "rules"
 	headerReasonLAPIFailure          = "lapi-failure"
 	headerReasonStreamUnhealthy      = "stream-unhealthy"
 	headerReasonCacheFail            = "cache-fail"
@@ -54,9 +54,10 @@ func encodeHeaderOrigin(origin string) string {
 // headerReasonFromOrigin maps a metrics origin to a closed header reason.
 // Plugin origins stay a reason token. Every other origin is lapi (third field is that origin).
 func headerReasonFromOrigin(origin string) string {
+	if strings.HasPrefix(origin, lapi.OriginPluginRulesPrefix) {
+		return headerReasonRules
+	}
 	switch origin {
-	case lapi.OriginPluginForcedDecision:
-		return headerReasonDecisionHeader
 	case lapi.OriginPluginLapiFailure:
 		return headerReasonLAPIFailure
 	case lapi.OriginPluginTechStreamFail:
