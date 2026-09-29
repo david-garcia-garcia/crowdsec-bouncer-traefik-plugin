@@ -40,7 +40,7 @@ func TestHeaderReasonFromOrigin(t *testing.T) {
 		origin string
 		want   string
 	}{
-		{origin: lapi.OriginPluginForcedDecision, want: headerReasonDecisionHeader},
+		{origin: lapi.OriginPluginRules("decision-ban"), want: headerReasonRules},
 		{origin: lapi.OriginPluginLapiFailure, want: headerReasonLAPIFailure},
 		{origin: lapi.OriginPluginTechStreamFail, want: headerReasonStreamUnhealthy},
 		{origin: lapi.OriginPluginAppsecFailure, want: headerReasonAppsecFailure},

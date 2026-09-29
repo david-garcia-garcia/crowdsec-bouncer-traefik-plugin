@@ -202,3 +202,115 @@ func TestMatch_nonMatchingHostDoesNotBypass(t *testing.T) {
 		t.Fatal("non-matching host must not match")
 	}
 }
+
+func mustNewActionSet(t *testing.T, rules []ActionRule) *ActionSet {
+	t.Helper()
+	set, err := NewActionSet(rules)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return set
+}
+
+func TestMatching_returnsEveryHitInOrder(t *testing.T) {
+	set := mustNew(t, []Rule{{Path: "^/ab"}, {Path: "^/a"}, {Path: "^/ab"}})
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/ab", nil)
+	got := set.Matching(req)
+	if len(got) != 3 || got[0] != 0 || got[1] != 1 || got[2] != 2 {
+		t.Fatalf("Matching=%v want [0 1 2]", got)
+	}
+	if !set.Match(req) {
+		t.Fatal("Match dest first-wins must still be true")
+	}
+}
+
+func TestMatching_emptyListAndNilRequest(t *testing.T) {
+	set := mustNew(t, nil)
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/health", nil)
+	if hits := set.Matching(req); hits != nil {
+		t.Fatalf("empty list Matching=%v want nil", hits)
+	}
+	if hits := set.Matching(nil); hits != nil {
+		t.Fatalf("nil request Matching=%v want nil", hits)
+	}
+	var nilSet *Set
+	if hits := nilSet.Matching(req); hits != nil {
+		t.Fatalf("nil set Matching=%v want nil", hits)
+	}
+}
+
+func TestNewActionSet_emptyListMatchesNothing(t *testing.T) {
+	set := mustNewActionSet(t, nil)
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/health", nil)
+	if hits := set.Matching(req); len(hits) != 0 {
+		t.Fatalf("empty ActionSet Matching=%v", hits)
+	}
+}
+
+func TestNewActionSet_rejectsNameAndAction(t *testing.T) {
+	tests := []struct {
+		name    string
+		rules   []ActionRule
+		wantErr string
+	}{
+		{name: "empty name", rules: []ActionRule{{Action: []string{ActionBypass}, Rule: Rule{Path: "^/x$"}}}, wantErr: "name: empty"},
+		{name: "colon in name", rules: []ActionRule{{Name: "a:b", Action: []string{ActionBypass}, Rule: Rule{Path: "^/x$"}}}, wantErr: "name: contains colon"},
+		{name: "duplicate name", rules: []ActionRule{
+			{Name: "healthz", Action: []string{ActionBypass}, Rule: Rule{Path: "^/a$"}},
+			{Name: "healthz", Action: []string{ActionBypass}, Rule: Rule{Path: "^/b$"}},
+		}, wantErr: "name: duplicate"},
+		{name: "empty action", rules: []ActionRule{{Name: "x", Rule: Rule{Path: "^/x$"}}}, wantErr: "action: empty"},
+		{name: "unknown token", rules: []ActionRule{{Name: "x", Action: []string{"pass"}, Rule: Rule{Path: "^/x$"}}}, wantErr: `action: unknown "pass"`},
+		{name: "duplicate token", rules: []ActionRule{{Name: "x", Action: []string{ActionBypass, ActionBypass}, Rule: Rule{Path: "^/x$"}}}, wantErr: "action: duplicate"},
+		{name: "ban with skip", rules: []ActionRule{{Name: "x", Action: []string{ActionBan, ActionBypass}, Rule: Rule{Path: "^/x$"}}}, wantErr: "action: ban must be alone"},
+		{name: "ban with captcha", rules: []ActionRule{{Name: "x", Action: []string{ActionBan, ActionCaptcha}, Rule: Rule{Path: "^/x$"}}}, wantErr: "action: ban must be alone"},
+		{name: "fully empty predicates", rules: []ActionRule{{Name: "x", Action: []string{ActionBypass}}}, wantErr: "empty"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewActionSet(tt.rules)
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("err=%v want %q", err, tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), "rule 0:") && !strings.Contains(err.Error(), "rule 1:") {
+				t.Fatalf("want index-prefixed error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestNewActionSet_zipsTokensWithMatching(t *testing.T) {
+	set := mustNewActionSet(t, []ActionRule{
+		{Name: "lapi", Action: []string{ActionBypassLapi}, Rule: Rule{Path: "^/ab"}},
+		{Name: "appsec", Action: []string{ActionBypassAppsec}, Rule: Rule{Path: "^/ab"}},
+		{Name: "other", Action: []string{ActionBan}, Rule: Rule{Path: "^/nope$"}},
+	})
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/ab", nil)
+	hits := set.Matching(req)
+	if len(hits) != 2 || hits[0] != 0 || hits[1] != 1 {
+		t.Fatalf("Matching=%v want [0 1]", hits)
+	}
+	if !set.SkipLapi(0) || set.SkipAppsec(0) || set.Ban(0) {
+		t.Fatal("index 0 must be bypassLapi only")
+	}
+	if set.SkipLapi(1) || !set.SkipAppsec(1) {
+		t.Fatal("index 1 must be bypassAppsec only")
+	}
+	if set.Name(0) != "lapi" || set.Name(1) != "appsec" {
+		t.Fatalf("names %q %q", set.Name(0), set.Name(1))
+	}
+}
+
+func TestNewActionSet_bypassTokenSkipsBothLegs(t *testing.T) {
+	set := mustNewActionSet(t, []ActionRule{
+		{Name: "challenge-health", Action: []string{ActionCaptcha, ActionBypass}, Rule: Rule{Path: "^/healthz$"}},
+	})
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/healthz", nil)
+	hits := set.Matching(req)
+	if len(hits) != 1 || hits[0] != 0 {
+		t.Fatalf("Matching=%v want [0]", hits)
+	}
+	if !set.SkipLapi(0) || !set.SkipAppsec(0) || !set.Captcha(0) || set.Ban(0) {
+		t.Fatal("bypass must skip both legs and keep captcha")
+	}
+}

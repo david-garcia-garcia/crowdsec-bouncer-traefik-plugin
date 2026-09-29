@@ -125,8 +125,8 @@ priority: normal
 local: core_plugin_middleware_captcha-eucaptcha-verify.md
 description: How eucaptcha posts a solver token to EU CAPTCHA /v1/verify and classifies success and train.
 
-## Forced decision header
+## Action rules
 priority: normal
-local: core_plugin_middleware_forced-decision.md
-description: How a config-named request header forces ban without lookup, or captcha unless a CrowdSec ban wins.
+local: core_plugin_middleware_action-rules.md
+description: How bouncerActionRules compile once and fold every matching ban, skip, and captcha token after trusted-IP.
 

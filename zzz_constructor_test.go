@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -216,7 +217,11 @@ func cfgCaptchaOwnerAt(t *testing.T, instanceName string) *configuration.Config 
 	c.CaptchaSecretKey = "secret"
 	c.CaptchaGateSecret = "gate-secret"
 	c.CaptchaFilePath = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
-	c.BouncerDecisionHeader = "X-Crowdsec-Decision"
+	c.BouncerActionRules = []httprule.ActionRule{{
+		Name:   "decision-captcha",
+		Action: []string{httprule.ActionCaptcha},
+		Rule:   httprule.Rule{Headers: map[string]string{"X-Crowdsec-Decision": "^c$"}},
+	}}
 	c.BouncerRemediationHeadersCustomName = "X-Remediation"
 	c.BouncerForwardedHeadersTrustedIPs = []string{"127.0.0.1/32"}
 	c.BouncerForwardedHeadersCustomName = "X-Forwarded-For"
@@ -239,8 +244,8 @@ func TestNew_CaptchaOwnerServesChallenge(t *testing.T) {
 	}
 	rw := httptest.NewRecorder()
 	h.ServeHTTP(rw, captchaForceReq())
-	if got := rw.Header().Get("X-Remediation"); got != "captcha:decision-header" {
-		t.Fatalf("remediation %q want captcha:decision-header, body: %s", got, rw.Body.String())
+	if got := rw.Header().Get("X-Remediation"); got != "captcha:rules" {
+		t.Fatalf("remediation %q want captcha:rules, body: %s", got, rw.Body.String())
 	}
 	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
 		t.Fatalf("owner must serve captcha, body: %s", rw.Body.String())
@@ -325,8 +330,8 @@ func TestNew_CaptchaSubscriberUsesRouterHeader(t *testing.T) {
 	}
 	rw := httptest.NewRecorder()
 	h.ServeHTTP(rw, captchaForceReq())
-	if got := rw.Header().Get("X-Route"); got != "captcha:decision-header" {
-		t.Fatalf("subscriber remediation %q want captcha:decision-header on X-Route, body: %s", got, rw.Body.String())
+	if got := rw.Header().Get("X-Route"); got != "captcha:rules" {
+		t.Fatalf("subscriber remediation %q want captcha:rules on X-Route, body: %s", got, rw.Body.String())
 	}
 	if got := rw.Header().Get("X-Owner"); got != "" {
 		t.Fatalf("subscriber must not write owner's X-Owner, got %q", got)

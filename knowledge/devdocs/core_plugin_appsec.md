@@ -11,7 +11,7 @@ JSON CrowdSec 1.8 AppSec returns to the bouncer (`action`, `http_status`, `user_
 _Avoid_: LAPI captcha, ban template HTML, `RemoteAddr`
 
 **Challenge**:
-AppSec `action` `challenge`. The bouncer writes that envelope to the browser. `/crowdsec-internal/challenge/*` must use the same middleware so the callback is not sent to origin.
+AppSec `action` `challenge`. The bouncer writes that envelope to the browser unless a matched captcha action rule already owns the gate (`core_plugin_middleware_action-rules.md`). `/crowdsec-internal/challenge/*` must use the same middleware so the callback is not sent to origin.
 _Avoid_: CrowdSec LAPI captcha remediation
 
 **Client disconnected**:
@@ -27,7 +27,7 @@ _Avoid_: GetBody ban, unreadable body, FailureAction passthrough
 - Enable with existing `appsecEnabled`. Do not add a bot-detection plugin key.
 - Open with `appsec.Open` (reclaim by middleware name plus AppSec URL+key+body limit+TLS+`appsecHttpTimeoutSeconds`). A knob change is a new Client. Do not construct the AppSec client inside `lapi.New`. Do not use `atomic.Pointer[T]`.
 - `newTransport` sets `http.Client.Timeout` and stored `httpTimeoutSeconds` from `cfg.AppsecHTTPTimeoutSeconds`. Do not inherit from a shared default. Store the knob so `fieldsDiffer` sees a timeout change. Query uses that stored client.
-- `action` allow or empty 200 → `next`. `ban` → `handleBanServeHTTP` with `headerReason` `appsec` (`ban:appsec` when the remediation header is set). Any other non-allow action (challenge, AppSec captcha HTML) → relay. Missing or empty-string `challenge` `user_body_content` → `handleBanServeHTTP` with `headerReason` `appsec-challenge-empty` (`ban:appsec-challenge-empty`) before `WriteHeader`. Empty `captcha` body still relays `http_status` (not the operator ban page). AppSec `captcha` is not `pkg/captcha`.
+- `action` allow or empty 200 → `next`. `ban` → `handleBanServeHTTP` with `headerReason` `appsec` (`ban:appsec` when the remediation header is set). Any other non-allow action (challenge, AppSec captcha HTML) → relay, except a matched captcha action rule: non-empty `challenge` body MUST NOT relay (`applyAppsecServeHTTP` returns false so the plugin gate runs). Missing or empty-string `challenge` `user_body_content` → `handleBanServeHTTP` with `headerReason` `appsec-challenge-empty` (`ban:appsec-challenge-empty`) before `WriteHeader`. Empty `captcha` body still relays `http_status` (not the operator ban page). AppSec `captcha` is not `pkg/captcha`.
 - On relay, when `bouncerRemediationHeadersCustomName` is set, write `formatAppsecRelayHeader(decision.Action)`: `captcha` → `captcha:appsec`, `challenge` → `captcha:challenge`, any other action → `{sanitized-action}:appsec` (trim; strip CR/LF/TAB; `:` → `_`). Do not copy raw `decision.Action`. AppSec unpublished / Query error / unusable verdict fail-closed through `headerReason` `appsec-failure` (`ban:appsec-failure` or `captcha:appsec-failure`).
 - On relay, assign `user_headers` onto the writer (`rw.Header()[canonical] = values`): same name replaces, including CSP. Skip hop-by-hop names and `Set-Cookie` in that map. `Header().Add("Set-Cookie")` once per `user_cookies` entry. Do not append a second same-name header and do not join cookies with commas.
 - AppSec HTTP 500, unreachable (transport failure or listener HTTP 502/503/504), AppSec response-body io errors, and an unreadable HTTP/2 or HTTP/3 body on POST, PUT, or PATCH use per-router `bouncerAppsecFailureAction` (`passthrough` | `ban` | `captcha`), not the three removed block bools. `captcha` here is `pkg/captcha`, not AppSec JSON `action: captcha`. A response-body io error keeps `appsecQuery:readBody`. Oversized AppSec bodies do not use this action. A **client disconnect** while buffering a readable forwardable body is not FailureAction: `Query` returns `ErrClientDisconnected`, AppSec is not called, origin is not called, TRACE only, optional `error:client-disconnected` header. Unclassified client-body read faults keep `appsecQuery:GetBody` and today's ban wiring.
@@ -57,6 +57,7 @@ decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
 ## Gotchas
 
 - Challenge always arrives as AppSec listener 403 plus JSON `action: challenge`. Browser status is `http_status` (often 200, sometimes 307).
+- A matched captcha action rule wins over a non-empty AppSec challenge envelope. Empty challenge body still fail-closed bans (`headerReasonAppsecChallengeEmpty`) and WARNs `ServeHTTP:forcedCaptchaSuperseded`.
 - Empty-challenge fail-closed runs in `applyAppsecServeHTTP` before `handleAppsecResponseServeHTTP` and before `WriteHeader`. Do not commit status first.
 - Relay replaces same-name `user_headers` (assign, do not `Add`) and `Add`s each `user_cookies` string as its own `Set-Cookie`.
 - Missing `http_status` is 200. Values outside 100–999 use `remediationStatusCode`.

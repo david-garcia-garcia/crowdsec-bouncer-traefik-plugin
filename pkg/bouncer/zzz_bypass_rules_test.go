@@ -2,6 +2,7 @@ package bouncer
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -21,19 +22,6 @@ import (
 )
 
 const testBypassHealthPath = "/health"
-
-func mustCompileBypass(t *testing.T, rules []httprule.Rule) *httprule.Set {
-	t.Helper()
-	set, err := httprule.New(rules)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return set
-}
-
-func pathBypass(path string) []httprule.Rule {
-	return []httprule.Rule{{Path: path}}
-}
 
 func testBypassHealthRequest() *http.Request {
 	req := httptest.NewRequest(http.MethodGet, "http://example.com"+testBypassHealthPath, nil)
@@ -68,26 +56,28 @@ func testBypassOriginBouncer(t *testing.T) (*Bouncer, *bool) {
 	return b, &passed
 }
 
-func TestBouncerNew_compilesBypassRules(t *testing.T) {
+func TestBouncerNew_compilesActionRules(t *testing.T) {
 	log := logger.New("ERROR", "")
 	cfg := configuration.New()
-	cfg.BouncerAppsecBypassRules = pathBypass("^/healthz$")
-	cfg.BouncerLapiBypassRules = pathBypass("^/ok/")
+	cfg.BouncerActionRules = []httprule.ActionRule{
+		{Name: "healthz", Action: []string{httprule.ActionBypassAppsec}, Rule: httprule.Rule{Path: "^/healthz$"}},
+		{Name: "ok", Action: []string{httprule.ActionBypassLapi}, Rule: httprule.Rule{Path: "^/ok/"}},
+	}
 	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, false, false, log)
 	if err != nil {
 		t.Fatal(err)
 	}
 	appsecReq := httptest.NewRequest(http.MethodGet, "http://example.com/healthz", nil)
-	if !got.appsecBypassRules.Match(appsecReq) {
-		t.Fatal("appsecBypassRules must compile")
+	if hits := got.actionRules.Matching(appsecReq); len(hits) != 1 || !got.actionRules.SkipAppsec(hits[0]) {
+		t.Fatal("appsec action rule must compile")
 	}
 	lapiReq := httptest.NewRequest(http.MethodGet, "http://example.com/ok/x", nil)
-	if !got.lapiBypassRules.Match(lapiReq) {
-		t.Fatal("lapiBypassRules must compile")
+	if hits := got.actionRules.Matching(lapiReq); len(hits) != 1 || !got.actionRules.SkipLapi(hits[0]) {
+		t.Fatal("lapi action rule must compile")
 	}
 }
 
-func TestBouncerNew_emptyBypassRulesMatchNothing(t *testing.T) {
+func TestBouncerNew_emptyActionRulesMatchNothing(t *testing.T) {
 	log := logger.New("ERROR", "")
 	cfg := configuration.New()
 	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, false, false, log)
@@ -95,24 +85,18 @@ func TestBouncerNew_emptyBypassRulesMatchNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/health", nil)
-	if got.lapiBypassRules.Match(req) || got.appsecBypassRules.Match(req) {
-		t.Fatal("empty bypass lists must match nothing")
+	if len(got.actionRules.Matching(req)) != 0 {
+		t.Fatal("empty action lists must match nothing")
 	}
 }
 
-func TestBouncerNew_invalidBypassRules(t *testing.T) {
+func TestBouncerNew_invalidActionRules(t *testing.T) {
 	log := logger.New("ERROR", "")
 	cfg := configuration.New()
-	cfg.BouncerLapiBypassRules = pathBypass("(")
+	cfg.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBypassLapi}, Rule: httprule.Rule{Path: "("}}}
 	_, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, false, false, log)
 	if err == nil {
-		t.Fatal("invalid LAPI bypass must fail New")
-	}
-	cfg = configuration.New()
-	cfg.BouncerAppsecBypassRules = pathBypass("(")
-	_, err = New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, false, false, log)
-	if err == nil {
-		t.Fatal("invalid AppSec bypass must fail New")
+		t.Fatal("invalid action rule must fail New")
 	}
 }
 
@@ -140,7 +124,7 @@ func TestServeHTTP_nonMatchingLapiBypassStillLooksUp(t *testing.T) {
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
 	})
 	bindTestLAPI(b, lapiClient)
-	b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/nomatch$"))
+	b.actionRules = mustPathAction(t, "lapi", "^/nomatch$", httprule.ActionBypassLapi)
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testBypassHealthRequest())
 	if *passed {
@@ -156,7 +140,7 @@ func TestServeHTTP_lapiBypassSkipsUnboundLAPIFailure(t *testing.T) {
 	b.subscribeLAPI = true
 	b.startupBlock = false
 	b.lapiFailureAction = configuration.FailureActionBan
-	b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/health$"))
+	b.actionRules = mustPathAction(t, "lapi", "^/health$", httprule.ActionBypassLapi)
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testBypassHealthRequest())
 	if !*passed {
@@ -175,7 +159,7 @@ func TestServeHTTP_lapiBypassSkipsStreamStoreAndUnhealthy(t *testing.T) {
 	})
 	lapiClient.SetStreamHealthyForTest(false)
 	bindTestLAPI(b, lapiClient)
-	b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/health$"))
+	b.actionRules = mustPathAction(t, "lapi", "^/health$", httprule.ActionBypassLapi)
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testBypassHealthRequest())
 	if !*passed {
@@ -221,7 +205,7 @@ func TestServeHTTP_lapiBypassSkipsLiveAndNoneLookup(t *testing.T) {
 			b, passed := testBypassOriginBouncer(t)
 			b.subscribeLAPI = true
 			b.lapiBound.Store(lapiClient)
-			b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/health$"))
+			b.actionRules = mustPathAction(t, "lapi", "^/health$", httprule.ActionBypassLapi)
 			b.ServeHTTP(httptest.NewRecorder(), testBypassHealthRequest())
 			if !*passed {
 				t.Fatal("LAPI bypass must skip LiveLookup")
@@ -247,7 +231,7 @@ func TestServeHTTP_appsecBypassSkipsQuery(t *testing.T) {
 	}
 	b, passed := testBypassOriginBouncer(t)
 	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
-	b.appsecBypassRules = mustCompileBypass(t, pathBypass("^/health$"))
+	b.actionRules = mustPathAction(t, "appsec", "^/health$", httprule.ActionBypassAppsec)
 	b.ServeHTTP(httptest.NewRecorder(), testBypassHealthRequest())
 	if !*passed {
 		t.Fatal("AppSec bypass must call next")
@@ -271,7 +255,7 @@ func TestServeHTTP_nonMatchingAppsecBypassStillQueries(t *testing.T) {
 	}
 	b, passed := testBypassOriginBouncer(t)
 	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
-	b.appsecBypassRules = mustCompileBypass(t, pathBypass("^/nomatch$"))
+	b.actionRules = mustPathAction(t, "appsec", "^/nomatch$", httprule.ActionBypassAppsec)
 	b.ServeHTTP(httptest.NewRecorder(), testBypassHealthRequest())
 	if !*passed {
 		t.Fatal("non-matching AppSec bypass must call next")
@@ -300,7 +284,7 @@ func TestServeHTTP_lapiBypassDoesNotSkipAppsec(t *testing.T) {
 	})
 	bindTestLAPI(b, lapiClient)
 	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
-	b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/health$"))
+	b.actionRules = mustPathAction(t, "lapi", "^/health$", httprule.ActionBypassLapi)
 	b.ServeHTTP(httptest.NewRecorder(), testBypassHealthRequest())
 	if !*passed {
 		t.Fatal("LAPI bypass still reaches the pass path")
@@ -317,7 +301,7 @@ func TestServeHTTP_appsecBypassDoesNotSkipLapi(t *testing.T) {
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
 	})
 	bindTestLAPI(b, lapiClient)
-	b.appsecBypassRules = mustCompileBypass(t, pathBypass("^/health$"))
+	b.actionRules = mustPathAction(t, "appsec", "^/health$", httprule.ActionBypassAppsec)
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testBypassHealthRequest())
 	if *passed {
@@ -330,7 +314,7 @@ func TestServeHTTP_appsecBypassDoesNotSkipLapi(t *testing.T) {
 
 func TestServeHTTP_forcedBStillBansBeforeLapiBypass(t *testing.T) {
 	b, lapiClient, passed := testForcedDecisionBouncer(t, nil, nil, nil, true)
-	b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/protected$"))
+	b.actionRules = mustPathAndDecision(t, "lapi", "^/protected$", httprule.ActionBypassLapi)
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testForcedDecisionRequest("b"))
 	if *passed {
@@ -339,7 +323,7 @@ func TestServeHTTP_forcedBStillBansBeforeLapiBypass(t *testing.T) {
 	if rw.Code != http.StatusForbidden || rw.Body.String() == "" {
 		t.Fatalf("status=%d body=%q", rw.Code, rw.Body.String())
 	}
-	if got := lapiClient.TestDroppedCount(lapi.OriginPluginForcedDecision, "ipv4", "ban"); got != 1 {
+	if got := lapiClient.TestDroppedCount(lapi.OriginPluginRules("decision-ban"), "ipv4", "ban"); got != 1 {
 		t.Fatalf("dropped origin=%d", got)
 	}
 }
@@ -347,7 +331,7 @@ func TestServeHTTP_forcedBStillBansBeforeLapiBypass(t *testing.T) {
 func TestServeHTTP_forcedCStillCaptchasAfterLapiBypass(t *testing.T) {
 	client := testCaptchaClient(t, "/fast.js", "", "", nil)
 	b, _, passed := testForcedDecisionBouncer(t, nil, client, nil, true)
-	b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/protected$"))
+	b.actionRules = mustPathAndDecision(t, "lapi", "^/protected$", httprule.ActionBypassLapi)
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testForcedDecisionRequest("c"))
 	if *passed {
@@ -373,7 +357,7 @@ func TestServeHTTP_trustedIPStillSkipsPlugin(t *testing.T) {
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
 	})
 	bindTestLAPI(b, lapiClient)
-	b.lapiBypassRules = mustCompileBypass(t, pathBypass("^/nomatch$"))
+	b.actionRules = mustPathAction(t, "lapi", "^/nomatch$", httprule.ActionBypassLapi)
 	b.ServeHTTP(httptest.NewRecorder(), testBypassHealthRequest())
 	if !*passed {
 		t.Fatal("trusted client must skip the whole plugin")
@@ -387,7 +371,7 @@ func TestServeHTTP_unanchoredPathMatchesSubstring(t *testing.T) {
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
 	})
 	bindTestLAPI(b, lapiClient)
-	b.lapiBypassRules = mustCompileBypass(t, pathBypass("health"))
+	b.actionRules = mustPathAction(t, "lapi", "health", httprule.ActionBypassLapi)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/unhealthy", nil)
 	req.Host = "example.com"
 	req.RemoteAddr = "203.0.113.10:1"
@@ -404,7 +388,7 @@ func TestServeHTTP_hostIsNotInPathMatch(t *testing.T) {
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
 	})
 	bindTestLAPI(b, lapiClient)
-	b.lapiBypassRules = mustCompileBypass(t, pathBypass("example.com://health"))
+	b.actionRules = mustPathAction(t, "lapi", "example.com://health", httprule.ActionBypassLapi)
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testBypassHealthRequest())
 	if *passed {
@@ -429,7 +413,7 @@ func TestServeHTTP_queryStringNotInPath(t *testing.T) {
 	}
 	b, passed := testBypassOriginBouncer(t)
 	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
-	b.appsecBypassRules = mustCompileBypass(t, pathBypass("^/health$"))
+	b.actionRules = mustPathAction(t, "appsec", "^/health$", httprule.ActionBypassAppsec)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/health?a=1", nil)
 	req.Host = "example.com"
 	req.RemoteAddr = "203.0.113.10:1"
@@ -439,5 +423,184 @@ func TestServeHTTP_queryStringNotInPath(t *testing.T) {
 	}
 	if atomic.LoadInt64(&hits) != 0 {
 		t.Fatalf("AppSec Query hits=%d want 0", hits)
+	}
+}
+
+func TestServeHTTP_allMatchingSkipsLapiAndAppsec(t *testing.T) {
+	var hits int64
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"action":"allow"}`))
+	}))
+	t.Cleanup(appsecServer.Close)
+	appsecURL, err := url.Parse(appsecServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, passed := testBypassOriginBouncer(t)
+	lapiClient, store := lapi.NewTestClient(b.log)
+	store.Put(decisionstore.Decision{
+		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
+	})
+	bindTestLAPI(b, lapiClient)
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	b.actionRules = mustCompileActions(t, []httprule.ActionRule{
+		{Name: "lapi", Action: []string{httprule.ActionBypassLapi}, Rule: httprule.Rule{Path: "^/health$"}},
+		{Name: "appsec", Action: []string{httprule.ActionBypassAppsec}, Rule: httprule.Rule{Path: "^/health$"}},
+	})
+	b.ServeHTTP(httptest.NewRecorder(), testBypassHealthRequest())
+	if !*passed {
+		t.Fatal("both matching skips must reach origin")
+	}
+	if atomic.LoadInt64(&hits) != 0 {
+		t.Fatalf("AppSec Query hits=%d want 0", hits)
+	}
+}
+
+func TestServeHTTP_captchaPlusBypassSkipsBothThenCaptchas(t *testing.T) {
+	var hits int64
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"action":"ban"}`))
+	}))
+	t.Cleanup(appsecServer.Close)
+	appsecURL, err := url.Parse(appsecServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := testCaptchaClient(t, "/fast.js", "", "", nil)
+	b, passed := testBypassOriginBouncer(t)
+	lapiClient, store := lapi.NewTestClient(b.log)
+	lapi.AttachTestMetricsReporter(lapiClient)
+	store.Put(decisionstore.Decision{
+		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
+	})
+	bindTestLAPI(b, lapiClient)
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	bindTestCaptcha(b, client)
+	b.actionRules = mustPathAction(t, "challenge-health", "^/health$", httprule.ActionCaptcha, httprule.ActionBypass)
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, testBypassHealthRequest())
+	if *passed {
+		t.Fatal("captcha plus bypass must not reach origin")
+	}
+	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
+		t.Fatalf("want captcha page, got %q", rw.Body.String())
+	}
+	if atomic.LoadInt64(&hits) != 0 {
+		t.Fatalf("AppSec Query hits=%d want 0", hits)
+	}
+	if got := lapiClient.TestDroppedCount(lapi.OriginPluginRules("challenge-health"), "ipv4", "captcha"); got != 1 {
+		t.Fatalf("dropped origin=%d", got)
+	}
+}
+
+func TestServeHTTP_captchaPlusBypassLapiStillAllowsAppsecBan(t *testing.T) {
+	log, sink := newTestLogSink(slog.LevelWarn)
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"action":"ban","http_status":403,"user_body_content":"appsec default page"}`))
+	}))
+	t.Cleanup(appsecServer.Close)
+	appsecURL, err := url.Parse(appsecServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := testCaptchaClient(t, "/fast.js", "", "", nil)
+	b, passed := testBypassOriginBouncer(t)
+	b.log = log
+	lapiClient, store := lapi.NewTestClient(log)
+	lapi.AttachTestMetricsReporter(lapiClient)
+	store.Put(decisionstore.Decision{
+		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
+	})
+	bindTestLAPI(b, lapiClient)
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), log))
+	bindTestCaptcha(b, client)
+	b.actionRules = mustPathAction(t, "c", "^/health$", httprule.ActionCaptcha, httprule.ActionBypassLapi)
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, testBypassHealthRequest())
+	if *passed {
+		t.Fatal("AppSec ban must not reach origin")
+	}
+	if rw.Code != http.StatusForbidden || !strings.Contains(rw.Body.String(), "banned") {
+		t.Fatalf("status=%d body=%q", rw.Code, rw.Body.String())
+	}
+	logged := sink.String()
+	if !strings.Contains(logged, "ServeHTTP:forcedCaptchaSuperseded") {
+		t.Fatalf("want WARN forcedCaptchaSuperseded, got %s", logged)
+	}
+	if !strings.Contains(logged, `"name":"c"`) {
+		t.Fatalf("want name=c, got %s", logged)
+	}
+	if got := lapiClient.TestDroppedCount("appsec", "ipv4", "ban"); got != 1 {
+		t.Fatalf("dropped origin=%d", got)
+	}
+}
+
+func TestServeHTTP_nonEmptyAppsecChallengeDoesNotOverrideCaptchaRule(t *testing.T) {
+	var hits int64
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"action":"challenge","http_status":200,"user_body_content":"<html>challenge</html>"}`))
+	}))
+	t.Cleanup(appsecServer.Close)
+	appsecURL, err := url.Parse(appsecServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := testCaptchaClient(t, "/fast.js", "", "", nil)
+	b, passed := testBypassOriginBouncer(t)
+	lapiClient, _ := lapi.NewTestClient(b.log)
+	lapi.AttachTestMetricsReporter(lapiClient)
+	lapiClient.SetStreamHealthyForTest(true)
+	bindTestLAPI(b, lapiClient)
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	bindTestCaptcha(b, client)
+	b.actionRules = mustPathAction(t, "challenge-health", "^/health$", httprule.ActionCaptcha)
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, testBypassHealthRequest())
+	if *passed {
+		t.Fatal("captcha rule must not reach origin")
+	}
+	if atomic.LoadInt64(&hits) != 1 {
+		t.Fatalf("AppSec Query hits=%d want 1", hits)
+	}
+	if strings.Contains(rw.Body.String(), "<html>challenge</html>") {
+		t.Fatal("must not relay the AppSec challenge envelope")
+	}
+	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
+		t.Fatalf("want plugin captcha page, got %q", rw.Body.String())
+	}
+	if got := lapiClient.TestDroppedCount(lapi.OriginPluginRules("challenge-health"), "ipv4", "captcha"); got != 1 {
+		t.Fatalf("dropped origin=%d", got)
+	}
+}
+
+func TestServeHTTP_firstMatchingBanNameWins(t *testing.T) {
+	b, passed := testBypassOriginBouncer(t)
+	lapiClient, _ := lapi.NewTestClient(b.log)
+	lapi.AttachTestMetricsReporter(lapiClient)
+	bindTestLAPI(b, lapiClient)
+	b.actionRules = mustCompileActions(t, []httprule.ActionRule{
+		{Name: "first", Action: []string{httprule.ActionBan}, Rule: httprule.Rule{Path: "^/health$"}},
+		{Name: "second", Action: []string{httprule.ActionBan}, Rule: httprule.Rule{Path: "^/health$"}},
+	})
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, testBypassHealthRequest())
+	if *passed {
+		t.Fatal("matching ban must not reach origin")
+	}
+	if rw.Code != http.StatusForbidden || !strings.Contains(rw.Body.String(), "banned") {
+		t.Fatalf("status=%d body=%q", rw.Code, rw.Body.String())
+	}
+	if got := lapiClient.TestDroppedCount(lapi.OriginPluginRules("first"), "ipv4", "ban"); got != 1 {
+		t.Fatalf("dropped origin=%d", got)
+	}
+	if got := lapiClient.TestDroppedCount(lapi.OriginPluginRules("second"), "ipv4", "ban"); got != 0 {
+		t.Fatalf("second ban name dropped=%d", got)
 	}
 }

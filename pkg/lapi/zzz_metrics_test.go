@@ -64,7 +64,7 @@ func TestReportMetricsPluginFailClosedOrigins(t *testing.T) {
 		OriginPluginTechStreamFail,
 		OriginPluginLapiFailure,
 		OriginPluginAppsecFailure,
-		OriginPluginForcedDecision,
+		OriginPluginRules("healthz"),
 	}
 	for _, origin := range origins {
 		client.IncDropped(origin, "ipv4", "ban")

@@ -25,8 +25,13 @@ const (
 	OriginPluginTechStreamFail    = "plugin:tech_streamfail"    // stream unhealthy
 	OriginPluginLapiFailure       = "plugin:lapi_failure"       // live LAPI lookup error
 	OriginPluginAppsecFailure     = "plugin:appsec_failure"     // AppSec failure-action
-	OriginPluginForcedDecision    = "plugin:forced_decision"    // crowdsecDecisionHeader forced b or c
+	OriginPluginRulesPrefix       = "plugin:rules:"             // action-rule applied ban or captcha
 )
+
+// OriginPluginRules is the usage-metrics origin for a matching action rule of the winning kind.
+func OriginPluginRules(name string) string {
+	return OriginPluginRulesPrefix + name
+}
 
 // crowdsecQueryFunc POSTs through the Client's current LAPI transport.
 type crowdsecQueryFunc func(stringURL string, data []byte) ([]byte, error)
