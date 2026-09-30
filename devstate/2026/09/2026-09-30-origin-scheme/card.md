@@ -26,14 +26,14 @@ A Go httptest through the plugin forges proto and TLS and asserts `Secure` on `c
 In progress. 0 items remain.
 
 Priority: P2 — HTTPS clients get the AppSec challenge cookie without Secure, limited to bot-detection and that cookie
-Reviewed head: f89768a9
+Reviewed head: eb4b6588
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36754025223 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | N/A | no OPEN PR |
 
@@ -43,14 +43,14 @@ Owner decision: None.
 | Branch | 2026-09-30-origin-scheme pushed | `git` |
 | OpenSpec | origin-scheme | `openspec/` |
 | Pull request | none | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 36754025223 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36754025223 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36754025223 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
 Worktree:
 - [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-30-origin-scheme/openspec/changes/archive/2026-09-30-origin-scheme/proposal.md) — modified
-- [core_plugin_clientrequest_inbound-request](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-30-origin-scheme/openspec/changes/archive/2026-09-30-origin-scheme/proposal.md) — added
+- [core_plugin_clientrequest_inbound-request](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-30-origin-scheme/openspec/changes/archive/2026-09-30-origin-scheme/proposal.md) — modified
 - [core_plugin_middleware_captcha-gate](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-30-origin-scheme/openspec/changes/archive/2026-09-30-origin-scheme/proposal.md) — modified
 
 Completed:
@@ -67,7 +67,7 @@ Completed:
 None.
 
 ## How this fits together
-Ticket 2026-09-30-origin-scheme on branch 2026-09-30-origin-scheme targeting master; PR no PR yet; CI not seen.
+Ticket 2026-09-30-origin-scheme on branch 2026-09-30-origin-scheme targeting master; PR no PR yet; CI build 36754025223 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36754025223.
 
 ## Explore Decisions
 None.
@@ -91,9 +91,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 2 added / 4 modified | Same list as ## Specs |
+| Specs in this PR | 1 added / 5 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | f89768a96072ea62da56c1484373a37344a3a1b5 | Card must match the branch you measured |
+| Reviewed head | eb4b65884e9b76f413c1808b233284259506629d | Card must match the branch you measured |
 
 ### Stored data model
 None.
