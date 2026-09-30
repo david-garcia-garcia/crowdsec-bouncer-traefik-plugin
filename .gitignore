@@ -31,8 +31,3 @@ tmp/
 .agents/
 .cursor/
 .pin_diff/
-
-# In-flight OpenSpec change (archive stays tracked)
-openspec/changes/*
-!openspec/changes/archive/
-!openspec/changes/archive/**
