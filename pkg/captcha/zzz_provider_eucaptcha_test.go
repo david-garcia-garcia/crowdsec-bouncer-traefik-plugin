@@ -106,7 +106,7 @@ func Test_Validate_eucaptchaURLAndJSONFields(t *testing.T) {
 	req.Header.Set("X-Forwarded-For", "198.51.100.1")
 	req.Header.Set("X-Real-Ip", "198.51.100.2")
 	req.Header.Set("X-Client-Ip", "198.51.100.3")
-	outcome, err := client.Validate(req, "203.0.113.9")
+	outcome, err := client.Validate(testCaptchaRequest(req, "203.0.113.9"))
 	if err != nil || outcome != Pass {
 		t.Fatalf("want Pass, got outcome=%v err=%v", outcome, err)
 	}
@@ -149,7 +149,7 @@ func Test_Validate_eucaptchaURLAndJSONFields(t *testing.T) {
 func Test_Validate_eucaptchaEmptyRemoteIPDoesNotPost(t *testing.T) {
 	trip := &eucaptchaTrip{status: http.StatusOK, body: `{"success": true, "train": false}`}
 	client := newTestEucaptchaClient(t, &http.Client{Transport: trip})
-	outcome, err := client.Validate(eucaptchaSolverPOST(), "")
+	outcome, err := client.Validate(testCaptchaRequest(eucaptchaSolverPOST(), ""))
 	if err != nil || outcome != Reject {
 		t.Fatalf("got outcome=%v err=%v", outcome, err)
 	}
@@ -162,7 +162,7 @@ func Test_Validate_eucaptchaEmptyUserAgentIsSent(t *testing.T) {
 	trip := &eucaptchaTrip{status: http.StatusOK, body: `{"success": true, "train": false}`}
 	client := newTestEucaptchaClient(t, &http.Client{Transport: trip})
 	req := eucaptchaSolverPOST()
-	outcome, err := client.Validate(req, "203.0.113.9")
+	outcome, err := client.Validate(testCaptchaRequest(req, "203.0.113.9"))
 	if err != nil || outcome != Pass {
 		t.Fatalf("got outcome=%v err=%v", outcome, err)
 	}
@@ -195,7 +195,7 @@ func Test_Validate_eucaptchaSuccessTrainMatrix(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			trip := &eucaptchaTrip{status: http.StatusOK, body: tt.body}
 			client := newTestEucaptchaClient(t, &http.Client{Transport: trip})
-			outcome, err := client.Validate(eucaptchaSolverPOST(), "203.0.113.9")
+			outcome, err := client.Validate(testCaptchaRequest(eucaptchaSolverPOST(), "203.0.113.9"))
 			if (err != nil) != tt.wantErr || outcome != tt.want {
 				t.Fatalf("got outcome=%v err=%v", outcome, err)
 			}
@@ -207,7 +207,7 @@ func Test_Validate_eucaptchaErrorVersusReject(t *testing.T) {
 	t.Run("non-2xx is error", func(t *testing.T) {
 		trip := &eucaptchaTrip{status: http.StatusBadRequest, body: `{"error":"missing_field"}`}
 		client := newTestEucaptchaClient(t, &http.Client{Transport: trip})
-		outcome, err := client.Validate(eucaptchaSolverPOST(), "203.0.113.9")
+		outcome, err := client.Validate(testCaptchaRequest(eucaptchaSolverPOST(), "203.0.113.9"))
 		if err == nil || outcome != None {
 			t.Fatalf("got outcome=%v err=%v", outcome, err)
 		}
@@ -215,7 +215,7 @@ func Test_Validate_eucaptchaErrorVersusReject(t *testing.T) {
 	t.Run("empty body is error", func(t *testing.T) {
 		trip := &eucaptchaTrip{status: http.StatusOK, body: ""}
 		client := newTestEucaptchaClient(t, &http.Client{Transport: trip})
-		outcome, err := client.Validate(eucaptchaSolverPOST(), "203.0.113.9")
+		outcome, err := client.Validate(testCaptchaRequest(eucaptchaSolverPOST(), "203.0.113.9"))
 		if err == nil || outcome != None {
 			t.Fatalf("got outcome=%v err=%v", outcome, err)
 		}
@@ -223,7 +223,7 @@ func Test_Validate_eucaptchaErrorVersusReject(t *testing.T) {
 	t.Run("non-JSON body is error", func(t *testing.T) {
 		trip := &eucaptchaTrip{status: http.StatusOK, body: "not-json"}
 		client := newTestEucaptchaClient(t, &http.Client{Transport: trip})
-		outcome, err := client.Validate(eucaptchaSolverPOST(), "203.0.113.9")
+		outcome, err := client.Validate(testCaptchaRequest(eucaptchaSolverPOST(), "203.0.113.9"))
 		if err == nil || outcome != None {
 			t.Fatalf("got outcome=%v err=%v", outcome, err)
 		}
@@ -232,7 +232,7 @@ func Test_Validate_eucaptchaErrorVersusReject(t *testing.T) {
 		oversized := `{"success":true,"train":false,"pad":"` + strings.Repeat("x", 64<<10) + `"}`
 		trip := &eucaptchaTrip{status: http.StatusOK, body: oversized}
 		client := newTestEucaptchaClient(t, &http.Client{Transport: trip})
-		outcome, err := client.Validate(eucaptchaSolverPOST(), "203.0.113.9")
+		outcome, err := client.Validate(testCaptchaRequest(eucaptchaSolverPOST(), "203.0.113.9"))
 		if err == nil || outcome != None {
 			t.Fatalf("got outcome=%v err=%v", outcome, err)
 		}
@@ -244,7 +244,7 @@ func Test_Validate_eucaptchaEmptyTokenDoesNotPost(t *testing.T) {
 	client := newTestEucaptchaClient(t, &http.Client{Transport: trip})
 	emptyPOST := httptest.NewRequest(http.MethodPost, "/foo", strings.NewReader(""))
 	emptyPOST.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	outcome, err := client.Validate(emptyPOST, "203.0.113.9")
+	outcome, err := client.Validate(testCaptchaRequest(emptyPOST, "203.0.113.9"))
 	if err != nil || outcome != None {
 		t.Fatalf("got outcome=%v err=%v", outcome, err)
 	}
@@ -257,7 +257,7 @@ func Test_ServeHTTP_eucaptchaPassMintsGateAnd302(t *testing.T) {
 	trip := &eucaptchaTrip{status: http.StatusOK, body: `{"success": true, "train": false}`}
 	client := newTestEucaptchaClient(t, &http.Client{Transport: trip})
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, eucaptchaSolverPOST(), "192.0.2.10", "", "")
+	client.ServeHTTP(rw, testCaptchaRequest(eucaptchaSolverPOST(), "192.0.2.10"), "", "")
 	if rw.Code != http.StatusFound {
 		t.Fatalf("pass want 302, got %d", rw.Code)
 	}
@@ -271,7 +271,7 @@ func Test_ServeHTTP_eucaptchaTrainTrueDoesNotMint(t *testing.T) {
 	trip := &eucaptchaTrip{status: http.StatusOK, body: `{"success": true, "train": true}`}
 	client := newTestEucaptchaClient(t, &http.Client{Transport: trip})
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, eucaptchaSolverPOST(), "192.0.2.10", "", "")
+	client.ServeHTTP(rw, testCaptchaRequest(eucaptchaSolverPOST(), "192.0.2.10"), "", "")
 	if rw.Code != http.StatusOK {
 		t.Fatalf("train true want 200, got %d", rw.Code)
 	}
@@ -284,7 +284,7 @@ func Test_ServeHTTP_eucaptchaErrorRendersChallenge(t *testing.T) {
 	trip := &eucaptchaTrip{status: http.StatusInternalServerError, body: `{"error":"server"}`}
 	client := newTestEucaptchaClient(t, &http.Client{Transport: trip})
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, eucaptchaSolverPOST(), "192.0.2.10", "", "")
+	client.ServeHTTP(rw, testCaptchaRequest(eucaptchaSolverPOST(), "192.0.2.10"), "", "")
 	if rw.Code != http.StatusOK {
 		t.Fatalf("error want 200, got %d", rw.Code)
 	}
@@ -315,7 +315,7 @@ func Test_ServeHTTP_eucaptchaStockTemplate(t *testing.T) {
 		t.Fatal(err)
 	}
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/foo", nil), "192.0.2.10", "", "")
+	client.ServeHTTP(rw, testCaptchaRequest(httptest.NewRequest(http.MethodGet, "/foo", nil), "192.0.2.10"), "", "")
 	if rw.Code != http.StatusOK {
 		t.Fatalf("GET want 200, got %d", rw.Code)
 	}

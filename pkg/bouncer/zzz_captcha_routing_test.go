@@ -79,7 +79,7 @@ func solveTestGateCookie(t *testing.T, client *captcha.Client) string {
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/protected", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, req, testCaptchaRemoteIP, "", "")
+	client.ServeHTTP(rw, testClientRequest(req, testCaptchaRemoteIP), "", "")
 	if rw.Code != http.StatusFound {
 		body, _ := io.ReadAll(rw.Result().Body)
 		t.Fatalf("solve want 302, got %d %s", rw.Code, body)

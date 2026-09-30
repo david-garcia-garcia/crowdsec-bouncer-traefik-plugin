@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
@@ -39,6 +41,11 @@ func (b failingBody) Read(_ []byte) (int, error) {
 
 func (failingBody) Close() error { return nil }
 
+// testAppsecRequest wraps a Query test request with the standard 1.2.3.4 client address.
+func testAppsecRequest(httpReq *http.Request) clientrequest.Request {
+	return clientrequest.New(httpReq, "1.2.3.4", net.ParseIP("1.2.3.4"), "ipv4")
+}
+
 func newReadablePostWithFailingBody(readErr error) *http.Request {
 	req := httptest.NewRequest(http.MethodPost, "http://localhost/", failingBody{err: readErr})
 	req.ProtoMajor = 1
@@ -57,7 +64,7 @@ func assertClientDisconnectedQuery(t *testing.T, readErr error, failureAction st
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
 	client := newQueryClient(appsecURL, appsecServer.Client())
-	decision, err := client.Query("1.2.3.4", newReadablePostWithFailingBody(readErr), Policy{FailureAction: failureAction})
+	decision, err := client.Query(testAppsecRequest(newReadablePostWithFailingBody(readErr)), Policy{FailureAction: failureAction})
 	if !errors.Is(err, ErrClientDisconnected) {
 		t.Fatalf("Query() error %v want ErrClientDisconnected", err)
 	}
@@ -80,7 +87,7 @@ func assertUnclassifiedBodyReadStillGetBody(t *testing.T) {
 	appsecURL, _ := url.Parse(appsecServer.URL)
 	client := newQueryClient(appsecURL, appsecServer.Client())
 	sentinel := errors.New("disk read fault")
-	_, err := client.Query("1.2.3.4", newReadablePostWithFailingBody(sentinel), Policy{FailureAction: configuration.FailureActionPassthrough})
+	_, err := client.Query(testAppsecRequest(newReadablePostWithFailingBody(sentinel)), Policy{FailureAction: configuration.FailureActionPassthrough})
 	if err == nil {
 		t.Fatal("Query() expected error for unclassified body read failure")
 	}
@@ -169,7 +176,7 @@ func Test_appsecQuery_streamingDoesNotBlock(t *testing.T) {
 	defer close(done)
 	finished := make(chan error, 1)
 	go func() {
-		_, err := client.Query("1.2.3.4", newStreamingRequest(done), Policy{FailureAction: configuration.FailureActionPassthrough})
+		_, err := client.Query(testAppsecRequest(newStreamingRequest(done)), Policy{FailureAction: configuration.FailureActionPassthrough})
 		finished <- err
 	}()
 	select {
@@ -193,7 +200,7 @@ func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
 	defer close(done)
 	finished := make(chan error, 1)
 	go func() {
-		_, err := client.Query("1.2.3.4", newStreamingRequest(done), Policy{FailureAction: configuration.FailureActionBan})
+		_, err := client.Query(testAppsecRequest(newStreamingRequest(done)), Policy{FailureAction: configuration.FailureActionBan})
 		finished <- err
 	}()
 	select {
@@ -224,7 +231,7 @@ func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 	defer close(done)
 	finished := make(chan error, 1)
 	go func() {
-		_, err := client.Query("1.2.3.4", newUnreadableGetRequest(done), Policy{FailureAction: configuration.FailureActionBan})
+		_, err := client.Query(testAppsecRequest(newUnreadableGetRequest(done)), Policy{FailureAction: configuration.FailureActionBan})
 		finished <- err
 	}()
 	select {
@@ -257,7 +264,7 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 			const calls = 10
 			for i := 0; i < calls; i++ { //nolint:intrange
 				req, _ := http.NewRequest(http.MethodGet, "http://localhost/", nil)
-				_, _ = client.Query("1.2.3.4", req, Policy{FailureAction: configuration.FailureActionPassthrough})
+				_, _ = client.Query(testAppsecRequest(req), Policy{FailureAction: configuration.FailureActionPassthrough})
 			}
 			mu.Lock()
 			defer mu.Unlock()
@@ -281,7 +288,7 @@ func Test_appsecQuery_userAgentIncludesPluginVersion(t *testing.T) {
 	appsecURL, _ := url.Parse(appsecServer.URL)
 	client := newQueryClient(appsecURL, appsecServer.Client())
 	client.pluginVersion = wantVersion
-	_, err := client.Query("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), Policy{})
+	_, err := client.Query(testAppsecRequest(httptest.NewRequest(http.MethodGet, "http://localhost/", nil)), Policy{})
 	if err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
@@ -298,7 +305,7 @@ func Test_appsecQuery_allowJSONPasses(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), Policy{})
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(testAppsecRequest(httptest.NewRequest(http.MethodGet, "http://localhost/", nil)), Policy{})
 	if err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
@@ -313,7 +320,7 @@ func Test_appsecQuery_emptyOKPasses(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), Policy{})
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(testAppsecRequest(httptest.NewRequest(http.MethodGet, "http://localhost/", nil)), Policy{})
 	if err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
@@ -329,7 +336,7 @@ func Test_appsecQuery_challengeJSON(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), Policy{})
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(testAppsecRequest(httptest.NewRequest(http.MethodGet, "http://localhost/", nil)), Policy{})
 	if err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
@@ -348,7 +355,7 @@ func Test_appsecQuery_captchaJSON(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), Policy{})
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(testAppsecRequest(httptest.NewRequest(http.MethodGet, "http://localhost/", nil)), Policy{})
 	if err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
@@ -366,7 +373,7 @@ func Test_appsecQuery_emptyForbiddenErrors(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), Policy{})
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(testAppsecRequest(httptest.NewRequest(http.MethodGet, "http://localhost/", nil)), Policy{})
 	if err == nil {
 		t.Fatal("Query() expected error for empty 403")
 	}
@@ -382,7 +389,7 @@ func Test_appsecQuery_oversizedOKResponsePasses(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), Policy{})
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(testAppsecRequest(httptest.NewRequest(http.MethodGet, "http://localhost/", nil)), Policy{})
 	if err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
@@ -408,7 +415,7 @@ func Test_appsecQuery_zeroBodyLimitForwardsPost(t *testing.T) {
 	client := newQueryClient(appsecURL, appsecServer.Client())
 	client.appsecBodyLimit = 0
 	req := httptest.NewRequest(http.MethodPost, "http://localhost/", strings.NewReader(payload))
-	_, err := client.Query("1.2.3.4", req, Policy{})
+	_, err := client.Query(testAppsecRequest(req), Policy{})
 	if err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
@@ -455,7 +462,7 @@ func Test_appsecQuery_rebuildsContentLengthFromForwardedBytes(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "http://localhost/", strings.NewReader(forwarded))
 	req.Header.Set("Content-Length", "999")
 	req.Header.Set("Transfer-Encoding", "chunked")
-	_, err := client.Query("1.2.3.4", req, Policy{})
+	_, err := client.Query(testAppsecRequest(req), Policy{})
 	if err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
@@ -490,7 +497,7 @@ func Test_appsecQuery_unreadableBodyDeleteNotDropped(t *testing.T) {
 	defer close(done)
 	finished := make(chan error, 1)
 	go func() {
-		_, err := client.Query("1.2.3.4", newUnreadableDeleteRequest(done), Policy{FailureAction: configuration.FailureActionBan})
+		_, err := client.Query(testAppsecRequest(newUnreadableDeleteRequest(done)), Policy{FailureAction: configuration.FailureActionBan})
 		finished <- err
 	}()
 	select {
@@ -556,7 +563,7 @@ func Test_appsecQuery_forwardsBodyOnlyForBodyMethods(t *testing.T) {
 			}
 			capture := &forwardCaptureRoundTripper{}
 			req := httptest.NewRequest(tt.method, "http://localhost/", strings.NewReader(payload))
-			if _, err := newForwardCaptureClient(capture).Query("1.2.3.4", req, Policy{}); err != nil {
+			if _, err := newForwardCaptureClient(capture).Query(testAppsecRequest(req), Policy{}); err != nil {
 				t.Fatalf("Query() returned error: %v", err)
 			}
 			if capture.method != wantMethod {
@@ -595,7 +602,7 @@ func Test_appsecQuery_stripsHopByHopHeaders(t *testing.T) {
 	}
 	req.Header.Set("Cookie", "session=keep")
 	req.Header.Set("X-Forwarded-For", "1.2.3.4")
-	if _, err := newForwardCaptureClient(capture).Query("1.2.3.4", req, Policy{}); err != nil {
+	if _, err := newForwardCaptureClient(capture).Query(testAppsecRequest(req), Policy{}); err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
 	for _, name := range hopByHop {
@@ -665,6 +672,34 @@ func Test_isMethodWithForwardableBody(t *testing.T) {
 	}
 }
 
+func Test_appsecQuery_originFormURIUsesConstructorScheme(t *testing.T) {
+	gotURI := ""
+	gotHost := ""
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		gotURI = r.Header.Get(crowdsecAppsecURIHeader)
+		gotHost = r.Header.Get(crowdsecAppsecHostHeader)
+		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write([]byte(`{"action":"allow"}`))
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	httpReq := httptest.NewRequest(http.MethodGet, "/foo?q=1", nil)
+	httpReq.Host = "app.example"
+	httpReq.URL.Scheme = ""
+	httpReq.URL.Host = ""
+	httpReq.Header.Set("X-Forwarded-Proto", "https")
+	_, err := newQueryClient(appsecURL, appsecServer.Client()).Query(clientrequest.New(httpReq, "1.2.3.4", net.ParseIP("1.2.3.4"), "ipv4"), Policy{})
+	if err != nil {
+		t.Fatalf("Query() returned error: %v", err)
+	}
+	if gotURI != "https://app.example/foo?q=1" {
+		t.Fatalf("X-Crowdsec-Appsec-Uri %q", gotURI)
+	}
+	if gotHost != "app.example" {
+		t.Fatalf("X-Crowdsec-Appsec-Host %q", gotHost)
+	}
+}
+
 func Test_appsecQuery_oversizedForbiddenResponseBlocks(t *testing.T) {
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusForbidden)
@@ -672,7 +707,7 @@ func Test_appsecQuery_oversizedForbiddenResponseBlocks(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), Policy{})
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(testAppsecRequest(httptest.NewRequest(http.MethodGet, "http://localhost/", nil)), Policy{})
 	if err == nil {
 		t.Fatal("Query() expected error, got nil")
 	}

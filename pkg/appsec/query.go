@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 )
 
@@ -131,8 +132,8 @@ func isHopByHopHeader(name string) bool {
 
 // Query forwards the request to this AppSec HTTP client.
 // A structured JSON envelope is returned when AppSec supplies a non-empty action.
-func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response, error) {
-	req, err := c.newAppsecForwardRequest(ip, httpReq, pol)
+func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error) {
+	appsecReq, err := c.newAppsecForwardRequest(req, pol)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +143,7 @@ func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response,
 		c.log.Error("appsecQuery:unreachable")
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
-	res, err := current.httpClient.Do(req)
+	res, err := current.httpClient.Do(appsecReq)
 	if err != nil {
 		c.log.Error("appsecQuery:unreachable")
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
@@ -172,43 +173,43 @@ func (c *Client) Query(ip string, httpReq *http.Request, pol Policy) (*Response,
 }
 
 // newAppsecForwardRequest builds the AppSec listener request, copying client headers and identity.
-func (c *Client) newAppsecForwardRequest(ip string, httpReq *http.Request, pol Policy) (*http.Request, error) {
+func (c *Client) newAppsecForwardRequest(req clientrequest.Request, pol Policy) (*http.Request, error) {
 	routeURL := url.URL{
 		Scheme: c.appsecScheme,
 		Host:   c.appsecHost,
 		Path:   c.appsecPath,
 	}
-	req, err := c.newAppsecBodyRequest(routeURL.String(), httpReq, pol)
+	appsecReq, err := c.newAppsecBodyRequest(routeURL.String(), req.Request, pol)
 	if err != nil {
 		return nil, err
 	}
 	// Omit hop-by-hop headers (Transfer-Encoding among them) and the client Content-Length;
 	// the length is rebuilt below from the bytes actually forwarded.
-	for key, headers := range httpReq.Header {
+	for key, headers := range req.Header {
 		if isHopByHopHeader(key) || strings.EqualFold(key, "Content-Length") {
 			continue
 		}
 		for _, value := range headers {
-			req.Header.Add(key, value)
+			appsecReq.Header.Add(key, value)
 		}
 	}
 	// POST is the only outbound method that carries bytes; a bodyless GET gets no length header.
-	if req.Method == http.MethodPost {
-		req.Header.Set("Content-Length", strconv.FormatInt(req.ContentLength, 10))
+	if appsecReq.Method == http.MethodPost {
+		appsecReq.Header.Set("Content-Length", strconv.FormatInt(appsecReq.ContentLength, 10))
 	}
 	current := c.currentTransport()
 	appsecKey := ""
 	if current != nil {
 		appsecKey = current.key
 	}
-	req.Header.Set(crowdsecAppsecHeader, appsecKey)
-	req.Header.Set(crowdsecAppsecIPHeader, ip)
-	req.Header.Set(crowdsecAppsecVerbHeader, httpReq.Method)
-	req.Header.Set(crowdsecAppsecHostHeader, httpReq.Host)
-	req.Header.Set(crowdsecAppsecURIHeader, httpReq.URL.String())
-	req.Header.Set(crowdsecAppsecUserAgent, httpReq.Header.Get("User-Agent"))
-	req.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+c.pluginVersion)
-	return req, nil
+	appsecReq.Header.Set(crowdsecAppsecHeader, appsecKey)
+	appsecReq.Header.Set(crowdsecAppsecIPHeader, req.RemoteIP)
+	appsecReq.Header.Set(crowdsecAppsecVerbHeader, req.Method)
+	appsecReq.Header.Set(crowdsecAppsecHostHeader, req.Host)
+	appsecReq.Header.Set(crowdsecAppsecURIHeader, req.AbsoluteURL())
+	appsecReq.Header.Set(crowdsecAppsecUserAgent, req.Header.Get("User-Agent"))
+	appsecReq.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+c.pluginVersion)
+	return appsecReq, nil
 }
 
 // newAppsecBodyRequest chooses GET (no, unreadable, or non-body-method body) or POST (copied client

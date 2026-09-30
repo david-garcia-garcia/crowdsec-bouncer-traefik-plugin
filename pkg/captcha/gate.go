@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 )
 
 const (
@@ -72,7 +74,7 @@ func validateGateValue(secret []byte, bindIPConfig bool, remoteIP, value string,
 }
 
 // setGateCookie writes crowdsec_captcha_gate onto rw.
-func setGateCookie(rw http.ResponseWriter, r *http.Request, value string, maxAge int64) {
+func setGateCookie(rw http.ResponseWriter, req clientrequest.Request, value string, maxAge int64) {
 	cookie := &http.Cookie{
 		Name:     gateCookieName,
 		Value:    value,
@@ -81,8 +83,8 @@ func setGateCookie(rw http.ResponseWriter, r *http.Request, value string, maxAge
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	}
-	// Secure on connection TLS or Traefik-left X-Forwarded-Proto https.
-	if r.TLS != nil || strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")), "https") {
+	// Secure iff the inbound-request scheme is https. Captcha does not read proto or TLS.
+	if req.Scheme() == "https" {
 		cookie.Secure = true
 	}
 	http.SetCookie(rw, cookie)

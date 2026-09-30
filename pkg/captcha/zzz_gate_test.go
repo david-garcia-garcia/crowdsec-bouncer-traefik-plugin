@@ -7,13 +7,20 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 )
+
+// testCaptchaRequest wraps httpReq plus remoteIP for Check, Validate, ServeHTTP, and setGateCookie tests.
+func testCaptchaRequest(httpReq *http.Request, remoteIP string) clientrequest.Request {
+	return clientrequest.New(httpReq, remoteIP, nil, "")
+}
 
 // issuedGateCookie calls setGateCookie and returns the cookie written to rw.
 func issuedGateCookie(t *testing.T, req *http.Request) *http.Cookie {
 	t.Helper()
 	rw := httptest.NewRecorder()
-	setGateCookie(rw, req, "v", 60)
+	setGateCookie(rw, testCaptchaRequest(req, ""), "v", 60)
 	cookies := rw.Result().Cookies()
 	if len(cookies) != 1 {
 		t.Fatalf("got %d cookies, want 1", len(cookies))
@@ -79,7 +86,7 @@ func Test_Check_readsCookie(t *testing.T) {
 	value := mintGateValue(secret, true, "10.0.0.2", now)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.AddCookie(&http.Cookie{Name: gateCookieName, Value: value})
-	if !client.Check(req, "10.0.0.2") {
+	if !client.Check(testCaptchaRequest(req, "10.0.0.2")) {
 		t.Fatal("Check should accept valid cookie")
 	}
 }
@@ -103,6 +110,16 @@ func Test_setGateCookie_connectionTLSSetsSecure(t *testing.T) {
 	cookie := issuedGateCookie(t, req)
 	if !cookie.Secure {
 		t.Fatal("Secure=false when request TLS is set")
+	}
+}
+
+func Test_setGateCookie_protoHTTPWithTLSOmitsSecure(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("X-Forwarded-Proto", "http")
+	req.TLS = &tls.ConnectionState{}
+	cookie := issuedGateCookie(t, req)
+	if cookie.Secure {
+		t.Fatal("Secure=true for proto http with TLS set")
 	}
 }
 

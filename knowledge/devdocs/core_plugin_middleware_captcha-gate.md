@@ -8,14 +8,14 @@ _Avoid_: `{ip}_captcha`, `CaptchaDoneValue`, reusing `CaptchaSecretKey` for the 
 
 ## Overview
 
-Configure `captchaGateSecret` (or file) when `captchaEnabled` is true. Optional `captchaGateBindIp` (default true) ties the cookie to `clientRequest.remoteIP` after ServeHTTP has canonicalized a successful parse.
+Configure `captchaGateSecret` (or file) when `captchaEnabled` is true. Optional `captchaGateBindIp` (default true) ties the cookie to `clientRequest.RemoteIP` after ServeHTTP has canonicalized a successful parse.
 
 ## How to use
 
-- Validation: `pkg/captcha.Client.Check(r, remoteIP)` reads the cookie only; stale cache grace keys are ignored.
+- Validation: `pkg/captcha.Client.Check(req)` reads the cookie only; stale cache grace keys are ignored.
 - After solve: `ServeHTTP` sets the gate cookie then 302; no cache write.
 - Cookie-only mode: set `captchaGateBindIp` false; payload uses bind flag `0` and empty IP segment.
-- Set `Secure` when the request has TLS or Traefik-left `X-Forwarded-Proto` is `https` (trim, case-insensitive, whole value). Do not copy `GetRemoteIP` hop trust into captcha.
+- Set `Secure` when the inbound-request scheme is `https`. Captcha MUST NOT read `X-Forwarded-Proto` or `Request.TLS`. Do not copy `GetRemoteIP` hop trust into captcha.
 
 ## Key files
 

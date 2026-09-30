@@ -80,7 +80,7 @@ func Test_Validate_customJSONPostsJSONSecretAndResponse(t *testing.T) {
 	t.Cleanup(siteverify.Close)
 
 	client := newTestCaptchaClient(t, configuration.CustomProvider, configuration.CaptchaCustomValidateBodyJSON, siteverify.URL+"/siteverify", siteverify.Client())
-	outcome, err := client.Validate(solverPOST(), "")
+	outcome, err := client.Validate(testCaptchaRequest(solverPOST(), ""))
 	if err != nil || outcome != Pass {
 		t.Fatalf("Validate json want success, got outcome=%v err=%v", outcome, err)
 	}
@@ -113,7 +113,7 @@ func Test_Validate_customJSONPostsRemoteIP(t *testing.T) {
 	t.Cleanup(siteverify.Close)
 
 	client := newTestCaptchaClient(t, configuration.CustomProvider, configuration.CaptchaCustomValidateBodyJSON, siteverify.URL+"/siteverify", siteverify.Client())
-	outcome, err := client.Validate(solverPOST(), passedRemoteIP)
+	outcome, err := client.Validate(testCaptchaRequest(solverPOST(), passedRemoteIP))
 	if err != nil || outcome != Pass {
 		t.Fatalf("Validate json want success, got outcome=%v err=%v", outcome, err)
 	}
@@ -140,7 +140,7 @@ func Test_Validate_customFormOrOmitStaysURLEncoded(t *testing.T) {
 			t.Cleanup(siteverify.Close)
 
 			client := newTestCaptchaClient(t, configuration.CustomProvider, validateBody, siteverify.URL+"/siteverify", siteverify.Client())
-			outcome, err := client.Validate(solverPOST(), "")
+			outcome, err := client.Validate(testCaptchaRequest(solverPOST(), ""))
 			if err != nil || outcome != Pass {
 				t.Fatalf("Validate form want success, got outcome=%v err=%v", outcome, err)
 			}
@@ -173,7 +173,7 @@ func Test_Validate_builtinAlwaysURLEncoded(t *testing.T) {
 	t.Cleanup(siteverify.Close)
 
 	client := newTestCaptchaClient(t, configuration.HcaptchaProvider, configuration.CaptchaCustomValidateBodyJSON, siteverify.URL+"/siteverify", siteverify.Client())
-	outcome, err := client.Validate(solverPOST(), "")
+	outcome, err := client.Validate(testCaptchaRequest(solverPOST(), ""))
 	if err != nil || outcome != Pass {
 		t.Fatalf("built-in Validate want success, got outcome=%v err=%v", outcome, err)
 	}
@@ -198,7 +198,7 @@ func Test_ServeHTTP_customJSONSuccessIssuesCookieAnd302(t *testing.T) {
 
 	client := newTestCaptchaClient(t, configuration.CustomProvider, configuration.CaptchaCustomValidateBodyJSON, siteverify.URL+"/siteverify", siteverify.Client())
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, solverPOST(), "192.0.2.10", "", "")
+	client.ServeHTTP(rw, testCaptchaRequest(solverPOST(), "192.0.2.10"), "", "")
 	if rw.Code != http.StatusFound {
 		t.Fatalf("json success want 302, got %d", rw.Code)
 	}
@@ -216,7 +216,7 @@ func Test_Validate_successFalseIsReject(t *testing.T) {
 	t.Cleanup(siteverify.Close)
 
 	client := newTestCaptchaClient(t, configuration.CustomProvider, "", siteverify.URL+"/siteverify", siteverify.Client())
-	outcome, err := client.Validate(solverPOST(), "")
+	outcome, err := client.Validate(testCaptchaRequest(solverPOST(), ""))
 	if err != nil || outcome != Reject {
 		t.Fatalf("success false want Reject, got outcome=%v err=%v", outcome, err)
 	}
@@ -234,14 +234,14 @@ func Test_Validate_emptyTokenIsNoneAndDoesNotCallVerifier(t *testing.T) {
 	client := newTestCaptchaClient(t, configuration.CustomProvider, "", siteverify.URL+"/siteverify", siteverify.Client())
 	emptyPOST := httptest.NewRequest(http.MethodPost, "/foo", strings.NewReader(""))
 	emptyPOST.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	outcome, err := client.Validate(emptyPOST, "192.0.2.10")
+	outcome, err := client.Validate(testCaptchaRequest(emptyPOST, "192.0.2.10"))
 	if err != nil || outcome != None {
 		t.Fatalf("empty token want None, got outcome=%v err=%v", outcome, err)
 	}
 	if called {
 		t.Fatal("empty token must not call the verifier")
 	}
-	getOutcome, getErr := client.Validate(httptest.NewRequest(http.MethodGet, "/foo", nil), "192.0.2.10")
+	getOutcome, getErr := client.Validate(testCaptchaRequest(httptest.NewRequest(http.MethodGet, "/foo", nil), "192.0.2.10"))
 	if getErr != nil || getOutcome != None {
 		t.Fatalf("GET want None, got outcome=%v err=%v", getOutcome, getErr)
 	}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
 	captcha "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
@@ -366,15 +367,15 @@ func (b *Bouncer) foldActionRules(httpReq *http.Request) actionMatch {
 }
 
 // warnCaptchaSuperseded logs when a captcha rule lost to a ban from another leg.
-func (b *Bouncer) warnCaptchaSuperseded(req clientRequest, match actionMatch) {
+func (b *Bouncer) warnCaptchaSuperseded(req clientrequest.Request, match actionMatch) {
 	if match.captchaName == "" {
 		return
 	}
-	b.log.Warn("ServeHTTP:forcedCaptchaSuperseded", "ip", req.remoteIP, "name", match.captchaName)
+	b.log.Warn("ServeHTTP:forcedCaptchaSuperseded", "ip", req.RemoteIP, "name", match.captchaName)
 }
 
 // passOrCaptchaRule passes to next, or applies a captcha rule after remaining legs.
-func (b *Bouncer) passOrCaptchaRule(rw http.ResponseWriter, req clientRequest) {
+func (b *Bouncer) passOrCaptchaRule(rw http.ResponseWriter, req clientrequest.Request) {
 	match := b.foldActionRules(req.Request)
 	if match.captchaName != "" {
 		b.applyCaptchaRuleServeHTTP(rw, req, match)
@@ -384,7 +385,7 @@ func (b *Bouncer) passOrCaptchaRule(rw http.ResponseWriter, req clientRequest) {
 }
 
 // applyCaptchaRuleServeHTTP queries AppSec unless skipped, then serves the plugin captcha gate.
-func (b *Bouncer) applyCaptchaRuleServeHTTP(rw http.ResponseWriter, req clientRequest, match actionMatch) {
+func (b *Bouncer) applyCaptchaRuleServeHTTP(rw http.ResponseWriter, req clientrequest.Request, match actionMatch) {
 	if !match.skipAppsec && b.subscribeAppSec && b.applyAppsecServeHTTP(rw, req) {
 		return
 	}
@@ -392,7 +393,7 @@ func (b *Bouncer) applyCaptchaRuleServeHTTP(rw http.ResponseWriter, req clientRe
 }
 
 // remediateOrCaptchaRule applies lookup kind. A captcha rule does not replace CrowdSec captcha.
-func (b *Bouncer) remediateOrCaptchaRule(rw http.ResponseWriter, req clientRequest, kind, origin string) {
+func (b *Bouncer) remediateOrCaptchaRule(rw http.ResponseWriter, req clientrequest.Request, kind, origin string) {
 	match := b.foldActionRules(req.Request)
 	if decisionscope.RemediationKind(kind) == decisionscope.BannedValue {
 		b.warnCaptchaSuperseded(req, match)
@@ -401,7 +402,7 @@ func (b *Bouncer) remediateOrCaptchaRule(rw http.ResponseWriter, req clientReque
 }
 
 // banOrWarnCaptchaRule bans, and WARNs when a captcha rule lost.
-func (b *Bouncer) banOrWarnCaptchaRule(rw http.ResponseWriter, req clientRequest, reason, headerReason, origin string) {
+func (b *Bouncer) banOrWarnCaptchaRule(rw http.ResponseWriter, req clientrequest.Request, reason, headerReason, origin string) {
 	b.warnCaptchaSuperseded(req, b.foldActionRules(req.Request))
 	b.handleBanServeHTTP(rw, req, reason, headerReason, origin)
 }
@@ -466,27 +467,22 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	}
 
 	remoteIP, ipAddr, err := ip.GetRemoteIP(httpReq, b.serverPoolStrategy, b.forwardedCustomHeader, b.forwardedHeadersInsecure)
-	req := clientRequest{
-		Request:  httpReq,
-		ipAddr:   ipAddr,
-		ipType:   ip.FamilyOfIP(ipAddr),
-		remoteIP: remoteIP,
-	}
-	b.recordProcessed(req.ipType)
+	req := clientrequest.New(httpReq, remoteIP, ipAddr, ip.FamilyOfIP(ipAddr))
+	b.recordProcessed(req.IPType)
 	if err != nil {
-		b.log.Error("ServeHTTP:getRemoteIp", "ip", req.remoteIP, "error", err)
+		b.log.Error("ServeHTTP:getRemoteIp", "ip", req.RemoteIP, "error", err)
 		b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, headerReasonUnparseableRequest, lapi.OriginPluginTechGetRemoteFail)
 		return
 	}
-	if req.ipAddr == nil {
-		b.log.Error("ServeHTTP:parseClientIP", "ip", req.remoteIP)
+	if req.IPAddr == nil {
+		b.log.Error("ServeHTTP:parseClientIP", "ip", req.RemoteIP)
 		b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, headerReasonUnparseableRequest, lapi.OriginPluginTechTrustIPFail)
 		return
 	}
 	// Lookup, live memo, and captcha bind share this spelling. GetRemoteIP still returned the raw text.
-	req.remoteIP = req.ipAddr.String()
-	isTrusted := b.clientPoolStrategy.Checker.ContainsIP(req.ipAddr)
-	logger.Trace(b.log, "ServeHTTP", "ip", req.remoteIP, "isTrusted", isTrusted)
+	req.RemoteIP = req.IPAddr.String()
+	isTrusted := b.clientPoolStrategy.Checker.ContainsIP(req.IPAddr)
+	logger.Trace(b.log, "ServeHTTP", "ip", req.RemoteIP, "isTrusted", isTrusted)
 	if isTrusted {
 		b.next.ServeHTTP(rw, req.Request)
 		// Trusted clients skip LAPI and AppSec.
@@ -495,7 +491,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 
 	match := b.foldActionRules(req.Request)
 	if match.banName != "" {
-		logger.Trace(b.log, "ServeHTTP", "ip", req.remoteIP, "actionRule", match.banName)
+		logger.Trace(b.log, "ServeHTTP", "ip", req.RemoteIP, "actionRule", match.banName)
 		b.handleRemediationServeHTTP(rw, req, decisionscope.BannedValue, lapi.OriginPluginRules(match.banName))
 		return
 	}
@@ -521,22 +517,22 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		var kind, origin string
 		var originID uint16
 		var lookupErr error
-		kind, origin, originID, lookupErr = lapiClient.LookupRemediation(req.remoteIP, req.ipAddr, scopes)
+		kind, origin, originID, lookupErr = lapiClient.LookupRemediation(req.RemoteIP, req.IPAddr, scopes)
 		if lookupErr != nil {
-			b.log.Debug("ServeHTTP:Get", "ip", req.remoteIP, "cache", lookupErr)
+			b.log.Debug("ServeHTTP:Get", "ip", req.RemoteIP, "cache", lookupErr)
 			if errors.Is(lookupErr, decisionstore.ErrUnreachable) && !b.redisUnreachableBlock {
-				b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "redisUnreachable", true)
+				b.log.Error("ServeHTTP:Get", "ip", req.RemoteIP, "redisUnreachable", true)
 				b.passOrCaptchaRule(rw, req)
 				return
 			}
-			b.log.Error("ServeHTTP:Get", "ip", req.remoteIP, "error", lookupErr)
+			b.log.Error("ServeHTTP:Get", "ip", req.RemoteIP, "error", lookupErr)
 			b.banOrWarnCaptchaRule(rw, req, configuration.ReasonTECH, headerReasonCacheFail, lapi.OriginPluginTechCacheFail)
 			return
 		}
 		kind, origin = b.appliedLAPIRemediation(kind, origin, originID)
 		switch {
 		case decisionscope.IsActiveRemediation(kind):
-			logger.Trace(b.log, "ServeHTTP", withPresentScopes([]any{"ip", req.remoteIP, "remediation", kind}, scopes)...)
+			logger.Trace(b.log, "ServeHTTP", withPresentScopes([]any{"ip", req.RemoteIP, "remediation", kind}, scopes)...)
 			b.remediateOrCaptchaRule(rw, req, kind, b.resolveDroppedOrigin(origin, originID))
 			return
 		case kind == decisionscope.NoBannedValue:
@@ -551,14 +547,14 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			// No decision affecting this IP.
 			return
 		}
-		b.log.Debug("ServeHTTP", "isCrowdsecStreamHealthy", false, "ip", req.remoteIP)
+		b.log.Debug("ServeHTTP", "isCrowdsecStreamHealthy", false, "ip", req.RemoteIP)
 		b.applyLapiFailureAction(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechStreamFail)
 		// Stream/alone never query LAPI per request. Miss is allow or failure action.
 		return
 	}
 
 	if crowdsecMode == configuration.LiveMode || crowdsecMode == configuration.NoneMode {
-		kind, origin, err := lapiClient.LiveLookup(req.remoteIP, scopes, b.defaultDecisionSeconds)
+		kind, origin, err := lapiClient.LiveLookup(req.RemoteIP, scopes, b.defaultDecisionSeconds)
 		if err != nil {
 			b.log.Debug("ServeHTTP:LiveLookup", "error", err.Error())
 			if !decisionscope.IsActiveRemediation(kind) {
@@ -571,13 +567,13 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			b.passOrCaptchaRule(rw, req)
 			return
 		}
-		logger.Trace(b.log, "ServeHTTP:LiveLookup", withPresentScopes([]any{"ip", req.remoteIP, "isBanned", kind}, scopes)...)
+		logger.Trace(b.log, "ServeHTTP:LiveLookup", withPresentScopes([]any{"ip", req.RemoteIP, "isBanned", kind}, scopes)...)
 		b.remediateOrCaptchaRule(rw, req, kind, origin)
 	}
 }
 
 // applyLapiFailureAction remediates a live LAPI error or stream-unhealthy cache miss.
-func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req clientRequest, banReason, origin string) {
+func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req clientrequest.Request, banReason, origin string) {
 	switch b.lapiFailureAction {
 	case configuration.FailureActionPassthrough:
 		b.passOrCaptchaRule(rw, req)
@@ -603,8 +599,8 @@ func (b *Bouncer) recordDropped(origin, ipType, remediation string) {
 }
 
 // handleBanServeHTTP writes the operator ban template for this client.
-func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, reason, headerReason, origin string) {
-	b.recordDropped(origin, req.ipType, "ban")
+func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientrequest.Request, reason, headerReason, origin string) {
+	b.recordDropped(origin, req.IPType, "ban")
 
 	if b.remediationCustomHeader != "" {
 		if value := formatRemediationHeader(headerKindBan, headerReason, origin); value != "" {
@@ -619,7 +615,7 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 	}
 	templateData := map[string]string{
 		"RemediationReason": reason,
-		"ClientIP":          req.remoteIP,
+		"ClientIP":          req.RemoteIP,
 		"Domain":            html.EscapeString(captcha.RequestDomain(req.Host)),
 	}
 
@@ -635,8 +631,8 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientRequest, 
 }
 
 // handleClientDisconnectedServeHTTP stops the request without a ban when the client dropped the body.
-func (b *Bouncer) handleClientDisconnectedServeHTTP(rw http.ResponseWriter, req clientRequest) {
-	logger.Trace(b.log, "client disconnected while buffering AppSec body", "ip", req.remoteIP)
+func (b *Bouncer) handleClientDisconnectedServeHTTP(rw http.ResponseWriter, req clientrequest.Request) {
+	logger.Trace(b.log, "client disconnected while buffering AppSec body", "ip", req.RemoteIP)
 	if b.remediationCustomHeader != "" {
 		if value := formatRemediationHeader(headerKindError, headerReasonClientDisconnected, ""); value != "" {
 			rw.Header().Set(b.remediationCustomHeader, value)
@@ -663,9 +659,9 @@ func (b *Bouncer) resolveDroppedOrigin(origin string, originID uint16) string {
 // Captcha kind serves a challenge only when this router subscribed and the
 // client is usable (every method, HEAD included). Unsubscribed captcha kind
 // WARNs crowdsec bouncer captcha unsubscribed then handleBanServeHTTP.
-func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientRequest, remediation, origin string) {
+func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientrequest.Request, remediation, origin string) {
 	kind := decisionscope.RemediationKind(remediation)
-	logger.Trace(b.log, "handleRemediationServeHTTP", "ip", req.remoteIP, "remediation", kind)
+	logger.Trace(b.log, "handleRemediationServeHTTP", "ip", req.RemoteIP, "remediation", kind)
 	if kind == decisionscope.CaptchaValue {
 		b.handleCaptchaKindServeHTTP(rw, req, origin)
 		return
@@ -674,7 +670,7 @@ func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientR
 }
 
 // handleCaptchaKindServeHTTP serves a challenge, or bans when this router cannot.
-func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientRequest, origin string) {
+func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientrequest.Request, origin string) {
 	if !b.subscribeCaptcha {
 		b.log.Warn(msgCaptchaUnsubscribed, "leg", "captcha", "instanceName", b.captchaInstanceName)
 		b.handleBanServeHTTP(rw, req, configuration.ReasonLAPI, headerReasonCaptchaDowngrade, origin)
@@ -693,7 +689,7 @@ func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientR
 	}
 
 	// A valid gate cookie plus a captcha-form POST is a second-tab submit, not origin traffic.
-	if captchaClient.Check(req.Request, req.remoteIP) {
+	if captchaClient.Check(req) {
 		if captchaClient.IsCaptchaFormPost(req.Request) {
 			captchaClient.WriteSolvedRedirect(rw, req.Request, b.remediationCustomHeader)
 			return
@@ -702,13 +698,13 @@ func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientR
 		return
 	}
 
-	b.recordDropped(origin, req.ipType, "captcha")
+	b.recordDropped(origin, req.IPType, "captcha")
 	challengeValue := formatRemediationHeader(headerKindCaptcha, headerReasonFromOrigin(origin), origin)
-	captchaClient.ServeHTTP(rw, req.Request, req.remoteIP, b.remediationCustomHeader, challengeValue)
+	captchaClient.ServeHTTP(rw, req, b.remediationCustomHeader, challengeValue)
 }
 
 // handleNextServeHTTP runs AppSec if enabled and not skipped by an action rule, then the next handler.
-func (b *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req clientRequest) {
+func (b *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req clientrequest.Request) {
 	if b.foldActionRules(req.Request).skipAppsec {
 		b.next.ServeHTTP(rw, req.Request)
 		return
@@ -720,7 +716,7 @@ func (b *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req clientRequest)
 }
 
 // applyAppsecServeHTTP queries AppSec and writes a remediation when the request must not reach origin.
-func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientRequest) bool {
+func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientrequest.Request) bool {
 	match := b.foldActionRules(req.Request)
 	appsecClient := b.loadedAppSec()
 	if appsecClient == nil {
@@ -739,7 +735,7 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientRequest
 	pol := appsec.Policy{
 		FailureAction: b.appsecFailureAction,
 	}
-	decision, err := appsecClient.Query(req.remoteIP, req.Request, pol)
+	decision, err := appsecClient.Query(req, pol)
 	if errors.Is(err, appsec.ErrClientDisconnected) {
 		b.handleClientDisconnectedServeHTTP(rw, req)
 		return true
@@ -749,7 +745,7 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientRequest
 		return true
 	}
 	if err != nil {
-		b.log.Debug("handleNextServeHTTP", "ip", req.remoteIP, "isWaf", true, "error", err)
+		b.log.Debug("handleNextServeHTTP", "ip", req.RemoteIP, "isWaf", true, "error", err)
 		b.warnCaptchaSuperseded(req, match)
 		b.handleBanServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsecFailure, lapi.OriginPluginAppsecFailure)
 		return true
@@ -777,8 +773,8 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientRequest
 }
 
 // handleAppsecResponseServeHTTP writes a structured AppSec envelope (challenge HTML, cookies, headers) to the client.
-func (b *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req clientRequest, decision *appsec.Response) {
-	b.recordDropped("appsec", req.ipType, "")
+func (b *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req clientrequest.Request, decision *appsec.Response) {
+	b.recordDropped("appsec", req.IPType, "")
 
 	// Copy AppSec-supplied headers, skipping hop-by-hop names and Set-Cookie (cookies have their own field).
 	for name, values := range decision.UserHeaders {
@@ -813,7 +809,7 @@ func (b *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req clie
 		return
 	}
 	if _, err := rw.Write([]byte(decision.UserBodyContent)); err != nil {
-		b.log.Warn("handleAppsecResponseServeHTTP could not write appsec response", "ip", req.remoteIP, "error", err)
+		b.log.Warn("handleAppsecResponseServeHTTP could not write appsec response", "ip", req.RemoteIP, "error", err)
 	}
 }
 
