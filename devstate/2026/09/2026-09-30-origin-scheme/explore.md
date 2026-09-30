@@ -99,23 +99,23 @@ Roots searched: worktree `pkg/**/*.go` excluding `vendor/` for `clientRequest`, 
 
 - Q: Who already owns client HTTPS / Host / the trust hop for proto?
   Rank: bounded asked — existing Traefik proto contract and GetRemoteIP address owner, enumerated (research packet + `pkg/ip`); criterion 2 names the scheme rule and forbids hop re-check
-  Decision: assumed — Traefik entrypoint `forwardedHeaders` owns whether `X-Forwarded-Proto` is trustworthy. `Request.TLS` owns connection TLS to Traefik. `pkg/ip.GetRemoteIP` owns client address. `Request.Host` owns Host. The new constructor owns the scheme **token** derived from proto-then-TLS. AppSec URI host reuses `Request.Host` when `URL.Host` is empty. Do not re-derive hop trust in captcha or AppSec.
-  By: explore
+  Decision: resolved — Traefik entrypoint `forwardedHeaders` owns whether `X-Forwarded-Proto` is trustworthy. `Request.TLS` owns connection TLS to Traefik. `pkg/ip.GetRemoteIP` owns client address. `Request.Host` owns Host. The new constructor owns the scheme **token** derived from proto-then-TLS. AppSec URI host reuses `Request.Host` when `URL.Host` is empty. Do not re-derive hop trust in captcha or AppSec. Do not propose a second calculation of the same fact.
+  By: propose
 
 - Q: What is the leaf package and type name?
   Rank: additive asked — new package this change creates; criterion 1 names "a new leaf package" with no identifier
   Decision: assumed — `pkg/clientrequest`, exported type `Request`. Fields or accessors for the embedded request, `remoteIP` / `ipAddr` / `ipType`, and `scheme`. Call sites keep the name `req`. Not Wrapper, Context, or a second address field.
-  By: explore
+  By: propose
 
 - Q: Captcha signatures that take only `*http.Request` — widen them to the wrapper?
   Rank: additive asked — leaving them is not a reshape; criterion 1 names "instead of a bare `*http.Request` plus a parallel remoteIP string"; those have no parallel IP
   Decision: assumed — leave `IsCustomResourceRequest`, `IsCaptchaFormPost`, `WriteSolvedRedirect`, `gateCookieValue`, and `RequestDomain` on `*http.Request` / host string. Out of scope already names captcha redirect target and custom-resource path checks. `setGateCookie` must take the wrapper (or its scheme) because captcha must not read proto or TLS.
-  By: explore
+  By: propose
 
 - Q: URI host when both `URL.Host` and `Request.Host` are set?
   Rank: additive asked — host fallback on the URI builder this change creates; criterion 4 names only the empty-`URL.Host` case
   Decision: assumed — use `URL.Host` when non-empty, else `Request.Host`. Matches `url.URL` once scheme is set. Traefik server requests have empty `URL.Host`.
-  By: explore
+  By: propose
 
 - Q: Does CrowdSec 1.8 still key `__crowdsec_challenge` Secure on `request.URL.Scheme == "https"`?
   Rank: additive asked — new URI shape this change sends; criterion 4 cites that engine check
@@ -125,9 +125,9 @@ Roots searched: worktree `pkg/**/*.go` excluding `vendor/` for `clientRequest`, 
 - Q: Where does the dual-cookie Secure e2e live?
   Rank: additive asked — new test; criterion 5 names TLS on/off, `X-Forwarded-Proto`, and both cookie names
   Decision: assumed — Go httptest through the plugin (forge `req.TLS` and proto). Stub AppSec sets `__crowdsec_challenge` Secure iff the forwarded URI scheme is `https`. Real-stack compose is HTTP `:80` only (`tests/e2e/real/config/docker-compose.test.yml`); adding an HTTPS entrypoint is not in the ask. Mocklapi does not implement CrowdSec's scheme check. Criterion 5's TLS-on clause cannot be forged in dest Pester without that entrypoint.
-  By: explore
+  By: propose
 
 - Q: Does the captcha-gate spec keep TLS **or** proto `https`?
   Rank: bounded asked — one live spec leaf, callers are dest tests + usage packet; criterion 3 names Secure iff shared scheme `https` and proto `http` + TLS → not Secure
   Decision: assumed — no. Propose rewrites the Secure clause to the shared scheme. Add a scenario for explicit proto `http` with TLS set. HttpOnly, Path, SameSite, MaxAge, no Domain stay. Dest `Test_setGateCookie_connectionTLSSetsSecure` must gain "no proto" or it will hide the new case.
-  By: explore
+  By: propose
