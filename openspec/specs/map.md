@@ -19,6 +19,7 @@ Allowlist of root + domain: `openspec/specs/domains.md`.
 ### plugin
 
 - appsec
+- clientrequest
 - decisions
 - decisionstore
 - ip
