@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 0e804ec5
+Reviewed head: c1694635
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,14 +32,17 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-30-intern-decision-scenario pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | intern-decision-scenario | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/178 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-30-intern-decision-scenario/openspec/changes/intern-decision-scenario/proposal.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-30-intern-decision-scenario/openspec/changes/intern-decision-scenario/proposal.md) — modified
+
 
 ## Deviations from the ask
 None.
@@ -67,9 +70,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 0e804ec550e006446a4975855ca31b87c7f8efdf | Card must match the branch you measured |
+| Reviewed head | c1694635cee0a7c71245fce5457545abbe17c67c | Card must match the branch you measured |
 
 ### Stored data model
 None.
