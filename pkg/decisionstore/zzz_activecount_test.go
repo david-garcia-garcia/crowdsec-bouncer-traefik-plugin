@@ -158,6 +158,20 @@ func TestActiveCountsOverflowOriginIDZero(t *testing.T) {
 	}
 }
 
+func TestActiveCountsIgnoresPackedScenario(t *testing.T) {
+	store := countedMemory(t)
+	publishDecisions(store, Decision{
+		Scope: decisionscope.ScopeIP, Value: activeCountBanIP, Kind: decisionscope.BannedValue,
+		Origin: activeCountOrigin, Scenario: "ssh-bf", DurationSec: 60,
+	})
+	if got := originCount(store, activeCountOrigin, activeCountFamily); got != 1 {
+		t.Fatalf("scenario must not fork the gauge, got %d", got)
+	}
+	if len(store.ActiveCounts()) != 1 {
+		t.Fatalf("want one origin×family key, got %#v", store.ActiveCounts())
+	}
+}
+
 func TestActiveCountsMemoryPublishTickExpiryDropsSlot(t *testing.T) {
 	store := countedMemory(t)
 	store.BeginTick()

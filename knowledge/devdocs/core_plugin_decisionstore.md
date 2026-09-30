@@ -15,12 +15,16 @@ Funcs bound at `NewMemory` or `NewRedis` (`memoryEngine` / `redisEngine`): Begin
 _Avoid_: a backend interface, `if mem` / `if red` on every method, nil-checking `s` or the funcs
 
 **Origin intern**:
-A `pkg/intern.Table` on one DecisionStore incarnation. Append-only `names` (`[]string`, index is id) plus `byName`. `ID` and `Name` are inverse. Id 0 is unused or overflow. Overflow does not wrap.
-_Avoid_: package `var`, a table shared across store reclaim keys, leftover origin strings
+A `pkg/intern.Table` on one DecisionStore incarnation. Append-only `names` (`[]string`, index is id) plus `byName`. `ID` and `Name` are inverse. Id 0 is unused or overflow. Overflow does not wrap. Origins stay folded `MetricsOrigin` (including `lists:<name>`).
+_Avoid_: package `var`, a table shared across store reclaim keys, leftover origin strings, reporter-owned table
+
+**Scenario intern**:
+A second `pkg/intern.Table` on the same DecisionStore incarnation. Same type as Origin intern (`uint16`, empty name id 0, overflow at 65535). Interns the raw LAPI `scenario`. Overflow Warns `decisionstore:scenario intern overflow` and packs scenario id 0; kind, family, origin, and TTL stay.
+_Avoid_: reporter-owned table, packing intern ids into Redis or the range blob, a `scenario` usage-metrics label
 
 **Packed word**:
-A memory `uint32` of `kind[0]` in bits 0–7, intern id in bits 8–23, and family code in bits 24–25 (`1`=ipv4, `2`=ipv6, `0`=empty). Family is classified at Put with `FamilyOfHostOrCIDR`. Redis slots and the range-index blob stay `KindOriginString` (kind, optional newline, origin). Overflow Warns and packs origin id 0.
-_Avoid_: leftover U+001F, packing inside a cache bag, intern ids in the range-index blob, ParseIP on the ActiveCounts walk
+A memory `uint32` of 2-bit kind (0 empty / 1 `t` / 2 `c` / 3 `f`), 12-bit origin intern id, 2-bit family (`1`=ipv4, `2`=ipv6, `0`=empty), and 16-bit scenario intern id. Unpack of a packed word returns ASCII `t`/`c`/`f`. Origin id greater than 4095 saturates to 0 and Warns `decisionstore:intern overflow`. Family is classified at Put with `FamilyOfHostOrCIDR`. Redis slots and the range-index blob stay `KindOriginString` (kind, optional newline, origin). `LiveSlot` stays `{uint32,int32}` (8 bytes).
+_Avoid_: leftover U+001F, packing inside a cache bag, intern ids in the range-index blob, ParseIP on the ActiveCounts walk, `uint16(word>>8)` as origin id
 
 **KindOriginString**:
 The Redis SET value and the Range blob remediation: kind letter, then newline, then origin when origin is present. Letter-only is still a hit.
@@ -49,7 +53,7 @@ Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx
 - Stream apply calls Store `BeginTick` / `DeleteMany` / `PutMany` / `PublishTick(ElapsedNow())` / `ApplyRangeBatch` (`core_plugin_lapi_stream-apply.md`). Memory `PublishTick(0)` skips expiry sweep; non-zero `now` drops tick slots where `ExpiresAt > 0 && ExpiresAt <= now`, then recounts `ActiveCounts` from packed origin id and family on the published map. Redis tick methods are no-ops and ignore `now`; Redis PutMany is MSetEX by TTL in `PutManyChunk` batches. Redis `ActiveCounts` is empty.
 - Snapshot origin×family counts with `Store.ActiveCounts` at usage-metrics POST. Do not store `usageMetricKey` or LAPI item JSON in decisionstore. `ApplyRangeBatch` is omitted from the walk. Redis does not support this gauge.
 - Captcha grace is the gate cookie (`core_plugin_middleware_captcha-gate.md`), not store keys.
-- Origin intern is a `pkg/intern.Table` field on `Store`. `OriginID` / `OriginName` forward to it. `Name` takes `RLock`. Resolve origin only on drop.
+- Origin intern is a `pkg/intern.Table` field on `Store`. `OriginID` / `OriginName` forward to it. `Name` takes `RLock`. Resolve origin only on drop. Scenario intern is a second table on the same Store (`ScenarioName`). Lists intern twice (`lists:<name>` on origins, raw name on scenarios). Memory pack saturates origin ids above 4095. Redis Put and Range stay `KindOriginString`; intern ids are process-local.
 - `Store.Close()` logs `crowdsec decision store closed` then drains Redis idle pools. Memory Close is a no-op drain. Call Close only from the store’s reclaim Close hook. Safe to call more than once on a real Redis store. Do not Close a nil `*Store`.
 - Install log-only Sleep/Wake (`crowdsec decision store sleeping` / `waking`). They MUST NOT drain Redis or drop maps. Create logs `crowdsec decision store started`. `reclaim_put|orphan|reclaim|dispose` stay DEBUG.
 

@@ -37,20 +37,63 @@ func splitKindOrigin(stored string) (string, string) {
 	return decisionscope.RemediationKind(kind), origin
 }
 
-const packedFamilyShift = 24
-const packedFamilyMask = 3
-
 const (
-	packedFamilyIPv4 = 1
-	packedFamilyIPv6 = 2
+	packedKindMask      = 3
+	packedOriginShift   = 2
+	packedOriginMask    = 4095
+	packedFamilyShift   = 14
+	packedFamilyMask    = 3
+	packedScenarioShift = 16
+	packedKindEmpty     = 0
+	packedKindBan       = 1
+	packedKindCaptcha   = 2
+	packedKindNoBan     = 3
+	packedFamilyIPv4    = 1
+	packedFamilyIPv6    = 2
 )
 
-// packWord is kind[0] in bits 0-7, intern id in 8-23, family code in 24-25 (1=ipv4, 2=ipv6, 0=empty).
-func packWord(kind string, originID uint16, family string) uint32 {
+// packWord is 2-bit kind, 12-bit origin id, 2-bit family, 16-bit scenario id.
+// Origin id greater than 4095 packs as 0. Unpack of the kind bits returns ASCII t/c/f.
+func packWord(kind string, originID uint16, family string, scenarioID uint16) uint32 {
 	if kind == "" {
 		return 0
 	}
-	return uint32(kind[0]) | uint32(originID)<<8 | packFamilyCode(family)<<packedFamilyShift
+	packedOrigin := uint32(originID)
+	if packedOrigin > packedOriginMask {
+		packedOrigin = 0
+	}
+	return packKindCode(kind) |
+		packedOrigin<<packedOriginShift |
+		packFamilyCode(family)<<packedFamilyShift |
+		uint32(scenarioID)<<packedScenarioShift
+}
+
+// packKindCode is 1 for t, 2 for c, 3 for f, 0 for empty or unknown.
+func packKindCode(kind string) uint32 {
+	switch kind {
+	case decisionscope.BannedValue:
+		return packedKindBan
+	case decisionscope.CaptchaValue:
+		return packedKindCaptcha
+	case decisionscope.NoBannedValue:
+		return packedKindNoBan
+	default:
+		return packedKindEmpty
+	}
+}
+
+// unpackKindCode maps packed kind 1/2/3 back to ASCII t/c/f.
+func unpackKindCode(code uint32) string {
+	switch code {
+	case packedKindBan:
+		return decisionscope.BannedValue
+	case packedKindCaptcha:
+		return decisionscope.CaptchaValue
+	case packedKindNoBan:
+		return decisionscope.NoBannedValue
+	default:
+		return ""
+	}
 }
 
 // packFamilyCode is 1 for ipv4, 2 for ipv6, 0 for header-scope or unknown.
@@ -65,12 +108,12 @@ func packFamilyCode(family string) uint32 {
 	}
 }
 
-// packedOriginID is bits 8-23. The uint16 cast drops the family code.
+// packedOriginID is bits 2-13.
 func packedOriginID(word uint32) uint16 {
-	return uint16(word >> 8) //nolint:gosec // G115 intern id is stored in 16 bits
+	return uint16((word >> packedOriginShift) & packedOriginMask) //nolint:gosec // G115 origin id is stored in 12 bits
 }
 
-// packedFamily is ipv4, ipv6, or empty from bits 24-25.
+// packedFamily is ipv4, ipv6, or empty from bits 14-15.
 func packedFamily(word uint32) string {
 	switch (word >> packedFamilyShift) & packedFamilyMask {
 	case packedFamilyIPv4:
@@ -82,7 +125,12 @@ func packedFamily(word uint32) string {
 	}
 }
 
-// unpackWord is kind letter, empty origin name, and intern id. Family stays in the high bits for packedFamily.
+// packedScenarioID is bits 16-31.
+func packedScenarioID(word uint32) uint16 {
+	return uint16(word >> packedScenarioShift) //nolint:gosec // G115 scenario id is stored in 16 bits
+}
+
+// unpackWord is ASCII kind, empty origin name, and packed origin id.
 func unpackWord(word uint32) (string, string, uint16) {
-	return string([]byte{byte(word)}), "", packedOriginID(word)
+	return unpackKindCode(word & packedKindMask), "", packedOriginID(word)
 }

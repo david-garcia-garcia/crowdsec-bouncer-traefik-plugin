@@ -1,24 +1,24 @@
 ## 1. Packed word
 
-- [ ] 1.1 Re-lay `packWord` to 2-bit kind enum (0 empty / 1 `t` / 2 `c` / 3 `f`) + 12-bit origin + 2-bit family + 16-bit scenario id in `pkg/decisionstore/pack.go`
-- [ ] 1.2 Saturate origin id `> 4095` to 0 inside `packWord`; keep `intern.Table.ID` at uint16 max 65535
-- [ ] 1.3 Map `unpackWord` kind 1/2/3 back to ASCII `t`/`c`/`f`; update `packedOriginID` / `packedFamily`; add `packedScenarioID`
+- [x] 1.1 Re-lay `packWord` to 2-bit kind enum (0 empty / 1 `t` / 2 `c` / 3 `f`) + 12-bit origin + 2-bit family + 16-bit scenario id in `pkg/decisionstore/pack.go`
+- [x] 1.2 Saturate origin id `> 4095` to 0 inside `packWord`; keep `intern.Table.ID` at uint16 max 65535
+- [x] 1.3 Map `unpackWord` kind 1/2/3 back to ASCII `t`/`c`/`f`; update `packedOriginID` / `packedFamily`; add `packedScenarioID`
 
 ## 2. Store intern tables
 
-- [ ] 2.1 Add `Decision.Scenario`; construct a second `intern.Table` in `NewMemory` and `NewRedis`
-- [ ] 2.2 Pass Scenario intern into `newMemory`; intern origin and scenario in `memory.pack`; Warn `decisionstore:intern overflow` on origin table overflow or 12-bit saturate; Warn `decisionstore:scenario intern overflow` on scenario table overflow; keep kind, family, origin (when not origin-overflow), and TTL
-- [ ] 2.3 Add `ScenarioName` (and scenario-table fill for tests) as the origin-table sibling; do not grow `LookupRemediation`
+- [x] 2.1 Add `Decision.Scenario`; construct a second `intern.Table` in `NewMemory` and `NewRedis`
+- [x] 2.2 Pass Scenario intern into `newMemory`; intern origin and scenario in `memory.pack`; Warn `decisionstore:intern overflow` on origin table overflow or 12-bit saturate; Warn `decisionstore:scenario intern overflow` on scenario table overflow; keep kind, family, origin (when not origin-overflow), and TTL
+- [x] 2.3 Add `ScenarioName` (and scenario-table fill for tests) as the origin-table sibling; do not grow `LookupRemediation`
 
 ## 3. Stream and live write
 
-- [ ] 3.1 Copy LAPI `item.Scenario` in `streamPutItem`; keep `Origin` as `MetricsOrigin`
-- [ ] 3.2 Carry raw scenario on `liveResult`; `preferLiveResult` keeps the winner’s scenario; `memoLive` Puts it
-- [ ] 3.3 Leave Redis `PutMany` and Range upserts on `KindOriginString(kind, folded origin)`
+- [x] 3.1 Copy LAPI `item.Scenario` in `streamPutItem`; keep `Origin` as `MetricsOrigin`
+- [x] 3.2 Carry raw scenario on `liveResult`; `preferLiveResult` keeps the winner’s scenario; `memoLive` Puts it
+- [x] 3.3 Leave Redis `PutMany` and Range upserts on `KindOriginString(kind, folded origin)`
 
 ## 4. Tests
 
-- [ ] 4.1 Update `zzz_pack_test.go` for the new layout (no `uint16(word>>8)`, unpack returns `t`/`c`/`f`)
-- [ ] 4.2 Add origin 12-bit saturate, lists intern twice (`lists:firehol_level1` + `firehol_level1`), and scenario overflow Warn tests; keep `TestMemoryInternOverflowWarns`
-- [ ] 4.3 Keep `TestReportMetricsOmitsScenarioLabel` and `TestMetricsOriginListsRewrite`; assert `ActiveCounts` still groups origin×family when a scenario is packed
-- [ ] 4.4 Run `go test ./pkg/intern ./pkg/decisionstore ./pkg/lapi ./pkg/bouncer`
+- [x] 4.1 Update `zzz_pack_test.go` for the new layout (no `uint16(word>>8)`, unpack returns `t`/`c`/`f`)
+- [x] 4.2 Add origin 12-bit saturate, lists intern twice (`lists:firehol_level1` + `firehol_level1`), and scenario overflow Warn tests; keep `TestMemoryInternOverflowWarns`
+- [x] 4.3 Keep `TestReportMetricsOmitsScenarioLabel` and `TestMetricsOriginListsRewrite`; assert `ActiveCounts` still groups origin×family when a scenario is packed
+- [x] 4.4 Run `go test ./pkg/intern ./pkg/decisionstore ./pkg/lapi ./pkg/bouncer`

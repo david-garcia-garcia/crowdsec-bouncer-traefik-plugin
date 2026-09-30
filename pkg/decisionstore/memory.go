@@ -19,6 +19,7 @@ type publishedSlots struct {
 type memory struct {
 	log        *slog.Logger
 	origins    *intern.Table            // origin name → id packed into LiveSlot.Word
+	scenarios  *intern.Table            // raw LAPI scenario → id packed into LiveSlot.Word
 	mu         sync.RWMutex             // tick, ticking, rangeIndex, active; not lookup
 	ticking    bool                     // stream window: PutMany/DeleteMany write tick; Lookup reads published
 	tick       map[string]LiveSlot      // unpublished clone; SlotKey → packed word + elapsed expiry
@@ -28,12 +29,13 @@ type memory struct {
 }
 
 // newMemory allocates non-nil tick and an empty published snapshot.
-func newMemory(log *slog.Logger, origins *intern.Table) *memory {
+func newMemory(log *slog.Logger, origins, scenarios *intern.Table) *memory {
 	mem := &memory{
-		log:     log,
-		origins: origins,
-		tick:    map[string]LiveSlot{},
-		active:  map[ActiveCountKey]int64{},
+		log:       log,
+		origins:   origins,
+		scenarios: scenarios,
+		tick:      map[string]LiveSlot{},
+		active:    map[ActiveCountKey]int64{},
 	}
 	mem.storePublished(map[string]LiveSlot{})
 	return mem
@@ -121,22 +123,45 @@ func (m *memory) putSlot(slots map[string]LiveSlot, item Decision) {
 	if key == "" {
 		return
 	}
-	slots[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin, item.Value), item.DurationSec)
+	slots[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin, item.Scenario, item.Value), item.DurationSec)
 }
 
-// pack encodes kind, intern origin id, and FamilyOfHostOrCIDR(value) into one uint32.
-// Intern overflow Warns and packs origin id 0; family is still packed.
-func (m *memory) pack(kind, origin, value string) uint32 {
+// pack encodes kind, intern origin id, intern scenario id, and FamilyOfHostOrCIDR(value) into one uint32.
+// Origin table overflow or id greater than 4095 Warns decisionstore:intern overflow and packs origin id 0.
+// Scenario table overflow Warns decisionstore:scenario intern overflow and packs scenario id 0.
+func (m *memory) pack(kind, origin, scenario, value string) uint32 {
 	family := ip.FamilyOfHostOrCIDR(value)
-	if m.origins != nil {
-		if originID, ok := m.origins.ID(origin); ok {
-			return packWord(kind, originID, family)
-		}
+	return packWord(kind, m.internOriginForPack(kind, origin), family, m.internScenarioForPack(kind, scenario))
+}
+
+// internOriginForPack interns origin and saturates ids above 4095. Overflow or saturate Warns and returns 0.
+func (m *memory) internOriginForPack(kind, origin string) uint16 {
+	if m.origins == nil {
+		return 0
+	}
+	originID, ok := m.origins.ID(origin)
+	if !ok || originID > packedOriginMask {
 		if m.log != nil {
 			m.log.Warn("decisionstore:intern overflow", "kind", kind, "origin", origin)
 		}
+		return 0
 	}
-	return packWord(kind, 0, family)
+	return originID
+}
+
+// internScenarioForPack interns scenario. Table overflow Warns and returns 0.
+func (m *memory) internScenarioForPack(kind, scenario string) uint16 {
+	if m.scenarios == nil {
+		return 0
+	}
+	scenarioID, ok := m.scenarios.ID(scenario)
+	if !ok {
+		if m.log != nil {
+			m.log.Warn("decisionstore:scenario intern overflow", "kind", kind, "scenario", scenario)
+		}
+		return 0
+	}
+	return scenarioID
 }
 
 // DeleteMany drops canonical slots and prior Ip spellings from tick or the published map.
