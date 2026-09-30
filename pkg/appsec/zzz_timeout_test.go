@@ -4,8 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"net"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -56,7 +54,7 @@ func TestQuery_HangHonorsAppsecOverride(t *testing.T) {
 	}
 
 	started := time.Now()
-	decision, queryErr := client.Query("1.2.3.4", httptest.NewRequest(http.MethodGet, "http://localhost/", nil), Policy{
+	decision, queryErr := client.Query(buildTestRequest(), Policy{
 		FailureAction: configuration.FailureActionPassthrough,
 	})
 	elapsed := time.Since(started)

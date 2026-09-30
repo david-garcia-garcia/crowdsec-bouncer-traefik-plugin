@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-09-30-origin-scheme",
+  "jobName": "2026-09-30-origin-scheme",
+  "startedAt": "2026-09-30T15:06:59.727Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-30T15:12:20.651Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-30T15:21:42.969Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-30T15:31:18.502Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-30T15:54:56.571Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-30T16:05:10.470Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-30T17:37:41.949Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-30T17:44:13.880Z"
+    },
+    "pullrequest": {
+      "work": false,
+      "card": false,
+      "at": null
+    }
+  }
+}

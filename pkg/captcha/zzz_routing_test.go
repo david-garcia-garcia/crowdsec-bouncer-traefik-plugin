@@ -298,7 +298,7 @@ func Test_ServeHTTP_rendersChallengeURL(t *testing.T) {
 	}
 
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "http://app.example/protected", nil), "192.0.2.10", "", "")
+	client.ServeHTTP(rw, testCaptchaRequest(httptest.NewRequest(http.MethodGet, "http://app.example/protected", nil), "192.0.2.10"), "", "")
 	if !strings.Contains(rw.Body.String(), `data-challenge-url="http://captcha.localhost:8000/v0/challenge"`) {
 		t.Fatalf("captcha page must render the configured challenge URL, got %q", rw.Body.String())
 	}
@@ -328,7 +328,7 @@ func Test_ServeHTTP_challengeURLEmptyForBuiltinProvider(t *testing.T) {
 	}
 
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "http://app.example/protected", nil), "192.0.2.10", "", "")
+	client.ServeHTTP(rw, testCaptchaRequest(httptest.NewRequest(http.MethodGet, "http://app.example/protected", nil), "192.0.2.10"), "", "")
 	if !strings.Contains(rw.Body.String(), `data-challenge-url=""`) {
 		t.Fatalf("built-in provider must render an empty challenge URL, got %q", rw.Body.String())
 	}

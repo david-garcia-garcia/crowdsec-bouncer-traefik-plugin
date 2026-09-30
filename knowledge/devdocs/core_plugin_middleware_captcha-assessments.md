@@ -12,7 +12,7 @@ _Avoid_: score-first, treating a Google error envelope as reject
 
 ## Overview
 
-`recaptcha-enterprise` pairs the assessments verifier in `Client.New`. `Validate` calls `Pass` only after a non-empty token. Siteverify encoding stays on `core_plugin_middleware_captcha-siteverify`. Gate cookie format stays on `core_plugin_middleware_captcha-gate`. `event.userIpAddress` is `clientRequest.remoteIP` after GetRemoteIP (`core_plugin_ip`).
+`recaptcha-enterprise` pairs the assessments verifier in `Client.New`. `Validate` calls `Pass` only after a non-empty token. Siteverify encoding stays on `core_plugin_middleware_captcha-siteverify`. Gate cookie format stays on `core_plugin_middleware_captcha-gate`. `event.userIpAddress` is `req.RemoteIP()` as `New` stored it (`core_plugin_clientrequest_inbound-request.md`).
 
 ## How to use
 

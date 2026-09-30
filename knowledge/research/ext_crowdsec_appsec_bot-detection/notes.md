@@ -20,7 +20,7 @@ JSON field names and Go types (engine `BodyResponse`):
 
 Owners: [challenge protocol](https://docs.crowdsec.net/docs/next/appsec/bot_detection/challenge_protocol.md); `github.com/crowdsecurity/crowdsec@cc76dbbce40bd2e6a3ce1ba07e3c41d8b462de66:pkg/appsec/appsec.go` (`BodyResponse`). Extracts: `.sources/challenge_protocol.md`, `.sources/appsec.go.md`.
 
-`user_cookies` entries are `http.Cookie.String()` output. Cookie builder defaults: `Path=/`, `SameSite=Lax`. Owner: `github.com/crowdsecurity/crowdsec@cc76dbbce40bd2e6a3ce1ba07e3c41d8b462de66:pkg/appsec/cookie/cookie.go`. Extract: `.sources/cookie.go.md`. Official example: `__crowdsec_challenge=...; Path=/; HttpOnly; SameSite=Lax`. Owner: [challenge protocol](https://docs.crowdsec.net/docs/next/appsec/bot_detection/challenge_protocol.md).
+`user_cookies` entries are `http.Cookie.String()` output. Cookie builder defaults: `Path=/`, `SameSite=Lax`. HttpOnly and Secure only if the builder caller sets them. Owner: `github.com/crowdsecurity/crowdsec@cc76dbbce40bd2e6a3ce1ba07e3c41d8b462de66:pkg/appsec/cookie/cookie.go`. Extract: `.sources/cookie.go.md`. Official example: `__crowdsec_challenge=...; Path=/; HttpOnly; SameSite=Lax` (no `Secure`). Owner: [challenge protocol](https://docs.crowdsec.net/docs/next/appsec/bot_detection/challenge_protocol.md). How `__crowdsec_challenge` actually gets `Secure` is `§ Challenge cookie Secure`.
 
 ### AppSec listener HTTP status versus `http_status`
 
@@ -63,6 +63,16 @@ Cookie name: `__crowdsec_challenge`. Owner: `github.com/crowdsecurity/crowdsec@c
 Default TTL `12h`, sealed under the master cookie key (independent of per-epoch signing-key rotation). Owner: [configuration](https://docs.crowdsec.net/docs/next/appsec/bot_detection/configuration.md). Extract: `.sources/configuration.md`.
 
 The bouncer never parses, validates, or mints the cookie. Subsequent requests must forward the browser `Cookie` header to AppSec so a solved challenge becomes `allow`. Owner: [challenge protocol](https://docs.crowdsec.net/docs/next/appsec/bot_detection/challenge_protocol.md).
+
+### Challenge cookie Secure
+
+On `__crowdsec_challenge`, after `HttpOnly`, `Path=/`, and `SameSite=Lax`, CrowdSec `v1.8.0` sets `Secure` iff `request.URL.Scheme == "https"`. Same gate on the solved cookie (`ValidateChallengeResponse`) and the grant/allowlist cookie (`SealAllowlistCookie`). Owner: `github.com/crowdsecurity/crowdsec@cc76dbbce40bd2e6a3ce1ba07e3c41d8b462de66:pkg/appsec/challenge/challenge.go` (`ValidateChallengeResponse` lines 728–730; `SealAllowlistCookie` lines 757–759). Extract: `.sources/challenge.go.md`.
+
+That `*http.Request` is `ParsedRequest.HTTPRequest`. `NewParsedRequestFromRequest` reads `X-Crowdsec-Appsec-Uri`, `url.Parse`s it, and assigns the result to `originalHTTPRequest.URL` (and `ParsedRequest.URL`). The submit and grant paths pass `request.HTTPRequest` into those seal functions. Owners: `github.com/crowdsecurity/crowdsec@cc76dbbce40bd2e6a3ce1ba07e3c41d8b462de66:pkg/appsec/request.go` (`NewParsedRequestFromRequest`); `github.com/crowdsecurity/crowdsec@cc76dbbce40bd2e6a3ce1ba07e3c41d8b462de66:pkg/appsec/appsec.go` (`ValidateChallengeResponse(request.HTTPRequest, …)`, `SealAllowlistCookie(request.HTTPRequest, …)`). Extracts: `.sources/request.go.md`, `.sources/appsec.go.md`.
+
+Official protocol: `X-Crowdsec-Appsec-Uri` is “The URI of the original HTTP request”. Worked example value is `/login`. The page does not mention the `Secure` flag. Owner: [WAF / bouncer protocol](https://docs.crowdsec.net/docs/next/appsec/protocol.md). Extract: `.sources/protocol.md`. Conflict: official is silent on `Secure`; this engine version sets it iff the parsed URI scheme is `https`. Follow source for `v1.8.0`.
+
+Go `url.Parse` accepts a relative URL (a path, without a host) or an absolute URL (starting with a scheme). Owner: [net/url Parse](https://pkg.go.dev/net/url#Parse). Extract: `.sources/net-url-parse.md`. A path-only value (`/foo`, official example `/login`) is origin-form: empty `Scheme`, so `Scheme == "https"` is false and `Secure` is not set. Owners: Go `Parse` of origin-form (official); challenge.go scheme check (source).
 
 Internal paths the bouncer must forward to AppSec unmodified, never to origin:
 

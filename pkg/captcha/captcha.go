@@ -11,6 +11,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
@@ -100,19 +101,19 @@ func (c *Client) HTTPClientForTest() *http.Client {
 
 // ServeHTTP handles captcha html page or validation.
 // remediationHeader is this router's name. challengeValue is the already-formatted challenge-page header.
-func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP, remediationHeader, challengeValue string) {
-	outcome, err := c.Validate(r, remoteIP)
+func (c *Client) ServeHTTP(rw http.ResponseWriter, req clientrequest.Request, remediationHeader, challengeValue string) {
+	outcome, err := c.Validate(req)
 	// Transport and JSON decode stay classified; the solver retries the challenge.
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP:validate", "error", err)
 	}
 	if outcome == Pass {
 		logger.Trace(c.log, "captcha:ServeHTTP captcha:valid")
-		value := mintGateValue(c.gateSecret, c.gateBindIP, remoteIP, time.Now())
-		setGateCookie(rw, r, value, c.gracePeriodSeconds)
+		value := mintGateValue(c.gateSecret, c.gateBindIP, req.RemoteIP(), time.Now())
+		setGateCookie(rw, req, value, c.gracePeriodSeconds)
 		writeRemediationHeader(rw, remediationHeader, remediationHeaderCaptchaSolved)
 		rw.Header().Set("Cache-Control", "no-cache, no-store")
-		http.Redirect(rw, r, r.URL.String(), http.StatusFound)
+		http.Redirect(rw, req.Request, req.URL.String(), http.StatusFound)
 		return
 	}
 	bootScript := c.widget.BootScript
@@ -131,7 +132,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, r *http.Request, remoteIP, re
 		"BootScript":   bootScript,
 		"Action":       c.widget.Action,
 		"DrawCheckbox": c.widget.drawCheckbox(),
-		"Domain":       html.EscapeString(RequestDomain(r.Host)),
+		"Domain":       html.EscapeString(RequestDomain(req.Host)),
 	})
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP captchaTemplateServe", "error", err)
@@ -152,9 +153,9 @@ func RequestDomain(host string) string {
 }
 
 // Check Verify if the captcha is already done via gate cookie.
-func (c *Client) Check(r *http.Request, remoteIP string) bool {
-	passed := validateGateValue(c.gateSecret, c.gateBindIP, remoteIP, gateCookieValue(r), time.Now(), c.gracePeriodSeconds)
-	logger.Trace(c.log, "captcha:Check", "ip", remoteIP, "pass", passed)
+func (c *Client) Check(req clientrequest.Request) bool {
+	passed := validateGateValue(c.gateSecret, c.gateBindIP, req.RemoteIP(), gateCookieValue(req.Request), time.Now(), c.gracePeriodSeconds)
+	logger.Trace(c.log, "captcha:Check", "ip", req.RemoteIP(), "pass", passed)
 	return passed
 }
 
@@ -286,17 +287,17 @@ func (c *Client) bindIdentity(middlewareName, bindKey string) {
 
 // Validate classifies the challenge request as None, Pass, or Reject.
 // Empty token is None and does not call the verifier. Error is the error return.
-func (c *Client) Validate(r *http.Request, remoteIP string) (Outcome, error) {
-	if r.Method != http.MethodPost {
-		logger.Trace(c.log, "captcha:Validate invalid method", "method", r.Method)
+func (c *Client) Validate(req clientrequest.Request) (Outcome, error) {
+	if req.Method != http.MethodPost {
+		logger.Trace(c.log, "captcha:Validate invalid method", "method", req.Method)
 		return None, nil
 	}
-	token := readFieldFromRequest(r, c.widget.TokenField)
+	token := readFieldFromRequest(req.Request, c.widget.TokenField)
 	if token == "" {
 		logger.Trace(c.log, "captcha:Validate no captcha response found in request")
 		return None, nil
 	}
-	passed, err := c.verifier.Pass(token, remoteIP, r.UserAgent())
+	passed, err := c.verifier.Pass(token, req.RemoteIP(), req.UserAgent())
 	if err != nil {
 		c.log.Debug("captcha:Validate", "error", err)
 		return None, err

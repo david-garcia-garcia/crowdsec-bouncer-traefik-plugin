@@ -45,6 +45,11 @@ priority: normal
 local: core_plugin_ip.md
 description: How this plugin stores trusted hop and client CIDRs and answers membership.
 
+## Inbound request
+priority: normal
+local: core_plugin_clientrequest_inbound-request.md
+description: How this plugin holds one inbound request plus GetRemoteIP address plus constructor scheme.
+
 ## HTTP request rules
 priority: normal
 local: core_plugin_httprule.md

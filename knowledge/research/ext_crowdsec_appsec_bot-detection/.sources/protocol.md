@@ -1,11 +1,13 @@
 ---
 url: https://docs.crowdsec.net/docs/next/appsec/protocol.md
 title: WAF / Bouncer Communication Protocol
-fetched: 2026-09-05
+fetched: 2026-09-30
 authority: official
 ---
 
 Required headers on the request the bouncer sends to AppSec include X-Crowdsec-Appsec-Ip, -Uri, -Host, -Verb, -Api-Key, -User-Agent, -Http-Version. GET unless original has a body, then POST with that body.
+
+X-Crowdsec-Appsec-Uri: "The URI of the original HTTP request". Worked example value is `/login`. The page does not mention the cookie Secure flag, nor that the engine parses this header into request.URL.Scheme.
 
 Listener response codes:
 - 200: allowed. Body {"action": "allow"}

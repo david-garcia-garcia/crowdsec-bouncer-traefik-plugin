@@ -116,7 +116,7 @@ func Test_New_enterpriseCheckboxAndScoreWidgets(t *testing.T) {
 func Test_Validate_enterpriseURLAndHeader(t *testing.T) {
 	trip := &enterpriseTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":true}}`}
 	client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeCheckbox, Enterprise{}, &http.Client{Transport: trip})
-	outcome, err := client.Validate(enterpriseSolverPOST(), "")
+	outcome, err := client.Validate(testCaptchaRequest(enterpriseSolverPOST(), ""))
 	if err != nil || outcome != Pass {
 		t.Fatalf("want Pass, got outcome=%v err=%v", outcome, err)
 	}
@@ -137,7 +137,7 @@ func Test_Validate_enterpriseURLAndHeader(t *testing.T) {
 func Test_Validate_enterpriseEventFields(t *testing.T) {
 	trip := &enterpriseTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":true}}`}
 	client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeCheckbox, Enterprise{}, &http.Client{Transport: trip})
-	if _, err := client.Validate(enterpriseSolverPOST(), "203.0.113.9"); err != nil {
+	if _, err := client.Validate(testCaptchaRequest(enterpriseSolverPOST(), "203.0.113.9")); err != nil {
 		t.Fatal(err)
 	}
 	var payload enterpriseAssessmentRequest
@@ -153,7 +153,7 @@ func Test_Validate_enterpriseEventFields(t *testing.T) {
 
 	actionTrip := &enterpriseTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":true,"action":"login"},"riskAnalysis":{"score":0.9}}`}
 	score := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeScore, Enterprise{Action: "login", MinScore: "0.5"}, &http.Client{Transport: actionTrip})
-	if _, err := score.Validate(enterpriseSolverPOST(), ""); err != nil {
+	if _, err := score.Validate(testCaptchaRequest(enterpriseSolverPOST(), "")); err != nil {
 		t.Fatal(err)
 	}
 	var scorePayload enterpriseAssessmentRequest
@@ -171,7 +171,7 @@ func Test_Validate_enterpriseOmitsEmptyRemoteIPAndAction(t *testing.T) {
 	req := enterpriseSolverPOST()
 	req.Header.Set("X-Forwarded-For", "198.51.100.1")
 	req.Header.Set("X-Real-Ip", "198.51.100.2")
-	if _, err := client.Validate(req, ""); err != nil {
+	if _, err := client.Validate(testCaptchaRequest(req, "")); err != nil {
 		t.Fatal(err)
 	}
 	body := string(trip.lastBody)
@@ -187,7 +187,7 @@ func Test_Validate_enterprisePassOrder(t *testing.T) {
 	t.Run("valid checkbox passes", func(t *testing.T) {
 		trip := &enterpriseTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":true}}`}
 		client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeCheckbox, Enterprise{}, &http.Client{Transport: trip})
-		outcome, err := client.Validate(enterpriseSolverPOST(), "")
+		outcome, err := client.Validate(testCaptchaRequest(enterpriseSolverPOST(), ""))
 		if err != nil || outcome != Pass {
 			t.Fatalf("got outcome=%v err=%v", outcome, err)
 		}
@@ -195,7 +195,7 @@ func Test_Validate_enterprisePassOrder(t *testing.T) {
 	t.Run("action case-insensitive", func(t *testing.T) {
 		trip := &enterpriseTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":true,"action":"login"},"riskAnalysis":{"score":0.9}}`}
 		client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeScore, Enterprise{Action: "LOGIN", MinScore: "0.5"}, &http.Client{Transport: trip})
-		outcome, err := client.Validate(enterpriseSolverPOST(), "")
+		outcome, err := client.Validate(testCaptchaRequest(enterpriseSolverPOST(), ""))
 		if err != nil || outcome != Pass {
 			t.Fatalf("got outcome=%v err=%v", outcome, err)
 		}
@@ -203,7 +203,7 @@ func Test_Validate_enterprisePassOrder(t *testing.T) {
 	t.Run("different action rejects", func(t *testing.T) {
 		trip := &enterpriseTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":true,"action":"checkout"},"riskAnalysis":{"score":0.9}}`}
 		client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeScore, Enterprise{Action: "login", MinScore: "0.5"}, &http.Client{Transport: trip})
-		outcome, err := client.Validate(enterpriseSolverPOST(), "")
+		outcome, err := client.Validate(testCaptchaRequest(enterpriseSolverPOST(), ""))
 		if err != nil || outcome != Reject {
 			t.Fatalf("got outcome=%v err=%v", outcome, err)
 		}
@@ -211,7 +211,7 @@ func Test_Validate_enterprisePassOrder(t *testing.T) {
 	t.Run("score below minimum rejects", func(t *testing.T) {
 		trip := &enterpriseTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":true,"action":"login"},"riskAnalysis":{"score":0.3}}`}
 		client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeScore, Enterprise{Action: "login", MinScore: "0.5"}, &http.Client{Transport: trip})
-		outcome, err := client.Validate(enterpriseSolverPOST(), "")
+		outcome, err := client.Validate(testCaptchaRequest(enterpriseSolverPOST(), ""))
 		if err != nil || outcome != Reject {
 			t.Fatalf("got outcome=%v err=%v", outcome, err)
 		}
@@ -219,7 +219,7 @@ func Test_Validate_enterprisePassOrder(t *testing.T) {
 	t.Run("score at minimum passes", func(t *testing.T) {
 		trip := &enterpriseTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":true,"action":"login"},"riskAnalysis":{"score":0.5}}`}
 		client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeScore, Enterprise{Action: "login", MinScore: "0.5"}, &http.Client{Transport: trip})
-		outcome, err := client.Validate(enterpriseSolverPOST(), "")
+		outcome, err := client.Validate(testCaptchaRequest(enterpriseSolverPOST(), ""))
 		if err != nil || outcome != Pass {
 			t.Fatalf("got outcome=%v err=%v", outcome, err)
 		}
@@ -227,7 +227,7 @@ func Test_Validate_enterprisePassOrder(t *testing.T) {
 	t.Run("missing riskAnalysis with minScore rejects", func(t *testing.T) {
 		trip := &enterpriseTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":true,"action":"login"}}`}
 		client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeScore, Enterprise{Action: "login", MinScore: "0.5"}, &http.Client{Transport: trip})
-		outcome, err := client.Validate(enterpriseSolverPOST(), "")
+		outcome, err := client.Validate(testCaptchaRequest(enterpriseSolverPOST(), ""))
 		if err != nil || outcome != Reject {
 			t.Fatalf("got outcome=%v err=%v", outcome, err)
 		}
@@ -238,7 +238,7 @@ func Test_Validate_enterpriseErrorVersusReject(t *testing.T) {
 	t.Run("valid false is reject", func(t *testing.T) {
 		trip := &enterpriseTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":false}}`}
 		client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeCheckbox, Enterprise{}, &http.Client{Transport: trip})
-		outcome, err := client.Validate(enterpriseSolverPOST(), "")
+		outcome, err := client.Validate(testCaptchaRequest(enterpriseSolverPOST(), ""))
 		if err != nil || outcome != Reject {
 			t.Fatalf("got outcome=%v err=%v", outcome, err)
 		}
@@ -246,7 +246,7 @@ func Test_Validate_enterpriseErrorVersusReject(t *testing.T) {
 	t.Run("non-2xx is error", func(t *testing.T) {
 		trip := &enterpriseTrip{status: http.StatusForbidden, body: `{"error":{"message":"denied"}}`}
 		client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeCheckbox, Enterprise{}, &http.Client{Transport: trip})
-		outcome, err := client.Validate(enterpriseSolverPOST(), "")
+		outcome, err := client.Validate(testCaptchaRequest(enterpriseSolverPOST(), ""))
 		if err == nil || outcome != None {
 			t.Fatalf("got outcome=%v err=%v", outcome, err)
 		}
@@ -254,7 +254,7 @@ func Test_Validate_enterpriseErrorVersusReject(t *testing.T) {
 	t.Run("empty body is error", func(t *testing.T) {
 		trip := &enterpriseTrip{status: http.StatusOK, body: ""}
 		client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeCheckbox, Enterprise{}, &http.Client{Transport: trip})
-		outcome, err := client.Validate(enterpriseSolverPOST(), "")
+		outcome, err := client.Validate(testCaptchaRequest(enterpriseSolverPOST(), ""))
 		if err == nil || outcome != None {
 			t.Fatalf("got outcome=%v err=%v", outcome, err)
 		}
@@ -262,7 +262,7 @@ func Test_Validate_enterpriseErrorVersusReject(t *testing.T) {
 	t.Run("non-JSON body is error", func(t *testing.T) {
 		trip := &enterpriseTrip{status: http.StatusOK, body: "not-json"}
 		client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeCheckbox, Enterprise{}, &http.Client{Transport: trip})
-		outcome, err := client.Validate(enterpriseSolverPOST(), "")
+		outcome, err := client.Validate(testCaptchaRequest(enterpriseSolverPOST(), ""))
 		if err == nil || outcome != None {
 			t.Fatalf("got outcome=%v err=%v", outcome, err)
 		}
@@ -270,7 +270,7 @@ func Test_Validate_enterpriseErrorVersusReject(t *testing.T) {
 	t.Run("error envelope without tokenProperties is error", func(t *testing.T) {
 		trip := &enterpriseTrip{status: http.StatusOK, body: `{"error":{"code":400,"message":"denied"}}`}
 		client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeCheckbox, Enterprise{}, &http.Client{Transport: trip})
-		outcome, err := client.Validate(enterpriseSolverPOST(), "")
+		outcome, err := client.Validate(testCaptchaRequest(enterpriseSolverPOST(), ""))
 		if err == nil || outcome != None {
 			t.Fatalf("got outcome=%v err=%v", outcome, err)
 		}
@@ -282,7 +282,7 @@ func Test_Validate_emptyTokenDoesNotPostAssessments(t *testing.T) {
 	client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeCheckbox, Enterprise{}, &http.Client{Transport: trip})
 	emptyPOST := httptest.NewRequest(http.MethodPost, "/foo", strings.NewReader(""))
 	emptyPOST.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	outcome, err := client.Validate(emptyPOST, "192.0.2.10")
+	outcome, err := client.Validate(testCaptchaRequest(emptyPOST, "192.0.2.10"))
 	if err != nil || outcome != None {
 		t.Fatalf("got outcome=%v err=%v", outcome, err)
 	}
@@ -295,7 +295,7 @@ func Test_ServeHTTP_enterprisePassMintsGateAnd302(t *testing.T) {
 	trip := &enterpriseTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":true}}`}
 	client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeCheckbox, Enterprise{}, &http.Client{Transport: trip})
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, enterpriseSolverPOST(), "192.0.2.10", "", "")
+	client.ServeHTTP(rw, testCaptchaRequest(enterpriseSolverPOST(), "192.0.2.10"), "", "")
 	if rw.Code != http.StatusFound {
 		t.Fatalf("pass want 302, got %d", rw.Code)
 	}
@@ -309,7 +309,7 @@ func Test_ServeHTTP_scoreRejectOmitsBoot(t *testing.T) {
 	trip := &enterpriseTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":true,"action":"login"},"riskAnalysis":{"score":0.1}}`}
 	client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeScore, Enterprise{Action: "login", MinScore: "0.5"}, &http.Client{Transport: trip})
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, enterpriseSolverPOST(), "192.0.2.10", "", "")
+	client.ServeHTTP(rw, testCaptchaRequest(enterpriseSolverPOST(), "192.0.2.10"), "", "")
 	if rw.Code != http.StatusOK {
 		t.Fatalf("score reject want 200, got %d", rw.Code)
 	}
@@ -326,7 +326,7 @@ func Test_ServeHTTP_checkboxRejectKeepsBoot(t *testing.T) {
 	trip := &enterpriseTrip{status: http.StatusOK, body: `{"tokenProperties":{"valid":false}}`}
 	client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeCheckbox, Enterprise{}, &http.Client{Transport: trip})
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, enterpriseSolverPOST(), "192.0.2.10", "", "")
+	client.ServeHTTP(rw, testCaptchaRequest(enterpriseSolverPOST(), "192.0.2.10"), "", "")
 	if rw.Code != http.StatusOK {
 		t.Fatalf("checkbox reject want 200, got %d", rw.Code)
 	}
@@ -346,7 +346,7 @@ func Test_ServeHTTP_enterpriseErrorRendersWithBoot(t *testing.T) {
 	trip := &enterpriseTrip{status: http.StatusInternalServerError, body: `{"error":{"message":"denied"}}`}
 	client := newTestEnterpriseClient(t, configuration.CaptchaEnterpriseKeyTypeScore, Enterprise{Action: "login", MinScore: "0.5"}, &http.Client{Transport: trip})
 	rw := httptest.NewRecorder()
-	client.ServeHTTP(rw, enterpriseSolverPOST(), "192.0.2.10", "", "")
+	client.ServeHTTP(rw, testCaptchaRequest(enterpriseSolverPOST(), "192.0.2.10"), "", "")
 	if rw.Code != http.StatusOK {
 		t.Fatalf("error want 200, got %d", rw.Code)
 	}
@@ -399,7 +399,7 @@ func newTestEnterpriseClientStock(t *testing.T, keyType string, enterprise Enter
 func Test_ServeHTTP_stockTemplateCheckboxAndScore(t *testing.T) {
 	checkbox := newTestEnterpriseClientStock(t, configuration.CaptchaEnterpriseKeyTypeCheckbox, Enterprise{})
 	checkboxRW := httptest.NewRecorder()
-	checkbox.ServeHTTP(checkboxRW, httptest.NewRequest(http.MethodGet, "/foo", nil), "192.0.2.10", "", "")
+	checkbox.ServeHTTP(checkboxRW, testCaptchaRequest(httptest.NewRequest(http.MethodGet, "/foo", nil), "192.0.2.10"), "", "")
 	if checkboxRW.Code != http.StatusOK {
 		t.Fatalf("checkbox GET want 200, got %d", checkboxRW.Code)
 	}
@@ -416,7 +416,7 @@ func Test_ServeHTTP_stockTemplateCheckboxAndScore(t *testing.T) {
 
 	score := newTestEnterpriseClientStock(t, configuration.CaptchaEnterpriseKeyTypeScore, Enterprise{Action: "login", MinScore: "0.5"})
 	scoreRW := httptest.NewRecorder()
-	score.ServeHTTP(scoreRW, httptest.NewRequest(http.MethodGet, "/foo", nil), "192.0.2.10", "", "")
+	score.ServeHTTP(scoreRW, testCaptchaRequest(httptest.NewRequest(http.MethodGet, "/foo", nil), "192.0.2.10"), "", "")
 	if scoreRW.Code != http.StatusOK {
 		t.Fatalf("score GET want 200, got %d", scoreRW.Code)
 	}

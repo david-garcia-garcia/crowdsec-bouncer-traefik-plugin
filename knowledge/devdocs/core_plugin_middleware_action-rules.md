@@ -17,7 +17,7 @@ Compile `bouncerActionRules` once into `*httprule.ActionSet`. After trusted-IP, 
 - After trusted-IP, call `Matching` then fold. Any ban → `handleRemediationServeHTTP` ban with `lapi.OriginPluginRules(firstBanName)` and return.
 - Else OR skipLapi / skipAppsec / captchaFlag. SkipLapi uses `passOrCaptchaRule`. SkipAppsec is checked again in `handleNextServeHTTP` and `applyCaptchaRuleServeHTTP`.
 - Captcha flag still runs remaining legs. LAPI/AppSec ban (including fail-closed) prevails; WARN `ServeHTTP:forcedCaptchaSuperseded` with attrs `ip` and `name` (the captcha rule). Non-empty AppSec challenge does not override the captcha rule; empty challenge body stays dest fail-closed ban.
-- Do not put captcha or skip flags on `clientRequest`. Recompute `foldActionRules` in helpers.
+- Do not put captcha or skip flags on the inbound request (`core_plugin_clientrequest_inbound-request.md`). Recompute `foldActionRules` in helpers.
 - Closed remediation reason is `rules` (prefix-map `plugin:rules:`). Metrics origin is `plugin:rules:<name>`. Do not hash the list into LAPI ownership or AppSec identity.
 - Leftover `bouncerAppsecBypassRules` / `bouncerLapiBypassRules` / `bouncerDecisionHeader` YAML never reaches `New`.
 

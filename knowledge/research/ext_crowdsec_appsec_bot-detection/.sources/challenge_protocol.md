@@ -14,7 +14,7 @@ action: "challenge"
 http_status: 200
 user_body_content: "<!DOCTYPE html>..."
 user_headers: map of header name → list of strings (Content-Type, Cache-Control, Content-Security-Policy)
-user_cookies: list of Set-Cookie strings, e.g. "__crowdsec_challenge=...; Path=/; HttpOnly; SameSite=Lax"
+user_cookies: list of Set-Cookie strings, e.g. "__crowdsec_challenge=...; Path=/; HttpOnly; SameSite=Lax" (official example has no Secure; page does not document the Secure flag)
 ```
 
 http_status is the browser status, not the 403 the bouncer received. Official default if absent or zero: 200. Not always 200: GrantChallengeCookie() answers 307 plus Location in user_headers.

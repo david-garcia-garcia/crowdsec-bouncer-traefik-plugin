@@ -473,6 +473,9 @@ services:
 
       - "traefik.http.routers.bot-detection.rule=PathPrefix(`/bot-detection`)"
       - "traefik.http.routers.bot-detection.entrypoints=web"
+      - "traefik.http.routers.origin-scheme.rule=PathPrefix(`/origin-scheme`)"
+      - "traefik.http.routers.origin-scheme.entrypoints=web"
+      - "traefik.http.routers.origin-scheme.middlewares=bouncer-bot@docker"
       - "traefik.http.routers.bot-detection.middlewares=bouncer-bot@docker"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.appsecEnabled=true"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.appsecHost=crowdsec:7423"
@@ -514,6 +517,7 @@ services:
       - "traefik.http.routers.status-429.service=whoami"
       - "traefik.http.routers.short-captcha.service=whoami"
       - "traefik.http.routers.bot-detection.service=whoami"
+      - "traefik.http.routers.origin-scheme.service=whoami"
 
   dragonfly:
     image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2
@@ -580,6 +584,7 @@ services:
       - "crowdsec-config-test:/etc/crowdsec/"
       - "./acquis.yaml:/etc/crowdsec/acquis.yaml:ro"
       - "./acquis.d:/etc/crowdsec/acquis.d:ro"
+      - "./appsec-configs/e2e-origin-scheme-grant.yaml:/etc/crowdsec/appsec-configs/e2e-origin-scheme-grant.yaml:ro"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.crowdsec-challenge.rule=PathPrefix(`/crowdsec-internal/challenge`)"

@@ -20,7 +20,7 @@ _Avoid_: GetBody ban, unreadable body, FailureAction passthrough
 
 ## Overview
 
-`appsec.Client.Query` owns the AppSec HTTP round-trip and JSON parse. `Bouncer` owns writing the client response or the operator ban template. Client IP is `pkg/ip.GetRemoteIP` only; AppSec handlers take `clientRequest` still named `req`.
+`appsec.Client.Query` owns the AppSec HTTP round-trip and JSON parse. `Bouncer` owns writing the client response or the operator ban template. Client IP is `pkg/ip.GetRemoteIP` only; AppSec handlers take `clientrequest.Request` still named `req`.
 
 ## How to use
 
@@ -33,7 +33,7 @@ _Avoid_: GetBody ban, unreadable body, FailureAction passthrough
 - AppSec HTTP 500, unreachable (transport failure or listener HTTP 502/503/504), AppSec response-body io errors, and an unreadable HTTP/2 or HTTP/3 body on POST, PUT, or PATCH use per-router `bouncerAppsecFailureAction` (`passthrough` | `ban` | `captcha`), not the three removed block bools. `captcha` here is `pkg/captcha`, not AppSec JSON `action: captcha`. A response-body io error keeps `appsecQuery:readBody`. Oversized AppSec bodies do not use this action. A **client disconnect** while buffering a readable forwardable body is not FailureAction: `Query` returns `ErrClientDisconnected`, AppSec is not called, origin is not called, TRACE only, optional `error:client-disconnected` header. Unclassified client-body read faults keep `appsecQuery:GetBody` and today's ban wiring.
 - `appsecBodyLimit` `0` is unlimited: skip `io.LimitReader` and `io.ReadAll` the readable client body. A positive limit still caps the copy. Omitted default stays 10485760.
 - Copy a readable body only when `isMethodWithForwardableBody` says so (POST, PUT, PATCH, DELETE) and the body is not `http.NoBody`. Everything else is a headers-only GET whose body is never read, so a GET carrying a body is not laundered into a POST at the listener. The real verb always travels on `X-Crowdsec-Appsec-Verb`.
-- After the forwarded bytes exist, omit client `Content-Length` and every hop-by-hop header (`isHopByHopHeader`); set `Request.ContentLength` and the `Content-Length` header from those bytes on the POST branch only. Reuse the `ip` argument on `X-Crowdsec-Appsec-Ip`.
+- After the forwarded bytes exist, omit client `Content-Length` and every hop-by-hop header (`isHopByHopHeader`); set `Request.ContentLength` and the `Content-Length` header from those bytes on the POST branch only. Reuse `req.RemoteIP()` on `X-Crowdsec-Appsec-Ip`. Set `X-Crowdsec-Appsec-Uri` from `req.AbsoluteURL()` (`core_plugin_clientrequest_inbound-request.md`). Do not set that header from `URL.String()` or `URL.Scheme`. Do not derive scheme from proto or TLS.
 - Drain and close every non-nil AppSec `Do` response before return, including 502/503/504. Transport errors have no body.
 - Route `PathPrefix(/crowdsec-internal/challenge)` through the same middleware; service backend is the AppSec listener.
 - Copy request `Cookie` through to AppSec (already copied with other headers). Do not parse `__crowdsec_challenge` in this plugin.
@@ -41,7 +41,7 @@ _Avoid_: GetBody ban, unreadable body, FailureAction passthrough
 ## Pattern snippet
 
 ```go
-decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
+decision, err := b.appsecClient.Query(req, pol)
 ```
 
 ## Key files
@@ -52,7 +52,7 @@ decision, err := b.appsecClient.Query(req.remoteIP, req.Request, pol)
 - `pkg/appsec/session.go`
 - `pkg/bouncer/bouncer.go`
 - `pkg/bouncer/remediation_header.go`
-- `pkg/bouncer/clientrequest.go`
+- `pkg/clientrequest/request.go`
 
 ## Gotchas
 

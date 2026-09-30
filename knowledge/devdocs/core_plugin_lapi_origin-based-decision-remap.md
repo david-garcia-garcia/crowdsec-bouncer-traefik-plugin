@@ -25,7 +25,7 @@ Stream Ip/header, stream Range, and live/none query store `RemediationValue` onl
 ## Pattern snippet
 
 ```go
-kind, origin, originID, err := b.lapiClient.LookupRemediation(req.remoteIP, req.ipAddr, scopes)
+kind, origin, originID, err := b.lapiClient.LookupRemediation(req.RemoteIP(), req.IPAddr(), scopes)
 // ... handle err ...
 kind, origin = b.appliedLAPIRemediation(kind, origin, originID)
 ```
