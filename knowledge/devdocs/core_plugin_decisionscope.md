@@ -15,7 +15,7 @@ Two utilities Helpers (ban, captcha) on the reclaimed DecisionStore. Each Range 
 _Avoid_: trusted-IP Checker, one LPM tree, `sync.Once`, package globals, a Crowdsec-mode flag on lookup, re-parsing `storedByCIDR` on a Range hit
 
 **Ip cache key**:
-The one canonical spelling an Ip-scoped decision is filed under, `net.IP.String()` of the address. `IPCacheKey` derives it from a LAPI decision value (host prefix, bare address, or verbatim when neither). After a successful parse, `clientRequest.remoteIP` is that same string and is the request-path key. CrowdSec stores decision values verbatim, so the store path still canonicalizes text; the request path must not re-parse.
+The one canonical spelling an Ip-scoped decision is filed under, `net.IP.String()` of the address. `IPCacheKey` derives it from a LAPI decision value (host prefix, bare address, or verbatim when neither). After a successful parse, `req.RemoteIP()` is that same string and is the request-path key. CrowdSec stores decision values verbatim, so the store path still canonicalizes text; the request path must not re-parse.
 _Avoid_: keying on the raw header text, a second request-path key helper, re-parsing `remoteIP` in lookup or the live memo, pushing a Country or AS value through address parsing
 
 **Header-mapped scope**:
@@ -33,7 +33,7 @@ Use `pkg/decisionscope` for letters, PreferRemediation, RequestScopeValues, Stre
 ## How to use
 
 - Pass `bouncerDecisionScopeHeaders` from config into the bouncer (request headers). Stream `scopes=` and the stream store filter are the live-router union (`core_plugin_lapi_scope-union.md`). Live/none still pass scopes per `LiveLookup`.
-- Resolve the client IP with `pkg/ip.GetRemoteIP`. After a successful parse, set `req.remoteIP = req.ipAddr.String()` before lookup, live memo, or captcha bind. Then `lapiClient.LookupRemediation`. Pass `req.remoteIP` as the Ip key and `req.ipAddr` only into Range membership. Matching uses the first letter; origin is for usage-metrics only. Do not put scopes on `clientRequest`.
+- Resolve the client IP with `pkg/ip.GetRemoteIP`. Pass that string and `ipAddr` into `clientrequest.New` (`core_plugin_clientrequest_inbound-request.md`); `New` stores `ipAddr.String()` when the address parsed. Then `lapiClient.LookupRemediation`. Pass `req.RemoteIP()` as the Ip key and `req.IPAddr()` only into Range membership. Matching uses the first letter; origin is for usage-metrics only. Do not assign `RemoteIP` after `New`. Do not put scopes on the inbound request.
 - Writing an Ip slot from a LAPI decision value (stream store, stream delete) goes through `IPCacheKey`. The live memo writes `Set(remoteIP)` using the already-canonical request string. Changing one side of that pair on its own is a permanent cache miss, not a partial fix.
 - Stream Range items: collect the tick, then Store `ApplyRangeBatch` (one read, one write) with `KindOriginString`. Removals run before upserts so a same-window CIDR replacement stays (`core_plugin_lapi_stream-apply.md`). It returns an error when it could not read the shared blob; propagate it so the poll counts as failed. Hydrate membership from the blob after apply and at stream start. Do not GET+SET per Range line.
 - Live/none: keep `?ip=` (LAPI expands Range). Add `scope`+`value` when a mapped header is present. Do not hydrate membership. The live client-address cache key stores the `?ip=` result only; header remediations stay on `HeaderScopeKey`. A cache miss still live-looks-up; do not treat that miss as a stream-health decision.
@@ -43,12 +43,11 @@ Use `pkg/decisionscope` for letters, PreferRemediation, RequestScopeValues, Stre
 
 ```go
 scopes := decisionscope.RequestScopeValues(headers, req)
-req.remoteIP = req.ipAddr.String()
-kind, origin, originID, err := lapiClient.LookupRemediation(req.remoteIP, req.ipAddr, scopes)
+kind, origin, originID, err := lapiClient.LookupRemediation(req.RemoteIP(), req.IPAddr(), scopes)
 if origin == "" {
 	origin = lapiClient.OriginName(originID)
 }
-lapiClient.IncDropped(origin, req.ipType, "ban")
+lapiClient.IncDropped(origin, req.IPType(), "ban")
 ```
 
 ## Key files
@@ -56,7 +55,7 @@ lapiClient.IncDropped(origin, req.ipType, "ban")
 - `pkg/decisionscope/`
 - `pkg/configuration/configuration.go` (`BouncerDecisionScopeHeaders`)
 - `pkg/bouncer/bouncer.go`
-- `pkg/bouncer/clientrequest.go`
+- `pkg/clientrequest/request.go`
 - `pkg/decisionstore/`
 - `pkg/lapi/client.go`
 - `pkg/lapi/client_decisions.go`

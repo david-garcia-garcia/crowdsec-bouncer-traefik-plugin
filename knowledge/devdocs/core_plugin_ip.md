@@ -22,10 +22,6 @@ _Avoid_: parsing `RemoteAddr` on the connection, a second X-Forwarded-For walk, 
 An RFC 4007 scoped-address suffix on an IPv6 literal (`%eth0`, `%12`).
 _Avoid_: zone index as a second address; IPv4 `%` suffix as a zone
 
-**clientRequest**:
-The inbound request plus the client address GetRemoteIP already chose (`IPAddr` net.IP, `IPType` for metrics, `RemoteIP` string) plus the constructor-owned scheme token. After a successful parse, `RemoteIP` is `IPAddr.String()`; before that it stays the raw extract so fail logs can show the garbage header. Handlers keep the parameter name `req`. Scheme is proto-then-TLS at `clientrequest.New`; callers MUST NOT assign it.
-_Avoid_: renaming `req` to `client`; a fourth address field; a bag for scopes, origin, or captcha state; `context.Value`
-
 ## Overview
 
 Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker stores those CIDRs in the utilities `iplookup` Helper. Stream/alone Range uses two Helpers on the LAPI Client (ban set, captcha set), not Checker. Use `ip.InNetwork` when the question is one CIDR (blob line parse). Do not parse `RemoteAddr` in the helper; classify `GetRemoteIP`.
@@ -33,7 +29,7 @@ Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker st
 ## How to use
 
 - Build the Checker once in `bouncer.New` from config lists.
-- Resolve the client address with `GetRemoteIP` (server/trusted-hop pool + custom header). Put that string, `IPAddr`, and `FamilyOfIP` on `clientrequest.Request` via `New`. After a successful parse, set `req.RemoteIP = req.IPAddr.String()` before lookup, live memo, or captcha bind. Keep the name `req`. Then `ContainsIP` on `req.IPAddr` for the client pool. Do not parse `RemoteAddr` again. Do not parse the chosen string again for trusted-client membership. Do not add scopes or origin to `clientRequest`.
+- Resolve the client address with `GetRemoteIP` (server/trusted-hop pool + custom header). Pass that string and `ipAddr` into `clientrequest.New` (`core_plugin_clientrequest_inbound-request.md`). Keep the name `req`. Then `ContainsIP` on `req.IPAddr()` for the client pool. Do not parse `RemoteAddr` again. Do not parse the chosen string again for trusted-client membership. Do not assign `RemoteIP` after `New`. Do not add scopes or origin to the inbound request.
 - On the request path, call `ContainsIP` on the parsed GetRemoteIP address. `Contains` remains for string callers. Do not walk a CIDR slice beside the helper.
 - Call `HostCIDR` to format a parseable bare address as `/32` or `/128` before `AddCIDR`.
 - Range stream/alone membership reuses two Helpers on the LAPI Client (`AddCIDR(network, remediation)` then `Contains` metadata). Checker stays `AddCIDR(cidr, "")`. Do not put Range in Checker. Do not put ban and captcha on one LPM tree.
@@ -44,7 +40,7 @@ Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker st
 
 ```go
 checker, err := ip.NewChecker(log, config.BouncerClientTrustedIPs)
-ok := checker.ContainsIP(req.IPAddr)
+ok := checker.ContainsIP(req.IPAddr())
 ```
 
 ## Key files
@@ -52,7 +48,6 @@ ok := checker.ContainsIP(req.IPAddr)
 - `pkg/ip/checker.go`
 - `pkg/ip/network.go`
 - `vendor/github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup/`
-- `pkg/clientrequest/request.go`
 - `pkg/bouncer/bouncer.go`
 - `pkg/configuration/configuration.go` (`validateParamsIPs`)
 

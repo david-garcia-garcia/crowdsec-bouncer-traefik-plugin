@@ -24,7 +24,7 @@ Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. S
 
 ## How to use
 
-- Classify `ip_type` with `ip.FamilyOfIP` on the `net.IP` GetRemoteIP already yielded (`req.ipType` on the request path). Do not parse `RemoteAddr`. Do not call `ip.Family` on the client string on the request path.
+- Classify `ip_type` with `ip.FamilyOfIP` on the `net.IP` GetRemoteIP already yielded (`req.IPType()` on the request path; `New` stores that family). Do not parse `RemoteAddr`. Do not call `ip.Family` on the client string on the request path.
 - Build origin with `MetricsOrigin(decision.Origin, decision.Scenario)` before Store Put and before `IncDropped`.
 - AppSec remediations use `origin=appsec`. Fail-closed drops use `plugin:tech_getremotefail`, `plugin:tech_trustipfail`, `plugin:tech_cachefail`, `plugin:tech_streamfail`, `plugin:lapi_failure`, or `plugin:appsec_failure`. Applied action-rule ban or captcha uses `plugin:rules:<name>`.
 - Persist origin on Redis Ip/header and Range-index via `KindOriginString`. Packed memory values use the DecisionStore intern table. Overflow Warns and keeps origin id 0 (`OriginName` empty). Bare letter-only Range lines still match and MAY omit origin. `ActiveCounts` is intern id + family; POST emits `OriginName(originID)` only.
@@ -37,12 +37,12 @@ Call `IncProcessed` and `IncDropped` from the bouncer on each handled request. S
 ## Pattern snippet
 
 ```go
-kind, origin, originID, err := lapiClient.LookupRemediation(req.remoteIP, req.ipAddr, scopes)
+kind, origin, originID, err := lapiClient.LookupRemediation(req.RemoteIP(), req.IPAddr(), scopes)
 if origin == "" {
 	origin = lapiClient.OriginName(originID)
 }
-lapiClient.IncProcessed(req.ipType)
-lapiClient.IncDropped(origin, req.ipType, "ban")
+lapiClient.IncProcessed(req.IPType())
+lapiClient.IncDropped(origin, req.IPType(), "ban")
 ```
 
 ## Key files

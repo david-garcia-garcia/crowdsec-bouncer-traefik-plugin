@@ -3,3 +3,15 @@
 - updated knowledge/devdocs/core_plugin_middleware_captcha-gate.md
 - updated knowledge/devdocs/core_plugin_appsec.md
 - updated knowledge/devdocs/core_plugin_ip.md
+- created knowledge/devdocs/core_plugin_clientrequest_inbound-request.md
+- updated knowledge/devdocs/index_core_plugin.md
+- updated knowledge/devdocs/core_plugin_middleware.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-routing.md
+- updated knowledge/devdocs/core_plugin_decisionscope.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-assessments.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-eucaptcha-verify.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-widget.md
+- updated knowledge/devdocs/std_go_logger_debug-attrs.md
+- updated knowledge/devdocs/core_plugin_middleware_action-rules.md
+- updated knowledge/devdocs/core_plugin_lapi_usage-metrics.md
+- updated knowledge/devdocs/core_plugin_lapi_origin-based-decision-remap.md

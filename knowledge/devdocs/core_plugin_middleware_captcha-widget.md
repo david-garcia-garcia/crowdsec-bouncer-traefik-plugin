@@ -21,9 +21,9 @@ _Avoid_: `(bool, error)` as the `Validate` result, `(None, err)`
 ## How to use
 
 - Pair widget and verifier in `New`. Do not mention a provider name or key type in `ServeHTTP` or `Validate`.
-- `ServeHTTP` takes this router's header name plus the caller-formatted challenge-page value. Do not hard-code `captcha` or `solved-captcha`. Do not import plugin origins or the closed reason table.
+- `ServeHTTP` takes `clientrequest.Request`, this router's header name, plus the caller-formatted challenge-page value. Do not hard-code `captcha` or `solved-captcha`. Do not import plugin origins or the closed reason table.
 - `Validate` returns `(Outcome, error)`. Non-POST or empty token is `None` (no `Pass` call). Verifier true is `Pass`. Verifier false with no error is `Reject`. Transport or undecodable provider body is the error return.
-- `Validate` calls `Pass(token, remoteIP, r.UserAgent())`. Siteverify and assessments ignore `userAgent`. Do not put User-Agent on `clientRequest`.
+- `Validate` takes `clientrequest.Request` and calls `Pass(token, req.RemoteIP(), req.UserAgent())`. Siteverify and assessments ignore `userAgent`. Do not put User-Agent on the inbound request.
 - `Verifier.Pass` stays `(bool, error)` as the return.
 - Eucaptcha: script `https://cdn.eu-captcha.eu/verify.js`, class `eu-captcha`, field `eu-captcha-response`, retry true. Pair the eucaptcha verifier. Do not put `eucaptcha` in `infoProviders`. Verify HTTP stays on `core_plugin_middleware_captcha-eucaptcha-verify`.
 - On `Pass`: mint `crowdsec_captcha_gate`, set `captcha:solved` when configured (no third field), set `Cache-Control: no-cache, no-store`, 302 to the request URL.

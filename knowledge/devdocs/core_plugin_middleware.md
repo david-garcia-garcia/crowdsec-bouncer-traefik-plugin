@@ -63,7 +63,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - Put stream tickers, replaceable LAPI HTTP (`transport` on `atomic.Value`), and Range membership on `lapi.Client`. Open the DecisionStore on the same `New` ctx (`core_plugin_decisionstore.md`). Put AppSec HTTP+auth on `appsec.Client`. Put captcha widget, verifier, template, and gate on `captcha.Client`. Put ban templates, LAPI failure action, Redis fail-closed, live-cache TTL, and this router’s remediation header on Bouncer. Timeout/TLS changes are a new ownership key, not Adopt-only.
 - Format the remediation header in `pkg/bouncer/remediation_header.go` (`formatRemediationHeader`). Join `kind:reason`; append encoded origin only when reason is `lapi` and origin is non-empty. Strip CR/LF/TAB from origin; rewrite only the prefix `lists:` → `lists_`. Map plugin `OriginPlugin*` and AppSec specials to closed reason tokens, never a third field. Empty kind or reason MUST NOT invent `allow: pass`. Pass the already-formatted challenge-page value into `captcha.Client.ServeHTTP`; Pass 302 and `WriteSolvedRedirect` write `captcha:solved` inside captcha. Do not emit this header on pass, bypass, trusted, passthrough, remap-to-pass, widget-asset, valid gate-cookie origin GET, disabled, or startup 503.
 - Do not pass `config.LapiDefaultDecisionSeconds` from the bouncer into `LiveLookup`; the bound client already has it.
-- Resolve client IP with `pkg/ip.GetRemoteIP`. Fold `remoteIP`, parsed `net.IP`, and `ipType` into `clientRequest`. Keep the name `req`.
+- Resolve client IP with `pkg/ip.GetRemoteIP`. Pass that string and `ipAddr` into `clientrequest.New` (`core_plugin_clientrequest_inbound-request.md`). Keep the name `req`.
 - After the trusted-client skip, fold `bouncerActionRules` (`core_plugin_middleware_action-rules.md`). Any matching ban remediates immediately. Else skip LAPI and/or AppSec and/or set a captcha flag. Captcha is not an early return.
 - Compile `bouncerActionRules` once in `bouncer.New` via `httprule.NewActionSet` (`core_plugin_httprule.md`). Do not compile on the request path. Path owner is `req.URL.Path` as `net/http` decoded it; do not rebuild from `RequestURI`, `EscapedPath`, or AppSec forwarded URI. Host owner is the hostname of `req.Host` (`net.SplitHostPort` when that succeeds). Do not hash this list into LAPI ownership or AppSec identity.
 - Range and header-mapped CrowdSec scopes live in `pkg/decisionscope`. Do not geolocate in `New` or `ServeHTTP`.
@@ -105,7 +105,7 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 - `pkg/captcha/session.go`
 - `pkg/bouncer/bouncer.go`
 - `pkg/bouncer/remediation_header.go`
-- `pkg/bouncer/clientrequest.go`
+- `pkg/clientrequest/request.go`
 - `pkg/httprule/`
 - `.traefik.yml`
 
