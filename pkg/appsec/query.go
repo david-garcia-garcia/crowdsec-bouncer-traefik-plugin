@@ -203,7 +203,7 @@ func (c *Client) newAppsecForwardRequest(req clientrequest.Request, pol Policy) 
 		appsecKey = current.key
 	}
 	appsecReq.Header.Set(crowdsecAppsecHeader, appsecKey)
-	appsecReq.Header.Set(crowdsecAppsecIPHeader, req.RemoteIP)
+	appsecReq.Header.Set(crowdsecAppsecIPHeader, req.RemoteIP())
 	appsecReq.Header.Set(crowdsecAppsecVerbHeader, req.Method)
 	appsecReq.Header.Set(crowdsecAppsecHostHeader, req.Host)
 	appsecReq.Header.Set(crowdsecAppsecURIHeader, req.AbsoluteURL())

@@ -2,6 +2,7 @@ package clientrequest
 
 import (
 	"crypto/tls"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -45,7 +46,7 @@ func TestNew_schemeMatrix(t *testing.T) {
 			if testCase.urlSch != "" {
 				httpReq.URL.Scheme = testCase.urlSch
 			}
-			got := New(httpReq, "192.0.2.1", nil, "")
+			got := New(httpReq, "192.0.2.1", nil)
 			if got.Scheme() != testCase.want {
 				t.Fatalf("scheme=%q want %q", got.Scheme(), testCase.want)
 			}
@@ -57,9 +58,34 @@ func TestNew_doesNotWriteURLScheme(t *testing.T) {
 	httpReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	httpReq.URL.Scheme = ""
 	httpReq.Header.Set("X-Forwarded-Proto", "https")
-	_ = New(httpReq, "192.0.2.1", nil, "")
+	_ = New(httpReq, "192.0.2.1", nil)
 	if httpReq.URL.Scheme != "" {
 		t.Fatalf("URL.Scheme=%q want empty", httpReq.URL.Scheme)
+	}
+}
+
+func TestNew_addressIsSnapshot(t *testing.T) {
+	httpReq := httptest.NewRequest(http.MethodGet, "/", nil)
+	raw := net.ParseIP("2001:0db8:0000:0000:0000:0000:0000:0001")
+	got := New(httpReq, "2001:0db8:0000:0000:0000:0000:0000:0001", raw)
+	raw[0] = 0
+	if got.RemoteIP() != "2001:db8::1" {
+		t.Fatalf("remoteIP=%q", got.RemoteIP())
+	}
+	if got.IPType() != "ipv6" {
+		t.Fatalf("ipType=%q", got.IPType())
+	}
+	if !got.IPAddr().Equal(net.ParseIP("2001:db8::1")) {
+		t.Fatalf("ipAddr=%v", got.IPAddr())
+	}
+	got.IPAddr()[0] = 9
+	if !got.IPAddr().Equal(net.ParseIP("2001:db8::1")) {
+		t.Fatalf("IPAddr getter returned the stored slice")
+	}
+
+	unparsed := New(httpReq, "not-an-ip", nil)
+	if unparsed.RemoteIP() != "not-an-ip" || unparsed.IPAddr() != nil || unparsed.IPType() != "" {
+		t.Fatalf("remoteIP=%q ipAddr=%v ipType=%q", unparsed.RemoteIP(), unparsed.IPAddr(), unparsed.IPType())
 	}
 }
 
@@ -69,8 +95,23 @@ func TestAbsoluteURL_originFormUsesRequestHost(t *testing.T) {
 	httpReq.URL.Scheme = ""
 	httpReq.URL.Host = ""
 	httpReq.Header.Set("X-Forwarded-Proto", "https")
-	got := New(httpReq, "192.0.2.1", nil, "").AbsoluteURL()
+	got := New(httpReq, "192.0.2.1", nil).AbsoluteURL()
 	if got != "https://app.example/foo?q=1" {
+		t.Fatalf("AbsoluteURL=%q", got)
+	}
+}
+
+func TestAbsoluteURL_frozenAtNew(t *testing.T) {
+	httpReq := httptest.NewRequest(http.MethodGet, "/foo?q=1", nil)
+	httpReq.Host = "app.example"
+	httpReq.URL.Scheme = ""
+	httpReq.URL.Host = ""
+	httpReq.Header.Set("X-Forwarded-Proto", "https")
+	req := New(httpReq, "192.0.2.1", nil)
+	httpReq.Host = "other.example"
+	httpReq.URL.Path = "/changed"
+	httpReq.URL.RawQuery = "q=2"
+	if got := req.AbsoluteURL(); got != "https://app.example/foo?q=1" {
 		t.Fatalf("AbsoluteURL=%q", got)
 	}
 }
@@ -78,7 +119,7 @@ func TestAbsoluteURL_originFormUsesRequestHost(t *testing.T) {
 func TestAbsoluteURL_URLHostWins(t *testing.T) {
 	httpReq := httptest.NewRequest(http.MethodGet, "http://url.example/path", nil)
 	httpReq.Host = "req.example"
-	if got := New(httpReq, "192.0.2.1", nil, "").AbsoluteURL(); got != "http://url.example/path" {
+	if got := New(httpReq, "192.0.2.1", nil).AbsoluteURL(); got != "http://url.example/path" {
 		t.Fatalf("AbsoluteURL=%q", got)
 	}
 }

@@ -109,7 +109,7 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, req clientrequest.Request, re
 	}
 	if outcome == Pass {
 		logger.Trace(c.log, "captcha:ServeHTTP captcha:valid")
-		value := mintGateValue(c.gateSecret, c.gateBindIP, req.RemoteIP, time.Now())
+		value := mintGateValue(c.gateSecret, c.gateBindIP, req.RemoteIP(), time.Now())
 		setGateCookie(rw, req, value, c.gracePeriodSeconds)
 		writeRemediationHeader(rw, remediationHeader, remediationHeaderCaptchaSolved)
 		rw.Header().Set("Cache-Control", "no-cache, no-store")
@@ -154,8 +154,8 @@ func RequestDomain(host string) string {
 
 // Check Verify if the captcha is already done via gate cookie.
 func (c *Client) Check(req clientrequest.Request) bool {
-	passed := validateGateValue(c.gateSecret, c.gateBindIP, req.RemoteIP, gateCookieValue(req.Request), time.Now(), c.gracePeriodSeconds)
-	logger.Trace(c.log, "captcha:Check", "ip", req.RemoteIP, "pass", passed)
+	passed := validateGateValue(c.gateSecret, c.gateBindIP, req.RemoteIP(), gateCookieValue(req.Request), time.Now(), c.gracePeriodSeconds)
+	logger.Trace(c.log, "captcha:Check", "ip", req.RemoteIP(), "pass", passed)
 	return passed
 }
 
@@ -297,7 +297,7 @@ func (c *Client) Validate(req clientrequest.Request) (Outcome, error) {
 		logger.Trace(c.log, "captcha:Validate no captcha response found in request")
 		return None, nil
 	}
-	passed, err := c.verifier.Pass(token, req.RemoteIP, req.UserAgent())
+	passed, err := c.verifier.Pass(token, req.RemoteIP(), req.UserAgent())
 	if err != nil {
 		c.log.Debug("captcha:Validate", "error", err)
 		return None, err

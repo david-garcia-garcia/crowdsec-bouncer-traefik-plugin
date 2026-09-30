@@ -28,14 +28,14 @@ func testClientRequest(req *http.Request, remoteIP string) clientrequest.Request
 	if parsed != nil {
 		remoteIP = parsed.String()
 	}
-	return clientrequest.New(req, remoteIP, parsed, ip.FamilyOfIP(parsed))
+	return clientrequest.New(req, remoteIP, parsed)
 }
 
 func TestClientRequestRemoteIPIsCanonical(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
 	got := testClientRequest(req, "2001:0db8:0000:0000:0000:0000:0000:0001")
-	if got.RemoteIP != "2001:db8::1" {
-		t.Fatalf("remoteIP=%q", got.RemoteIP)
+	if got.RemoteIP() != "2001:db8::1" {
+		t.Fatalf("remoteIP=%q", got.RemoteIP())
 	}
 }
 

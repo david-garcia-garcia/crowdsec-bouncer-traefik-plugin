@@ -56,7 +56,7 @@ func TestQuery_HangHonorsAppsecOverride(t *testing.T) {
 	}
 
 	started := time.Now()
-	decision, queryErr := client.Query(testAppsecRequest(httptest.NewRequest(http.MethodGet, "http://localhost/", nil)), Policy{
+	decision, queryErr := client.Query(buildTestRequest(httptest.NewRequest(http.MethodGet, "http://localhost/", nil)), Policy{
 		FailureAction: configuration.FailureActionPassthrough,
 	})
 	elapsed := time.Since(started)

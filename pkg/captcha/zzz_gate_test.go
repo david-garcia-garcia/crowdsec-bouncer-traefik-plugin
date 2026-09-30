@@ -13,7 +13,7 @@ import (
 
 // testCaptchaRequest wraps httpReq plus remoteIP for Check, Validate, ServeHTTP, and setGateCookie tests.
 func testCaptchaRequest(httpReq *http.Request, remoteIP string) clientrequest.Request {
-	return clientrequest.New(httpReq, remoteIP, nil, "")
+	return clientrequest.New(httpReq, remoteIP, nil)
 }
 
 // issuedGateCookie calls setGateCookie and returns the cookie written to rw.

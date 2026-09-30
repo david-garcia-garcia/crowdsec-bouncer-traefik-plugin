@@ -19,7 +19,7 @@ func TestQuery_NilTransportUsesFailureAction(t *testing.T) {
 	}
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
 
-	decision, err := client.Query(testAppsecRequest(req), Policy{FailureAction: configuration.FailureActionPassthrough})
+	decision, err := client.Query(buildTestRequest(req), Policy{FailureAction: configuration.FailureActionPassthrough})
 	if err != nil {
 		t.Fatalf("passthrough nil transport: %v", err)
 	}
@@ -27,11 +27,11 @@ func TestQuery_NilTransportUsesFailureAction(t *testing.T) {
 		t.Fatalf("passthrough nil transport decision = %+v, want allow", decision)
 	}
 
-	_, err = client.Query(testAppsecRequest(req), Policy{FailureAction: configuration.FailureActionBan})
+	_, err = client.Query(buildTestRequest(req), Policy{FailureAction: configuration.FailureActionBan})
 	if err == nil {
 		t.Fatal("ban nil transport must return an error")
 	}
-	_, err = client.Query(testAppsecRequest(req), Policy{FailureAction: configuration.FailureActionCaptcha})
+	_, err = client.Query(buildTestRequest(req), Policy{FailureAction: configuration.FailureActionCaptcha})
 	if !errors.Is(err, ErrFailureCaptcha) {
 		t.Fatalf("captcha nil transport err = %v", err)
 	}

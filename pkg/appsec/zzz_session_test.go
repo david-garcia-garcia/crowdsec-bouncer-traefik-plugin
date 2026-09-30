@@ -10,19 +10,6 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
-func testAppsecConfig(host string) *configuration.Config {
-	return &configuration.Config{
-		AppsecBodyLimit:          10485760,
-		AppsecEnabled:            true,
-		AppsecHost:               host,
-		AppsecHTTPTimeoutSeconds: 1,
-		AppsecKey:                "test-key",
-		AppsecPath:               "/",
-		AppsecScheme:             "http",
-		AppsecTLSInsecureVerify:  true,
-	}
-}
-
 func TestOpen_P1MiddlewareNameSplitsClient(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
