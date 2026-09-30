@@ -14,7 +14,7 @@
       "at": "2026-09-30T18:10:02.145Z"
     },
     "propose": {
-      "work": false,
+      "work": true,
       "card": false,
       "at": null
     },
