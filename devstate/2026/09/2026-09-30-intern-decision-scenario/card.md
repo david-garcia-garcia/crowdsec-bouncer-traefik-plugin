@@ -20,14 +20,14 @@ Stream and live copy LAPI `Scenario` onto `decisionstore.Decision` (`streamPutIt
 Ready for review. 0 items remain.
 
 Priority: P3 — spec, docs, tests, or internal clarity — no current user or operator harm
-Reviewed head: 97b9fa1f
+Reviewed head: da22f58d
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36768680685 |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36769453493 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,7 +37,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-30-intern-decision-scenario pushed | `git` |
 | OpenSpec | intern-decision-scenario | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/178 | pr-host |
-| CI | build 36768680685 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36768680685 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36768680685 |
+| CI | build 36769453493 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36769453493 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36769453493 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -58,7 +58,7 @@ None.
 None.
 
 ## How this fits together
-Ticket #172 on branch 2026-09-30-intern-decision-scenario targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/178; CI build 36768680685 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36768680685.
+Ticket #172 on branch 2026-09-30-intern-decision-scenario targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/178; CI build 36769453493 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36769453493.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -87,7 +87,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 97b9fa1f2c69a0179fddd87a85b0e4e875815f89 | Card must match the branch you measured |
+| Reviewed head | da22f58d36622c374971f5ee26115a5649e3459b | Card must match the branch you measured |
 
 ### Stored data model
 None.
