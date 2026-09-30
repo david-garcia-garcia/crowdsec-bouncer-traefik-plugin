@@ -79,7 +79,7 @@ Roots searched: worktree `pkg/**/*.go` excluding `vendor/` for `clientRequest`, 
 
 - Traefik proto trust: `knowledge/research/ext_traefik_forwardedheaders_x-forwarded-proto/`.
 - AppSec protocol URI meaning ("Original URI" only): `knowledge/research/ext_crowdsec_appsec_protocol/`.
-- CrowdSec 1.8 `__crowdsec_challenge` Secure: `github.com/crowdsecurity/crowdsec@v1.8.0` (`cc76dbbce40bd2e6a3ce1ba07e3c41d8b462de66`) `pkg/appsec/challenge/challenge.go` (Secure iff `request.URL.Scheme == "https"` on mint and allowlist seal) and `pkg/appsec/request.go` (`url.Parse` of `X-Crowdsec-Appsec-Uri` into `originalHTTPRequest.URL`). Research folder `ext_crowdsec_appsec_bot-detection/` is being updated with this pin (delegate in flight).
+- CrowdSec 1.8 `__crowdsec_challenge` Secure: `knowledge/research/ext_crowdsec_appsec_bot-detection/` `§ Challenge cookie Secure`. Pin `github.com/crowdsecurity/crowdsec@cc76dbbce40bd2e6a3ce1ba07e3c41d8b462de66` (`v1.8.0`) `pkg/appsec/challenge/challenge.go` and `pkg/appsec/request.go`. Secure iff parsed `X-Crowdsec-Appsec-Uri` scheme is `https`. Path-only URI → empty Scheme → no Secure. Official protocol is silent on Secure.
 - Go server origin-form URL: reproduced above; Scheme and URL.Host empty.
 
 ## Decisions
@@ -119,7 +119,7 @@ Roots searched: worktree `pkg/**/*.go` excluding `vendor/` for `clientRequest`, 
 
 - Q: Does CrowdSec 1.8 still key `__crowdsec_challenge` Secure on `request.URL.Scheme == "https"`?
   Rank: additive asked — new URI shape this change sends; criterion 4 cites that engine check
-  Decision: resolved — yes, on `github.com/crowdsecurity/crowdsec@cc76dbbce40bd2e6a3ce1ba07e3c41d8b462de66` (`v1.8.0`) `pkg/appsec/challenge/challenge.go` (mint and allowlist seal). `pkg/appsec/request.go` assigns `url.Parse(X-Crowdsec-Appsec-Uri)` to `originalHTTPRequest.URL`. Path-only URI → empty Scheme → no Secure. Official protocol page does not mention Secure.
+  Decision: resolved — yes. Owner: `knowledge/research/ext_crowdsec_appsec_bot-detection/` `§ Challenge cookie Secure` (`github.com/crowdsecurity/crowdsec@cc76dbbce40bd2e6a3ce1ba07e3c41d8b462de66` `pkg/appsec/challenge/challenge.go` and `pkg/appsec/request.go`). Path-only URI → empty Scheme → no Secure. Official protocol page does not mention Secure.
   By: explore
 
 - Q: Where does the dual-cookie Secure e2e live?

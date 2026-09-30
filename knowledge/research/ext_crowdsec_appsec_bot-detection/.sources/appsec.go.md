@@ -1,7 +1,7 @@
 ---
 url: https://github.com/crowdsecurity/crowdsec/blob/cc76dbbce40bd2e6a3ce1ba07e3c41d8b462de66/pkg/appsec/appsec.go
 title: pkg/appsec/appsec.go BodyResponse and challenge dispatch
-fetched: 2026-09-05
+fetched: 2026-09-30
 authority: source
 ref: github.com/crowdsecurity/crowdsec@cc76dbbce40bd2e6a3ce1ba07e3c41d8b462de66:pkg/appsec/appsec.go
 ---
@@ -14,8 +14,8 @@ GenerateResponse: allow → BouncerPassedHTTPCode (default 200). challenge copie
 
 setChallengeResponse: action challenge, SetHTTPCode(user code), BouncerHTTPResponseCode = BouncerBlockedHTTPCode, body/headers/optional cookie.
 
-Dispatch: pow-worker.js and fpscanner.js GET → setChallengeResponse StatusOK + JS. POST submit: validate; fail → failed JSON StatusOK; RejectSubmission → rejected JSON; else ok JSON + cookie. All still bouncer 403.
+Dispatch: pow-worker.js and fpscanner.js GET → setChallengeResponse StatusOK + JS. POST submit: validate; fail → failed JSON StatusOK; RejectSubmission → rejected JSON; else ok JSON + cookie. All still bouncer 403. Submit validation calls `ValidateChallengeResponse(request.HTTPRequest, request.Body)`.
 
-GrantChallengeCookie (pre_eval/post_eval): mint allowlist cookie, 307 Location=RequestURI, kind granted. GrantAllowlistCookieInline (submit): cookie on existing envelope, no 307.
+GrantChallengeCookie (pre_eval/post_eval): mint allowlist cookie, 307 Location=RequestURI, kind granted. GrantAllowlistCookieInline (submit): cookie on existing envelope, no 307. Both mint via `SealAllowlistCookie(request.HTTPRequest, reason, ttlOverride)`.
 
 Build defaults: BouncerBlockedHTTPCode 403, BouncerPassedHTTPCode 200, UserBlockedHTTPCode 403, UserPassedHTTPCode 200.
