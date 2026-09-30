@@ -26,7 +26,7 @@ A Go httptest through the plugin forges proto and TLS and asserts `Secure` on `c
 In progress. 0 items remain.
 
 Priority: P2 — HTTPS clients get the AppSec challenge cookie without Secure, limited to bot-detection and that cookie
-Reviewed head: 5a38fe5b
+Reviewed head: ada90ba1
 Owner decision: None.
 
 ## Review scores
@@ -35,20 +35,24 @@ Owner decision: None.
 | Overall readiness | 1/6 | Not ready |
 | CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
-| Review resolution | 6/6 | no open PR comments |
+| Review resolution | N/A | no OPEN PR |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-09-30-origin-scheme pushed | `git` |
 | OpenSpec | origin-scheme | `openspec/` |
-| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/177 | pr-host |
+| Pull request | none | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-30-origin-scheme/openspec/changes/origin-scheme/proposal.md) — modified
+- [core_plugin_clientrequest_inbound-request](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-30-origin-scheme/openspec/changes/origin-scheme/proposal.md) — added
+- [core_plugin_middleware_captcha-gate](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-30-origin-scheme/openspec/changes/origin-scheme/proposal.md) — modified
+
 
 ## Deviations from the ask
 - taken: one real end-to-end test forges TLS on/off and `X-Forwarded-Proto` and asserts Secure on `crowdsec_captcha_gate` and `__crowdsec_challenge`. → one Go httptest through the plugin with a stub AppSec that sets `__crowdsec_challenge` Secure iff the forwarded URI scheme is `https`. — `pkg/bouncer httptest (zzz_bouncer_test.go testBouncerWithAppsec) and pkg/captcha gate tests` — honouring "real" would add an HTTPS Traefik entrypoint to compose that is HTTP `:80` only; mocklapi does not implement CrowdSec's scheme check. The job (both cookies' Secure under TLS and proto) survives on the existing plugin test harness.. Requester: not asked.
@@ -58,7 +62,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-09-30-origin-scheme on branch 2026-09-30-origin-scheme targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/177; CI not seen.
+Ticket 2026-09-30-origin-scheme on branch 2026-09-30-origin-scheme targeting master; PR no PR yet; CI not seen.
 
 ## Explore Decisions
 None.
@@ -82,9 +86,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 1 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 5a38fe5b3e16382bbac31bdbacca8537db6ff684 | Card must match the branch you measured |
+| Reviewed head | ada90ba18c0ba2a65df672093287840337b1f8f9 | Card must match the branch you measured |
 
 ### Stored data model
 None.
