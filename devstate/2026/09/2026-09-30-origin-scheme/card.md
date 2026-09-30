@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 5d8fd2f9
-Owner decision: None.
+Reviewed head: 2fa78eda
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -51,7 +51,10 @@ None.
 Ticket 2026-09-30-origin-scheme on branch 2026-09-30-origin-scheme targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/177; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Who already owns client HTTPS / Host / the trust hop for proto? | bounded asked — existing Traefik proto contract and GetRemoteIP address owner, enumerated (research packet + `pkg/ip`); criterion 2 names the scheme rule and forbids hop re-check | assumed — Traefik entrypoint `forwardedHeaders` owns whether `X-Forwarded-Proto` is trustworthy. `Request.TLS` owns connection TLS to Traefik. `pkg/ip.GetRemoteIP` owns client address. `Request.Host` owns Host. The new constructor owns the scheme **token** derived from proto-then-TLS. AppSec URI host reuses `Request.Host` when `URL.Host` is empty. Do not re-derive hop trust in captcha or AppSec. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 5d8fd2f9697c80874217ee41608864d91a50dfd5 | Card must match the branch you measured |
+| Reviewed head | 2fa78eda1cc03077fb37c8b4bff165a8e450fa4f | Card must match the branch you measured |
 
 ### Stored data model
 None.
