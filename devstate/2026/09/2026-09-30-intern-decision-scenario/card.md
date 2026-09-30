@@ -20,14 +20,14 @@ Stream and live copy LAPI `Scenario` onto `decisionstore.Decision` (`streamPutIt
 Ready for review. 0 items remain.
 
 Priority: P3 — spec, docs, tests, or internal clarity — no current user or operator harm
-Reviewed head: a974a2e8
+Reviewed head: 97b9fa1f
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36766339119 |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36768680685 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,14 +37,18 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-09-30-intern-decision-scenario pushed | `git` |
 | OpenSpec | intern-decision-scenario | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/178 | pr-host |
-| CI | build 36766339119 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36766339119 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36766339119 |
+| CI | build 36768680685 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36768680685 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36768680685 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
 Worktree:
-- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-30-intern-decision-scenario/openspec/changes/intern-decision-scenario/proposal.md) — modified
-- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-30-intern-decision-scenario/openspec/changes/intern-decision-scenario/proposal.md) — modified
+- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-30-intern-decision-scenario/openspec/changes/archive/2026-09-30-intern-decision-scenario/proposal.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-30-intern-decision-scenario/openspec/changes/archive/2026-09-30-intern-decision-scenario/proposal.md) — modified
+
+Completed:
+- [core_plugin_decisionstore_store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-30-intern-decision-scenario/openspec/specs/core_plugin_decisionstore_store/spec.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-09-30-intern-decision-scenario/openspec/specs/core_plugin_lapi_usage-metrics/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -54,7 +58,7 @@ None.
 None.
 
 ## How this fits together
-Ticket #172 on branch 2026-09-30-intern-decision-scenario targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/178; CI build 36766339119 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36766339119.
+Ticket #172 on branch 2026-09-30-intern-decision-scenario targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/178; CI build 36768680685 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/36768680685.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -81,9 +85,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | a974a2e8e25f86b6fca42b1eac177c02d808db67 | Card must match the branch you measured |
+| Reviewed head | 97b9fa1f2c69a0179fddd87a85b0e4e875815f89 | Card must match the branch you measured |
 
 ### Stored data model
 None.
