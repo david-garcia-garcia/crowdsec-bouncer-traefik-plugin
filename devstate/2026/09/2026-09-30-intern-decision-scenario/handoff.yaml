@@ -1,0 +1,14 @@
+issueKey: 2026-09-30-intern-decision-scenario
+jobName: 2026-09-30-intern-decision-scenario
+issueHost: github
+issueRef: #172
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
