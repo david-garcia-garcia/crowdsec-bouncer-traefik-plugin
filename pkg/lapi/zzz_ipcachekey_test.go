@@ -174,6 +174,32 @@ func TestLiveLookup_MemoHitsAcrossSpellings(t *testing.T) {
 	}
 }
 
+func TestLiveLookup_MemoKeepsBanWhenLAPIClears(t *testing.T) {
+	var payload atomic.Value
+	payload.Store(testLiveBanBody("Ip", "1.2.3.4"))
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		body, _ := payload.Load().(string)
+		if _, err := rw.Write([]byte(body)); err != nil {
+			t.Errorf("live LAPI stub write: %v", err)
+		}
+	}))
+	t.Cleanup(server.Close)
+	client := newTestLiveClient(t, server)
+	kind, _, err := client.LiveLookup("1.2.3.4", nil, 60)
+	if err == nil || kind != decisionscope.BannedValue {
+		t.Fatalf("first live lookup kind %q err %v", kind, err)
+	}
+	payload.Store("null")
+	cached, lookupErr := lookupAsRequest(client, "1.2.3.4")
+	if lookupErr != nil || cached != decisionscope.BannedValue {
+		t.Fatalf("cached ban must survive LAPI delete, kind %q err %v", cached, lookupErr)
+	}
+	slot, ok := client.decisionStore.PublishedMemoryMapForTest()["1.2.3.4"]
+	if !ok || client.decisionStore.ScenarioName(decisionstore.PackedScenarioIDForTest(slot.Word)) != "test" {
+		t.Fatalf("live memo must pack scenario")
+	}
+}
+
 // closedTestReaderAddr is a local TCP address with no listener. Dest used 127.0.0.1:1, which
 // can be LISTEN on a workstation and then GET returns redis:unsupported-reply, not unreachable.
 func closedTestReaderAddr(t *testing.T) string {
