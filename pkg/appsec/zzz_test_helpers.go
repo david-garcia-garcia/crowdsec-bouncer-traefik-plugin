@@ -28,8 +28,13 @@ func testAppsecConfig(host string) *configuration.Config {
 	}
 }
 
-// buildTestRequest builds a Query test request with the standard 1.2.3.4 client address.
-func buildTestRequest(httpReq *http.Request) clientrequest.Request {
+// buildTestRequest is a GET http://localhost/ with the standard 1.2.3.4 client address.
+func buildTestRequest() clientrequest.Request {
+	return withTestAddress(httptest.NewRequest(http.MethodGet, "http://localhost/", nil))
+}
+
+// withTestAddress attaches the standard 1.2.3.4 client address to a request the test already built.
+func withTestAddress(httpReq *http.Request) clientrequest.Request {
 	return clientrequest.New(httpReq, "1.2.3.4", net.ParseIP("1.2.3.4"))
 }
 
@@ -100,7 +105,7 @@ func assertClientDisconnectedQuery(t *testing.T, readErr error, failureAction st
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
 	client := newQueryClient(appsecURL, appsecServer.Client())
-	decision, err := client.Query(buildTestRequest(newReadablePostWithFailingBody(readErr)), Policy{FailureAction: failureAction})
+	decision, err := client.Query(withTestAddress(newReadablePostWithFailingBody(readErr)), Policy{FailureAction: failureAction})
 	if !errors.Is(err, ErrClientDisconnected) {
 		t.Fatalf("Query() error %v want ErrClientDisconnected", err)
 	}
@@ -123,7 +128,7 @@ func assertUnclassifiedBodyReadStillGetBody(t *testing.T) {
 	appsecURL, _ := url.Parse(appsecServer.URL)
 	client := newQueryClient(appsecURL, appsecServer.Client())
 	sentinel := errors.New("disk read fault")
-	_, err := client.Query(buildTestRequest(newReadablePostWithFailingBody(sentinel)), Policy{FailureAction: configuration.FailureActionPassthrough})
+	_, err := client.Query(withTestAddress(newReadablePostWithFailingBody(sentinel)), Policy{FailureAction: configuration.FailureActionPassthrough})
 	if err == nil {
 		t.Fatal("Query() expected error for unclassified body read failure")
 	}
