@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 6dbb69a5
-Owner decision: None.
+Reviewed head: 0e804ec5
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -51,7 +51,10 @@ None.
 Ticket #172 on branch 2026-09-30-intern-decision-scenario targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/178; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Does raw scenario ride a new `Decision.Scenario` field or another Put argument? | additive incidental — new field on `decisionstore.Decision`; existing `Decision{}` literals keep working (zero value is empty id 0); Unknowns lists the surface, no criterion names field vs extra argument | assumed — add `Scenario` on `decisionstore.Decision`. `streamPutItem` copies LAPI `item.Scenario`. Grow unexported `liveResult` with a scenario string so `memoLive` Puts it. Do not add a parallel Put argument. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 6dbb69a5db0e8326c70f9861de8bf4441f54fcef | Card must match the branch you measured |
+| Reviewed head | 0e804ec550e006446a4975855ca31b87c7f8efdf | Card must match the branch you measured |
 
 ### Stored data model
 None.
