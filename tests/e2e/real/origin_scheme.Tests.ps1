@@ -21,57 +21,57 @@ BeforeAll {
     if (-not $result.Success) {
         throw "CrowdSec LAPI failed to become ready"
     }
-}
 
-function Get-CookieSecure {
-    param($Headers, [string]$CookieName)
+    function script:Get-CookieSecure {
+        param($Headers, [string]$CookieName)
 
-    $raw = $Headers["Set-Cookie"]
-    if ($null -eq $raw) {
+        $raw = $Headers["Set-Cookie"]
+        if ($null -eq $raw) {
+            return $null
+        }
+        $lines = @()
+        if ($raw -is [System.Array]) {
+            $lines = @($raw | ForEach-Object { [string]$_ })
+        } else {
+            $lines = @([string]$raw)
+        }
+        foreach ($line in $lines) {
+            $parts = $line -split ";"
+            if ($parts[0].Trim() -notlike "$CookieName=*") {
+                continue
+            }
+            foreach ($attr in ($parts | Select-Object -Skip 1)) {
+                if ($attr.Trim() -ieq "Secure") {
+                    return $true
+                }
+            }
+            return $false
+        }
         return $null
     }
-    $lines = @()
-    if ($raw -is [System.Array]) {
-        $lines = @($raw | ForEach-Object { [string]$_ })
-    } else {
-        $lines = @([string]$raw)
-    }
-    foreach ($line in $lines) {
-        $parts = $line -split ";"
-        if ($parts[0].Trim() -notlike "$CookieName=*") {
-            continue
+
+    function script:Assert-BothCookiesSecure {
+        param([string]$Proto, [bool]$WantSecure)
+
+        $protoHeader = @{ "X-Forwarded-Proto" = $Proto }
+
+        $challenge = Test-HttpRequest -Endpoint "/origin-scheme" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl `
+            -ExtraHeaders $protoHeader -MaximumRedirection 0
+        $challenge.StatusCode | Should -Be 307 -Because "grant status=$($challenge.StatusCode) content=$($challenge.Content)"
+        $challengeSecure = Get-CookieSecure -Headers $challenge.Headers -CookieName "__crowdsec_challenge"
+        $challengeSecure | Should -Be $WantSecure -Because "proto=$Proto Set-Cookie=$($challenge.Headers['Set-Cookie'])"
+
+        Add-TestDecision -IP $script:ClientIP -Type "captcha"
+        $formHeaders = @{
+            "Content-Type"      = "application/x-www-form-urlencoded"
+            "X-Forwarded-Proto" = $Proto
         }
-        foreach ($attr in ($parts | Select-Object -Skip 1)) {
-            if ($attr.Trim() -ieq "Secure") {
-                return $true
-            }
-        }
-        return $false
+        $solve = Test-HttpRequest -Endpoint "/captcha" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl `
+            -Method POST -Body "dummy-captcha-response=ok" -ExtraHeaders $formHeaders -MaximumRedirection 0
+        $solve.StatusCode | Should -Be 302 -Because "solve status=$($solve.StatusCode) content=$($solve.Content)"
+        $gateSecure = Get-CookieSecure -Headers $solve.Headers -CookieName "crowdsec_captcha_gate"
+        $gateSecure | Should -Be $WantSecure -Because "proto=$Proto Set-Cookie=$($solve.Headers['Set-Cookie'])"
     }
-    return $null
-}
-
-function Assert-BothCookiesSecure {
-    param([string]$Proto, [bool]$WantSecure)
-
-    $protoHeader = @{ "X-Forwarded-Proto" = $Proto }
-
-    $challenge = Test-HttpRequest -Endpoint "/origin-scheme" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl `
-        -ExtraHeaders $protoHeader -MaximumRedirection 0
-    $challenge.StatusCode | Should -Be 307 -Because "grant status=$($challenge.StatusCode) content=$($challenge.Content)"
-    $challengeSecure = Get-CookieSecure -Headers $challenge.Headers -CookieName "__crowdsec_challenge"
-    $challengeSecure | Should -Be $WantSecure -Because "proto=$Proto Set-Cookie=$($challenge.Headers['Set-Cookie'])"
-
-    Add-TestDecision -IP $script:ClientIP -Type "captcha"
-    $formHeaders = @{
-        "Content-Type"       = "application/x-www-form-urlencoded"
-        "X-Forwarded-Proto"  = $Proto
-    }
-    $solve = Test-HttpRequest -Endpoint "/captcha" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl `
-        -Method POST -Body "dummy-captcha-response=ok" -ExtraHeaders $formHeaders -MaximumRedirection 0
-    $solve.StatusCode | Should -Be 302 -Because "solve status=$($solve.StatusCode) content=$($solve.Content)"
-    $gateSecure = Get-CookieSecure -Headers $solve.Headers -CookieName "crowdsec_captcha_gate"
-    $gateSecure | Should -Be $WantSecure -Because "proto=$Proto Set-Cookie=$($solve.Headers['Set-Cookie'])"
 }
 
 Describe "CrowdSec Bouncer origin scheme Secure cookies" {
