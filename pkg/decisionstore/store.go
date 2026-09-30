@@ -283,8 +283,8 @@ func (s *Store) OriginName(id uint16) string {
 	return s.origins.Name(id)
 }
 
-// ScenarioName is the interned raw LAPI scenario for id. Unknown id is empty.
-func (s *Store) ScenarioName(id uint16) string {
+// ScenarioNameForTest is the interned raw LAPI scenario for id. Unknown id is empty. Tests only.
+func (s *Store) ScenarioNameForTest(id uint16) string {
 	return s.scenarios.Name(id)
 }
 
@@ -317,5 +317,5 @@ func (s *Store) PublishedMemoryMapForTest() map[string]LiveSlot {
 
 // PackedScenarioIDForTest is bits 16-31 of a memory word. Tests only.
 func PackedScenarioIDForTest(word uint32) uint16 {
-	return packedScenarioID(word)
+	return uint16(word >> packedScenarioShift) //nolint:gosec // G115 scenario id is stored in 16 bits
 }

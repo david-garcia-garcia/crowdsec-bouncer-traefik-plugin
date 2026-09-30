@@ -125,11 +125,6 @@ func packedFamily(word uint32) string {
 	}
 }
 
-// packedScenarioID is bits 16-31.
-func packedScenarioID(word uint32) uint16 {
-	return uint16(word >> packedScenarioShift) //nolint:gosec // G115 scenario id is stored in 16 bits
-}
-
 // unpackWord is ASCII kind, empty origin name, and packed origin id.
 func unpackWord(word uint32) (string, string, uint16) {
 	return unpackKindCode(word & packedKindMask), "", packedOriginID(word)

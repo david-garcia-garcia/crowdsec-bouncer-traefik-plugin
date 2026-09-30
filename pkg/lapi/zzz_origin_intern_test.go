@@ -44,8 +44,8 @@ func TestStoreStreamDecisionPacksMemory(t *testing.T) {
 		t.Fatalf("kind %q origin %q err %v", kind, store.OriginName(originID), err)
 	}
 	slot, ok := store.PublishedMemoryMapForTest()["203.0.113.10"]
-	if !ok || store.ScenarioName(decisionstore.PackedScenarioIDForTest(slot.Word)) != "ssh-bf" {
-		t.Fatalf("scenario %q", store.ScenarioName(decisionstore.PackedScenarioIDForTest(slot.Word)))
+	if !ok || store.ScenarioNameForTest(decisionstore.PackedScenarioIDForTest(slot.Word)) != "ssh-bf" {
+		t.Fatalf("scenario %q", store.ScenarioNameForTest(decisionstore.PackedScenarioIDForTest(slot.Word)))
 	}
 }
 
@@ -81,8 +81,8 @@ func TestMemoLivePutsScenario(t *testing.T) {
 		t.Fatalf("kind %q origin %q err %v", kind, store.OriginName(originID), err)
 	}
 	slot, ok := store.PublishedMemoryMapForTest()["203.0.113.10"]
-	if !ok || store.ScenarioName(decisionstore.PackedScenarioIDForTest(slot.Word)) != "ssh-bf" {
-		t.Fatalf("scenario %q", store.ScenarioName(decisionstore.PackedScenarioIDForTest(slot.Word)))
+	if !ok || store.ScenarioNameForTest(decisionstore.PackedScenarioIDForTest(slot.Word)) != "ssh-bf" {
+		t.Fatalf("scenario %q", store.ScenarioNameForTest(decisionstore.PackedScenarioIDForTest(slot.Word)))
 	}
 }
 

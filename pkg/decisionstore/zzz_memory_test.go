@@ -124,11 +124,11 @@ func TestMemoryOriginPackSaturatesAt12Bits(t *testing.T) {
 	if !ok {
 		t.Fatal("missing slot")
 	}
-	if packedFamily(slot.Word) != "ipv4" || packedScenarioID(slot.Word) == 0 {
-		t.Fatalf("family %q scenario %d", packedFamily(slot.Word), packedScenarioID(slot.Word))
+	if packedFamily(slot.Word) != "ipv4" || PackedScenarioIDForTest(slot.Word) == 0 {
+		t.Fatalf("family %q scenario %d", packedFamily(slot.Word), PackedScenarioIDForTest(slot.Word))
 	}
-	if store.ScenarioName(packedScenarioID(slot.Word)) != "ssh-bf" {
-		t.Fatalf("scenario %q", store.ScenarioName(packedScenarioID(slot.Word)))
+	if store.ScenarioNameForTest(PackedScenarioIDForTest(slot.Word)) != "ssh-bf" {
+		t.Fatalf("scenario %q", store.ScenarioNameForTest(PackedScenarioIDForTest(slot.Word)))
 	}
 }
 
@@ -148,8 +148,8 @@ func TestMemoryListsInternTwice(t *testing.T) {
 	if !ok {
 		t.Fatal("missing slot")
 	}
-	if store.ScenarioName(packedScenarioID(slot.Word)) != "firehol_level1" {
-		t.Fatalf("scenario %q", store.ScenarioName(packedScenarioID(slot.Word)))
+	if store.ScenarioNameForTest(PackedScenarioIDForTest(slot.Word)) != "firehol_level1" {
+		t.Fatalf("scenario %q", store.ScenarioNameForTest(PackedScenarioIDForTest(slot.Word)))
 	}
 }
 
@@ -172,8 +172,8 @@ func TestMemoryScenarioInternOverflowWarns(t *testing.T) {
 		t.Fatalf("kind %q origin %q err %v", kind, store.OriginName(originID), err)
 	}
 	slot, ok := store.PublishedMemoryMapForTest()["203.0.113.10"]
-	if !ok || packedScenarioID(slot.Word) != 0 {
-		t.Fatalf("scenario id %d", packedScenarioID(slot.Word))
+	if !ok || PackedScenarioIDForTest(slot.Word) != 0 {
+		t.Fatalf("scenario id %d", PackedScenarioIDForTest(slot.Word))
 	}
 }
 

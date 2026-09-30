@@ -195,7 +195,7 @@ func TestLiveLookup_MemoKeepsBanWhenLAPIClears(t *testing.T) {
 		t.Fatalf("cached ban must survive LAPI delete, kind %q err %v", cached, lookupErr)
 	}
 	slot, ok := client.decisionStore.PublishedMemoryMapForTest()["1.2.3.4"]
-	if !ok || client.decisionStore.ScenarioName(decisionstore.PackedScenarioIDForTest(slot.Word)) != "test" {
+	if !ok || client.decisionStore.ScenarioNameForTest(decisionstore.PackedScenarioIDForTest(slot.Word)) != "test" {
 		t.Fatalf("live memo must pack scenario")
 	}
 }

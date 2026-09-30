@@ -19,8 +19,8 @@ func TestPackUnpackMemoryWord(t *testing.T) {
 	if kind != decisionscope.BannedValue || origin != "" || unpackedID != originID {
 		t.Fatalf("kind %q origin %q id %d", kind, origin, unpackedID)
 	}
-	if packedScenarioID(word) != 7 {
-		t.Fatalf("scenario id %d", packedScenarioID(word))
+	if PackedScenarioIDForTest(word) != 7 {
+		t.Fatalf("scenario id %d", PackedScenarioIDForTest(word))
 	}
 }
 
@@ -90,8 +90,8 @@ func TestPackSaturatesOriginPast12Bits(t *testing.T) {
 	if packedOriginID(word) != 0 {
 		t.Fatalf("saturated origin id %d", packedOriginID(word))
 	}
-	if packedFamily(word) != "ipv4" || packedScenarioID(word) != 9 {
-		t.Fatalf("family %q scenario %d", packedFamily(word), packedScenarioID(word))
+	if packedFamily(word) != "ipv4" || PackedScenarioIDForTest(word) != 9 {
+		t.Fatalf("family %q scenario %d", packedFamily(word), PackedScenarioIDForTest(word))
 	}
 	kind, _, _ := Unpack(word)
 	if kind != decisionscope.BannedValue {
