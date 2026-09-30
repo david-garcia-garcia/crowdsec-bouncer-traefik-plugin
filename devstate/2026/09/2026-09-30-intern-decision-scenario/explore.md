@@ -125,5 +125,5 @@ Live contract: `openspec/specs/core_plugin_decisionstore_store/spec.md` (word `u
 
 - Q: What language term for the second intern table?
   Rank: additive asked — Decision: two intern tables; dest packet already names Origin intern
-  Decision: assumed — Scenario intern, parallel to Origin intern in `core_plugin_decisionstore.md`. Implement / devdocs-impact updates Packed word and Origin intern usage. Explore does not write the packet.
-  By: explore
+  Decision: resolved — Scenario intern, parallel to Origin intern in `core_plugin_decisionstore.md`.
+  By: devdocsimpact
