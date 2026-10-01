@@ -1,42 +1,28 @@
 package decisionstore
 
 import (
-	"strings"
-
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
-const kindOriginSep = "\n"
-
-// Unpack reads a packed word or a kind+origin string (Redis slot or Range blob payload).
-func Unpack(payload any) (kind string, origin string, originID uint16) {
-	switch payloadTyped := payload.(type) {
-	case uint32:
-		return unpackWord(payloadTyped)
-	case string:
-		kind, origin := splitKindOrigin(payloadTyped)
-		return kind, origin, 0
-	default:
-		return "", "", 0
-	}
-}
-
-// KindOriginString is the Redis SET value and the Range blob remediation: kind, then newline, then origin.
-func KindOriginString(kind, origin string) string {
-	if origin == "" {
-		return kind
-	}
-	return kind + kindOriginSep + origin
-}
-
-func splitKindOrigin(stored string) (string, string) {
-	kind, origin, ok := strings.Cut(stored, kindOriginSep)
-	if !ok {
-		return decisionscope.RemediationKind(stored), ""
-	}
-	return decisionscope.RemediationKind(kind), origin
-}
-
+// Memory keeps each decision in an 8-byte LiveSlot: this uint32 plus an int32 expiry.
+// The word is 2-bit kind, 12-bit origin id, 2-bit family, 16-bit scenario id.
+// Origin and scenario names are stored once, in the memory intern tables.
+// Family is packed so ActiveCounts can group without parsing the address again.
+// Redis stores the same hit as text. These ids are process-local, so another
+// bouncer cannot decode them. Expiry stays outside both payloads.
+//
+// Retained heap for 400k decisions. The map key is the IP. The value is the slot.
+// Kind, origin, and scenario are t, crowdsec, and crowdsecurity/http-probing.
+// Each total is the IP keys plus that map (values and buckets).
+//
+//	(A) packed word                          12.7 + 14.0 = 26.7 MB
+//	(B) struct of interned strings           12.7 + 42.0 = 54.7 MB
+//	(C) struct of private string copies      12.7 + 61.2 = 73.9 MB
+//
+// (B) and (C) are {kind, origin, scenario string, int32 expiry}, 56 bytes.
+// Interning shares the 35 bytes of text. (C) copies those 35 bytes on every slot
+// (14.0 MB of characters, 19.2 MB once the allocator rounds them).
 const (
 	packedKindMask      = 3
 	packedOriginShift   = 2
@@ -51,6 +37,22 @@ const (
 	packedFamilyIPv4    = 1
 	packedFamilyIPv6    = 2
 )
+
+// packToWord encodes the hit into one uint32. Family comes from value. Intern overflow packs id 0.
+func (m *memory) packToWord(hit lookupHit, value string) uint32 {
+	originID, _ := m.origins.ID(hit.origin)
+	scenarioID, _ := m.scenarios.ID(hit.scenario)
+	return packWord(hit.kind, originID, ip.FamilyOfHostOrCIDR(value), scenarioID)
+}
+
+// unpackFromWord reads a memory word back into the same hit Redis stores as text.
+func (m *memory) unpackFromWord(word uint32) lookupHit {
+	return lookupHit{
+		kind:     unpackKindCode(word & packedKindMask),
+		origin:   m.origins.Name(packedOriginID(word)),
+		scenario: m.scenarios.Name(packedScenarioID(word)),
+	}
+}
 
 // packWord is 2-bit kind, 12-bit origin id, 2-bit family, 16-bit scenario id.
 // Origin id greater than 4095 packs as 0. Unpack of the kind bits returns ASCII t/c/f.
@@ -123,6 +125,11 @@ func packedFamily(word uint32) string {
 	default:
 		return ""
 	}
+}
+
+// packedScenarioID is bits 16-31.
+func packedScenarioID(word uint32) uint16 {
+	return uint16(word >> packedScenarioShift) //nolint:gosec // G115 scenario id is stored in 16 bits
 }
 
 // unpackWord is ASCII kind, empty origin name, and packed origin id.

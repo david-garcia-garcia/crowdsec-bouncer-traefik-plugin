@@ -9,8 +9,6 @@ import (
 	"time"
 
 	simpleredis "github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis"
-
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 )
 
 const (
@@ -25,22 +23,18 @@ const (
 // per slot has no inventory to walk without SCAN+MGET or a second HASH of slots,
 // which would exist only for this gauge.
 type redis struct {
-	log       *slog.Logger
-	origins   *intern.Table // folded origin name → id; Redis values stay KindOriginString
-	scenarios *intern.Table // raw LAPI scenario → id; Redis values stay KindOriginString
-	prefix    string
-	writer    *simpleredis.SimpleRedis
-	readers   []*simpleredis.SimpleRedis
-	counter   atomic.Uint64
+	log     *slog.Logger
+	prefix  string
+	writer  *simpleredis.SimpleRedis
+	readers []*simpleredis.SimpleRedis
+	counter atomic.Uint64
 }
 
 // newRedis dials the writer and optional readers via simpleredis.New.
 func newRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string) *redis {
 	red := &redis{
-		log:       log,
-		origins:   intern.New(),
-		scenarios: intern.New(),
-		prefix:    keyPrefix,
+		log:    log,
+		prefix: keyPrefix,
 	}
 	writer, err := simpleredis.New(redisClientConfig(writeHost, pass, database, log))
 	if err != nil {
@@ -192,7 +186,7 @@ func (r *redis) PutMany(items []Decision) {
 		}
 		ttl := item.DurationSec
 		namesByTTL[ttl] = append(namesByTTL[ttl], prefixed(r.prefix, key))
-		valuesByTTL[ttl] = append(valuesByTTL[ttl], []byte(KindOriginString(item.Kind, item.Origin)))
+		valuesByTTL[ttl] = append(valuesByTTL[ttl], []byte(packToString(lookupHit{kind: item.Kind, origin: item.Origin, scenario: item.Scenario})))
 	}
 	for ttl, names := range namesByTTL {
 		r.msetexGrouped(names, valuesByTTL[ttl], ttl)
@@ -245,12 +239,12 @@ func (r *redis) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[str
 	if err != nil {
 		return "", "", 0, err
 	}
-	kind, origin, originID = lookupHits(func(key string) any {
+	kind, origin = lookupHits(func(key string) lookupHit {
 		value, ok := found[key]
 		if !ok || value == "" {
-			return nil
+			return lookupHit{}
 		}
-		return value
+		return unpackFromString(value)
 	}, remoteIP, ipAddr, scopes, membership)
 	return kind, origin, originID, nil
 }

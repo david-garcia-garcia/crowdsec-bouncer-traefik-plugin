@@ -15,7 +15,7 @@ func TestPackUnpackMemoryWord(t *testing.T) {
 		t.Fatal("intern crowdsec")
 	}
 	word := packWord(decisionscope.BannedValue, originID, "ipv4", 7)
-	kind, origin, unpackedID := Unpack(word)
+	kind, origin, unpackedID := unpackWord(word)
 	if kind != decisionscope.BannedValue || origin != "" || unpackedID != originID {
 		t.Fatalf("kind %q origin %q id %d", kind, origin, unpackedID)
 	}
@@ -32,16 +32,16 @@ func TestPackOverflowUsesGenericOrigin(t *testing.T) {
 		t.Fatal("overflow must fail")
 	}
 	word := packWord(decisionscope.BannedValue, 0, "ipv4", 0)
-	kind, origin, originID := Unpack(word)
+	kind, origin, originID := unpackWord(word)
 	if kind != decisionscope.BannedValue || origin != "" || originID != 0 {
 		t.Fatalf("kind %q origin %q id %d", kind, origin, originID)
 	}
 }
 
 func TestUnpackKindOriginString(t *testing.T) {
-	kind, origin, originID := Unpack(KindOriginString(decisionscope.BannedValue, "crowdsec"))
-	if kind != decisionscope.BannedValue || origin != "crowdsec" || originID != 0 {
-		t.Fatalf("kind %q origin %q id %d", kind, origin, originID)
+	hit := unpackFromString(KindOriginString(decisionscope.BannedValue, "crowdsec"))
+	if hit.kind != decisionscope.BannedValue || hit.origin != "crowdsec" || hit.scenario != "" {
+		t.Fatalf("hit %+v", hit)
 	}
 }
 
@@ -58,7 +58,7 @@ func TestPackFamilyCodes(t *testing.T) {
 	if packedFamily(header) != "" {
 		t.Fatalf("header word family %q", packedFamily(header))
 	}
-	kind, _, originID := Unpack(ipv4)
+	kind, _, originID := unpackWord(ipv4)
 	if kind != decisionscope.BannedValue || originID != 1 {
 		t.Fatalf("unpack after family pack kind %q id %d", kind, originID)
 	}
@@ -78,7 +78,7 @@ func TestPackKindEnumUnpacksASCII(t *testing.T) {
 		if word&packedKindMask != packCase.code {
 			t.Fatalf("kind %q packed %d, want %d", packCase.kind, word&packedKindMask, packCase.code)
 		}
-		kind, _, _ := Unpack(word)
+		kind, _, _ := unpackWord(word)
 		if kind != packCase.kind {
 			t.Fatalf("unpack kind %q, want %q", kind, packCase.kind)
 		}
@@ -93,7 +93,7 @@ func TestPackSaturatesOriginPast12Bits(t *testing.T) {
 	if packedFamily(word) != "ipv4" || PackedScenarioIDForTest(word) != 9 {
 		t.Fatalf("family %q scenario %d", packedFamily(word), PackedScenarioIDForTest(word))
 	}
-	kind, _, _ := Unpack(word)
+	kind, _, _ := unpackWord(word)
 	if kind != decisionscope.BannedValue {
 		t.Fatalf("kind %q", kind)
 	}

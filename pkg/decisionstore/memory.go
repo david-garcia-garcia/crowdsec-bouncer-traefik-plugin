@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
 // publishedSlots is one immutable lookup map. atomic.Value stores *publishedSlots, not the map (Yaegi).
@@ -120,16 +119,7 @@ func (m *memory) putSlot(slots map[string]LiveSlot, item Decision) {
 	if key == "" {
 		return
 	}
-	slots[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin, item.Scenario, item.Value), item.DurationSec)
-}
-
-// pack encodes kind, intern origin id, intern scenario id, and FamilyOfHostOrCIDR(value) into one uint32.
-// Origin id greater than 4095 packs as 0 inside packWord. Table overflow packs id 0. Neither path logs.
-func (m *memory) pack(kind, origin, scenario, value string) uint32 {
-	family := ip.FamilyOfHostOrCIDR(value)
-	originID, _ := m.origins.ID(origin)
-	scenarioID, _ := m.scenarios.ID(scenario)
-	return packWord(kind, originID, family, scenarioID)
+	slots[key] = LiveSlotFromPack(m.packToWord(lookupHit{kind: item.Kind, origin: item.Origin, scenario: item.Scenario}, item.Value), item.DurationSec)
 }
 
 // DeleteMany drops canonical slots and prior Ip spellings from tick or the published map.
@@ -186,15 +176,12 @@ func (m *memory) activeCounts() map[ActiveCountKey]int64 {
 func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (kind string, origin string, originID uint16, err error) {
 	slots := m.publishedMapValue()
 	now := elapsedNow()
-	kind, origin, originID = lookupHits(func(key string) any {
+	kind, origin = lookupHits(func(key string) lookupHit {
 		slot, ok := slots[key]
-		if !ok {
-			return nil
+		if !ok || (slot.ExpiresAt > 0 && slot.ExpiresAt <= now) {
+			return lookupHit{}
 		}
-		if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
-			return nil
-		}
-		return slot.Word
+		return m.unpackFromWord(slot.Word)
 	}, remoteIP, ipAddr, scopes, membership)
 	return kind, origin, originID, nil
 }

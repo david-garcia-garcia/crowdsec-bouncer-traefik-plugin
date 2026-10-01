@@ -49,7 +49,7 @@ lapiClient.IncDropped(origin, req.IPType(), "ban")
 
 - `pkg/lapi/client_metrics.go`
 - `pkg/lapi/client.go` (`metricsReporter` field and ticker wiring)
-- `pkg/decisionstore/pack.go`
+- `pkg/decisionstore/memory_pack.go`
 - `pkg/ip/network.go` (`Family`, `FamilyOfIP`, `FamilyOfHostOrCIDR`)
 - `pkg/bouncer/bouncer.go`
 

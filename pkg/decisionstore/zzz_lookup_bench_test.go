@@ -25,10 +25,9 @@ func BenchmarkLookupStreamMiss_100kSeq(b *testing.B) {
 	get := benchSnapshotGet(snapshot)
 	b.ResetTimer()
 	for range b.N {
-		kind, origin, originID := lookupHits(get, remoteIP, ipAddr, scopes, membership)
+		kind, origin := lookupHits(get, remoteIP, ipAddr, scopes, membership)
 		_ = kind
 		_ = origin
-		_ = originID
 	}
 }
 
@@ -40,10 +39,9 @@ func BenchmarkLookupStreamMiss_100kParallel(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			kind, origin, originID := lookupHits(get, remoteIP, ipAddr, scopes, membership)
+			kind, origin := lookupHits(get, remoteIP, ipAddr, scopes, membership)
 			_ = kind
 			_ = origin
-			_ = originID
 		}
 	})
 }
@@ -66,13 +64,14 @@ func benchPackedBan() uint32 {
 	return packWord(decisionscope.BannedValue, originID, "ipv4", 0)
 }
 
-func benchSnapshotGet(snapshot map[string]LiveSlot) func(string) any {
-	return func(key string) any {
+func benchSnapshotGet(snapshot map[string]LiveSlot) func(string) lookupHit {
+	return func(key string) lookupHit {
 		slot, ok := snapshot[key]
 		if !ok {
-			return nil
+			return lookupHit{}
 		}
-		return slot.Word
+		slotKind, _, _ := unpackWord(slot.Word)
+		return lookupHit{kind: slotKind, origin: "o"}
 	}
 }
 

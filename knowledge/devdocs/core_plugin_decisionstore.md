@@ -53,7 +53,7 @@ Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx
 - Stream apply calls Store `BeginTick` / `DeleteMany` / `PutMany` / `PublishTick(ElapsedNow())` / `ApplyRangeBatch` (`core_plugin_lapi_stream-apply.md`). Memory `PublishTick(0)` skips expiry sweep; non-zero `now` drops tick slots where `ExpiresAt > 0 && ExpiresAt <= now`, then recounts `ActiveCounts` from packed origin id and family on the published map. Redis tick methods are no-ops and ignore `now`; Redis PutMany is MSetEX by TTL in `PutManyChunk` batches. Redis `ActiveCounts` is empty.
 - Snapshot origin×family counts with `Store.ActiveCounts` at usage-metrics POST. Do not store `usageMetricKey` or LAPI item JSON in decisionstore. `ApplyRangeBatch` is omitted from the walk. Redis does not support this gauge.
 - Captcha grace is the gate cookie (`core_plugin_middleware_captcha-gate.md`), not store keys.
-- Origin intern is a `pkg/intern.Table` field on `Store`. `OriginID` / `OriginName` forward to it. `Name` takes `RLock`. Resolve origin only on drop. Scenario intern is a second table on the same Store. `NewMemory` and `NewRedis` each construct both tables. Pass raw LAPI scenario on `Decision.Scenario` (empty is intern id 0). Stream `streamPutItem` copies `item.Scenario`; live `memoLive` Puts the live pick's scenario. Origin stays `MetricsOrigin`. Do not grow `LookupRemediation` with a scenario id. Tests read interned names with `ScenarioNameForTest`. Lists intern twice (`lists:<name>` on origins, raw name on scenarios). Memory pack saturates origin ids above 4095. Redis Put and Range stay `KindOriginString`; intern ids are process-local.
+- Origin intern is a `pkg/intern.Table` on the memory engine. `OriginID` / `OriginName` forward to it. `Name` takes `RLock`. Resolve origin only on drop. Scenario intern is a second table on that same engine. Only memory constructs both tables. Redis does not intern. Pass raw LAPI scenario on `Decision.Scenario` (empty is intern id 0). Stream `streamPutItem` copies `item.Scenario`; live `memoLive` Puts the live pick's scenario. Origin stays `MetricsOrigin`. Do not grow `LookupRemediation` with a scenario id. Tests read interned names with `ScenarioNameForTest`. Lists intern twice (`lists:<name>` on origins, raw name on scenarios). Memory pack saturates origin ids above 4095. Redis Put and Range stay `KindOriginString`; intern ids are process-local.
 - `Store.Close()` logs `crowdsec decision store closed` then drains Redis idle pools. Memory Close is a no-op drain. Call Close only from the store’s reclaim Close hook. Safe to call more than once on a real Redis store. Do not Close a nil `*Store`.
 - Install log-only Sleep/Wake (`crowdsec decision store sleeping` / `waking`). They MUST NOT drain Redis or drop maps. Create logs `crowdsec decision store started`. `reclaim_put|orphan|reclaim|dispose` stay DEBUG.
 
@@ -69,7 +69,8 @@ kind, origin, originID, err := lapiClient.LookupRemediation(remoteIP, ipAddr, sc
 
 - `pkg/decisionstore/store.go`
 - `pkg/decisionstore/memory.go`
-- `pkg/decisionstore/pack.go`
+- `pkg/decisionstore/memory_pack.go`
+- `pkg/decisionstore/redis_pack.go`
 - `pkg/decisionstore/decision.go`
 - `pkg/decisionstore/redis.go`
 - `pkg/lapi/decisionstore.go`

@@ -144,9 +144,9 @@ func TestMemoryListsInternTwice(t *testing.T) {
 		Origin: "lists:firehol_level1", Scenario: "firehol_level1", DurationSec: 60,
 	})
 	store.PublishTick(0)
-	kind, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
-	if err != nil || kind != decisionscope.BannedValue || store.OriginName(originID) != "lists:firehol_level1" {
-		t.Fatalf("kind %q origin %q err %v", kind, store.OriginName(originID), err)
+	kind, origin, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	if err != nil || kind != decisionscope.BannedValue || origin != "lists:firehol_level1" {
+		t.Fatalf("kind %q origin %q err %v", kind, origin, err)
 	}
 	slot, ok := store.PublishedMemoryMapForTest()["203.0.113.10"]
 	if !ok {
@@ -171,9 +171,9 @@ func TestMemoryScenarioInternOverflowPacksZero(t *testing.T) {
 	if strings.Contains(logged.String(), "scenario intern overflow") {
 		t.Fatalf("scenario overflow must stay silent, got %s", logged.String())
 	}
-	kind, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
-	if err != nil || kind != decisionscope.BannedValue || store.OriginName(originID) != "crowdsec" {
-		t.Fatalf("kind %q origin %q err %v", kind, store.OriginName(originID), err)
+	kind, origin, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	if err != nil || kind != decisionscope.BannedValue || origin != "crowdsec" {
+		t.Fatalf("kind %q origin %q err %v", kind, origin, err)
 	}
 	slot, ok := store.PublishedMemoryMapForTest()["203.0.113.10"]
 	if !ok || PackedScenarioIDForTest(slot.Word) != 0 {
@@ -193,7 +193,9 @@ func TestRedisPutHasNoInternId(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := KindOriginString(decisionscope.BannedValue, "crowdsec")
+	want := packToString(lookupHit{
+		kind: decisionscope.BannedValue, origin: "crowdsec", scenario: "ssh-bf",
+	})
 	if got != want {
 		t.Fatalf("redis payload %q, want %q", got, want)
 	}
