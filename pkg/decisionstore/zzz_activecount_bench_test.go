@@ -17,8 +17,8 @@ func BenchmarkCountPublishedSlots_1M(b *testing.B) {
 func benchmarkCountPublishedSlots(b *testing.B, n int) {
 	b.Helper()
 	word := benchPackedBan()
-	_, _, originID := unpackWord(word)
-	want := ActiveCountKey{OriginID: originID, Family: packedFamily(word)}
+	_, originID, family, _ := unpackWord(word)
+	want := ActiveCountKey{OriginID: originID, Family: family}
 	snapshot := make(map[string]LiveSlot, n)
 	for i := range n {
 		key := fmt.Sprintf("10.%d.%d.%d", i>>16&0xff, i>>8&0xff, i&0xff)

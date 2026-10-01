@@ -47,15 +47,16 @@ func (m *memory) packToWord(hit lookupHit, value string) uint32 {
 
 // unpackFromWord reads a memory word back into the same hit Redis stores as text.
 func (m *memory) unpackFromWord(word uint32) lookupHit {
+	kind, originID, _, scenarioID := unpackWord(word)
 	return lookupHit{
-		kind:     unpackKindCode(word & packedKindMask),
-		origin:   m.origins.Name(packedOriginID(word)),
-		scenario: m.scenarios.Name(packedScenarioID(word)),
+		kind:     kind,
+		origin:   m.origins.Name(originID),
+		scenario: m.scenarios.Name(scenarioID),
 	}
 }
 
 // packWord is 2-bit kind, 12-bit origin id, 2-bit family, 16-bit scenario id.
-// Origin id greater than 4095 packs as 0. Unpack of the kind bits returns ASCII t/c/f.
+// Origin id greater than 4095 packs as 0.
 func packWord(kind string, originID uint16, family string, scenarioID uint16) uint32 {
 	if kind == "" {
 		return 0
@@ -110,14 +111,9 @@ func packFamilyCode(family string) uint32 {
 	}
 }
 
-// packedOriginID is bits 2-13.
-func packedOriginID(word uint32) uint16 {
-	return uint16((word >> packedOriginShift) & packedOriginMask) //nolint:gosec // G115 origin id is stored in 12 bits
-}
-
-// packedFamily is ipv4, ipv6, or empty from bits 14-15.
-func packedFamily(word uint32) string {
-	switch (word >> packedFamilyShift) & packedFamilyMask {
+// unpackFamilyCode is ipv4, ipv6, or empty for family code 1, 2, or anything else.
+func unpackFamilyCode(code uint32) string {
+	switch code {
 	case packedFamilyIPv4:
 		return "ipv4"
 	case packedFamilyIPv6:
@@ -127,12 +123,12 @@ func packedFamily(word uint32) string {
 	}
 }
 
-// packedScenarioID is bits 16-31.
-func packedScenarioID(word uint32) uint16 {
-	return uint16(word >> packedScenarioShift) //nolint:gosec // G115 scenario id is stored in 16 bits
-}
-
-// unpackWord is ASCII kind, empty origin name, and packed origin id.
-func unpackWord(word uint32) (string, string, uint16) {
-	return unpackKindCode(word & packedKindMask), "", packedOriginID(word)
+// unpackWord is the inverse of packWord: kind letter, origin id, family, scenario id.
+func unpackWord(word uint32) (string, uint16, string, uint16) {
+	originID := uint16((word >> packedOriginShift) & packedOriginMask) //nolint:gosec // G115 origin id is stored in 12 bits
+	scenarioID := uint16(word >> packedScenarioShift)                  //nolint:gosec // G115 scenario id is stored in 16 bits
+	return unpackKindCode(word & packedKindMask),
+		originID,
+		unpackFamilyCode((word >> packedFamilyShift) & packedFamilyMask),
+		scenarioID
 }

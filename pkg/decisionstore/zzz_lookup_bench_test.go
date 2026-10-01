@@ -70,7 +70,7 @@ func benchSnapshotGet(snapshot map[string]LiveSlot) func(string) lookupHit {
 		if !ok {
 			return lookupHit{}
 		}
-		slotKind, _, _ := unpackWord(slot.Word)
+		slotKind, _, _, _ := unpackWord(slot.Word)
 		return lookupHit{kind: slotKind, origin: "o"}
 	}
 }

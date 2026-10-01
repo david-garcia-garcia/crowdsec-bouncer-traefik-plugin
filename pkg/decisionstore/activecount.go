@@ -18,7 +18,8 @@ func countPublishedSlots(slots map[string]LiveSlot) map[ActiveCountKey]int64 {
 	out := make(map[ActiveCountKey]int64)
 	for _, slot := range slots {
 		word := slot.Word
-		out[ActiveCountKey{OriginID: packedOriginID(word), Family: packedFamily(word)}]++
+		_, originID, family, _ := unpackWord(word)
+		out[ActiveCountKey{OriginID: originID, Family: family}]++
 	}
 	return out
 }

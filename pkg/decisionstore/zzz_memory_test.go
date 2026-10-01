@@ -128,11 +128,12 @@ func TestMemoryOriginPackSaturatesAt12Bits(t *testing.T) {
 	if !ok {
 		t.Fatal("missing slot")
 	}
-	if packedFamily(slot.Word) != "ipv4" || PackedScenarioIDForTest(slot.Word) == 0 {
-		t.Fatalf("family %q scenario %d", packedFamily(slot.Word), PackedScenarioIDForTest(slot.Word))
+	_, _, family, scenarioID := unpackWord(slot.Word)
+	if family != "ipv4" || scenarioID == 0 {
+		t.Fatalf("family %q scenario %d", family, scenarioID)
 	}
-	if store.ScenarioNameForTest(PackedScenarioIDForTest(slot.Word)) != "ssh-bf" {
-		t.Fatalf("scenario %q", store.ScenarioNameForTest(PackedScenarioIDForTest(slot.Word)))
+	if store.ScenarioNameForTest(scenarioID) != "ssh-bf" {
+		t.Fatalf("scenario %q", store.ScenarioNameForTest(scenarioID))
 	}
 }
 
