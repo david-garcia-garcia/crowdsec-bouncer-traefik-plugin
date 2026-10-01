@@ -123,12 +123,22 @@ func unpackFamilyCode(code uint32) string {
 	}
 }
 
+// unpackOriginID is the origin id stored in bits 2-13.
+func unpackOriginID(word uint32) uint16 {
+	return uint16((word >> packedOriginShift) & packedOriginMask) //nolint:gosec // G115 origin id is stored in 12 bits
+}
+
+// unpackFamily is the family string stored in bits 14-15.
+func unpackFamily(word uint32) string {
+	return unpackFamilyCode((word >> packedFamilyShift) & packedFamilyMask)
+}
+
+// unpackScenarioID is the scenario id stored in bits 16-31.
+func unpackScenarioID(word uint32) uint16 {
+	return uint16(word >> packedScenarioShift) //nolint:gosec // G115 scenario id is stored in 16 bits
+}
+
 // unpackWord is the inverse of packWord: kind letter, origin id, family, scenario id.
 func unpackWord(word uint32) (string, uint16, string, uint16) {
-	originID := uint16((word >> packedOriginShift) & packedOriginMask) //nolint:gosec // G115 origin id is stored in 12 bits
-	scenarioID := uint16(word >> packedScenarioShift)                  //nolint:gosec // G115 scenario id is stored in 16 bits
-	return unpackKindCode(word & packedKindMask),
-		originID,
-		unpackFamilyCode((word >> packedFamilyShift) & packedFamilyMask),
-		scenarioID
+	return unpackKindCode(word & packedKindMask), unpackOriginID(word), unpackFamily(word), unpackScenarioID(word)
 }

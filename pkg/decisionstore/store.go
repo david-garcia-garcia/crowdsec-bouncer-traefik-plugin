@@ -324,6 +324,5 @@ func (s *Store) PublishedMemoryMapForTest() map[string]LiveSlot {
 
 // PackedScenarioIDForTest is bits 16-31 of a memory word. Tests only.
 func PackedScenarioIDForTest(word uint32) uint16 {
-	_, _, _, scenarioID := unpackWord(word)
-	return scenarioID
+	return unpackScenarioID(word)
 }
