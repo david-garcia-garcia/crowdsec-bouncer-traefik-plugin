@@ -19,11 +19,11 @@ A `pkg/intern.Table` on one DecisionStore incarnation. Append-only `names` (`[]s
 _Avoid_: package `var`, a table shared across store reclaim keys, leftover origin strings, reporter-owned table
 
 **Scenario intern**:
-A second `pkg/intern.Table` on the same DecisionStore incarnation. Same type as Origin intern (`uint16`, empty name id 0, overflow at 65535). Interns the raw LAPI `scenario`. Overflow Warns `decisionstore:scenario intern overflow` and packs scenario id 0; kind, family, origin, and TTL stay.
+A second `pkg/intern.Table` on the same DecisionStore incarnation. Same type as Origin intern (`uint16`, empty name id 0, overflow at 65535). Interns the raw LAPI `scenario`. Overflow packs scenario id 0 with no log; kind, family, origin, and TTL stay.
 _Avoid_: reporter-owned table, packing intern ids into Redis or the range blob, a `scenario` usage-metrics label
 
 **Packed word**:
-A memory `uint32` of 2-bit kind (0 empty / 1 `t` / 2 `c` / 3 `f`), 12-bit origin intern id, 2-bit family (`1`=ipv4, `2`=ipv6, `0`=empty), and 16-bit scenario intern id. Unpack of a packed word returns ASCII `t`/`c`/`f`. Origin id greater than 4095 saturates to 0 and Warns `decisionstore:intern overflow`. Family is classified at Put with `FamilyOfHostOrCIDR`. Redis slots and the range-index blob stay `KindOriginString` (kind, optional newline, origin). `LiveSlot` stays `{uint32,int32}` (8 bytes).
+A memory `uint32` of 2-bit kind (0 empty / 1 `t` / 2 `c` / 3 `f`), 12-bit origin intern id, 2-bit family (`1`=ipv4, `2`=ipv6, `0`=empty), and 16-bit scenario intern id. Unpack of a packed word returns ASCII `t`/`c`/`f`. Origin id greater than 4095 saturates to 0 with no log. Family is classified at Put with `FamilyOfHostOrCIDR`. Redis slots and the range-index blob stay `KindOriginString` (kind, optional newline, origin). `LiveSlot` stays `{uint32,int32}` (8 bytes).
 _Avoid_: leftover U+001F, packing inside a cache bag, intern ids in the range-index blob, ParseIP on the ActiveCounts walk, `uint16(word>>8)` as origin id
 
 **KindOriginString**:

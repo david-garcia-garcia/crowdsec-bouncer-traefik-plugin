@@ -85,7 +85,7 @@ Live contract: `openspec/specs/core_plugin_decisionstore_store/spec.md` (word `u
 
 - Q: What Warn text for origin overflow vs scenario overflow?
   Rank: additive incidental — dest has one `decisionstore:intern overflow` line; no criterion names the strings
-  Decision: assumed — origin overflow (table max or pack saturate `> 4095`) stays `decisionstore:intern overflow`. Scenario table overflow is `decisionstore:scenario intern overflow`. Do not change `intern.Table`.
+  Decision: assumed — origin overflow (table max or pack saturate `> 4095`) packs origin id 0 and does not log. Scenario table overflow packs scenario id 0 and does not log. Do not change `intern.Table`.
   By: propose
 
 - Q: Does `LookupRemediation` grow a scenario id now?

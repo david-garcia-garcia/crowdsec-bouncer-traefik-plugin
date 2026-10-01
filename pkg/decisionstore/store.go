@@ -79,15 +79,13 @@ type Store struct {
 }
 
 // NewMemory is in-process COW slots and an in-process Range blob.
-func NewMemory(log *slog.Logger) *Store {
-	origins := intern.New()
-	scenarios := intern.New()
-	mem := newMemory(log, origins, scenarios)
+func NewMemory(_ *slog.Logger) *Store {
+	mem := newMemory()
 	return &Store{
 		engine:     memoryEngine(mem),
 		mem:        mem,
-		origins:    origins,
-		scenarios:  scenarios,
+		origins:    mem.origins,
+		scenarios:  mem.scenarios,
 		engineName: "memory",
 	}
 }
@@ -95,14 +93,12 @@ func NewMemory(log *slog.Logger) *Store {
 // NewRedis stores Ip, header-scope, and Range on Redis (keyPrefix namespaces keys).
 // intern stays in-process (no Redis intern table). ActiveCounts is always empty.
 func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string) *Store {
-	origins := intern.New()
-	scenarios := intern.New()
 	red := newRedis(log, writeHost, readHosts, pass, database, keyPrefix)
 	return &Store{
 		engine:     redisEngine(red),
 		red:        red,
-		origins:    origins,
-		scenarios:  scenarios,
+		origins:    red.origins,
+		scenarios:  red.scenarios,
 		engineName: "redis",
 	}
 }

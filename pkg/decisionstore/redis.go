@@ -9,6 +9,8 @@ import (
 	"time"
 
 	simpleredis "github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis"
+
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 )
 
 const (
@@ -23,16 +25,23 @@ const (
 // per slot has no inventory to walk without SCAN+MGET or a second HASH of slots,
 // which would exist only for this gauge.
 type redis struct {
-	log     *slog.Logger
-	prefix  string
-	writer  *simpleredis.SimpleRedis
-	readers []*simpleredis.SimpleRedis
-	counter atomic.Uint64
+	log       *slog.Logger
+	origins   *intern.Table // folded origin name → id; Redis values stay KindOriginString
+	scenarios *intern.Table // raw LAPI scenario → id; Redis values stay KindOriginString
+	prefix    string
+	writer    *simpleredis.SimpleRedis
+	readers   []*simpleredis.SimpleRedis
+	counter   atomic.Uint64
 }
 
 // newRedis dials the writer and optional readers via simpleredis.New.
 func newRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string) *redis {
-	red := &redis{log: log, prefix: keyPrefix}
+	red := &redis{
+		log:       log,
+		origins:   intern.New(),
+		scenarios: intern.New(),
+		prefix:    keyPrefix,
+	}
 	writer, err := simpleredis.New(redisClientConfig(writeHost, pass, database, log))
 	if err != nil {
 		if log != nil {

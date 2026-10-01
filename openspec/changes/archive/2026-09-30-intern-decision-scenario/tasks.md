@@ -7,7 +7,7 @@
 ## 2. Store intern tables
 
 - [x] 2.1 Add `Decision.Scenario`; construct a second `intern.Table` in `NewMemory` and `NewRedis`
-- [x] 2.2 Pass Scenario intern into `newMemory`; intern origin and scenario in `memory.pack`; Warn `decisionstore:intern overflow` on origin table overflow or 12-bit saturate; Warn `decisionstore:scenario intern overflow` on scenario table overflow; keep kind, family, origin (when not origin-overflow), and TTL
+- [x] 2.2 `newMemory` and `newRedis` each construct origin and scenario intern tables; `memory.pack` calls `ID`; pack origin id 0 with no log on table overflow or 12-bit saturate; pack scenario id 0 with no log on scenario table overflow; keep kind, family, origin (when not origin-overflow), and TTL
 - [x] 2.3 Add `ScenarioName` (and scenario-table fill for tests) as the origin-table sibling; do not grow `LookupRemediation`
 
 ## 3. Stream and live write
@@ -19,6 +19,6 @@
 ## 4. Tests
 
 - [x] 4.1 Update `zzz_pack_test.go` for the new layout (no `uint16(word>>8)`, unpack returns `t`/`c`/`f`)
-- [x] 4.2 Add origin 12-bit saturate, lists intern twice (`lists:firehol_level1` + `firehol_level1`), and scenario overflow Warn tests; keep `TestMemoryInternOverflowWarns`
+- [x] 4.2 Add origin 12-bit saturate, lists intern twice (`lists:firehol_level1` + `firehol_level1`), and silent overflow pack-zero tests (`TestMemoryInternOverflowPacksZero`)
 - [x] 4.3 Keep `TestReportMetricsOmitsScenarioLabel` and `TestMetricsOriginListsRewrite`; assert `ActiveCounts` still groups origin×family when a scenario is packed
 - [x] 4.4 Run `go test ./pkg/intern ./pkg/decisionstore ./pkg/lapi ./pkg/bouncer`

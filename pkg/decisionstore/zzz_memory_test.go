@@ -85,7 +85,7 @@ func TestMemoryTickDeleteOnlyMissesAfterPublish(t *testing.T) {
 	}
 }
 
-func TestMemoryInternOverflowWarns(t *testing.T) {
+func TestMemoryInternOverflowPacksZero(t *testing.T) {
 	var logged bytes.Buffer
 	log := slog.New(slog.NewJSONHandler(&logged, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	store := NewMemory(log)
@@ -93,8 +93,12 @@ func TestMemoryInternOverflowWarns(t *testing.T) {
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.99", Kind: decisionscope.BannedValue, Origin: "overflow-origin", DurationSec: 60})
 	store.PublishTick(0)
-	if !strings.Contains(logged.String(), "decisionstore:intern overflow") {
-		t.Fatalf("want overflow Warn, got %s", logged.String())
+	if strings.Contains(logged.String(), "intern overflow") {
+		t.Fatalf("origin overflow must stay silent, got %s", logged.String())
+	}
+	kind, _, originID, err := store.LookupRemediation("203.0.113.99", net.ParseIP("203.0.113.99"), nil)
+	if err != nil || kind != decisionscope.BannedValue || originID != 0 {
+		t.Fatalf("kind %q id %d err %v", kind, originID, err)
 	}
 }
 
@@ -113,8 +117,8 @@ func TestMemoryOriginPackSaturatesAt12Bits(t *testing.T) {
 		Origin: "saturate-origin", Scenario: "ssh-bf", DurationSec: 60,
 	})
 	store.PublishTick(0)
-	if !strings.Contains(logged.String(), "decisionstore:intern overflow") {
-		t.Fatalf("want saturate Warn, got %s", logged.String())
+	if strings.Contains(logged.String(), "intern overflow") {
+		t.Fatalf("origin saturate must stay silent, got %s", logged.String())
 	}
 	kind, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	if err != nil || kind != decisionscope.BannedValue || originID != 0 {
@@ -153,7 +157,7 @@ func TestMemoryListsInternTwice(t *testing.T) {
 	}
 }
 
-func TestMemoryScenarioInternOverflowWarns(t *testing.T) {
+func TestMemoryScenarioInternOverflowPacksZero(t *testing.T) {
 	var logged bytes.Buffer
 	log := slog.New(slog.NewJSONHandler(&logged, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	store := NewMemory(log)
@@ -164,8 +168,8 @@ func TestMemoryScenarioInternOverflowWarns(t *testing.T) {
 		Origin: "crowdsec", Scenario: "overflow-scenario", DurationSec: 60,
 	})
 	store.PublishTick(0)
-	if !strings.Contains(logged.String(), "decisionstore:scenario intern overflow") {
-		t.Fatalf("want scenario overflow Warn, got %s", logged.String())
+	if strings.Contains(logged.String(), "scenario intern overflow") {
+		t.Fatalf("scenario overflow must stay silent, got %s", logged.String())
 	}
 	kind, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	if err != nil || kind != decisionscope.BannedValue || store.OriginName(originID) != "crowdsec" {
