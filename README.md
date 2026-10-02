@@ -2,27 +2,26 @@
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/david-garcia-garcia/crowdsec-bouncer-traefik-plugin)
 ![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/david-garcia-garcia/crowdsec-bouncer-traefik-plugin)
 [![Build Status](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/workflows/main.yml/badge.svg)](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions)
-[![Go Report Card](https://goreportcard.com/badge/github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin)](https://goreportcard.com/badge/github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin)
 
 # Crowdsec Bouncer Traefik plugin
 
 ## What this plugin is
 
-CrowdSec bouncer for Traefik. It authorizes, bans, or challenges requests from CrowdSec decisions: community lists, local detections, and optional AppSec.
+A CrowdSec bouncer for Traefik. For every request it decides, based on CrowdSec, whether to let the visitor through, ban them, or show them a captcha. Decisions come from community blocklists, your own CrowdSec detections, and (optionally) the CrowdSec AppSec WAF.
 
-A rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin). What changed:
+It is a rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin). What changed:
 
 - **AI-first.** OpenSpec specs, a knowledge base, and intensive test coverage, including mock and real-stack harnesses.
-- **LAPI metrics.** Processed requests by address family, drops by decision origin and remediation, and an active-decisions count for `cscli metrics show bouncers`. The original plugin posts a single dropped counter.
-- **reCAPTCHA Enterprise.** Checkbox and score keys (`recaptcha-enterprise`), plus classic reCAPTCHA, hCaptcha, Turnstile, and custom widgets.
+- **Detailed metrics in CrowdSec.** Blocked requests are reported per decision origin and per blocklist, so they show up broken down in `cscli metrics` and the CrowdSec Console. See [LAPI metrics reporting](#lapi-metrics-reporting).
+- **reCAPTCHA Enterprise.** Checkbox and score keys, plus classic reCAPTCHA, hCaptcha, Turnstile, and custom widgets.
 - **EU CAPTCHA.** Provider `eucaptcha`.
-- **Stateless Captcha Gate.** A passed challenge is now a cookie on the client that solved it, and can also be bound to that client's IP. The original plugin stores a server-side IP whitelist, so one solve covers every browser behind that address, and the pass exists only where that cache is reachable (it required redis backend to support distributed systems).
-- **Zero dependency on Redis.** Captcha does not need Redis. The recommended setup is an in-memory `stream`, and the recommended deployment does not include Redis. Redis remains only for the historical `alone` and `live` modes.
-- **Per-router settings.** Each router keeps its own status code, captcha, trusted IPs, failure action when LAPI or AppSec is down, and an optional remap of a decision origin (a community-list ban can be shown as captcha). The original plugin shares one cache and one set of key settings across every CrowdSec middleware in the process.
-- **Several CrowdSec engines** in one Traefik, each with its own API key, or several routers on one engine. See [Middleware Architecture](#middleware-architecture).
-- **Reload applies settings.** A Traefik router reload applies a new LAPI stream (host, key, mode, poll interval, scopes) and the rest of the middleware settings. The original plugin keeps the first stream, and the first values for interval, AppSec, metrics, and similar settings, until the Traefik process restarts.
-- **Ip, Range, and other scopes.** Client IP, CIDR containment, and header-mapped scopes such as country and ASN. The original plugin matches the client IP only.
-- **AppSec independent of LAPI mode.** A router can run the WAF, decision lookup, or both. The original `appsec` mode turns IP checks off.
+- **Captcha passes stored on the visitor.** A solved captcha is remembered with a signed cookie on that browser (optionally tied to its IP). The original plugin whitelisted the IP on the server, so one solve let in every browser behind that address, and multi-instance setups needed Redis to share it.
+- **No Redis needed.** The recommended setup keeps decisions in memory. Redis is only useful for the `live` LAPI mode with several Traefik replicas.
+- **Per-router settings.** Each router keeps its own status code, captcha, trusted IPs, behavior when CrowdSec is down, and can soften specific blocklists (for example, show a captcha instead of a ban for community-list hits). The original plugin shared one set of settings across every CrowdSec middleware in Traefik.
+- **Several CrowdSec engines** in one Traefik, each with its own API key, or several routers sharing one engine. See [Middleware Architecture](#middleware-architecture).
+- **Config reloads apply.** Changing the LAPI host, key, mode, interval, or any other setting takes effect on a Traefik configuration reload. The original plugin kept the first values until Traefik restarted.
+- **IP, IP range, country, ASN, and custom scopes.** The original plugin matched the client IP only.
+- **AppSec independent of the LAPI mode.** A router can run the WAF, the decision lookup, or both.
 
 > [!TIP]
 >
@@ -30,16 +29,16 @@ A rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github.com/m
 >
 > The basic middlewares you need to secure your Traefik ingress:
 >
-> 🌍 **Geoblock**: [david-garcia-garcia/traefik-geoblock](https://github.com/david-garcia-garcia/traefik-geoblock) - Block or allow requests based on IP geolocation
-> 🛡️ **CrowdSec**: [david-garcia-garcia/crowdsec-bouncer-traefik-plugin](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin) - Real-time threat intelligence and automated blocking
-> 🔒 **ModSecurity CRS**: [david-garcia-garcia/traefik-modsecurity](https://github.com/david-garcia-garcia/traefik-modsecurity) - Web Application Firewall with OWASP Core Rule Set
-> 🚦 **Ratelimit**: [Traefik Rate Limit](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/ratelimit/) - Control request rates and prevent abuse
+> - 🌍 **Geoblock**: [david-garcia-garcia/traefik-geoblock](https://github.com/david-garcia-garcia/traefik-geoblock) - Block or allow requests based on IP geolocation
+> - 🛡️ **CrowdSec**: [david-garcia-garcia/crowdsec-bouncer-traefik-plugin](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin) - Real-time threat intelligence and automated blocking
+> - 🔒 **ModSecurity CRS**: [david-garcia-garcia/traefik-modsecurity](https://github.com/david-garcia-garcia/traefik-modsecurity) - Web Application Firewall with OWASP Core Rule Set
+> - 🚦 **Ratelimit**: [Traefik Rate Limit](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/ratelimit/) - Control request rates and prevent abuse
 
 > [!WARNING]
 >
 > **Do not run middlewares as Yaegi plugins in production.**
 >
-> Traefik's catalog loads plugins with [Yaegi](https://github.com/traefik/yaegi), a Go interpreter. A middleware runs on every request, so that cost is on the hot path: memory, CPU, and observability ([Yaegi #1712](https://github.com/traefik/yaegi/pull/1712)). For real traffic, compile the middleware into the Traefik binary, for example [traefik-with-plugins](https://github.com/david-garcia-garcia/traefik-with-plugins). Discussion: [Traefik #12213](https://github.com/traefik/traefik/issues/12213).
+> Traefik's catalog loads plugins with [Yaegi](https://github.com/traefik/yaegi), a Go interpreter. A middleware runs on every request, so the interpreter's cost lands on every request too: memory, CPU, and observability ([Yaegi #1712](https://github.com/traefik/yaegi/pull/1712)). For real traffic, compile the middleware into the Traefik binary, for example with [traefik-with-plugins](https://github.com/david-garcia-garcia/traefik-with-plugins). Discussion: [Traefik #12213](https://github.com/traefik/traefik/issues/12213).
 
 ## What CrowdSec is
 
@@ -48,7 +47,14 @@ A rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github.com/m
 > [CrowdSec](https://www.crowdsec.net/) is an open-source and collaborative IPS (Intrusion Prevention System) and a security suite.
 > We leverage local behavior analysis and crowd power to build the largest CTI network in the world.
 
-The Crowdsec utility will provide the community blocklist which contains highly reported and validated IPs banned from the Crowdsec network.
+CrowdSec also provides the community blocklist: IPs that are widely reported and validated as malicious across the CrowdSec network.
+
+A few CrowdSec terms used in this README:
+
+- **LAPI** (Local API): the CrowdSec service that stores decisions ("ban this IP for 4 hours"). This plugin reads decisions from it.
+- **CAPI** (Central API): CrowdSec's cloud service that distributes the community blocklist.
+- **AppSec**: CrowdSec's WAF component. It inspects a single request and answers allow or block.
+- **Bouncer**: a component that enforces decisions. This plugin is a bouncer.
 
 ## Architecture diagram
 
@@ -83,22 +89,26 @@ Users are blocked based on:
 - Local decisions from inspecting your Traefik access logs and identifying attack patterns
 - AppSec WAF
 
-This plugin is the bouncer: it asks LAPI (and optionally AppSec) on the request path. It does not ingest logs.
+This plugin only enforces decisions. It does not read logs; CrowdSec does that and produces the decisions.
 
-How one Traefik process can share a stream, or run several CrowdSec engines, is in [Middleware Architecture](#middleware-architecture).
+To share one CrowdSec connection between routers, or to use several CrowdSec engines in one Traefik, see [Middleware Architecture](#middleware-architecture).
 
 ## Decisions
 
-A CrowdSec decision is *who* (scope) plus *what* (remediation). This plugin looks up that pair.
+A CrowdSec decision says *who* (the scope, e.g. an IP) and *what to do* (the remediation, e.g. ban).
 
-Decision **scopes** supported by the plugin are `Ip`, `Range` (CIDR), and any other CrowdSec scope listed in `bouncerDecisionScopeHeaders`.
+Supported scopes:
 
-`bouncerDecisionScopeHeaders` maps a CrowdSec **scope name** (the map key) to a request **header name** (the map value). The key selects how the header is interpreted, not the header name:
+- `Ip`: the client IP.
+- `Range`: an IP range (CIDR) that contains the client IP.
+- Any other scope (country, ASN, username, …) read from a request header you configure in `bouncerDecisionScopeHeaders`.
 
-- `Country` (any case: `country`, `Country`): ISO 3166-1 alpha-2, case-insensitive. Cloudflare `XX` and `T1` do not match. Example headers: `CF-IPCountry`, or `X-IPCountry` from a geoenrich middleware.
-- `AS` (any case: `as`, `AS`): decimal ASN. A leading `AS` / `as` on the header or the decision is ignored. Example header: `CF-ASN`.
-- Any other key (`username`, `session`, …): trimmed header string, compared as-is to the decision value. The key must match the scope LAPI stored (`username` is not `user`).
-- `Ip` and `Range` cannot be mapped. IP comes from the client address; Range is CIDR containment.
+`bouncerDecisionScopeHeaders` maps a CrowdSec **scope name** (the key) to the **request header** that holds the value (the value). The key also decides how the header is compared:
+
+- `Country` (any case): two-letter ISO country code, case-insensitive. Cloudflare's `XX` and `T1` never match. Example headers: `CF-IPCountry`, or `X-IPCountry` from a geolocation middleware.
+- `AS` (any case): ASN number. A leading `AS` (as in `AS13335`) is ignored. Example header: `CF-ASN`.
+- Any other key (`username`, `session`, …): the header value, trimmed, compared exactly. The key must match the scope name stored in CrowdSec (`username` is not `user`).
+- `Ip` and `Range` cannot be mapped to a header; they always use the client address.
 
 ```yaml
 bouncerDecisionScopeHeaders:
@@ -107,71 +117,90 @@ bouncerDecisionScopeHeaders:
   username: X-User
 ```
 
-The plugin does not resolve GeoIP or invent header values. Every `bouncerDecisionScopeHeaders` scope is taken from the request as-is (CDN, reverse proxy, or a Traefik middleware such as [traefik-geoblock](https://github.com/david-garcia-garcia/traefik-geoblock)). If the client can set that header, they can change matching — use only values you trust when the header is not client-controlled. A worked chain is in [examples/geoenrich-decisions](examples/geoenrich-decisions/README.md).
+The plugin does not geolocate. Header values are used as received, so they must come from something you trust: a CDN, a reverse proxy, or an earlier Traefik middleware such as [traefik-geoblock](https://github.com/david-garcia-garcia/traefik-geoblock). If visitors can set the header themselves, they can dodge or trigger these decisions. A complete example is in [examples/geoenrich-decisions](examples/geoenrich-decisions/README.md).
 
 ## Remediation
 
-CrowdSec remediations this plugin applies ([CrowdSec bouncers](https://docs.crowdsec.net/u/bouncers/intro)):
+What the visitor gets for each CrowdSec remediation ([CrowdSec bouncers](https://docs.crowdsec.net/u/bouncers/intro)):
 
 | Remediation | What the user gets |
 | ----------- | ------------------ |
-| `ban`       | Ban page (or empty body) with `bouncerRemediationStatusCode` (default 403) |
-| `captcha`   | A challenge page (HTTP 200). A pass is HTTP 302 back to the same URL and a `crowdsec_captcha_gate` cookie. They stay clean for `captchaGracePeriodSeconds`, then get challenged again if CrowdSec still has a decision. See [examples/captcha](examples/captcha/README.md). |
+| `ban`       | A ban page (or an empty body) with status `bouncerRemediationStatusCode` (default 403). |
+| `captcha`   | A captcha page. Once solved, the visitor is redirected back to the page they asked for and is not challenged again for `captchaGracePeriodSeconds` (default 24 hours). See [examples/captcha](examples/captcha/README.md). |
 
 Captcha providers:
 
-- [hCaptcha](https://www.hcaptcha.com/)
-- [reCAPTCHA](https://www.google.com/recaptcha/about/) (classic `recaptcha`: `api.js` / siteverify)
-- [reCAPTCHA Enterprise](https://cloud.google.com/recaptcha/docs/introduction) (`recaptcha-enterprise`: `enterprise.js` / Cloud assessments)
-- [Turnstile](https://www.cloudflare.com/products/turnstile/)
-- [EU CAPTCHA](https://eu-captcha.eu/) (`eucaptcha`: `verify.js` / `POST /v1/verify`; site key and secret required)
-- [custom / Wicketkeeper](https://github.com/a-ve/wicketkeeper)
+- [hCaptcha](https://www.hcaptcha.com/) (`hcaptcha`)
+- [reCAPTCHA](https://www.google.com/recaptcha/about/) (`recaptcha`)
+- [reCAPTCHA Enterprise](https://cloud.google.com/recaptcha/docs/introduction) (`recaptcha-enterprise`)
+- [Turnstile](https://www.cloudflare.com/products/turnstile/) (`turnstile`)
+- [EU CAPTCHA](https://eu-captcha.eu/) (`eucaptcha`)
+- Any other widget, for example [Wicketkeeper](https://github.com/a-ve/wicketkeeper) (`custom`)
+
+To serve captchas, set `captchaEnabled: true` together with the `captcha*` settings. Setting only `captchaProvider` is not enough.
 
 ## AppSec
 
-This plugin supports [AppSec](https://doc.crowdsec.net/docs/next/appsec/intro/), including virtual patching and legacy ModSecurity rules.
+This plugin supports [AppSec](https://doc.crowdsec.net/docs/next/appsec/intro/), CrowdSec's WAF, which offers:
 
-Appsec feature is supported from plugin version 1.2.0 and Crowdsec 1.6.0. CrowdSec 1.8 AppSec **bot-detection** (challenge HTML, `__crowdsec_challenge` cookie, `/crowdsec-internal/challenge/*`) is supported by this plugin: enable AppSec as usual and route that path prefix through the **same** CrowdSec middleware as the protected app so the callback is not sent to origin. There is no extra plugin option. See [CrowdSec bot detection](https://docs.crowdsec.net/docs/next/appsec/bot_detection/intro.md).
+- Low-effort virtual patching.
+- Support for your existing ModSecurity rules.
+- Classic WAF protection combined with CrowdSec's behavior detection.
 
-The AppSec Component offers:
+AppSec requires CrowdSec 1.6.0 or later.
 
-- Low-effort virtual patching capabilities.
-- Support for your legacy ModSecurity rules.
-- Combining classic WAF benefits with advanced CrowdSec features for otherwise difficult advanced behavior detection.
+**Bot detection (CrowdSec 1.8+).** CrowdSec can answer a suspicious request with a JavaScript challenge page instead of a ban. This works out of the box once AppSec is enabled. The challenge page calls back to URLs under `/crowdsec-internal/challenge/`, and those calls must go through this middleware so CrowdSec can verify them. If the middleware already covers every path of the host, you are done. If it only covers some paths (for example `/api`), add a router for ``PathPrefix(`/crowdsec-internal/challenge`)`` with the same middleware. See [CrowdSec bot detection](https://docs.crowdsec.net/docs/next/appsec/bot_detection/intro.md).
 
-More information on appsec in the [Crowdsec Documentation](https://doc.crowdsec.net/docs/next/appsec/intro/).
+More information in the [CrowdSec AppSec documentation](https://doc.crowdsec.net/docs/next/appsec/intro/).
 
-## Modes
+## LAPI modes
 
-There are four operating modes (`lapiMode`). Sequence diagrams live in [docs/modes.md](docs/modes.md).
+`lapiMode` controls how the plugin gets decisions from LAPI. Sequence diagrams are in [docs/modes.md](docs/modes.md).
 
-| Mode   | Summary |
-| ------ | ------- |
-| none   | Every request asks LAPI. No decision cache. Ban or captcha from that answer. |
-| live   | Same as none, but caches each IP's result. |
-| stream | Sync decisions from LAPI on an interval; the request path hits cache only. Recommended. |
-| alone  | Like stream, but pulls the community blocklist from CAPI. No local CrowdSec. |
+| LAPI mode | How it works |
+| --------- | ------------ |
+| `stream`  | Downloads all decisions from LAPI and refreshes them on an interval. Requests are checked against memory only. **Recommended.** |
+| `live`    | Asks LAPI about each new client IP and caches the answer for a while. |
+| `none`    | Asks LAPI on every request. No cache. |
+| `alone`   | Like `stream`, but downloads the community blocklist directly from CAPI. No local CrowdSec needed. |
 
-`stream` is recommended: decisions refresh every 60 seconds by default. The request path does not call LAPI. Usage-metrics still POST to LAPI on `lapiMetricsUpdateIntervalSeconds` unless that interval is zero or less.
+`stream` is recommended:
 
-`lapiMode` is how an **owned** LAPI client fetches decisions. It is not “which pieces this middleware runs.” AppSec-only is `lapiEnabled: false` plus `appsecEnabled: true`. `lapiMode: appsec` is removed.
+- Requests never wait on LAPI; decisions are refreshed every 60 seconds by default (`lapiUpdateIntervalSeconds`).
+- Expect around 20 MB of memory for a full decision stream, community blocklist included.
+- The plugin still sends usage metrics to LAPI every `lapiMetricsUpdateIntervalSeconds` (set it to `0` to turn metrics off).
+
+To run AppSec without any decision lookup, set `lapiEnabled: false` and `appsecEnabled: true` (see [AppSec only](#appsec-only)).
+
+## LAPI metrics reporting
+
+The plugin reports what it did back to CrowdSec through LAPI's usage-metrics endpoint, every `lapiMetricsUpdateIntervalSeconds` (default 10 minutes). It reports:
+
+- Requests processed, split by IPv4 and IPv6.
+- Requests dropped, split by remediation (ban or captcha) and by **decision origin**: your own CrowdSec detections, manual `cscli` decisions, the community blocklist (CAPI), and each subscribed blocklist on its own.
+- The number of active decisions held in memory.
+
+You can read these with `cscli metrics show bouncers`, and the CrowdSec Console shows them per origin:
+
+![CrowdSec Console: requests dropped per origin](.assets/dashboard_origins.jpg)
 
 ## Middleware Architecture
 
-One Traefik middleware object can run up to four independent pieces:
+Most installs need a single middleware with everything enabled (see [One middleware](#one-middleware-all-in-one)). Read the rest of this section if you protect several routers with different settings, or use several CrowdSec engines.
 
-| Piece | Flag | Job |
-| ----- | ---- | --- |
-| LAPI client | `lapiEnabled` | Open one connection to one CrowdSec LAPI (`stream` / `live` / `none` / `alone`). Publish it under `lapiInstanceName`. |
-| AppSec client | `appsecEnabled` | Open one AppSec listener. Publish it under `appsecInstanceName`. |
-| Captcha client | `captchaEnabled` | Open one siteverify client, template, and gate. Publish it under `captchaInstanceName`. |
-| Bouncer | `bouncerEnabled` | Serve this router: subscribe to those names, apply this route’s remediations (status, header, captcha, trusted IPs, failure action). |
+A middleware can do two jobs:
 
-`bouncerEnabled` never opens a backend. An omitted instance name is filled with this Traefik middleware name only when that piece’s owner flag is true. LAPI, AppSec, and captcha use **separate** name tables, so all three may be called `shared`. A bouncing subscriber sets `bouncerEnabled: true` and the instance name, and leaves the owner flag false so it does not Open.
+1. **Connect** to CrowdSec. Each connection is turned on separately and is shared under a name, which defaults to the middleware's own name:
 
-**BREAKING:** Owner-read captcha settings moved from `bouncerCaptcha*` / `BouncerCaptcha*` to `captcha*` / `Captcha*`. No old-key aliases. Operators must rename labels and YAML. Leftover `bouncerCaptcha*` is dropped. A leftover pre-prefix `captchaFilePath` starts matching `CaptchaFilePath` again (the captcha stem, not an alias).
+   | Connection | Turn on with | Shared as |
+   | ---------- | ------------ | --------- |
+   | LAPI (decisions) | `lapiEnabled: true` | `lapiInstanceName` |
+   | AppSec (WAF) | `appsecEnabled: true` | `appsecInstanceName` |
+   | Captcha provider | `captchaEnabled: true` | `captchaInstanceName` |
 
-**BREAKING:** YAML that only sets `captchaProvider` no longer owns or serves captcha. Set `captchaEnabled: true` on the owner (empty `captchaInstanceName` fills to the Traefik name). `captcha` failure action requires that router’s captcha instance name after fill.
+2. **Protect** the router it is attached to (`bouncerEnabled: true`), using the connections it names.
+
+A middleware that only protects sets `bouncerEnabled: true` plus the instance names it wants to use, and leaves the `*Enabled` connection flags off. It does not repeat the host, key, or interval: those live on the middleware that connects. It keeps its own request settings (status code, captcha, trusted IPs, behavior when CrowdSec is down, response headers). LAPI, AppSec, and captcha names are independent, so all three can be called `shared`.
 
 ```mermaid
 flowchart LR
@@ -195,11 +224,11 @@ flowchart LR
   L2 --> CS2
 ```
 
-`New` never waits for a publisher (that deadlocks Traefik). A missing subscribed backend with `bouncerStartupBlock: true` is **503** on the request; with the flag false it uses that piece’s failure action.
+Right after Traefik starts or reloads, a connection can take a moment to become available. Until it does, requests get a **503** (`bouncerStartupBlock: true`, the default) or the configured failure action (`bouncerStartupBlock: false`).
 
 ### One middleware (all-in-one)
 
-Names omitted: this Traefik name is the slot. Same shape as a single-router install.
+No instance names needed: the middleware connects and protects on its own.
 
 ```yaml
 api-crowdsec:
@@ -214,9 +243,9 @@ api-crowdsec:
       lapiMode: stream
 ```
 
-### Shared stream, per-router bounce policy
+### Shared connection, per-router settings
 
-One middleware owns the LAPI (and optional AppSec) stream. Other routers only bounce: they subscribe by name and keep their own policy. They do not copy host, key, mode, or poll interval.
+`cs` connects to LAPI and AppSec and shares both as `shared`. `cs-admin` reuses them and only adds its own setting.
 
 ```yaml
 cs:
@@ -240,7 +269,7 @@ cs-admin:
       lapiInstanceName: shared
 ```
 
-A dummy owner (`enabled: false`) is optional. Use it only when no bouncing route should own the clients. Traefik still needs a router attached so `New` runs.
+If you prefer the connections to live in a middleware that protects nothing, set `bouncerEnabled: false` on it. It still has to be attached to some router, or Traefik never loads it.
 
 ```yaml
 cs-holders:
@@ -259,9 +288,9 @@ cs-holders:
 
 ### Several LAPI streams or CrowdSec engines
 
-CrowdSec still identifies **one stream per LAPI key + the IP this Traefik uses to call LAPI**. Two stream owners that share that pair fight over one cursor. A second isolated decision set needs a **second LAPI key** (and usually a second host if it is another engine).
+CrowdSec tracks one stream per combination of **bouncer API key and the IP Traefik connects from**. Two LAPI connections with the same key from the same Traefik interfere with each other. Each separate stream needs its own bouncer key (and its own host if it is another engine).
 
-Give each owner its own instance name. Point each bouncing router at the name it should use.
+Give each connection its own name, and point each protecting middleware at the one it should use:
 
 ```yaml
 cs-a:
@@ -294,11 +323,11 @@ app-b:
       lapiInstanceName: engine-b
 ```
 
-`/app-a` and `/app-b` can sit on the same Traefik. They do not share a decision store. The same pattern works for two streams against one engine (two bouncer API keys) when you want isolated cursors.
+`app-a` and `app-b` run in the same Traefik but see different decisions. The same pattern works for two streams from one engine, using two bouncer keys.
 
 ### AppSec only
 
-No LAPI client on this middleware. The bouncer subscribes only to AppSec.
+No decision lookup; only the WAF.
 
 ```yaml
 waf:
@@ -311,25 +340,23 @@ waf:
       lapiEnabled: false
 ```
 
-`lapiStreamScopes` is opener-only extra stream scopes (`country`, `as`, …). It is not copied from `bouncerDecisionScopeHeaders`.
-
 ## Cache
 
-The cache remembers CrowdSec remediations so this plugin does not have to ask LAPI on every request.
+The cache keeps CrowdSec decisions so the plugin does not ask LAPI on every request.
 
-- **`live`**: stores each client result (banned, captcha, or clean) for `DefaultDecisionSeconds`. This is the mode where a shared Redis cache is useful: several Traefik replicas can reuse the same LAPI answers.
-- **`stream` / `alone`**: stores the decision list locally. Prefer the in-memory store. Redis adds a network hop for a set you already sync on an interval.
-- **`none`**: no decision cache to share.
+- **`stream` / `alone`**: the full decision list is kept in memory. Redis is supported but not recommended here: it adds a network hop for data already refreshed on an interval.
+- **`live`**: each client's answer (banned, captcha, or clean) is kept for `lapiDefaultDecisionSeconds`. With several Traefik replicas, a shared Redis lets them reuse each other's answers.
+- **`none`**: no cache.
 
-Captcha grace does not use this cache. After a passed challenge, the plugin sets a signed cookie (`crowdsec_captcha_gate`), not a cache key.
+Solved captchas are not stored in this cache; they are remembered with a signed cookie on the visitor's browser.
 
 ## What you can do
 
-These are the settings that change what a visitor, a tester, or an access log sees. The [Variables](#variables) list is the full reference.
+Common tasks and the settings behind them. The [Variables](#variables) list is the full reference.
 
 ### Test a ban or a captcha from the browser
 
-`bouncerActionRules` can match an incoming header. There is no dedicated `bouncerDecisionHeader` key. Leftover `bouncerDecisionHeader` YAML is ignored. Header match is unanchored Go RE2 against each value, so write `^b$` and `^c$` (a bare `b` also matches `abc`).
+`bouncerActionRules` can force a ban or a captcha when a request carries a header you choose:
 
 ```yaml
 bouncerActionRules:
@@ -349,7 +376,9 @@ captchaGateSecret: FIXME
 bouncerEnabled: true
 ```
 
-Then send the header yourself. From the browser, a header extension or DevTools is enough. `curl` does the same:
+Header values are regular expressions, so use `^b$` for an exact match (a bare `b` also matches `abc`).
+
+Then send the header yourself, with a browser header extension, DevTools, or `curl`:
 
 ```bash
 curl -D - -H "X-Crowdsec-Decision: b" https://app.example/
@@ -358,76 +387,75 @@ curl -D - -H "X-Crowdsec-Decision: c" https://app.example/
 
 | Value | What you get |
 | ----- | ------------ |
-| `b` (matches `^b$`) | Ban immediately. No LAPI or AppSec. Status is `bouncerRemediationStatusCode` (default 403). |
-| `c` (matches `^c$`) | Captcha flag. Remaining legs still run. A CrowdSec or fail-closed ban still wins (log `ServeHTTP:forcedCaptchaSuperseded`). Use `[captcha, bypass]` to skip both legs then captcha. |
-| anything else (`B`, `t`, empty, padded ` b `) | No header rule matches. Normal lookup continues. |
+| `b` | Ban immediately, with status `bouncerRemediationStatusCode` (default 403). CrowdSec is not consulted. |
+| `c` | A captcha, unless CrowdSec bans the client anyway (a ban always wins). Use `action: [captcha, bypass]` to skip the CrowdSec checks and always get the captcha. |
+| anything else | No rule matches; the request is checked normally. |
 
-A visitor who already solved the captcha still has `crowdsec_captcha_gate`. While that cookie is valid, a captcha rule reaches the app. Delete the cookie to see the challenge again. A ban rule does not care about the cookie.
+Once you solve the captcha, you will not see it again until the grace period ends. Delete the `crowdsec_captcha_gate` cookie to get challenged again.
 
-Clients in `bouncerClientTrustedIps` skip the plugin, including these rules. Test from an address that is not in that list.
+Clients listed in `bouncerClientTrustedIps` skip the plugin entirely, including these rules, so test from another address.
 
-Do not leave a client-writable header on a public route. Anyone who can set it can ban or captcha their own requests. Prefer an earlier middleware that sets the header only for traffic you control, or use it on a staging router and remove it afterward.
+Do not leave a header that visitors can set on a public route: anyone could ban or captcha their own requests. Either have an earlier middleware set the header only for traffic you control, or use it on a staging router and remove it afterwards.
 
-`cscli decisions add` is the other way to test, against a real decision. See [Manually add an IP to the blocklist](#manually-add-an-ip-to-the-blocklist-for-testing-purposes).
+You can also test with a real decision: see [Manually add an IP to the blocklist](#manually-add-an-ip-to-the-blocklist-for-testing-purposes).
 
 ### See the verdict in access logs
 
-`bouncerRemediationHeadersCustomName` is a response header the plugin sets when it handles the request. Empty disables it. Colon is the field separator (`kind:reason` or `kind:reason:origin`). Split at most three fields. There is no space after `:`.
+Set `bouncerRemediationHeadersCustomName` to a header name, and the plugin adds that header to every response it blocks or challenges. Add the same name to Traefik's `accessLog.fields.headers` to see it in your logs.
 
 ```yaml
 bouncerRemediationHeadersCustomName: cs-remediation
 ```
 
-Include that name in Traefik `accessLog.fields.headers`. **BREAKING:** values that used to be a single token (`ban`, `captcha`, `solved-captcha`, or a raw AppSec `action`) are now structured. Operators who panel on those strings must update queries. `error:client-disconnected` is unchanged.
+The value is `what:why` or `what:why:origin`, separated by colons with no spaces:
 
 | Value | Meaning |
 | ----- | ------- |
-| `ban:rules` | A matching `bouncerActionRules` row applied `ban`. |
-| `ban:lapi` | CrowdSec ban, empty metrics origin. |
-| `ban:lapi:<origin>` | CrowdSec ban. Third field is header-safe `MetricsOrigin` (prefix `lists:` becomes `lists_` only; CR/LF/TAB stripped). |
-| `ban:lapi-failure` | LAPI down / unpublished, fail-closed ban. |
-| `ban:stream-unhealthy` | Stream miss + unhealthy, fail-closed ban. |
-| `ban:cache-fail` | Redis/cache fail-closed. |
-| `ban:unparseable-request` | `GetRemoteIP` failed or the client IP would not parse. |
-| `ban:appsec` | AppSec JSON `action: ban`. |
-| `ban:appsec-challenge-empty` | AppSec `action: challenge` with empty body (fail-closed to the ban page). |
-| `ban:appsec-failure` | AppSec down / unusable verdict, fail-closed ban. |
-| `ban:captcha-downgrade` | Kind was captcha; this router served a ban page (unsubscribed / unpublished / invalid captcha client). |
-| `captcha:rules` | A matching `bouncerActionRules` row applied `captcha`. |
-| `captcha:lapi` / `captcha:lapi:<origin>` | CrowdSec captcha (same origin encoding). |
-| `captcha:lapi-failure` | LAPI fail-closed captcha. |
-| `captcha:stream-unhealthy` | Stream fail-closed captcha. |
-| `captcha:appsec-failure` | AppSec fail-closed captcha. |
-| `captcha:appsec` | AppSec JSON `action: captcha` (envelope relay, not this plugin's captcha). |
-| `captcha:challenge` | AppSec bot-detection `action: challenge` with a non-empty body. |
-| `captcha:solved` | 302 after a successful solve (token pass or second-tab captcha-form POST). |
-| `error:client-disconnected` | The client dropped the body while AppSec was reading it. This is not a ban. |
-| `{action}:appsec` | Any other AppSec JSON action (trimmed; CR/LF/TAB stripped; `:` in the action becomes `_`). |
+| `ban:rules` | Banned by a `bouncerActionRules` rule. |
+| `ban:lapi` / `ban:lapi:<origin>` | Banned by a CrowdSec decision. The third field is the decision origin (`crowdsec`, `cscli`, `CAPI`, or `lists_<name>` for a blocklist). |
+| `ban:lapi-failure` | LAPI was unreachable, and the failure action is `ban`. |
+| `ban:stream-unhealthy` | Decisions could not be refreshed for too long, and the failure action is `ban`. |
+| `ban:cache-fail` | Redis was unreachable. |
+| `ban:unparseable-request` | The client IP could not be determined. |
+| `ban:appsec` | Blocked by AppSec. |
+| `ban:appsec-challenge-empty` | AppSec asked for a bot challenge but sent no page, so a ban was served instead. |
+| `ban:appsec-failure` | AppSec was unreachable, and the failure action is `ban`. |
+| `ban:captcha-downgrade` | A captcha was due, but this router has no captcha configured, so a ban was served. |
+| `captcha:rules` | Captcha from a `bouncerActionRules` rule. |
+| `captcha:lapi` / `captcha:lapi:<origin>` | Captcha from a CrowdSec decision. |
+| `captcha:lapi-failure` | LAPI was unreachable, and the failure action is `captcha`. |
+| `captcha:stream-unhealthy` | Decisions could not be refreshed for too long, and the failure action is `captcha`. |
+| `captcha:appsec-failure` | AppSec was unreachable, and the failure action is `captcha`. |
+| `captcha:appsec` | AppSec asked for a captcha. |
+| `captcha:challenge` | AppSec served a bot-detection challenge. |
+| `captcha:solved` | The visitor just solved the captcha and is being redirected back. |
+| `error:client-disconnected` | The client disconnected while AppSec was reading the request body. Not a ban. |
+| `<action>:appsec` | Any other action returned by AppSec. |
 
-Pass, bypass, trusted IP, failure-action passthrough, remap-to-pass, widget-asset passthrough, valid gate-cookie origin GET, disabled bouncer, and startup 503 do not set this header. The plugin does not emit `allow: pass`.
+Requests that are let through get no header.
 
 ### Put a request id on the ban page
 
-`bouncerTraceHeadersCustomName` copies one request header into the ban HTML as `{{ .TraceID }}`. Empty disables it.
+`bouncerTraceHeadersCustomName` copies one request header into the ban page as `{{ .TraceID }}`, so visitors can quote it to support.
 
 ```yaml
 bouncerTraceHeadersCustomName: X-Request-ID
 bouncerBanFilePath: /ban.html
 ```
 
-Only a token of letters, digits, `_`, `.`, `:`, `-`, length 1–200, is inserted. Anything else becomes empty, so a client cannot inject markup through that header.
+Only values made of letters, digits, `_`, `.`, `:`, and `-` (up to 200 characters) are inserted; anything else is left out, so the header cannot inject markup.
 
 The ban template can also use:
 
-- `{{ .ClientIP }}` — the address this plugin remediated
-- `{{ .Domain }}` — the request host
+- `{{ .ClientIP }}` — the visitor's IP
+- `{{ .Domain }}` — the requested host
 - `{{ .RemediationReason }}` — `LAPI`, `APPSEC`, or `TECHNICAL_ISSUE`
 
-A sample page is in [examples/custom-ban-page](examples/custom-ban-page/README.md). With no `bouncerBanFilePath`, a ban is the status code and an empty body.
+A sample page is in [examples/custom-ban-page](examples/custom-ban-page/README.md). Without `bouncerBanFilePath`, a ban is just the status code with an empty body.
 
 ### Show a community ban as a captcha
 
-`bouncerOriginBasedDecisionRemap` changes the remediation for one router at apply time. The decision stored from LAPI stays a ban; this router can show a captcha instead.
+`bouncerOriginBasedDecisionRemap` softens decisions from specific origins on this router only. For example, to show a captcha instead of a ban to IPs from the community blocklist or from one list:
 
 ```yaml
 bouncerOriginBasedDecisionRemap:
@@ -437,42 +465,45 @@ bouncerOriginBasedDecisionRemap:
     ban: captcha
 ```
 
-`CAPI` is exact. `lists` matches every CrowdSec list. `lists:<name>` matches one list (the decision scenario). The inner key is the LAPI type (`ban` or `captcha`). The inner value is `captcha` or `pass`. One hop only: `ban: captcha` does not then follow `captcha: pass`. `pass` skips the LAPI remediation; AppSec still runs if this router has it.
+- The outer key is the origin: `CAPI` (community blocklist), `lists` (every blocklist), or `lists:<name>` (one blocklist).
+- The inner key is what CrowdSec decided (`ban` or `captcha`); the value is what this router does instead (`captcha` or `pass`).
+- `pass` lets the request through the decision check; AppSec still runs if enabled.
+- Rules do not chain: with `ban: captcha` and `captcha: pass`, a ban becomes a captcha, not a pass.
 
-This router needs a captcha client (`captchaEnabled` or `captchaInstanceName`). Without one, a remapped captcha is still served as a ban. Two routers on the same LAPI client can remap differently.
+The router needs a captcha configured; otherwise the remapped captcha is served as a ban. Two routers sharing one LAPI connection can remap differently.
 
 ### Let a LAN or VPN through
 
-`bouncerClientTrustedIps` skips the bouncer and AppSec for those client addresses. A worked example is [examples/trusted-ips](examples/trusted-ips/README.md).
+`bouncerClientTrustedIps` lets these client addresses skip all checks, AppSec included. See [examples/trusted-ips](examples/trusted-ips/README.md).
 
 ```yaml
 bouncerClientTrustedIps:
   - 192.168.1.0/24
 ```
 
-The address compared is the one from [the real client IP](#remediate-the-visitor-not-the-proxy), not the raw socket peer when a trusted proxy is configured.
+The address checked is the [real client IP](#remediate-the-visitor-not-the-proxy), not the proxy's, when a trusted proxy is configured.
 
 ### Remediate the visitor, not the proxy
 
-Behind Cloudflare, a load balancer, or another reverse proxy, the socket peer is the proxy. Without `bouncerForwardedHeadersTrustedIps`, every visitor is remediated as that proxy.
+Behind Cloudflare, a load balancer, or another reverse proxy, every connection comes from the proxy. Unless you tell the plugin to trust the proxy, every visitor is treated as the proxy's IP.
 
-Put the proxy’s addresses in `bouncerForwardedHeadersTrustedIps` and set `bouncerForwardedHeadersCustomName` to the header that proxy actually sends (`X-Real-Ip`, `CF-Connecting-IP`, or `X-Forwarded-For`). A worked chain is [examples/behind-proxy](examples/behind-proxy/README.md). The variable entries below spell out the hop walk and why `bouncerForwardedHeadersInsecure` is unsafe on an open entrypoint.
+List the proxy's addresses in `bouncerForwardedHeadersTrustedIps` and set `bouncerForwardedHeadersCustomName` to the header that proxy sends with the real client IP (`CF-Connecting-IP`, `X-Forwarded-For`, or `X-Real-Ip`). See [examples/behind-proxy](examples/behind-proxy/README.md), and the variable descriptions below for details.
 
 ### Choose what happens when CrowdSec is down
 
-`bouncerLapiFailureAction` and `bouncerAppsecFailureAction` are `ban` (default), `passthrough`, or `captcha`.
+`bouncerLapiFailureAction` and `bouncerAppsecFailureAction` decide what happens when LAPI or AppSec cannot give an answer:
 
-- `ban` — treat the outage as a ban.
-- `passthrough` — send the request on. AppSec still runs on a LAPI passthrough when AppSec is enabled.
-- `captcha` — show the challenge. This router must name a captcha instance (`captchaEnabled`, or `captchaInstanceName`).
+- `ban` (default) — block the request.
+- `passthrough` — let it through. If LAPI is down, AppSec still checks the request.
+- `captcha` — show a captcha. Requires a captcha on this router.
 
-`bouncerStartupBlock: true` (default) is different: while a backend this router subscribes to is not published yet, the response is **503**, not the failure action. `false` uses the failure action instead. Startup ready means the client is published, not that the first stream poll has finished.
+In `stream` and `alone` LAPI modes, the plugin keeps using the decisions it already has when LAPI is down. The failure action only applies to clients without a known decision, after `lapiUpdateMaxFailure` failed refreshes.
 
-In `stream` and `alone`, a cache hit still applies when the stream is unhealthy. The failure action is for a miss after `lapiUpdateMaxFailure` failed polls, and for `live` / `none` when LAPI does not return a usable verdict.
+Right after startup or a reload, `bouncerStartupBlock` applies instead: see [Middleware Architecture](#middleware-architecture).
 
 ### Match a country or an ASN
 
-`bouncerDecisionScopeHeaders` reads a header you already trust. This plugin does not geolocate.
+`bouncerDecisionScopeHeaders` reads the country or ASN from a header you trust; the plugin does not geolocate. `lapiStreamScopes` asks LAPI to include those decisions in the stream:
 
 ```yaml
 bouncerDecisionScopeHeaders:
@@ -483,7 +514,7 @@ lapiStreamScopes:
   - as
 ```
 
-`lapiStreamScopes` is set on the middleware that **owns** the stream (`lapiEnabled: true`). It is not copied from the header map. A bouncing router that only subscribes still needs `bouncerDecisionScopeHeaders` so it knows which header to read. A worked chain is [examples/geoenrich-decisions](examples/geoenrich-decisions/README.md).
+`lapiStreamScopes` goes on the middleware that connects to LAPI (`lapiEnabled: true`). `bouncerDecisionScopeHeaders` goes on every middleware that protects a router. See [examples/geoenrich-decisions](examples/geoenrich-decisions/README.md).
 
 ## Usage
 
@@ -495,43 +526,34 @@ You can run it with:
 make run
 ```
 
-### Note
-
-> [!IMPORTANT]
-> You can declare many CrowdSec middlewares in one Traefik. Each bouncing router keeps its own request policy (enabled, captcha, trusted IPs, failure actions, templates).
->
-> Share one LAPI, AppSec, or captcha client by publishing a name (`lapiInstanceName` / `appsecInstanceName` / `captchaInstanceName`) and subscribing other routers to it. Interval, host, key, `lapiStreamScopes`, and captcha provider settings live on the **owner**. See [Middleware Architecture](#middleware-architecture).
->
-> CrowdSec LAPI still identifies **one stream per LAPI key + the IP this Traefik uses to call LAPI**. A second isolated stream or engine needs a different key (and a different instance name). Two stream owners on the same pair fight over one cursor.
-
-> [!WARNING]  
-> **Appsec maximum body limit is defaulted to 10MB** > _Be careful when you upgrade to >1.4.x_
+> [!WARNING]
+> AppSec only receives the first 10 MB of a request body by default (`appsecBodyLimit`).
 
 ### Variables
 
-Headings are the Go field. YAML and Docker labels use the json name: lower camel case, with `HTTP`→`Http`, `TLS`→`Tls`, `IP`→`Ip`, `URL`→`Url`, `ID`→`Id`. **BouncerClientTrustedIPs** is `bouncerClientTrustedIps`. Samples below use the json names.
+Names below are written as Go fields. In YAML and Docker labels, use lower camel case, with acronyms written as words: `HTTP`→`Http`, `TLS`→`Tls`, `IP`→`Ip`, `URL`→`Url`, `ID`→`Id`. For example, **BouncerClientTrustedIPs** is `bouncerClientTrustedIps`.
 
-A string secret or PEM can also be loaded from a file Traefik can read. The file key is the same name plus `File` (`lapiKey` → `lapiKeyFile`). When both are set, the file wins. The pairs are listed under [Fill variable with value of file](#fill-variable-with-value-of-file).
+Secrets and certificates can also be read from a file: add `File` to the name (`lapiKey` → `lapiKeyFile`). If both are set, the file wins. See [Fill variable with value of file](#fill-variable-with-value-of-file).
 
 **BouncerBanFilePath** (string, default `""`)
-Path to the ban file. Empty disables it. Content-Type is inferred from the extension.
+Path to the ban page. Empty means no page (status code only). Content-Type is inferred from the extension.
 
 **CaptchaCustomChallengeUrl** (string, default `""`)
-`custom` only. Origin widget challenge URL (Wicketkeeper: `http://captcha.localhost:8000/v0/challenge`). Rendered as `{{ .ChallengeURL }}`. A captcha-flagged client may request this exact path and it is passed through (banned clients are not). Empty means no challenge passthrough.
+`custom` only. Challenge URL of the widget (Wicketkeeper: `http://captcha.localhost:8000/v0/challenge`), available in the template as `{{ .ChallengeURL }}`. Visitors who must solve a captcha are allowed to request this exact path.
 
 **CaptchaCustomJsUrl** (string, no default)
-`custom` only. URL that loads the challenge in HTML (hCaptcha: `https://hcaptcha.com/1/api.js`). When the widget is on the protected router, a captcha-flagged client may request this exact path and it is passed through (banned clients are not).
+`custom` only. Script URL that loads the widget (hCaptcha: `https://hcaptcha.com/1/api.js`). If it is served from the protected router, visitors who must solve a captcha are allowed to request it.
 
 **CaptchaCustomKey** (string, no default)
 `custom` only. CSS class of the captcha div (hCaptcha: `h-captcha`).
 
 **CaptchaCustomResponse** (string, no default)
-`custom` only. POST field from `captcha.html` (hCaptcha: `h-captcha-response`).
+`custom` only. Name of the form field holding the captcha answer (hCaptcha: `h-captcha-response`).
 
 **CaptchaCustomValidateBody** (string, default `""`)
-Siteverify request encoding. After trim, exact lowercase `""` or `form` POSTs `application/x-www-form-urlencoded` `secret` and `response` (same as omit; Wicketkeeper). `json` POSTs `application/json` `{"secret","response"}`. `json` is `custom` only — a built-in plus `json` fails startup. `JSON`, `Form`, and any other token fail for every provider.
+`custom` only. How the answer is sent to the validation URL: `form` (or empty) for a form POST of `secret` and `response`, or `json` for a JSON body. Any other value fails startup.
 
-CapJS / Cap Standalone as `custom` (operator HTML stays yours; no `trycap` provider):
+Example: [Cap Standalone](https://capjs.js.org/) as a `custom` provider:
 
 ```yaml
 captchaCustomJsUrl: https://<instance>/assets/widget.js
@@ -547,97 +569,148 @@ captchaEnabled: true
 ```
 
 **CaptchaCustomValidateUrl** (string, no default)
-`custom` only. URL that validates the challenge (hCaptcha: `https://api.hcaptcha.com/siteverify`). Cap Standalone: `https://<instance>/<site_key>/siteverify` with `captchaCustomValidateBody: json`.
+`custom` only. URL that validates the answer (hCaptcha: `https://api.hcaptcha.com/siteverify`).
+
+**captchaEnabled** (bool, default `false`)
+This middleware sets up the captcha provider and shares it as `captchaInstanceName`. Required to serve captchas; `captchaProvider` alone is not enough.
 
 **captchaEnterpriseAction** (string, default `""`)
-`recaptcha-enterprise` only. Assessment `expectedAction` and checkbox `data-action`. Required for `score`. Empty is valid for `checkbox` (omits both).
+`recaptcha-enterprise` only. Expected action name. Required for `score` keys, optional for `checkbox` keys.
 
 **captchaEnterpriseApiKey** (string, no default)
-`recaptcha-enterprise` only. Google Cloud API key sent as `X-Goog-Api-Key`. Required when this provider is selected.
-
-**captchaEnterpriseApiKeyFile** (string, no default)
-File path for `captchaEnterpriseApiKey` (preferred over an inline key when both are set).
+`recaptcha-enterprise` only. Google Cloud API key. Required.
 
 **captchaEnterpriseKeyType** (string, no default)
-`recaptcha-enterprise` only. Expected: `checkbox` or `score`. Required when this provider is selected.
+`recaptcha-enterprise` only. `checkbox` or `score`. Required.
 
 **captchaEnterpriseMinScore** (string, default `""`)
-`recaptcha-enterprise` only. Minimum `riskAnalysis.score` (`0.0`–`1.0`) as a string. Required for `score` and must parse greater than `0` and at most `1`. Empty is valid for `checkbox` (score is ignored).
+`recaptcha-enterprise` only. Minimum score to pass, greater than `0` and up to `1` (e.g. `"0.5"`). Required for `score` keys, ignored for `checkbox` keys.
 
 **captchaEnterpriseProjectId** (string, no default)
-`recaptcha-enterprise` only. Google Cloud project id in the assessments URL. Required when this provider is selected.
+`recaptcha-enterprise` only. Google Cloud project id. Required.
 
 **CaptchaFilePath** (string, default `/captcha.html`)
-Path to the captcha template. Content-Type is inferred from the extension.
+Path to the captcha page template. Content-Type is inferred from the extension.
 
 **CaptchaGateBindIp** (bool, default `true`)
-When true, the gate cookie binds to the client IP from `GetRemoteIP`. When false, grace is cookie-only (HMAC + expiry).
+Tie a solved captcha to the visitor's IP. When `false`, the cookie alone is enough, even if the visitor's IP changes.
 
 **captchaGateSecret** (string, no default)
-HMAC secret for the stateless captcha grace cookie (`crowdsec_captcha_gate`). Required when `captchaEnabled` is true and `captchaProvider` is set. Not the same as `captchaSecretKey`. Or set `captchaGateSecretFile`.
-
-**captchaGateSecretFile** (string, no default)
-File path for `captchaGateSecret` (preferred over an inline secret when both are set).
+Secret used to sign the cookie that remembers a solved captcha. Required when captcha is enabled. Use a long random value; it is not the provider's secret key.
 
 **CaptchaGracePeriodSeconds** (int64, default `86400` / 24 hours)
-How long after a passed captcha before a new challenge, if the CrowdSec decision is still valid.
+How long a solved captcha is valid. After that, the visitor is challenged again if CrowdSec still has a decision for them.
+
+**CaptchaInstanceName** (string, default the middleware name)
+Name under which the captcha provider is shared, or which one to use. See [Middleware Architecture](#middleware-architecture).
 
 **CaptchaProvider** (string, no default)
-Captcha validator. Expected: `hcaptcha`, `recaptcha`, `recaptcha-enterprise`, `turnstile`, `custom`, `eucaptcha`. Classic `recaptcha` stays on `api.js` and siteverify. `recaptcha-enterprise` loads `enterprise.js` and calls Cloud assessments. `eucaptcha` loads `verify.js` and POSTs JSON to EU CAPTCHA `/v1/verify`.
+`hcaptcha`, `recaptcha`, `recaptcha-enterprise`, `turnstile`, `eucaptcha`, or `custom`.
 
 **captchaSecretKey** (string, no default)
-Site secret key for the captcha provider. Unused for `recaptcha-enterprise` (not required). Required for `hcaptcha`, `recaptcha`, `turnstile`, `custom`, and `eucaptcha`.
+Secret key from the captcha provider. Required for every provider except `recaptcha-enterprise`.
 
 **captchaSiteKey** (string, no default)
-Site key for the captcha provider.
+Site key from the captcha provider.
 
 **CaptchaSiteverifyHTTPTimeoutSeconds** (int64, default `10`)
-Timeout in seconds for the captcha provider siteverify client. MUST be `>= 1`. Independent of the LAPI and AppSec timeouts.
+Timeout in seconds when validating a captcha with the provider. Must be at least `1`.
 
-**BouncerClientTrustedIPs** ([]string, default `[]`)
-Client IPs that bypass bouncer and cache checks (LAN or VPN). Trusted clients also skip AppSec.
-
-**AppsecBodyLimit** (int64, default `10485760` / 10MB)
-Send only the first N bytes to AppSec. `0` is unlimited. Only POST, PUT, PATCH, and DELETE bodies are forwarded; any other method (including a GET with a body) is sent as a headers-only GET with the real verb on `X-Crowdsec-Appsec-Verb`.
+**AppsecBodyLimit** (int64, default `10485760` / 10 MB)
+Send at most this many bytes of the request body to AppSec. `0` means no limit. Only POST, PUT, PATCH, and DELETE bodies are sent.
 
 **appsecEnabled** (bool, default `false`)
-Enable CrowdSec AppSec (WAF). Independent of `lapiMode`: it inspects the requests the decision check allowed, in every mode. CrowdSec 1.8 bot-detection needs this set, plus a Traefik router `PathPrefix(/crowdsec-internal/challenge)` using this same middleware.
+This middleware connects to AppSec and shares the connection as `appsecInstanceName`. AppSec checks every request that passed the decision check, whatever the LAPI mode.
 
-**BouncerActionRules** ([]object, default `[]`)
-Per-request rules that skip LAPI, skip AppSec, ban, and/or captcha. **BREAKING:** replaces `bouncerAppsecBypassRules`, `bouncerLapiBypassRules`, and `bouncerDecisionHeader`. Leftover old keys are ignored (Traefik unused-key decode). Each rule needs a unique `name` (no `:`) and a non-empty `action` array. Tokens: `bypass`, `bypassLapi`, `bypassAppsec`, `ban`, `captcha`. `bypass` skips both legs. `ban` must be the only token on that row. Predicates are the httprule shape: `method`, `path`, `host`, `headers`, `cookies`. Omit a field (or empty `path` / `host` / `method` after trim, or an empty map) to mean any. Set fields AND. All matching rules contribute (not first-match-wins). `path` is unanchored Go RE2 on `req.URL.Path` (percent-decoded, not the query; the plugin does not insert `^` or `$`). `host` is unanchored Go RE2 on the hostname of `req.Host` (port stripped: `example.com:443` → `example.com`, `[::1]:443` → `::1`). `method` is unanchored Go RE2 on `req.Method`; optional leading `!` negates (`!POST`). Do not lowercase and do not force `(?i)`. Empty header or cookie pattern means that name is present. Header names are case-insensitive; cookie names are case-sensitive. Header values are not trimmed; write `^b$` / `^c$` for an exact letter. A fully empty rule (every predicate is any) fails `New`. Invalid RE2, empty/duplicate/colon names, and invalid action arrays fail `New`. After trusted IPs: any matching `ban` remediates immediately (`plugin:rules:<name>`); otherwise skipLapi / skipAppsec OR together and a captcha token is a flag (remaining legs still run). Not part of LAPI or AppSec reclaim keys.
-
-**BouncerAppsecFailureAction** (string, default `ban`)
-What to do when AppSec does not return a usable verdict (HTTP 500, unreachable, body read error, or unreadable HTTP/2 or HTTP/3 body on POST/PUT/PATCH). Expected: `passthrough`, `ban`, `captcha`. `ban` drops the request. `passthrough` lets 500/unreachable/body-io errors continue as allow, and sends a headers-only GET when the body cannot be buffered. `captcha` uses the subscribed published captcha client (`captchaEnabled` or a non-empty `captchaInstanceName` after owner-fill). **BREAKING:** replaces `crowdsecAppsecFailureBlock`, `crowdsecAppsecUnreachableBlock`, and `crowdsecAppsecUnreadableBodyBlock`. Operators who had those bools set to `false` MUST set `bouncerAppsecFailureAction: passthrough`.
-
-**appsecHost** (string, default `"crowdsec:7422"`)
+**AppsecHost** (string, default `"crowdsec:7422"`)
 AppSec host and port.
 
-**appsecHttpTimeoutSeconds** (int64, default `10`)
-Timeout in seconds when contacting AppSec. MUST be `>= 1`. Independent of the LAPI and captcha siteverify timeouts. Example: `appsecHttpTimeoutSeconds: 1` with `bouncerAppsecFailureAction: passthrough` so an AppSec hang fails open after one second.
+**AppsecHttpTimeoutSeconds** (int64, default `10`)
+Timeout in seconds when contacting AppSec. Must be at least `1`. For example, `1` with `bouncerAppsecFailureAction: passthrough` lets requests through after one second if AppSec hangs.
 
-**appsecKey** (string, default `""`)
-AppSec API key. When `appsecEnabled` is true and this is empty, startup copies `lapiKey`. Or set `appsecKeyFile`.
+**AppsecInstanceName** (string, default the middleware name)
+Name under which the AppSec connection is shared, or which one to use. See [Middleware Architecture](#middleware-architecture).
 
-**appsecPath** (string, default `"/"`)
-AppSec path, appended to `appsecHost`. A trailing `/` lets API suffixes join cleanly. Other values are accepted and joined as written.
+**AppsecKey** (string, default `""`)
+AppSec API key. Defaults to `lapiKey`.
 
-**appsecScheme** (string, default `""`)
-`http` or `https`. When `appsecEnabled` is true and this is empty, startup copies `lapiScheme`. After that copy, TLS uses the `appsecTls…` settings, not the LAPI ones.
+**AppsecPath** (string, default `"/"`)
+Path appended to `appsecHost`.
+
+**AppsecScheme** (string, default `""`)
+`http` or `https`. Defaults to `lapiScheme`.
 
 **AppsecTLSCertificateAuthority** (string, default `""`)
-PEM CA used to verify AppSec's server certificate. When empty (and `appsecTlsInsecureVerify` is `false`), the host system trust store is used.
+PEM CA that signed AppSec's certificate. Empty uses the system trust store.
+
+**AppsecTLSClientCertificate** (string, default `""`)
+PEM client certificate presented to AppSec. Used with `appsecTlsClientKey`.
+
+**AppsecTLSClientKey** (string, default `""`)
+PEM client private key presented to AppSec.
 
 **AppsecTLSInsecureVerify** (bool, default `false`)
-Disable verification of the certificate presented by AppSec.
+Do not verify AppSec's certificate. Not for production.
 
-**appsecTlsClientCertificate** (string, default `""`)
-PEM client certificate presented to AppSec. Used with `appsecTlsClientKey`. Or set `appsecTlsClientCertificateFile`.
+**BouncerActionRules** ([]object, default `[]`)
+Rules that, for matching requests, skip checks or force a ban or captcha. Each rule has a unique `name` (no `:`), conditions, and an `action` list.
 
-**appsecTlsClientKey** (string, default `""`)
-PEM client private key presented to AppSec. Or set `appsecTlsClientKeyFile`.
+- Conditions (all optional, all must match): `method`, `path`, `host`, `headers`, `cookies`. Values are regular expressions matched anywhere in the value, so anchor them (`^/health$`). `method` accepts a leading `!` to negate (`!POST`). An empty header or cookie pattern means "is present". A rule must have at least one condition.
+- Actions: `bypass` (skip LAPI and AppSec), `bypassLapi`, `bypassAppsec`, `captcha`, `ban`. `ban` must be the only action of its rule.
+- Every matching rule applies. A `ban` applies immediately. A `captcha` is shown unless CrowdSec bans the client anyway.
 
-**appsecTlsCertificateAuthorityFile** (string, default `""`)
-File path for `appsecTlsCertificateAuthority`. The file wins when both are set.
+```yaml
+bouncerActionRules:
+  - name: healthcheck
+    path: "^/health$"
+    action: [bypass]
+  - name: no-waf-for-uploads
+    method: "^POST$"
+    path: "^/upload/"
+    action: [bypassAppsec]
+```
+
+**BouncerAppsecFailureAction** (string, default `ban`)
+What to do when AppSec cannot give an answer (unreachable, error, or request body cannot be read): `ban`, `passthrough`, or `captcha`. See [Choose what happens when CrowdSec is down](#choose-what-happens-when-crowdsec-is-down).
+
+**BouncerClientTrustedIPs** ([]string, default `[]`)
+Client IPs or ranges that skip all checks, AppSec included (LAN, VPN).
+
+**BouncerDecisionScopeHeaders** (map[string]string, default `{}`)
+Maps a CrowdSec scope (country, AS, or any custom one) to the request header holding its value. See [Decisions](#decisions).
+
+**BouncerEnabled** (bool, default `false`)
+This middleware checks the requests of its router. When `false`, every request is let through (connections this middleware owns are still shared with others).
+
+**BouncerForwardedHeadersCustomName** (string, default `"X-Forwarded-For"`)
+Header holding the real client IP. Only read when the connection comes from an IP in `bouncerForwardedHeadersTrustedIps`. For `X-Forwarded-For`, trusted proxy IPs are skipped from right to left and the first other address is used. Use `X-Real-Ip` only if your front proxy (e.g. nginx or HAProxy) sets it: Traefik fills it in with the connecting IP when missing, so behind Cloudflare it would hold Cloudflare's address. Behind Cloudflare, use `CF-Connecting-IP`.
+
+**BouncerForwardedHeadersInsecure** (bool, default `false`)
+Trust the header from any connection, as a single address. Only safe when Traefik's entrypoint already restricts forwarded headers with `forwardedHeaders.trustedIPs`. Otherwise any visitor can choose the IP the plugin checks.
+
+**BouncerForwardedHeadersTrustedIPs** ([]string, default `[]`)
+IPs or ranges of the proxies in front of Traefik (for example Cloudflare's ranges). The forwarded header is only used when the connection comes from one of them; when empty, the connecting IP is used. Do not use a catch-all such as `0.0.0.0/0`: every address in the header is then treated as a proxy and the plugin silently falls back to the connecting IP. On a private network you can list private ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), as long as real clients are not in them.
+
+**BouncerLapiFailureAction** (string, default `ban`)
+What to do when LAPI cannot give an answer: `ban`, `passthrough`, or `captcha`. In `live` and `none`, this also applies when a country, AS, or other header-scope lookup fails. See [Choose what happens when CrowdSec is down](#choose-what-happens-when-crowdsec-is-down).
+
+**BouncerOriginBasedDecisionRemap** (map[string]map[string]string, default `{}`)
+Turn bans or captchas from specific origins into a captcha or a pass on this router. See [Show a community ban as a captcha](#show-a-community-ban-as-a-captcha).
+
+**BouncerRedisUnreachableBlock** (bool, default `true`)
+When Redis cannot be reached, ban (`true`) or let the request through (`false`).
+
+**BouncerRemediationHeadersCustomName** (string, default `""`)
+Response header that tells why a request was blocked or challenged. Empty disables it. See [See the verdict in access logs](#see-the-verdict-in-access-logs).
+
+**BouncerRemediationStatusCode** (int, default `403`)
+HTTP status for a ban.
+
+**BouncerStartupBlock** (bool, default `true`)
+Right after Traefik starts or reloads, until the CrowdSec connections this router uses are ready: return **503** (`true`) or apply the failure action (`false`).
+
+**BouncerTraceHeadersCustomName** (string, default `""`)
+Request header copied into the ban page as `{{ .TraceID }}`. See [Put a request id on the ban page](#put-a-request-id-on-the-ban-page).
 
 **LapiCapiMachineID** (string, no default)
 `alone` only. CAPI login.
@@ -648,26 +721,56 @@ File path for `appsecTlsCertificateAuthority`. The file wins when both are set.
 **LapiCapiScenarios** ([]string, no default)
 `alone` only. CAPI scenarios.
 
-**BouncerLapiFailureAction** (string, default `ban`)
-What to do when LAPI does not return a usable verdict (live/none HTTP or parse error, or a cache miss while stream/alone is unhealthy after `lapiUpdateMaxFailure`). Expected: `passthrough`, `ban`, `captcha`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled). `captcha` uses the subscribed published captcha client (`captchaEnabled` or a non-empty `captchaInstanceName` after owner-fill). **Behavior change:** in `live` and `none`, this action also covers a failed `bouncerDecisionScopeHeaders` query. Previously a LAPI that answered the IP query but errored on a header-scope query was treated as "no decision" and allowed (`DEBUG`). That is now a LAPI failure: default `ban` blocks those requests and logs `WARN`. An active ban still wins. Set `bouncerLapiFailureAction: passthrough` to keep allowing when a header-scope query fails.
+**LapiDefaultDecisionSeconds** (int64, default `60`)
+`live` only. How long a LAPI answer is cached, at most.
 
-**lapiHost** (string, default `"crowdsec:8080"`)
+**lapiEnabled** (bool, default `false`)
+This middleware connects to LAPI and shares the connection as `lapiInstanceName`.
+
+**LapiHost** (string, default `"crowdsec:8080"`)
 LAPI host and port.
 
-**lapiHttpTimeoutSeconds** (int64, default `10`)
-Timeout in seconds when contacting LAPI. MUST be `>= 1`. Independent of the AppSec and captcha siteverify timeouts.
+**LapiHttpTimeoutSeconds** (int64, default `10`)
+Timeout in seconds when contacting LAPI. Must be at least `1`.
 
-**lapiKey** (string, default `""`)
-LAPI key for the bouncer.
+**LapiInstanceName** (string, default the middleware name)
+Name under which the LAPI connection is shared, or which one to use. See [Middleware Architecture](#middleware-architecture).
 
-**lapiPath** (string, default `"/"`)
-LAPI path, appended to `lapiHost`. A trailing `/` lets API suffixes join cleanly. Other values are accepted and joined as written. `alone` overwrites this to `/`.
+**LapiKey** (string, default `""`)
+Bouncer API key for LAPI.
 
-**lapiScheme** (string, default `http`)
-Expected: `http`, `https`.
+**LapiMetricsUpdateIntervalSeconds** (int64, default `600`)
+Seconds between metrics reports to LAPI. `0` disables metrics. See [LAPI metrics reporting](#lapi-metrics-reporting).
+
+**LapiMode** (string, default `live`)
+`stream`, `live`, `none`, or `alone`. See [LAPI modes](#lapi-modes).
+
+**LapiPath** (string, default `"/"`)
+Path appended to `lapiHost`. Ignored in `alone`.
+
+**LapiRedisDatabase** (string, default `""`)
+Redis database.
+
+**LapiRedisEnabled** (bool, default `false`)
+Use Redis instead of memory for the cache.
+
+**LapiRedisHost** (string, default `"redis:6379"`)
+Redis primary, `host:port`.
+
+**LapiRedisPassword** (string, default `""`)
+Redis password.
+
+**LapiRedisReadHosts** ([]string, default `[]`)
+Redis replicas for reads, used in turn. Defaults to `lapiRedisHost`. Reads do not fall back to the primary, so an outage of the replicas blocks requests (see `bouncerRedisUnreachableBlock`) even if the primary is up.
+
+**LapiScheme** (string, default `http`)
+`http` or `https`.
+
+**LapiStreamScopes** ([]string, default empty)
+Extra decision scopes to download in `stream` (`country`, `as`, …). IP and range decisions are always included. Set it on the middleware that connects to LAPI.
 
 **LapiTLSCertificateAuthority** (string, default `""`)
-PEM CA used to verify LAPI's server certificate. When empty (and `lapiTlsInsecureVerify` is `false`), the host system trust store is used.
+PEM CA that signed LAPI's certificate. Empty uses the system trust store.
 
 **LapiTLSClientCertificate** (string, default `""`)
 PEM client certificate of the bouncer.
@@ -676,102 +779,31 @@ PEM client certificate of the bouncer.
 PEM client private key of the bouncer.
 
 **LapiTLSInsecureVerify** (bool, default `false`)
-Disable verification of the certificate presented by LAPI.
-
-**LapiMode** (string, default `live`)
-Expected: `none`, `live`, `stream`, `alone`. `appsec` is rejected. AppSec-only is `lapiEnabled: false` and `appsecEnabled: true`.
-
-**BouncerDecisionScopeHeaders** (map[string]string, default `{}`)
-Maps a CrowdSec scope name (key) to a request header (value). `Country` (any case) is ISO 3166-1 alpha-2 and ignores `XX`/`T1`; `AS` (any case) is decimal digits and strips a leading `AS`; any other key is a trimmed exact match. Do not map `Ip` or `Range`. Empty disables header scopes. This plugin does not geolocate. See the `bouncerDecisionScopeHeaders` example above.
-
-**LapiDefaultDecisionSeconds** (int64, default `60`)
-`live` only. Maximum decision duration.
-
-**BouncerEnabled** (bool, default `false`)
-This middleware remediates requests. It does not open LAPI, AppSec, or captcha; those are `lapiEnabled`, `appsecEnabled`, and `captchaEnabled`. `false` publishes any owned clients and lets every request through.
-
-**BouncerForwardedHeadersCustomName** (string, default `"X-Forwarded-For"`)
-Header that holds the real client IP. Read only when the socket peer is in `bouncerForwardedHeadersTrustedIps`. That list also skips hops in the header right-to-left; the first value not in the list wins. `X-Real-Ip` is trustworthy only when the front proxy sets it. Traefik's entrypoint deletes `X-Forwarded-*` and `X-Real-Ip` from untrusted peers and only writes `X-Real-Ip` when absent, filling it with the socket peer. Cloudflare sends `CF-Connecting-IP` and `X-Forwarded-For` but not `X-Real-Ip`, so Traefik would fill in the Cloudflare edge and every visitor would be remediated as Cloudflare. Use `X-Real-Ip` with an nginx or HAProxy front that sets it.
-
-**BouncerForwardedHeadersInsecure** (bool, default `false`)
-Skip the socket-peer gate, treat the named header as a single client address with no hop walk, and default the header to `X-Real-Ip` when `bouncerForwardedHeadersCustomName` is still `X-Forwarded-For`. Safe only when the Traefik entrypoint has `forwardedHeaders.trustedIPs` set and is not running with `forwardedHeaders.insecure: true`. Otherwise any client can choose which IP this plugin bans, captchas, and caches.
-
-**BouncerForwardedHeadersTrustedIPs** ([]string, default `[]`)
-IPs of trusted proxies in front of Traefik (for example Cloudflare). The forwarded header is honored only when the connecting peer is in this list. While empty, forwarded headers are ignored and the plugin remediates the connecting address. If Traefik sits behind a load balancer or CDN, list it here or every visitor is remediated as the proxy. Without `bouncerForwardedHeadersInsecure` there is no way to trust every peer. A catch-all `0.0.0.0/0` plus `::/0` passes the peer check but then treats the header value as a trusted hop and falls back to the connecting address with no warning (peer `203.0.113.7`, `X-Real-Ip: 198.51.100.9` resolves to `203.0.113.7`). `0.0.0.0/0` is IPv4 only and `::/0` is IPv6 only. Private ranges `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` are the alternative to enumerating proxies on a private ingress: the peer must be inside a listed range and the real client must not. Verified working: pool `172.16.0.0/12`, peer `172.18.0.5`, `X-Real-Ip: 198.51.100.9` → `198.51.100.9`. Verified failure: pool `10.0.0.0/8`, peer `10.1.2.3`, `X-Real-Ip: 10.9.9.9` → `10.1.2.3`.
-
-**LogFilePath** (string, default `""`)
-File path for logs. Must be writable by Traefik. Rotation may need a Traefik restart.
-
-**LogFormat** (string, default `common`)
-`common` for text logs, `json` for structured JSON. Expected: `common`, `json`.
-
-**LogLevel** (string, default `INFO`)
-Logs go to `stdout` / `stderr`, or to a file if `LogFilePath` is set. Expected: `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`. `TRACE` is for per-request breadcrumbs (`ServeHTTP`, captcha check); `DEBUG` is for startup, stream ticks, and request-path failures.
-
-**LapiMetricsUpdateIntervalSeconds** (int64, default `600`)
-Seconds between metrics updates to CrowdSec. `0` disables collection. A negative value fails startup.
-
-**BouncerOriginBasedDecisionRemap** (map[string]map[string]string, default `{}`)
-Origin-keyed remap of LAPI decision types to a weaker kind at request apply (per Traefik middleware instance). Outer key is the metrics origin (`MetricsOrigin`): `CAPI` is exact; `lists` matches every CrowdSec list; `lists:<name>` matches one list (the decision scenario). Inner key is the original LAPI type (`ban` or `captcha`). Inner value is `captcha` or `pass`. One hop on the original type: `CAPI: {ban: captcha, captcha: pass}` treats a CAPI ban as captcha and does not chain to pass. `pass` skips LAPI remediation (AppSec still runs). The DecisionStore keeps the LAPI kind. Unmapped origins and types keep the LAPI type. Invalid pairs fail configuration validation. Without a captcha provider, applied captcha still renders as ban. Two routers sharing one LAPI Client may disagree.
-
-**LapiRedisDatabase** (string, default `""`)
-Redis database selection.
-
-**LapiRedisEnabled** (bool, default `false`)
-Use Redis instead of in-memory cache.
-
-**LapiRedisHost** (string, default `"redis:6379"`)
-Redis write host (primary), `host:port`.
-
-**LapiRedisPassword** (string, default `""`)
-Redis password.
-
-**LapiRedisReadHosts** ([]string, default `[]`)
-Redis replica hosts for reads (round-robin). Falls back to `lapiRedisHost` when empty. When set, reads are not retried against the primary if replicas are unreachable. With `bouncerRedisUnreachableBlock` at its default (`true`), a replica outage blocks or delays requests even if the primary is healthy.
-
-**BouncerRedisUnreachableBlock** (bool, default `true`)
-When true, a Redis lookup that cannot reach Redis is a ban. When false, that lookup is a pass. The request waits only for the Redis dial and command timeouts.
-
-**ReclaimGraceSeconds** (int64, default `30`)
-Process-wide wait after the last holder of a LAPI or AppSec client, so a Traefik reload can reuse the same incarnation. First `New` in the process sets it; later middlewares are ignored. Zero disposes as soon as the last holder ends. Not captcha cookie grace.
-
-**BouncerRemediationHeadersCustomName** (string, default `""`)
-Response header name when the plugin handles the request. Header value is structured `kind:reason` or `kind:reason:origin` (see [See the verdict in access logs](#see-the-verdict-in-access-logs)). Empty disables the header. Include this header in Traefik `accessLog.fields.headers` if you want disconnects (`error:client-disconnected`) and other remediations in access logs. Operators who matched single-token `ban` / `captcha` / `solved-captcha` / raw AppSec action must update those queries.
-
-**BouncerRemediationStatusCode** (int, default `403`)
-HTTP status for a banned user (not captcha).
-
-**BouncerStartupBlock** (bool, default `true`)
-On the request path, `true` returns **503** while any backend this bouncer subscribes to is not published yet. `false` uses that leg's failure action. `New` never waits. Ready here means the subscribed client is published, not that the first stream poll finished.
-
-**lapiEnabled** (bool, default `false`)
-This middleware owns a LAPI client (`Open` + publish). Bounce still uses `bouncerEnabled`.
-
-**captchaEnabled** (bool, default `false`)
-This middleware owns a captcha client (`Open` + publish). Bounce still uses `bouncerEnabled`. A set `captchaProvider` alone does not own captcha.
-
-**LapiInstanceName** / **AppsecInstanceName** / **CaptchaInstanceName** (string, default Traefik name when that leg is owned)
-Slot name bouncers subscribe to. LAPI, AppSec, and captcha are separate tables, so all three may be `shared`.
-
-**LapiStreamScopes** ([]string, default empty)
-Extra LAPI stream scopes (`country`, `as`, …). Omitted or empty is `ip,range` only. Opener only; not copied from `bouncerDecisionScopeHeaders`.
-
-**BouncerTraceHeadersCustomName** (string, default `""`)
-Request header copied into the ban HTML as `{{ .TraceID }}`. Empty disables it. See [Put a request id on the ban page](#put-a-request-id-on-the-ban-page).
+Do not verify LAPI's certificate. Not for production.
 
 **LapiUpdateIntervalSeconds** (int64, default `60`)
-Seconds between decision fetches in `stream`. In `alone`, startup overwrites this to `7200`.
+Seconds between decision refreshes in `stream`. Fixed to `7200` in `alone`.
 
 **LapiUpdateMaxFailure** (int64, default `0`)
-`stream` and `alone` only. After this many failed polls the stream is unhealthy, and a cache miss uses `bouncerLapiFailureAction`. `0` means the first failure. `-1` never marks the stream unhealthy. Cache hits still apply.
+`stream` and `alone` only. Number of failed refreshes tolerated before `bouncerLapiFailureAction` applies to clients without a known decision. `0` reacts on the first failure; `-1` never. Known decisions keep applying.
+
+**LogFilePath** (string, default `""`)
+Write logs to this file instead of stdout/stderr. Must be writable by Traefik.
+
+**LogFormat** (string, default `common`)
+`common` (text) or `json`.
+
+**LogLevel** (string, default `INFO`)
+`TRACE`, `DEBUG`, `INFO`, `WARN`, or `ERROR`. `TRACE` logs every request; `DEBUG` logs startup, refreshes, and errors.
+
+**ReclaimGraceSeconds** (int64, default `30`)
+How long a LAPI or AppSec connection stays open after no middleware uses it, so a Traefik config reload can reuse it instead of reconnecting. `0` closes it immediately. Only the first value loaded in the Traefik process applies.
 
 ### Configuration
 
-For each plugin, the Traefik static configuration must define the module name (as is usual for Go packages).
+The Traefik static configuration declares the plugin, and the dynamic configuration uses it in a middleware.
 
-The following declaration (given here in YAML) defines a plugin:
-
-> Note that you don't need to copy all thoses settings but only the ones you want to use.  
+> You don't need to copy all these settings, only the ones you want to use.
 > See the examples for advanced usage.
 
 ```yaml
@@ -785,9 +817,9 @@ experimental:
       moduleName: github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
 ```
 
-A catalog `GET` of `github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin` at `v1.7.1` or `vX.Y.Z` returns 404, and plugins.traefik.io does not list forks. Do not use `experimental.plugins` plus a `version` of this module as the working install.
+This fork is not published in the Traefik plugin catalog, so `experimental.plugins` with a `version` does not work. Load it as a local plugin, or compile it into Traefik.
 
-If the host already loads upstream `experimental.plugins.bouncer` (`github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin`), register this fork under a different alias, for example `experimental.localPlugins.crowdsec` and `plugin.crowdsec` in the dynamic YAML. In-tree examples keep alias `bouncer`.
+If you also load the original plugin (`github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin`) as `bouncer`, register this one under another name, for example `experimental.localPlugins.crowdsec` and `plugin.crowdsec` in the dynamic configuration. The examples in this repository use `bouncer`.
 
 ```yaml
 # Simplified dynamic configuration
@@ -816,7 +848,7 @@ http:
           lapiEnabled: true
           lapiHost: crowdsec:8080
           lapiKey: privateKey-foo
-          lapiMode: live
+          lapiMode: stream
           logLevel: DEBUG
 ```
 
@@ -945,7 +977,7 @@ http:
 
 #### Fill variable with value of file
 
-These settings can be the raw value or a file path Traefik can read. When both are set, the file wins.
+These settings accept either the value itself or, with the `File` variant, a path to a file Traefik can read. When both are set, the file wins.
 
 | Content | File |
 | ------- | ---- |
@@ -967,20 +999,18 @@ These settings can be the raw value or a file path Traefik can read. When both a
 
 #### Authenticate with LAPI
 
-You can authenticate to the LAPI either with lapiKey or by using client certificates.  
-Please see below for more details on each option.
+You can authenticate to LAPI either with `lapiKey` or with client certificates. Both options are described below.
 
 #### Generate LAPI KEY
 
-You can generate a crowdsec API key for the LAPI.  
-You can follow the documentation here: [docs.crowdsec.net/docs/user_guides/lapi_mgmt](https://docs.crowdsec.net/docs/user_guides/lapi_mgmt)
+Generate a bouncer API key for LAPI, as described in the [CrowdSec documentation](https://docs.crowdsec.net/docs/user_guides/lapi_mgmt):
 
 ```bash
 docker compose -f docker-compose-local.yml up -d crowdsec
 docker exec crowdsec cscli bouncers add crowdsecBouncer
 ```
 
-This LAPI key must be set where is noted FIXME-LAPI-KEY in the docker-compose.yml
+Set this key where `FIXME-LAPI-KEY` appears in `docker-compose.yml`:
 
 ```yaml
 ..
@@ -996,11 +1026,9 @@ crowdsec:
     BOUNCER_KEY_TRAEFIK: FIXME-LAPI-KEY
 ```
 
-Note:
+> CrowdSec accepts any string as a key, so `FIXME-LAPI-KEY` would work, but use a long random value in practice.
 
-> Crowdsec does not require a specific format for la LAPI-key, you may use something like FIXME-LAPI-KEY but that is not recommanded for obvious reasons
-
-You can then run all the containers:
+Then start all the containers:
 
 ```bash
 docker compose up -d
@@ -1008,29 +1036,25 @@ docker compose up -d
 
 #### Use certificates to authenticate with CrowdSec
 
-You can follow the example in `examples/tls-auth` to view how to authenticate with client certificates with the LAPI.  
-In that case, communications with the LAPI must go through HTTPS.
+See `examples/tls-auth` for client-certificate authentication with LAPI. In that case, LAPI must be reached over HTTPS.
 
-A script is available to generate certificates in `examples/tls-auth/gencerts.sh` and must be in the same directory as the inputs for the PKI creation.
+The script `examples/tls-auth/gencerts.sh` generates the certificates; run it from the directory that holds the PKI input files.
 
 #### Use HTTPS to communicate with the LAPI
 
-Set `lapiScheme` to `https`. The plugin then validates Crowdsec's server certificate. Three options:
+Set `lapiScheme` to `https`. The plugin then verifies CrowdSec's server certificate in one of three ways:
 
-- **Publicly trusted certificate** (e.g. Let's Encrypt behind a reverse proxy): leave `lapiTlsCertificateAuthority` empty and `lapiTlsInsecureVerify` `false`. The plugin falls back to the host's system trust store (the `traefik` image ships `ca-certificates`).
-- **Private/self-signed CA**: set `lapiTlsCertificateAuthority` (or `…File`) to the PEM-encoded CA that signed Crowdsec's server cert.
-- **Skip verification entirely** (not recommended for production): set `lapiTlsInsecureVerify` to `true`.
+- **Publicly trusted certificate** (e.g. Let's Encrypt behind a reverse proxy): leave `lapiTlsCertificateAuthority` empty and `lapiTlsInsecureVerify` `false`. The system trust store is used (the `traefik` image ships `ca-certificates`).
+- **Private or self-signed CA**: set `lapiTlsCertificateAuthority` (or `lapiTlsCertificateAuthorityFile`) to the PEM CA that signed CrowdSec's certificate.
+- **No verification** (not for production): set `lapiTlsInsecureVerify` to `true`.
 
-Crowdsec must be listening in HTTPS for this to work.
-Please see the [tls-auth example](examples/tls-auth/README.md) or the official documentation: [docs.crowdsec.net/docs/local_api/tls_auth/](https://docs.crowdsec.net/docs/local_api/tls_auth/)
+CrowdSec must be listening on HTTPS. See the [tls-auth example](examples/tls-auth/README.md) or the [CrowdSec documentation](https://docs.crowdsec.net/docs/local_api/tls_auth/).
 
 #### Use HTTPS to communicate with the Appsec
 
-Set `appsecScheme` to `https`. An empty `appsecScheme` copies `lapiScheme` at startup; the AppSec client then uses the `appsecTls…` settings, not the LAPI ones.
+Set `appsecScheme` to `https` (if left empty, it follows `lapiScheme`). AppSec uses its own `appsecTls…` settings, with the same three options as LAPI: system trust store, a private CA in `appsecTlsCertificateAuthority`, or `appsecTlsInsecureVerify: true`.
 
-Same three server-certificate options as LAPI: empty CA with verification uses the system trust store, `appsecTlsCertificateAuthority` (or `appsecTlsCertificateAuthorityFile`) pins a private CA, and `appsecTlsInsecureVerify: true` skips verification.
-
-To present a client certificate, set `appsecTlsClientCertificate` and `appsecTlsClientKey` (or the `File` forms). CrowdSec must be configured to accept that certificate.
+To present a client certificate, set `appsecTlsClientCertificate` and `appsecTlsClientKey` (or their `File` variants). CrowdSec must be configured to accept it.
 
 #### Manually add an IP to the blocklist (for testing purposes)
 
@@ -1044,13 +1068,13 @@ docker exec crowdsec cscli decisions remove --ip 10.0.0.10 -t captcha
 
 ### Testing
 
-Mock e2e (Traefik binary + mock LAPI, no Crowdsec):
+Mock end-to-end tests (Traefik binary and a mock LAPI, no CrowdSec):
 
 ```bash
 make e2e_mock
 ```
 
-Real-stack e2e (Docker Traefik + Crowdsec, Pester):
+Real-stack end-to-end tests (Traefik and CrowdSec in Docker, with Pester):
 
 ```bash
 ./tests/e2e/real/Test-Integration.ps1
@@ -1075,12 +1099,8 @@ make e2e_pester
 
 ### Local Mode
 
-Traefik also offers a developer mode that can be used for temporary testing of plugins not hosted on GitHub.
-To use a plugin in local mode, the Traefik static configuration must define the module name (as is usual for Go packages) and a path to a [Go workspace](https://golang.org/doc/gopath_code.html#Workspaces), which can be the local GOPATH or any directory.
-
-The plugins must be placed in the `./plugins-local` directory,
-which should be in the working directory of the process running the Traefik binary.
-The source code of the plugin should be organized as follows:
+Traefik's local plugin mode loads a plugin from disk instead of the plugin catalog.
+The Traefik static configuration declares the module name (see [Configuration](#configuration)), and the sources go in a `./plugins-local` directory inside the working directory of the Traefik process:
 
 ```
 ./plugins-local/
@@ -1096,8 +1116,7 @@ The source code of the plugin should be organized as follows:
                     └── vendor/*
 ```
 
-For local development, a `docker-compose.local.yml` is provided which reproduces the directory layout needed by Traefik.  
-This works once you have generated and filled your _LAPI-KEY_ (lapiKey), if not read above for informations.
+For local development, `docker-compose.local.yml` reproduces this layout. Generate and set your LAPI key first (see [Generate LAPI KEY](#generate-lapi-key)), then run:
 
 ```bash
 docker compose -f docker-compose.local.yml up -d
@@ -1108,4 +1127,3 @@ Equivalent to
 ```bash
 make run_local
 ```
-
