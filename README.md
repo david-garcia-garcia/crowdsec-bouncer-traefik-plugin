@@ -17,7 +17,8 @@ It is a rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github
 - **EU CAPTCHA.** Provider `eucaptcha`.
 - **Captcha passes stored on the visitor.** A solved captcha is remembered with a signed cookie on that browser (optionally tied to its IP). The original plugin whitelisted the IP on the server, so one solve let in every browser behind that address, and multi-instance setups needed Redis to share it.
 - **No Redis needed.** The recommended setup keeps decisions in memory. Redis is only useful for the `live` LAPI mode with several Traefik replicas.
-- **Per-router settings.** Each router keeps its own status code, captcha, trusted IPs, behavior when CrowdSec is down, and can soften specific blocklists (for example, show a captcha instead of a ban for community-list hits). The original plugin shared one set of settings across every CrowdSec middleware in Traefik.
+- **Per-router settings.** Each router keeps its own status code, captcha, trusted IPs, and behavior when CrowdSec is down. The original plugin shared one set of settings across every CrowdSec middleware in Traefik.
+- **Soften a ban per origin with `bouncerOriginBasedDecisionRemap`.** On one router, turn a ban from a chosen origin into a captcha or a pass: the community blocklist, every blocklist, or one named list. Other routers sharing the same LAPI connection keep the original ban. See [Show a community ban as a captcha](#show-a-community-ban-as-a-captcha).
 - **Several CrowdSec engines** in one Traefik, each with its own API key, or several routers sharing one engine. See [Middleware Architecture](#middleware-architecture).
 - **Config reloads apply.** Changing the LAPI host, key, mode, interval, or any other setting takes effect on a Traefik configuration reload. The original plugin kept the first values until Traefik restarted.
 - **IP, IP range, country, ASN, and custom scopes.** The original plugin matched the client IP only.
