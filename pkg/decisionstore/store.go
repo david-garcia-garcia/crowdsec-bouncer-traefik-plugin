@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -59,12 +58,12 @@ func redisEngine(red *redis) engine {
 	}
 }
 
-// Store is one reclaim value: intern table, Range membership, and the decision engine.
+// Store is one reclaim value: Range membership and the decision engine.
+// The memory engine owns the origin and scenario intern tables.
 type Store struct {
 	engine          engine
 	mem             *memory
 	red             *redis
-	origins         *intern.Table
 	rangeMembership atomic.Value // *RangeMembership
 	lastRangeIndex  atomic.Value // string of the blob last used to build membership
 	createdBy       string       // Traefik New name from the create that first put this store
@@ -78,26 +77,22 @@ type Store struct {
 }
 
 // NewMemory is in-process COW slots and an in-process Range blob.
-func NewMemory(log *slog.Logger) *Store {
-	origins := intern.New()
-	mem := newMemory(log, origins)
+func NewMemory(_ *slog.Logger) *Store {
+	mem := newMemory()
 	return &Store{
 		engine:     memoryEngine(mem),
 		mem:        mem,
-		origins:    origins,
 		engineName: "memory",
 	}
 }
 
 // NewRedis stores Ip, header-scope, and Range on Redis (keyPrefix namespaces keys).
-// intern stays in-process (no Redis intern table). ActiveCounts is always empty.
+// Redis values are text. ActiveCounts is always empty.
 func NewRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string) *Store {
-	origins := intern.New()
 	red := newRedis(log, writeHost, readHosts, pass, database, keyPrefix)
 	return &Store{
 		engine:     redisEngine(red),
 		red:        red,
-		origins:    origins,
 		engineName: "redis",
 	}
 }
@@ -269,18 +264,45 @@ func (s *Store) HydrateRange() {
 }
 
 // OriginID appends an origin name for metrics. Empty name is id 0. Overflow does not wrap.
+// A Redis store has no intern table and returns 0, false.
 func (s *Store) OriginID(name string) (uint16, bool) {
-	return s.origins.ID(name)
+	if s.mem == nil {
+		return 0, false
+	}
+	return s.mem.origins.ID(name)
 }
 
 // OriginName is the interned origin for id. Unknown id is empty.
+// A Redis store has no intern table and returns empty.
 func (s *Store) OriginName(id uint16) string {
-	return s.origins.Name(id)
+	if s.mem == nil {
+		return ""
+	}
+	return s.mem.origins.Name(id)
 }
 
-// FillUntilMaxForTest fills the intern table so the next OriginID overflows. Tests only.
+// ScenarioNameForTest is the interned raw LAPI scenario for id. Unknown id is empty. Tests only.
+func (s *Store) ScenarioNameForTest(id uint16) string {
+	if s.mem == nil {
+		return ""
+	}
+	return s.mem.scenarios.Name(id)
+}
+
+// FillUntilMaxForTest fills the origin intern table so the next OriginID overflows. Tests only.
 func (s *Store) FillUntilMaxForTest() {
-	s.origins.FillUntilMaxForTest()
+	if s.mem == nil {
+		return
+	}
+	s.mem.origins.FillUntilMaxForTest()
+}
+
+// FillScenarioUntilMaxForTest fills the scenario intern table so the next scenario ID overflows. Tests only.
+func (s *Store) FillScenarioUntilMaxForTest() {
+	if s.mem == nil {
+		return
+	}
+	s.mem.scenarios.FillUntilMaxForTest()
 }
 
 // SeedSlotForTest publishes one memory slot without a tick. Redis Put goes to Redis.
@@ -298,4 +320,9 @@ func (s *Store) PublishedMemoryMapForTest() map[string]LiveSlot {
 		return nil
 	}
 	return s.mem.publishedMap()
+}
+
+// PackedScenarioIDForTest is bits 16-31 of a memory word. Tests only.
+func PackedScenarioIDForTest(word uint32) uint16 {
+	return unpackScenarioID(word)
 }

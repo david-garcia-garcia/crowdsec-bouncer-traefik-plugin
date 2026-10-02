@@ -1,13 +1,11 @@
 package decisionstore
 
 import (
-	"log/slog"
 	"net"
 	"sync"
 	"sync/atomic"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
 // publishedSlots is one immutable lookup map. atomic.Value stores *publishedSlots, not the map (Yaegi).
@@ -17,8 +15,8 @@ type publishedSlots struct {
 
 // memory is in-process COW tick/published LiveSlot maps plus the Range blob.
 type memory struct {
-	log        *slog.Logger
 	origins    *intern.Table            // origin name → id packed into LiveSlot.Word
+	scenarios  *intern.Table            // raw LAPI scenario → id packed into LiveSlot.Word
 	mu         sync.RWMutex             // tick, ticking, rangeIndex, active; not lookup
 	ticking    bool                     // stream window: PutMany/DeleteMany write tick; Lookup reads published
 	tick       map[string]LiveSlot      // unpublished clone; SlotKey → packed word + elapsed expiry
@@ -27,13 +25,13 @@ type memory struct {
 	rangeIndex string                   // Range CIDR=kind blob; membership is rebuilt from this
 }
 
-// newMemory allocates non-nil tick and an empty published snapshot.
-func newMemory(log *slog.Logger, origins *intern.Table) *memory {
+// newMemory allocates the intern tables, a non-nil tick, and an empty published snapshot.
+func newMemory() *memory {
 	mem := &memory{
-		log:     log,
-		origins: origins,
-		tick:    map[string]LiveSlot{},
-		active:  map[ActiveCountKey]int64{},
+		origins:   intern.New(),
+		scenarios: intern.New(),
+		tick:      map[string]LiveSlot{},
+		active:    map[ActiveCountKey]int64{},
 	}
 	mem.storePublished(map[string]LiveSlot{})
 	return mem
@@ -115,28 +113,13 @@ func (m *memory) PutMany(items []Decision) {
 	m.storePublished(next)
 }
 
-// putSlot writes one decision into slots. Intern overflow logs Warn and packs origin id 0.
+// putSlot writes one decision into slots.
 func (m *memory) putSlot(slots map[string]LiveSlot, item Decision) {
 	key, _ := slotKeys(item.Scope, item.Value)
 	if key == "" {
 		return
 	}
-	slots[key] = LiveSlotFromPack(m.pack(item.Kind, item.Origin, item.Value), item.DurationSec)
-}
-
-// pack encodes kind, intern origin id, and FamilyOfHostOrCIDR(value) into one uint32.
-// Intern overflow Warns and packs origin id 0; family is still packed.
-func (m *memory) pack(kind, origin, value string) uint32 {
-	family := ip.FamilyOfHostOrCIDR(value)
-	if m.origins != nil {
-		if originID, ok := m.origins.ID(origin); ok {
-			return packWord(kind, originID, family)
-		}
-		if m.log != nil {
-			m.log.Warn("decisionstore:intern overflow", "kind", kind, "origin", origin)
-		}
-	}
-	return packWord(kind, 0, family)
+	slots[key] = LiveSlotFromPack(m.packToWord(lookupHit{kind: item.Kind, origin: item.Origin, scenario: item.Scenario}, item.Value), item.DurationSec)
 }
 
 // DeleteMany drops canonical slots and prior Ip spellings from tick or the published map.
@@ -193,15 +176,12 @@ func (m *memory) activeCounts() map[ActiveCountKey]int64 {
 func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (kind string, origin string, originID uint16, err error) {
 	slots := m.publishedMapValue()
 	now := elapsedNow()
-	kind, origin, originID = lookupHits(func(key string) any {
+	kind, origin = lookupHits(func(key string) lookupHit {
 		slot, ok := slots[key]
-		if !ok {
-			return nil
+		if !ok || (slot.ExpiresAt > 0 && slot.ExpiresAt <= now) {
+			return lookupHit{}
 		}
-		if slot.ExpiresAt > 0 && slot.ExpiresAt <= now {
-			return nil
-		}
-		return slot.Word
+		return m.unpackFromWord(slot.Word)
 	}, remoteIP, ipAddr, scopes, membership)
 	return kind, origin, originID, nil
 }

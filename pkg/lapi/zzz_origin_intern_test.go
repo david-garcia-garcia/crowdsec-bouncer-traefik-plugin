@@ -17,9 +17,9 @@ func TestPackUsesInternOnMemoryStore(t *testing.T) {
 	store.BeginTick()
 	store.Put(decisionstore.Decision{Scope: decisionscope.ScopeIP, Value: "k", Kind: decisionscope.BannedValue, Origin: "crowdsec", DurationSec: 60})
 	store.PublishTick(0)
-	kind, _, originID, err := store.LookupRemediation("k", nil, nil)
-	if err != nil || kind != decisionscope.BannedValue || store.OriginName(originID) != "crowdsec" {
-		t.Fatalf("kind %q origin %q err %v", kind, store.OriginName(originID), err)
+	kind, origin, _, err := store.LookupRemediation("k", nil, nil)
+	if err != nil || kind != decisionscope.BannedValue || origin != "crowdsec" {
+		t.Fatalf("kind %q origin %q err %v", kind, origin, err)
 	}
 }
 
@@ -37,11 +37,15 @@ func TestStoreStreamDecisionPacksMemory(t *testing.T) {
 	store := newTestInternStore()
 	client := &Client{decisionStore: store, log: logger.New("ERROR", "")}
 	store.BeginTick()
-	client.storeStreamDecision(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.10", Origin: "crowdsec"}, 60)
+	client.storeStreamDecision(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.10", Origin: "crowdsec", Scenario: "ssh-bf"}, 60)
 	store.PublishTick(0)
-	kind, _, originID, err := store.LookupRemediation("203.0.113.10", nil, nil)
-	if err != nil || kind != decisionscope.BannedValue || store.OriginName(originID) != "crowdsec" {
-		t.Fatalf("kind %q origin %q err %v", kind, store.OriginName(originID), err)
+	kind, origin, _, err := store.LookupRemediation("203.0.113.10", nil, nil)
+	if err != nil || kind != decisionscope.BannedValue || origin != "crowdsec" {
+		t.Fatalf("kind %q origin %q err %v", kind, origin, err)
+	}
+	slot, ok := store.PublishedMemoryMapForTest()["203.0.113.10"]
+	if !ok || store.ScenarioNameForTest(decisionstore.PackedScenarioIDForTest(slot.Word)) != "ssh-bf" {
+		t.Fatalf("scenario %q", store.ScenarioNameForTest(decisionstore.PackedScenarioIDForTest(slot.Word)))
 	}
 }
 
@@ -65,6 +69,20 @@ func TestActiveDecisionDeleteOmitsGauge(t *testing.T) {
 		if item["name"] == "active_decisions" {
 			t.Fatalf("deleted slot still posted %#v", item)
 		}
+	}
+}
+
+func TestMemoLivePutsScenario(t *testing.T) {
+	store := newTestInternStore()
+	client := &Client{decisionStore: store, log: logger.New("ERROR", "")}
+	client.memoLive(decisionscope.ScopeIP, "203.0.113.10", decisionscope.BannedValue, "crowdsec", "ssh-bf", 60)
+	kind, origin, _, err := store.LookupRemediation("203.0.113.10", nil, nil)
+	if err != nil || kind != decisionscope.BannedValue || origin != "crowdsec" {
+		t.Fatalf("kind %q origin %q err %v", kind, origin, err)
+	}
+	slot, ok := store.PublishedMemoryMapForTest()["203.0.113.10"]
+	if !ok || store.ScenarioNameForTest(decisionstore.PackedScenarioIDForTest(slot.Word)) != "ssh-bf" {
+		t.Fatalf("scenario %q", store.ScenarioNameForTest(decisionstore.PackedScenarioIDForTest(slot.Word)))
 	}
 }
 

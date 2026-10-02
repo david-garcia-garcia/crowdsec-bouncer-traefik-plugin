@@ -6,60 +6,46 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
-// lookupHit is one Ip, header, or Range candidate while merging ban over captcha.
+// lookupHit is the decision both encodings pack and unpack: kind, origin name, scenario name.
 type lookupHit struct {
-	stored   string
+	kind     string
 	origin   string
-	originID uint16
+	scenario string
 }
 
-// mergeLookupHit keeps ban over captcha and remembers the winner's origin name or packed id.
+// mergeLookupHit keeps ban over captcha and remembers the winner's origin name.
 func mergeLookupHit(chosen lookupHit, incoming lookupHit) lookupHit {
-	if incoming.stored == "" {
+	if incoming.kind == "" {
 		return chosen
 	}
-	next := decisionscope.PreferRemediation(chosen.stored, incoming.stored)
-	if next == chosen.stored {
+	next := decisionscope.PreferRemediation(chosen.kind, incoming.kind)
+	if next == chosen.kind {
 		return chosen
 	}
 	return incoming
 }
 
-// hitFromPayload unpacks a packed word or a kind+origin string.
-func hitFromPayload(payload any) lookupHit {
-	if payload == nil {
-		return lookupHit{}
-	}
-	kind, origin, originID := Unpack(payload)
-	payloadTyped, isString := payload.(string)
-	stored := kind
-	if isString {
-		stored = payloadTyped
-	}
-	return lookupHit{stored: stored, origin: origin, originID: originID}
-}
-
 // lookupHits merges Ip, present header scopes, and Range. Ban on Ip skips Range membership.
-// payloadForKey returns a packed word, kind+origin string, or nil when the key is absent. Empty kind is a miss.
-func lookupHits(payloadForKey func(string) any, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, uint16) {
-	if payloadForKey == nil {
-		payloadForKey = func(string) any { return nil }
+// hitForKey returns the unpacked slot. A zero hit is a miss.
+func lookupHits(hitForKey func(string) lookupHit, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string) {
+	if hitForKey == nil {
+		hitForKey = func(string) lookupHit { return lookupHit{} }
 	}
 	var chosen lookupHit
-	chosen = mergeLookupHit(chosen, hitFromPayload(payloadForKey(remoteIP)))
+	chosen = mergeLookupHit(chosen, hitForKey(remoteIP))
 	for scope, identifier := range scopes {
 		if identifier == "" {
 			continue
 		}
-		chosen = mergeLookupHit(chosen, hitFromPayload(payloadForKey(HeaderScopeKey(scope, identifier))))
+		chosen = mergeLookupHit(chosen, hitForKey(HeaderScopeKey(scope, identifier)))
 	}
-	if membership != nil && decisionscope.RemediationKind(chosen.stored) != decisionscope.BannedValue {
-		chosen = mergeLookupHit(chosen, hitFromPayload(membership.Remediation(ipAddr)))
+	if membership != nil && decisionscope.RemediationKind(chosen.kind) != decisionscope.BannedValue {
+		chosen = mergeLookupHit(chosen, unpackFromString(membership.Remediation(ipAddr)))
 	}
-	if chosen.stored == "" {
-		return "", "", 0
+	if chosen.kind == "" {
+		return "", ""
 	}
-	return decisionscope.RemediationKind(chosen.stored), chosen.origin, chosen.originID
+	return decisionscope.RemediationKind(chosen.kind), chosen.origin
 }
 
 // lookupKeys is the IP and present header-scope keys lookupHits reads. Range is membership, not a slot.

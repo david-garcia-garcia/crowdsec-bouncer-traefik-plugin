@@ -48,9 +48,9 @@ func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, 
 	// A clean IP result is not written when a header query failed (fail-closed).
 	if isLiveMode && defaultDecisionSeconds > 0 {
 		if decisionscope.IsActiveRemediation(ipResult.kind) {
-			c.memoLive(decisionscope.ScopeIP, remoteIP, ipResult.kind, ipResult.origin, liveCacheTTL(ipResult.duration, defaultDecisionSeconds))
+			c.memoLive(decisionscope.ScopeIP, remoteIP, ipResult.kind, ipResult.origin, ipResult.scenario, liveCacheTTL(ipResult.duration, defaultDecisionSeconds))
 		} else if scopeErr == nil {
-			c.memoLive(decisionscope.ScopeIP, remoteIP, decisionscope.NoBannedValue, "", defaultDecisionSeconds)
+			c.memoLive(decisionscope.ScopeIP, remoteIP, decisionscope.NoBannedValue, "", "", defaultDecisionSeconds)
 		}
 	}
 	// An active remediation is a real decision, so it outranks a scope failure and comes back with

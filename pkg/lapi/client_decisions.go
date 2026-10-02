@@ -57,7 +57,7 @@ func (c *Client) streamPutItem(item Decision, duration int64) (decisionstore.Dec
 		return decisionstore.Decision{}, false
 	}
 	return decisionstore.Decision{
-		Scope: scope, Value: item.Value, Kind: kind, Origin: origin, DurationSec: duration,
+		Scope: scope, Value: item.Value, Kind: kind, Origin: origin, Scenario: item.Scenario, DurationSec: duration,
 	}, true
 }
 
@@ -118,18 +118,20 @@ func (c *Client) queryLiveDecisions(rawQuery string) (liveResult, error) {
 	return liveResult{
 		kind:     kind,
 		origin:   origin,
+		scenario: picked.Scenario,
 		duration: parsedDuration,
 	}, nil
 }
 
-// liveResult is one live/none LAPI query: kind, metrics origin, and decision TTL.
+// liveResult is one live/none LAPI query: kind, metrics origin, raw scenario, and decision TTL.
 type liveResult struct {
 	kind     string
 	origin   string
+	scenario string
 	duration time.Duration
 }
 
-// preferLiveResult keeps ban over captcha over empty and the winner's origin and duration.
+// preferLiveResult keeps ban over captcha over empty and the winner's origin, scenario, and duration.
 func preferLiveResult(current, incoming liveResult) liveResult {
 	if decisionscope.PreferRemediation(current.kind, incoming.kind) != current.kind {
 		return incoming
@@ -186,19 +188,19 @@ func (c *Client) cacheLiveScope(scope, identifier string, result liveResult, isL
 		return
 	}
 	if !decisionscope.IsActiveRemediation(result.kind) {
-		c.memoLive(scope, identifier, decisionscope.NoBannedValue, "", defaultDecisionSeconds)
+		c.memoLive(scope, identifier, decisionscope.NoBannedValue, "", "", defaultDecisionSeconds)
 		return
 	}
-	c.memoLive(scope, identifier, result.kind, result.origin, liveCacheTTL(result.duration, defaultDecisionSeconds))
+	c.memoLive(scope, identifier, result.kind, result.origin, result.scenario, liveCacheTTL(result.duration, defaultDecisionSeconds))
 }
 
 // memoLive writes a live/none TTL slot through the decision store.
-func (c *Client) memoLive(scope, value, kind, origin string, durationSec int64) {
+func (c *Client) memoLive(scope, value, kind, origin, scenario string, durationSec int64) {
 	if c == nil || c.decisionStore == nil {
 		return
 	}
 	c.decisionStore.Put(decisionstore.Decision{
-		Scope: scope, Value: value, Kind: kind, Origin: origin, DurationSec: durationSec,
+		Scope: scope, Value: value, Kind: kind, Origin: origin, Scenario: scenario, DurationSec: durationSec,
 	})
 }
 

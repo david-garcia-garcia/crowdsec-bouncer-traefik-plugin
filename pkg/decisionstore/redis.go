@@ -32,7 +32,10 @@ type redis struct {
 
 // newRedis dials the writer and optional readers via simpleredis.New.
 func newRedis(log *slog.Logger, writeHost string, readHosts []string, pass, database, keyPrefix string) *redis {
-	red := &redis{log: log, prefix: keyPrefix}
+	red := &redis{
+		log:    log,
+		prefix: keyPrefix,
+	}
 	writer, err := simpleredis.New(redisClientConfig(writeHost, pass, database, log))
 	if err != nil {
 		if log != nil {
@@ -183,7 +186,7 @@ func (r *redis) PutMany(items []Decision) {
 		}
 		ttl := item.DurationSec
 		namesByTTL[ttl] = append(namesByTTL[ttl], prefixed(r.prefix, key))
-		valuesByTTL[ttl] = append(valuesByTTL[ttl], []byte(KindOriginString(item.Kind, item.Origin)))
+		valuesByTTL[ttl] = append(valuesByTTL[ttl], []byte(packToString(lookupHit{kind: item.Kind, origin: item.Origin, scenario: item.Scenario})))
 	}
 	for ttl, names := range namesByTTL {
 		r.msetexGrouped(names, valuesByTTL[ttl], ttl)
@@ -236,12 +239,12 @@ func (r *redis) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[str
 	if err != nil {
 		return "", "", 0, err
 	}
-	kind, origin, originID = lookupHits(func(key string) any {
+	kind, origin = lookupHits(func(key string) lookupHit {
 		value, ok := found[key]
 		if !ok || value == "" {
-			return nil
+			return lookupHit{}
 		}
-		return value
+		return unpackFromString(value)
 	}, remoteIP, ipAddr, scopes, membership)
 	return kind, origin, originID, nil
 }

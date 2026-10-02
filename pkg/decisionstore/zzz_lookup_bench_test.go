@@ -25,10 +25,9 @@ func BenchmarkLookupStreamMiss_100kSeq(b *testing.B) {
 	get := benchSnapshotGet(snapshot)
 	b.ResetTimer()
 	for range b.N {
-		kind, origin, originID := lookupHits(get, remoteIP, ipAddr, scopes, membership)
+		kind, origin := lookupHits(get, remoteIP, ipAddr, scopes, membership)
 		_ = kind
 		_ = origin
-		_ = originID
 	}
 }
 
@@ -40,10 +39,9 @@ func BenchmarkLookupStreamMiss_100kParallel(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			kind, origin, originID := lookupHits(get, remoteIP, ipAddr, scopes, membership)
+			kind, origin := lookupHits(get, remoteIP, ipAddr, scopes, membership)
 			_ = kind
 			_ = origin
-			_ = originID
 		}
 	})
 }
@@ -63,16 +61,17 @@ func benchLiveSnapshot(b *testing.B) map[string]LiveSlot {
 func benchPackedBan() uint32 {
 	table := intern.New()
 	originID, _ := table.ID("o")
-	return packWord(decisionscope.BannedValue, originID, "ipv4")
+	return packWord(decisionscope.BannedValue, originID, "ipv4", 0)
 }
 
-func benchSnapshotGet(snapshot map[string]LiveSlot) func(string) any {
-	return func(key string) any {
+func benchSnapshotGet(snapshot map[string]LiveSlot) func(string) lookupHit {
+	return func(key string) lookupHit {
 		slot, ok := snapshot[key]
 		if !ok {
-			return nil
+			return lookupHit{}
 		}
-		return slot.Word
+		slotKind := unpackKindCode(slot.Word & packedKindMask)
+		return lookupHit{kind: slotKind, origin: "o"}
 	}
 }
 
@@ -94,7 +93,7 @@ func BenchmarkHeapRetained_LiveMap100k(b *testing.B) {
 		snapshot := make(map[string]LiveSlot, benchLiveEntries)
 		for n := range benchLiveEntries {
 			key := fmt.Sprintf("10.%d.%d.%d", n>>16&0xff, n>>8&0xff, n&0xff)
-			snapshot[key] = LiveSlot{Word: packWord(decisionscope.BannedValue, 1, "ipv4"), ExpiresAt: math.MaxInt32}
+			snapshot[key] = LiveSlot{Word: packWord(decisionscope.BannedValue, 1, "ipv4", 0), ExpiresAt: math.MaxInt32}
 		}
 		b.SetBytes(int64(len(snapshot)) * 68)
 	}

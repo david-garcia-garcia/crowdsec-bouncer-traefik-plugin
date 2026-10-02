@@ -22,6 +22,25 @@ func TestStreamPutItemStoresLAPIKind(t *testing.T) {
 	}
 }
 
+func TestStreamPutItemCopiesScenario(t *testing.T) {
+	client, _ := NewTestClient(logger.New("ERROR", ""))
+	stored, ok := client.streamPutItem(Decision{
+		Type: "ban", Scope: "ip", Value: "203.0.113.10", Origin: "lists", Scenario: "firehol_level1",
+	}, 60)
+	if !ok || stored.Origin != "lists:firehol_level1" || stored.Scenario != "firehol_level1" {
+		t.Fatalf("lists must intern twice on the stored decision, got %#v ok=%v", stored, ok)
+	}
+}
+
+func TestPreferLiveResultKeepsWinnerScenario(t *testing.T) {
+	ban := liveResult{kind: decisionscope.BannedValue, origin: "crowdsec", scenario: "ssh-bf"}
+	captcha := liveResult{kind: decisionscope.CaptchaValue, origin: "cscli", scenario: "http-probing"}
+	got := preferLiveResult(captcha, ban)
+	if got.scenario != "ssh-bf" || got.origin != "crowdsec" || got.kind != decisionscope.BannedValue {
+		t.Fatalf("%#v", got)
+	}
+}
+
 func TestHandleStreamCacheRangeStoresLAPIKind(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		if _, err := rw.Write([]byte(`{"new":[{"id":1,"origin":"CAPI","type":"ban","scope":"Range","value":"10.0.0.0/8","duration":"1h","scenario":"scan"}],"deleted":[]}`)); err != nil {

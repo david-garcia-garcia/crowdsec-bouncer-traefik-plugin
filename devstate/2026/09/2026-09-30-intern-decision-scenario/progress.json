@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-09-30-intern-decision-scenario",
+  "jobName": "2026-09-30-intern-decision-scenario",
+  "startedAt": "2026-09-30T17:58:14.388Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-30T18:03:06.241Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-30T18:10:02.145Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-30T18:19:38.561Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-30T18:46:11.966Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-30T19:19:44.790Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-30T19:38:31.535Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-30T19:59:00.641Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-30T20:08:41.932Z"
+    }
+  }
+}

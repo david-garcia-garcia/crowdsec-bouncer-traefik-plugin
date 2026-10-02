@@ -5,34 +5,33 @@ import (
 	"testing"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 )
 
 func TestLookupHitsHeaderScope(t *testing.T) {
-	payloads := map[string]any{HeaderScopeKey(decisionscope.ScopeCountry, "FR"): decisionscope.BannedValue}
-	kind, _, _ := lookupHits(func(key string) any { return payloads[key] }, "203.0.113.10", net.ParseIP("203.0.113.10"), map[string]string{decisionscope.ScopeCountry: "FR"}, nil)
+	hits := map[string]lookupHit{HeaderScopeKey(decisionscope.ScopeCountry, "FR"): {kind: decisionscope.BannedValue}}
+	kind, _ := lookupHits(func(key string) lookupHit { return hits[key] }, "203.0.113.10", net.ParseIP("203.0.113.10"), map[string]string{decisionscope.ScopeCountry: "FR"}, nil)
 	if kind != decisionscope.BannedValue {
 		t.Fatalf("kind %q, want ban", kind)
 	}
 }
 
 func TestLookupHitsMiss(t *testing.T) {
-	kind, origin, originID := lookupHits(func(string) any { return nil }, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
-	if kind != "" || origin != "" || originID != 0 {
-		t.Fatalf("miss kind %q origin %q id %d", kind, origin, originID)
+	kind, origin := lookupHits(func(string) lookupHit { return lookupHit{} }, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
+	if kind != "" || origin != "" {
+		t.Fatalf("miss kind %q origin %q", kind, origin)
 	}
 }
 
 func TestLookupHitsBanWinsAcrossScopes(t *testing.T) {
-	payloads := map[string]any{HeaderScopeKey(decisionscope.ScopeCountry, "FR"): decisionscope.BannedValue}
-	kind, _, _ := lookupHits(func(key string) any { return payloads[key] }, "10.1.2.3", net.ParseIP("10.1.2.3"), map[string]string{decisionscope.ScopeCountry: "FR"}, MembershipFromIndex("10.0.0.0/8="+decisionscope.CaptchaValue))
+	hits := map[string]lookupHit{HeaderScopeKey(decisionscope.ScopeCountry, "FR"): {kind: decisionscope.BannedValue}}
+	kind, _ := lookupHits(func(key string) lookupHit { return hits[key] }, "10.1.2.3", net.ParseIP("10.1.2.3"), map[string]string{decisionscope.ScopeCountry: "FR"}, MembershipFromIndex("10.0.0.0/8="+decisionscope.CaptchaValue))
 	if kind != decisionscope.BannedValue {
 		t.Fatalf("range captcha + country ban kind %q, want ban", kind)
 	}
 }
 
 func TestLookupHitsNilMembershipDoesNotReadBlob(t *testing.T) {
-	kind, _, _ := lookupHits(func(string) any { return nil }, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, nil)
+	kind, _ := lookupHits(func(string) lookupHit { return lookupHit{} }, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, nil)
 	if kind != "" {
 		t.Fatalf("nil membership must miss, kind %q", kind)
 	}
@@ -40,32 +39,20 @@ func TestLookupHitsNilMembershipDoesNotReadBlob(t *testing.T) {
 
 func TestLookupHitsMembershipNotSlot(t *testing.T) {
 	banOnly := MembershipFromIndex("10.0.0.0/8=" + decisionscope.BannedValue)
-	kind, _, _ := lookupHits(func(string) any { return nil }, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, banOnly)
+	kind, _ := lookupHits(func(string) lookupHit { return lookupHit{} }, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, banOnly)
 	if kind != decisionscope.BannedValue {
 		t.Fatalf("membership must win, kind %q", kind)
 	}
-	miss, origin, originID := lookupHits(func(string) any { return nil }, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, MembershipFromIndex(""))
-	if miss != "" || origin != "" || originID != 0 {
-		t.Fatalf("empty membership must miss, got %q origin %q id %d", miss, origin, originID)
-	}
-}
-
-func TestLookupHitsPackedWord(t *testing.T) {
-	table := intern.New()
-	originID, ok := table.ID("crowdsec")
-	if !ok {
-		t.Fatal("intern crowdsec")
-	}
-	payloads := map[string]any{"203.0.113.10": packWord(decisionscope.BannedValue, originID, "ipv4")}
-	kind, origin, unpackedID := lookupHits(func(key string) any { return payloads[key] }, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
-	if kind != decisionscope.BannedValue || origin != "" || unpackedID != originID {
-		t.Fatalf("kind %q origin %q id %d, want id %d", kind, origin, unpackedID, originID)
+	miss, origin := lookupHits(func(string) lookupHit { return lookupHit{} }, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, MembershipFromIndex(""))
+	if miss != "" || origin != "" {
+		t.Fatalf("empty membership must miss, got %q origin %q", miss, origin)
 	}
 }
 
 func TestLookupHitsOriginSuffix(t *testing.T) {
-	payloads := map[string]any{"203.0.113.10": KindOriginString(decisionscope.BannedValue, "crowdsec")}
-	kind, origin, _ := lookupHits(func(key string) any { return payloads[key] }, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
+	hit := unpackFromString(KindOriginString(decisionscope.BannedValue, "crowdsec"))
+	hits := map[string]lookupHit{"203.0.113.10": hit}
+	kind, origin := lookupHits(func(key string) lookupHit { return hits[key] }, "203.0.113.10", net.ParseIP("203.0.113.10"), nil, nil)
 	if kind != decisionscope.BannedValue || origin != "crowdsec" {
 		t.Fatalf("kind %q origin %q", kind, origin)
 	}
@@ -73,14 +60,14 @@ func TestLookupHitsOriginSuffix(t *testing.T) {
 
 func TestLookupHitsRangeOnlyOrigin(t *testing.T) {
 	stored := KindOriginString(decisionscope.BannedValue, "crowdsec")
-	kind, origin, _ := lookupHits(func(string) any { return nil }, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, MembershipFromIndex("10.0.0.0/8="+stored))
+	kind, origin := lookupHits(func(string) lookupHit { return lookupHit{} }, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, MembershipFromIndex("10.0.0.0/8="+stored))
 	if kind != decisionscope.BannedValue || origin != "crowdsec" {
 		t.Fatalf("kind %q origin %q", kind, origin)
 	}
 }
 
 func TestLookupHitsRangeLetterOnlyStillBans(t *testing.T) {
-	kind, origin, _ := lookupHits(func(string) any { return nil }, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, MembershipFromIndex("10.0.0.0/8="+decisionscope.BannedValue))
+	kind, origin := lookupHits(func(string) lookupHit { return lookupHit{} }, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, MembershipFromIndex("10.0.0.0/8="+decisionscope.BannedValue))
 	if kind != decisionscope.BannedValue || origin != "" {
 		t.Fatalf("letter-only kind %q origin %q", kind, origin)
 	}

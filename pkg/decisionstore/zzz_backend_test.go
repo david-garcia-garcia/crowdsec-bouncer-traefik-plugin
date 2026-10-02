@@ -218,17 +218,14 @@ func checkPutRangeScopeIsIgnored(t *testing.T, store *Store) {
 }
 
 // lookupRemediation is Store.LookupRemediation the way ServeHTTP does: remoteIP is ipAddr.String().
-// Packed intern ids and Redis kind+origin strings resolve to the same origin name.
+// Memory and Redis both return the origin name.
 func lookupRemediation(store *Store, remoteIP string, scopes map[string]string) (string, string, error) {
 	ipAddr := net.ParseIP(remoteIP)
 	if ipAddr != nil {
 		remoteIP = ipAddr.String()
 	}
-	kind, originName, originID, err := store.LookupRemediation(remoteIP, ipAddr, scopes)
-	if originID != 0 {
-		return kind, store.OriginName(originID), err
-	}
-	return kind, originName, err
+	kind, origin, _, err := store.LookupRemediation(remoteIP, ipAddr, scopes)
+	return kind, origin, err
 }
 
 func mustKind(t *testing.T, store *Store, remoteIP string, scopes map[string]string, wantKind, wantOrigin string) {
