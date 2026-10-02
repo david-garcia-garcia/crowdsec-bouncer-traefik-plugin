@@ -22,6 +22,7 @@ It is a rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github
 - **Config reloads apply.** Changing the LAPI host, key, mode, interval, or any other setting takes effect on a Traefik configuration reload. The original plugin kept the first values until Traefik restarted.
 - **IP, IP range, country, ASN, and custom scopes.** The original plugin matched the client IP only.
 - **AppSec independent of the LAPI mode.** A router can run the WAF, the decision lookup, or both.
+- **Permanent rules with `bouncerActionRules`.** Ban, captcha, or skip checks for requests matching a path, host, method, header, or cookie, without any CrowdSec decision. For example, always show a captcha to a whole country or region by matching a country header such as `CF-IPCountry`. See [BouncerActionRules](#variables).
 
 > [!TIP]
 >
@@ -668,6 +669,10 @@ bouncerActionRules:
     method: "^POST$"
     path: "^/upload/"
     action: [bypassAppsec]
+  - name: captcha-some-countries
+    headers:
+      CF-IPCountry: "^(CN|RU|KP)$"
+    action: [captcha]
 ```
 
 **BouncerAppsecFailureAction** (string, default `ban`)
