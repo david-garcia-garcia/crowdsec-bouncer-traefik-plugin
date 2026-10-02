@@ -22,7 +22,7 @@ It is a rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github
 - **Config reloads apply.** Changing the LAPI host, key, mode, interval, or any other setting takes effect on a Traefik configuration reload. The original plugin kept the first values until Traefik restarted.
 - **IP, IP range, country, ASN, and custom scopes.** The original plugin matched the client IP only.
 - **AppSec independent of the LAPI mode.** A router can run the WAF, the decision lookup, or both.
-- **Permanent rules with `bouncerActionRules`.** Ban, captcha, or skip checks for requests matching a path, host, method, header, or cookie, without any CrowdSec decision. For example, always show a captcha to a whole country or region by matching a country header such as `CF-IPCountry`. See [BouncerActionRules](#variables).
+- **Permanent rules with `bouncerActionRules`.** Ban, captcha, or skip checks for requests matching a path, host, method, header, or cookie, without any CrowdSec decision. For example, always show a captcha to a whole country or region by matching a country header such as `CF-IPCountry`, or skip all checks for a specific host. See [BouncerActionRules](#variables).
 - **Detailed verdict header.** `bouncerRemediationHeadersCustomName` now tells not only what was done (ban or captcha) but why and from where: a CrowdSec decision and its origin (`ban:lapi:CAPI`, `ban:lapi:lists_firehol_level1`), AppSec, a rule, or an outage of LAPI or AppSec. Add it to your access logs to trace every blocked request back to its cause. The original plugin only sent `ban` or `captcha`. See [See the verdict in access logs](#see-the-verdict-in-access-logs).
 
 > [!TIP]
@@ -670,6 +670,9 @@ bouncerActionRules:
     method: "^POST$"
     path: "^/upload/"
     action: [bypassAppsec]
+  - name: internal-host
+    host: "^internal\\.example\\.com$"
+    action: [bypass]
   - name: captcha-some-countries
     headers:
       CF-IPCountry: "^(CN|RU|KP)$"
