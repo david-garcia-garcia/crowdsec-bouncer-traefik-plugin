@@ -813,7 +813,18 @@ The Traefik static configuration declares the plugin, and the dynamic configurat
 > See the examples for advanced usage.
 
 ```yaml
-# Static configuration — load this tree as a local plugin.
+# Static configuration — download a release from the Traefik plugin catalog.
+# Pick a tag from https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/releases
+
+experimental:
+  plugins:
+    bouncer:
+      moduleName: github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
+      version: vX.Y.Z
+```
+
+```yaml
+# Static configuration — or load the sources from disk as a local plugin.
 # Copy or bind-mount sources to ./plugins-local/src/github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
 # relative to the Traefik working directory (see Local Mode below).
 
@@ -823,9 +834,9 @@ experimental:
       moduleName: github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
 ```
 
-This fork is not published in the Traefik plugin catalog, so `experimental.plugins` with a `version` does not work. Load it as a local plugin, or compile it into Traefik.
+Both load the plugin through Yaegi. For production, compile it into Traefik instead (see the warning at the top).
 
-If you also load the original plugin (`github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin`) as `bouncer`, register this one under another name, for example `experimental.localPlugins.crowdsec` and `plugin.crowdsec` in the dynamic configuration. The examples in this repository use `bouncer`.
+If you also load the original plugin (`github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin`) as `bouncer`, register this one under another name, for example `crowdsec`, and use `plugin.crowdsec` in the dynamic configuration. The examples in this repository use `bouncer`.
 
 ```yaml
 # Simplified dynamic configuration
