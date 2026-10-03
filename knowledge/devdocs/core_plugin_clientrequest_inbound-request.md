@@ -24,6 +24,7 @@ Construct once in `ServeHTTP` after `pkg/ip.GetRemoteIP`. Captcha gate Secure an
 - When `ipAddr` is non-nil, `New` stores a copy and `RemoteIP()` is `ipAddr.String()`. When it is nil, `RemoteIP()` stays the raw extract for fail logs. `IPType()` is `ip.FamilyOfIP` of that parsed address.
 - Do not assign `RemoteIP`, `IPAddr`, scheme, or AbsoluteURL after construction. Do not write scheme onto the live `*http.Request`.
 - Pass `req` into captcha `ServeHTTP` / `Check` / `Validate` / `setGateCookie` and AppSec `Query`. Do not pass a parallel `remoteIP` string.
+- Estimate dropped bytes with `req.EstimatedSize()` at drop time. Do not read `Body`. Do not call `httputil.DumpRequest` or `Request.Write`.
 - Leave path-only captcha helpers (`IsCustomResourceRequest`, `IsCaptchaFormPost`, `WriteSolvedRedirect`, `gateCookieValue`, `RequestDomain`) on `*http.Request` / host string.
 - AppSec copies `AbsoluteURL()` onto `X-Crowdsec-Appsec-Uri`. Do not rebuild proto-then-TLS in captcha or AppSec. Do not copy GetRemoteIP hop trust into those packages.
 
@@ -47,4 +48,5 @@ decision, err := appsecClient.Query(req, pol)
 - A set proto `http` with TLS set is scheme `http` (cookie not Secure). Dest OR of TLS with proto `https` is gone.
 - `wss`, empty, `https,http`, `Forwarded`, `Front-End-Https`, `X-Forwarded-Protocol`, `X-Scheme`, and `URL.Scheme` are not a set proto. TLS non-nil then `https`, else `http`.
 - Traefik origin-form requests have empty `URL.Scheme` and `URL.Host`. AbsoluteURL uses `Request.Host` then.
-- Later edits to `Host`, `URL`, or the passed `net.IP` do not change the snapshots `New` stored.
+- Later edits to `Host`, `URL`, or the passed `net.IP` do not change the snapshots `New` stored. `EstimatedSize` reads the live embed at call time (`RequestURI`, `Host`, `Header`, `ContentLength`).
+- `EstimatedSize` adds `len(Host)` separately because the server lifts Host out of Header. It does not parse `:authority` or `X-Forwarded-Host`. `ContentLength == -1` adds nothing for the body; a value above 50 MiB counts 50 MiB for that part.

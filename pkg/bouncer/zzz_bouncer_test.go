@@ -120,6 +120,10 @@ func TestServeHTTP_PackedMemoryBanRecordsCrowdsecOrigin(t *testing.T) {
 	if got := lapiClient.TestDroppedCount("crowdsec", "ipv4", "ban"); got != 1 {
 		t.Fatalf("dropped crowdsec=%d", got)
 	}
+	wantBytes := clientrequest.New(req, "203.0.113.10", net.ParseIP("203.0.113.10")).EstimatedSize()
+	if got := lapiClient.TestDroppedByteCount("crowdsec", "ipv4"); got != wantBytes {
+		t.Fatalf("dropped bytes=%d want %d", got, wantBytes)
+	}
 }
 
 func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {

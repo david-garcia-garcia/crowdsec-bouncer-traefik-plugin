@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-10-03-dropped-bytes",
+  "jobName": "2026-10-03-dropped-bytes",
+  "startedAt": "2026-10-03T04:04:01.200Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-03T04:09:47.765Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-03T04:28:37.963Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-03T04:34:38.485Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-03T04:44:56.902Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-03T05:00:35.588Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-03T05:03:48.417Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-03T05:08:12.324Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-03T05:13:08.792Z"
+    }
+  }
+}

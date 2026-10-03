@@ -1,0 +1,16 @@
+issueKey: 2026-10-03-dropped-bytes
+jobName: 2026-10-03-dropped-bytes
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: e28561db86ba670f279c5fd31f36c6cead6ea978c21ab09603a1de55ddfe163f
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: dropped-bytes
+pr: { id: 182, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/182}

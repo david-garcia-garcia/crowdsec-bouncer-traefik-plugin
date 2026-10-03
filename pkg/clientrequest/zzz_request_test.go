@@ -2,6 +2,7 @@ package clientrequest
 
 import (
 	"crypto/tls"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -123,6 +124,81 @@ func TestAbsoluteURL_URLHostWins(t *testing.T) {
 		t.Fatalf("AbsoluteURL=%q", got)
 	}
 }
+
+func TestEstimatedSize_namedFields(t *testing.T) {
+	httpReq := originFormRequest()
+	httpReq.Header.Set("X-A", "b")
+	httpReq.ContentLength = 10
+	got := New(httpReq, "192.0.2.1", nil).EstimatedSize()
+	want := int64(len("/a") + len("h") + len("X-A") + len("b") + 10)
+	if got != want {
+		t.Fatalf("EstimatedSize=%d want %d", got, want)
+	}
+}
+
+func TestEstimatedSize_headerNameOncePerKey(t *testing.T) {
+	httpReq := originFormRequest()
+	httpReq.Header.Add("X-A", "b")
+	httpReq.Header.Add("X-A", "c")
+	httpReq.ContentLength = 0
+	got := New(httpReq, "192.0.2.1", nil).EstimatedSize()
+	want := int64(len("/a") + len("h") + len("X-A") + len("b") + len("c"))
+	if got != want {
+		t.Fatalf("EstimatedSize=%d want %d", got, want)
+	}
+}
+
+func TestEstimatedSize_contentLengthCap(t *testing.T) {
+	httpReq := originFormRequest()
+	httpReq.ContentLength = maxContentLengthContribution + 1
+	got := New(httpReq, "192.0.2.1", nil).EstimatedSize()
+	want := int64(len("/a")+len("h")) + maxContentLengthContribution
+	if got != want {
+		t.Fatalf("EstimatedSize=%d want %d", got, want)
+	}
+}
+
+func TestEstimatedSize_unknownBodyLengthAddsNothing(t *testing.T) {
+	spy := &readSpy{}
+	httpReq := originFormRequest()
+	httpReq.Body = spy
+	httpReq.ContentLength = -1
+	got := New(httpReq, "192.0.2.1", nil).EstimatedSize()
+	want := int64(len("/a") + len("h"))
+	if got != want {
+		t.Fatalf("EstimatedSize=%d want %d", got, want)
+	}
+	if spy.read {
+		t.Fatal("EstimatedSize must not read Body")
+	}
+}
+
+// originFormRequest is RequestURI /a and Host h with an empty Header map (Traefik origin-form).
+func originFormRequest() *http.Request {
+	httpReq := httptest.NewRequest(http.MethodGet, "/a", nil)
+	httpReq.Host = "h"
+	httpReq.Header = make(http.Header)
+	return httpReq
+}
+
+func TestEstimatedSize_nilEmbed(t *testing.T) {
+	got := Request{}.EstimatedSize()
+	if got != 0 {
+		t.Fatalf("EstimatedSize=%d want 0", got)
+	}
+}
+
+// readSpy records whether Read was called. EstimatedSize must not touch Body.
+type readSpy struct {
+	read bool
+}
+
+func (s *readSpy) Read([]byte) (int, error) {
+	s.read = true
+	return 0, io.EOF
+}
+
+func (s *readSpy) Close() error { return nil }
 
 // optionalProto is a set X-Forwarded-Proto value; nil on the case means the header is absent.
 func optionalProto(value string) *string {

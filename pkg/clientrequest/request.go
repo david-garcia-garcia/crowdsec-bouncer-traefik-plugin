@@ -14,6 +14,8 @@ import (
 const (
 	schemeHTTP  = "http"
 	schemeHTTPS = "https"
+	// maxContentLengthContribution caps the ContentLength part of EstimatedSize at 50 MiB.
+	maxContentLengthContribution = 50 * 1024 * 1024
 )
 
 // Request is one inbound request plus the GetRemoteIP address plus the scheme token.
@@ -76,6 +78,33 @@ func (r Request) Scheme() string {
 // AbsoluteURL is the client-facing URL captured by New: constructor scheme, URL.Host else Request.Host, path and query preserved.
 func (r Request) AbsoluteURL() string {
 	return r.absoluteURL
+}
+
+// EstimatedSize is the inbound request size for dropped / byte usage-metrics.
+// It sums RequestURI, Host, each Header map key once plus each header value, and capped ContentLength.
+// It does not read Body and does not reconstruct a wire image.
+func (r Request) EstimatedSize() int64 {
+	if r.Request == nil {
+		return 0
+	}
+	// Sum the live request-target and the server-lifted Host field.
+	n := int64(len(r.RequestURI) + len(r.Host))
+	// Add each Header map key once and each header value. Host is not reconstructed from Header.
+	for name, values := range r.Header {
+		n += int64(len(name))
+		for _, value := range values {
+			n += int64(len(value))
+		}
+	}
+	// Count declared ContentLength when known; cap that part at 50 MiB. Do not read Body.
+	if r.ContentLength >= 0 {
+		contentLength := r.ContentLength
+		if contentLength > maxContentLengthContribution {
+			contentLength = maxContentLengthContribution
+		}
+		n += contentLength
+	}
+	return n
 }
 
 // absoluteURL snapshots the client-facing URL. It does not read URL.Scheme.
