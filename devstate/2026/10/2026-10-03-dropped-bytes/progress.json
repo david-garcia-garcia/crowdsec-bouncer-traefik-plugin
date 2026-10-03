@@ -4,12 +4,12 @@
   "startedAt": "2026-10-03T04:04:01.200Z",
   "phases": {
     "prepare": {
-      "work": false,
+      "work": true,
       "card": true,
       "at": "2026-10-03T04:09:47.765Z"
     },
     "explore": {
-      "work": false,
+      "work": true,
       "card": false,
       "at": null
     },
