@@ -24,7 +24,7 @@ Byte window keys share the same counters map; `unit` distinguishes the item. Add
 In progress. 0 items remain.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: 52d4345a
+Reviewed head: 46861aa8
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -47,7 +47,10 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-03-dropped-bytes/openspec/changes/dropped-bytes/proposal.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-03-dropped-bytes/openspec/changes/archive/2026-10-03-dropped-bytes/proposal.md) — modified
+
+Completed:
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-03-dropped-bytes/openspec/specs/core_plugin_lapi_usage-metrics/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -84,9 +87,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 52d4345a037f1b354e5396325a09dcfb61373a53 | Card must match the branch you measured |
+| Reviewed head | 46861aa8f0ab682ecb06ac0812a77cd2a19ba432 | Card must match the branch you measured |
 
 ### Stored data model
 None.
