@@ -10,49 +10,32 @@ import (
 )
 
 func TestNew_BouncerInitializedTrustedIPs(t *testing.T) {
-	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
-	log, sink := newTestLogSink(slog.LevelDebug)
-	cfg := configuration.New()
-	forwarded := []string{"10.0.0.0/8", "192.168.0.0/16", "192.0.2.1"}
-	client := []string{"172.16.0.0/12", "203.0.113.0/24"}
-	cfg.BouncerForwardedHeadersTrustedIPs = forwarded
-	cfg.BouncerClientTrustedIPs = client
-	if _, err := New(next, "test", cfg, false, false, false, log); err != nil {
-		t.Fatalf("New() error = %v", err)
+	listedForwarded := []string{"10.0.0.0/8", "192.168.0.0/16", "192.0.2.1"}
+	listedClient := []string{"172.16.0.0/12", "203.0.113.0/24"}
+	cases := []struct {
+		name                      string
+		forwarded, client         []string
+		wantForwarded, wantClient []string
+	}{
+		{name: "listed", forwarded: listedForwarded, client: listedClient, wantForwarded: listedForwarded, wantClient: listedClient},
+		{name: "empty", forwarded: []string{}, client: []string{}, wantForwarded: []string{}, wantClient: []string{}},
+		{name: "nil", wantForwarded: []string{}, wantClient: []string{}},
 	}
-	logged := sink.String()
-	rec := bouncerInitializedRecord(t, logged)
-	assertStringSliceAttr(t, rec, "forwardedHeadersTrustedIPs", forwarded)
-	assertStringSliceAttr(t, rec, "clientTrustedIPs", client)
-}
-
-func TestNew_BouncerInitializedEmptyTrustedIPs(t *testing.T) {
-	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
-	log, sink := newTestLogSink(slog.LevelDebug)
-	cfg := configuration.New()
-	cfg.BouncerForwardedHeadersTrustedIPs = []string{}
-	cfg.BouncerClientTrustedIPs = []string{}
-	if _, err := New(next, "test", cfg, false, false, false, log); err != nil {
-		t.Fatalf("New() error = %v", err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+			log, sink := newTestLogSink(slog.LevelDebug)
+			cfg := configuration.New()
+			cfg.BouncerForwardedHeadersTrustedIPs = tc.forwarded
+			cfg.BouncerClientTrustedIPs = tc.client
+			if _, err := New(next, "test", cfg, false, false, false, log); err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+			rec := bouncerInitializedRecord(t, sink.String())
+			assertStringSliceAttr(t, rec, "forwardedHeadersTrustedIPs", tc.wantForwarded)
+			assertStringSliceAttr(t, rec, "clientTrustedIPs", tc.wantClient)
+		})
 	}
-	logged := sink.String()
-	rec := bouncerInitializedRecord(t, logged)
-	assertStringSliceAttr(t, rec, "forwardedHeadersTrustedIPs", []string{})
-	assertStringSliceAttr(t, rec, "clientTrustedIPs", []string{})
-}
-
-func TestNew_BouncerInitializedNilTrustedIPs(t *testing.T) {
-	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
-	log, sink := newTestLogSink(slog.LevelDebug)
-	cfg := configuration.New()
-	cfg.BouncerForwardedHeadersTrustedIPs = nil
-	cfg.BouncerClientTrustedIPs = nil
-	if _, err := New(next, "test", cfg, false, false, false, log); err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-	rec := bouncerInitializedRecord(t, sink.String())
-	assertStringSliceAttr(t, rec, "forwardedHeadersTrustedIPs", []string{})
-	assertStringSliceAttr(t, rec, "clientTrustedIPs", []string{})
 }
 
 // bouncerInitializedRecord is the one DEBUG Bouncer initialized JSON object.

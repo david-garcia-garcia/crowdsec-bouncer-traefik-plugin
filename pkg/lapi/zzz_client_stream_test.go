@@ -85,18 +85,6 @@ func newTestStreamPoller(t *testing.T, server *httptest.Server) *Client {
 	return client
 }
 
-func TestHandleStreamCache_FailedGetAllowsRetry(t *testing.T) {
-	server, _ := testFailThenServeStreamLAPI(t, 1)
-	client := newTestStreamPoller(t, server)
-
-	if err := client.handleStreamCache(); err == nil {
-		t.Fatal("stream 500 must return an error")
-	}
-	if err := client.handleStreamCache(); err != nil {
-		t.Fatalf("retry after failure: %v", err)
-	}
-}
-
 // TestHandleStreamCache_NextTickRepollsAfterFailure proves the released lease lets the very next
 // tick call LAPI again rather than waiting out max(updateInterval-1, 1) seconds.
 func TestHandleStreamCache_NextTickRepollsAfterFailure(t *testing.T) {
@@ -144,84 +132,67 @@ func newSharedStreamPoller(t *testing.T, store *decisionstore.Store, host string
 	return client
 }
 
-func TestHandleStreamCache_TwoMemoryPollersBothFetch(t *testing.T) {
-	server, hits := testStreamLAPI(t)
-	parsed, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatal(err)
+func TestHandleStreamCache_TwoPollersBothFetch(t *testing.T) {
+	cases := []struct {
+		name  string
+		store func(t *testing.T) *decisionstore.Store
+	}{
+		{
+			name: "memory",
+			store: func(t *testing.T) *decisionstore.Store {
+				t.Helper()
+				return decisionstore.NewMemory(logger.New("ERROR", ""))
+			},
+		},
+		{
+			name: "redis",
+			store: func(t *testing.T) *decisionstore.Store {
+				t.Helper()
+				redisServer := startTestLeaseRedis(t)
+				return newTestRedisStore(t, redisServer.addr(), nil, "sess")
+			},
+		},
 	}
-	store := decisionstore.NewMemory(logger.New("ERROR", ""))
-	first := newSharedStreamPoller(t, store, parsed.Host)
-	second := newSharedStreamPoller(t, store, parsed.Host)
-	attachTestTransport(first, server.Client(), "test-key")
-	attachTestTransport(second, server.Client(), "test-key")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			server, hits := testStreamLAPI(t)
+			parsed, err := url.Parse(server.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			store := tc.store(t)
+			first := newSharedStreamPoller(t, store, parsed.Host)
+			second := newSharedStreamPoller(t, store, parsed.Host)
+			attachTestTransport(first, server.Client(), "test-key")
+			attachTestTransport(second, server.Client(), "test-key")
 
-	var started sync.WaitGroup
-	var release sync.WaitGroup
-	started.Add(2)
-	release.Add(1)
-	var done sync.WaitGroup
-	done.Add(2)
-	run := func(client *Client) {
-		defer done.Done()
-		started.Done()
-		release.Wait()
-		if pollErr := client.handleStreamCache(); pollErr != nil {
-			t.Errorf("handleStreamCache: %v", pollErr)
-		}
-	}
-	go run(first)
-	go run(second)
-	started.Wait()
-	release.Done()
-	done.Wait()
+			var started sync.WaitGroup
+			var release sync.WaitGroup
+			started.Add(2)
+			release.Add(1)
+			var done sync.WaitGroup
+			done.Add(2)
+			run := func(client *Client) {
+				defer done.Done()
+				started.Done()
+				release.Wait()
+				if pollErr := client.handleStreamCache(); pollErr != nil {
+					t.Errorf("handleStreamCache: %v", pollErr)
+				}
+			}
+			go run(first)
+			go run(second)
+			started.Wait()
+			release.Done()
+			done.Wait()
 
-	if got := first.StreamFetches() + second.StreamFetches(); got != 2 {
-		t.Fatalf("streamFetches=%d, want 2", got)
-	}
-	if got := atomic.LoadInt64(hits); got != 2 {
-		t.Fatalf("LAPI hits=%d, want 2", got)
-	}
-}
-
-func TestHandleStreamCache_TwoRedisPollersBothFetch(t *testing.T) {
-	lapiServer, hits := testStreamLAPI(t)
-	parsed, err := url.Parse(lapiServer.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	redisServer := startTestLeaseRedis(t)
-	store := newTestRedisStore(t, redisServer.addr(), nil, "sess")
-	first := newSharedStreamPoller(t, store, parsed.Host)
-	second := newSharedStreamPoller(t, store, parsed.Host)
-	attachTestTransport(first, lapiServer.Client(), "test-key")
-	attachTestTransport(second, lapiServer.Client(), "test-key")
-
-	var started sync.WaitGroup
-	var release sync.WaitGroup
-	started.Add(2)
-	release.Add(1)
-	var done sync.WaitGroup
-	done.Add(2)
-	run := func(client *Client) {
-		defer done.Done()
-		started.Done()
-		release.Wait()
-		if pollErr := client.handleStreamCache(); pollErr != nil {
-			t.Errorf("handleStreamCache: %v", pollErr)
-		}
-	}
-	go run(first)
-	go run(second)
-	started.Wait()
-	release.Done()
-	done.Wait()
-
-	if got := first.StreamFetches() + second.StreamFetches(); got != 2 {
-		t.Fatalf("streamFetches=%d, want 2", got)
-	}
-	if got := atomic.LoadInt64(hits); got != 2 {
-		t.Fatalf("LAPI hits=%d, want 2", got)
+			if got := first.StreamFetches() + second.StreamFetches(); got != 2 {
+				t.Fatalf("streamFetches=%d, want 2", got)
+			}
+			if got := atomic.LoadInt64(hits); got != 2 {
+				t.Fatalf("LAPI hits=%d, want 2", got)
+			}
+		})
 	}
 }
 

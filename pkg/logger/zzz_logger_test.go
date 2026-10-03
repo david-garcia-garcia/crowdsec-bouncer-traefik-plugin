@@ -1,9 +1,7 @@
 package logger
 
 import (
-	"bytes"
 	"encoding/json"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,113 +33,6 @@ func TestNew(t *testing.T) {
 			// Verify it's a slog.Logger (we can call methods on it)
 			logger.Info("test initialization")
 		})
-	}
-}
-
-func TestJSONLogFormat(t *testing.T) {
-	var buf bytes.Buffer
-
-	// Create a logger with JSON handler to capture output
-	handler := slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})
-	logger := slog.New(handler).With("component", "CrowdsecBouncer")
-
-	testMessage := "json test message"
-	logger.Info(testMessage)
-
-	output := buf.String()
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-
-	if len(lines) != 1 {
-		t.Fatalf("Expected 1 log line, got %d", len(lines))
-	}
-
-	// Verify it's valid JSON
-	var logEntry map[string]interface{}
-	err := json.Unmarshal([]byte(lines[0]), &logEntry)
-	if err != nil {
-		t.Fatalf("Expected valid JSON output, got error: %v, output: %s", err, output)
-	}
-
-	// Verify JSON structure
-	if logEntry["level"] != "INFO" {
-		t.Errorf("Expected level 'INFO', got '%v'", logEntry["level"])
-	}
-	if logEntry["msg"] != testMessage {
-		t.Errorf("Expected message '%s', got '%v'", testMessage, logEntry["msg"])
-	}
-	if logEntry["time"] == nil {
-		t.Error("Expected timestamp to be set")
-	}
-	if logEntry["component"] != "CrowdsecBouncer" {
-		t.Errorf("Expected component 'CrowdsecBouncer', got '%v'", logEntry["component"])
-	}
-}
-
-func TestCommonLogFormat(t *testing.T) {
-	var buf bytes.Buffer
-
-	// Create a logger with text handler to capture output
-	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})
-	logger := slog.New(handler).With("component", "CrowdsecBouncer")
-
-	testMessage := "common test message"
-	logger.Info(testMessage)
-
-	output := buf.String()
-
-	// Verify common format (should contain level and message)
-	if !strings.Contains(output, "level=INFO") {
-		t.Error("Expected common format with INFO level")
-	}
-	if !strings.Contains(output, testMessage) {
-		t.Error("Expected test message in common format")
-	}
-	if !strings.Contains(output, "component=CrowdsecBouncer") {
-		t.Error("Expected component field in common format")
-	}
-
-	// Should NOT be JSON (should be slog text format)
-	var logEntry map[string]interface{}
-	err := json.Unmarshal([]byte(strings.TrimSpace(output)), &logEntry)
-	if err == nil {
-		t.Error("Expected common format (not JSON), but got valid JSON")
-	}
-}
-
-func TestErrorLevel(t *testing.T) {
-	var buf bytes.Buffer
-
-	// Create a logger with ERROR level to capture output
-	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelError})
-	logger := slog.New(handler).With("component", "CrowdsecBouncer")
-
-	testMessage := "error only test"
-
-	// Test all log methods
-	logger.Error(testMessage)
-	logger.Warn(testMessage)  // Should not appear
-	logger.Info(testMessage)  // Should not appear
-	logger.Debug(testMessage) // Should not appear
-
-	output := buf.String()
-
-	// Only ERROR should appear
-	if !strings.Contains(output, "level=ERROR") {
-		t.Error("Expected ERROR message to appear")
-	}
-
-	// Other levels should NOT appear
-	unwantedLevels := []string{"level=WARN", "level=INFO", "level=DEBUG"}
-	for _, level := range unwantedLevels {
-		if strings.Contains(output, level) {
-			t.Errorf("Unexpected %s message appeared at ERROR level", level)
-		}
-	}
-
-	// Verify only one message appears
-	messageCount := strings.Count(output, testMessage)
-	if messageCount != 1 {
-		t.Errorf("Expected 1 occurrence of test message at ERROR level, got %d", messageCount)
 	}
 }
 
