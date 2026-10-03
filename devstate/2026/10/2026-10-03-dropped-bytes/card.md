@@ -17,14 +17,14 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 60237070
+Reviewed head: b00fafe6
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 3/6 | Limited confidence |
+| CI proof | 3/6 | in progress |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | N/A | no OPEN PR |
 
@@ -34,8 +34,8 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-10-03-dropped-bytes pushed | `git` |
 | OpenSpec | dropped-bytes | `openspec/` |
 | Pull request | none | pr-host |
-| CI | not seen | caller omitted CI snapshot |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 37097539128 in progress | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/37097539128 |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
@@ -50,7 +50,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-03-dropped-bytes on branch 2026-10-03-dropped-bytes targeting master; PR no PR yet; CI not seen.
+Ticket 2026-10-03-dropped-bytes on branch 2026-10-03-dropped-bytes targeting master; PR no PR yet; CI build 37097539128 in progress.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -71,7 +71,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 602370703f6e7c51c330e51cd2cd5a3e3016cdc0 | Card must match the branch you measured |
+| Reviewed head | b00fafe66695fe450e12c41a899d4e78991e49dc | Card must match the branch you measured |
 
 ### Stored data model
 None.
