@@ -10,31 +10,29 @@ Units this change would touch:
 - **Live contract** (`openspec/specs/core_plugin_lapi_usage-metrics/spec.md`) — requires `dropped` / `request`. Job: propose folds an ADDED `dropped` / `byte` series beside it.
 - **Proof** (`pkg/lapi/zzz_metrics_test.go`, `pkg/lapi/test_client.go` `TestDroppedCount`, `tests/e2e/real/usage_metrics.Tests.ps1`) — all keyed on unit `request`.
 
-```
-  *http.Request ──► clientrequest.New (IPType, embed)
-                         │
-                         ▼
-              Bouncer remediating path
-        handleBanServeHTTP
-        handleCaptchaKindServeHTTP (unsolved)
-        handleAppsecResponseServeHTTP
-                         │
-                         ▼
-              recordDropped(origin, ipType, remediation)
-                         │
-            ┌────────────┴────────────┐
-            ▼                         ▼
-   IncDropped unit=request    (proposed) estimate + dropped/byte
-            │                         │
-            └──────────┬──────────────┘
-                       ▼
-            MetricsReporter.windowCounters
-            addWindow / restoreMetricsWindow / POST
-                       ▼
-            LAPI POST /v1/usage-metrics
-                       ▼
-            cscli metrics show bouncers  (name → unit)
-```
+    *http.Request --> clientrequest.New (IPType, embed)
+                           |
+                           v
+                Bouncer remediating path
+          handleBanServeHTTP
+          handleCaptchaKindServeHTTP (unsolved)
+          handleAppsecResponseServeHTTP
+                           |
+                           v
+                recordDropped(origin, ipType, remediation)
+                           |
+              +------------+------------+
+              v                         v
+     IncDropped unit=request    (proposed) estimate + dropped/byte
+              |                         |
+              +------------+------------+
+                           v
+              MetricsReporter.windowCounters
+              addWindow / restoreMetricsWindow / POST
+                           v
+              LAPI POST /v1/usage-metrics
+                           v
+              cscli metrics show bouncers  (name + unit)
 
 Call sites that matter (roots searched: worktree `pkg/**/*.go`, `tests/e2e/real/*.ps1`):
 
@@ -49,7 +47,7 @@ Reproduce: **reproduced — no dropped/byte item**.
 - `MetricsReporter.IncDropped` always stores `unit: "request"` (`pkg/lapi/client_metrics.go`).
 - `recordDropped` does not read request size or pass a byte delta.
 - `addWindow` and `restoreMetricsWindow` use `+=` (wraps). `IncProcessed` uses `atomic.AddInt64` (wraps).
-- Worktree `rg` of `pkg/` and `tests/` found no usage-metrics unit `"byte"`.
+- Worktree search of `pkg/` and `tests/` found no usage-metrics unit `"byte"`.
 - `go test ./pkg/lapi/ -count=1` in the worktree: **ok** (7.623s). Existing POST tests accept a request-only window.
 - e2e only queries `-Unit "request"` for dropped.
 

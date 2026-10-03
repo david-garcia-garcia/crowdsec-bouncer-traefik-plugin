@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 0173c157
-Owner decision: None.
+Reviewed head: d0da1907
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -51,7 +51,10 @@ None.
 Ticket 2026-10-03-dropped-bytes on branch 2026-10-03-dropped-bytes targeting master; PR no PR yet; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Which labels does the new `dropped` / `byte` item send? | additive incidental — labels on an item this change creates; no In-scope or criterion line names those labels (Unknowns) | assumed — `origin` + `ip_type` only, same values as the paired request item; omit `remediation` (firewall `dropped` / `byte` shape in `ext_crowdsec_lapi_usage-metrics`) | explore |
+
 
 ## Findings
 None.
@@ -66,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 0173c15775f7f52f055d7fd5c75029f774691149 | Card must match the branch you measured |
+| Reviewed head | d0da1907b4d2408e5b5738667f4cfc47c0fd0f01 | Card must match the branch you measured |
 
 ### Stored data model
 None.
