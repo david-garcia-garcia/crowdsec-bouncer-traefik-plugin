@@ -589,16 +589,17 @@ func (b *Bouncer) recordProcessed(ipType string) {
 	}
 }
 
-// recordDropped counts a remediating response on the connection usage-metrics window.
-func (b *Bouncer) recordDropped(origin, ipType, remediation string) {
+// recordDropped counts a remediating response on the connection usage-metrics window (request and byte series).
+func (b *Bouncer) recordDropped(req clientrequest.Request, origin, remediation string) {
 	if client := b.loadedLAPI(); client != nil {
-		client.IncDropped(origin, ipType, remediation)
+		client.IncDropped(origin, req.IPType(), remediation)
+		client.IncDroppedBytes(origin, req.IPType(), req.EstimatedSize())
 	}
 }
 
 // handleBanServeHTTP writes the operator ban template for this client.
 func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientrequest.Request, reason, headerReason, origin string) {
-	b.recordDropped(origin, req.IPType(), "ban")
+	b.recordDropped(req, origin, "ban")
 
 	if b.remediationCustomHeader != "" {
 		if value := formatRemediationHeader(headerKindBan, headerReason, origin); value != "" {
@@ -696,7 +697,7 @@ func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientr
 		return
 	}
 
-	b.recordDropped(origin, req.IPType(), "captcha")
+	b.recordDropped(req, origin, "captcha")
 	challengeValue := formatRemediationHeader(headerKindCaptcha, headerReasonFromOrigin(origin), origin)
 	captchaClient.ServeHTTP(rw, req, b.remediationCustomHeader, challengeValue)
 }
@@ -772,7 +773,7 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientrequest
 
 // handleAppsecResponseServeHTTP writes a structured AppSec envelope (challenge HTML, cookies, headers) to the client.
 func (b *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req clientrequest.Request, decision *appsec.Response) {
-	b.recordDropped("appsec", req.IPType(), "")
+	b.recordDropped(req, "appsec", "")
 
 	// Copy AppSec-supplied headers, skipping hop-by-hop names and Set-Cookie (cookies have their own field).
 	for name, values := range decision.UserHeaders {

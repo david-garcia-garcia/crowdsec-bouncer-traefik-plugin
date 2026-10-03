@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/url"
 	"strings"
 	"sync"
@@ -163,6 +164,24 @@ func (r *MetricsReporter) IncDropped(origin, ipType, remediation string) {
 	}, 1)
 }
 
+// IncDroppedBytes counts estimated dropped request bytes. Empty origin/ipType labels are omitted on POST.
+func (c *Client) IncDroppedBytes(origin, ipType string, n int64) {
+	if c.metricsReporter == nil {
+		return
+	}
+	c.metricsReporter.IncDroppedBytes(origin, ipType, n)
+}
+
+// IncDroppedBytes counts estimated dropped request bytes. Remediation is never a label on this item.
+func (r *MetricsReporter) IncDroppedBytes(origin, ipType string, n int64) {
+	r.addWindow(usageMetricKey{
+		name:   "dropped",
+		unit:   "byte",
+		origin: origin,
+		ipType: ipType,
+	}, n)
+}
+
 // addWindow adds delta to a dropped counter for this push window.
 func (r *MetricsReporter) addWindow(key usageMetricKey, delta int64) {
 	r.metricsMu.Lock()
@@ -170,7 +189,22 @@ func (r *MetricsReporter) addWindow(key usageMetricKey, delta int64) {
 	if r.windowCounters == nil {
 		r.windowCounters = make(map[usageMetricKey]int64)
 	}
-	r.windowCounters[key] += delta
+	addWindowDelta(r.windowCounters, key, delta)
+}
+
+// addWindowDelta adds delta to a window key. Byte keys saturate at MaxInt64 and skip a zero delta. Request keys wrap.
+func addWindowDelta(counters map[usageMetricKey]int64, key usageMetricKey, delta int64) {
+	if key.unit == "byte" {
+		if delta == 0 {
+			return
+		}
+		cur := counters[key]
+		if delta > 0 && cur > math.MaxInt64-delta {
+			counters[key] = math.MaxInt64
+			return
+		}
+	}
+	counters[key] += delta
 }
 
 // reportMetrics POSTs the current window of usage-metrics items to LAPI.
@@ -265,7 +299,7 @@ func (r *MetricsReporter) restoreMetricsWindow(window map[usageMetricKey]int64, 
 		r.windowCounters = make(map[usageMetricKey]int64)
 	}
 	for key, value := range window {
-		r.windowCounters[key] += value
+		addWindowDelta(r.windowCounters, key, value)
 	}
 	r.metricsMu.Unlock()
 	atomic.AddInt64(&r.processedIPv4, processedIPv4)

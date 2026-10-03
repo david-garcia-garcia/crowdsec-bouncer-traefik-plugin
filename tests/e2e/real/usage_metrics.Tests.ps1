@@ -69,6 +69,15 @@ Describe "CrowdSec Bouncer usage-metrics" {
             }
             $dropped.Success | Should -Be $true -Because "a banned /stream hit must POST dropped with origin=cscli"
 
+            $droppedBytesBefore = Get-CscliBouncerMetricValue -Origin "cscli" -Name "dropped" -Unit "byte"
+            $null = Test-HttpRequest -Endpoint "/stream" -IP $script:BannedIP -TraefikUrl $script:TraefikUrl
+
+            $droppedBytes = Wait-ForCondition -Description "cscli dropped bytes in cscli metrics" -TimeoutSeconds 20 -RetryIntervalSeconds 1 -Condition {
+                $after = Get-CscliBouncerMetricValue -Origin "cscli" -Name "dropped" -Unit "byte"
+                return ($after -gt $droppedBytesBefore)
+            }
+            $droppedBytes.Success | Should -Be $true -Because "a banned /stream hit must POST dropped bytes with origin=cscli"
+
             $active = Wait-ForCondition -Description "cscli active_decisions gauge in cscli metrics" -TimeoutSeconds 20 -RetryIntervalSeconds 1 -Condition {
                 $gauge = Get-CscliBouncerMetricValue -Origin "cscli" -Name "active_decisions" -Unit "ip"
                 return ($gauge -ge 1)

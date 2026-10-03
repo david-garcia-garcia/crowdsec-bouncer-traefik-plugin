@@ -3,6 +3,7 @@ package lapi
 import (
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -477,6 +478,79 @@ func TestReportMetricsRestoresOnFailure(t *testing.T) {
 	}
 	if processedValue(t, *gotBody, "ipv4") != 1 {
 		t.Fatalf("retry must send restored processed, body=%s", *gotBody)
+	}
+}
+
+func TestIncDroppedBytesPostsBesideRequestSeries(t *testing.T) {
+	client, body := newUsageMetricsClient(t)
+	client.IncDropped("crowdsec", "ipv4", "ban")
+	client.IncDroppedBytes("crowdsec", "ipv4", 17)
+	if err := client.reportMetrics(); err != nil {
+		t.Fatal(err)
+	}
+	var requestItem, byteItem map[string]interface{}
+	for _, raw := range usageMetricItems(t, body.bytes()) {
+		item := asObject(t, raw)
+		if item["name"] != "dropped" {
+			continue
+		}
+		switch item["unit"] {
+		case "request":
+			requestItem = item
+		case "byte":
+			byteItem = item
+		}
+	}
+	if requestItem == nil || byteItem == nil {
+		t.Fatalf("want dropped request and byte items, body=%s", body.bytes())
+	}
+	requestLabels := asObject(t, requestItem["labels"])
+	byteLabels := asObject(t, byteItem["labels"])
+	if requestLabels["origin"] != "crowdsec" || requestLabels["ip_type"] != "ipv4" {
+		t.Fatalf("request labels %#v", requestLabels)
+	}
+	if requestLabels["remediation"] != "ban" {
+		t.Fatalf("request remediation %#v", requestLabels)
+	}
+	if byteLabels["origin"] != "crowdsec" || byteLabels["ip_type"] != "ipv4" {
+		t.Fatalf("byte labels %#v", byteLabels)
+	}
+	if _, ok := byteLabels["remediation"]; ok {
+		t.Fatalf("byte item must omit remediation %#v", byteLabels)
+	}
+	if byteItem["value"] != float64(17) {
+		t.Fatalf("byte value %#v", byteItem["value"])
+	}
+}
+
+func TestIncDroppedBytesSaturatesOnAdd(t *testing.T) {
+	client, _ := newUsageMetricsClient(t)
+	key := usageMetricKey{name: "dropped", unit: "byte", origin: "crowdsec", ipType: "ipv4"}
+	client.metricsReporter.windowCounters[key] = math.MaxInt64 - 5
+	client.IncDroppedBytes("crowdsec", "ipv4", 10)
+	if got := client.TestDroppedByteCount("crowdsec", "ipv4"); got != math.MaxInt64 {
+		t.Fatalf("got %d want MaxInt64", got)
+	}
+}
+
+func TestIncDroppedBytesSaturatesOnFailedPostRestore(t *testing.T) {
+	client, _ := newUsageMetricsClient(t)
+	key := usageMetricKey{name: "dropped", unit: "byte", origin: "crowdsec", ipType: "ipv4"}
+	client.metricsReporter.windowCounters[key] = math.MaxInt64 - 5
+	client.metricsReporter.restoreMetricsWindow(map[usageMetricKey]int64{key: 10}, 0, 0, 0)
+	if got := client.TestDroppedByteCount("crowdsec", "ipv4"); got != math.MaxInt64 {
+		t.Fatalf("got %d want MaxInt64", got)
+	}
+}
+
+func TestIncDroppedBytesZeroDeltaSkipsKey(t *testing.T) {
+	client, _ := newUsageMetricsClient(t)
+	client.IncDroppedBytes("crowdsec", "ipv4", 0)
+	if got := client.TestDroppedByteCount("crowdsec", "ipv4"); got != 0 {
+		t.Fatalf("got %d", got)
+	}
+	if _, ok := client.metricsReporter.windowCounters[usageMetricKey{name: "dropped", unit: "byte", origin: "crowdsec", ipType: "ipv4"}]; ok {
+		t.Fatal("zero byte delta must not create a window key")
 	}
 }
 

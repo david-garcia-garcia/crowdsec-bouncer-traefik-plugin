@@ -119,3 +119,19 @@ func (c *Client) TestDroppedCount(origin, ipType, remediation string) int64 {
 	defer c.metricsReporter.metricsMu.Unlock()
 	return c.metricsReporter.windowCounters[key]
 }
+
+// TestDroppedByteCount is the current window dropped byte count for origin+ipType (no remediation label).
+func (c *Client) TestDroppedByteCount(origin, ipType string) int64 {
+	if c == nil || c.metricsReporter == nil {
+		return 0
+	}
+	key := usageMetricKey{
+		name:   "dropped",
+		unit:   "byte",
+		origin: origin,
+		ipType: ipType,
+	}
+	c.metricsReporter.metricsMu.Lock()
+	defer c.metricsReporter.metricsMu.Unlock()
+	return c.metricsReporter.windowCounters[key]
+}
