@@ -21,7 +21,7 @@ Four constructors nest. `bouncer.New` sets `traefikName`. `lapi.New`, `appsec.Ne
 ```go
 log = log.With("traefikName", name)
 log = log.With("traefikName", middlewareName, "instanceName", cfg.CrowdsecLapiInstanceName, "leg", instance.LegLAPI, "sessionKey", bindKey)
-log.Debug("handleStreamTicker:poll", "startup", startup, "interval", interval)
+logger.Trace(log, "handleStreamTicker:poll", "startup", startup, "interval", interval)
 ```
 
 ## Key files

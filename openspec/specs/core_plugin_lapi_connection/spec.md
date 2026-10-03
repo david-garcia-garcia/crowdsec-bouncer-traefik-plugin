@@ -22,20 +22,19 @@
 - **AND** `pkg/lapi/connection_appsec.go` does not exist
 - **AND** `transport` is declared in `client_http.go`
 
-### Requirement: Stream poll ticks stay at DEBUG
+### Requirement: Stream poll enter stays at TRACE
+A stream poll SHALL emit `handleStreamTicker:poll` at TRACE when it wins the in-flight CAS and SHALL emit `handleStreamCache:updated` at DEBUG after a successful LAPI fetch and apply. The enter line MUST NOT appear at DEBUG or at the default INFO level. The finish line MUST NOT appear when the plugin logger is at the default INFO level. Enter and finish lines SHALL carry `sessionKey` and a `startup` attribute (`true` when the GET uses `startup=true`). The finish line SHALL also carry applied `new` and `deleted` counts (decisions written into the store, not raw payload length), `durationMs`, and `fetches`. A busy tick SHALL emit `handleStreamTicker:skip` at WARN and MUST NOT GET stream. There is no stream lease and no `handleStreamCache:alreadyUpdated` line. Stream health transitions (`crowdsec stream became healthy` / `crowdsec stream became unhealthy`) remain INFO and are not this requirement.
 
-### Requirement: Stream poll ticks stay at DEBUG
-A stream poll SHALL emit `handleStreamTicker:poll` when it wins the in-flight CAS and SHALL emit `handleStreamCache:updated` after a successful LAPI fetch and apply. Both MUST be DEBUG. They MUST NOT appear when the plugin logger is at the default INFO level. Enter and finish lines SHALL carry `sessionKey` and a `startup` attribute (`true` when the GET uses `startup=true`). The finish line SHALL also carry applied `new` and `deleted` counts (decisions written into the store, not raw payload length), `durationMs`, and `fetches`. A busy tick SHALL emit `handleStreamTicker:skip` at WARN and MUST NOT GET stream. There is no stream lease and no `handleStreamCache:alreadyUpdated` line. Stream health transitions (`crowdsec stream became healthy` / `crowdsec stream became unhealthy`) remain INFO and are not this requirement.
-
-#### Scenario: Successful startup poll does not INFO-spam
+#### Scenario: Successful startup poll does not DEBUG-spam the enter line
 - **WHEN** stream mode polls LAPI with `startup=true` and the fetch succeeds
-- **THEN** `handleStreamTicker:poll` and `handleStreamCache:updated` are present at DEBUG
+- **THEN** `handleStreamTicker:poll` is present at TRACE and absent at DEBUG
+- **AND** `handleStreamCache:updated` is present at DEBUG
 - **AND** those records include `startup=true`
 - **AND** those messages are absent when the logger is at INFO
 
-#### Scenario: Successful delta poll does not INFO-spam
+#### Scenario: Successful delta poll does not DEBUG-spam the enter line
 - **WHEN** stream mode polls LAPI with `startup=false` and the fetch succeeds
-- **THEN** `handleStreamTicker:poll` and `handleStreamCache:updated` are present at DEBUG
+- **THEN** `handleStreamTicker:poll` is present at TRACE and `handleStreamCache:updated` is present at DEBUG
 - **AND** those records include `startup=false`
 
 #### Scenario: Busy tick warns

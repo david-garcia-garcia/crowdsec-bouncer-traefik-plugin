@@ -61,7 +61,7 @@ An owning LAPI or AppSec Client SHALL store the instance name it last published.
 - **AND** no second `instance started` log for the same incarnation
 
 ### Requirement: Lifecycle logs match e2e grep contract
-Backend Create/Close at INFO, Sleep/Wake at DEBUG, with stable `msg` values `crowdsec lapi instance …` / `crowdsec appsec instance …` / `crowdsec captcha instance …`, attrs `leg`, `instanceName`, `incarnation`. Bouncer bound/unbound at INFO with `msg` `crowdsec bouncer bound` / `crowdsec bouncer unbound`, attrs `traefikName`, `leg`, `instanceName`, `incarnation`. These lines MUST NOT be emitted on the request path. Captcha Sleep/Wake MAY be no-ops when the client has no ticker.
+Backend Create/Close at INFO, Sleep/Wake at DEBUG, with stable `msg` values `crowdsec lapi instance …` / `crowdsec appsec instance …` / `crowdsec captcha instance …`, attrs `leg`, `instanceName`, `incarnation`. Bouncer bound and unbound at TRACE with `msg` `crowdsec bouncer bound` / `crowdsec bouncer unbound`, attrs `traefikName`, `leg`, `instanceName`, and `incarnation` when one is known. These lines MUST NOT be emitted on the request path. Captcha Sleep/Wake MAY be no-ops when the client has no ticker.
 
 #### Scenario: Replace A by B logs two bound lines
 - **WHEN** Publish replaces client A with B on the same slot for a subscriber

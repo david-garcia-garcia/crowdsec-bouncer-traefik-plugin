@@ -214,20 +214,11 @@ func (b *Bouncer) receiveLAPI() {
 	b.lapiReceived = current
 	b.lapiReceiveSeen = true
 	if previous != nil && previous != current {
-		b.log.Debug("crowdsec bouncer unbound",
-			"traefikName", b.name,
-			"leg", "lapi",
-			"instanceName", b.lapiInstanceName,
-			"incarnation", previous.Incarnation(),
-		)
+		b.traceBouncerBinding(false, "lapi", b.lapiInstanceName, previous.Incarnation())
 	}
 	if current == nil {
 		if previous == nil {
-			b.log.Debug("crowdsec bouncer unbound",
-				"traefikName", b.name,
-				"leg", "lapi",
-				"instanceName", b.lapiInstanceName,
-			)
+			b.traceBouncerBinding(false, "lapi", b.lapiInstanceName, "")
 		}
 		return
 	}
@@ -238,12 +229,7 @@ func (b *Bouncer) receiveLAPI() {
 			"missing", strings.Join(missing, ","),
 		)
 	}
-	b.log.Info("crowdsec bouncer bound",
-		"traefikName", b.name,
-		"leg", "lapi",
-		"instanceName", b.lapiInstanceName,
-		"incarnation", current.Incarnation(),
-	)
+	b.traceBouncerBinding(true, "lapi", b.lapiInstanceName, current.Incarnation())
 }
 
 func (b *Bouncer) receiveAppSec() {
@@ -257,29 +243,15 @@ func (b *Bouncer) receiveAppSec() {
 	b.appsecReceived = current
 	b.appsecReceiveSeen = true
 	if previous != nil && previous != current {
-		b.log.Debug("crowdsec bouncer unbound",
-			"traefikName", b.name,
-			"leg", "appsec",
-			"instanceName", b.appsecInstanceName,
-			"incarnation", previous.Incarnation(),
-		)
+		b.traceBouncerBinding(false, "appsec", b.appsecInstanceName, previous.Incarnation())
 	}
 	if current == nil {
 		if previous == nil {
-			b.log.Debug("crowdsec bouncer unbound",
-				"traefikName", b.name,
-				"leg", "appsec",
-				"instanceName", b.appsecInstanceName,
-			)
+			b.traceBouncerBinding(false, "appsec", b.appsecInstanceName, "")
 		}
 		return
 	}
-	b.log.Info("crowdsec bouncer bound",
-		"traefikName", b.name,
-		"leg", "appsec",
-		"instanceName", b.appsecInstanceName,
-		"incarnation", current.Incarnation(),
-	)
+	b.traceBouncerBinding(true, "appsec", b.appsecInstanceName, current.Incarnation())
 }
 
 func (b *Bouncer) receiveCaptcha() {
@@ -293,29 +265,33 @@ func (b *Bouncer) receiveCaptcha() {
 	b.captchaReceived = current
 	b.captchaReceiveSeen = true
 	if previous != nil && previous != current {
-		b.log.Debug("crowdsec bouncer unbound",
-			"traefikName", b.name,
-			"leg", "captcha",
-			"instanceName", b.captchaInstanceName,
-			"incarnation", previous.Incarnation(),
-		)
+		b.traceBouncerBinding(false, "captcha", b.captchaInstanceName, previous.Incarnation())
 	}
 	if current == nil {
 		if previous == nil {
-			b.log.Debug("crowdsec bouncer unbound",
-				"traefikName", b.name,
-				"leg", "captcha",
-				"instanceName", b.captchaInstanceName,
-			)
+			b.traceBouncerBinding(false, "captcha", b.captchaInstanceName, "")
 		}
 		return
 	}
-	b.log.Info("crowdsec bouncer bound",
+	b.traceBouncerBinding(true, "captcha", b.captchaInstanceName, current.Incarnation())
+}
+
+// traceBouncerBinding records whether this route bound or released the named backend.
+// An empty incarnation is omitted, which is the case where nothing was bound before.
+func (b *Bouncer) traceBouncerBinding(bound bool, leg, instanceName, incarnation string) {
+	msg := "crowdsec bouncer unbound"
+	if bound {
+		msg = "crowdsec bouncer bound"
+	}
+	attrs := []any{
 		"traefikName", b.name,
-		"leg", "captcha",
-		"instanceName", b.captchaInstanceName,
-		"incarnation", current.Incarnation(),
-	)
+		"leg", leg,
+		"instanceName", instanceName,
+	}
+	if incarnation != "" {
+		attrs = append(attrs, "incarnation", incarnation)
+	}
+	logger.Trace(b.log, msg, attrs...)
 }
 
 func (b *Bouncer) warnBackendMissing(leg, instanceName string) {
