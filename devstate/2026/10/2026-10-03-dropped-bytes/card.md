@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: d0da1907
+Reviewed head: 89d66ae1
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -69,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | d0da1907b4d2408e5b5738667f4cfc47c0fd0f01 | Card must match the branch you measured |
+| Reviewed head | 89d66ae1fe0fcf2d60a8f625dbe122ccad67202d | Card must match the branch you measured |
 
 ### Stored data model
 None.
