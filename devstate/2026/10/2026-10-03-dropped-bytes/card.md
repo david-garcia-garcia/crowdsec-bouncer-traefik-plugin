@@ -24,7 +24,7 @@ Byte window keys share the same counters map; `unit` distinguishes the item. Add
 In progress. 0 items remain.
 
 Priority: P2 — real operator pain, with a workaround or limited blast radius
-Reviewed head: 541b5810
+Reviewed head: 52d4345a
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -86,7 +86,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 541b581006a87e3ae8845050a062441e9e3aaaf7 | Card must match the branch you measured |
+| Reviewed head | 52d4345a037f1b354e5396325a09dcfb61373a53 | Card must match the branch you measured |
 
 ### Stored data model
 None.
