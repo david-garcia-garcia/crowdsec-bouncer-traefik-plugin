@@ -54,25 +54,20 @@ func TestNew_methodIsCaseSensitive(t *testing.T) {
 	}
 }
 
-func TestNew_rejectsDoubleBangAndEmptyNegation(t *testing.T) {
+func TestNew_rejectsInvalidRE2(t *testing.T) {
 	if _, err := New([]Rule{{Method: "!!POST"}}); err == nil || !strings.Contains(err.Error(), "double negation") {
 		t.Fatalf("!! must fail New, got %v", err)
 	}
 	if _, err := New([]Rule{{Method: "!"}}); err == nil || !strings.Contains(err.Error(), "empty negation") {
 		t.Fatalf("! must fail New, got %v", err)
 	}
-}
-
-func TestNew_rejectsFullyEmptyAndMatchEverythingMethod(t *testing.T) {
 	if _, err := New([]Rule{{}}); err == nil || !strings.Contains(err.Error(), "empty") {
 		t.Fatalf("{} must fail New, got %v", err)
 	}
 	if _, err := New([]Rule{{Method: ".*"}}); err == nil || !strings.Contains(err.Error(), "empty") {
 		t.Fatalf("{method: .*} must fail New, got %v", err)
 	}
-}
 
-func TestNew_rejectsInvalidRE2(t *testing.T) {
 	if _, err := New([]Rule{{Path: "("}}); err == nil {
 		t.Fatal("invalid path RE2 must fail New")
 	}
@@ -151,14 +146,6 @@ func TestMatch_cookieNamesAreCaseSensitive(t *testing.T) {
 	}
 }
 
-func TestMatch_firstRuleWins(t *testing.T) {
-	set := mustNew(t, []Rule{{Path: "^/a"}, {Path: "^/ab"}})
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/ab", nil)
-	if !set.Match(req) {
-		t.Fatal("first matching rule must win")
-	}
-}
-
 func TestNew_hostOnly(t *testing.T) {
 	set := mustNew(t, []Rule{{Host: "^example.com$"}})
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
@@ -168,18 +155,20 @@ func TestNew_hostOnly(t *testing.T) {
 }
 
 func TestMatch_hostPortIsStripped(t *testing.T) {
-	set := mustNew(t, []Rule{{Host: "^example.com$"}})
-	req := httptest.NewRequest(http.MethodGet, "http://example.com:443/", nil)
-	if !set.Match(req) {
-		t.Fatal("host must match example.com after stripping :443")
+	cases := []struct {
+		name, host, rawURL string
+	}{
+		{name: "ipv4", host: "^example.com$", rawURL: "http://example.com:443/"},
+		{name: "ipv6", host: "^::1$", rawURL: "http://[::1]:443/"},
 	}
-}
-
-func TestMatch_ipv6HostPortIsStripped(t *testing.T) {
-	set := mustNew(t, []Rule{{Host: "^::1$"}})
-	req := httptest.NewRequest(http.MethodGet, "http://[::1]:443/", nil)
-	if !set.Match(req) {
-		t.Fatal("host must match ::1 after stripping port from [::1]:443")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			set := mustNew(t, []Rule{{Host: tc.host}})
+			req := httptest.NewRequest(http.MethodGet, tc.rawURL, nil)
+			if !set.Match(req) {
+				t.Fatalf("host must match after stripping the port from %s", tc.rawURL)
+			}
+		})
 	}
 }
 

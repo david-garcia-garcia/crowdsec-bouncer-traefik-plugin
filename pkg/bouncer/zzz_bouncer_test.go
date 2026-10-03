@@ -472,24 +472,6 @@ func TestHandleNextServeHTTPOutOfRangeStatusDoesNotPanic(t *testing.T) {
 	}
 }
 
-func TestHandleNextServeHTTPEmptyChallengeBodyBans(t *testing.T) {
-	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte(`{"action":"challenge","http_status":200}`))
-	}, nil)
-	defer appsecServer.Close()
-
-	recorder := httptest.NewRecorder()
-	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
-
-	if recorder.Code != http.StatusForbidden {
-		t.Fatalf("expected ban for empty challenge body, got %d", recorder.Code)
-	}
-	if got := recorder.Header().Get("X-Remediation"); got != "ban:appsec-challenge-empty" {
-		t.Fatalf("expected ban:appsec-challenge-empty header, got %q", got)
-	}
-}
-
 // TestHandleNextServeHTTPEmptyChallengeBodyBansWithBanPage proves
 // https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/397:
 // missing or empty-string challenge user_body_content fail-closes to the operator ban page.

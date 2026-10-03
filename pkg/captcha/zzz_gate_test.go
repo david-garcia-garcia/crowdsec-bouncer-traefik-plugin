@@ -102,25 +102,14 @@ func Test_setGateCookie_forwardedHTTPSSetsSecure(t *testing.T) {
 			}
 		})
 	}
-}
-
-func Test_setGateCookie_connectionTLSSetsSecure(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.TLS = &tls.ConnectionState{}
-	cookie := issuedGateCookie(t, req)
-	if !cookie.Secure {
-		t.Fatal("Secure=false when request TLS is set")
-	}
-}
-
-func Test_setGateCookie_protoHTTPWithTLSOmitsSecure(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set("X-Forwarded-Proto", "http")
-	req.TLS = &tls.ConnectionState{}
-	cookie := issuedGateCookie(t, req)
-	if cookie.Secure {
-		t.Fatal("Secure=true for proto http with TLS set")
-	}
+	t.Run("connection TLS", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.TLS = &tls.ConnectionState{}
+		cookie := issuedGateCookie(t, req)
+		if !cookie.Secure {
+			t.Fatal("Secure=false when request TLS is set")
+		}
+	})
 }
 
 func Test_setGateCookie_httpOrAbsentProtoOmitsSecure(t *testing.T) {
@@ -128,8 +117,10 @@ func Test_setGateCookie_httpOrAbsentProtoOmitsSecure(t *testing.T) {
 		name      string
 		setHeader bool
 		proto     string
+		withTLS   bool
 	}{
 		{name: "http", setHeader: true, proto: "http"},
+		{name: "http with TLS", setHeader: true, proto: "http", withTLS: true},
 		{name: "wss", setHeader: true, proto: "wss"},
 		{name: "absent", setHeader: false},
 		{name: "empty", setHeader: true, proto: ""},
@@ -139,6 +130,9 @@ func Test_setGateCookie_httpOrAbsentProtoOmitsSecure(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			if testCase.setHeader {
 				req.Header.Set("X-Forwarded-Proto", testCase.proto)
+			}
+			if testCase.withTLS {
+				req.TLS = &tls.ConnectionState{}
 			}
 			cookie := issuedGateCookie(t, req)
 			if cookie.Secure {

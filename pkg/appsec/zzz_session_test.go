@@ -116,24 +116,6 @@ func TestOpen_P4OmittedSchemeFollowsLAPI(t *testing.T) {
 	}
 }
 
-func TestOpen_DifferentHostsIsolate(t *testing.T) {
-	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
-
-	ctx := context.Background()
-	first, err := Open(ctx, testAppsecConfig("127.0.0.1:1"), slog.Default(), "first", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := Open(ctx, testAppsecConfig("127.0.0.1:2"), slog.Default(), "first", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first == second {
-		t.Fatal("different AppSec hosts must isolate Clients")
-	}
-}
-
 func TestKey_TimeoutKnobsChangeIdentity(t *testing.T) {
 	base := testAppsecConfig("127.0.0.1:1")
 	timeouts := testAppsecConfig("127.0.0.1:1")

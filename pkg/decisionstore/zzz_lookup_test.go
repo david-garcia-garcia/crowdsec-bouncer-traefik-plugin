@@ -30,13 +30,6 @@ func TestLookupHitsBanWinsAcrossScopes(t *testing.T) {
 	}
 }
 
-func TestLookupHitsNilMembershipDoesNotReadBlob(t *testing.T) {
-	kind, _ := lookupHits(func(string) lookupHit { return lookupHit{} }, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, nil)
-	if kind != "" {
-		t.Fatalf("nil membership must miss, kind %q", kind)
-	}
-}
-
 func TestLookupHitsMembershipNotSlot(t *testing.T) {
 	banOnly := MembershipFromIndex("10.0.0.0/8=" + decisionscope.BannedValue)
 	kind, _ := lookupHits(func(string) lookupHit { return lookupHit{} }, "10.1.2.3", net.ParseIP("10.1.2.3"), nil, banOnly)

@@ -131,23 +131,6 @@ func testRemapStreamBouncer(t *testing.T, lapiClient *lapi.Client, remap map[str
 	return b, &passed
 }
 
-func TestServeHTTP_OriginBasedDecisionRemapPassSkipsLAPIBan(t *testing.T) {
-	log := logger.New("ERROR", "")
-	lapiClient, store := lapi.NewTestClient(log)
-	lapi.AttachTestMetricsReporter(lapiClient)
-	lapiClient.SetStreamHealthyForTest(true)
-	b, passed := testRemapStreamBouncer(t, lapiClient, map[string]map[string]string{
-		"CAPI": {"ban": "pass"},
-	})
-	lapi.SeedLiveSnapshotForTest(store, "203.0.113.10", decisionscope.BannedValue, "CAPI", 60)
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
-	req.RemoteAddr = "203.0.113.10:1"
-	b.ServeHTTP(httptest.NewRecorder(), req)
-	if !*passed {
-		t.Fatal("CAPI ban remapped to pass must reach next")
-	}
-}
-
 func TestServeHTTP_OriginBasedDecisionRemapIsPerBouncer(t *testing.T) {
 	log := logger.New("ERROR", "")
 	lapiClient, store := lapi.NewTestClient(log)

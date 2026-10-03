@@ -32,40 +32,9 @@ func (failBodyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 	}, nil
 }
 
-func Test_appsecQuery_failureActionOn500(t *testing.T) {
-	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		rw.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer appsecServer.Close()
-	appsecURL, _ := url.Parse(appsecServer.URL)
-	client := newQueryClient(appsecURL, appsecServer.Client())
-	req := httptest.NewRequest(http.MethodGet, "http://localhost/", nil)
-
-	decision, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionBan})
-	if err == nil {
-		t.Fatal("ban on 500 expected an error")
-	}
-	if decision != nil {
-		t.Fatalf("ban on 500 returned decision %#v", decision)
-	}
-
-	decision, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionPassthrough})
-	if err != nil {
-		t.Fatalf("passthrough on 500: %v", err)
-	}
-	if decision == nil || decision.Action != ActionAllow {
-		t.Fatalf("passthrough on 500 want allow, got %#v", decision)
-	}
-
-	_, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionCaptcha})
-	if !errors.Is(err, ErrFailureCaptcha) {
-		t.Fatalf("captcha on 500 want ErrFailureCaptcha, got %v", err)
-	}
-}
-
-// Test_appsecQuery_failureActionOnReverseProxyError proves HTTP 502/503/504 honor failure actions.
-func Test_appsecQuery_failureActionOnReverseProxyError(t *testing.T) {
-	for _, status := range []int{http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout} {
+// Test_appsecQuery_failureActionOnServerError proves HTTP 500/502/503/504 honor failure actions.
+func Test_appsecQuery_failureActionOnServerError(t *testing.T) {
+	for _, status := range []int{http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 				rw.WriteHeader(status)
