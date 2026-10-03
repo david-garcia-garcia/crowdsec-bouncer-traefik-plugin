@@ -13,6 +13,4 @@ requirement: requirement.md
 comments: none
 explore: explore.md
 change: dropped-bytes
-pr:
-  id: 182
-  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/182
+pr: { id: 182, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/182}
