@@ -238,12 +238,7 @@ func (b *Bouncer) receiveLAPI() {
 			"missing", strings.Join(missing, ","),
 		)
 	}
-	b.log.Info("crowdsec bouncer bound",
-		"traefikName", b.name,
-		"leg", "lapi",
-		"instanceName", b.lapiInstanceName,
-		"incarnation", current.Incarnation(),
-	)
+	b.traceBouncerBound("lapi", b.lapiInstanceName, current.Incarnation())
 }
 
 func (b *Bouncer) receiveAppSec() {
@@ -274,12 +269,7 @@ func (b *Bouncer) receiveAppSec() {
 		}
 		return
 	}
-	b.log.Info("crowdsec bouncer bound",
-		"traefikName", b.name,
-		"leg", "appsec",
-		"instanceName", b.appsecInstanceName,
-		"incarnation", current.Incarnation(),
-	)
+	b.traceBouncerBound("appsec", b.appsecInstanceName, current.Incarnation())
 }
 
 func (b *Bouncer) receiveCaptcha() {
@@ -310,11 +300,16 @@ func (b *Bouncer) receiveCaptcha() {
 		}
 		return
 	}
-	b.log.Info("crowdsec bouncer bound",
+	b.traceBouncerBound("captcha", b.captchaInstanceName, current.Incarnation())
+}
+
+// traceBouncerBound records that this route is using the named backend incarnation.
+func (b *Bouncer) traceBouncerBound(leg, instanceName, incarnation string) {
+	logger.Trace(b.log, "crowdsec bouncer bound",
 		"traefikName", b.name,
-		"leg", "captcha",
-		"instanceName", b.captchaInstanceName,
-		"incarnation", current.Incarnation(),
+		"leg", leg,
+		"instanceName", instanceName,
+		"incarnation", incarnation,
 	)
 }
 

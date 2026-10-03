@@ -12,6 +12,7 @@ import (
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // Stream is the body returned from Crowdsec Stream LAPI.
@@ -52,7 +53,7 @@ func (c *Client) handleStreamTicker() {
 
 	started := time.Now()
 	startup := c.streamStartup()
-	c.log.Debug("handleStreamTicker:poll",
+	logger.Trace(c.log, "handleStreamTicker:poll",
 		"startup", startup,
 		"interval", c.updateInterval,
 	)

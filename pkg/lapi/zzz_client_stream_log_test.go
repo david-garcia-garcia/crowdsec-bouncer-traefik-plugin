@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // newTestStreamTickClient builds a stream Client that can poll a mock LAPI without starting tickers.
@@ -100,8 +102,8 @@ func TestHandleStreamCacheUpdatedIsDebug(t *testing.T) {
 	}
 }
 
-// TestHandleStreamTickerPollLogsAreDebug proves enter and finish stems stay DEBUG with startup=true.
-func TestHandleStreamTickerPollLogsAreDebug(t *testing.T) {
+// TestHandleStreamTickerPollIsTraceAndUpdatedIsDebug proves the enter line is TRACE and the finish line stays DEBUG.
+func TestHandleStreamTickerPollIsTraceAndUpdatedIsDebug(t *testing.T) {
 	server, _ := testStreamLAPI(t)
 	serverURL, err := url.Parse(server.URL)
 	if err != nil {
@@ -109,23 +111,26 @@ func TestHandleStreamTickerPollLogsAreDebug(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		level slog.Level
-		want  bool
+		level   slog.Level
+		poll    bool
+		updated bool
 	}{
-		{slog.LevelInfo, false},
-		{slog.LevelDebug, true},
+		{slog.LevelInfo, false, false},
+		{slog.LevelDebug, false, true},
+		{logger.LevelTrace, true, true},
 	} {
 		t.Run(tc.level.String(), func(t *testing.T) {
 			logged := captureTestStreamTickLog(t, tc.level, func(log *slog.Logger) {
 				client := newTestStreamTickClient(t, log, serverURL.Host, server.Client())
 				client.handleStreamTicker()
 			})
-			for _, msg := range []string{"handleStreamTicker:poll", "handleStreamCache:updated"} {
-				if got := strings.Contains(logged, msg); got != tc.want {
-					t.Fatalf("%s at %s: got %v want %v\n%s", msg, tc.level, got, tc.want, logged)
-				}
+			if got := strings.Contains(logged, "handleStreamTicker:poll"); got != tc.poll {
+				t.Fatalf("handleStreamTicker:poll at %s: got %v want %v\n%s", tc.level, got, tc.poll, logged)
 			}
-			if tc.want {
+			if got := strings.Contains(logged, "handleStreamCache:updated"); got != tc.updated {
+				t.Fatalf("handleStreamCache:updated at %s: got %v want %v\n%s", tc.level, got, tc.updated, logged)
+			}
+			if tc.updated {
 				for _, field := range []string{
 					`"traefikName":"test-mw"`,
 					`"instanceName":"shared"`,
@@ -137,7 +142,7 @@ func TestHandleStreamTickerPollLogsAreDebug(t *testing.T) {
 					`"fetches":1`,
 				} {
 					if !strings.Contains(logged, field) {
-						t.Fatalf("poll at DEBUG missing %s:\n%s", field, logged)
+						t.Fatalf("poll at %s missing %s:\n%s", tc.level, field, logged)
 					}
 				}
 			}
@@ -156,7 +161,7 @@ func TestHandleStreamTickerSubsequentPollLogsDelta(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	log, sink := newTestLogSink(slog.LevelDebug)
+	log, sink := newTestLogSink(logger.LevelTrace)
 	client := newTestStreamTickClient(t, log, serverURL.Host, server.Client())
 	client.handleStreamTicker()
 	client.handleStreamTicker()

@@ -164,8 +164,9 @@ $svc
     }
 
     function Get-SevKnobs {
+        param([string]$LogLevel = "DEBUG")
         return @"
-          logLevel: DEBUG
+          logLevel: $LogLevel
           logFormat: json
           reclaimGraceSeconds: "2"
           lapiUpdateIntervalSeconds: "5"
@@ -265,7 +266,7 @@ $knobs
     }
 
     It "T2 named share owner is a real route" {
-        $knobs = Get-SevKnobs
+        $knobs = Get-SevKnobs -LogLevel TRACE
         $svc = Get-SevService
         Write-SevYaml @"
 http:
