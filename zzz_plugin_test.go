@@ -95,25 +95,8 @@ func reqForIP(ip string) *http.Request {
 	return req
 }
 
-func TestServeHTTP(t *testing.T) {
-	cfg := CreateConfig()
-	cfg.LapiEnabled = true
-	cfg.LapiKey = "test"
-	ctx := context.Background()
-	handler, err := New(ctx, testNextOK(), cfg, "demo-plugin")
-	if err != nil {
-		t.Fatal(err)
-	}
-	recorder := httptest.NewRecorder()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	handler.ServeHTTP(recorder, req)
-}
-
-// TestNew_RejectsEmptyCaptchaKeys stops at ValidateParams so New does not open LAPI.
-func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
+// TestNew_RejectsBeforeOpeningLAPI stops at ValidateParams so New does not open LAPI.
+func TestNew_RejectsBeforeOpeningLAPI(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() {
 		reclaim.ResetForTest()
@@ -122,77 +105,71 @@ func TestNew_RejectsEmptyCaptchaKeys(t *testing.T) {
 	var hits int64
 	srv := liveLAPI(t, nil, &hits)
 	t.Cleanup(func() { srv.Close() })
-	u, err := url.Parse(srv.URL)
+	parsed, err := url.Parse(srv.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cfg := cfgLiveAt(u.Host)
-	cfg.CaptchaEnabled = true
-	cfg.CaptchaProvider = configuration.HcaptchaProvider
-	cfg.CaptchaGateSecret = "gate-secret"
-	cfg.CaptchaFilePath = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
-
-	handler, err := New(context.Background(), testNextOK(), cfg, "empty-captcha-keys")
-	if err == nil {
-		t.Fatal("New must fail when captchaProvider is set and site key is empty")
+	cases := []struct {
+		name       string
+		middleware string
+		mutate     func(cfg *configuration.Config)
+		want       string
+	}{
+		{
+			name:       "empty captcha keys",
+			middleware: "empty-captcha-keys",
+			mutate: func(cfg *configuration.Config) {
+				cfg.CaptchaEnabled = true
+				cfg.CaptchaProvider = configuration.HcaptchaProvider
+				cfg.CaptchaGateSecret = "gate-secret"
+				cfg.CaptchaFilePath = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
+			},
+			want: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set",
+		},
+		{
+			name:       "invalid action rule",
+			middleware: "invalid-lapi-action",
+			mutate: func(cfg *configuration.Config) {
+				cfg.BouncerActionRules = []httprule.ActionRule{{
+					Name:   "x",
+					Action: []string{httprule.ActionBypassLapi},
+					Rule:   httprule.Rule{Path: "("},
+				}}
+			},
+			want: "BouncerActionRules",
+		},
+		{
+			name:       "empty action rule",
+			middleware: "invalid-empty-action",
+			mutate: func(cfg *configuration.Config) {
+				cfg.BouncerActionRules = []httprule.ActionRule{{
+					Name:   "x",
+					Action: []string{httprule.ActionBypassAppsec},
+				}}
+			},
+			want: "BouncerActionRules",
+		},
 	}
-	if handler != nil {
-		t.Fatal("New must return a nil handler when captcha keys are empty")
-	}
-	if !strings.Contains(err.Error(), "CaptchaSiteKey: cannot be empty when CaptchaProvider is set") {
-		t.Fatalf("error %q", err)
-	}
-	if atomic.LoadInt64(&hits) != 0 {
-		t.Fatalf("New opened LAPI (%d hits)", hits)
-	}
-}
-
-func TestNew_RejectsInvalidActionRules(t *testing.T) {
-	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() {
-		reclaim.ResetForTest()
-	})
-
-	var hits int64
-	srv := liveLAPI(t, nil, &hits)
-	t.Cleanup(func() { srv.Close() })
-	u, err := url.Parse(srv.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cfg := cfgLiveAt(u.Host)
-	cfg.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBypassLapi}, Rule: httprule.Rule{Path: "("}}}
-	handler, err := New(context.Background(), testNextOK(), cfg, "invalid-lapi-action")
-	if err == nil {
-		t.Fatal("New must fail when BouncerActionRules is invalid RE2")
-	}
-	if handler != nil {
-		t.Fatal("New must return a nil handler when action rules are invalid")
-	}
-	if !strings.Contains(err.Error(), "BouncerActionRules") {
-		t.Fatalf("error %q", err)
-	}
-	if atomic.LoadInt64(&hits) != 0 {
-		t.Fatalf("New opened LAPI (%d hits)", hits)
-	}
-
-	hits = 0
-	cfg = cfgLiveAt(u.Host)
-	cfg.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBypassAppsec}}}
-	handler, err = New(context.Background(), testNextOK(), cfg, "invalid-empty-action")
-	if err == nil {
-		t.Fatal("New must fail when BouncerActionRules contains a fully empty rule")
-	}
-	if handler != nil {
-		t.Fatal("New must return a nil handler when action rules are invalid")
-	}
-	if !strings.Contains(err.Error(), "BouncerActionRules") {
-		t.Fatalf("error %q", err)
-	}
-	if atomic.LoadInt64(&hits) != 0 {
-		t.Fatalf("New opened LAPI (%d hits)", hits)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			hits = 0
+			cfg := cfgLiveAt(parsed.Host)
+			tc.mutate(cfg)
+			handler, newErr := New(context.Background(), testNextOK(), cfg, tc.middleware)
+			if newErr == nil {
+				t.Fatal("New must fail")
+			}
+			if handler != nil {
+				t.Fatal("New must return a nil handler")
+			}
+			if !strings.Contains(newErr.Error(), tc.want) {
+				t.Fatalf("error %q", newErr)
+			}
+			if atomic.LoadInt64(&hits) != 0 {
+				t.Fatalf("New opened LAPI (%d hits)", hits)
+			}
+		})
 	}
 }
 

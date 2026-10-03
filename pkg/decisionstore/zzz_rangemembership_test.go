@@ -12,18 +12,19 @@ func ipOf(addr string) net.IP {
 }
 
 func TestMembershipFromIndexBanWinsOverLongerCaptcha(t *testing.T) {
-	index := "10.0.0.0/8=" + decisionscope.BannedValue + "\n10.1.0.0/16=" + decisionscope.CaptchaValue
-	got := MembershipFromIndex(index).Remediation(ipOf("10.1.2.3"))
-	if got != decisionscope.BannedValue {
-		t.Fatalf("got %q, want ban", got)
+	cases := []struct {
+		name, index string
+	}{
+		{name: "wide ban", index: "10.0.0.0/8=" + decisionscope.BannedValue + "\n10.1.0.0/16=" + decisionscope.CaptchaValue},
+		{name: "longer ban", index: "10.0.0.0/8=" + decisionscope.CaptchaValue + "\n10.1.0.0/16=" + decisionscope.BannedValue},
 	}
-}
-
-func TestMembershipFromIndexLongerBanWinsOverCaptcha(t *testing.T) {
-	index := "10.0.0.0/8=" + decisionscope.CaptchaValue + "\n10.1.0.0/16=" + decisionscope.BannedValue
-	got := MembershipFromIndex(index).Remediation(ipOf("10.1.2.3"))
-	if got != decisionscope.BannedValue {
-		t.Fatalf("got %q, want ban", got)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := MembershipFromIndex(tc.index).Remediation(ipOf("10.1.2.3"))
+			if got != decisionscope.BannedValue {
+				t.Fatalf("got %q, want ban", got)
+			}
+		})
 	}
 }
 

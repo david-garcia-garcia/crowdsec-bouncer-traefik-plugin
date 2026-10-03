@@ -12,20 +12,6 @@ import (
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-func TestMemoryTickPublishLookup(t *testing.T) {
-	store := NewMemory(logger.New("ERROR", ""))
-	store.BeginTick()
-	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60})
-	store.PublishTick(0)
-	kind, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
-	if err != nil || kind != decisionscope.BannedValue {
-		t.Fatalf("kind %q err %v", kind, err)
-	}
-	if _, ok := store.PublishedMemoryMapForTest()["203.0.113.10"]; !ok {
-		t.Fatal("published map missing slot")
-	}
-}
-
 func TestElapsedNowStaysAboveSkipSentinel(t *testing.T) {
 	if got := elapsedNow(); got < elapsedBias {
 		t.Fatalf("elapsedNow %d, want at least bias %d", got, elapsedBias)
@@ -33,26 +19,18 @@ func TestElapsedNowStaysAboveSkipSentinel(t *testing.T) {
 }
 
 func TestMemoryDurationZeroMissesAfterPublish(t *testing.T) {
-	store := NewMemory(logger.New("ERROR", ""))
-	store.BeginTick()
-	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 0})
-	store.PublishTick(ElapsedNow())
-	kind, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
-	_ = originID
-	if err != nil || kind != "" {
-		t.Fatalf("duration 0 must miss after publish, got kind %q err %v", kind, err)
-	}
-}
-
-func TestMemoryExpiryOnPublish(t *testing.T) {
-	store := NewMemory(logger.New("ERROR", ""))
-	store.BeginTick()
-	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: -1})
-	store.PublishTick(ElapsedNow())
-	kind, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
-	_ = originID
-	if err != nil || kind != "" {
-		t.Fatalf("expired slot must miss, got kind %q err %v", kind, err)
+	for _, durationSec := range []int64{0, -1} {
+		t.Run(strconv.FormatInt(durationSec, 10), func(t *testing.T) {
+			store := NewMemory(logger.New("ERROR", ""))
+			store.BeginTick()
+			store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: durationSec})
+			store.PublishTick(ElapsedNow())
+			kind, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+			_ = originID
+			if err != nil || kind != "" {
+				t.Fatalf("duration %d must miss after publish, got kind %q err %v", durationSec, kind, err)
+			}
+		})
 	}
 }
 
@@ -68,6 +46,9 @@ func TestMemoryTickPutHiddenUntilPublish(t *testing.T) {
 	kind, origin, originID, err = store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	if err != nil || kind != decisionscope.BannedValue {
 		t.Fatalf("kind %q origin %q id %d err %v", kind, origin, originID, err)
+	}
+	if _, ok := store.PublishedMemoryMapForTest()["203.0.113.10"]; !ok {
+		t.Fatal("published map missing slot")
 	}
 }
 

@@ -59,14 +59,6 @@ func TestActiveCountsPutWithoutPublishTickIsEmpty(t *testing.T) {
 	}
 }
 
-func TestActiveCountsLivePutDoesNotIncrement(t *testing.T) {
-	store := NewMemory(logger.New("ERROR", ""))
-	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: activeCountBanIP, Kind: decisionscope.BannedValue, Origin: activeCountOrigin, DurationSec: 60})
-	if got := store.ActiveCounts(); len(got) != 0 {
-		t.Fatalf("live Put must not count, got %#v", got)
-	}
-}
-
 func TestActiveCountsRedisAlwaysEmpty(t *testing.T) {
 	server := startTestStoreRedis(t)
 	store := NewRedis(logger.New("ERROR", ""), server.addr(), nil, "", "", "sess")

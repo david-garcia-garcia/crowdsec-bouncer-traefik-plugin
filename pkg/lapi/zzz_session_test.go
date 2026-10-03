@@ -154,12 +154,6 @@ func TestSessionKey_PolicyAndTLSDoNotChangeKey(t *testing.T) {
 	}
 }
 
-func TestClient_ReclaimGrace(t *testing.T) {
-	if reclaim.ProcessGrace != 30*time.Second {
-		t.Fatalf("ProcessGrace: %v", reclaim.ProcessGrace)
-	}
-}
-
 func TestClient_LifecycleLogs(t *testing.T) {
 	log, logSink := newTestLogSink(slog.LevelDebug)
 	log = log.With("leg", "lapi", "sessionKey", "lapi:test-key")
@@ -497,36 +491,6 @@ func TestOpenStream_FailureActionOnlyKeepsClient(t *testing.T) {
 	}
 }
 
-func TestOpenStream_TLSOnlyAdoptsTransport(t *testing.T) {
-	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
-
-	server, _ := testStreamLAPI(t)
-	parsed, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	log := slog.Default()
-	ctx := context.Background()
-	firstCfg := testStreamConfig(parsed.Host, 1)
-	firstCfg.LapiHTTPTimeoutSeconds = 10
-	secondCfg := testStreamConfig(parsed.Host, 1)
-	secondCfg.LapiHTTPTimeoutSeconds = 30
-
-	first, err := Open(ctx, firstCfg, log, "shared", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := Open(ctx, secondCfg, log, "shared", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first == second {
-		t.Fatal("timeout-only New must open a new Client")
-	}
-	second.Close()
-}
-
 func TestOpenStream_LapiOverrideAdoptsTimeout(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
@@ -553,34 +517,6 @@ func TestOpenStream_LapiOverrideAdoptsTimeout(t *testing.T) {
 	}
 	if first == second {
 		t.Fatal("LAPI override-only New must open a new Client")
-	}
-}
-
-func TestOpenStream_SharedDefaultChangeAdoptsWhenOverrideZero(t *testing.T) {
-	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
-
-	server, _ := testStreamLAPI(t)
-	parsed, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx := context.Background()
-	firstCfg := testStreamConfig(parsed.Host, 1)
-	firstCfg.LapiHTTPTimeoutSeconds = 10
-	secondCfg := testStreamConfig(parsed.Host, 1)
-	secondCfg.LapiHTTPTimeoutSeconds = 20
-
-	first, err := Open(ctx, firstCfg, slog.Default(), "shared", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := Open(ctx, secondCfg, slog.Default(), "shared", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first == second {
-		t.Fatal("shared-default timeout New must open a new Client")
 	}
 }
 

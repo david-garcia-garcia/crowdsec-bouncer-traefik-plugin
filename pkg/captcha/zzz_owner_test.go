@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -55,30 +56,21 @@ func TestPrepare_SubscriberOmitStaysEmpty(t *testing.T) {
 func TestOpen_SiteverifyTimeoutHonorsOverride(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
-	cfg := testOwnerConfig(t, 1)
-	client, err := Open(context.Background(), cfg, logger.New("ERROR", ""), "cs-owner", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	httpClient := client.HTTPClientForTest()
-	if httpClient == nil {
-		t.Fatal("siteverify client was not stored")
-	}
-	if httpClient.Timeout != time.Second {
-		t.Fatalf("Timeout = %v want 1s", httpClient.Timeout)
-	}
-}
-
-func TestOpen_SiteverifyTimeoutUsesOwnKnob(t *testing.T) {
-	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
-	cfg := testOwnerConfig(t, 10)
-	client, err := Open(context.Background(), cfg, logger.New("ERROR", ""), "cs-owner", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := client.HTTPClientForTest().Timeout; got != 10*time.Second {
-		t.Fatalf("Timeout = %v want 10s", got)
+	for _, seconds := range []int64{1, 10} {
+		t.Run(strconv.FormatInt(seconds, 10), func(t *testing.T) {
+			cfg := testOwnerConfig(t, seconds)
+			client, err := Open(context.Background(), cfg, logger.New("ERROR", ""), "cs-owner", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			httpClient := client.HTTPClientForTest()
+			if httpClient == nil {
+				t.Fatal("siteverify client was not stored")
+			}
+			if httpClient.Timeout != time.Duration(seconds)*time.Second {
+				t.Fatalf("Timeout = %v want %ds", httpClient.Timeout, seconds)
+			}
+		})
 	}
 }
 

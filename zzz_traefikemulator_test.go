@@ -95,7 +95,7 @@ func waitFor(t *testing.T, timeout time.Duration, ready func() bool) {
 	t.Fatal("condition was not met before the deadline")
 }
 
-func TestGeneration_SubscriberBeforeOwnerWithinGrace(t *testing.T) {
+func TestGeneration_LAPISubscriberBothOrders(t *testing.T) {
 	var zero int64
 	srv := liveLAPI(t, nil, &zero)
 	t.Cleanup(func() { srv.Close() })
@@ -104,31 +104,18 @@ func TestGeneration_SubscriberBeforeOwnerWithinGrace(t *testing.T) {
 
 	owner := generationRoute("owner", "owner", lapiOwnerConfig(host, "shared"))
 	subscriber := generationRoute("subscriber", "subscriber", lapiSubscriberConfig(host))
-	// yaegi v0.16.1 cannot range over an integer.
-	for attempt := 0; attempt < 2; attempt++ { //nolint:intrange
-		if failed := generation.Apply([]traefikemulator.Route{subscriber, owner}); failed != nil {
-			t.Fatal(failed)
+	for _, routes := range [][]traefikemulator.Route{
+		{subscriber, owner},
+		{owner, subscriber},
+	} {
+		// yaegi v0.16.1 cannot range over an integer.
+		for attempt := 0; attempt < 2; attempt++ { //nolint:intrange
+			if failed := generation.Apply(routes); failed != nil {
+				t.Fatal(failed)
+			}
 		}
+		requireBound(t, generation, "subscriber", routeClient(t, generation, "owner"))
 	}
-	requireBound(t, generation, "subscriber", routeClient(t, generation, "owner"))
-}
-
-func TestGeneration_OwnerBeforeSubscriberWithinGrace(t *testing.T) {
-	var zero int64
-	srv := liveLAPI(t, nil, &zero)
-	t.Cleanup(func() { srv.Close() })
-	host := mustHost(t, srv.URL)
-	generation := newGeneration(t, time.Second)
-
-	owner := generationRoute("owner", "owner", lapiOwnerConfig(host, "shared"))
-	subscriber := generationRoute("subscriber", "subscriber", lapiSubscriberConfig(host))
-	// yaegi v0.16.1 cannot range over an integer.
-	for attempt := 0; attempt < 2; attempt++ { //nolint:intrange
-		if failed := generation.Apply([]traefikemulator.Route{owner, subscriber}); failed != nil {
-			t.Fatal(failed)
-		}
-	}
-	requireBound(t, generation, "subscriber", routeClient(t, generation, "owner"))
 }
 
 func TestGeneration_ReloadAfterGraceBindsNewClient(t *testing.T) {
