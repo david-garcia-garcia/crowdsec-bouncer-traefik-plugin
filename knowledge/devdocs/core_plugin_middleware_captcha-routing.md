@@ -43,7 +43,7 @@ _Avoid_: `CaptchaCustomValidateURL`, the bundled default `captcha.html`
 - Match custom assets with `IsCustomResourceRequest`. `configuration.CustomCaptchaResourcePath` is the one owner of which configured value names a browser path; `Client.New` calls it for `CaptchaCustomJsURL` and optional `captchaCustomChallengeUrl` (custom provider only) and compares the stored paths to `req.URL.Path`. Ignore host and query. Never `CaptchaCustomValidateURL`. Never a prefix.
 - Render the endpoint through template `ChallengeURL` (execute map sibling of `FrontendJS`). Captcha templates use `{{` / `}}`, unlike the ban template's `[[` / `]]`. Wire it in `examples/custom-captcha`, not in the bundled default `captcha.html`.
 - Past-captcha is `Check(req)` only — the HMAC gate cookie. Do not read or write cache grace keys, and do not reintroduce an IP-keyed grace cache.
-- Passthrough and Check-true ordinary requests call `handleNextServeHTTP`. Ban never passthrough.
+- Passthrough and Check-true ordinary requests call `appsecThenNextServeHTTP`. Ban never passthrough.
 
 ## Key files
 

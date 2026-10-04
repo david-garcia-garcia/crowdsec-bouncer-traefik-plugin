@@ -58,7 +58,7 @@ func TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan(t *testing.T) {
 		enabled:                  true,
 		forwardedHeadersInsecure: true,
 		forwardedCustomHeader:    "X-Forwarded-For",
-		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
+		trustedClients:           &ip.PoolStrategy{Checker: clientChecker},
 		log:                      log,
 		remediationStatusCode:    http.StatusForbidden,
 		banTemplate:              banTemplate,
@@ -97,7 +97,7 @@ func TestServeHTTP_PackedMemoryBanRecordsCrowdsecOrigin(t *testing.T) {
 	passed := false
 	b := &Bouncer{
 		enabled:                true,
-		clientPoolStrategy:     &ip.PoolStrategy{Checker: clientChecker},
+		trustedClients:         &ip.PoolStrategy{Checker: clientChecker},
 		log:                    log,
 		remediationStatusCode:  http.StatusForbidden,
 		banTemplate:            banTemplate,
@@ -284,7 +284,7 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 	defer appsecServer.Close()
 
 	recorder := httptest.NewRecorder()
-	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+	b.appsecThenNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected challenge status 200, got %d", recorder.Code)
@@ -324,7 +324,7 @@ func TestHandleNextServeHTTPChallengeCSPReplacesAndCookiesStaySeparate(t *testin
 	// Pre-set CSP so replace (not append) is observable on the same writer map.
 	recorder := httptest.NewRecorder()
 	recorder.Header().Set("Content-Security-Policy", "default-src 'self'")
-	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+	b.appsecThenNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 	csp := recorder.Header().Values("Content-Security-Policy")
 	if len(csp) != 1 || csp[0] != "script-src 'none'" {
@@ -356,7 +356,7 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecCaptcha(t *testing.T) {
 	defer appsecServer.Close()
 
 	recorder := httptest.NewRecorder()
-	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+	b.appsecThenNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("expected captcha status 403, got %d", recorder.Code)
@@ -387,7 +387,7 @@ func TestHandleNextServeHTTPEmptyCaptchaBodyRelaysStatus(t *testing.T) {
 	defer appsecServer.Close()
 
 	recorder := httptest.NewRecorder()
-	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+	b.appsecThenNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("expected captcha status 403, got %d", recorder.Code)
@@ -407,7 +407,7 @@ func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
 	defer appsecServer.Close()
 
 	recorder := httptest.NewRecorder()
-	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+	b.appsecThenNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("expected fallback ban status 403, got %d", recorder.Code)
@@ -429,7 +429,7 @@ func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
 	defer appsecServer.Close()
 
 	recorder := httptest.NewRecorder()
-	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+	b.appsecThenNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d", recorder.Code)
@@ -451,7 +451,7 @@ func TestHandleNextServeHTTPChallengeFallsBackToBanContentType(t *testing.T) {
 	defer appsecServer.Close()
 
 	recorder := httptest.NewRecorder()
-	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+	b.appsecThenNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected challenge status 200, got %d", recorder.Code)
@@ -469,7 +469,7 @@ func TestHandleNextServeHTTPOutOfRangeStatusDoesNotPanic(t *testing.T) {
 	defer appsecServer.Close()
 
 	recorder := httptest.NewRecorder()
-	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+	b.appsecThenNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("expected clamped status 403, got %d", recorder.Code)
@@ -500,7 +500,7 @@ func TestHandleNextServeHTTPEmptyChallengeBodyBansWithBanPage(t *testing.T) {
 			defer appsecServer.Close()
 
 			recorder := httptest.NewRecorder()
-			b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+			b.appsecThenNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 			if recorder.Code != http.StatusForbidden {
 				t.Fatalf("expected ban status 403, got %d", recorder.Code)
@@ -524,7 +524,7 @@ func TestHandleNextServeHTTPZeroStatusIs200(t *testing.T) {
 	defer appsecServer.Close()
 
 	recorder := httptest.NewRecorder()
-	b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+	b.appsecThenNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected missing http_status to be 200, got %d", recorder.Code)
@@ -549,7 +549,7 @@ func TestHandleNextServeHTTPAllowCallsNext(t *testing.T) {
 		log: logger.New("ERROR", ""),
 	}
 	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
-	b.handleNextServeHTTP(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+	b.appsecThenNextServeHTTP(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 	if !nextCalled {
 		t.Fatal("next handler should be called for allow")
 	}
@@ -608,7 +608,7 @@ func TestHandleNextServeHTTP_clientDisconnected(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", failingBodyForDisconnectTest{err: context.Canceled})
 	req.ContentLength = 100
 	rw := &statusWatchRecorder{ResponseRecorder: httptest.NewRecorder()}
-	b.handleNextServeHTTP(rw, testClientRequest(req, "192.0.2.10"))
+	b.appsecThenNextServeHTTP(rw, testClientRequest(req, "192.0.2.10"))
 	if nextCalled {
 		t.Fatal("origin must not run after client disconnect")
 	}
@@ -635,7 +635,7 @@ func TestHandleNextServeHTTP_clientDisconnected(t *testing.T) {
 		b.log = infoLog
 		req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", failingBodyForDisconnectTest{err: context.Canceled})
 		req.ContentLength = 100
-		b.handleNextServeHTTP(httptest.NewRecorder(), testClientRequest(req, "192.0.2.10"))
+		b.appsecThenNextServeHTTP(httptest.NewRecorder(), testClientRequest(req, "192.0.2.10"))
 		if infoBuf.Len() != 0 {
 			t.Fatalf("INFO log should be empty, got %s", infoBuf.String())
 		}
@@ -727,7 +727,7 @@ func TestHandleNextServeHTTPAppsecFailureAction(t *testing.T) {
 			log:                 logger.New("ERROR", ""),
 		}
 		bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
-		b.handleNextServeHTTP(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+		b.appsecThenNextServeHTTP(httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 		if !nextCalled {
 			t.Fatal("passthrough on AppSec 500 should call next")
 		}
@@ -739,7 +739,7 @@ func TestHandleNextServeHTTPAppsecFailureAction(t *testing.T) {
 		defer appsecServer.Close()
 		b.appsecFailureAction = configuration.FailureActionBan
 		recorder := httptest.NewRecorder()
-		b.handleNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+		b.appsecThenNextServeHTTP(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 		if recorder.Code != http.StatusForbidden {
 			t.Fatalf("ban on AppSec 500 want 403, got %d", recorder.Code)
 		}

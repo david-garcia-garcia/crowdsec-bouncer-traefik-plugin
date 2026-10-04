@@ -32,8 +32,8 @@ type Bouncer struct {
 	actionRules              *httprule.ActionSet
 	banTemplate              *template.Template
 	banTemplateContentType   string
-	captchaBound             atomic.Value // *captcha.Client; typed nil when empty
-	clientPoolStrategy       *ip.PoolStrategy
+	captchaBound             atomic.Value      // *captcha.Client; typed nil when empty
+	trustedClients           *ip.PoolStrategy  // client addresses that skip LAPI and AppSec
 	decisionScopeHeaders     map[string]string // CrowdSec header scope → request header
 	enabled                  bool
 	forwardedCustomHeader    string
@@ -61,8 +61,7 @@ type Bouncer struct {
 	next                     http.Handler
 	remediationCustomHeader  string
 	remediationStatusCode    int
-	serverPoolStrategy       *ip.PoolStrategy
-	template                 *template.Template
+	trustedHops              *ip.PoolStrategy // hops allowed to set the forwarded client header
 	traceCustomHeader        string
 	originBasedDecisionRemap map[string]map[string]string // per-router apply; LAPI/store keep original kinds
 }
@@ -74,7 +73,7 @@ const msgCaptchaUnsubscribed = "crowdsec bouncer captcha unsubscribed"
 // New returns a per-router handler. Clients arrive later through ReceiveLAPI, ReceiveAppSec, and ReceiveCaptcha.
 func New(next http.Handler, name string, config *configuration.Config, subscribeLAPI, subscribeAppSec, subscribeCaptcha bool, log *slog.Logger) (*Bouncer, error) {
 	log = log.With("traefikName", name)
-	serverChecker, _ := ip.NewChecker(log, config.BouncerForwardedHeadersTrustedIPs)
+	hopChecker, _ := ip.NewChecker(log, config.BouncerForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(log, config.BouncerClientTrustedIPs)
 	forwardedCustomHeader := config.BouncerForwardedHeadersCustomName
 	if config.BouncerForwardedHeadersInsecure && forwardedCustomHeader == "X-Forwarded-For" {
@@ -108,7 +107,7 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 		actionRules:              actionRules,
 		banTemplate:              banTemplate,
 		banTemplateContentType:   banTemplateContentType,
-		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
+		trustedClients:           &ip.PoolStrategy{Checker: clientChecker},
 		decisionScopeHeaders:     decisionscope.NormalizeDecisionScopeHeaders(config.BouncerDecisionScopeHeaders),
 		enabled:                  config.BouncerEnabled,
 		forwardedCustomHeader:    forwardedCustomHeader,
@@ -128,8 +127,7 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 		next:                     next,
 		remediationCustomHeader:  config.BouncerRemediationHeadersCustomName,
 		remediationStatusCode:    config.BouncerRemediationStatusCode,
-		serverPoolStrategy:       &ip.PoolStrategy{Checker: serverChecker},
-		template:                 template.New("CrowdsecBouncer").Delims("[[", "]]"),
+		trustedHops:              &ip.PoolStrategy{Checker: hopChecker},
 		traceCustomHeader:        config.BouncerTraceHeadersCustomName,
 		originBasedDecisionRemap: copyOriginBasedDecisionRemap(config.BouncerOriginBasedDecisionRemap),
 	}
@@ -323,7 +321,7 @@ func (b *Bouncer) passOrCaptchaRule(rw http.ResponseWriter, req clientrequest.Re
 		b.applyCaptchaRuleServeHTTP(rw, req, match)
 		return
 	}
-	b.handleNextServeHTTP(rw, req)
+	b.appsecThenNextServeHTTP(rw, req)
 }
 
 // applyCaptchaRuleServeHTTP queries AppSec unless skipped, then serves the plugin captcha gate.
@@ -408,7 +406,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		crowdsecMode = lapiClient.Mode()
 	}
 
-	remoteIP, ipAddr, err := ip.GetRemoteIP(httpReq, b.serverPoolStrategy, b.forwardedCustomHeader, b.forwardedHeadersInsecure)
+	remoteIP, ipAddr, err := ip.GetRemoteIP(httpReq, b.trustedHops, b.forwardedCustomHeader, b.forwardedHeadersInsecure)
 	req := clientrequest.New(httpReq, remoteIP, ipAddr)
 	b.recordProcessed(req.IPType())
 	if err != nil {
@@ -421,7 +419,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, headerReasonUnparseableRequest, lapi.OriginPluginTechTrustIPFail)
 		return
 	}
-	isTrusted := b.clientPoolStrategy.Checker.ContainsIP(req.IPAddr())
+	isTrusted := b.trustedClients.Checker.ContainsIP(req.IPAddr())
 	logger.Trace(b.log, "ServeHTTP", "ip", req.RemoteIP(), "isTrusted", isTrusted)
 	if isTrusted {
 		b.next.ServeHTTP(rw, req.Request)
@@ -625,7 +623,7 @@ func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientr
 
 	// Same-origin widget assets must load while the visitor is still unsolved.
 	if captchaClient.IsCustomResourceRequest(req.Request) {
-		b.handleNextServeHTTP(rw, req)
+		b.appsecThenNextServeHTTP(rw, req)
 		return
 	}
 
@@ -635,7 +633,7 @@ func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientr
 			captchaClient.WriteSolvedRedirect(rw, req.Request, b.remediationCustomHeader)
 			return
 		}
-		b.handleNextServeHTTP(rw, req)
+		b.appsecThenNextServeHTTP(rw, req)
 		return
 	}
 
@@ -644,8 +642,9 @@ func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientr
 	captchaClient.ServeHTTP(rw, req, b.remediationCustomHeader, challengeValue)
 }
 
-// handleNextServeHTTP runs AppSec if enabled and not skipped by an action rule, then the next handler.
-func (b *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req clientrequest.Request) {
+// appsecThenNextServeHTTP runs AppSec unless an action rule skips it, then calls next.
+// An AppSec response returns before next.
+func (b *Bouncer) appsecThenNextServeHTTP(rw http.ResponseWriter, req clientrequest.Request) {
 	if b.actionRules.Fold(req.Request).SkipAppsec {
 		b.next.ServeHTTP(rw, req.Request)
 		return
@@ -686,7 +685,7 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientrequest
 		return true
 	}
 	if err != nil {
-		b.log.Debug("handleNextServeHTTP", "ip", req.RemoteIP(), "isWaf", true, "error", err)
+		b.log.Debug("applyAppsecServeHTTP", "ip", req.RemoteIP(), "isWaf", true, "error", err)
 		b.warnCaptchaSuperseded(req, match)
 		b.handleBanServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsecFailure, lapi.OriginPluginAppsecFailure)
 		return true

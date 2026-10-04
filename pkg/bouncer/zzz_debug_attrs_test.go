@@ -32,7 +32,7 @@ func testStreamAllowBouncer(t *testing.T, log *slog.Logger) (*Bouncer, *httptest
 		enabled:                  true,
 		forwardedHeadersInsecure: true,
 		forwardedCustomHeader:    "X-Forwarded-For",
-		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
+		trustedClients:           &ip.PoolStrategy{Checker: clientChecker},
 		log:                      log,
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			passed = true
@@ -61,7 +61,7 @@ func testStreamBanBouncer(t *testing.T, log *slog.Logger, scopeHeaders map[strin
 		enabled:                  true,
 		forwardedHeadersInsecure: true,
 		forwardedCustomHeader:    "X-Forwarded-For",
-		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
+		trustedClients:           &ip.PoolStrategy{Checker: clientChecker},
 		decisionScopeHeaders:     scopeHeaders,
 		log:                      log,
 		remediationStatusCode:    http.StatusForbidden,
@@ -279,7 +279,7 @@ func TestHunt_ServeHTTPLiveLookupTraceIncludesScopes(t *testing.T) {
 		enabled:                  true,
 		forwardedHeadersInsecure: true,
 		forwardedCustomHeader:    "X-Forwarded-For",
-		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
+		trustedClients:           &ip.PoolStrategy{Checker: clientChecker},
 		decisionScopeHeaders: map[string]string{
 			decisionscope.ScopeCountry: "CF-IPCountry",
 			decisionscope.ScopeAS:      "CF-ASN",

@@ -44,7 +44,7 @@ func testBypassOriginBouncer(t *testing.T) (*Bouncer, *bool) {
 	passed := false
 	b := &Bouncer{
 		enabled:                true,
-		clientPoolStrategy:     &ip.PoolStrategy{Checker: clientChecker},
+		trustedClients:         &ip.PoolStrategy{Checker: clientChecker},
 		log:                    log,
 		remediationStatusCode:  http.StatusForbidden,
 		banTemplate:            banTemplate,
@@ -351,7 +351,7 @@ func TestServeHTTP_trustedIPStillSkipsPlugin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b.clientPoolStrategy = &ip.PoolStrategy{Checker: trusted}
+	b.trustedClients = &ip.PoolStrategy{Checker: trusted}
 	lapiClient, store := lapi.NewTestClient(b.log)
 	store.Put(decisionstore.Decision{
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,

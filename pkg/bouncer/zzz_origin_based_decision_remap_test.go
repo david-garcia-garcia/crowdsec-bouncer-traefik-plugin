@@ -117,7 +117,7 @@ func testRemapStreamBouncer(t *testing.T, lapiClient *lapi.Client, remap map[str
 	passed := false
 	b := &Bouncer{
 		enabled:                  true,
-		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
+		trustedClients:           &ip.PoolStrategy{Checker: clientChecker},
 		log:                      log,
 		remediationStatusCode:    http.StatusForbidden,
 		banTemplate:              banTemplate,
