@@ -15,16 +15,16 @@ One authoring row beside `Rule`: unique `name`, `action` tokens, and embedded pr
 _Avoid_: first-match-wins fold, putting `name` / `action` on `Rule`
 
 **ActionSet**:
-The compiled list `httprule.NewActionSet` returns. Predicate match stays on `Set`; names and tokens sit beside it. `Matching` returns every hit; callers zip Ban / Captcha / SkipLapi / SkipAppsec.
+The compiled list `httprule.NewActionSet` returns. Predicate match stays on `Set`; names and tokens sit beside it. `Matching` returns every hit. `Fold` reduces those hits to `ActionMatch`: first ban name, first captcha name, OR of the skip flags. A ban row contributes only its name.
 _Avoid_: interpreting action tokens inside `Set.Match`
 
 ## Overview
 
-Compile request exemptions once with `httprule.New`. Config holds `[]ActionRule`; Bouncer stores `*ActionSet`. Predicate compile stays `httprule.New`. The package imports only the Go standard library. ServeHTTP fold stays on `core_plugin_middleware_action-rules.md`. Constructor reject wrapping stays on `core_plugin_middleware_config-validation.md`.
+Compile request exemptions once with `httprule.New`. Config holds `[]ActionRule`; Bouncer stores `*ActionSet`. Predicate compile stays `httprule.New`. The package imports only the Go standard library. `ActionSet.Fold` is the request-level reduction; ServeHTTP remediation stays on `core_plugin_middleware_action-rules.md`. Constructor reject wrapping stays on `core_plugin_middleware_config-validation.md`.
 
 ## How to use
 
-- Call `httprule.New` once at construct for predicate-only lists. Call `httprule.NewActionSet` for `bouncerActionRules`. Do not compile on the request path. Store `*Set` or `*ActionSet`. Call `Set.Match(*http.Request)` for first-wins boolean; call `Matching(*http.Request)` when every hit must contribute.
+- Call `httprule.New` once at construct for predicate-only lists. Call `httprule.NewActionSet` for `bouncerActionRules`. Do not compile on the request path. Store `*Set` or `*ActionSet`. Call `Set.Match(*http.Request)` for first-wins boolean; call `Matching(*http.Request)` when every hit index is needed; call `ActionSet.Fold(*http.Request)` for the reduced `ActionMatch`. A nil `ActionSet` folds to the zero value.
 - Do not import this plugin's other packages from `pkg/httprule`.
 - Method: unanchored Go RE2 `MatchString` on `req.Method`. Do not insert `^` or `$`. Do not lowercase. Do not force `(?i)`. Omit or empty after trim is any. Optional single leading `!` (outside the pattern) negates (`!POST`, `!^POST$`). `!!` and `!` with an empty pattern fail `New`.
 - Path: unanchored `MatchString` on `req.URL.Path` as `net/http` decoded it. Do not rebuild from `RequestURI`, `EscapedPath`, or AppSec forwarded URI. Host is not in the path. Query is not in the path.
@@ -41,7 +41,7 @@ set, err := httprule.NewActionSet([]httprule.ActionRule{{Name: "healthz", Action
 if err != nil {
 	return nil, err
 }
-hits := set.Matching(httpReq)
+match := set.Fold(httpReq)
 ```
 
 ## Key files

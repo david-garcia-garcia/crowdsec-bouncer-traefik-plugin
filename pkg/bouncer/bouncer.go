@@ -308,52 +308,18 @@ func (b *Bouncer) SameLapiClient(other *Bouncer) bool {
 	return other != nil && b.loadedLAPI() == other.loadedLAPI()
 }
 
-// actionMatch is the folded bouncerActionRules result for one request.
-type actionMatch struct {
-	banName     string // first matching ban rule; empty if none
-	captchaName string // first matching captcha rule; empty if none
-	skipAppsec  bool
-	skipLapi    bool
-}
-
-// foldActionRules zips Matching indices with name and tokens. All hits contribute.
-func (b *Bouncer) foldActionRules(httpReq *http.Request) actionMatch {
-	var match actionMatch
-	if b.actionRules == nil {
-		return match
-	}
-	for _, i := range b.actionRules.Matching(httpReq) {
-		if b.actionRules.Ban(i) {
-			if match.banName == "" {
-				match.banName = b.actionRules.Name(i)
-			}
-			continue
-		}
-		if b.actionRules.SkipLapi(i) {
-			match.skipLapi = true
-		}
-		if b.actionRules.SkipAppsec(i) {
-			match.skipAppsec = true
-		}
-		if b.actionRules.Captcha(i) && match.captchaName == "" {
-			match.captchaName = b.actionRules.Name(i)
-		}
-	}
-	return match
-}
-
 // warnCaptchaSuperseded logs when a captcha rule lost to a ban from another leg.
-func (b *Bouncer) warnCaptchaSuperseded(req clientrequest.Request, match actionMatch) {
-	if match.captchaName == "" {
+func (b *Bouncer) warnCaptchaSuperseded(req clientrequest.Request, match httprule.ActionMatch) {
+	if match.CaptchaName == "" {
 		return
 	}
-	b.log.Warn("ServeHTTP:forcedCaptchaSuperseded", "ip", req.RemoteIP(), "name", match.captchaName)
+	b.log.Warn("ServeHTTP:forcedCaptchaSuperseded", "ip", req.RemoteIP(), "name", match.CaptchaName)
 }
 
 // passOrCaptchaRule passes to next, or applies a captcha rule after remaining legs.
 func (b *Bouncer) passOrCaptchaRule(rw http.ResponseWriter, req clientrequest.Request) {
-	match := b.foldActionRules(req.Request)
-	if match.captchaName != "" {
+	match := b.actionRules.Fold(req.Request)
+	if match.CaptchaName != "" {
 		b.applyCaptchaRuleServeHTTP(rw, req, match)
 		return
 	}
@@ -361,16 +327,16 @@ func (b *Bouncer) passOrCaptchaRule(rw http.ResponseWriter, req clientrequest.Re
 }
 
 // applyCaptchaRuleServeHTTP queries AppSec unless skipped, then serves the plugin captcha gate.
-func (b *Bouncer) applyCaptchaRuleServeHTTP(rw http.ResponseWriter, req clientrequest.Request, match actionMatch) {
-	if !match.skipAppsec && b.subscribeAppSec && b.applyAppsecServeHTTP(rw, req) {
+func (b *Bouncer) applyCaptchaRuleServeHTTP(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) {
+	if !match.SkipAppsec && b.subscribeAppSec && b.applyAppsecServeHTTP(rw, req) {
 		return
 	}
-	b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginRules(match.captchaName))
+	b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginRules(match.CaptchaName))
 }
 
 // remediateOrCaptchaRule applies lookup kind. A captcha rule does not replace CrowdSec captcha.
 func (b *Bouncer) remediateOrCaptchaRule(rw http.ResponseWriter, req clientrequest.Request, kind, origin string) {
-	match := b.foldActionRules(req.Request)
+	match := b.actionRules.Fold(req.Request)
 	if decisionscope.RemediationKind(kind) == decisionscope.BannedValue {
 		b.warnCaptchaSuperseded(req, match)
 	}
@@ -379,7 +345,7 @@ func (b *Bouncer) remediateOrCaptchaRule(rw http.ResponseWriter, req clientreque
 
 // banOrWarnCaptchaRule bans, and WARNs when a captcha rule lost.
 func (b *Bouncer) banOrWarnCaptchaRule(rw http.ResponseWriter, req clientrequest.Request, reason, headerReason, origin string) {
-	b.warnCaptchaSuperseded(req, b.foldActionRules(req.Request))
+	b.warnCaptchaSuperseded(req, b.actionRules.Fold(req.Request))
 	b.handleBanServeHTTP(rw, req, reason, headerReason, origin)
 }
 
@@ -463,13 +429,13 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		return
 	}
 
-	match := b.foldActionRules(req.Request)
-	if match.banName != "" {
-		logger.Trace(b.log, "ServeHTTP", "ip", req.RemoteIP(), "actionRule", match.banName)
-		b.handleRemediationServeHTTP(rw, req, decisionscope.BannedValue, lapi.OriginPluginRules(match.banName))
+	match := b.actionRules.Fold(req.Request)
+	if match.BanName != "" {
+		logger.Trace(b.log, "ServeHTTP", "ip", req.RemoteIP(), "actionRule", match.BanName)
+		b.handleRemediationServeHTTP(rw, req, decisionscope.BannedValue, lapi.OriginPluginRules(match.BanName))
 		return
 	}
-	if match.skipLapi {
+	if match.SkipLapi {
 		b.passOrCaptchaRule(rw, req)
 		return
 	}
@@ -680,7 +646,7 @@ func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientr
 
 // handleNextServeHTTP runs AppSec if enabled and not skipped by an action rule, then the next handler.
 func (b *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req clientrequest.Request) {
-	if b.foldActionRules(req.Request).skipAppsec {
+	if b.actionRules.Fold(req.Request).SkipAppsec {
 		b.next.ServeHTTP(rw, req.Request)
 		return
 	}
@@ -692,7 +658,7 @@ func (b *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req clientrequest.
 
 // applyAppsecServeHTTP queries AppSec and writes a remediation when the request must not reach origin.
 func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientrequest.Request) bool {
-	match := b.foldActionRules(req.Request)
+	match := b.actionRules.Fold(req.Request)
 	appsecClient := b.loadedAppSec()
 	if appsecClient == nil {
 		switch b.appsecFailureAction {
@@ -739,7 +705,7 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientrequest
 			b.handleBanServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsecChallengeEmpty, "appsec")
 			return true
 		}
-		if match.captchaName != "" {
+		if match.CaptchaName != "" {
 			return false
 		}
 	}

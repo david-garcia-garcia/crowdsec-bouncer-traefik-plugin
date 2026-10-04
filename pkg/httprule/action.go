@@ -67,12 +67,49 @@ func NewActionSet(rules []ActionRule) (*ActionSet, error) {
 	return &ActionSet{names: names, set: set, tokens: tokens}, nil
 }
 
+// ActionMatch is every matching row reduced for one request.
+// BanName and CaptchaName are the first matching rule of that token. Empty means none.
+// SkipLapi and SkipAppsec are OR'd across every non-ban hit. A ban row contributes only its name.
+type ActionMatch struct {
+	BanName     string
+	CaptchaName string
+	SkipAppsec  bool
+	SkipLapi    bool
+}
+
 // Matching returns every matching index in list order. Cookie is parsed once when needed.
 func (set *ActionSet) Matching(httpReq *http.Request) []int {
 	if set == nil || set.set == nil {
 		return nil
 	}
 	return set.set.Matching(httpReq)
+}
+
+// Fold reduces every matching row. A nil set matches nothing.
+// The first ban name wins and that row contributes nothing else. Skip flags OR. The first captcha name wins.
+func (set *ActionSet) Fold(httpReq *http.Request) ActionMatch {
+	var match ActionMatch
+	if set == nil {
+		return match
+	}
+	for _, i := range set.Matching(httpReq) {
+		if set.Ban(i) {
+			if match.BanName == "" {
+				match.BanName = set.Name(i)
+			}
+			continue
+		}
+		if set.SkipLapi(i) {
+			match.SkipLapi = true
+		}
+		if set.SkipAppsec(i) {
+			match.SkipAppsec = true
+		}
+		if set.Captcha(i) && match.CaptchaName == "" {
+			match.CaptchaName = set.Name(i)
+		}
+	}
+	return match
 }
 
 // Name is the authoring name at index i. Empty when the set is nil or i is out of range.
