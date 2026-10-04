@@ -245,7 +245,6 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 	if crowdsecMode == configuration.LiveMode || crowdsecMode == configuration.StreamMode || crowdsecMode == configuration.AloneMode {
 		kind, origin, originID, lookupErr := lapiClient.LookupRemediation(req.IPAddrString(), req.IPAddr(), scopes)
 		if lookupErr != nil {
-			b.log.Debug("serveLAPI:Get", "ip", req.IPAddrString(), "cache", lookupErr)
 			if errors.Is(lookupErr, decisionstore.ErrUnreachable) && !b.redisUnreachableBlock {
 				b.log.Error("serveLAPI:Get", "ip", req.IPAddrString(), "redisUnreachable", true)
 				return false
