@@ -228,8 +228,6 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 
 // serveLAPI reports whether LAPI wrote the response.
 // False means LAPI had nothing to say, and ServeHTTP continues with AppSec.
-//
-//nolint:gocyclo,gocognit,funlen // mode branches stay in this one lookup
 func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
 	if match.SkipLapi || !b.subscribeLAPI {
 		return false

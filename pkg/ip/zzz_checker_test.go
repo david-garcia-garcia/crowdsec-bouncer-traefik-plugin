@@ -174,21 +174,7 @@ func runGetRemoteIPCases(t *testing.T, tests []getRemoteIPCase) {
 func assertGetRemoteIPResult(t *testing.T, tc getRemoteIPCase, got string, parsed net.IP, err error) {
 	t.Helper()
 	if tc.wantErr {
-		if err == nil {
-			t.Fatal("expected error")
-		}
-		if tc.wantIP == "" {
-			return
-		}
-		if got != tc.wantIP {
-			t.Fatalf("GetRemoteIP = %q want %q", got, tc.wantIP)
-		}
-		if parsed != nil {
-			t.Fatalf("GetRemoteIP parsed = %v want nil for %q", parsed, got)
-		}
-		if !errors.Is(err, ErrUnparseableClient) {
-			t.Fatalf("err = %v, want unparseable client", err)
-		}
+		assertGetRemoteIPError(t, tc, got, parsed, err)
 		return
 	}
 	if err != nil {
@@ -204,6 +190,26 @@ func assertGetRemoteIPResult(t *testing.T, tc getRemoteIPCase, got string, parse
 		t.Fatalf("GetRemoteIP parsed = %v want nil for %q", parsed, got)
 	}
 	assertGetRemoteIPParsed(t, tc.wantParsedIP, parsed)
+}
+
+// assertGetRemoteIPError checks a GetRemoteIP error and, when wantIP is set, the raw text.
+func assertGetRemoteIPError(t *testing.T, tc getRemoteIPCase, got string, parsed net.IP, err error) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if tc.wantIP == "" {
+		return
+	}
+	if got != tc.wantIP {
+		t.Fatalf("GetRemoteIP = %q want %q", got, tc.wantIP)
+	}
+	if parsed != nil {
+		t.Fatalf("GetRemoteIP parsed = %v want nil for %q", parsed, got)
+	}
+	if !errors.Is(err, ErrUnparseableClient) {
+		t.Fatalf("err = %v, want unparseable client", err)
+	}
 }
 
 func assertGetRemoteIPParsed(t *testing.T, wantParsedIP string, parsed net.IP) {
