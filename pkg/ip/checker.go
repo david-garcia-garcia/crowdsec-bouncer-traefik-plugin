@@ -131,6 +131,14 @@ func (s *PoolStrategy) getIP(req *http.Request, customHeader string) (string, ne
 	return "", nil
 }
 
+// ErrUnparseableClient means the chosen client address text is not an IP.
+// The string return is that text.
+var ErrUnparseableClient = errors.New("unparseable client address")
+
+func unparseableClient(addr string) (string, net.IP, error) {
+	return addr, nil, fmt.Errorf("%w: %s", ErrUnparseableClient, addr)
+}
+
 // GetRemoteIP returns the client address for a request.
 // Unless insecure is true, it requires req.RemoteAddr to be in the trusted-hop pool
 // before honoring forwarded headers. When the pool is empty, the checker is nil, or
@@ -140,7 +148,9 @@ func (s *PoolStrategy) getIP(req *http.Request, customHeader string) (string, ne
 // header is empty. When insecure is true it does not consult the checker: it returns
 // the whole trimmed header value (no comma split) when that value is non-empty, or
 // the RemoteAddr host when the header is absent, empty, or whitespace-only.
-// The net.IP is that chosen address when parseable.
+// The net.IP is that chosen address when parseable. A chosen text that is not
+// an IP returns that text and ErrUnparseableClient. A RemoteAddr that is not
+// host:port returns a different error and an empty string.
 func GetRemoteIP(req *http.Request, strategy *PoolStrategy, customHeader string, insecure bool) (string, net.IP, error) {
 	remoteHost, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
@@ -150,13 +160,16 @@ func GetRemoteIP(req *http.Request, strategy *PoolStrategy, customHeader string,
 	if insecure {
 		headerVal := strings.TrimSpace(req.Header.Get(customHeader))
 		if headerVal == "" {
-			parsed, _ := parseIP(remoteHost)
+			parsed, parseErr := parseIP(remoteHost)
+			if parseErr != nil {
+				return unparseableClient(remoteHost)
+			}
 			return remoteHost, parsed, nil
 		}
 		if parsed, parseErr := parseIP(headerVal); parseErr == nil {
 			return headerVal, parsed, nil
 		}
-		return headerVal, nil, nil
+		return unparseableClient(headerVal)
 	}
 
 	trustedPeer := false
@@ -169,10 +182,16 @@ func GetRemoteIP(req *http.Request, strategy *PoolStrategy, customHeader string,
 	if trustedPeer {
 		remoteIP, parsed := strategy.getIP(req, customHeader)
 		if len(remoteIP) != 0 {
+			if parsed == nil {
+				return unparseableClient(remoteIP)
+			}
 			return remoteIP, parsed, nil
 		}
 	}
 
-	parsed, _ := parseIP(remoteHost)
+	parsed, parseErr := parseIP(remoteHost)
+	if parseErr != nil {
+		return unparseableClient(remoteHost)
+	}
 	return remoteHost, parsed, nil
 }

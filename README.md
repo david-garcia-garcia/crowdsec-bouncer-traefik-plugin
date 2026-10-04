@@ -419,7 +419,6 @@ The value is `what:why` or `what:why:origin`, separated by colons with no spaces
 | `ban:lapi-failure` | LAPI was unreachable, and the failure action is `ban`. |
 | `ban:stream-unhealthy` | Decisions could not be refreshed for too long, and the failure action is `ban`. |
 | `ban:cache-fail` | Redis was unreachable. |
-| `ban:unparseable-request` | The client IP could not be determined. |
 | `ban:appsec` | Blocked by AppSec. |
 | `ban:appsec-challenge-empty` | AppSec asked for a bot challenge but sent no page, so a ban was served instead. |
 | `ban:appsec-failure` | AppSec was unreachable, and the failure action is `ban`. |
@@ -435,7 +434,7 @@ The value is `what:why` or `what:why:origin`, separated by colons with no spaces
 | `error:client-disconnected` | The client disconnected while AppSec was reading the request body. Not a ban. |
 | `<action>:appsec` | Any other action returned by AppSec. |
 
-Requests that are let through get no header.
+Requests that are let through get no header. A client address that cannot be read (`RemoteAddr` is not `host:port`, or the chosen text is not an IP) is HTTP 502 `Bad Gateway`, also with no header.
 
 ### Put a request id on the ban page
 

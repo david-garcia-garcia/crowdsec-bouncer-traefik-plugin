@@ -18,7 +18,6 @@ const (
 	headerReasonLAPIFailure          = "lapi-failure"
 	headerReasonStreamUnhealthy      = "stream-unhealthy"
 	headerReasonCacheFail            = "cache-fail"
-	headerReasonUnparseableRequest   = "unparseable-request"
 	headerReasonAppsec               = "appsec"
 	headerReasonAppsecChallengeEmpty = "appsec-challenge-empty"
 	headerReasonAppsecFailure        = "appsec-failure"

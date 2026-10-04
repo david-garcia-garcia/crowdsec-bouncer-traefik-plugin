@@ -21,7 +21,7 @@ _Avoid_: an empty group, flattening as `scope.Country`, inventing keys for missi
 ## How to use
 
 - Call `logger.Trace(b.log, "ServeHTTP", "ip", req.RemoteIP(), "isTrusted", isTrusted)` for the first breadcrumb. Do not require `scopes` on that line.
-- On a store-hit remediation, call `logger.Trace` with stem `ServeHTTP`, `ip`, `remediation`, and `withPresentScopes` from the map already in `scopes`. Do not pass `cache`.
+- On a store-hit remediation, call `logger.Trace` with stem `ServeHTTP`, `ip`, `remediation`, and `appendScopesGroup` from the map already in `scopes`. Do not pass `cache`.
 - On a remediating `LiveLookup`, keep stem `ServeHTTP:LiveLookup`, `ip`, and `isBanned`. Attach the same `scopes` group. Do not pass `cache`.
 - Reuse `GetRemoteIP` / `req.RemoteIP()` and the trusted-client `ContainsIP` result. Do not re-parse `RemoteAddr`. Do not call `RequestScopeValues` again at log time.
 - Leave `handleRemediationServeHTTP` TRACE as `ip` + `remediation`. Leave DEBUG `ServeHTTP:Get` `cache` (the lookup error).
@@ -37,15 +37,16 @@ b.log.Debug("Bouncer initialized",
 	"forwardedHeadersTrustedIPs", forwardedHeadersTrustedIPs,
 	"clientTrustedIPs", clientTrustedIPs)
 logger.Trace(b.log, "ServeHTTP", "ip", req.RemoteIP(), "isTrusted", isTrusted)
-logger.Trace(b.log, "ServeHTTP", withPresentScopes([]any{"ip", req.RemoteIP(), "remediation", kind}, scopes)...)
-logger.Trace(b.log, "ServeHTTP:LiveLookup", withPresentScopes([]any{"ip", req.RemoteIP(), "isBanned", kind}, scopes)...)
+logger.Trace(b.log, "ServeHTTP", appendScopesGroup([]any{"ip", req.RemoteIP(), "remediation", kind}, scopes)...)
+logger.Trace(b.log, "ServeHTTP:LiveLookup", appendScopesGroup([]any{"ip", req.RemoteIP(), "isBanned", kind}, scopes)...)
 b.log.Debug("ServeHTTP:Get", "ip", req.RemoteIP(), "cache", lookupErr)
 ```
 
 ## Key files
 
 - `pkg/logger/logger.go` — `LevelTrace`, `Trace`, `ReplaceAttr` names
-- `pkg/bouncer/bouncer.go` — construct-time DEBUG `Bouncer initialized`, `ServeHTTP` Trace, `withPresentScopes`
+- `pkg/bouncer/bouncer.go` — construct-time DEBUG `Bouncer initialized`, `ServeHTTP` Trace
+- `pkg/bouncer/scope_trace.go` — `appendScopesGroup`
 
 ## Gotchas
 

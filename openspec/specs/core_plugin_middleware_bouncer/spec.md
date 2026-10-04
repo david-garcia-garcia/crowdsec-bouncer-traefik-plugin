@@ -225,7 +225,6 @@ Closed reasons never take a third field. The closed vocabulary is:
 | `ban:lapi-failure` | LAPI down / unpublished, fail-closed ban |
 | `ban:stream-unhealthy` | Stream miss + unhealthy, fail-closed ban |
 | `ban:cache-fail` | Redis/cache fail-closed |
-| `ban:unparseable-request` | `GetRemoteIP` failed or client IP would not parse |
 | `ban:appsec` | AppSec JSON `action: ban` |
 | `ban:appsec-challenge-empty` | AppSec `action: challenge` with empty body (fail-closed to ban page) |
 | `ban:appsec-failure` | AppSec down / unusable verdict, fail-closed ban |
@@ -276,10 +275,11 @@ The bouncer SHALL format ban, AppSec relay, disconnect, captcha-downgrade, and c
 - **THEN** the response is a ban
 - **AND** the header value is `ban:captcha-downgrade`
 
-#### Scenario: Unparseable client address
-- **WHEN** `bouncerRemediationHeadersCustomName` is set
-- **AND** `GetRemoteIP` fails, or the parsed client IP is nil
-- **THEN** the header value is `ban:unparseable-request`
+#### Scenario: GetRemoteIP error is HTTP 502
+- **WHEN** `GetRemoteIP` returns an error
+- **THEN** the response status is 502
+- **AND** the body is plain text `Bad Gateway`
+- **AND** the remediation header is not set
 
 #### Scenario: Pass path still omits the header
 - **WHEN** `bouncerRemediationHeadersCustomName` is set
@@ -298,7 +298,7 @@ The bouncer SHALL expose one public Config list `bouncerActionRules`. Default em
 
 All matching rows SHALL contribute. This is not first-match-wins. List order SHALL pick the origin name only when two rows share the same winning remediation (first matching `ban`, else first matching `captcha`).
 
-After startup block, GetRemoteIP (failure still tech-bans), unparseable client IP (still tech-bans), `recordProcessed`, and the trusted-IP skip, ServeHTTP SHALL collect every matching row. Trusted clients MUST NOT hit these rules. A failed client-IP parse MUST NOT be saved by a matching skip.
+After startup block, a `GetRemoteIP` error (HTTP 502, not a ban), `IncProcessed`, and the trusted-IP skip, ServeHTTP SHALL collect every matching row. Trusted clients MUST NOT hit these rules. A `GetRemoteIP` error MUST NOT be saved by a matching skip.
 
 - Any matching `ban` SHALL remediate immediately as ban. LAPI and AppSec MUST NOT run. Metrics origin SHALL be `plugin:rules:<name>` where `<name>` is the first matching ban row. `remediation=ban`. A skip on another matching row MUST NOT weaken this ban. Closed remediation-header reason SHALL be `rules` (no third field) when that header is configured.
 - Else fold every match: `bypass` or `bypassLapi` SHALL skip LAPI; `bypass` or `bypassAppsec` SHALL skip AppSec; any `captcha` token SHALL set a captcha flag. Skips SHALL add; they MUST NOT cancel each other or a captcha flag.
@@ -439,10 +439,10 @@ Cookies SHALL use the same predicate shape as headers against that cookie's valu
 - **AND** ServeHTTP does not apply action rules
 
 #### Scenario: GetRemoteIP failure is not saved by a skip
-- **WHEN** GetRemoteIP fails
+- **WHEN** GetRemoteIP returns an error
 - **AND** an action rule would match with `action: [bypass]`
-- **THEN** the response is the tech ban
-- **AND** origin is `plugin:tech_getremotefail`
+- **THEN** the response status is 502
+- **AND** usage-metrics `dropped` is not incremented
 
 #### Scenario: Skip does not increment dropped
 - **WHEN** a matching row is `{action: [bypass]}` and no ban or captcha matched

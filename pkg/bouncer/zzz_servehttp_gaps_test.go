@@ -113,36 +113,45 @@ func TestServeHTTP_StreamUnhealthyUsesFailureAction(t *testing.T) {
 	})
 }
 
-func TestServeHTTP_BadRemoteAddrBans(t *testing.T) {
+func TestServeHTTP_BadRemoteAddrRejects(t *testing.T) {
 	b, _, passed := testForcedDecisionBouncer(t, nil, nil, nil, false)
 	b.remediationCustomHeader = "X-Remediation"
 	req := testForcedDecisionRequest("")
 	req.RemoteAddr = "not-a-socket"
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, req)
-	if *passed || rw.Code != http.StatusForbidden {
+	if *passed || rw.Code != http.StatusBadGateway {
 		t.Fatalf("bad RemoteAddr passed=%v status=%d body=%q", *passed, rw.Code, rw.Body.String())
 	}
-	if !strings.Contains(rw.Body.String(), "banned") {
-		t.Fatalf("body = %q, want ban template", rw.Body.String())
+	if strings.Contains(rw.Body.String(), "banned") {
+		t.Fatalf("body = %q, unusable RemoteAddr must not use the ban page", rw.Body.String())
 	}
-	if got := rw.Header().Get("X-Remediation"); got != "ban:unparseable-request" {
-		t.Fatalf("remediation %q want ban:unparseable-request", got)
+	if got := rw.Header().Get("X-Remediation"); got != "" {
+		t.Fatalf("remediation %q want empty", got)
+	}
+	if !strings.Contains(rw.Body.String(), "Bad Gateway") {
+		t.Fatalf("body = %q, want Bad Gateway", rw.Body.String())
 	}
 }
 
-func TestServeHTTP_UnparseableClientIPBans(t *testing.T) {
+func TestServeHTTP_UnparseableClientIPRejects(t *testing.T) {
 	b, _, passed := testForcedDecisionBouncer(t, nil, nil, nil, false)
 	b.remediationCustomHeader = "X-Remediation"
 	req := testForcedDecisionRequest("")
 	req.Header.Set("X-Forwarded-For", "not-an-ip")
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, req)
-	if *passed || rw.Code != http.StatusForbidden {
-		t.Fatalf("unparseable client passed=%v status=%d", *passed, rw.Code)
+	if *passed || rw.Code != http.StatusBadGateway {
+		t.Fatalf("unparseable client passed=%v status=%d body=%q", *passed, rw.Code, rw.Body.String())
 	}
-	if got := rw.Header().Get("X-Remediation"); got != "ban:unparseable-request" {
-		t.Fatalf("remediation %q want ban:unparseable-request", got)
+	if strings.Contains(rw.Body.String(), "banned") {
+		t.Fatalf("body = %q, unparseable client must not use the ban page", rw.Body.String())
+	}
+	if got := rw.Header().Get("X-Remediation"); got != "" {
+		t.Fatalf("remediation %q want empty", got)
+	}
+	if !strings.Contains(rw.Body.String(), "Bad Gateway") {
+		t.Fatalf("body = %q, want Bad Gateway", rw.Body.String())
 	}
 }
 

@@ -20,8 +20,8 @@ const crowdsecLapiMetricsRoute = "v1/usage-metrics"
 // Origins for drops that are not a CrowdSec decision. cscli shows origin rows;
 // empty origin is totals-only. Do not reuse crowdsec / CAPI / appsec / lists:.
 const (
-	OriginPluginTechGetRemoteFail = "plugin:tech_getremotefail" // GetRemoteIP failed
-	OriginPluginTechTrustIPFail   = "plugin:tech_trustipfail"   // trusted-IP checker failed
+	OriginPluginTechGetRemoteFail = "plugin:tech_getremotefail" // reporter still accepts this origin; ServeHTTP does not emit it
+	OriginPluginTechTrustIPFail   = "plugin:tech_trustipfail"   // reporter still accepts this origin; ServeHTTP does not emit it
 	OriginPluginTechCacheFail     = "plugin:tech_cachefail"     // cache error fail-closed
 	OriginPluginTechStreamFail    = "plugin:tech_streamfail"    // stream unhealthy
 	OriginPluginLapiFailure       = "plugin:lapi_failure"       // live LAPI lookup error

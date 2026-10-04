@@ -6,7 +6,6 @@ import (
 	"html"
 	"log/slog"
 	"net/http"
-	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -211,24 +210,6 @@ func (b *Bouncer) banOrWarnCaptchaRule(rw http.ResponseWriter, req clientrequest
 	b.handleBanServeHTTP(rw, req, reason, headerReason, origin)
 }
 
-// withPresentScopes appends slog group scopes from RequestScopeValues already in hand.
-func withPresentScopes(args []any, scopes map[string]string) []any {
-	if len(scopes) == 0 {
-		return args
-	}
-	// Sort CrowdSec scope names so TRACE and tests see a stable group.
-	names := make([]string, 0, len(scopes))
-	for name := range scopes {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	groupArgs := make([]any, 0, len(names)*2)
-	for _, name := range names {
-		groupArgs = append(groupArgs, name, scopes[name])
-	}
-	return append(args, slog.Group("scopes", groupArgs...))
-}
-
 // ServeHTTP is the per-router middleware handler.
 //
 // none: no stream, no cache; LiveLookup every request.
@@ -264,31 +245,34 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		}
 	}
 
-	lapiClient := b.loadedLAPI()
-	crowdsecMode := ""
-	if lapiClient != nil {
-		crowdsecMode = lapiClient.Mode()
-	}
-
+	// prepare client request
 	remoteIP, ipAddr, err := ip.GetRemoteIP(httpReq, b.trustedHops, b.forwardedCustomHeader, b.forwardedHeadersInsecure)
-	req := clientrequest.New(httpReq, remoteIP, ipAddr)
-	b.recordProcessed(req.IPType())
 	if err != nil {
-		b.log.Error("ServeHTTP:getRemoteIp", "ip", req.RemoteIP(), "error", err)
-		b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, headerReasonUnparseableRequest, lapi.OriginPluginTechGetRemoteFail)
+		b.log.Error("ServeHTTP:getRemoteIp", "remoteAddr", httpReq.RemoteAddr, "ip", remoteIP, "error", err)
+		http.Error(rw, http.StatusText(http.StatusBadGateway), http.StatusBadGateway)
 		return
 	}
-	if req.IPAddr() == nil {
-		b.log.Error("ServeHTTP:parseClientIP", "ip", req.RemoteIP())
-		b.handleBanServeHTTP(rw, req, configuration.ReasonTECH, headerReasonUnparseableRequest, lapi.OriginPluginTechTrustIPFail)
-		return
-	}
+	req := clientrequest.New(httpReq, remoteIP, ipAddr)
+
+	// Bypass trusted clients
 	isTrusted := b.trustedClients.Checker.ContainsIP(req.IPAddr())
 	logger.Trace(b.log, "ServeHTTP", "ip", req.RemoteIP(), "isTrusted", isTrusted)
 	if isTrusted {
 		b.next.ServeHTTP(rw, req.Request)
 		// Trusted clients skip LAPI and AppSec.
 		return
+	}
+
+	// Lapi MODE is very coupled with the bouncer logic
+	lapiClient := b.loadedLAPI()
+	crowdsecMode := ""
+	if lapiClient != nil {
+		crowdsecMode = lapiClient.Mode()
+	}
+
+	// If we have a lapi client, add this to metrics
+	if lapiClient != nil {
+		lapiClient.IncProcessed(req.IPType())
 	}
 
 	match := b.actionRules.Fold(req.Request)
@@ -334,7 +318,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		kind, origin = b.appliedLAPIRemediation(kind, origin, originID)
 		switch {
 		case decisionscope.IsActiveRemediation(kind):
-			logger.Trace(b.log, "ServeHTTP", withPresentScopes([]any{"ip", req.RemoteIP(), "remediation", kind}, scopes)...)
+			logger.Trace(b.log, "ServeHTTP", appendScopesGroup([]any{"ip", req.RemoteIP(), "remediation", kind}, scopes)...)
 			b.remediateOrCaptchaRule(rw, req, kind, b.resolveDroppedOrigin(origin, originID))
 			return
 		case kind == decisionscope.NoBannedValue:
@@ -369,7 +353,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 			b.passOrCaptchaRule(rw, req)
 			return
 		}
-		logger.Trace(b.log, "ServeHTTP:LiveLookup", withPresentScopes([]any{"ip", req.RemoteIP(), "isBanned", kind}, scopes)...)
+		logger.Trace(b.log, "ServeHTTP:LiveLookup", appendScopesGroup([]any{"ip", req.RemoteIP(), "isBanned", kind}, scopes)...)
 		b.remediateOrCaptchaRule(rw, req, kind, origin)
 	}
 }
@@ -387,12 +371,6 @@ func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req clientreque
 }
 
 // recordProcessed counts this request on the connection usage-metrics window.
-func (b *Bouncer) recordProcessed(ipType string) {
-	if client := b.loadedLAPI(); client != nil {
-		client.IncProcessed(ipType)
-	}
-}
-
 // recordDropped counts a remediating response on the connection usage-metrics window (request and byte series).
 func (b *Bouncer) recordDropped(req clientrequest.Request, origin, remediation string) {
 	if client := b.loadedLAPI(); client != nil {
