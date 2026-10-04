@@ -146,132 +146,10 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 	return routeHandler, nil
 }
 
-func (b *Bouncer) loadedLAPI() *lapi.Client {
-	client, _ := reclaim.Unbox(&b.lapiBound).(*lapi.Client)
-	return client
-}
-
-func (b *Bouncer) loadedAppSec() *appsec.Client {
-	stored := reclaim.Unbox(&b.appsecBound)
-	client, _ := stored.(*appsec.Client)
-	return client
-}
-
-func (b *Bouncer) loadedCaptcha() *captcha.Client {
-	client, _ := reclaim.Unbox(&b.captchaBound).(*captcha.Client)
-	return client
-}
-
-// ReceiveLAPI stores the published LAPI client and validates it.
-// published is a reclaim.Published. The same pointer is a no-op.
-func (b *Bouncer) ReceiveLAPI(published any) {
-	if !b.subscribeLAPI {
-		return
-	}
-	notice, _ := published.(reclaim.Published)
-	b.storeBinding(&b.lapiBound, notice.Value)
-	b.receiveLAPI()
-}
-
-// ReceiveAppSec stores the published AppSec client.
-// published is a reclaim.Published. The same pointer is a no-op.
-func (b *Bouncer) ReceiveAppSec(published any) {
-	if !b.subscribeAppSec {
-		return
-	}
-	notice, _ := published.(reclaim.Published)
-	b.storeBinding(&b.appsecBound, notice.Value)
-	b.receiveAppSec()
-}
-
-// ReceiveCaptcha stores the published captcha client.
-// published is a reclaim.Published. The same pointer is a no-op.
-func (b *Bouncer) ReceiveCaptcha(published any) {
-	if !b.subscribeCaptcha {
-		return
-	}
-	notice, _ := published.(reclaim.Published)
-	b.storeBinding(&b.captchaBound, notice.Value)
-	b.receiveCaptcha()
-}
-
 // storeBinding publishes value as a new immutable *reclaim.Box.
 // Never assign Box.Value in place: concurrent Unbox reads that field without sync.
 func (b *Bouncer) storeBinding(dest *atomic.Value, value any) {
 	dest.Store(&reclaim.Box{Value: value})
-}
-
-func (b *Bouncer) receiveLAPI() {
-	current := b.loadedLAPI()
-	b.bindingMu.Lock()
-	defer b.bindingMu.Unlock()
-	if b.lapiReceiveSeen && current == b.lapiReceived {
-		return
-	}
-	previous := b.lapiReceived
-	b.lapiReceived = current
-	b.lapiReceiveSeen = true
-	if previous != nil && previous != current {
-		b.traceBouncerBinding(false, "lapi", b.lapiInstanceName, previous.Incarnation())
-	}
-	if current == nil {
-		if previous == nil {
-			b.traceBouncerBinding(false, "lapi", b.lapiInstanceName, "")
-		}
-		return
-	}
-	missing := decisionscope.MissingStreamScopes(b.decisionScopeHeaders, current.StreamScopes())
-	if len(missing) > 0 {
-		b.log.Warn("crowdsec bouncer stream scopes missing",
-			"traefikName", b.name,
-			"missing", strings.Join(missing, ","),
-		)
-	}
-	b.traceBouncerBinding(true, "lapi", b.lapiInstanceName, current.Incarnation())
-}
-
-func (b *Bouncer) receiveAppSec() {
-	current := b.loadedAppSec()
-	b.bindingMu.Lock()
-	defer b.bindingMu.Unlock()
-	if b.appsecReceiveSeen && current == b.appsecReceived {
-		return
-	}
-	previous := b.appsecReceived
-	b.appsecReceived = current
-	b.appsecReceiveSeen = true
-	if previous != nil && previous != current {
-		b.traceBouncerBinding(false, "appsec", b.appsecInstanceName, previous.Incarnation())
-	}
-	if current == nil {
-		if previous == nil {
-			b.traceBouncerBinding(false, "appsec", b.appsecInstanceName, "")
-		}
-		return
-	}
-	b.traceBouncerBinding(true, "appsec", b.appsecInstanceName, current.Incarnation())
-}
-
-func (b *Bouncer) receiveCaptcha() {
-	current := b.loadedCaptcha()
-	b.bindingMu.Lock()
-	defer b.bindingMu.Unlock()
-	if b.captchaReceiveSeen && current == b.captchaReceived {
-		return
-	}
-	previous := b.captchaReceived
-	b.captchaReceived = current
-	b.captchaReceiveSeen = true
-	if previous != nil && previous != current {
-		b.traceBouncerBinding(false, "captcha", b.captchaInstanceName, previous.Incarnation())
-	}
-	if current == nil {
-		if previous == nil {
-			b.traceBouncerBinding(false, "captcha", b.captchaInstanceName, "")
-		}
-		return
-	}
-	b.traceBouncerBinding(true, "captcha", b.captchaInstanceName, current.Incarnation())
 }
 
 // traceBouncerBinding records whether this route bound or released the named backend.
@@ -290,20 +168,6 @@ func (b *Bouncer) traceBouncerBinding(bound bool, leg, instanceName, incarnation
 		attrs = append(attrs, "incarnation", incarnation)
 	}
 	logger.Trace(b.log, msg, attrs...)
-}
-
-func (b *Bouncer) warnBackendMissing(leg, instanceName string) {
-	b.log.Warn(msgBackendMissing, "leg", leg, "instanceName", instanceName)
-}
-
-// LapiClient is the bound LAPI backend this route uses, or nil.
-func (b *Bouncer) LapiClient() *lapi.Client {
-	return b.loadedLAPI()
-}
-
-// SameLapiClient reports whether two routes share one LAPI client pointer.
-func (b *Bouncer) SameLapiClient(other *Bouncer) bool {
-	return other != nil && b.loadedLAPI() == other.loadedLAPI()
 }
 
 // warnCaptchaSuperseded logs when a captcha rule lost to a ban from another leg.
@@ -384,17 +248,17 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 
 	if b.startupBlock {
 		if b.subscribeLAPI && b.loadedLAPI() == nil {
-			b.warnBackendMissing("lapi", b.lapiInstanceName)
+			b.log.Warn(msgBackendMissing, "leg", "lapi", "instanceName", b.lapiInstanceName)
 			rw.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
 		if b.subscribeAppSec && b.loadedAppSec() == nil {
-			b.warnBackendMissing("appsec", b.appsecInstanceName)
+			b.log.Warn(msgBackendMissing, "leg", "appsec", "instanceName", b.appsecInstanceName)
 			rw.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
 		if b.subscribeCaptcha && b.loadedCaptcha() == nil {
-			b.warnBackendMissing("captcha", b.captchaInstanceName)
+			b.log.Warn(msgBackendMissing, "leg", "captcha", "instanceName", b.captchaInstanceName)
 			rw.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
