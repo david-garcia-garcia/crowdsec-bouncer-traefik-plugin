@@ -79,7 +79,7 @@ func assertChallengeCookieSecure(t *testing.T, proto string, tlsOn, wantSecure b
 
 	req := originFormRequest(http.MethodGet, "/protected", nil, proto, tlsOn)
 	rw := httptest.NewRecorder()
-	b.appsecThenNextServeHTTP(rw, testClientRequest(req, "192.0.2.10"))
+	continueAfterLAPIForTest(b, rw, testClientRequest(req, "192.0.2.10"))
 	got := cookieNamed(rw.Result().Cookies(), "__crowdsec_challenge")
 	if got == nil {
 		t.Fatal("missing __crowdsec_challenge")

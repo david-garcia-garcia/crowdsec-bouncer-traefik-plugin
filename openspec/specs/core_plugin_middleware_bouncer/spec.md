@@ -16,7 +16,7 @@ The plugin SHALL export `CreateConfig` and `New` from the package Traefik loads 
 The per-router bouncer SHALL hold three optional bound clients as `atomic.Value` fields (LAPI, AppSec, and captcha), each able to hold a typed nil. Each field's stored concrete type SHALL stay `*reclaim.Box` (Yaegi). On every Watch publish into a bound field, the bouncer SHALL `Store` a new `*reclaim.Box{Value: …}` and MUST NOT assign `Box.Value` in place on a Box already published in that field. `ServeHTTP` SHALL `Load` those fields only and MUST NOT resolve instance names, Peek slot tables, or Open clients on the request path. Subscribers MUST NOT Bind reclaim on those clients. The bouncer SHALL read `lapiMode` from the loaded LAPI client on each request, not from a copy taken at `New`. When `bouncerEnabled` is false the handler SHALL call `next` without applying decisions while owners may still Open and publish.
 
 #### Scenario: Nil LAPI client uses failure action for that leg
-- **WHEN** the bouncer subscribed to LAPI but the loaded value is empty and `startupBlock` is false
+- **WHEN** the bouncer subscribed to LAPI but the loaded value is empty
 - **THEN** the request uses that router's LAPI failure action for the LAPI leg
 - **AND** no panic occurs
 
@@ -35,20 +35,21 @@ The per-router bouncer SHALL hold three optional bound clients as `atomic.Value`
 - **AND** the previous Box's `Value` field is not written in place
 - **AND** concurrent ServeHTTP Unbox of that field does not panic from a torn `any`
 
-### Requirement: Stream startup block guards subscribed backends on the request path
-When `bouncerStartupBlock` is true, before calling `next` or applying decisions the bouncer SHALL check every leg it subscribed to (LAPI, AppSec, and captcha independently). For each subscribed leg, if the loaded client is not published (typed nil), `ServeHTTP` SHALL return HTTP 503 and MUST NOT call `next`. When `bouncerStartupBlock` is false, a missing subscribed LAPI or AppSec client SHALL use that leg's failure action instead, and a missing subscribed captcha client SHALL ban a captcha verdict. The check MUST NOT block `New`. A leg the bouncer did not subscribe to is not part of the guard. The Bouncer field name SHALL be `startupBlock` (not `streamStartupBlock`).
+### Requirement: A missing subscribed client uses that leg's failure action
+A missing subscribed LAPI client SHALL use this router's LAPI failure action. A missing subscribed AppSec client SHALL use this router's AppSec failure action when the request reaches AppSec. A missing subscribed captcha client SHALL ban a captcha verdict. `New` MUST NOT wait for a client to be published. A leg the bouncer did not subscribe to is not part of that check.
 
-#### Scenario: AppSec-only subscriber does not 503 for missing LAPI
+#### Scenario: AppSec-only subscriber ignores a missing LAPI client
 - **WHEN** the bouncer subscribes only to AppSec and LAPI is not subscribed
-- **THEN** a missing LAPI client does not cause 503 solely for LAPI
+- **THEN** a missing LAPI client does not by itself remediate the request
 
-#### Scenario: Both legs subscribed one missing yields 503 when block true
-- **WHEN** the bouncer subscribes to LAPI and AppSec, `bouncerStartupBlock` is true, and AppSec is not published
-- **THEN** every request returns 503 until AppSec is published
+#### Scenario: Missing AppSec uses the AppSec failure action
+- **WHEN** the bouncer subscribes to LAPI and AppSec, LAPI is published, and AppSec is not
+- **AND** the request reaches AppSec
+- **THEN** the AppSec failure action applies
 
-#### Scenario: Unpublished subscribed captcha yields 503 when block true
-- **WHEN** the bouncer subscribes to captcha, `bouncerStartupBlock` is true, and captcha is not published
-- **THEN** every request returns 503 until captcha is published
+#### Scenario: Unpublished subscribed captcha bans a captcha verdict
+- **WHEN** the bouncer subscribes to captcha, captcha is not published, and the verdict is captcha
+- **THEN** the response is a ban
 
 ### Requirement: Bouncer does not own the stream ticker
 The per-router bouncer SHALL handle request policy (trusted IPs, ban/captcha pages, whether AppSec runs on pass, action rules, LAPI failure action, Redis fail-closed, and live-cache TTL) and MUST NOT start a process-wide stream ticker. Stream polling remains on the LAPI Client opened by an owner middleware.
@@ -139,15 +140,15 @@ When AppSec `Query` returns `ErrClientDisconnected`, the bouncer SHALL stop with
 ### Requirement: Captcha verdict without a published client is a ban
 When the remediation kind is captcha and the loaded captcha binding is empty or not valid, the bouncer SHALL remediate as a ban. It MUST NOT construct a fallback local captcha client on the request path or in `bouncer.New`. A bounce-only middleware MUST NOT build a captcha client from leftover `captcha*` owner-read keys.
 
-#### Scenario: Unpublished captcha with startup block off bans
-- **WHEN** the bouncer subscribed to captcha, `bouncerStartupBlock` is false, the loaded captcha value is empty, and the verdict is captcha
+#### Scenario: Unpublished captcha bans
+- **WHEN** the bouncer subscribed to captcha, the loaded captcha value is empty, and the verdict is captcha
 - **THEN** the response is a ban
 - **AND** no captcha challenge page is served
 
 #### Scenario: Bounce-only leftover keys are not a client
 - **WHEN** `captchaEnabled` is false, `captchaProvider` is set on this router, and no captcha client is published
 - **THEN** `bouncer.New` does not construct a captcha client from those keys
-- **AND** a captcha verdict remediates as a ban when startup block is false
+- **AND** a captcha verdict remediates as a ban
 
 ### Requirement: Remediation header is not stored on the shared captcha client
 The remediation header name SHALL stay on the Bouncer (`bouncerRemediationHeadersCustomName`). Challenge page, solved redirect, and captcha-kind responses SHALL write this router's header. The published `captcha.Client` MUST NOT store a remediation header copied from the owner. The bouncer SHALL pass the already-formatted challenge-page value into `ServeHTTP`. Pass 302 and Check-true form POST SHALL write `captcha:solved` inside captcha. Captcha MUST NOT import plugin origins or the closed reason table.
@@ -159,7 +160,7 @@ The remediation header name SHALL stay on the Bouncer (`bouncerRemediationHeader
 - **AND** it is not `X-Owner`
 
 ### Requirement: Unsubscribed captcha kind warns then bans
-When the remediation kind is captcha and this bouncer did not subscribe to captcha, the bouncer SHALL emit WARN `crowdsec bouncer captcha unsubscribed` with attributes `leg` equal to `captcha` and `instanceName` (empty when unsubscribed) on every remediating request that reaches that path, then remediate as a ban. It MUST NOT emit an `ip` attribute on that WARN. It MUST NOT reconstruct the client address; identity stays `pkg/ip.GetRemoteIP` on `clientRequest`. It MUST NOT emit this WARN when the bouncer subscribed to captcha, including when the loaded captcha binding is empty or not valid. Subscribed-unpublished with `bouncerStartupBlock` true SHALL stay HTTP 503 plus WARN `crowdsec bouncer backend missing`. This WARN SHALL apply to every captcha-kind remediation that reaches the remediating handler (LAPI captcha kind, action-rule captcha, captcha failure-action).
+When the remediation kind is captcha and this bouncer did not subscribe to captcha, the bouncer SHALL emit WARN `crowdsec bouncer captcha unsubscribed` with attributes `leg` equal to `captcha` and `instanceName` (empty when unsubscribed) on every remediating request that reaches that path, then remediate as a ban. It MUST NOT emit an `ip` attribute on that WARN. It MUST NOT reconstruct the client address; identity stays `pkg/ip.GetRemoteIP` on `clientRequest`. It MUST NOT emit this WARN when the bouncer subscribed to captcha, including when the loaded captcha binding is empty or not valid. This WARN SHALL apply to every captcha-kind remediation that reaches the remediating handler (LAPI captcha kind, action-rule captcha, captcha failure-action).
 
 #### Scenario: Bounce-only captcha kind warns then bans
 - **WHEN** the bouncer did not subscribe to captcha
@@ -182,18 +183,9 @@ When the remediation kind is captcha and this bouncer did not subscribe to captc
 
 #### Scenario: Subscribed unpublished does not emit this warn
 - **WHEN** the bouncer subscribed to captcha
-- **AND** `bouncerStartupBlock` is false
 - **AND** the loaded captcha value is empty
 - **AND** the verdict is captcha
 - **THEN** the response is a ban
-- **AND** the log MUST NOT contain `crowdsec bouncer captcha unsubscribed`
-
-#### Scenario: Subscribed unpublished startup block stays backend missing
-- **WHEN** the bouncer subscribed to captcha
-- **AND** `bouncerStartupBlock` is true
-- **AND** captcha is not published
-- **THEN** every request returns 503
-- **AND** the log contains WARN `crowdsec bouncer backend missing`
 - **AND** the log MUST NOT contain `crowdsec bouncer captcha unsubscribed`
 
 ### Requirement: Ban page sets Cache-Control
@@ -225,7 +217,6 @@ Closed reasons never take a third field. The closed vocabulary is:
 | `ban:lapi-failure` | LAPI down / unpublished, fail-closed ban |
 | `ban:stream-unhealthy` | Stream miss + unhealthy, fail-closed ban |
 | `ban:cache-fail` | Redis/cache fail-closed |
-| `ban:unparseable-request` | `GetRemoteIP` failed or client IP would not parse |
 | `ban:appsec` | AppSec JSON `action: ban` |
 | `ban:appsec-challenge-empty` | AppSec `action: challenge` with empty body (fail-closed to ban page) |
 | `ban:appsec-failure` | AppSec down / unusable verdict, fail-closed ban |
@@ -276,10 +267,11 @@ The bouncer SHALL format ban, AppSec relay, disconnect, captcha-downgrade, and c
 - **THEN** the response is a ban
 - **AND** the header value is `ban:captcha-downgrade`
 
-#### Scenario: Unparseable client address
-- **WHEN** `bouncerRemediationHeadersCustomName` is set
-- **AND** `GetRemoteIP` fails, or the parsed client IP is nil
-- **THEN** the header value is `ban:unparseable-request`
+#### Scenario: GetRemoteIP error is HTTP 502
+- **WHEN** `GetRemoteIP` returns an error
+- **THEN** the response status is 502
+- **AND** the body is plain text `Bad Gateway`
+- **AND** the remediation header is not set
 
 #### Scenario: Pass path still omits the header
 - **WHEN** `bouncerRemediationHeadersCustomName` is set
@@ -298,13 +290,13 @@ The bouncer SHALL expose one public Config list `bouncerActionRules`. Default em
 
 All matching rows SHALL contribute. This is not first-match-wins. List order SHALL pick the origin name only when two rows share the same winning remediation (first matching `ban`, else first matching `captcha`).
 
-After startup block, GetRemoteIP (failure still tech-bans), unparseable client IP (still tech-bans), `recordProcessed`, and the trusted-IP skip, ServeHTTP SHALL collect every matching row. Trusted clients MUST NOT hit these rules. A failed client-IP parse MUST NOT be saved by a matching skip.
+After a `GetRemoteIP` error (HTTP 502, not a ban), `IncProcessed`, and the trusted-IP skip, ServeHTTP SHALL collect every matching row. Trusted clients MUST NOT hit these rules. A `GetRemoteIP` error MUST NOT be saved by a matching skip.
 
 - Any matching `ban` SHALL remediate immediately as ban. LAPI and AppSec MUST NOT run. Metrics origin SHALL be `plugin:rules:<name>` where `<name>` is the first matching ban row. `remediation=ban`. A skip on another matching row MUST NOT weaken this ban. Closed remediation-header reason SHALL be `rules` (no third field) when that header is configured.
 - Else fold every match: `bypass` or `bypassLapi` SHALL skip LAPI; `bypass` or `bypassAppsec` SHALL skip AppSec; any `captcha` token SHALL set a captcha flag. Skips SHALL add; they MUST NOT cancel each other or a captcha flag.
 - A LAPI skip SHALL skip `LookupRemediation`, `LiveLookup`, missing-subscribed-LAPI failure action, and stream/alone unhealthy failure action.
 - An AppSec skip SHALL skip AppSec `Query` and the AppSec body buffer on that path.
-- `captcha` MUST NOT return immediately. Legs that were not skipped SHALL still run. An active LAPI ban, or a fail-closed ban from that leg (lookup error, stream/alone unhealthy, failure action `ban`), SHALL prevail over the captcha rule and SHALL keep that leg's origin, not `plugin:rules:`. An AppSec `ban` verdict, or an AppSec failure-action `ban`, SHALL prevail over the captcha rule and SHALL keep origin `appsec` / `plugin:appsec_failure`. Those drops SHALL log WARN `ServeHTTP:forcedCaptchaSuperseded` with attributes `name` (the first matching captcha row that lost) and dest `ip`. The plugin MUST NOT log attr `header` for this WARN.
+- `captcha` MUST NOT return immediately. Legs that were not skipped SHALL still run. An active LAPI ban, or a fail-closed ban from that leg (lookup error, stream/alone unhealthy, failure action `ban`), SHALL prevail over the captcha rule and SHALL keep that leg's origin, not `plugin:rules:`. An AppSec `ban` verdict, or an AppSec failure-action `ban`, SHALL prevail over the captcha rule and SHALL keep origin `appsec` / `plugin:appsec_failure`. Those drops SHALL log WARN `warnCaptchaSuperseded` with attributes `name` (the first matching captcha row that lost) and dest `ip`. The plugin MUST NOT log attr `header` for this WARN.
 - An AppSec `challenge` with non-empty body is not a ban and MUST NOT override the captcha rule (MUST NOT relay; apply the plugin gate). An AppSec `challenge` with empty `UserBodyContent` SHALL stay dest fail-closed ban (`ban:appsec-challenge-empty`, origin `appsec`) and therefore SHALL prevail over the captcha rule like `ban`. Empty-challenge dest when no captcha rule matched MUST NOT change.
 - A CrowdSec captcha decision SHALL be unchanged: the rule MUST NOT replace that outcome, the metrics origin SHALL stay the CrowdSec origin, and AppSec for that decision SHALL stay after a valid captcha gate cookie, not before the challenge page.
 - If no leg banned and a captcha rule matched, ServeHTTP SHALL serve the existing captcha gate. Origin `plugin:rules:<name>` of the first matching captcha row, `remediation=captcha`, only when that rule is what is applied. A valid gate cookie SHALL still pass. After the cookie is valid, AppSec SHALL still run unless a matching `bypass` or `bypassAppsec` skipped it.
@@ -387,7 +379,7 @@ Cookies SHALL use the same predicate shape as headers against that cookie's valu
 - **AND** stream lookup is ban for that client
 - **THEN** the response is the ban page
 - **AND** origin is the LAPI origin, not `plugin:rules:`
-- **AND** the log includes WARN `ServeHTTP:forcedCaptchaSuperseded` with `name` `c`
+- **AND** the log includes WARN `warnCaptchaSuperseded` with `name` `c`
 
 #### Scenario: Captcha plus bypassLapi still allows an AppSec ban
 - **WHEN** `bouncerActionRules` contains `{name: c, path: "^/x$", action: [captcha, bypassLapi]}`
@@ -395,7 +387,7 @@ Cookies SHALL use the same predicate shape as headers against that cookie's valu
 - **AND** AppSec returns `action: ban`
 - **THEN** the response is the ban page
 - **AND** origin is `appsec`
-- **AND** the log includes WARN `ServeHTTP:forcedCaptchaSuperseded` with `name` `c`
+- **AND** the log includes WARN `warnCaptchaSuperseded` with `name` `c`
 
 #### Scenario: Non-empty AppSec challenge does not override captcha rule
 - **WHEN** a captcha rule matched and AppSec was not skipped
@@ -439,10 +431,10 @@ Cookies SHALL use the same predicate shape as headers against that cookie's valu
 - **AND** ServeHTTP does not apply action rules
 
 #### Scenario: GetRemoteIP failure is not saved by a skip
-- **WHEN** GetRemoteIP fails
+- **WHEN** GetRemoteIP returns an error
 - **AND** an action rule would match with `action: [bypass]`
-- **THEN** the response is the tech ban
-- **AND** origin is `plugin:tech_getremotefail`
+- **THEN** the response status is 502
+- **AND** usage-metrics `dropped` is not incremented
 
 #### Scenario: Skip does not increment dropped
 - **WHEN** a matching row is `{action: [bypass]}` and no ban or captcha matched

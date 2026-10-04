@@ -92,7 +92,6 @@ type Config struct {
 	BouncerRedisUnreachableBlock        bool                         `json:"bouncerRedisUnreachableBlock,omitempty"`
 	BouncerRemediationHeadersCustomName string                       `json:"bouncerRemediationHeadersCustomName,omitempty"`
 	BouncerRemediationStatusCode        int                          `json:"bouncerRemediationStatusCode,omitempty"`
-	BouncerStartupBlock                 bool                         `json:"bouncerStartupBlock,omitempty"`
 	BouncerTraceHeadersCustomName       string                       `json:"bouncerTraceHeadersCustomName,omitempty"`
 	CaptchaCustomChallengeURL           string                       `json:"captchaCustomChallengeUrl,omitempty"`
 	CaptchaCustomJsURL                  string                       `json:"captchaCustomJsUrl,omitempty"`
@@ -223,7 +222,6 @@ func New() *Config {
 		BouncerRedisUnreachableBlock:        true,
 		BouncerRemediationHeadersCustomName: "",
 		BouncerRemediationStatusCode:        http.StatusForbidden,
-		BouncerStartupBlock:                 true,
 		BouncerTraceHeadersCustomName:       "",
 		CaptchaCustomChallengeURL:           "",
 		CaptchaCustomJsURL:                  "",

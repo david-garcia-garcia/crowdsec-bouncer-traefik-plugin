@@ -36,7 +36,6 @@ func generationRoute(name, middlewareName string, cfg *configuration.Config) tra
 func lapiOwnerConfig(host, instanceName string) *configuration.Config {
 	cfg := cfgLiveAt(host)
 	cfg.LapiInstanceName = instanceName
-	cfg.BouncerStartupBlock = true
 	return cfg
 }
 
@@ -167,7 +166,7 @@ func TestGeneration_OwnerRemovedSubscriberKeptUntilGrace(t *testing.T) {
 	requireBound(t, generation, "subscriber", client)
 
 	waitFor(t, grace+time.Second, func() bool {
-		return client.ClosedForTest() && serveStatus(t, generation, "subscriber") == http.StatusServiceUnavailable
+		return client.ClosedForTest() && serveStatus(t, generation, "subscriber") == http.StatusForbidden
 	})
 }
 
@@ -235,7 +234,7 @@ func TestGeneration_OwnerLegDisabledUnbindsSubscriber(t *testing.T) {
 	if failed := generation.Apply([]traefikemulator.Route{owner, subscriber}); failed != nil {
 		t.Fatal(failed)
 	}
-	if serveStatus(t, generation, "subscriber") != http.StatusServiceUnavailable {
+	if serveStatus(t, generation, "subscriber") != http.StatusForbidden {
 		t.Fatal("ClearPublisher must unbind the subscriber")
 	}
 	waitFor(t, time.Second, client.SleepingForTest)
@@ -315,7 +314,6 @@ func appsecSubscriberConfig() *configuration.Config {
 	cfg.LapiKey = ""
 	cfg.AppsecEnabled = false
 	cfg.AppsecInstanceName = "shared"
-	cfg.BouncerStartupBlock = true
 	return cfg
 }
 

@@ -15,7 +15,7 @@ A parseable CIDR whose network `To4()` is non-nil and whose mask `bits` is 128 (
 _Avoid_: native IPv6 CIDR, a mapped prefix `ParseCIDR` already rewrote to native IPv6
 
 **GetRemoteIP**:
-The owner of the client address for a request. Unless `BouncerForwardedHeadersInsecure` is true, requires the host from `req.RemoteAddr` to be in the trusted-hop pool before honoring forwarded headers; when the pool is empty or the peer is untrusted, returns `RemoteAddr` only. Otherwise walks the custom forwarded header most-recent-first against the trusted-hop pool, then the host of `RemoteAddr` when every hop is trusted or the header is empty. When the flag is true, skips the checker and returns the whole trimmed header (no hop walk), or the `RemoteAddr` host when that header is absent, empty, or whitespace-only. Also yields that address as `net.IP` when parseable.
+The owner of the client address for a request. Unless `BouncerForwardedHeadersInsecure` is true, requires the host from `req.RemoteAddr` to be in the trusted-hop pool before honoring forwarded headers; when the pool is empty or the peer is untrusted, returns `RemoteAddr` only. Otherwise walks the custom forwarded header most-recent-first against the trusted-hop pool, then the host of `RemoteAddr` when every hop is trusted or the header is empty. When the flag is true, skips the checker and returns the whole trimmed header (no hop walk), or the `RemoteAddr` host when that header is absent, empty, or whitespace-only. Also yields that address as `net.IP` when parseable. A chosen text that is not an IP returns that text and `ErrUnparseableClient`. A `RemoteAddr` that is not `host:port` returns an error and an empty string. ServeHTTP answers either error with HTTP 502.
 _Avoid_: parsing `RemoteAddr` on the connection, a second X-Forwarded-For walk, Traefik ipstrategy as a second owner
 
 **IPv6 zone ID**:
@@ -29,7 +29,7 @@ Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker st
 ## How to use
 
 - Build the Checker once in `bouncer.New` from config lists.
-- Resolve the client address with `GetRemoteIP` (server/trusted-hop pool + custom header). Pass that string and `ipAddr` into `clientrequest.New` (`core_plugin_clientrequest_inbound-request.md`). Keep the name `req`. Then `ContainsIP` on `req.IPAddr()` for the client pool. Do not parse `RemoteAddr` again. Do not parse the chosen string again for trusted-client membership. Do not assign `RemoteIP` after `New`. Do not add scopes or origin to the inbound request.
+- Resolve the client address with `GetRemoteIP` (server/trusted-hop pool + custom header). Pass that string and `ipAddr` into `clientrequest.New` (`core_plugin_clientrequest_inbound-request.md`). Keep the name `req`. Then `ContainsIP` on `req.IPAddr()` for the client pool. Do not parse `RemoteAddr` again. Do not parse the chosen string again for trusted-client membership. Do not assign `IPAddrString` after `New`. Do not add scopes or origin to the inbound request.
 - On the request path, call `ContainsIP` on the parsed GetRemoteIP address. `Contains` remains for string callers. Do not walk a CIDR slice beside the helper.
 - Call `HostCIDR` to format a parseable bare address as `/32` or `/128` before `AddCIDR`.
 - Range stream/alone membership reuses two Helpers on the LAPI Client (`AddCIDR(network, remediation)` then `Contains` metadata). Checker stays `AddCIDR(cidr, "")`. Do not put Range in Checker. Do not put ban and captcha on one LPM tree.

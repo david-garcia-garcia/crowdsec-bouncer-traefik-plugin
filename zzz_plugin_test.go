@@ -84,7 +84,6 @@ func cfgStreamAt(host string, interval int64) *configuration.Config {
 	c := cfgLiveAt(host)
 	c.LapiMode = configuration.StreamMode
 	c.LapiUpdateIntervalSeconds = interval
-	c.BouncerStartupBlock = true
 	return c
 }
 

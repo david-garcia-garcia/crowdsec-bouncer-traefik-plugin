@@ -279,7 +279,6 @@ func TestNew_CaptchaSubscriberBeforePublishBans(t *testing.T) {
 
 	sub := cfgCaptchaOwnerAt(t, "shared")
 	sub.CaptchaEnabled = false
-	sub.BouncerStartupBlock = false
 	h, err := New(context.Background(), testNextOK(), sub, "cs-bounce")
 	if err != nil {
 		t.Fatal(err)
@@ -291,24 +290,6 @@ func TestNew_CaptchaSubscriberBeforePublishBans(t *testing.T) {
 	}
 	if strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
 		t.Fatal("unpublished captcha must not serve the challenge")
-	}
-}
-
-func TestNew_CaptchaSubscriberBeforePublishBlocks(t *testing.T) {
-	reclaim.ResetForTestWith(0)
-	t.Cleanup(func() { reclaim.ResetForTest() })
-
-	sub := cfgCaptchaOwnerAt(t, "shared")
-	sub.CaptchaEnabled = false
-	sub.BouncerStartupBlock = true
-	h, err := New(context.Background(), testNextOK(), sub, "cs-bounce")
-	if err != nil {
-		t.Fatal(err)
-	}
-	rw := httptest.NewRecorder()
-	h.ServeHTTP(rw, captchaForceReq())
-	if rw.Code != http.StatusServiceUnavailable {
-		t.Fatalf("unpublished subscribed captcha with startup block must 503, status=%d body=%s", rw.Code, rw.Body.String())
 	}
 }
 

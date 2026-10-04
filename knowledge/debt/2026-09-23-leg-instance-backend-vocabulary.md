@@ -6,7 +6,7 @@ Action: note
 
 ## Why this follow-up
 
-The same LAPI or AppSec client is named three ways. `leg` is the kind (`lapi` / `appsec`) in logs, alias groups, and `plugin.go` constants. `instance` / `instanceName` is the public publish name (`crowdsecLapiInstanceName`, `instanceAlias`). `backend` is what the bouncer says when a subscribed client is missing (`msgBackendMissing`, `streamStartupBlock` "subscribed backend"). Readers cannot tell whether a sentence is about the ownership key, the public alias, or the `atomic.Value` late-bind.
+The same LAPI or AppSec client is named three ways. `leg` is the kind (`lapi` / `appsec`) in logs, alias groups, and `plugin.go` constants. `instance` / `instanceName` is the public publish name (`crowdsecLapiInstanceName`, `instanceAlias`). `backend` was the word for a subscribed client that is not published yet. Readers cannot tell whether a sentence is about the ownership key, the public alias, or the `atomic.Value` late-bind.
 
 ## Why it was not taken
 

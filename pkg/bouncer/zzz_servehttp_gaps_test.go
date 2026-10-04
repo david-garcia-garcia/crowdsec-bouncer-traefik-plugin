@@ -25,38 +25,6 @@ func TestServeHTTP_DisabledSkipsBan(t *testing.T) {
 	}
 }
 
-func TestServeHTTP_StartupBlockMissingBackend(t *testing.T) {
-	cases := []struct {
-		name string
-		bind func(*Bouncer)
-	}{
-		{name: "lapi", bind: func(b *Bouncer) {
-			bindTestLAPI(b, nil)
-			b.subscribeLAPI = true
-			b.lapiInstanceName = "shared"
-		}},
-		{name: "appsec", bind: func(b *Bouncer) {
-			b.subscribeAppSec = true
-			b.appsecInstanceName = "shared"
-		}},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			b, _, passed := testForcedDecisionBouncer(t, nil, nil, nil, false)
-			tc.bind(b)
-			b.startupBlock = true
-			rw := httptest.NewRecorder()
-			b.ServeHTTP(rw, testForcedDecisionRequest(""))
-			if *passed {
-				t.Fatal("startup block must not call next")
-			}
-			if rw.Code != http.StatusServiceUnavailable {
-				t.Fatalf("missing %s status = %d, want 503", tc.name, rw.Code)
-			}
-		})
-	}
-}
-
 func TestServeHTTP_UnboundLAPIUsesFailureAction(t *testing.T) {
 	t.Run("ban", func(t *testing.T) {
 		b, _, passed := testForcedDecisionBouncer(t, nil, nil, nil, false)
@@ -113,36 +81,45 @@ func TestServeHTTP_StreamUnhealthyUsesFailureAction(t *testing.T) {
 	})
 }
 
-func TestServeHTTP_BadRemoteAddrBans(t *testing.T) {
+func TestServeHTTP_BadRemoteAddrRejects(t *testing.T) {
 	b, _, passed := testForcedDecisionBouncer(t, nil, nil, nil, false)
 	b.remediationCustomHeader = "X-Remediation"
 	req := testForcedDecisionRequest("")
 	req.RemoteAddr = "not-a-socket"
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, req)
-	if *passed || rw.Code != http.StatusForbidden {
+	if *passed || rw.Code != http.StatusBadGateway {
 		t.Fatalf("bad RemoteAddr passed=%v status=%d body=%q", *passed, rw.Code, rw.Body.String())
 	}
-	if !strings.Contains(rw.Body.String(), "banned") {
-		t.Fatalf("body = %q, want ban template", rw.Body.String())
+	if strings.Contains(rw.Body.String(), "banned") {
+		t.Fatalf("body = %q, unusable RemoteAddr must not use the ban page", rw.Body.String())
 	}
-	if got := rw.Header().Get("X-Remediation"); got != "ban:unparseable-request" {
-		t.Fatalf("remediation %q want ban:unparseable-request", got)
+	if got := rw.Header().Get("X-Remediation"); got != "" {
+		t.Fatalf("remediation %q want empty", got)
+	}
+	if !strings.Contains(rw.Body.String(), "Bad Gateway") {
+		t.Fatalf("body = %q, want Bad Gateway", rw.Body.String())
 	}
 }
 
-func TestServeHTTP_UnparseableClientIPBans(t *testing.T) {
+func TestServeHTTP_UnparseableClientIPRejects(t *testing.T) {
 	b, _, passed := testForcedDecisionBouncer(t, nil, nil, nil, false)
 	b.remediationCustomHeader = "X-Remediation"
 	req := testForcedDecisionRequest("")
 	req.Header.Set("X-Forwarded-For", "not-an-ip")
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, req)
-	if *passed || rw.Code != http.StatusForbidden {
-		t.Fatalf("unparseable client passed=%v status=%d", *passed, rw.Code)
+	if *passed || rw.Code != http.StatusBadGateway {
+		t.Fatalf("unparseable client passed=%v status=%d body=%q", *passed, rw.Code, rw.Body.String())
 	}
-	if got := rw.Header().Get("X-Remediation"); got != "ban:unparseable-request" {
-		t.Fatalf("remediation %q want ban:unparseable-request", got)
+	if strings.Contains(rw.Body.String(), "banned") {
+		t.Fatalf("body = %q, unparseable client must not use the ban page", rw.Body.String())
+	}
+	if got := rw.Header().Get("X-Remediation"); got != "" {
+		t.Fatalf("remediation %q want empty", got)
+	}
+	if !strings.Contains(rw.Body.String(), "Bad Gateway") {
+		t.Fatalf("body = %q, want Bad Gateway", rw.Body.String())
 	}
 }
 
@@ -188,7 +165,7 @@ func TestHandleNextServeHTTP_UnpublishedAppSecUsesFailureAction(t *testing.T) {
 
 	t.Run("passthrough", func(t *testing.T) {
 		b, passed := newBouncer(configuration.FailureActionPassthrough)
-		b.appsecThenNextServeHTTP(httptest.NewRecorder(), req)
+		continueAfterLAPIForTest(b, httptest.NewRecorder(), req)
 		if !*passed {
 			t.Fatal("unpublished AppSec passthrough must call next")
 		}
@@ -196,7 +173,7 @@ func TestHandleNextServeHTTP_UnpublishedAppSecUsesFailureAction(t *testing.T) {
 	t.Run("ban", func(t *testing.T) {
 		b, passed := newBouncer(configuration.FailureActionBan)
 		rw := httptest.NewRecorder()
-		b.appsecThenNextServeHTTP(rw, req)
+		continueAfterLAPIForTest(b, rw, req)
 		if *passed || rw.Code != http.StatusForbidden {
 			t.Fatalf("unpublished AppSec ban passed=%v status=%d", *passed, rw.Code)
 		}
@@ -204,7 +181,7 @@ func TestHandleNextServeHTTP_UnpublishedAppSecUsesFailureAction(t *testing.T) {
 	t.Run("captcha", func(t *testing.T) {
 		b, passed := newBouncer(configuration.FailureActionCaptcha)
 		rw := httptest.NewRecorder()
-		b.appsecThenNextServeHTTP(rw, req)
+		continueAfterLAPIForTest(b, rw, req)
 		if *passed || rw.Code != http.StatusForbidden {
 			t.Fatalf("unpublished AppSec captcha passed=%v status=%d", *passed, rw.Code)
 		}

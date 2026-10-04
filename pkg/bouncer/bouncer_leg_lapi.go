@@ -56,7 +56,7 @@ func (b *Bouncer) receiveLAPI() {
 	b.traceBouncerBinding(true, "lapi", b.lapiInstanceName, current.Incarnation())
 }
 
-// LapiClient is the bound LAPI backend this route uses, or nil.
+// LapiClient is the published LAPI client this route has stored, or nil.
 func (b *Bouncer) LapiClient() *lapi.Client {
 	return b.loadedLAPI()
 }

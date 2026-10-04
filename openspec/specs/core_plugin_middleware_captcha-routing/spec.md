@@ -79,7 +79,7 @@ The Check-true form-POST redirect SHALL set the configured remediation header to
 - **THEN** that header value is `captcha:solved`
 
 ### Requirement: Custom challenge resources pass to origin under captcha only
-While the remediation kind is captcha, a request whose path is an exact match of a configured browser challenge-resource path SHALL pass to origin. Ban kind MUST NOT pass those paths. Passthrough SHALL use the same pass path as other allowed requests so AppSec still runs when enabled. Built-in provider CDN URLs are not a match set.
+While the remediation kind is captcha, a request whose path is an exact match of a configured browser challenge-resource path SHALL pass to origin. Ban kind MUST NOT pass those paths. `handleCaptchaKindServeHTTP` SHALL return false for that path and for a cleared gate that is not a captcha-form POST, and MUST NOT call next. ServeHTTP continues with the match already folded, so AppSec still runs when enabled. Built-in provider CDN URLs are not a match set.
 
 #### Scenario: Custom JS path under captcha reaches origin
 - **WHEN** captcha kind applies

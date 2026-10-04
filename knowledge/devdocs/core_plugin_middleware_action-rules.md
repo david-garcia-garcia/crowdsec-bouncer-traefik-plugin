@@ -14,10 +14,10 @@ Compile `bouncerActionRules` once into `*httprule.ActionSet`. After trusted-IP, 
 
 - Store `BouncerActionRules` on Config. Default `[]`. Compile with `httprule.NewActionSet` in `ValidateParams` (wrap `BouncerActionRules: %w`, discard) and again in `bouncer.New` (store). Do not compile on the request path.
 - Tokens: `ban`, `bypass`, `bypassLapi`, `bypassAppsec`, `captcha`. Array order does not matter. `bypass` sets skipLapi and skipAppsec. `ban` must be the only token on that row.
-- After trusted-IP, call `ActionSet.Fold`. Any ban → `handleRemediationServeHTTP` ban with `lapi.OriginPluginRules(match.BanName)` and return.
-- Else OR skipLapi / skipAppsec / captchaFlag. SkipLapi uses `passOrCaptchaRule`. SkipAppsec is checked again in `appsecThenNextServeHTTP` and `applyCaptchaRuleServeHTTP`.
-- Captcha flag still runs remaining legs. LAPI/AppSec ban (including fail-closed) prevails; WARN `ServeHTTP:forcedCaptchaSuperseded` with attrs `ip` and `name` (the captcha rule). Non-empty AppSec challenge does not override the captcha rule; empty challenge body stays dest fail-closed ban.
-- Do not put captcha or skip flags on the inbound request (`core_plugin_clientrequest_inbound-request.md`). Recompute `actionRules.Fold` in helpers.
+- After trusted-IP, call `ActionSet.Fold` once. Any ban → `handleRemediationServeHTTP` ban with `lapi.OriginPluginRules(match.BanName)` and return. Pass that match into `serveLAPI` and `serveAppSec`.
+- `serveLAPI` returns false when LAPI does not write the response (skip LAPI, no subscription, clean miss, passthrough, cleared captcha gate, widget asset). `serveAppSec` then runs with the same match. A captcha rule queries AppSec first, then serves the plugin gate. Skip AppSec skips that query in `serveAppSec` and `applyCaptchaRuleServeHTTP`.
+- Captcha flag still runs after LAPI when LAPI did not write. LAPI/AppSec ban (including fail-closed) prevails; WARN `warnCaptchaSuperseded` with attrs `ip` and `name` (the captcha rule). Non-empty AppSec challenge does not override the captcha rule; empty challenge body stays dest fail-closed ban.
+- Do not put captcha or skip flags on the inbound request (`core_plugin_clientrequest_inbound-request.md`). Fold once in `ServeHTTP`. A cleared gate and a widget asset return false from the captcha handler so that same match reaches `serveAppSec`.
 - Closed remediation reason is `rules` (prefix-map `plugin:rules:`). Metrics origin is `plugin:rules:<name>`. Do not hash the list into LAPI ownership or AppSec identity.
 - Leftover `bouncerAppsecBypassRules` / `bouncerLapiBypassRules` / `bouncerDecisionHeader` YAML never reaches `New`.
 
@@ -29,6 +29,13 @@ if match.BanName != "" {
 	b.handleRemediationServeHTTP(rw, req, decisionscope.BannedValue, lapi.OriginPluginRules(match.BanName))
 	return
 }
+if b.serveLAPI(rw, req, match) {
+	return
+}
+if b.serveAppSec(rw, req, match) {
+	return
+}
+b.next.ServeHTTP(rw, req.Request)
 ```
 
 ## Key files

@@ -82,30 +82,3 @@ func TestHandleRemediationServeHTTP_subscribedUnpublishedDoesNotWarnUnsubscribed
 		t.Fatalf("subscribed unpublished must not emit %s, got %s", msgCaptchaUnsubscribed, sink.String())
 	}
 }
-
-func TestServeHTTP_subscribedUnpublishedStartupBlockDoesNotWarnUnsubscribed(t *testing.T) {
-	log, sink := newTestLogSink(slog.LevelWarn)
-	b, originCalled := testCaptchaRoutingBouncer(t, nil)
-	b.log = log
-	b.enabled = true
-	b.subscribeCaptcha = true
-	b.startupBlock = true
-	b.captchaInstanceName = "shared"
-	rw := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
-	req.RemoteAddr = "127.0.0.1:1"
-	b.ServeHTTP(rw, req)
-	if *originCalled {
-		t.Fatal("startup-block captcha must not reach origin")
-	}
-	if rw.Code != http.StatusServiceUnavailable {
-		t.Fatalf("subscribed unpublished startup block want 503, got %d", rw.Code)
-	}
-	logged := sink.String()
-	if !strings.Contains(logged, msgBackendMissing) {
-		t.Fatalf("want WARN %s, got %s", msgBackendMissing, logged)
-	}
-	if strings.Contains(logged, msgCaptchaUnsubscribed) {
-		t.Fatalf("startup-block must not emit %s, got %s", msgCaptchaUnsubscribed, logged)
-	}
-}

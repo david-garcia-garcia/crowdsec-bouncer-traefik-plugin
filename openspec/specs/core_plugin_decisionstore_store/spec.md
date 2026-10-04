@@ -29,7 +29,7 @@ A DecisionStore SHALL be `pkg/decisionstore.Store`, opened with `reclaim.OpenWit
 - **AND** `reclaim_put` is absent at INFO
 
 ### Requirement: Store key is SessionHex only
-The DecisionStore reclaim key SHALL be `decisionstore:` plus `SessionHex`. Which knobs enter `SessionHex` is owned by `core_plugin_lapi_reclaim-key` (JSON field names on that marshaler change in this change and produce a new hash; a process restart builds a new store prefix). That key MUST NOT include `lapiUpdateIntervalSeconds`, `lapiMetricsUpdateIntervalSeconds`, `lapiUpdateMaxFailure`, `bouncerDecisionScopeHeaders`, TLS, failure action, `bouncerStartupBlock`, live-cache TTL, or middleware name. Stream `scopes=` and the store header-scope filter are owned by `core_plugin_lapi_scope-union`. Existing Redis keys under the previous hash are not migrated.
+The DecisionStore reclaim key SHALL be `decisionstore:` plus `SessionHex`. Which knobs enter `SessionHex` is owned by `core_plugin_lapi_reclaim-key` (JSON field names on that marshaler change in this change and produce a new hash; a process restart builds a new store prefix). That key MUST NOT include `lapiUpdateIntervalSeconds`, `lapiMetricsUpdateIntervalSeconds`, `lapiUpdateMaxFailure`, `bouncerDecisionScopeHeaders`, TLS, failure action, live-cache TTL, or middleware name. Stream `scopes=` and the store header-scope filter are owned by `core_plugin_lapi_scope-union`. Existing Redis keys under the previous hash are not migrated.
 
 #### Scenario: Different Redis hosts share one store
 - **WHEN** two stream Clients share Traefik name, LAPI URL and key and use different `lapiRedisHost` while Redis is off

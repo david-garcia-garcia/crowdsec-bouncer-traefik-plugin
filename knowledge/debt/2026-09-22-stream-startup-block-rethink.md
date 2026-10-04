@@ -1,21 +1,23 @@
 # Stream startup block still means more than "published"
 
+Resolved: `bouncerStartupBlock` was removed. A missing subscribed client uses that leg's failure action.
+
 IssueKey: 2026-09-22-bouncer-instance-severance
 Size: large
 Action: note
 
 ## Why this follow-up
 
-`streamStartupBlock` still uses a name that says stream startup. On the request path, `true` now asks whether every backend this bouncer subscribes to is published. One subscription checks only that backend. A published client counts as ready even while the first stream poll is in flight. `New` must not wait. What "ready" should mean past "the subscribed client is published", and whether the knob should be renamed, are still open.
+The public name said "wait until the stream cache is warm." On the request path it only asked whether every subscribed client was published. A published client counted as ready while the first poll was still in flight, and `New` did not wait. The knob overlapped the per-leg failure action for that unpublished window, so it was removed rather than renamed.
 
 ## Why it was not taken
 
-This change had to stop blocking Traefik `New`. Tightening "ready" to first-poll complete, or renaming the public YAML key, is a later product decision with operator-visible semantics.
+This change had to stop blocking Traefik `New`. Tightening "ready" to first-poll complete was a later product decision. Removing the knob closed the overlap: unpublished LAPI and AppSec use their failure action, and an unpublished captcha client bans a captcha verdict.
 
 ## Risks
 
-Operators who read `streamStartupBlock` as "wait until the stream cache is warm" can see 200/403 from an empty store after the client is published. A later rename is a breaking public-key change.
+Operators who set the old key still have it ignored by encoding. Until a client is published, the default failure action is ban.
 
 ## Context
 
-Owner: bouncer request path (`pkg/bouncer`). Not LAPI `startStream`. Default stays true.
+Owner: bouncer request path (`pkg/bouncer`). Not LAPI `startStream`. The first poll stays asynchronous.

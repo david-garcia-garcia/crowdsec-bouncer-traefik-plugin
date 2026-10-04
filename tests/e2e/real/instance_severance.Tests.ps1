@@ -365,7 +365,7 @@ $knobs
         $app.Success | Should -BeTrue
     }
 
-    It "T4 AppSec only has no LAPI 503" {
+    It "T4 AppSec only ignores LAPI bans" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
         Write-SevYaml @"
@@ -458,7 +458,7 @@ Describe "Instance severance late bind" {
         Remove-AllTestDecisions
     }
 
-    It "L1 subscriber-only first publish is 503 then 403" {
+    It "L1 subscriber-only first publish uses the failure action then the decision" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
         $ip = "10.90.0.61"
@@ -476,13 +476,12 @@ $svc
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          bouncerStartupBlock: "true"
+          bouncerLapiFailureAction: passthrough
           lapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
-        $miss = Wait-SevCodes -Path "/sev-l1" -IP $ip -Codes @(503) -TimeoutSeconds 15
-        $miss.Success | Should -BeTrue -Because "L1 before owner is 503"
-        (Get-SevLogs) | Should -Match "crowdsec bouncer backend missing"
+        $miss = Wait-SevCodes -Path "/sev-l1" -IP $ip -Codes @(200) -TimeoutSeconds 15
+        $miss.Success | Should -BeTrue -Because "L1 before owner uses the passthrough failure action"
         Add-TestDecision -IP $ip -Type "ban" -Reason "L1"
         Write-SevYaml @"
 http:
@@ -503,7 +502,6 @@ $svc
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          bouncerStartupBlock: "true"
           lapiInstanceName: $(Get-SevSlot)
 $knobs
     sev-l1-owner:
@@ -521,7 +519,7 @@ $knobs
         $hit.Success | Should -BeTrue -Because "L1 after owner uses the decision"
     }
 
-    It "L1b startup block off uses failure action" {
+    It "L1b missing client uses each router's failure action" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
         $ip = "10.90.0.62"
@@ -544,7 +542,6 @@ $svc
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          bouncerStartupBlock: "false"
           bouncerLapiFailureAction: passthrough
           lapiInstanceName: $(Get-SevSlot)
 $knobs
@@ -552,7 +549,6 @@ $knobs
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          bouncerStartupBlock: "false"
           bouncerLapiFailureAction: ban
           lapiInstanceName: $(Get-SevSlot)
 $knobs
@@ -563,7 +559,7 @@ $knobs
         $ban.Success | Should -BeTrue
     }
 
-    It "L2 missing name stays 503 or failure action" {
+    It "L2 missing name uses the failure action" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
         $ip = "10.90.0.63"
@@ -586,25 +582,24 @@ $svc
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          bouncerStartupBlock: "true"
+          bouncerLapiFailureAction: passthrough
           lapiInstanceName: missing
 $knobs
     sev-l2-fail:
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          bouncerStartupBlock: "false"
           bouncerLapiFailureAction: ban
           lapiInstanceName: missing
 $knobs
 "@
-        $block = Wait-SevCodes -Path "/sev-l2-block" -IP $ip -Codes @(503) -TimeoutSeconds 15
+        $block = Wait-SevCodes -Path "/sev-l2-block" -IP $ip -Codes @(200) -TimeoutSeconds 15
         $fail = Wait-SevCodes -Path "/sev-l2-fail" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $block.Success | Should -BeTrue
         $fail.Success | Should -BeTrue
     }
 
-    It "L3 two subscribed clients one missing is 503" {
+    It "L3 a LAPI ban applies while AppSec is unpublished" {
         $knobs = Get-SevKnobs
         $svc = Get-SevService
         $ip = "10.90.0.64"
@@ -637,13 +632,12 @@ $knobs
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          bouncerStartupBlock: "true"
           lapiInstanceName: $(Get-SevSlot)
           appsecInstanceName: missing-appsec
 $knobs
 "@
         Add-TestDecision -IP $ip -Type "ban" -Reason "L3"
-        $block = Wait-SevCodes -Path "/sev-l3" -IP $ip -Codes @(503) -TimeoutSeconds 15
+        $block = Wait-SevCodes -Path "/sev-l3" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $block.Success | Should -BeTrue
     }
 
@@ -680,7 +674,6 @@ $knobs
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          bouncerStartupBlock: "false"
           bouncerAppsecFailureAction: passthrough
           lapiInstanceName: $(Get-SevSlot)
           appsecInstanceName: $(Get-SevSlot)-waf
@@ -931,7 +924,6 @@ $knobs
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          bouncerStartupBlock: "true"
           lapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
@@ -972,7 +964,7 @@ $knobs
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          bouncerStartupBlock: "true"
+          bouncerLapiFailureAction: passthrough
           lapiInstanceName: $(Get-SevSlot)
 $knobs
     sev-r4-other:
@@ -982,9 +974,9 @@ $knobs
           lapiInstanceName: $(Get-SevSlot)-other
 $knobs
 "@
-        $admin503 = Wait-SevCodes -Path "/sev-r4-admin" -IP $ip -Codes @(503) -TimeoutSeconds 15
+        $admin503 = Wait-SevCodes -Path "/sev-r4-admin" -IP $ip -Codes @(200) -TimeoutSeconds 15
         $other403 = Wait-SevCodes -Path "/sev-r4-other" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
-        $admin503.Success | Should -BeTrue
+        $admin503.Success | Should -BeTrue -Because "the old slot is unpublished, so passthrough calls next"
         $other403.Success | Should -BeTrue
     }
 
@@ -1021,7 +1013,6 @@ $knobs
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          bouncerStartupBlock: "true"
           lapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
@@ -1053,12 +1044,12 @@ $knobs
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          bouncerStartupBlock: "true"
+          bouncerLapiFailureAction: passthrough
           lapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
         Start-Sleep -Seconds $script:GraceSeconds
-        $gone = Wait-SevCodes -Path "/sev-r5-admin" -IP $ip -Codes @(503) -TimeoutSeconds 15
+        $gone = Wait-SevCodes -Path "/sev-r5-admin" -IP $ip -Codes @(200) -TimeoutSeconds 15
         $gone.Success | Should -BeTrue
         (Get-SevSlotLogs) | Should -Match "crowdsec lapi instance closed"
     }
@@ -1096,7 +1087,6 @@ $knobs
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          bouncerStartupBlock: "true"
           lapiInstanceName: $(Get-SevSlot)
 $knobs
 "@
@@ -1147,7 +1137,6 @@ $svc
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          bouncerStartupBlock: "true"
           lapiInstanceName: $(Get-SevSlot)
 $knobs
     sev-n2-other:
@@ -1172,7 +1161,7 @@ $knobs
         $delta | Should -Match "crowdsec lapi instance started"
         $delta | Should -Not -Match "crowdsec lapi instance waking"
         $admin = Test-HttpRequest -Endpoint "/sev-n2-admin" -IP $ip -TraefikUrl $script:TraefikUrl
-        $admin.StatusCode | Should -BeIn @(403, 429, 503)
+        $admin.StatusCode | Should -BeIn @(403, 429)
     }
 }
 
@@ -1321,7 +1310,6 @@ $knobs
       plugin:
         bouncer:
           bouncerEnabled: "true"
-          bouncerStartupBlock: "true"
           lapiInstanceName: $(Get-SevSlot)-api
 $knobs
 "@
@@ -1330,7 +1318,7 @@ $knobs
         $logs | Should -Match '"leg":"appsec"'
         $cs = Test-HttpRequest -Endpoint "/sev-f2-cs" -IP $ip -TraefikUrl $script:TraefikUrl
         $cs.StatusCode | Should -Be 404
-        $sub = Wait-SevCodes -Path "/sev-f2-sub" -IP $ip -Codes @(503) -TimeoutSeconds 15
+        $sub = Wait-SevCodes -Path "/sev-f2-sub" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
         $sub.Success | Should -BeTrue
     }
 

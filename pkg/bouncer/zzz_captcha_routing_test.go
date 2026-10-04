@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -69,6 +70,14 @@ func testCaptchaRoutingBouncer(t *testing.T, client *captcha.Client) (*Bouncer, 
 	return b, &originCalled
 }
 
+// continueCaptchaForTest calls next when the captcha kind did not write.
+func continueCaptchaForTest(b *Bouncer, rw http.ResponseWriter, req clientrequest.Request, remediation string) {
+	if b.handleRemediationServeHTTP(rw, req, remediation, "cscli") {
+		return
+	}
+	b.next.ServeHTTP(rw, req.Request)
+}
+
 // testCaptchaRemoteIP is the one client address these routing tests solve captcha for.
 const testCaptchaRemoteIP = "192.0.2.10"
 
@@ -110,7 +119,7 @@ func TestHandleRemediationServeHTTP_solvedFormPostRedirects(t *testing.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "crowdsec_captcha_gate", Value: cookieValue})
 	rw := httptest.NewRecorder()
-	b.handleRemediationServeHTTP(rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli")
+	continueCaptchaForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue)
 
 	if rw.Code != http.StatusFound {
 		t.Fatalf("Check-true form POST want 302, got %d", rw.Code)
@@ -138,7 +147,7 @@ func TestHandleRemediationServeHTTP_ordinaryPostAfterSolveReachesOrigin(t *testi
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "crowdsec_captcha_gate", Value: cookieValue})
 	rw := httptest.NewRecorder()
-	b.handleRemediationServeHTTP(rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli")
+	continueCaptchaForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue)
 
 	if !*originCalled {
 		t.Fatal("ordinary POST after solve must reach origin")
@@ -183,7 +192,7 @@ func TestHandleRemediationServeHTTP_overMaxPostAfterSolveReachesOriginIntact(t *
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "crowdsec_captcha_gate", Value: cookieValue})
 	rw := httptest.NewRecorder()
-	b.handleRemediationServeHTTP(rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli")
+	continueCaptchaForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue)
 
 	if rw.Code == http.StatusFound {
 		t.Fatal("an upload over the captcha-form cap must not be redirected as a duplicate solve")
@@ -206,7 +215,7 @@ func TestHandleRemediationServeHTTP_queryTokenGetIsNotFormPost(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected?dummy-captcha-response=token", nil)
 	req.AddCookie(&http.Cookie{Name: "crowdsec_captcha_gate", Value: cookieValue})
-	b.handleRemediationServeHTTP(httptest.NewRecorder(), testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli")
+	continueCaptchaForTest(b, httptest.NewRecorder(), testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue)
 	if !*originCalled {
 		t.Fatal("GET with query token after solve must reach origin")
 	}
@@ -217,14 +226,14 @@ func TestHandleRemediationServeHTTP_customResourcePassthrough(t *testing.T) {
 	b, originCalled := testCaptchaRoutingBouncer(t, client)
 
 	jsReq := httptest.NewRequest(http.MethodGet, "http://app.example/assets/fast.js", nil)
-	b.handleRemediationServeHTTP(httptest.NewRecorder(), testClientRequest(jsReq, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli")
+	continueCaptchaForTest(b, httptest.NewRecorder(), testClientRequest(jsReq, testCaptchaRemoteIP), decisionscope.CaptchaValue)
 	if !*originCalled {
 		t.Fatal("custom JS path under captcha must reach origin")
 	}
 
 	*originCalled = false
 	challengeReq := httptest.NewRequest(http.MethodGet, "http://app.example/v0/challenge", nil)
-	b.handleRemediationServeHTTP(httptest.NewRecorder(), testClientRequest(challengeReq, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli")
+	continueCaptchaForTest(b, httptest.NewRecorder(), testClientRequest(challengeReq, testCaptchaRemoteIP), decisionscope.CaptchaValue)
 	if !*originCalled {
 		t.Fatal("challenge path under captcha must reach origin")
 	}
@@ -232,7 +241,7 @@ func TestHandleRemediationServeHTTP_customResourcePassthrough(t *testing.T) {
 	*originCalled = false
 	prefixReq := httptest.NewRequest(http.MethodGet, "http://app.example/assets", nil)
 	prefixRW := httptest.NewRecorder()
-	b.handleRemediationServeHTTP(prefixRW, testClientRequest(prefixReq, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli")
+	continueCaptchaForTest(b, prefixRW, testClientRequest(prefixReq, testCaptchaRemoteIP), decisionscope.CaptchaValue)
 	if *originCalled {
 		t.Fatal("prefix of the JS path must not pass")
 	}
@@ -242,7 +251,7 @@ func TestHandleRemediationServeHTTP_customResourcePassthrough(t *testing.T) {
 
 	*originCalled = false
 	validateReq := httptest.NewRequest(http.MethodGet, "http://app.example/v0/siteverify", nil)
-	b.handleRemediationServeHTTP(httptest.NewRecorder(), testClientRequest(validateReq, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli")
+	continueCaptchaForTest(b, httptest.NewRecorder(), testClientRequest(validateReq, testCaptchaRemoteIP), decisionscope.CaptchaValue)
 	if *originCalled {
 		t.Fatal("ValidateURL path must not pass")
 	}
@@ -253,7 +262,7 @@ func TestHandleRemediationServeHTTP_banDoesNotPassthroughCustomResource(t *testi
 	b, originCalled := testCaptchaRoutingBouncer(t, client)
 	req := httptest.NewRequest(http.MethodGet, "http://app.example/fast.js", nil)
 	rw := httptest.NewRecorder()
-	b.handleRemediationServeHTTP(rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.BannedValue, "cscli")
+	continueCaptchaForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.BannedValue)
 	if *originCalled {
 		t.Fatal("ban must not passthrough a custom-resource path")
 	}
@@ -272,7 +281,7 @@ func TestHandleRemediationServeHTTP_captchaHEADServesChallengePage(t *testing.T)
 
 	headReq := httptest.NewRequest(http.MethodHead, "http://example.com/protected", nil)
 	rw := httptest.NewRecorder()
-	b.handleRemediationServeHTTP(rw, testClientRequest(headReq, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli")
+	continueCaptchaForTest(b, rw, testClientRequest(headReq, testCaptchaRemoteIP), decisionscope.CaptchaValue)
 	if *originCalled {
 		t.Fatal("unsolved captcha HEAD must not reach origin")
 	}
@@ -290,7 +299,7 @@ func TestHandleRemediationServeHTTP_captchaHEADServesChallengePage(t *testing.T)
 	}
 
 	banRW := httptest.NewRecorder()
-	b.handleRemediationServeHTTP(banRW, testClientRequest(httptest.NewRequest(http.MethodHead, "http://example.com/protected", nil), testCaptchaRemoteIP), decisionscope.BannedValue, "cscli")
+	continueCaptchaForTest(b, banRW, testClientRequest(httptest.NewRequest(http.MethodHead, "http://example.com/protected", nil), testCaptchaRemoteIP), decisionscope.BannedValue)
 	if banRW.Code != http.StatusForbidden {
 		t.Fatalf("ban HEAD want 403, got %d", banRW.Code)
 	}
@@ -303,7 +312,7 @@ func TestHandleRemediationServeHTTP_customResourceHEADReachesOrigin(t *testing.T
 	client := testCaptchaClient(t, "/fast.js", "", "", nil)
 	b, originCalled := testCaptchaRoutingBouncer(t, client)
 	req := httptest.NewRequest(http.MethodHead, "http://app.example/fast.js", nil)
-	b.handleRemediationServeHTTP(httptest.NewRecorder(), testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli")
+	continueCaptchaForTest(b, httptest.NewRecorder(), testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue)
 	if !*originCalled {
 		t.Fatal("custom-resource HEAD under captcha must reach origin")
 	}
@@ -314,7 +323,7 @@ func TestHandleRemediationServeHTTP_staleCacheGraceDoesNotPass(t *testing.T) {
 	b, originCalled := testCaptchaRoutingBouncer(t, client)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	rw := httptest.NewRecorder()
-	b.handleRemediationServeHTTP(rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli")
+	continueCaptchaForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue)
 	if *originCalled {
 		t.Fatal("no gate cookie must not be treated as past-captcha")
 	}

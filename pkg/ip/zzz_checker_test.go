@@ -1,6 +1,7 @@
 package ip
 
 import (
+	"errors"
 	"log/slog"
 	"net"
 	"net/http"
@@ -173,9 +174,7 @@ func runGetRemoteIPCases(t *testing.T, tests []getRemoteIPCase) {
 func assertGetRemoteIPResult(t *testing.T, tc getRemoteIPCase, got string, parsed net.IP, err error) {
 	t.Helper()
 	if tc.wantErr {
-		if err == nil {
-			t.Fatal("expected error")
-		}
+		assertGetRemoteIPError(t, tc, got, parsed, err)
 		return
 	}
 	if err != nil {
@@ -191,6 +190,26 @@ func assertGetRemoteIPResult(t *testing.T, tc getRemoteIPCase, got string, parse
 		t.Fatalf("GetRemoteIP parsed = %v want nil for %q", parsed, got)
 	}
 	assertGetRemoteIPParsed(t, tc.wantParsedIP, parsed)
+}
+
+// assertGetRemoteIPError checks a GetRemoteIP error and, when wantIP is set, the raw text.
+func assertGetRemoteIPError(t *testing.T, tc getRemoteIPCase, got string, parsed net.IP, err error) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if tc.wantIP == "" {
+		return
+	}
+	if got != tc.wantIP {
+		t.Fatalf("GetRemoteIP = %q want %q", got, tc.wantIP)
+	}
+	if parsed != nil {
+		t.Fatalf("GetRemoteIP parsed = %v want nil for %q", parsed, got)
+	}
+	if !errors.Is(err, ErrUnparseableClient) {
+		t.Fatalf("err = %v, want unparseable client", err)
+	}
 }
 
 func assertGetRemoteIPParsed(t *testing.T, wantParsedIP string, parsed net.IP) {
@@ -305,6 +324,7 @@ func TestGetRemoteIP(t *testing.T) {
 			strategy:   strategy,
 			wantIP:     "not-an-ip",
 			wantParsed: false,
+			wantErr:    true,
 		},
 		{
 			name:       "malformed rightmost hop fails closed",
@@ -314,6 +334,7 @@ func TestGetRemoteIP(t *testing.T) {
 			strategy:   strategy,
 			wantIP:     "bad-hop",
 			wantParsed: false,
+			wantErr:    true,
 		},
 		{
 			name:       "port suffixed hop fails closed",
@@ -323,6 +344,7 @@ func TestGetRemoteIP(t *testing.T) {
 			strategy:   strategy,
 			wantIP:     "203.0.113.10:443",
 			wantParsed: false,
+			wantErr:    true,
 		},
 		{
 			name:       "RemoteAddr without port fails",
@@ -376,6 +398,7 @@ func TestGetRemoteIP(t *testing.T) {
 			strategy:   strategy,
 			wantIP:     "[fe80::1%eth0]",
 			wantParsed: false,
+			wantErr:    true,
 		},
 		{
 			name:       "IPv4 hop with percent stays fail-closed",
@@ -385,6 +408,7 @@ func TestGetRemoteIP(t *testing.T) {
 			strategy:   strategy,
 			wantIP:     "192.0.2.1%eth0",
 			wantParsed: false,
+			wantErr:    true,
 		},
 	})
 }
@@ -461,6 +485,7 @@ func TestGetRemoteIPInsecure(t *testing.T) {
 			insecure:   true,
 			wantIP:     "203.0.113.10, 10.0.0.1",
 			wantParsed: false,
+			wantErr:    true,
 		},
 		{
 			name:       "insecure garbage fails closed",
@@ -471,6 +496,7 @@ func TestGetRemoteIPInsecure(t *testing.T) {
 			insecure:   true,
 			wantIP:     "not-an-ip",
 			wantParsed: false,
+			wantErr:    true,
 		},
 		{
 			name:       "insecure port-suffixed value fails closed",
@@ -481,6 +507,7 @@ func TestGetRemoteIPInsecure(t *testing.T) {
 			insecure:   true,
 			wantIP:     "203.0.113.10:443",
 			wantParsed: false,
+			wantErr:    true,
 		},
 		{
 			name:       "insecure bracketed IPv6 fails closed",
@@ -491,6 +518,7 @@ func TestGetRemoteIPInsecure(t *testing.T) {
 			insecure:   true,
 			wantIP:     "[2001:db8::1]",
 			wantParsed: false,
+			wantErr:    true,
 		},
 		{
 			name:       "insecure RemoteAddr without port fails",

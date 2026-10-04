@@ -138,7 +138,6 @@ func TestServeHTTP_nonMatchingLapiBypassStillLooksUp(t *testing.T) {
 func TestServeHTTP_lapiBypassSkipsUnboundLAPIFailure(t *testing.T) {
 	b, passed := testBypassOriginBouncer(t)
 	b.subscribeLAPI = true
-	b.startupBlock = false
 	b.lapiFailureAction = configuration.FailureActionBan
 	b.actionRules = mustPathAction(t, "lapi", "^/health$", httprule.ActionBypassLapi)
 	rw := httptest.NewRecorder()
@@ -529,8 +528,8 @@ func TestServeHTTP_captchaPlusBypassLapiStillAllowsAppsecBan(t *testing.T) {
 		t.Fatalf("status=%d body=%q", rw.Code, rw.Body.String())
 	}
 	logged := sink.String()
-	if !strings.Contains(logged, "ServeHTTP:forcedCaptchaSuperseded") {
-		t.Fatalf("want WARN forcedCaptchaSuperseded, got %s", logged)
+	if !strings.Contains(logged, "warnCaptchaSuperseded") {
+		t.Fatalf("want WARN warnCaptchaSuperseded, got %s", logged)
 	}
 	if !strings.Contains(logged, `"name":"c"`) {
 		t.Fatalf("want name=c, got %s", logged)

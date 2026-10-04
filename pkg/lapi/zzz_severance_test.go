@@ -248,7 +248,7 @@ func TestOwnership_I2DefaultDecisionSecondsForksStore(t *testing.T) {
 	}
 }
 
-func TestOwnership_I3StartupBlockIsNeitherKey(t *testing.T) {
+func TestOpen_DoesNotWaitOnFirstPoll(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 	server, _ := testStreamLAPI(t)
@@ -256,29 +256,11 @@ func TestOwnership_I3StartupBlockIsNeitherKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstCfg := testStreamConfig(parsed.Host, 1)
-	firstCfg.BouncerStartupBlock = true
 	started := time.Now()
-	first, err := Open(context.Background(), firstCfg, slog.Default(), "i3", "test")
-	if err != nil {
+	if _, err := Open(context.Background(), testStreamConfig(parsed.Host, 1), slog.Default(), "i3", "test"); err != nil {
 		t.Fatal(err)
 	}
 	if time.Since(started) > 2*time.Second {
-		t.Fatal("I3: Open must not wait on the first poll")
-	}
-	secondCfg := testStreamConfig(parsed.Host, 1)
-	secondCfg.BouncerStartupBlock = false
-	if SessionHex(firstCfg) != SessionHex(secondCfg) {
-		t.Fatal("I3: streamStartupBlock must not change SessionHex")
-	}
-	if OwnershipKey(firstCfg, "i3") != OwnershipKey(secondCfg, "i3") {
-		t.Fatal("I3: streamStartupBlock must not change the ownership key")
-	}
-	second, err := Open(context.Background(), secondCfg, slog.Default(), "i3", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first != second {
-		t.Fatal("I3: streamStartupBlock-only change must Wake the same Client")
+		t.Fatal("Open must not wait on the first poll")
 	}
 }

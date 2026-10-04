@@ -85,7 +85,7 @@ The plugin SHALL publish captcha on the existing reclaim alias table as group `c
 - **AND** the captcha bound field holds a typed nil until a later Publish Stores a client
 
 ### Requirement: Empty captcha instance name fills only when owned
-When `captchaEnabled` is true and the trimmed `captchaInstanceName` is empty, `Prepare` SHALL set the instance name to this middleware's Traefik name. When `captchaEnabled` is false, an empty name SHALL stay empty. The ownership Open key SHALL be the middleware name plus instance-owned captcha knobs (provider, keys, files, timeouts, template, gate, custom paths, and the recaptcha-enterprise knobs: key type, project id, API key, action, min score) plus `logLevel`, `logFilePath`, and `logFormat`. Slot name, `bouncerEnabled`, failure actions, remediation header, and `bouncerStartupBlock` MUST NOT be in that key.
+When `captchaEnabled` is true and the trimmed `captchaInstanceName` is empty, `Prepare` SHALL set the instance name to this middleware's Traefik name. When `captchaEnabled` is false, an empty name SHALL stay empty. The ownership Open key SHALL be the middleware name plus instance-owned captcha knobs (provider, keys, files, timeouts, template, gate, custom paths, and the recaptcha-enterprise knobs: key type, project id, API key, action, min score) plus `logLevel`, `logFilePath`, and `logFormat`. Slot name, `bouncerEnabled`, failure actions, and the remediation header MUST NOT be in that key.
 
 #### Scenario: Owner omit fills to Traefik name
 - **WHEN** `captchaEnabled` is true and `captchaInstanceName` is omitted

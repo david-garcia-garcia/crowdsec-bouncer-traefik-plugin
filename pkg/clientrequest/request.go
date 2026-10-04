@@ -23,15 +23,15 @@ const (
 // Address, scheme, and absolute URL are fixed by New.
 type Request struct {
 	*http.Request
-	ipAddr      net.IP // copy of the parsed address; nil when unparseable
-	ipType      string // ip.FamilyOfIP(ipAddr): ipv4, ipv6, or empty
-	remoteIP    string // ipAddr.String() when parsed; otherwise the raw extract for fail logs
-	scheme      string // constructor token: http or https
-	absoluteURL string // constructor snapshot of the client-facing URL
+	ipAddr       net.IP // copy of the parsed address; nil when unparseable
+	ipType       string // ip.FamilyOfIP(ipAddr): ipv4, ipv6, or empty
+	ipAddrString string // ipAddr.String() when parsed; otherwise the raw extract for fail logs
+	scheme       string // constructor token: http or https
+	absoluteURL  string // constructor snapshot of the client-facing URL
 }
 
 // New builds Request from the live request and the address GetRemoteIP already chose.
-// When ipAddr is non-nil, remoteIP is stored as ipAddr.String(). The family is ip.FamilyOfIP(ipAddr).
+// When ipAddr is non-nil, IPAddrString is stored as ipAddr.String(). The family is ip.FamilyOfIP(ipAddr).
 // Scheme and AbsoluteURL are fixed here. Later edits to Host, URL, or the passed net.IP do not change them.
 // New does not write onto the live *http.Request.
 func New(httpReq *http.Request, remoteIP string, ipAddr net.IP) Request {
@@ -41,12 +41,12 @@ func New(httpReq *http.Request, remoteIP string, ipAddr net.IP) Request {
 	}
 	scheme := schemeOf(httpReq)
 	return Request{
-		Request:     httpReq,
-		ipAddr:      ipAddr,
-		ipType:      ip.FamilyOfIP(ipAddr),
-		remoteIP:    remoteIP,
-		scheme:      scheme,
-		absoluteURL: absoluteURL(httpReq, scheme),
+		Request:      httpReq,
+		ipAddr:       ipAddr,
+		ipType:       ip.FamilyOfIP(ipAddr),
+		ipAddrString: remoteIP,
+		scheme:       scheme,
+		absoluteURL:  absoluteURL(httpReq, scheme),
 	}
 }
 
@@ -64,10 +64,10 @@ func (r Request) IPType() string {
 	return r.ipType
 }
 
-// RemoteIP is the client address string captured by New.
+// IPAddrString is the client address string captured by New, the same address as IPAddr.
 // A parsed address is ipAddr.String(); an unparsed extract stays as GetRemoteIP returned it.
-func (r Request) RemoteIP() string {
-	return r.remoteIP
+func (r Request) IPAddrString() string {
+	return r.ipAddrString
 }
 
 // Scheme is the constructor-owned client-facing scheme token (http or https).

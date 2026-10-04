@@ -8,7 +8,7 @@ _Avoid_: captcha gate cookie, `{ip}_captcha`, prefix bypass
 
 **Unsubscribed captcha**:
 A captcha-kind remediation on a Bouncer that never subscribed to captcha (`subscribeCaptcha` false: bounce on, empty `CaptchaInstanceName`).
-_Avoid_: subscribed-unpublished, `!Valid`, AppSec JSON `action: captcha`, `crowdsec bouncer backend missing`
+_Avoid_: subscribed-unpublished, `!Valid`, AppSec JSON `action: captcha`
 
 **Solved-form POST**:
 A POST whose provider response field is non-empty in a body of at most `captchaFormMaxBytes` (64KiB), read by `IsCaptchaFormPost`. Not a GET with a query token, and not an over-cap upload that happens to contain the field name.
@@ -28,22 +28,22 @@ _Avoid_: `CaptchaCustomValidateURL`, the bundled default `captcha.html`
 
 ## Overview
 
-`handleRemediationServeHTTP` sends captcha kind to `handleCaptchaKindServeHTTP` (WARN-and-ban when this router never subscribed). A subscribed, usable client then routes after cookie grace and first-solve 302. Cookie mint stays on `core_plugin_middleware_captcha-gate`.
+`handleRemediationServeHTTP` sends captcha kind to `handleCaptchaKindServeHTTP` (WARN-and-ban when this router never subscribed). A subscribed, usable client then routes after cookie grace and first-solve 302. A widget asset or a cleared gate returns false and does not call next. Cookie mint stays on `core_plugin_middleware_captcha-gate`.
 
 ## How to use
 
 - When kind is captcha and `subscribeCaptcha` is false, WARN `crowdsec bouncer captcha unsubscribed` with `leg` `captcha` and `instanceName` (empty when unsubscribed), then ban with `headerReason` `captcha-downgrade` (`ban:captcha-downgrade` when the remediation header is set). Do not emit `ip`. Do not call `GetRemoteIP`. Emit on every remediating request.
-- Do not WARN when subscribed. Empty or `!Valid` still ban without this stem (`headerReason` `captcha-downgrade`). Startup-block stays 503 plus `crowdsec bouncer backend missing`.
+- Do not WARN when subscribed. Empty or `!Valid` still ban without this stem (`headerReason` `captcha-downgrade`).
 - Load the published captcha Client. Empty or `!Valid` remediates as ban with `headerReason` `captcha-downgrade`. Do not construct a local client on the request path or in bounce-only `New`.
 - Pass this router's `remediationCustomHeader` and the already-formatted challenge-page value into `ServeHTTP(rw, req, …)`. Pass the header name into `WriteSolvedRedirect`. Do not store the header on Client.
-- Sequence a loaded Valid client as: custom-resource path → Check-true form POST 302 → Check-true origin → `captcha.ServeHTTP` (HEAD included). Else ban.
+- Sequence a loaded Valid client as: custom-resource path returns false → Check-true form POST 302 → other Check-true requests return false → `captcha.ServeHTTP` (HEAD included). Else ban. Do not call AppSec or next from this handler.
 - HEAD under a subscribed, usable captcha remediation gets the challenge page, never the ban page. That is ratified; do not "fix" it back to ban. A HEAD on a custom-resource path still reaches origin.
 - Detect form POST with `IsCaptchaFormPost`. It is a reader of its own, not `captchaResponseFromRequest`: routing may still forward the request, so it caps at 64KiB, reads urlencoded and multipart, answers from `PostForm` when the form was already parsed, and restores `Body` plus `ContentLength` when it answers no. Keep the two callers apart.
 - After Check, call `WriteSolvedRedirect`: `302 Found` to `req.URL.String()`, set the remediation header to `captcha:solved` when configured (no third field). Do not remint the gate cookie. Do not call siteverify.
 - Match custom assets with `IsCustomResourceRequest`. `configuration.CustomCaptchaResourcePath` is the one owner of which configured value names a browser path; `Client.New` calls it for `CaptchaCustomJsURL` and optional `captchaCustomChallengeUrl` (custom provider only) and compares the stored paths to `req.URL.Path`. Ignore host and query. Never `CaptchaCustomValidateURL`. Never a prefix.
 - Render the endpoint through template `ChallengeURL` (execute map sibling of `FrontendJS`). Captcha templates use `{{` / `}}`, unlike the ban template's `[[` / `]]`. Wire it in `examples/custom-captcha`, not in the bundled default `captcha.html`.
 - Past-captcha is `Check(req)` only — the HMAC gate cookie. Do not read or write cache grace keys, and do not reintroduce an IP-keyed grace cache.
-- Passthrough and Check-true ordinary requests call `appsecThenNextServeHTTP`. Ban never passthrough.
+- A widget asset and a cleared gate return false. The caller continues, so AppSec still runs in `serveAppSec` and then `next`. The challenge page, a solved-form redirect, and a downgrade ban return true. Ban never returns false.
 
 ## Key files
 
