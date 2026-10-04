@@ -56,7 +56,6 @@ http:
           bouncerForwardedHeadersTrustedIps:
             - "172.16.0.0/12"
             - "127.0.0.1/32"
-          bouncerStartupBlock: "false"
           lapiEnabled: "true"
           lapiHost: crowdsec:8080
           lapiHttpTimeoutSeconds: "60"

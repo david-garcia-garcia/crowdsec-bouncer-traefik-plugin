@@ -44,7 +44,6 @@ type Bouncer struct {
 	subscribeLAPI            bool
 	subscribeAppSec          bool
 	subscribeCaptcha         bool
-	startupBlock             bool
 	redisUnreachableBlock    bool  // per-router Redis fail-closed
 	defaultDecisionSeconds   int64 // per-router live-cache TTL passed into LiveLookup
 	log                      *slog.Logger
@@ -64,7 +63,6 @@ type Bouncer struct {
 	originBasedDecisionRemap map[string]map[string]string // per-router apply; LAPI/store keep original kinds
 }
 
-const msgBackendMissing = "crowdsec bouncer backend missing"
 const msgBanTemplateUnavailable = "crowdsec bouncer ban template unavailable"
 const msgCaptchaUnsubscribed = "crowdsec bouncer captcha unsubscribed"
 
@@ -117,7 +115,6 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 		subscribeLAPI:            subscribeLAPI,
 		subscribeAppSec:          subscribeAppSec,
 		subscribeCaptcha:         subscribeCaptcha,
-		startupBlock:             config.BouncerStartupBlock,
 		redisUnreachableBlock:    config.BouncerRedisUnreachableBlock,
 		defaultDecisionSeconds:   config.LapiDefaultDecisionSeconds,
 		log:                      log,
@@ -152,27 +149,16 @@ func (b *Bouncer) warnCaptchaSuperseded(req clientrequest.Request, match httprul
 	b.log.Warn("ServeHTTP:forcedCaptchaSuperseded", "ip", req.RemoteIP(), "name", match.CaptchaName)
 }
 
-// passOrCaptchaRule passes to next, or applies a captcha rule after remaining legs.
-func (b *Bouncer) passOrCaptchaRule(rw http.ResponseWriter, req clientrequest.Request) {
-	match := b.actionRules.Fold(req.Request)
-	if match.CaptchaName != "" {
-		b.applyCaptchaRuleServeHTTP(rw, req, match)
-		return
-	}
-	b.appsecThenNextServeHTTP(rw, req)
-}
-
 // applyCaptchaRuleServeHTTP queries AppSec unless skipped, then serves the plugin captcha gate.
 func (b *Bouncer) applyCaptchaRuleServeHTTP(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) {
-	if !match.SkipAppsec && b.subscribeAppSec && b.applyAppsecServeHTTP(rw, req) {
+	if !match.SkipAppsec && b.subscribeAppSec && b.applyAppsecServeHTTP(rw, req, match) {
 		return
 	}
 	b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginRules(match.CaptchaName))
 }
 
 // remediateOrCaptchaRule applies lookup kind. A captcha rule does not replace CrowdSec captcha.
-func (b *Bouncer) remediateOrCaptchaRule(rw http.ResponseWriter, req clientrequest.Request, kind, origin string) {
-	match := b.actionRules.Fold(req.Request)
+func (b *Bouncer) remediateOrCaptchaRule(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, kind, origin string) {
 	if decisionscope.RemediationKind(kind) == decisionscope.BannedValue {
 		b.warnCaptchaSuperseded(req, match)
 	}
@@ -180,8 +166,8 @@ func (b *Bouncer) remediateOrCaptchaRule(rw http.ResponseWriter, req clientreque
 }
 
 // banOrWarnCaptchaRule bans, and WARNs when a captcha rule lost.
-func (b *Bouncer) banOrWarnCaptchaRule(rw http.ResponseWriter, req clientrequest.Request, reason, headerReason, origin string) {
-	b.warnCaptchaSuperseded(req, b.actionRules.Fold(req.Request))
+func (b *Bouncer) banOrWarnCaptchaRule(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, reason, headerReason, origin string) {
+	b.warnCaptchaSuperseded(req, match)
 	b.handleBanServeHTTP(rw, req, reason, headerReason, origin)
 }
 
@@ -191,33 +177,11 @@ func (b *Bouncer) banOrWarnCaptchaRule(rw http.ResponseWriter, req clientrequest
 // live: no stream; LiveLookup, then memo in cache.
 // stream: LAPI stream ticker writes the cache; request path only reads it.
 // alone: same as stream, but the ticker is CAPI (no local CrowdSec).
-// appsec: no LAPI; skip to the pass path (AppSec if enabled).
-//
-// ServeHTTP is a mode dispatcher; gocyclo/funlen fire on the flattened branches.
-//
-//nolint:gocyclo,gocognit,funlen
+// appsec: no LAPI; ServeHTTP continues to AppSec.
 func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	if !b.enabled {
 		b.next.ServeHTTP(rw, httpReq)
 		return
-	}
-
-	if b.startupBlock {
-		if b.subscribeLAPI && b.loadedLAPI() == nil {
-			b.log.Warn(msgBackendMissing, "leg", "lapi", "instanceName", b.lapiInstanceName)
-			rw.WriteHeader(http.StatusServiceUnavailable)
-			return
-		}
-		if b.subscribeAppSec && b.loadedAppSec() == nil {
-			b.log.Warn(msgBackendMissing, "leg", "appsec", "instanceName", b.appsecInstanceName)
-			rw.WriteHeader(http.StatusServiceUnavailable)
-			return
-		}
-		if b.subscribeCaptcha && b.loadedCaptcha() == nil {
-			b.log.Warn(msgBackendMissing, "leg", "captcha", "instanceName", b.captchaInstanceName)
-			rw.WriteHeader(http.StatusServiceUnavailable)
-			return
-		}
 	}
 
 	// prepare client request
@@ -238,110 +202,126 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		return
 	}
 
-	// Lapi MODE is very coupled with the bouncer logic
-	lapiClient := b.loadedLAPI()
-	crowdsecMode := ""
-	if lapiClient != nil {
-		crowdsecMode = lapiClient.Mode()
-	}
-
 	// If we have a lapi client, add this to metrics
-	if lapiClient != nil {
+	if lapiClient := b.loadedLAPI(); lapiClient != nil {
 		lapiClient.IncProcessed(req.IPType())
 	}
 
+	// Return ASAP a ban that comes from an action rule
 	match := b.actionRules.Fold(req.Request)
 	if match.BanName != "" {
 		logger.Trace(b.log, "ServeHTTP", "ip", req.RemoteIP(), "actionRule", match.BanName)
 		b.handleRemediationServeHTTP(rw, req, decisionscope.BannedValue, lapi.OriginPluginRules(match.BanName))
 		return
 	}
-	if match.SkipLapi {
-		b.passOrCaptchaRule(rw, req)
+
+	if b.serveLAPI(rw, req, match) {
 		return
 	}
-
-	if b.subscribeLAPI && lapiClient == nil {
-		b.applyLapiFailureAction(rw, req, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
+	if b.serveAppSec(rw, req, match) {
 		return
+	}
+	b.next.ServeHTTP(rw, req.Request)
+}
+
+// serveLAPI reports whether LAPI wrote the response.
+// False means LAPI had nothing to say, and ServeHTTP continues with AppSec.
+//
+//nolint:gocyclo,gocognit,funlen // mode branches stay in this one lookup
+func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
+	if match.SkipLapi {
+		return false
+	}
+	lapiClient := b.loadedLAPI()
+	if b.subscribeLAPI && lapiClient == nil {
+		return b.applyLapiFailureAction(rw, req, match, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
 	}
 	if !b.subscribeLAPI {
-		b.passOrCaptchaRule(rw, req)
-		return
+		return false
 	}
+	crowdsecMode := lapiClient.Mode()
 
 	// Mapped scope headers for this request. Missing headers are omitted.
 	scopes := decisionscope.RequestScopeValues(b.decisionScopeHeaders, req.Request)
 
 	// live, stream, and alone consult the cache.
 	if crowdsecMode == configuration.LiveMode || crowdsecMode == configuration.StreamMode || crowdsecMode == configuration.AloneMode {
-		var kind, origin string
-		var originID uint16
-		var lookupErr error
-		kind, origin, originID, lookupErr = lapiClient.LookupRemediation(req.RemoteIP(), req.IPAddr(), scopes)
+		kind, origin, originID, lookupErr := lapiClient.LookupRemediation(req.RemoteIP(), req.IPAddr(), scopes)
 		if lookupErr != nil {
 			b.log.Debug("ServeHTTP:Get", "ip", req.RemoteIP(), "cache", lookupErr)
 			if errors.Is(lookupErr, decisionstore.ErrUnreachable) && !b.redisUnreachableBlock {
 				b.log.Error("ServeHTTP:Get", "ip", req.RemoteIP(), "redisUnreachable", true)
-				b.passOrCaptchaRule(rw, req)
-				return
+				return false
 			}
 			b.log.Error("ServeHTTP:Get", "ip", req.RemoteIP(), "error", lookupErr)
-			b.banOrWarnCaptchaRule(rw, req, configuration.ReasonTECH, headerReasonCacheFail, lapi.OriginPluginTechCacheFail)
-			return
+			b.banOrWarnCaptchaRule(rw, req, match, configuration.ReasonTECH, headerReasonCacheFail, lapi.OriginPluginTechCacheFail)
+			return true
 		}
 		kind, origin = b.appliedLAPIRemediation(kind, origin, originID)
 		switch {
 		case decisionscope.IsActiveRemediation(kind):
 			logger.Trace(b.log, "ServeHTTP", appendScopesGroup([]any{"ip", req.RemoteIP(), "remediation", kind}, scopes)...)
-			b.remediateOrCaptchaRule(rw, req, kind, b.resolveDroppedOrigin(origin, originID))
-			return
+			b.remediateOrCaptchaRule(rw, req, match, kind, b.resolveDroppedOrigin(origin, originID))
+			return true
 		case kind == decisionscope.NoBannedValue:
-			b.passOrCaptchaRule(rw, req)
-			return
+			return false
 		}
 	}
 
 	if crowdsecMode == configuration.StreamMode || crowdsecMode == configuration.AloneMode {
 		if lapiClient.StreamHealthy() {
-			b.passOrCaptchaRule(rw, req)
 			// No decision affecting this IP.
-			return
+			return false
 		}
 		b.log.Debug("ServeHTTP", "isCrowdsecStreamHealthy", false, "ip", req.RemoteIP())
-		b.applyLapiFailureAction(rw, req, configuration.ReasonTECH, lapi.OriginPluginTechStreamFail)
 		// Stream/alone never query LAPI per request. Miss is allow or failure action.
-		return
+		return b.applyLapiFailureAction(rw, req, match, configuration.ReasonTECH, lapi.OriginPluginTechStreamFail)
 	}
 
 	if crowdsecMode == configuration.LiveMode || crowdsecMode == configuration.NoneMode {
-		kind, origin, err := lapiClient.LiveLookup(req.RemoteIP(), scopes, b.defaultDecisionSeconds)
-		if err != nil {
-			b.log.Debug("ServeHTTP:LiveLookup", "error", err.Error())
+		kind, origin, lookupErr := lapiClient.LiveLookup(req.RemoteIP(), scopes, b.defaultDecisionSeconds)
+		if lookupErr != nil {
+			b.log.Debug("ServeHTTP:LiveLookup", "error", lookupErr.Error())
 			if !decisionscope.IsActiveRemediation(kind) {
-				b.applyLapiFailureAction(rw, req, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
-				return
+				return b.applyLapiFailureAction(rw, req, match, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
 			}
 		}
 		kind, origin = b.appliedLAPIRemediation(kind, origin, 0)
 		if kind == decisionscope.NoBannedValue {
-			b.passOrCaptchaRule(rw, req)
-			return
+			return false
 		}
 		logger.Trace(b.log, "ServeHTTP:LiveLookup", appendScopesGroup([]any{"ip", req.RemoteIP(), "isBanned", kind}, scopes)...)
-		b.remediateOrCaptchaRule(rw, req, kind, origin)
+		b.remediateOrCaptchaRule(rw, req, match, kind, origin)
+		return true
 	}
+	return true
+}
+
+// serveAppSec reports whether AppSec wrote the response.
+// A captcha rule queries AppSec first, then serves the plugin gate.
+func (b *Bouncer) serveAppSec(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
+	if match.CaptchaName != "" {
+		b.applyCaptchaRuleServeHTTP(rw, req, match)
+		return true
+	}
+	if match.SkipAppsec {
+		return false
+	}
+	return b.subscribeAppSec && b.applyAppsecServeHTTP(rw, req, match)
 }
 
 // applyLapiFailureAction remediates a live LAPI error or stream-unhealthy cache miss.
-func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req clientrequest.Request, banReason, origin string) {
+// False is passthrough: the response is not written, and ServeHTTP continues with AppSec.
+func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, banReason, origin string) bool {
 	switch b.lapiFailureAction {
 	case configuration.FailureActionPassthrough:
-		b.passOrCaptchaRule(rw, req)
+		return false
 	case configuration.FailureActionCaptcha:
-		b.remediateOrCaptchaRule(rw, req, decisionscope.CaptchaValue, origin)
+		b.remediateOrCaptchaRule(rw, req, match, decisionscope.CaptchaValue, origin)
+		return true
 	default:
-		b.banOrWarnCaptchaRule(rw, req, banReason, headerReasonFromOrigin(origin), origin)
+		b.banOrWarnCaptchaRule(rw, req, match, banReason, headerReasonFromOrigin(origin), origin)
+		return true
 	}
 }
 
@@ -462,19 +442,19 @@ func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientr
 // appsecThenNextServeHTTP runs AppSec unless an action rule skips it, then calls next.
 // An AppSec response returns before next.
 func (b *Bouncer) appsecThenNextServeHTTP(rw http.ResponseWriter, req clientrequest.Request) {
-	if b.actionRules.Fold(req.Request).SkipAppsec {
+	match := b.actionRules.Fold(req.Request)
+	if match.SkipAppsec {
 		b.next.ServeHTTP(rw, req.Request)
 		return
 	}
-	if b.subscribeAppSec && b.applyAppsecServeHTTP(rw, req) {
+	if b.subscribeAppSec && b.applyAppsecServeHTTP(rw, req, match) {
 		return
 	}
 	b.next.ServeHTTP(rw, req.Request)
 }
 
 // applyAppsecServeHTTP queries AppSec and writes a remediation when the request must not reach origin.
-func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientrequest.Request) bool {
-	match := b.actionRules.Fold(req.Request)
+func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
 	appsecClient := b.loadedAppSec()
 	if appsecClient == nil {
 		switch b.appsecFailureAction {

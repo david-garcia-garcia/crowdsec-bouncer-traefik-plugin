@@ -8,7 +8,7 @@ _Avoid_: slot name as the Client key, IdentityHex as the Open suffix, Bouncer, C
 
 **SessionHex**:
 The DecisionStore identity hash: mode, LAPI URL+key, CAPI machine/password, `lapiDefaultDecisionSeconds`, stream canonical scope list, and the Redis set only when `lapiRedisEnabled` is true. Not middleware name. Not the slot name.
-_Avoid_: leftover Redis fields when Redis is off, `bouncerDecisionScopeHeaders`, `bouncerStartupBlock`
+_Avoid_: leftover Redis fields when Redis is off, `bouncerDecisionScopeHeaders`
 
 ## Overview
 
@@ -21,7 +21,6 @@ How this plugin keys a reclaimed `lapi.Client` versus the store it writes. Spec:
 - A knob on the ownership key that is not in SessionHex (interval, metrics, `updateMaxFailure`, CAPI scenarios) Opens a new Client and keeps the store.
 - `lapiDefaultDecisionSeconds` is on both: new Client and new store.
 - Redis off: leftover host/password/database/read hosts do not change SessionHex. Redis on: the whole set is in SessionHex (read hosts sorted).
-- Leave `bouncerStartupBlock` out of both keys.
 - Pass `reclaim.Hooks` for Sleep/Wake/Close. An unreclaimed `lapi.Client` waits process-table grace (`reclaimGraceSeconds`, default 30).
 
 ## Pattern snippet

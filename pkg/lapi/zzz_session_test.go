@@ -20,7 +20,6 @@ import (
 func testStreamConfig(host string, metricsInterval int64) *configuration.Config {
 	return &configuration.Config{
 		BouncerLapiFailureAction:         configuration.FailureActionBan,
-		BouncerStartupBlock:              true,
 		LapiDefaultDecisionSeconds:       60,
 		LapiHost:                         host,
 		LapiHTTPTimeoutSeconds:           10,
@@ -133,7 +132,6 @@ func TestSessionKey_PolicyAndTLSDoNotChangeKey(t *testing.T) {
 	policy.BouncerLapiFailureAction = configuration.FailureActionPassthrough
 	policy.BouncerRedisUnreachableBlock = true
 	policy.LapiDefaultDecisionSeconds = 5
-	policy.BouncerStartupBlock = false
 	tlsOnly := testStreamConfig("lapi.example:8080", 1)
 	tlsOnly.LapiHTTPTimeoutSeconds = 30
 	tlsOnly.LapiTLSInsecureVerify = false

@@ -138,7 +138,6 @@ func TestServeHTTP_nonMatchingLapiBypassStillLooksUp(t *testing.T) {
 func TestServeHTTP_lapiBypassSkipsUnboundLAPIFailure(t *testing.T) {
 	b, passed := testBypassOriginBouncer(t)
 	b.subscribeLAPI = true
-	b.startupBlock = false
 	b.lapiFailureAction = configuration.FailureActionBan
 	b.actionRules = mustPathAction(t, "lapi", "^/health$", httprule.ActionBypassLapi)
 	rw := httptest.NewRecorder()

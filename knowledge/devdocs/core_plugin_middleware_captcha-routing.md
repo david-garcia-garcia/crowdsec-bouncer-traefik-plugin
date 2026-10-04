@@ -8,7 +8,7 @@ _Avoid_: captcha gate cookie, `{ip}_captcha`, prefix bypass
 
 **Unsubscribed captcha**:
 A captcha-kind remediation on a Bouncer that never subscribed to captcha (`subscribeCaptcha` false: bounce on, empty `CaptchaInstanceName`).
-_Avoid_: subscribed-unpublished, `!Valid`, AppSec JSON `action: captcha`, `crowdsec bouncer backend missing`
+_Avoid_: subscribed-unpublished, `!Valid`, AppSec JSON `action: captcha`
 
 **Solved-form POST**:
 A POST whose provider response field is non-empty in a body of at most `captchaFormMaxBytes` (64KiB), read by `IsCaptchaFormPost`. Not a GET with a query token, and not an over-cap upload that happens to contain the field name.
@@ -33,7 +33,7 @@ _Avoid_: `CaptchaCustomValidateURL`, the bundled default `captcha.html`
 ## How to use
 
 - When kind is captcha and `subscribeCaptcha` is false, WARN `crowdsec bouncer captcha unsubscribed` with `leg` `captcha` and `instanceName` (empty when unsubscribed), then ban with `headerReason` `captcha-downgrade` (`ban:captcha-downgrade` when the remediation header is set). Do not emit `ip`. Do not call `GetRemoteIP`. Emit on every remediating request.
-- Do not WARN when subscribed. Empty or `!Valid` still ban without this stem (`headerReason` `captcha-downgrade`). Startup-block stays 503 plus `crowdsec bouncer backend missing`.
+- Do not WARN when subscribed. Empty or `!Valid` still ban without this stem (`headerReason` `captcha-downgrade`).
 - Load the published captcha Client. Empty or `!Valid` remediates as ban with `headerReason` `captcha-downgrade`. Do not construct a local client on the request path or in bounce-only `New`.
 - Pass this router's `remediationCustomHeader` and the already-formatted challenge-page value into `ServeHTTP(rw, req, …)`. Pass the header name into `WriteSolvedRedirect`. Do not store the header on Client.
 - Sequence a loaded Valid client as: custom-resource path → Check-true form POST 302 → Check-true origin → `captcha.ServeHTTP` (HEAD included). Else ban.

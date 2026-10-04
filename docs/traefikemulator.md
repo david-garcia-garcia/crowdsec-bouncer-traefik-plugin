@@ -25,7 +25,7 @@ These tests use a spy constructor. They do not call the plugin.
 
 ## Plugin
 
-Observable signal: `streamStartupBlock` is 503 when the subscribed client is missing, and the next handler runs when it is bound. Client pointer equality is the grace signal. Use the existing live LAPI stub.
+Observable signal: a missing subscribed client uses that leg's failure action, and the next handler runs when the client is bound and the request is allowed. Client pointer equality is the grace signal. Use the existing live LAPI stub.
 
 Owner publishes a LAPI instance. Subscriber only watches that name. `Apply` lists both routes.
 

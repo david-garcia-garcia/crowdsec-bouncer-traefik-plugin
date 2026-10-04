@@ -81,14 +81,12 @@ func TestOwnershipKey_ExcludesSlotAndBounce(t *testing.T) {
 	left.BouncerEnabled = true
 	left.BouncerLapiFailureAction = configuration.FailureActionCaptcha
 	left.BouncerRemediationHeadersCustomName = "X-Owner"
-	left.BouncerStartupBlock = true
 	right.CaptchaInstanceName = "other"
 	right.BouncerEnabled = false
 	right.BouncerLapiFailureAction = configuration.FailureActionBan
 	right.BouncerRemediationHeadersCustomName = "X-Route"
-	right.BouncerStartupBlock = false
 	if OwnershipKey(left, "mw") != OwnershipKey(&right, "mw") {
-		t.Fatal("slot name, bounce, failure, header, and startup-block must stay off the ownership key")
+		t.Fatal("slot name, bounce, failure, and header must stay off the ownership key")
 	}
 }
 

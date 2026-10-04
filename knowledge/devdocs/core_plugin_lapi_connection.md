@@ -20,7 +20,7 @@ _Avoid_: `atomic.Pointer[T]`, a write-once Client `httpClient` field, CrowdsecCo
 - After `LiveLookup`, the client-address cache key holds the `?ip=` result only. Header remediations stay on `HeaderScopeKey` via `cacheLiveScope`. Do not write the merged PreferRemediation verdict onto the IP key.
 - Read a `LiveLookup` result by the remediation kind, never by the error alone: an active remediation plus a non-nil error is a decision to remediate; a non-active remediation plus a non-nil error is a LAPI failure, and the caller applies `BouncerLapiFailureAction`. Every query the lookup makes reports that way — the client-address query and each mapped header scope.
 - One exchange over the stored transport is `core_plugin_lapi_query-round-trip.md` (drain, `401` replay, message shape). Do not restate those rules here.
-- Do not put `startupBlock` on the Client. Bouncer owns `bouncerStartupBlock` on the request path (`core_plugin_middleware.md`).
+- Do not put a startup flag on the Client. A missing subscribed client uses that leg's failure action (`core_plugin_middleware.md`).
 - Publish stream startup, healthy, and update-failure as `int64` fields with `atomic.LoadInt64` / `StoreInt64`. `StreamHealthy` loads. Do not use `atomic.Bool` or `atomic.Int64`. Intra-instance poll overlap is `core_plugin_lapi_stream-single-flight.md`.
 - `logInfo` includes reclaim `sessionKey` (stream/alone `SessionKey`, live/none `Key`) and `reason` (`started|sleeping|waking|closed`). Name transport replace and a live joiner `adopted` at INFO. Do not log `ignored` or warn-and-wire.
 

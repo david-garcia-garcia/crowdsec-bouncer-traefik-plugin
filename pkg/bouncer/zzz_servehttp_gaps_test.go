@@ -25,38 +25,6 @@ func TestServeHTTP_DisabledSkipsBan(t *testing.T) {
 	}
 }
 
-func TestServeHTTP_StartupBlockMissingBackend(t *testing.T) {
-	cases := []struct {
-		name string
-		bind func(*Bouncer)
-	}{
-		{name: "lapi", bind: func(b *Bouncer) {
-			bindTestLAPI(b, nil)
-			b.subscribeLAPI = true
-			b.lapiInstanceName = "shared"
-		}},
-		{name: "appsec", bind: func(b *Bouncer) {
-			b.subscribeAppSec = true
-			b.appsecInstanceName = "shared"
-		}},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			b, _, passed := testForcedDecisionBouncer(t, nil, nil, nil, false)
-			tc.bind(b)
-			b.startupBlock = true
-			rw := httptest.NewRecorder()
-			b.ServeHTTP(rw, testForcedDecisionRequest(""))
-			if *passed {
-				t.Fatal("startup block must not call next")
-			}
-			if rw.Code != http.StatusServiceUnavailable {
-				t.Fatalf("missing %s status = %d, want 503", tc.name, rw.Code)
-			}
-		})
-	}
-}
-
 func TestServeHTTP_UnboundLAPIUsesFailureAction(t *testing.T) {
 	t.Run("ban", func(t *testing.T) {
 		b, _, passed := testForcedDecisionBouncer(t, nil, nil, nil, false)

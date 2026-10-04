@@ -227,7 +227,7 @@ flowchart LR
   L2 --> CS2
 ```
 
-Right after Traefik starts or reloads, a connection can take a moment to become available. Until it does, requests get a **503** (`bouncerStartupBlock: true`, the default) or the configured failure action (`bouncerStartupBlock: false`).
+Right after Traefik starts or reloads, a connection can take a moment to become available. Until it does, a request that needs that connection uses the configured failure action.
 
 ### One middleware (all-in-one)
 
@@ -499,9 +499,7 @@ List the proxy's addresses in `bouncerForwardedHeadersTrustedIps` and set `bounc
 - `passthrough` — let it through. If LAPI is down, AppSec still checks the request.
 - `captcha` — show a captcha. Requires a captcha on this router.
 
-In `stream` and `alone` LAPI modes, the plugin keeps using the decisions it already has when LAPI is down. The failure action only applies to clients without a known decision, after `lapiUpdateMaxFailure` failed refreshes.
-
-Right after startup or a reload, `bouncerStartupBlock` applies instead: see [Middleware Architecture](#middleware-architecture).
+In `stream` and `alone` LAPI modes, the plugin keeps using the decisions it already has when LAPI is down. The failure action only applies to clients without a known decision, after `lapiUpdateMaxFailure` failed refreshes. The same action applies while the connection is not published yet, including right after startup or a reload.
 
 ### Match a country or an ASN
 
@@ -714,9 +712,6 @@ Response header that tells why a request was blocked or challenged. Empty disabl
 
 **BouncerRemediationStatusCode** (int, default `403`)
 HTTP status for a ban.
-
-**BouncerStartupBlock** (bool, default `true`)
-Right after Traefik starts or reloads, until the CrowdSec connections this router uses are ready: return **503** (`true`) or apply the failure action (`false`).
 
 **BouncerTraceHeadersCustomName** (string, default `""`)
 Request header copied into the ban page as `{{ .TraceID }}`. See [Put a request id on the ban page](#put-a-request-id-on-the-ban-page).
@@ -940,7 +935,6 @@ http:
           bouncerRedisUnreachableBlock: true
           bouncerRemediationHeadersCustomName: cs-remediation
           bouncerRemediationStatusCode: 403
-          bouncerStartupBlock: true
           bouncerTraceHeadersCustomName: X-Request-ID
           captchaEnabled: true
           lapiCapiMachineId: login
