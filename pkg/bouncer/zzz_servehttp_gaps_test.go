@@ -165,7 +165,7 @@ func TestHandleNextServeHTTP_UnpublishedAppSecUsesFailureAction(t *testing.T) {
 
 	t.Run("passthrough", func(t *testing.T) {
 		b, passed := newBouncer(configuration.FailureActionPassthrough)
-		b.appsecThenNextServeHTTP(httptest.NewRecorder(), req)
+		continueAfterLAPIForTest(b, httptest.NewRecorder(), req)
 		if !*passed {
 			t.Fatal("unpublished AppSec passthrough must call next")
 		}
@@ -173,7 +173,7 @@ func TestHandleNextServeHTTP_UnpublishedAppSecUsesFailureAction(t *testing.T) {
 	t.Run("ban", func(t *testing.T) {
 		b, passed := newBouncer(configuration.FailureActionBan)
 		rw := httptest.NewRecorder()
-		b.appsecThenNextServeHTTP(rw, req)
+		continueAfterLAPIForTest(b, rw, req)
 		if *passed || rw.Code != http.StatusForbidden {
 			t.Fatalf("unpublished AppSec ban passed=%v status=%d", *passed, rw.Code)
 		}
@@ -181,7 +181,7 @@ func TestHandleNextServeHTTP_UnpublishedAppSecUsesFailureAction(t *testing.T) {
 	t.Run("captcha", func(t *testing.T) {
 		b, passed := newBouncer(configuration.FailureActionCaptcha)
 		rw := httptest.NewRecorder()
-		b.appsecThenNextServeHTTP(rw, req)
+		continueAfterLAPIForTest(b, rw, req)
 		if *passed || rw.Code != http.StatusForbidden {
 			t.Fatalf("unpublished AppSec captcha passed=%v status=%d", *passed, rw.Code)
 		}
