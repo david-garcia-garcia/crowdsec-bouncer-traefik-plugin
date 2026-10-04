@@ -54,6 +54,7 @@ reclaim.Watch(ctx, instanceAlias("captcha", captchaName), (*captcha.Client)(nil)
 - `plugin.go`
 - `pkg/captcha/session.go`
 - `pkg/bouncer/bouncer.go`
+- `pkg/bouncer/bouncer_leg_utils.go` (`storeBinding`)
 
 ## Gotchas
 
