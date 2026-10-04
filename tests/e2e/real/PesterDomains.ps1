@@ -7,6 +7,7 @@
 $script:PesterDomainFiles = @{
     lapi   = @(
         'simple-bouncer.Tests.ps1'
+        'action_rules.Tests.ps1'
         'mode_none.Tests.ps1'
         'mode_live.Tests.ps1'
         'mode_stream.Tests.ps1'

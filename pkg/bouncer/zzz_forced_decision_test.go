@@ -51,7 +51,7 @@ func testForcedDecisionBouncer(t *testing.T, log *slog.Logger, captchaClient *ca
 		actionRules:              mustCompileActions(t, decisionHeaderRules()),
 		forwardedHeadersInsecure: true,
 		forwardedCustomHeader:    "X-Forwarded-For",
-		clientPoolStrategy:       &ip.PoolStrategy{Checker: clientChecker},
+		trustedClients:           &ip.PoolStrategy{Checker: clientChecker},
 		log:                      log,
 		remediationStatusCode:    http.StatusForbidden,
 		banTemplate:              banTemplate,

@@ -290,6 +290,30 @@ func TestNewActionSet_zipsTokensWithMatching(t *testing.T) {
 	}
 }
 
+func TestActionSet_fold(t *testing.T) {
+	var nilSet *ActionSet
+	if got := nilSet.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/", nil)); got != (ActionMatch{}) {
+		t.Fatalf("nil set Fold=%+v", got)
+	}
+	set := mustNewActionSet(t, []ActionRule{
+		{Name: "wide-captcha", Action: []string{ActionCaptcha}, Rule: Rule{Path: "^/a"}},
+		{Name: "first-ban", Action: []string{ActionBan}, Rule: Rule{Path: "^/ab"}},
+		{Name: "second-ban", Action: []string{ActionBan}, Rule: Rule{Path: "^/ab"}},
+		{Name: "lapi", Action: []string{ActionBypassLapi}, Rule: Rule{Path: "^/ab"}},
+		{Name: "appsec", Action: []string{ActionBypassAppsec}, Rule: Rule{Path: "^/ab"}},
+		{Name: "narrow-captcha", Action: []string{ActionCaptcha, ActionBypass}, Rule: Rule{Path: "^/abc"}},
+	})
+	miss := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/z", nil))
+	if miss != (ActionMatch{}) {
+		t.Fatalf("miss Fold=%+v", miss)
+	}
+	got := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/abc", nil))
+	want := ActionMatch{BanName: "first-ban", CaptchaName: "wide-captcha", SkipAppsec: true, SkipLapi: true}
+	if got != want {
+		t.Fatalf("Fold=%+v want %+v", got, want)
+	}
+}
+
 func TestNewActionSet_bypassTokenSkipsBothLegs(t *testing.T) {
 	set := mustNewActionSet(t, []ActionRule{
 		{Name: "challenge-health", Action: []string{ActionCaptcha, ActionBypass}, Rule: Rule{Path: "^/healthz$"}},

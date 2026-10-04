@@ -568,6 +568,7 @@ services:
       BOUNCER_KEY_EUCAPTCHA: "c51a1c70000000000000000000000017"
       BOUNCER_KEY_ENTERPRISE: "c51a1c70000000000000000000000018"
       BOUNCER_KEY_ENTERPRISE_SCORE: "c51a1c70000000000000000000000019"
+      BOUNCER_KEY_ACTION_RULES: "c51a1c7000000000000000000000001a"
       # Disable aggressive collections that cause 150k decision issue
       DISABLE_COLLECTIONS: "crowdsecurity/iptables crowdsecurity/linux crowdsecurity/sshd"
       # Enable debugging
