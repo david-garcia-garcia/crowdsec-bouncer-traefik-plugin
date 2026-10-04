@@ -296,7 +296,7 @@ After a `GetRemoteIP` error (HTTP 502, not a ban), `IncProcessed`, and the trust
 - Else fold every match: `bypass` or `bypassLapi` SHALL skip LAPI; `bypass` or `bypassAppsec` SHALL skip AppSec; any `captcha` token SHALL set a captcha flag. Skips SHALL add; they MUST NOT cancel each other or a captcha flag.
 - A LAPI skip SHALL skip `LookupRemediation`, `LiveLookup`, missing-subscribed-LAPI failure action, and stream/alone unhealthy failure action.
 - An AppSec skip SHALL skip AppSec `Query` and the AppSec body buffer on that path.
-- `captcha` MUST NOT return immediately. Legs that were not skipped SHALL still run. An active LAPI ban, or a fail-closed ban from that leg (lookup error, stream/alone unhealthy, failure action `ban`), SHALL prevail over the captcha rule and SHALL keep that leg's origin, not `plugin:rules:`. An AppSec `ban` verdict, or an AppSec failure-action `ban`, SHALL prevail over the captcha rule and SHALL keep origin `appsec` / `plugin:appsec_failure`. Those drops SHALL log WARN `ServeHTTP:forcedCaptchaSuperseded` with attributes `name` (the first matching captcha row that lost) and dest `ip`. The plugin MUST NOT log attr `header` for this WARN.
+- `captcha` MUST NOT return immediately. Legs that were not skipped SHALL still run. An active LAPI ban, or a fail-closed ban from that leg (lookup error, stream/alone unhealthy, failure action `ban`), SHALL prevail over the captcha rule and SHALL keep that leg's origin, not `plugin:rules:`. An AppSec `ban` verdict, or an AppSec failure-action `ban`, SHALL prevail over the captcha rule and SHALL keep origin `appsec` / `plugin:appsec_failure`. Those drops SHALL log WARN `warnCaptchaSuperseded` with attributes `name` (the first matching captcha row that lost) and dest `ip`. The plugin MUST NOT log attr `header` for this WARN.
 - An AppSec `challenge` with non-empty body is not a ban and MUST NOT override the captcha rule (MUST NOT relay; apply the plugin gate). An AppSec `challenge` with empty `UserBodyContent` SHALL stay dest fail-closed ban (`ban:appsec-challenge-empty`, origin `appsec`) and therefore SHALL prevail over the captcha rule like `ban`. Empty-challenge dest when no captcha rule matched MUST NOT change.
 - A CrowdSec captcha decision SHALL be unchanged: the rule MUST NOT replace that outcome, the metrics origin SHALL stay the CrowdSec origin, and AppSec for that decision SHALL stay after a valid captcha gate cookie, not before the challenge page.
 - If no leg banned and a captcha rule matched, ServeHTTP SHALL serve the existing captcha gate. Origin `plugin:rules:<name>` of the first matching captcha row, `remediation=captcha`, only when that rule is what is applied. A valid gate cookie SHALL still pass. After the cookie is valid, AppSec SHALL still run unless a matching `bypass` or `bypassAppsec` skipped it.
@@ -379,7 +379,7 @@ Cookies SHALL use the same predicate shape as headers against that cookie's valu
 - **AND** stream lookup is ban for that client
 - **THEN** the response is the ban page
 - **AND** origin is the LAPI origin, not `plugin:rules:`
-- **AND** the log includes WARN `ServeHTTP:forcedCaptchaSuperseded` with `name` `c`
+- **AND** the log includes WARN `warnCaptchaSuperseded` with `name` `c`
 
 #### Scenario: Captcha plus bypassLapi still allows an AppSec ban
 - **WHEN** `bouncerActionRules` contains `{name: c, path: "^/x$", action: [captcha, bypassLapi]}`
@@ -387,7 +387,7 @@ Cookies SHALL use the same predicate shape as headers against that cookie's valu
 - **AND** AppSec returns `action: ban`
 - **THEN** the response is the ban page
 - **AND** origin is `appsec`
-- **AND** the log includes WARN `ServeHTTP:forcedCaptchaSuperseded` with `name` `c`
+- **AND** the log includes WARN `warnCaptchaSuperseded` with `name` `c`
 
 #### Scenario: Non-empty AppSec challenge does not override captcha rule
 - **WHEN** a captcha rule matched and AppSec was not skipped

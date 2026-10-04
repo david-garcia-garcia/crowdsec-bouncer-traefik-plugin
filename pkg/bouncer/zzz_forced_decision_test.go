@@ -118,8 +118,8 @@ func TestServeHTTP_forcedDecisionCaptchaDoesNotOverrideBan(t *testing.T) {
 		t.Fatalf("status=%d body=%q", rw.Code, rw.Body.String())
 	}
 	logged := sink.String()
-	if !strings.Contains(logged, "ServeHTTP:forcedCaptchaSuperseded") {
-		t.Fatalf("want WARN forcedCaptchaSuperseded, got %s", logged)
+	if !strings.Contains(logged, "warnCaptchaSuperseded") {
+		t.Fatalf("want WARN warnCaptchaSuperseded, got %s", logged)
 	}
 	if !strings.Contains(logged, `"name":"decision-captcha"`) {
 		t.Fatalf("want name=decision-captcha, got %s", logged)

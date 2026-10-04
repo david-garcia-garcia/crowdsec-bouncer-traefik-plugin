@@ -95,27 +95,27 @@ func jsonLinesWithMsg(logged, msg string) []string {
 	return lines
 }
 
-// remediatingServeHTTPTrace is the store-hit ServeHTTP TRACE (has remediation, not the first breadcrumb).
-func remediatingServeHTTPTrace(t *testing.T, logged string) string {
+// remediatingServeLAPITrace is the store-hit serveLAPI TRACE.
+func remediatingServeLAPITrace(t *testing.T, logged string) string {
 	t.Helper()
-	for _, line := range jsonLinesWithMsg(logged, "ServeHTTP") {
+	for _, line := range jsonLinesWithMsg(logged, "serveLAPI") {
 		if strings.Contains(line, `"remediation":`) {
 			return line
 		}
 	}
-	t.Fatalf("want remediating ServeHTTP TRACE, got %s", logged)
+	t.Fatalf("want remediating serveLAPI TRACE, got %s", logged)
 	return ""
 }
 
 // remediatingLiveLookupTrace is the LiveLookup TRACE that carries isBanned.
 func remediatingLiveLookupTrace(t *testing.T, logged string) string {
 	t.Helper()
-	for _, line := range jsonLinesWithMsg(logged, "ServeHTTP:LiveLookup") {
+	for _, line := range jsonLinesWithMsg(logged, "serveLAPI:LiveLookup") {
 		if strings.Contains(line, `"isBanned"`) {
 			return line
 		}
 	}
-	t.Fatalf("want ServeHTTP:LiveLookup TRACE, got %s", logged)
+	t.Fatalf("want serveLAPI:LiveLookup TRACE, got %s", logged)
 	return ""
 }
 
@@ -183,7 +183,7 @@ func TestHunt_ServeHTTPTraceRemediatingIncludesPresentScopes(t *testing.T) {
 	if *passed {
 		t.Fatal("origin must not run on store-hit ban")
 	}
-	record := remediatingServeHTTPTrace(t, sink.String())
+	record := remediatingServeLAPITrace(t, sink.String())
 	if !strings.Contains(record, `"ip":"203.0.113.10"`) {
 		t.Fatalf("want ip attribute, got %s", record)
 	}
@@ -208,7 +208,7 @@ func TestHunt_ServeHTTPTraceRemediatingOmitsMissingHeaders(t *testing.T) {
 	if *passed {
 		t.Fatal("origin must not run on store-hit ban")
 	}
-	record := remediatingServeHTTPTrace(t, sink.String())
+	record := remediatingServeLAPITrace(t, sink.String())
 	if strings.Contains(record, `"Country"`) {
 		t.Fatalf("missing Country header must not appear under scopes, got %s", record)
 	}
@@ -222,7 +222,7 @@ func TestHunt_ServeHTTPTraceRemediatingInventNoScopeKeys(t *testing.T) {
 	if *passed {
 		t.Fatal("origin must not run on store-hit ban")
 	}
-	record := remediatingServeHTTPTrace(t, sink.String())
+	record := remediatingServeLAPITrace(t, sink.String())
 	if !strings.Contains(record, `"ip":"203.0.113.10"`) || !strings.Contains(record, `"remediation":"t"`) {
 		t.Fatalf("want ip and remediation, got %s", record)
 	}

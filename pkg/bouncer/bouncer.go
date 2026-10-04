@@ -146,7 +146,7 @@ func (b *Bouncer) warnCaptchaSuperseded(req clientrequest.Request, match httprul
 	if match.CaptchaName == "" {
 		return
 	}
-	b.log.Warn("ServeHTTP:forcedCaptchaSuperseded", "ip", req.RemoteIP(), "name", match.CaptchaName)
+	b.log.Warn("warnCaptchaSuperseded", "ip", req.RemoteIP(), "name", match.CaptchaName)
 }
 
 // applyCaptchaRuleServeHTTP queries AppSec unless skipped, then serves the plugin captcha gate.
@@ -248,19 +248,19 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 	if crowdsecMode == configuration.LiveMode || crowdsecMode == configuration.StreamMode || crowdsecMode == configuration.AloneMode {
 		kind, origin, originID, lookupErr := lapiClient.LookupRemediation(req.RemoteIP(), req.IPAddr(), scopes)
 		if lookupErr != nil {
-			b.log.Debug("ServeHTTP:Get", "ip", req.RemoteIP(), "cache", lookupErr)
+			b.log.Debug("serveLAPI:Get", "ip", req.RemoteIP(), "cache", lookupErr)
 			if errors.Is(lookupErr, decisionstore.ErrUnreachable) && !b.redisUnreachableBlock {
-				b.log.Error("ServeHTTP:Get", "ip", req.RemoteIP(), "redisUnreachable", true)
+				b.log.Error("serveLAPI:Get", "ip", req.RemoteIP(), "redisUnreachable", true)
 				return false
 			}
-			b.log.Error("ServeHTTP:Get", "ip", req.RemoteIP(), "error", lookupErr)
+			b.log.Error("serveLAPI:Get", "ip", req.RemoteIP(), "error", lookupErr)
 			b.banOrWarnCaptchaRule(rw, req, match, configuration.ReasonTECH, headerReasonCacheFail, lapi.OriginPluginTechCacheFail)
 			return true
 		}
 		kind, origin = b.appliedLAPIRemediation(kind, origin, originID)
 		switch {
 		case decisionscope.IsActiveRemediation(kind):
-			logger.Trace(b.log, "ServeHTTP", appendScopesGroup([]any{"ip", req.RemoteIP(), "remediation", kind}, scopes)...)
+			logger.Trace(b.log, "serveLAPI", appendScopesGroup([]any{"ip", req.RemoteIP(), "remediation", kind}, scopes)...)
 			b.remediateOrCaptchaRule(rw, req, match, kind, b.resolveDroppedOrigin(origin, originID))
 			return true
 		case kind == decisionscope.NoBannedValue:
@@ -273,7 +273,7 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 			// No decision affecting this IP.
 			return false
 		}
-		b.log.Debug("ServeHTTP", "isCrowdsecStreamHealthy", false, "ip", req.RemoteIP())
+		b.log.Debug("serveLAPI", "isCrowdsecStreamHealthy", false, "ip", req.RemoteIP())
 		// Stream/alone never query LAPI per request. Miss is allow or failure action.
 		return b.applyLapiFailureAction(rw, req, match, configuration.ReasonTECH, lapi.OriginPluginTechStreamFail)
 	}
@@ -281,7 +281,7 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 	if crowdsecMode == configuration.LiveMode || crowdsecMode == configuration.NoneMode {
 		kind, origin, lookupErr := lapiClient.LiveLookup(req.RemoteIP(), scopes, b.defaultDecisionSeconds)
 		if lookupErr != nil {
-			b.log.Debug("ServeHTTP:LiveLookup", "error", lookupErr.Error())
+			b.log.Debug("serveLAPI:LiveLookup", "error", lookupErr.Error())
 			if !decisionscope.IsActiveRemediation(kind) {
 				return b.applyLapiFailureAction(rw, req, match, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
 			}
@@ -290,7 +290,7 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 		if kind == decisionscope.NoBannedValue {
 			return false
 		}
-		logger.Trace(b.log, "ServeHTTP:LiveLookup", appendScopesGroup([]any{"ip", req.RemoteIP(), "isBanned", kind}, scopes)...)
+		logger.Trace(b.log, "serveLAPI:LiveLookup", appendScopesGroup([]any{"ip", req.RemoteIP(), "isBanned", kind}, scopes)...)
 		b.remediateOrCaptchaRule(rw, req, match, kind, origin)
 		return true
 	}

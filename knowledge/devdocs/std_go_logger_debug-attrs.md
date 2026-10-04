@@ -7,7 +7,7 @@ A Trace call on the request hot path (`ServeHTTP` allow/hit, captcha Check/Valid
 _Avoid_: Sprintf-then-Trace, concatenating the message before `Trace`, logging per-request breadcrumbs at Debug, logging failures at Trace
 
 **Remediating TRACE**:
-A request-path Trace after a store-hit or LiveLookup remediation. Stem is `ServeHTTP` (store hit) or `ServeHTTP:LiveLookup` (live/none miss). Fields are `ip`, the kind letter (`remediation` or `isBanned`), and present header-mapped values as slog group `scopes`.
+A request-path Trace after a store-hit or LiveLookup remediation. Stem is `serveLAPI` (store hit) or `serveLAPI:LiveLookup` (live/none miss). Fields are `ip`, the kind letter (`remediation` or `isBanned`), and present header-mapped values as slog group `scopes`.
 _Avoid_: cache, cache=hit, a winning-scope field, a Range CIDR, re-reading headers, requiring `scopes` on the allow/trust breadcrumb
 
 **scopes group**:
@@ -21,10 +21,10 @@ _Avoid_: an empty group, flattening as `scope.Country`, inventing keys for missi
 ## How to use
 
 - Call `logger.Trace(b.log, "ServeHTTP", "ip", req.RemoteIP(), "isTrusted", isTrusted)` for the first breadcrumb. Do not require `scopes` on that line.
-- On a store-hit remediation, call `logger.Trace` with stem `ServeHTTP`, `ip`, `remediation`, and `appendScopesGroup` from the map already in `scopes`. Do not pass `cache`.
-- On a remediating `LiveLookup`, keep stem `ServeHTTP:LiveLookup`, `ip`, and `isBanned`. Attach the same `scopes` group. Do not pass `cache`.
+- On a store-hit remediation, call `logger.Trace` with stem `serveLAPI`, `ip`, `remediation`, and `appendScopesGroup` from the map already in `scopes`. Do not pass `cache`.
+- On a remediating `LiveLookup`, keep stem `serveLAPI:LiveLookup`, `ip`, and `isBanned`. Attach the same `scopes` group. Do not pass `cache`.
 - Reuse `GetRemoteIP` / `req.RemoteIP()` and the trusted-client `ContainsIP` result. Do not re-parse `RemoteAddr`. Do not call `RequestScopeValues` again at log time.
-- Leave `handleRemediationServeHTTP` TRACE as `ip` + `remediation`. Leave DEBUG `ServeHTTP:Get` `cache` (the lookup error).
+- Leave `handleRemediationServeHTTP` TRACE as `ip` + `remediation`. Leave DEBUG `serveLAPI:Get` `cache` (the lookup error).
 - Keep the first-breadcrumb stem recognizable. Do not drop `ip` or `isTrusted` from that line.
 - Leave construct-time, stream-tick, and failure Debug (`Bouncer initialized`, `handleStreamCache:updated`, drain/parse errors) at Debug. Identity for those lines is on the constructor `log.With` child (`std_go_logger_nested`).
 - On `bouncer.New` DEBUG `Bouncer initialized`, pass `forwardedHeadersTrustedIPs` and `clientTrustedIPs` from the Config slices as written. Bare hosts stay bare. Empty or nil slices still log both attrs as empty lists. Do not re-derive hops or client IP. Do not merge the two pools. Do not emit per-entry Checker insert Debug.
@@ -37,15 +37,15 @@ b.log.Debug("Bouncer initialized",
 	"forwardedHeadersTrustedIPs", forwardedHeadersTrustedIPs,
 	"clientTrustedIPs", clientTrustedIPs)
 logger.Trace(b.log, "ServeHTTP", "ip", req.RemoteIP(), "isTrusted", isTrusted)
-logger.Trace(b.log, "ServeHTTP", appendScopesGroup([]any{"ip", req.RemoteIP(), "remediation", kind}, scopes)...)
-logger.Trace(b.log, "ServeHTTP:LiveLookup", appendScopesGroup([]any{"ip", req.RemoteIP(), "isBanned", kind}, scopes)...)
-b.log.Debug("ServeHTTP:Get", "ip", req.RemoteIP(), "cache", lookupErr)
+logger.Trace(b.log, "serveLAPI", appendScopesGroup([]any{"ip", req.RemoteIP(), "remediation", kind}, scopes)...)
+logger.Trace(b.log, "serveLAPI:LiveLookup", appendScopesGroup([]any{"ip", req.RemoteIP(), "isBanned", kind}, scopes)...)
+b.log.Debug("serveLAPI:Get", "ip", req.RemoteIP(), "cache", lookupErr)
 ```
 
 ## Key files
 
 - `pkg/logger/logger.go` — `LevelTrace`, `Trace`, `ReplaceAttr` names
-- `pkg/bouncer/bouncer.go` — construct-time DEBUG `Bouncer initialized`, `ServeHTTP` Trace
+- `pkg/bouncer/bouncer.go` — construct-time DEBUG `Bouncer initialized`, `ServeHTTP` and `serveLAPI` Trace
 - `pkg/bouncer/scope_trace.go` — `appendScopesGroup`
 
 ## Gotchas

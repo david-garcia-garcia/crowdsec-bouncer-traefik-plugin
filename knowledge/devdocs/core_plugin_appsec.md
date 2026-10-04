@@ -57,7 +57,7 @@ decision, err := b.appsecClient.Query(req, pol)
 ## Gotchas
 
 - Challenge always arrives as AppSec listener 403 plus JSON `action: challenge`. Browser status is `http_status` (often 200, sometimes 307).
-- A matched captcha action rule wins over a non-empty AppSec challenge envelope. Empty challenge body still fail-closed bans (`headerReasonAppsecChallengeEmpty`) and WARNs `ServeHTTP:forcedCaptchaSuperseded`.
+- A matched captcha action rule wins over a non-empty AppSec challenge envelope. Empty challenge body still fail-closed bans (`headerReasonAppsecChallengeEmpty`) and WARNs `warnCaptchaSuperseded`.
 - Empty-challenge fail-closed runs in `applyAppsecServeHTTP` before `handleAppsecResponseServeHTTP` and before `WriteHeader`. Do not commit status first.
 - Relay replaces same-name `user_headers` (assign, do not `Add`) and `Add`s each `user_cookies` string as its own `Set-Cookie`.
 - Missing `http_status` is 200. Values outside 100–999 use `remediationStatusCode`.
