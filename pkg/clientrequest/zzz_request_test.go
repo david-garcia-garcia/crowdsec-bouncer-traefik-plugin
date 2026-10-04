@@ -70,8 +70,8 @@ func TestNew_addressIsSnapshot(t *testing.T) {
 	raw := net.ParseIP("2001:0db8:0000:0000:0000:0000:0000:0001")
 	got := New(httpReq, "2001:0db8:0000:0000:0000:0000:0000:0001", raw)
 	raw[0] = 0
-	if got.RemoteIP() != "2001:db8::1" {
-		t.Fatalf("remoteIP=%q", got.RemoteIP())
+	if got.IPAddrString() != "2001:db8::1" {
+		t.Fatalf("remoteIP=%q", got.IPAddrString())
 	}
 	if got.IPType() != "ipv6" {
 		t.Fatalf("ipType=%q", got.IPType())
@@ -85,8 +85,8 @@ func TestNew_addressIsSnapshot(t *testing.T) {
 	}
 
 	unparsed := New(httpReq, "not-an-ip", nil)
-	if unparsed.RemoteIP() != "not-an-ip" || unparsed.IPAddr() != nil || unparsed.IPType() != "" {
-		t.Fatalf("remoteIP=%q ipAddr=%v ipType=%q", unparsed.RemoteIP(), unparsed.IPAddr(), unparsed.IPType())
+	if unparsed.IPAddrString() != "not-an-ip" || unparsed.IPAddr() != nil || unparsed.IPType() != "" {
+		t.Fatalf("remoteIP=%q ipAddr=%v ipType=%q", unparsed.IPAddrString(), unparsed.IPAddr(), unparsed.IPType())
 	}
 }
 

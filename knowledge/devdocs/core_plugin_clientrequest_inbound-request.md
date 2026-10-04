@@ -21,8 +21,8 @@ Construct once in `ServeHTTP` after `pkg/ip.GetRemoteIP`. Captcha gate Secure an
 ## How to use
 
 - After `GetRemoteIP`, call `clientrequest.New(httpReq, remoteIP, ipAddr)`. Keep the name `req`.
-- When `ipAddr` is non-nil, `New` stores a copy and `RemoteIP()` is `ipAddr.String()`. When it is nil, `RemoteIP()` stays the raw extract for fail logs. `IPType()` is `ip.FamilyOfIP` of that parsed address.
-- Do not assign `RemoteIP`, `IPAddr`, scheme, or AbsoluteURL after construction. Do not write scheme onto the live `*http.Request`.
+- When `ipAddr` is non-nil, `New` stores a copy and `IPAddrString()` is `ipAddr.String()`. When it is nil, `IPAddrString()` stays the raw extract for fail logs. `IPType()` is `ip.FamilyOfIP` of that parsed address. `IPAddr()` and `IPAddrString()` are that one address.
+- Do not assign `IPAddrString`, `IPAddr`, scheme, or AbsoluteURL after construction. Do not write scheme onto the live `*http.Request`.
 - Pass `req` into captcha `ServeHTTP` / `Check` / `Validate` / `setGateCookie` and AppSec `Query`. Do not pass a parallel `remoteIP` string.
 - Estimate dropped bytes with `req.EstimatedSize()` at drop time. Do not read `Body`. Do not call `httputil.DumpRequest` or `Request.Write`.
 - Leave path-only captcha helpers (`IsCustomResourceRequest`, `IsCaptchaFormPost`, `WriteSolvedRedirect`, `gateCookieValue`, `RequestDomain`) on `*http.Request` / host string.

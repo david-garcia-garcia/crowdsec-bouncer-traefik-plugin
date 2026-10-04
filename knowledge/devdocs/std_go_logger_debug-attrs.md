@@ -16,14 +16,14 @@ _Avoid_: an empty group, flattening as `scope.Country`, inventing keys for missi
 
 ## Overview
 
-`slog.Logger` has no Trace method. Use `logger.Trace` (`slog.Level(-8)`). Call-site arguments are still evaluated before `Enabled`, so pass a message stem and the fields as slog attributes instead of `fmt.Sprintf`. Remediating TRACE reuses `req.RemoteIP()` and the `RequestScopeValues` map already in hand; omit group `scopes` when that map is empty. DEBUG still covers construct-time, stream-tick, and request-path failure lines.
+`slog.Logger` has no Trace method. Use `logger.Trace` (`slog.Level(-8)`). Call-site arguments are still evaluated before `Enabled`, so pass a message stem and the fields as slog attributes instead of `fmt.Sprintf`. Remediating TRACE reuses `req.IPAddrString()` and the `RequestScopeValues` map already in hand; omit group `scopes` when that map is empty. DEBUG still covers construct-time, stream-tick, and request-path failure lines (lookup, drain, parse, AppSec). The per-request stream-unhealthy cache miss is Trace. The poll logs the healthy and unhealthy transition once at Info.
 
 ## How to use
 
-- Call `logger.Trace(b.log, "ServeHTTP", "ip", req.RemoteIP(), "isTrusted", isTrusted)` for the first breadcrumb. Do not require `scopes` on that line.
+- Call `logger.Trace(b.log, "ServeHTTP", "ip", req.IPAddrString(), "isTrusted", isTrusted)` for the first breadcrumb. Do not require `scopes` on that line.
 - On a store-hit remediation, call `logger.Trace` with stem `serveLAPI`, `ip`, `remediation`, and `appendScopesGroup` from the map already in `scopes`. Do not pass `cache`.
 - On a remediating `LiveLookup`, keep stem `serveLAPI:LiveLookup`, `ip`, and `isBanned`. Attach the same `scopes` group. Do not pass `cache`.
-- Reuse `GetRemoteIP` / `req.RemoteIP()` and the trusted-client `ContainsIP` result. Do not re-parse `RemoteAddr`. Do not call `RequestScopeValues` again at log time.
+- Reuse `GetRemoteIP` / `req.IPAddrString()` and the trusted-client `ContainsIP` result. Do not re-parse `RemoteAddr`. Do not call `RequestScopeValues` again at log time.
 - Leave `handleRemediationServeHTTP` TRACE as `ip` + `remediation`. Leave DEBUG `serveLAPI:Get` `cache` (the lookup error).
 - Keep the first-breadcrumb stem recognizable. Do not drop `ip` or `isTrusted` from that line.
 - Leave construct-time, stream-tick, and failure Debug (`Bouncer initialized`, `handleStreamCache:updated`, drain/parse errors) at Debug. Identity for those lines is on the constructor `log.With` child (`std_go_logger_nested`).
@@ -36,10 +36,10 @@ _Avoid_: an empty group, flattening as `scope.Country`, inventing keys for missi
 b.log.Debug("Bouncer initialized",
 	"forwardedHeadersTrustedIPs", forwardedHeadersTrustedIPs,
 	"clientTrustedIPs", clientTrustedIPs)
-logger.Trace(b.log, "ServeHTTP", "ip", req.RemoteIP(), "isTrusted", isTrusted)
-logger.Trace(b.log, "serveLAPI", appendScopesGroup([]any{"ip", req.RemoteIP(), "remediation", kind}, scopes)...)
-logger.Trace(b.log, "serveLAPI:LiveLookup", appendScopesGroup([]any{"ip", req.RemoteIP(), "isBanned", kind}, scopes)...)
-b.log.Debug("serveLAPI:Get", "ip", req.RemoteIP(), "cache", lookupErr)
+logger.Trace(b.log, "ServeHTTP", "ip", req.IPAddrString(), "isTrusted", isTrusted)
+logger.Trace(b.log, "serveLAPI", appendScopesGroup([]any{"ip", req.IPAddrString(), "remediation", kind}, scopes)...)
+logger.Trace(b.log, "serveLAPI:LiveLookup", appendScopesGroup([]any{"ip", req.IPAddrString(), "isBanned", kind}, scopes)...)
+b.log.Debug("serveLAPI:Get", "ip", req.IPAddrString(), "cache", lookupErr)
 ```
 
 ## Key files

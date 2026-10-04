@@ -8,7 +8,7 @@ _Avoid_: `{ip}_captcha`, `CaptchaDoneValue`, reusing `CaptchaSecretKey` for the 
 
 ## Overview
 
-Configure `captchaGateSecret` (or file) when `captchaEnabled` is true. Optional `captchaGateBindIp` (default true) ties the cookie to `req.RemoteIP()` as `clientrequest.New` stored it (`core_plugin_clientrequest_inbound-request.md`).
+Configure `captchaGateSecret` (or file) when `captchaEnabled` is true. Optional `captchaGateBindIp` (default true) ties the cookie to `req.IPAddrString()` as `clientrequest.New` stored it (`core_plugin_clientrequest_inbound-request.md`).
 
 ## How to use
 

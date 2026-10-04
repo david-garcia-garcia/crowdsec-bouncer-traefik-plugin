@@ -38,7 +38,7 @@ Call `IncProcessed` once the client address parsed, and `IncDropped` on each rem
 ## Pattern snippet
 
 ```go
-kind, origin, originID, err := lapiClient.LookupRemediation(req.RemoteIP(), req.IPAddr(), scopes)
+kind, origin, originID, err := lapiClient.LookupRemediation(req.IPAddrString(), req.IPAddr(), scopes)
 if origin == "" {
 	origin = lapiClient.OriginName(originID)
 }

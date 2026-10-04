@@ -12,14 +12,14 @@ _Avoid_: treating `success` alone as pass
 
 ## Overview
 
-`eucaptcha` pairs the eucaptcha verifier in `Client.New`. `Validate` calls `Pass` only after a non-empty token. `client_ip` is `req.RemoteIP()` as `New` stored it (`core_plugin_clientrequest_inbound-request.md`). `client_user_agent` is `req.UserAgent()`. Siteverify encoding stays on `core_plugin_middleware_captcha-siteverify`. Assessments stay on `core_plugin_middleware_captcha-assessments`. Gate cookie format stays on `core_plugin_middleware_captcha-gate`. Widget pairing stays on `core_plugin_middleware_captcha-widget`.
+`eucaptcha` pairs the eucaptcha verifier in `Client.New`. `Validate` calls `Pass` only after a non-empty token. `client_ip` is `req.IPAddrString()` as `New` stored it (`core_plugin_clientrequest_inbound-request.md`). `client_user_agent` is `req.UserAgent()`. Siteverify encoding stays on `core_plugin_middleware_captcha-siteverify`. Assessments stay on `core_plugin_middleware_captcha-assessments`. Gate cookie format stays on `core_plugin_middleware_captcha-gate`. Widget pairing stays on `core_plugin_middleware_captcha-widget`.
 
 ## How to use
 
 - POST JSON to `https://api.eu-captcha.eu/v1/verify` on the captcha `http.Client` (`captchaSiteverifyHTTPTimeoutSeconds`).
 - Send `Content-Type: application/json`. Do not log the secret.
 - Body always has `sitekey`, `secret`, `client_ip`, `client_token`, and `client_user_agent`.
-- Reuse `Validate`'s `req.RemoteIP()` and `req.UserAgent()`. Do not parse `X-Forwarded-For`, `X-Real-Ip`, `X-Client-IP`, or `RemoteAddr`. Do not send the LAPI plugin User-Agent.
+- Reuse `Validate`'s `req.IPAddrString()` and `req.UserAgent()`. Do not parse `X-Forwarded-For`, `X-Real-Ip`, `X-Client-IP`, or `RemoteAddr`. Do not send the LAPI plugin User-Agent.
 - Empty `remoteIP` is Pass-false with no vendor POST. Empty `userAgent` is still POSTed as `""`.
 - Pass only when HTTP 200 JSON has `success` true and `train` is JSON false or null (`*bool` nil counts as false-or-null). `train` true is Pass-false. `success` false is Pass-false.
 - Non-2xx or undecodable JSON is the error return, not reject. Cap the body the same way assessments does (64KiB).

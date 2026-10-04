@@ -29,7 +29,7 @@ Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker st
 ## How to use
 
 - Build the Checker once in `bouncer.New` from config lists.
-- Resolve the client address with `GetRemoteIP` (server/trusted-hop pool + custom header). Pass that string and `ipAddr` into `clientrequest.New` (`core_plugin_clientrequest_inbound-request.md`). Keep the name `req`. Then `ContainsIP` on `req.IPAddr()` for the client pool. Do not parse `RemoteAddr` again. Do not parse the chosen string again for trusted-client membership. Do not assign `RemoteIP` after `New`. Do not add scopes or origin to the inbound request.
+- Resolve the client address with `GetRemoteIP` (server/trusted-hop pool + custom header). Pass that string and `ipAddr` into `clientrequest.New` (`core_plugin_clientrequest_inbound-request.md`). Keep the name `req`. Then `ContainsIP` on `req.IPAddr()` for the client pool. Do not parse `RemoteAddr` again. Do not parse the chosen string again for trusted-client membership. Do not assign `IPAddrString` after `New`. Do not add scopes or origin to the inbound request.
 - On the request path, call `ContainsIP` on the parsed GetRemoteIP address. `Contains` remains for string callers. Do not walk a CIDR slice beside the helper.
 - Call `HostCIDR` to format a parseable bare address as `/32` or `/128` before `AddCIDR`.
 - Range stream/alone membership reuses two Helpers on the LAPI Client (`AddCIDR(network, remediation)` then `Contains` metadata). Checker stays `AddCIDR(cidr, "")`. Do not put Range in Checker. Do not put ban and captcha on one LPM tree.
