@@ -244,5 +244,55 @@ Describe "CrowdSec Bouncer Captcha Remediation Tests" {
             $response.Content | Should -Match ([regex]::Escape($Marker))
         }
     }
+
+    Context "Captcha then AppSec" -Tag "captcha", "appsec" {
+        BeforeEach {
+            Clear-TraefikAccessLogs
+            Remove-AllTestDecisions
+        }
+
+        It "Should let the widget through and run AppSec after the gate is cleared" {
+            $ip = "172.19.0.50"
+            Add-TestDecision -IP $ip -Type "captcha"
+
+            $page = Test-HttpRequest -Endpoint "/captcha-appsec" -IP $ip -TraefikUrl $script:TraefikUrl
+            $page.StatusCode | Should -Be 200
+            $page.Content | Should -Match "E2E captcha challenge"
+
+            $widget = Test-HttpRequest -Endpoint "/captcha-appsec/widget.js" -IP $ip -TraefikUrl $script:TraefikUrl
+            $widget.StatusCode | Should -Be 200
+            $widget.Content | Should -Match "Hostname:"
+            $widget.Content | Should -Not -Match "E2E captcha challenge"
+
+            $formHeaders = @{ "Content-Type" = "application/x-www-form-urlencoded" }
+            $solve = Test-HttpRequest -Endpoint "/captcha-appsec" -IP $ip -TraefikUrl $script:TraefikUrl `
+                -Method POST -Body "dummy-captcha-response=ok" -ExtraHeaders $formHeaders `
+                -MaximumRedirection 0
+            $solve.StatusCode | Should -Be 302
+            $cookieHeaders = @{ Cookie = (([string]$solve.Headers["Set-Cookie"]) -split ';')[0].Trim() }
+
+            $passed = Test-HttpRequest -Endpoint "/captcha-appsec" -IP $ip -TraefikUrl $script:TraefikUrl `
+                -ExtraHeaders $cookieHeaders
+            $passed.StatusCode | Should -Be 200
+            $passed.Content | Should -Match "Hostname:"
+
+            $sqli = Test-HttpRequest -Endpoint "/captcha-appsec?id=1%27%20OR%20%271%27%3D%271" -IP $ip -TraefikUrl $script:TraefikUrl `
+                -ExtraHeaders $cookieHeaders
+            $sqli.StatusCode | Should -Be 403 -Because "a cleared gate still runs AppSec"
+            $sqli.Content | Should -Not -Match "E2E captcha challenge"
+        }
+
+        It "Should run AppSec before a captcha action rule" {
+            $ip = "172.19.0.51"
+
+            $page = Test-HttpRequest -Endpoint "/captcha-appsec/rule" -IP $ip -TraefikUrl $script:TraefikUrl
+            $page.StatusCode | Should -Be 200
+            $page.Content | Should -Match "E2E captcha challenge"
+
+            $sqli = Test-HttpRequest -Endpoint "/captcha-appsec/rule?id=1%27%20OR%20%271%27%3D%271" -IP $ip -TraefikUrl $script:TraefikUrl
+            $sqli.StatusCode | Should -Be 403 -Because "an AppSec ban prevails over the captcha action rule"
+            $sqli.Content | Should -Not -Match "E2E captcha challenge"
+        }
+    }
 }
 
