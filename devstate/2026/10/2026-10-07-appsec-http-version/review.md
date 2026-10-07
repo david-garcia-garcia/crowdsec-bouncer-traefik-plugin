@@ -43,3 +43,10 @@ head: d90e76eac7111f460a02cdbc0a78aad802d7c21b
 findings: none
 fixed: folded Query forwards client HTTP version into openspec/specs/core_plugin_appsec_client/spec.md; moved change to openspec/changes/archive/2026-10-07-appsec-http-version
 skipped: catalog MCP validators not seen; GitHub PR summary not updated
+
+## pullrequest (2026-10-07)
+phase: pullrequest
+verdict: in progress
+head: fc7f659b58a41a6c63192f63d07ae61d4ea88f8e
+findings: none
+skipped: GitHub PR summary not updated (form broken); hostSet skipped; HEAD has no check runs ([skip ci]); green checks are on 97f9f3b7 Main 37688708507 and E2E 37688708502

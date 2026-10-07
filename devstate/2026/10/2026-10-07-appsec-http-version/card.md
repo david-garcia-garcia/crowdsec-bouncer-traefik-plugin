@@ -20,8 +20,8 @@ Priority: P2 — real operator, admin-user, or end-user pain, with a workaround 
 In progress. 0 items remain.
 
 Priority: P2 — real operator, admin-user, or end-user pain, with a workaround or limited blast radius
-Reviewed head: d90e76ea
-Owner decision: None.
+Reviewed head: fc7f659b
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -37,11 +37,9 @@ Owner decision: None.
 | Branch | 2026-10-07-appsec-http-version pushed | `git` |
 | OpenSpec | appsec-http-version | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/189 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | HEAD not seen (`[skip ci]`); product SHA 97f9f3b7 succeeded (Main id 37688708507, E2E id 37688708502) | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/37688708507 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
-| Catalog MCP validators | not seen | validate_spec_map / validate_artifact_names absent |
-| OpenSpec CLI | passed | validate --changes ok; validate --specs 37 passed, 0 failed |
 
 ## Specs
 Worktree:
@@ -58,7 +56,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-07-appsec-http-version on branch 2026-10-07-appsec-http-version targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/189; CI not seen. OpenSpec change `appsec-http-version` is archived at `openspec/changes/archive/2026-10-07-appsec-http-version`. Live catalog `core_plugin_appsec_client` gained requirement Query forwards client HTTP version. Upstream report: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/400. Catalog MCP validators (`validate_spec_map`, `validate_artifact_names`) were not seen; sync and folder move were done by hand. OpenSpec CLI: `status --change` 4/4 artifacts complete; `validate --changes` passed; `validate --specs` 37 passed, 0 failed. GitHub PR summary was not updated.
+Ticket 2026-10-07-appsec-http-version on branch 2026-10-07-appsec-http-version targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/189. The fork was affected and now sends `X-Crowdsec-Appsec-Http-Version` as two ASCII digits from `ProtoMajor`/`ProtoMinor`, omitted when `ProtoMajor` is 0. Official docs: https://docs.crowdsec.net/docs/appsec/protocol. Upstream report: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/400. OpenSpec change `appsec-http-version` is archived at `openspec/changes/archive/2026-10-07-appsec-http-version`; live requirement Query forwards client HTTP version is in `openspec/specs/core_plugin_appsec_client/spec.md`. HEAD `fc7f659b58a41a6c63192f63d07ae61d4ea88f8e` itself has no GitHub check runs (`[skip ci]` on this commit and later ancestors). Green checks belong to product commit `97f9f3b77a02ad80a049bec5ab54cb52c4d3caa8`: Main id 37688708507 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/37688708507 and E2E id 37688708502 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/37688708502. The GitHub PR summary was not updated. The durable card for this run is `devstate/2026/10/2026-10-07-appsec-http-version/card.md`.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -87,7 +85,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | d90e76eac7111f460a02cdbc0a78aad802d7c21b | Card must match the branch you measured |
+| Reviewed head | fc7f659b58a41a6c63192f63d07ae61d4ea88f8e | Card must match the branch you measured |
 
 ### Stored data model
 None.
