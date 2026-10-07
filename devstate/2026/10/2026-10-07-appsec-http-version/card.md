@@ -20,8 +20,8 @@ Priority: P2 — real operator, admin-user, or end-user pain, with a workaround 
 In progress. 0 items remain.
 
 Priority: P2 — real operator, admin-user, or end-user pain, with a workaround or limited blast radius
-Reviewed head: 7180cf7e
-Owner decision: Required. See Explore Decisions.
+Reviewed head: d90e76ea
+Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -40,10 +40,15 @@ Owner decision: Required. See Explore Decisions.
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
+| Catalog MCP validators | not seen | validate_spec_map / validate_artifact_names absent |
+| OpenSpec CLI | passed | validate --changes ok; validate --specs 37 passed, 0 failed |
 
 ## Specs
 Worktree:
-- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-07-appsec-http-version/openspec/changes/appsec-http-version/proposal.md) — modified
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-07-appsec-http-version/openspec/changes/archive/2026-10-07-appsec-http-version/proposal.md) — modified
+
+Completed:
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-07-appsec-http-version/openspec/specs/core_plugin_appsec_client/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -53,13 +58,13 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-07-appsec-http-version on branch 2026-10-07-appsec-http-version targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/189; CI not seen. OpenSpec change `appsec-http-version` folds `X-Crowdsec-Appsec-Http-Version` into `core_plugin_appsec_client`. Upstream report: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/400. Usage packet `core_plugin_appsec` already covers Query; GitHub PR summary was not updated.
+Ticket 2026-10-07-appsec-http-version on branch 2026-10-07-appsec-http-version targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/189; CI not seen. OpenSpec change `appsec-http-version` is archived at `openspec/changes/archive/2026-10-07-appsec-http-version`. Live catalog `core_plugin_appsec_client` gained requirement Query forwards client HTTP version. Upstream report: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/400. Catalog MCP validators (`validate_spec_map`, `validate_artifact_names`) were not seen; sync and folder move were done by hand. OpenSpec CLI: `status --change` 4/4 artifacts complete; `validate --changes` passed; `validate --specs` 37 passed, 0 failed. GitHub PR summary was not updated.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
 | --- | --- | --- | --- |
-| Should Query omit the header when `ProtoMajor` is 0 (upstream PR 400 guard)? | additive incidental - optional skip on `ProtoMajor` 0; requirement does not name the upstream `if httpReq.ProtoMajor > 0` guard | assumed - omit when `ProtoMajor` is 0 so AppSec keeps connection proto instead of applying ` "00" `. Real Traefik requests have `ProtoMajor` >= 1. | propose |
-| How is HTTP/3 (`ProtoMajor` 3) encoded? | additive incidental - same two-digit encoding for `ProtoMajor` 3; Desired names ` "10" ` / ` "11" ` / ` "20" ` only | assumed - `fmt.Sprintf("%d%d", ProtoMajor, ProtoMinor)` so HTTP/3 is ` "30" `. `applyHTTPVersion` accepts any two digits (`r.Proto` becomes `HTTP/3.0`). This plugin already inspects `ProtoMajor` >= 2 including 3 in `isBodyUnreadable`. | propose |
+| Should Query omit the header when `ProtoMajor` is 0 (upstream PR 400 guard)? | additive incidental - optional skip on `ProtoMajor` 0; requirement does not name the upstream `if httpReq.ProtoMajor > 0` guard | assumed - omit when `ProtoMajor` is 0 so AppSec keeps connection proto instead of applying `00`. Real Traefik requests have `ProtoMajor` >= 1. | propose |
+| How is HTTP/3 (`ProtoMajor` 3) encoded? | additive incidental - same two-digit encoding for `ProtoMajor` 3; Desired names `10` / `11` / `20` only | assumed - `fmt.Sprintf("%d%d", ProtoMajor, ProtoMinor)` so HTTP/3 is `30`. `applyHTTPVersion` accepts any two digits (`r.Proto` becomes `HTTP/3.0`). This plugin already inspects `ProtoMajor` >= 2 including 3 in `isBodyUnreadable`. | propose |
 
 ## Findings
 None.
@@ -80,9 +85,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 7180cf7ee7749e906c11ffbe40d71c3e2381295e | Card must match the branch you measured |
+| Reviewed head | d90e76eac7111f460a02cdbc0a78aad802d7c21b | Card must match the branch you measured |
 
 ### Stored data model
 None.

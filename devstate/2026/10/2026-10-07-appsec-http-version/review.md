@@ -35,3 +35,11 @@ verdict: in progress
 head: 7180cf7ee7749e906c11ffbe40d71c3e2381295e
 findings: none
 skipped: GitHub PR summary update (form broken)
+
+## archive (2026-10-07)
+phase: archive
+verdict: in progress
+head: d90e76eac7111f460a02cdbc0a78aad802d7c21b
+findings: none
+fixed: folded Query forwards client HTTP version into openspec/specs/core_plugin_appsec_client/spec.md; moved change to openspec/changes/archive/2026-10-07-appsec-http-version
+skipped: catalog MCP validators not seen; GitHub PR summary not updated
