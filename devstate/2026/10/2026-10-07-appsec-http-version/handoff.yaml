@@ -12,5 +12,5 @@ localTests: none
 requirement: requirement.md
 comments: none
 explore: explore.md
-change: none
+change: appsec-http-version
 pr: { id: 189, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/189 }

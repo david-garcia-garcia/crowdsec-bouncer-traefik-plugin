@@ -61,9 +61,9 @@ Usage packet `knowledge/devdocs/core_plugin_appsec.md` is enough to call `Query`
 - Q: Should Query omit the header when `ProtoMajor` is 0 (upstream PR 400 guard)?
   Rank: additive incidental — optional skip on `ProtoMajor` 0; requirement does not name the upstream `if httpReq.ProtoMajor > 0` guard
   Decision: assumed — omit when `ProtoMajor` is 0 so AppSec keeps connection proto instead of applying `"00"`. Real Traefik requests have `ProtoMajor` >= 1.
-  By: explore
+  By: propose
 
 - Q: How is HTTP/3 (`ProtoMajor` 3) encoded?
   Rank: additive incidental — same two-digit encoding for `ProtoMajor` 3; Desired names `"10"` / `"11"` / `"20"` only
   Decision: assumed — `fmt.Sprintf("%d%d", ProtoMajor, ProtoMinor)` so HTTP/3 is `"30"`. `applyHTTPVersion` accepts any two digits (`r.Proto` becomes `HTTP/3.0`). This plugin already inspects `ProtoMajor` >= 2 including 3 in `isBodyUnreadable`.
-  By: explore
+  By: propose
