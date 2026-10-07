@@ -1,15 +1,19 @@
 ---
 url: https://docs.crowdsec.net/docs/appsec/protocol
 title: WAF / Bouncer Communication Protocol
-fetched: 2026-09-05
+fetched: 2026-10-07
 authority: official
 ---
 
 Section is for authors of a remediation component (or in-app integration), not operators.
 
-Required extra headers on the forwarded request: X-Crowdsec-Appsec-Ip, X-Crowdsec-Appsec-Uri, X-Crowdsec-Appsec-Host, X-Crowdsec-Appsec-Verb, X-Crowdsec-Appsec-Api-Key, X-Crowdsec-Appsec-User-Agent, X-Crowdsec-Appsec-Http-Version (integer form 10, 11, ...). Plus original HTTP headers and body.
+Required extra headers on the forwarded request: X-Crowdsec-Appsec-Ip, X-Crowdsec-Appsec-Uri, X-Crowdsec-Appsec-Host, X-Crowdsec-Appsec-Verb, X-Crowdsec-Appsec-Api-Key, X-Crowdsec-Appsec-User-Agent, X-Crowdsec-Appsec-Http-Version.
 
-Forward via GET. If the original HTTP request contains a body, send POST to AppSec.
+Quoted description for X-Crowdsec-Appsec-Http-Version: "The HTTP version used by the original HTTP request (in integer form `10`, `11`, ...)".
+
+The worked example (POST /login HTTP/1.1 forwarded to AppSec) does not include X-Crowdsec-Appsec-Http-Version. The page does not mention ProtoMajor, ProtoMinor, r.Proto, or "20".
+
+Plus original HTTP headers and body. Forward via GET. If the original HTTP request contains a body, send POST to AppSec.
 
 Response codes:
 

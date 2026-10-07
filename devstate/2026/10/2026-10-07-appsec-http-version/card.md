@@ -1,5 +1,5 @@
 ## Motivation
-
+Not yet.
 
 ## Implementation
 Not yet.
@@ -14,22 +14,29 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-in progress
+In progress. 0 items remain.
 
-Priority: unset
-Reviewed head: 6b1015e0e918045f6cc7583dabfd852d399244fd
-Owner decision: unset
+Priority: unknown — motivation not written
+Reviewed head: 4e61d3d4
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Prepare | qualified-with-gaps | The missing header is grounded in pkg/appsec/query.go. The official AppSec encoding is still an unknown. |
+| Overall readiness | 1/6 | Not ready |
+| CI proof | 1/6 | not seen |
+| Local tests proof | N/A | remote PR — CI proof covers this |
+| Review resolution | 6/6 | no open PR comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Local tests | not seen | Prepare does not run the suite. |
-| CI | not seen | Not measured this phase. |
+| Branch | 2026-10-07-appsec-http-version pushed | `git` |
+| OpenSpec | none | `openspec/` |
+| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/189 | pr-host |
+| CI | not seen | caller omitted CI snapshot |
+| Local tests | none | handoff.yaml localTests |
+| PR comments | no comments | devstate/comments.md |
 
 ## Specs
 None.
@@ -41,10 +48,13 @@ None.
 None.
 
 ## How this fits together
-This fork's AppSec client does not send the client HTTP version. Upstream report: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/400. OpenDev MCP is absent, so the run bus and checkpoints are written by hand. The GitHub update form is broken; the PR summary on https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/189 was not updated. The card in this file is the record.
+Ticket 2026-10-07-appsec-http-version on branch 2026-10-07-appsec-http-version targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/189; CI not seen. Upstream report: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/400. The PR summary was not updated because GitHub forms are broken.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Should Query omit the header when `ProtoMajor` is 0 (upstream PR 400 guard)? | additive incidental — optional skip on `ProtoMajor` 0; requirement does not name the upstream `if httpReq.ProtoMajor > 0` guard | assumed — omit when `ProtoMajor` is 0 so AppSec keeps connection proto instead of applying `"00"`. Real Traefik requests have `ProtoMajor` >= 1. | explore |
+| How is HTTP/3 (`ProtoMajor` 3) encoded? | additive incidental — same two-digit encoding for `ProtoMajor` 3; Desired names `"10"` / `"11"` / `"20"` only | assumed — `fmt.Sprintf("%d%d", ProtoMajor, ProtoMinor)` so HTTP/3 is `"30"`. `applyHTTPVersion` accepts any two digits (`r.Proto` becomes `HTTP/3.0`). This plugin already inspects `ProtoMajor` >= 2 including 3 in `isBodyUnreadable`. | explore |
 
 ## Findings
 None.
@@ -57,8 +67,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Qualify | qualified-with-gaps | Docs confirmation is still open. |
-| PR | #189 | Stub exists. Summary not rewritten. |
+| Specs in this PR | none | Same list as ## Specs |
+| Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
+| Reviewed head | 4e61d3d4a183d685b98653b38dc175dfed76d69d | Card must match the branch you measured |
 
 ### Stored data model
 None.

@@ -7,6 +7,41 @@
       "work": true,
       "card": true,
       "at": "2026-10-07T20:55:32.359Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-07T21:05:22.019Z"
+    },
+    "propose": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "implement": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "codereview": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "devdocsimpact": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "archive": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "pullrequest": {
+      "work": false,
+      "card": false,
+      "at": null
     }
   }
 }
