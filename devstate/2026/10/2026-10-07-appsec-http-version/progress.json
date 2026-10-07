@@ -1,0 +1,12 @@
+{
+  "issueKey": "2026-10-07-appsec-http-version",
+  "jobName": "2026-10-07-appsec-http-version",
+  "startedAt": "2026-10-07T20:55:32.359Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-07T20:55:32.359Z"
+    }
+  }
+}
