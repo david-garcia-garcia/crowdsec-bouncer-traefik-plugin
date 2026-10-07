@@ -12,18 +12,15 @@ Priority: P2 — real operator, admin-user, or end-user pain, with a workaround 
 
 ## What this changes
 **Operators.** None.
-
 **Admin users.** None.
-
 **Developers.** None.
-
 **End users.** None.
 
 ## Merge readiness
 In progress. 0 items remain.
 
 Priority: P2 — real operator, admin-user, or end-user pain, with a workaround or limited blast radius
-Reviewed head: 5aa88259
+Reviewed head: 7180cf7e
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -48,6 +45,7 @@ Owner decision: Required. See Explore Decisions.
 Worktree:
 - [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-07-appsec-http-version/openspec/changes/appsec-http-version/proposal.md) — modified
 
+
 ## Deviations from the ask
 None.
 
@@ -55,13 +53,13 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-07-appsec-http-version on branch 2026-10-07-appsec-http-version targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/189; CI not seen this phase. OpenSpec change `appsec-http-version` folds `X-Crowdsec-Appsec-Http-Version` into `core_plugin_appsec_client`. Upstream report: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/400. The PR summary was not updated because GitHub forms are broken.
+Ticket 2026-10-07-appsec-http-version on branch 2026-10-07-appsec-http-version targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/189; CI not seen. OpenSpec change `appsec-http-version` folds `X-Crowdsec-Appsec-Http-Version` into `core_plugin_appsec_client`. Upstream report: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/400. Usage packet `core_plugin_appsec` already covers Query; GitHub PR summary was not updated.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
 | --- | --- | --- | --- |
-| Should Query omit the header when `ProtoMajor` is 0 (upstream PR 400 guard)? | additive incidental - optional skip on `ProtoMajor` 0; requirement does not name the upstream `if httpReq.ProtoMajor > 0` guard | assumed - omit when `ProtoMajor` is 0 so AppSec keeps connection proto instead of applying `"00"`. Real Traefik requests have `ProtoMajor` >= 1. | propose |
-| How is HTTP/3 (`ProtoMajor` 3) encoded? | additive incidental - same two-digit encoding for `ProtoMajor` 3; Desired names `"10"` / `"11"` / `"20"` only | assumed - `fmt.Sprintf("%d%d", ProtoMajor, ProtoMinor)` so HTTP/3 is `"30"`. `applyHTTPVersion` accepts any two digits (`r.Proto` becomes `HTTP/3.0`). This plugin already inspects `ProtoMajor` >= 2 including 3 in `isBodyUnreadable`. | propose |
+| Should Query omit the header when `ProtoMajor` is 0 (upstream PR 400 guard)? | additive incidental - optional skip on `ProtoMajor` 0; requirement does not name the upstream `if httpReq.ProtoMajor > 0` guard | assumed - omit when `ProtoMajor` is 0 so AppSec keeps connection proto instead of applying ` "00" `. Real Traefik requests have `ProtoMajor` >= 1. | propose |
+| How is HTTP/3 (`ProtoMajor` 3) encoded? | additive incidental - same two-digit encoding for `ProtoMajor` 3; Desired names ` "10" ` / ` "11" ` / ` "20" ` only | assumed - `fmt.Sprintf("%d%d", ProtoMajor, ProtoMinor)` so HTTP/3 is ` "30" `. `applyHTTPVersion` accepts any two digits (`r.Proto` becomes `HTTP/3.0`). This plugin already inspects `ProtoMajor` >= 2 including 3 in `isBodyUnreadable`. | propose |
 
 ## Findings
 None.
@@ -76,6 +74,7 @@ None.
 [Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-07-appsec-http-version/devstate/2026/10/2026-10-07-appsec-http-version/codereview_dead.md) — 0 total, 0 pending, 0 completed
 [Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-07-appsec-http-version/devstate/2026/10/2026-10-07-appsec-http-version/codereview_coverage.md) — 0 total, 0 pending, 0 completed
 
+
 ## Agent review details
 
 ### Review metrics
@@ -83,7 +82,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 5aa8825939fc89144c276d18e116a32044ae899e | Card must match the branch you measured |
+| Reviewed head | 7180cf7ee7749e906c11ffbe40d71c3e2381295e | Card must match the branch you measured |
 
 ### Stored data model
 None.
