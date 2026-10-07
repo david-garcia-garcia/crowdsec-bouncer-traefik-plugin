@@ -18,13 +18,14 @@ import (
 )
 
 const (
-	crowdsecAppsecIPHeader   = "X-Crowdsec-Appsec-Ip"
-	crowdsecAppsecURIHeader  = "X-Crowdsec-Appsec-Uri"
-	crowdsecAppsecHostHeader = "X-Crowdsec-Appsec-Host"
-	crowdsecAppsecVerbHeader = "X-Crowdsec-Appsec-Verb"
-	crowdsecAppsecHeader     = "X-Crowdsec-Appsec-Api-Key"
-	crowdsecAppsecUserAgent  = "X-Crowdsec-Appsec-User-Agent"
-	appsecResponseBodyLimit  = 1 << 20 // 1 MiB
+	crowdsecAppsecIPHeader          = "X-Crowdsec-Appsec-Ip"
+	crowdsecAppsecURIHeader         = "X-Crowdsec-Appsec-Uri"
+	crowdsecAppsecHostHeader        = "X-Crowdsec-Appsec-Host"
+	crowdsecAppsecVerbHeader        = "X-Crowdsec-Appsec-Verb"
+	crowdsecAppsecHeader            = "X-Crowdsec-Appsec-Api-Key"
+	crowdsecAppsecUserAgent         = "X-Crowdsec-Appsec-User-Agent"
+	crowdsecAppsecHTTPVersionHeader = "X-Crowdsec-Appsec-Http-Version"
+	appsecResponseBodyLimit         = 1 << 20 // 1 MiB
 )
 
 // Structured AppSec JSON action values CrowdSec 1.8 puts in the envelope body.
@@ -209,6 +210,10 @@ func (c *Client) newAppsecForwardRequest(req clientrequest.Request, pol Policy) 
 	appsecReq.Header.Set(crowdsecAppsecURIHeader, req.AbsoluteURL())
 	appsecReq.Header.Set(crowdsecAppsecUserAgent, req.Header.Get("User-Agent"))
 	appsecReq.Header.Set("User-Agent", "Crowdsec-Bouncer-Traefik-Plugin/"+c.pluginVersion)
+	// Two ASCII digits, major then minor, so AppSec can populate r.Proto. Skip 0 so AppSec keeps the listener proto.
+	if req.ProtoMajor > 0 {
+		appsecReq.Header.Set(crowdsecAppsecHTTPVersionHeader, fmt.Sprintf("%d%d", req.ProtoMajor, req.ProtoMinor))
+	}
 	return appsecReq, nil
 }
 

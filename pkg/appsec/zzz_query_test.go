@@ -459,6 +459,37 @@ func Test_appsecQuery_stripsHopByHopHeaders(t *testing.T) {
 	}
 }
 
+// Test_appsecQuery_forwardsHTTPVersion proves Query encodes inbound ProtoMajor/ProtoMinor
+// as two ASCII digits on X-Crowdsec-Appsec-Http-Version, and omits the header when ProtoMajor is 0.
+func Test_appsecQuery_forwardsHTTPVersion(t *testing.T) {
+	tests := []struct {
+		name       string
+		protoMajor int
+		protoMinor int
+		want       string
+	}{
+		{name: "http1.1 encodes as 11", protoMajor: 1, protoMinor: 1, want: "11"},
+		{name: "http2 encodes as 20", protoMajor: 2, protoMinor: 0, want: "20"},
+		{name: "http3 encodes as 30", protoMajor: 3, protoMinor: 0, want: "30"},
+		{name: "protoMajor 0 omits header", protoMajor: 0, protoMinor: 0, want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			capture := &forwardCaptureRoundTripper{}
+			req := httptest.NewRequest(http.MethodGet, "http://localhost/", nil)
+			req.ProtoMajor = tt.protoMajor
+			req.ProtoMinor = tt.protoMinor
+			if _, err := newForwardCaptureClient(capture).Query(withTestAddress(req), Policy{}); err != nil {
+				t.Fatalf("Query() returned error: %v", err)
+			}
+			got := capture.header.Get(crowdsecAppsecHTTPVersionHeader)
+			if got != tt.want {
+				t.Errorf("%s %q want %q", crowdsecAppsecHTTPVersionHeader, got, tt.want)
+			}
+		})
+	}
+}
+
 // Test_isHopByHopHeader checks the RFC 7230 section 6.1 set and that end-to-end headers pass.
 func Test_isHopByHopHeader(t *testing.T) {
 	tests := []struct {
