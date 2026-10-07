@@ -20,3 +20,11 @@ head: 97f9f3b77a02ad80a049bec5ab54cb52c4d3caa8
 findings: none
 fixed: Query sets X-Crowdsec-Appsec-Http-Version; Test_appsecQuery_forwardsHTTPVersion; core_plugin_appsec How-to-use
 skipped: GitHub PR summary update (form broken)
+
+## codereview (2026-10-07)
+phase: codereview
+verdict: in progress
+head: 5aa8825939fc89144c276d18e116a32044ae899e
+findings: none
+fixed: none (no hard/missing/wrong)
+skipped: GitHub PR summary update (form broken)
