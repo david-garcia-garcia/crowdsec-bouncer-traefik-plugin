@@ -2,7 +2,7 @@
 
 Official CrowdSec WAF / bouncer HTTP contract: headers, methods, and response codes a remediation component must honour.
 
-Fetched: 2026-09-05. Docs: CrowdSec v1.8 protocol page. Source pin for the Traefik plugin: `github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin@04d928872df12bdb9d953b2d92948e0b89692d6a`.
+Fetched: 2026-10-07 (HTTP version encoding re-checked). Docs: CrowdSec protocol page. Source pin for AppSec parse: `github.com/crowdsecurity/crowdsec@3d5c4d9b127091e9063b9b5eb785372a599a4435:pkg/appsec/request.go`. Source pin for the Traefik plugin: `github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin@04d928872df12bdb9d953b2d92948e0b89692d6a`.
 
 ## What the bouncer sends
 
@@ -18,9 +18,19 @@ Required headers ([protocol](https://docs.crowdsec.net/docs/appsec/protocol)):
 | `X-Crowdsec-Appsec-Verb` | Original method |
 | `X-Crowdsec-Appsec-Api-Key` | Bouncer API key (same key used to pull LAPI) |
 | `X-Crowdsec-Appsec-User-Agent` | Original User-Agent |
-| `X-Crowdsec-Appsec-Http-Version` | Original HTTP version as integer (`10`, `11`, …) |
+| `X-Crowdsec-Appsec-Http-Version` | Original HTTP version as two ASCII digits, major then minor (`10`, `11`, `20`, …) |
 
 Method: forward as `GET` unless the original request has a body, then `POST`. ([protocol](https://docs.crowdsec.net/docs/appsec/protocol))
+
+### HTTP version encoding
+
+Official protocol page: header name `X-Crowdsec-Appsec-Http-Version`; value is “The HTTP version used by the original HTTP request (in integer form `10`, `11`, ...)”. ([protocol](https://docs.crowdsec.net/docs/appsec/protocol), extract `.sources/appsec-protocol.md`) The worked example on that page does not include the header. The page does not name Go `ProtoMajor` / `ProtoMinor` or `r.Proto`.
+
+CrowdSec AppSec parser (`applyHTTPVersion`): the value must be exactly two ASCII digits. Digit 0 is major, digit 1 is minor. `"11"` → `ProtoMajor=1`, `ProtoMinor=1`, `r.Proto="HTTP/1.1"`. `"20"` → `ProtoMajor=2`, `ProtoMinor=0`, `r.Proto="HTTP/2"` (special-cased; other pairs use `HTTP/M.N`). Malformed values are logged and ignored. Empty / missing: debug log `missing 'X-Crowdsec-Appsec-Http-Version' header`; `applyHTTPVersion` is not called, so `r.Proto` stays the AppSec listener connection proto (the bouncer-to-AppSec HTTP version). Missing is not an error (unlike IP / URI / Verb). ([request.go](https://github.com/crowdsecurity/crowdsec/blob/3d5c4d9b127091e9063b9b5eb785372a599a4435/pkg/appsec/request.go), extract `.sources/request.go.md`)
+
+**Official vs source (required vs optional):** the protocol table lists the header with the other required extras. Source treats absence as optional for old bouncers. Follow source for what this CrowdSec version does when the header is missing; a bouncer that can send the original client version still should, or AppSec cannot see HTTP/1.0 or HTTP/2 clients behind an HTTP/1.1 forward.
+
+A Go bouncer produces the integer form from the inbound request: `fmt.Sprintf("%d%d", ProtoMajor, ProtoMinor)` (`"10"`, `"11"`, `"20"`). That encoding matches the protocol page and the parser. Official docs do not disagree with upstream Traefik PR [400](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/400); they are thinner.
 
 **Official vs official (auth header name):** the contributing spec says AppSec auth is header **`X-Api-Key`**, same param as LAPI. ([bouncer specs](https://docs.crowdsec.net/docs/next/contributing/specs/bouncer_appsec_specs.md), extract `.sources/bouncer_appsec_specs.md`) The protocol page and the Traefik plugin send **`X-Crowdsec-Appsec-Api-Key`**. Follow the protocol page and Traefik source for the wire header. ([bouncer.go](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/blob/04d928872df12bdb9d953b2d92948e0b89692d6a/bouncer.go), extract `.sources/bouncer.go.md`)
 
@@ -72,6 +82,6 @@ Follow source for what `maxlerebourg/crowdsec-bouncer-traefik-plugin@04d92887` d
 ## References
 
 - Official: [WAF / Bouncer communication protocol](https://docs.crowdsec.net/docs/appsec/protocol), [challenge protocol](https://docs.crowdsec.net/docs/next/appsec/bot_detection/challenge_protocol.md), [bouncer AppSec specs](https://docs.crowdsec.net/docs/next/contributing/specs/bouncer_appsec_specs.md)
-- Source: `github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin@04d92887:bouncer.go`
+- Source: `github.com/crowdsecurity/crowdsec@3d5c4d9b:pkg/appsec/request.go` (`applyHTTPVersion`), `github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin@04d92887:bouncer.go`
 - Related finding: `ext_crowdsec_bouncers_failure-action/`
 - Extracts: `.sources/`

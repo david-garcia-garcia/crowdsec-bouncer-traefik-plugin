@@ -1,0 +1,16 @@
+issueKey: 2026-10-07-appsec-http-version
+jobName: 2026-10-07-appsec-http-version
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: c5bd2546c4464ecc4dacf13abd11ec12e2c7ee0dc8af270fd39a8e5230188bbf
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: appsec-http-version
+pr: { id: 189, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/189 }
