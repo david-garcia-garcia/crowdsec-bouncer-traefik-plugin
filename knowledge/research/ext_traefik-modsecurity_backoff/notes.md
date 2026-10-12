@@ -1,6 +1,6 @@
 # Unhealthy WAF admission gate
 
-How [david-garcia-garcia/traefik-modsecurity](https://github.com/david-garcia-garcia/traefik-modsecurity) (`e860d2494f41d49172f2d8aae916615c8ee356e1`) skips the CRS sidecar after repeated inspect failures, via `backendbackoff.Gate`. This worktree’s `vendor/github.com/david-garcia-garcia/traefik-middleware-utilities/` has no `backendbackoff` package; the plugin’s `go.mod` requires utilities `v1.0.3` (`950b08de86b6fd9ea68ac1d205e17a379ec60522`).
+How [david-garcia-garcia/traefik-modsecurity](https://github.com/david-garcia-garcia/traefik-modsecurity) (`e860d2494f41d49172f2d8aae916615c8ee356e1`) skips the CRS sidecar after repeated inspect failures, via `backendbackoff.Gate`. This worktree’s `vendor/github.com/david-garcia-garcia/traefik-middleware-utilities/` has no `backendbackoff` package; the plugin’s `go.mod` requires utilities `v1.0.3` (`950b08de86b6fd9ea68ac1d205e17a379ec60522`). Extract: `.sources/go.mod.md`.
 
 Fetched: 2026-10-12.
 

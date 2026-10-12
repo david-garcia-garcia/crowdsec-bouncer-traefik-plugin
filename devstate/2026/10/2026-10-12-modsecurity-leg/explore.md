@@ -64,7 +64,7 @@ Roots searched in the worktree: `*.go` under `plugin.go`, `pkg/bouncer/`, `pkg/a
 - `https://github.com/david-garcia-garcia/traefik-modsecurity@e860d249` via GitHub MCP (README, `modsecurity.go`, `pkg/modsecurity/{config,plugin,serve}.go`, `Test-Integration.ps1`, `scripts/*.Tests.ps1`).
 - `https://github.com/david-garcia-garcia/traefik-middleware-utilities@v1.0.7` (`42e6a1a`) `backendbackoff/gate.go`.
 - In-tree: `knowledge/devdocs/core_plugin_middleware.md`, `core_plugin_middleware_instance-slots.md`, `core_plugin_appsec.md`, `core_plugin_clientrequest_inbound-request.md`, `core_plugin_httprule.md`, `core_plugin_middleware_action-rules.md`, `build_e2e_real.md`; `knowledge/research/ext_crowdsec_bouncers_failure-action/`; live specs `core_plugin_middleware_bouncer`, `core_plugin_middleware_instance-slots`, `core_plugin_appsec_failure-action`.
-- Research folders `ext_traefik-modsecurity_{backoff,inspect,e2e}/` are being written by the research worker for later phases.
+- In-tree research: `knowledge/research/ext_traefik-modsecurity_backoff/`, `ext_traefik-modsecurity_inspect/`, `ext_traefik-modsecurity_e2e/` (pin `traefik-modsecurity@e860d249`).
 
 ## Decisions
 
