@@ -21,7 +21,7 @@
 3. [hard] Critical path untested — `pkg/modsecurity/inspect.go:119` — sidecar transport error must follow failMode; tests cover sidecar HTTP 5xx only
    Quote:
       ```
-      handleSidecarDoError: non-cancel Do error → reportOutcome(false) then serveFailClosed
+      handleSidecarDoError: non-cancel Do error then reportOutcome(false) then serveFailClosed
       TestInspect_sidecar5xxUsesFailMode (HTTP 5xx); (none) for connection/transport failure
       ```
    Fix: Assert Inspect against an unreachable sidecar continues on open and writes empty 502 on close
@@ -30,7 +30,7 @@
 4. [hard] Edge case untested — `pkg/modsecurity/inspect.go:121` — inbound cancel must not Report the gate; TestInspect_inboundCancelIsEmpty502 has no gate
    Quote:
       ```
-      handleSidecarDoError: Canceled → empty 502, return before reportOutcome
+      handleSidecarDoError: Canceled then empty 502, return before reportOutcome
       TestInspect_inboundCancelIsEmpty502: status 502, default backoff 0 so Gate is nil
       ```
    Fix: Cancel inspect with a live gate, then assert a later hop is still admitted
@@ -39,7 +39,7 @@
 5. [hard] Edge case untested — `pkg/appsec/query.go:157` — AppSec hop cancel must not Report or apply FailureAction; existing disconnect tests only fail the body read
    Quote:
       ```
-      Do err + req.Context() Canceled → ErrClientDisconnected (no reportGate)
+      Do err + req.Context() Canceled then ErrClientDisconnected (no reportGate)
       Test_appsecQuery_clientDisconnected: failing Body before the hop, appsecHits==0
       ```
    Fix: Cancel the inbound context during the AppSec hop and assert ErrClientDisconnected with no FailureAction and no gate trip
