@@ -22,14 +22,14 @@ The same Gate is imported onto the AppSec Client. Omitted `appsecUnhealthyBackOf
 Ready for review. 0 items remain.
 
 Priority: P2 — real operator pain with a workaround and limited blast radius
-Reviewed head: df563feb
+Reviewed head: 9f7856dc
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38299091242 |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38300994375 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -39,7 +39,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-10-12-modsecurity-leg pushed | `git` |
 | OpenSpec | modsecurity-leg | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/190 | pr-host |
-| CI | build 38299091242 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38299091242 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38299091242 |
+| CI | build 38300994375 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38300994375 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38300994375 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -63,7 +63,7 @@ Worktree:
 None.
 
 ## How this fits together
-Ticket 2026-10-12-modsecurity-leg on branch 2026-10-12-modsecurity-leg targeting 2026-10-04-bouncer-refactor; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/190; CI build 38299091242 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38299091242.
+Ticket 2026-10-12-modsecurity-leg on branch 2026-10-12-modsecurity-leg targeting 2026-10-04-bouncer-refactor; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/190; CI build 38300994375 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38300994375.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -75,14 +75,14 @@ Ticket 2026-10-12-modsecurity-leg on branch 2026-10-12-modsecurity-leg targeting
 None.
 
 ## Axis review
-Standards — None.
-Nitpicks — None.
-Spec — None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/devstate/2026/10/2026-10-12-modsecurity-leg/codereview_standards.md) — 6 total, 0 pending, 5 completed, 1 skipped
+[Nitpicks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/devstate/2026/10/2026-10-12-modsecurity-leg/codereview_nitpicks.md) — 8 total, 0 pending, 8 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/devstate/2026/10/2026-10-12-modsecurity-leg/codereview_spec.md) — 1 total, 0 pending, 1 completed
 [Scope](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/devstate/2026/10/2026-10-12-modsecurity-leg/codereview_scope.md) — 0 total, 0 pending, 0 completed
-[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/devstate/2026/10/2026-10-12-modsecurity-leg/codereview_security.md) — 1 total, 1 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/devstate/2026/10/2026-10-12-modsecurity-leg/codereview_security.md) — 1 total, 0 pending, 1 completed
 [Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/devstate/2026/10/2026-10-12-modsecurity-leg/codereview_performance.md) — 0 total, 0 pending, 0 completed
 [Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/devstate/2026/10/2026-10-12-modsecurity-leg/codereview_dead.md) — 0 total, 0 pending, 0 completed
-Test coverage — None.
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/devstate/2026/10/2026-10-12-modsecurity-leg/codereview_coverage.md) — 7 total, 0 pending, 6 completed, 1 skipped
 
 
 ## Agent review details
@@ -92,7 +92,7 @@ Test coverage — None.
 | --- | --- | --- |
 | Specs in this PR | 2 added / 6 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | df563febbd9e4dc2278a63743b9519b1d4df2fdb | Card must match the branch you measured |
+| Reviewed head | 9f7856dc67f5d3ad99357c54458d2d39b9b602a5 | Card must match the branch you measured |
 
 ### Stored data model
 None.
