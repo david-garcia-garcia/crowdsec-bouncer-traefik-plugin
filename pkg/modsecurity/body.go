@@ -22,12 +22,7 @@ func (c *Client) readInboundBody(rw http.ResponseWriter, req *http.Request) (bod
 		req.Body = http.MaxBytesReader(rw, req.Body, c.bodyLimit)
 	}
 
-	usePool := true
-	if req.ContentLength >= 0 {
-		usePool = req.ContentLength <= c.poolCap
-	}
-
-	if !usePool {
+	if req.ContentLength >= 0 && req.ContentLength > c.poolCap {
 		return io.ReadAll(req.Body)
 	}
 

@@ -169,6 +169,9 @@ func TestServeHTTP_appsecGateSkipStillRunsModsec(t *testing.T) {
 	if rw.Code != http.StatusForbidden {
 		t.Fatalf("status=%d want 403", rw.Code)
 	}
+	if rw.Header().Get("X-Remediation") != "ban:modsec" {
+		t.Fatalf("header=%q want ban:modsec", rw.Header().Get("X-Remediation"))
+	}
 	if hits != 1 {
 		t.Fatalf("AppSec hits=%d want 1", hits)
 	}

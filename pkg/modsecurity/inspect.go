@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
@@ -33,7 +34,7 @@ func (c *Client) Inspect(rw http.ResponseWriter, req *http.Request, failMode, re
 		bodyReader = bytes.NewReader(body)
 		req.Body = io.NopCloser(bytes.NewReader(body))
 	}
-	if skipHop, wrote := c.denyAdmission(rw, req, failMode); skipHop {
+	if skipHop, wrote := c.skipSidecarHop(rw, req, failMode); skipHop {
 		return wrote
 	}
 
@@ -51,7 +52,7 @@ func (c *Client) Inspect(rw http.ResponseWriter, req *http.Request, failMode, re
 
 	resp, err := c.httpClient.Do(proxyReq)
 	if err != nil {
-		return c.handleSidecarDoError(rw, req, failMode, err)
+		return c.replySidecarDoError(rw, req, failMode, err)
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
@@ -65,14 +66,14 @@ func (c *Client) Inspect(rw http.ResponseWriter, req *http.Request, failMode, re
 			rw.Header().Set(remediationHeader, "ban:"+headerReasonModsec)
 		}
 		forwardResponse(resp, rw)
-		discardSidecarBody(resp.Body)
+		c.discardSidecarBody(resp.Body)
 		return true
 	}
-	discardSidecarBody(resp.Body)
+	c.discardSidecarBody(resp.Body)
 	if resp.StatusCode >= 500 {
 		c.reportOutcome(false)
 		c.log.Error("fail to send HTTP request to modsec", "error", fmt.Errorf("waf status %d", resp.StatusCode), "inbound", req.Context().Err())
-		return c.serveFailClosed(rw, failMode)
+		return c.applyFailMode(rw, failMode)
 	}
 	c.reportOutcome(true)
 	return false
@@ -85,7 +86,7 @@ func (c *Client) rejectDeniedVerbBody(rw http.ResponseWriter, req *http.Request)
 	}
 	limitedBody := http.MaxBytesReader(rw, req.Body, 1)
 	testByte := make([]byte, 1)
-	if n, err := limitedBody.Read(testByte); n > 0 || err == nil {
+	if n, _ := limitedBody.Read(testByte); n > 0 {
 		c.log.Warn("HTTP request should not have a body, rejecting", "method", req.Method)
 		http.Error(rw, "HTTP "+req.Method+" requests should not have a body", http.StatusBadRequest)
 		return true
@@ -93,9 +94,9 @@ func (c *Client) rejectDeniedVerbBody(rw http.ResponseWriter, req *http.Request)
 	return false
 }
 
-// denyAdmission consults the Gate after deny-verbs and body-limit.
+// skipSidecarHop consults the Gate after deny-verbs and body-limit.
 // skipHop means Inspect must not call the sidecar. wrote is Inspect's return value.
-func (c *Client) denyAdmission(rw http.ResponseWriter, req *http.Request, failMode string) (skipHop bool, wrote bool) {
+func (c *Client) skipSidecarHop(rw http.ResponseWriter, req *http.Request, failMode string) (skipHop bool, wrote bool) {
 	if c.gate == nil {
 		return false, false
 	}
@@ -107,25 +108,26 @@ func (c *Client) denyAdmission(rw http.ResponseWriter, req *http.Request, failMo
 			return true, true
 		}
 		c.log.Error("fail to admit WAF request", "error", allowErr)
-		return true, c.serveFailClosed(rw, failMode)
+		return true, c.applyFailMode(rw, failMode)
 	}
 	if !allowed {
 		c.log.Warn("skipping sidecar; waf backoff open")
-		return true, c.serveFailClosed(rw, failMode)
+		return true, c.applyFailMode(rw, failMode)
 	}
 	return false, false
 }
 
-func (c *Client) handleSidecarDoError(rw http.ResponseWriter, req *http.Request, failMode string, err error) bool {
+// replySidecarDoError classifies inbound cancel vs sidecar miss after Client.Do fails.
+func (c *Client) replySidecarDoError(rw http.ResponseWriter, req *http.Request, failMode string, err error) bool {
 	inboundErr := req.Context().Err()
-	if errors.Is(inboundErr, context.Canceled) {
+	if errors.Is(err, context.Canceled) || errors.Is(inboundErr, context.Canceled) {
 		c.log.Info("inbound request canceled; WAF call aborted", "error", err, "inbound", inboundErr)
 		http.Error(rw, "", http.StatusBadGateway)
 		return true
 	}
 	c.reportOutcome(false)
-	c.log.Error("fail to send HTTP request to modsec", "error", err, "inbound", inboundErr)
-	return c.serveFailClosed(rw, failMode)
+	c.log.Error("fail to send HTTP request to modsec", "host", sidecarLogHost(c.modsecURL), "inbound", inboundErr)
+	return c.applyFailMode(rw, failMode)
 }
 
 func (c *Client) replyInboundBodyReadFailure(rw http.ResponseWriter, _ *http.Request, err error) {
@@ -139,7 +141,8 @@ func (c *Client) replyInboundBodyReadFailure(rw http.ResponseWriter, _ *http.Req
 	http.Error(rw, "", http.StatusBadGateway)
 }
 
-func (c *Client) serveFailClosed(rw http.ResponseWriter, failMode string) bool {
+// applyFailMode writes empty 502 on close and continues on open.
+func (c *Client) applyFailMode(rw http.ResponseWriter, failMode string) bool {
 	if configuration.EffectiveModsecFailMode(failMode) == configuration.ModsecFailModeClose {
 		http.Error(rw, "", http.StatusBadGateway)
 		return true
@@ -156,8 +159,20 @@ func (c *Client) reportOutcome(success bool) {
 	}
 }
 
-func discardSidecarBody(body io.Reader) {
-	_, _ = io.Copy(io.Discard, io.LimitReader(body, sidecarBodyDrainLimit))
+// discardSidecarBody drains leftover sidecar bytes so the HTTP slot can be reused.
+func (c *Client) discardSidecarBody(body io.Reader) {
+	if _, errDrain := io.Copy(io.Discard, io.LimitReader(body, sidecarBodyDrainLimit)); errDrain != nil {
+		c.log.Debug("modsecInspect:drainBody", "error", errDrain)
+	}
+}
+
+// sidecarLogHost is the sidecar host for error logs. Query and userinfo stay off it.
+func sidecarLogHost(modsecURL string) string {
+	parsed, err := url.Parse(modsecURL)
+	if err != nil || parsed.Host == "" {
+		return "unknown"
+	}
+	return parsed.Host
 }
 
 func headerValuesContainToken(values []string, token string) bool {

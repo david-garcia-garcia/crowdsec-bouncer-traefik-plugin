@@ -504,7 +504,7 @@ The router needs a captcha configured; otherwise the remapped captcha is served 
 
 ### Let a LAN or VPN through
 
-`bouncerClientTrustedIps` lets these client addresses skip all checks, AppSec included. See [examples/trusted-ips](examples/trusted-ips/README.md).
+`bouncerClientTrustedIps` lets these client addresses skip all checks, including LAPI, AppSec, and ModSec. See [examples/trusted-ips](examples/trusted-ips/README.md).
 
 ```yaml
 bouncerClientTrustedIps:
@@ -874,7 +874,7 @@ Cap on the ModSec gate cooldown. `0` keeps the cooldown equal to `modsecUnhealth
 Absolute `http` or `https` URL of the inspect-only CRS sidecar, required when `modsecEnabled` is true. `modSecurityUrl` is not accepted.
 
 **ReclaimGraceSeconds** (int64, default `30`)
-How long a LAPI or AppSec connection stays open after no middleware uses it, so a Traefik config reload can reuse it instead of reconnecting. `0` closes it immediately. Only the first value loaded in the Traefik process applies.
+How long a LAPI, AppSec, or ModSec connection stays open after no middleware uses it, so a Traefik config reload can reuse it instead of reconnecting. `0` closes it immediately. Only the first value loaded in the Traefik process applies.
 
 ### Configuration
 

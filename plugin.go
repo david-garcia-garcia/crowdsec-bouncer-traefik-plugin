@@ -175,40 +175,44 @@ func openOwnedLeg(bindCtx context.Context, config *configuration.Config, log *sl
 
 // claimOwned publishes each owned instance name (SetAlias) to the Client Open just
 // created. A taken name fails New. A later claim failure clears already-published
-// legs (LAPI and AppSec when captcha's SetAlias fails) so we do not leave a
-// half-claimed owner.
+// legs so we do not leave a half-claimed owner. Order matches openOwned.
 func claimOwned(config *configuration.Config, log *slog.Logger, name string) error {
 	if err := claimOwnedLeg(config, log, name, config.LapiEnabled, legLAPI); err != nil {
 		return err
 	}
 	if err := claimOwnedLeg(config, log, name, config.AppsecEnabled, legAppSec); err != nil {
-		if config.LapiEnabled {
-			reclaim.ClearPublisher(name, legLAPI)
-		}
+		clearClaimedPublishers(config, name, legLAPI)
+		return err
+	}
+	if err := claimOwnedLeg(config, log, name, config.CaptchaEnabled, legCaptcha); err != nil {
+		clearClaimedPublishers(config, name, legLAPI, legAppSec)
 		return err
 	}
 	if err := claimOwnedLeg(config, log, name, config.ModsecEnabled, legModsec); err != nil {
-		if config.LapiEnabled {
-			reclaim.ClearPublisher(name, legLAPI)
-		}
-		if config.AppsecEnabled {
-			reclaim.ClearPublisher(name, legAppSec)
-		}
+		clearClaimedPublishers(config, name, legLAPI, legAppSec, legCaptcha)
 		return err
 	}
-	err := claimOwnedLeg(config, log, name, config.CaptchaEnabled, legCaptcha)
-	if err != nil {
-		if config.LapiEnabled {
-			reclaim.ClearPublisher(name, legLAPI)
+	return nil
+}
+
+// clearClaimedPublishers drops SetAlias for owned groups already published in this New.
+func clearClaimedPublishers(config *configuration.Config, name string, groups ...string) {
+	for _, group := range groups {
+		enabled := false
+		switch group {
+		case legLAPI:
+			enabled = config.LapiEnabled
+		case legAppSec:
+			enabled = config.AppsecEnabled
+		case legCaptcha:
+			enabled = config.CaptchaEnabled
+		case legModsec:
+			enabled = config.ModsecEnabled
 		}
-		if config.AppsecEnabled {
-			reclaim.ClearPublisher(name, legAppSec)
-		}
-		if config.ModsecEnabled {
-			reclaim.ClearPublisher(name, legModsec)
+		if enabled {
+			reclaim.ClearPublisher(name, group)
 		}
 	}
-	return err
 }
 
 func claimOwnedLeg(config *configuration.Config, log *slog.Logger, name string, enabled bool, group string) error {

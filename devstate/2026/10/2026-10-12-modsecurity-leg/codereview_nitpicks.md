@@ -16,8 +16,8 @@
       	return c.serveFailClosed(rw, failMode)
       }
       ```
-   Status: open
-   Argument: none.
+   Status: done
+   Argument: renamed handleSidecarDoError to replySidecarDoError
 2. [hard] Name for the scope — `pkg/modsecurity/inspect.go:142` — `serveFailClosed` names only close; the body also continues on open
    Fix: Rename to `applyFailMode` (or `serveFailMode`) so the identifier covers both cases
    Quote:
@@ -30,8 +30,8 @@
       	return false
       }
       ```
-   Status: open
-   Argument: none.
+   Status: done
+   Argument: renamed serveFailClosed to applyFailMode
 3. [hard] Name for the scope — `pkg/modsecurity/inspect.go:98` — `denyAdmission` names the deny mood; the body also admits (nil gate / allowed) and returns skip vs wrote
    Fix: Rename to the call-site job (`skipSidecarHop` or `admitHop`)
    Quote:
@@ -57,8 +57,8 @@
       	return false, false
       }
       ```
-   Status: open
-   Argument: none.
+   Status: done
+   Argument: renamed denyAdmission to skipSidecarHop
 4. [hard] Symmetry and consistency — `plugin.go:141` — `openOwned` walks LAPI, AppSec, Captcha, then ModSec; sibling `claimOwned` walks LAPI, AppSec, ModSec, then Captcha
    Fix: Use the same leg order in both (`openOwned`'s LAPI, AppSec, Captcha, ModSec)
    Quote:
@@ -70,8 +70,8 @@
       	// LAPI, AppSec, ModSec, then Captcha
       }
       ```
-   Status: open
-   Argument: none.
+   Status: done
+   Argument: claimOwned now claims LAPI, AppSec, Captcha, then ModSec
 5. [hard] Symmetry and consistency — `pkg/modsecurity/inspect.go:104` — inbound-cancel in `denyAdmission` ORs `allowErr` with `ctx.Err()`; sibling `handleSidecarDoError` checks only `req.Context().Err()`
    Fix: Use the same cancel detection (and the same empty-502 / log steps) on both paths
    Quote:
@@ -88,8 +88,8 @@
       	return true
       }
       ```
-   Status: open
-   Argument: none.
+   Status: done
+   Argument: replySidecarDoError ORs Do Canceled with ctx.Err()
 6. [hard] Clear conditions — `pkg/modsecurity/body.go:25` — `usePool` / `if !usePool` is the complement of a flag; the body is known ContentLength above `poolCap`
    Fix: Early return `if req.ContentLength >= 0 && req.ContentLength > c.poolCap { return io.ReadAll(req.Body) }`
    Quote:
@@ -102,8 +102,8 @@
       	return io.ReadAll(req.Body)
       }
       ```
-   Status: open
-   Argument: none.
+   Status: done
+   Argument: readInboundBody early-returns when ContentLength exceeds poolCap
 7. [hard] Clear conditions — `pkg/modsecurity/inspect.go:88` — `n > 0 || err == nil` hides "got a readable body byte"
    Fix: `if n > 0` (EOF means no body byte)
    Quote:
@@ -114,8 +114,8 @@
       	return true
       }
       ```
-   Status: open
-   Argument: none.
+   Status: done
+   Argument: rejectDeniedVerbBody rejects when n > 0
 8. [hard] Linear coding — `plugin.go:180` — `claimOwned` inlines "clear already-published legs" as growing `if config.*Enabled { ClearPublisher }` lists on each failure
    Fix: Extract a method named for that job; each claim failure asks it with the legs already claimed
    Quote:
@@ -142,5 +142,5 @@
       	}
       }
       ```
-   Status: open
-   Argument: none.
+   Status: done
+   Argument: extracted clearClaimedPublishers; claim failures call it

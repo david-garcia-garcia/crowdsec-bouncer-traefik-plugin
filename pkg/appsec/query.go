@@ -136,14 +136,14 @@ func isHopByHopHeader(name string) bool {
 // Query forwards the request to this AppSec HTTP client.
 // A structured JSON envelope is returned when AppSec supplies a non-empty action.
 func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error) {
-	appsecReq, err := c.newAppsecForwardRequest(req, pol)
-	if err != nil {
-		return nil, err
-	}
 	if skip, skipErr := c.admitAppsecHop(req.Context()); skipErr != nil {
 		return nil, skipErr
 	} else if skip {
 		return nil, ErrGateSkip
+	}
+	appsecReq, err := c.newAppsecForwardRequest(req, pol)
+	if err != nil {
+		return nil, err
 	}
 
 	current := c.currentTransport()

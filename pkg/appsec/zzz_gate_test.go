@@ -1,6 +1,7 @@
 package appsec
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -93,5 +94,54 @@ func TestQuery_admittedMissStillUsesFailureAction(t *testing.T) {
 	_, banErr := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan})
 	if banErr == nil || errors.Is(banErr, ErrGateSkip) {
 		t.Fatalf("admitted miss must use FailureAction, got %v", banErr)
+	}
+}
+
+func Test_appsecQuery_hopCancelDoesNotTripGate(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	hits := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		if hits == 1 {
+			close(started)
+			<-release
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	defer close(release)
+	u, _ := url.Parse(srv.URL)
+	cfg := testAppsecConfig(u.Host)
+	cfg.AppsecHTTPTimeoutSeconds = 30
+	cfg.AppsecUnhealthyBackOffPeriodSecs = 30
+	cfg.AppsecUnhealthyFailureThreshold = 1
+	cfg.AppsecUnhealthyFailureRatio = configuration.DefaultUnhealthyFailureRatio
+	client, err := New(cfg, logger.New("ERROR", ""), "test", "n", "k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	httpReq := httptest.NewRequest(http.MethodGet, "http://localhost/", nil).WithContext(ctx)
+	done := make(chan struct{})
+	var hopErr error
+	go func() {
+		defer close(done)
+		_, hopErr = client.Query(withTestAddress(httpReq), Policy{FailureAction: configuration.FailureActionBan})
+	}()
+	<-started
+	cancel()
+	<-done
+	if !errors.Is(hopErr, ErrClientDisconnected) {
+		t.Fatalf("hop cancel want ErrClientDisconnected, got %v", hopErr)
+	}
+	_, laterErr := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan})
+	if laterErr != nil {
+		t.Fatalf("later hop after cancel: %v", laterErr)
+	}
+	if hits != 2 {
+		t.Fatalf("AppSec hits=%d want 2", hits)
 	}
 }

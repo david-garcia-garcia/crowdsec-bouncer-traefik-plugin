@@ -193,6 +193,114 @@ func TestInspect_gateSkipUsesFailMode(t *testing.T) {
 	if client.Inspect(second, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeOpen, "") {
 		t.Fatal("gate skip open must continue")
 	}
+	closeRW := httptest.NewRecorder()
+	if !client.Inspect(closeRW, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeClose, "") {
+		t.Fatal("gate skip close must write 502")
+	}
+	if closeRW.Code != http.StatusBadGateway {
+		t.Fatalf("status=%d want 502", closeRW.Code)
+	}
+	if sidecarHits != 1 {
+		t.Fatalf("sidecar hits=%d want 1", sidecarHits)
+	}
+}
+
+func TestInspect_sidecarTransportErrorUsesFailMode(t *testing.T) {
+	client, err := New(testModsecConfig("http://127.0.0.1:1"), slog.Default(), "test", "n", "k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	openRW := httptest.NewRecorder()
+	if client.Inspect(openRW, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeOpen, "X-Remediation") {
+		t.Fatal("open transport error must continue")
+	}
+	if openRW.Header().Get("X-Remediation") != "" {
+		t.Fatal("fail-open must omit remediation header")
+	}
+	closeRW := httptest.NewRecorder()
+	if !client.Inspect(closeRW, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeClose, "X-Remediation") {
+		t.Fatal("close transport error must write 502")
+	}
+	if closeRW.Code != http.StatusBadGateway {
+		t.Fatalf("status=%d want 502", closeRW.Code)
+	}
+	if closeRW.Header().Get("X-Remediation") != "" {
+		t.Fatal("fail-close 502 must omit remediation header")
+	}
+}
+
+func TestInspect_inboundCancelDoesNotTripGate(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	sidecarHits := 0
+	sidecar := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		sidecarHits++
+		if sidecarHits == 1 {
+			close(started)
+			<-release
+		}
+	}))
+	defer sidecar.Close()
+	defer close(release)
+	cfg := testModsecConfig(sidecar.URL)
+	cfg.ModsecHTTPTimeoutSeconds = 30
+	cfg.ModsecUnhealthyBackOffPeriodSecs = 30
+	cfg.ModsecUnhealthyFailureThreshold = 1
+	client, err := New(cfg, slog.Default(), "test", "n", "k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil).WithContext(ctx)
+	done := make(chan struct{})
+	rw := httptest.NewRecorder()
+	go func() {
+		defer close(done)
+		_ = client.Inspect(rw, req, configuration.ModsecFailModeOpen, "")
+	}()
+	<-started
+	cancel()
+	<-done
+	if rw.Code != http.StatusBadGateway {
+		t.Fatalf("status=%d want 502", rw.Code)
+	}
+	later := httptest.NewRecorder()
+	if client.Inspect(later, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeOpen, "") {
+		t.Fatal("later hop after cancel must still be admitted")
+	}
+	if sidecarHits != 2 {
+		t.Fatalf("sidecar hits=%d want 2", sidecarHits)
+	}
+}
+
+func TestInspect_denyGetWithBodyAfterGateTrip(t *testing.T) {
+	sidecarHits := 0
+	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		sidecarHits++
+		http.Error(w, "down", http.StatusInternalServerError)
+	}))
+	defer sidecar.Close()
+	cfg := testModsecConfig(sidecar.URL)
+	cfg.ModsecUnhealthyBackOffPeriodSecs = 30
+	cfg.ModsecUnhealthyFailureThreshold = 1
+	client, err := New(cfg, slog.Default(), "test", "n", "k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	if client.Inspect(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeOpen, "") {
+		t.Fatal("first 500 open must continue")
+	}
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/", strings.NewReader("x"))
+	if !client.Inspect(rw, req, configuration.ModsecFailModeClose, "") {
+		t.Fatal("GET with body must write 400")
+	}
+	if rw.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d want 400, not failMode", rw.Code)
+	}
 	if sidecarHits != 1 {
 		t.Fatalf("sidecar hits=%d want 1", sidecarHits)
 	}

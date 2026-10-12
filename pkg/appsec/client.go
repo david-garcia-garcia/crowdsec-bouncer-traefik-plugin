@@ -107,7 +107,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, m
 	return client, nil
 }
 
-// Close releases idle AppSec HTTP connections. Safe to call more than once.
+// Close releases the admission gate and idle AppSec HTTP. Safe to call more than once.
 func (c *Client) Close() {
 	c.mu.Lock()
 	if c.closed {
