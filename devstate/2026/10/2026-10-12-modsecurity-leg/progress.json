@@ -10,8 +10,8 @@
     },
     "explore": {
       "work": true,
-      "card": false,
-      "at": null
+      "card": true,
+      "at": "2026-10-12T18:15:57.760Z"
     },
     "propose": {
       "work": false,
