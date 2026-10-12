@@ -13,13 +13,16 @@ import (
 
 func modsecSidecar(t *testing.T) *httptest.Server {
 	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.RawQuery, "../etc") {
 			http.Error(w, "blocked", http.StatusForbidden)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 	}))
+	// Closure: Yaegi v0.16 types httptest.Server.Close as a method value with a receiver.
+	t.Cleanup(func() { srv.Close() })
+	return srv
 }
 
 func cfgModsecOwnerAt(sidecarURL, instanceName string) *configuration.Config {
@@ -40,7 +43,6 @@ func TestNew_ModsecOwnerBlocksCRSPath(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 	sidecar := modsecSidecar(t)
-	t.Cleanup(sidecar.Close)
 
 	h, err := New(context.Background(), testNextOK(), cfgModsecOwnerAt(sidecar.URL, "waf"), "modsec-owner")
 	if err != nil {
@@ -67,7 +69,6 @@ func TestNew_ModsecSubscriberUsesOwnerClient(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 	sidecar := modsecSidecar(t)
-	t.Cleanup(sidecar.Close)
 
 	if _, err := New(context.Background(), testNextOK(), cfgModsecOwnerAt(sidecar.URL, "shared"), "modsec-owner"); err != nil {
 		t.Fatal(err)
@@ -91,7 +92,6 @@ func TestNew_ModsecHolderWithBounceOffStillPublishes(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 	sidecar := modsecSidecar(t)
-	t.Cleanup(sidecar.Close)
 
 	holder := cfgModsecOwnerAt(sidecar.URL, "shared")
 	holder.BouncerEnabled = false
@@ -117,7 +117,6 @@ func TestNew_ModsecInstanceNameCollisionFails(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 	sidecar := modsecSidecar(t)
-	t.Cleanup(sidecar.Close)
 
 	if _, err := New(context.Background(), testNextOK(), cfgModsecOwnerAt(sidecar.URL, "shared"), "modsec-a"); err != nil {
 		t.Fatal(err)
@@ -131,7 +130,6 @@ func TestNew_CaptchaClaimFailureClearsModsecPublisher(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 	sidecar := modsecSidecar(t)
-	t.Cleanup(sidecar.Close)
 
 	if _, err := New(context.Background(), testNextOK(), cfgCaptchaOwnerAt(t, "shared"), "cs-a"); err != nil {
 		t.Fatal(err)

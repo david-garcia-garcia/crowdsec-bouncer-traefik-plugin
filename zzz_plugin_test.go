@@ -267,7 +267,7 @@ func TestNew_LAPIUserAgentUsesVersionGo(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 	}))
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() { srv.Close() })
 	u, err := url.Parse(srv.URL)
 	if err != nil {
 		t.Fatal(err)
