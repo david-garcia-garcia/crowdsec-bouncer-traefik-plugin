@@ -60,6 +60,7 @@ func getTestConfig() *configuration.Config {
 		LogFilePath:                         "",
 		LogFormat:                           "common",
 		LogLevel:                            "INFO",
+		ModsecHTTPTimeoutSeconds:            10,
 	}
 }
 

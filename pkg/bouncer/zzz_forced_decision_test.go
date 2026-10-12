@@ -250,7 +250,7 @@ func TestBouncerNew_compilesActionHeaderRules(t *testing.T) {
 	cfg := configuration.New()
 	cfg.LapiMode = configuration.StreamMode
 	cfg.BouncerActionRules = decisionHeaderRules()
-	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, true, false, log)
+	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, true, false, false, log)
 	if err != nil {
 		t.Fatal(err)
 	}

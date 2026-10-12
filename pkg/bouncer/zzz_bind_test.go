@@ -5,6 +5,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/modsecurity"
 )
 
 func bindTestLAPI(b *Bouncer, client *lapi.Client) {
@@ -33,4 +34,13 @@ func bindTestCaptcha(b *Bouncer, client *captcha.Client) {
 		return
 	}
 	b.captchaBound.Store((*captcha.Client)(nil))
+}
+
+func bindTestModSec(b *Bouncer, client *modsecurity.Client) {
+	b.subscribeModsec = client != nil
+	if client != nil {
+		b.modsecBound.Store(client)
+		return
+	}
+	b.modsecBound.Store((*modsecurity.Client)(nil))
 }

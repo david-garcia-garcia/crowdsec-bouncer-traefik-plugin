@@ -47,6 +47,9 @@ var ErrFailureCaptcha = errors.New("failureAction captcha")
 // Query MUST NOT call AppSec or apply FailureAction; the bouncer stops without a ban.
 var ErrClientDisconnected = errors.New("appsecQuery:clientDisconnected")
 
+// ErrGateSkip is a denied AppSec admission. Query MUST NOT call AppSec or apply FailureAction.
+var ErrGateSkip = errors.New("appsecQuery:unhealthySkip")
+
 // errAppsecReadBody is the io failure from readCappedAppsecBody (not an oversized body).
 var errAppsecReadBody = errors.New("appsecQuery:readBody")
 
@@ -137,26 +140,38 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 	if err != nil {
 		return nil, err
 	}
+	if skip, skipErr := c.admitAppsecHop(req.Context()); skipErr != nil {
+		return nil, skipErr
+	} else if skip {
+		return nil, ErrGateSkip
+	}
 
 	current := c.currentTransport()
 	if current == nil || current.httpClient == nil {
 		c.log.Error("appsecQuery:unreachable")
+		c.reportGate(false)
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
 	res, err := current.httpClient.Do(appsecReq)
 	if err != nil {
+		if errors.Is(req.Context().Err(), context.Canceled) {
+			return nil, ErrClientDisconnected
+		}
 		c.log.Error("appsecQuery:unreachable")
+		c.reportGate(false)
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
 	// Drain every live response, including 502/503/504, so keep-alive can reuse the slot.
 	defer c.drainResponse(res)
 	if isReverseProxyError(res.StatusCode) {
 		c.log.Error("appsecQuery:unreachable")
+		c.reportGate(false)
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
 
 	if res.StatusCode == http.StatusInternalServerError {
 		c.log.Info("appsecQuery:failure")
+		c.reportGate(false)
 		return resultForFailureAction(pol.FailureAction, "appsecQuery statusCode:500")
 	}
 
@@ -165,11 +180,41 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 		// Io errors use FailureAction; oversized bodies stay as dest (allow 200 / error otherwise).
 		if errors.Is(err, errAppsecReadBody) {
 			c.log.Info("appsecQuery:failure")
+			c.reportGate(false)
 			return resultForFailureAction(pol.FailureAction, err.Error())
 		}
 		return nil, err
 	}
+	c.reportGate(true)
 	return interpretAppsecBody(res.StatusCode, body, c.log)
+}
+
+// admitAppsecHop consults the Gate. skip is a denied Allow. Cancel does not Report.
+func (c *Client) admitAppsecHop(ctx context.Context) (skip bool, err error) {
+	if c.gate == nil {
+		return false, nil
+	}
+	allowed, _, allowErr := c.gate.Allow(ctx, gateKey)
+	if allowErr != nil {
+		if errors.Is(allowErr, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
+			return false, ErrClientDisconnected
+		}
+		c.log.Error("fail to admit AppSec request", "error", allowErr)
+		return false, allowErr
+	}
+	if !allowed {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (c *Client) reportGate(success bool) {
+	if c.gate == nil {
+		return
+	}
+	if err := c.gate.Report(gateKey, success); err != nil {
+		c.log.Error("fail to report AppSec admission outcome", "error", err, "success", success)
+	}
 }
 
 // newAppsecForwardRequest builds the AppSec listener request, copying client headers and identity.
