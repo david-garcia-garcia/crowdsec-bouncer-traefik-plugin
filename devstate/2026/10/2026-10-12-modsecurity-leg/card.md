@@ -22,7 +22,7 @@ The same Gate is imported onto the AppSec Client. Omitted `appsecUnhealthyBackOf
 In progress. 0 items remain.
 
 Priority: P2 — real operator pain with a workaround and limited blast radius
-Reviewed head: da3b8258
+Reviewed head: 3c180ab2
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -45,14 +45,24 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/changes/modsecurity-leg/proposal.md) — modified
-- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/changes/modsecurity-leg/proposal.md) — modified
-- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/changes/modsecurity-leg/proposal.md) — modified
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/changes/modsecurity-leg/proposal.md) — modified
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/changes/modsecurity-leg/proposal.md) — modified
-- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/changes/modsecurity-leg/proposal.md) — modified
-- [core_plugin_modsecurity_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/changes/modsecurity-leg/proposal.md) — added
-- [core_plugin_modsecurity_inspect](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/changes/modsecurity-leg/proposal.md) — added
+- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/changes/archive/2026-10-12-modsecurity-leg/proposal.md) — modified
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/changes/archive/2026-10-12-modsecurity-leg/proposal.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/changes/archive/2026-10-12-modsecurity-leg/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/changes/archive/2026-10-12-modsecurity-leg/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/changes/archive/2026-10-12-modsecurity-leg/proposal.md) — modified
+- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/changes/archive/2026-10-12-modsecurity-leg/proposal.md) — modified
+- [core_plugin_modsecurity_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/changes/archive/2026-10-12-modsecurity-leg/proposal.md) — added
+- [core_plugin_modsecurity_inspect](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/changes/archive/2026-10-12-modsecurity-leg/proposal.md) — added
+
+Completed:
+- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/specs/build_e2e_pester_crowdsec-stack/spec.md) — modified
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/specs/core_plugin_appsec_client/spec.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/specs/core_plugin_appsec_failure-action/spec.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/specs/core_plugin_middleware_config-validation/spec.md) — modified
+- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/specs/core_plugin_middleware_instance-slots/spec.md) — modified
+- [core_plugin_modsecurity_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/specs/core_plugin_modsecurity_client/spec.md) — added
+- [core_plugin_modsecurity_inspect](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-12-modsecurity-leg/openspec/specs/core_plugin_modsecurity_inspect/spec.md) — added
 
 
 ## Deviations from the ask
@@ -90,9 +100,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 2 added / 6 modified | Same list as ## Specs |
+| Specs in this PR | 4 added / 12 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | da3b8258def15c3a15007a4a175435b421c9eaad | Card must match the branch you measured |
+| Reviewed head | 3c180ab2f17e4f1acf2f898802a10126254ee9fa | Card must match the branch you measured |
 
 ### Stored data model
 None.
