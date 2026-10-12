@@ -3,8 +3,12 @@
 ## Language
 
 **AppSec Client**:
-The reclaim value for one CrowdSec AppSec listener (`pkg/appsec`). Keyed by middleware name plus host, path, resolved key, body limit, TLS, and `appsecHttpTimeoutSeconds`. Owns JSON parse and HTTP+auth. Not the LAPI Client.
+The reclaim value for one CrowdSec AppSec listener (`pkg/appsec`). Keyed by middleware name plus host, path, resolved key, body limit, TLS, `appsecHttpTimeoutSeconds`, and the unhealthy-backoff knobs. Owns JSON parse, HTTP+auth, and the admission gate. Not the LAPI Client.
 _Avoid_: CrowdsecConnection, `AppsecQuery` on LAPI, LAPI captcha, `atomic.Pointer[T]`, Adopt-only timeout or TLS
+
+**Gate skip**:
+A denied AppSec admission (`ErrGateSkip`). Query does not call AppSec and does not apply `bouncerAppsecFailureAction`. The bouncer continues (then ModSec if subscribed). Not an admitted miss and not client disconnected.
+_Avoid_: FailureAction, FailMode, treating skip as ban, Reporting a denied Allow
 
 **Structured AppSec response**:
 JSON CrowdSec 1.8 AppSec returns to the bouncer (`action`, `http_status`, `user_body_content`, `user_cookies`, `user_headers`). Listener HTTP 403 carries a remediation envelope; listener 200 is allow.
@@ -20,17 +24,19 @@ _Avoid_: GetBody ban, unreadable body, FailureAction passthrough
 
 ## Overview
 
-`appsec.Client.Query` owns the AppSec HTTP round-trip and JSON parse. `Bouncer` owns writing the client response or the operator ban template. Client IP is `pkg/ip.GetRemoteIP` only; AppSec handlers take `clientrequest.Request` still named `req`.
+`appsec.Client.Query` owns the AppSec HTTP round-trip and JSON parse. When backoff is on, Query admits then Reports. `Bouncer` owns writing the client response or the operator ban template. Client IP is `pkg/ip.GetRemoteIP` only; AppSec handlers take `clientrequest.Request` still named `req`.
 
 ## How to use
 
 - Enable with existing `appsecEnabled`. Do not add a bot-detection plugin key.
-- Open with `appsec.Open` (reclaim by middleware name plus AppSec URL+key+body limit+TLS+`appsecHttpTimeoutSeconds`). A knob change is a new Client. Do not construct the AppSec client inside `lapi.New`. Do not use `atomic.Pointer[T]`.
+- Open with `appsec.Open` (reclaim by middleware name plus AppSec URL+key+body limit+TLS+`appsecHttpTimeoutSeconds`+unhealthy-backoff knobs). A knob change is a new Client. Do not construct the AppSec client inside `lapi.New`. Do not use `atomic.Pointer[T]`.
+- When `appsecUnhealthyBackOffPeriodSecs` is greater than 0, hold one `backendbackoff.Gate` from dest utilities `v1.0.7`. Default period is 30. `0` builds no gate. Omitted threshold is `5`. Omitted ratio is packaged `0.30`. Omitted max period equals the base. Do not set `Jitter` or `TTL`. `Close` Closes a non-nil Gate.
+- Query `Allow`s before the AppSec hop. Denied Allow returns `ErrGateSkip`: do not call AppSec, do not apply FailureAction. `applyAppsecServeHTTP` treats that error as continue (then ModSec if subscribed). Admitted transport / 5xx / unreachable / response-body io error `Report`s failure then applies FailureAction. A usable verdict `Report`s success. Inbound cancel does not Report.
 - `newTransport` sets `http.Client.Timeout` and stored `httpTimeoutSeconds` from `cfg.AppsecHTTPTimeoutSeconds`. Do not inherit from a shared default. Store the knob so `fieldsDiffer` sees a timeout change. Query uses that stored client.
 - `action` allow or empty 200 → `next`. `ban` → `handleBanServeHTTP` with `headerReason` `appsec` (`ban:appsec` when the remediation header is set). Any other non-allow action (challenge, AppSec captcha HTML) → relay, except a matched captcha action rule: non-empty `challenge` body MUST NOT relay (`applyAppsecServeHTTP` returns false so the plugin gate runs). Missing or empty-string `challenge` `user_body_content` → `handleBanServeHTTP` with `headerReason` `appsec-challenge-empty` (`ban:appsec-challenge-empty`) before `WriteHeader`. Empty `captcha` body still relays `http_status` (not the operator ban page). AppSec `captcha` is not `pkg/captcha`.
 - On relay, when `bouncerRemediationHeadersCustomName` is set, write `formatAppsecRelayHeader(decision.Action)`: `captcha` → `captcha:appsec`, `challenge` → `captcha:challenge`, any other action → `{sanitized-action}:appsec` (trim; strip CR/LF/TAB; `:` → `_`). Do not copy raw `decision.Action`. AppSec unpublished / Query error / unusable verdict fail-closed through `headerReason` `appsec-failure` (`ban:appsec-failure` or `captcha:appsec-failure`).
 - On relay, assign `user_headers` onto the writer (`rw.Header()[canonical] = values`): same name replaces, including CSP. Skip hop-by-hop names and `Set-Cookie` in that map. `Header().Add("Set-Cookie")` once per `user_cookies` entry. Do not append a second same-name header and do not join cookies with commas.
-- AppSec HTTP 500, unreachable (transport failure or listener HTTP 502/503/504), AppSec response-body io errors, and an unreadable HTTP/2 or HTTP/3 body on POST, PUT, or PATCH use per-router `bouncerAppsecFailureAction` (`passthrough` | `ban` | `captcha`), not the three removed block bools. `captcha` here is `pkg/captcha`, not AppSec JSON `action: captcha`. A response-body io error keeps `appsecQuery:readBody`. Oversized AppSec bodies do not use this action. A **client disconnect** while buffering a readable forwardable body is not FailureAction: `Query` returns `ErrClientDisconnected`, AppSec is not called, origin is not called, TRACE only, optional `error:client-disconnected` header. Unclassified client-body read faults keep `appsecQuery:GetBody` and today's ban wiring.
+- AppSec HTTP 500, unreachable (transport failure or listener HTTP 502/503/504), AppSec response-body io errors, and an unreadable HTTP/2 or HTTP/3 body on POST, PUT, or PATCH use per-router `bouncerAppsecFailureAction` (`passthrough` | `ban` | `captcha`) only when the hop was admitted (the gate allowed the call, or no gate exists). Default stays `ban`. `captcha` here is `pkg/captcha`, not AppSec JSON `action: captcha`. A response-body io error keeps `appsecQuery:readBody`. Oversized AppSec bodies do not use this action. A **Gate skip** is not FailureAction (`ErrGateSkip`). A **client disconnect** while buffering a readable forwardable body is not FailureAction: `Query` returns `ErrClientDisconnected`, AppSec is not called, origin is not called, TRACE only, optional `error:client-disconnected` header. Unclassified client-body read faults keep `appsecQuery:GetBody` and today's ban wiring.
 - `appsecBodyLimit` `0` is unlimited: skip `io.LimitReader` and `io.ReadAll` the readable client body. A positive limit still caps the copy. Omitted default stays 10485760.
 - Copy a readable body only when `isMethodWithForwardableBody` says so (POST, PUT, PATCH, DELETE) and the body is not `http.NoBody`. Everything else is a headers-only GET whose body is never read, so a GET carrying a body is not laundered into a POST at the listener. The real verb always travels on `X-Crowdsec-Appsec-Verb`.
 - After the forwarded bytes exist, omit client `Content-Length` and every hop-by-hop header (`isHopByHopHeader`); set `Request.ContentLength` and the `Content-Length` header from those bytes on the POST branch only. Reuse `req.IPAddrString()` on `X-Crowdsec-Appsec-Ip`. Set `X-Crowdsec-Appsec-Uri` from `req.AbsoluteURL()` (`core_plugin_clientrequest_inbound-request.md`). Do not set that header from `URL.String()` or `URL.Scheme`. Do not derive scheme from proto or TLS.
@@ -48,6 +54,7 @@ decision, err := b.appsecClient.Query(req, pol)
 
 - `pkg/appsec/`
 - `pkg/appsec/query.go`
+- `pkg/appsec/gate.go`
 - `pkg/appsec/client_http.go`
 - `pkg/appsec/session.go`
 - `pkg/bouncer/bouncer.go`
@@ -71,4 +78,5 @@ decision, err := b.appsecClient.Query(req, pol)
 - Do not strip header names listed in the client's own `Connection` header, even though RFC 7230 tells a proxy to. This forward is an inspection copy, so that rule would let a client hide `Cookie` (or anything else) from the WAF. The static hop-by-hop list is the whole filter.
 - Classify AppSec response-body io failures with `errors.Is` on the package-local sentinel. Do not match the `appsecQuery:readBody` prefix. Oversized AppSec bodies stay a different error and skip FailureAction.
 - Do not pass `0` into `io.LimitReader` (`N <= 0` is immediate EOF).
-- AppSec TLS, body limit, and `appsecHttpTimeoutSeconds` live on the ownership key. A change is a new Client. Do not apply those knobs with `AdoptTransport`.
+- AppSec TLS, body limit, `appsecHttpTimeoutSeconds`, and the unhealthy-backoff knobs live on the ownership key. A change is a new Client. Do not apply those knobs with `AdoptTransport`.
+- Do not copy Gate into this repository. Do not treat a denied Allow as FailureAction even when that action is `ban`. Real-stack AppSec routes pin `appsecUnhealthyBackOffPeriodSecs: 0` so FailureAction cases are not skipped by the default gate.

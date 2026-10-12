@@ -8,7 +8,7 @@ description: How LAPI Clients share one Store keyed by CrowdSec cursor SessionHe
 ## Middleware New
 priority: normal
 local: core_plugin_middleware.md
-description: How Traefik New reclaims a LAPI Client, an AppSec Client, and a captcha Client and returns a per-router Bouncer (`core_plugin_middleware_bouncer`).
+description: How Traefik New reclaims a LAPI Client, an AppSec Client, a captcha Client, and a ModSec Client and returns a per-router Bouncer (`core_plugin_middleware_bouncer`).
 
 ## Ban page
 priority: normal
@@ -18,7 +18,7 @@ description: How handleBanServeHTTP writes the operator ban response (status, Co
 ## Instance slots
 priority: normal
 local: core_plugin_middleware_instance-slots.md
-description: How named LAPI, AppSec, and captcha slots Publish and Subscribe through Yaegi-safe atomic.Value.
+description: How named LAPI, AppSec, captcha, and ModSec slots Publish and Subscribe through Yaegi-safe atomic.Value.
 
 ## Local plugin
 priority: normal
@@ -134,4 +134,14 @@ description: How eucaptcha posts a solver token to EU CAPTCHA /v1/verify and cla
 priority: normal
 local: core_plugin_middleware_action-rules.md
 description: How bouncerActionRules compile once and fold every matching ban, skip, and captcha token after trusted-IP.
+
+## ModSecurity Client
+priority: normal
+local: core_plugin_modsecurity_client.md
+description: How this plugin reclaims one OWASP CRS sidecar inspect Client.
+
+## ModSecurity inspect
+priority: normal
+local: core_plugin_modsecurity_inspect.md
+description: How this plugin copies an inbound request to the CRS sidecar and classifies allow, copied block, or WAF failure.
 

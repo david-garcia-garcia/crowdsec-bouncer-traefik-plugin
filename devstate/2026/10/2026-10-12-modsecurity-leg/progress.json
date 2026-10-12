@@ -29,7 +29,7 @@
       "at": "2026-10-12T20:06:50.552Z"
     },
     "devdocsimpact": {
-      "work": false,
+      "work": true,
       "card": false,
       "at": null
     },
