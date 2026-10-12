@@ -1,6 +1,7 @@
 package modsecurity
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
@@ -28,7 +29,10 @@ func newHTTPClient(timeoutSeconds int64) *http.Client {
 			MinVersion: tls.VersionTLS12,
 		},
 		ForceAttemptHTTP2: true,
-		DialContext:       dialer.DialContext,
+		// Closure, not dialer.DialContext: Yaegi v0.16 types the method value with a receiver.
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return dialer.DialContext(ctx, network, addr)
+		},
 	}
 	return &http.Client{
 		Timeout:   timeout,
