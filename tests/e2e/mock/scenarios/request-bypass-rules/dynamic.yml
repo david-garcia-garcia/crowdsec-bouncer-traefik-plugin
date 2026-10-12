@@ -19,6 +19,7 @@ http:
           appsecEnabled: "true"
           appsecHost: "@@APPSEC_HOST@@"
           appsecScheme: http
+          appsecUnhealthyBackOffPeriodSecs: "0"
           bouncerActionRules:
             - name: appsec-skip
               path: ^/foo/403-skip$

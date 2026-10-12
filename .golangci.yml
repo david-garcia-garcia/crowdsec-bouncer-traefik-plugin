@@ -44,6 +44,8 @@ linters-settings:
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest
           - github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis
           - github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup
+          - github.com/david-garcia-garcia/traefik-middleware-utilities/backendbackoff
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/modsecurity
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi
@@ -59,6 +61,8 @@ linters-settings:
           - $gostd
           - github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis
           - github.com/david-garcia-garcia/traefik-middleware-utilities/iplookup
+          - github.com/david-garcia-garcia/traefik-middleware-utilities/backendbackoff
+          - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/modsecurity
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration

@@ -8,6 +8,7 @@
 - dragonfly
 - redis
 - traefik-geoblock
+- traefik-modsecurity
 - http
 - hcaptcha
 - recaptcha

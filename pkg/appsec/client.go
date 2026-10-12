@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/traefik-middleware-utilities/backendbackoff"
 )
 
 const (
@@ -40,6 +41,7 @@ type Client struct {
 	sessionKey      string
 	closed          bool
 	sleeping        bool
+	gate            *backendbackoff.Gate
 }
 
 // Prepare resolves AppSec secrets on cfg when AppSec is enabled. Empty key/scheme copy from LAPI.
@@ -78,6 +80,15 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, m
 		log.Error("New:getTLSConfigCrowdsec fail to get tlsAppsecConfig", "error", err)
 		return nil, err
 	}
+	gate, err := newAdmissionGate(
+		config.AppsecUnhealthyBackOffPeriodSecs,
+		config.AppsecUnhealthyMaxBackOffPeriodSecs,
+		config.AppsecUnhealthyFailureThreshold,
+		config.AppsecUnhealthyFailureRatio,
+	)
+	if err != nil {
+		return nil, err
+	}
 	client := &Client{
 		appsecScheme:    config.AppsecScheme,
 		appsecHost:      config.AppsecHost,
@@ -88,6 +99,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, m
 		sessionKey:      bindKey,
 		log:             log,
 		pluginVersion:   pluginVersion,
+		gate:            gate,
 	}
 	client.incarnation = fmt.Sprintf("%p", client)
 	client.transport.Store(next)
@@ -95,7 +107,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, m
 	return client, nil
 }
 
-// Close releases idle AppSec HTTP connections. Safe to call more than once.
+// Close releases the admission gate and idle AppSec HTTP. Safe to call more than once.
 func (c *Client) Close() {
 	c.mu.Lock()
 	if c.closed {
@@ -105,7 +117,11 @@ func (c *Client) Close() {
 	c.closed = true
 	c.sleeping = false
 	current := c.currentTransport()
+	gate := c.gate
 	c.mu.Unlock()
+	if gate != nil {
+		gate.Close()
+	}
 	if current != nil {
 		closeIdle(current.httpClient)
 	}
@@ -142,6 +158,14 @@ func (c *Client) Incarnation() string {
 		return ""
 	}
 	return c.incarnation
+}
+
+// GateForTest is the admission gate, or nil when backoff is off.
+func (c *Client) GateForTest() *backendbackoff.Gate {
+	if c == nil {
+		return nil
+	}
+	return c.gate
 }
 
 func (c *Client) bindIdentity(middlewareName, bindKey string) {

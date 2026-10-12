@@ -20,7 +20,7 @@ Public config `bouncerAppsecFailureAction` SHALL be one of `passthrough`, `ban`,
 - **THEN** plugin initialization fails validation
 
 ### Requirement: One action covers 500, unreachable, and unreadable body
-`BouncerAppsecFailureAction` SHALL apply to: AppSec HTTP 500; transport failure or HTTP 502/503/504; an unreadable HTTP/2 or HTTP/3 body on POST, PUT, or PATCH; and an io error while reading the AppSec response body. `ban` SHALL drop the request. `passthrough` on 500, unreachable, or AppSec response-body io error SHALL continue as allow (then `next`). `passthrough` on unreadable body SHALL keep today’s headers-only GET to AppSec. `captcha` SHALL use the configured captcha client (`pkg/captcha`), not AppSec JSON `action: captcha`. HTTP 502, 503, and 504 from the AppSec listener SHALL be unreachable (same fallback as a transport failure), not a generic non-200 ban. DELETE SHALL NOT be treated as a method that would have sent a body. An oversized AppSec response body SHALL NOT use this action: HTTP 200 SHALL allow and non-200 SHALL error as today. A response-body io error SHALL keep the `appsecQuery:readBody` error string (MUST NOT collapse to `appsecQuery:unreachable`). A classified client disconnect while buffering a readable request body SHALL NOT use this action (`core_plugin_appsec_client`, `core_plugin_middleware_bouncer`). Unclassified errors during client body buffering SHALL keep the `appsecQuery:GetBody` path and today's ban wiring.
+`BouncerAppsecFailureAction` SHALL apply to: AppSec HTTP 500; transport failure or HTTP 502/503/504; an unreadable HTTP/2 or HTTP/3 body on POST, PUT, or PATCH; and an io error while reading the AppSec response body. It SHALL apply only when the AppSec hop was admitted (the admission gate allowed the call, or no gate exists). A denied Allow SHALL NOT use this action. `ban` SHALL drop the request. `passthrough` on 500, unreachable, or AppSec response-body io error SHALL continue as allow (then `next`). `passthrough` on unreadable body SHALL keep today's headers-only GET to AppSec. `captcha` SHALL use the configured captcha client (`pkg/captcha`), not AppSec JSON `action: captcha`. HTTP 502, 503, and 504 from the AppSec listener SHALL be unreachable (same fallback as a transport failure), not a generic non-200 ban. DELETE SHALL NOT be treated as a method that would have sent a body. An oversized AppSec response body SHALL NOT use this action: HTTP 200 SHALL allow and non-200 SHALL error as today. A response-body io error SHALL keep the `appsecQuery:readBody` error string (MUST NOT collapse to `appsecQuery:unreachable`). A classified client disconnect while buffering a readable request body SHALL NOT use this action (`core_plugin_appsec_client`, `core_plugin_middleware_bouncer`). Unclassified errors during client body buffering SHALL keep the `appsecQuery:GetBody` path and today's ban wiring.
 
 #### Scenario: Unreachable passthrough
 - **WHEN** AppSec is unreachable and `bouncerAppsecFailureAction` is `passthrough`
@@ -62,6 +62,10 @@ Public config `bouncerAppsecFailureAction` SHALL be one of `passthrough`, `ban`,
 - **WHEN** buffering a readable POST, PUT, PATCH, or DELETE body for AppSec fails because the client disconnected or canceled
 - **THEN** `bouncerAppsecFailureAction` does not choose ban, passthrough, or captcha
 
+#### Scenario: Gate skip is not a failure action
+- **WHEN** the AppSec Gate denies Allow
+- **THEN** `bouncerAppsecFailureAction` does not choose ban, passthrough, or captcha
+
 ### Requirement: Structured AppSec verdicts are not failure actions
 HTTP 200 and parseable AppSec JSON `action` values (`allow`, `ban`, `challenge`, AppSec `captcha` HTML) SHALL keep existing bot-detection behavior. `BouncerAppsecFailureAction` MUST NOT rewrite those envelopes. Legacy empty/non-JSON non-200 (other than 500/502/503/504) SHALL still ban.
 
@@ -87,3 +91,18 @@ HTTP 200 and parseable AppSec JSON `action` values (`allow`, `ban`, `challenge`,
 #### Scenario: Old bool fields are gone
 - **WHEN** plugin config is decoded
 - **THEN** those three JSON keys are not fields on `Config` and do not change runtime behavior
+
+### Requirement: Unhealthy skip is not a failure action
+When the AppSec admission gate denies Allow, `bouncerAppsecFailureAction` SHALL NOT choose ban, passthrough, or captcha. The skip SHALL NOT call AppSec. The request SHALL continue (then ModSec if subscribed). FailureAction SHALL still apply to an admitted miss (HTTP 500, unreachable, unreadable body, response-body io error). Default FailureAction SHALL remain `ban`.
+
+#### Scenario: After trip, skip is pass even when FailureAction is ban
+- **WHEN** the AppSec Gate denies Allow
+- **AND** `bouncerAppsecFailureAction` is `ban`
+- **THEN** the client is not forbidden for that skip
+- **AND** AppSec is not called
+
+#### Scenario: Admitted 500 still bans by default
+- **WHEN** the Gate admits the request
+- **AND** AppSec returns HTTP 500
+- **AND** `bouncerAppsecFailureAction` is omitted
+- **THEN** the client is forbidden

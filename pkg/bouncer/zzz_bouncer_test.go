@@ -32,9 +32,16 @@ func testClientRequest(req *http.Request, remoteIP string) clientrequest.Request
 	return clientrequest.New(req, remoteIP, parsed)
 }
 
-// continueAfterLAPIForTest is the ServeHTTP tail these tests enter directly: AppSec, then next.
+// continueAfterLAPIForTest is the ServeHTTP tail these tests enter directly: AppSec, then ModSec, then next.
 func continueAfterLAPIForTest(b *Bouncer, rw http.ResponseWriter, req clientrequest.Request) {
-	if b.serveAppSec(rw, req, b.actionRules.Fold(req.Request)) {
+	match := httprule.ActionMatch{}
+	if b.actionRules != nil {
+		match = b.actionRules.Fold(req.Request)
+	}
+	if b.serveAppSec(rw, req, match) {
+		return
+	}
+	if b.serveModSec(rw, req, match) {
 		return
 	}
 	b.next.ServeHTTP(rw, req.Request)
@@ -774,7 +781,7 @@ func TestNewForwardedHeadersInsecureHeaderName(t *testing.T) {
 		cfg := configuration.New()
 		cfg.LapiMode = configuration.StreamMode
 		cfg.BouncerForwardedHeadersInsecure = true
-		b, err := New(next, "test", cfg, false, true, false, log)
+		b, err := New(next, "test", cfg, false, true, false, false, log)
 		if err != nil {
 			t.Fatalf("New = %v", err)
 		}
@@ -787,7 +794,7 @@ func TestNewForwardedHeadersInsecureHeaderName(t *testing.T) {
 		cfg.LapiMode = configuration.StreamMode
 		cfg.BouncerForwardedHeadersInsecure = true
 		cfg.BouncerForwardedHeadersCustomName = "CF-Connecting-IP"
-		b, err := New(next, "test", cfg, false, true, false, log)
+		b, err := New(next, "test", cfg, false, true, false, false, log)
 		if err != nil {
 			t.Fatalf("New = %v", err)
 		}

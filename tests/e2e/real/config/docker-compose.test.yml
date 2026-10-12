@@ -46,6 +46,8 @@ services:
       - crowdsec
       - dragonfly
       - dummy-captcha
+      - waf
+      - waf-5xx
 
   # Always-pass siteverify so Pester can POST a dummy form and assert the gate cookie.
   dummy-captcha:
@@ -320,6 +322,7 @@ services:
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.appsecEnabled=true"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.appsecHost=crowdsec:7422"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.appsecHttpTimeoutSeconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.appsecUnhealthyBackOffPeriodSecs=0"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.bouncerEnabled=true"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.bouncerForwardedHeadersCustomName=X-Forwarded-For"
       - "traefik.http.middlewares.bouncer-appsec.plugin.bouncer.bouncerForwardedHeadersTrustedIps=172.28.0.1/32"
@@ -378,6 +381,7 @@ services:
       - "traefik.http.routers.waf-only.middlewares=bouncer-waf-only@docker"
       - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.appsecEnabled=true"
       - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.appsecHost=crowdsec:7422"
+      - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.appsecUnhealthyBackOffPeriodSecs=0"
       - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.appsecKey=c51a1c70000000000000000000000005"
       - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.bouncerEnabled=true"
       - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.bouncerForwardedHeadersCustomName=X-Forwarded-For"
@@ -392,6 +396,7 @@ services:
       - "traefik.http.routers.waf-fail-ban.middlewares=bouncer-waf-fail-ban@docker"
       - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.appsecEnabled=true"
       - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.appsecHost=crowdsec:9"
+      - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.appsecUnhealthyBackOffPeriodSecs=0"
       - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.appsecHttpTimeoutSeconds=2"
       - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.bouncerappsecfailureaction=ban"
       - "traefik.http.middlewares.bouncer-waf-fail-ban.plugin.bouncer.bouncerEnabled=true"
@@ -411,6 +416,7 @@ services:
       - "traefik.http.routers.waf-fail-pass.middlewares=bouncer-waf-fail-pass@docker"
       - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.appsecEnabled=true"
       - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.appsecHost=crowdsec:9"
+      - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.appsecUnhealthyBackOffPeriodSecs=0"
       - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.appsecHttpTimeoutSeconds=2"
       - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.bouncerappsecfailureaction=passthrough"
       - "traefik.http.middlewares.bouncer-waf-fail-pass.plugin.bouncer.bouncerEnabled=true"
@@ -480,6 +486,7 @@ services:
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.appsecEnabled=true"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.appsecHost=crowdsec:7423"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.appsecHttpTimeoutSeconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.appsecUnhealthyBackOffPeriodSecs=0"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.bouncerEnabled=true"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.bouncerForwardedHeadersCustomName=X-Forwarded-For"
       - "traefik.http.middlewares.bouncer-bot.plugin.bouncer.bouncerForwardedHeadersTrustedIps=172.28.0.1/32"
@@ -518,6 +525,33 @@ services:
       - "traefik.http.routers.short-captcha.service=whoami"
       - "traefik.http.routers.bot-detection.service=whoami"
       - "traefik.http.routers.origin-scheme.service=whoami"
+
+  waf:
+    image: owasp/modsecurity-crs:4.3.0-apache-alpine-202406090906
+    container_name: "waf-modsec-test"
+    restart: unless-stopped
+    environment:
+      - PARANOIA=1
+      - ANOMALY_INBOUND=5
+      - ANOMALY_OUTBOUND=4
+      - MODSEC_RULE_ENGINE=On
+      - MODSEC_REQ_BODY_LIMIT=10485760
+      - MODSEC_REQ_BODY_NOFILES_LIMIT=1048576
+      - MODSEC_AUDIT_ENGINE=Off
+      - "REMOTEIP_INT_PROXY=10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
+    volumes:
+      - ./crs-apache/httpd-vhosts.drain.conf:/usr/local/apache2/conf/extra/httpd-vhosts.conf:ro
+    labels:
+      - "traefik.enable=false"
+
+  waf-5xx:
+    image: nginx:alpine
+    container_name: "waf-5xx-test"
+    restart: unless-stopped
+    volumes:
+      - ./waf-5xx.conf:/etc/nginx/conf.d/default.conf:ro
+    labels:
+      - "traefik.enable=false"
 
   dragonfly:
     image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2

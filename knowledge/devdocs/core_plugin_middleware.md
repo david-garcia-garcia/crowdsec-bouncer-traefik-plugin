@@ -7,19 +7,23 @@ The reclaim value for one CrowdSec LAPI/CAPI decisions backend. Opened by owners
 _Avoid_: CrowdsecConnection, AppSec client, Bouncer, Plugin, process singleton, `sync.Once`, first-wins settings hash, PeekLivePrefix
 
 **AppSec Client**:
-The reclaim value for one CrowdSec AppSec listener: replaceable HTTP+auth, host, body limit. Keyed by middleware name plus listener knobs including TLS and `appsecHttpTimeoutSeconds`. Not the LAPI Client.
+The reclaim value for one CrowdSec AppSec listener: replaceable HTTP+auth, host, body limit. Keyed by middleware name plus listener knobs including TLS, `appsecHttpTimeoutSeconds`, and the unhealthy-backoff knobs. Not the LAPI Client.
 _Avoid_: CrowdsecConnection, LAPI, `AppsecQuery` on the LAPI type, `atomic.Pointer[T]`
 
 **Captcha Client**:
 The reclaim value for one named captcha widget, verifier, template, and gate. Opened by ownership key (middleware name plus instance-owned captcha knobs including the recaptcha-enterprise knobs and `logLevel`, `logFilePath`, `logFormat`). Not a Bouncer field and not the slot name.
 _Avoid_: per-Bouncer captcha, local construct on bounce-only, storing the remediation header on Client, siteverify-only client
 
+**ModSec Client**:
+The reclaim value for one OWASP CRS sidecar inspect listener (`pkg/modsecurity`). Opened by ownership key (middleware name plus sidecar URL, timeout, body limit, deny-verbs, and unhealthy-backoff knobs). Not the AppSec Client and not CrowdSec AppSec JSON.
+_Avoid_: AppSec client, `modSecurityUrl`, FailMode as ownership, `atomic.Pointer[T]`
+
 **Stream session**:
 The CrowdSec bouncer row this process polls: LAPI scheme, host, and path plus lapiKey (CAPI machine and password in alone), plus canonical stream scopes and Redis when enabled. Interval knobs are the Client, not the session.
 _Avoid_: slot name, IdentityHex as the Open suffix, `bouncerDecisionScopeHeaders`, AppSec host, PeekLivePrefix
 
 **Bouncer**:
-The per-router `http.Handler` Traefik gets back from `New`. Holds `next`, request policy, and three optional `atomic.Value` bindings (LAPI, AppSec, and captcha). `ServeHTTP` only Loads those fields. Mode comes from the loaded LAPI client.
+The per-router `http.Handler` Traefik gets back from `New`. Holds `next`, request policy, and four optional `atomic.Value` bindings (LAPI, AppSec, captcha, and ModSec). `ServeHTTP` only Loads those fields. Mode comes from the loaded LAPI client.
 _Avoid_: ForRoute, Plugin core, the reclaim value, `atomic.Pointer[T]`
 
 **Remediation header**:
@@ -27,12 +31,12 @@ The optional outgoing response header named by `bouncerRemediationHeadersCustomN
 _Avoid_: solved-captcha, single-token `ban`/`captcha`, copying raw AppSec `action`, storing the name on captcha.Client
 
 **Failure action**:
-The operator enum (`passthrough` | `ban` | `captcha`) this plugin applies when LAPI or AppSec does not return a usable verdict. LAPI action is per-router on Bouncer; AppSec action is per-router on Bouncer. Default is `ban`.
+The operator enum (`passthrough` | `ban` | `captcha`) this plugin applies when an admitted LAPI or AppSec hop does not return a usable verdict. LAPI action is per-router on Bouncer; AppSec action is per-router on Bouncer. Default is `ban`. An AppSec Gate skip is not this enum (`core_plugin_appsec.md`). ModSec uses FailMode, not this enum (`core_plugin_modsecurity_inspect.md`).
 _Avoid_: fail mode, FailMode, the three removed AppSec block bools, AppSec JSON `action: captcha`, LAPI Client identity
 
 **Action rule**:
-One authoring row on `bouncerActionRules` (unique `name`, `action` tokens, plus httprule predicates). All matching rows contribute. Ban remediates immediately; otherwise OR skipLapi / skipAppsec / captchaFlag. Not a trusted-IP skip, not CrowdSec identity, not the outgoing remediation header.
-_Avoid_: first-match-wins, `bouncerAppsecBypassRules`, `bouncerLapiBypassRules`, `bouncerDecisionHeader`
+One authoring row on `bouncerActionRules` (unique `name`, `action` tokens, plus httprule predicates). All matching rows contribute. Ban remediates immediately; otherwise OR skipLapi / skipAppsec / skipModsec / captchaFlag. Not a trusted-IP skip, not CrowdSec identity, not the outgoing remediation header.
+_Avoid_: first-match-wins, `bouncerAppsecBypassRules`, `bouncerLapiBypassRules`, `bouncerDecisionHeader`, `modsecBypassRules`
 
 **Config snapshot**:
 `New`'s own shallow copy of Traefik's `rawConfig` (`config := *rawConfig`). Everything downstream of `New` reads and writes `config`: normalised `logLevel`, the `Prepare` secret resolution, alone-mode LAPI rewrite. Its slice and map fields still alias the caller's.
@@ -43,7 +47,7 @@ The `context.WithCancel` child of the constructor `ctx` that every reclaim `Open
 _Avoid_: `context.Background()` as the bind parent, a Release API on the table, a closure-captured success bool
 
 **Two configuration axes**:
-`lapiEnabled` owns a LAPI client; `appsecEnabled` owns an AppSec client; `captchaEnabled` owns a captcha client; `bouncerEnabled` only bounces. `lapiMode` is the owned LAPI fetch strategy (`live` | `stream` | `none` | `alone`). AppSec-only is LAPI flag false plus AppSec flag true. `lapiMode: appsec` is rejected.
+`lapiEnabled` owns a LAPI client; `appsecEnabled` owns an AppSec client; `captchaEnabled` owns a captcha client; `modsecEnabled` owns a ModSec client; `bouncerEnabled` only bounces. `lapiMode` is the owned LAPI fetch strategy (`live` | `stream` | `none` | `alone`). AppSec-only is LAPI flag false plus AppSec flag true. `lapiMode: appsec` is rejected.
 _Avoid_: treating mode as which legs run, implying AppSec from mode, crowdsecMode, enabled as own, implicit captcha own from provider
 
 ## Overview
@@ -53,22 +57,22 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 ## How to use
 
 - Keep `CreateConfig` / `New` on the module root (`plugin.go`).
-- Keep `pluginVersion` in root `version.go` (release workflow bumps it). Pass it into `lapi.New` and `appsec.New`.
+- Keep `pluginVersion` in root `version.go` (release workflow bumps it). Pass it into `lapi.New`, `appsec.New`, and `modsecurity.New`.
 - Snapshot first: `config := *rawConfig`, then work on `&config` for the rest of `New`. Never write through Traefik's pointer.
 - After the snapshot, do not copy leftover YAML keys or peer aliases into `BouncerBanFilePath` / `CaptchaFilePath`. Traefik’s decode of those two fields is the only owner.
 - Derive `bindCtx, releaseHolders := context.WithCancel(ctx)` before the first `Open`, and release it from a `defer` that fires only when the named `err` is non-nil.
-- Call `lapi.Prepare` then `appsec.Prepare` then `captcha.Prepare` (each fills an omitted instance name when that leg is owned; AppSec key/scheme copy only when AppSec is enabled). When `lapiEnabled`: `lapi.Open` (do not read `lapiMode` to pick an entry point; mode stays on `Config`). When `appsecEnabled`: `appsec.Open`. When `captchaEnabled`: `captcha.Open`. Then `reclaim.SetAlias` with group `lapi`/`appsec`/`captcha`. When this `New` did not Open a leg, `reclaim.ClearPublisher(name, group)`. `bouncer.New` takes subscribe flags, not client pointers. `Watch` after New. Open key: `core_plugin_lapi_reclaim-key.md`. Stream `scopes=`: `core_plugin_lapi_scope-union.md`. Slots: `core_plugin_middleware_instance-slots.md`.
-- `ServeHTTP` Loads `atomic.Value` only. A missing subscribed LAPI or AppSec client uses that leg's failure action. A missing subscribed captcha client bans a captcha verdict. Do not block `New`. Do not put a startup flag on the client.
+- Call `lapi.Prepare` then `appsec.Prepare` then `captcha.Prepare` then `modsecurity.Prepare` (each fills an omitted instance name when that leg is owned; AppSec key/scheme copy only when AppSec is enabled). When `lapiEnabled`: `lapi.Open` (do not read `lapiMode` to pick an entry point; mode stays on `Config`). When `appsecEnabled`: `appsec.Open`. When `captchaEnabled`: `captcha.Open`. When `modsecEnabled`: `modsecurity.Open`. Then `reclaim.SetAlias` with group `lapi`/`appsec`/`captcha`/`modsec`. A later claim failure `ClearPublisher`s already-published groups in open order. When this `New` did not Open a leg, `reclaim.ClearPublisher(name, group)`. `bouncer.New` takes subscribe flags, not client pointers. `Watch` after New. Open key: `core_plugin_lapi_reclaim-key.md`. Stream `scopes=`: `core_plugin_lapi_scope-union.md`. Slots: `core_plugin_middleware_instance-slots.md`.
+- `ServeHTTP` Loads `atomic.Value` only. Order after trusted-IP and action-rule ban: LAPI, AppSec, ModSec, `next`. A missing subscribed LAPI or AppSec client uses that leg's failure action. A missing subscribed captcha client bans a captcha verdict. A missing subscribed ModSec client uses that router's FailMode (`core_plugin_modsecurity_inspect.md`). Do not block `New`. Do not put a startup flag on the client.
 - When a captcha owner Opens the captcha `http.Client`, set `Timeout` from `cfg.CaptchaSiteverifyHTTPTimeoutSeconds`. Siteverify and assessments share that client. Publish it. Do not construct captcha on bounce-only.
-- Put stream tickers, replaceable LAPI HTTP (`transport` on `atomic.Value`), and Range membership on `lapi.Client`. Open the DecisionStore on the same `New` ctx (`core_plugin_decisionstore.md`). Put AppSec HTTP+auth on `appsec.Client`. Put captcha widget, verifier, template, and gate on `captcha.Client`. Put ban templates, LAPI failure action, Redis fail-closed, live-cache TTL, and this router’s remediation header on Bouncer. Timeout/TLS changes are a new ownership key, not Adopt-only.
+- Put stream tickers, replaceable LAPI HTTP (`transport` on `atomic.Value`), and Range membership on `lapi.Client`. Open the DecisionStore on the same `New` ctx (`core_plugin_decisionstore.md`). Put AppSec HTTP+auth and the AppSec admission gate on `appsec.Client`. Put captcha widget, verifier, template, and gate on `captcha.Client`. Put sidecar HTTP, body pool, deny-verbs, and the ModSec admission gate on `modsecurity.Client`. Put ban templates, LAPI failure action, AppSec failure action, ModSec FailMode, Redis fail-closed, live-cache TTL, and this router’s remediation header on Bouncer. Timeout/TLS/backoff changes are a new ownership key, not Adopt-only.
 - Format the remediation header in `pkg/bouncer/remediation_header.go` (`formatRemediationHeader`). Join `kind:reason`; append encoded origin only when reason is `lapi` and origin is non-empty. Strip CR/LF/TAB from origin; rewrite only the prefix `lists:` → `lists_`. Map plugin `OriginPlugin*` and AppSec specials to closed reason tokens, never a third field. Empty kind or reason MUST NOT invent `allow: pass`. Pass the already-formatted challenge-page value into `captcha.Client.ServeHTTP`; Pass 302 and `WriteSolvedRedirect` write `captcha:solved` inside captcha. Do not emit this header on pass, bypass, trusted, passthrough, remap-to-pass, widget-asset, valid gate-cookie origin GET, or disabled.
 - Do not pass `config.LapiDefaultDecisionSeconds` from the bouncer into `LiveLookup`; the bound client already has it.
 - Resolve client IP with `pkg/ip.GetRemoteIP`. Pass that string and `ipAddr` into `clientrequest.New` (`core_plugin_clientrequest_inbound-request.md`). Keep the name `req`.
-- After the trusted-client skip, fold `bouncerActionRules` (`core_plugin_middleware_action-rules.md`). Any matching ban remediates immediately. Else skip LAPI and/or AppSec and/or set a captcha flag. Captcha is not an early return.
+- After the trusted-client skip, fold `bouncerActionRules` (`core_plugin_middleware_action-rules.md`). Any matching ban remediates immediately. Else skip LAPI and/or AppSec and/or ModSec and/or set a captcha flag. Captcha is not an early return. Trusted clients skip LAPI, AppSec, and ModSec.
 - Compile `bouncerActionRules` once in `bouncer.New` via `httprule.NewActionSet` (`core_plugin_httprule.md`). Do not compile on the request path. Path owner is `req.URL.Path` as `net/http` decoded it; do not rebuild from `RequestURI`, `EscapedPath`, or AppSec forwarded URI. Host owner is the hostname of `req.Host` (`net.SplitHostPort` when that succeeds). Do not hash this list into LAPI ownership or AppSec identity.
 - Range and header-mapped CrowdSec scopes live in `pkg/decisionscope`. Do not geolocate in `New` or `ServeHTTP`.
-- Live LAPI error and stream-unhealthy cache miss use `bouncerLapiFailureAction`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled).
-- Watch logs `reclaim_put|bind|orphan|reclaim|dispose` and `crowdsec lapi instance|crowdsec appsec instance|crowdsec captcha instance|crowdsec bouncer bound|crowdsec bouncer unbound`.
+- Live LAPI error and stream-unhealthy cache miss use `bouncerLapiFailureAction`. Cache hits still apply when the stream is unhealthy. `passthrough` uses the pass path (AppSec still runs if enabled). An AppSec Gate skip does not apply FailureAction and continues to ModSec if subscribed (`core_plugin_appsec.md`).
+- Watch logs `reclaim_put|bind|orphan|reclaim|dispose` and `crowdsec lapi instance|crowdsec appsec instance|crowdsec captcha instance|crowdsec modsec instance|crowdsec bouncer bound|crowdsec bouncer unbound`.
 
 ## Pattern snippet
 
@@ -78,6 +82,7 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 	_ = lapi.Prepare(&config, log, name)
 	_ = appsec.Prepare(&config, log, name)
 	_ = captcha.Prepare(&config, log, name)
+	_ = modsecurity.Prepare(&config, log, name)
 	bindCtx, releaseHolders := context.WithCancel(ctx)
 	defer func() {
 		if err != nil {
@@ -88,7 +93,7 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 		lapiClient, err = lapi.Open(bindCtx, &config, log, name, pluginVersion)
 	}
 	err = reclaim.SetAlias(lapi.OwnershipKey(&config, name), instanceAlias("lapi", config.LapiInstanceName), name, "lapi")
-	handler, err = bouncer.New(next, name, &config, subscribeLAPI, subscribeAppSec, subscribeCaptcha, log)
+	handler, err = bouncer.New(next, name, &config, subscribeLAPI, subscribeAppSec, subscribeCaptcha, subscribeModsec, log)
 	return handler, err
 }
 ```
@@ -101,9 +106,11 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 - `pkg/lapi/client_http.go`
 - `pkg/lapi/client_live.go`
 - `pkg/appsec/`
+- `pkg/modsecurity/`
 - `pkg/captcha/captcha.go`
 - `pkg/captcha/session.go`
 - `pkg/bouncer/bouncer.go`
+- `pkg/bouncer/bouncer_leg_modsec.go`
 - `pkg/bouncer/remediation_header.go`
 - `pkg/clientrequest/request.go`
 - `pkg/httprule/`
@@ -111,14 +118,14 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 
 ## Gotchas
 
-- Unused keys (`banHtmlFilePath`, `captchaHtmlFilePath`, leftover `bouncerCaptcha*`, leftover `bouncerAppsecExcludeRegex` / `bouncerLapiExcludeRegex`, leftover `bouncerAppsecBypassRules` / `bouncerLapiBypassRules` / `bouncerDecisionHeader`, HTML-cased twins) never reach `New` (Traefik v3.7.11 drops them). Operators who set only those keys get CreateConfig defaults (`BouncerBanFilePath` empty, `CaptchaFilePath` `/captcha.html`). Do not re-add Config fields or `New` copies to catch leftovers. A leftover pre-prefix `captchaFilePath` binds `CaptchaFilePath` again (the captcha stem, not an alias).
+- Unused keys (`banHtmlFilePath`, `captchaHtmlFilePath`, leftover `bouncerCaptcha*`, leftover `bouncerAppsecExcludeRegex` / `bouncerLapiExcludeRegex`, leftover `bouncerAppsecBypassRules` / `bouncerLapiBypassRules` / `bouncerDecisionHeader`, source-plugin `modSecurityUrl`, HTML-cased twins) never reach `New` (Traefik v3.7.11 drops them). Operators who set only those keys get CreateConfig defaults (`BouncerBanFilePath` empty, `CaptchaFilePath` `/captcha.html`). Do not re-add Config fields or `New` copies to catch leftovers. A leftover pre-prefix `captchaFilePath` binds `CaptchaFilePath` again (the captcha stem, not an alias).
 - The reclaim table has no Release: a holder goes away only when the context it bound is Done (`std_go_reclaim.md`). That is why `New` opens on `bindCtx` — with Traefik's own long-lived ctx, a constructor that failed after `Open` left the stream ticker polling LAPI for the process lifetime.
 - Do not release `bindCtx` on the success path, and do not parent it on `context.Background()`: the first disposes the incarnation the handler is about to use, the second survives a Traefik shutdown.
 - `lapiMode: appsec` is invalid (E4). AppSec-only is `lapiEnabled: false` plus `appsecEnabled: true`.
 - When `appsecEnabled` is true, `ValidateParams` rejects an empty `appsecHost` (`http.NewRequest` accepts `http:///`). Disabled-AppSec empty host still passes. Do not require the host in `validateURL` or `validateParamsRequired`.
-- Ownership Open key includes middleware name plus client knobs (LAPI: mode, URL, key, TLS, `lapiHttpTimeoutSeconds`, Redis, stream scopes, CAPI, intervals, `lapiUpdateMaxFailure`, `lapiDefaultDecisionSeconds`). Slot name, `bouncerEnabled`, `bouncerDecisionScopeHeaders`, `bouncerAppsecFailureAction`, and action rules are not in it. AppSec key includes middleware name plus listener knobs including TLS and `appsecHttpTimeoutSeconds`. Captcha key includes middleware name plus instance-owned captcha knobs (provider, keys, files, timeouts, template, gate, custom paths, recaptcha-enterprise knobs, `logLevel`, `logFilePath`, `logFormat`). Slot name, bounce, failure actions, remediation header, and action rules stay off it. `core_plugin_lapi_reclaim-key.md`. `pkg/captcha/session.go`.
-- `bouncerLapiFailureAction` is per-router on Bouncer. `bouncerAppsecFailureAction` stays on Bouncer. Two routers on one published client MAY disagree. Action rules are the same: two routers MAY disagree, and they are not in reclaim keys.
+- Ownership Open key includes middleware name plus client knobs (LAPI: mode, URL, key, TLS, `lapiHttpTimeoutSeconds`, Redis, stream scopes, CAPI, intervals, `lapiUpdateMaxFailure`, `lapiDefaultDecisionSeconds`). Slot name, `bouncerEnabled`, `bouncerDecisionScopeHeaders`, `bouncerAppsecFailureAction`, `bouncerModsecFailMode`, and action rules are not in it. AppSec key includes middleware name plus listener knobs including TLS, `appsecHttpTimeoutSeconds`, and the unhealthy-backoff knobs. ModSec key includes middleware name plus sidecar URL, timeout, body limit, deny-verbs, and unhealthy-backoff knobs (`core_plugin_modsecurity_client.md`). Captcha key includes middleware name plus instance-owned captcha knobs (provider, keys, files, timeouts, template, gate, custom paths, recaptcha-enterprise knobs, `logLevel`, `logFilePath`, `logFormat`). Slot name, bounce, failure actions, FailMode, remediation header, and action rules stay off it. `core_plugin_lapi_reclaim-key.md`. `pkg/captcha/session.go`.
+- `bouncerLapiFailureAction` is per-router on Bouncer. `bouncerAppsecFailureAction` stays on Bouncer. `bouncerModsecFailMode` stays on Bouncer. Two routers on one published client MAY disagree. Action rules are the same: two routers MAY disagree, and they are not in reclaim keys.
 - Stream/alone: CrowdSec stores one `GET /v1/decisions/stream` cursor per hashed API key plus the IP LAPI sees. Two stream owners with the same host and key log `crowdsec lapi stream collision` and both `New` succeed. DecisionStore key is `SessionHex` (canonical stream scopes; Redis block only when enabled). Subscribers must not Bind reclaim. Isolated backends still need a second bouncer key unless they only subscribe.
-- LAPI `Close()` stops tickers and idle LAPI HTTP. It does not Close the shared DecisionStore unless this incarnation still owns it. AppSec `Close()` releases idle AppSec HTTP. Do not use `sync.Once`.
+- LAPI `Close()` stops tickers and idle LAPI HTTP. It does not Close the shared DecisionStore unless this incarnation still owns it. AppSec `Close()` Closes a non-nil admission gate and idle AppSec HTTP. ModSec `Close()` Closes a non-nil admission gate and idle sidecar HTTP. Do not use `sync.Once`.
 - Both puts use `Open` / `OpenWithHooks` on the process table. First `New` sets table grace from `reclaimGraceSeconds` (default 30). Utilities `DefaultGrace` (10s) is only the table’s negative-grace fallback.
-- Backend Create/Close at INFO (`crowdsec lapi instance started|closed`); Sleep/Wake at DEBUG. Watch calls `func(any)` with `reclaim.Published` when the published client changes. `ReceiveLAPI` / `ReceiveAppSec` / `ReceiveCaptcha` store that value and log bound at INFO and unbound at DEBUG once per pointer. `ReceiveLAPI` warns `crowdsec bouncer stream scopes missing`. `ServeHTTP` only Loads. DecisionStore INFO uses `storeKey` and `engine`. `reclaim_put`, `reclaim_reclaim`, and `reclaim_dispose` stay DEBUG. Stream poll stems are DEBUG. `startup` is an attribute on poll/updated (`true` for the full-set GET).
+- Backend Create/Close at INFO (`crowdsec lapi instance started|closed`); Sleep/Wake at DEBUG. Watch calls `func(any)` with `reclaim.Published` when the published client changes. `ReceiveLAPI` / `ReceiveAppSec` / `ReceiveCaptcha` / `ReceiveModSec` store that value and log bound at INFO and unbound at DEBUG once per pointer. `ReceiveLAPI` warns `crowdsec bouncer stream scopes missing`. `ServeHTTP` only Loads. DecisionStore INFO uses `storeKey` and `engine`. `reclaim_put`, `reclaim_reclaim`, and `reclaim_dispose` stay DEBUG. Stream poll stems are DEBUG. `startup` is an attribute on poll/updated (`true` for the full-set GET).

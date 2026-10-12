@@ -279,10 +279,10 @@ func TestNewActionSet_zipsTokensWithMatching(t *testing.T) {
 	if len(hits) != 2 || hits[0] != 0 || hits[1] != 1 {
 		t.Fatalf("Matching=%v want [0 1]", hits)
 	}
-	if !set.SkipLapi(0) || set.SkipAppsec(0) || set.Ban(0) {
+	if !set.SkipLapi(0) || set.SkipAppsec(0) || set.SkipModsec(0) || set.Ban(0) {
 		t.Fatal("index 0 must be bypassLapi only")
 	}
-	if set.SkipLapi(1) || !set.SkipAppsec(1) {
+	if set.SkipLapi(1) || !set.SkipAppsec(1) || set.SkipModsec(1) {
 		t.Fatal("index 1 must be bypassAppsec only")
 	}
 	if set.Name(0) != "lapi" || set.Name(1) != "appsec" {
@@ -308,7 +308,7 @@ func TestActionSet_fold(t *testing.T) {
 		t.Fatalf("miss Fold=%+v", miss)
 	}
 	got := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/abc", nil))
-	want := ActionMatch{BanName: "first-ban", CaptchaName: "wide-captcha", SkipAppsec: true, SkipLapi: true}
+	want := ActionMatch{BanName: "first-ban", CaptchaName: "wide-captcha", SkipAppsec: true, SkipLapi: true, SkipModsec: true}
 	if got != want {
 		t.Fatalf("Fold=%+v want %+v", got, want)
 	}
@@ -323,7 +323,25 @@ func TestNewActionSet_bypassTokenSkipsBothLegs(t *testing.T) {
 	if len(hits) != 1 || hits[0] != 0 {
 		t.Fatalf("Matching=%v want [0]", hits)
 	}
-	if !set.SkipLapi(0) || !set.SkipAppsec(0) || !set.Captcha(0) || set.Ban(0) {
-		t.Fatal("bypass must skip both legs and keep captcha")
+	if !set.SkipLapi(0) || !set.SkipAppsec(0) || !set.SkipModsec(0) || !set.Captcha(0) || set.Ban(0) {
+		t.Fatal("bypass must skip LAPI, AppSec, and ModSec and keep captcha")
+	}
+}
+
+func TestNewActionSet_bypassModsecToken(t *testing.T) {
+	set := mustNewActionSet(t, []ActionRule{
+		{Name: "healthz", Action: []string{ActionBypassModsec}, Rule: Rule{Path: "^/healthz$"}},
+	})
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/healthz", nil)
+	hits := set.Matching(req)
+	if len(hits) != 1 || hits[0] != 0 {
+		t.Fatalf("Matching=%v want [0]", hits)
+	}
+	if set.SkipLapi(0) || set.SkipAppsec(0) || !set.SkipModsec(0) {
+		t.Fatal("bypassModsec must skip only ModSec")
+	}
+	got := set.Fold(req)
+	if !got.SkipModsec || got.SkipLapi || got.SkipAppsec {
+		t.Fatalf("Fold=%+v", got)
 	}
 }

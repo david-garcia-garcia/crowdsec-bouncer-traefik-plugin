@@ -2,6 +2,7 @@
 # lapi: request decisions from LAPI (stream and live modes, ban, scopes, trusted IPs, metrics).
 # appsec: AppSec, captcha, and the Redis decision cache.
 # lifecycle: instance severance (late bind, reclaim, name collisions).
+# modsec: inspect-only Apache CRS sidecar (allow, CRS block, body, deny GET-with-body, failMode, backoff, skip).
 # Local `make e2e_pester` still runs every file. Each CI job runs one domain.
 
 $script:PesterDomainFiles = @{
@@ -26,6 +27,9 @@ $script:PesterDomainFiles = @{
     )
     lifecycle = @(
         'instance_severance.Tests.ps1'
+    )
+    modsec = @(
+        'modsec.Tests.ps1'
     )
 }
 

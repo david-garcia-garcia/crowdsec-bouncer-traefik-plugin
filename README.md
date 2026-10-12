@@ -7,7 +7,7 @@
 
 ## What this plugin is
 
-A CrowdSec bouncer for Traefik. For every request it decides, based on CrowdSec, whether to let the visitor through, ban them, or show them a captcha. Decisions come from community blocklists, your own CrowdSec detections, and (optionally) the CrowdSec AppSec WAF.
+A CrowdSec bouncer for Traefik. For every request it decides, based on CrowdSec, whether to let the visitor through, ban them, or show them a captcha. Decisions come from community blocklists, your own CrowdSec detections, and (optionally) the CrowdSec AppSec WAF. It can also inspect the same request with an OWASP ModSecurity CRS sidecar (`modsecEnabled`).
 
 It is a rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin). What changed:
 
@@ -23,6 +23,7 @@ It is a rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github
 - **Config reloads apply.** Changing the LAPI host, key, mode, interval, or any other setting takes effect on a Traefik configuration reload. The original plugin kept the first values until Traefik restarted.
 - **IP, IP range, country, ASN, and custom scopes.** The original plugin matched the client IP only.
 - **AppSec independent of the LAPI mode.** A router can run the WAF, the decision lookup, or both.
+- **ModSecurity CRS sidecar.** A fourth inspect leg (`modsecEnabled`) copies the request to an OWASP CRS container. Sidecar 2xx allows the origin; 3xx/4xx is copied as a block. This plugin does not follow sidecar redirects.
 - **Permanent rules with `bouncerActionRules`.** Ban, captcha, or skip checks for requests matching a path, host, method, header, or cookie, without any CrowdSec decision. For example, always show a captcha to a whole country or region by matching a country header such as `CF-IPCountry`, or skip all checks for a specific host. See [BouncerActionRules](#variables).
 - **Detailed verdict header.** `bouncerRemediationHeadersCustomName` now tells not only what was done (ban or captcha) but why and from where: a CrowdSec decision and its origin (`ban:lapi:CAPI`, `ban:lapi:lists_firehol_level1`), AppSec, a rule, or an outage of LAPI or AppSec. Add it to your access logs to trace every blocked request back to its cause. The original plugin only sent `ban` or `captcha`. See [See the verdict in access logs](#see-the-verdict-in-access-logs).
 
@@ -33,8 +34,7 @@ It is a rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github
 > The basic middlewares you need to secure your Traefik ingress:
 >
 > - 🌍 **Geoblock**: [david-garcia-garcia/traefik-geoblock](https://github.com/david-garcia-garcia/traefik-geoblock) - Block or allow requests based on IP geolocation
-> - 🛡️ **CrowdSec**: [david-garcia-garcia/crowdsec-bouncer-traefik-plugin](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin) - Real-time threat intelligence and automated blocking
-> - 🔒 **ModSecurity CRS**: [david-garcia-garcia/traefik-modsecurity](https://github.com/david-garcia-garcia/traefik-modsecurity) - Web Application Firewall with OWASP Core Rule Set
+> - 🛡️ **CrowdSec**: [david-garcia-garcia/crowdsec-bouncer-traefik-plugin](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin) - Real-time threat intelligence, AppSec, captcha, and optional ModSecurity CRS inspect
 > - 🚦 **Ratelimit**: [Traefik Rate Limit](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/ratelimit/) - Control request rates and prevent abuse
 
 > [!WARNING]
@@ -57,6 +57,7 @@ A few CrowdSec terms used in this README:
 - **LAPI** (Local API): the CrowdSec service that stores decisions ("ban this IP for 4 hours"). This plugin reads decisions from it.
 - **CAPI** (Central API): CrowdSec's cloud service that distributes the community blocklist.
 - **AppSec**: CrowdSec's WAF component. It inspects a single request and answers allow or block.
+- **ModSec**: an optional OWASP ModSecurity CRS sidecar this plugin inspects against, separate from CrowdSec AppSec.
 - **Bouncer**: a component that enforces decisions. This plugin is a bouncer.
 
 ## Architecture diagram
@@ -72,6 +73,7 @@ flowchart LR
   LAPI["LAPI"]
   CAPI["CAPI / community lists"]
   AppSec["AppSec"]
+  ModSec["ModSecurity CRS sidecar"]
 
   User -->|"HTTP request"| Traefik
   Traefik -->|"User Http Request"| Plugin
@@ -84,6 +86,8 @@ flowchart LR
   LAPI -->|"decision lookup"| Plugin
   Plugin -.->|"this request?"| AppSec
   AppSec -.->|"allow / block"| Plugin
+  Plugin -.->|"this request?"| ModSec
+  ModSec -.->|"2xx allow / 3xx-4xx block"| Plugin
 ```
 
 Users are blocked based on:
@@ -91,6 +95,7 @@ Users are blocked based on:
 - Remote decisions (threat intelligence)
 - Local decisions from inspecting your Traefik access logs and identifying attack patterns
 - AppSec WAF
+- Optional ModSecurity CRS sidecar inspect (`modsecEnabled`)
 
 This plugin only enforces decisions. It does not read logs; CrowdSec does that and produces the decisions.
 
@@ -200,10 +205,11 @@ A middleware can do two jobs:
    | LAPI (decisions) | `lapiEnabled: true` | `lapiInstanceName` |
    | AppSec (WAF) | `appsecEnabled: true` | `appsecInstanceName` |
    | Captcha provider | `captchaEnabled: true` | `captchaInstanceName` |
+   | ModSecurity CRS sidecar | `modsecEnabled: true` | `modsecInstanceName` |
 
 2. **Protect** the router it is attached to (`bouncerEnabled: true`), using the connections it names.
 
-A middleware that only protects sets `bouncerEnabled: true` plus the instance names it wants to use, and leaves the `*Enabled` connection flags off. It does not repeat the host, key, or interval: those live on the middleware that connects. It keeps its own request settings (status code, captcha, trusted IPs, behavior when CrowdSec is down, response headers). LAPI, AppSec, and captcha names are independent, so all three can be called `shared`.
+A middleware that only protects sets `bouncerEnabled: true` plus the instance names it wants to use, and leaves the `*Enabled` connection flags off. It does not repeat the host, key, or interval: those live on the middleware that connects. It keeps its own request settings (status code, captcha, trusted IPs, behavior when CrowdSec is down, ModSec fail mode, response headers). LAPI, AppSec, captcha, and ModSec names are independent, so all four can be called `shared`.
 
 ```mermaid
 flowchart LR
@@ -400,6 +406,28 @@ Clients listed in `bouncerClientTrustedIps` skip the plugin entirely, including 
 
 Do not leave a header that visitors can set on a public route: anyone could ban or captcha their own requests. Either have an earlier middleware set the header only for traffic you control, or use it on a staging router and remove it afterwards.
 
+### Inspect requests with a ModSecurity CRS sidecar
+
+Turn on the ModSec leg on the middleware that owns the sidecar HTTP client (`modsecEnabled: true`) and point `modsecUrl` at an inspect-only OWASP CRS container (Apache or nginx). The plugin copies the inbound request to that URL. Sidecar **2xx** lets the request continue to the origin. Sidecar **3xx or 4xx** is copied back to the visitor as a block (hop-by-hop headers and `Server` are omitted). Sidecar **5xx** or a transport error uses `bouncerModsecFailMode`: `open` (default) continues to the origin; `close` writes an empty HTTP 502.
+
+The sidecar URL, timeout, body limit, deny-verbs list, and backoff knobs belong to the owner. Fail mode is per router. A bounce-only middleware sets `modsecInstanceName` and `bouncerEnabled: true` without repeating `modsecUrl`.
+
+```yaml
+cs-modsec:
+  plugin:
+    bouncer:
+      bouncerEnabled: true
+      bouncerModsecFailMode: open
+      lapiEnabled: true
+      lapiHost: crowdsec:8080
+      lapiKey: "..."
+      lapiMode: stream
+      modsecEnabled: true
+      modsecUrl: http://waf:8080
+```
+
+`bypass` and `bypassModsec` skip this inspect. `modsecUnhealthyBackOffPeriodSecs` defaults to `0` (every request still reaches the sidecar). AppSec skip-after-trip is different: omitted `appsecUnhealthyBackOffPeriodSecs` is `30`, so after enough AppSec failures the gate skips AppSec and does **not** apply `bouncerAppsecFailureAction`. Set `appsecUnhealthyBackOffPeriodSecs: 0` to keep per-request FailureAction with no skip.
+
 You can also test with a real decision: see [Manually add an IP to the blocklist](#manually-add-an-ip-to-the-blocklist-for-testing-purposes).
 
 ### See the verdict in access logs
@@ -476,7 +504,7 @@ The router needs a captcha configured; otherwise the remapped captcha is served 
 
 ### Let a LAN or VPN through
 
-`bouncerClientTrustedIps` lets these client addresses skip all checks, AppSec included. See [examples/trusted-ips](examples/trusted-ips/README.md).
+`bouncerClientTrustedIps` lets these client addresses skip all checks, including LAPI, AppSec, and ModSec. See [examples/trusted-ips](examples/trusted-ips/README.md).
 
 ```yaml
 bouncerClientTrustedIps:
@@ -652,11 +680,23 @@ PEM client private key presented to AppSec.
 **AppsecTLSInsecureVerify** (bool, default `false`)
 Do not verify AppSec's certificate. Not for production.
 
+**appsecUnhealthyBackOffPeriodSecs** (int64, default `30`)
+Seconds of cooldown after AppSec trips the admission gate. `0` disables the gate so every request still calls AppSec and uses `bouncerAppsecFailureAction` on a miss. The default `30` skips AppSec after a trip (pass) instead of applying FailureAction.
+
+**appsecUnhealthyFailureRatio** (float, default `0.30`)
+Failure ratio for the AppSec admission gate. `0` leaves the packaged default. Only used when the backoff period is greater than `0`.
+
+**appsecUnhealthyFailureThreshold** (int64, default `5`)
+Consecutive AppSec failures that trip the gate. Only used when the backoff period is greater than `0`.
+
+**appsecUnhealthyMaxBackOffPeriodSecs** (int64, default `0`)
+Cap on the AppSec gate cooldown. `0` keeps the cooldown equal to `appsecUnhealthyBackOffPeriodSecs`.
+
 **BouncerActionRules** ([]object, default `[]`)
 Rules that, for matching requests, skip checks or force a ban or captcha. Each rule has a unique `name` (no `:`), conditions, and an `action` list.
 
 - Conditions (all optional, all must match): `method`, `path`, `host`, `headers`, `cookies`. Values are regular expressions matched anywhere in the value, so anchor them (`^/health$`). `method` accepts a leading `!` to negate (`!POST`). An empty header or cookie pattern means "is present". A rule must have at least one condition.
-- Actions: `bypass` (skip LAPI and AppSec), `bypassLapi`, `bypassAppsec`, `captcha`, `ban`. `ban` must be the only action of its rule.
+- Actions: `bypass` (skip LAPI, AppSec, and ModSec), `bypassLapi`, `bypassAppsec`, `bypassModsec`, `captcha`, `ban`. `ban` must be the only action of its rule.
 - Every matching rule applies. A `ban` applies immediately. A `captcha` is shown unless CrowdSec bans the client anyway.
 
 ```yaml
@@ -678,10 +718,10 @@ bouncerActionRules:
 ```
 
 **BouncerAppsecFailureAction** (string, default `ban`)
-What to do when AppSec cannot give an answer (unreachable, error, or request body cannot be read): `ban`, `passthrough`, or `captcha`. See [Choose what happens when CrowdSec is down](#choose-what-happens-when-crowdsec-is-down).
+What to do when AppSec cannot give an answer (unreachable, error, or request body cannot be read): `ban`, `passthrough`, or `captcha`. After the AppSec admission gate trips (default `appsecUnhealthyBackOffPeriodSecs: 30`), later requests skip AppSec and do not apply this action. Set the period to `0` to keep per-request FailureAction. See [Choose what happens when CrowdSec is down](#choose-what-happens-when-crowdsec-is-down).
 
 **BouncerClientTrustedIPs** ([]string, default `[]`)
-Client IPs or ranges that skip all checks, AppSec included (LAN, VPN).
+Client IPs or ranges that skip all checks, AppSec and ModSec included (LAN, VPN).
 
 **BouncerDecisionScopeHeaders** (map[string]string, default `{}`)
 Maps a CrowdSec scope (country, AS, or any custom one) to the request header holding its value. See [Decisions](#decisions).
@@ -700,6 +740,9 @@ IPs or ranges of the proxies in front of Traefik (for example Cloudflare's range
 
 **BouncerLapiFailureAction** (string, default `ban`)
 What to do when LAPI cannot give an answer: `ban`, `passthrough`, or `captcha`. In `live` and `none`, this also applies when a country, AS, or other header-scope lookup fails. See [Choose what happens when CrowdSec is down](#choose-what-happens-when-crowdsec-is-down).
+
+**bouncerModsecFailMode** (string, default `open`)
+Per-router behavior when ModSec inspect fails (sidecar 5xx, transport error, missing client, or a gate skip): `open` continues to the origin, `close` writes an empty HTTP 502. Copied 3xx/4xx blocks are not failMode.
 
 **BouncerOriginBasedDecisionRemap** (map[string]map[string]string, default `{}`)
 Turn bans or captchas from specific origins into a captcha or a pass on this router. See [Show a community ban as a captcha](#show-a-community-ban-as-a-captcha).
@@ -800,8 +843,38 @@ Write logs to this file instead of stdout/stderr. Must be writable by Traefik.
 **LogLevel** (string, default `INFO`)
 `TRACE`, `DEBUG`, `INFO`, `WARN`, or `ERROR`. `TRACE` logs every request; `DEBUG` logs startup, refreshes, and errors.
 
+**modsecBodyLimit** (int64, default `8388608` / 8 MiB)
+Read at most this many bytes of the inbound body before copying it to the ModSec sidecar. `0` means no limit. Deny-verbs and this limit run before the admission gate.
+
+**modsecDenyVerbsWithBody** ([]string, default `HEAD`, `GET`, `DELETE`, `OPTIONS`, `TRACE`, `CONNECT`)
+HTTP methods that must not carry a body. A listed method with a readable body byte is rejected with HTTP 400. An explicit empty list denies nothing. Omitted uses the default list.
+
+**modsecEnabled** (bool, default `false`)
+This middleware connects to the ModSecurity CRS sidecar and shares the connection as `modsecInstanceName`. See [Inspect requests with a ModSecurity CRS sidecar](#inspect-requests-with-a-modsecurity-crs-sidecar).
+
+**modsecHttpTimeoutSeconds** (int64, default `10`)
+Timeout in seconds when contacting the sidecar. Must be at least `1`.
+
+**modsecInstanceName** (string, default the middleware name when owned)
+Name under which the ModSec connection is shared, or which one to use. See [Middleware Architecture](#middleware-architecture).
+
+**modsecUnhealthyBackOffPeriodSecs** (int64, default `0`)
+Seconds of cooldown after the sidecar trips the admission gate. `0` disables the gate (every request still reaches the sidecar). A skip uses `bouncerModsecFailMode`.
+
+**modsecUnhealthyFailureRatio** (float, default `0.30`)
+Failure ratio for the ModSec admission gate. Only used when the backoff period is greater than `0`.
+
+**modsecUnhealthyFailureThreshold** (int64, default `5`)
+Sidecar failures that trip the gate. Only used when the backoff period is greater than `0`.
+
+**modsecUnhealthyMaxBackOffPeriodSecs** (int64, default `0`)
+Cap on the ModSec gate cooldown. `0` keeps the cooldown equal to `modsecUnhealthyBackOffPeriodSecs`.
+
+**modsecUrl** (string, no default)
+Absolute `http` or `https` URL of the inspect-only CRS sidecar, required when `modsecEnabled` is true. `modSecurityUrl` is not accepted.
+
 **ReclaimGraceSeconds** (int64, default `30`)
-How long a LAPI or AppSec connection stays open after no middleware uses it, so a Traefik config reload can reuse it instead of reconnecting. `0` closes it immediately. Only the first value loaded in the Traefik process applies.
+How long a LAPI, AppSec, or ModSec connection stays open after no middleware uses it, so a Traefik config reload can reuse it instead of reconnecting. `0` closes it immediately. Only the first value loaded in the Traefik process applies.
 
 ### Configuration
 

@@ -1,0 +1,146 @@
+# Inspect-only Apache CRS sidecar (modsec leg). Distinct PathPrefix values.
+http:
+  routers:
+    modsec-allow:
+      rule: PathPrefix(`/modsec-allow`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec]
+      service: whoami@docker
+    modsec-crs:
+      rule: PathPrefix(`/modsec-crs`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec]
+      service: whoami@docker
+    modsec-body:
+      rule: PathPrefix(`/modsec-body`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec-body]
+      service: whoami@docker
+    modsec-deny-get:
+      rule: PathPrefix(`/modsec-deny-get`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec]
+      service: whoami@docker
+    modsec-fail-open:
+      rule: PathPrefix(`/modsec-fail-open`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec-fail-open]
+      service: whoami@docker
+    modsec-fail-close:
+      rule: PathPrefix(`/modsec-fail-close`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec-fail-close]
+      service: whoami@docker
+    modsec-backoff:
+      rule: PathPrefix(`/modsec-backoff`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec-backoff]
+      service: whoami@docker
+    modsec-skip:
+      rule: PathPrefix(`/modsec-skip`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec-skip]
+      service: whoami@docker
+  middlewares:
+    bouncer-modsec:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          modsecEnabled: "true"
+          modsecHttpTimeoutSeconds: "10"
+          modsecUrl: http://waf:8080
+          reclaimGraceSeconds: "2"
+    bouncer-modsec-body:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          modsecBodyLimit: "1024"
+          modsecDenyVerbsWithBody: []
+          modsecEnabled: "true"
+          modsecHttpTimeoutSeconds: "10"
+          modsecUrl: http://waf:8080
+          reclaimGraceSeconds: "2"
+    bouncer-modsec-fail-open:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerModsecFailMode: open
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          modsecEnabled: "true"
+          modsecHttpTimeoutSeconds: "2"
+          modsecUrl: http://127.0.0.1:9
+          reclaimGraceSeconds: "2"
+    bouncer-modsec-fail-close:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerModsecFailMode: close
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          modsecEnabled: "true"
+          modsecHttpTimeoutSeconds: "2"
+          modsecUrl: http://127.0.0.1:9
+          reclaimGraceSeconds: "2"
+    bouncer-modsec-backoff:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerModsecFailMode: open
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          modsecEnabled: "true"
+          modsecHttpTimeoutSeconds: "2"
+          modsecUnhealthyBackOffPeriodSecs: "30"
+          modsecUnhealthyFailureThreshold: "1"
+          modsecUrl: http://waf-5xx:80
+          reclaimGraceSeconds: "2"
+    bouncer-modsec-skip:
+      plugin:
+        bouncer:
+          bouncerActionRules:
+            - name: skip-modsec
+              path: ^/modsec-skip/ok
+              action:
+                - bypassModsec
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          modsecEnabled: "true"
+          modsecHttpTimeoutSeconds: "10"
+          modsecUrl: http://waf:8080
+          reclaimGraceSeconds: "2"
