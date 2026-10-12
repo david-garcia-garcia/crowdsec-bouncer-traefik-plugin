@@ -19,17 +19,17 @@ The same Gate is imported onto the AppSec Client. Omitted `appsecUnhealthyBackOf
 **End users.** After AppSec trips unhealthy under the new default gate, later visitors are no longer banned solely because AppSec is down. When operators enable ModSec, sidecar 3xx/4xx becomes a visitor-facing block.
 
 ## Merge readiness
-Ready for review. 0 items remain.
+In progress. 0 items remain.
 
 Priority: P2 — real operator pain with a workaround and limited blast radius
-Reviewed head: 9f7856dc
+Reviewed head: da3b8258
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38300994375 |
+| Overall readiness | 1/6 | Not ready |
+| CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -39,7 +39,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-10-12-modsecurity-leg pushed | `git` |
 | OpenSpec | modsecurity-leg | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/190 | pr-host |
-| CI | build 38300994375 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38300994375 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38300994375 |
+| CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -63,7 +63,7 @@ Worktree:
 None.
 
 ## How this fits together
-Ticket 2026-10-12-modsecurity-leg on branch 2026-10-12-modsecurity-leg targeting 2026-10-04-bouncer-refactor; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/190; CI build 38300994375 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38300994375.
+Ticket 2026-10-12-modsecurity-leg on branch 2026-10-12-modsecurity-leg targeting 2026-10-04-bouncer-refactor; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/190; CI not seen.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -92,7 +92,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 2 added / 6 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 9f7856dc67f5d3ad99357c54458d2d39b9b602a5 | Card must match the branch you measured |
+| Reviewed head | da3b8258def15c3a15007a4a175435b421c9eaad | Card must match the branch you measured |
 
 ### Stored data model
 None.

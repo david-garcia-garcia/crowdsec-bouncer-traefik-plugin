@@ -30,8 +30,8 @@
     },
     "devdocsimpact": {
       "work": true,
-      "card": false,
-      "at": null
+      "card": true,
+      "at": "2026-10-12T20:16:49.300Z"
     },
     "archive": {
       "work": false,
