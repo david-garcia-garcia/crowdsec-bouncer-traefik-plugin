@@ -15,3 +15,10 @@
   Why: honouring a second skip list would add a variation point to a unit whose job is uniform request-rule skips.
   By: explore
   Requester: not asked
+- [x] taken  dest `modsecBodyLimit` `0` unlimited instead of source Prepare fill
+  Asked: absorb traefik-modsecurity (Prepare treats body-size `0` as omit and fills 8 MiB).
+  Instead: omitted default 8 MiB (source CreateConfig); `0` is unlimited like `appsecBodyLimit`.
+  Owner: `pkg/configuration/configuration.go`
+  Why: honouring source zero-means-omit would add a second zero rule next to AppSec's unlimited zero.
+  By: propose
+  Requester: not asked
