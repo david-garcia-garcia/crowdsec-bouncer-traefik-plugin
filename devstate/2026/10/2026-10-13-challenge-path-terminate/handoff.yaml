@@ -1,0 +1,16 @@
+issueKey: 2026-10-13-challenge-path-terminate
+jobName: Terminate internal challenge paths
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: main
+qualify: qualified-with-gaps
+src: fe6acffb5066e8593a6f7d6aab181ff0eb9d8d7353e3c446f8a82d3a0c3d9169
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
