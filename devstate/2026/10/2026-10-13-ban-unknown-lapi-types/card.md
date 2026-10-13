@@ -16,7 +16,7 @@ LAPI ingest maps ban and captcha through RemediationValue and stores every other
 In progress. 0 items remain.
 
 Priority: P1 — unknown LAPI types fail open today
-Reviewed head: 9ff0b95e
+Reviewed head: 9e37dadb
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -39,8 +39,12 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [core_plugin_decisions_scopes](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-ban-unknown-lapi-types/openspec/changes/ban-unknown-lapi-types/proposal.md) — modified
-- [core_plugin_lapi_origin-based-decision-remap](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-ban-unknown-lapi-types/openspec/changes/ban-unknown-lapi-types/proposal.md) — modified
+- [core_plugin_decisions_scopes](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-ban-unknown-lapi-types/openspec/changes/archive/2026-10-13-ban-unknown-lapi-types/proposal.md) — modified
+- [core_plugin_lapi_origin-based-decision-remap](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-ban-unknown-lapi-types/openspec/changes/archive/2026-10-13-ban-unknown-lapi-types/proposal.md) — modified
+
+Completed:
+- [core_plugin_decisions_scopes](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-ban-unknown-lapi-types/openspec/specs/core_plugin_decisions_scopes/spec.md) — modified
+- [core_plugin_lapi_origin-based-decision-remap](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-ban-unknown-lapi-types/openspec/specs/core_plugin_lapi_origin-based-decision-remap/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -77,9 +81,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 9ff0b95efd84261df0f8c075b0dfb9f27742ef86 | Card must match the branch you measured |
+| Reviewed head | 9e37dadbcc49c9a26c358e052beec2ae5b05e8a6 | Card must match the branch you measured |
 
 ### Stored data model
 - DecisionStore (memory and Redis): stream and live ingest now Put kind ban (	) for unknown LAPI types on existing Ip/header keys and Range 
