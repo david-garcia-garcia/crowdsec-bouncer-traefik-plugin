@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: ccfa29d4
+Reviewed head: a6c21fdd
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,14 +32,16 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-10-13-count-challenge-once pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | count-challenge-drop-once | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/197 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-count-challenge-once/openspec/changes/count-challenge-drop-once/proposal.md) — modified
+
 
 ## Deviations from the ask
 None.
@@ -67,9 +69,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | ccfa29d44bedcce9d70930a2a87215619e205c49 | Card must match the branch you measured |
+| Reviewed head | a6c21fdd61f84d4c67b82ee653cc52f6438274d1 | Card must match the branch you measured |
 
 ### Stored data model
 None.
