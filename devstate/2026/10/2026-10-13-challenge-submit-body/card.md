@@ -1,30 +1,33 @@
 ## Motivation
-Not yet.
+Bot-detection posts the visitor proof to `/crowdsec-internal/challenge/submit`. AppSec must receive that form in full. This fork already forwards the whole readable body when `appsecBodyLimit` is `0`, and the default 10MB cap is meant to be enough.
+
+The README AppSec / bot-detection paragraph and the **AppsecBodyLimit** key never said the challenge proof depends on that body. An operator who set a smaller positive limit, or who read upstream PR 403 and thought `0` sends no body, had no fork-accurate warning.
+
+Left alone, a truncated proof keeps the visitor on the challenge. The gap is operator wording, not the copy path.
+
+Priority: P3 — docs and operator clarity; no current runtime change
 
 ## Implementation
-Not yet.
+Two README seams now state the same facts: `/crowdsec-internal/challenge/submit` must reach AppSec with the full form; the default 10MB is enough; a smaller positive limit cuts the proof short; `0` means no limit and the whole body is sent. Runtime and `Test_appsecQuery_zeroBodyLimitForwardsPost` are unchanged. `skip_specs` — no live-contract delta.
 
 ## What this changes
-**Operators.** None.
-
+**Operators.** README now says the challenge submit POST needs the full form, the default 10MB is enough, a smaller positive limit cuts the proof short, and `appsecBodyLimit` `0` sends the whole body.
 **Admin users.** None.
-
 **Developers.** None.
-
 **End users.** None.
 
 ## Merge readiness
-Ready for review. 0 items remain.
+In progress. 0 items remain.
 
-Priority: unknown — motivation not written
-Reviewed head: 3334503c
+Priority: P3 — docs and operator clarity; no current runtime change
+Reviewed head: 4083ee68
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38441119834 |
+| Overall readiness | 1/6 | Not ready |
+| CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -34,7 +37,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-10-13-challenge-submit-body pushed | `git` |
 | OpenSpec | document-challenge-submit-body | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/194 | pr-host |
-| CI | build 38441119834 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38441119834 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38441119834 |
+| CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -48,7 +51,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-13-challenge-submit-body on branch 2026-10-13-challenge-submit-body targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/194; CI build 38441119834 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38441119834.
+Ticket 2026-10-13-challenge-submit-body on branch 2026-10-13-challenge-submit-body targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/194; CI not seen.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -60,7 +63,15 @@ Ticket 2026-10-13-challenge-submit-body on branch 2026-10-13-challenge-submit-bo
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-challenge-submit-body/devstate/2026/10/2026-10-13-challenge-submit-body/codereview_standards.md) — 0 total, 0 pending, 0 completed
+[Nitpicks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-challenge-submit-body/devstate/2026/10/2026-10-13-challenge-submit-body/codereview_nitpicks.md) — 0 total, 0 pending, 0 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-challenge-submit-body/devstate/2026/10/2026-10-13-challenge-submit-body/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Scope](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-challenge-submit-body/devstate/2026/10/2026-10-13-challenge-submit-body/codereview_scope.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-challenge-submit-body/devstate/2026/10/2026-10-13-challenge-submit-body/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-challenge-submit-body/devstate/2026/10/2026-10-13-challenge-submit-body/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-challenge-submit-body/devstate/2026/10/2026-10-13-challenge-submit-body/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-challenge-submit-body/devstate/2026/10/2026-10-13-challenge-submit-body/codereview_coverage.md) — 0 total, 0 pending, 0 completed
+
 
 ## Agent review details
 
@@ -69,7 +80,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 3334503c7aab95d665c9e0e5d89a5dae2878897c | Card must match the branch you measured |
+| Reviewed head | 4083ee681586cf1290ba9ea71455a649e1a794dd | Card must match the branch you measured |
 
 ### Stored data model
 None.
