@@ -18,7 +18,7 @@ Query still parses a JSON `action` first. After `interpretAppsecBody` errors, HT
 Ready for review. 0 items remain.
 
 Priority: P2 — real operator pain with a limited blast radius (only AppSec 401/unexpected, default action remains ban)
-Reviewed head: f1b5c6bd
+Reviewed head: c3ed13f0
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -41,8 +41,12 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-appsec-unexpected-status/openspec/changes/appsec-unexpected-status-failure-action/proposal.md) — modified
-- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-appsec-unexpected-status/openspec/changes/appsec-unexpected-status-failure-action/proposal.md) — modified
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-appsec-unexpected-status/openspec/changes/archive/2026-10-13-appsec-unexpected-status-failure-action/proposal.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-appsec-unexpected-status/openspec/changes/archive/2026-10-13-appsec-unexpected-status-failure-action/proposal.md) — modified
+
+Completed:
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-appsec-unexpected-status/openspec/specs/core_plugin_appsec_bot-detection/spec.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-appsec-unexpected-status/openspec/specs/core_plugin_appsec_failure-action/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -80,9 +84,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | f1b5c6bdb968405c7f5d25423c0850ab198e57fa | Card must match the branch you measured |
+| Reviewed head | c3ed13f0808e4df05c18be6b00b1e048a967df50 | Card must match the branch you measured |
 
 ### Stored data model
 None.
