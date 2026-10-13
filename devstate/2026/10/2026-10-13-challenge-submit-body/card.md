@@ -17,17 +17,17 @@ Two README seams now state the same facts: `/crowdsec-internal/challenge/submit`
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: P3 — docs and operator clarity; no current runtime change
-Reviewed head: f39661ab
+Reviewed head: 84a23a2b
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38442668173 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,7 +37,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-10-13-challenge-submit-body pushed | `git` |
 | OpenSpec | document-challenge-submit-body | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/194 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 38442668173 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38442668173 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38442668173 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -51,7 +51,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-13-challenge-submit-body on branch 2026-10-13-challenge-submit-body targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/194; CI not seen.
+Ticket 2026-10-13-challenge-submit-body on branch 2026-10-13-challenge-submit-body targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/194; CI build 38442668173 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38442668173.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -80,7 +80,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | f39661ab1506b601751788f0e1c5143321f1be9d | Card must match the branch you measured |
+| Reviewed head | 84a23a2b5b9e2614a0c0b44d64c092b2d8bb3ecf | Card must match the branch you measured |
 
 ### Stored data model
 None.
