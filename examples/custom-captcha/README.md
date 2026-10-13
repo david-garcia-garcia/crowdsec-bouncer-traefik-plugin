@@ -13,6 +13,13 @@ Minimal API requirement:
 - the HTML className to tell to the JS where to display the challenge
 - the verify URL endpoint to send the field `response` from the captcha with `content-type: application/x-www-form-urlencoded`
 - the name of the field when you POST the resolved captcha to Traefik
+- the challenge URL the widget fetches from the browser, when the provider has one
+
+Here wicketkeeper serves both the JS file and the challenge endpoint on the protected router,
+so a captcha-flagged client must be able to reach `/fast.js` and `/v0/challenge` to solve the
+captcha at all. Declaring them as `captchaCustomJsUrl` and `captchaCustomChallengeUrl` is what
+lets those two exact paths through to the origin while the client is still unsolved. Banned
+clients never get that passthrough.
 
 - the JS file need to respect the `data-callback` on the div that contains the captcha if you use our template, but you can customize it by your side
 
@@ -21,17 +28,20 @@ Minimal API requirement:
     ...
     labels:
       # Choose captcha provider
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaEnabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaProvider=custom"
       # Define captcha grace period seconds
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=1800"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomJsURL=http://captcha.localhost:8000/fast.js"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=86400"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomJsUrl=http://captcha.localhost:8000/fast.js"
+      # The widget fetches this from the browser, so it is rendered in captcha.html and passed through to the origin
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomChallengeUrl=http://captcha.localhost:8000/v0/challenge"
       # Inside Traefik container the plugin must be able to reach wicketkeeper service so we can go through a Traefik localhost
       # domain which would resolve traefik itself and the port for the dashboard
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomValidateURL=http://wicketkeeper:8080/v0/siteverify"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomKey=wicketkeeper"
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.CaptchaCustomResponse=wicketkeeper_solution"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomValidateUrl=http://wicketkeeper:8080/v0/siteverify"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomKey=wicketkeeper"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaCustomResponse=wicketkeeper_solution"
       # Define captcha HTML file path
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaFilePath=/captcha.html"
 ```
 
 ```yaml
@@ -54,8 +64,11 @@ redis:
   image: redis/redis-stack-server:latest
 ```
 
+`data-challenge-url` comes from `captchaCustomChallengeUrl`, so the endpoint is configured once
+on the middleware instead of being hard-coded in the template:
+
 ```html
-<div id="captcha" class="{{ .FrontendKey }}" data-sitekey="{{ .SiteKey }}" data-callback="captchaCallback" data-challenge-url="http://captcha.localhost:8000/v0/challenge">
+<div id="captcha" class="{{ .FrontendKey }}" data-sitekey="{{ .SiteKey }}" data-callback="captchaCallback" data-challenge-url="{{ .ChallengeURL }}">
 ```
 
 ## Exemple navigation

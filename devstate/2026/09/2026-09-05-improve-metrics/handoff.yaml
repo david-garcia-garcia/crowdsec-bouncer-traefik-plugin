@@ -1,0 +1,17 @@
+issueKey: 2026-09-05-improve-metrics
+jobName: 2026-09-05-improve-metrics
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 74581db22c0e3ba6bc0c54c547de1d39e85216fd73bf4008afc51d089370c16c
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: align-lapi-usage-metrics
+pr:
+  id: 15
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/15

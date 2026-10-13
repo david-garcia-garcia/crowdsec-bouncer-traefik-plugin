@@ -16,14 +16,15 @@ http:
     bouncer:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecMode: stream
-          updateIntervalSeconds: "2"
-          crowdsecLapiScheme: http
-          crowdsecLapiHost: "@@LAPI_HOST@@"
-          crowdsecLapiKey: "@@APIKEY@@"
-          forwardedHeadersTrustedIps:
+          bouncerBanFilePath: "@@SCENARIO_DIR@@/ban.json"
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
-          banFilePath: "@@SCENARIO_DIR@@/ban.json"
-          remediationHeadersCustomName: "X-E2E-Remediation"
-          traceHeadersCustomName: x-trace
+          bouncerRemediationHeadersCustomName: "X-E2E-Remediation"
+          bouncerTraceHeadersCustomName: x-trace
+          lapiEnabled: "true"
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          lapiMode: stream
+          lapiScheme: http
+          lapiUpdateIntervalSeconds: "2"

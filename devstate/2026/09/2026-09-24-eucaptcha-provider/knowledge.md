@@ -1,0 +1,13 @@
+# Knowledge
+- created knowledge/research/ext_eucaptcha_verify/
+- created knowledge/research/ext_eucaptcha_widget/
+- created knowledge/debt/2026-09-24-allowlist-on-captcha-enterprise-config.md
+- created knowledge/devdocs/core_plugin_middleware_captcha-eucaptcha-verify.md
+- updated knowledge/devdocs/index_core_plugin.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-widget.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-enterprise-config.md
+- updated knowledge/devdocs/core_plugin_middleware_config-validation.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-siteverify.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-assessments.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-gate.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-enterprise-config.md

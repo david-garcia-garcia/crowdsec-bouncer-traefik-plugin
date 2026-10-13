@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-09-25-bouncer-exclude-regex",
+  "jobName": "2026-09-25-bouncer-exclude-regex",
+  "startedAt": "2026-09-25T09:09:00.822Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T09:14:45.893Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T09:21:39.134Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T09:28:00.087Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T09:59:02.440Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T10:10:17.476Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T10:14:54.146Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T10:20:48.438Z"
+    },
+    "pullrequest": {
+      "work": false,
+      "card": false,
+      "at": null
+    }
+  }
+}

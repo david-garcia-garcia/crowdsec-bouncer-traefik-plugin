@@ -16,18 +16,26 @@ http:
     bouncer:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecMode: stream
-          updateIntervalSeconds: "2"
-          crowdsecLapiScheme: http
-          crowdsecLapiHost: "@@LAPI_HOST@@"
-          crowdsecLapiKey: "@@APIKEY@@"
-          forwardedHeadersTrustedIps:
-            - "127.0.0.1/32"
-          captchaProvider: turnstile
-          # Cloudflare Turnstile public test keys: render a valid widget without
-          # contacting a real API key.
-          captchaSiteKey: "1x00000000000000000000AA"
-          captchaSecretKey: "1x0000000000000000000000000000000AA"
-          captchaHtmlFilePath: "@@SCENARIO_DIR@@/captcha.html"
+          # custom + mocklapi /siteverify: always-pass JSON, no real bot check.
+          captchaCustomJsUrl: "http://@@LAPI_HOST@@/dummy.js"
+          captchaCustomKey: dummy-captcha
+          captchaCustomResponse: dummy-captcha-response
+          captchaCustomValidateUrl: "http://@@LAPI_HOST@@/siteverify"
+          captchaFilePath: "@@SCENARIO_DIR@@/captcha.html"
+          captchaGateBindIp: true
+          captchaGateSecret: "e2e-mock-captcha-gate-secret"
           captchaGracePeriodSeconds: "10"
+          captchaProvider: custom
+          captchaSecretKey: "e2e-dummy-secret"
+          captchaSiteKey: "e2e-dummy-site"
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersTrustedIps:
+            - "127.0.0.1/32"
+          captchaEnabled: true
+          lapiEnabled: "true"
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          lapiMode: stream
+          lapiScheme: http
+          lapiUpdateIntervalSeconds: "2"
+          logLevel: DEBUG

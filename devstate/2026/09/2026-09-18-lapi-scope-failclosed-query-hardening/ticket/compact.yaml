@@ -1,0 +1,5 @@
+host: local
+ref: none
+title: "Fail closed on header-scope LAPI errors, and harden crowdsecQuery"
+url: none
+number: none

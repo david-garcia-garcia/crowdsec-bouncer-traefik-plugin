@@ -13,7 +13,7 @@ The "internal" Traefik instance is configured to trust the forward headers
 
 We configure the middleware to trust as well as the IP of the intermediate proxy if needed:
 ```yaml
-    - "traefik.http.middlewares.crowdsec.plugin.bouncer.forwardedheaderstrustedips=172.21.0.5"
+    - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerForwardedHeadersTrustedIps=172.21.0.5"
 ```
 
 Add your IP to the ban list
@@ -26,7 +26,7 @@ You should get a 403 on http://localhost/foo
 
 Add the IPs that will not be filtered by the plugin
 ```yaml
-    - "traefik.http.middlewares.crowdsec.plugin.bouncer.clientTrustedips=10.0.10.30/32"
+    - "traefik.http.middlewares.crowdsec.plugin.bouncer.bouncerClientTrustedIps=10.0.10.30/32"
 ```
 
 > Replace *10.0.10.30/32* by your IP or IP range, so it's not getting checked against ban cache of crowdsec

@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-09-24-eucaptcha-provider",
+  "jobName": "2026-09-24-eucaptcha-provider",
+  "startedAt": "2026-09-24T21:34:52.666Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T21:40:27.432Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T21:59:54.128Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T22:09:49.785Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T22:26:31.263Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T22:38:28.664Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T22:43:01.792Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T22:48:27.170Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T22:59:25.224Z"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-10-07-appsec-http-version",
+  "jobName": "2026-10-07-appsec-http-version",
+  "startedAt": "2026-10-07T20:55:32.359Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-07T20:55:32.359Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-07T21:05:22.019Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-07T21:14:23.566Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-07T21:28:06.051Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-07T21:38:40.391Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-07T21:47:29.390Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-07T21:54:39.064Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-07T22:03:22.845Z"
+    }
+  }
+}

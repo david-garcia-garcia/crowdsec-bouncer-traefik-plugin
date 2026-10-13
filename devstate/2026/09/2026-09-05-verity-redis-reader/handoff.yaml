@@ -1,0 +1,17 @@
+issueKey: 2026-09-05-verity-redis-reader
+jobName: 2026-09-05-verity-redis-reader
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 8453ea0842c48abcfc49bcd1e4b18c071b68d3a11b54c8aba4fd2c8fe5503091
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: prove-redis-readers-by-pointer
+pr:
+  id: 12
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/12

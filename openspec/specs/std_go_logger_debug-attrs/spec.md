@@ -1,0 +1,81 @@
+## Purpose
+
+Keeps request-path Trace from formatting a string unless Trace is enabled, while still logging the same fields.
+
+## Requirements
+
+### Requirement: Request-path Trace does not format unless Trace is enabled
+On the request hot path, Trace SHALL NOT evaluate a format string (`fmt.Sprintf` or equivalent concatenation that builds the log message) unless the logger's level includes Trace. Trace SHALL pass the existing fields as slog attributes (or an Enabled check before any format). Fields that DestBranch already logs MUST remain: ServeHTTP `ip` and `isTrusted`. This leaf MUST NOT require `cache.Client` Get/GetMany/Set/Delete Debug stems. The client address SHALL reuse `GetRemoteIP` / `clientRequest.remoteIP`. Trusted-client membership SHALL reuse the trusted-client Checker `ContainsIP` result. Message stem `ServeHTTP` MUST stay recognizable. Construct-time logger destination and format (`std_go_logger_slog-output`) MUST NOT change. Default `logLevel` MUST NOT change. Per-request ServeHTTP breadcrumbs and captcha Check/Validate SHALL log at Trace, not Debug. Failure lines on that path (drain, parse, too-large body, AppSec error) SHALL stay Debug. A store lookup error SHALL log once at Error on `serveLAPI:Get` and MUST NOT also log at Debug. The per-request stream-unhealthy cache miss SHALL log at Trace. DEBUG SHALL still emit construct-time and stream-tick Debug.
+
+#### Scenario: INFO allow does not emit request-path Trace
+- **WHEN** a stream-mode request is allowed with the logger at INFO
+- **THEN** no Trace record is emitted for ServeHTTP
+
+#### Scenario: DEBUG allow does not emit request-path Trace
+- **WHEN** a stream-mode request is allowed with the logger at DEBUG
+- **THEN** no Trace record is emitted for ServeHTTP
+
+#### Scenario: TRACE ServeHTTP keeps ip and isTrusted as attributes
+- **WHEN** ServeHTTP runs with the logger at TRACE
+- **THEN** the Trace record message is `ServeHTTP`
+- **AND** the record includes attribute `ip` equal to the client address already chosen for that request
+- **AND** the record includes attribute `isTrusted` equal to the trusted-client Checker result
+
+### Requirement: Remediating TRACE shows mapped scopes in play
+When serveLAPI remediates from a live, stream, or alone store hit, the remediating TRACE record message SHALL be `serveLAPI`. That record SHALL include attribute `ip` equal to the client address already chosen for that request (`GetRemoteIP` / `clientRequest.remoteIP`) and attribute `remediation` equal to the remediation letter. It MUST NOT include attribute `cache`. It MUST NOT present the hit as a cache hit. When `RequestScopeValues` already collected for that request has present entries, the record SHALL include slog group `scopes` whose keys are those CrowdSec scope names and whose values are those header values. Missing mapped headers SHALL be omitted. The record MUST reuse that already-collected map; it MUST NOT re-read request headers and MUST NOT re-parse `RemoteAddr`. The record MUST NOT add a winning-scope field. The record MUST NOT log a Range CIDR. When no mapped header is present, the record MUST NOT invent scope keys. The first TRACE `ServeHTTP` breadcrumb (stem, `ip`, `isTrusted`) SHALL stay; that breadcrumb MUST NOT be required to include `scopes`. When live or none remediates after `LiveLookup`, TRACE `serveLAPI:LiveLookup` SHALL include the same `ip`, the same `scopes` group when present, and the existing kind attribute `isBanned`. `handleRemediationServeHTTP` TRACE SHALL stay `ip` and `remediation`. Default `logLevel` and logger destination or format MUST NOT change.
+
+#### Scenario: TRACE remediating store hit drops cache and includes present scopes
+- **WHEN** a stream-mode request remediates from a store hit with the logger at TRACE
+- **AND** mapped Country and AS headers are present
+- **THEN** a TRACE record message is `serveLAPI`
+- **AND** the record includes attribute `ip` equal to the client address already chosen for that request
+- **AND** the record includes attribute `remediation` equal to the remediation letter
+- **AND** the record MUST NOT include attribute `cache`
+- **AND** the record includes group `scopes` with those present Country and AS values
+
+#### Scenario: TRACE remediating store hit omits missing headers
+- **WHEN** a stream-mode request remediates from a store hit with the logger at TRACE
+- **AND** Country is mapped but the Country header is missing
+- **THEN** the remediating `serveLAPI` TRACE MUST NOT include a Country key under `scopes`
+
+#### Scenario: TRACE first breadcrumb keeps ip and isTrusted without requiring scopes
+- **WHEN** ServeHTTP runs with the logger at TRACE
+- **THEN** a TRACE record message is `ServeHTTP`
+- **AND** the record includes attribute `ip` equal to the client address already chosen for that request
+- **AND** the record includes attribute `isTrusted` equal to the trusted-client Checker result
+- **AND** that breadcrumb MUST NOT be required to include `scopes`
+
+#### Scenario: TRACE LiveLookup remediating includes scopes and isBanned
+- **WHEN** a live or none request remediates after `LiveLookup` with the logger at TRACE
+- **AND** mapped scope headers are present
+- **THEN** a TRACE record message is `serveLAPI:LiveLookup`
+- **AND** the record includes attribute `ip` equal to the client address already chosen for that request
+- **AND** the record includes attribute `isBanned` equal to the remediation kind
+- **AND** the record includes group `scopes` with those present mapped values
+- **AND** the record MUST NOT include attribute `cache`
+
+#### Scenario: TRACE remediating with no mapped headers invents no scope keys
+- **WHEN** a stream-mode request remediates from a store hit with the logger at TRACE
+- **AND** no mapped header is present
+- **THEN** the remediating `serveLAPI` TRACE includes `ip` and `remediation`
+- **AND** the record MUST NOT include attribute `cache`
+- **AND** the record MUST NOT invent scope keys
+
+### Requirement: Construct-time Bouncer initialized lists trusted IPs
+When bouncer construction succeeds, DEBUG SHALL emit one record whose message is `Bouncer initialized`. That record SHALL include attribute `forwardedHeadersTrustedIPs` equal to the forwarded-headers trusted-IP config slice as written, and attribute `clientTrustedIPs` equal to the client trusted-IP config slice as written. Bare hosts SHALL stay bare on that line; they MUST NOT be rewritten to `/32` or `/128`. Empty or nil slices SHALL still appear as empty lists. The record MUST reuse those Config slices already in hand at construction; it MUST NOT re-derive hops or the client address. Default `logLevel` and logger destination or format MUST NOT change. Request-path TRACE SHALL stay out of this requirement.
+
+#### Scenario: CIDRs and a bare host on one line
+- **WHEN** bouncer construction succeeds with a forwarded-headers list that contains CIDRs and a bare host, and a client list that contains CIDRs
+- **THEN** one DEBUG record message is `Bouncer initialized`
+- **AND** `forwardedHeadersTrustedIPs` equals those forwarded-headers strings as written
+- **AND** `clientTrustedIPs` equals those client strings as written
+
+#### Scenario: Empty lists still log both attrs
+- **WHEN** bouncer construction succeeds with empty forwarded-headers and empty client trusted-IP lists
+- **THEN** one DEBUG record message is `Bouncer initialized`
+- **AND** both attributes are present as empty lists
+
+#### Scenario: Two pools stay distinct
+- **WHEN** the forwarded-headers list and the client list differ
+- **THEN** the two attributes keep those distinct slices
+- **AND** they MUST NOT be merged into one list

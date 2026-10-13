@@ -1,0 +1,124 @@
+package captcha
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strconv"
+	"testing"
+	"time"
+
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
+)
+
+func testOwnerConfig(t *testing.T, timeout int64) *configuration.Config {
+	t.Helper()
+	templatePath := filepath.Join(t.TempDir(), "captcha.html")
+	if err := os.WriteFile(templatePath, []byte("captcha"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := configuration.New()
+	cfg.CaptchaEnabled = true
+	cfg.CaptchaProvider = configuration.HcaptchaProvider
+	cfg.CaptchaSiteKey = "site"
+	cfg.CaptchaSecretKey = "secret"
+	cfg.CaptchaGateSecret = "gate-secret"
+	cfg.CaptchaFilePath = templatePath
+	cfg.CaptchaSiteverifyHTTPTimeoutSeconds = timeout
+	return cfg
+}
+
+func TestPrepare_OwnerOmitFillsTraefikName(t *testing.T) {
+	cfg := configuration.New()
+	cfg.CaptchaEnabled = true
+	if err := Prepare(cfg, nil, "cs-owner"); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.CaptchaInstanceName != "cs-owner" {
+		t.Fatalf("CaptchaInstanceName = %q want cs-owner", cfg.CaptchaInstanceName)
+	}
+}
+
+func TestPrepare_SubscriberOmitStaysEmpty(t *testing.T) {
+	cfg := configuration.New()
+	cfg.CaptchaEnabled = false
+	cfg.BouncerEnabled = true
+	if err := Prepare(cfg, nil, "cs-bounce"); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.CaptchaInstanceName != "" {
+		t.Fatalf("subscriber omit must stay empty, got %q", cfg.CaptchaInstanceName)
+	}
+}
+
+func TestOpen_SiteverifyTimeoutHonorsOverride(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+	for _, seconds := range []int64{1, 10} {
+		t.Run(strconv.FormatInt(seconds, 10), func(t *testing.T) {
+			cfg := testOwnerConfig(t, seconds)
+			client, err := Open(context.Background(), cfg, logger.New("ERROR", ""), "cs-owner", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			httpClient := client.HTTPClientForTest()
+			if httpClient == nil {
+				t.Fatal("siteverify client was not stored")
+			}
+			if httpClient.Timeout != time.Duration(seconds)*time.Second {
+				t.Fatalf("Timeout = %v want %ds", httpClient.Timeout, seconds)
+			}
+		})
+	}
+}
+
+func TestOwnershipKey_ExcludesSlotAndBounce(t *testing.T) {
+	left := testOwnerConfig(t, 10)
+	right := *left
+	left.CaptchaInstanceName = "shared"
+	left.BouncerEnabled = true
+	left.BouncerLapiFailureAction = configuration.FailureActionCaptcha
+	left.BouncerRemediationHeadersCustomName = "X-Owner"
+	right.CaptchaInstanceName = "other"
+	right.BouncerEnabled = false
+	right.BouncerLapiFailureAction = configuration.FailureActionBan
+	right.BouncerRemediationHeadersCustomName = "X-Route"
+	if OwnershipKey(left, "mw") != OwnershipKey(&right, "mw") {
+		t.Fatal("slot name, bounce, failure, and header must stay off the ownership key")
+	}
+}
+
+func TestOwnershipKey_EnterpriseKnobChangeReclaims(t *testing.T) {
+	left := testOwnerConfig(t, 10)
+	left.CaptchaEnterpriseMinScore = "0.5"
+	right := *left
+	right.CaptchaEnterpriseMinScore = "0.9"
+	if OwnershipKey(left, "mw") == OwnershipKey(&right, "mw") {
+		t.Fatal("enterprise knob change must change the ownership key")
+	}
+}
+
+// TestOwnershipKey_LogConfigChangeReclaims proves OwnershipKey forks when logLevel, logFilePath, or logFormat changes.
+func TestOwnershipKey_LogConfigChangeReclaims(t *testing.T) {
+	left := testOwnerConfig(t, 10)
+	// logLevel-only Config change must change OwnershipKey.
+	rightLevel := *left
+	rightLevel.LogLevel = "DEBUG"
+	if OwnershipKey(left, "mw") == OwnershipKey(&rightLevel, "mw") {
+		t.Fatal("logLevel change must change the ownership key")
+	}
+	// logFilePath-only Config change must change OwnershipKey.
+	rightPath := *left
+	rightPath.LogFilePath = "/tmp/bouncer.log"
+	if OwnershipKey(left, "mw") == OwnershipKey(&rightPath, "mw") {
+		t.Fatal("logFilePath change must change the ownership key")
+	}
+	// logFormat-only Config change must change OwnershipKey.
+	rightFormat := *left
+	rightFormat.LogFormat = "json"
+	if OwnershipKey(left, "mw") == OwnershipKey(&rightFormat, "mw") {
+		t.Fatal("logFormat change must change the ownership key")
+	}
+}

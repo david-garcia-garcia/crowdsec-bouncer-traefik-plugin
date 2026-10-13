@@ -15,15 +15,16 @@ For now 3 captcha providers are supported:
 ```yaml
   labels:
       # Choose captcha provider
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaEnabled=true"
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaProvider=hcaptcha"
       # Define captcha site key
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSiteKey=FIXME"
       # Define captcha secret key
       - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaSecretKey=FIXME"
       # Define captcha grace period seconds
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=1800"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaGracePeriodSeconds=86400"
       # Define captcha HTML file path
-      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaHTMLFilePath=/captcha.html"
+      - "traefik.http.middlewares.crowdsec.plugin.bouncer.captchaFilePath=/captcha.html"
 ```
 
 The captcha HTML file must be present in the Traefik container (bind mounted or added during a custom build).  

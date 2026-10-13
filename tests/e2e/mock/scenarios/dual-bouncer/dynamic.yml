@@ -1,0 +1,46 @@
+http:
+  routers:
+    router-a:
+      rule: "PathPrefix(`/a`)"
+      entryPoints:
+        - web
+      service: backend
+      middlewares:
+        - bouncer-a
+    router-b:
+      rule: "PathPrefix(`/b`)"
+      entryPoints:
+        - web
+      service: backend
+      middlewares:
+        - bouncer-b
+  services:
+    backend:
+      loadBalancer:
+        servers:
+          - url: "@@BACKEND_URL@@"
+  middlewares:
+    bouncer-a:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersTrustedIps:
+            - "127.0.0.1/32"
+          lapiDefaultDecisionSeconds: "2"
+          lapiEnabled: "true"
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          lapiMode: live
+          lapiScheme: http
+    bouncer-b:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersTrustedIps:
+            - "127.0.0.1/32"
+          lapiDefaultDecisionSeconds: "2"
+          lapiEnabled: "true"
+          lapiHost: "@@LAPI_HOST_B@@"
+          lapiKey: "@@APIKEY@@"
+          lapiMode: live
+          lapiScheme: http

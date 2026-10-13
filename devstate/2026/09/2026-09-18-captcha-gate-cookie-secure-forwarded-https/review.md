@@ -1,0 +1,47 @@
+## prepare (2026-09-18)
+phase: prepare
+findings: none
+fixed: none
+skipped: product apply not started
+
+## explore (2026-09-18)
+phase: explore
+findings: none
+fixed: none
+skipped: product apply not started; Secure still TLS-only; five assumed proto/parse/test/spec decisions recorded
+
+## propose (2026-09-18)
+phase: propose
+findings: none
+fixed: none
+skipped: product apply not started; Secure still TLS-only; change captcha-gate-cookie-secure-forwarded-https apply-ready; five assumed decisions taken
+
+## implement (2026-09-18)
+phase: implement
+findings: none
+fixed: setGateCookie Secure on TLS or Traefik-left X-Forwarded-Proto https; Test_setGateCookie_* added; spec and usage packet updated (f315de3)
+skipped: five assumed proto/parse/test/spec decisions unchanged
+
+## codereview (2026-09-18)
+phase: codereview
+findings: none
+fixed: none
+skipped: Task sub-agents unavailable; six axes run inline; all none; e2e binary CI failed on 365f206
+
+## devdocsimpact (2026-09-18)
+phase: devdocsimpact
+findings: none
+fixed: none
+skipped: usage already matched the apply; no Language write
+
+## archive (2026-09-18)
+phase: archive
+findings: none
+fixed: FindSpecHost fold core_plugin_middleware_captcha-gate; catalog already matched the MODIFIED Secure clause; validators exit 0; moved openspec/changes/archive/2026-09-18-captcha-gate-cookie-secure-forwarded-https/
+skipped: Task sub-agent unavailable; FindSpecHost run inline; map.md --write no family delta
+
+## pullrequest (2026-09-18)
+phase: pullrequest
+findings: none
+fixed: reused OPEN PR 88; ready title; CI succeeded on 77fa65f (Main Process, Race detector, e2e binary, e2e docker)
+skipped: no comments.md; no second PR

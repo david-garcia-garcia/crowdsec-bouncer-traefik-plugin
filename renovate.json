@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
-  "gitAuthor": "Renovate Bot <22881669+maxlerebourg@users.noreply.github.com>",
+  "gitAuthor": "Renovate Bot <9599352+david-garcia-garcia@users.noreply.github.com>",
   "fetchChangeLogs": "off",
   "labels": ["dependencies"],
   "ignorePaths": ["**/vendor/**", "**/node_modules/**"],
@@ -32,7 +32,7 @@
       "matchStrings": [
         "experimental\\.plugins\\.bouncer\\.version=(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"
       ],
-      "depNameTemplate": "maxlerebourg/crowdsec-bouncer-traefik-plugin",
+      "depNameTemplate": "david-garcia-garcia/crowdsec-bouncer-traefik-plugin",
       "datasourceTemplate": "github-tags"
     },
     {
@@ -42,7 +42,7 @@
       "matchStrings": [
         "version:\\s*\"(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)\""
       ],
-      "depNameTemplate": "maxlerebourg/crowdsec-bouncer-traefik-plugin",
+      "depNameTemplate": "david-garcia-garcia/crowdsec-bouncer-traefik-plugin",
       "datasourceTemplate": "github-tags"
     },
     {

@@ -3,7 +3,9 @@
 <head><meta charset="utf-8"><title>E2E captcha marker</title></head>
 <body>
 <h1 id="e2e-captcha-marker">E2E_CAPTCHA_PAGE_MARKER</h1>
-<script src="{{ .FrontendJS }}"></script>
-<div class="{{ .FrontendKey }}" data-sitekey="{{ .SiteKey }}"></div>
+<form method="post">
+  <input type="hidden" name="dummy-captcha-response" value="ok">
+  <button type="submit">Solve</button>
+</form>
 </body>
 </html>

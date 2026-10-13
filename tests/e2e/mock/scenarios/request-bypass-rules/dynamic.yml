@@ -1,0 +1,53 @@
+http:
+  routers:
+    r:
+      rule: "PathPrefix(`/foo`) || PathPrefix(`/healthz`) || PathPrefix(`/lapi-skip`)"
+      entryPoints:
+        - web
+      service: backend
+      middlewares:
+        - bouncer
+  services:
+    backend:
+      loadBalancer:
+        servers:
+          - url: "@@BACKEND_URL@@"
+  middlewares:
+    bouncer:
+      plugin:
+        bouncer:
+          appsecEnabled: "true"
+          appsecHost: "@@APPSEC_HOST@@"
+          appsecScheme: http
+          bouncerActionRules:
+            - name: appsec-skip
+              path: ^/foo/403-skip$
+              action:
+                - bypassAppsec
+            - name: healthz
+              path: ^/healthz$
+              action:
+                - bypassLapi
+            - name: lapi-skip
+              path: ^/lapi-skip
+              action:
+                - bypassLapi
+            - name: probe
+              host: ^probe\.example$
+              action:
+                - bypassLapi
+            - name: decision-ban
+              headers:
+                X-Crowdsec-Decision: "^b$"
+              action:
+                - ban
+          bouncerAppsecFailureAction: ban
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersTrustedIps:
+            - "127.0.0.1/32"
+          lapiEnabled: "true"
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          lapiMode: stream
+          lapiScheme: http
+          lapiUpdateIntervalSeconds: "2"

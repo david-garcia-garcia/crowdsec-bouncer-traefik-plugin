@@ -16,10 +16,11 @@ http:
     bouncer:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecMode: none
-          crowdsecLapiScheme: http
-          crowdsecLapiHost: "@@LAPI_HOST@@"
-          crowdsecLapiKey: "@@APIKEY@@"
-          forwardedHeadersTrustedIps:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
+          lapiEnabled: "true"
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          lapiMode: none
+          lapiScheme: http

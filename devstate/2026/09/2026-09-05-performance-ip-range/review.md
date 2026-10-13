@@ -1,0 +1,49 @@
+# Review
+
+## prepare (2026-09-05)
+phase: prepare
+findings: none
+fixed: none
+skipped: CI not seen (`gh` missing; GitHub MCP has no checks tool)
+
+## explore (2026-09-05)
+phase: explore
+findings: none
+fixed: none
+skipped: CI not seen; ticket bench not re-run; assumed blob compare, RangeMembership arg, startStream hydrate, atomic swap, keep tree on Redis hydrate failure
+
+## propose (2026-09-05)
+phase: propose
+findings: none
+fixed: none
+skipped: CI not seen
+
+## implement (2026-09-05)
+phase: implement
+findings: none
+fixed: in-process RangeMembership on CrowdsecConnection; request path no longer MGETs range-index
+skipped: E2E still in progress on fdc2e4e; Windows logging TempDir cleanup flake
+
+## codereview (2026-09-05)
+phase: codereview
+findings: Standards 1 hard (LookupCacheKeys useRangeIndex), Standards 2 judgement (shared blob loop)
+fixed: dropped useRangeIndex from LookupCacheKeys
+skipped: extract shared blob-line iteration; CI in progress on e033765
+
+## devdocsimpact (2026-09-05)
+phase: devdocsimpact
+findings: none
+fixed: none
+skipped: none
+
+## archive (2026-09-05)
+phase: archive
+findings: none
+fixed: synced core_plugin_decisions_scopes and core_plugin_ip_radix-lookup; moved change to archive/2026-09-05-in-process-range-membership
+skipped: none
+
+## pullrequest (2026-09-05)
+phase: pullrequest
+findings: none
+fixed: dropped WIP title; Main and E2E succeeded on 71f53e6
+skipped: none

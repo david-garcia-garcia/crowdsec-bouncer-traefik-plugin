@@ -1,0 +1,47 @@
+## prepare (2026-09-17T15:43:03Z)
+phase: prepare
+findings: none
+fixed: none
+skipped: none
+
+## explore (2026-09-17T15:48:08Z)
+phase: explore
+findings: none
+fixed: none
+skipped: none
+
+## propose (2026-09-17T15:54:30Z)
+phase: propose
+findings: none
+fixed: none
+skipped: none
+
+## implement (2026-09-17T16:04:52Z)
+phase: implement
+findings: none
+fixed: live dump retired; reclaim-key + bouncer added; AdoptTransport folded; debt deleted
+skipped: none
+
+## codereview (2026-09-17T16:11:36Z)
+phase: codereview
+findings: P3 1
+fixed: Standards 1 Name for the scope — Visitor address → Client address (`2d046f7`)
+skipped: none
+
+## devdocsimpact (2026-09-17T16:16:29Z)
+phase: devdocsimpact
+findings: missing-packet 1
+fixed: produced `knowledge/devdocs/core_plugin_lapi_reclaim-key.md` and index heading
+skipped: none (Bouncer / connection / failure-action were none; no vague packet rename)
+
+## archive (2026-09-17T16:21:38Z)
+phase: archive
+findings: none
+fixed: catalog already matched; change moved to `openspec/changes/archive/2026-09-17-rename-instance-reclaim-leaf/`
+skipped: Task tool unavailable; FindSpecHost Search+Verdict on archive thread
+
+## pullrequest (2026-09-17T16:30:11Z)
+phase: pullrequest
+findings: none
+fixed: reused PR #63; dropped WIP; title 📝 docs(specs): split instance-reclaim into reclaim-key and bouncer; merged origin/master; CI succeeded on 2567e98
+skipped: comments.md absent

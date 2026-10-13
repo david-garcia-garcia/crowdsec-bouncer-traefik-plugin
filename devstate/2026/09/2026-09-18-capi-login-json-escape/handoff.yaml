@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-capi-login-json-escape
+jobName: 2026-09-18-capi-login-json-escape
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:f8bd03fad6216f4426ab2cdbbd803603aafe9a9da057fc15432f0bf76a687c2e
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: capi-login-json-escape
+pr:
+  id: 90
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/90

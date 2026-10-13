@@ -1,0 +1,41 @@
+## prepare (2026-09-17T16:47:57Z)
+phase: prepare
+findings: none
+fixed: none
+skipped: none
+
+## explore (2026-09-17T16:54:14Z)
+phase: explore
+findings: none
+fixed: none
+skipped: none
+
+## propose (2026-09-17T17:00:57Z)
+phase: propose
+findings: none
+fixed: none
+skipped: none
+
+## implement (2026-09-17T17:22:28Z)
+phase: implement
+findings: none
+fixed: DecisionStore reclaim; atomic stream lease (Redis Eval + memory mutex); Client Close no longer closes the shared cache; isolated-store usage remapped; shared-store debt deleted
+skipped: core_plugin_reclaim packet (assumed no)
+
+## codereview (2026-09-17T17:32:55Z)
+phase: codereview
+findings: P3 7
+fixed: Standards 3 (rename placeholders, storeParamsFrom comment, ApplyRangeBatch Cache()); Dead 2 (CachePrefix, AcquireLease); Coverage 2 (live SessionHex prefix GET, last-holder grace Close)
+skipped: none
+
+## devdocsimpact (2026-09-17T17:38:37Z)
+phase: devdocsimpact
+findings: 2 produced (missing-packet Stream lease, stale-usage Redis CachePrefix); 0 skipped
+fixed: created core_plugin_lapi_stream-lease.md; SessionHex keyPrefix + acquire.go on Redis usage
+skipped: none
+
+## archive (2026-09-17T17:43:34Z)
+phase: archive
+findings: none
+fixed: catalog sync (decision-store new; isolated-store / stream-lease / reclaim-key / utilities-client fold) + move to openspec/changes/archive/2026-09-17-shared-decision-store/
+skipped: FindSpecHost Task tool unavailable on archive worker; ran find-spec-host.md on this thread

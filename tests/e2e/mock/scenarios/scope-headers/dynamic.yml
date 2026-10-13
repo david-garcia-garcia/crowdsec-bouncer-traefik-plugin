@@ -1,0 +1,35 @@
+http:
+  routers:
+    r:
+      rule: "PathPrefix(`/foo`)"
+      entryPoints:
+        - web
+      service: backend
+      middlewares:
+        - bouncer
+  services:
+    backend:
+      loadBalancer:
+        servers:
+          - url: "@@BACKEND_URL@@"
+  middlewares:
+    bouncer:
+      plugin:
+        bouncer:
+          bouncerDecisionScopeHeaders:
+            Country: CF-IPCountry
+            AS: CF-ASN
+            username: X-User
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersTrustedIps:
+            - "127.0.0.1/32"
+          lapiEnabled: "true"
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          lapiMode: stream
+          lapiScheme: http
+          lapiStreamScopes:
+            - country
+            - as
+            - username
+          lapiUpdateIntervalSeconds: "2"

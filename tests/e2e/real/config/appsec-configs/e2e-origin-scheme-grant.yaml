@@ -1,0 +1,9 @@
+# Mint __crowdsec_challenge without a browser solve. CrowdSec sets Secure
+# from the scheme on X-Crowdsec-Appsec-Uri. The path stays off /bot-detection
+# so the existing challenge-page test still receives the HTML challenge.
+name: e2e/origin-scheme-grant
+inband:
+  pre_eval:
+    - filter: 'req.URL.Path == "/origin-scheme" || req.URL.Path startsWith "/origin-scheme/"'
+      apply:
+        - GrantChallengeCookie("e2e-origin-scheme", "1h")

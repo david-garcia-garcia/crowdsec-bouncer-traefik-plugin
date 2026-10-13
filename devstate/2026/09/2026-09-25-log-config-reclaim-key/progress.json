@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-09-25-log-config-reclaim-key",
+  "jobName": "2026-09-25-log-config-reclaim-key",
+  "startedAt": "2026-09-25T11:48:57.817Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T11:52:14.270Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T12:01:39.373Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T12:06:50.262Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T12:18:29.464Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T12:33:36.820Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T12:38:10.711Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T12:42:50.117Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-25T12:59:38.972Z"
+    }
+  }
+}

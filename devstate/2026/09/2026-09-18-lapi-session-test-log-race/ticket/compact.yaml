@@ -1,0 +1,5 @@
+host: local
+ref: none
+title: stop the pkg/lapi session tests racing on their log buffer
+url: none
+number: none

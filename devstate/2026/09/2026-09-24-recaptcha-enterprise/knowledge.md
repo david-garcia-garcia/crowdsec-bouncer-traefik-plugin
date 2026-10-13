@@ -1,0 +1,11 @@
+# Knowledge
+- created knowledge/research/ext_recaptcha_enterprise_assessments/
+- created knowledge/research/ext_recaptcha_enterprise_widget/
+- updated knowledge/devdocs/core_plugin_middleware_captcha-siteverify.md
+- updated knowledge/devdocs/core_plugin_middleware_config-validation.md
+- updated knowledge/devdocs/core_plugin_middleware_instance-slots.md
+- created knowledge/devdocs/core_plugin_middleware_captcha-assessments.md
+- created knowledge/devdocs/core_plugin_middleware_captcha-widget.md
+- created knowledge/devdocs/core_plugin_middleware_captcha-enterprise-config.md
+- updated knowledge/devdocs/core_plugin_middleware.md
+- updated knowledge/devdocs/index_core_plugin.md
