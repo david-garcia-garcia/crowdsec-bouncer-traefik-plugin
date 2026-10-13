@@ -815,8 +815,8 @@ func isMethodWithBody(method string) bool {
 }
 
 // appsecAllowDecision is pass-through: AppSec allowed, or a configured failure path that must not ban.
-func appsecAllowDecision() (*AppSecResponse, error) {
-	return &AppSecResponse{Action: appsecAllowAction}, nil
+func appsecAllowDecision() *AppSecResponse {
+	return &AppSecResponse{Action: appsecAllowAction}
 }
 
 // appsecQuery asks AppSec about this request. A parsed challenge action is returned with a nil error; other hits stay an error so the caller bans.
@@ -867,7 +867,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		if bouncer.appsecUnreachableBlock {
 			return nil, fmt.Errorf("appsecQuery:unreachable %w", err)
 		}
-		return appsecAllowDecision()
+		return appsecAllowDecision(), nil
 	}
 	defer func() {
 		// net/http returns a conn to the idle pool once its body has been read to EOF, closing early discards it.
@@ -884,7 +884,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		if bouncer.appsecFailureBlock {
 			return nil, errors.New("appsecQuery statusCode:500")
 		}
-		return appsecAllowDecision()
+		return appsecAllowDecision(), nil
 	}
 	if res.StatusCode == http.StatusForbidden {
 		return parseAppsecChallengeBody(bouncer, res.Body)
@@ -893,7 +893,7 @@ func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecRes
 		return nil, fmt.Errorf("appsecQuery statusCode:%d", res.StatusCode)
 	}
 
-	return appsecAllowDecision()
+	return appsecAllowDecision(), nil
 }
 
 // parseAppsecChallengeBody reads a bounded AppSec 403 body and returns a structured action when JSON names one.
