@@ -16,14 +16,14 @@ LAPI ingest maps ban and captcha through RemediationValue and stores every other
 In progress. 0 items remain.
 
 Priority: P1 — unknown LAPI types fail open today
-Reviewed head: 766ed786
+Reviewed head: 9ff0b95e
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38463159991 |
+| Overall readiness | 1/6 | Not ready |
+| CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | N/A | no OPEN PR |
 
@@ -33,7 +33,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-10-13-ban-unknown-lapi-types pushed | `git` |
 | OpenSpec | ban-unknown-lapi-types | `openspec/` |
 | Pull request | none | pr-host |
-| CI | build 38463159991 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38463159991 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38463159991 |
+| CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -50,7 +50,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-13-ban-unknown-lapi-types on branch 2026-10-13-ban-unknown-lapi-types targeting master; PR no PR yet; CI build 38463159991 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38463159991.
+Ticket 2026-10-13-ban-unknown-lapi-types on branch 2026-10-13-ban-unknown-lapi-types targeting master; PR no PR yet; CI not seen.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -79,7 +79,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 766ed786178c533c6b3c9df7ca28b96f319baa12 | Card must match the branch you measured |
+| Reviewed head | 9ff0b95efd84261df0f8c075b0dfb9f27742ef86 | Card must match the branch you measured |
 
 ### Stored data model
 - DecisionStore (memory and Redis): stream and live ingest now Put kind ban (	) for unknown LAPI types on existing Ip/header keys and Range 
