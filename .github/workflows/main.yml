@@ -26,7 +26,8 @@ jobs:
       CGO_ENABLED: 0
     defaults:
       run:
-        working-directory: ${{ github.workspace }}/go/src/github.com/${{ github.repository }}
+        # Yaegi v0.16 resolves imports from GOPATH/src/<module>, not github.repository.
+        working-directory: ${{ github.workspace }}/go/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
 
     steps:
 
@@ -40,7 +41,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v7
         with:
-          path: go/src/github.com/${{ github.repository }}
+          path: go/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
           fetch-depth: 0
 
       # https://github.com/marketplace/actions/cache
@@ -73,6 +74,17 @@ jobs:
 
       - name: Lint and Tests
         run: make
+
+      # Yaegi v0.16 resolves imports from GOPATH/src, not vendor.
+      - name: Expose vendor packages on GOPATH for Yaegi
+        run: |
+          gopath="${{ github.workspace }}/go"
+          for pkg in github.com/leprosus/golang-ttl-map github.com/maxlerebourg/simpleredis; do
+            dest="$gopath/src/$pkg"
+            mkdir -p "$(dirname "$dest")"
+            rm -rf "$dest"
+            cp -a "vendor/$pkg" "$dest"
+          done
 
       - name: Run tests with Yaegi
         run: make yaegi_test
