@@ -1,0 +1,16 @@
+issueKey: 2026-10-13-count-challenge-once
+jobName: Count a challenge drop once on master
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: e591ed2428c7c7714a4be990a3376122a4e950b5252bf46b567a0c9159b0bb65
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
