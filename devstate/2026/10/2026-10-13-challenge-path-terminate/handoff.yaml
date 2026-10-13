@@ -12,5 +12,5 @@ localTests: none
 requirement: requirement.md
 comments: none
 explore: explore.md
-change: none
+change: terminate-internal-challenge-paths
 pr: { id: 192, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/192 }
