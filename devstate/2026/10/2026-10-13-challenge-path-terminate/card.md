@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 2b7fae43
+Reviewed head: 729012fb
 Owner decision: None.
 
 ## Review scores
@@ -42,7 +42,8 @@ Owner decision: None.
 None.
 
 ## Deviations from the ask
-None.
+- taken: Update the spec and the README sentence that tells operators the prefix is safe whenever the middleware covers the host. → dest `main` has no OpenSpec catalog; document the 404 in README only. — `README.md` — honouring the wording would bootstrap `openspec/` as a new catalog on dest, which has no spec leaves or callers.. Requester: not asked.
+
 
 ## Follow-up issues
 None.
@@ -66,10 +67,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 2b7fae439d731929b6d2d7d75bd044408f92ac5d | Card must match the branch you measured |
+| Reviewed head | 729012fba3c7c869f0352ad5bffcadbda579466b | Card must match the branch you measured |
 
 ### Stored data model
 None.
-
-## Upstream
-This fork's gap versus [upstream PR 403](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403) (fixes [issue 402](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/402) point 4): on AppSec allow (or a nil decision) this plugin still calls `next` for `/crowdsec-internal/challenge/*`, so a host-wide middleware leaks those paths to origin. This change terminates that prefix with 404 here; it is not a copy of their patch.
