@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-10-13-count-challenge-once",
+  "jobName": "Count a challenge drop once on master",
+  "startedAt": "2026-10-13T20:10:42.364Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-13T20:15:24.568Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-13T20:19:45.960Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-13T20:22:47.821Z"
+    },
+    "implement": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "codereview": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "devdocsimpact": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "archive": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "pullrequest": {
+      "work": false,
+      "card": false,
+      "at": null
+    }
+  }
+}
