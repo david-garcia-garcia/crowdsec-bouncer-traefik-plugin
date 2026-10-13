@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: abe86e71
+Reviewed head: 99fd6fd0
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,14 +32,17 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-10-13-appsec-unexpected-status pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | appsec-unexpected-status-failure-action | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/191 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-appsec-unexpected-status/openspec/changes/appsec-unexpected-status-failure-action/proposal.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-appsec-unexpected-status/openspec/changes/appsec-unexpected-status-failure-action/proposal.md) — modified
+
 
 ## Deviations from the ask
 - taken: a status that is not 200, not 502/503/504, and not a parseable JSON action follows `bouncerAppsecFailureAction` (so a bare 403 would passthrough when configured). → HTTP 403 with empty or invalid JSON keeps today's Query error, which the bouncer bans. 401 and other unexpected statuses follow FailureAction. — `pkg/appsec/query.go interpretAppsecBody` — the challenge protocol already owns 403 as the verdict channel and fail-closes empty/invalid JSON; honouring the letter would add a FailureAction branch on that channel.. Requester: not asked.
@@ -68,9 +71,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | abe86e71e5286a3fb5e20b125f5e3cc80d7e14a8 | Card must match the branch you measured |
+| Reviewed head | 99fd6fd0a83297697aa5d045588e0fa65a226399 | Card must match the branch you measured |
 
 ### Stored data model
 None.
