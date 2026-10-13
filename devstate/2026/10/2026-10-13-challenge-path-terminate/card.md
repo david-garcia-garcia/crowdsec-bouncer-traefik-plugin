@@ -20,7 +20,7 @@ After a nil `appsecQuery` while AppSec is enabled, `handleNextServeHTTP` respond
 In progress. 0 items remain.
 
 Priority: P1 — leaking `/crowdsec-internal/challenge/` to origin is a wrong public contract today
-Reviewed head: 762fdb2a
+Reviewed head: 38114bc1
 Owner decision: None.
 
 ## Review scores
@@ -78,7 +78,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 762fdb2a80db80088030df37833b1d2189015424 | Card must match the branch you measured |
+| Reviewed head | 38114bc1b5e95131495e964cbaabf1146f6984ed | Card must match the branch you measured |
 
 ### Stored data model
 None.
