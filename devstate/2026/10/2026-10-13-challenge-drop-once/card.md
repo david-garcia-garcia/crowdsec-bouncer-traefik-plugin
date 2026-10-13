@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 6d8ba526
-Owner decision: None.
+Reviewed head: 2324266d
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -42,7 +42,8 @@ Owner decision: None.
 None.
 
 ## Deviations from the ask
-None.
+- taken: a relay under `/crowdsec-internal/challenge/` does not increment dropped (request or bytes). → skip `blockedRequests` only; do not add a bytes series. — `bouncer.go reportMetrics` — dest's metrics POST has a single `dropped` request item and no bytes series; adding bytes would change the POST shape, which the ask forbids.. Requester: not asked.
+
 
 ## Follow-up issues
 None.
@@ -53,7 +54,10 @@ Ticket 2026-10-13-challenge-drop-once on branch 2026-10-13-challenge-drop-once t
 Upstream: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403 (fixes https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/402, point 5). This fork's `main` has not merged upstream #343, so `handleAppsecResponseServeHTTP` does not exist here; PR 403 point 5 skips the dropped increment on `/crowdsec-internal/challenge/*` in that function. We are not copying their patch.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Dest has no challenge relay; can the skip attach without adding one? | additive asked — new relay unit this change creates; Desired names a relayed AppSec challenge envelope | assumed — add a minimal challenge-JSON relay in `bouncer.go` and skip `blockedRequests` under `/crowdsec-internal/challenge/`; do not merge #343 wholesale | explore |
+
 
 ## Findings
 None.
@@ -68,7 +72,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 6d8ba526081c320eb41a6142bbf7e176621538e5 | Card must match the branch you measured |
+| Reviewed head | 2324266df04d14cd9d218606d934a41ba85cdad6 | Card must match the branch you measured |
 
 ### Stored data model
 None.
