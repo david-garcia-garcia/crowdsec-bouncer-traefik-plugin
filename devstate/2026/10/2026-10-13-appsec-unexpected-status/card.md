@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 3b010e46
-Owner decision: None.
+Reviewed head: abe86e71
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -42,16 +42,20 @@ Owner decision: None.
 None.
 
 ## Deviations from the ask
-None.
+- taken: a status that is not 200, not 502/503/504, and not a parseable JSON action follows `bouncerAppsecFailureAction` (so a bare 403 would passthrough when configured). → HTTP 403 with empty or invalid JSON keeps today's Query error, which the bouncer bans. 401 and other unexpected statuses follow FailureAction. — `pkg/appsec/query.go interpretAppsecBody` — the challenge protocol already owns 403 as the verdict channel and fail-closes empty/invalid JSON; honouring the letter would add a FailureAction branch on that channel.. Requester: not asked.
+
 
 ## Follow-up issues
 None.
 
 ## How this fits together
-Ticket 2026-10-13-appsec-unexpected-status on branch 2026-10-13-appsec-unexpected-status targeting main; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/191; CI not seen.
+Ticket 2026-10-13-appsec-unexpected-status on branch 2026-10-13-appsec-unexpected-status targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/191; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Does HTTP 403 with empty or invalid JSON follow FailureAction (ticket letter) or stay fail-closed ban (challenge protocol)? | bounded incidental — existing `interpretAppsecBody` 403 error path and `Test_appsecQuery_emptyForbiddenErrors` (1 Query call site, roots `pkg/appsec`); requirement Desired names unexpected statuses, not the 403 fail-closed rows | assumed — keep fail-closed ban on 403 empty/invalid JSON; 401 and other unexpected statuses use FailureAction | explore |
+
 
 ## Findings
 None.
@@ -66,7 +70,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 3b010e4626a1cb5281b4e9a3d671d080e6b37b33 | Card must match the branch you measured |
+| Reviewed head | abe86e71e5286a3fb5e20b125f5e3cc80d7e14a8 | Card must match the branch you measured |
 
 ### Stored data model
 None.
