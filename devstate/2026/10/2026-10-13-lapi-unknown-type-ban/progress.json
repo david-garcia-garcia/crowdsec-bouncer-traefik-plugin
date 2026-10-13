@@ -29,9 +29,9 @@
       "at": "2026-10-13T18:16:36.488Z"
     },
     "devdocsimpact": {
-      "work": false,
-      "card": false,
-      "at": null
+      "work": true,
+      "card": true,
+      "at": "2026-10-13T18:17:35.980Z"
     },
     "archive": {
       "work": false,

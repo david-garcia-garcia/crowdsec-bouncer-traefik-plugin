@@ -20,7 +20,7 @@ CI Yaegi checkout is the go.mod module path (`github.com/maxlerebourg/crowdsec-b
 In progress. 0 items remain.
 
 Priority: P1 — production serves a wrong public contract today
-Reviewed head: 3d085498
+Reviewed head: aa2be164
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -80,7 +80,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 3d08549813f201e7e8d52380d06300f9fa99ff7c | Card must match the branch you measured |
+| Reviewed head | aa2be164bfc396bacc37dee260814d1fc8682174 | Card must match the branch you measured |
 
 ### Stored data model
 - Redis cache (when Redis cache is enabled): unknown LAPI decision keys now persist payload `t` (ban) instead of an empty string. Same key, same TTL. No schema or field change. Memory cache is process-local.
