@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: bc1a3e03
-Owner decision: None.
+Reviewed head: 3bfb3b59
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -51,7 +51,10 @@ None.
 Ticket 2026-10-13-ban-unknown-lapi-types on branch 2026-10-13-ban-unknown-lapi-types targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/198; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Should stream Range upserts map unknown types to ban, not only `streamPutItem`? | bounded asked — 1 Range call site in `pkg/lapi/client_stream.go` plus 3 other ingest sites in `pkg/lapi` (roots: `pkg/`); Desired "Stream, live, and none store and apply" | assumed — include Range in the ingest helper; still not `RemediationValue`. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | bc1a3e037c9d980f289a48bfed086c23d42db302 | Card must match the branch you measured |
+| Reviewed head | 3bfb3b5965522eafe6c4e181604682358b2edc74 | Card must match the branch you measured |
 
 ### Stored data model
 None.
