@@ -601,45 +601,30 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 	}
 }
 
-// newUnknownTypeCache is a memory cache client for unknown-type ingest tests.
-func newUnknownTypeCache(t *testing.T) *cache.Client {
-	t.Helper()
-	cacheClient := &cache.Client{}
-	cacheClient.New(logger.New("INFO", ""), false, "", nil, "", "")
-	return cacheClient
-}
-
-// newUnknownTypeLAPI serves a fixed LAPI body and returns the parsed URL.
-func newUnknownTypeLAPI(t *testing.T, body string) (*httptest.Server, *url.URL) {
-	t.Helper()
-	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		_, _ = rw.Write([]byte(body))
+// TestHandleStreamCacheUnknownTypesAreBanned fails if a stream challenge decision is skipped or allowed.
+func TestHandleStreamCacheUnknownTypesAreBanned(t *testing.T) {
+	lapiServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		_, _ = rw.Write([]byte(`{"new":[{"value":"192.0.2.80","type":"challenge","scope":"Ip","duration":"1h"}],"deleted":[]}`))
 	}))
-	t.Cleanup(server.Close)
-	parsed, err := url.Parse(server.URL)
+	defer lapiServer.Close()
+	lapiURL, err := url.Parse(lapiServer.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return server, parsed
-}
-
-// TestHandleStreamCacheUnknownTypesAreBanned fails if a stream challenge decision is skipped or allowed.
-func TestHandleStreamCacheUnknownTypesAreBanned(t *testing.T) {
-	const ip = "192.0.2.80"
-	server, lapiURL := newUnknownTypeLAPI(t, `{"new":[{"value":"`+ip+`","type":"challenge","scope":"Ip","duration":"1h"}],"deleted":[]}`)
-	cacheClient := newUnknownTypeCache(t)
+	cacheClient := &cache.Client{}
+	cacheClient.New(logger.New("INFO", ""), false, "", nil, "", "")
 	startup := isCrowdsecStreamStartup
-	t.Cleanup(func() {
+	defer func() {
 		cacheClient.Delete(cacheTimeoutKey)
-		cacheClient.Delete(ip)
+		cacheClient.Delete("192.0.2.80")
 		isCrowdsecStreamStartup = startup
-	})
+	}()
 	bouncer := &Bouncer{
 		crowdsecScheme:      lapiURL.Scheme,
 		crowdsecHost:        lapiURL.Host,
 		crowdsecStreamRoute: crowdsecLapiStreamRoute,
 		crowdsecHeader:      crowdsecLapiHeader,
-		httpClient:          server.Client(),
+		httpClient:          lapiServer.Client(),
 		cacheClient:         cacheClient,
 		updateInterval:      60,
 		log:                 logger.New("INFO", ""),
@@ -647,7 +632,7 @@ func TestHandleStreamCacheUnknownTypesAreBanned(t *testing.T) {
 	if err := handleStreamCache(bouncer); err != nil {
 		t.Fatal(err)
 	}
-	got, err := cacheClient.Get(ip)
+	got, err := cacheClient.Get("192.0.2.80")
 	if err != nil || got != cache.BannedValue {
 		t.Fatalf("challenge stream cache Get=%q err=%v, want %q", got, err, cache.BannedValue)
 	}
@@ -655,21 +640,28 @@ func TestHandleStreamCacheUnknownTypesAreBanned(t *testing.T) {
 
 // TestHandleStreamCacheAllowTypeIsBanned fails if a stream allow decision is skipped or allowed.
 func TestHandleStreamCacheAllowTypeIsBanned(t *testing.T) {
-	const ip = "192.0.2.81"
-	server, lapiURL := newUnknownTypeLAPI(t, `{"new":[{"value":"`+ip+`","type":"allow","scope":"Ip","duration":"1h"}],"deleted":[]}`)
-	cacheClient := newUnknownTypeCache(t)
+	lapiServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		_, _ = rw.Write([]byte(`{"new":[{"value":"192.0.2.81","type":"allow","scope":"Ip","duration":"1h"}],"deleted":[]}`))
+	}))
+	defer lapiServer.Close()
+	lapiURL, err := url.Parse(lapiServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cacheClient := &cache.Client{}
+	cacheClient.New(logger.New("INFO", ""), false, "", nil, "", "")
 	startup := isCrowdsecStreamStartup
-	t.Cleanup(func() {
+	defer func() {
 		cacheClient.Delete(cacheTimeoutKey)
-		cacheClient.Delete(ip)
+		cacheClient.Delete("192.0.2.81")
 		isCrowdsecStreamStartup = startup
-	})
+	}()
 	bouncer := &Bouncer{
 		crowdsecScheme:      lapiURL.Scheme,
 		crowdsecHost:        lapiURL.Host,
 		crowdsecStreamRoute: crowdsecLapiStreamRoute,
 		crowdsecHeader:      crowdsecLapiHeader,
-		httpClient:          server.Client(),
+		httpClient:          lapiServer.Client(),
 		cacheClient:         cacheClient,
 		updateInterval:      60,
 		log:                 logger.New("INFO", ""),
@@ -677,7 +669,7 @@ func TestHandleStreamCacheAllowTypeIsBanned(t *testing.T) {
 	if err := handleStreamCache(bouncer); err != nil {
 		t.Fatal(err)
 	}
-	got, err := cacheClient.Get(ip)
+	got, err := cacheClient.Get("192.0.2.81")
 	if err != nil || got != cache.BannedValue {
 		t.Fatalf("allow stream cache Get=%q err=%v, want %q", got, err, cache.BannedValue)
 	}
@@ -685,25 +677,32 @@ func TestHandleStreamCacheAllowTypeIsBanned(t *testing.T) {
 
 // TestHandleNoStreamCacheUnknownTypesAreBanned fails if a live challenge decision is not stored as a ban.
 func TestHandleNoStreamCacheUnknownTypesAreBanned(t *testing.T) {
-	const ip = "192.0.2.82"
-	server, lapiURL := newUnknownTypeLAPI(t, `[{"value":"`+ip+`","type":"challenge","scope":"Ip","duration":"1h"}]`)
-	cacheClient := newUnknownTypeCache(t)
-	t.Cleanup(func() { cacheClient.Delete(ip) })
+	lapiServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		_, _ = rw.Write([]byte(`[{"value":"192.0.2.82","type":"challenge","scope":"Ip","duration":"1h"}]`))
+	}))
+	defer lapiServer.Close()
+	lapiURL, err := url.Parse(lapiServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cacheClient := &cache.Client{}
+	cacheClient.New(logger.New("INFO", ""), false, "", nil, "", "")
+	defer cacheClient.Delete("192.0.2.82")
 	bouncer := &Bouncer{
 		crowdsecScheme:         lapiURL.Scheme,
 		crowdsecHost:           lapiURL.Host,
 		crowdsecHeader:         crowdsecLapiHeader,
 		crowdsecMode:           configuration.LiveMode,
-		httpClient:             server.Client(),
+		httpClient:             lapiServer.Client(),
 		cacheClient:            cacheClient,
 		defaultDecisionTimeout: 60,
 		log:                    logger.New("INFO", ""),
 	}
-	got, err := handleNoStreamCache(bouncer, ip)
+	got, liveErr := handleNoStreamCache(bouncer, "192.0.2.82")
 	if got != cache.BannedValue {
-		t.Fatalf("challenge live value=%q err=%v, want %q", got, err, cache.BannedValue)
+		t.Fatalf("challenge live value=%q err=%v, want %q", got, liveErr, cache.BannedValue)
 	}
-	cached, cacheErr := cacheClient.Get(ip)
+	cached, cacheErr := cacheClient.Get("192.0.2.82")
 	if cacheErr != nil || cached != cache.BannedValue {
 		t.Fatalf("challenge live cache Get=%q err=%v, want %q", cached, cacheErr, cache.BannedValue)
 	}
@@ -711,22 +710,29 @@ func TestHandleNoStreamCacheUnknownTypesAreBanned(t *testing.T) {
 
 // TestHandleNoStreamCacheEmptyListIsAllowed fails if an empty live decision list is treated as a ban.
 func TestHandleNoStreamCacheEmptyListIsAllowed(t *testing.T) {
-	const ip = "192.0.2.83"
-	server, lapiURL := newUnknownTypeLAPI(t, `[]`)
-	cacheClient := newUnknownTypeCache(t)
-	t.Cleanup(func() { cacheClient.Delete(ip) })
+	lapiServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		_, _ = rw.Write([]byte(`[]`))
+	}))
+	defer lapiServer.Close()
+	lapiURL, err := url.Parse(lapiServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cacheClient := &cache.Client{}
+	cacheClient.New(logger.New("INFO", ""), false, "", nil, "", "")
+	defer cacheClient.Delete("192.0.2.83")
 	bouncer := &Bouncer{
 		crowdsecScheme:         lapiURL.Scheme,
 		crowdsecHost:           lapiURL.Host,
 		crowdsecHeader:         crowdsecLapiHeader,
 		crowdsecMode:           configuration.LiveMode,
-		httpClient:             server.Client(),
+		httpClient:             lapiServer.Client(),
 		cacheClient:            cacheClient,
 		defaultDecisionTimeout: 60,
 		log:                    logger.New("INFO", ""),
 	}
-	got, err := handleNoStreamCache(bouncer, ip)
-	if err != nil || got != cache.NoBannedValue {
-		t.Fatalf("empty live list value=%q err=%v, want %q and nil err", got, err, cache.NoBannedValue)
+	got, liveErr := handleNoStreamCache(bouncer, "192.0.2.83")
+	if liveErr != nil || got != cache.NoBannedValue {
+		t.Fatalf("empty live list value=%q err=%v, want %q and nil err", got, liveErr, cache.NoBannedValue)
 	}
 }
