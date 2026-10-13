@@ -1,23 +1,22 @@
 ## Motivation
-Not yet.
+A LAPI or blocklist decision whose type is neither ban nor captcha is skipped at ingest. Stream Put, Range upsert, and live/none query then treat the client as clean. Type challenge is the CrowdSec case that carries nothing to render; type allow and any other unknown type take the same skip. lua-cs-bouncer fails those types closed to ban. Leaving the skip in place lets an IP with an active unknown decision through.
+
+Priority: P1 — unknown LAPI types fail open today
 
 ## Implementation
-Not yet.
+LAPI ingest maps ban and captcha through RemediationValue and stores every other type as ban, TRACE-logging handleStreamCache:unknownType via logger.Trace. streamPutItem, Range upsert, strongestLiveDecision, and queryLiveDecisions share that helper. RemediationValue stays empty so origin remap still treats empty as not a code. Same job as upstream https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403 point 1; this fork applies it at LAPI ingest because master has no root bouncer.go.
 
 ## What this changes
-**Operators.** None.
-
+**Operators.** Unknown LAPI decision types (challenge, allow, anything else) now ban instead of allowing the IP. The unknown-type log is TRACE, not Info.
 **Admin users.** None.
-
-**Developers.** None.
-
-**End users.** None.
+**Developers.** LAPI ingest stores unknown types as ban; RemediationValue still returns empty for those types.
+**End users.** A client with only an unknown-type LAPI decision is banned instead of allowed.
 
 ## Merge readiness
 In progress. 0 items remain.
 
-Priority: unknown — motivation not written
-Reviewed head: 5a02dcd0
+Priority: P1 — unknown LAPI types fail open today
+Reviewed head: 766ed786
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -63,7 +62,15 @@ Ticket 2026-10-13-ban-unknown-lapi-types on branch 2026-10-13-ban-unknown-lapi-t
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-ban-unknown-lapi-types/devstate/2026/10/2026-10-13-ban-unknown-lapi-types/codereview_standards.md) — 0 total, 0 pending, 0 completed
+[Nitpicks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-ban-unknown-lapi-types/devstate/2026/10/2026-10-13-ban-unknown-lapi-types/codereview_nitpicks.md) — 0 total, 0 pending, 0 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-ban-unknown-lapi-types/devstate/2026/10/2026-10-13-ban-unknown-lapi-types/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Scope](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-ban-unknown-lapi-types/devstate/2026/10/2026-10-13-ban-unknown-lapi-types/codereview_scope.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-ban-unknown-lapi-types/devstate/2026/10/2026-10-13-ban-unknown-lapi-types/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-ban-unknown-lapi-types/devstate/2026/10/2026-10-13-ban-unknown-lapi-types/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-ban-unknown-lapi-types/devstate/2026/10/2026-10-13-ban-unknown-lapi-types/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-ban-unknown-lapi-types/devstate/2026/10/2026-10-13-ban-unknown-lapi-types/codereview_coverage.md) — 0 total, 0 pending, 0 completed
+
 
 ## Agent review details
 
@@ -72,7 +79,8 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 5a02dcd07a266e751038fc5abaa2f790bcfd0d16 | Card must match the branch you measured |
+| Reviewed head | 766ed786178c533c6b3c9df7ca28b96f319baa12 | Card must match the branch you measured |
 
 ### Stored data model
-None.
+- DecisionStore (memory and Redis): stream and live ingest now Put kind ban (	) for unknown LAPI types on existing Ip/header keys and Range 
+ange-index lines. KindOriginString format is unchanged. No schema or field added or removed.
