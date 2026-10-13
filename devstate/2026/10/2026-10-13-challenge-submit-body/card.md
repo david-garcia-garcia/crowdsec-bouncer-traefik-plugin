@@ -20,7 +20,7 @@ Two README seams now state the same facts: `/crowdsec-internal/challenge/submit`
 In progress. 0 items remain.
 
 Priority: P3 — docs and operator clarity; no current runtime change
-Reviewed head: 4083ee68
+Reviewed head: 2e19fd72
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -80,7 +80,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 4083ee681586cf1290ba9ea71455a649e1a794dd | Card must match the branch you measured |
+| Reviewed head | 2e19fd72a3cdccfa4c1472bec90a5ac534be60ce | Card must match the branch you measured |
 
 ### Stored data model
 None.
