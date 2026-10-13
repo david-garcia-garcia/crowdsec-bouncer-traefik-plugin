@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 55ce127d
-Owner decision: None.
+Reviewed head: fcc6d408
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -51,7 +51,10 @@ None.
 Ticket 2026-10-13-challenge-submit-body on branch 2026-10-13-challenge-submit-body targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/194; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Does CrowdSec AppSec reject a truncated `/crowdsec-internal/challenge/submit` body and re-challenge forever? | additive asked — Desired names the forever-challenge consequence as the reason to document; no engine code moves | assumed — write the operator warning as asked; do not claim this run measured the engine. Research already says the POST body must be relayed; upstream PR 403 asserts reject-and-retry. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 55ce127dff20983f0f4daf341f7f89d41dbfb89f | Card must match the branch you measured |
+| Reviewed head | fcc6d408aeca7df751cd696202569dd636b02264 | Card must match the branch you measured |
 
 ### Stored data model
 None.
