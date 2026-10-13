@@ -17,14 +17,14 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: a9fa005d
+Reviewed head: 5a02dcd0
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38463159991 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | N/A | no OPEN PR |
 
@@ -34,8 +34,8 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-10-13-ban-unknown-lapi-types pushed | `git` |
 | OpenSpec | ban-unknown-lapi-types | `openspec/` |
 | Pull request | none | pr-host |
-| CI | not seen | caller omitted CI snapshot |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 38463159991 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38463159991 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38463159991 |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
@@ -51,7 +51,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-13-ban-unknown-lapi-types on branch 2026-10-13-ban-unknown-lapi-types targeting master; PR no PR yet; CI not seen.
+Ticket 2026-10-13-ban-unknown-lapi-types on branch 2026-10-13-ban-unknown-lapi-types targeting master; PR no PR yet; CI build 38463159991 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38463159991.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -72,7 +72,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | a9fa005da2bd514551a5efd959ce98bcc7bcf151 | Card must match the branch you measured |
+| Reviewed head | 5a02dcd07a266e751038fc5abaa2f790bcfd0d16 | Card must match the branch you measured |
 
 ### Stored data model
 None.
