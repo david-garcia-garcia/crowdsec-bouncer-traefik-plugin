@@ -27,21 +27,22 @@ import (
 )
 
 const (
-	crowdsecAppsecIPHeader   = "X-Crowdsec-Appsec-Ip"
-	crowdsecAppsecURIHeader  = "X-Crowdsec-Appsec-Uri"
-	crowdsecAppsecHostHeader = "X-Crowdsec-Appsec-Host"
-	crowdsecAppsecVerbHeader = "X-Crowdsec-Appsec-Verb"
-	crowdsecAppsecHeader     = "X-Crowdsec-Appsec-Api-Key"
-	crowdsecAppsecUserAgent  = "X-Crowdsec-Appsec-User-Agent"
-	crowdsecLapiHeader       = "X-Api-Key"
-	crowdsecLapiRoute        = "v1/decisions"
-	crowdsecLapiStreamRoute  = "v1/decisions/stream"
-	crowdsecLapiMetricsRoute = "v1/usage-metrics"
-	crowdsecCapiHost         = "api.crowdsec.net"
-	crowdsecCapiHeader       = "Authorization"
-	crowdsecCapiLoginRoute   = "v2/watchers/login"
-	crowdsecCapiStreamRoute  = "v2/decisions/stream"
-	cacheTimeoutKey          = "updated"
+	crowdsecAppsecIPHeader    = "X-Crowdsec-Appsec-Ip"
+	crowdsecAppsecURIHeader   = "X-Crowdsec-Appsec-Uri"
+	crowdsecAppsecHostHeader  = "X-Crowdsec-Appsec-Host"
+	crowdsecAppsecVerbHeader  = "X-Crowdsec-Appsec-Verb"
+	crowdsecAppsecHeader      = "X-Crowdsec-Appsec-Api-Key"
+	crowdsecAppsecUserAgent   = "X-Crowdsec-Appsec-User-Agent"
+	appsecChallengePathPrefix = "/crowdsec-internal/challenge/"
+	crowdsecLapiHeader        = "X-Api-Key"
+	crowdsecLapiRoute         = "v1/decisions"
+	crowdsecLapiStreamRoute   = "v1/decisions/stream"
+	crowdsecLapiMetricsRoute  = "v1/usage-metrics"
+	crowdsecCapiHost          = "api.crowdsec.net"
+	crowdsecCapiHeader        = "Authorization"
+	crowdsecCapiLoginRoute    = "v2/watchers/login"
+	crowdsecCapiStreamRoute   = "v2/decisions/stream"
+	cacheTimeoutKey           = "updated"
 )
 
 // ##############################################################
@@ -487,11 +488,18 @@ func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *
 	bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonLAPI)
 }
 
+// handleNextServeHTTP runs AppSec when enabled, then remediates, 404s an unanswered
+// challenge path, or calls next.
 func (bouncer *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string) {
 	if bouncer.appsecEnabled {
 		if err := appsecQuery(bouncer, remoteIP, req); err != nil {
 			bouncer.log.Debug(fmt.Sprintf("handleNextServeHTTP ip:%s isWaf:true %s", remoteIP, err.Error()))
 			bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
+			return
+		}
+		// AppSec allow/passthrough must not send CrowdSec challenge assets to origin.
+		if strings.HasPrefix(req.URL.Path, appsecChallengePathPrefix) {
+			http.NotFound(rw, req)
 			return
 		}
 	}

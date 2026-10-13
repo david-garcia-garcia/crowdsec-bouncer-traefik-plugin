@@ -600,3 +600,62 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 		})
 	}
 }
+
+// TestHandleNextServeHTTPKeepsChallengePathsFromTheBackend proves AppSec HTTP 200
+// on /crowdsec-internal/challenge/custom.js is 404 and next is not called.
+func TestHandleNextServeHTTPKeepsChallengePathsFromTheBackend(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+	appsecURL, err := url.Parse(appsecServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nextCalled := false
+	bouncer := &Bouncer{
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			nextCalled = true
+		}),
+		appsecEnabled:    true,
+		appsecScheme:     appsecURL.Scheme,
+		appsecHost:       appsecURL.Host,
+		appsecPath:       "/",
+		httpAppsecClient: appsecServer.Client(),
+		log:              logger.New("ERROR", ""),
+	}
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/crowdsec-internal/challenge/custom.js", nil)
+	bouncer.handleNextServeHTTP(recorder, req, "192.0.2.10")
+	if nextCalled || recorder.Code != http.StatusNotFound {
+		t.Fatalf("expected a 404 without reaching the backend, got status %d (next called: %t)", recorder.Code, nextCalled)
+	}
+}
+
+// TestHandleNextServeHTTPAllowCallsNext proves a normal path that AppSec allows still calls next.
+func TestHandleNextServeHTTPAllowCallsNext(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+	appsecURL, err := url.Parse(appsecServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nextCalled := false
+	bouncer := &Bouncer{
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			nextCalled = true
+		}),
+		appsecEnabled:    true,
+		appsecScheme:     appsecURL.Scheme,
+		appsecHost:       appsecURL.Host,
+		appsecPath:       "/",
+		httpAppsecClient: appsecServer.Client(),
+		log:              logger.New("ERROR", ""),
+	}
+	bouncer.handleNextServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10")
+	if !nextCalled {
+		t.Fatal("next handler should be called for allow")
+	}
+}

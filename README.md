@@ -29,6 +29,8 @@ The AppSec Component offers:
 
 More information on appsec in the [Crowdsec Documentation](https://doc.crowdsec.net/docs/next/appsec/intro/).
 
+**Bot detection (CrowdSec 1.8+).** Challenge pages call back under `/crowdsec-internal/challenge/`. Those URLs must go through this middleware so AppSec can answer them. When AppSec is enabled and does not serve a path under that prefix (for example HTTP 200 on `/crowdsec-internal/challenge/custom.js` when no custom script is configured), the plugin responds 404 and does not forward to origin. Covering every path of the host with the middleware is not enough by itself: without that 404, an AppSec allow would reach the backend. Clients in `bouncerClientTrustedIps` skip the plugin, so they are the only exception. If the middleware only covers some paths (for example `/api`), add a router for `PathPrefix(`/crowdsec-internal/challenge`)` with the same middleware. See [CrowdSec bot detection](https://docs.crowdsec.net/docs/next/appsec/bot_detection/intro.md).
+
 Remediation offered by [Crowdsec](https://docs.crowdsec.net/u/bouncers/intro) and supported by the plugin can be either `ban` or `captcha`.  
 For the `ban` remediation the user will be blocked in Traefik (HTTP 403).  
 For the `captcha` remediation, the user will be redirected to a page to complete a captcha challenge.
