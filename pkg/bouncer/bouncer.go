@@ -317,7 +317,7 @@ func (b *Bouncer) serveAppSec(rw http.ResponseWriter, req clientrequest.Request,
 	if b.applyAppsecServeHTTP(rw, req, match) {
 		return true
 	}
-	// Unanswered AppSec on the challenge prefix must not reach origin.
+	// Unanswered AppSec (allow or failure-action passthrough) on the challenge prefix must not reach origin.
 	if isAppsecChallengePath(req.URL.Path) {
 		http.NotFound(rw, req.Request)
 		return true
