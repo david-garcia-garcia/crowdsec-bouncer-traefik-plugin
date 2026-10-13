@@ -20,7 +20,7 @@ Public config `bouncerAppsecFailureAction` SHALL be one of `passthrough`, `ban`,
 - **THEN** plugin initialization fails validation
 
 ### Requirement: One action covers 500, unreachable, and unreadable body
-`BouncerAppsecFailureAction` SHALL apply to: AppSec HTTP 500; transport failure or HTTP 502/503/504; an unreadable HTTP/2 or HTTP/3 body on POST, PUT, or PATCH; and an io error while reading the AppSec response body. `ban` SHALL drop the request. `passthrough` on 500, unreachable, or AppSec response-body io error SHALL continue as allow (then `next`). `passthrough` on unreadable body SHALL keep today’s headers-only GET to AppSec. `captcha` SHALL use the configured captcha client (`pkg/captcha`), not AppSec JSON `action: captcha`. HTTP 502, 503, and 504 from the AppSec listener SHALL be unreachable (same fallback as a transport failure), not a generic non-200 ban. DELETE SHALL NOT be treated as a method that would have sent a body. An oversized AppSec response body SHALL NOT use this action: HTTP 200 SHALL allow and non-200 SHALL error as today. A response-body io error SHALL keep the `appsecQuery:readBody` error string (MUST NOT collapse to `appsecQuery:unreachable`). A classified client disconnect while buffering a readable request body SHALL NOT use this action (`core_plugin_appsec_client`, `core_plugin_middleware_bouncer`). Unclassified errors during client body buffering SHALL keep the `appsecQuery:GetBody` path and today's ban wiring.
+`BouncerAppsecFailureAction` SHALL apply to: AppSec HTTP 500; AppSec HTTP 401; any other unexpected listener status that is not 200, not 403, not 500, and not 502/503/504, when the body has no parseable JSON with a non-empty `action`; transport failure or HTTP 502/503/504; an unreadable HTTP/2 or HTTP/3 body on POST, PUT, or PATCH; and an io error while reading the AppSec response body. `ban` SHALL drop the request. `passthrough` on 500, 401, unexpected status, unreachable, or AppSec response-body io error SHALL continue as allow (then `next`). `passthrough` on unreadable body SHALL keep today’s headers-only GET to AppSec. `captcha` SHALL use the configured captcha client (`pkg/captcha`), not AppSec JSON `action: captcha`. HTTP 502, 503, and 504 from the AppSec listener SHALL be unreachable (same fallback as a transport failure), not a generic non-200 ban. DELETE SHALL NOT be treated as a method that would have sent a body. An oversized AppSec response body SHALL NOT use this action: HTTP 200 SHALL allow and non-200 SHALL error as today. A response-body io error SHALL keep the `appsecQuery:readBody` error string (MUST NOT collapse to `appsecQuery:unreachable`). A classified client disconnect while buffering a readable request body SHALL NOT use this action (`core_plugin_appsec_client`, `core_plugin_middleware_bouncer`). Unclassified errors during client body buffering SHALL keep the `appsecQuery:GetBody` path and today's ban wiring. An unexpected-status or 401 failure SHALL be logged at Error with the listener status code. HTTP 500 logging SHALL stay as today.
 
 #### Scenario: Unreachable passthrough
 - **WHEN** AppSec is unreachable and `bouncerAppsecFailureAction` is `passthrough`
@@ -62,12 +62,32 @@ Public config `bouncerAppsecFailureAction` SHALL be one of `passthrough`, `ban`,
 - **WHEN** buffering a readable POST, PUT, PATCH, or DELETE body for AppSec fails because the client disconnected or canceled
 - **THEN** `bouncerAppsecFailureAction` does not choose ban, passthrough, or captcha
 
+#### Scenario: HTTP 401 passthrough allows
+- **WHEN** the AppSec listener returns HTTP 401 with no parseable JSON `action` and `bouncerAppsecFailureAction` is `passthrough`
+- **THEN** Query returns allow and the bouncer calls `next`
+
+#### Scenario: HTTP 401 ban forbids
+- **WHEN** the AppSec listener returns HTTP 401 with no parseable JSON `action` and `bouncerAppsecFailureAction` is `ban`
+- **THEN** Query forbids with `appsecQuery statusCode:401`
+
+#### Scenario: HTTP 401 captcha serves captcha
+- **WHEN** the AppSec listener returns HTTP 401 with no parseable JSON `action` and `bouncerAppsecFailureAction` is `captcha`
+- **THEN** Query returns `ErrFailureCaptcha` and the bouncer serves the captcha client
+
+#### Scenario: Unexpected status passthrough allows
+- **WHEN** the AppSec listener returns an unexpected status (not 200, not 403, not 500, not 502/503/504) with no parseable JSON `action` and `bouncerAppsecFailureAction` is `passthrough`
+- **THEN** Query returns allow and the bouncer calls `next`
+
 ### Requirement: Structured AppSec verdicts are not failure actions
-HTTP 200 and parseable AppSec JSON `action` values (`allow`, `ban`, `challenge`, AppSec `captcha` HTML) SHALL keep existing bot-detection behavior. `BouncerAppsecFailureAction` MUST NOT rewrite those envelopes. Legacy empty/non-JSON non-200 (other than 500/502/503/504) SHALL still ban.
+HTTP 200 and parseable AppSec JSON `action` values (`allow`, `ban`, `challenge`, AppSec `captcha` HTML, or any other non-empty action) SHALL keep existing bot-detection behavior. `BouncerAppsecFailureAction` MUST NOT rewrite those envelopes. HTTP 403 with an empty body or invalid JSON SHALL stay fail-closed ban and MUST NOT use `bouncerAppsecFailureAction`. HTTP 401 and other unexpected listener statuses without a parseable non-empty `action` SHALL use `bouncerAppsecFailureAction` (`core_plugin_appsec_failure-action` One action covers 500, unreachable, and unreadable body).
 
 #### Scenario: Challenge still relays
 - **WHEN** AppSec returns HTTP 403 with `action` `challenge` and a non-empty body
 - **THEN** the bouncer relays that envelope regardless of `bouncerAppsecFailureAction`
+
+#### Scenario: Empty 403 still bans
+- **WHEN** AppSec returns HTTP 403 with an empty body
+- **THEN** Query returns an error and the client is forbidden regardless of `bouncerAppsecFailureAction`
 
 ### Requirement: Captcha failure action works in appsec mode
 `bouncerAppsecFailureAction: captcha` SHALL serve the captcha challenge from the subscribed published captcha client in every `lapiMode`, AppSec-only included. `bouncer.New` MUST NOT construct a local captcha client for that action. `handleRemediationServeHTTP` SHALL ban when the loaded captcha client is empty or not valid. AppSec-only with `captcha` action SHALL subscribe to `captchaInstanceName` the same way any other bouncing router does.

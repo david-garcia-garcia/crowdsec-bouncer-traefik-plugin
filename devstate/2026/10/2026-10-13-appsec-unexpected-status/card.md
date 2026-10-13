@@ -18,7 +18,7 @@ Query still parses a JSON `action` first. After `interpretAppsecBody` errors, HT
 Ready for review. 0 items remain.
 
 Priority: P2 — real operator pain with a limited blast radius (only AppSec 401/unexpected, default action remains ban)
-Reviewed head: d0db6997
+Reviewed head: f1b5c6bd
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -82,7 +82,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | d0db699758ad818e6a92471ede98f5c4eaa33968 | Card must match the branch you measured |
+| Reviewed head | f1b5c6bdb968405c7f5d25423c0850ab198e57fa | Card must match the branch you measured |
 
 ### Stored data model
 None.
