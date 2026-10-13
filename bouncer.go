@@ -500,6 +500,7 @@ func (bouncer *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req *
 	bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonLAPI)
 }
 
+// handleNextServeHTTP queries AppSec when enabled, then either relays a challenge, bans, or calls next.
 func (bouncer *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Request, remoteIP string) {
 	if bouncer.appsecEnabled {
 		decision, err := appsecQuery(bouncer, remoteIP, req)
@@ -508,11 +509,11 @@ func (bouncer *Bouncer) handleNextServeHTTP(rw http.ResponseWriter, req *http.Re
 			bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
 			return
 		}
+		if decision != nil && decision.Action == appsecChallengeAction {
+			bouncer.handleAppsecResponseServeHTTP(rw, req, decision)
+			return
+		}
 		if decision != nil && decision.Action != appsecAllowAction {
-			if decision.Action == appsecChallengeAction {
-				bouncer.handleAppsecResponseServeHTTP(rw, req, decision)
-				return
-			}
 			bouncer.handleBanServeHTTP(rw, req, remoteIP, configuration.ReasonAPPSEC)
 			return
 		}
@@ -813,6 +814,7 @@ func isMethodWithBody(method string) bool {
 	}
 }
 
+// appsecQuery asks AppSec about this request. A parsed challenge action is returned with a nil error; other hits stay an error so the caller bans.
 func appsecQuery(bouncer *Bouncer, ip string, httpReq *http.Request) (*AppSecResponse, error) {
 	routeURL := url.URL{
 		Scheme: bouncer.appsecScheme,
