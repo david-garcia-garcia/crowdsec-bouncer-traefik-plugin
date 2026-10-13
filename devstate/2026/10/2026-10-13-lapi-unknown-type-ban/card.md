@@ -1,30 +1,33 @@
 ## Motivation
-Not yet.
+Stream ingest stored a LAPI decision whose type was neither `ban` nor `captcha` (for example `challenge`) as an empty cache payload. Cache Get treats empty as a miss. A healthy stream then allowed the IP.
+
+Live and none returned that empty payload on the first query (already remediates as a ban) and cached a miss, so the next Get repeated the LAPI call. CrowdSec's challenge protocol and lua-cs-bouncer fail closed to ban for unsupported types. Leaving stream allow is a wrong public contract for those IPs.
+
+Priority: P1 — production serves a wrong public contract today
 
 ## Implementation
-Not yet.
+Both ingest switches call `lapiDecisionRemediation`, which maps `ban` and `captcha` to their cache payloads and maps every other type to `cache.BannedValue` after the existing `handleStreamCache:unknownType` Info log. Empty lists and JSON `null` stay `cache.NoBannedValue`. Tests assert stream Get and live cache for `challenge`/`allow`, and an empty live list still allowed.
+
+CI Yaegi checkout is the go.mod module path (`github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin`) with vendor packages copied onto GOPATH/src, so this fork can load `pkg/cache`. Dest `main` already failed that check.
 
 ## What this changes
-**Operators.** None.
-
+**Operators.** A `challenge` or other unknown LAPI/blocklist decision now bans the IP in stream, live, and none.
 **Admin users.** None.
-
-**Developers.** None.
-
-**End users.** None.
+**Developers.** Ingest unknown types store `cache.BannedValue`; Yaegi CI checkouts at the Go module path.
+**End users.** An IP with an unknown LAPI type is banned instead of allowed in stream mode.
 
 ## Merge readiness
-Ready for review. 0 items remain.
+In progress. 0 items remain.
 
-Priority: unknown — motivation not written
-Reviewed head: 49d30238
+Priority: P1 — production serves a wrong public contract today
+Reviewed head: 3d085498
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38444677056 |
+| Overall readiness | 1/6 | Not ready |
+| CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -34,7 +37,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-10-13-lapi-unknown-type-ban pushed | `git` |
 | OpenSpec | ban-unknown-lapi-decision-types | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/193 | pr-host |
-| CI | build 38444677056 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38444677056 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38444677056 |
+| CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -48,7 +51,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-13-lapi-unknown-type-ban on branch 2026-10-13-lapi-unknown-type-ban targeting main; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/193; CI build 38444677056 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38444677056.
+Ticket 2026-10-13-lapi-unknown-type-ban on branch 2026-10-13-lapi-unknown-type-ban targeting main; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/193; CI not seen.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -60,7 +63,15 @@ Ticket 2026-10-13-lapi-unknown-type-ban on branch 2026-10-13-lapi-unknown-type-b
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-lapi-unknown-type-ban/devstate/2026/10/2026-10-13-lapi-unknown-type-ban/codereview_standards.md) — 0 total, 0 pending, 0 completed
+[Nitpicks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-lapi-unknown-type-ban/devstate/2026/10/2026-10-13-lapi-unknown-type-ban/codereview_nitpicks.md) — 0 total, 0 pending, 0 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-lapi-unknown-type-ban/devstate/2026/10/2026-10-13-lapi-unknown-type-ban/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Scope](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-lapi-unknown-type-ban/devstate/2026/10/2026-10-13-lapi-unknown-type-ban/codereview_scope.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-lapi-unknown-type-ban/devstate/2026/10/2026-10-13-lapi-unknown-type-ban/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-lapi-unknown-type-ban/devstate/2026/10/2026-10-13-lapi-unknown-type-ban/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-lapi-unknown-type-ban/devstate/2026/10/2026-10-13-lapi-unknown-type-ban/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-lapi-unknown-type-ban/devstate/2026/10/2026-10-13-lapi-unknown-type-ban/codereview_coverage.md) — 0 total, 0 pending, 0 completed
+
 
 ## Agent review details
 
@@ -69,7 +80,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 49d30238601d24a1cb19b0a4a81c3406b5d5d212 | Card must match the branch you measured |
+| Reviewed head | 3d08549813f201e7e8d52380d06300f9fa99ff7c | Card must match the branch you measured |
 
 ### Stored data model
-None.
+- Redis cache (when Redis cache is enabled): unknown LAPI decision keys now persist payload `t` (ban) instead of an empty string. Same key, same TTL. No schema or field change. Memory cache is process-local.
