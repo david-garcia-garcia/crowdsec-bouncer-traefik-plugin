@@ -1,0 +1,18 @@
+issueKey: 2026-10-13-terminate-challenge-paths
+jobName: Terminate challenge paths on master
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: b889fa4924c88196c82f05e337ae972e22dd822e809441fe293b7e14749996e6
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: terminate-unanswered-challenge-paths
+pr:
+  id: 196
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/196

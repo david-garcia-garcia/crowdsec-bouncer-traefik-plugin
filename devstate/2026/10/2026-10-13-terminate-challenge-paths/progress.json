@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-10-13-terminate-challenge-paths",
+  "jobName": "Terminate challenge paths on master",
+  "startedAt": "2026-10-13T20:10:36.901Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-13T20:14:14.482Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-13T20:17:50.642Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-13T20:21:03.884Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-13T20:39:22.515Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-13T20:41:00.610Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": false,
+      "at": null
+    },
+    "archive": {
+      "work": false,
+      "card": false,
+      "at": null
+    },
+    "pullrequest": {
+      "work": false,
+      "card": false,
+      "at": null
+    }
+  }
+}
