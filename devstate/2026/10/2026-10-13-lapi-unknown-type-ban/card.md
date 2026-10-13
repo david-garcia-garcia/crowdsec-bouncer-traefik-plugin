@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 604ad777
+Reviewed head: b640bbd0
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,7 +32,7 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-10-13-lapi-unknown-type-ban pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | ban-unknown-lapi-decision-types | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/193 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
@@ -69,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 604ad777164202daf41d2dc5b07238c1be154ebc | Card must match the branch you measured |
+| Reviewed head | b640bbd04077937ebbf7a0354cf8de9bcad19ac9 | Card must match the branch you measured |
 
 ### Stored data model
 None.
