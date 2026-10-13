@@ -292,8 +292,18 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 	return true
 }
 
+// appsecChallengePathPrefix is the CrowdSec bot-detection callback prefix.
+// AppSec must answer these paths; unanswered results must not reach origin.
+const appsecChallengePathPrefix = "/crowdsec-internal/challenge/"
+
+// isAppsecChallengePath reports whether this URL path is under the CrowdSec challenge prefix.
+func isAppsecChallengePath(path string) bool {
+	return strings.HasPrefix(path, appsecChallengePathPrefix)
+}
+
 // serveAppSec reports whether AppSec or a captcha rule wrote the response.
 // A cleared captcha gate or a widget asset did not write. False means ServeHTTP calls next.
+// An unanswered AppSec result on the challenge prefix writes 404 so origin is not called.
 func (b *Bouncer) serveAppSec(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
 	if match.CaptchaName != "" {
 		return b.applyCaptchaRuleServeHTTP(rw, req, match)
@@ -301,7 +311,18 @@ func (b *Bouncer) serveAppSec(rw http.ResponseWriter, req clientrequest.Request,
 	if match.SkipAppsec {
 		return false
 	}
-	return b.subscribeAppSec && b.applyAppsecServeHTTP(rw, req, match)
+	if !b.subscribeAppSec {
+		return false
+	}
+	if b.applyAppsecServeHTTP(rw, req, match) {
+		return true
+	}
+	// Unanswered AppSec on the challenge prefix must not reach origin.
+	if isAppsecChallengePath(req.URL.Path) {
+		http.NotFound(rw, req.Request)
+		return true
+	}
+	return false
 }
 
 // applyLapiFailureAction applies this router's LAPI failure action.

@@ -564,6 +564,70 @@ func TestHandleNextServeHTTPAllowCallsNext(t *testing.T) {
 	}
 }
 
+// TestHandleNextServeHTTPAllowKeepsChallengePathsFromOrigin proves AppSec allow
+// (and unpublished passthrough) on /crowdsec-internal/challenge/ is 404, not origin.
+func TestHandleNextServeHTTPAllowKeepsChallengePathsFromOrigin(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"action":"allow"}`))
+	}))
+	t.Cleanup(appsecServer.Close)
+	appsecURL, err := url.Parse(appsecServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newAllowBouncer := func() (*Bouncer, *bool) {
+		nextCalled := false
+		b := &Bouncer{
+			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				nextCalled = true
+			}),
+			log: logger.New("ERROR", ""),
+		}
+		bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+		return b, &nextCalled
+	}
+
+	t.Run("custom.js", func(t *testing.T) {
+		b, nextCalled := newAllowBouncer()
+		rw := httptest.NewRecorder()
+		continueAfterLAPIForTest(b, rw, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/crowdsec-internal/challenge/custom.js", nil), "192.0.2.10"))
+		if *nextCalled {
+			t.Fatal("next must not run for an unanswered challenge path")
+		}
+		if rw.Code != http.StatusNotFound {
+			t.Fatalf("status=%d want 404", rw.Code)
+		}
+	})
+	t.Run("protected", func(t *testing.T) {
+		b, nextCalled := newAllowBouncer()
+		continueAfterLAPIForTest(b, httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
+		if !*nextCalled {
+			t.Fatal("next handler should be called for allow outside the challenge prefix")
+		}
+	})
+	t.Run("unpublished passthrough custom.js", func(t *testing.T) {
+		nextCalled := false
+		b := &Bouncer{
+			subscribeAppSec:     true,
+			appsecFailureAction: configuration.FailureActionPassthrough,
+			log:                 logger.New("ERROR", ""),
+			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				nextCalled = true
+			}),
+		}
+		rw := httptest.NewRecorder()
+		continueAfterLAPIForTest(b, rw, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/crowdsec-internal/challenge/custom.js", nil), "192.0.2.10"))
+		if nextCalled {
+			t.Fatal("next must not run for unpublished AppSec passthrough on a challenge path")
+		}
+		if rw.Code != http.StatusNotFound {
+			t.Fatalf("status=%d want 404", rw.Code)
+		}
+	})
+}
+
 // failingBodyForDisconnectTest simulates a readable POST whose Read fails mid-copy.
 type failingBodyForDisconnectTest struct {
 	err error
