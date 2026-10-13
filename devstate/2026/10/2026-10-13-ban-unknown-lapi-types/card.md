@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 0a83d26e
+Reviewed head: a9fa005d
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -26,20 +26,23 @@ Owner decision: Required. See Explore Decisions.
 | Overall readiness | 1/6 | Not ready |
 | CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
-| Review resolution | 6/6 | no open PR comments |
+| Review resolution | N/A | no OPEN PR |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-10-13-ban-unknown-lapi-types pushed | `git` |
-| OpenSpec | none | `openspec/` |
-| Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/198 | pr-host |
+| OpenSpec | ban-unknown-lapi-types | `openspec/` |
+| Pull request | none | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_decisions_scopes](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-ban-unknown-lapi-types/openspec/changes/ban-unknown-lapi-types/proposal.md) — modified
+- [core_plugin_lapi_origin-based-decision-remap](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-ban-unknown-lapi-types/openspec/changes/ban-unknown-lapi-types/proposal.md) — modified
+
 
 ## Deviations from the ask
 None.
@@ -48,7 +51,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-13-ban-unknown-lapi-types on branch 2026-10-13-ban-unknown-lapi-types targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/198; CI not seen.
+Ticket 2026-10-13-ban-unknown-lapi-types on branch 2026-10-13-ban-unknown-lapi-types targeting master; PR no PR yet; CI not seen.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -67,9 +70,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 0a83d26eae1c3fc6f8b5b1605a488c654dd6a4c1 | Card must match the branch you measured |
+| Reviewed head | a9fa005da2bd514551a5efd959ce98bcc7bcf151 | Card must match the branch you measured |
 
 ### Stored data model
 None.
