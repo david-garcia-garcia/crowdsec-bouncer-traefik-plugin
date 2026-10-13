@@ -607,9 +607,9 @@ func TestHandleStreamCacheUnknownTypesAreBanned(t *testing.T) {
 		_, _ = rw.Write([]byte(`{"new":[{"value":"192.0.2.80","type":"challenge","scope":"Ip","duration":"1h"}],"deleted":[]}`))
 	}))
 	defer lapiServer.Close()
-	lapiURL, err := url.Parse(lapiServer.URL)
-	if err != nil {
-		t.Fatal(err)
+	lapiURL, parseErr := url.Parse(lapiServer.URL)
+	if parseErr != nil {
+		t.Fatal(parseErr)
 	}
 	cacheClient := &cache.Client{}
 	cacheClient.New(logger.New("INFO", ""), false, "", nil, "", "")
@@ -629,12 +629,12 @@ func TestHandleStreamCacheUnknownTypesAreBanned(t *testing.T) {
 		updateInterval:      60,
 		log:                 logger.New("INFO", ""),
 	}
-	if err := handleStreamCache(bouncer); err != nil {
-		t.Fatal(err)
+	if streamErr := handleStreamCache(bouncer); streamErr != nil {
+		t.Fatal(streamErr)
 	}
-	got, err := cacheClient.Get("192.0.2.80")
-	if err != nil || got != cache.BannedValue {
-		t.Fatalf("challenge stream cache Get=%q err=%v, want %q", got, err, cache.BannedValue)
+	got, getErr := cacheClient.Get("192.0.2.80")
+	if getErr != nil || got != cache.BannedValue {
+		t.Fatalf("challenge stream cache Get=%q err=%v, want %q", got, getErr, cache.BannedValue)
 	}
 }
 
@@ -644,9 +644,9 @@ func TestHandleStreamCacheAllowTypeIsBanned(t *testing.T) {
 		_, _ = rw.Write([]byte(`{"new":[{"value":"192.0.2.81","type":"allow","scope":"Ip","duration":"1h"}],"deleted":[]}`))
 	}))
 	defer lapiServer.Close()
-	lapiURL, err := url.Parse(lapiServer.URL)
-	if err != nil {
-		t.Fatal(err)
+	lapiURL, parseErr := url.Parse(lapiServer.URL)
+	if parseErr != nil {
+		t.Fatal(parseErr)
 	}
 	cacheClient := &cache.Client{}
 	cacheClient.New(logger.New("INFO", ""), false, "", nil, "", "")
@@ -666,12 +666,12 @@ func TestHandleStreamCacheAllowTypeIsBanned(t *testing.T) {
 		updateInterval:      60,
 		log:                 logger.New("INFO", ""),
 	}
-	if err := handleStreamCache(bouncer); err != nil {
-		t.Fatal(err)
+	if streamErr := handleStreamCache(bouncer); streamErr != nil {
+		t.Fatal(streamErr)
 	}
-	got, err := cacheClient.Get("192.0.2.81")
-	if err != nil || got != cache.BannedValue {
-		t.Fatalf("allow stream cache Get=%q err=%v, want %q", got, err, cache.BannedValue)
+	got, getErr := cacheClient.Get("192.0.2.81")
+	if getErr != nil || got != cache.BannedValue {
+		t.Fatalf("allow stream cache Get=%q err=%v, want %q", got, getErr, cache.BannedValue)
 	}
 }
 
@@ -681,9 +681,9 @@ func TestHandleNoStreamCacheUnknownTypesAreBanned(t *testing.T) {
 		_, _ = rw.Write([]byte(`[{"value":"192.0.2.82","type":"challenge","scope":"Ip","duration":"1h"}]`))
 	}))
 	defer lapiServer.Close()
-	lapiURL, err := url.Parse(lapiServer.URL)
-	if err != nil {
-		t.Fatal(err)
+	lapiURL, parseErr := url.Parse(lapiServer.URL)
+	if parseErr != nil {
+		t.Fatal(parseErr)
 	}
 	cacheClient := &cache.Client{}
 	cacheClient.New(logger.New("INFO", ""), false, "", nil, "", "")
@@ -714,9 +714,9 @@ func TestHandleNoStreamCacheEmptyListIsAllowed(t *testing.T) {
 		_, _ = rw.Write([]byte(`[]`))
 	}))
 	defer lapiServer.Close()
-	lapiURL, err := url.Parse(lapiServer.URL)
-	if err != nil {
-		t.Fatal(err)
+	lapiURL, parseErr := url.Parse(lapiServer.URL)
+	if parseErr != nil {
+		t.Fatal(parseErr)
 	}
 	cacheClient := &cache.Client{}
 	cacheClient.New(logger.New("INFO", ""), false, "", nil, "", "")
