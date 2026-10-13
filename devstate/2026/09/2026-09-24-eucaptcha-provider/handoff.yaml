@@ -1,0 +1,18 @@
+issueKey: 2026-09-24-eucaptcha-provider
+jobName: 2026-09-24-eucaptcha-provider
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 88ad5225f471360e9e74069e1dfddb4946452e2e325e6818ccf6d08103e4a947
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: eucaptcha-provider
+pr:
+  id: 155
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/155

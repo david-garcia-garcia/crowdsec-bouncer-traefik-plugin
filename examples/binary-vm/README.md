@@ -47,7 +47,9 @@ sudo vagrant ssh
 ### Context
 
 Traefik is installed as a systemd service.
-It is configured with the dashboard activated and listening on port 8081 and port 80 for the web
+It is configured with the dashboard activated and listening on port 8081 and port 80 for the web.
+
+`files/traefik/traefik.yml` registers this tree as `experimental.localPlugins.bouncer`. Copy the repository to `./plugins-local/src/github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin` relative to the Traefik process working directory. Catalog download of this module 404s.
 
 Crowdsec is started and listening on port 8080.
 Certificates are generated on the provision step of vagrant.

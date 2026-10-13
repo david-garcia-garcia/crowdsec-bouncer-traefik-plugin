@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-09-24-remediation-match-trace",
+  "jobName": "2026-09-24-remediation-match-trace",
+  "startedAt": "2026-09-24T19:21:32.402Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T19:29:07.742Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T19:34:56.861Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T19:41:41.094Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T20:03:09.544Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T20:21:44.112Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T20:35:03.700Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T20:55:48.700Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T21:03:44.237Z"
+    }
+  }
+}

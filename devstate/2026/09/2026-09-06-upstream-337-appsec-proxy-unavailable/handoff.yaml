@@ -1,0 +1,17 @@
+issueKey: 2026-09-06-upstream-337-appsec-proxy-unavailable
+jobName: 2026-09-06-upstream-337-appsec-proxy-unavailable
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:a0aac0831e93d165ed4314eed8c32db87a1feda864abe7c3b84dd882701c4a4d
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: appsec-proxy-unavailable-tests
+pr:
+  id: 46
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/46

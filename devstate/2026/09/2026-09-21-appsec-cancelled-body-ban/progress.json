@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-09-21-appsec-cancelled-body-ban",
+  "jobName": "2026-09-21-appsec-cancelled-body-ban",
+  "startedAt": "2026-09-21T16:29:17.607Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-21T16:30:34.921Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-21T16:32:47.319Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-21T16:43:39.571Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-21T16:51:43.439Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-21T16:56:16.556Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-21T16:57:32.820Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-21T16:59:38.591Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-21T17:19:27.335Z"
+    }
+  }
+}

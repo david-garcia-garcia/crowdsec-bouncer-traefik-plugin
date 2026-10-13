@@ -1,0 +1,5 @@
+host: local
+ref: none
+title: "[BUG] appsec responding with 502, 503 or 504 should be considered as unavailable"
+url: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/337
+number: 337

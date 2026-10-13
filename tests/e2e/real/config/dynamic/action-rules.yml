@@ -1,0 +1,35 @@
+# bouncerActionRules on a live LAPI (none mode). /action-rules/ban is a plugin ban.
+# /action-rules/skip skips LAPI. Any other path under the prefix is a normal lookup.
+http:
+  routers:
+    action-rules:
+      rule: PathPrefix(`/action-rules`)
+      entryPoints: [web]
+      middlewares: [bouncer-action]
+      service: whoami@docker
+  middlewares:
+    bouncer-action:
+      plugin:
+        bouncer:
+          bouncerActionRules:
+            - name: force-ban
+              path: ^/action-rules/ban$
+              action:
+                - ban
+            - name: skip-lapi
+              path: ^/action-rules/skip$
+              action:
+                - bypassLapi
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          lapiEnabled: "true"
+          lapiHost: crowdsec:8080
+          lapiHttpTimeoutSeconds: "30"
+          lapiKey: "c51a1c7000000000000000000000001a"
+          lapiMode: none
+          lapiUpdateIntervalSeconds: "5"
+          logFormat: json
+          logLevel: DEBUG
+          reclaimGraceSeconds: "2"

@@ -1,0 +1,11 @@
+http:
+  routers:
+    sev-idle:
+      rule: PathPrefix(`/sev-idle`)
+      entryPoints: [web]
+      service: sev-whoami
+  services:
+    sev-whoami:
+      loadBalancer:
+        servers:
+          - url: "http://whoami-test:80"

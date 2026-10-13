@@ -1,0 +1,18 @@
+issueKey: 2026-09-24-appsec-challenge-coverage
+jobName: 2026-09-24-appsec-challenge-coverage
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: 76756e74a212b333db42518d36a00cfb11199bec8eb90a451960cfdb2375cec9
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: appsec-challenge-coverage
+pr:
+  id: 146
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/146

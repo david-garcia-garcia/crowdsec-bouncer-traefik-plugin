@@ -1,0 +1,18 @@
+issueKey: 2026-09-30-origin-scheme
+jobName: 2026-09-30-origin-scheme
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 8742d160e522ffa07bacb70eb2c9a3d3640837cdf000a83d4aba0e017a070a96
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: origin-scheme
+pr:
+  id: 177
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/177

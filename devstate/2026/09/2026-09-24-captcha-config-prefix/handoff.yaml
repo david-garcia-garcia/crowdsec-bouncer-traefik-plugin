@@ -1,0 +1,18 @@
+issueKey: 2026-09-24-captcha-config-prefix
+jobName: 2026-09-24-captcha-config-prefix
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: 2941c926c66b3eaaf38f6f259ef5561adebf41d562b51f3919fdc3de720014d7
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: captcha-config-prefix
+pr:
+  id: 142
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/142

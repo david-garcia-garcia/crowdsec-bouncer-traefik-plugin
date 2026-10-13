@@ -1,0 +1,17 @@
+issueKey: 2026-09-06-plugin-lifecycle-lapi
+jobName: 2026-09-06-plugin-lifecycle-lapi
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 6b05430faa8e5e6d2996d4c4653c2b582999444089f40c5ba9f5fb7a13bff568
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: one-stream-per-lapi-session
+pr:
+  id: 23
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/23

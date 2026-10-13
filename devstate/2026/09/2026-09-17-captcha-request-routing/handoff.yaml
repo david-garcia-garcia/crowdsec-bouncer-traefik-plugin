@@ -1,0 +1,17 @@
+issueKey: 2026-09-17-captcha-request-routing
+jobName: 2026-09-17-captcha-request-routing
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:3f3608e424367ee39f2d476bea1d1f6f13a22cdfef61e70ed1d08f52beb7c0e7
+comments: none
+localTests: passed
+requirement: requirement.md
+explore: explore.md
+change: captcha-request-routing
+pr:
+  id: 68
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/68

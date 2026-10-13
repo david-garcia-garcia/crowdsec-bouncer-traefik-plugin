@@ -5,10 +5,7 @@ the local source tree, and replaces Crowdsec with a small **HTTP mock**
 ([`mocklapi/`](mocklapi/main.go), a stdlib-only Go command). No Docker, no real
 Crowdsec.
 
-It is what **CI runs** (`make e2e_mock`). A separate, local-only **Docker
-suite** (real Traefik + Crowdsec, under `tests/e2e/scenarios`) is kept for
-high-fidelity debugging against a real Crowdsec but is not exercised in CI; it
-ships in its own PR (#333).
+It is what **CI runs** for plugin-only coverage (`make e2e_mock`). A separate **Pester real-stack** suite (`tests/e2e/real/`, Docker Traefik + Crowdsec) runs in CI as `e2e (docker + pester / lapi)`, `e2e (docker + pester / appsec)`, and `e2e (docker + pester / lifecycle)`.
 
 ## Scope — what this suite tests
 
@@ -22,7 +19,9 @@ the plugin consumes — including a single, deterministic AppSec rule (block any
 URI containing `rpc2`, the probe from [`examples/appsec-enabled`](../../../examples/appsec-enabled)).
 It is not the real WAF engine, so this suite exercises the plugin's AppSec
 *wiring* rather than the detection accuracy of OWASP CRS / virtual patching —
-that lives upstream in Crowdsec.
+that lives upstream in Crowdsec. The captcha scenario uses `captchaEnabled: true`
+plus `captchaProvider: custom` and mocklapi `POST /siteverify` (always `{"success":true}`) so curl can
+complete solve → `crowdsec_captcha_gate` cookie → backend without a real widget.
 
 ## What runs
 
@@ -86,6 +85,6 @@ mock/
    template).
 2. In `run.sh`, define a `body` function with the assertions and call
    `run_scenario "<name>" "$HERE" body`.
-3. Drive decisions with `lapi_add_decision <ip> [type] [duration]` and
-   `lapi_delete_decision <ip>`.
+3. Drive decisions with `lapi_add_decision <ip> [type] [duration] [origin] [scenario]` and
+   `lapi_delete_decision <ip>`. Origin defaults to `crowdsec`.
 4. Add `<name>` to `E2E_MOCK_SCENARIOS` in the `Makefile`.

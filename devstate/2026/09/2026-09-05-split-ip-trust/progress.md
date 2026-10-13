@@ -1,0 +1,14 @@
+# Progress
+IssueKey: 2026-09-05-split-ip-trust
+JobName: 2026-09-05-split-ip-trust
+
+| Phase | Work | Card | At |
+|-------|------|------|----|
+| prepare | [x] | [x] | 2026-09-05T16:27:38.852Z |
+| explore | [x] | [x] | 2026-09-05T16:29:54.246Z |
+| propose | [x] | [x] | 2026-09-05T16:32:56.176Z |
+| implement | [x] | [x] | 2026-09-05T16:37:03.532Z |
+| codereview | [x] | [x] | 2026-09-05T16:38:54.697Z |
+| devdocsimpact | [x] | [x] | 2026-09-05T16:40:28.362Z |
+| archive | [x] | [x] | 2026-09-05T16:42:12.139Z |
+| pullrequest | [x] | [x] | 2026-09-05T16:45:53.483Z |

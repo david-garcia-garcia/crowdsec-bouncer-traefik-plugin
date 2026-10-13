@@ -1,0 +1,19 @@
+# Knowledge
+- updated knowledge/devdocs/core_plugin_middleware_config-validation.md
+- updated knowledge/devdocs/core_plugin_middleware.md
+- updated knowledge/devdocs/core_plugin_lapi_connection.md
+- updated knowledge/devdocs/core_plugin_lapi_reclaim-key.md
+- updated knowledge/devdocs/core_plugin_appsec.md
+- updated knowledge/devdocs/core_plugin_lapi_scope-union.md
+- updated knowledge/devdocs/index_core_plugin.md
+- updated knowledge/devdocs/core_plugin_decisionstore.md
+- updated knowledge/devdocs/core_plugin_decisionscope.md
+- updated knowledge/devdocs/core_plugin_middleware_forced-decision.md
+- updated knowledge/devdocs/core_plugin_lapi_origin-based-decision-remap.md
+- updated knowledge/devdocs/core_plugin_ip.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-gate.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-siteverify.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-routing.md
+- updated knowledge/devdocs/build_e2e_real.md
+- updated knowledge/devdocs/build_e2e_mock.md
+- updated knowledge/devdocs/core_plugin_lapi_usage-metrics.md

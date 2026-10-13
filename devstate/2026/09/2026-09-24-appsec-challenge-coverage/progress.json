@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-09-24-appsec-challenge-coverage",
+  "jobName": "2026-09-24-appsec-challenge-coverage",
+  "startedAt": "2026-09-24T08:11:07.636Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T08:15:01.791Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T08:20:33.075Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T08:25:19.152Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T08:38:49.364Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T08:44:22.446Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T08:47:37.632Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T08:52:47.605Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-09-24T09:01:24.235Z"
+    }
+  }
+}

@@ -1,0 +1,18 @@
+issueKey: 2026-09-24-template-startup-warn
+jobName: 2026-09-24-template-startup-warn
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: 71fd114d6b767c5f2c2f0a211460ad6755b1673e75f065bed62dfa88908c76b5
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: 2026-09-24-template-startup-warn
+pr:
+  id: 151
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/151

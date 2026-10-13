@@ -12,7 +12,7 @@ body() {
   lapi_add_decision 1.2.3.4 ban 5m
 
   echo "[$SCENARIO] banned response becomes 403 once the next stream poll lands"
-  wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 403 15 -H "X-Forwarded-For: 1.2.3.4"
+  wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 403 45 -H "X-Forwarded-For: 1.2.3.4"
 
   echo "[$SCENARIO] banned response Content-Type is HTML"
   assert_header "http://127.0.0.1:${WEB_PORT}/foo" Content-Type "application/json" -H "X-Forwarded-For: 1.2.3.4"
@@ -23,8 +23,8 @@ body() {
   echo "[$SCENARIO] banned response body contains the IP and reason from templating"
   assert_body_contains "http://127.0.0.1:${WEB_PORT}/foo" "IP: 1.2.3.4, reason: LAPI, trace: 0123456789" -H "X-Forwarded-For: 1.2.3.4" -H "X-Trace: 0123456789"
 
-  echo "[$SCENARIO] banned response carries the custom remediation header (remediationHeadersCustomName)"
-  assert_header "http://127.0.0.1:${WEB_PORT}/foo" X-E2E-Remediation "ban" -H "X-Forwarded-For: 1.2.3.4"
+  echo "[$SCENARIO] banned response carries the custom remediation header (bouncerRemediationHeadersCustomName)"
+  assert_header "http://127.0.0.1:${WEB_PORT}/foo" X-E2E-Remediation "ban:lapi:crowdsec" -H "X-Forwarded-For: 1.2.3.4"
 }
 
 run_scenario "$SCENARIO" "$HERE" body

@@ -16,13 +16,14 @@ http:
     bouncer:
       plugin:
         bouncer:
-          enabled: "true"
-          crowdsecMode: stream
-          updateIntervalSeconds: "2"
-          crowdsecLapiScheme: http
-          crowdsecLapiHost: "@@LAPI_HOST@@"
-          crowdsecLapiKey: "@@APIKEY@@"
-          forwardedHeadersTrustedIps:
-            - "127.0.0.1/32"
-          clientTrustedIps:
+          bouncerClientTrustedIps:
             - "1.2.3.4/32"
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersTrustedIps:
+            - "127.0.0.1/32"
+          lapiEnabled: "true"
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          lapiMode: stream
+          lapiScheme: http
+          lapiUpdateIntervalSeconds: "2"

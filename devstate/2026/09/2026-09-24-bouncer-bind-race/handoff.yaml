@@ -1,0 +1,18 @@
+issueKey: 2026-09-24-bouncer-bind-race
+jobName: 2026-09-24-bouncer-bind-race
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: 424125e5216f507ec063c6344668e4ed4d39ac2ca5cc11652a590f6bdff0e5a3
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: bouncer-bind-immutable-box
+pr:
+  id: 143
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/143

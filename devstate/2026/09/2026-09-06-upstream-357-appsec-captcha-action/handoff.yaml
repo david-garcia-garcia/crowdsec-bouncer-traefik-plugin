@@ -1,0 +1,17 @@
+issueKey: 2026-09-06-upstream-357-appsec-captcha-action
+jobName: 2026-09-06-upstream-357-appsec-captcha-action
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: sha256:3e250f4ecc0d15e9dcef99d6c0767ed5354b5b78bb0b8411675950cbad1ea059
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: appsec-captcha-action-tests
+pr:
+  id: 44
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/44

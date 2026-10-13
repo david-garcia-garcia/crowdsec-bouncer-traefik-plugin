@@ -1,0 +1,17 @@
+issueKey: 2026-09-18-cache-miss-sentinel
+jobName: 2026-09-18-cache-miss-sentinel
+issueHost: local
+issueRef: none
+prHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: sha256:840e7dbef520fc961529396f6f8a89de1dea2c56bfcca403011a5fe59508cc8c
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: cache-miss-sentinels
+pr:
+  id: 107
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/107

@@ -1,0 +1,14 @@
+# Progress
+IssueKey: 2026-09-18-stream-apply-deleted-before-new
+JobName: 2026-09-18-stream-apply-deleted-before-new
+
+| Phase | Work | Card | At |
+|-------|------|------|----|
+| prepare | [x] | [x] | 2026-09-18T14:14:56Z |
+| explore | [x] | [x] | 2026-09-18T14:19:48Z |
+| propose | [x] | [x] | 2026-09-18T14:22:08Z |
+| implement | [x] | [x] | 2026-09-18T14:25:28Z |
+| codereview | [x] | [x] | 2026-09-18T14:30:27Z |
+| devdocsimpact | [x] | [x] | 2026-09-18T14:31:06Z |
+| archive | [x] | [x] | 2026-09-18T14:33:33Z |
+| pullrequest | [x] | [x] | 2026-09-18T14:50:11Z |

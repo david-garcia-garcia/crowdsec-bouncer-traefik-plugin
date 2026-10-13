@@ -1,0 +1,47 @@
+# LAPI captcha and AppSec on one router. A cleared gate and the widget path
+# continue into AppSec. /captcha-appsec/rule is a captcha action rule, so AppSec
+# runs before the plugin gate.
+http:
+  routers:
+    captcha-appsec:
+      rule: PathPrefix(`/captcha-appsec`)
+      entryPoints: [web]
+      middlewares: [bouncer-captcha-appsec]
+      service: whoami@docker
+  middlewares:
+    bouncer-captcha-appsec:
+      plugin:
+        bouncer:
+          appsecEnabled: "true"
+          appsecHost: crowdsec:7422
+          appsecHttpTimeoutSeconds: "30"
+          bouncerActionRules:
+            - name: force-captcha
+              path: ^/captcha-appsec/rule$
+              action:
+                - captcha
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          captchaCustomJsUrl: http://widget.example/captcha-appsec/widget.js
+          captchaCustomKey: dummy-captcha
+          captchaCustomResponse: dummy-captcha-response
+          captchaCustomValidateUrl: http://dummy-captcha/siteverify
+          captchaEnabled: "true"
+          captchaFilePath: /e2e-captcha.html
+          captchaGateBindIp: "true"
+          captchaGateSecret: test-gate-secret
+          captchaProvider: custom
+          captchaSecretKey: e2e-dummy-secret
+          captchaSiteKey: e2e-dummy-site
+          lapiEnabled: "true"
+          lapiHost: crowdsec:8080
+          lapiHttpTimeoutSeconds: "30"
+          lapiKey: "c51a1c7000000000000000000000001b"
+          lapiMode: none
+          lapiUpdateIntervalSeconds: "5"
+          logFormat: json
+          logLevel: DEBUG
+          reclaimGraceSeconds: "2"
