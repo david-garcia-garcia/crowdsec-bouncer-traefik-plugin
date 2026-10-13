@@ -48,16 +48,14 @@ Usage packets that will be stale after apply: knowledge/devdocs/core_plugin_lapi
 ## Open questions
 
 - Q: Should stream Range upserts map unknown types to ban, not only streamPutItem?
-  Rank: bounded asked — 1 Range call site in pkg/lapi/client_stream.go plus 3 other ingest sites in pkg/lapi (roots: pkg/); Desired Stream, live, and none store and apply
+  Rank: bounded asked — 1 Range call site in pkg/lapi/client_stream.go plus 3 other ingest sites in pkg/lapi (roots: pkg/); Desired names stream store and apply
   Decision: assumed — include Range in the ingest helper; still not RemediationValue.
   By: explore
-
 - Q: Log unknown types on live pick with the stream stem handleStreamCache:unknownType?
-  Rank: additive asked — new helper this change creates; Desired keep stem handleStreamCache:unknownType
+  Rank: additive asked — new helper this change creates; Desired keep the existing message stem
   Decision: assumed — the helper TRACE-logs once per unknown type at every ingest call, including live.
   By: explore
-
-- Q: Store LAPI type llow as ban despite whitelist debt?
-  Rank: bounded asked — Desired names allow; knowledge/debt/2026-09-19-multiple-decisions-per-cache-key.md is not this ticket
-  Decision: assumed — store llow as ban; leave the existing debt file; do not take whitelist work.
+- Q: Store LAPI type allow as ban despite whitelist debt?
+  Rank: bounded asked — Desired names allow; existing debt file is not this ticket
+  Decision: assumed — store allow as ban; leave the existing debt file; do not take whitelist work.
   By: explore
