@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 9ffb21fc
-Owner decision: None.
+Reviewed head: 01527109
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -51,7 +51,10 @@ None.
 Ticket 2026-10-13-terminate-challenge-paths on branch 2026-10-13-terminate-challenge-paths targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/196; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Does the prefix include exact `/crowdsec-internal/challenge` with no trailing slash? | additive asked — new membership test this change adds; Desired names `/crowdsec-internal/challenge/` | assumed — `strings.HasPrefix(path, "/crowdsec-internal/challenge/")` as written. The regression path is `custom.js` under that slash. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 9ffb21fc956d4165fe3d256ac3cf748d626c0c64 | Card must match the branch you measured |
+| Reviewed head | 01527109242178b1d66e9d26e8bf67d73fef3ea6 | Card must match the branch you measured |
 
 ### Stored data model
 None.
