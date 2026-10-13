@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 2324266d
+Reviewed head: a3460484
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,7 +32,7 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-10-13-challenge-drop-once pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | count-challenge-drop-once | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/195 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
@@ -51,7 +51,7 @@ None.
 ## How this fits together
 Ticket 2026-10-13-challenge-drop-once on branch 2026-10-13-challenge-drop-once targeting main; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/195; CI not seen.
 
-Upstream: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403 (fixes https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/402, point 5). This fork's `main` has not merged upstream #343, so `handleAppsecResponseServeHTTP` does not exist here; PR 403 point 5 skips the dropped increment on `/crowdsec-internal/challenge/*` in that function. We are not copying their patch.
+Upstream: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403 (fixes https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/402, point 5). This fork's `main` has not merged upstream #343, so dest had no challenge relay; PR 403 point 5 skips the dropped increment on `/crowdsec-internal/challenge/*`. We add a minimal relay plus that skip. We are not copying their patch.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -72,7 +72,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 2324266df04d14cd9d218606d934a41ba85cdad6 | Card must match the branch you measured |
+| Reviewed head | a346048466a84e2897bbb290fef68e1b29a3b614 | Card must match the branch you measured |
 
 ### Stored data model
 None.
