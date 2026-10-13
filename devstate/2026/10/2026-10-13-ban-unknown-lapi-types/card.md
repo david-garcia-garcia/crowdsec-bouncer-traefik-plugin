@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 59f63c02
+Reviewed head: 0a83d26e
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -53,7 +53,7 @@ Ticket 2026-10-13-ban-unknown-lapi-types on branch 2026-10-13-ban-unknown-lapi-t
 ## Explore Decisions
 | Question | Rank | Decision | By |
 | --- | --- | --- | --- |
-| Should stream Range upserts map unknown types to ban, not only streamPutItem? | bounded asked — 1 Range call site in pkg/lapi/client_stream.go plus 3 other ingest sites in pkg/lapi (roots: pkg/); Desired Stream, live, and none store and apply | assumed — include Range in the ingest helper; still not RemediationValue. | explore |
+| Should stream Range upserts map unknown types to ban, not only streamPutItem? | bounded asked — 1 Range call site in pkg/lapi/client_stream.go plus 3 other ingest sites in pkg/lapi (roots: pkg/); Desired names stream store and apply | assumed — include Range in the ingest helper; still not RemediationValue. | explore |
 
 
 ## Findings
@@ -69,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 59f63c02dd6683edacba5a3e1804847aa7657f79 | Card must match the branch you measured |
+| Reviewed head | 0a83d26eae1c3fc6f8b5b1605a488c654dd6a4c1 | Card must match the branch you measured |
 
 ### Stored data model
 None.
