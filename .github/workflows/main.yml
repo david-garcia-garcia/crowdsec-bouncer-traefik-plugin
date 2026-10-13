@@ -74,6 +74,15 @@ jobs:
       - name: Lint and Tests
         run: make
 
+      # Yaegi resolves imports from GOPATH/src/<module>. This fork's go.mod is
+      # github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin while checkout
+      # lands under github.com/${{ github.repository }}.
+      - name: Map GOPATH to module path
+        run: |
+          mkdir -p "${{ github.workspace }}/go/src/github.com/maxlerebourg"
+          ln -sfn "${{ github.workspace }}/go/src/github.com/${{ github.repository }}" \
+            "${{ github.workspace }}/go/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+
       - name: Run tests with Yaegi
         run: make yaegi_test
         env:
