@@ -30,10 +30,10 @@ Outside facts: CrowdSec challenge protocol (in-tree dump; dest has no `knowledge
 
 - Q: Dest has no challenge relay; can the skip attach without adding one?
   Rank: additive asked — new relay unit this change creates; Desired names a relayed AppSec challenge envelope
-  Decision: assumed — add a minimal challenge-JSON relay in `bouncer.go` and skip `blockedRequests` under `/crowdsec-internal/challenge/`; do not merge #343 wholesale
-  By: explore
+  Decision: resolved — add a minimal challenge-JSON relay in `bouncer.go` and skip `blockedRequests` under `/crowdsec-internal/challenge/`; do not merge #343 wholesale
+  By: implement
 
 - Q: Dest has no dropped-bytes series; the dump says skip request or bytes.
   Rank: additive asked — dump names bytes; dest `reportMetrics` posts only a request `dropped` item
-  Decision: assumed — skip only the request counter dest already has; do not add a bytes series or change the POST shape
-  By: explore
+  Decision: resolved — skip only the request counter dest already has; do not add a bytes series or change the POST shape
+  By: implement

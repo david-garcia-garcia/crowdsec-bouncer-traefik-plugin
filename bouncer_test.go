@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"text/template"
 	"time"
@@ -463,7 +464,8 @@ func Test_appsecQuery_streamingDoesNotBlock(t *testing.T) {
 
 	finished := make(chan error, 1)
 	go func() {
-		finished <- appsecQuery(bouncer, "1.2.3.4", newStreamingRequest(done))
+		_, err := appsecQuery(bouncer, "1.2.3.4", newStreamingRequest(done))
+		finished <- err
 	}()
 
 	select {
@@ -501,7 +503,8 @@ func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
 
 	finished := make(chan error, 1)
 	go func() {
-		finished <- appsecQuery(bouncer, "1.2.3.4", newStreamingRequest(done))
+		_, err := appsecQuery(bouncer, "1.2.3.4", newStreamingRequest(done))
+		finished <- err
 	}()
 
 	select {
@@ -544,7 +547,8 @@ func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 
 	finished := make(chan error, 1)
 	go func() {
-		finished <- appsecQuery(bouncer, "1.2.3.4", newUnreadableGetRequest(done))
+		_, err := appsecQuery(bouncer, "1.2.3.4", newUnreadableGetRequest(done))
+		finished <- err
 	}()
 
 	select {
@@ -589,7 +593,7 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 			const calls = 10
 			for i := 0; i < calls; i++ { //nolint:intrange
 				req, _ := http.NewRequest(http.MethodGet, "http://localhost/", nil)
-				_ = appsecQuery(bouncer, "1.2.3.4", req)
+				_, _ = appsecQuery(bouncer, "1.2.3.4", req)
 			}
 
 			mu.Lock()
@@ -598,5 +602,51 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 				t.Errorf("appsecQuery() opened %d connections for %d calls, want 1 (response body not drained?)", len(conns), calls)
 			}
 		})
+	}
+}
+
+func TestHandleNextServeHTTPCountsChallengePageOnce(t *testing.T) {
+	atomic.StoreInt64(&blockedRequests, 0)
+	envelope := `{"action":"challenge","http_status":200,"user_body_content":"<html>challenge</html>"}`
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusForbidden)
+		if _, err := rw.Write([]byte(envelope)); err != nil {
+			t.Errorf("appsec stub write: %v", err)
+		}
+	}))
+	t.Cleanup(appsecServer.Close)
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	nextCalled := 0
+	bouncer := &Bouncer{
+		appsecEnabled:    true,
+		appsecScheme:     appsecURL.Scheme,
+		appsecHost:       appsecURL.Host,
+		appsecPath:       "/",
+		httpAppsecClient: appsecServer.Client(),
+		log:              logger.New("INFO", ""),
+		next:             http.HandlerFunc(func(http.ResponseWriter, *http.Request) { nextCalled++ }),
+	}
+
+	page := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	pageRW := httptest.NewRecorder()
+	bouncer.handleNextServeHTTP(pageRW, page, "1.2.3.4")
+	if got := atomic.LoadInt64(&blockedRequests); got != 1 {
+		t.Fatalf("challenge page dropped count = %d, want 1", got)
+	}
+	if pageRW.Code != http.StatusOK {
+		t.Fatalf("challenge page status = %d, want 200", pageRW.Code)
+	}
+	if pageRW.Body.String() != "<html>challenge</html>" {
+		t.Fatalf("challenge page body = %q", pageRW.Body.String())
+	}
+
+	submit := httptest.NewRequest(http.MethodPost, "/crowdsec-internal/challenge/submit", nil)
+	submitRW := httptest.NewRecorder()
+	bouncer.handleNextServeHTTP(submitRW, submit, "1.2.3.4")
+	if got := atomic.LoadInt64(&blockedRequests); got != 1 {
+		t.Fatalf("after submit dropped count = %d, want 1 (page only)", got)
+	}
+	if nextCalled != 0 {
+		t.Fatalf("next called %d times, want 0", nextCalled)
 	}
 }
