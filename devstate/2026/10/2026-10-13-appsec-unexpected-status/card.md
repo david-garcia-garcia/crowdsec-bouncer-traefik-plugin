@@ -14,17 +14,17 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 99fd6fd0
+Reviewed head: 022af7a7
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38441837710 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -34,8 +34,8 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-10-13-appsec-unexpected-status pushed | `git` |
 | OpenSpec | appsec-unexpected-status-failure-action | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/191 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 38441837710 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38441837710 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38441837710 |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
@@ -52,7 +52,7 @@ Worktree:
 None.
 
 ## How this fits together
-Ticket 2026-10-13-appsec-unexpected-status on branch 2026-10-13-appsec-unexpected-status targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/191; CI not seen.
+Ticket 2026-10-13-appsec-unexpected-status on branch 2026-10-13-appsec-unexpected-status targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/191; CI build 38441837710 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38441837710.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -73,7 +73,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 99fd6fd0a83297697aa5d045588e0fa65a226399 | Card must match the branch you measured |
+| Reviewed head | 022af7a7115ac3c58e390a86cd7225b15b930a2f | Card must match the branch you measured |
 
 ### Stored data model
 None.
