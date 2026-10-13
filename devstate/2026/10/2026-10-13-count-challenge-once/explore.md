@@ -26,14 +26,16 @@ Outside facts: `knowledge/research/ext_crowdsec_appsec_bot-detection/` (callback
 ## Open questions
 
 - Q: Which request path field implements the challenge-callback prefix?
-  Rank: additive asked - Desired names the path prefix; httprule already matches URL.Path (1 family in pkg/httprule, enumerated with pkg/bouncer/bouncer.go)
-  Decision: assumed - use req.URL.Path with strings.HasPrefix and /crowdsec-internal/challenge/. Traefik ServeHTTP fills URL.Path; do not parse RequestURI.
+  Rank: additive asked — Desired names the path prefix; httprule already matches URL.Path (1 family in pkg/httprule, enumerated with pkg/bouncer/bouncer.go)
+  Decision: assumed — use req.URL.Path with strings.HasPrefix and /crowdsec-internal/challenge/. Traefik ServeHTTP fills URL.Path; do not parse RequestURI.
   By: explore
+
 - Q: Does exact /crowdsec-internal/challenge with no extra segment skip dropped?
-  Rank: additive asked - Desired text is under /crowdsec-internal/challenge/ with the trailing slash
-  Decision: assumed - that exact path still increments (it is not under the slash prefix). CrowdSec callbacks are /challenge/submit, /challenge/fpscanner.js, /challenge/pow-worker.js.
+  Rank: additive asked — Desired text is under /crowdsec-internal/challenge/ with the trailing slash
+  Decision: assumed — that exact path still increments (it is not under the slash prefix). CrowdSec callbacks are /challenge/submit, /challenge/fpscanner.js, /challenge/pow-worker.js.
   By: explore
+
 - Q: Does an AppSec captcha or other non-challenge envelope on a callback path skip dropped?
-  Rank: additive asked - Desired: path-based skip on relay; bans, pkg/captcha, and non-challenge relays stay counted as today
-  Decision: assumed - skip is only in handleAppsecResponseServeHTTP and is path-based. Ban and pkg/captcha never enter that function so they stay counted. AppSec captcha on a normal path still counts. A captcha envelope on the callback prefix would skip (same shared relay); that case is not in the regression.
+  Rank: additive asked — Desired: path-based skip on relay; bans, pkg/captcha, and non-challenge relays stay counted as today
+  Decision: assumed — skip is only in handleAppsecResponseServeHTTP and is path-based. Ban and pkg/captcha never enter that function so they stay counted. AppSec captcha on a normal path still counts. A captcha envelope on the callback prefix would skip (same shared relay); that case is not in the regression.
   By: explore

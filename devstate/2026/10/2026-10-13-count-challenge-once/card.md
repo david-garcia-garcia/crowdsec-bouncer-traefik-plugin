@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 69337943
+Reviewed head: d013d24e
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -53,7 +53,7 @@ Ticket 2026-10-13-count-challenge-once on branch 2026-10-13-count-challenge-once
 ## Explore Decisions
 | Question | Rank | Decision | By |
 | --- | --- | --- | --- |
-| Which request path field implements "under `/crowdsec-internal/challenge/`"? | additive asked — Desired names the path prefix; httprule already matches `URL.Path` (1 family in `pkg/httprule`, enumerated with `pkg/bouncer/bouncer.go`) | assumed — use `req.URL.Path` (`strings.HasPrefix(..., "/crowdsec-internal/challenge/")`). Traefik ServeHTTP fills `URL.Path`; do not parse `RequestURI`. | explore |
+| Which request path field implements the challenge-callback prefix? | additive asked - Desired names the path prefix; httprule already matches URL.Path (1 family in pkg/httprule, enumerated with pkg/bouncer/bouncer.go) | assumed - use req.URL.Path with strings.HasPrefix and /crowdsec-internal/challenge/. Traefik ServeHTTP fills URL.Path; do not parse RequestURI. | explore |
 
 
 ## Findings
@@ -69,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 693379435d073748d515530a979e013ba15a5562 | Card must match the branch you measured |
+| Reviewed head | d013d24ebd9c1d46838fdab65881d7d8a37ea9a5 | Card must match the branch you measured |
 
 ### Stored data model
 None.
