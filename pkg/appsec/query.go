@@ -170,7 +170,16 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 		}
 		return nil, err
 	}
-	return interpretAppsecBody(res.StatusCode, body, c.log)
+	decision, err := interpretAppsecBody(res.StatusCode, body, c.log)
+	if err == nil {
+		return decision, nil
+	}
+	// 403 without a parseable action is fail-closed ban, not FailureAction.
+	if res.StatusCode == http.StatusForbidden {
+		return nil, err
+	}
+	c.log.Error("appsecQuery:failure", "statusCode", res.StatusCode)
+	return resultForFailureAction(pol.FailureAction, err.Error())
 }
 
 // newAppsecForwardRequest builds the AppSec listener request, copying client headers and identity.

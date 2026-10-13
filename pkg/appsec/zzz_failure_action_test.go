@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -47,6 +48,47 @@ func Test_appsecQuery_failureActionOnServerError(t *testing.T) {
 			decision, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionBan})
 			if err == nil {
 				t.Fatalf("ban on %d expected an error", status)
+			}
+			if decision != nil {
+				t.Fatalf("ban on %d returned decision %#v", status, decision)
+			}
+
+			decision, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionPassthrough})
+			if err != nil {
+				t.Fatalf("passthrough on %d: %v", status, err)
+			}
+			if decision == nil || decision.Action != ActionAllow {
+				t.Fatalf("passthrough on %d want allow, got %#v", status, decision)
+			}
+
+			_, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionCaptcha})
+			if !errors.Is(err, ErrFailureCaptcha) {
+				t.Fatalf("captcha on %d want ErrFailureCaptcha, got %v", status, err)
+			}
+		})
+	}
+}
+
+// Test_appsecQuery_failureActionOnUnauthorized proves HTTP 401 and other unexpected
+// statuses honor failure actions. Dest still returns appsecQuery statusCode:401 on passthrough.
+func Test_appsecQuery_failureActionOnUnauthorized(t *testing.T) {
+	for _, status := range []int{http.StatusUnauthorized, http.StatusTeapot} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+				rw.WriteHeader(status)
+			}))
+			defer appsecServer.Close()
+			appsecURL, _ := url.Parse(appsecServer.URL)
+			client := newQueryClient(appsecURL, appsecServer.Client())
+			req := httptest.NewRequest(http.MethodGet, "http://localhost/", nil)
+
+			decision, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionBan})
+			if err == nil {
+				t.Fatalf("ban on %d expected an error", status)
+			}
+			want := "statusCode:" + strconv.Itoa(status)
+			if !strings.Contains(err.Error(), want) {
+				t.Fatalf("ban on %d error %q want %s", status, err, want)
 			}
 			if decision != nil {
 				t.Fatalf("ban on %d returned decision %#v", status, decision)
