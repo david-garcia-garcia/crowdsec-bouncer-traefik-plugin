@@ -18,7 +18,7 @@ Priority: P2 — operators see inflated dropped counts for every solved bot-dete
 In progress. 0 items remain.
 
 Priority: P2 — operators see inflated dropped counts for every solved bot-detection challenge
-Reviewed head: 75a7dc55
+Reviewed head: cab10319
 Owner decision: None.
 
 ## Review scores
@@ -52,8 +52,6 @@ None.
 ## How this fits together
 Ticket 2026-10-13-challenge-drop-once on branch 2026-10-13-challenge-drop-once targeting main; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/195; CI not seen.
 
-Upstream: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403 (fixes https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/402, point 5). This fork's `main` had no challenge relay (#343 not merged). We added a minimal 403 JSON relay and skip `blockedRequests` on `/crowdsec-internal/challenge/*`. We are not copying their patch.
-
 ## Explore Decisions
 None.
 
@@ -78,7 +76,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 75a7dc55fa85cf8e5244925c8a160380ac239ff9 | Card must match the branch you measured |
+| Reviewed head | cab103194eebbf89693fdaf2e1cbdfc7e1b13ee5 | Card must match the branch you measured |
 
 ### Stored data model
 None.
