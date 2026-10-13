@@ -17,17 +17,17 @@ After a nil `appsecQuery` while AppSec is enabled, `handleNextServeHTTP` respond
 **End users.** Requests under `/crowdsec-internal/challenge/` that AppSec does not serve receive HTTP 404 instead of origin content.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: P1 — leaking `/crowdsec-internal/challenge/` to origin is a wrong public contract today
-Reviewed head: 517f7453
+Reviewed head: ed4516dd
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38444423184 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,7 +37,7 @@ Owner decision: None.
 | Branch | 2026-10-13-challenge-path-terminate pushed | `git` |
 | OpenSpec | terminate-internal-challenge-paths | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/192 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 38444423184 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38444423184 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38444423184 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -52,7 +52,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-13-challenge-path-terminate on branch 2026-10-13-challenge-path-terminate targeting main; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/192; CI not seen.
+Ticket 2026-10-13-challenge-path-terminate on branch 2026-10-13-challenge-path-terminate targeting main; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/192; CI build 38444423184 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38444423184.
 
 ## Explore Decisions
 None.
@@ -78,7 +78,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 517f7453fa85225bddc26b09e8404222fc6f313c | Card must match the branch you measured |
+| Reviewed head | ed4516dd3d1251e7790074be12ea0457e482edd1 | Card must match the branch you measured |
 
 ### Stored data model
 None.
