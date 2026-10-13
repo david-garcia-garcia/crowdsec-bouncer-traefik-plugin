@@ -416,6 +416,22 @@ func (bouncer *Bouncer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 // CUSTOM CODE.
 // TODO place in another file.
 
+// lapiDecisionRemediation maps a LAPI decision type to a cache payload.
+// Types other than ban and captcha fail closed to ban.
+func lapiDecisionRemediation(decisionType string, log *slog.Logger) string {
+	switch decisionType {
+	case "ban":
+		return cache.BannedValue
+	case "captcha":
+		return cache.CaptchaValue
+	default:
+		if log != nil {
+			log.Info("handleStreamCache:unknownType " + decisionType)
+		}
+		return cache.BannedValue
+	}
+}
+
 // Decision Body returned from Crowdsec LAPI.
 type Decision struct {
 	ID        int    `json:"id"`
@@ -578,16 +594,7 @@ func handleNoStreamCache(bouncer *Bouncer, remoteIP string) (string, error) {
 	if err != nil {
 		return cache.BannedValue, fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
 	}
-	var value string
-	switch decision.Type {
-	case "ban":
-		value = cache.BannedValue
-	case "captcha":
-		value = cache.CaptchaValue
-	default:
-		bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
-		value = cache.BannedValue
-	}
+	value := lapiDecisionRemediation(decision.Type, bouncer.log)
 	if isLiveMode && bouncer.defaultDecisionTimeout > 0 {
 		durationSecond := int64(duration.Seconds())
 		if bouncer.defaultDecisionTimeout < durationSecond {
@@ -668,16 +675,7 @@ func handleStreamCache(bouncer *Bouncer) error {
 	for _, decision := range stream.New {
 		duration, err := time.ParseDuration(decision.Duration)
 		if err == nil {
-			var value string
-			switch decision.Type {
-			case "ban":
-				value = cache.BannedValue
-			case "captcha":
-				value = cache.CaptchaValue
-			default:
-				bouncer.log.Info("handleStreamCache:unknownType " + decision.Type)
-				value = cache.BannedValue
-			}
+			value := lapiDecisionRemediation(decision.Type, bouncer.log)
 			bouncer.cacheClient.Set(decision.Value, value, int64(duration.Seconds()))
 		}
 	}

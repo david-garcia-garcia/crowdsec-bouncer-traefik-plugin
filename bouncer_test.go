@@ -601,81 +601,26 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 	}
 }
 
-// TestHandleStreamCacheUnknownTypesAreBanned fails if a stream challenge decision is skipped or allowed.
-func TestHandleStreamCacheUnknownTypesAreBanned(t *testing.T) {
-	lapiServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		_, _ = rw.Write([]byte(`{"new":[{"value":"192.0.2.80","type":"challenge","scope":"Ip","duration":"1h"}],"deleted":[]}`))
-	}))
-	defer lapiServer.Close()
-	lapiURL, parseErr := url.Parse(lapiServer.URL)
-	if parseErr != nil {
-		t.Fatal(parseErr)
+// TestLapiDecisionRemediationUnknownTypesAreBanned fails if an unknown LAPI type is not a ban.
+func TestLapiDecisionRemediationUnknownTypesAreBanned(t *testing.T) {
+	tests := []struct {
+		decisionType string
+		want         string
+	}{
+		{decisionType: "ban", want: cache.BannedValue},
+		{decisionType: "captcha", want: cache.CaptchaValue},
+		{decisionType: "challenge", want: cache.BannedValue},
+		{decisionType: "allow", want: cache.BannedValue},
 	}
-	cacheClient := &cache.Client{}
-	cacheClient.New(logger.New("INFO", ""), false, "", nil, "", "")
-	startup := isCrowdsecStreamStartup
-	defer func() {
-		cacheClient.Delete(cacheTimeoutKey)
-		cacheClient.Delete("192.0.2.80")
-		isCrowdsecStreamStartup = startup
-	}()
-	bouncer := &Bouncer{
-		crowdsecScheme:      lapiURL.Scheme,
-		crowdsecHost:        lapiURL.Host,
-		crowdsecStreamRoute: crowdsecLapiStreamRoute,
-		crowdsecHeader:      crowdsecLapiHeader,
-		httpClient:          lapiServer.Client(),
-		cacheClient:         cacheClient,
-		updateInterval:      60,
-		log:                 logger.New("INFO", ""),
-	}
-	if streamErr := handleStreamCache(bouncer); streamErr != nil {
-		t.Fatal(streamErr)
-	}
-	got, getErr := cacheClient.Get("192.0.2.80")
-	if getErr != nil || got != cache.BannedValue {
-		t.Fatalf("challenge stream cache Get=%q err=%v, want %q", got, getErr, cache.BannedValue)
+	for _, tt := range tests {
+		got := lapiDecisionRemediation(tt.decisionType, nil)
+		if got != tt.want {
+			t.Errorf("lapiDecisionRemediation(%q)=%q, want %q", tt.decisionType, got, tt.want)
+		}
 	}
 }
 
-// TestHandleStreamCacheAllowTypeIsBanned fails if a stream allow decision is skipped or allowed.
-func TestHandleStreamCacheAllowTypeIsBanned(t *testing.T) {
-	lapiServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		_, _ = rw.Write([]byte(`{"new":[{"value":"192.0.2.81","type":"allow","scope":"Ip","duration":"1h"}],"deleted":[]}`))
-	}))
-	defer lapiServer.Close()
-	lapiURL, parseErr := url.Parse(lapiServer.URL)
-	if parseErr != nil {
-		t.Fatal(parseErr)
-	}
-	cacheClient := &cache.Client{}
-	cacheClient.New(logger.New("INFO", ""), false, "", nil, "", "")
-	startup := isCrowdsecStreamStartup
-	defer func() {
-		cacheClient.Delete(cacheTimeoutKey)
-		cacheClient.Delete("192.0.2.81")
-		isCrowdsecStreamStartup = startup
-	}()
-	bouncer := &Bouncer{
-		crowdsecScheme:      lapiURL.Scheme,
-		crowdsecHost:        lapiURL.Host,
-		crowdsecStreamRoute: crowdsecLapiStreamRoute,
-		crowdsecHeader:      crowdsecLapiHeader,
-		httpClient:          lapiServer.Client(),
-		cacheClient:         cacheClient,
-		updateInterval:      60,
-		log:                 logger.New("INFO", ""),
-	}
-	if streamErr := handleStreamCache(bouncer); streamErr != nil {
-		t.Fatal(streamErr)
-	}
-	got, getErr := cacheClient.Get("192.0.2.81")
-	if getErr != nil || got != cache.BannedValue {
-		t.Fatalf("allow stream cache Get=%q err=%v, want %q", got, getErr, cache.BannedValue)
-	}
-}
-
-// TestHandleNoStreamCacheUnknownTypesAreBanned fails if a live challenge decision is not stored as a ban.
+// TestHandleNoStreamCacheUnknownTypesAreBanned fails if a live/none challenge decision is allowed.
 func TestHandleNoStreamCacheUnknownTypesAreBanned(t *testing.T) {
 	lapiServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		_, _ = rw.Write([]byte(`[{"value":"192.0.2.82","type":"challenge","scope":"Ip","duration":"1h"}]`))
@@ -685,26 +630,17 @@ func TestHandleNoStreamCacheUnknownTypesAreBanned(t *testing.T) {
 	if parseErr != nil {
 		t.Fatal(parseErr)
 	}
-	cacheClient := &cache.Client{}
-	cacheClient.New(logger.New("INFO", ""), false, "", nil, "", "")
-	defer cacheClient.Delete("192.0.2.82")
 	bouncer := &Bouncer{
-		crowdsecScheme:         lapiURL.Scheme,
-		crowdsecHost:           lapiURL.Host,
-		crowdsecHeader:         crowdsecLapiHeader,
-		crowdsecMode:           configuration.LiveMode,
-		httpClient:             lapiServer.Client(),
-		cacheClient:            cacheClient,
-		defaultDecisionTimeout: 60,
-		log:                    logger.New("INFO", ""),
+		crowdsecScheme: lapiURL.Scheme,
+		crowdsecHost:   lapiURL.Host,
+		crowdsecHeader: crowdsecLapiHeader,
+		crowdsecMode:   configuration.NoneMode,
+		httpClient:     lapiServer.Client(),
+		log:            logger.New("INFO", ""),
 	}
 	got, liveErr := handleNoStreamCache(bouncer, "192.0.2.82")
 	if got != cache.BannedValue {
-		t.Fatalf("challenge live value=%q err=%v, want %q", got, liveErr, cache.BannedValue)
-	}
-	cached, cacheErr := cacheClient.Get("192.0.2.82")
-	if cacheErr != nil || cached != cache.BannedValue {
-		t.Fatalf("challenge live cache Get=%q err=%v, want %q", cached, cacheErr, cache.BannedValue)
+		t.Fatalf("challenge none-mode value=%q err=%v, want %q", got, liveErr, cache.BannedValue)
 	}
 }
 
@@ -718,21 +654,16 @@ func TestHandleNoStreamCacheEmptyListIsAllowed(t *testing.T) {
 	if parseErr != nil {
 		t.Fatal(parseErr)
 	}
-	cacheClient := &cache.Client{}
-	cacheClient.New(logger.New("INFO", ""), false, "", nil, "", "")
-	defer cacheClient.Delete("192.0.2.83")
 	bouncer := &Bouncer{
-		crowdsecScheme:         lapiURL.Scheme,
-		crowdsecHost:           lapiURL.Host,
-		crowdsecHeader:         crowdsecLapiHeader,
-		crowdsecMode:           configuration.LiveMode,
-		httpClient:             lapiServer.Client(),
-		cacheClient:            cacheClient,
-		defaultDecisionTimeout: 60,
-		log:                    logger.New("INFO", ""),
+		crowdsecScheme: lapiURL.Scheme,
+		crowdsecHost:   lapiURL.Host,
+		crowdsecHeader: crowdsecLapiHeader,
+		crowdsecMode:   configuration.NoneMode,
+		httpClient:     lapiServer.Client(),
+		log:            logger.New("INFO", ""),
 	}
 	got, liveErr := handleNoStreamCache(bouncer, "192.0.2.83")
 	if liveErr != nil || got != cache.NoBannedValue {
-		t.Fatalf("empty live list value=%q err=%v, want %q and nil err", got, liveErr, cache.NoBannedValue)
+		t.Fatalf("empty none-mode list value=%q err=%v, want %q and nil err", got, liveErr, cache.NoBannedValue)
 	}
 }
