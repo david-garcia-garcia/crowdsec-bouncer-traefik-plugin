@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 729012fb
+Reviewed head: 66f873c1
 Owner decision: None.
 
 ## Review scores
@@ -32,7 +32,7 @@ Owner decision: None.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-10-13-challenge-path-terminate pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | terminate-internal-challenge-paths | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/192 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
@@ -67,7 +67,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 729012fba3c7c869f0352ad5bffcadbda579466b | Card must match the branch you measured |
+| Reviewed head | 66f873c18fed8a639ed4e7bc3b734ae07c042530 | Card must match the branch you measured |
 
 ### Stored data model
 None.
