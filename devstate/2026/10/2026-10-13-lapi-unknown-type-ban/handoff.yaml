@@ -1,0 +1,16 @@
+issueKey: 2026-10-13-lapi-unknown-type-ban
+jobName: Ban unknown LAPI decision types
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: main
+qualify: qualified-with-gaps
+src: d5194c1140d6a920bc1be3cf5372d2ab873e2c4604b9424df3d5ee49a0637a65
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
