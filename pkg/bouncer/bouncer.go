@@ -66,6 +66,9 @@ type Bouncer struct {
 const msgBanTemplateUnavailable = "crowdsec bouncer ban template unavailable"
 const msgCaptchaUnsubscribed = "crowdsec bouncer captcha unsubscribed"
 
+// crowdsecChallengeCallbackPrefix is the CrowdSec 1.8 bot-detection script and submit path prefix.
+const crowdsecChallengeCallbackPrefix = "/crowdsec-internal/challenge/"
+
 // New returns a per-router handler. Clients arrive later through ReceiveLAPI, ReceiveAppSec, and ReceiveCaptcha.
 func New(next http.Handler, name string, config *configuration.Config, subscribeLAPI, subscribeAppSec, subscribeCaptcha bool, log *slog.Logger) (*Bouncer, error) {
 	log = log.With("traefikName", name)
@@ -491,9 +494,17 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientrequest
 	return true
 }
 
+// isCrowdsecChallengeCallbackPath reports script and submit paths under /crowdsec-internal/challenge/.
+func isCrowdsecChallengeCallbackPath(path string) bool {
+	return strings.HasPrefix(path, crowdsecChallengeCallbackPrefix)
+}
+
 // handleAppsecResponseServeHTTP writes a structured AppSec envelope (challenge HTML, cookies, headers) to the client.
 func (b *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req clientrequest.Request, decision *appsec.Response) {
-	b.recordDropped(req, "appsec", "")
+	// Challenge scripts and submit are the same solve as the page; do not count them as extra drops.
+	if !isCrowdsecChallengeCallbackPath(req.URL.Path) {
+		b.recordDropped(req, "appsec", "")
+	}
 
 	// Copy AppSec-supplied headers, skipping hop-by-hop names and Set-Cookie (cookies have their own field).
 	for name, values := range decision.UserHeaders {

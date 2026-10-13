@@ -312,6 +312,32 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 	}
 }
 
+// testChallengeDroppedCount relays one AppSec challenge envelope on path and returns origin appsec dropped/request.
+func testChallengeDroppedCount(t *testing.T, method, path string) int64 {
+	t.Helper()
+	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"action":"challenge","http_status":200,"user_body_content":"<html>challenge</html>"}`))
+	}, nil)
+	t.Cleanup(appsecServer.Close)
+	lapiClient, _ := lapi.NewTestClient(logger.New("ERROR", ""))
+	lapi.AttachTestMetricsReporter(lapiClient)
+	bindTestLAPI(b, lapiClient)
+	rw := httptest.NewRecorder()
+	continueAfterLAPIForTest(b, rw, testClientRequest(httptest.NewRequest(method, "http://example.com"+path, nil), "192.0.2.10"))
+	return lapiClient.TestDroppedCount("appsec", "ipv4", "")
+}
+
+// TestHandleNextServeHTTPChallengePageIncrementsDroppedOnce counts the challenge page once and skips /crowdsec-internal/challenge/submit.
+func TestHandleNextServeHTTPChallengePageIncrementsDroppedOnce(t *testing.T) {
+	if got := testChallengeDroppedCount(t, http.MethodGet, "/protected"); got != 1 {
+		t.Fatalf("protected dropped=%d want 1", got)
+	}
+	if got := testChallengeDroppedCount(t, http.MethodPost, "/crowdsec-internal/challenge/submit"); got != 0 {
+		t.Fatalf("submit dropped=%d want 0", got)
+	}
+}
+
 // TestHandleNextServeHTTPChallengeCSPReplacesAndCookiesStaySeparate proves
 // https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/397:
 // AppSec user_headers of the same name replace (including CSP), and each user_cookies value is its own Set-Cookie.
