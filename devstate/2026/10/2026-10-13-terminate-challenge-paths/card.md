@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 01527109
+Reviewed head: 960f683f
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,14 +32,17 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-10-13-terminate-challenge-paths pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | terminate-unanswered-challenge-paths | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/196 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-terminate-challenge-paths/openspec/changes/terminate-unanswered-challenge-paths/proposal.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-terminate-challenge-paths/openspec/changes/terminate-unanswered-challenge-paths/proposal.md) — modified
+
 
 ## Deviations from the ask
 None.
@@ -67,9 +70,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 01527109242178b1d66e9d26e8bf67d73fef3ea6 | Card must match the branch you measured |
+| Reviewed head | 960f683fc72026acdc1bd3f38da9562a14b00b3f | Card must match the branch you measured |
 
 ### Stored data model
 None.
