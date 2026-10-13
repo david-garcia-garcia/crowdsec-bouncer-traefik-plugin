@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: d38fef62
-Owner decision: None.
+Reviewed head: 69337943
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -51,7 +51,10 @@ None.
 Ticket 2026-10-13-count-challenge-once on branch 2026-10-13-count-challenge-once targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/197; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Which request path field implements "under `/crowdsec-internal/challenge/`"? | additive asked — Desired names the path prefix; httprule already matches `URL.Path` (1 family in `pkg/httprule`, enumerated with `pkg/bouncer/bouncer.go`) | assumed — use `req.URL.Path` (`strings.HasPrefix(..., "/crowdsec-internal/challenge/")`). Traefik ServeHTTP fills `URL.Path`; do not parse `RequestURI`. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | d38fef62ae1fe767dd03b2317d040a5faccb3255 | Card must match the branch you measured |
+| Reviewed head | 693379435d073748d515530a979e013ba15a5562 | Card must match the branch you measured |
 
 ### Stored data model
 None.
