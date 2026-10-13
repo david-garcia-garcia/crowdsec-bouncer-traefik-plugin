@@ -173,8 +173,8 @@ func TestHandleStreamTickerSubsequentPollLogsDelta(t *testing.T) {
 	if strings.Count(logged, `"msg":"handleStreamCache:updated"`) != 2 {
 		t.Fatalf("want 2 updated lines:\n%s", logged)
 	}
-	if !strings.Contains(logged, `"new":2`) || !strings.Contains(logged, `"deleted":1`) {
-		t.Fatalf("startup apply must count written decisions (2 new, skip unknown, 1 deleted):\n%s", logged)
+	if !strings.Contains(logged, `"new":3`) || !strings.Contains(logged, `"deleted":1`) {
+		t.Fatalf("startup apply must count written decisions (2 bans plus unknown type as ban, 1 deleted):\n%s", logged)
 	}
 	if !strings.Contains(logged, `"new":1`) {
 		t.Fatalf("delta apply missing new=1:\n%s", logged)

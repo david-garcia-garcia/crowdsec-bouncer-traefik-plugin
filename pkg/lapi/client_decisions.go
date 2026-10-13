@@ -10,6 +10,7 @@ import (
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // streamStartup is whether this poll asks LAPI for the full decision set (startup=true).
@@ -35,14 +36,24 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 	c.decisionStore.PutMany([]decisionstore.Decision{stored})
 }
 
+// ingestRemediationKind is the store letter for one LAPI decision type at ingest.
+// ban and captcha keep RemediationValue; any other type is ban.
+func (c *Client) ingestRemediationKind(decisionType string) string {
+	kind := decisionscope.RemediationValue(decisionType)
+	if kind != "" {
+		return kind
+	}
+	// Unknown types have nothing to render; fail closed to ban.
+	if c.log != nil {
+		logger.Trace(c.log, "handleStreamCache:unknownType", "type", decisionType)
+	}
+	return decisionscope.BannedValue
+}
+
 // streamPutItem is the Ip/header stream New item to store, or false when the decision is skipped.
 func (c *Client) streamPutItem(item Decision, duration int64) (decisionstore.Decision, bool) {
 	origin := MetricsOrigin(item.Origin, item.Scenario)
-	kind := decisionscope.RemediationValue(item.Type)
-	if kind == "" {
-		c.log.Debug("handleStreamCache:unknownType", "type", item.Type)
-		return decisionstore.Decision{}, false
-	}
+	kind := c.ingestRemediationKind(item.Type)
 	scope := decisionscope.NormalizeScope(item.Scope)
 	if scope == decisionscope.ScopeRange {
 		return decisionstore.Decision{}, false
@@ -111,12 +122,8 @@ func (c *Client) queryLiveDecisions(rawQuery string) (liveResult, error) {
 		return liveResult{}, fmt.Errorf("handleNoStreamCache:parseDuration %w", err)
 	}
 	origin := MetricsOrigin(picked.Origin, picked.Scenario)
-	kind := decisionscope.RemediationValue(picked.Type)
-	if kind == "" {
-		return liveResult{kind: decisionscope.NoBannedValue}, nil
-	}
 	return liveResult{
-		kind:     kind,
+		kind:     c.ingestRemediationKind(picked.Type),
 		origin:   origin,
 		scenario: picked.Scenario,
 		duration: parsedDuration,
@@ -150,11 +157,11 @@ func (c *Client) OriginName(id uint16) string {
 	return c.decisionStore.OriginName(id)
 }
 
-// strongestLiveDecision returns the first still-ban by LAPI type, else the first captcha.
+// strongestLiveDecision returns the first ban by ingest kind (unknown types included), else the first captcha.
 func (c *Client) strongestLiveDecision(items []Decision) *Decision {
 	var fallback *Decision
 	for i := range items {
-		kind := decisionscope.RemediationValue(items[i].Type)
+		kind := c.ingestRemediationKind(items[i].Type)
 		if kind == decisionscope.BannedValue {
 			return &items[i]
 		}
