@@ -43,6 +43,18 @@ jobs:
           path: go/src/github.com/${{ github.repository }}
           fetch-depth: 0
 
+      # Yaegi resolves imports from GOPATH/src/<module>. The checkout path is
+      # github.repository (this fork); go.mod is still maxlerebourg's module path.
+      - name: Map go.mod path for Yaegi
+        run: |
+          checkout="${{ github.workspace }}/go/src/github.com/${{ github.repository }}"
+          module="${{ github.workspace }}/go/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+          if [ "$checkout" != "$module" ]; then
+            mkdir -p "$(dirname "$module")"
+            ln -sfn "$checkout" "$module"
+          fi
+        working-directory: ${{ github.workspace }}
+
       # https://github.com/marketplace/actions/cache
       - name: Cache Go modules
         uses: actions/cache@v6
