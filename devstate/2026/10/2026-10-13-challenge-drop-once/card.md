@@ -15,17 +15,17 @@ Priority: P2 — operators see inflated dropped counts for every solved bot-dete
 **End users.** The browser receives the AppSec challenge HTML instead of the operator ban page when AppSec returns that envelope.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: P2 — operators see inflated dropped counts for every solved bot-detection challenge
-Reviewed head: cab10319
+Reviewed head: 141fa3be
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38444202155 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -35,7 +35,7 @@ Owner decision: None.
 | Branch | 2026-10-13-challenge-drop-once pushed | `git` |
 | OpenSpec | count-challenge-drop-once | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/195 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 38444202155 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38444202155 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38444202155 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -44,16 +44,20 @@ None.
 
 ## Deviations from the ask
 - taken: a relay under `/crowdsec-internal/challenge/` does not increment dropped (request or bytes). → skip `blockedRequests` only; do not add a bytes series. — `bouncer.go reportMetrics` — dest's metrics POST has a single `dropped` request item and no bytes series; adding bytes would change the POST shape, which the ask forbids.. Requester: not asked.
+- taken: CI on the PR head succeeds. → map GOPATH `maxlerebourg/crowdsec-bouncer-traefik-plugin` to this fork checkout; do not change go.mod. — `.github/workflows/main.yml` — dest `main` already failed Yaegi with `unable to find source related to pkg/cache`. Requester: not asked.
 
 
 ## Follow-up issues
 None.
 
 ## How this fits together
-Ticket 2026-10-13-challenge-drop-once on branch 2026-10-13-challenge-drop-once targeting main; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/195; CI not seen.
+Ticket 2026-10-13-challenge-drop-once on branch 2026-10-13-challenge-drop-once targeting main; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/195; CI build 38444202155 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38444202155 (Main Process and e2e binary + mock LAPI).
+
+Upstream: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403 (fixes https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/402, point 5). This fork's `main` had no challenge relay (#343 not merged). We added a minimal 403 JSON relay and skip `blockedRequests` on `/crowdsec-internal/challenge/*`. We are not copying their patch.
 
 ## Explore Decisions
-None.
+- Dest has no challenge relay; can the skip attach without adding one? → add a minimal challenge-JSON relay in `bouncer.go` and skip `blockedRequests` under `/crowdsec-internal/challenge/`; do not merge #343 wholesale. By implement.
+- Dest has no dropped-bytes series; the dump says skip request or bytes. → skip only the request counter dest already has; do not add a bytes series or change the POST shape. By implement.
 
 ## Findings
 None.
@@ -76,7 +80,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | cab103194eebbf89693fdaf2e1cbdfc7e1b13ee5 | Card must match the branch you measured |
+| Reviewed head | 141fa3be8f876ae4efb04c6df20a0db9ec0ab042 | Card must match the branch you measured |
 
 ### Stored data model
 None.
