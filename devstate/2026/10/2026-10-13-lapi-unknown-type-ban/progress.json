@@ -4,7 +4,7 @@
   "startedAt": "2026-10-13T16:56:22.552Z",
   "phases": {
     "prepare": {
-      "work": false,
+      "work": true,
       "card": false,
       "at": null
     },
