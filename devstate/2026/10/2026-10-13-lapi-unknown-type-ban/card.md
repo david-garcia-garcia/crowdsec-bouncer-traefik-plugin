@@ -17,17 +17,17 @@ CI Yaegi checkout is the go.mod module path (`github.com/maxlerebourg/crowdsec-b
 **End users.** An IP with an unknown LAPI type is banned instead of allowed in stream mode.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: P1 — production serves a wrong public contract today
-Reviewed head: 162025ec
+Reviewed head: 4d5c3d94
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38445767472 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,7 +37,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-10-13-lapi-unknown-type-ban pushed | `git` |
 | OpenSpec | ban-unknown-lapi-decision-types | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/193 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 38445767472 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38445767472 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38445767472 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -51,7 +51,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-13-lapi-unknown-type-ban on branch 2026-10-13-lapi-unknown-type-ban targeting main; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/193; CI not seen.
+Ticket 2026-10-13-lapi-unknown-type-ban on branch 2026-10-13-lapi-unknown-type-ban targeting main; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/193; CI build 38445767472 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38445767472.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -80,7 +80,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 162025ecf9cce961dcf6867b10a497ab023461c5 | Card must match the branch you measured |
+| Reviewed head | 4d5c3d94026c09ba74ec60e9a056b7da3389ffca | Card must match the branch you measured |
 
 ### Stored data model
 - Redis cache (when Redis cache is enabled): unknown LAPI decision keys now persist payload `t` (ban) instead of an empty string. Same key, same TTL. No schema or field change. Memory cache is process-local.
