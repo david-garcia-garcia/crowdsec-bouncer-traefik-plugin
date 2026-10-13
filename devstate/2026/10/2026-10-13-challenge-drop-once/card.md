@@ -18,7 +18,7 @@ Priority: P2 — operators see inflated dropped counts for every solved bot-dete
 In progress. 0 items remain.
 
 Priority: P2 — operators see inflated dropped counts for every solved bot-detection challenge
-Reviewed head: 3996c570
+Reviewed head: 75a7dc55
 Owner decision: None.
 
 ## Review scores
@@ -78,7 +78,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 3996c5703d1a7eb8ecd04da6619d47d0246ea5cb | Card must match the branch you measured |
+| Reviewed head | 75a7dc55fa85cf8e5244925c8a160380ac239ff9 | Card must match the branch you measured |
 
 ### Stored data model
 None.
