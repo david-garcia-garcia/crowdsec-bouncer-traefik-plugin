@@ -1,23 +1,24 @@
 ## Motivation
-Not yet.
+CrowdSec AppSec answers HTTP 401 when the bouncer key is rejected, and also when AppSec cannot reach LAPI to validate a key it has not cached yet. The challenge protocol says that status, like 500, uses the component's configured AppSec failure behaviour.
+
+This fork already mapped HTTP 500 and unreachable 502/503/504 onto `bouncerAppsecFailureAction`. A bare 401 still became Query error `appsecQuery statusCode:401`, and the bouncer banned the visitor at Debug regardless of passthrough. An AppSec restart during a LAPI outage therefore banned every client even when the operator set passthrough.
+
+Priority: P2 — real operator pain with a limited blast radius (only AppSec 401/unexpected, default action remains ban)
 
 ## Implementation
-Not yet.
+Query still parses a JSON `action` first. After `interpretAppsecBody` errors, HTTP 403 stays fail-closed. Any other leftover status (401, 418, …) logs `appsecQuery:failure` at Error with attr `statusCode` and calls `resultForFailureAction`. Passthrough returns allow so the bouncer calls next; ban keeps `appsecQuery statusCode:<n>`; captcha returns `ErrFailureCaptcha`. 500 and 502/503/504 paths are untouched. Community PR 403's bool/default branch was not copied.
 
 ## What this changes
-**Operators.** None.
-
+**Operators.** `bouncerAppsecFailureAction: passthrough` now allows the request when AppSec answers 401 or another unexpected status, instead of banning; watch Error `appsecQuery:failure` with `statusCode`.
 **Admin users.** None.
-
-**Developers.** None.
-
-**End users.** None.
+**Developers.** Query treats 401/unexpected like 500 for FailureAction; empty 403 still errors; do not assume every non-200 is a ban.
+**End users.** Visitors are no longer banned solely because AppSec returned 401 while the operator chose passthrough.
 
 ## Merge readiness
 Ready for review. 0 items remain.
 
-Priority: unknown — motivation not written
-Reviewed head: 022af7a7
+Priority: P2 — real operator pain with a limited blast radius (only AppSec 401/unexpected, default action remains ban)
+Reviewed head: d0db6997
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -64,7 +65,15 @@ Ticket 2026-10-13-appsec-unexpected-status on branch 2026-10-13-appsec-unexpecte
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-appsec-unexpected-status/devstate/2026/10/2026-10-13-appsec-unexpected-status/codereview_standards.md) — 0 total, 0 pending, 0 completed
+[Nitpicks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-appsec-unexpected-status/devstate/2026/10/2026-10-13-appsec-unexpected-status/codereview_nitpicks.md) — 0 total, 0 pending, 0 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-appsec-unexpected-status/devstate/2026/10/2026-10-13-appsec-unexpected-status/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Scope](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-appsec-unexpected-status/devstate/2026/10/2026-10-13-appsec-unexpected-status/codereview_scope.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-appsec-unexpected-status/devstate/2026/10/2026-10-13-appsec-unexpected-status/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-appsec-unexpected-status/devstate/2026/10/2026-10-13-appsec-unexpected-status/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-appsec-unexpected-status/devstate/2026/10/2026-10-13-appsec-unexpected-status/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-13-appsec-unexpected-status/devstate/2026/10/2026-10-13-appsec-unexpected-status/codereview_coverage.md) — 0 total, 0 pending, 0 completed
+
 
 ## Agent review details
 
@@ -73,7 +82,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 022af7a7115ac3c58e390a86cd7225b15b930a2f | Card must match the branch you measured |
+| Reviewed head | d0db699758ad818e6a92471ede98f5c4eaa33968 | Card must match the branch you measured |
 
 ### Stored data model
 None.
