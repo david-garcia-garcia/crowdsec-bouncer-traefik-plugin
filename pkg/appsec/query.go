@@ -174,7 +174,7 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 	if err == nil {
 		return decision, nil
 	}
-	// 403 without a parseable action is fail-closed ban, not FailureAction.
+	// CrowdSec uses 403 for a rule match, not an outage. No parseable action still bans; FailureAction does not apply.
 	if res.StatusCode == http.StatusForbidden {
 		return nil, err
 	}
