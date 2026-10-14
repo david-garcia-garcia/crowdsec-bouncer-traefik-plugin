@@ -31,7 +31,9 @@ func Debounced(log *slog.Logger, level slog.Level, interval time.Duration, msg s
 // A repeat inside the window loads the stored time and returns. It does not take a lock.
 func allowDebounced(msg string, interval time.Duration, now time.Time) bool {
 	if actual, ok := debounceSlots.Load(msg); ok {
-		return claimDebounceSlot(actual.(*debounceSlot), interval, now)
+		if slot, ok := actual.(*debounceSlot); ok {
+			return claimDebounceSlot(slot, interval, now)
+		}
 	}
 	fresh := &debounceSlot{}
 	stamp := now
@@ -40,7 +42,11 @@ func allowDebounced(msg string, interval time.Duration, now time.Time) bool {
 	if !loaded {
 		return true
 	}
-	return claimDebounceSlot(actual.(*debounceSlot), interval, now)
+	slot, ok := actual.(*debounceSlot)
+	if !ok {
+		return true
+	}
+	return claimDebounceSlot(slot, interval, now)
 }
 
 // claimDebounceSlot logs when interval has elapsed since slot was last claimed.
