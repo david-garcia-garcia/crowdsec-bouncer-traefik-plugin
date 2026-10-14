@@ -9,8 +9,9 @@ import (
 )
 
 // debounceSlot holds the last time one message text was logged.
+// last stores a time.Time. atomic.Pointer[T] is not used: Yaegi v0.16 cannot select that field.
 type debounceSlot struct {
-	last atomic.Pointer[time.Time]
+	last atomic.Value
 }
 
 // debounceSlots is process-wide so every logger shares one window per message text.
@@ -36,8 +37,7 @@ func allowDebounced(msg string, interval time.Duration, now time.Time) bool {
 		}
 	}
 	fresh := &debounceSlot{}
-	stamp := now
-	fresh.last.Store(&stamp)
+	fresh.last.Store(now)
 	actual, loaded := debounceSlots.LoadOrStore(msg, fresh)
 	if !loaded {
 		return true
@@ -51,12 +51,16 @@ func allowDebounced(msg string, interval time.Duration, now time.Time) bool {
 
 // claimDebounceSlot logs when interval has elapsed since slot was last claimed.
 func claimDebounceSlot(slot *debounceSlot, interval time.Duration, now time.Time) bool {
-	last := slot.last.Load()
-	if last != nil && now.Sub(*last) < interval {
+	loaded := slot.last.Load()
+	last, ok := loaded.(time.Time)
+	if ok && now.Sub(last) < interval {
 		return false
 	}
-	stamp := now
-	return slot.last.CompareAndSwap(last, &stamp)
+	if !ok {
+		slot.last.Store(now)
+		return true
+	}
+	return slot.last.CompareAndSwap(last, now)
 }
 
 // ResetDebounceForTest clears the process-wide windows. Test-only.

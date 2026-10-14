@@ -37,5 +37,5 @@ log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogForma
 ## Gotchas
 
 - Raw slog JSON without this package's `ReplaceAttr` prints Trace as `DEBUG-4`. Product `NewWithFormat` prints `TRACE`.
-- `logger.Debounced(log, level, interval, msg, attrs...)` emits `msg` at most once per `interval`. The caller passes that duration. The key is the message text, process-wide, so attributes do not open a new window. Tests that assert the line call `logger.ResetDebounceForTest` first.
+- `logger.Debounced(log, level, interval, msg, attrs...)` emits `msg` at most once per `interval`. The caller passes that duration. The key is the message text, process-wide, so attributes do not open a new window. Tests that assert the line call `logger.ResetDebounceForTest` first. The stored time is an `atomic.Value`, not `atomic.Pointer[T]`: Yaegi v0.16 imports this package and cannot select that field.
 - Operators filtering `component=CrowdsecBouncerTraefikPlugin` miss new logs.
