@@ -172,11 +172,11 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 	// and does not use FailureAction. 500 uses FailureAction. 401 and any other code use FailureAction
 	// and log a WARN debounced on that message text.
 	if res.StatusCode == http.StatusInternalServerError {
-		logger.Debounced(c.log, slog.LevelInfo, 15*time.Second, "appsecQuery:failure")
+		logger.Debounced(c.log, slog.LevelInfo, 5*time.Second, "appsecQuery:failure")
 		return resultForFailureAction(pol.FailureAction, "appsecQuery statusCode:500")
 	}
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusForbidden {
-		logger.Debounced(c.log, slog.LevelWarn, time.Minute, msgUnexpectedListenerStatus, "statusCode", res.StatusCode)
+		logger.Debounced(c.log, slog.LevelWarn, 5*time.Second, msgUnexpectedListenerStatus, "statusCode", res.StatusCode)
 		return resultForFailureAction(pol.FailureAction, fmt.Sprintf("appsecQuery statusCode:%d", res.StatusCode))
 	}
 
