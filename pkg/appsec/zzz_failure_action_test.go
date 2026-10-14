@@ -237,11 +237,11 @@ func Test_appsecQuery_unexpectedStatusWarnsOnce(t *testing.T) {
 			t.Fatalf("passthrough on 401: %v", err)
 		}
 	}
-	if got := strings.Count(sink.String(), msgUnexpectedListenerStatus); got != 1 {
+	if got := strings.Count(sink.String(), msgUnauthenticated); got != 1 {
 		t.Fatalf("401 WARN count %d, log %s", got, sink.String())
 	}
-	if !strings.Contains(sink.String(), `"statusCode":401`) {
-		t.Fatalf("401 WARN missing statusCode: %s", sink.String())
+	if strings.Contains(sink.String(), msgUnexpectedListenerStatus) {
+		t.Fatalf("401 logged the unexpected-status WARN: %s", sink.String())
 	}
 
 	statusCode = http.StatusBadGateway
@@ -250,7 +250,10 @@ func Test_appsecQuery_unexpectedStatusWarnsOnce(t *testing.T) {
 		t.Fatalf("ban on 502: %v", err)
 	}
 	if got := strings.Count(sink.String(), msgUnexpectedListenerStatus); got != 1 {
-		t.Fatalf("502 shares the message window, count %d, log %s", got, sink.String())
+		t.Fatalf("502 WARN count %d, log %s", got, sink.String())
+	}
+	if !strings.Contains(sink.String(), `"statusCode":502`) {
+		t.Fatalf("502 WARN missing statusCode: %s", sink.String())
 	}
 	if strings.Contains(sink.String(), "appsecQuery:unreachable") {
 		t.Fatalf("502 logged unreachable: %s", sink.String())

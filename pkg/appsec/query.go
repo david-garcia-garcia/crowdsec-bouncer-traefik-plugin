@@ -30,7 +30,10 @@ const (
 	appsecResponseBodyLimit         = 1 << 20 // 1 MiB
 )
 
-// msgUnexpectedListenerStatus is the debounced WARN when the listener status is not 200, 403, or 500.
+// msgUnauthenticated is the debounced WARN for HTTP 401. The text is the AppSec protocol sentence.
+const msgUnauthenticated = "Remediation component is not authenticated."
+
+// msgUnexpectedListenerStatus is the debounced WARN when the listener status is not 200, 401, 403, or 500.
 const msgUnexpectedListenerStatus = "The remediation component returned an unexpected status code"
 
 // Structured AppSec JSON action values CrowdSec 1.8 puts in the envelope body.
@@ -169,11 +172,15 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 	//	      Use the same API key that pulls the local API.
 	//
 	// A 200 with no parseable action is still allow. A 403 with no parseable action is still a ban
-	// and does not use FailureAction. 500 uses FailureAction. 401 and any other code use FailureAction
-	// and log a WARN debounced on that message text.
+	// and does not use FailureAction. 500 uses FailureAction. 401 uses FailureAction and logs the
+	// protocol sentence. Any other code uses FailureAction and logs a WARN debounced on that message text.
 	if res.StatusCode == http.StatusInternalServerError {
 		logger.Debounced(c.log, slog.LevelInfo, 5*time.Second, "appsecQuery:failure")
 		return resultForFailureAction(pol.FailureAction, "appsecQuery statusCode:500")
+	}
+	if res.StatusCode == http.StatusUnauthorized {
+		logger.Debounced(c.log, slog.LevelWarn, 5*time.Second, msgUnauthenticated)
+		return resultForFailureAction(pol.FailureAction, "appsecQuery statusCode:401")
 	}
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusForbidden {
 		logger.Debounced(c.log, slog.LevelWarn, 5*time.Second, msgUnexpectedListenerStatus, "statusCode", res.StatusCode)
