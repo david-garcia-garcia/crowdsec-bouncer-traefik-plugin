@@ -79,6 +79,8 @@ Follow source for what `maxlerebourg/crowdsec-bouncer-traefik-plugin@04d92887` d
 - Any other non-200, including protocol `401` and protocol `403`, returns an error and the request is banned. The plugin does **not** parse the `403` JSON `action` body.
 - It does not send `X-Crowdsec-Appsec-Http-Version`.
 
+Community PR [maxlerebourg/crowdsec-bouncer-traefik-plugin#403](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403) (2026-10-12, merge `e0505f98`, issue 402 point 2) maps 401 and every other unexpected status onto the same `crowdsecAppsecFailureBlock` branch as 500, logs `Error(fmt.Sprintf("appsecQuery:failure statusCode:%d"))`, and keeps 502/503/504 as unreachable. 403 still parses JSON before that default. That PR does not exist on this fork's `master`; this fork already replaced the bools with `bouncerAppsecFailureAction` and still bans a bare 401.
+
 ## References
 
 - Official: [WAF / Bouncer communication protocol](https://docs.crowdsec.net/docs/appsec/protocol), [challenge protocol](https://docs.crowdsec.net/docs/next/appsec/bot_detection/challenge_protocol.md), [bouncer AppSec specs](https://docs.crowdsec.net/docs/next/contributing/specs/bouncer_appsec_specs.md)

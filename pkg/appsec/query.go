@@ -12,9 +12,11 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 const (
@@ -27,6 +29,12 @@ const (
 	crowdsecAppsecHTTPVersionHeader = "X-Crowdsec-Appsec-Http-Version"
 	appsecResponseBodyLimit         = 1 << 20 // 1 MiB
 )
+
+// msgUnauthenticated is the debounced WARN for HTTP 401. The text is the AppSec protocol sentence.
+const msgUnauthenticated = "Remediation component is not authenticated."
+
+// msgUnexpectedListenerStatus is the debounced WARN when the listener status is not 200, 401, 403, or 500.
+const msgUnexpectedListenerStatus = "The remediation component returned an unexpected status code"
 
 // Structured AppSec JSON action values CrowdSec 1.8 puts in the envelope body.
 const (
@@ -132,7 +140,7 @@ func isHopByHopHeader(name string) bool {
 }
 
 // Query forwards the request to this AppSec HTTP client.
-// A structured JSON envelope is returned when AppSec supplies a non-empty action.
+// The status table in the body is the CrowdSec AppSec protocol this method follows.
 func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error) {
 	appsecReq, err := c.newAppsecForwardRequest(req, pol)
 	if err != nil {
@@ -149,16 +157,34 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 		c.log.Error("appsecQuery:unreachable")
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
-	// Drain every live response, including 502/503/504, so keep-alive can reuse the slot.
+	// Drain every live response, including unexpected statuses, so keep-alive can reuse the slot.
 	defer c.drainResponse(res)
-	if isReverseProxyError(res.StatusCode) {
-		c.log.Error("appsecQuery:unreachable")
-		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
-	}
-
+	// CrowdSec AppSec response (https://docs.crowdsec.net/docs/appsec/protocol):
+	//
+	//	Code  Description                                      Body
+	//	200   The HTTP request is allowed                      {"action":"allow"}
+	//	403   One or more AppSec rules matched                 {"action":"ban","http_status":403},
+	//	                                                       {"action":"captcha","http_status":403},
+	//	                                                       or {"action":"challenge",...}
+	//	500   Error in the AppSec component. Apply             null
+	//	      APPSEC_FAILURE_ACTION (bouncerAppsecFailureAction).
+	//	401   Remediation component is not authenticated.      null
+	//	      Use the same API key that pulls the local API.
+	//
+	// A 200 with no parseable action is still allow. A 403 with no parseable action is still a ban
+	// and does not use FailureAction. 500 uses FailureAction. 401 uses FailureAction and logs the
+	// protocol sentence. Any other code uses FailureAction and logs a WARN debounced on that message text.
 	if res.StatusCode == http.StatusInternalServerError {
-		c.log.Info("appsecQuery:failure")
+		logger.Debounced(c.log, slog.LevelInfo, 5*time.Second, "appsecQuery:failure")
 		return resultForFailureAction(pol.FailureAction, "appsecQuery statusCode:500")
+	}
+	if res.StatusCode == http.StatusUnauthorized {
+		logger.Debounced(c.log, slog.LevelWarn, 5*time.Second, msgUnauthenticated)
+		return resultForFailureAction(pol.FailureAction, "appsecQuery statusCode:401")
+	}
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusForbidden {
+		logger.Debounced(c.log, slog.LevelWarn, 5*time.Second, msgUnexpectedListenerStatus, "statusCode", res.StatusCode)
+		return resultForFailureAction(pol.FailureAction, fmt.Sprintf("appsecQuery statusCode:%d", res.StatusCode))
 	}
 
 	body, err := c.readCappedAppsecBody(res)
@@ -170,7 +196,12 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 		}
 		return nil, err
 	}
-	return interpretAppsecBody(res.StatusCode, body, c.log)
+	// Only 200 and 403 reach here. interpretAppsecBody turns a missing action into allow or a ban.
+	decision, err := interpretAppsecBody(res.StatusCode, body, c.log)
+	if err != nil {
+		return nil, err
+	}
+	return decision, nil
 }
 
 // newAppsecForwardRequest builds the AppSec listener request, copying client headers and identity.

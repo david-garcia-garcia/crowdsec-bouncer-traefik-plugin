@@ -270,12 +270,20 @@ func Test_appsecQuery_emptyForbiddenErrors(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{})
+	client := newQueryClient(appsecURL, appsecServer.Client())
+	decision, err := client.Query(buildTestRequest(), Policy{})
 	if err == nil {
 		t.Fatal("Query() expected error for empty 403")
 	}
 	if decision != nil {
 		t.Fatalf("Query() returned decision: %#v", decision)
+	}
+	decision, err = client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough})
+	if err == nil {
+		t.Fatal("passthrough must not allow empty 403")
+	}
+	if decision != nil {
+		t.Fatalf("passthrough empty 403 returned decision: %#v", decision)
 	}
 }
 
