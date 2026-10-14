@@ -4,7 +4,6 @@ package appsec
 import (
 	"fmt"
 	"log/slog"
-	"net/http"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -153,10 +152,4 @@ func (c *Client) bindIdentity(middlewareName, bindKey string) {
 	if c.sessionKey == "" {
 		c.sessionKey = bindKey
 	}
-}
-
-func isReverseProxyError(statusCode int) bool {
-	return statusCode == http.StatusBadGateway ||
-		statusCode == http.StatusServiceUnavailable ||
-		statusCode == http.StatusGatewayTimeout
 }

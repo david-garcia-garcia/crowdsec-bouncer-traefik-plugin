@@ -31,9 +31,11 @@ log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogForma
 ## Key files
 
 - `pkg/logger/logger.go` — `NewWithFormat`, `ReplaceAttr`, shared files
+- `pkg/logger/debounce.go` — `Debounced`, `ResetDebounceForTest`
 - `plugin.go` — process logger construction
 
 ## Gotchas
 
 - Raw slog JSON without this package's `ReplaceAttr` prints Trace as `DEBUG-4`. Product `NewWithFormat` prints `TRACE`.
+- `logger.Debounced(log, level, interval, msg, attrs...)` emits `msg` at most once per `interval`. The caller passes that duration. The key is the message text, process-wide, so attributes do not open a new window. Tests that assert the line call `logger.ResetDebounceForTest` first.
 - Operators filtering `component=CrowdsecBouncerTraefikPlugin` miss new logs.

@@ -1,7 +1,9 @@
 package appsec
 
 import (
+	"bytes"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -10,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
-	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // failReadCloser is an AppSec response body that always fails on Read.
@@ -160,5 +162,106 @@ func Test_appsecQuery_failureActionOnResponseBodyReadError(t *testing.T) {
 	_, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionCaptcha})
 	if !errors.Is(err, ErrFailureCaptcha) {
 		t.Fatalf("captcha on response-body read error want ErrFailureCaptcha, got %v", err)
+	}
+}
+
+// Test_appsecQuery_unparseable200Allows proves a 200 with a body that is not JSON is still allow.
+func Test_appsecQuery_unparseable200Allows(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write([]byte("not-json"))
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan})
+	if err != nil {
+		t.Fatalf("unparseable 200: %v", err)
+	}
+	if decision == nil || decision.Action != ActionAllow {
+		t.Fatalf("unparseable 200 want allow, got %#v", decision)
+	}
+}
+
+// Test_appsecQuery_unparseable403Bans proves a 403 with a body that is not JSON bans and ignores FailureAction.
+func Test_appsecQuery_unparseable403Bans(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusForbidden)
+		_, _ = rw.Write([]byte("not-json"))
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough})
+	if err == nil {
+		t.Fatal("unparseable 403 with passthrough expected an error")
+	}
+	if decision != nil {
+		t.Fatalf("unparseable 403 returned decision %#v", decision)
+	}
+}
+
+// Test_appsecQuery_unexpectedStatusIgnoresBody proves a non-protocol status uses FailureAction even with a ban envelope.
+func Test_appsecQuery_unexpectedStatusIgnoresBody(t *testing.T) {
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusUnauthorized)
+		_, _ = rw.Write([]byte(`{"action":"ban"}`))
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough})
+	if err != nil {
+		t.Fatalf("passthrough on 401 with ban JSON: %v", err)
+	}
+	if decision == nil || decision.Action != ActionAllow {
+		t.Fatalf("passthrough on 401 want allow, got %#v", decision)
+	}
+}
+
+// Test_appsecQuery_unexpectedStatusWarnsOnce proves the WARN is debounced on the message text.
+func Test_appsecQuery_unexpectedStatusWarnsOnce(t *testing.T) {
+	logger.ResetDebounceForTest()
+	var statusCode int
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(statusCode)
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	var sink bytes.Buffer
+	log := slog.New(slog.NewJSONHandler(&sink, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	client := NewTestClient(appsecURL, appsecServer.Client(), log)
+	req := buildTestRequest()
+
+	statusCode = http.StatusUnauthorized
+	for range 2 {
+		_, err := client.Query(req, Policy{FailureAction: configuration.FailureActionPassthrough})
+		if err != nil {
+			t.Fatalf("passthrough on 401: %v", err)
+		}
+	}
+	if got := strings.Count(sink.String(), msgUnexpectedListenerStatus); got != 1 {
+		t.Fatalf("401 WARN count %d, log %s", got, sink.String())
+	}
+	if !strings.Contains(sink.String(), `"statusCode":401`) {
+		t.Fatalf("401 WARN missing statusCode: %s", sink.String())
+	}
+
+	statusCode = http.StatusBadGateway
+	_, err := client.Query(req, Policy{FailureAction: configuration.FailureActionBan})
+	if err == nil || !strings.Contains(err.Error(), "statusCode:502") {
+		t.Fatalf("ban on 502: %v", err)
+	}
+	if got := strings.Count(sink.String(), msgUnexpectedListenerStatus); got != 1 {
+		t.Fatalf("502 shares the message window, count %d, log %s", got, sink.String())
+	}
+	if strings.Contains(sink.String(), "appsecQuery:unreachable") {
+		t.Fatalf("502 logged unreachable: %s", sink.String())
+	}
+
+	statusCode = http.StatusInternalServerError
+	_, err = client.Query(req, Policy{FailureAction: configuration.FailureActionPassthrough})
+	if err != nil {
+		t.Fatalf("passthrough on 500: %v", err)
+	}
+	if got := strings.Count(sink.String(), msgUnexpectedListenerStatus); got != 1 {
+		t.Fatalf("500 must not warn, count %d, log %s", got, sink.String())
 	}
 }
