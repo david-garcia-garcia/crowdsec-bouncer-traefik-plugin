@@ -152,7 +152,7 @@ This plugin supports [AppSec](https://doc.crowdsec.net/docs/next/appsec/intro/),
 
 AppSec requires CrowdSec 1.6.0 or later.
 
-**Bot detection (CrowdSec 1.8+).** CrowdSec can answer a suspicious request with a JavaScript challenge page instead of a ban. This works out of the box once AppSec is enabled. The challenge page calls back to URLs under `/crowdsec-internal/challenge/`, and those calls must go through this middleware so CrowdSec can verify them. If the middleware already covers every path of the host, you are done. If it only covers some paths (for example `/api`), add a router for ``PathPrefix(`/crowdsec-internal/challenge`)`` with the same middleware. See [CrowdSec bot detection](https://docs.crowdsec.net/docs/next/appsec/bot_detection/intro.md).
+**Bot detection (CrowdSec 1.8+).** CrowdSec can answer a suspicious request with a JavaScript challenge page instead of a ban. This works out of the box once AppSec is enabled. The challenge page calls back to URLs under `/crowdsec-internal/challenge/`, and those calls must go through this middleware so CrowdSec can verify them. The proof is POSTed to `/crowdsec-internal/challenge/submit` and must reach AppSec with the full form. The default `appsecBodyLimit` of 10MB is enough. A smaller positive limit cuts the proof short. `0` means no limit: the whole body is sent. If the middleware already covers every path of the host, you are done. If it only covers some paths (for example `/api`), add a router for ``PathPrefix(`/crowdsec-internal/challenge`)`` with the same middleware. See [CrowdSec bot detection](https://docs.crowdsec.net/docs/next/appsec/bot_detection/intro.md).
 
 More information in the [CrowdSec AppSec documentation](https://doc.crowdsec.net/docs/next/appsec/intro/).
 
@@ -617,7 +617,7 @@ Site key from the captcha provider.
 Timeout in seconds when validating a captcha with the provider. Must be at least `1`.
 
 **AppsecBodyLimit** (int64, default `10485760` / 10 MB)
-Send at most this many bytes of the request body to AppSec. `0` means no limit. Only POST, PUT, PATCH, and DELETE bodies are sent.
+Send at most this many bytes of the request body to AppSec. `0` means no limit: the whole body is sent. Only POST, PUT, PATCH, and DELETE bodies are sent. `/crowdsec-internal/challenge/submit` must reach AppSec with the full form. The default 10MB is enough. A smaller positive limit cuts the proof short.
 
 **appsecEnabled** (bool, default `false`)
 This middleware connects to AppSec and shares the connection as `appsecInstanceName`. AppSec checks every request that passed the decision check, whatever the LAPI mode.

@@ -1,0 +1,18 @@
+issueKey: 2026-10-13-challenge-submit-body
+jobName: Document challenge submit body limit
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: dbad4086adb77bc64837c7b10e81545f21f445596e297cf2be97547a36f11b4a
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: document-challenge-submit-body
+pr:
+  id: 194
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/194
