@@ -65,8 +65,8 @@ Identity: this change does not set or reconstruct client address, user, tenant, 
 
 - Q: What exact leftover go.sum / vendor tree remains after tidy+vendor?
   Rank: additive asked — Desired bullet names go mod tidy and go mod vendor so the go.mod require, go.sum lines, vendored copy, and vendor/modules.txt entry are gone
-  Decision: assumed — implement measures after tidy+vendor; expect those four artifacts gone; do not invent extra leftovers.
-  By: explore
+  Decision: resolved — after tidy+vendor the go.mod require, two go.sum lines, vendor/modules.txt entry, and vendor/github.com/leprosus/golang-ttl-map/ are gone. No extra leftovers.
+  By: implement
 
 - Q: Does Optiways PR 1 contain additional findings beyond SUP-07/P-1?
   Rank: additive asked — Out of scope: Other patches on Optiways/crowdsec-bouncer-traefik-plugin#1; that URL is a citation of the same condition, not work to merge that fork.
