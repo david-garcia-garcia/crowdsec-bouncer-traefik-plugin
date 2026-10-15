@@ -19,17 +19,17 @@ The TTLMap bench and its `ttl_map` import were deleted so nothing in the tree st
 **End users.** None.
 
 ## Merge readiness
-Ready for review. 0 items remain.
+Needs changes. 0 items remain.
 
 Priority: P3 — unused GPL-3.0 test module, no current user or operator harm
-Reviewed head: 6654ecf6
+Reviewed head: decee6cc
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38685196188/job/116258327059 |
+| Overall readiness | 2/6 | Needs work |
+| CI proof | 2/6 | failed |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -39,7 +39,7 @@ Owner decision: None.
 | Branch | 2026-10-15-drop-gpl-test-dep pushed | `git` |
 | OpenSpec | drop-gpl-test-dep | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/199 | pr-host |
-| CI | build 38685196188 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38685196188/job/116258327059 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38685196188/job/116258327059 |
+| CI | build 38688540723 failed https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38688540723/job/116268871079 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38688540723/job/116268871079 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -53,7 +53,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-15-drop-gpl-test-dep on branch 2026-10-15-drop-gpl-test-dep targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/199; CI build 38685196188 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38685196188/job/116258327059.
+Ticket 2026-10-15-drop-gpl-test-dep on branch 2026-10-15-drop-gpl-test-dep targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/199; CI build 38688540723 failed https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38688540723/job/116268871079.
 
 ## Explore Decisions
 None.
@@ -79,7 +79,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 6654ecf65b26c6e91a6a5f2c122db44c04631282 | Card must match the branch you measured |
+| Reviewed head | decee6cc767286fd72cba28169b0597d2cc2a984 | Card must match the branch you measured |
 
 ### Stored data model
 None.
