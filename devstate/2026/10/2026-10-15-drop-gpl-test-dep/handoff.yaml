@@ -1,0 +1,16 @@
+issueKey: 2026-10-15-drop-gpl-test-dep
+jobName: 2026-10-15-drop-gpl-test-dep
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified
+src: e7600c281431aa6febb727641d72f10170e4676c9c6d11699d1a181239d2056a
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: drop-gpl-test-dep
+pr: { id: 199, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/199 }
