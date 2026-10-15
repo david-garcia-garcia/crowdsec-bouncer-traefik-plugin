@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 48377f29
+Reviewed head: 79525d5f
 Owner decision: None.
 
 ## Review scores
@@ -48,7 +48,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-15-drop-gpl-test-dep on branch 2026-10-15-drop-gpl-test-dep targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/199; CI not seen. Citation (not a second product change): https://github.com/Optiways/crowdsec-bouncer-traefik-plugin/pull/1.
+Ticket 2026-10-15-drop-gpl-test-dep on branch 2026-10-15-drop-gpl-test-dep targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/199; CI not seen.
 
 ## Explore Decisions
 None.
@@ -66,7 +66,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 48377f29219c44976c3b45e1580e43a533d0d286 | Card must match the branch you measured |
+| Reviewed head | 79525d5f27b337bd88c941266b636d826bd7a0a7 | Card must match the branch you measured |
 
 ### Stored data model
 None.

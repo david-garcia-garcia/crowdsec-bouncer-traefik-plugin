@@ -42,7 +42,7 @@ Reproduce: **reproduced** on worktree `d:\repositories\crowdsec-bouncer-traefik-
 
 Did not run `go test` or the heap benchmarks (explore does not implement). Did not fetch Optiways PR #1 as a code change.
 
-Outside facts: in-tree `License.md` (GPL-3.0). No new `knowledge/research/` write. Existing notes that *mention* the vendor path (`knowledge/research/ext_redis_commands_set-ex-zero/`, `knowledge/research/ext_traefik-middleware-utilities_packages/`) are historical; they are not this ticket. Citation (delivery card, not a second product change): https://github.com/Optiways/crowdsec-bouncer-traefik-plugin/pull/1 (SUP-07 / P-1).
+Outside facts: in-tree `License.md` (GPL-3.0). No new `knowledge/research/` write. Existing notes that mention the vendor path (`knowledge/research/ext_redis_commands_set-ex-zero/`, `knowledge/research/ext_traefik-middleware-utilities_packages/`) are historical; they are not this ticket. Citation (delivery card, not a second product change): https://github.com/Optiways/crowdsec-bouncer-traefik-plugin/pull/1 (SUP-07 / P-1).
 
 Usage consumed: `knowledge/devdocs/index.md` (no `priority: always`), `index_core_plugin.md` → `core_plugin_decisionstore.md` (Language already `_Avoid_`s process `ttl_map`; usage already names `map[string]LiveSlot`), `index_std_go.md` → `std_go_test_zzz-prefix.md` (keep the `zzz_` bench file), `index_build_ci.md` → `build_ci_github.md` (no depguard packet). Language/usage enough — produce nothing.
 
@@ -51,39 +51,39 @@ Identity: this change does not set or reconstruct client address, user, tenant, 
 ## Decisions
 
 - **Chosen:** Delete `BenchmarkHeapRetained_TTLMap100k` and its `ttl_map` import; keep `BenchmarkHeapRetained_LiveMap100k` and `memory.go`; run `go mod tidy` and `go mod vendor`; remove the Test depguard allow for `github.com/leprosus/golang-ttl-map`.
-- **Rejected:** Rewrite the TTLMap bench onto `map[string]LiveSlot` — would keep a second heap bench the requirement does not ask for and would change the LiveMap neighbor’s comparison story.
+- **Rejected:** Rewrite the TTLMap bench onto `map[string]LiveSlot` — would keep a second heap bench the requirement does not ask for and would change the LiveMap neighbor's comparison story.
 - **Rejected:** Keep the module as an unused require — leaves GPL-3.0 in `go.mod` / vendor after the importer is gone.
 - **Rejected:** Merge or cherry-pick Optiways/crowdsec-bouncer-traefik-plugin#1 — that URL is a citation of the same condition, not work to merge that fork.
 - **Live contract:** `no live contract`. Cleanup of an unused test module. Live `openspec/specs/core_plugin_decisionstore_store/spec.md` already says memory MUST NOT Set stream or live keys on a TTL heap; this change does not modify that promise.
 
 ## Open questions
 
-- Q: How should the leftover `golang-ttl-map` module be removed?
-  Rank: bounded asked — 1 existing Go importer plus module-graph and Test depguard allow enumerated (`**/*.go`, `go.mod`, `go.sum`, `vendor/modules.txt`, `.golangci.yml`); Desired first two bullets name this reshape
-  Decision: resolved — remove `BenchmarkHeapRetained_TTLMap100k` and the `ttl_map` import from `pkg/decisionstore/zzz_lookup_bench_test.go`; keep `BenchmarkHeapRetained_LiveMap100k`; `go mod tidy` + `go mod vendor`; delete the Test depguard allow entry.
+- Q: How should the leftover golang-ttl-map module be removed?
+  Rank: bounded asked — 1 existing Go importer plus module-graph and Test depguard allow enumerated (roots: pkg, go.mod, go.sum, vendor/modules.txt, .golangci.yml); Desired first two bullets name this reshape
+  Decision: resolved — remove BenchmarkHeapRetained_TTLMap100k and the ttl_map import from pkg/decisionstore/zzz_lookup_bench_test.go; keep BenchmarkHeapRetained_LiveMap100k; go mod tidy + go mod vendor; delete the Test depguard allow entry.
   By: explore
 
-- Q: What exact leftover `go.sum` / vendor tree remains after tidy+vendor?
-  Rank: additive asked — Desired bullet "Run `go mod tidy` and `go mod vendor` so the `go.mod` require, `go.sum` lines, vendored copy, and `vendor/modules.txt` entry are gone"
+- Q: What exact leftover go.sum / vendor tree remains after tidy+vendor?
+  Rank: additive asked — Desired bullet names go mod tidy and go mod vendor so the go.mod require, go.sum lines, vendored copy, and vendor/modules.txt entry are gone
   Decision: assumed — implement measures after tidy+vendor; expect those four artifacts gone; do not invent extra leftovers.
   By: explore
 
-- Q: Does Optiways PR #1 contain additional findings beyond SUP-07/P-1?
-  Rank: additive asked — Out of scope: "Other patches on Optiways/crowdsec-bouncer-traefik-plugin#1; that URL is a citation of the same condition, not work to merge that fork."
-  Decision: assumed — citation only on the delivery card; do not ingest or merge other findings from that URL.
+- Q: Does Optiways PR 1 contain additional findings beyond SUP-07/P-1?
+  Rank: additive asked — Out of scope: Other patches on Optiways/crowdsec-bouncer-traefik-plugin#1; that URL is a citation of the same condition, not work to merge that fork.
+  Decision: assumed — citation only on the delivery card (https://github.com/Optiways/crowdsec-bouncer-traefik-plugin/pull/1); do not ingest or merge other findings from that URL.
   By: explore
 
 - Q: Does dropping the unused test module need a live catalog spec delta?
   Rank: additive asked — unused test module, never a remaining production promise (Live catalog: unused code/files, never specified)
-  Decision: resolved — `none — no live contract`. Propose journals that. Do not ADDED "the module is absent."
+  Decision: resolved — none — no live contract. Propose journals that. Do not ADDED the module is absent.
   By: explore
 
-- Q: Should this change rewrite research, debt, or archive text that still names `golang-ttl-map`?
+- Q: Should this change rewrite research, debt, or archive text that still names golang-ttl-map?
   Rank: additive incidental — no existing caller contract reshaped; no criterion names research rewrite
-  Decision: assumed — leave `knowledge/research/ext_redis_commands_set-ex-zero/`, `knowledge/research/ext_traefik-middleware-utilities_packages/`, `knowledge/debt/2026-09-19-multiple-decisions-per-cache-key.md`, and `openspec/changes/archive/**` untouched. Historical mentions stay. Enumerated those four live mentions plus archive (searched `knowledge/research`, `knowledge/devdocs`, `knowledge/debt`, `openspec/specs`).
+  Decision: assumed — leave knowledge/research/ext_redis_commands_set-ex-zero/, knowledge/research/ext_traefik-middleware-utilities_packages/, knowledge/debt/2026-09-19-multiple-decisions-per-cache-key.md, and openspec/changes/archive untouched. Historical mentions stay.
   By: explore
 
-- Q: Must `BenchmarkHeapRetained_LiveMap100k` or `pkg/decisionstore/memory.go` change?
-  Rank: additive asked — Out of scope: "Changing `BenchmarkHeapRetained_LiveMap100k` or the live memory store."
+- Q: Must BenchmarkHeapRetained_LiveMap100k or pkg/decisionstore/memory.go change?
+  Rank: additive asked — Out of scope: Changing BenchmarkHeapRetained_LiveMap100k or the live memory store.
   Decision: resolved — keep both as they are.
   By: explore
