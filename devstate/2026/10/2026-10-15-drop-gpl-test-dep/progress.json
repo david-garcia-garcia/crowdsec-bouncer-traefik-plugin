@@ -5,8 +5,8 @@
   "phases": {
     "prepare": {
       "work": true,
-      "card": false,
-      "at": null
+      "card": true,
+      "at": "2026-10-15T04:11:47.119Z"
     },
     "explore": {
       "work": false,
