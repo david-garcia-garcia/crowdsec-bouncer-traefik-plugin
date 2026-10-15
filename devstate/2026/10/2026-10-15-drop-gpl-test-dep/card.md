@@ -22,7 +22,7 @@ The TTLMap bench and its `ttl_map` import were deleted so nothing in the tree st
 Ready for review. 0 items remain.
 
 Priority: P3 — unused GPL-3.0 test module, no current user or operator harm
-Reviewed head: af538b13
+Reviewed head: 6b39e08e
 Owner decision: None.
 
 ## Review scores
@@ -79,7 +79,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | af538b13debe7b8d4efd4e8af3247ccfc6658797 | Card must match the branch you measured |
+| Reviewed head | 6b39e08e242d8f202860248a6ef98e08bb964841 | Card must match the branch you measured |
 
 ### Stored data model
 None.
