@@ -14,28 +14,28 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: f209a0cc
+Reviewed head: 599238fb
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38685196188/job/116258327059 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
 ## Verification
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Branch | 2026-10-15-drop-gpl-test-dep pushed | `git` |
-| OpenSpec | drop-gpl-test-dep | `openspec/` |
+| Branch | 2026-10-15-drop-gpl-test-dep pushed | git |
+| OpenSpec | drop-gpl-test-dep | openspec/ |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/199 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 38685196188 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38685196188/job/116258327059 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38685196188/job/116258327059 |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
@@ -48,7 +48,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-15-drop-gpl-test-dep on branch 2026-10-15-drop-gpl-test-dep targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/199; CI not seen. Citation of the same condition (not a second product change): https://github.com/Optiways/crowdsec-bouncer-traefik-plugin/pull/1 (SUP-07 / P-1).
+Ticket 2026-10-15-drop-gpl-test-dep on branch 2026-10-15-drop-gpl-test-dep targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/199; CI build 38685196188 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38685196188/job/116258327059. Citation of the same condition (not a second product change): https://github.com/Optiways/crowdsec-bouncer-traefik-plugin/pull/1 (SUP-07 / P-1).
 
 ## Explore Decisions
 None.
@@ -66,7 +66,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | f209a0ccaa56e710541e6273e6c9056a7547a4bf | Card must match the branch you measured |
+| Reviewed head | 599238fb46f0637daf7eec85bef956e152c6699f | Card must match the branch you measured |
 
 ### Stored data model
 None.
