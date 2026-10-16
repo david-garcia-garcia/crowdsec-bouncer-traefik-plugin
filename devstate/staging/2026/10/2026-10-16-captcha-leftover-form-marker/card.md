@@ -20,7 +20,7 @@ Priority: P1 — production is serving a wrong public contract today
 Ready for review. 1 items remain.
 
 Priority: P1 — production is serving a wrong public contract today
-Reviewed head: 88b17a08
+Reviewed head: 775cdd44
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -85,7 +85,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 88b17a08a30cd88fde66101c7eebf5f99eb5aad8 | Card must match the branch you measured |
+| Reviewed head | 775cdd44397fbd3b34a8781f61757d6e554ce224 | Card must match the branch you measured |
 
 ### Stored data model
 None.
