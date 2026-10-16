@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 035acb8b
-Owner decision: None.
+Reviewed head: 122efcf1
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -51,7 +51,10 @@ None.
 Ticket 2026-10-16-captcha-leftover-form-marker on branch 2026-10-16-captcha-leftover-form-marker targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/201; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| After the gate is valid, does leftover-form detection read only `crowdsec_captcha_challenge=v1`, not `TokenField`? | bounded asked — existing `IsCaptchaFormPost` has 1 production caller (`pkg/bouncer/bouncer.go` `handleCaptchaKindServeHTTP`; searched `**/*.go`); requirement Proposed solution valid-gate branch and “duplicate-form detection reads that marker only” | assumed — change `IsCaptchaFormPost` to that marker; migrate the bouncer caller (signature stays) and the routing tests in `pkg/captcha` and `pkg/bouncer`. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 035acb8b2c143fd094cd9e4acbed4a31d37bdf59 | Card must match the branch you measured |
+| Reviewed head | 122efcf1c8e465d070d4e11b3e7e8c51f76168a2 | Card must match the branch you measured |
 
 ### Stored data model
 None.

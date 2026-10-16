@@ -65,37 +65,32 @@ The detector cannot tell an application form that also carries the vendor token 
 
 ## Open questions
 
-- Q: After the gate is valid, does leftover-form detection read only `crowdsec_captcha_challenge=v1`, not `TokenField`?
-  Rank: bounded asked — existing `IsCaptchaFormPost` has 1 production caller (`pkg/bouncer/bouncer.go` `handleCaptchaKindServeHTTP`; searched `**/*.go`); requirement Proposed solution valid-gate branch and “duplicate-form detection reads that marker only”
-  Decision: assumed — change `IsCaptchaFormPost` to that marker; migrate the bouncer caller (signature stays) and the routing tests in `pkg/captcha` and `pkg/bouncer`.
+- Q: After the gate is valid, does leftover-form detection read only crowdsec_captcha_challenge=v1, not TokenField?
+  Rank: bounded asked — existing IsCaptchaFormPost has 1 production caller in pkg/bouncer/bouncer.go handleCaptchaKindServeHTTP, searched Go files; requirement Proposed solution valid-gate branch names marker-only detection
+  Decision: assumed — change IsCaptchaFormPost to that marker; migrate the bouncer caller (signature stays) and the routing tests in pkg/captcha and pkg/bouncer.
   By: explore
-
-- Q: Who already owns past-captcha and the client address this path must not reconstruct?
-  Rank: additive incidental — no identity unit is reshaped; explore identity gate, not a requirement criterion
-  Decision: resolved — past-captcha is `Client.Check` on `crowdsec_captcha_gate` vs `req.IPAddrString()` from `clientrequest.New` after `ip.GetRemoteIP` (`core_plugin_middleware_captcha-gate`, `core_plugin_clientrequest_inbound-request`). Leftover detection calls `Check(req)` and does not re-derive address, Host, tenant, or trust hop.
-  By: explore
-
 - Q: Do vendor widgets inject their token field into ordinary application POSTs in every provider mode?
-  Rank: additive asked — no existing caller reshape; requirement Unknowns “Explore owns vendor facts” and Why the signal is wrong
-  Decision: assumed — checkbox/class widgets inject the TokenField into the form that contains the widget when that form is submitted (sourced: enterprise checkbox `g-recaptcha-response`; EU CAPTCHA `eu-captcha-response`; in-tree stock checkbox omits a hidden token). Score/execute can still POST `g-recaptcha-response` (in-tree `scoreBootScript`; enterprise button integration). After-gate detection therefore must not use TokenField, even where a mode does not inject. First-solve still uses TokenField. hCaptcha/Turnstile/classic v2 widget HTML was not in the catalog at write time; in-tree TokenField names remain the first-solve contract.
+  Rank: additive asked — no existing caller reshape; requirement Unknowns say Explore owns vendor facts
+  Decision: assumed — checkbox widgets inject TokenField into the form that contains the widget (sourced: enterprise checkbox g-recaptcha-response; EU CAPTCHA eu-captcha-response; in-tree stock checkbox omits a hidden token). Score/execute can still POST g-recaptcha-response. After-gate detection must not use TokenField. First-solve still uses TokenField.
   By: explore
-
-- Q: Should leftover detection keep the 64KiB peek cap in `pkg/captcha/form.go`?
-  Rank: additive incidental — keeping the existing peek is not a reshape; no requirement line names dropping `captchaFormMaxBytes`
-  Decision: assumed — keep `captchaFormMaxBytes` (64KiB) and the same urlencoded/multipart/already-parsed rules; look up the marker instead of TokenField. A larger leftover POST is forwarded, as today’s leftover POST over the cap already is.
+- Q: Should leftover detection keep the 64KiB peek cap in pkg/captcha/form.go?
+  Rank: additive incidental — keeping the existing peek is not a reshape; no requirement line names dropping captchaFormMaxBytes
+  Decision: assumed — keep captchaFormMaxBytes (64KiB) and the same urlencoded/multipart/already-parsed rules; look up the marker instead of TokenField.
   By: explore
-
 - Q: What happens to a replaced operator template that omits the new hidden input?
   Rank: additive asked — Templates section: first submit still solves; second submit is forwarded
-  Decision: assumed — honour that blast: no TokenField fallback. Operators who still want duplicate-tab redirect add the same hidden input. Field count of such templates is unknown and not required.
+  Decision: assumed — honour that blast: no TokenField fallback. Operators who still want duplicate-tab redirect add the same hidden input.
   By: explore
-
 - Q: Where does the marker name and value live so leftover detection and the shipped HTML stay one owner?
-  Rank: additive asked — Proposed solution names `<input type="hidden" name="crowdsec_captcha_challenge" value="v1">`; Out of scope forbids a Traefik key
-  Decision: assumed — `pkg/captcha` owns the leftover-detection constant; shipped templates emit that same name and value. Do not share `gatePayloadVersion`. Do not add a Config key.
+  Rank: additive asked — Proposed solution names crowdsec_captcha_challenge=v1; Out of scope forbids a Traefik key
+  Decision: assumed — pkg/captcha owns the leftover-detection constant; shipped templates emit that same name and value. Do not share gatePayloadVersion. Do not add a Config key.
+  By: explore
+- Q: Who already owns past-captcha and the client address this path must not reconstruct?
+  Rank: additive incidental — no identity unit is reshaped; explore identity gate, not a requirement criterion
+  Decision: resolved — past-captcha is Client.Check on crowdsec_captcha_gate vs req.IPAddrString() from clientrequest.New after ip.GetRemoteIP. Leftover detection calls Check(req) and does not re-derive address, Host, tenant, or trust hop.
+  By: explore
+- Q: Does first-solve still verify the provider TokenField when the gate cookie is not valid?
+  Rank: bounded asked — existing Validate / readFieldFromRequest callers stay; requirement When the gate cookie is not valid, request handling stays unchanged
+  Decision: resolved — yes. ServeHTTP then Validate then readFieldFromRequest(TokenField) unchanged; leftover detection stays a separate reader.
   By: explore
 
-- Q: Does first-solve still verify the provider TokenField when the gate cookie is not valid?
-  Rank: bounded asked — existing `Validate` / `readFieldFromRequest` callers stay; requirement “When the gate cookie is not valid, request handling stays unchanged”
-  Decision: resolved — yes. `ServeHTTP` → `Validate` → `readFieldFromRequest(TokenField)` unchanged; leftover detection stays a separate reader.
-  By: explore

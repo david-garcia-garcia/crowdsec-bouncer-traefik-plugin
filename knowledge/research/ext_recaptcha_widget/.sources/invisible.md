@@ -11,7 +11,7 @@ Invoke by: automatically binding the challenge to a button, programmatically bin
 
 Script: `https://www.google.com/recaptcha/api.js` with `async defer`.
 
-Automatic bind: class `g-recaptcha` on the HTML button, `data-sitekey`, and `data-callback`. Official sample `onSubmit(token)` calls `document.getElementById("demo-form").submit()` and does not assign `token` to a form field. Form markup is the button only.
+Automatic bind: class `g-recaptcha` on the HTML button, `data-sitekey`, and `data-callback`. The intro lists those three as the necessary attributes. Official sample `onSubmit(token)` calls `document.getElementById("demo-form").submit()` and does not assign `token` to a form field. Form markup is the button only.
 
 Programmatic invoke: a `div` with class `g-recaptcha`, `data-sitekey`, `data-callback`, and `data-size="invisible"`, then `grecaptcha.execute()`. After client-side validation sample: `onSubmit(token)` only alerts; it does not POST the form. Form markup includes an ordinary named field, the invisible div, and a separate submit button.
 
