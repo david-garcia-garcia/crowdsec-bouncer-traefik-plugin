@@ -32,7 +32,7 @@ _Avoid_: `(bool, error)` as the `Validate` result, `(None, err)`
 - Enterprise checkbox: `enterprise.js` with no `render=`, class `g-recaptcha`, field `g-recaptcha-response`, retry true.
 - Enterprise score: `enterprise.js?render={siteKey}`, no checkbox class, same token field, retry false. Boot is fixed Go text (`grecaptcha.enterprise.ready` then `execute`, write the token, submit). Do not take boot from config.
 - Stock `captcha.html` stays one file. Template map keeps `SiteKey`, `FrontendJS`, `FrontendKey`, `ChallengeURL` and adds `BootScript`, `Action`, `DrawCheckbox` (non-empty when the checkbox div should render).
-- Emit leftover-form marker `<input type="hidden" name="crowdsec_captcha_challenge" value="v1">` inside the POST form on every shipped challenge page. Do not take that name or value from Config. First-solve still reads `TokenField`.
+- Emit leftover-form marker `<input type="hidden" name="crowdsec_captcha_challenge" value="v1">` inside the POST form on every shipped challenge page: stock `captcha.html`, `examples/captcha/captcha.html`, `examples/custom-captcha/captcha.html`, `tests/e2e/real/config/captcha-dummy.html`, `tests/e2e/mock/scenarios/captcha/captcha.html`, `tests/e2e/mock/scenarios/captcha-ban-origins/captcha.html`. Do not take that name or value from Config. First-solve still reads `TokenField`.
 
 ## Pattern snippet
 
@@ -54,6 +54,11 @@ rw.WriteHeader(http.StatusOK)
 - `pkg/captcha/eucaptcha.go`
 - `pkg/captcha/captcha.go` (`New`, `ServeHTTP`, `Validate`)
 - `captcha.html`
+- `examples/captcha/captcha.html`
+- `examples/custom-captcha/captcha.html`
+- `tests/e2e/real/config/captcha-dummy.html`
+- `tests/e2e/mock/scenarios/captcha/captcha.html`
+- `tests/e2e/mock/scenarios/captcha-ban-origins/captcha.html`
 
 ## Gotchas
 
