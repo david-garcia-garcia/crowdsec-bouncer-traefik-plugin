@@ -173,26 +173,26 @@ func (c *Client) IsCustomResourceRequest(r *http.Request) bool {
 	return false
 }
 
-// leftoverFormMarkerName is the hidden field leftover-form detection reads.
+// challengeMarkerName is the hidden field that marks a CrowdSec challenge form.
 // Shipped challenge pages emit the same name. Not a Config key.
-const leftoverFormMarkerName = "crowdsec_captcha_challenge"
+const challengeMarkerName = "crowdsec_captcha_challenge"
 
-// leftoverFormMarkerValue is the only leftover-form marker value that counts as a CrowdSec challenge POST.
-const leftoverFormMarkerValue = "v1"
+// challengeMarkerValue is the only marker value that counts as a CrowdSec challenge POST.
+const challengeMarkerValue = "v1"
 
-// IsCaptchaFormPost reports whether this POST carries leftover-form marker crowdsec_captcha_challenge=v1.
+// HasChallengeMarker reports whether this POST carries challenge marker crowdsec_captcha_challenge=v1.
 // Its caller may still forward the request, so it never consumes the body: a POST that
-// turns out not to be a captcha form reaches origin intact. Validate uses
+// does not carry the marker reaches origin intact. Validate uses
 // readFieldFromRequest instead, which is free to consume the body.
-func (*Client) IsCaptchaFormPost(r *http.Request) bool {
+func (*Client) HasChallengeMarker(r *http.Request) bool {
 	if r == nil || r.Method != http.MethodPost {
 		return false
 	}
 	// Something upstream already parsed the form; rereading Body would find nothing.
 	if r.PostForm != nil {
-		return r.PostForm.Get(leftoverFormMarkerName) == leftoverFormMarkerValue
+		return r.PostForm.Get(challengeMarkerName) == challengeMarkerValue
 	}
-	// A declared body over the cap is origin traffic; do not buffer it to hunt for the leftover-form marker.
+	// A declared body over the cap is origin traffic; do not buffer it to hunt for the challenge marker.
 	if r.ContentLength > captchaFormMaxBytes {
 		return false
 	}
@@ -200,7 +200,7 @@ func (*Client) IsCaptchaFormPost(r *http.Request) bool {
 	if !withinCap {
 		return false
 	}
-	return formFieldValue(r.Header.Get("Content-Type"), body, leftoverFormMarkerName) == leftoverFormMarkerValue
+	return formFieldValue(r.Header.Get("Content-Type"), body, challengeMarkerName) == challengeMarkerValue
 }
 
 // WriteSolvedRedirect issues 302 to the same URL without reminting the gate cookie.

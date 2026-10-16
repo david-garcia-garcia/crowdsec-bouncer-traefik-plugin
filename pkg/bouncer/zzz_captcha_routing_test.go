@@ -192,7 +192,7 @@ func TestHandleRemediationServeHTTP_vendorTokenPostWithoutMarkerReachesOrigin(t 
 	continueCaptchaForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue)
 
 	if rw.Code == http.StatusFound {
-		t.Fatal("Check-true POST with a vendor token and no leftover-form marker must not 302")
+		t.Fatal("Check-true POST with a vendor token and no challenge marker must not 302")
 	}
 	if originBody != payload {
 		t.Fatalf("origin body want %q unchanged, got %q", payload, originBody)
@@ -200,8 +200,8 @@ func TestHandleRemediationServeHTTP_vendorTokenPostWithoutMarkerReachesOrigin(t 
 }
 
 // TestHandleRemediationServeHTTP_overMaxPostAfterSolveReachesOriginIntact proves a large
-// upload is not sacrificed to captcha-form detection: it reaches origin byte for byte even
-// though it happens to contain the leftover-form marker name.
+// upload is not sacrificed to challenge-marker detection: it reaches origin byte for byte even
+// though it happens to contain the challenge marker name.
 func TestHandleRemediationServeHTTP_overMaxPostAfterSolveReachesOriginIntact(t *testing.T) {
 	siteverify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

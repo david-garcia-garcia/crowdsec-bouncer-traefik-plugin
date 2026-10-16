@@ -420,9 +420,9 @@ func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientr
 		return false
 	}
 
-	// A valid gate cookie plus a captcha-form POST is a second-tab submit, not origin traffic.
+	// A valid gate cookie plus the challenge marker is a second-tab submit, not origin traffic.
 	if captchaClient.Check(req) {
-		if captchaClient.IsCaptchaFormPost(req.Request) {
+		if captchaClient.HasChallengeMarker(req.Request) {
 			captchaClient.WriteSolvedRedirect(rw, req.Request, b.remediationCustomHeader)
 			return true
 		}
