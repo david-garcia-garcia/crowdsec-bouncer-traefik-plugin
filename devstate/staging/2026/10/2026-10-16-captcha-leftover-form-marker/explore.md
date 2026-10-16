@@ -48,7 +48,9 @@ The detector cannot tell an application form that also carries the vendor token 
 - `knowledge/research/ext_recaptcha_enterprise_widget/`: checkbox POSTs `g-recaptcha-response` on form submit; score `execute` is JS; score **button** integration can still POST `g-recaptcha-response`.
 - `knowledge/research/ext_eucaptcha_widget/`: `verify.js` injects hidden `eu-captcha-response` into the form that contains the widget.
 - In-tree stock `captcha.html`: checkbox branch has no hidden token input (vendor script fills it); score branch has hidden `g-recaptcha-response` and `scoreBootScript` writes that field then submits.
-- hCaptcha / Turnstile / classic v2 widget HTML injection: not in the research catalog at explore write time (siteverify notes only). Background research spawned; leftover detection after this change does not read those fields anyway.
+- `knowledge/research/ext_hcaptcha_widget/`: checkbox/visible ordinary Submit posts `h-captcha-response`; invisible uses the same name via callback/`execute`, not unintercepted Submit.
+- `knowledge/research/ext_recaptcha_widget/`: classic v2 checkbox native submit posts `g-recaptcha-response`; invisible auto-bind submits the form; programmatic invisible delivers the token via callback and does not POST in the official sample.
+- `knowledge/research/ext_cloudflare_turnstile_widget/`: a widget inside a form injects hidden `cf-turnstile-response` by default in Managed, Non-Interactive, and Invisible; `response-field=false` skips the input.
 - HTTP 302 method rewrite: not in `knowledge/research/` (only `ext_http_media-types/`). Not required to choose the marker seam.
 
 ## Decisions
@@ -71,7 +73,7 @@ The detector cannot tell an application form that also carries the vendor token 
   By: explore
 - Q: Do vendor widgets inject their token field into ordinary application POSTs in every provider mode?
   Rank: additive asked — no existing caller reshape; requirement Unknowns say Explore owns vendor facts
-  Decision: assumed — checkbox widgets inject TokenField into the form that contains the widget (sourced: enterprise checkbox g-recaptcha-response; EU CAPTCHA eu-captcha-response; in-tree stock checkbox omits a hidden token). Score/execute can still POST g-recaptcha-response. After-gate detection must not use TokenField. First-solve still uses TokenField.
+  Decision: resolved — not every mode. Checkbox/visible ordinary Submit posts TokenField (hCaptcha h-captcha-response; classic v2 and enterprise g-recaptcha-response; EU CAPTCHA eu-captcha-response; Turnstile cf-turnstile-response by default in all three widget modes). Invisible/execute/callback paths often do not POST; Turnstile can disable the field. After-gate detection must not use TokenField. First-solve still uses TokenField.
   By: explore
 - Q: Should leftover detection keep the 64KiB peek cap in pkg/captcha/form.go?
   Rank: additive incidental — keeping the existing peek is not a reshape; no requirement line names dropping captchaFormMaxBytes
