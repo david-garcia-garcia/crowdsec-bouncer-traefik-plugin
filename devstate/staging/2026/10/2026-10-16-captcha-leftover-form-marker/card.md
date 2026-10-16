@@ -14,17 +14,17 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 12ceda00
+Reviewed head: 09633b90
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38850093953/job/116809180927 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -34,8 +34,8 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-10-16-captcha-leftover-form-marker pushed | `git` |
 | OpenSpec | captcha-challenge-form-marker | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/201 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 38850093953 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38850093953/job/116809180927 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38850093953/job/116809180927 |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
@@ -49,10 +49,11 @@ Worktree:
 
 
 ## Follow-up issues
-None.
+- [ ] [Tighten Debounced status-code assertion](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-16-captcha-leftover-form-marker/knowledge/debt/2026-10-16-logger-debounce-status-substring.md) — TestDebounced_sameMessageOnce matches statusCode 502 via Contains("502"), so a timestamp millisecond .502 fails it.
+
 
 ## How this fits together
-Ticket 2026-10-16-captcha-leftover-form-marker on branch 2026-10-16-captcha-leftover-form-marker targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/201; CI not seen.
+Ticket 2026-10-16-captcha-leftover-form-marker on branch 2026-10-16-captcha-leftover-form-marker targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/201; CI build 38850093953 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38850093953/job/116809180927.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -73,7 +74,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 12ceda00d633eb93b7fbc3ded78d6a536cb4569f | Card must match the branch you measured |
+| Reviewed head | 09633b90fad38203115f8861fc71579540cbf714 | Card must match the branch you measured |
 
 ### Stored data model
 None.
