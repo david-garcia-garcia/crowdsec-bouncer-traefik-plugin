@@ -6,3 +6,6 @@
 - created knowledge/research/ext_cloudflare_turnstile_widget/
 - updated knowledge/research/index_ext_cloudflare.md
 - updated knowledge/research/index.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-routing.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-widget.md
+- created knowledge/debt/2026-10-16-logger-debounce-status-substring.md

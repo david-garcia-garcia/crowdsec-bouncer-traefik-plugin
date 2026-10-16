@@ -173,20 +173,26 @@ func (c *Client) IsCustomResourceRequest(r *http.Request) bool {
 	return false
 }
 
-// IsCaptchaFormPost reports whether this POST carries a non-empty provider response field.
+// leftoverFormMarkerName is the hidden field leftover-form detection reads.
+// Shipped challenge pages emit the same name. Not a Config key.
+const leftoverFormMarkerName = "crowdsec_captcha_challenge"
+
+// leftoverFormMarkerValue is the only leftover-form marker value that counts as a CrowdSec challenge POST.
+const leftoverFormMarkerValue = "v1"
+
+// IsCaptchaFormPost reports whether this POST carries leftover-form marker crowdsec_captcha_challenge=v1.
 // Its caller may still forward the request, so it never consumes the body: a POST that
 // turns out not to be a captcha form reaches origin intact. Validate uses
 // readFieldFromRequest instead, which is free to consume the body.
-func (c *Client) IsCaptchaFormPost(r *http.Request) bool {
-	if r == nil || r.Method != http.MethodPost || c.widget.TokenField == "" {
+func (*Client) IsCaptchaFormPost(r *http.Request) bool {
+	if r == nil || r.Method != http.MethodPost {
 		return false
 	}
-	field := c.widget.TokenField
 	// Something upstream already parsed the form; rereading Body would find nothing.
 	if r.PostForm != nil {
-		return r.PostForm.Get(field) != ""
+		return r.PostForm.Get(leftoverFormMarkerName) == leftoverFormMarkerValue
 	}
-	// A declared body over the cap is origin traffic; do not buffer it to hunt for a token.
+	// A declared body over the cap is origin traffic; do not buffer it to hunt for the leftover-form marker.
 	if r.ContentLength > captchaFormMaxBytes {
 		return false
 	}
@@ -194,7 +200,7 @@ func (c *Client) IsCaptchaFormPost(r *http.Request) bool {
 	if !withinCap {
 		return false
 	}
-	return formFieldValue(r.Header.Get("Content-Type"), body, field) != ""
+	return formFieldValue(r.Header.Get("Content-Type"), body, leftoverFormMarkerName) == leftoverFormMarkerValue
 }
 
 // WriteSolvedRedirect issues 302 to the same URL without reminting the gate cookie.

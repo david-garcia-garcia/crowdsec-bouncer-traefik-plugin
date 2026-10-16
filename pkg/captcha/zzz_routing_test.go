@@ -23,34 +23,39 @@ func writeRoutingCaptchaTemplate(t *testing.T) string {
 	return path
 }
 
-func Test_IsCaptchaFormPost(t *testing.T) {
-	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
+// leftoverFormBody is urlencoded leftover-form marker crowdsec_captcha_challenge=v1.
+func leftoverFormBody() string {
+	return leftoverFormMarkerName + "=" + leftoverFormMarkerValue
+}
 
-	formPOST := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader("dummy-captcha-response=token"))
+func Test_IsCaptchaFormPost(t *testing.T) {
+	client := &Client{}
+
+	formPOST := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader(leftoverFormBody()))
 	formPOST.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if !client.IsCaptchaFormPost(formPOST) {
-		t.Fatal("POST with provider field must be a captcha-form POST")
+		t.Fatal("POST with leftover-form marker must be a captcha-form POST")
 	}
 
 	ordinaryPOST := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader("other=1"))
 	ordinaryPOST.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if client.IsCaptchaFormPost(ordinaryPOST) {
-		t.Fatal("POST without provider field must not be a captcha-form POST")
+		t.Fatal("POST without leftover-form marker must not be a captcha-form POST")
 	}
 
-	queryGET := httptest.NewRequest(http.MethodGet, "/protected?dummy-captcha-response=token", nil)
+	queryGET := httptest.NewRequest(http.MethodGet, "/protected?"+leftoverFormBody(), nil)
 	if client.IsCaptchaFormPost(queryGET) {
-		t.Fatal("GET with provider field in query is not a form POST")
+		t.Fatal("GET with leftover-form marker in query is not a form POST")
 	}
 }
 
 func Test_IsCaptchaFormPost_ordinaryPostKeepsItsBody(t *testing.T) {
-	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
+	client := &Client{}
 	payload := "comment=hello&other=1"
 	req := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader(payload))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if client.IsCaptchaFormPost(req) {
-		t.Fatal("POST without provider field must not be a captcha-form POST")
+		t.Fatal("POST without leftover-form marker must not be a captcha-form POST")
 	}
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -65,10 +70,10 @@ func Test_IsCaptchaFormPost_ordinaryPostKeepsItsBody(t *testing.T) {
 }
 
 func Test_IsCaptchaFormPost_overMaxBodyReachesOriginIntact(t *testing.T) {
-	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
-	// A token cannot be this big, so the upload must pass through untouched even
-	// though it does contain the provider field name.
-	payload := "dummy-captcha-response=token&blob=" + strings.Repeat("a", captchaFormMaxBytes)
+	client := &Client{}
+	// A leftover-form marker cannot be this big, so the upload must pass through
+	// untouched even though it does contain the leftover-form marker name.
+	payload := leftoverFormBody() + "&blob=" + strings.Repeat("a", captchaFormMaxBytes)
 	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(payload))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if client.IsCaptchaFormPost(req) {
@@ -84,9 +89,9 @@ func Test_IsCaptchaFormPost_overMaxBodyReachesOriginIntact(t *testing.T) {
 }
 
 func Test_IsCaptchaFormPost_unknownContentLength(t *testing.T) {
-	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
+	client := &Client{}
 
-	small := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader("dummy-captcha-response=token"))
+	small := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader(leftoverFormBody()))
 	small.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	small.ContentLength = -1
 	if !client.IsCaptchaFormPost(small) {
@@ -110,11 +115,11 @@ func Test_IsCaptchaFormPost_unknownContentLength(t *testing.T) {
 }
 
 func Test_IsCaptchaFormPost_multipartForm(t *testing.T) {
-	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
+	client := &Client{}
 
 	var solved bytes.Buffer
 	writer := multipart.NewWriter(&solved)
-	if err := writer.WriteField("dummy-captcha-response", "token"); err != nil {
+	if err := writer.WriteField(leftoverFormMarkerName, leftoverFormMarkerValue); err != nil {
 		t.Fatal(err)
 	}
 	if err := writer.Close(); err != nil {
@@ -123,7 +128,7 @@ func Test_IsCaptchaFormPost_multipartForm(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/protected", bytes.NewReader(solved.Bytes()))
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	if !client.IsCaptchaFormPost(req) {
-		t.Fatal("multipart POST carrying the provider field must be a captcha-form POST")
+		t.Fatal("multipart POST carrying the leftover-form marker must be a captcha-form POST")
 	}
 
 	var upload bytes.Buffer
@@ -138,7 +143,7 @@ func Test_IsCaptchaFormPost_multipartForm(t *testing.T) {
 	otherReq := httptest.NewRequest(http.MethodPost, "/protected", bytes.NewReader(payload))
 	otherReq.Header.Set("Content-Type", otherWriter.FormDataContentType())
 	if client.IsCaptchaFormPost(otherReq) {
-		t.Fatal("multipart POST without the provider field must not be a captcha-form POST")
+		t.Fatal("multipart POST without the leftover-form marker must not be a captcha-form POST")
 	}
 	body, err := io.ReadAll(otherReq.Body)
 	if err != nil {
@@ -150,8 +155,8 @@ func Test_IsCaptchaFormPost_multipartForm(t *testing.T) {
 }
 
 func Test_IsCaptchaFormPost_alreadyParsedPostForm(t *testing.T) {
-	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
-	req := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader("dummy-captcha-response=token"))
+	client := &Client{}
+	req := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader(leftoverFormBody()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if err := req.ParseForm(); err != nil {
 		t.Fatal(err)
@@ -168,6 +173,53 @@ func Test_IsCaptchaFormPost_alreadyParsedPostForm(t *testing.T) {
 	}
 	if client.IsCaptchaFormPost(parsedOther) {
 		t.Fatal("already-parsed ordinary form must not be a captcha-form POST")
+	}
+}
+
+func Test_IsCaptchaFormPost_tokenFieldIsNotLeftoverProof(t *testing.T) {
+	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
+
+	vendorOnly := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader("dummy-captcha-response=token"))
+	vendorOnly.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if client.IsCaptchaFormPost(vendorOnly) {
+		t.Fatal("POST with TokenField and no leftover-form marker must not be a captcha-form POST")
+	}
+
+	markerOnly := &Client{}
+	markerPOST := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader(leftoverFormBody()))
+	markerPOST.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if !markerOnly.IsCaptchaFormPost(markerPOST) {
+		t.Fatal("POST with leftover-form marker and no TokenField must be a captcha-form POST")
+	}
+
+	wrongValue := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader(leftoverFormMarkerName+"=v2"))
+	wrongValue.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if client.IsCaptchaFormPost(wrongValue) {
+		t.Fatal("POST with leftover-form marker value other than v1 must not be a captcha-form POST")
+	}
+}
+
+func Test_shippedChallengePagesIncludeLeftoverFormMarker(t *testing.T) {
+	pages := []string{
+		filepath.Join("..", "..", "captcha.html"),
+		filepath.Join("..", "..", "examples", "captcha", "captcha.html"),
+		filepath.Join("..", "..", "examples", "custom-captcha", "captcha.html"),
+		filepath.Join("..", "..", "tests", "e2e", "real", "config", "captcha-dummy.html"),
+		filepath.Join("..", "..", "tests", "e2e", "mock", "scenarios", "captcha", "captcha.html"),
+		filepath.Join("..", "..", "tests", "e2e", "mock", "scenarios", "captcha-ban-origins", "captcha.html"),
+	}
+	for _, path := range pages {
+		raw, err := os.ReadFile(path) //nolint:gosec // shipped challenge-page fixtures
+		if err != nil {
+			t.Fatal(err)
+		}
+		page := string(raw)
+		if !strings.Contains(page, leftoverFormMarkerName) {
+			t.Fatalf("%s must contain leftover-form marker name %q", path, leftoverFormMarkerName)
+		}
+		if !strings.Contains(page, leftoverFormMarkerValue) {
+			t.Fatalf("%s must contain leftover-form marker value %q", path, leftoverFormMarkerValue)
+		}
 	}
 }
 
