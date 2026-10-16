@@ -46,36 +46,31 @@ Outside facts: vendor widgets inject TokenField names (`ext_recaptcha_enterprise
 ## Open questions
 
 - Q: Who already owns the fact that a POST is the CrowdSec challenge form?
-  Rank: bounded asked — existing `IsCaptchaFormPost` + TokenField contract with 1 production caller (`handleCaptchaKindServeHTTP` in `pkg/bouncer/bouncer.go`); roots `pkg/bouncer`, `pkg/captcha`, `tests/`, `knowledge/devdocs`, `openspec/specs`; Proposed solution and Why the signal is wrong name the owner move.
-  Decision: assumed — after Check-true the plugin-owned hidden field is the owner; TokenField stays the first-solve Validate owner; Check stays the gate-cookie owner. Do not reconstruct leftover-form from the vendor field. Client address, Host, and trust hop are not reconstructed here (`clientrequest.Request` / `Check`).
+  Rank: bounded asked — existing IsCaptchaFormPost plus TokenField contract with 1 production caller (handleCaptchaKindServeHTTP in pkg/bouncer/bouncer.go); roots pkg/bouncer, pkg/captcha, tests/, knowledge/devdocs, openspec/specs; Proposed solution and Why the signal is wrong name the owner move.
+  Decision: assumed — after Check-true the plugin-owned hidden field is the owner; TokenField stays the first-solve Validate owner; Check stays the gate-cookie owner. Do not reconstruct leftover-form from the vendor field. Client address, Host, and trust hop are not reconstructed here (clientrequest.Request / Check).
   By: explore
-
-- Q: Does Check-true marker detection reuse `IsCaptchaFormPost`'s 64KiB peek, multipart, and already-parsed PostForm rules, or a sibling reader?
-  Rank: bounded asked — same 1 production caller plus 6 `Test_IsCaptchaFormPost*` tests and bouncer routing tests through that caller; roots as above; What stays the same / forward body included, and live spec "Captcha-form detection never costs origin its body".
-  Decision: assumed — reuse that reader; change the field from TokenField to `crowdsec_captcha_challenge`; do not share it with `readFieldFromRequest`; empty TokenField must not gate marker detection.
+- Q: Does Check-true marker detection reuse the IsCaptchaFormPost 64KiB peek, multipart, and already-parsed PostForm rules, or a sibling reader?
+  Rank: bounded asked — same 1 production caller plus 6 Test_IsCaptchaFormPost tests and bouncer routing tests through that caller; roots as above; What stays the same / forward body included, and live spec Captcha-form detection never costs origin its body.
+  Decision: assumed — reuse that reader; change the field from TokenField to crowdsec_captcha_challenge; do not share it with readFieldFromRequest; empty TokenField must not gate marker detection.
   By: explore
-
-- Q: Must the marker value be exactly `v1`, or is a non-empty field enough?
-  Rank: additive asked — new field this change adds; Proposed solution HTML and decision tree name `crowdsec_captcha_challenge=v1`.
-  Decision: assumed — exact value `v1`; missing, empty, or other values are application traffic on the Check-true branch.
+- Q: Must the marker value be exactly v1, or is a non-empty field enough?
+  Rank: additive asked — new field this change adds; Proposed solution HTML and decision tree name crowdsec_captcha_challenge=v1.
+  Decision: assumed — exact value v1; missing, empty, or other values are application traffic on the Check-true branch.
   By: explore
-
-- Q: Does any application already POST `crowdsec_captcha_challenge=v1`?
+- Q: Does any application already POST crowdsec_captcha_challenge=v1?
   Rank: additive asked — new field this change adds; Unknowns on requirement.md.
   Decision: assumed — no in-tree use of that name; CrowdSec-prefixed field is plugin-owned. An origin that posts it with a valid gate cookie is redirected; the marker grants nothing.
   By: explore
-
 - Q: What happens to operator-replaced templates that omit the hidden field?
   Rank: additive asked — Templates section names the migration; not an unenumerated Go caller.
   Decision: assumed — first-solve still verifies TokenField; a second submit of that template is forwarded. Operators who want the duplicate-tab 302 add the same hidden input. Stock, examples, and e2e pages in this repo gain the field.
   By: explore
-
 - Q: Is a new Traefik setting needed for the marker name or value?
-  Rank: additive asked — Out of scope names "A new Traefik setting for the marker name or value."
-  Decision: assumed — hardcoded name and `v1`; no Config key.
+  Rank: additive asked — Out of scope names a new Traefik setting for the marker name or value.
+  Decision: assumed — hardcoded name and v1; no Config key.
+  By: explore
+- Q: Keep IsCaptchaFormPost as the identifier after it stops reading TokenField?
+  Rank: additive incidental — renaming is a means to the field change, not a named criterion.
+  Decision: assumed — keep the identifier; retarget its comment and the usage Language Solved-form POST to the marker. Propose may rename if the identifier becomes a lie.
   By: explore
 
-- Q: Keep `IsCaptchaFormPost` as the identifier after it stops reading TokenField?
-  Rank: additive incidental — renaming is a means to the field change, not a named criterion.
-  Decision: assumed — keep the identifier; retarget its comment and the usage Language **Solved-form POST** to the marker. Propose may rename if the identifier becomes a lie.
-  By: explore
