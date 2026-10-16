@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-10-13-ban-unknown-lapi-types",
+  "jobName": "Ban unknown LAPI decision types on master",
+  "startedAt": "2026-10-13T20:10:32.056Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-13T20:15:49.435Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-13T20:21:14.951Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-13T20:24:45.303Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-13T20:36:13.814Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-13T20:38:03.698Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-13T20:40:26.110Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-13T20:42:14.817Z"
+    },
+    "pullrequest": {
+      "work": false,
+      "card": false,
+      "at": null
+    }
+  }
+}

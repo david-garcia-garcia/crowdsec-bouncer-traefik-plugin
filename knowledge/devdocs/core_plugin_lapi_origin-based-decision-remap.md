@@ -12,14 +12,14 @@ _Avoid_: treating `lists:foo` as a prefix of other lists, case-fold match
 
 ## Overview
 
-Stream Ip/header, stream Range, and live/none query store `RemediationValue` only. Each router applies `applyOriginBasedDecisionRemap` after a successful lookup or live query. Live strongest pick uses the LAPI type so a still-ban wins in the shared cache. Two Bouncers on one Client may disagree.
+Stream Ip/header, stream Range, and live/none query store ingest kind: `RemediationValue` for `ban`/`captcha`, ban for any other type. Each router applies `applyOriginBasedDecisionRemap` after a successful lookup or live query. Live strongest pick uses ingest kind so a still-ban (including unknown types) wins in the shared cache. Two Bouncers on one Client may disagree.
 
 ## How to use
 
 - Copy trimmed weaken edges in `bouncer.New` (`copyOriginBasedDecisionRemap`). Do not hash them into `SessionKey` or live `Key`. Do not copy them onto `lapi.Client`.
-- Store with `MetricsOrigin` then `kind := decisionscope.RemediationValue(type)` on stream Put, Range upsert, and live query.
+- Store with `MetricsOrigin` then `ingestRemediationKind` on stream Put, Range upsert, and live query. `RemediationValue` stays empty for unknown types so remap to-tokens can mean "not a code".
 - After a successful `LookupRemediation` or `LiveLookup`, call `appliedLAPIRemediation` before `IsActiveRemediation`. Resolve packed origin ids when the table is non-empty.
-- Empty table: ban stays `t`, captcha stays `c`. Unknown type stays empty (skip store). `pass` applies as `NoBannedValue`.
+- Empty table: ban stays `t`, captcha stays `c`. Unknown type stores as ban (`t`) at ingest and TRACE-logs `handleStreamCache:unknownType`. `pass` applies as `NoBannedValue`.
 - Reject invalid edges in `ValidateParams`. Do not require `captchaProvider`; missing provider still falls back to ban rendering for applied captcha.
 
 ## Pattern snippet
@@ -36,7 +36,7 @@ kind, origin = b.appliedLAPIRemediation(kind, origin, originID)
 - `pkg/configuration/origin_based_decision_remap.go`
 - `pkg/bouncer/origin_based_decision_remap.go`
 - `pkg/bouncer/bouncer.go` (`New` copy, ServeHTTP apply)
-- `pkg/lapi/client_decisions.go` (store `RemediationValue`)
+- `pkg/lapi/client_decisions.go` (`ingestRemediationKind`)
 - `pkg/lapi/client_stream.go`
 
 ## Gotchas
