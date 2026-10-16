@@ -20,7 +20,7 @@ Priority: P1 — production is serving a wrong public contract today
 Ready for review. 1 items remain.
 
 Priority: P1 — production is serving a wrong public contract today
-Reviewed head: 775cdd44
+Reviewed head: 34f02417
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -43,8 +43,12 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [core_plugin_middleware_captcha-routing](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-16-captcha-leftover-form-marker/openspec/changes/captcha-challenge-form-marker/proposal.md) — modified
-- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-16-captcha-leftover-form-marker/openspec/changes/captcha-challenge-form-marker/proposal.md) — modified
+- [core_plugin_middleware_captcha-routing](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-16-captcha-leftover-form-marker/openspec/changes/archive/2026-10-16-captcha-challenge-form-marker/proposal.md) — modified
+- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-16-captcha-leftover-form-marker/openspec/changes/archive/2026-10-16-captcha-challenge-form-marker/proposal.md) — modified
+
+Completed:
+- [core_plugin_middleware_captcha-routing](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-16-captcha-leftover-form-marker/openspec/specs/core_plugin_middleware_captcha-routing/spec.md) — modified
+- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-16-captcha-leftover-form-marker/openspec/specs/core_plugin_middleware_captcha-widget/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -83,9 +87,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 775cdd44397fbd3b34a8781f61757d6e554ce224 | Card must match the branch you measured |
+| Reviewed head | 34f0241742645574be93475d34695b4e4cbf1b9f | Card must match the branch you measured |
 
 ### Stored data model
 None.
