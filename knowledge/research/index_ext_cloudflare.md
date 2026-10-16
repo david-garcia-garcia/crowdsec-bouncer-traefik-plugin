@@ -8,4 +8,4 @@ description: Official Cloudflare Turnstile Siteverify request fields and remotei
 ## Turnstile widget
 priority: normal
 local: ext_cloudflare_turnstile_widget/
-description: Official Cloudflare Turnstile api.js widget, form token field, and widget modes.
+description: Official Cloudflare Turnstile browser widget hidden form field, widget modes, and response-field contract.
