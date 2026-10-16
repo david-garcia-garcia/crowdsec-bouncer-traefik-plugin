@@ -114,7 +114,7 @@ func TestHandleRemediationServeHTTP_solvedFormPostRedirects(t *testing.T) {
 	b, originCalled := testCaptchaRoutingBouncer(t, client)
 
 	form := url.Values{}
-	form.Set("dummy-captcha-response", "again")
+	form.Set("crowdsec_captcha_challenge", "v1")
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/protected", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "crowdsec_captcha_gate", Value: cookieValue})
@@ -157,9 +157,51 @@ func TestHandleRemediationServeHTTP_ordinaryPostAfterSolveReachesOrigin(t *testi
 	}
 }
 
+func TestHandleRemediationServeHTTP_vendorTokenPostWithoutMarkerReachesOrigin(t *testing.T) {
+	siteverify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true}`))
+	}))
+	t.Cleanup(siteverify.Close)
+
+	client := testCaptchaClient(t, "/fast.js", "", siteverify.URL+"/siteverify", siteverify.Client())
+	cookieValue := solveTestGateCookie(t, client)
+
+	payload := "dummy-captcha-response=vendor-token&username=alice"
+	var originBody string
+	b := &Bouncer{
+		next: http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			raw, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			originBody = string(raw)
+		}),
+		log:                     logger.New("ERROR", ""),
+		remediationStatusCode:   http.StatusForbidden,
+		remediationCustomHeader: "X-Remediation",
+		banTemplateContentType:  "text/html; charset=utf-8",
+	}
+	bindTestCaptcha(b, client)
+
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/protected", strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "crowdsec_captcha_gate", Value: cookieValue})
+	rw := httptest.NewRecorder()
+	continueCaptchaForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue)
+
+	if rw.Code == http.StatusFound {
+		t.Fatal("Check-true POST with a vendor token and no challenge marker must not 302")
+	}
+	if originBody != payload {
+		t.Fatalf("origin body want %q unchanged, got %q", payload, originBody)
+	}
+}
+
 // TestHandleRemediationServeHTTP_overMaxPostAfterSolveReachesOriginIntact proves a large
-// upload is not sacrificed to captcha-form detection: it reaches origin byte for byte even
-// though it happens to contain the provider response field name.
+// upload is not sacrificed to challenge-marker detection: it reaches origin byte for byte even
+// though it happens to contain the challenge marker name.
 func TestHandleRemediationServeHTTP_overMaxPostAfterSolveReachesOriginIntact(t *testing.T) {
 	siteverify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -187,7 +229,7 @@ func TestHandleRemediationServeHTTP_overMaxPostAfterSolveReachesOriginIntact(t *
 	}
 	bindTestCaptcha(b, client)
 
-	payload := "dummy-captcha-response=token&blob=" + strings.Repeat("a", 64<<10)
+	payload := "crowdsec_captcha_challenge=v1&blob=" + strings.Repeat("a", 64<<10)
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", strings.NewReader(payload))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(&http.Cookie{Name: "crowdsec_captcha_gate", Value: cookieValue})

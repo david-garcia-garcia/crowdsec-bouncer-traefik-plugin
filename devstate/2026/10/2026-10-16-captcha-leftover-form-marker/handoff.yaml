@@ -1,0 +1,18 @@
+issueKey: 2026-10-16-captcha-leftover-form-marker
+jobName: 2026-10-16-captcha-leftover-form-marker
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 4d88a63740d3d9096ba8c1ee8a331dec63ca189f19e1a455ddfb0a8cadbfebfd
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: captcha-challenge-form-marker
+pr:
+  id: 201
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/201

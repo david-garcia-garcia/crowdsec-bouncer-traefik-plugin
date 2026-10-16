@@ -68,6 +68,7 @@
     <div class="brand">{{ .Domain }}</div>
     <h1>Verify you are human</h1>
     <form id="captcha-form" action="" method="POST">
+      <input type="hidden" name="crowdsec_captcha_challenge" value="v1">
       {{ if .DrawCheckbox }}
       <div class="widget">
         <div id="captcha" class="{{ .FrontendKey }}" data-sitekey="{{ .SiteKey }}" data-callback="captchaCallback" data-action="{{ .Action }}"></div>
