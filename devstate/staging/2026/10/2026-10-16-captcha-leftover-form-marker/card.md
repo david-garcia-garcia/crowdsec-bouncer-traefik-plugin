@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 122efcf1
+Reviewed head: 5c4ce36f
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -53,7 +53,7 @@ Ticket 2026-10-16-captcha-leftover-form-marker on branch 2026-10-16-captcha-left
 ## Explore Decisions
 | Question | Rank | Decision | By |
 | --- | --- | --- | --- |
-| After the gate is valid, does leftover-form detection read only `crowdsec_captcha_challenge=v1`, not `TokenField`? | bounded asked — existing `IsCaptchaFormPost` has 1 production caller (`pkg/bouncer/bouncer.go` `handleCaptchaKindServeHTTP`; searched `**/*.go`); requirement Proposed solution valid-gate branch and “duplicate-form detection reads that marker only” | assumed — change `IsCaptchaFormPost` to that marker; migrate the bouncer caller (signature stays) and the routing tests in `pkg/captcha` and `pkg/bouncer`. | explore |
+| After the gate is valid, does leftover-form detection read only crowdsec_captcha_challenge=v1, not TokenField? | bounded asked — existing IsCaptchaFormPost has 1 production caller in pkg/bouncer/bouncer.go handleCaptchaKindServeHTTP, searched Go files; requirement Proposed solution valid-gate branch names marker-only detection | assumed — change IsCaptchaFormPost to that marker; migrate the bouncer caller (signature stays) and the routing tests in pkg/captcha and pkg/bouncer. | explore |
 
 
 ## Findings
@@ -69,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 122efcf1c8e465d070d4e11b3e7e8c51f76168a2 | Card must match the branch you measured |
+| Reviewed head | 5c4ce36ffab38be8f17f3b1cfb2f36891886134a | Card must match the branch you measured |
 
 ### Stored data model
 None.
