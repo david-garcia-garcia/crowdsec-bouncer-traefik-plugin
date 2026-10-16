@@ -20,14 +20,14 @@ Priority: P1 — production is serving a wrong public contract today
 Ready for review. 1 items remain.
 
 Priority: P1 — production is serving a wrong public contract today
-Reviewed head: 34f02417
+Reviewed head: dd5a93fb
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38850093953 |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38852724673 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,7 +37,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-10-16-captcha-leftover-form-marker pushed | `git` |
 | OpenSpec | captcha-challenge-form-marker | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/201 | pr-host |
-| CI | build 38850093953 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38850093953 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38850093953 |
+| CI | build 38852724673 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38852724673 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38852724673 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -60,7 +60,7 @@ Completed:
 
 
 ## How this fits together
-Ticket 2026-10-16-captcha-leftover-form-marker on branch 2026-10-16-captcha-leftover-form-marker targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/201; CI build 38850093953 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38850093953.
+Ticket 2026-10-16-captcha-leftover-form-marker on branch 2026-10-16-captcha-leftover-form-marker targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/201; CI build 38852724673 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/38852724673.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -89,7 +89,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 34f0241742645574be93475d34695b4e4cbf1b9f | Card must match the branch you measured |
+| Reviewed head | dd5a93fb012d246bead8aeaacc2fbf3c9e269adc | Card must match the branch you measured |
 
 ### Stored data model
 None.
