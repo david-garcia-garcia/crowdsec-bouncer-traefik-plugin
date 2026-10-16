@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 5c4ce36f
+Reviewed head: 12ceda00
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,17 +32,21 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-10-16-captcha-leftover-form-marker pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | captcha-challenge-form-marker | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/201 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_middleware_captcha-routing](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-16-captcha-leftover-form-marker/openspec/changes/captcha-challenge-form-marker/proposal.md) — modified
+- [core_plugin_middleware_captcha-widget](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-10-16-captcha-leftover-form-marker/openspec/changes/captcha-challenge-form-marker/proposal.md) — modified
+
 
 ## Deviations from the ask
-None.
+- taken: leftover detection is POST contains `crowdsec_captcha_challenge=v1`, with no size named. → leftover detection keeps the existing 64KiB peek; over-cap bodies are not leftover forms. — `pkg/captcha/form.go (captchaFormMaxBytes, peekCaptchaFormBody)` — honouring an uncapped read would drop the live routing promise that detection never costs origin its body; the ask's HTML does not name dropping the cap.. Requester: not asked.
+
 
 ## Follow-up issues
 None.
@@ -67,9 +71,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 5c4ce36ffab38be8f17f3b1cfb2f36891886134a | Card must match the branch you measured |
+| Reviewed head | 12ceda00d633eb93b7fbc3ded78d6a536cb4569f | Card must match the branch you measured |
 
 ### Stored data model
 None.
