@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 8db1baa3
+Reviewed head: 0386c1f4
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -53,7 +53,7 @@ Ticket 2026-10-16-captcha-challenge-form-marker on branch 2026-10-16-captcha-cha
 ## Explore Decisions
 | Question | Rank | Decision | By |
 | --- | --- | --- | --- |
-| Who already owns the fact that a POST is the CrowdSec challenge form? | bounded asked — existing `IsCaptchaFormPost` + TokenField contract with 1 production caller (`handleCaptchaKindServeHTTP` in `pkg/bouncer/bouncer.go`); roots `pkg/bouncer`, `pkg/captcha`, `tests/`, `knowledge/devdocs`, `openspec/specs`; Proposed solution and Why the signal is wrong name the owner move. | assumed — after Check-true the plugin-owned hidden field is the owner; TokenField stays the first-solve Validate owner; Check stays the gate-cookie owner. Do not reconstruct leftover-form from the vendor field. Client address, Host, and trust hop are not reconstructed here (`clientrequest.Request` / `Check`). | explore |
+| Who already owns the fact that a POST is the CrowdSec challenge form? | bounded asked — existing IsCaptchaFormPost plus TokenField contract with 1 production caller (handleCaptchaKindServeHTTP in pkg/bouncer/bouncer.go); roots pkg/bouncer, pkg/captcha, tests/, knowledge/devdocs, openspec/specs; Proposed solution and Why the signal is wrong name the owner move. | assumed — after Check-true the plugin-owned hidden field is the owner; TokenField stays the first-solve Validate owner; Check stays the gate-cookie owner. Do not reconstruct leftover-form from the vendor field. Client address, Host, and trust hop are not reconstructed here (clientrequest.Request / Check). | explore |
 
 
 ## Findings
@@ -69,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 8db1baa364d39bbadc04304e55a1d57db4f4d4cb | Card must match the branch you measured |
+| Reviewed head | 0386c1f44464e02b7840f69d8636d0cfcd791064 | Card must match the branch you measured |
 
 ### Stored data model
 None.
