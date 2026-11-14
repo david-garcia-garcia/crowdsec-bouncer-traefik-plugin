@@ -21,6 +21,7 @@ Use this suite for plugin-only CI and for proving two Crowdsec configs in one pr
 - dual-bouncer: two middlewares, two LAPI ports (`LAPI_PORT_B`), `lapi_add_decision_at`.
 - Header-mapped scopes: `tests/e2e/mock/scenarios/scope-headers/` injects synthetic Country/AS/username headers. Real-stack Country uses geoblock instead.
 - `mocklapi --lapi-only` when AppSec is not under test.
+- The mocklapi AppSec stand-in picks its verdict from `X-Crowdsec-Appsec-Uri`: `rpc2` / `403` block, `challenge` relays a challenge envelope, `appsec-captcha` answers `{"action":"captcha","http_status":403}` on GET only (the captcha form POST is allowed, as a GET-keyed rule would), `appsec-tarpit` answers an unknown bodyless action, `500` / `502` exercise the failure action. Name a probe path after the verdict you need; do not reuse one of those words by accident.
 - CI job `e2e (binary + mock LAPI)` runs this suite.
 
 ## Pattern snippet
@@ -35,6 +36,7 @@ make e2e_mock
 - `tests/e2e/mock/scenarios/dual-bouncer/`
 - `tests/e2e/mock/scenarios/scope-headers/`
 - `tests/e2e/mock/scenarios/captcha/`
+- `tests/e2e/mock/scenarios/appsec-captcha/`
 - `tests/e2e/mock/lib/common.sh`
 - `.github/workflows/e2e.yml`
 
