@@ -1,0 +1,18 @@
+issueKey: 2026-10-13-ban-unknown-lapi-types
+jobName: Ban unknown LAPI decision types on master
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: dbb185d39e51ede693362a475c71e1a72eae014a2c5350a0823d59a3972bc9e0
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: ban-unknown-lapi-types
+pr:
+  id: 198
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/198
