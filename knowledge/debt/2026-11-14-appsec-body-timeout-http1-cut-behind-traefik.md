@@ -16,4 +16,4 @@ The cause is outside this repository: which Traefik `ResponseWriter` wrapper hid
 
 ## Context
 - Measurement: `tests/e2e/mock/scenarios/appsec/run.sh` (body read timeout block), `knowledge/research/std_go_net-http_body-read-deadline/notes.md` (Measured later).
-- Plugin side: `pkg/appsec/query.go` `readClientBodyForAppsec`; `pkg/bouncer/bouncer.go` `applyAppsecServeHTTP` builds `http.NewResponseController(rw)`.
+- Plugin side: `pkg/appsec/query.go` `copyClientBodyForAppsecAndRestoreForOrigin` / `cutClientBodyRead`; `pkg/bouncer/bouncer.go` `applyAppsecServeHTTP` builds `http.NewResponseController(rw)`.

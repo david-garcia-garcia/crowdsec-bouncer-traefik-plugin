@@ -64,8 +64,6 @@ func headerReasonFromOrigin(origin string) string {
 		return headerReasonStreamUnhealthy
 	case lapi.OriginPluginAppsecFailure:
 		return headerReasonAppsecFailure
-	case lapi.OriginPluginAppsecBodyTimeout:
-		return headerReasonAppsecBodyTimeout
 	default:
 		return headerReasonLAPI
 	}

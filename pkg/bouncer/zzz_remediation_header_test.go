@@ -44,7 +44,6 @@ func TestHeaderReasonFromOrigin(t *testing.T) {
 		{origin: lapi.OriginPluginLapiFailure, want: headerReasonLAPIFailure},
 		{origin: lapi.OriginPluginTechStreamFail, want: headerReasonStreamUnhealthy},
 		{origin: lapi.OriginPluginAppsecFailure, want: headerReasonAppsecFailure},
-		{origin: lapi.OriginPluginAppsecBodyTimeout, want: headerReasonAppsecBodyTimeout},
 		{origin: "crowdsec", want: headerReasonLAPI},
 		{origin: "lists:firehol_level1", want: headerReasonLAPI},
 		{origin: "", want: headerReasonLAPI},

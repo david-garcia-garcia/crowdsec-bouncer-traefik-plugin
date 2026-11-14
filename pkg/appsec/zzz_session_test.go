@@ -126,6 +126,7 @@ func TestKey_TimeoutKnobsChangeIdentity(t *testing.T) {
 	}
 }
 
+// TestKey_BodyReadTimeoutChangesIdentity proves appsecBodyReadTimeoutSeconds is in the AppSec reclaim identity.
 func TestKey_BodyReadTimeoutChangesIdentity(t *testing.T) {
 	base := testAppsecConfig("127.0.0.1:1")
 	longer := testAppsecConfig("127.0.0.1:1")
@@ -135,6 +136,7 @@ func TestKey_BodyReadTimeoutChangesIdentity(t *testing.T) {
 	}
 }
 
+// TestPrepare_NonPositiveBodyLimitSharesDefaultIdentity proves appsecBodyLimit 0 / -1 after Prepare share the omitted-limit AppSec Key.
 func TestPrepare_NonPositiveBodyLimitSharesDefaultIdentity(t *testing.T) {
 	omitted := testAppsecConfig("127.0.0.1:1")
 	omitted.AppsecBodyLimit = configuration.New().AppsecBodyLimit

@@ -121,6 +121,15 @@ func isMethodWithForwardableBody(method string) bool {
 	}
 }
 
+// hasBodyForAppsec reports a client body that is copied to AppSec: present, not http.NoBody, and on
+// a method in isMethodWithForwardableBody. Any other request goes to AppSec headers-only.
+func hasBodyForAppsec(httpReq *http.Request) bool {
+	if httpReq.Body == nil || httpReq.Body == http.NoBody {
+		return false
+	}
+	return isMethodWithForwardableBody(httpReq.Method)
+}
+
 // isHopByHopHeader reports whether a header is connection-scoped (RFC 7230 section 6.1, errata 4522)
 // and therefore must not be forwarded to the AppSec listener.
 func isHopByHopHeader(name string) bool {
@@ -247,11 +256,11 @@ func (c *Client) newAppsecForwardRequest(req clientrequest.Request, responseCont
 // newAppsecBodyRequest chooses GET (no body, or a method whose body is not inspected) or POST (copied
 // client body) toward AppSec. The original verb always travels on X-Crowdsec-Appsec-Verb.
 func (c *Client) newAppsecBodyRequest(target string, req clientrequest.Request, responseController *http.ResponseController) (*http.Request, error) {
-	if req.Body == nil || req.Body == http.NoBody || !isMethodWithForwardableBody(req.Method) {
+	if !hasBodyForAppsec(req.Request) {
 		appsecReq, _ := http.NewRequest(http.MethodGet, target, nil)
 		return appsecReq, nil
 	}
-	bodyBytes, err := c.readClientBodyForAppsec(req, responseController)
+	bodyBytes, err := c.copyClientBodyForAppsecAndRestoreForOrigin(req, responseController)
 	if err != nil {
 		return nil, err
 	}
@@ -260,22 +269,12 @@ func (c *Client) newAppsecBodyRequest(target string, req clientrequest.Request, 
 	return appsecReq, nil
 }
 
-// readClientBodyForAppsec copies up to appsecBodyLimit bytes of the client body for AppSec and
-// restores the full body for origin. A body of unknown length must arrive within
+// copyClientBodyForAppsecAndRestoreForOrigin copies up to appsecBodyLimit bytes of the client body for
+// AppSec and restores the full body for origin on req. A body of unknown length must arrive within
 // appsecBodyReadTimeoutSeconds, else ErrBodyReadTimeout. A client gone mid-read is ErrClientDisconnected.
-func (c *Client) readClientBodyForAppsec(req clientrequest.Request, responseController *http.ResponseController) ([]byte, error) {
+func (c *Client) copyClientBodyForAppsecAndRestoreForOrigin(req clientrequest.Request, responseController *http.ResponseController) ([]byte, error) {
 	clientBody := req.Body
-
-	// Arm the total deadline only for a body of unknown length; a declared length keeps Traefik's readTimeout.
-	var deadlineTimer *time.Timer
-	if isBodyLengthUnknown(req.Request) {
-		deadlineTimer = time.AfterFunc(time.Duration(c.bodyReadTimeoutSeconds)*time.Second, func() {
-			// Cut the in-flight read. The controller reaches HTTP/1.1 and HTTP/2; Close only HTTP/2 (and HTTP/3).
-			if responseController == nil || responseController.SetReadDeadline(time.Now()) != nil {
-				_ = clientBody.Close()
-			}
-		})
-	}
+	deadlineTimer := c.armBodyReadDeadline(req, responseController)
 
 	// Copy at most appsecBodyLimit bytes; the tee keeps them for the origin restore below.
 	var bodyBuffer bytes.Buffer
@@ -283,7 +282,7 @@ func (c *Client) readClientBodyForAppsec(req clientrequest.Request, responseCont
 
 	// The plugin's own timer is the only classifier of a deadline, checked before the read error:
 	// a cut read can look like a client disconnect, or even succeed when the timer races the last byte.
-	if deadlineTimer != nil && !deadlineTimer.Stop() {
+	if bodyReadDeadlineFired(deadlineTimer) {
 		logger.Debounced(c.log, slog.LevelWarn, 5*time.Second, msgBodyReadTimeout,
 			"ip", req.IPAddrString(),
 			"method", req.Method,
@@ -304,6 +303,36 @@ func (c *Client) readClientBodyForAppsec(req clientrequest.Request, responseCont
 	// Give origin the bytes already read followed by whatever the client still sends past the limit.
 	req.Body = io.NopCloser(io.MultiReader(&bodyBuffer, clientBody))
 	return bodyBytes, nil
+}
+
+// armBodyReadDeadline starts the appsecBodyReadTimeoutSeconds timer for a body of unknown length and
+// returns it. A declared length returns nil and keeps Traefik's readTimeout.
+func (c *Client) armBodyReadDeadline(req clientrequest.Request, responseController *http.ResponseController) *time.Timer {
+	if !isBodyLengthUnknown(req.Request) {
+		return nil
+	}
+	clientBody := req.Body
+	return time.AfterFunc(time.Duration(c.bodyReadTimeoutSeconds)*time.Second, func() {
+		cutClientBodyRead(clientBody, responseController)
+	})
+}
+
+// cutClientBodyRead ends the in-flight client body read. The controller reaches HTTP/1.1 and HTTP/2;
+// Close (the fallback when there is no controller or it refuses the deadline) reaches only HTTP/2 and HTTP/3.
+func cutClientBodyRead(clientBody io.Closer, responseController *http.ResponseController) {
+	if responseController != nil && responseController.SetReadDeadline(time.Now()) == nil {
+		return
+	}
+	_ = clientBody.Close()
+}
+
+// bodyReadDeadlineFired reports whether the body-read deadline timer already fired. It stops a timer
+// that has not fired. A nil timer (declared length, no deadline) never fired.
+func bodyReadDeadlineFired(deadlineTimer *time.Timer) bool {
+	if deadlineTimer == nil {
+		return false
+	}
+	return !deadlineTimer.Stop()
 }
 
 // drainResponse consumes leftover bytes so the AppSec HTTP connection can be reused.

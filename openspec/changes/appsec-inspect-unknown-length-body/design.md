@@ -31,7 +31,7 @@ Alternative: keep `isBodyUnreadable` and change its branch to "read with deadlin
 
 ### D2. Deadline mechanism: timer → `SetReadDeadline(now)`, fallback `Body.Close`
 
-Inside the read helper (proposed `readClientBodyForAppsec`), when the length is unknown:
+Inside the read helper (`copyClientBodyForAppsecAndRestoreForOrigin`), when the length is unknown:
 
 ```go
 timer := time.AfterFunc(c.bodyReadTimeout(), func() {
@@ -65,7 +65,7 @@ Migration: 1 production call (`pkg/bouncer/bouncer.go`), 43 test calls in `pkg/a
 - `pkg/appsec`: `var ErrBodyReadTimeout = errors.New("appsecQuery:bodyReadTimeout")`, documented like `ErrClientDisconnected`. `Query` returns it straight from `newAppsecForwardRequest`, so the listener is never called and `resultForFailureAction` is never consulted.
 - The WARN is emitted in `pkg/appsec` at the point the sentinel is produced (the owner of the knob and of the read), through `logger.Debounced(c.log, slog.LevelWarn, 5*time.Second, msgBodyReadTimeout, "ip", req.IPAddrString(), "method", req.Method, "host", req.Host, "path", req.URL.Path, "timeoutSeconds", c.bodyReadTimeoutSeconds)`. Message text is fixed in the spec (`core_plugin_appsec_body-read-timeout`). Client address comes from `clientrequest.Request` (owner: `pkg/ip.GetRemoteIP`); do not re-derive it.
 - `pkg/bouncer`: in `applyAppsecServeHTTP`, after the `ErrClientDisconnected` branch: `if errors.Is(err, appsec.ErrBodyReadTimeout) { b.warnCaptchaSuperseded(req, match); b.handleBanServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsecBodyTimeout, lapi.OriginPluginAppsecBodyTimeout); return true }`. It never reaches the generic Debug + `appsec-failure` branch.
-- `headerReasonAppsecBodyTimeout = "appsec-body-timeout"` in `pkg/bouncer/remediation_header.go`; `headerReasonFromOrigin` maps the new origin to it (symmetry with `appsec-failure`).
+- `headerReasonAppsecBodyTimeout = "appsec-body-timeout"` in `pkg/bouncer/remediation_header.go`; the body-timeout ban passes it straight to `handleBanServeHTTP`, so `headerReasonFromOrigin` does not map the new origin (same as `OriginPluginTechCacheFail`).
 - `OriginPluginAppsecBodyTimeout = "plugin:appsec_body_timeout"` in `pkg/lapi/client_metrics.go` next to `OriginPluginAppsecFailure`.
 
 Alternatives: HTTP 408 — RFC 9110 §15.5.9 invites the client to retry into the same block and skips the operator's status code, template, header, and metrics; reuse `appsec-failure` — Decision 7 reserves it for "AppSec failed".

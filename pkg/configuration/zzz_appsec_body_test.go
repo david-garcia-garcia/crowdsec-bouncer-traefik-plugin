@@ -7,6 +7,7 @@ import (
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
+// TestNew_AppsecBodyDefaults proves CreateConfig defaults: a 10 MiB body cap and a 30 s body read deadline.
 func TestNew_AppsecBodyDefaults(t *testing.T) {
 	cfg := New()
 	if cfg.AppsecBodyLimit != 10485760 {
@@ -17,6 +18,7 @@ func TestNew_AppsecBodyDefaults(t *testing.T) {
 	}
 }
 
+// TestEffectiveAppsecBodyLimit proves a non-positive appsecBodyLimit maps to 10 MiB and a positive one is kept.
 func TestEffectiveAppsecBodyLimit(t *testing.T) {
 	cases := []struct {
 		limit int64
@@ -34,12 +36,16 @@ func TestEffectiveAppsecBodyLimit(t *testing.T) {
 	}
 }
 
+// TestValidateParams_AppsecBodyKnobs proves the validation of appsecBodyReadTimeoutSeconds (at least 1)
+// and that appsecBodyLimit 0 / -1 no longer fail (they mean the default cap).
 func TestValidateParams_AppsecBodyKnobs(t *testing.T) {
 	log := logger.New("INFO", "")
+	// Defaults pass.
 	if err := ValidateParams(getMinimalConfig(), log); err != nil {
 		t.Fatalf("defaults: %v", err)
 	}
 
+	// A zero body read timeout fails like the other *TimeoutSeconds keys.
 	zeroTimeout := getMinimalConfig()
 	zeroTimeout.AppsecBodyReadTimeoutSeconds = 0
 	err := ValidateParams(zeroTimeout, log)
@@ -47,12 +53,14 @@ func TestValidateParams_AppsecBodyKnobs(t *testing.T) {
 		t.Fatalf("zero body read timeout: %v", err)
 	}
 
+	// A negative body limit is accepted: it means the default cap.
 	negativeLimit := getMinimalConfig()
 	negativeLimit.AppsecBodyLimit = -1
 	if err := ValidateParams(negativeLimit, log); err != nil {
 		t.Fatalf("negative appsecBodyLimit must be accepted (it means the default cap): %v", err)
 	}
 
+	// A zero body limit is accepted: it means the default cap, not unlimited.
 	zeroLimit := getMinimalConfig()
 	zeroLimit.AppsecBodyLimit = 0
 	if err := ValidateParams(zeroLimit, log); err != nil {
