@@ -125,10 +125,11 @@ func Test_pollTimer_stopIsNilSafeAndIdempotent(t *testing.T) {
 func Test_clientSleepWakeClose_restartsAndStopsPollTimers(t *testing.T) {
 	client, _ := NewTestClient(discardLogger())
 	client.updateInterval = 3600
-	// metricsInterval 0 keeps Sleep/Close from POSTing usage-metrics (this Client has no LAPI);
-	// it is set to 3600 only around Wake so Wake starts the metrics timer.
+	// Set before any lifecycle call: Sleep reads it on its async drain. The test Client has no
+	// MetricsReporter, so that drain POSTs nothing.
+	client.metricsInterval = 3600
 	client.streamTimer = startPollTimer("stream", client.updateInterval, client.log, func() {})
-	client.metricsTimer = startPollTimer("metrics", 3600, client.log, func() {})
+	client.metricsTimer = startPollTimer("metrics", client.metricsInterval, client.log, func() {})
 	stream, metrics := client.streamTimer, client.metricsTimer
 
 	client.Sleep()
@@ -140,9 +141,7 @@ func Test_clientSleepWakeClose_restartsAndStopsPollTimers(t *testing.T) {
 	}
 
 	client.decisionStore.TryBeginStreamPoll() // Wake's first poll skips instead of calling LAPI.
-	client.metricsInterval = 3600
 	client.Wake()
-	client.metricsInterval = 0
 	if client.streamTimer == nil || client.metricsTimer == nil {
 		t.Fatal("Wake must start both poll timers")
 	}
