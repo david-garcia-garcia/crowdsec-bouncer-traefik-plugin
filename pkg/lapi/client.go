@@ -72,8 +72,8 @@ type Client struct {
 	isCrowdsecStreamStartup int64
 	isCrowdsecStreamHealthy int64
 	updateFailure           int64
-	streamStop              chan bool
-	metricsStop             chan bool
+	streamTimer             *pollTimer
+	metricsTimer            *pollTimer
 	metricsReporter         *MetricsReporter
 	streamFetches           int64
 }
@@ -177,7 +177,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 	if config.LapiMetricsUpdateIntervalSeconds > 0 {
 		client.metricsReporter.lastMetricsPush = time.Now()
 		go client.handleMetricsTicker()
-		client.metricsStop = startMetricsTicker(client.metricsInterval, log, func() {
+		client.metricsTimer = startPollTimer("metrics", client.metricsInterval, log, func() {
 			client.handleMetricsTicker()
 		})
 	}
@@ -198,10 +198,10 @@ func (c *Client) Close() {
 	}
 	c.closed = true
 	c.sleeping = false
-	stopTicker(c.streamStop)
-	stopTicker(c.metricsStop)
-	c.streamStop = nil
-	c.metricsStop = nil
+	c.streamTimer.stop()
+	c.metricsTimer.stop()
+	c.streamTimer = nil
+	c.metricsTimer = nil
 	c.mu.Unlock()
 
 	c.drainMetrics()
@@ -226,10 +226,10 @@ func (c *Client) Sleep() {
 		return
 	}
 	c.sleeping = true
-	stopTicker(c.streamStop)
-	stopTicker(c.metricsStop)
-	c.streamStop = nil
-	c.metricsStop = nil
+	c.streamTimer.stop()
+	c.metricsTimer.stop()
+	c.streamTimer = nil
+	c.metricsTimer = nil
 	c.mu.Unlock()
 	c.log.Debug(MsgConnectionSleeping, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "reason", "sleeping")
 	go c.drainMetrics()
@@ -245,13 +245,13 @@ func (c *Client) Wake() {
 	}
 	c.sleeping = false
 	resumeStream := c.crowdsecMode == configuration.StreamMode || c.crowdsecMode == configuration.AloneMode
-	if resumeStream && c.streamStop == nil {
-		c.streamStop = startStreamTicker(c.updateInterval, c.log, func() {
+	if resumeStream && c.streamTimer == nil {
+		c.streamTimer = startPollTimer("stream", c.updateInterval, c.log, func() {
 			c.handleStreamTicker()
 		})
 	}
-	if c.metricsInterval > 0 && c.metricsStop == nil {
-		c.metricsStop = startMetricsTicker(c.metricsInterval, c.log, func() {
+	if c.metricsInterval > 0 && c.metricsTimer == nil {
+		c.metricsTimer = startPollTimer("metrics", c.metricsInterval, c.log, func() {
 			c.handleMetricsTicker()
 		})
 	}
@@ -301,70 +301,69 @@ func (c *Client) StreamScopes() []string {
 	return names
 }
 
-func stopTicker(stop chan bool) {
-	if stop == nil {
+// pollTimer runs one Client loop (stream or usage-metrics) on a stdlib timer until stop.
+// It has no select on purpose: yaegi v0.16.1 shares one select case slice per statement
+// across every goroutine that runs it, so the loops of different Clients could take each
+// other's ticks and stops. time.AfterFunc is the stdlib timer (same reason as reclaim grace).
+type pollTimer struct {
+	mu      sync.Mutex
+	timer   *time.Timer
+	stopped bool
+	name    string
+	log     *slog.Logger
+}
+
+// startPollTimer runs work every intervalSeconds, measured from the end of the previous work.
+func startPollTimer(name string, intervalSeconds int64, log *slog.Logger, work func()) *pollTimer {
+	return startPollTimerEvery(name, time.Duration(intervalSeconds)*time.Second, log, work)
+}
+
+// startPollTimerEvery is startPollTimer with a Duration, so tests can use sub-second intervals.
+func startPollTimerEvery(name string, interval time.Duration, log *slog.Logger, work func()) *pollTimer {
+	poll := &pollTimer{name: name, log: log}
+	log.Debug("ticker:started", "name", name, "interval", int64(interval/time.Second))
+	// Hold mu so a first fire cannot read timer before it is assigned.
+	poll.mu.Lock()
+	defer poll.mu.Unlock()
+	poll.timer = time.AfterFunc(interval, func() {
+		poll.fire(interval, work)
+	})
+	return poll
+}
+
+// fire runs work on the timer goroutine, then re-arms one interval later unless stopped.
+func (p *pollTimer) fire(interval time.Duration, work func()) {
+	if p.isStopped() {
 		return
 	}
-	select {
-	case stop <- true:
-	default:
+	work()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.stopped {
+		p.timer.Reset(interval)
 	}
 }
 
-// startStreamTicker starts the stream poll loop and returns its stop channel.
-func startStreamTicker(updateInterval int64, log *slog.Logger, work func()) chan bool {
-	ticker := time.NewTicker(time.Duration(updateInterval) * time.Second)
-	stop := make(chan bool, 1)
-	go func() {
-		log.Debug("ticker:started", "name", "stream", "interval", updateInterval)
-		defer log.Debug("ticker:stopped", "name", "stream")
-		// Stop the ticker when the loop returns on the stop channel.
-		defer ticker.Stop()
-		runStreamTicker(ticker.C, stop, work)
-	}()
-	return stop
+func (p *pollTimer) isStopped() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.stopped
 }
 
-// startMetricsTicker starts the usage-metrics loop and returns its stop channel.
-func startMetricsTicker(updateInterval int64, log *slog.Logger, work func()) chan bool {
-	ticker := time.NewTicker(time.Duration(updateInterval) * time.Second)
-	stop := make(chan bool, 1)
-	go func() {
-		log.Debug("ticker:started", "name", "metrics", "interval", updateInterval)
-		defer log.Debug("ticker:stopped", "name", "metrics")
-		// Stop the ticker when the loop returns on the stop channel.
-		defer ticker.Stop()
-		runMetricsTicker(ticker.C, stop, work)
-	}()
-	return stop
-}
-
-// runStreamTicker waits on this stream loop's tick channel and buffered stop.
-// The select must stay a distinct statement from runMetricsTicker: yaegi v0.16.1
-// shares one _select case slice per statement across goroutines.
-func runStreamTicker(ticks <-chan time.Time, stop <-chan bool, work func()) {
-	for {
-		select {
-		case <-ticks:
-			work()
-		case <-stop:
-			return
-		}
+// stop ends the loop. It does not wait for a work call already running. Nil-safe and idempotent.
+func (p *pollTimer) stop() {
+	if p == nil {
+		return
 	}
-}
-
-// runMetricsTicker waits on this metrics loop's tick channel and buffered stop.
-// The select must stay a distinct statement from runStreamTicker: yaegi v0.16.1
-// shares one _select case slice per statement across goroutines.
-func runMetricsTicker(ticks <-chan time.Time, stop <-chan bool, work func()) {
-	for {
-		select {
-		case <-ticks:
-			work()
-		case <-stop:
-			return
-		}
+	p.mu.Lock()
+	if p.stopped {
+		p.mu.Unlock()
+		return
 	}
+	p.stopped = true
+	p.timer.Stop()
+	p.mu.Unlock()
+	p.log.Debug("ticker:stopped", "name", p.name)
 }
 
 // StreamHealthy is true while stream polling is succeeding.

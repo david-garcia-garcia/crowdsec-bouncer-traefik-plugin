@@ -36,7 +36,7 @@ func (c *Client) startStream(config *configuration.Config, log *slog.Logger) err
 		c.decisionStore.HydrateRange()
 	}
 	go c.handleStreamTicker()
-	c.streamStop = startStreamTicker(config.LapiUpdateIntervalSeconds, log, func() {
+	c.streamTimer = startPollTimer("stream", config.LapiUpdateIntervalSeconds, log, func() {
 		c.handleStreamTicker()
 	})
 	return nil

@@ -1,6 +1,7 @@
 package lapi
 
 import (
+	"io"
 	"log/slog"
 	"sync/atomic"
 	"testing"
@@ -93,14 +94,11 @@ func (c *Client) SleepingForTest() bool {
 	return c.sleeping && !c.closed
 }
 
-// RunStreamTickerForTest runs the production stream ticker loop so a Yaegi program can drive it.
-func RunStreamTickerForTest(ticks <-chan time.Time, stop <-chan bool, work func()) {
-	runStreamTicker(ticks, stop, work)
-}
-
-// RunMetricsTickerForTest runs the production metrics ticker loop so a Yaegi program can drive it.
-func RunMetricsTickerForTest(ticks <-chan time.Time, stop <-chan bool, work func()) {
-	runMetricsTicker(ticks, stop, work)
+// StartPollTimerForTest starts the production Client poll timer so a Yaegi program can drive
+// many of them. The returned func stops that timer.
+func StartPollTimerForTest(interval time.Duration, work func()) func() {
+	poll := startPollTimerEvery("test", interval, slog.New(slog.NewTextHandler(io.Discard, nil)), work)
+	return func() { poll.stop() }
 }
 
 // TestDroppedCount is the current window dropped count for origin+ipType+remediation.
