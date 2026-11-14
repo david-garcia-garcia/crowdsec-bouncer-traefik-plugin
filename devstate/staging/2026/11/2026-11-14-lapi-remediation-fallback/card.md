@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 95ef9e9d
+Reviewed head: 27c4726d
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,14 +32,19 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-11-14-lapi-remediation-fallback pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | lapi-remediation-fallback | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/205 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_decisions_scopes](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-remediation-fallback/openspec/changes/lapi-remediation-fallback/proposal.md) — modified
+- [core_plugin_lapi_origin-based-decision-remap](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-remediation-fallback/openspec/changes/lapi-remediation-fallback/proposal.md) — modified
+- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-remediation-fallback/openspec/changes/lapi-remediation-fallback/proposal.md) — modified
+- [core_plugin_lapi_remediation-fallback](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-remediation-fallback/openspec/changes/lapi-remediation-fallback/proposal.md) — added
+
 
 ## Deviations from the ask
 None.
@@ -67,9 +72,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 1 added / 3 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 95ef9e9db5f23c67b1f0dd94e401da4ee3a8063b | Card must match the branch you measured |
+| Reviewed head | 27c4726dc200e5456e242f845837846ccc916e8f | Card must match the branch you measured |
 
 ### Stored data model
 None.
