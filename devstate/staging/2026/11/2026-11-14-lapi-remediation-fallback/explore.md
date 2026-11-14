@@ -104,8 +104,8 @@ Outside facts used:
 
 - Q: How does ingest signal "not stored" under `ignore`, and how does the Deleted path learn the type rule?
   Rank: bounded asked — changes `ingestRemediationKind` and the stream / live call sites; 4 production call sites of `ingestRemediationKind`, 2 of `streamPutItem`, 2 of `streamDeleteItem`, 1 of `strongestLiveDecision` enumerated above (roots `pkg/`, repo-root `*.go`) and all migrated here; requirement Desired 2 names stream New, stream Deleted and live/none
-  Decision: assumed — `ingestRemediationKind` returns an empty kind for an unknown type under `ignore` (still TRACE-logged). Every ingest site treats empty as not stored: `streamPutItem` returns false; the Range New branch skips; `strongestLiveDecision` already skips anything that is neither ban nor captcha, so an IP whose only rows are unknown-type returns `NoBannedValue` (`queryLiveDecisions` l.117-119) and live mode caches that pass like any empty result. Deleted: one Client predicate named for the job (whether this Deleted type may clear stored state) is used by `streamDeleteItem` and the Range Deleted branch, so both shapes follow one rule (`skill:opd-commandments:Symmetry and consistency`). Skipped rows do not count in `newCount` / `deletedCount` (they count rows written). Do not restructure the loops (`Smallest durable delta`). Propose names the predicate.
-  By: explore
+  Decision: assumed — `ingestRemediationKind` returns an empty kind for an unknown type under `ignore` (still TRACE-logged). Every ingest site treats empty as not stored: `streamPutItem` returns false; the Range New branch skips; `strongestLiveDecision` already skips anything that is neither ban nor captcha, so an IP whose only rows are unknown-type returns `NoBannedValue` (`queryLiveDecisions` l.117-119) and live mode caches that pass like any empty result. Deleted: one Client predicate named for the job (whether this Deleted type may clear stored state) is used by `streamDeleteItem` and the Range Deleted branch, so both shapes follow one rule (`skill:opd-commandments:Symmetry and consistency`). Skipped rows do not count in `newCount` / `deletedCount` (they count rows written). Do not restructure the loops (`Smallest durable delta`). Propose named the predicate `deletedTypeClearsStore` on `Client` (true for `ban` / `captcha`, true for any type under `ban` / `captcha` fallback, false for an unknown type under `ignore`); see `openspec/changes/lapi-remediation-fallback/design.md`.
+  By: propose
 
 - Q: Under `ignore`, what does a stream Deleted row of an unknown type do; under `ban` / `captcha`?
   Rank: additive asked — new branch in the delete path for a value this change creates; requirement Desired 2 (`ignore` bullet) and Out of scope (typed delete)
@@ -134,8 +134,8 @@ Outside facts used:
 
 - Q: Do live specs change in this run?
   Rank: additive asked — spec deltas follow the knob; requirement Affected lists the live specs
-  Decision: assumed — yes, through propose deltas: `core_plugin_lapi_origin-based-decision-remap` and `core_plugin_decisions_scopes` change "unknown is ban" to "unknown follows `lapiRemediationFallback` (default ban)"; `core_plugin_lapi_reclaim-key` adds the knob to the ownership and `SessionHex` lists; `core_plugin_middleware_config-validation` (or the chosen host) adds the enum rule. Propose picks the host for the knob requirement.
-  By: explore
+  Decision: assumed — yes, through propose deltas: `core_plugin_lapi_origin-based-decision-remap` and `core_plugin_decisions_scopes` change "unknown is ban" to "unknown follows `lapiRemediationFallback` (default ban)"; `core_plugin_lapi_reclaim-key` adds the knob to the ownership and `SessionHex` lists; the knob itself (values, default, enum validation, opener-only, stream New / Deleted / live per value, TRACE attribute) lives in a new leaf `core_plugin_lapi_remediation-fallback` (FindSpecHost `new`); `core_plugin_middleware_config-validation` and `core_plugin_lapi_stream-apply` get no delta (the new leaf owns its validation and its Deleted rule, as `core_plugin_lapi_failure-action` owns its own). Journal: `specs.md`.
+  By: propose
 
 - Q: Which devdocs term names the knob, and when is it written?
   Rank: additive incidental — new Language entry; no criterion names devdocs Language (Desired 5 names usage docs)
