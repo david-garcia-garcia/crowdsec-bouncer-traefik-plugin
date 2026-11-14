@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: a932861c
+Reviewed head: 1910881b
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,14 +32,20 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-11-14-appsec-unknown-length-body pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | appsec-inspect-unknown-length-body | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/204 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_appsec_body-read-timeout](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/changes/appsec-inspect-unknown-length-body/proposal.md) — added
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/changes/appsec-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/changes/appsec-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/changes/appsec-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/changes/appsec-inspect-unknown-length-body/proposal.md) — modified
+
 
 ## Deviations from the ask
 - taken: a total read deadline on bodies of unknown length that blocks independently of `bouncerAppsecFailureAction` (decisions 1 and 2); no criterion names a `Query` signature change. → `Query` gains a parameter carrying the `http.ResponseController` the bouncer builds from its `rw`, so the deadline timer can cut an HTTP/1.1 read (`Body.Close` cannot, measured). 1 production call site (`pkg/bouncer/bouncer.go:458`) and 43 test call sites in `pkg/appsec` migrate in this change. — `pkg/appsec/query.go (Client.Query); pkg/bouncer/bouncer.go (applyAppsecServeHTTP, sole owner of rw)` — the response writer is the only handle that sets a read deadline on HTTP/1.1 and HTTP/2; the bouncer owns it, the AppSec client owns the read. Rank `bounded incidental` (explore.md, open question on distinguishing the deadline from a client disconnect).. Requester: not asked.
@@ -68,9 +74,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 1 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | a932861cd2698ba6b0c2c14bc0bafc14570acd7b | Card must match the branch you measured |
+| Reviewed head | 1910881b18898b41080a3bebcdfeeda481f5ac20 | Card must match the branch you measured |
 
 ### Stored data model
 None.
