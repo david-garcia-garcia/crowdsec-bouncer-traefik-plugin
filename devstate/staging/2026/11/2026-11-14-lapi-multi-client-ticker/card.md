@@ -20,7 +20,7 @@ Both loops now run on a `pollTimer` built on `time.AfterFunc`: the stdlib timer 
 In progress. 0 items remain.
 
 Priority: P2 — real operator pain with limited blast radius: only deployments with several LAPI middlewares or reloads, and the silent stop needs a crossing at the moment another Client stops
-Reviewed head: 4aaff6e2
+Reviewed head: bf07adc2
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -43,8 +43,12 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [core_plugin_lapi_stream-single-flight](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/openspec/changes/isolate-lapi-poll-loops-across-clients/proposal.md) — modified
-- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/openspec/changes/isolate-lapi-poll-loops-across-clients/proposal.md) — modified
+- [core_plugin_lapi_stream-single-flight](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/openspec/changes/archive/2026-11-14-isolate-lapi-poll-loops-across-clients/proposal.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/openspec/changes/archive/2026-11-14-isolate-lapi-poll-loops-across-clients/proposal.md) — modified
+
+Completed:
+- [core_plugin_lapi_stream-single-flight](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/openspec/specs/core_plugin_lapi_stream-single-flight/spec.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/openspec/specs/core_plugin_lapi_usage-metrics/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -81,9 +85,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 4aaff6e270debb798ee119c09a56b9902690cac5 | Card must match the branch you measured |
+| Reviewed head | bf07adc2f978cfe97d142b556e61e40fc8cca674 | Card must match the branch you measured |
 
 ### Stored data model
 None.
