@@ -59,3 +59,13 @@ description: What CrowdSec returns on watchers/login and how official apiclient 
 priority: normal
 local: ext_crowdsec_capi_watchers-login/
 description: What CrowdSec CAPI accepts on POST /watchers/login and which fields the official client sends.
+
+## Unknown decision type fallback
+priority: normal
+local: ext_crowdsec_bouncers_remediation-fallback/
+description: How official CrowdSec remediation components treat a LAPI decision type they do not support, on add and on delete.
+
+## Allowlists and parser whitelists
+priority: normal
+local: ext_crowdsec_allowlists/
+description: How CrowdSec allows traffic without decisions, when each allow mechanism acts relative to decisions, and which decision types exist.
