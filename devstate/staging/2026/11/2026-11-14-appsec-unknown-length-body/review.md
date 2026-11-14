@@ -24,3 +24,8 @@ head: dc4964aa01a0959847109c7a91c31571615372f5
 phase: codereview
 verdict: ready for review
 head: 0155c11c52413b2cd8764da7d3bc628ef3e9c4aa
+
+## devdocsimpact (2026-11-14)
+phase: devdocsimpact
+verdict: ready for review
+head: dd240f17cac2b8dc4c9d5aba18b6e48498b08e0a

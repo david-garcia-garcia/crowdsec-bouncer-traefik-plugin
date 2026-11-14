@@ -44,14 +44,14 @@ Tests:
 Ready for review. 1 items remain.
 
 Priority: P2 — real operator and end-user pain (restic blocked with a silent 403), with a workaround whose blast radius is limited to deployments that opt into `passthrough`
-Reviewed head: 0155c11c
+Reviewed head: dd240f17
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43628192957 |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43629553613 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -61,7 +61,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-11-14-appsec-unknown-length-body pushed | `git` |
 | OpenSpec | appsec-inspect-unknown-length-body | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/204 | pr-host |
-| CI | build 43628192957 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43628192957 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43628192957 |
+| CI | build 43629553613 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43629553613 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43629553613 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -83,7 +83,7 @@ Worktree:
 
 
 ## How this fits together
-Ticket 2026-11-14-appsec-unknown-length-body on branch 2026-11-14-appsec-unknown-length-body targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/204; CI build 43628192957 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43628192957.
+Ticket 2026-11-14-appsec-unknown-length-body on branch 2026-11-14-appsec-unknown-length-body targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/204; CI build 43629553613 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43629553613.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -112,7 +112,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 0155c11c52413b2cd8764da7d3bc628ef3e9c4aa | Card must match the branch you measured |
+| Reviewed head | dd240f17cac2b8dc4c9d5aba18b6e48498b08e0a | Card must match the branch you measured |
 
 ### Stored data model
 None.
