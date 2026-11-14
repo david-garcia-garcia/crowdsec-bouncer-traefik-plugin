@@ -60,7 +60,7 @@ _Avoid_: `CaptchaCustomValidateURL`, the bundled default `captcha.html`
 
 ## Gotchas
 
-- Unsubscribed captcha WARN is router subscription, not identity. Do not add `ip`. Do not treat AppSec JSON `action: captcha` as this signal.
+- Unsubscribed captcha WARN is router subscription, not identity. Do not add `ip`. An AppSec `captcha` verdict on a router without captcha is captcha kind too, so it WARNs and downgrades like any other source.
 - Built-in provider CDN URLs are not a match set, and their `ChallengeURL` renders empty.
 - Empty `captchaCustomChallengeUrl` keeps JsURL-path only; it is not a required custom field. A non-empty custom-provider value that names no absolute path is rejected by `validateEnabledCaptchaSettings` — that is master's owner, not a rival `validateConfiguredCaptcha`.
 - A challenge marker hidden inside an over-cap POST is deliberately missed; keeping the upload body intact for origin matters more.
