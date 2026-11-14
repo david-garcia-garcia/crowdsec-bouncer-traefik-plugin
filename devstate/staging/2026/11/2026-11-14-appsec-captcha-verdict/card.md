@@ -25,17 +25,17 @@ Priority: P2 — real end-user pain (blank page instead of a captcha) limited to
 **End users.** A visitor asked for a captcha by AppSec sees a captcha page they can solve, instead of a blank page.
 
 ## Merge readiness
-In progress. 1 items remain.
+Ready for review. 1 items remain.
 
 Priority: P2 — real end-user pain (blank page instead of a captcha) limited to operators who use AppSec `captcha` or custom actions
-Reviewed head: cba59199
+Reviewed head: 431ed285
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43636283014 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -45,7 +45,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-11-14-appsec-captcha-verdict pushed | `git` |
 | OpenSpec | appsec-captcha-verdict | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/206 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 43636283014 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43636283014 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43636283014 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -68,7 +68,7 @@ Completed:
 
 
 ## How this fits together
-Ticket 2026-11-14-appsec-captcha-verdict on branch 2026-11-14-appsec-captcha-verdict targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/206; CI not seen.
+Ticket 2026-11-14-appsec-captcha-verdict on branch 2026-11-14-appsec-captcha-verdict targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/206; CI build 43636283014 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43636283014.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -97,7 +97,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | cba59199b0fbb87b940cc6086e83061ae40d15cb | Card must match the branch you measured |
+| Reviewed head | 431ed285c4478b27c1d00da1302dfcec276006b5 | Card must match the branch you measured |
 
 ### Stored data model
 None.
