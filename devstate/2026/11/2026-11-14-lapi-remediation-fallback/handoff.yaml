@@ -1,0 +1,16 @@
+issueKey: 2026-11-14-lapi-remediation-fallback
+jobName: Add lapiRemediationFallback for unknown LAPI decision types
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 2287ddeb24d4c0ef
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: lapi-remediation-fallback
+pr: { id: 205, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/205 }

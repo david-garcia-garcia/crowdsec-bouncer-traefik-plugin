@@ -12,14 +12,15 @@ _Avoid_: treating `lists:foo` as a prefix of other lists, case-fold match
 
 ## Overview
 
-Stream Ip/header, stream Range, and live/none query store ingest kind: `RemediationValue` for `ban`/`captcha`, ban for any other type. Each router applies `applyOriginBasedDecisionRemap` after a successful lookup or live query. Live strongest pick uses ingest kind so a still-ban (including unknown types) wins in the shared cache. Two Bouncers on one Client may disagree.
+Stream Ip/header, stream Range, and live/none query store ingest kind: `RemediationValue` for `ban`/`captcha`, and the remediation fallback (`lapiRemediationFallback`, default ban; `core_plugin_lapi_remediation-fallback.md`) for any other type. Each router applies `applyOriginBasedDecisionRemap` after a successful lookup or live query. Live strongest pick uses ingest kind so a still-ban (including an unknown type under fallback ban) wins in the shared cache; under `ignore` an unknown type is never picked. Two Bouncers on one Client may disagree.
 
 ## How to use
 
 - Copy trimmed weaken edges in `bouncer.New` (`copyOriginBasedDecisionRemap`). Do not hash them into `SessionKey` or live `Key`. Do not copy them onto `lapi.Client`.
 - Store with `MetricsOrigin` then `ingestRemediationKind` on stream Put, Range upsert, and live query. `RemediationValue` stays empty for unknown types so remap to-tokens can mean "not a code".
 - After a successful `LookupRemediation` or `LiveLookup`, call `appliedLAPIRemediation` before `IsActiveRemediation`. Resolve packed origin ids when the table is non-empty.
-- Empty table: ban stays `t`, captcha stays `c`. Unknown type stores as ban (`t`) at ingest and TRACE-logs `handleStreamCache:unknownType`. `pass` applies as `NoBannedValue`.
+- Empty table: ban stays `t`, captcha stays `c`. Unknown type stores as the remediation fallback letter at ingest (default ban `t`; `c` under captcha; not stored under ignore) and TRACE-logs `handleStreamCache:unknownType`. `pass` applies as `NoBannedValue`.
+- Remap follows the stored letter: an unknown type stored as captcha follows `captcha` edges, one stored as ban follows `ban` edges. Under `ignore` there is nothing to remap.
 - Reject invalid edges in `ValidateParams`. Do not require `captchaProvider`; missing provider still falls back to ban rendering for applied captcha.
 
 ## Pattern snippet
@@ -45,4 +46,5 @@ kind, origin = b.appliedLAPIRemediation(kind, origin, originID)
 - Two routers sharing a Client each apply their own table.
 - Match is exact except the `lists` prefix rule. `capi` does not match `CAPI`.
 - `CAPI: {ban: captcha, captcha: pass}` applies a stored CAPI ban as captcha; it does not chain to pass.
+- `whitelist` and `allow` are not valid CrowdSec decision types and are an inadequate way to manage whitelists: the LAPI stream says WHAT TO BLOCK, not WHAT TO ALLOW. Neither is a remap edge nor an allow; use parser whitelists or LAPI allowlists (`cscli allowlists`).
 - Lookup still collapses on stored (LAPI) strength: an Ip ban skips Range membership before this router remaps.

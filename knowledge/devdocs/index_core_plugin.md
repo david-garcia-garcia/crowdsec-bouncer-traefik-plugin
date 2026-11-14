@@ -80,6 +80,11 @@ priority: normal
 local: core_plugin_lapi_stream-apply.md
 description: How this plugin writes one CrowdSec stream payload (deleted before new) into the DecisionStore.
 
+## Remediation fallback
+priority: normal
+local: core_plugin_lapi_remediation-fallback.md
+description: How the LAPI connection stores, deletes, or skips a decision type that is neither ban nor captcha (lapiRemediationFallback).
+
 ## OriginBasedDecisionRemap
 priority: normal
 local: core_plugin_lapi_origin-based-decision-remap.md

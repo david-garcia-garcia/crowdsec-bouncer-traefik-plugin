@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-11-14-lapi-remediation-fallback",
+  "jobName": "Add lapiRemediationFallback for unknown LAPI decision types",
+  "startedAt": "2026-11-14T19:02:19.108Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T19:07:19.364Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T19:19:39.244Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T19:25:50.427Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T19:45:45.728Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T20:01:06.010Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T20:14:24.038Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T20:17:59.055Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T20:27:47.566Z"
+    }
+  }
+}

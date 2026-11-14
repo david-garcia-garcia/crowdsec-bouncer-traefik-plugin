@@ -122,6 +122,8 @@ bouncerDecisionScopeHeaders:
 
 The plugin does not geolocate. Header values are used as received, so they must come from something you trust: a CDN, a reverse proxy, or an earlier Traefik middleware such as [traefik-geoblock](https://github.com/david-garcia-garcia/traefik-geoblock). If visitors can set the header themselves, they can dodge or trigger these decisions. A complete example is in [examples/geoenrich-decisions](examples/geoenrich-decisions/README.md).
 
+The plugin remediates `ban` and `captcha` decisions as such. A decision of any other type (for example `throttle`) follows [`lapiRemediationFallback`](#variables): stored as a ban (default), stored as a captcha, or ignored. No type name gets special treatment, including `whitelist` and `allow`. These are not valid CrowdSec decision types, and using decisions to allow traffic is an inadequate way to manage whitelists: the LAPI stream is designed to say WHAT TO BLOCK, not WHAT TO ALLOW. To let traffic through, use CrowdSec parser whitelists or LAPI allowlists (`cscli allowlists`), which stop or expire decisions at the source. Background: upstream issue [#402](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/402) (point 1) and PR [#403](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403) (point 1), fork PR [#198](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/198) (unknown types stored as a ban), and upstream PR [#433](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/433) (whitelist decisions as an allow; not followed here).
+
 ## Remediation
 
 What the visitor gets for each CrowdSec remediation ([CrowdSec bouncers](https://docs.crowdsec.net/u/bouncers/intro)):
@@ -767,6 +769,9 @@ Redis password.
 **LapiRedisReadHosts** ([]string, default `[]`)
 Redis replicas for reads, used in turn. Defaults to `lapiRedisHost`. Reads do not fall back to the primary, so an outage of the replicas blocks requests (see `bouncerRedisUnreachableBlock`) even if the primary is up.
 
+**LapiRemediationFallback** (string, default `ban`)
+What to do with a LAPI decision whose type is neither `ban` nor `captcha` (for example `throttle`): `ban` stores it as a ban, `captcha` stores it as a captcha, `ignore` neither stores it nor lets a deleted decision of that type remove anything. `ban` and `captcha` decisions are not affected. Set it on the middleware that connects to LAPI. A captcha on a router without captcha serves the ban page, as for any captcha decision. This is not `bouncerLapiFailureAction`, which decides what to do when LAPI cannot answer. See [Decisions](#decisions).
+
 **LapiScheme** (string, default `http`)
 `http` or `https`.
 
@@ -959,6 +964,7 @@ http:
           lapiRedisReadHosts:
             - "redis-replica-1:6379"
             - "redis-replica-2:6379"
+          lapiRemediationFallback: ban
           lapiScheme: http
           lapiStreamScopes: []
           lapiTlsCertificateAuthority: |-

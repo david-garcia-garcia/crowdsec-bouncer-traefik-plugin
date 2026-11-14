@@ -130,6 +130,9 @@ func (c *Client) fetchAndApplyStreamDecisions() (int, int, error) {
 	deletedCount := 0
 	for _, decision := range stream.Deleted {
 		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
+			if !c.deletedTypeClearsStore(decision.Type) {
+				continue
+			}
 			if cidr := strings.TrimSpace(decision.Value); cidr != "" {
 				rangeRemovals = append(rangeRemovals, cidr)
 				deletedCount++
@@ -159,7 +162,8 @@ func (c *Client) fetchAndApplyStreamDecisions() (int, int, error) {
 			cidr := strings.TrimSpace(decision.Value)
 			origin := MetricsOrigin(decision.Origin, decision.Scenario)
 			kind := c.ingestRemediationKind(decision.Type)
-			if cidr != "" {
+			// An empty kind is a type the remediation fallback (ignore) does not store.
+			if cidr != "" && kind != "" {
 				rangeUpserts[cidr] = decisionstore.KindOriginString(kind, origin)
 				newCount++
 			}

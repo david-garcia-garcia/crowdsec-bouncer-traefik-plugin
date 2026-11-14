@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -37,23 +38,52 @@ func (c *Client) storeStreamDecision(item Decision, duration int64) {
 }
 
 // ingestRemediationKind is the store letter for one LAPI decision type at ingest.
-// ban and captcha keep RemediationValue; any other type is ban.
+// ban and captcha keep RemediationValue; any other type follows the remediation fallback:
+// ban, captcha, or empty (not stored) under ignore.
 func (c *Client) ingestRemediationKind(decisionType string) string {
 	kind := decisionscope.RemediationValue(decisionType)
 	if kind != "" {
 		return kind
 	}
-	// Unknown types have nothing to render; fail closed to ban.
+	fallback := c.effectiveRemediationFallback()
 	if c.log != nil {
-		logger.Trace(c.log, "handleStreamCache:unknownType", "type", decisionType)
+		logger.Trace(c.log, "handleStreamCache:unknownType", "type", decisionType, "fallback", fallback)
+	}
+	switch fallback {
+	case configuration.LapiRemediationFallbackCaptcha:
+		return decisionscope.CaptchaValue
+	case configuration.LapiRemediationFallbackIgnore:
+		return ""
 	}
 	return decisionscope.BannedValue
+}
+
+// effectiveRemediationFallback is the opener lapiRemediationFallback, ban when unset.
+func (c *Client) effectiveRemediationFallback() string {
+	return configuration.EffectiveLapiRemediationFallback(c.remediationFallback)
+}
+
+// deletedTypeClearsStore is whether a stream Deleted row of decisionType may drop the stored slot or CIDR.
+// ban and captcha always may; any other type may only when the remediation fallback stores it (ban or captcha).
+func (c *Client) deletedTypeClearsStore(decisionType string) bool {
+	if decisionscope.RemediationValue(decisionType) != "" {
+		return true
+	}
+	switch c.effectiveRemediationFallback() {
+	case configuration.LapiRemediationFallbackBan, configuration.LapiRemediationFallbackCaptcha:
+		return true
+	}
+	return false
 }
 
 // streamPutItem is the Ip/header stream New item to store, or false when the decision is skipped.
 func (c *Client) streamPutItem(item Decision, duration int64) (decisionstore.Decision, bool) {
 	origin := MetricsOrigin(item.Origin, item.Scenario)
 	kind := c.ingestRemediationKind(item.Type)
+	if kind == "" {
+		// The remediation fallback is ignore: this type is not stored.
+		return decisionstore.Decision{}, false
+	}
 	scope := decisionscope.NormalizeScope(item.Scope)
 	if scope == decisionscope.ScopeRange {
 		return decisionstore.Decision{}, false
@@ -85,6 +115,9 @@ func (c *Client) deleteStreamDecision(item Decision) {
 func (c *Client) streamDeleteItem(item Decision) (decisionstore.Decision, bool) {
 	scope := decisionscope.NormalizeScope(item.Scope)
 	if scope == decisionscope.ScopeRange {
+		return decisionstore.Decision{}, false
+	}
+	if !c.deletedTypeClearsStore(item.Type) {
 		return decisionstore.Decision{}, false
 	}
 	return decisionstore.Decision{Scope: scope, Value: item.Value}, true
@@ -157,7 +190,8 @@ func (c *Client) OriginName(id uint16) string {
 	return c.decisionStore.OriginName(id)
 }
 
-// strongestLiveDecision returns the first ban by ingest kind (unknown types included), else the first captcha.
+// strongestLiveDecision returns the first ban by ingest kind, else the first captcha.
+// Unknown types rank as the remediation fallback stores them; under ignore they are never picked.
 func (c *Client) strongestLiveDecision(items []Decision) *Decision {
 	var fallback *Decision
 	for i := range items {

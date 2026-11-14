@@ -57,6 +57,12 @@ const (
 	FailureActionBan = "ban"
 	// FailureActionCaptcha remediates with pkg/captcha when LAPI or AppSec is down.
 	FailureActionCaptcha = "captcha"
+	// LapiRemediationFallbackBan stores a LAPI decision type that is neither ban nor captcha as a ban.
+	LapiRemediationFallbackBan = "ban"
+	// LapiRemediationFallbackCaptcha stores a LAPI decision type that is neither ban nor captcha as a captcha.
+	LapiRemediationFallbackCaptcha = "captcha"
+	// LapiRemediationFallbackIgnore neither stores nor deletes for a LAPI decision type that is neither ban nor captcha.
+	LapiRemediationFallbackIgnore = "ignore"
 )
 
 // Config the plugin configuration. Fields are alphabetical by json tag so
@@ -139,6 +145,7 @@ type Config struct {
 	LapiRedisPassword                   string                       `json:"lapiRedisPassword,omitempty"`
 	LapiRedisPasswordFile               string                       `json:"lapiRedisPasswordFile,omitempty"`
 	LapiRedisReadHosts                  []string                     `json:"lapiRedisReadHosts,omitempty"`
+	LapiRemediationFallback             string                       `json:"lapiRemediationFallback,omitempty"`
 	LapiScheme                          string                       `json:"lapiScheme,omitempty"`
 	LapiStreamScopes                    []string                     `json:"lapiStreamScopes,omitempty"`
 	LapiTLSCertificateAuthority         string                       `json:"lapiTlsCertificateAuthority,omitempty"`
@@ -195,6 +202,14 @@ func EffectiveFailureAction(action string) string {
 		return FailureActionBan
 	}
 	return action
+}
+
+// EffectiveLapiRemediationFallback maps empty config to ban (plugin default).
+func EffectiveLapiRemediationFallback(fallback string) string {
+	if fallback == "" {
+		return LapiRemediationFallbackBan
+	}
+	return fallback
 }
 
 // New creates the default plugin configuration.
@@ -255,6 +270,7 @@ func New() *Config {
 		LapiRedisHost:                       "redis:6379",
 		LapiRedisPassword:                   "",
 		LapiRedisReadHosts:                  []string{},
+		LapiRemediationFallback:             LapiRemediationFallbackBan,
 		LapiScheme:                          HTTP,
 		LapiStreamScopes:                    []string{},
 		LapiTLSInsecureVerify:               false,
@@ -825,6 +841,9 @@ func validateParamsRequired(config *Config) error {
 
 	if !contains([]string{NoneMode, LiveMode, StreamMode, AloneMode}, config.LapiMode) {
 		return errors.New("LapiMode: must be one of 'none', 'live', 'stream' or 'alone'")
+	}
+	if !contains([]string{"", LapiRemediationFallbackBan, LapiRemediationFallbackCaptcha, LapiRemediationFallbackIgnore}, config.LapiRemediationFallback) {
+		return errors.New("LapiRemediationFallback: must be one of 'ban', 'captcha' or 'ignore'")
 	}
 	if !contains([]string{HTTP, HTTPS}, config.LapiScheme) {
 		return errors.New("LapiScheme: must be one of 'http' or 'https'")
