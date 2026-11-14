@@ -92,7 +92,7 @@ An AppSec `captcha` verdict SHALL be remediated as captcha kind through the same
 - **THEN** the client receives the captcha challenge page with header `captcha:rules`
 
 ### Requirement: Challenge-marker POST let through by AppSec stays on the captcha gate
-When AppSec ran on a request with no matching captcha action rule and did not write a response, a POST carrying challenge marker `crowdsec_captcha_challenge=v1` SHALL go to the router captcha gate (metrics origin `appsec`) instead of `next`, provided this router has a subscribed, published, Valid captcha client. Every other request SHALL reach `next` as before, with its body unchanged.
+When the AppSec leg (a verdict, or failure action `passthrough`) did not write a response for a request with no matching captcha action rule and no AppSec skip, a POST carrying challenge marker `crowdsec_captcha_challenge=v1` SHALL go to the router captcha gate (metrics origin `appsec`) instead of `next`, provided this router has a subscribed, published, Valid captcha client. Every other request SHALL reach `next` as before, with its body unchanged.
 
 #### Scenario: Captcha solve allowed by AppSec is validated
 - **WHEN** AppSec allows a POST that carries `crowdsec_captcha_challenge=v1` and a valid provider token

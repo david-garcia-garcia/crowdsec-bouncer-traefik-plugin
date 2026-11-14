@@ -309,19 +309,29 @@ func (b *Bouncer) serveAppSec(rw http.ResponseWriter, req clientrequest.Request,
 	}
 	// AppSec judged this request alone. A captcha form POST it let through is
 	// still the answer to an earlier captcha, so the gate validates it.
-	if b.hasUsableCaptcha() && b.loadedCaptcha().HasChallengeMarker(req.Request) {
+	if b.isCaptchaFormAnswer(req) {
 		return b.serveAppsecCaptchaGate(rw, req)
 	}
 	return false
 }
 
-// hasUsableCaptcha reports whether this router can serve its captcha gate rather than a downgrade ban.
-func (b *Bouncer) hasUsableCaptcha() bool {
+// usableCaptcha is this router's captcha client when it can serve the gate: subscribed, published, and Valid.
+// Nil means a captcha here is a downgrade ban.
+func (b *Bouncer) usableCaptcha() *captcha.Client {
 	if !b.subscribeCaptcha {
-		return false
+		return nil
 	}
 	captchaClient := b.loadedCaptcha()
-	return captchaClient != nil && captchaClient.Valid
+	if captchaClient == nil || !captchaClient.Valid {
+		return nil
+	}
+	return captchaClient
+}
+
+// isCaptchaFormAnswer reports whether req is a challenge-form POST this router's captcha gate can answer.
+func (b *Bouncer) isCaptchaFormAnswer(req clientrequest.Request) bool {
+	captchaClient := b.usableCaptcha()
+	return captchaClient != nil && captchaClient.HasChallengeMarker(req.Request)
 }
 
 // applyLapiFailureAction applies this router's LAPI failure action.
@@ -415,7 +425,7 @@ func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientr
 	kind := decisionscope.RemediationKind(remediation)
 	logger.Trace(b.log, "handleRemediationServeHTTP", "ip", req.IPAddrString(), "remediation", kind)
 	if kind == decisionscope.CaptchaValue {
-		return b.handleCaptchaKindServeHTTP(rw, req, origin, headerReasonFromOrigin(origin), configuration.ReasonLAPI)
+		return b.handleCaptchaKindServeHTTP(rw, req, configuration.ReasonLAPI, headerReasonFromOrigin(origin), origin)
 	}
 	b.handleBanServeHTTP(rw, req, configuration.ReasonLAPI, headerReasonFromOrigin(origin), origin)
 	return true
@@ -424,20 +434,20 @@ func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientr
 // serveAppsecCaptchaGate serves this router's captcha gate for AppSec: a captcha verdict, or a captcha form POST AppSec let through.
 // False means a widget asset or a cleared gate, and the caller continues.
 func (b *Bouncer) serveAppsecCaptchaGate(rw http.ResponseWriter, req clientrequest.Request) bool {
-	return b.handleCaptchaKindServeHTTP(rw, req, originAppsec, headerReasonAppsec, configuration.ReasonAPPSEC)
+	return b.handleCaptchaKindServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsec, originAppsec)
 }
 
 // handleCaptchaKindServeHTTP writes a challenge, a solved-form redirect, or a downgrade ban.
-// headerReason names the challenge page; banReason is the ban template reason on a downgrade.
+// Parameters follow handleBanServeHTTP: banReason is the ban template reason on a downgrade, headerReason names the challenge page.
 // False means a widget asset or a cleared gate, and the caller continues.
-func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientrequest.Request, origin, headerReason, banReason string) bool {
+func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientrequest.Request, banReason, headerReason, origin string) bool {
 	if !b.subscribeCaptcha {
 		b.log.Warn(msgCaptchaUnsubscribed, "leg", "captcha", "instanceName", b.captchaInstanceName)
 		b.handleBanServeHTTP(rw, req, banReason, headerReasonCaptchaDowngrade, origin)
 		return true
 	}
-	captchaClient := b.loadedCaptcha()
-	if captchaClient == nil || !captchaClient.Valid {
+	captchaClient := b.usableCaptcha()
+	if captchaClient == nil {
 		b.handleBanServeHTTP(rw, req, banReason, headerReasonCaptchaDowngrade, origin)
 		return true
 	}

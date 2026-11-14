@@ -19,14 +19,14 @@ import (
 // appsecCaptchaEnvelope is what CrowdSec sends for SetRemediation("captcha"): no page, no cookies, no headers.
 const appsecCaptchaEnvelope = `{"action":"captcha","http_status":403}`
 
-// appsecVerdictOrigin records what reached the backend.
-type appsecVerdictOrigin struct {
+// recordedNextRequest records what reached next (the backend).
+type recordedNextRequest struct {
 	called bool
 	body   string
 }
 
 // testAppsecVerdictBouncer wires AppSec (answering with verdict), an optional captcha client, and a metrics-counting LAPI client.
-func testAppsecVerdictBouncer(t *testing.T, verdict http.HandlerFunc, captchaClient *captcha.Client) (*Bouncer, *appsecVerdictOrigin, *lapi.Client) {
+func testAppsecVerdictBouncer(t *testing.T, verdict http.HandlerFunc, captchaClient *captcha.Client) (*Bouncer, *recordedNextRequest, *lapi.Client) {
 	t.Helper()
 	appsecServer := httptest.NewServer(verdict)
 	t.Cleanup(appsecServer.Close)
@@ -38,13 +38,13 @@ func testAppsecVerdictBouncer(t *testing.T, verdict http.HandlerFunc, captchaCli
 	if err != nil {
 		t.Fatal(err)
 	}
-	origin := &appsecVerdictOrigin{}
+	next := &recordedNextRequest{}
 	b := &Bouncer{
 		next: http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-			origin.called = true
+			next.called = true
 			if r.Body != nil {
 				body, _ := io.ReadAll(r.Body)
-				origin.body = string(body)
+				next.body = string(body)
 			}
 		}),
 		log:                     logger.New("ERROR", ""),
@@ -58,9 +58,10 @@ func testAppsecVerdictBouncer(t *testing.T, verdict http.HandlerFunc, captchaCli
 	lapiClient, _ := lapi.NewTestClient(b.log)
 	lapi.AttachTestMetricsReporter(lapiClient)
 	bindTestLAPI(b, lapiClient)
-	return b, origin, lapiClient
+	return b, next, lapiClient
 }
 
+// appsecAnswers is an AppSec stand-in that answers every query with status and body.
 func appsecAnswers(status int, body string) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(status)
@@ -79,6 +80,7 @@ func testSiteverifyCaptchaClient(t *testing.T) *captcha.Client {
 	return testCaptchaClient(t, "/fast.js", "", siteverify.URL+"/siteverify", siteverify.Client())
 }
 
+// captchaFormPost builds a form-encoded POST to /protected, with the gate cookie when gateCookie is set.
 func captchaFormPost(t *testing.T, fields url.Values, gateCookie string) *http.Request {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/protected", strings.NewReader(fields.Encode()))
@@ -90,23 +92,19 @@ func captchaFormPost(t *testing.T, fields url.Values, gateCookie string) *http.R
 }
 
 func hasGateCookie(rw *httptest.ResponseRecorder) bool {
-	for _, cookie := range rw.Result().Cookies() {
-		if cookie.Name == "crowdsec_captcha_gate" && cookie.Value != "" {
-			return true
-		}
-	}
-	return false
+	cookie := cookieNamed(rw.Result().Cookies(), "crowdsec_captcha_gate")
+	return cookie != nil && cookie.Value != ""
 }
 
 func TestAppsecCaptchaVerdict_servesRouterCaptcha(t *testing.T) {
-	b, origin, lapiClient := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusForbidden, appsecCaptchaEnvelope), testCaptchaClient(t, "/fast.js", "", "", nil))
+	b, next, lapiClient := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusForbidden, appsecCaptchaEnvelope), testCaptchaClient(t, "/fast.js", "", "", nil))
 
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	continueAfterLAPIForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP))
 
-	if origin.called {
-		t.Fatal("an unsolved AppSec captcha must not reach origin")
+	if next.called {
+		t.Fatal("an unsolved AppSec captcha must not reach the backend")
 	}
 	if rw.Code != http.StatusOK || !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
 		t.Fatalf("want the router captcha page, got %d %q", rw.Code, rw.Body.String())
@@ -122,15 +120,15 @@ func TestAppsecCaptchaVerdict_servesRouterCaptcha(t *testing.T) {
 func TestAppsecCaptchaVerdict_solvedGateReachesOrigin(t *testing.T) {
 	client := testSiteverifyCaptchaClient(t)
 	cookieValue := solveTestGateCookie(t, client)
-	b, origin, lapiClient := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusForbidden, appsecCaptchaEnvelope), client)
+	b, next, lapiClient := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusForbidden, appsecCaptchaEnvelope), client)
 
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	req.AddCookie(&http.Cookie{Name: "crowdsec_captcha_gate", Value: cookieValue})
 	rw := httptest.NewRecorder()
 	continueAfterLAPIForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP))
 
-	if !origin.called {
-		t.Fatalf("a solved visitor must reach origin, got %d %q", rw.Code, rw.Body.String())
+	if !next.called {
+		t.Fatalf("a solved visitor must reach the backend, got %d %q", rw.Code, rw.Body.String())
 	}
 	if got := rw.Header().Get("X-Remediation"); got != "" {
 		t.Fatalf("pass must not set X-Remediation, got %q", got)
@@ -141,14 +139,14 @@ func TestAppsecCaptchaVerdict_solvedGateReachesOrigin(t *testing.T) {
 }
 
 func TestAppsecCaptchaVerdict_routerWithoutCaptchaBans(t *testing.T) {
-	b, origin, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusForbidden, appsecCaptchaEnvelope), nil)
+	b, next, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusForbidden, appsecCaptchaEnvelope), nil)
 
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	continueAfterLAPIForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP))
 
-	if origin.called {
-		t.Fatal("AppSec captcha without a router captcha must not reach origin")
+	if next.called {
+		t.Fatal("AppSec captcha without a router captcha must not reach the backend")
 	}
 	if rw.Code != http.StatusForbidden || rw.Body.String() != "banned reason=APPSEC" {
 		t.Fatalf("want ban page with reason APPSEC, got %d %q", rw.Code, rw.Body.String())
@@ -159,15 +157,15 @@ func TestAppsecCaptchaVerdict_routerWithoutCaptchaBans(t *testing.T) {
 }
 
 func TestAppsecCaptchaVerdict_captchaRuleServesItsOwnGate(t *testing.T) {
-	b, origin, lapiClient := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusForbidden, appsecCaptchaEnvelope), testCaptchaClient(t, "/fast.js", "", "", nil))
+	b, next, lapiClient := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusForbidden, appsecCaptchaEnvelope), testCaptchaClient(t, "/fast.js", "", "", nil))
 	b.actionRules = mustPathAction(t, "login", "^/protected$", httprule.ActionCaptcha)
 
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	continueAfterLAPIForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP))
 
-	if origin.called {
-		t.Fatal("captcha rule plus AppSec captcha must not reach origin")
+	if next.called {
+		t.Fatal("captcha rule plus AppSec captcha must not reach the backend")
 	}
 	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
 		t.Fatalf("want captcha page, got %q", rw.Body.String())
@@ -181,14 +179,14 @@ func TestAppsecCaptchaVerdict_captchaRuleServesItsOwnGate(t *testing.T) {
 }
 
 func TestAppsecCaptchaVerdict_headServesCaptchaPage(t *testing.T) {
-	b, origin, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusForbidden, appsecCaptchaEnvelope), testCaptchaClient(t, "/fast.js", "", "", nil))
+	b, next, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusForbidden, appsecCaptchaEnvelope), testCaptchaClient(t, "/fast.js", "", "", nil))
 
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodHead, "http://example.com/protected", nil)
 	continueAfterLAPIForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP))
 
-	if origin.called {
-		t.Fatal("HEAD under an AppSec captcha must not reach origin")
+	if next.called {
+		t.Fatal("HEAD under an AppSec captcha must not reach the backend")
 	}
 	if got := rw.Header().Get("X-Remediation"); got != "captcha:appsec" {
 		t.Fatalf("X-Remediation=%q want captcha:appsec", got)
@@ -196,7 +194,7 @@ func TestAppsecCaptchaVerdict_headServesCaptchaPage(t *testing.T) {
 }
 
 func TestAppsecCaptchaVerdict_markerPostAllowedByAppsecIsValidated(t *testing.T) {
-	b, origin, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusOK, `{"action":"allow"}`), testSiteverifyCaptchaClient(t))
+	b, next, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusOK, `{"action":"allow"}`), testSiteverifyCaptchaClient(t))
 
 	fields := url.Values{}
 	fields.Set("crowdsec_captcha_challenge", "v1")
@@ -204,8 +202,8 @@ func TestAppsecCaptchaVerdict_markerPostAllowedByAppsecIsValidated(t *testing.T)
 	rw := httptest.NewRecorder()
 	continueAfterLAPIForTest(b, rw, testClientRequest(captchaFormPost(t, fields, ""), testCaptchaRemoteIP))
 
-	if origin.called {
-		t.Fatal("the captcha solve POST must not reach origin")
+	if next.called {
+		t.Fatal("the captcha solve POST must not reach the backend")
 	}
 	if rw.Code != http.StatusFound || !hasGateCookie(rw) {
 		t.Fatalf("want 302 with a gate cookie, got %d cookies=%v", rw.Code, rw.Result().Cookies())
@@ -216,15 +214,15 @@ func TestAppsecCaptchaVerdict_markerPostAllowedByAppsecIsValidated(t *testing.T)
 }
 
 func TestAppsecCaptchaVerdict_markerPostWithoutTokenServesChallenge(t *testing.T) {
-	b, origin, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusOK, `{"action":"allow"}`), testSiteverifyCaptchaClient(t))
+	b, next, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusOK, `{"action":"allow"}`), testSiteverifyCaptchaClient(t))
 
 	fields := url.Values{}
 	fields.Set("crowdsec_captcha_challenge", "v1")
 	rw := httptest.NewRecorder()
 	continueAfterLAPIForTest(b, rw, testClientRequest(captchaFormPost(t, fields, ""), testCaptchaRemoteIP))
 
-	if origin.called {
-		t.Fatal("a challenge-marker POST must not reach origin when captcha is usable")
+	if next.called {
+		t.Fatal("a challenge-marker POST must not reach the backend when captcha is usable")
 	}
 	if !strings.Contains(rw.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
 		t.Fatalf("want the captcha page again, got %d %q", rw.Code, rw.Body.String())
@@ -237,15 +235,15 @@ func TestAppsecCaptchaVerdict_markerPostWithoutTokenServesChallenge(t *testing.T
 func TestAppsecCaptchaVerdict_leftoverMarkerPostRedirects(t *testing.T) {
 	client := testSiteverifyCaptchaClient(t)
 	cookieValue := solveTestGateCookie(t, client)
-	b, origin, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusOK, `{"action":"allow"}`), client)
+	b, next, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusOK, `{"action":"allow"}`), client)
 
 	fields := url.Values{}
 	fields.Set("crowdsec_captcha_challenge", "v1")
 	rw := httptest.NewRecorder()
 	continueAfterLAPIForTest(b, rw, testClientRequest(captchaFormPost(t, fields, cookieValue), testCaptchaRemoteIP))
 
-	if origin.called {
-		t.Fatal("a leftover challenge form must not reach origin")
+	if next.called {
+		t.Fatal("a leftover challenge form must not reach the backend")
 	}
 	if rw.Code != http.StatusFound || hasGateCookie(rw) {
 		t.Fatalf("want 302 without a new gate cookie, got %d cookies=%v", rw.Code, rw.Result().Cookies())
@@ -253,7 +251,7 @@ func TestAppsecCaptchaVerdict_leftoverMarkerPostRedirects(t *testing.T) {
 }
 
 func TestAppsecCaptchaVerdict_ordinaryPostAllowedReachesOriginIntact(t *testing.T) {
-	b, origin, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusOK, `{"action":"allow"}`), testSiteverifyCaptchaClient(t))
+	b, next, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusOK, `{"action":"allow"}`), testSiteverifyCaptchaClient(t))
 
 	fields := url.Values{}
 	fields.Set("username", "alice")
@@ -261,39 +259,39 @@ func TestAppsecCaptchaVerdict_ordinaryPostAllowedReachesOriginIntact(t *testing.
 	rw := httptest.NewRecorder()
 	continueAfterLAPIForTest(b, rw, testClientRequest(captchaFormPost(t, fields, ""), testCaptchaRemoteIP))
 
-	if !origin.called {
-		t.Fatalf("an application POST must reach origin, got %d %q", rw.Code, rw.Body.String())
+	if !next.called {
+		t.Fatalf("an application POST must reach the backend, got %d %q", rw.Code, rw.Body.String())
 	}
-	if origin.body != fields.Encode() {
-		t.Fatalf("origin body=%q want %q", origin.body, fields.Encode())
+	if next.body != fields.Encode() {
+		t.Fatalf("backend body=%q want %q", next.body, fields.Encode())
 	}
 }
 
 func TestAppsecCaptchaVerdict_markerPostWithoutRouterCaptchaReachesOrigin(t *testing.T) {
-	b, origin, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusOK, `{"action":"allow"}`), nil)
+	b, next, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusOK, `{"action":"allow"}`), nil)
 
 	fields := url.Values{}
 	fields.Set("crowdsec_captcha_challenge", "v1")
 	rw := httptest.NewRecorder()
 	continueAfterLAPIForTest(b, rw, testClientRequest(captchaFormPost(t, fields, ""), testCaptchaRemoteIP))
 
-	if !origin.called {
-		t.Fatalf("without a router captcha the POST must reach origin, got %d %q", rw.Code, rw.Body.String())
+	if !next.called {
+		t.Fatalf("without a router captcha the POST must reach the backend, got %d %q", rw.Code, rw.Body.String())
 	}
-	if origin.body != fields.Encode() {
-		t.Fatalf("origin body=%q want %q", origin.body, fields.Encode())
+	if next.body != fields.Encode() {
+		t.Fatalf("backend body=%q want %q", next.body, fields.Encode())
 	}
 }
 
 func TestAppsecUnknownAction_withoutBodyBans(t *testing.T) {
-	b, origin, lapiClient := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusForbidden, `{"action":"tarpit","http_status":403}`), nil)
+	b, next, lapiClient := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusForbidden, `{"action":"tarpit","http_status":403}`), nil)
 
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	continueAfterLAPIForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP))
 
-	if origin.called {
-		t.Fatal("a bodyless AppSec action must not reach origin")
+	if next.called {
+		t.Fatal("a bodyless AppSec action must not reach the backend")
 	}
 	if rw.Code != http.StatusForbidden || rw.Body.String() != "banned reason=APPSEC" {
 		t.Fatalf("want ban page, got %d %q", rw.Code, rw.Body.String())
@@ -307,19 +305,76 @@ func TestAppsecUnknownAction_withoutBodyBans(t *testing.T) {
 }
 
 func TestAppsecUnknownAction_withBodyIsRelayed(t *testing.T) {
-	b, origin, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusForbidden, `{"action":"tarpit","http_status":403,"user_body_content":"<html>slow down</html>"}`), nil)
+	b, next, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusForbidden, `{"action":"tarpit","http_status":403,"user_body_content":"<html>slow down</html>"}`), nil)
 
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	continueAfterLAPIForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP))
 
-	if origin.called {
-		t.Fatal("a relayed AppSec action must not reach origin")
+	if next.called {
+		t.Fatal("a relayed AppSec action must not reach the backend")
 	}
 	if rw.Code != http.StatusForbidden || rw.Body.String() != "<html>slow down</html>" {
 		t.Fatalf("want the relayed body, got %d %q", rw.Code, rw.Body.String())
 	}
 	if got := rw.Header().Get("X-Remediation"); got != "tarpit:appsec" {
 		t.Fatalf("X-Remediation=%q want tarpit:appsec", got)
+	}
+}
+
+func TestAppsecCaptchaVerdict_markerPostWithUnusableCaptchaReachesOrigin(t *testing.T) {
+	tests := []struct {
+		name string
+		bind func(b *Bouncer)
+	}{
+		{name: "subscribed but unpublished", bind: func(b *Bouncer) {
+			bindTestCaptcha(b, nil)
+			b.subscribeCaptcha = true
+		}},
+		{name: "subscribed but not Valid", bind: func(b *Bouncer) {
+			bindTestCaptcha(b, &captcha.Client{})
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b, next, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusOK, `{"action":"allow"}`), nil)
+			tt.bind(b)
+
+			fields := url.Values{}
+			fields.Set("crowdsec_captcha_challenge", "v1")
+			rw := httptest.NewRecorder()
+			continueAfterLAPIForTest(b, rw, testClientRequest(captchaFormPost(t, fields, ""), testCaptchaRemoteIP))
+
+			if !next.called {
+				t.Fatalf("without a usable captcha the POST must reach the backend, got %d %q", rw.Code, rw.Body.String())
+			}
+			if next.body != fields.Encode() {
+				t.Fatalf("backend body=%q want %q", next.body, fields.Encode())
+			}
+			if got := rw.Header().Get("X-Remediation"); got != "" {
+				t.Fatalf("no remediation expected, got X-Remediation=%q", got)
+			}
+		})
+	}
+}
+
+// TestLapiCaptchaDowngrade_keepsLapiBanReason guards the reason order handleRemediationServeHTTP passes to the captcha gate.
+func TestLapiCaptchaDowngrade_keepsLapiBanReason(t *testing.T) {
+	b, next, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusOK, `{"action":"allow"}`), nil)
+
+	rw := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
+	if !b.handleRemediationServeHTTP(rw, testClientRequest(req, testCaptchaRemoteIP), "captcha", "crowdsec") {
+		t.Fatal("a downgrade ban must write the response")
+	}
+
+	if next.called {
+		t.Fatal("a downgrade ban must not reach the backend")
+	}
+	if rw.Body.String() != "banned reason=LAPI" {
+		t.Fatalf("want ban page with reason LAPI, got %q", rw.Body.String())
+	}
+	if got := rw.Header().Get("X-Remediation"); got != "ban:captcha-downgrade" {
+		t.Fatalf("X-Remediation=%q want ban:captcha-downgrade", got)
 	}
 }
