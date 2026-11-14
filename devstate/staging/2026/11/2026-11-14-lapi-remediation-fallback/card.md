@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 9422eca8
+Reviewed head: bb084543
 Owner decision: None.
 
 ## Review scores
@@ -66,7 +66,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 9422eca8c0f7376acf0fb59de2864d3d046ec546 | Card must match the branch you measured |
+| Reviewed head | bb0845439e0e64dd2a160a9ca752759c9cfe8f04 | Card must match the branch you measured |
 
 ### Stored data model
 None.

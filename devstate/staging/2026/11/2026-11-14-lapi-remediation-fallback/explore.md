@@ -77,6 +77,11 @@ Outside facts used:
 
 ## Open questions
 
+- Q: Where do README, devdocs and the delivery card state the position on `whitelist` / `allow` decisions, and with which references?
+  Rank: additive asked — new documentation text; requirement Desired 5 and "Delivery card (must)"
+  Decision: assumed — README: one paragraph under "## Decisions" (after the scope list) plus the `LapiRemediationFallback` Variables entry, which also says it is not `bouncerLapiFailureAction`. Devdocs: the stream-apply and origin-remap packets. Card: codereview's Delivery axis writes it into `codereview_delivery.md` `## Motivation`. Text in all three: `whitelist` and `allow` are not valid CrowdSec decision types and are an inadequate way to manage whitelists, because the LAPI stream is designed to say WHAT TO BLOCK, not WHAT TO ALLOW; use parser whitelists or LAPI allowlists (`cscli allowlists`). References: upstream issue #402 point 1 (https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/402), upstream PR #403 point 1 (https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403), upstream PR #433 whitelist part (https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/433), fork PR #198 (https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/198). Source: requirement.md; human, chat 2026-11-14.
+  By: explore
+
 - Q: Must `lapiRemediationFallback: captcha` be rejected when the router has no captcha instance, and what does a stored captcha do on such a router?
   Rank: additive asked — validation of a knob this change creates; requirement Desired 1 ("Any other value is rejected by config validation")
   Decision: resolved — no extra rejection; validation accepts exactly `ban`, `captcha`, `ignore` (plus empty as `ban`, see the default row). An unknown type stored as captcha takes the same path as an ordinary LAPI `captcha` decision: a router that did not subscribe to captcha WARNs `crowdsec bouncer captcha unsubscribed` and serves the ban page (`pkg/bouncer/bouncer.go` `handleCaptchaKindServeHTTP` l.405-415; `core_plugin_lapi_origin-based-decision-remap.md` "missing provider still falls back to ban rendering"). Ordinary captcha decisions are not rejected at config time, and the knob lives on the LAPI connection, which has no router to check (`validateFailureAction` gates only per-router failure actions). README states the downgrade. Source: verified in code; human, chat 2026-11-14.
@@ -130,11 +135,6 @@ Outside facts used:
 - Q: Do live specs change in this run?
   Rank: additive asked — spec deltas follow the knob; requirement Affected lists the live specs
   Decision: assumed — yes, through propose deltas: `core_plugin_lapi_origin-based-decision-remap` and `core_plugin_decisions_scopes` change "unknown is ban" to "unknown follows `lapiRemediationFallback` (default ban)"; `core_plugin_lapi_reclaim-key` adds the knob to the ownership and `SessionHex` lists; `core_plugin_middleware_config-validation` (or the chosen host) adds the enum rule. Propose picks the host for the knob requirement.
-  By: explore
-
-- Q: Where do README, devdocs and the delivery card state the position on `whitelist` / `allow` decisions, and with which references?
-  Rank: additive asked — new documentation text; requirement Desired 5 and "Delivery card (must)"
-  Decision: assumed — README: one paragraph under "## Decisions" (after the scope list) plus the `LapiRemediationFallback` Variables entry, which also says it is not `bouncerLapiFailureAction`. Devdocs: the stream-apply and origin-remap packets. Card: codereview's Delivery axis writes it into `codereview_delivery.md` `## Motivation`. Text in all three: `whitelist` and `allow` are not valid CrowdSec decision types and are an inadequate way to manage whitelists, because the LAPI stream is designed to say WHAT TO BLOCK, not WHAT TO ALLOW; use parser whitelists or LAPI allowlists (`cscli allowlists`). References: upstream issue #402 point 1 (https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/402), upstream PR #403 point 1 (https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403), upstream PR #433 whitelist part (https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/433), fork PR #198 (https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/198). Source: requirement.md; human, chat 2026-11-14.
   By: explore
 
 - Q: Which devdocs term names the knob, and when is it written?
