@@ -128,7 +128,7 @@ What the visitor gets for each CrowdSec remediation ([CrowdSec bouncers](https:/
 
 | Remediation | What the user gets |
 | ----------- | ------------------ |
-| `ban`       | A ban page (or an empty body) with status `bouncerRemediationStatusCode` (default 403). |
+| `ban`       | A ban page (or an empty body) with status `bouncerRemediationStatusCode` (default 403). An AppSec ban whose `http_status` is 429, such as a CrowdSec `RateLimit()` block, keeps 429. |
 | `captcha`   | A captcha page. Once solved, the visitor is redirected back to the page they asked for and is not challenged again for `captchaGracePeriodSeconds` (default 24 hours). See [examples/captcha](examples/captcha/README.md). |
 
 Captcha providers:
@@ -711,7 +711,7 @@ When Redis cannot be reached, ban (`true`) or let the request through (`false`).
 Response header that tells why a request was blocked or challenged. Empty disables it. See [See the verdict in access logs](#see-the-verdict-in-access-logs).
 
 **BouncerRemediationStatusCode** (int, default `403`)
-HTTP status for a ban.
+HTTP status for a ban. An AppSec ban whose `http_status` is 429 (CrowdSec `RateLimit()`, CrowdSec 1.8.2+) is answered with 429 whatever this value is, so clients can back off. Every other AppSec ban uses this value.
 
 **BouncerTraceHeadersCustomName** (string, default `""`)
 Request header copied into the ban page as `{{ .TraceID }}`. See [Put a request id on the ban page](#put-a-request-id-on-the-ban-page).

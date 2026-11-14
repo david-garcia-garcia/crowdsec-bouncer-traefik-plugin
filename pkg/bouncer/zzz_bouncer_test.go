@@ -452,6 +452,57 @@ func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
 	}
 }
 
+// TestHandleNextServeHTTPAppsecBanStatus proves AppSec RateLimit() bans reach the client as 429.
+// Upstream https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/421: the listener
+// answers 403 with {"action":"ban","http_status":429}. Every other ban status keeps remediationStatusCode.
+func TestHandleNextServeHTTPAppsecBanStatus(t *testing.T) {
+	tests := []struct {
+		name                  string
+		envelope              string
+		method                string
+		remediationStatusCode int
+		wantStatus            int
+		wantBody              string
+	}{
+		{name: "rate limit", envelope: `{"action":"ban","http_status":429}`, method: http.MethodGet, remediationStatusCode: http.StatusForbidden, wantStatus: http.StatusTooManyRequests, wantBody: "<html>ban 192.0.2.10</html>"},
+		{name: "rate limit wins over configured status", envelope: `{"action":"ban","http_status":429}`, method: http.MethodGet, remediationStatusCode: http.StatusServiceUnavailable, wantStatus: http.StatusTooManyRequests, wantBody: "<html>ban 192.0.2.10</html>"},
+		{name: "rate limit HEAD has no body", envelope: `{"action":"ban","http_status":429}`, method: http.MethodHead, remediationStatusCode: http.StatusForbidden, wantStatus: http.StatusTooManyRequests, wantBody: ""},
+		{name: "plain ban", envelope: `{"action":"ban","http_status":403}`, method: http.MethodGet, remediationStatusCode: http.StatusForbidden, wantStatus: http.StatusForbidden, wantBody: "<html>ban 192.0.2.10</html>"},
+		{name: "custom user code", envelope: `{"action":"ban","http_status":418}`, method: http.MethodGet, remediationStatusCode: http.StatusForbidden, wantStatus: http.StatusForbidden, wantBody: "<html>ban 192.0.2.10</html>"},
+		{name: "missing http_status", envelope: `{"action":"ban"}`, method: http.MethodGet, remediationStatusCode: http.StatusServiceUnavailable, wantStatus: http.StatusServiceUnavailable, wantBody: "<html>ban 192.0.2.10</html>"},
+	}
+	banTemplate, err := template.New("ban").Parse("<html>ban {{.ClientIP}}</html>")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(tt.envelope))
+			}, banTemplate)
+			defer appsecServer.Close()
+			b.remediationStatusCode = tt.remediationStatusCode
+
+			recorder := httptest.NewRecorder()
+			continueAfterLAPIForTest(b, recorder, testClientRequest(httptest.NewRequest(tt.method, "http://example.com/login", nil), "192.0.2.10"))
+
+			if recorder.Code != tt.wantStatus {
+				t.Fatalf("expected status %d, got %d", tt.wantStatus, recorder.Code)
+			}
+			if got := recorder.Body.String(); got != tt.wantBody {
+				t.Fatalf("expected the operator ban page %q, got %q", tt.wantBody, got)
+			}
+			if got := recorder.Header().Get("X-Remediation"); got != "ban:appsec" {
+				t.Fatalf("expected remediation header ban:appsec, got %q", got)
+			}
+			if got := recorder.Header().Get("Cache-Control"); got != "no-cache, no-store" {
+				t.Fatalf("expected the ban Cache-Control, got %q", got)
+			}
+		})
+	}
+}
+
 func TestHandleNextServeHTTPChallengeFallsBackToBanContentType(t *testing.T) {
 	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)

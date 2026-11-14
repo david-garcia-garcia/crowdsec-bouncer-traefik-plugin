@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-11-14-appsec-ratelimit-429",
+  "jobName": "2026-11-14-appsec-ratelimit-429",
+  "startedAt": "2026-11-14T19:17:53.469Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T19:19:40.324Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T19:27:26.233Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T19:28:32.578Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T20:01:07.080Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T20:03:49.479Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T20:04:55.584Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T20:06:06.938Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T20:13:45.871Z"
+    }
+  }
+}
