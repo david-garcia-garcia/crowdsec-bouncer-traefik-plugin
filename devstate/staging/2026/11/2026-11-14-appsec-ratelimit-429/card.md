@@ -3,7 +3,7 @@ CrowdSec AppSec `RateLimit()` blocks reach the bouncer as a listener 403 whose J
 
 This is upstream issue https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/421, fixed upstream by https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/422. This fork does the same job but cannot copy #422's patch, because this fork's master has no root `bouncer.go` for it to edit.
 
-Two further gaps were open. Nothing exercised `RateLimit()` against a real CrowdSec, so the 429 path had no end-to-end proof. And the real-stack e2e image, `crowdsecurity/crowdsec:v1.8.0`, cannot run it: `RateLimit()` first ships in CrowdSec v1.8.2 (from this run's research notes, not re-verified here).
+Two further gaps were open. Nothing exercised `RateLimit()` against a real CrowdSec, so the 429 path had no end-to-end proof. And the real-stack e2e image, `crowdsecurity/crowdsec:v1.8.0`, cannot run it: `RateLimit()` first ships in CrowdSec v1.8.2 (sourced in `knowledge/research/ext_crowdsec_appsec_rate-limit/`).
 
 Priority: P2 — rate-limited clients get the wrong status and keep retrying, with the throttle still enforced (limited blast radius).
 
@@ -24,7 +24,7 @@ README (ban table and `BouncerRemediationStatusCode`), devdocs, research notes a
 In progress. 0 items remain.
 
 Priority: P2 — rate-limited clients get the wrong status and keep retrying, with the throttle still enforced (limited blast radius).
-Reviewed head: 89c42472
+Reviewed head: b77b6e89
 Owner decision: None.
 
 ## Review scores
@@ -83,7 +83,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 89c42472c9f5903c4ac1740a94e1bb870d4f044a | Card must match the branch you measured |
+| Reviewed head | b77b6e8920a655b21e36c61cbb6d608cfeebab85 | Card must match the branch you measured |
 
 ### Stored data model
 None.
