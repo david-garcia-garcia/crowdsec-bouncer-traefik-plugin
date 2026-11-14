@@ -6,9 +6,13 @@
 The session-scoped skip-if-busy guard so one DecisionStore runs at most one stream GET+apply at a time. It owns the CrowdSec cursor and the applied cache, not this HTTP client.
 _Avoid_: Client IO cancel context, queueing mutex, `atomic.Pointer[T]`, `atomic.Bool`, `atomic.Int64`, a `select` in `pkg/lapi`
 
+**Poll timer**:
+The `time.AfterFunc` loop (`pollTimer`) one Client runs for its stream poll and, separately, for its usage-metrics push. It calls `work()` on the stdlib timer goroutine and re-arms one interval after `work()` returns until `stop`.
+_Avoid_: ticker loop, `select` loop, stop channel
+
 ## Overview
 
-`handleStreamTicker` enters with `TryBeginStreamPoll` on the DecisionStore and releases with `defer EndStreamPoll`. A busy tick is dropped. The same guard covers the stream ticker, `startStream`'s async first poll, and `Wake`. `streamReady` and `streamPollInFlight` live on the store; a reincarnated Client must not zero them. Client startup, healthy, and update-failure stay `int64` fields on Client so `StreamHealthy` and `streamQuery` can run on the request path. Specs: `core_plugin_lapi_stream-single-flight`. There is no stream lease; every tick that wins the CAS GETs stream. Do not cancel the in-flight `Do` (LAPI already advanced `stream_cursor`).
+`handleStreamTicker` enters with `TryBeginStreamPoll` on the DecisionStore and releases with `defer EndStreamPoll`. A busy tick is dropped. The same guard covers the stream poll timer, `startStream`'s async first poll, and `Wake`. `streamReady` and `streamPollInFlight` live on the store; a reincarnated Client must not zero them. Client startup, healthy, and update-failure stay `int64` fields on Client so `StreamHealthy` and `streamQuery` can run on the request path. Specs: `core_plugin_lapi_stream-single-flight`. There is no stream lease; every tick that wins the CAS GETs stream. Do not cancel the in-flight `Do` (LAPI already advanced `stream_cursor`).
 
 ## How to use
 
