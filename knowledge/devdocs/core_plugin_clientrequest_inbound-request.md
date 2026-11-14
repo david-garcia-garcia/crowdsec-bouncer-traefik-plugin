@@ -33,7 +33,7 @@ Construct once in `ServeHTTP` after `pkg/ip.GetRemoteIP`. Captcha gate Secure an
 ```go
 remoteIP, ipAddr, err := ip.GetRemoteIP(httpReq, b.trustedHops, b.forwardedCustomHeader, b.forwardedHeadersInsecure)
 req := clientrequest.New(httpReq, remoteIP, ipAddr)
-decision, err := appsecClient.Query(req, pol)
+decision, err := appsecClient.Query(req, pol, http.NewResponseController(rw))
 ```
 
 ## Key files

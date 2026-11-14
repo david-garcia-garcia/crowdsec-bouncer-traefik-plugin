@@ -455,9 +455,16 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientrequest
 	pol := appsec.Policy{
 		FailureAction: b.appsecFailureAction,
 	}
-	decision, err := appsecClient.Query(req, pol)
+	// The controller lets the AppSec body-read deadline cut a stalled read on this response's connection.
+	decision, err := appsecClient.Query(req, pol, http.NewResponseController(rw))
 	if errors.Is(err, appsec.ErrClientDisconnected) {
 		b.handleClientDisconnectedServeHTTP(rw, req)
+		return true
+	}
+	// A body of unknown length that missed appsecBodyReadTimeoutSeconds is a ban whatever the failure action.
+	if errors.Is(err, appsec.ErrBodyReadTimeout) {
+		b.warnCaptchaSuperseded(req, match)
+		b.handleBanServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsecBodyTimeout, lapi.OriginPluginAppsecBodyTimeout)
 		return true
 	}
 	if errors.Is(err, appsec.ErrFailureCaptcha) {

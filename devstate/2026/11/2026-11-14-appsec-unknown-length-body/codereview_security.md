@@ -1,0 +1,14 @@
+# Security
+
+1. [judgement] Fail-open on deny — `pkg/appsec/query.go:282` — client-chosen body size still buys less inspection: `io.LimitReader(clientBody, c.appsecBodyLimit)` stops at the cap and `query.go:305` hands origin `MultiReader(&bodyBuffer, clientBody)`, so every byte past `appsecBodyLimit` reaches origin uninspected and with no plugin deadline (10 MiB of padding then the payload skips the WAF). Pre-existing for declared-length bodies and recorded as "unchanged" in the proposal, but this diff widens it: an HTTP/2/HTTP/3 POST/PUT/PATCH without `Content-Length` under `bouncerAppsecFailureAction: ban` used to be blocked whole, and is now forwarded with an uninspected tail. That is at odds with the stated intent (a client signal may only lead to more inspection or a block)
+   Fix: Decide explicitly: either block (ban, independent of failure action, like the body-timeout) a body that exceeds `appsecBodyLimit`, or keep the tail pass-through and state in the spec that body size is an accepted exception to the intent
+   Status: skipped
+   Argument: judgement; requirement decision 5 (human, do not re-litigate) keeps bodies over appsecBodyLimit as "first N bytes inspected, remainder forwarded uninspected"; banning oversize bodies would contradict it.
+2. [judgement] Fail-open on deny — `pkg/appsec/client.go:51` — `appsecBodyLimit: 0` silently changes meaning on upgrade from "inspect the whole body" to a 10 MiB cap with the tail forwarded uninspected; `Prepare` rewrites the value and nothing is logged, so an operator who set `0` to close the padding bypass has it reopened without a signal (the README upgrade note is the only notice)
+   Fix: Log a WARN once at startup when the configured `appsecBodyLimit` is `<= 0`, naming the effective 10 MiB cap and that the remainder is not inspected
+   Status: skipped
+   Argument: judgement; requirement decision 4 sets `<= 0` → 10 MiB and the README carries the upgrade note; a startup WARN is an addition not in the ask, not applied unattended.
+3. [judgement] Client-controlled trust — `pkg/appsec/query.go:115` — the request method is client-chosen and gates body inspection: a body on any method outside POST/PUT/PATCH/DELETE (GET, OPTIONS, PROPFIND/REPORT/SEARCH, QUERY, custom verbs) goes to AppSec headers-only and reaches origin uninspected, with or without `Content-Length`. Pre-existing and documented in README/proposal; the diff re-states it in the new doc comment. Reachable only where the origin acts on bodies for those verbs, which the plugin cannot know
+   Fix: Record the method set as an accepted exception in the spec, or inspect any non-empty body whatever the method (the original verb already travels on `X-Crowdsec-Appsec-Verb`, so there is no POST laundering)
+   Status: skipped
+   Argument: judgement; GET/HEAD body forwarding policy is explicitly out of scope in requirement.md; pre-existing behaviour.

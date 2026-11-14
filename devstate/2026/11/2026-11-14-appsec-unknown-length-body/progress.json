@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-11-14-appsec-unknown-length-body",
+  "jobName": "2026-11-14-appsec-unknown-length-body",
+  "startedAt": "2026-11-14T17:20:33.968Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T17:25:03.682Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T17:46:04.958Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T17:57:46.666Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T18:33:21.713Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T18:52:07.358Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T19:08:04.164Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T19:13:59.809Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T19:24:49.066Z"
+    }
+  }
+}

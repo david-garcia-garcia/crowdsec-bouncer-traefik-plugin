@@ -20,13 +20,14 @@ const crowdsecLapiMetricsRoute = "v1/usage-metrics"
 // Origins for drops that are not a CrowdSec decision. cscli shows origin rows;
 // empty origin is totals-only. Do not reuse crowdsec / CAPI / appsec / lists:.
 const (
-	OriginPluginTechGetRemoteFail = "plugin:tech_getremotefail" // reporter still accepts this origin; ServeHTTP does not emit it
-	OriginPluginTechTrustIPFail   = "plugin:tech_trustipfail"   // reporter still accepts this origin; ServeHTTP does not emit it
-	OriginPluginTechCacheFail     = "plugin:tech_cachefail"     // cache error fail-closed
-	OriginPluginTechStreamFail    = "plugin:tech_streamfail"    // stream unhealthy
-	OriginPluginLapiFailure       = "plugin:lapi_failure"       // live LAPI lookup error
-	OriginPluginAppsecFailure     = "plugin:appsec_failure"     // AppSec failure-action
-	OriginPluginRulesPrefix       = "plugin:rules:"             // action-rule applied ban or captcha
+	OriginPluginTechGetRemoteFail = "plugin:tech_getremotefail"  // reporter still accepts this origin; ServeHTTP does not emit it
+	OriginPluginTechTrustIPFail   = "plugin:tech_trustipfail"    // reporter still accepts this origin; ServeHTTP does not emit it
+	OriginPluginTechCacheFail     = "plugin:tech_cachefail"      // cache error fail-closed
+	OriginPluginTechStreamFail    = "plugin:tech_streamfail"     // stream unhealthy
+	OriginPluginLapiFailure       = "plugin:lapi_failure"        // live LAPI lookup error
+	OriginPluginAppsecFailure     = "plugin:appsec_failure"      // AppSec failure-action
+	OriginPluginAppsecBodyTimeout = "plugin:appsec_body_timeout" // AppSec client body of unknown length missed appsecBodyReadTimeoutSeconds
+	OriginPluginRulesPrefix       = "plugin:rules:"              // action-rule applied ban or captcha
 )
 
 // OriginPluginRules is the usage-metrics origin for a matching action rule of the winning kind.

@@ -47,7 +47,7 @@ func Test_appsecQuery_failureActionOnServerError(t *testing.T) {
 			client := newQueryClient(appsecURL, appsecServer.Client())
 			req := httptest.NewRequest(http.MethodGet, "http://localhost/", nil)
 
-			decision, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionBan})
+			decision, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionBan}, nil)
 			if err == nil {
 				t.Fatalf("ban on %d expected an error", status)
 			}
@@ -55,7 +55,7 @@ func Test_appsecQuery_failureActionOnServerError(t *testing.T) {
 				t.Fatalf("ban on %d returned decision %#v", status, decision)
 			}
 
-			decision, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionPassthrough})
+			decision, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionPassthrough}, nil)
 			if err != nil {
 				t.Fatalf("passthrough on %d: %v", status, err)
 			}
@@ -63,7 +63,7 @@ func Test_appsecQuery_failureActionOnServerError(t *testing.T) {
 				t.Fatalf("passthrough on %d want allow, got %#v", status, decision)
 			}
 
-			_, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionCaptcha})
+			_, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionCaptcha}, nil)
 			if !errors.Is(err, ErrFailureCaptcha) {
 				t.Fatalf("captcha on %d want ErrFailureCaptcha, got %v", status, err)
 			}
@@ -84,7 +84,7 @@ func Test_appsecQuery_failureActionOnUnauthorized(t *testing.T) {
 			client := newQueryClient(appsecURL, appsecServer.Client())
 			req := httptest.NewRequest(http.MethodGet, "http://localhost/", nil)
 
-			decision, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionBan})
+			decision, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionBan}, nil)
 			if err == nil {
 				t.Fatalf("ban on %d expected an error", status)
 			}
@@ -96,7 +96,7 @@ func Test_appsecQuery_failureActionOnUnauthorized(t *testing.T) {
 				t.Fatalf("ban on %d returned decision %#v", status, decision)
 			}
 
-			decision, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionPassthrough})
+			decision, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionPassthrough}, nil)
 			if err != nil {
 				t.Fatalf("passthrough on %d: %v", status, err)
 			}
@@ -104,7 +104,7 @@ func Test_appsecQuery_failureActionOnUnauthorized(t *testing.T) {
 				t.Fatalf("passthrough on %d want allow, got %#v", status, decision)
 			}
 
-			_, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionCaptcha})
+			_, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionCaptcha}, nil)
 			if !errors.Is(err, ErrFailureCaptcha) {
 				t.Fatalf("captcha on %d want ErrFailureCaptcha, got %v", status, err)
 			}
@@ -121,12 +121,12 @@ func Test_appsecQuery_failureActionOnUnreachable(t *testing.T) {
 	appsecServer.Close()
 	req := httptest.NewRequest(http.MethodGet, "http://localhost/", nil)
 
-	_, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionBan})
+	_, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionBan}, nil)
 	if err == nil {
 		t.Fatal("ban on unreachable expected an error")
 	}
 
-	decision, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionPassthrough})
+	decision, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionPassthrough}, nil)
 	if err != nil {
 		t.Fatalf("passthrough on unreachable: %v", err)
 	}
@@ -140,7 +140,7 @@ func Test_appsecQuery_failureActionOnResponseBodyReadError(t *testing.T) {
 	client := NewTestClient(&url.URL{Scheme: "http", Host: "appsec.example"}, &http.Client{Transport: failBodyRoundTripper{}}, logger.New("INFO", ""))
 	req := httptest.NewRequest(http.MethodGet, "http://localhost/", nil)
 
-	decision, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionBan})
+	decision, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionBan}, nil)
 	if err == nil {
 		t.Fatal("ban on response-body read error expected an error")
 	}
@@ -151,7 +151,7 @@ func Test_appsecQuery_failureActionOnResponseBodyReadError(t *testing.T) {
 		t.Fatalf("ban on response-body read error returned decision %#v", decision)
 	}
 
-	decision, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionPassthrough})
+	decision, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionPassthrough}, nil)
 	if err != nil {
 		t.Fatalf("passthrough on response-body read error: %v", err)
 	}
@@ -159,7 +159,7 @@ func Test_appsecQuery_failureActionOnResponseBodyReadError(t *testing.T) {
 		t.Fatalf("passthrough on response-body read error want allow, got %#v", decision)
 	}
 
-	_, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionCaptcha})
+	_, err = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionCaptcha}, nil)
 	if !errors.Is(err, ErrFailureCaptcha) {
 		t.Fatalf("captcha on response-body read error want ErrFailureCaptcha, got %v", err)
 	}
@@ -173,7 +173,7 @@ func Test_appsecQuery_unparseable200Allows(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan})
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan}, nil)
 	if err != nil {
 		t.Fatalf("unparseable 200: %v", err)
 	}
@@ -190,7 +190,7 @@ func Test_appsecQuery_unparseable403Bans(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough})
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough}, nil)
 	if err == nil {
 		t.Fatal("unparseable 403 with passthrough expected an error")
 	}
@@ -207,7 +207,7 @@ func Test_appsecQuery_unexpectedStatusIgnoresBody(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough})
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough}, nil)
 	if err != nil {
 		t.Fatalf("passthrough on 401 with ban JSON: %v", err)
 	}
@@ -232,7 +232,7 @@ func Test_appsecQuery_unexpectedStatusWarnsOnce(t *testing.T) {
 
 	statusCode = http.StatusUnauthorized
 	for range 2 {
-		_, err := client.Query(req, Policy{FailureAction: configuration.FailureActionPassthrough})
+		_, err := client.Query(req, Policy{FailureAction: configuration.FailureActionPassthrough}, nil)
 		if err != nil {
 			t.Fatalf("passthrough on 401: %v", err)
 		}
@@ -245,7 +245,7 @@ func Test_appsecQuery_unexpectedStatusWarnsOnce(t *testing.T) {
 	}
 
 	statusCode = http.StatusBadGateway
-	_, err := client.Query(req, Policy{FailureAction: configuration.FailureActionBan})
+	_, err := client.Query(req, Policy{FailureAction: configuration.FailureActionBan}, nil)
 	if err == nil || !strings.Contains(err.Error(), "statusCode:502") {
 		t.Fatalf("ban on 502: %v", err)
 	}
@@ -260,7 +260,7 @@ func Test_appsecQuery_unexpectedStatusWarnsOnce(t *testing.T) {
 	}
 
 	statusCode = http.StatusInternalServerError
-	_, err = client.Query(req, Policy{FailureAction: configuration.FailureActionPassthrough})
+	_, err = client.Query(req, Policy{FailureAction: configuration.FailureActionPassthrough}, nil)
 	if err != nil {
 		t.Fatalf("passthrough on 500: %v", err)
 	}

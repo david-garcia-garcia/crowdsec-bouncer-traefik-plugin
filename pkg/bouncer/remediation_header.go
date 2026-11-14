@@ -21,6 +21,7 @@ const (
 	headerReasonAppsec               = "appsec"
 	headerReasonAppsecChallengeEmpty = "appsec-challenge-empty"
 	headerReasonAppsecFailure        = "appsec-failure"
+	headerReasonAppsecBodyTimeout    = "appsec-body-timeout"
 	headerReasonCaptchaDowngrade     = "captcha-downgrade"
 	headerReasonChallenge            = "challenge"
 	headerReasonClientDisconnected   = "client-disconnected"

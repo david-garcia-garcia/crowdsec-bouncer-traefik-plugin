@@ -27,6 +27,7 @@ type identity struct {
 	TLSClientCertificate    string `json:"tlsClientCertificate"`
 	TLSClientKey            string `json:"tlsClientKey"`
 	HTTPTimeoutSeconds      int64  `json:"httpTimeoutSeconds"`
+	BodyReadTimeoutSeconds  int64  `json:"bodyReadTimeoutSeconds"`
 }
 
 func identityFrom(cfg *configuration.Config, middlewareName string) identity {
@@ -45,6 +46,7 @@ func identityFrom(cfg *configuration.Config, middlewareName string) identity {
 		TLSClientCertificate:    cert,
 		TLSClientKey:            certKey,
 		HTTPTimeoutSeconds:      cfg.AppsecHTTPTimeoutSeconds,
+		BodyReadTimeoutSeconds:  cfg.AppsecBodyReadTimeoutSeconds,
 	}
 }
 

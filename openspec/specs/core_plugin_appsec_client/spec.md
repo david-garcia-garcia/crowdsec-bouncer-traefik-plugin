@@ -13,7 +13,7 @@
 - **AND** the call does not go through `lapi.Client`
 
 ### Requirement: AppSec is reclaimed by listener identity
-When `appsecEnabled` is true, the owning middleware SHALL reclaim an `appsec.Client` with `reclaim.Open` on the process table (30s grace). The reclaim **ownership** key SHALL be derived from the Traefik middleware name plus AppSec scheme, host, path, resolved key, body limit, TLS material, and `AppsecHTTPTimeoutSeconds`. AppSec instance slot names, `bouncerEnabled`, bounce knobs, LAPI fields, and per-router AppSec failure action MUST NOT be in that key. Two `Open` calls with different middleware names and otherwise identical AppSec knobs SHALL produce two Clients. Two `Open` calls with the same middleware name and identical knobs SHALL Wake the same Client on reload. A change to any keyed AppSec knob SHALL Open a new Client; `AdoptTransport` MUST NOT be the path that applies timeout or TLS changes.
+When `appsecEnabled` is true, the owning middleware SHALL reclaim an `appsec.Client` with `reclaim.Open` on the process table (30s grace). The reclaim **ownership** key SHALL be derived from the Traefik middleware name plus AppSec scheme, host, path, resolved key, effective body limit (after the non-positive default), `appsecBodyReadTimeoutSeconds`, TLS material, and `AppsecHTTPTimeoutSeconds`. AppSec instance slot names, `bouncerEnabled`, bounce knobs, LAPI fields, and per-router AppSec failure action MUST NOT be in that key. Two `Open` calls with different middleware names and otherwise identical AppSec knobs SHALL produce two Clients. Two `Open` calls with the same middleware name and identical knobs SHALL Wake the same Client on reload. A change to any keyed AppSec knob SHALL Open a new Client; `AdoptTransport` MUST NOT be the path that applies timeout or TLS changes.
 
 #### Scenario: Two middleware names do not share AppSec
 - **WHEN** two owners Open AppSec with different Traefik names and identical URL, key, and body limit
@@ -22,6 +22,11 @@ When `appsecEnabled` is true, the owning middleware SHALL reclaim an `appsec.Cli
 #### Scenario: Timeout change is a new Client
 - **WHEN** a second Open for the same middleware name changes only `appsecHttpTimeoutSeconds`
 - **THEN** the second Open returns a different Client incarnation than the first
+
+#### Scenario: Body read timeout change is a new Client
+- **WHEN** a second Open for the same middleware name changes only `appsecBodyReadTimeoutSeconds`
+- **THEN** the ownership keys differ
+- **AND** the second Open returns a different Client incarnation than the first
 
 #### Scenario: Same name same knobs Wake
 - **WHEN** the holder context for an AppSec ownership key is cancelled and a `New` with the same name and knobs runs before grace ends
@@ -59,14 +64,6 @@ When `Query` receives a non-nil AppSec HTTP response, it SHALL drain and close t
 - **WHEN** the AppSec listener returns HTTP 502, 503, or 504 and later requests use the same Client
 - **THEN** those later requests reuse the keep-alive connection
 
-### Requirement: Zero body limit forwards the full body
-When `appsecBodyLimit` is `0`, `Query` SHALL treat the cap as unlimited: it SHALL copy the full readable client body to AppSec and restore that body for origin. It MUST NOT apply a zero-byte read cap that yields an empty body. A positive limit SHALL still cap the copy. The omitted default SHALL remain 10485760.
-
-#### Scenario: Zero limit forwards a POST body
-- **WHEN** `appsecBodyLimit` is `0` and the client request has a readable body
-- **THEN** AppSec receives that body as POST
-- **AND** origin can still read the original body
-
 ### Requirement: AppSec URI is the inbound-request absolute URL
 `Query` SHALL take the inbound request value instead of a parallel IP string plus a bare `*http.Request`. `Query` SHALL set `X-Crowdsec-Appsec-Uri` to that value's absolute client-facing URL. `Query` MUST NOT set that header from `URL.String()` or `URL.Scheme`. `Query` MUST NOT derive scheme from `X-Forwarded-Proto` or `Request.TLS`. `X-Crowdsec-Appsec-Host` SHALL remain `Request.Host`.
 
@@ -98,8 +95,8 @@ After `Query` chooses the bytes sent to AppSec, it SHALL omit the client's `Cont
 - **THEN** none of those headers are present on the AppSec request
 - **AND** `Cookie` and `X-Forwarded-For` are still forwarded
 
-### Requirement: Readable body forwards only on body-bearing methods
-`Query` SHALL copy a readable client body to AppSec only when the method is POST, PUT, PATCH, or DELETE. Any other method, including a GET or HEAD that carries a body, SHALL be forwarded as a bodyless GET and its body MUST NOT be read. The original verb SHALL always travel on `X-Crowdsec-Appsec-Verb`. This readable-forward set SHALL be a predicate distinct from the unreadable-body drop set (POST, PUT, PATCH): DELETE is in the forward set and MUST NOT enter the drop set. A body that is `http.NoBody` SHALL be forwarded as a bodyless GET.
+### Requirement: Client body forwards only on body-bearing methods
+`Query` SHALL copy a client body to AppSec only when the method is POST, PUT, PATCH, or DELETE. That copy SHALL NOT depend on whether the client declared `Content-Length` or on the HTTP version: a body without `Content-Length` (HTTP/1.1 chunked, HTTP/2 or HTTP/3 without the header) SHALL be read and forwarded like a body with it, under the read deadline owned by `core_plugin_appsec_body-read-timeout`. Any other method, including a GET or HEAD that carries a body, SHALL be forwarded as a bodyless GET and its body MUST NOT be read. The original verb SHALL always travel on `X-Crowdsec-Appsec-Verb`. A body that is `http.NoBody` SHALL be forwarded as a bodyless GET.
 
 #### Scenario: GET with a body is not forwarded as POST
 - **WHEN** a GET request carries a readable body
@@ -108,9 +105,13 @@ After `Query` chooses the bytes sent to AppSec, it SHALL omit the client's `Cont
 - **AND** origin can still read the original body in full
 
 #### Scenario: DELETE body is inspected
-- **WHEN** a DELETE request carries a readable body
+- **WHEN** a DELETE request carries a body
 - **THEN** AppSec receives those bytes as POST
-- **AND** an unreadable DELETE body is still not a drop
+- **AND** an HTTP/2 or HTTP/3 DELETE body without `Content-Length` is forwarded the same way
+
+#### Scenario: Removing Content-Length does not reduce inspection
+- **WHEN** two HTTP/2 POST requests carry the same body, one with `Content-Length` and one without
+- **THEN** AppSec receives the same bytes for both
 
 ### Requirement: AppSec transport Timeout is the effective AppSec seconds
 AppSec HTTP construct SHALL set `http.Client.Timeout` and the stored timeout seconds from `config.AppsecHTTPTimeoutSeconds`. It MUST NOT read a shared or inherited timeout. Inside `pkg/appsec` the stored field SHALL be `HTTPTimeoutSeconds` (prefix already dropped). `Query` SHALL use that stored client. `AdoptTransport` SHALL keep last-writing that transport on the same Client only when the ownership key is unchanged. The AppSec ownership key SHALL include `AppsecHTTPTimeoutSeconds`. Implementations MUST NOT call `EffectiveHTTPTimeoutSeconds`.
@@ -132,13 +133,18 @@ AppSec HTTP construct SHALL set `http.Client.Timeout` and the stored timeout sec
 - **AND** two Client incarnations exist
 
 ### Requirement: Client disconnect while buffering is not an AppSec query
-When `Query` copies a readable POST, PUT, PATCH, or DELETE body and `io.ReadAll` fails with `context.Canceled`, `context.DeadlineExceeded`, or `io.ErrUnexpectedEOF`, `Query` SHALL return `ErrClientDisconnected` and MUST NOT send a request to the AppSec listener. `bouncerAppsecFailureAction` SHALL NOT change that result. Unclassified body-read errors SHALL keep `appsecQuery:GetBody`. Serving the disconnect (TRACE, optional remediation header, no ban, no origin) is owned by `core_plugin_middleware_bouncer`.
+When `Query` copies a POST, PUT, PATCH, or DELETE body and `io.ReadAll` fails with `context.Canceled`, `context.DeadlineExceeded`, or `io.ErrUnexpectedEOF`, `Query` SHALL return `ErrClientDisconnected` and MUST NOT send a request to the AppSec listener. When the AppSec body read deadline expired during that read (`core_plugin_appsec_body-read-timeout`), the body-read-timeout outcome SHALL take precedence and `Query` MUST NOT return `ErrClientDisconnected`, whatever error the cut read returned. `bouncerAppsecFailureAction` SHALL NOT change either result. Unclassified body-read errors SHALL keep `appsecQuery:GetBody`. Serving the disconnect (TRACE, optional remediation header, no ban, no origin) is owned by `core_plugin_middleware_bouncer`.
 
 #### Scenario: Canceled body does not reach AppSec
-- **WHEN** buffering a readable POST body fails with `context.Canceled`
+- **WHEN** buffering a POST body fails with `context.Canceled`
 - **THEN** `Query` returns `ErrClientDisconnected`
 - **AND** the AppSec listener is not called
 - **AND** `bouncerAppsecFailureAction: ban` does not change that
+
+#### Scenario: Expired body read deadline is not a disconnect
+- **WHEN** the AppSec body read deadline expires while a POST body without `Content-Length` is being read
+- **AND** the cut read returns an error that `isClientGoneBodyReadErr` would classify as client-gone
+- **THEN** `Query` returns the body-read-timeout outcome, not `ErrClientDisconnected`
 
 ### Requirement: AppSec identity JSON reuses the session marshaler
 AppSec reclaim identity JSON SHALL be produced only by the marshaler in `pkg/appsec/session.go`. Implementations MUST NOT reconstruct that payload in `pkg/configuration` or `pkg/bouncer`. That marshaler SHALL keep `scheme` / `host` / `path` / `key` and SHALL rename `tlsCertificateBouncer` / `tlsCertificateBouncerKey` to `tlsClientCertificate` / `tlsClientKey`. Transport fields still spelled `appsecTLSCertificateBouncer` SHALL use `TLSClientCertificate` / `TLSClientKey`. A field-name change SHALL change the hash. A process restart SHALL build a new Client.
@@ -166,3 +172,20 @@ AppSec reclaim identity JSON SHALL be produced only by the marshaler in `pkg/app
 #### Scenario: ProtoMajor 0 omits the header
 - **WHEN** `Query` forwards a request whose `ProtoMajor` is 0
 - **THEN** `X-Crowdsec-Appsec-Http-Version` is absent
+
+### Requirement: Non-positive body limit is the default cap
+An `appsecBodyLimit` of `0` or less SHALL be treated as 10485760 bytes, the same value as the omitted default, for the copy cap and for the AppSec reclaim identity. `ValidateParams` MUST NOT reject a negative `appsecBodyLimit`. `Query` SHALL always cap the copied client body at the effective limit; it MUST NOT copy an unbounded body.
+
+#### Scenario: Zero limit caps at 10 MiB
+- **WHEN** `appsecBodyLimit` is `0` and a POST body is longer than 10485760 bytes
+- **THEN** AppSec receives the first 10485760 bytes as POST
+- **AND** origin can still read the original body in full
+
+#### Scenario: Negative limit is accepted and capped
+- **WHEN** `appsecBodyLimit` is `-1`
+- **THEN** `ValidateParams` returns no error
+- **AND** the effective limit is 10485760
+
+#### Scenario: Zero and omitted share one Client
+- **WHEN** two Opens for the same middleware name and knobs differ only in `appsecBodyLimit` `0` versus omitted
+- **THEN** the ownership keys are equal

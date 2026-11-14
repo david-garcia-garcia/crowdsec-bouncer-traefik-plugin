@@ -65,6 +65,7 @@ func TestReportMetricsPluginFailClosedOrigins(t *testing.T) {
 		OriginPluginTechStreamFail,
 		OriginPluginLapiFailure,
 		OriginPluginAppsecFailure,
+		OriginPluginAppsecBodyTimeout,
 		OriginPluginRules("healthz"),
 	}
 	for _, origin := range origins {
