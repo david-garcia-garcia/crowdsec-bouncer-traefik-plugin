@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: f9a320a0
+Reviewed head: 340cb698
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,14 +32,17 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-11-14-lapi-multi-client-ticker pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | isolate-lapi-poll-loops-across-clients | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/208 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_lapi_stream-single-flight](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/openspec/changes/isolate-lapi-poll-loops-across-clients/proposal.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/openspec/changes/isolate-lapi-poll-loops-across-clients/proposal.md) — modified
+
 
 ## Deviations from the ask
 None.
@@ -67,9 +70,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | f9a320a0dd7f2ec0c1ef35c9948abfbe92674942 | Card must match the branch you measured |
+| Reviewed head | 340cb698e46b0da22e0a8377e9f39a62e81c6db3 | Card must match the branch you measured |
 
 ### Stored data model
 None.
