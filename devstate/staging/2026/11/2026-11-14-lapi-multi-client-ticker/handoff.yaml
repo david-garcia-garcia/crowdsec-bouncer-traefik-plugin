@@ -10,7 +10,7 @@ localTests: none
 requirement: requirement.md
 comments: none
 explore: explore.md
-change: none
+change: isolate-lapi-poll-loops-across-clients
 pr: { id: 208, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/208 }
 qualify: qualified-with-gaps
 src: f467f4152c5d07ce
