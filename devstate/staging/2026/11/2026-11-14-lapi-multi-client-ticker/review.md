@@ -14,3 +14,8 @@ head: f9a320a0dd7f2ec0c1ef35c9948abfbe92674942
 phase: propose
 verdict: in progress
 head: 340cb698e46b0da22e0a8377e9f39a62e81c6db3
+
+## implement (2026-11-14)
+phase: implement
+verdict: ready for review
+head: 4cbed92a762414f9c46da810eba7d6c1e0918614
