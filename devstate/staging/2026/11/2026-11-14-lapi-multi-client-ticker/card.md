@@ -20,7 +20,7 @@ Both loops now run on a `pollTimer` built on `time.AfterFunc`: the stdlib timer 
 In progress. 0 items remain.
 
 Priority: P2 — real operator pain with limited blast radius: only deployments with several LAPI middlewares or reloads, and the silent stop needs a crossing at the moment another Client stops
-Reviewed head: df096b61
+Reviewed head: 4aaff6e2
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -83,7 +83,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | df096b61b376f5a677375620699c225d625fd21e | Card must match the branch you measured |
+| Reviewed head | 4aaff6e270debb798ee119c09a56b9902690cac5 | Card must match the branch you measured |
 
 ### Stored data model
 None.
