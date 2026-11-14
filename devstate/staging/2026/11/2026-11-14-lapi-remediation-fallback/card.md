@@ -25,17 +25,17 @@ Process note: this run used the OpenDev CLI (`opd-mcp/scripts/cli.mjs`) instead 
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: P2 — operators get no choice for unknown decision types and an unknown-type delete can clear a real ban; the default still fails closed, so the blast radius is limited
-Reviewed head: 1731b4a5
+Reviewed head: fb1056c3
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43636993224 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -45,7 +45,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-11-14-lapi-remediation-fallback pushed | `git` |
 | OpenSpec | lapi-remediation-fallback | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/205 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 43636993224 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43636993224 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43636993224 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -70,7 +70,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-11-14-lapi-remediation-fallback on branch 2026-11-14-lapi-remediation-fallback targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/205; CI not seen.
+Ticket 2026-11-14-lapi-remediation-fallback on branch 2026-11-14-lapi-remediation-fallback targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/205; CI build 43636993224 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43636993224.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -99,7 +99,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 2 added / 6 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 1731b4a5d959ff5cf13a524b6042b047b321a15c | Card must match the branch you measured |
+| Reviewed head | fb1056c3b6ca9166ff5e458b4b6757214b1ed0d1 | Card must match the branch you measured |
 
 ### Stored data model
 - DecisionStore (memory `ttl_map` and Redis, key prefix `SessionHex`): no new key, table, or field. The stream session payload hashed into `SessionHex` gains `remediationFallback` (`omitempty`, filled only when the effective `lapiRemediationFallback` is not `ban`). Omitted, empty, or `ban` keeps the pre-knob `SessionHex` and Redis key prefix; `captcha` or `ignore` forks to a new prefix that refills from LAPI with `startup=true`, and the old keys expire by TTL. No migration needed (derived identity, not a schema).
