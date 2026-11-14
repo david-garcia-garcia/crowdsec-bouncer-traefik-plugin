@@ -40,5 +40,5 @@ rw.WriteHeader(statusCode)
 
 ## Gotchas
 
-- All ban call sites inherit the one Set on `handleBanServeHTTP`. Each site passes its own `headerReason`.
+- All ban call sites inherit the one Set on `handleBanStatusServeHTTP` (`handleBanServeHTTP` forwards `remediationStatusCode` to it). Each site passes its own `headerReason`.
 - Challenge HTML Cache-Control lives on `core_plugin_middleware_captcha-widget`, not here.

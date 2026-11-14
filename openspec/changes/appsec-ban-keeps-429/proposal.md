@@ -24,6 +24,6 @@ CrowdSec AppSec `RateLimit()` (CrowdSec v1.8.2+) blocks a client with `{"action"
 
 - `pkg/bouncer/bouncer.go` (`applyAppsecServeHTTP`, `handleBanServeHTTP`)
 - `pkg/bouncer` unit tests
-- `tests/e2e/real/config/docker-compose.test.yml`, `tests/e2e/real/config/acquis.d/appsec-bot.yaml`, `tests/e2e/real/config/appsec-configs/`, `tests/e2e/real/appsec.Tests.ps1`
+- `tests/e2e/real/config/docker-compose.test.yml`, `tests/e2e/real/config/acquis.yaml`, `tests/e2e/real/config/appsec-configs/`, `tests/e2e/real/appsec.Tests.ps1`
 - `README.md`
 - Usage packets `knowledge/devdocs/core_plugin_appsec.md`, `knowledge/devdocs/core_plugin_middleware_ban-page.md`, `knowledge/devdocs/build_e2e_real.md`

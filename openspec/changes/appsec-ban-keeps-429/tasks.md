@@ -14,7 +14,7 @@
 - [x] 3.1 Bump `crowdsecurity/crowdsec` to `v1.8.2` in `tests/e2e/real/config/docker-compose.test.yml`
 - [x] 3.2 Add `tests/e2e/real/config/appsec-configs/e2e-rate-limit.yaml` (`RateLimit()` on `/ratelimit`), mount it, and list it in `acquis.yaml` next to `crowdsecurity/crs-inband`
 - [x] 3.3 Add an AppSec-only router and middleware `/ratelimit` on the 7422 listener with the e2e ban page and remediation header
-- [x] 3.4 Add a Pester case in `tests/e2e/real/appsec.Tests.ps1`: requests under the limit pass, the next one is 429 with the ban page and `ban:appsec`
+- [x] 3.4 Add a Pester case in `tests/e2e/real/appsec.Tests.ps1`: requests under the limit pass, the next one is 429 with the ban page and `ban:appsec`; a CRS ban on the same `/ratelimit` route stays 403
 
 ## 4. Docs
 
