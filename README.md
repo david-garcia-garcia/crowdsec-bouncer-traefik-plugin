@@ -152,7 +152,9 @@ This plugin supports [AppSec](https://doc.crowdsec.net/docs/next/appsec/intro/),
 
 AppSec requires CrowdSec 1.6.0 or later.
 
-**Bot detection (CrowdSec 1.8+).** CrowdSec can answer a suspicious request with a JavaScript challenge page instead of a ban. This works out of the box once AppSec is enabled. The challenge page calls back to URLs under `/crowdsec-internal/challenge/`, and those calls must go through this middleware so CrowdSec can verify them. The proof is POSTed to `/crowdsec-internal/challenge/submit` and must reach AppSec with the full form. The default `appsecBodyLimit` of 10MB is enough. A smaller positive limit cuts the proof short. `0` means no limit: the whole body is sent. If the middleware already covers every path of the host, you are done. If it only covers some paths (for example `/api`), add a router for ``PathPrefix(`/crowdsec-internal/challenge`)`` with the same middleware. See [CrowdSec bot detection](https://docs.crowdsec.net/docs/next/appsec/bot_detection/intro.md).
+**Bot detection (CrowdSec 1.8+).** CrowdSec can answer a suspicious request with a JavaScript challenge page instead of a ban. This works out of the box once AppSec is enabled. The challenge page calls back to URLs under `/crowdsec-internal/challenge/`, and those calls must go through this middleware so CrowdSec can verify them. The proof is POSTed to `/crowdsec-internal/challenge/submit` and must reach AppSec with the full form. The default `appsecBodyLimit` of 10MB is enough. A smaller positive limit cuts the proof short. `0` or a negative value means the default 10 MB. If the middleware already covers every path of the host, you are done. If it only covers some paths (for example `/api`), add a router for ``PathPrefix(`/crowdsec-internal/challenge`)`` with the same middleware. See [CrowdSec bot detection](https://docs.crowdsec.net/docs/next/appsec/bot_detection/intro.md).
+
+**Request bodies.** AppSec receives the first `appsecBodyLimit` bytes of POST, PUT, PATCH, and DELETE bodies. Removing `Content-Length` no longer skips inspection: a body without it (HTTP/1.1 chunked, HTTP/2 or HTTP/3 without the header) is read and inspected like any other, as long as it arrives within `appsecBodyReadTimeoutSeconds`. Streaming bodies need a rule; see [Let streaming request bodies through](#let-streaming-request-bodies-through-grpc-connect-long-uploads).
 
 More information in the [CrowdSec AppSec documentation](https://doc.crowdsec.net/docs/next/appsec/intro/).
 
@@ -422,6 +424,7 @@ The value is `what:why` or `what:why:origin`, separated by colons with no spaces
 | `ban:appsec` | Blocked by AppSec. |
 | `ban:appsec-challenge-empty` | AppSec asked for a bot challenge but sent no page, so a ban was served instead. |
 | `ban:appsec-failure` | AppSec was unreachable, and the failure action is `ban`. |
+| `ban:appsec-body-timeout` | The request body (without `Content-Length`) did not arrive within `appsecBodyReadTimeoutSeconds`. Blocked whatever the failure action. |
 | `ban:captcha-downgrade` | A captcha was due, but this router has no captcha configured, so a ban was served. |
 | `captcha:rules` | Captcha from a `bouncerActionRules` rule. |
 | `captcha:lapi` / `captcha:lapi:<origin>` | Captcha from a CrowdSec decision. |
@@ -500,6 +503,53 @@ List the proxy's addresses in `bouncerForwardedHeadersTrustedIps` and set `bounc
 - `captcha` — show a captcha. Requires a captcha on this router.
 
 In `stream` and `alone` LAPI modes, the plugin keeps using the decisions it already has when LAPI is down. The failure action only applies to clients without a known decision, after `lapiUpdateMaxFailure` failed refreshes. The same action applies while the connection is not published yet, including right after startup or a reload.
+
+`bouncerAppsecFailureAction` only applies when AppSec itself fails (unreachable, HTTP 500, an unexpected status, an unreadable answer). It does not apply to slow or streaming request bodies: a body that misses `appsecBodyReadTimeoutSeconds` is always blocked. See [Let streaming request bodies through](#let-streaming-request-bodies-through-grpc-connect-long-uploads).
+
+### Let streaming request bodies through (gRPC, Connect, long uploads)
+
+With AppSec enabled, the plugin reads the request body before AppSec sees the request. A body without `Content-Length` (HTTP/1.1 chunked, HTTP/2 or HTTP/3 without the header) must end, or reach `appsecBodyLimit` bytes, within `appsecBodyReadTimeoutSeconds` (default `30`). Otherwise the request is blocked with the ban response and the `ban:appsec-body-timeout` header, whatever `bouncerAppsecFailureAction` says, and a WARN log line names the request.
+
+On HTTP/2 the plugin answers at the timeout. On HTTP/1.1 behind Traefik (measured with Traefik v3.7.11) the read cannot be cut early: the request is still blocked, but the answer is sent when the client ends its body or when Traefik's entrypoint `readTimeout` expires. HTTP/3 has not been measured.
+
+- Inspected as usual: gRPC and Connect unary calls, and any upload that ends in time. Their bodies end, so AppSec sees them.
+- Blocked after the timeout: client-streaming and bidirectional gRPC, Connect client and bidirectional streaming, and long-lived uploads without `Content-Length`.
+- Not affected: WebSockets (a GET upgrade has no body to read), and response streaming (Server-Sent Events, gRPC server streaming): only the request body is read.
+
+Exclude those routes from AppSec with a `bouncerActionRules` rule whose action is `bypassAppsec`. Scope each rule as tightly as you can:
+
+```yaml
+bouncerActionRules:
+  # One gRPC service, by its path.
+  - name: grpc-upload-service
+    path: "^/my\\.package\\.UploadService/"
+    action: [bypassAppsec]
+  # A host that only serves gRPC.
+  - name: grpc-host
+    host: "^grpc\\.example\\.com$"
+    action: [bypassAppsec]
+  # gRPC requests on one host. Never match on Content-Type alone.
+  - name: grpc-on-api-host
+    host: "^api\\.example\\.com$"
+    headers:
+      Content-Type: "^application/grpc"
+    action: [bypassAppsec]
+  # Connect streaming under one path.
+  - name: connect-streams
+    path: "^/stream/"
+    headers:
+      Content-Type: "^application/connect\\+"
+    action: [bypassAppsec]
+  # Long uploads to one path.
+  - name: big-uploads
+    method: "^(POST|PUT)$"
+    path: "^/upload/"
+    action: [bypassAppsec]
+```
+
+The trade-off: AppSec does not see matching requests at all, neither headers, URI, nor body. LAPI decisions still apply (use `bypass` only if you also want to skip them). `Content-Type` is sent by the client, so a rule that matches only on that header lets any client skip AppSec by sending it. Always combine it with `host` and/or `path`.
+
+For uploads that are slow but finite, a longer `appsecBodyReadTimeoutSeconds` is the alternative: the request stays inspected.
 
 ### Match a country or an ASN
 
@@ -617,7 +667,11 @@ Site key from the captcha provider.
 Timeout in seconds when validating a captcha with the provider. Must be at least `1`.
 
 **AppsecBodyLimit** (int64, default `10485760` / 10 MB)
-Send at most this many bytes of the request body to AppSec. `0` means no limit: the whole body is sent. Only POST, PUT, PATCH, and DELETE bodies are sent. `/crowdsec-internal/challenge/submit` must reach AppSec with the full form. The default 10MB is enough. A smaller positive limit cuts the proof short.
+Send at most this many bytes of the request body to AppSec. `0` or a negative value means the default 10 MB. Only POST, PUT, PATCH, and DELETE bodies are sent, with or without `Content-Length`. The rest of a larger body reaches the service uninspected. `/crowdsec-internal/challenge/submit` must reach AppSec with the full form. The default 10MB is enough. A smaller positive limit cuts the proof short.
+Upgrade note: `0` used to mean no limit (the whole body was sent). It now caps at 10 MB. Set an explicit positive value if you need more.
+
+**AppsecBodyReadTimeoutSeconds** (int64, default `30`)
+Total time, in seconds, to receive a request body that has no `Content-Length` (HTTP/1.1 chunked, HTTP/2 or HTTP/3 without the header), up to `appsecBodyLimit` bytes. Must be at least `1`. When it expires, the request is blocked with the ban response (header `ban:appsec-body-timeout`) whatever `bouncerAppsecFailureAction` says. On HTTP/1.1 behind Traefik that answer is sent only once the client ends its body or Traefik's `readTimeout` expires. Bodies with `Content-Length` are not affected. With the defaults, a client must send its first 10 MB at about 2.8 Mbit/s or faster. Streaming routes need a `bypassAppsec` rule: see [Let streaming request bodies through](#let-streaming-request-bodies-through-grpc-connect-long-uploads).
 
 **appsecEnabled** (bool, default `false`)
 This middleware connects to AppSec and shares the connection as `appsecInstanceName`. AppSec checks every request that passed the decision check, whatever the LAPI mode.
@@ -678,7 +732,7 @@ bouncerActionRules:
 ```
 
 **BouncerAppsecFailureAction** (string, default `ban`)
-What to do when AppSec cannot give an answer (unreachable, error, or request body cannot be read): `ban`, `passthrough`, or `captcha`. See [Choose what happens when CrowdSec is down](#choose-what-happens-when-crowdsec-is-down).
+What to do when AppSec cannot give an answer (unreachable, error, or unexpected status): `ban`, `passthrough`, or `captcha`. It does not apply to a request body that misses `appsecBodyReadTimeoutSeconds`; that request is always blocked. See [Choose what happens when CrowdSec is down](#choose-what-happens-when-crowdsec-is-down).
 
 **BouncerClientTrustedIPs** ([]string, default `[]`)
 Client IPs or ranges that skip all checks, AppSec included (LAN, VPN).
@@ -891,6 +945,7 @@ http:
       plugin:
         bouncer:
           appsecBodyLimit: 10485760
+          appsecBodyReadTimeoutSeconds: 30
           appsecEnabled: false
           appsecHost: crowdsec:7422
           appsecHttpTimeoutSeconds: 1

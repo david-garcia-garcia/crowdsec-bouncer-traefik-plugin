@@ -63,6 +63,7 @@ const (
 // appsec / bouncer / captcha / lapi / log / reclaim form one visible block each.
 type Config struct {
 	AppsecBodyLimit                     int64                        `json:"appsecBodyLimit,omitempty"`
+	AppsecBodyReadTimeoutSeconds        int64                        `json:"appsecBodyReadTimeoutSeconds,omitempty"`
 	AppsecEnabled                       bool                         `json:"appsecEnabled,omitempty"`
 	AppsecHost                          string                       `json:"appsecHost,omitempty"`
 	AppsecHTTPTimeoutSeconds            int64                        `json:"appsecHttpTimeoutSeconds,omitempty"`
@@ -189,6 +190,21 @@ func captchaInstanceNameReadyAfterOwnerFill(config *Config) bool {
 	return config.CaptchaEnabled
 }
 
+// DefaultAppsecBodyLimit is the AppSec client-body cap in bytes (10 MiB) for an omitted or non-positive appsecBodyLimit.
+const DefaultAppsecBodyLimit int64 = 10485760
+
+// DefaultAppsecBodyReadTimeoutSeconds is the default total time to receive a request body of unknown length.
+const DefaultAppsecBodyReadTimeoutSeconds int64 = 30
+
+// EffectiveAppsecBodyLimit maps a non-positive appsecBodyLimit to DefaultAppsecBodyLimit.
+// A positive limit is returned unchanged. There is no unlimited mode.
+func EffectiveAppsecBodyLimit(limit int64) int64 {
+	if limit <= 0 {
+		return DefaultAppsecBodyLimit
+	}
+	return limit
+}
+
 // EffectiveFailureAction maps empty config to ban (plugin default).
 func EffectiveFailureAction(action string) string {
 	if action == "" {
@@ -200,7 +216,8 @@ func EffectiveFailureAction(action string) string {
 // New creates the default plugin configuration.
 func New() *Config {
 	return &Config{
-		AppsecBodyLimit:                     10485760,
+		AppsecBodyLimit:                     DefaultAppsecBodyLimit,
+		AppsecBodyReadTimeoutSeconds:        DefaultAppsecBodyReadTimeoutSeconds,
 		AppsecEnabled:                       false,
 		AppsecHost:                          "crowdsec:7422",
 		AppsecHTTPTimeoutSeconds:            10,
@@ -781,7 +798,6 @@ func validateParamsRequired(config *Config) error {
 		}
 	}
 	requiredInt0 := map[string]int64{
-		"AppsecBodyLimit":                  config.AppsecBodyLimit,
 		"LapiMetricsUpdateIntervalSeconds": config.LapiMetricsUpdateIntervalSeconds,
 		"ReclaimGraceSeconds":              config.ReclaimGraceSeconds,
 	}
@@ -795,6 +811,7 @@ func validateParamsRequired(config *Config) error {
 		"LapiDefaultDecisionSeconds":          config.LapiDefaultDecisionSeconds,
 		"LapiHTTPTimeoutSeconds":              config.LapiHTTPTimeoutSeconds,
 		"AppsecHTTPTimeoutSeconds":            config.AppsecHTTPTimeoutSeconds,
+		"AppsecBodyReadTimeoutSeconds":        config.AppsecBodyReadTimeoutSeconds,
 		"CaptchaSiteverifyHTTPTimeoutSeconds": config.CaptchaSiteverifyHTTPTimeoutSeconds,
 		"CaptchaGracePeriodSeconds":           config.CaptchaGracePeriodSeconds,
 	}
@@ -815,9 +832,6 @@ func validateParamsRequired(config *Config) error {
 	}
 	if _, err := httprule.NewActionSet(config.BouncerActionRules); err != nil {
 		return fmt.Errorf("BouncerActionRules: %w", err)
-	}
-	if config.AppsecBodyLimit < 0 {
-		return errors.New("AppsecBodyLimit: cannot be less than 0")
 	}
 	if config.BouncerRemediationStatusCode < 100 || config.BouncerRemediationStatusCode >= 600 {
 		return errors.New("BouncerRemediationStatusCode: cannot be less than 100 and more than 600")

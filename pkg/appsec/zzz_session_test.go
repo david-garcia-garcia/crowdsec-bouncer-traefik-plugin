@@ -49,6 +49,7 @@ func TestOpen_P2KnobChangeSplitsClient(t *testing.T) {
 		{name: "bodyLimit", mut: func(c *configuration.Config) { c.AppsecBodyLimit = 200 }},
 		{name: "tls", mut: func(c *configuration.Config) { c.AppsecTLSInsecureVerify = false }},
 		{name: "timeout", mut: func(c *configuration.Config) { c.AppsecHTTPTimeoutSeconds = 30 }},
+		{name: "bodyReadTimeout", mut: func(c *configuration.Config) { c.AppsecBodyReadTimeoutSeconds = 5 }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -122,5 +123,34 @@ func TestKey_TimeoutKnobsChangeIdentity(t *testing.T) {
 	timeouts.AppsecHTTPTimeoutSeconds = 30
 	if Key(base, "mw") == Key(timeouts, "mw") {
 		t.Fatal("HTTP timeout knobs must change AppSec Key")
+	}
+}
+
+func TestKey_BodyReadTimeoutChangesIdentity(t *testing.T) {
+	base := testAppsecConfig("127.0.0.1:1")
+	longer := testAppsecConfig("127.0.0.1:1")
+	longer.AppsecBodyReadTimeoutSeconds = 60
+	if Key(base, "mw") == Key(longer, "mw") {
+		t.Fatal("appsecBodyReadTimeoutSeconds must change AppSec Key")
+	}
+}
+
+func TestPrepare_NonPositiveBodyLimitSharesDefaultIdentity(t *testing.T) {
+	omitted := testAppsecConfig("127.0.0.1:1")
+	omitted.AppsecBodyLimit = configuration.New().AppsecBodyLimit
+	zero := testAppsecConfig("127.0.0.1:1")
+	zero.AppsecBodyLimit = 0
+	negative := testAppsecConfig("127.0.0.1:1")
+	negative.AppsecBodyLimit = -1
+	for _, prepared := range []*configuration.Config{omitted, zero, negative} {
+		if err := Prepare(prepared, slog.Default(), "mw"); err != nil {
+			t.Fatal(err)
+		}
+		if prepared.AppsecBodyLimit != configuration.DefaultAppsecBodyLimit {
+			t.Fatalf("Prepare must write the default cap, got %d", prepared.AppsecBodyLimit)
+		}
+	}
+	if Key(zero, "mw") != Key(omitted, "mw") || Key(negative, "mw") != Key(omitted, "mw") {
+		t.Fatal("appsecBodyLimit 0 / -1 after Prepare must share the omitted-limit AppSec Key")
 	}
 }

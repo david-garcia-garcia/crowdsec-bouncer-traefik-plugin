@@ -51,12 +51,16 @@ Other abort errors seen in the probe (none match `os.ErrDeadlineExceeded` or a c
 
 An HTTP/2 POST whose client body is empty and has no Content-Length reaches the handler with `ContentLength == -1` and `Body != http.NoBody`; `io.ReadAll` returns at once with 0 bytes and nil error. (authority: inference — probe, restic `?create=true` shape)
 
+## Measured later (implement, 2026-11-14)
+
+- Yaegi v0.16.1, plain `net/http` server: a timer calling `ResponseController.SetReadDeadline(time.Now())` cuts an HTTP/1.1 chunked read at the deadline. (authority: inference — `pkg/appsec/zzz_yaegi_body_read_timeout_test.go`)
+- HTTP/2 over TLS (`httptest` `EnableHTTP2`): same cut at the deadline. (authority: inference — `pkg/appsec/zzz_body_read_timeout_test.go`)
+- Traefik v3.7.11 binary with the plugin loaded under Yaegi (mock e2e, access log on and off): HTTP/2 without Content-Length is answered at the deadline; an HTTP/1.1 chunked read is **not** cut — the handler's read returns only when the client ends or abandons its body. So the controller does not reach Traefik's HTTP/1.1 connection through the writer the plugin receives, and the `Body.Close` fallback cannot cut HTTP/1.1. Which wrapper stops `Unwrap` was not determined. (authority: inference — `tests/e2e/mock/scenarios/appsec/run.sh` and probe runs)
+
 ## Not measured
 
 - HTTP/3 (quic-go) behaviour.
-- Whether Traefik's ResponseWriter wrappers expose `SetReadDeadline` through `Unwrap` to `http.ResponseController`.
-- Behaviour under the Yaegi interpreter.
-- TLS (h2 over TLS); the probe used unencrypted HTTP/2 only.
+- Which Traefik ResponseWriter wrapper hides `SetReadDeadline` / `Unwrap` from `http.ResponseController` (not read in Traefik source).
 
 ## Sources
 

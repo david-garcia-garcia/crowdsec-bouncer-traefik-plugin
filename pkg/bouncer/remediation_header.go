@@ -21,6 +21,7 @@ const (
 	headerReasonAppsec               = "appsec"
 	headerReasonAppsecChallengeEmpty = "appsec-challenge-empty"
 	headerReasonAppsecFailure        = "appsec-failure"
+	headerReasonAppsecBodyTimeout    = "appsec-body-timeout"
 	headerReasonCaptchaDowngrade     = "captcha-downgrade"
 	headerReasonChallenge            = "challenge"
 	headerReasonClientDisconnected   = "client-disconnected"
@@ -63,6 +64,8 @@ func headerReasonFromOrigin(origin string) string {
 		return headerReasonStreamUnhealthy
 	case lapi.OriginPluginAppsecFailure:
 		return headerReasonAppsecFailure
+	case lapi.OriginPluginAppsecBodyTimeout:
+		return headerReasonAppsecBodyTimeout
 	default:
 		return headerReasonLAPI
 	}

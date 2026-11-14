@@ -7,6 +7,13 @@ http:
       service: backend
       middlewares:
         - bouncer
+    stream:
+      rule: "PathPrefix(`/stream`)"
+      entryPoints:
+        - web
+      service: backend
+      middlewares:
+        - bouncer-stream
   services:
     backend:
       loadBalancer:
@@ -17,6 +24,7 @@ http:
       plugin:
         bouncer:
           appsecBodyLimit: 4
+          appsecBodyReadTimeoutSeconds: 2
           appsecEnabled: "true"
           appsecHost: "@@APPSEC_HOST@@"
           appsecScheme: http
@@ -25,6 +33,24 @@ http:
           bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
           # IP bouncing disabled — this scenario exercises AppSec only.
+          lapiEnabled: "false"
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          lapiScheme: http
+    # Body read timeout: default appsecBodyLimit, and passthrough to show the timeout
+    # ignores the failure action.
+    bouncer-stream:
+      plugin:
+        bouncer:
+          appsecBodyReadTimeoutSeconds: 2
+          appsecEnabled: "true"
+          appsecHost: "@@APPSEC_HOST@@"
+          appsecScheme: http
+          bouncerAppsecFailureAction: passthrough
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersTrustedIps:
+            - "127.0.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Remediation
           lapiEnabled: "false"
           lapiHost: "@@LAPI_HOST@@"
           lapiKey: "@@APIKEY@@"

@@ -36,6 +36,10 @@ const msgUnauthenticated = "Remediation component is not authenticated."
 // msgUnexpectedListenerStatus is the debounced WARN when the listener status is not 200, 401, 403, or 500.
 const msgUnexpectedListenerStatus = "The remediation component returned an unexpected status code"
 
+// msgBodyReadTimeout is the debounced WARN when a client body of unknown length misses appsecBodyReadTimeoutSeconds.
+const msgBodyReadTimeout = "AppSec request body not received within appsecBodyReadTimeoutSeconds; request blocked. " +
+	"Exclude streaming routes with a bouncerActionRules bypassAppsec rule"
+
 // Structured AppSec JSON action values CrowdSec 1.8 puts in the envelope body.
 const (
 	ActionAllow     = "allow"
@@ -56,6 +60,11 @@ var ErrFailureCaptcha = errors.New("failureAction captcha")
 // Query MUST NOT call AppSec or apply FailureAction; the bouncer stops without a ban.
 var ErrClientDisconnected = errors.New("appsecQuery:clientDisconnected")
 
+// ErrBodyReadTimeout is a client body of unknown length that did not end (or reach appsecBodyLimit)
+// within appsecBodyReadTimeoutSeconds. Query MUST NOT call AppSec or apply FailureAction;
+// the bouncer serves it as its own ban. It takes precedence over ErrClientDisconnected.
+var ErrBodyReadTimeout = errors.New("appsecQuery:bodyReadTimeout")
+
 // errAppsecReadBody is the io failure from readCappedAppsecBody (not an oversized body).
 var errAppsecReadBody = errors.New("appsecQuery:readBody")
 
@@ -69,12 +78,6 @@ func resultForFailureAction(action, errMsg string) (*Response, error) {
 	default:
 		return nil, errors.New(errMsg)
 	}
-}
-
-// resultForFailureActionErr is resultForFailureAction when only an error is needed (request build).
-func resultForFailureActionErr(action, errMsg string) error {
-	_, err := resultForFailureAction(action, errMsg)
-	return err
 }
 
 // Response is the structured AppSec JSON envelope CrowdSec 1.8 returns for a remediation.
@@ -94,8 +97,10 @@ func appsecAllow() *Response {
 	return &Response{Action: ActionAllow}
 }
 
-func isBodyUnreadable(httpReq *http.Request) bool {
-	return httpReq.Body != nil && httpReq.Body != http.NoBody && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
+// isBodyLengthUnknown reports a client body with no declared length (HTTP/1.1 chunked, HTTP/2 or
+// HTTP/3 without Content-Length). Only such a body is read under appsecBodyReadTimeoutSeconds.
+func isBodyLengthUnknown(httpReq *http.Request) bool {
+	return httpReq.ContentLength < 0
 }
 
 // isClientGoneBodyReadErr reports disconnect or cancel while buffering a readable client body.
@@ -105,19 +110,8 @@ func isClientGoneBodyReadErr(err error) bool {
 		errors.Is(err, io.ErrUnexpectedEOF)
 }
 
-// isMethodWithBody reports whether an unreadable body on this method is a drop candidate.
-func isMethodWithBody(method string) bool {
-	switch method {
-	case http.MethodPost, http.MethodPut, http.MethodPatch:
-		return true
-	default:
-		return false
-	}
-}
-
-// isMethodWithForwardableBody reports whether a readable body on this method is copied to AppSec.
-// Deliberately wider than isMethodWithBody: a DELETE body is worth inspecting, but an unreadable
-// DELETE body is not a drop candidate. Keep the two sets separate.
+// isMethodWithForwardableBody reports whether a client body on this method is copied to AppSec.
+// Every other method goes headers-only, so a GET carrying a body is never read or laundered into a POST.
 func isMethodWithForwardableBody(method string) bool {
 	switch method {
 	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
@@ -141,8 +135,10 @@ func isHopByHopHeader(name string) bool {
 
 // Query forwards the request to this AppSec HTTP client.
 // The status table in the body is the CrowdSec AppSec protocol this method follows.
-func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error) {
-	appsecReq, err := c.newAppsecForwardRequest(req, pol)
+// responseController belongs to the inbound response writer; the body-read deadline uses it to cut
+// a stalled read. nil is allowed and falls back to closing the request body.
+func (c *Client) Query(req clientrequest.Request, pol Policy, responseController *http.ResponseController) (*Response, error) {
+	appsecReq, err := c.newAppsecForwardRequest(req, responseController)
 	if err != nil {
 		return nil, err
 	}
@@ -205,13 +201,13 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 }
 
 // newAppsecForwardRequest builds the AppSec listener request, copying client headers and identity.
-func (c *Client) newAppsecForwardRequest(req clientrequest.Request, pol Policy) (*http.Request, error) {
+func (c *Client) newAppsecForwardRequest(req clientrequest.Request, responseController *http.ResponseController) (*http.Request, error) {
 	routeURL := url.URL{
 		Scheme: c.appsecScheme,
 		Host:   c.appsecHost,
 		Path:   c.appsecPath,
 	}
-	appsecReq, err := c.newAppsecBodyRequest(routeURL.String(), req.Request, pol)
+	appsecReq, err := c.newAppsecBodyRequest(routeURL.String(), req, responseController)
 	if err != nil {
 		return nil, err
 	}
@@ -248,39 +244,66 @@ func (c *Client) newAppsecForwardRequest(req clientrequest.Request, pol Policy) 
 	return appsecReq, nil
 }
 
-// newAppsecBodyRequest chooses GET (no, unreadable, or non-body-method body) or POST (copied client
-// body) toward AppSec. The original verb always travels on X-Crowdsec-Appsec-Verb.
-func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol Policy) (*http.Request, error) {
-	switch {
-	case isBodyUnreadable(httpReq):
-		if isMethodWithBody(httpReq.Method) && configuration.EffectiveFailureAction(pol.FailureAction) != configuration.FailureActionPassthrough {
-			return nil, resultForFailureActionErr(pol.FailureAction, "appsecQuery:unreadableBody dropped")
-		}
-		req, _ := http.NewRequest(http.MethodGet, target, nil)
-		return req, nil
-	case httpReq.Body != nil && httpReq.Body != http.NoBody && isMethodWithForwardableBody(httpReq.Method):
-		// Readable body: cap with LimitReader only when the operator set a positive limit.
-		var bodyBuffer bytes.Buffer
-		bodyReader := io.Reader(httpReq.Body)
-		if c.appsecBodyLimit > 0 {
-			bodyReader = io.LimitReader(httpReq.Body, c.appsecBodyLimit)
-		}
-		teeReader := io.TeeReader(bodyReader, &bodyBuffer)
-		bodyBytes, err := io.ReadAll(teeReader)
-		if err != nil {
-			if isClientGoneBodyReadErr(err) {
-				return nil, ErrClientDisconnected
-			}
-			return nil, fmt.Errorf("appsecQuery:GetBody %w", err)
-		}
-		httpReq.Body = io.NopCloser(io.MultiReader(&bodyBuffer, httpReq.Body))
-		req, _ := http.NewRequest(http.MethodPost, target, bytes.NewBuffer(bodyBytes))
-		req.ContentLength = int64(len(bodyBytes))
-		return req, nil
-	default:
-		req, _ := http.NewRequest(http.MethodGet, target, nil)
-		return req, nil
+// newAppsecBodyRequest chooses GET (no body, or a method whose body is not inspected) or POST (copied
+// client body) toward AppSec. The original verb always travels on X-Crowdsec-Appsec-Verb.
+func (c *Client) newAppsecBodyRequest(target string, req clientrequest.Request, responseController *http.ResponseController) (*http.Request, error) {
+	if req.Body == nil || req.Body == http.NoBody || !isMethodWithForwardableBody(req.Method) {
+		appsecReq, _ := http.NewRequest(http.MethodGet, target, nil)
+		return appsecReq, nil
 	}
+	bodyBytes, err := c.readClientBodyForAppsec(req, responseController)
+	if err != nil {
+		return nil, err
+	}
+	appsecReq, _ := http.NewRequest(http.MethodPost, target, bytes.NewBuffer(bodyBytes))
+	appsecReq.ContentLength = int64(len(bodyBytes))
+	return appsecReq, nil
+}
+
+// readClientBodyForAppsec copies up to appsecBodyLimit bytes of the client body for AppSec and
+// restores the full body for origin. A body of unknown length must arrive within
+// appsecBodyReadTimeoutSeconds, else ErrBodyReadTimeout. A client gone mid-read is ErrClientDisconnected.
+func (c *Client) readClientBodyForAppsec(req clientrequest.Request, responseController *http.ResponseController) ([]byte, error) {
+	clientBody := req.Body
+
+	// Arm the total deadline only for a body of unknown length; a declared length keeps Traefik's readTimeout.
+	var deadlineTimer *time.Timer
+	if isBodyLengthUnknown(req.Request) {
+		deadlineTimer = time.AfterFunc(time.Duration(c.bodyReadTimeoutSeconds)*time.Second, func() {
+			// Cut the in-flight read. The controller reaches HTTP/1.1 and HTTP/2; Close only HTTP/2 (and HTTP/3).
+			if responseController == nil || responseController.SetReadDeadline(time.Now()) != nil {
+				_ = clientBody.Close()
+			}
+		})
+	}
+
+	// Copy at most appsecBodyLimit bytes; the tee keeps them for the origin restore below.
+	var bodyBuffer bytes.Buffer
+	bodyBytes, err := io.ReadAll(io.TeeReader(io.LimitReader(clientBody, c.appsecBodyLimit), &bodyBuffer))
+
+	// The plugin's own timer is the only classifier of a deadline, checked before the read error:
+	// a cut read can look like a client disconnect, or even succeed when the timer races the last byte.
+	if deadlineTimer != nil && !deadlineTimer.Stop() {
+		logger.Debounced(c.log, slog.LevelWarn, 5*time.Second, msgBodyReadTimeout,
+			"ip", req.IPAddrString(),
+			"method", req.Method,
+			"host", req.Host,
+			"path", req.URL.Path,
+			"timeoutSeconds", c.bodyReadTimeoutSeconds)
+		return nil, ErrBodyReadTimeout
+	}
+
+	// Classify the remaining read failures: client gone, or an unclassified GetBody fault.
+	if err != nil {
+		if isClientGoneBodyReadErr(err) {
+			return nil, ErrClientDisconnected
+		}
+		return nil, fmt.Errorf("appsecQuery:GetBody %w", err)
+	}
+
+	// Give origin the bytes already read followed by whatever the client still sends past the limit.
+	req.Body = io.NopCloser(io.MultiReader(&bodyBuffer, clientBody))
+	return bodyBytes, nil
 }
 
 // drainResponse consumes leftover bytes so the AppSec HTTP connection can be reused.

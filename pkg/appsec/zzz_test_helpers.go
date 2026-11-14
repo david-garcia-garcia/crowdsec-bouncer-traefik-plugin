@@ -17,14 +17,15 @@ import (
 
 func testAppsecConfig(host string) *configuration.Config {
 	return &configuration.Config{
-		AppsecBodyLimit:          10485760,
-		AppsecEnabled:            true,
-		AppsecHost:               host,
-		AppsecHTTPTimeoutSeconds: 1,
-		AppsecKey:                "test-key",
-		AppsecPath:               "/",
-		AppsecScheme:             "http",
-		AppsecTLSInsecureVerify:  true,
+		AppsecBodyLimit:              10485760,
+		AppsecBodyReadTimeoutSeconds: 30,
+		AppsecEnabled:                true,
+		AppsecHost:                   host,
+		AppsecHTTPTimeoutSeconds:     1,
+		AppsecKey:                    "test-key",
+		AppsecPath:                   "/",
+		AppsecScheme:                 "http",
+		AppsecTLSInsecureVerify:      true,
 	}
 }
 
@@ -71,24 +72,9 @@ func newReadablePostWithFailingBody(readErr error) *http.Request {
 	return req
 }
 
-func newStreamingRequest(done <-chan struct{}) *http.Request {
-	req, _ := http.NewRequest(http.MethodPost, "http://localhost/signalexchange.SignalExchange/ConnectStream", blockingBody{done: done})
-	req.Header.Set("Content-Type", "application/grpc")
-	req.ProtoMajor = 2
-	req.ContentLength = -1
-	return req
-}
-
-func newUnreadableGetRequest(done <-chan struct{}) *http.Request {
-	req, _ := http.NewRequest(http.MethodGet, "http://localhost/", blockingBody{done: done})
-	req.ProtoMajor = 3
-	req.ContentLength = -1
-	return req
-}
-
-// newUnreadableDeleteRequest is an HTTP/2 DELETE whose body cannot be buffered.
-func newUnreadableDeleteRequest(done <-chan struct{}) *http.Request {
-	req, _ := http.NewRequest(http.MethodDelete, "http://localhost/", blockingBody{done: done})
+// newUnknownLengthRequest is an HTTP/2 request whose body has no declared length (no Content-Length).
+func newUnknownLengthRequest(method string, body io.Reader) *http.Request {
+	req := httptest.NewRequest(method, "http://localhost/", body)
 	req.ProtoMajor = 2
 	req.ContentLength = -1
 	return req
@@ -105,7 +91,7 @@ func assertClientDisconnectedQuery(t *testing.T, readErr error, failureAction st
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
 	client := newQueryClient(appsecURL, appsecServer.Client())
-	decision, err := client.Query(withTestAddress(newReadablePostWithFailingBody(readErr)), Policy{FailureAction: failureAction})
+	decision, err := client.Query(withTestAddress(newReadablePostWithFailingBody(readErr)), Policy{FailureAction: failureAction}, nil)
 	if !errors.Is(err, ErrClientDisconnected) {
 		t.Fatalf("Query() error %v want ErrClientDisconnected", err)
 	}
@@ -128,7 +114,7 @@ func assertUnclassifiedBodyReadStillGetBody(t *testing.T) {
 	appsecURL, _ := url.Parse(appsecServer.URL)
 	client := newQueryClient(appsecURL, appsecServer.Client())
 	sentinel := errors.New("disk read fault")
-	_, err := client.Query(withTestAddress(newReadablePostWithFailingBody(sentinel)), Policy{FailureAction: configuration.FailureActionPassthrough})
+	_, err := client.Query(withTestAddress(newReadablePostWithFailingBody(sentinel)), Policy{FailureAction: configuration.FailureActionPassthrough}, nil)
 	if err == nil {
 		t.Fatal("Query() expected error for unclassified body read failure")
 	}

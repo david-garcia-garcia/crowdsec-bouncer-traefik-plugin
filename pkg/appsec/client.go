@@ -26,26 +26,29 @@ const (
 type Client struct {
 	mu sync.Mutex
 
-	appsecScheme    string
-	appsecHost      string
-	appsecPath      string
-	appsecBodyLimit int64
-	transport       atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
-	log             *slog.Logger
-	pluginVersion   string
-	middlewareName  string
-	instanceName    string
-	incarnation     string
-	sessionKey      string
-	closed          bool
-	sleeping        bool
+	appsecScheme           string
+	appsecHost             string
+	appsecPath             string
+	appsecBodyLimit        int64
+	bodyReadTimeoutSeconds int64        // total time to receive a client body of unknown length
+	transport              atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
+	log                    *slog.Logger
+	pluginVersion          string
+	middlewareName         string
+	instanceName           string
+	incarnation            string
+	sessionKey             string
+	closed                 bool
+	sleeping               bool
 }
 
 // Prepare resolves AppSec secrets on cfg when AppSec is enabled. Empty key/scheme copy from LAPI.
+// A non-positive appsecBodyLimit is written back as the default cap so the reclaim identity sees it.
 func Prepare(cfg *configuration.Config, log *slog.Logger, traefikName string) error {
 	if !cfg.AppsecEnabled {
 		return nil
 	}
+	cfg.AppsecBodyLimit = configuration.EffectiveAppsecBodyLimit(cfg.AppsecBodyLimit)
 	if strings.TrimSpace(cfg.AppsecInstanceName) == "" {
 		cfg.AppsecInstanceName = traefikName
 	}
@@ -78,15 +81,16 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, m
 		return nil, err
 	}
 	client := &Client{
-		appsecScheme:    config.AppsecScheme,
-		appsecHost:      config.AppsecHost,
-		appsecPath:      config.AppsecPath,
-		appsecBodyLimit: config.AppsecBodyLimit,
-		middlewareName:  middlewareName,
-		instanceName:    config.AppsecInstanceName,
-		sessionKey:      bindKey,
-		log:             log,
-		pluginVersion:   pluginVersion,
+		appsecScheme:           config.AppsecScheme,
+		appsecHost:             config.AppsecHost,
+		appsecPath:             config.AppsecPath,
+		appsecBodyLimit:        configuration.EffectiveAppsecBodyLimit(config.AppsecBodyLimit),
+		bodyReadTimeoutSeconds: config.AppsecBodyReadTimeoutSeconds,
+		middlewareName:         middlewareName,
+		instanceName:           config.AppsecInstanceName,
+		sessionKey:             bindKey,
+		log:                    log,
+		pluginVersion:          pluginVersion,
 	}
 	client.incarnation = fmt.Sprintf("%p", client)
 	client.transport.Store(next)

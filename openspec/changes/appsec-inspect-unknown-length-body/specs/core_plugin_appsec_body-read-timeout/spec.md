@@ -55,7 +55,9 @@ When the body read deadline expires before the body ends or reaches `appsecBodyL
 
 #### Scenario: Stalled HTTP/1.1 chunked body is blocked
 - **WHEN** an HTTP/1.1 chunked POST keeps its body open past `appsecBodyReadTimeoutSeconds`
-- **THEN** the client receives the ban response without waiting for the client to end its body
+- **THEN** the client receives the ban response, never origin
+- **AND** when the response writer exposes `SetReadDeadline` (Go `net/http` server), the ban is sent without waiting for the client to end its body
+- **AND** behind Traefik, whose writer does not expose it (measured on v3.7.11), the ban is sent once the client ends or abandons its body, or at Traefik's entrypoint `readTimeout`
 
 #### Scenario: Captcha failure action still bans
 - **WHEN** the body read deadline expires and `bouncerAppsecFailureAction` is `captcha`
