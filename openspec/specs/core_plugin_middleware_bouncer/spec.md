@@ -220,6 +220,7 @@ Closed reasons never take a third field. The closed vocabulary is:
 | `ban:appsec` | AppSec JSON `action: ban` |
 | `ban:appsec-challenge-empty` | AppSec `action: challenge` with empty body (fail-closed to ban page) |
 | `ban:appsec-failure` | AppSec down / unusable verdict, fail-closed ban |
+| `ban:appsec-body-timeout` | AppSec request body of unknown length not received within `appsecBodyReadTimeoutSeconds`; fail-closed ban that `bouncerAppsecFailureAction` does not change |
 | `ban:captcha-downgrade` | Kind was captcha; this router served a ban page (unsubscribed / unpublished / invalid captcha client) |
 | `captcha:rules` | Matching action rule applied captcha |
 | `captcha:lapi` / `captcha:lapi:<origin>` | CrowdSec decision type captcha (same origin encoding) |
@@ -282,6 +283,12 @@ The bouncer SHALL format ban, AppSec relay, disconnect, captcha-downgrade, and c
 - **WHEN** `bouncerRemediationHeadersCustomName` is empty
 - **AND** the bouncer writes a ban page
 - **THEN** no structured remediation header is set
+
+#### Scenario: AppSec body read timeout is its own reason
+- **WHEN** `bouncerRemediationHeadersCustomName` is set
+- **AND** the bouncer bans because the AppSec body read timeout expired
+- **THEN** the header value is `ban:appsec-body-timeout`
+- **AND** it is not `ban:appsec-failure`
 
 ### Requirement: Action rules fold every matching row
 The bouncer SHALL expose one public Config list `bouncerActionRules`. Default empty (omit or empty list) SHALL match nothing (setting off). Each row SHALL have `name`, `action`, and the same request predicates as dest `httprule.Rule` (`method`, `path`, `host`, `headers`, `cookies`). An omitted predicate, or `path` / `host` / `method` empty after trim, or an empty `headers` / `cookies` map, SHALL mean any for that predicate. Set predicates on one row SHALL all match (AND).

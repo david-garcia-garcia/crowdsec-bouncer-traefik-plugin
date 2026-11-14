@@ -14,3 +14,5 @@ FindSpecHost verdicts (propose, 2026-11-14):
 - `core_plugin_middleware_bouncer` — fold, confidence high. MODIFIED "Structured remediation header values": closed vocabulary row `ban:appsec-body-timeout`.
 - `core_plugin_lapi_usage-metrics` — fold, confidence high. MODIFIED "Dropped items use official labels": plugin origin `plugin:appsec_body_timeout`.
 - `core_plugin_middleware_config-validation` — not written. Explore listed it as a candidate; the key's validation lives in the new leaf and the negative-limit acceptance in `core_plugin_appsec_client`, so no requirement of that spec changes.
+
+Archive FindSpecHost (2026-11-14): Task sub-agent re-ran the search and confirmed all five propose verdicts (1 new, 4 fold; no skip, no cleanup/absence-only requirement). Synced into `openspec/specs/`; Purpose of `core_plugin_appsec_failure-action` no longer names an unbuffered request body. Change folder moved to `openspec/changes/archive/2026-11-14-appsec-inspect-unknown-length-body/`.
