@@ -1,14 +1,18 @@
 issueKey: 2026-11-14-appsec-ratelimit-429
-jobName: 2026-11-14-appsec-ratelimit-429
+jobName: Return 429 for AppSec RateLimit bans
 issueHost: local
 issueRef: none
 prHost: github
 ciHost: github
 repoSlug: crowdsec-bouncer-traefik-plugin
 destBranch: master
+qualify: qualified
+src: 06463388ea6de0fb4230c0d301dfb02bd52d0dbecbe5360a5542d7c217f54a18
 localTests: none
 requirement: requirement.md
 comments: none
 explore: none
 change: none
-pr: none
+pr:
+  id: 207
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/207
