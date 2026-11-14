@@ -50,6 +50,7 @@ type ownership struct {
 	UpdateMaxFailure             int64       `json:"updateMaxFailure"`
 	CapiScenarios                []string    `json:"capiScenarios"`
 	DefaultDecisionSeconds       int64       `json:"defaultDecisionSeconds"`
+	RemediationFallback          string      `json:"remediationFallback,omitempty"`
 }
 
 func identityFrom(cfg *configuration.Config) identity {
@@ -103,7 +104,18 @@ func ownershipFrom(cfg *configuration.Config, middlewareName string) ownership {
 		UpdateMaxFailure:             cfg.LapiUpdateMaxFailure,
 		CapiScenarios:                append([]string(nil), cfg.LapiCapiScenarios...),
 		DefaultDecisionSeconds:       cfg.LapiDefaultDecisionSeconds,
+		RemediationFallback:          nonDefaultRemediationFallback(cfg),
 	}
+}
+
+// nonDefaultRemediationFallback is the effective lapiRemediationFallback for store and Client identity,
+// or empty when it is the default ban so a config that predates the knob keeps its SessionHex and Open key.
+func nonDefaultRemediationFallback(cfg *configuration.Config) string {
+	fallback := configuration.EffectiveLapiRemediationFallback(cfg.LapiRemediationFallback)
+	if fallback == configuration.LapiRemediationFallbackBan {
+		return ""
+	}
+	return fallback
 }
 
 func sortedCopy(values []string) []string {

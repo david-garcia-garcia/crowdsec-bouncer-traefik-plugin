@@ -3,11 +3,11 @@
 ## Language
 
 **Ownership key**:
-The Open key for one `lapi.Client`: middleware name plus that client's knobs (mode, scheme, host, path, key, TLS, `lapiHttpTimeoutSeconds`, Redis, `lapiStreamScopes`, CAPI credentials, `lapiUpdateIntervalSeconds`, `lapiMetricsUpdateIntervalSeconds`, `lapiUpdateMaxFailure`, `lapiCapiScenarios`, `lapiDefaultDecisionSeconds`). Prefix `lapi:owner:`. Same middleware name and same knobs Wake. A different middleware name is a different Client.
+The Open key for one `lapi.Client`: middleware name plus that client's knobs (mode, scheme, host, path, key, TLS, `lapiHttpTimeoutSeconds`, Redis, `lapiStreamScopes`, CAPI credentials, `lapiUpdateIntervalSeconds`, `lapiMetricsUpdateIntervalSeconds`, `lapiUpdateMaxFailure`, `lapiCapiScenarios`, `lapiDefaultDecisionSeconds`, effective `lapiRemediationFallback` when not `ban`). Prefix `lapi:owner:`. Same middleware name and same knobs Wake. A different middleware name is a different Client.
 _Avoid_: slot name as the Client key, IdentityHex as the Open suffix, Bouncer, CrowdsecConnection, AppSec host
 
 **SessionHex**:
-The DecisionStore identity hash: mode, LAPI URL+key, CAPI machine/password, `lapiDefaultDecisionSeconds`, stream canonical scope list, and the Redis set only when `lapiRedisEnabled` is true. Not middleware name. Not the slot name.
+The DecisionStore identity hash: mode, LAPI URL+key, CAPI machine/password, `lapiDefaultDecisionSeconds`, effective `lapiRemediationFallback` only when not `ban`, stream canonical scope list, and the Redis set only when `lapiRedisEnabled` is true. Not middleware name. Not the slot name.
 _Avoid_: leftover Redis fields when Redis is off, `bouncerDecisionScopeHeaders`
 
 ## Overview
@@ -20,6 +20,7 @@ How this plugin keys a reclaimed `lapi.Client` versus the store it writes. Spec:
 - `StoreKey` is `decisionstore:` plus `SessionHex` only.
 - A knob on the ownership key that is not in SessionHex (interval, metrics, `updateMaxFailure`, CAPI scenarios) Opens a new Client and keeps the store.
 - `lapiDefaultDecisionSeconds` is on both: new Client and new store.
+- `lapiRemediationFallback` is on both: new Client and new store. Fill both payloads from `nonDefaultRemediationFallback` (`omitempty`): omitted, empty, and `ban` keep the SessionHex and Open key of a config that predates the knob, so an upgrade keeps its Redis keys.
 - Redis off: leftover host/password/database/read hosts do not change SessionHex. Redis on: the whole set is in SessionHex (read hosts sorted).
 - Pass `reclaim.Hooks` for Sleep/Wake/Close. An unreclaimed `lapi.Client` waits process-table grace (`reclaimGraceSeconds`, default 30).
 

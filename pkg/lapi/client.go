@@ -62,6 +62,7 @@ type Client struct {
 	instanceName         string
 	incarnation          string
 	lapiKey              string
+	remediationFallback  string // opener lapiRemediationFallback; store letter for a type that is neither ban nor captcha
 
 	transport     atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
 	decisionStore *decisionstore.Store
@@ -160,6 +161,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		middlewareName:          middlewareName,
 		instanceName:            config.LapiInstanceName,
 		lapiKey:                 config.LapiKey,
+		remediationFallback:     configuration.EffectiveLapiRemediationFallback(config.LapiRemediationFallback),
 		log:                     log,
 		pluginVersion:           pluginVersion,
 		isCrowdsecStreamStartup: startup,

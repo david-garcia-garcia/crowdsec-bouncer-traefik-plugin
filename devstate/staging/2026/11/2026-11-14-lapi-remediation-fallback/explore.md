@@ -79,8 +79,8 @@ Outside facts used:
 
 - Q: Where do README, devdocs and the delivery card state the position on `whitelist` / `allow` decisions, and with which references?
   Rank: additive asked — new documentation text; requirement Desired 5 and "Delivery card (must)"
-  Decision: assumed — README: one paragraph under "## Decisions" (after the scope list) plus the `LapiRemediationFallback` Variables entry, which also says it is not `bouncerLapiFailureAction`. Devdocs: the stream-apply and origin-remap packets. Card: codereview's Delivery axis writes it into `codereview_delivery.md` `## Motivation`. Text in all three: `whitelist` and `allow` are not valid CrowdSec decision types and are an inadequate way to manage whitelists, because the LAPI stream is designed to say WHAT TO BLOCK, not WHAT TO ALLOW; use parser whitelists or LAPI allowlists (`cscli allowlists`). References: upstream issue #402 point 1 (https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/402), upstream PR #403 point 1 (https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403), upstream PR #433 whitelist part (https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/433), fork PR #198 (https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/198). Source: requirement.md; human, chat 2026-11-14.
-  By: explore
+  Decision: assumed — README: one paragraph under "## Decisions" (after the scope list) plus the `LapiRemediationFallback` Variables entry, which also says it is not `bouncerLapiFailureAction`. Devdocs: the stream-apply and origin-remap packets. Card: codereview's Delivery axis writes it into `codereview_delivery.md` `## Motivation`. Text in all three: `whitelist` and `allow` are not valid CrowdSec decision types and are an inadequate way to manage whitelists, because the LAPI stream is designed to say WHAT TO BLOCK, not WHAT TO ALLOW; use parser whitelists or LAPI allowlists (`cscli allowlists`). References: upstream issue #402 point 1 (https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/402), upstream PR #403 point 1 (https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403), upstream PR #433 whitelist part (https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/433), fork PR #198 (https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/198). Source: requirement.md; human, chat 2026-11-14. Implement wrote the README paragraph (under "## Decisions", after the scope list and header mapping) and the Variables entry, and the same statement in `knowledge/devdocs/core_plugin_lapi_stream-apply.md` and `core_plugin_lapi_origin-based-decision-remap.md`; the card Motivation stays with codereview's Delivery axis.
+  By: implement
 
 - Q: Must `lapiRemediationFallback: captcha` be rejected when the router has no captcha instance, and what does a stored captcha do on such a router?
   Rank: additive asked — validation of a knob this change creates; requirement Desired 1 ("Any other value is rejected by config validation")
@@ -94,8 +94,8 @@ Outside facts used:
 
 - Q: Must the knob enter `SessionHex` and the ownership key?
   Rank: additive incidental — adds one field to the `sessionFrom` / `ownershipFrom` payloads; existing callers keep working and a default config keeps its hash; no requirement line names store identity
-  Decision: assumed — yes, both. Ownership key: the Client holds the value, so a change must Open a new Client (same rule as every other `lapi*` knob in `ownershipFrom`). `SessionHex`: the knob changes what is stored. Two middleware names with the same `SessionHex` share one DecisionStore, and Redis instances share keys by the `SessionHex` prefix, so without it two values would overwrite each other (last poll wins), and a switch from `ban` to `ignore` would keep the old bans until TTL. With it, a change forks the store and refills with `startup=true` (same as `lapiDefaultDecisionSeconds` and `lapiStreamScopes`, `core_plugin_lapi_reclaim-key.md`). Encode the field only when the effective value is not `ban` (`omitempty`), so existing deployments keep their `SessionHex` and Redis keys on upgrade. This also settles the requirement Unknown on Redis multi-instance runs. Propose adds the `core_plugin_lapi_reclaim-key` delta.
-  By: explore
+  Decision: assumed — yes, both. Ownership key: the Client holds the value, so a change must Open a new Client (same rule as every other `lapi*` knob in `ownershipFrom`). `SessionHex`: the knob changes what is stored. Two middleware names with the same `SessionHex` share one DecisionStore, and Redis instances share keys by the `SessionHex` prefix, so without it two values would overwrite each other (last poll wins), and a switch from `ban` to `ignore` would keep the old bans until TTL. With it, a change forks the store and refills with `startup=true` (same as `lapiDefaultDecisionSeconds` and `lapiStreamScopes`, `core_plugin_lapi_reclaim-key.md`). Encode the field only when the effective value is not `ban` (`omitempty`), so existing deployments keep their `SessionHex` and Redis keys on upgrade. This also settles the requirement Unknown on Redis multi-instance runs. Propose adds the `core_plugin_lapi_reclaim-key` delta. Implement: one helper `nonDefaultRemediationFallback` (`pkg/lapi/identity.go`) fills both payloads; `pkg/lapi/zzz_remediation_fallback_identity_test.go` pins the pre-knob SessionHex and the fork.
+  By: implement
 
 - Q: Is empty config `ban` at runtime, or is the default written in `New`?
   Rank: additive asked — default of a knob this change creates; requirement Desired 1 ("Default `ban`")
@@ -114,8 +114,8 @@ Outside facts used:
 
 - Q: Should `ignore` log the skipped type, and at what level?
   Rank: additive incidental — log attribute on a branch this change creates; no criterion names logging; requirement Out of scope keeps the stem and level
-  Decision: assumed — keep the TRACE stem `handleStreamCache:unknownType` for every unknown type and add the effective fallback as an attribute; no new Info/Debug line.
-  By: explore
+  Decision: resolved — implemented: TRACE stem `handleStreamCache:unknownType` for every unknown type with `type` and `fallback` attributes; no new Info/Debug line (`pkg/lapi/zzz_unknown_decision_type_test.go` `TestIngestUnknownTypeTraceCarriesFallback`).
+  By: implement
 
 - Q: How does the fallback interact with `bouncerOriginBasedDecisionRemap`?
   Rank: additive incidental — documentation of unchanged behavior; requirement Out of scope ("Changing ... `bouncerOriginBasedDecisionRemap` semantics")
@@ -139,5 +139,5 @@ Outside facts used:
 
 - Q: Which devdocs term names the knob, and when is it written?
   Rank: additive incidental — new Language entry; no criterion names devdocs Language (Desired 5 names usage docs)
-  Decision: assumed — no devdocs write in explore (no code path exists yet, `skill:opd-devdocs:Consume then produce`). Implement or devdocsimpact adds **Remediation fallback** (the store letter for a LAPI type that is neither `ban` nor `captcha`; `_Avoid_`: passthrough, whitelist, allow, failure action) to `core_plugin_lapi_stream-apply.md`, and updates usage lines l.22 there and l.15/20/22 in `core_plugin_lapi_origin-based-decision-remap.md`, with the whitelist/allow position above.
-  By: explore
+  Decision: resolved — implement added Language **Remediation fallback** (the store letter `lapiRemediationFallback` gives a LAPI type that is neither `ban` nor `captcha`; `_Avoid_`: passthrough, whitelist, allow, failure action) to `knowledge/devdocs/core_plugin_lapi_stream-apply.md`, with usage lines there (ingest, Deleted predicate, counts, opener-only) and in `core_plugin_lapi_origin-based-decision-remap.md` (fallback letter, remap follows the stored letter), each with the whitelist/allow position; `core_plugin_lapi_reclaim-key.md` names the knob in Ownership key / SessionHex and How to use. Code path: `pkg/lapi/client_decisions.go` `ingestRemediationKind`, `deletedTypeClearsStore`.
+  By: implement

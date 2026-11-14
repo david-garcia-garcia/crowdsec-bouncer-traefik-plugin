@@ -28,6 +28,7 @@ type streamSession struct {
 	DefaultDecisionSeconds int64         `json:"defaultDecisionSeconds"`
 	StreamScopes           []string      `json:"streamScopes,omitempty"`
 	Redis                  *sessionRedis `json:"redis,omitempty"`
+	RemediationFallback    string        `json:"remediationFallback,omitempty"`
 }
 
 type sessionRedis struct {
@@ -55,6 +56,7 @@ func sessionFrom(cfg *configuration.Config) streamSession {
 		CapiMachineID:          cfg.LapiCapiMachineID,
 		CapiPassword:           cfg.LapiCapiPassword,
 		DefaultDecisionSeconds: cfg.LapiDefaultDecisionSeconds,
+		RemediationFallback:    nonDefaultRemediationFallback(cfg),
 	}
 	if cfg.LapiMode == configuration.StreamMode {
 		session.StreamScopes = decisionscope.CanonicalStreamScopes(cfg.LapiStreamScopes)
