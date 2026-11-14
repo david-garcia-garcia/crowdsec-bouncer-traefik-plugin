@@ -20,7 +20,7 @@ Both loops now run on a `pollTimer` built on `time.AfterFunc`: the stdlib timer 
 Ready for review. 0 items remain.
 
 Priority: P2 — real operator pain with limited blast radius: only deployments with several LAPI middlewares or reloads, and the silent stop needs a crossing at the moment another Client stops
-Reviewed head: c2f9fa25
+Reviewed head: 5599b4ab
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -70,14 +70,14 @@ Ticket 2026-11-14-lapi-multi-client-ticker on branch 2026-11-14-lapi-multi-clien
 None.
 
 ## Axis review
-[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/devstate/staging/2026/11/2026-11-14-lapi-multi-client-ticker/codereview_standards.md) — 4 total, 0 pending, 4 completed
-[Nitpicks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/devstate/staging/2026/11/2026-11-14-lapi-multi-client-ticker/codereview_nitpicks.md) — 0 total, 0 pending, 0 completed
-[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/devstate/staging/2026/11/2026-11-14-lapi-multi-client-ticker/codereview_spec.md) — 0 total, 0 pending, 0 completed
-[Scope](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/devstate/staging/2026/11/2026-11-14-lapi-multi-client-ticker/codereview_scope.md) — 1 total, 0 pending, 0 completed, 1 skipped
-[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/devstate/staging/2026/11/2026-11-14-lapi-multi-client-ticker/codereview_security.md) — 0 total, 0 pending, 0 completed
-[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/devstate/staging/2026/11/2026-11-14-lapi-multi-client-ticker/codereview_performance.md) — 0 total, 0 pending, 0 completed
-[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/devstate/staging/2026/11/2026-11-14-lapi-multi-client-ticker/codereview_dead.md) — 0 total, 0 pending, 0 completed
-[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/devstate/staging/2026/11/2026-11-14-lapi-multi-client-ticker/codereview_coverage.md) — 1 total, 0 pending, 1 completed
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/devstate/2026/11/2026-11-14-lapi-multi-client-ticker/codereview_standards.md) — 4 total, 0 pending, 4 completed
+[Nitpicks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/devstate/2026/11/2026-11-14-lapi-multi-client-ticker/codereview_nitpicks.md) — 0 total, 0 pending, 0 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/devstate/2026/11/2026-11-14-lapi-multi-client-ticker/codereview_spec.md) — 0 total, 0 pending, 0 completed
+[Scope](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/devstate/2026/11/2026-11-14-lapi-multi-client-ticker/codereview_scope.md) — 1 total, 0 pending, 0 completed, 1 skipped
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/devstate/2026/11/2026-11-14-lapi-multi-client-ticker/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/devstate/2026/11/2026-11-14-lapi-multi-client-ticker/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/devstate/2026/11/2026-11-14-lapi-multi-client-ticker/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-lapi-multi-client-ticker/devstate/2026/11/2026-11-14-lapi-multi-client-ticker/codereview_coverage.md) — 1 total, 0 pending, 1 completed
 
 
 ## Agent review details
@@ -87,7 +87,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | c2f9fa25ab4bd68e7b348348933c3028aae7d6c8 | Card must match the branch you measured |
+| Reviewed head | 5599b4ab2adc5efca9d3b900ca8667e0cd14bd08 | Card must match the branch you measured |
 
 ### Stored data model
 None.
