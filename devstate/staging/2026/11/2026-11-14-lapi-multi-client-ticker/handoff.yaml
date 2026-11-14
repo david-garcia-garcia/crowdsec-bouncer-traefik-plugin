@@ -11,4 +11,6 @@ requirement: requirement.md
 comments: none
 explore: none
 change: none
-pr: none
+pr: { id: 208, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/208 }
+qualify: qualified-with-gaps
+src: f467f4152c5d07ce
