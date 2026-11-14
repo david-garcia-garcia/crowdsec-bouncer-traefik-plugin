@@ -228,7 +228,7 @@ func TestStreamNewBanIgnoresFallback(t *testing.T) {
 }
 
 // TestStreamDeletedUnknownTypeFollowsFallback proves a later Deleted throttle row keeps the Ip
-// and Range bans under ignore, and clears them under ban.
+// and Range bans under ignore, and clears them under ban and captcha.
 func TestStreamDeletedUnknownTypeFollowsFallback(t *testing.T) {
 	const newBans = `{"new":[` +
 		`{"id":1,"origin":"crowdsec","type":"ban","scope":"Ip","value":"203.0.113.7","duration":"1h","scenario":"s"},` +
@@ -244,6 +244,7 @@ func TestStreamDeletedUnknownTypeFollowsFallback(t *testing.T) {
 	}{
 		{configuration.LapiRemediationFallbackIgnore, decisionscope.BannedValue},
 		{configuration.LapiRemediationFallbackBan, ""},
+		{configuration.LapiRemediationFallbackCaptcha, ""},
 	} {
 		t.Run("fallback="+tc.fallback, func(t *testing.T) {
 			client := newTestFallbackStreamPoller(t, testStreamPollsLAPI(t, newBans, deletedThrottle), tc.fallback)
