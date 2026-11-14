@@ -41,17 +41,17 @@ Tests:
 **End users.** HTTP/2 and HTTP/3 clients that send a body without `Content-Length` (for example `restic init`) no longer get an automatic 403: AppSec inspects the body and decides, while request bodies that keep streaming past the timeout are blocked unless the route is excluded.
 
 ## Merge readiness
-Ready for review. 1 items remain.
+In progress. 1 items remain.
 
 Priority: P2 — real operator and end-user pain (restic blocked with a silent 403), with a workaround whose blast radius is limited to deployments that opt into `passthrough`
-Reviewed head: dd240f17
+Reviewed head: 5738eac6
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43629553613 |
+| Overall readiness | 1/6 | Not ready |
+| CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -61,17 +61,24 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-11-14-appsec-unknown-length-body pushed | `git` |
 | OpenSpec | appsec-inspect-unknown-length-body | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/204 | pr-host |
-| CI | build 43629553613 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43629553613 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43629553613 |
+| CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
 Worktree:
-- [core_plugin_appsec_body-read-timeout](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/changes/appsec-inspect-unknown-length-body/proposal.md) — added
-- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/changes/appsec-inspect-unknown-length-body/proposal.md) — modified
-- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/changes/appsec-inspect-unknown-length-body/proposal.md) — modified
-- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/changes/appsec-inspect-unknown-length-body/proposal.md) — modified
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/changes/appsec-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_appsec_body-read-timeout](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/changes/archive/2026-11-14-appsec-inspect-unknown-length-body/proposal.md) — added
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/changes/archive/2026-11-14-appsec-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/changes/archive/2026-11-14-appsec-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/changes/archive/2026-11-14-appsec-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/changes/archive/2026-11-14-appsec-inspect-unknown-length-body/proposal.md) — modified
+
+Completed:
+- [core_plugin_appsec_body-read-timeout](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/specs/core_plugin_appsec_body-read-timeout/spec.md) — added
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/specs/core_plugin_appsec_client/spec.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/specs/core_plugin_appsec_failure-action/spec.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/specs/core_plugin_lapi_usage-metrics/spec.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-unknown-length-body/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -83,7 +90,7 @@ Worktree:
 
 
 ## How this fits together
-Ticket 2026-11-14-appsec-unknown-length-body on branch 2026-11-14-appsec-unknown-length-body targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/204; CI build 43629553613 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43629553613.
+Ticket 2026-11-14-appsec-unknown-length-body on branch 2026-11-14-appsec-unknown-length-body targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/204; CI not seen.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -110,9 +117,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 1 added / 4 modified | Same list as ## Specs |
+| Specs in this PR | 2 added / 8 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | dd240f17cac2b8dc4c9d5aba18b6e48498b08e0a | Card must match the branch you measured |
+| Reviewed head | 5738eac68ac6af9f3bd27aeefbbe385dba94f22e | Card must match the branch you measured |
 
 ### Stored data model
 None.
