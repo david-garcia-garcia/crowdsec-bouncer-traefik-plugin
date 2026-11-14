@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 6f88ebfa
-Owner decision: None.
+Reviewed head: f9a320a0
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -51,7 +51,10 @@ None.
 Ticket 2026-11-14-lapi-multi-client-ticker on branch 2026-11-14-lapi-multi-client-ticker targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/208; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Which loop shape is yaegi-safe across Clients and still stops on Sleep/Close? | bounded asked — 2 startStreamTicker + 2 startMetricsTicker + 4 stopTicker call sites in pkg/lapi, all migrated here (roots: pkg/**/*.go); Desired "Each Client's stream loop and metrics loop receives only its own ticks and its own stop" | assumed — `time.AfterFunc` poll timer with Reset after work and a stopped flag; no select in pkg/lapi. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 6f88ebfa6aa3cf4b630fbaa7216350c59a25c786 | Card must match the branch you measured |
+| Reviewed head | f9a320a0dd7f2ec0c1ef35c9948abfbe92674942 | Card must match the branch you measured |
 
 ### Stored data model
 None.
