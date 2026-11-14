@@ -21,17 +21,17 @@ README (ban table and `BouncerRemediationStatusCode`), devdocs, research notes a
 **End users.** A client blocked by an AppSec rate limit now gets 429 with the same ban page, so clients that back off on 429 can do so.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: P2 — rate-limited clients get the wrong status and keep retrying, with the throttle still enforced (limited blast radius).
-Reviewed head: 499fa566
+Reviewed head: 939f9a7b
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43635695061 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -41,7 +41,7 @@ Owner decision: None.
 | Branch | 2026-11-14-appsec-ratelimit-429 pushed | `git` |
 | OpenSpec | appsec-ban-keeps-429 | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/207 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 43635695061 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43635695061 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43635695061 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -60,7 +60,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-11-14-appsec-ratelimit-429 on branch 2026-11-14-appsec-ratelimit-429 targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/207; CI not seen.
+Ticket 2026-11-14-appsec-ratelimit-429 on branch 2026-11-14-appsec-ratelimit-429 targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/207; CI build 43635695061 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43635695061.
 
 ## Explore Decisions
 None.
@@ -86,7 +86,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 499fa566aa1c5317d76868115d31f0854126f4c8 | Card must match the branch you measured |
+| Reviewed head | 939f9a7b866290bd339a105ad4de384bb4aca24a | Card must match the branch you measured |
 
 ### Stored data model
 None.
