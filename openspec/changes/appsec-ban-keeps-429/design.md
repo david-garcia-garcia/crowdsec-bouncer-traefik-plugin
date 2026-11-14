@@ -19,7 +19,7 @@ See proposal.md for why. `applyAppsecServeHTTP` routes `appsec.ActionBan` to `ha
 - `handleBanServeHTTP` keeps its signature and delegates to a ban writer that takes the status. The AppSec ban case passes the status from a `Bouncer` helper that returns 429 when `decision.HTTPStatus` is 429, else `remediationStatusCode`. Alternative: a status argument on all 10 callers — rejected; 9 never vary it.
 - Only 429 is honoured. Alternative: any `http_status` — rejected; `SetReturnCode()` would override the operator's `bouncerRemediationStatusCode`.
 - Header stays `ban:appsec`. Alternative: `ban:appsec-rate-limit` — rejected; the bouncer cannot tell `RateLimit()` from `SetReturnCode(429)`.
-- e2e runs on the 7423 listener, which already loads local appsec-configs, through a new AppSec-only router `/appsec-rate-limit` with the e2e ban page and remediation header. CrowdSec image moves to `v1.8.2`, the first release with `RateLimit()`.
+- e2e runs on the 7422 CRS listener (`acquis.yaml` now lists `crowdsecurity/crs-inband` and local `e2e/rate-limit`) through a new AppSec-only router `/ratelimit` with the e2e ban page and remediation header. The 7423 bot-detection listener is avoided so its challenge hooks cannot answer first. Alternative: 7423 — rejected for that reason. CrowdSec image moves to `v1.8.2`, the first release with `RateLimit()`.
 
 ## Risks / Trade-offs
 

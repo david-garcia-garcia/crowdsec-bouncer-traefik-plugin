@@ -34,7 +34,7 @@ Usage packets that will be stale after apply: `knowledge/devdocs/core_plugin_app
 - Seam: `handleBanServeHTTP` keeps its signature and delegates to a status-taking ban writer; the AppSec ban case passes a status chosen by a small `Bouncer` helper (429 when `decision.HTTPStatus == 429`, else `remediationStatusCode`). The other 9 callers do not change.
 - Same template, `Content-Type`, `Cache-Control`, header `ban:appsec`, dropped metrics (`appsec`/`ban`), HEAD without body.
 - Only 429 is honoured; 403, 418, 0 and missing keep `remediationStatusCode`. No `Retry-After`.
-- e2e: bump `crowdsecurity/crowdsec` to `v1.8.2`; add appsec-config `e2e/rate-limit` (`RateLimit()` on `/appsec-rate-limit`) to the 7423 listener; add an AppSec-only router/middleware `/appsec-rate-limit` with the e2e ban page and remediation header; Pester case in `appsec.Tests.ps1` with its own client IP.
+- e2e: bump `crowdsecurity/crowdsec` to `v1.8.2`; add appsec-config `e2e/rate-limit` (`RateLimit()` on `/ratelimit`) to the 7422 listener; add an AppSec-only router/middleware `/ratelimit` with the e2e ban page and remediation header; Pester case in `appsec.Tests.ps1` with its own client IP.
 - Live contract: MODIFY `core_plugin_appsec_bot-detection` requirement "Structured ban keeps the operator ban template" (status exception for 429).
 - Rejected: add a `status` parameter to every `handleBanServeHTTP` caller (9 callers gain a value they never vary).
 - Rejected: honour any AppSec ban `http_status` (would override the operator's `bouncerRemediationStatusCode` on `SetReturnCode()`).
@@ -52,9 +52,9 @@ Usage packets that will be stale after apply: `knowledge/devdocs/core_plugin_app
   Decision: assumed — no LAPI decision with the default profiles (research, inferred from source); the bucket is per client IP, so the case uses its own `X-Forwarded-For` and the dedicated route is AppSec-only (`lapiEnabled=false`).
   By: explore
 - Q: Which AppSec listener hosts the rate-limit config?
-  Rank: additive incidental — adds one local appsec-config to the existing 7423 list; the filter only matches `/appsec-rate-limit`
-  Decision: assumed — 7423 (`acquis.d/appsec-bot.yaml`), the listener that already loads local configs; 7422 keeps CRS only.
-  By: explore
+  Rank: additive incidental — adds one local appsec-config next to `crowdsecurity/crs-inband` on 7422; the filter only matches `/ratelimit`
+  Decision: assumed — 7422 (`tests/e2e/real/config/acquis.yaml` turns `appsec_config` into an `appsec_configs` list). 7423 loads the bot-detection challenge configs, which could answer a non-browser request before `RateLimit()`.
+  By: implement
 - Q: Name and shape of the status-taking ban writer?
   Rank: additive asked — new private method this change creates; Desired "same operator ban template … 429"
   Decision: assumed — `handleBanServeHTTP` delegates to a writer that takes the status; the AppSec ban site asks a `Bouncer` helper named for the AppSec ban status.

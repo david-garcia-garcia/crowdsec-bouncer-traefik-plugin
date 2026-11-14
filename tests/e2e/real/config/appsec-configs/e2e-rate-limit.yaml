@@ -1,0 +1,9 @@
+# CrowdSec AppSec RateLimit() (v1.8.2+) on /ratelimit. Over the limit the
+# listener answers 403 with {"action":"ban","http_status":429}; the bouncer
+# must hand the client 429. One bucket per client IP, 2 requests per minute.
+name: e2e/rate-limit
+inband:
+  pre_eval:
+    - filter: 'req.URL.Path == "/ratelimit" || req.URL.Path startsWith "/ratelimit/"'
+      apply:
+        - RateLimit("e2e-rate-limit", "2/m")
