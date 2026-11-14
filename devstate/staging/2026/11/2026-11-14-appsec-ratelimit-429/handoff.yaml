@@ -12,7 +12,7 @@ localTests: none
 requirement: requirement.md
 comments: none
 explore: explore.md
-change: none
+change: appsec-ban-keeps-429
 pr:
   id: 207
   url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/207
