@@ -25,17 +25,17 @@ Priority: P2 — real end-user pain (blank page instead of a captcha) limited to
 **End users.** A visitor asked for a captcha by AppSec sees a captcha page they can solve, instead of a blank page.
 
 ## Merge readiness
-Ready for review. 1 items remain.
+In progress. 1 items remain.
 
 Priority: P2 — real end-user pain (blank page instead of a captcha) limited to operators who use AppSec `captcha` or custom actions
-Reviewed head: c032c873
+Reviewed head: 6768fae6
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43634506199 |
+| Overall readiness | 1/6 | Not ready |
+| CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -45,7 +45,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-11-14-appsec-captcha-verdict pushed | `git` |
 | OpenSpec | appsec-captcha-verdict | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/206 | pr-host |
-| CI | build 43634506199 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43634506199 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43634506199 |
+| CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -64,7 +64,7 @@ Worktree:
 
 
 ## How this fits together
-Ticket 2026-11-14-appsec-captcha-verdict on branch 2026-11-14-appsec-captcha-verdict targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/206; CI build 43634506199 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43634506199.
+Ticket 2026-11-14-appsec-captcha-verdict on branch 2026-11-14-appsec-captcha-verdict targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/206; CI not seen.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -76,7 +76,15 @@ Ticket 2026-11-14-appsec-captcha-verdict on branch 2026-11-14-appsec-captcha-ver
 None.
 
 ## Axis review
-None.
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-captcha-verdict/devstate/staging/2026/11/2026-11-14-appsec-captcha-verdict/codereview_standards.md) — 5 total, 0 pending, 5 completed
+[Nitpicks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-captcha-verdict/devstate/staging/2026/11/2026-11-14-appsec-captcha-verdict/codereview_nitpicks.md) — 3 total, 0 pending, 3 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-captcha-verdict/devstate/staging/2026/11/2026-11-14-appsec-captcha-verdict/codereview_spec.md) — 1 total, 0 pending, 1 completed
+[Scope](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-captcha-verdict/devstate/staging/2026/11/2026-11-14-appsec-captcha-verdict/codereview_scope.md) — 0 total, 0 pending, 0 completed
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-captcha-verdict/devstate/staging/2026/11/2026-11-14-appsec-captcha-verdict/codereview_security.md) — 1 total, 0 pending, 0 completed, 1 skipped
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-captcha-verdict/devstate/staging/2026/11/2026-11-14-appsec-captcha-verdict/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-captcha-verdict/devstate/staging/2026/11/2026-11-14-appsec-captcha-verdict/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-captcha-verdict/devstate/staging/2026/11/2026-11-14-appsec-captcha-verdict/codereview_coverage.md) — 2 total, 0 pending, 2 completed
+
 
 ## Agent review details
 
@@ -85,7 +93,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | c032c873e5bc49a78303a022a102cdb23d134ebd | Card must match the branch you measured |
+| Reviewed head | 6768fae68cbce89fbda2a07ab6011eb86c81b801 | Card must match the branch you measured |
 
 ### Stored data model
 None.
