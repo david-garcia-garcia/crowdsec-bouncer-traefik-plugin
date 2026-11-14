@@ -64,7 +64,7 @@ rw.WriteHeader(http.StatusOK)
 
 - Challenge HTML at 200, the Pass 302, and `WriteSolvedRedirect` use exactly `no-cache, no-store`. Do not add `private`, `max-age`, or `Pragma`. Ban-page Cache-Control lives on `core_plugin_middleware_ban-page`.
 - A replaced checkbox template that omits the new keys still works when `FrontendJS` is `enterprise.js`. Score needs `BootScript`.
-- A replaced template that omits challenge marker `crowdsec_captcha_challenge=v1` still first-solves; its second submit is forwarded.
+- A replaced template that omits challenge marker `crowdsec_captcha_challenge=v1` still first-solves; its second submit is forwarded. `New` logs one WARN `crowdsec captcha template missing challenge marker` when the loaded template source does not contain `crowdsec_captcha_challenge`; Valid stays true.
 - Both enterprise key types keep field name `g-recaptcha-response`.
 - Omit-boot after score reject is a product choice so the page does not auto-`execute` again.
 - Eucaptcha TokenField is `eu-captcha-response`. Stock `captcha.html` does not hardcode that input; `verify.js` injects it.
