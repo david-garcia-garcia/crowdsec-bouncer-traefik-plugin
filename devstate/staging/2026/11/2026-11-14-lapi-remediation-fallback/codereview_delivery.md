@@ -18,7 +18,7 @@ The policy stays at LAPI ingest. `ingestRemediationKind` keeps `ban` / `captcha`
 
 The effective value enters the Client ownership key and, only when it is not `ban`, the `SessionHex` store identity (`omitempty`). A change of value opens a new Client and a new DecisionStore that refills from LAPI; default deployments keep their `SessionHex` and Redis keys on upgrade. README (Decisions paragraph and Variables entry), usage devdocs and the debt note carry the whitelist / allow position; the debt note loses its allow-as-veto framing and keeps the real multi-decision debt.
 
-Process note: this run used the OpenDev CLI (`opd-mcp/scripts/cli.mjs`) instead of the OpenDev MCP, the GitHub MCP for PR operations, and Claude Code subagents without the configured grok model slug.
+Process note: this run used the OpenDev CLI (`opd-mcp/scripts/cli.mjs`) instead of the OpenDev MCP, the GitHub MCP for PR operations, and Claude Code subagents without the configured grok model slug. The code review walked the ten axes in the reviewing agent itself, not as ten parallel subagents.
 
 ## What this changes
 **Operators.** New optional key `lapiRemediationFallback` (`ban` default, `captcha`, or `ignore`) on the middleware that connects to LAPI decides what happens to decision types other than `ban` and `captcha`; changing it from `ban` forks the decision store, which refills from LAPI, and it is separate from `bouncerLapiFailureAction`.
