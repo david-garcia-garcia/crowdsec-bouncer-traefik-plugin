@@ -24,7 +24,7 @@ README (ban table and `BouncerRemediationStatusCode`), devdocs, research notes a
 In progress. 0 items remain.
 
 Priority: P2 — rate-limited clients get the wrong status and keep retrying, with the throttle still enforced (limited blast radius).
-Reviewed head: b77b6e89
+Reviewed head: 9434a469
 Owner decision: None.
 
 ## Review scores
@@ -83,7 +83,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | b77b6e8920a655b21e36c61cbb6d608cfeebab85 | Card must match the branch you measured |
+| Reviewed head | 9434a469fc29740df45bdbd9eb877e0dd901b906 | Card must match the branch you measured |
 
 ### Stored data model
 None.
