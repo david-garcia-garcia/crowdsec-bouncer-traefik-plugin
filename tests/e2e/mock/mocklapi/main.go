@@ -217,6 +217,19 @@ func main() {
 		go func() {
 			log.Fatal(http.ListenAndServe(*appsecAddr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				uri := r.Header.Get("X-Crowdsec-Appsec-Uri")
+				// SetRemediation("captcha") on GET only: CrowdSec sends no page, and the
+				// captcha form POST to the same URI is allowed, as a GET-keyed rule would.
+				if strings.Contains(uri, "appsec-captcha") && r.Header.Get("X-Crowdsec-Appsec-Verb") == http.MethodGet {
+					w.WriteHeader(http.StatusForbidden)
+					_, _ = w.Write([]byte(`{"action":"captcha","http_status":403}`))
+					return
+				}
+				// A custom SetRemediation("tarpit"): unknown to the bouncer, no page.
+				if strings.Contains(uri, "appsec-tarpit") {
+					w.WriteHeader(http.StatusForbidden)
+					_, _ = w.Write([]byte(`{"action":"tarpit","http_status":403}`))
+					return
+				}
 				if strings.Contains(uri, "challenge") {
 					w.WriteHeader(http.StatusForbidden)
 					_, _ = w.Write([]byte(`{"action":"challenge","http_status":200,"user_body_content":"<html>e2e-challenge</html>","user_cookies":["__crowdsec_challenge=e2e; Path=/; HttpOnly"],"user_headers":{"Content-Type":["text/html"]}}`))
