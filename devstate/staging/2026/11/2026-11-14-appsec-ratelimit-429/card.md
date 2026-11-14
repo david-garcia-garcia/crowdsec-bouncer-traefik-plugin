@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 578bd5ef
+Reviewed head: 05f88456
 Owner decision: None.
 
 ## Review scores
@@ -66,7 +66,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 578bd5ef23cc5d6b374c4862205bb7fa40a8d858 | Card must match the branch you measured |
+| Reviewed head | 05f88456a7d8b3b96ee90c20896c501bace3a145 | Card must match the branch you measured |
 
 ### Stored data model
 None.
