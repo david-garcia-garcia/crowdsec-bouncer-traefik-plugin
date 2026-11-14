@@ -9,9 +9,9 @@
       "at": "2026-11-14T17:25:03.682Z"
     },
     "explore": {
-      "work": false,
-      "card": false,
-      "at": null
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T17:46:04.958Z"
     },
     "propose": {
       "work": false,

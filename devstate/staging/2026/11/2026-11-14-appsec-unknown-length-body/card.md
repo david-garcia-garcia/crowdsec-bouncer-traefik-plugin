@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: cafe3d44
-Owner decision: None.
+Reviewed head: a932861c
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -42,7 +42,8 @@ Owner decision: None.
 None.
 
 ## Deviations from the ask
-None.
+- taken: a total read deadline on bodies of unknown length that blocks independently of `bouncerAppsecFailureAction` (decisions 1 and 2); no criterion names a `Query` signature change. → `Query` gains a parameter carrying the `http.ResponseController` the bouncer builds from its `rw`, so the deadline timer can cut an HTTP/1.1 read (`Body.Close` cannot, measured). 1 production call site (`pkg/bouncer/bouncer.go:458`) and 43 test call sites in `pkg/appsec` migrate in this change. — `pkg/appsec/query.go (Client.Query); pkg/bouncer/bouncer.go (applyAppsecServeHTTP, sole owner of rw)` — the response writer is the only handle that sets a read deadline on HTTP/1.1 and HTTP/2; the bouncer owns it, the AppSec client owns the read. Rank `bounded incidental` (explore.md, open question on distinguishing the deadline from a client disconnect).. Requester: not asked.
+
 
 ## Follow-up issues
 None.
@@ -51,7 +52,10 @@ None.
 Ticket 2026-11-14-appsec-unknown-length-body on branch 2026-11-14-appsec-unknown-length-body targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/204; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Does the deadline also bound HTTP/1.1 chunked bodies and slow bodies with a declared `Content-Length`? | bounded asked — changes existing `newAppsecBodyRequest` (1 caller, `newAppsecForwardRequest`; roots `pkg/**`); decision 1 "Bodies of unknown length are read and inspected like any other body, capped at `appsecBodyLimit`, with a total read deadline" | assumed — the deadline applies to every forwarded body whose length is unknown (`ContentLength < 0`), on every protocol, HTTP/1.1 chunked included: the protocol a client picks must not change how long the plugin waits (principle line). It does not apply to bodies with a declared `Content-Length`: there the client signal cannot reduce inspection today — a stalled body ends at Traefik `readTimeout` with `os.ErrDeadlineExceeded` → `appsecQuery:GetBody` → ban (measured error type), or the client disconnects (no origin call) — so a deadline there would only add failures for slow legitimate uploads. The deadline covers reading up to `appsecBodyLimit` bytes; once the limit is reached the read stops and the rest streams on uninspected (decision 5) with no plugin deadline. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +70,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | cafe3d44a9ac1883ed2d7149ae236d8135c5d52e | Card must match the branch you measured |
+| Reviewed head | a932861cd2698ba6b0c2c14bc0bafc14570acd7b | Card must match the branch you measured |
 
 ### Stored data model
 None.
