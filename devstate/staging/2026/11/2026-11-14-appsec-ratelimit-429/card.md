@@ -24,7 +24,7 @@ README (ban table and `BouncerRemediationStatusCode`), devdocs, research notes a
 In progress. 0 items remain.
 
 Priority: P2 — rate-limited clients get the wrong status and keep retrying, with the throttle still enforced (limited blast radius).
-Reviewed head: 9434a469
+Reviewed head: 499fa566
 Owner decision: None.
 
 ## Review scores
@@ -47,7 +47,10 @@ Owner decision: None.
 
 ## Specs
 Worktree:
-- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-ratelimit-429/openspec/changes/appsec-ban-keeps-429/proposal.md) — modified
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-ratelimit-429/openspec/changes/archive/2026-11-14-appsec-ban-keeps-429/proposal.md) — modified
+
+Completed:
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-ratelimit-429/openspec/specs/core_plugin_appsec_bot-detection/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -81,9 +84,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 1 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 9434a469fc29740df45bdbd9eb877e0dd901b906 | Card must match the branch you measured |
+| Reviewed head | 499fa566aa1c5317d76868115d31f0854126f4c8 | Card must match the branch you measured |
 
 ### Stored data model
 None.
