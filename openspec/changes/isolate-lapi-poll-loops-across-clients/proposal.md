@@ -22,7 +22,8 @@ Under yaegi v0.16.1 every goroutine that runs the same `select` statement shares
 
 ## Impact
 
-- `pkg/lapi/client.go` (loop helpers, `Close`, `Sleep`, `Wake`, `New`)
+- `pkg/lapi/poll_timer.go` (new `AfterFunc` poll timer)
+- `pkg/lapi/client.go` (`Close`, `Sleep`, `Wake`, `New`; old loop helpers removed)
 - `pkg/lapi/client_stream.go` (`startStream`)
 - `pkg/lapi/test_client.go` (test exports for the yaegi program)
 - `pkg/lapi/zzz_ticker_own_channel_test.go` (replaced by poll-timer tests)

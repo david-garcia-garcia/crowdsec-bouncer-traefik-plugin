@@ -33,6 +33,7 @@ defer c.decisionStore.EndStreamPoll()
 - `pkg/lapi/client_stream.go`
 - `pkg/decisionstore/store.go`
 - `pkg/lapi/client.go`
+- `pkg/lapi/poll_timer.go`
 
 ## Gotchas
 

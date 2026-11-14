@@ -5,8 +5,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io"
-	"log/slog"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -46,14 +44,10 @@ func Test_lapiHasNoSelectStatement(t *testing.T) {
 	}
 }
 
-func discardLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(io.Discard, nil))
-}
-
-// waitPollRuns waits until counter reaches want or fails after timeout.
-func waitPollRuns(t *testing.T, counter *int64, want int64, timeout time.Duration) {
+// waitPollRuns waits until counter reaches want or fails after five seconds.
+func waitPollRuns(t *testing.T, counter *int64, want int64) {
 	t.Helper()
-	deadline := time.Now().Add(timeout)
+	deadline := time.Now().Add(5 * time.Second)
 	for atomic.LoadInt64(counter) < want {
 		if time.Now().After(deadline) {
 			t.Fatalf("poll timer ran %d times, want at least %d", atomic.LoadInt64(counter), want)
@@ -65,24 +59,47 @@ func waitPollRuns(t *testing.T, counter *int64, want int64, timeout time.Duratio
 // Test_pollTimer_rearmsAfterWork fails if the timer runs work only once.
 func Test_pollTimer_rearmsAfterWork(t *testing.T) {
 	var runs int64
-	poll := startPollTimerEvery("test", time.Millisecond, discardLogger(), func() { atomic.AddInt64(&runs, 1) })
+	poll := startPollTimerEvery("test", time.Millisecond, discardLoggerForTest(), func() { atomic.AddInt64(&runs, 1) })
 	t.Cleanup(poll.stop)
-	waitPollRuns(t, &runs, 3, 5*time.Second)
+	waitPollRuns(t, &runs, 3)
+}
+
+// Test_pollTimer_workRunsBeforeRearm fails if the timer re-arms before work returns
+// (fixed rate instead of fixed delay): a slow work would then overlap itself.
+func Test_pollTimer_workRunsBeforeRearm(t *testing.T) {
+	var runs, inFlight, maxInFlight int64
+	poll := startPollTimerEvery("test", time.Millisecond, discardLoggerForTest(), func() {
+		current := atomic.AddInt64(&inFlight, 1)
+		for {
+			seen := atomic.LoadInt64(&maxInFlight)
+			if current <= seen || atomic.CompareAndSwapInt64(&maxInFlight, seen, current) {
+				break
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+		atomic.AddInt64(&inFlight, -1)
+		atomic.AddInt64(&runs, 1)
+	})
+	t.Cleanup(poll.stop)
+	waitPollRuns(t, &runs, 4)
+	if got := atomic.LoadInt64(&maxInFlight); got != 1 {
+		t.Fatalf("one poll timer ran %d work calls at once, want 1", got)
+	}
 }
 
 // Test_pollTimer_stopEndsOnlyThatTimer fails if stopping one timer stops or stalls another.
 func Test_pollTimer_stopEndsOnlyThatTimer(t *testing.T) {
 	var stoppedRuns, liveRuns int64
-	stopped := startPollTimerEvery("stopped", time.Millisecond, discardLogger(), func() { atomic.AddInt64(&stoppedRuns, 1) })
-	live := startPollTimerEvery("live", time.Millisecond, discardLogger(), func() { atomic.AddInt64(&liveRuns, 1) })
+	stopped := startPollTimerEvery("stopped", time.Millisecond, discardLoggerForTest(), func() { atomic.AddInt64(&stoppedRuns, 1) })
+	live := startPollTimerEvery("live", time.Millisecond, discardLoggerForTest(), func() { atomic.AddInt64(&liveRuns, 1) })
 	t.Cleanup(live.stop)
-	waitPollRuns(t, &stoppedRuns, 2, 5*time.Second)
+	waitPollRuns(t, &stoppedRuns, 2)
 	stopped.stop()
 	// A fire that passed the stopped check before stop may still finish once.
 	time.Sleep(20 * time.Millisecond)
 	frozen := atomic.LoadInt64(&stoppedRuns)
 	liveBefore := atomic.LoadInt64(&liveRuns)
-	waitPollRuns(t, &liveRuns, liveBefore+5, 5*time.Second)
+	waitPollRuns(t, &liveRuns, liveBefore+5)
 	if got := atomic.LoadInt64(&stoppedRuns); got != frozen {
 		t.Fatalf("stopped timer kept running: %d after stop, then %d", frozen, got)
 	}
@@ -93,7 +110,7 @@ func Test_pollTimer_stopDuringWorkDoesNotRearm(t *testing.T) {
 	var runs int64
 	entered := make(chan struct{}, 1)
 	release := make(chan struct{})
-	poll := startPollTimerEvery("test", time.Millisecond, discardLogger(), func() {
+	poll := startPollTimerEvery("test", time.Millisecond, discardLoggerForTest(), func() {
 		if atomic.AddInt64(&runs, 1) == 1 {
 			entered <- struct{}{}
 			<-release
@@ -112,7 +129,7 @@ func Test_pollTimer_stopDuringWorkDoesNotRearm(t *testing.T) {
 func Test_pollTimer_stopIsNilSafeAndIdempotent(t *testing.T) {
 	var nilTimer *pollTimer
 	nilTimer.stop()
-	poll := startPollTimerEvery("test", time.Hour, discardLogger(), func() {})
+	poll := startPollTimerEvery("test", time.Hour, discardLoggerForTest(), func() {})
 	poll.stop()
 	poll.stop()
 	if !poll.isStopped() {
@@ -123,7 +140,7 @@ func Test_pollTimer_stopIsNilSafeAndIdempotent(t *testing.T) {
 // Test_clientSleepWakeClose_restartsAndStopsPollTimers fails if Sleep/Close leave a poll timer
 // running or Wake does not start new ones.
 func Test_clientSleepWakeClose_restartsAndStopsPollTimers(t *testing.T) {
-	client, _ := NewTestClient(discardLogger())
+	client, _ := NewTestClient(discardLoggerForTest())
 	client.updateInterval = 3600
 	// Set before any lifecycle call: Sleep reads it on its async drain. The test Client has no
 	// MetricsReporter, so that drain POSTs nothing.

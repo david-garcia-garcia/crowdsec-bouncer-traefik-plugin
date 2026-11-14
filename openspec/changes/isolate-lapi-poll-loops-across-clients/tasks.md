@@ -7,7 +7,7 @@
 
 ## 2. Poll loop
 
-- [x] 2.1 Add the `AfterFunc` poll timer in `pkg/lapi/client.go` (start, fire, stop) with `ticker:started` / `ticker:stopped` DEBUG lines
+- [x] 2.1 Add the `AfterFunc` poll timer in `pkg/lapi/poll_timer.go` (start, fire, stop) with `ticker:started` / `ticker:stopped` DEBUG lines
 - [x] 2.2 Move `New`, `startStream`, `Wake`, `Sleep`, `Close` onto it; remove `startStreamTicker`, `startMetricsTicker`, `runStreamTicker`, `runMetricsTicker`, `stopTicker`
 - [x] 2.3 Replace the `Run*TickerForTest` exports with a poll-timer export for the yaegi program
 

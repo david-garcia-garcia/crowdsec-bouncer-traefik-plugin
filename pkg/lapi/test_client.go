@@ -97,8 +97,13 @@ func (c *Client) SleepingForTest() bool {
 // StartPollTimerForTest starts the production Client poll timer so a Yaegi program can drive
 // many of them. The returned func stops that timer.
 func StartPollTimerForTest(interval time.Duration, work func()) func() {
-	poll := startPollTimerEvery("test", interval, slog.New(slog.NewTextHandler(io.Discard, nil)), work)
+	poll := startPollTimerEvery("test", interval, discardLoggerForTest(), work)
 	return func() { poll.stop() }
+}
+
+// discardLoggerForTest returns a logger that drops all output, for tests that do not read logs.
+func discardLoggerForTest() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 // TestDroppedCount is the current window dropped count for origin+ipType+remediation.
