@@ -28,7 +28,7 @@ Priority: P2 — real end-user pain (blank page instead of a captcha) limited to
 In progress. 1 items remain.
 
 Priority: P2 — real end-user pain (blank page instead of a captcha) limited to operators who use AppSec `captcha` or custom actions
-Reviewed head: 8fedf377
+Reviewed head: cba59199
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -51,8 +51,12 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-captcha-verdict/openspec/changes/appsec-captcha-verdict/proposal.md) — modified
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-captcha-verdict/openspec/changes/appsec-captcha-verdict/proposal.md) — modified
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-captcha-verdict/openspec/changes/archive/2026-11-14-appsec-captcha-verdict/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-captcha-verdict/openspec/changes/archive/2026-11-14-appsec-captcha-verdict/proposal.md) — modified
+
+Completed:
+- [core_plugin_appsec_bot-detection](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-captcha-verdict/openspec/specs/core_plugin_appsec_bot-detection/spec.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-14-appsec-captcha-verdict/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -91,9 +95,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 8fedf3775bf78658b4349a4e5b2bc69fc971dbeb | Card must match the branch you measured |
+| Reviewed head | cba59199b0fbb87b940cc6086e83061ae40d15cb | Card must match the branch you measured |
 
 ### Stored data model
 None.
