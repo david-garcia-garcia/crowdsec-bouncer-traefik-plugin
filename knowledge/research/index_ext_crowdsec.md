@@ -40,6 +40,11 @@ priority: normal
 local: ext_crowdsec_appsec_bot-detection/
 description: CrowdSec AppSec challenge-mode wire protocol a bouncer must implement to serve bot detection.
 
+## AppSec RateLimit helper
+priority: normal
+local: ext_crowdsec_appsec_rate-limit/
+description: How the CrowdSec AppSec RateLimit() pre_eval helper is configured, which release ships it, and what a bouncer and LAPI receive when it fires.
+
 ## LAPI stream cursor
 priority: normal
 local: ext_crowdsec_lapi_stream-cursor/
