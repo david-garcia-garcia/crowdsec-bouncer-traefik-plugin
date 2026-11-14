@@ -56,7 +56,7 @@ type Policy struct {
 // ErrFailureCaptcha tells the bouncer to run pkg/captcha instead of ban or next.
 var ErrFailureCaptcha = errors.New("failureAction captcha")
 
-// ErrClientDisconnected is a classified client disconnect while buffering a readable body.
+// ErrClientDisconnected is a classified client disconnect while buffering the client body for AppSec.
 // Query MUST NOT call AppSec or apply FailureAction; the bouncer stops without a ban.
 var ErrClientDisconnected = errors.New("appsecQuery:clientDisconnected")
 
@@ -103,7 +103,7 @@ func isBodyLengthUnknown(httpReq *http.Request) bool {
 	return httpReq.ContentLength < 0
 }
 
-// isClientGoneBodyReadErr reports disconnect or cancel while buffering a readable client body.
+// isClientGoneBodyReadErr reports disconnect or cancel while buffering the client body for AppSec.
 func isClientGoneBodyReadErr(err error) bool {
 	return errors.Is(err, context.Canceled) ||
 		errors.Is(err, context.DeadlineExceeded) ||

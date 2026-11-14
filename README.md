@@ -508,13 +508,15 @@ In `stream` and `alone` LAPI modes, the plugin keeps using the decisions it alre
 
 ### Let streaming request bodies through (gRPC, Connect, long uploads)
 
-With AppSec enabled, the plugin reads the request body before AppSec sees the request. A body without `Content-Length` (HTTP/1.1 chunked, HTTP/2 or HTTP/3 without the header) must end, or reach `appsecBodyLimit` bytes, within `appsecBodyReadTimeoutSeconds` (default `30`). Otherwise the request is blocked with the ban response and the `ban:appsec-body-timeout` header, whatever `bouncerAppsecFailureAction` says, and a WARN log line names the request.
+With AppSec enabled, the plugin reads the body of POST, PUT, PATCH, and DELETE requests before asking AppSec, and sends AppSec the first `appsecBodyLimit` bytes. Leaving out `Content-Length` does not skip that inspection: a body without it (HTTP/1.1 chunked, HTTP/2 or HTTP/3 without the header) is read and inspected like any other. It must end, or reach `appsecBodyLimit` bytes, within `appsecBodyReadTimeoutSeconds` (default `30`). Otherwise the request is blocked with the ban response (status `bouncerRemediationStatusCode`), whatever `bouncerAppsecFailureAction` says. When `bouncerRemediationHeadersCustomName` is set, that header reads `ban:appsec-body-timeout`. A WARN log line names the request, at most once every 5 seconds.
 
-On HTTP/2 the plugin answers at the timeout. On HTTP/1.1 behind Traefik (measured with Traefik v3.7.11) the read cannot be cut early: the request is still blocked, but the answer is sent when the client ends its body or when Traefik's entrypoint `readTimeout` expires. HTTP/3 has not been measured.
+Upgrading: earlier versions did not read an HTTP/2 or HTTP/3 body without `Content-Length`. A POST, PUT, or PATCH got `bouncerAppsecFailureAction`; with `passthrough` (and always on DELETE) the body reached the service uninspected. If you used `passthrough` to let gRPC or other streams through, add the `bypassAppsec` rules below instead: `passthrough` no longer lets them through.
+
+When the timeout expires on HTTP/2, the plugin answers at once. On HTTP/1.1 behind Traefik (measured with Traefik v3.7.11) the read cannot be cut early: the request is still blocked, but the answer is sent only when the client ends its body or when Traefik's entrypoint `readTimeout` expires. HTTP/3 has not been measured.
 
 - Inspected as usual: gRPC and Connect unary calls, and any upload that ends in time. Their bodies end, so AppSec sees them.
-- Blocked after the timeout: client-streaming and bidirectional gRPC, Connect client and bidirectional streaming, and long-lived uploads without `Content-Length`.
-- Not affected: WebSockets (a GET upgrade has no body to read), and response streaming (Server-Sent Events, gRPC server streaming): only the request body is read.
+- Blocked when the body stays open past the timeout: client-streaming and bidirectional gRPC, Connect client and bidirectional streaming, and long-lived uploads without `Content-Length`.
+- Not affected: requests with `Content-Length`, WebSockets (a GET upgrade has no body to read), and response streaming (Server-Sent Events, gRPC server streaming): only the request body is read.
 
 Exclude those routes from AppSec with a `bouncerActionRules` rule whose action is `bypassAppsec`. Scope each rule as tightly as you can:
 
@@ -549,7 +551,7 @@ bouncerActionRules:
 
 The trade-off: AppSec does not see matching requests at all, neither headers, URI, nor body. LAPI decisions still apply (use `bypass` only if you also want to skip them). `Content-Type` is sent by the client, so a rule that matches only on that header lets any client skip AppSec by sending it. Always combine it with `host` and/or `path`.
 
-For uploads that are slow but finite, a longer `appsecBodyReadTimeoutSeconds` is the alternative: the request stays inspected.
+For uploads without `Content-Length` that are slow but finite, a longer `appsecBodyReadTimeoutSeconds` is the alternative: the request stays inspected. Traefik's entrypoint `readTimeout` still limits the whole request, body included, so keep `appsecBodyReadTimeoutSeconds` below it.
 
 ### Match a country or an ASN
 
@@ -671,7 +673,7 @@ Send at most this many bytes of the request body to AppSec. `0` or a negative va
 Upgrade note: `0` used to mean no limit (the whole body was sent). It now caps at 10 MB. Set an explicit positive value if you need more.
 
 **AppsecBodyReadTimeoutSeconds** (int64, default `30`)
-Total time, in seconds, to receive a request body that has no `Content-Length` (HTTP/1.1 chunked, HTTP/2 or HTTP/3 without the header), up to `appsecBodyLimit` bytes. Must be at least `1`. When it expires, the request is blocked with the ban response (header `ban:appsec-body-timeout`) whatever `bouncerAppsecFailureAction` says. On HTTP/1.1 behind Traefik that answer is sent only once the client ends its body or Traefik's `readTimeout` expires. Bodies with `Content-Length` are not affected. With the defaults, a client must send its first 10 MB at about 2.8 Mbit/s or faster. Streaming routes need a `bypassAppsec` rule: see [Let streaming request bodies through](#let-streaming-request-bodies-through-grpc-connect-long-uploads).
+Total time, in seconds, to receive a request body that has no `Content-Length` (HTTP/1.1 chunked, HTTP/2 or HTTP/3 without the header), up to `appsecBodyLimit` bytes. Must be at least `1`. When it expires, the request is blocked with the ban response (remediation header `ban:appsec-body-timeout`) whatever `bouncerAppsecFailureAction` says. On HTTP/1.1 behind Traefik that answer is sent only once the client ends its body or Traefik's `readTimeout` expires. Bodies with `Content-Length` are not affected. With the defaults, a client must send its first 10 MB at about 2.8 Mbit/s or faster. Streaming routes need a `bypassAppsec` rule: see [Let streaming request bodies through](#let-streaming-request-bodies-through-grpc-connect-long-uploads).
 
 **appsecEnabled** (bool, default `false`)
 This middleware connects to AppSec and shares the connection as `appsecInstanceName`. AppSec checks every request that passed the decision check, whatever the LAPI mode.
