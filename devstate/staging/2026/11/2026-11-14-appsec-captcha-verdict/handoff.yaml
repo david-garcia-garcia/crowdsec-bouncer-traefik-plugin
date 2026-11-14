@@ -1,0 +1,14 @@
+issueKey: 2026-11-14-appsec-captcha-verdict
+jobName: 2026-11-14-appsec-captcha-verdict
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+localTests: none
+requirement: requirement.md
+comments: none
+explore: none
+change: none
+pr: none
