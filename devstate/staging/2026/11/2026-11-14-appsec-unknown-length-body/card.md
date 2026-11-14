@@ -41,17 +41,17 @@ Tests:
 **End users.** HTTP/2 and HTTP/3 clients that send a body without `Content-Length` (for example `restic init`) no longer get an automatic 403: AppSec inspects the body and decides, while request bodies that keep streaming past the timeout are blocked unless the route is excluded.
 
 ## Merge readiness
-In progress. 1 items remain.
+Ready for review. 1 items remain.
 
 Priority: P2 — real operator and end-user pain (restic blocked with a silent 403), with a workaround whose blast radius is limited to deployments that opt into `passthrough`
-Reviewed head: 5738eac6
+Reviewed head: 212d974c
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/204/checks |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -61,7 +61,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-11-14-appsec-unknown-length-body pushed | `git` |
 | OpenSpec | appsec-inspect-unknown-length-body | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/204 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 43631143133, 43631143145 (7/7 checks on a72487f7) succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/204/checks | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/204/checks |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -90,7 +90,7 @@ Completed:
 
 
 ## How this fits together
-Ticket 2026-11-14-appsec-unknown-length-body on branch 2026-11-14-appsec-unknown-length-body targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/204; CI not seen.
+Ticket 2026-11-14-appsec-unknown-length-body on branch 2026-11-14-appsec-unknown-length-body targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/204; CI build 43631143133, 43631143145 (7/7 checks on a72487f7) succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/204/checks.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -119,7 +119,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 2 added / 8 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 5738eac68ac6af9f3bd27aeefbbe385dba94f22e | Card must match the branch you measured |
+| Reviewed head | 212d974c5d2855f509a18cdfef6205d949bf9d02 | Card must match the branch you measured |
 
 ### Stored data model
 None.
