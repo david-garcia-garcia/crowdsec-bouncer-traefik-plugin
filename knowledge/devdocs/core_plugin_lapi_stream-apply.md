@@ -10,13 +10,9 @@ _Avoid_: stream poll, stream lease, ticker
 A `new` decision and a `deleted` prior for the same Ip value or the same Range CIDR in that one payload.
 _Avoid_: two ticks, live lookup
 
-**Remediation fallback**:
-The store letter (`lapiRemediationFallback`: ban, captcha, or not stored under ignore) the LAPI connection gives a decision type that is neither `ban` nor `captcha`.
-_Avoid_: passthrough, whitelist, allow, failure action
-
 ## Overview
 
-After the body is decoded, apply deleted first so a same-window replacement stays active. Range stays one Store `ApplyRangeBatch` (one read, one write). Intra-Client poll skip is `core_plugin_lapi_stream-single-flight.md`. There is no stream lease.
+After the body is decoded, apply deleted first so a same-window replacement stays active. Range stays one Store `ApplyRangeBatch` (one read, one write). Intra-Client poll skip is `core_plugin_lapi_stream-single-flight.md`. Unknown-type rules are the remediation fallback (`core_plugin_lapi_remediation-fallback.md`). There is no stream lease.
 
 ## How to use
 
@@ -57,6 +53,5 @@ if err := c.decisionStore.ApplyRangeBatch(rangeUpserts, rangeRemovals); err != n
 - On memory, `PublishTick` takes int32 elapsed seconds (`decisionstore.ElapsedNow()`), not wall Unix; mixing clocks drops every slot on publish.
 - Header-mapped scopes ride the same loops as Ip; they do not need a separate apply path.
 - `ApplyRangeBatch` one-sided callers stay equivalent when only one map is non-empty.
-- `lapiRemediationFallback` is read from the opener in `lapi.New`; a subscriber's value is unused. It is not `bouncerLapiFailureAction` (LAPI unreachable).
-- `whitelist` and `allow` are not valid CrowdSec decision types and are an inadequate way to manage whitelists: the LAPI stream says WHAT TO BLOCK, not WHAT TO ALLOW. They follow the remediation fallback like any unknown type and never lift a ban. Allowing traffic belongs to parser whitelists and LAPI allowlists (`cscli allowlists`), which stop or expire decisions at the source (`knowledge/research/ext_crowdsec_allowlists/`).
+- `whitelist` and `allow` are not valid CrowdSec decision types and are an inadequate way to manage whitelists: the LAPI stream says WHAT TO BLOCK, not WHAT TO ALLOW. They follow the remediation fallback like any unknown type and never lift a ban (`core_plugin_lapi_remediation-fallback.md`).
 - Official vendor apply order lives in `knowledge/research/ext_crowdsec_bouncers_stream-apply/` when that folder exists.

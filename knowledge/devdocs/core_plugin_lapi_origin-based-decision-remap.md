@@ -12,7 +12,7 @@ _Avoid_: treating `lists:foo` as a prefix of other lists, case-fold match
 
 ## Overview
 
-Stream Ip/header, stream Range, and live/none query store ingest kind: `RemediationValue` for `ban`/`captcha`, and the remediation fallback (`lapiRemediationFallback`, default ban; `core_plugin_lapi_stream-apply.md`) for any other type. Each router applies `applyOriginBasedDecisionRemap` after a successful lookup or live query. Live strongest pick uses ingest kind so a still-ban (including an unknown type under fallback ban) wins in the shared cache; under `ignore` an unknown type is never picked. Two Bouncers on one Client may disagree.
+Stream Ip/header, stream Range, and live/none query store ingest kind: `RemediationValue` for `ban`/`captcha`, and the remediation fallback (`lapiRemediationFallback`, default ban; `core_plugin_lapi_remediation-fallback.md`) for any other type. Each router applies `applyOriginBasedDecisionRemap` after a successful lookup or live query. Live strongest pick uses ingest kind so a still-ban (including an unknown type under fallback ban) wins in the shared cache; under `ignore` an unknown type is never picked. Two Bouncers on one Client may disagree.
 
 ## How to use
 
