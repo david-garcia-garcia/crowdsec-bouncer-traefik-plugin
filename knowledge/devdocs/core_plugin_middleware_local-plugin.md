@@ -8,7 +8,11 @@ _Avoid_: `github.repository` as the identity, a fourth path, upstream `maxlerebo
 
 **Local plugin**:
 A Traefik `experimental.localPlugins.<alias>` registration: `moduleName` is the Go module path, sources sit at `plugins-local/src/<that path>`, and there is no `version`.
-_Avoid_: catalog plugin, `experimental.plugins` plus `version`
+_Avoid_: `version` on a local plugin, a catalog pin in a compose that bind-mounts the checkout
+
+**Catalog plugin**:
+A Traefik `experimental.plugins.<alias>` registration: `moduleName` is the Go module path and `version` is a release tag that plugins.traefik.io serves. Traefik downloads it at startup into `plugins-storage`.
+_Avoid_: a catalog pin older than `v1.9.0` (not served), `github.com/maxlerebourg/...` as this tree's `moduleName`
 
 **Plugin alias**:
 The Traefik routing key (`plugin.<alias>`). In-tree this tree uses `bouncer`.
@@ -16,7 +20,7 @@ _Avoid_: `moduleName` as the routing name, a second in-tree middleware family
 
 ## Overview
 
-This unpublished fork is loaded as a Local plugin. Keep one Go module path. Catalog download of this module 404s and plugins.traefik.io does not list forks. Spec: `core_plugin_middleware_local-plugin`. Yaegi `New`: `core_plugin_middleware.md`.
+Keep one Go module path. Compose files and e2e harnesses that run from a checkout load this tree as a Local plugin. Install examples that do not ship the tree (Kubernetes, binary VM) and the README use the Catalog plugin: plugins.traefik.io lists this module and serves its release tags from `v1.9.0`. Spec: `core_plugin_middleware_local-plugin`. Yaegi `New`: `core_plugin_middleware.md`.
 
 ## How to use
 
@@ -24,15 +28,24 @@ This unpublished fork is loaded as a Local plugin. Keep one Go module path. Cata
 - Keep the root package clause `crowdsec_bouncer_traefik_plugin`. Do not set `.traefik.yml` `basePkg`.
 - Set `.traefik.yml` `import` equal to the Go module path.
 - Set `.traefik.yml` `displayName` to `CrowdSec Bouncer Traefik Plugin (david-garcia-garcia)`. Do not leave it empty. Do not use upstream `Crowdsec Bouncer Traefik Plugin`.
-- Register in-tree Traefik as `experimental.localPlugins.bouncer` (CLI `experimental.localplugins.bouncer`) with `moduleName` equal to the Go module path.
-- Place sources at `plugins-local/src/<that module>` (bind-mount, symlink, or operator copy).
+- In compose and e2e that run from a checkout, register `experimental.localPlugins.bouncer` (CLI `experimental.localplugins.bouncer`) with `moduleName` equal to the Go module path, place sources at `plugins-local/src/<that module>` (bind-mount or symlink), and set no `version`.
+- In install examples that do not ship the tree (`examples/kubernetes`, `examples/binary-vm`), register `experimental.plugins.bouncer` with the same `moduleName` and a pinned release `version: "vX.Y.Z"`. Renovate bumps that pin.
 - Keep routing `plugin.bouncer` in-tree.
-- Do not set `experimental.plugins.bouncer.version` for this module.
-- On a host that already has upstream `experimental.plugins.bouncer`, use a different Plugin alias (`localPlugins.crowdsec` + `plugin.crowdsec`).
+- On a host that already has upstream `experimental.plugins.bouncer`, use a different Plugin alias (`plugins.crowdsec` or `localPlugins.crowdsec`, with `plugin.crowdsec`).
 
 ## Pattern snippet
 
 ```yaml
+# install example: catalog release
+experimental:
+  plugins:
+    bouncer:
+      moduleName: github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
+      version: "v1.9.6"
+```
+
+```yaml
+# checkout: local plugin
 experimental:
   localPlugins:
     bouncer:
@@ -53,10 +66,12 @@ experimental:
 - `README.md`
 - `tests/e2e/mock/lib/traefik.yml`
 - `tests/e2e/real/config/docker-compose.test.yml`
+- `examples/kubernetes/traefik/values.yml`
+- `examples/binary-vm/files/traefik/traefik.yml`
 
 ## Gotchas
 
-- Catalog `GET` of this module at `v1.7.1` or `vX.Y.Z` returns 404. Do not ship a catalog `version=` of this fork as the working install.
+- The catalog serves this module from `v1.9.0`; `v1.8.2` returns 500 and Traefik fails the install on any non-200. An older measurement (404 at `v1.7.1`, 2026-09-18) predates the catalog listing (2026-09-21) and no longer holds. Research: `knowledge/research/ext_traefik_plugins_catalog/notes.md`.
 - Same Plugin alias is a map write: local overwrites catalog. Two plugins need two aliases.
 - Last path segment is unchanged, so Traefik’s derived `basePkg` stays `crowdsec_bouncer_traefik_plugin`.
 - Research extracts may still show dest-era `maxlerebourg` paths; do not copy those into new compose.

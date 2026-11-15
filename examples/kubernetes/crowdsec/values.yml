@@ -1,5 +1,10 @@
-image:
-  tag: v1.7.8-2
+# Do not set image.tag: each chart version ships the image it was written for.
+# An image older than its chart makes the Local API fail on startup with
+# "field auto_registration not found".
+
+# kind, k3s, k3d and most managed clusters run containerd. Set "docker" if your
+# nodes run Docker, otherwise the agent cannot parse the Traefik logs.
+container_runtime: containerd
 
 agent:
   acquisition:
@@ -11,15 +16,27 @@ agent:
       value: "crowdsecurity/traefik"
 
 lapi:
-  dashboard:
-    enabled: false
   env:
-    - name: ENROLL_KEY
-      value: 40796d93c2958f9e58345514e67740e5
-    - name: ENROLL_INSTANCE_NAME
-      value: k8s_cluster
-    - name: ENROLL_TAGS
-      value: "k8s linux test"
+    # Registers the "traefik" bouncer with the key stored in the crowdsec-keys secret.
+    - name: BOUNCER_KEY_traefik
+      valueFrom:
+        secretKeyRef:
+          name: crowdsec-keys
+          key: BOUNCER_KEY_traefik
     # If it's a test, we don't want to share signals with CrowdSec so disable the Online API.
     - name: DISABLE_ONLINE_API
       value: "true"
+
+appsec:
+  enabled: true
+  acquisitions:
+    - source: appsec
+      listen_addr: "0.0.0.0:7422"
+      path: /
+      appsec_configs:
+        - crowdsecurity/appsec-default
+      labels:
+        type: appsec
+  env:
+    - name: COLLECTIONS
+      value: "crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules"

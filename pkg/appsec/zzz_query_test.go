@@ -117,6 +117,79 @@ func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
 	}
 }
 
+// Test_appsecQuery_unreadableBodyMethods drives an HTTP/3 request without Content-Length through
+// Query for every method, so a change to the drop condition in Query fails here even when the
+// isBodyUnreadable / isMethodWithBody predicates stay untouched. Regression for
+// https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/385 (upstream PR #386):
+// a bodyless HTTP/3 DELETE must reach AppSec instead of being dropped.
+func Test_appsecQuery_unreadableBodyMethods(t *testing.T) {
+	tests := []struct {
+		method   string
+		wantDrop bool
+	}{
+		{method: http.MethodPost, wantDrop: true},
+		{method: http.MethodPut, wantDrop: true},
+		{method: http.MethodPatch, wantDrop: true},
+		{method: http.MethodDelete, wantDrop: false},
+		{method: http.MethodGet, wantDrop: false},
+		{method: http.MethodHead, wantDrop: false},
+		{method: http.MethodOptions, wantDrop: false},
+	}
+	for _, tt := range tests {
+		for _, failureAction := range []string{configuration.FailureActionBan, configuration.FailureActionPassthrough} {
+			// Passthrough never drops: the body is skipped and the headers still go to AppSec.
+			wantDrop := tt.wantDrop && failureAction != configuration.FailureActionPassthrough
+			t.Run(tt.method+"/"+failureAction, func(t *testing.T) {
+				assertUnreadableHTTP3Query(t, tt.method, failureAction, wantDrop)
+			})
+		}
+	}
+}
+
+// assertUnreadableHTTP3Query runs Query on an HTTP/3 request whose body blocks until the test ends.
+// A drop must fail without contacting AppSec; otherwise AppSec gets a bodyless GET carrying the verb.
+func assertUnreadableHTTP3Query(t *testing.T, method, failureAction string, wantDrop bool) {
+	t.Helper()
+	done := make(chan struct{})
+	defer close(done)
+	req, _ := http.NewRequest(method, "http://localhost/", blockingBody{done: done})
+	req.ProtoMajor = 3
+	req.ContentLength = -1
+	capture := &forwardCaptureRoundTripper{}
+	finished := make(chan error, 1)
+	go func() {
+		_, err := newForwardCaptureClient(capture).Query(withTestAddress(req), Policy{FailureAction: failureAction})
+		finished <- err
+	}()
+	var err error
+	select {
+	case err = <-finished:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("Query() blocked reading the body of an HTTP/3 %s without content-length", method)
+	}
+	if wantDrop {
+		if err == nil {
+			t.Fatalf("Query() on an HTTP/3 %s without content-length returned nil, want a drop error", method)
+		}
+		if capture.method != "" {
+			t.Errorf("AppSec was contacted (%s) for a dropped HTTP/3 %s", capture.method, method)
+		}
+		return
+	}
+	if err != nil {
+		t.Fatalf("Query() on an HTTP/3 %s without content-length returned error: %v", method, err)
+	}
+	if capture.method != http.MethodGet {
+		t.Errorf("AppSec method %q want %q", capture.method, http.MethodGet)
+	}
+	if capture.body != "" {
+		t.Errorf("AppSec body %q want empty", capture.body)
+	}
+	if got := capture.header.Get(crowdsecAppsecVerbHeader); got != method {
+		t.Errorf("%s %q want %q", crowdsecAppsecVerbHeader, got, method)
+	}
+}
+
 func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusOK)
