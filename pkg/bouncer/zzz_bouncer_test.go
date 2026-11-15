@@ -34,7 +34,7 @@ func testClientRequest(req *http.Request, remoteIP string) clientrequest.Request
 
 // continueAfterLAPIForTest is the ServeHTTP tail these tests enter directly: AppSec, then next.
 func continueAfterLAPIForTest(b *Bouncer, rw http.ResponseWriter, req clientrequest.Request) {
-	if b.serveAppSec(rw, req, b.actionRules.Fold(req.Request)) {
+	if b.serveAppSec(rw, req, b.foldActionRules(req)) {
 		return
 	}
 	b.next.ServeHTTP(rw, req.Request)
@@ -642,14 +642,14 @@ func TestHandleNextServeHTTPAllowKeepsChallengePathsFromOrigin(t *testing.T) {
 			t.Fatalf("status=%d want 404", rw.Code)
 		}
 	})
-	// AppSec not in use for this request: the 404 guard does not apply and the request reaches next.
+	// A bypassAppsec rule does not skip AppSec on the challenge prefix, so the 404 guard still applies.
 	t.Run("appsec bypass rule custom.js", func(t *testing.T) {
 		b, nextCalled := newAllowBouncer()
 		b.actionRules = mustPathAction(t, "appsec", "^/crowdsec-internal/challenge/", httprule.ActionBypassAppsec)
 		rw := httptest.NewRecorder()
 		continueAfterLAPIForTest(b, rw, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/crowdsec-internal/challenge/custom.js", nil), "192.0.2.10"))
-		if !*nextCalled || rw.Code == http.StatusNotFound {
-			t.Fatalf("next=%v status=%d, want next called and no 404 when AppSec is skipped", *nextCalled, rw.Code)
+		if *nextCalled || rw.Code != http.StatusNotFound {
+			t.Fatalf("next=%v status=%d, want 404 and no next: a bypass rule must not skip AppSec on the challenge prefix", *nextCalled, rw.Code)
 		}
 	})
 	t.Run("appsec not subscribed custom.js", func(t *testing.T) {

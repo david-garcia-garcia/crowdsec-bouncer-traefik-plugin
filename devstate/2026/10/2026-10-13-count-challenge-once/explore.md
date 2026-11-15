@@ -65,6 +65,7 @@ Folded from PR 196 explore:
 - Q: (folded from PR 196) Does SkipAppsec on a challenge path 404 or call `next`?
   Rank: additive asked — Desired says "when AppSec is in use for this request"
   Decision: assumed — SkipAppsec is not AppSec in use; still `next`. No extra skip-rule exception.
+  Reversed 2026-11-15: a bypass rule that matches this prefix made the challenge unsolvable (`upstream-review-2026-11-14.md` problem 7; upstream issue https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/393, PR https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/413). `foldActionRules` now clears SkipAppsec on the prefix, so AppSec is always in use there and the 404 applies. See `openspec/changes/archive/2026-11-15-action-rule-skips-challenge-and-ambiguous-paths/`.
   By: explore
 
 - Q: (folded from PR 196) Which 404 helper?

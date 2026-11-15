@@ -70,11 +70,14 @@ func NewActionSet(rules []ActionRule) (*ActionSet, error) {
 // ActionMatch is every matching row reduced for one request.
 // BanName and CaptchaName are the first matching rule of that token. Empty means none.
 // SkipLapi and SkipAppsec are OR'd across every non-ban hit. A ban row contributes only its name.
+// AmbiguousPathName is the first matching rule with a path predicate whose skips were dropped
+// because the request path has more than one reading (see SingleReadingPath). Empty means none.
 type ActionMatch struct {
-	BanName     string
-	CaptchaName string
-	SkipAppsec  bool
-	SkipLapi    bool
+	AmbiguousPathName string
+	BanName           string
+	CaptchaName       string
+	SkipAppsec        bool
+	SkipLapi          bool
 }
 
 // Matching returns every matching index in list order. Cookie is parsed once when needed.
@@ -87,11 +90,14 @@ func (set *ActionSet) Matching(httpReq *http.Request) []int {
 
 // Fold reduces every matching row. A nil set matches nothing.
 // The first ban name wins and that row contributes nothing else. Skip flags OR. The first captcha name wins.
+// A row with a path predicate skips no leg when the path has more than one reading: its regex saw
+// one reading and the backend may serve another. Its captcha token still applies.
 func (set *ActionSet) Fold(httpReq *http.Request) ActionMatch {
 	var match ActionMatch
 	if set == nil {
 		return match
 	}
+	pathChecked, pathAmbiguous := false, false
 	for _, i := range set.Matching(httpReq) {
 		if set.Ban(i) {
 			if match.BanName == "" {
@@ -99,14 +105,29 @@ func (set *ActionSet) Fold(httpReq *http.Request) ActionMatch {
 			}
 			continue
 		}
+		if set.Captcha(i) && match.CaptchaName == "" {
+			match.CaptchaName = set.Name(i)
+		}
+		if !set.SkipLapi(i) && !set.SkipAppsec(i) {
+			continue
+		}
+		if set.set.hasPath(i) {
+			if !pathChecked {
+				pathAmbiguous = !SingleReadingPath(httpReq.URL)
+				pathChecked = true
+			}
+			if pathAmbiguous {
+				if match.AmbiguousPathName == "" {
+					match.AmbiguousPathName = set.Name(i)
+				}
+				continue
+			}
+		}
 		if set.SkipLapi(i) {
 			match.SkipLapi = true
 		}
 		if set.SkipAppsec(i) {
 			match.SkipAppsec = true
-		}
-		if set.Captcha(i) && match.CaptchaName == "" {
-			match.CaptchaName = set.Name(i)
 		}
 	}
 	return match

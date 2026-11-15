@@ -218,7 +218,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	}
 
 	// Return ASAP a ban that comes from an action rule
-	match := b.actionRules.Fold(req.Request)
+	match := b.foldActionRules(req)
 	if match.BanName != "" {
 		logger.Trace(b.log, "ServeHTTP", "ip", req.IPAddrString(), "actionRule", match.BanName)
 		b.handleRemediationServeHTTP(rw, req, decisionscope.BannedValue, lapi.OriginPluginRules(match.BanName))
@@ -570,6 +570,21 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientrequest
 	}
 	b.handleAppsecResponseServeHTTP(rw, req, decision)
 	return true
+}
+
+// foldActionRules reduces the action rules for req.
+// The challenge prefix belongs to CrowdSec, not to the site: AppSec must answer it to solve the challenge,
+// so a bypass or bypassAppsec rule that also matches it does not skip AppSec there. LAPI skips stay.
+func (b *Bouncer) foldActionRules(req clientrequest.Request) httprule.ActionMatch {
+	match := b.actionRules.Fold(req.Request)
+	if match.AmbiguousPathName != "" {
+		logger.Trace(b.log, "foldActionRules", "ip", req.IPAddrString(), "ambiguousPathRule", match.AmbiguousPathName)
+	}
+	if match.SkipAppsec && isCrowdsecChallengeCallbackPath(req.URL.Path) {
+		logger.Trace(b.log, "foldActionRules", "ip", req.IPAddrString(), "challengePathKeepsAppsec", true)
+		match.SkipAppsec = false
+	}
+	return match
 }
 
 // isCrowdsecChallengeCallbackPath reports script and submit paths under /crowdsec-internal/challenge/.

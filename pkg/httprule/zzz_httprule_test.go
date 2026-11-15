@@ -327,3 +327,58 @@ func TestNewActionSet_bypassTokenSkipsBothLegs(t *testing.T) {
 		t.Fatal("bypass must skip both legs and keep captcha")
 	}
 }
+
+func TestSingleReadingPath(t *testing.T) {
+	for _, tc := range []struct {
+		target string
+		want   bool
+	}{
+		{"/", true},
+		{"/healthz", true},
+		{"/healthz/", true},
+		{"/healthz/live", true},
+		{"/a-b_c.d~e/f:g@h/!$&'()+,=", true},
+		{"/healthz/..;/admin", false},
+		{"/healthz;/admin", false},
+		{"/healthz/%2E%2E;/admin", false},
+		{"/healthz/..%5Cadmin", false},
+		{"/healthz%2Fadmin", false},
+		{"/healthz/%61dmin", false},
+		{"/healthz/%252e%252e/admin", false},
+		{"/my%20file", false},
+		{"/healthz/../admin", false},
+		{"/healthz/./admin", false},
+		{"/healthz//admin", false},
+		{"/healthz/.../admin", false},
+		{"/healthz/*", false},
+	} {
+		req := httptest.NewRequest(http.MethodGet, "http://example.com"+tc.target, nil)
+		if got := SingleReadingPath(req.URL); got != tc.want {
+			t.Errorf("SingleReadingPath(%q)=%v want %v (Path=%q RawPath=%q)", tc.target, got, tc.want, req.URL.Path, req.URL.RawPath)
+		}
+	}
+	if SingleReadingPath(nil) {
+		t.Error("nil URL must not be a single reading")
+	}
+}
+
+func TestActionSet_foldAmbiguousPathDropsPathSkipsOnly(t *testing.T) {
+	set := mustNewActionSet(t, []ActionRule{
+		{Name: "healthz", Action: []string{ActionBypassAppsec}, Rule: Rule{Path: "^/healthz(/|$)"}},
+		{Name: "login-captcha", Action: []string{ActionCaptcha, ActionBypassLapi}, Rule: Rule{Path: "^/healthz/"}},
+		{Name: "internal-host", Action: []string{ActionBypassLapi}, Rule: Rule{Host: `^internal\.example$`}},
+	})
+	clean := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/healthz/live", nil))
+	if want := (ActionMatch{CaptchaName: "login-captcha", SkipAppsec: true, SkipLapi: true}); clean != want {
+		t.Fatalf("clean Fold=%+v want %+v", clean, want)
+	}
+	ambiguous := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/healthz/..;/admin", nil))
+	if want := (ActionMatch{AmbiguousPathName: "healthz", CaptchaName: "login-captcha"}); ambiguous != want {
+		t.Fatalf("ambiguous Fold=%+v want %+v", ambiguous, want)
+	}
+	// A rule without a path predicate does not read the path, so its skip stays.
+	hostOnly := set.Fold(httptest.NewRequest(http.MethodGet, "http://internal.example/healthz/..;/admin", nil))
+	if want := (ActionMatch{AmbiguousPathName: "healthz", CaptchaName: "login-captcha", SkipLapi: true}); hostOnly != want {
+		t.Fatalf("host-only Fold=%+v want %+v", hostOnly, want)
+	}
+}
