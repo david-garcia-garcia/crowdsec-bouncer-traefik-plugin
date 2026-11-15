@@ -25,7 +25,7 @@ Both parts act on the same prefix and share one helper, `isCrowdsecChallengeCall
 In progress. 0 items remain.
 
 Priority: P2 — operators see inflated drop metrics, and unanswered challenge paths reach origin, with limited blast radius and no data loss.
-Reviewed head: b2f4ab95
+Reviewed head: 4042324e
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -93,7 +93,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 5 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | b2f4ab95c2cdd67cbb9c1f2b114b2f557e0de096 | Card must match the branch you measured |
+| Reviewed head | 4042324ee95c8be6910ac766ba8ef52254cf11af | Card must match the branch you measured |
 
 ### Stored data model
 None.
