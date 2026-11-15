@@ -22,17 +22,17 @@ Both parts act on the same prefix and share one helper, `isCrowdsecChallengeCall
 **End users.** A request to a challenge-prefix path that nothing answers (such as an unconfigured `custom.js`) now gets 404 instead of whatever the origin application returns; the challenge itself behaves as before.
 
 ## Merge readiness
-Ready for review. 0 items remain.
+In progress. 0 items remain.
 
 Priority: P2 — operators see inflated drop metrics, and unanswered challenge paths reach origin, with limited blast radius and no data loss.
-Reviewed head: 91ea457f
+Reviewed head: b2f4ab95
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43748976777 |
+| Overall readiness | 1/6 | Not ready |
+| CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -42,7 +42,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-10-13-count-challenge-once pushed | `git` |
 | OpenSpec | count-challenge-drop-once | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/197 | pr-host |
-| CI | build 43748976777 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43748976777 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43748976777 |
+| CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -64,7 +64,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-13-count-challenge-once on branch 2026-10-13-count-challenge-once targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/197; CI build 43748976777 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43748976777.
+Ticket 2026-10-13-count-challenge-once on branch 2026-10-13-count-challenge-once targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/197; CI not seen.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -93,7 +93,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 5 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 91ea457f2caba7b756c14d6ec145ffbe08a10ffa | Card must match the branch you measured |
+| Reviewed head | b2f4ab95c2cdd67cbb9c1f2b114b2f557e0de096 | Card must match the branch you measured |
 
 ### Stored data model
 None.
