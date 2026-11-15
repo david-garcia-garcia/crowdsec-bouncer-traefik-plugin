@@ -298,9 +298,33 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 	return true
 }
 
+// appsecChallengePathPrefix is the CrowdSec bot-detection callback prefix.
+// AppSec must answer these paths; unanswered results must not reach origin.
+const appsecChallengePathPrefix = "/crowdsec-internal/challenge/"
+
+// isAppsecChallengePath reports whether this URL path is under the CrowdSec challenge prefix.
+func isAppsecChallengePath(path string) bool {
+	return strings.HasPrefix(path, appsecChallengePathPrefix)
+}
+
 // serveAppSec reports whether AppSec or a captcha rule wrote the response.
 // A cleared captcha gate or a widget asset did not write. False means ServeHTTP calls next.
+// When AppSec is in use and nothing wrote, the challenge prefix gets 404 so origin is not called.
 func (b *Bouncer) serveAppSec(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
+	if b.answerAppSec(rw, req, match) {
+		return true
+	}
+	// Nothing answered (allow, failure-action passthrough, or a cleared captcha gate):
+	// the challenge prefix still must not reach origin.
+	if !match.SkipAppsec && b.subscribeAppSec && isAppsecChallengePath(req.URL.Path) {
+		http.NotFound(rw, req.Request)
+		return true
+	}
+	return false
+}
+
+// answerAppSec runs the captcha rule or AppSec for this request. True means the response was written.
+func (b *Bouncer) answerAppSec(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
 	if match.CaptchaName != "" {
 		return b.applyCaptchaRuleServeHTTP(rw, req, match)
 	}
@@ -312,10 +336,7 @@ func (b *Bouncer) serveAppSec(rw http.ResponseWriter, req clientrequest.Request,
 	}
 	// AppSec judged this request alone. A captcha form POST it let through is
 	// still the answer to an earlier captcha, so the gate validates it.
-	if b.isCaptchaFormAnswer(req) {
-		return b.serveAppsecCaptchaGate(rw, req)
-	}
-	return false
+	return b.isCaptchaFormAnswer(req) && b.serveAppsecCaptchaGate(rw, req)
 }
 
 // usableCaptcha is this router's captcha client when it can serve the gate: subscribed, published, and Valid.

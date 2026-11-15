@@ -378,3 +378,56 @@ func TestLapiCaptchaDowngrade_keepsLapiBanReason(t *testing.T) {
 		t.Fatalf("X-Remediation=%q want ban:captcha-downgrade", got)
 	}
 }
+
+// TestAppsecCaptchaVerdict_markerPostOnChallengePathNeverReachesOrigin proves the
+// challenge-prefix 404 still applies after the captcha-form gate declined to write.
+func TestAppsecCaptchaVerdict_markerPostOnChallengePathNeverReachesOrigin(t *testing.T) {
+	const challengeAsset = "/crowdsec-internal/challenge/fast.js"
+	cases := map[string]*captcha.Client{
+		"no router captcha":          nil,
+		"gate passes a widget asset": testCaptchaClient(t, challengeAsset, "", "", nil),
+	}
+	for name, client := range cases {
+		t.Run(name, func(t *testing.T) {
+			b, next, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusOK, `{"action":"allow"}`), client)
+			fields := url.Values{}
+			fields.Set("crowdsec_captcha_challenge", "v1")
+			req := httptest.NewRequest(http.MethodPost, "http://example.com"+challengeAsset, strings.NewReader(fields.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rw := httptest.NewRecorder()
+			continueAfterLAPIForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP))
+
+			if next.called {
+				t.Fatal("a challenge-prefix path must not reach the backend")
+			}
+			if rw.Code != http.StatusNotFound {
+				t.Fatalf("status=%d want 404", rw.Code)
+			}
+		})
+	}
+}
+
+// TestAppsecChallengePath_solvedCaptchaRuleNeverReachesOrigin proves a captcha action rule
+// whose gate is already solved does not reopen the challenge prefix to origin.
+func TestAppsecChallengePath_solvedCaptchaRuleNeverReachesOrigin(t *testing.T) {
+	client := testSiteverifyCaptchaClient(t)
+	cookieValue := solveTestGateCookie(t, client)
+	b, next, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusOK, `{"action":"allow"}`), client)
+	b.actionRules = mustPathAction(t, "site", "^/", httprule.ActionCaptcha)
+
+	for _, target := range []string{"/crowdsec-internal/challenge/custom.js", "/protected"} {
+		next.called = false
+		req := httptest.NewRequest(http.MethodGet, "http://example.com"+target, nil)
+		req.AddCookie(&http.Cookie{Name: "crowdsec_captcha_gate", Value: cookieValue})
+		rw := httptest.NewRecorder()
+		continueAfterLAPIForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP))
+
+		onChallengePath := strings.HasPrefix(target, "/crowdsec-internal/challenge/")
+		if next.called == onChallengePath {
+			t.Fatalf("%s: next called=%v, want %v", target, next.called, !onChallengePath)
+		}
+		if onChallengePath && rw.Code != http.StatusNotFound {
+			t.Fatalf("%s: status=%d want 404", target, rw.Code)
+		}
+	}
+}
