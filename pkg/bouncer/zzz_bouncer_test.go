@@ -312,8 +312,8 @@ func TestHandleNextServeHTTPRelaysStructuredAppsecChallenge(t *testing.T) {
 	}
 }
 
-// testChallengeDroppedCount relays one AppSec challenge envelope on path and returns origin appsec dropped/request.
-func testChallengeDroppedCount(t *testing.T, method, path string) int64 {
+// testChallengeDropped relays one AppSec challenge envelope on path and returns origin appsec dropped requests and bytes.
+func testChallengeDropped(t *testing.T, method, path string) (requests, bytes int64) {
 	t.Helper()
 	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
@@ -325,16 +325,16 @@ func testChallengeDroppedCount(t *testing.T, method, path string) int64 {
 	bindTestLAPI(b, lapiClient)
 	rw := httptest.NewRecorder()
 	continueAfterLAPIForTest(b, rw, testClientRequest(httptest.NewRequest(method, "http://example.com"+path, nil), "192.0.2.10"))
-	return lapiClient.TestDroppedCount("appsec", "ipv4", "")
+	return lapiClient.TestDroppedCount("appsec", "ipv4", ""), lapiClient.TestDroppedByteCount("appsec", "ipv4")
 }
 
-// TestHandleNextServeHTTPChallengePageIncrementsDroppedOnce counts the challenge page once and skips /crowdsec-internal/challenge/submit.
+// TestHandleNextServeHTTPChallengePageIncrementsDroppedOnce counts the challenge page once (requests and bytes) and skips /crowdsec-internal/challenge/submit.
 func TestHandleNextServeHTTPChallengePageIncrementsDroppedOnce(t *testing.T) {
-	if got := testChallengeDroppedCount(t, http.MethodGet, "/protected"); got != 1 {
-		t.Fatalf("protected dropped=%d want 1", got)
+	if requests, bytes := testChallengeDropped(t, http.MethodGet, "/protected"); requests != 1 || bytes <= 0 {
+		t.Fatalf("protected dropped requests=%d bytes=%d, want 1 and > 0", requests, bytes)
 	}
-	if got := testChallengeDroppedCount(t, http.MethodPost, "/crowdsec-internal/challenge/submit"); got != 0 {
-		t.Fatalf("submit dropped=%d want 0", got)
+	if requests, bytes := testChallengeDropped(t, http.MethodPost, "/crowdsec-internal/challenge/submit"); requests != 0 || bytes != 0 {
+		t.Fatalf("submit dropped requests=%d bytes=%d, want 0 and 0", requests, bytes)
 	}
 }
 
