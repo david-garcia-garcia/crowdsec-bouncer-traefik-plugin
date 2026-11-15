@@ -38,31 +38,120 @@ Describe "CrowdSec Bouncer Real AppSec Tests" {
         }
     }
 
+    # CrowdSec 1.8.2 crowdsecurity/appsec-bot-challenge on listener 7423 (bouncer-bot, cscli bouncer BOT).
+    # /crowdsec-internal/challenge has its own router through bouncer-bot whose service is that listener,
+    # as the README asks; the listener itself answers a direct request with 401. Only the plugin relay
+    # writes X-Remediation captcha:challenge, so that header tells a relay apart from a forward.
     Context "AppSec bot-detection challenge" -Tag "appsec", "bot-detection" {
+        BeforeAll {
+            $script:BotIP = "172.19.0.41"
+            $script:Browser = @{
+                "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+
+            function script:Get-FirstHeader {
+                param($Headers, [string]$Name)
+                $value = $Headers[$Name]
+                if ($value -is [System.Array]) {
+                    return [string]$value[0]
+                }
+                return [string]$value
+            }
+
+            # GrantChallengeCookie on /origin-scheme (e2e/origin-scheme-grant) mints a valid
+            # __crowdsec_challenge without running the browser proof of work.
+            function script:Get-GrantedChallengeCookie {
+                $grant = Test-HttpRequest -Endpoint "/origin-scheme" -IP $script:BotIP -TraefikUrl $script:TraefikUrl `
+                    -ExtraHeaders $script:Browser -MaximumRedirection 0
+                $grant.StatusCode | Should -Be 307 -Because "grant status=$($grant.StatusCode)"
+                foreach ($line in @($grant.Headers["Set-Cookie"])) {
+                    $pair = ([string]$line -split ";")[0].Trim()
+                    if ($pair -like "__crowdsec_challenge=*") {
+                        return $pair
+                    }
+                }
+                throw "no __crowdsec_challenge in Set-Cookie: $($grant.Headers['Set-Cookie'])"
+            }
+
+            function script:Get-BotAppsecDropped {
+                return Get-CscliBouncerMetricValue -Bouncer "BOT" -Origin "appsec" -Name "dropped" -Unit "request"
+            }
+        }
+
         BeforeEach {
             Clear-TraefikAccessLogs
             Remove-AllTestDecisions
         }
 
-        It "Should not silently ban when bot-detection is loaded" {
-            $browser = @{
-                "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            }
-            $response = Test-HttpRequest -Endpoint "/bot-detection" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl -ExtraHeaders $browser
-            $cookie = ""
-            if ($response.Headers -and $response.Headers["Set-Cookie"]) {
-                $cookie = [string]$response.Headers["Set-Cookie"]
-            }
-            $isChallenge = ($response.Content -match "crowdsec|fpscanner|challenge") -or ($cookie -match "__crowdsec_challenge")
-            $isExemptAllow = ($response.StatusCode -eq 200) -and ($response.Content -match "Hostname:")
-            $isSilentBan = ($response.StatusCode -eq 403) -and (-not $isChallenge)
-            $isSilentBan | Should -BeFalse
-            ($isChallenge -or $isExemptAllow) | Should -BeTrue
+        It "Should serve the CrowdSec challenge page to a browser with no challenge cookie" {
+            $response = Test-HttpRequest -Endpoint "/bot-detection" -IP $script:BotIP -TraefikUrl $script:TraefikUrl -ExtraHeaders $script:Browser
+            $response.StatusCode | Should -Be 200
+            (Get-FirstHeader -Headers $response.Headers -Name "X-Remediation") | Should -Be "captcha:challenge"
+            $response.Content | Should -Match "<title>CrowdSec Challenge</title>"
+            $response.Content | Should -Not -Match "Hostname:" -Because "the origin whoami must not answer a challenged request"
         }
 
-        It "Should keep challenge assets off the origin whoami" {
-            $response = Test-HttpRequest -Endpoint "/crowdsec-internal/challenge/fpscanner.js" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl
-            $response.Content | Should -Not -Match "Hostname:"
+        It "Should relay the challenge script <Script> from AppSec" -TestCases @(
+            @{ Script = "fpscanner.js" }
+            @{ Script = "pow-worker.js" }
+        ) {
+            param($Script)
+            $response = Test-HttpRequest -Endpoint "/crowdsec-internal/challenge/$Script" -IP $script:BotIP -TraefikUrl $script:TraefikUrl -ExtraHeaders $script:Browser
+            $response.StatusCode | Should -Be 200
+            (Get-FirstHeader -Headers $response.Headers -Name "X-Remediation") | Should -Be "captcha:challenge"
+            $response.ContentType | Should -Match "javascript"
+        }
+
+        It "Should relay the challenge submit answer from AppSec" {
+            $response = Test-HttpRequest -Endpoint "/crowdsec-internal/challenge/submit" -IP $script:BotIP -TraefikUrl $script:TraefikUrl `
+                -Method POST -Body "{}" -ExtraHeaders ($script:Browser + @{ "Content-Type" = "application/json" })
+            $response.StatusCode | Should -Be 200
+            (Get-FirstHeader -Headers $response.Headers -Name "X-Remediation") | Should -Be "captcha:challenge"
+            $response.Content | Should -Match '"status"' -Because "an unsolved submit is CrowdSec's JSON verdict, not the origin"
+        }
+
+        It "Should let a visitor with a valid challenge cookie through to origin" {
+            $cookie = Get-GrantedChallengeCookie
+            $response = Test-HttpRequest -Endpoint "/bot-detection" -IP $script:BotIP -TraefikUrl $script:TraefikUrl `
+                -ExtraHeaders ($script:Browser + @{ "Cookie" = $cookie })
+            $response.StatusCode | Should -Be 200
+            $response.Content | Should -Match "Hostname:"
+            (Get-FirstHeader -Headers $response.Headers -Name "X-Remediation") | Should -BeNullOrEmpty
+        }
+
+        It "Should answer 404 on a challenge path AppSec allows instead of forwarding it" {
+            # With a valid cookie AppSec allows a challenge path it does not serve. The plugin answers 404;
+            # forwarding would reach the listener service, which answers 401.
+            $cookie = Get-GrantedChallengeCookie
+            $response = Test-HttpRequest -Endpoint "/crowdsec-internal/challenge/e2e-unknown" -IP $script:BotIP -TraefikUrl $script:TraefikUrl `
+                -ExtraHeaders ($script:Browser + @{ "Cookie" = $cookie })
+            $response.StatusCode | Should -Be 404
+            (Get-FirstHeader -Headers $response.Headers -Name "X-Remediation") | Should -BeNullOrEmpty
+        }
+
+        It "Should count a challenge page and its callbacks as one AppSec drop" -Tag "metrics" {
+            # bouncer-bot posts usage metrics every 10s. Start from a settled count so earlier drops are already in.
+            $settled = Wait-ForCondition -Description "BOT appsec dropped to settle" -TimeoutSeconds 60 -RetryIntervalSeconds 1 -Condition {
+                $first = Get-BotAppsecDropped
+                Start-Sleep -Seconds 12
+                $script:SettledDropped = Get-BotAppsecDropped
+                return ($script:SettledDropped -eq $first)
+            }
+            $settled.Success | Should -Be $true
+            $before = $script:SettledDropped
+
+            Test-HttpRequest -Endpoint "/bot-detection" -IP $script:BotIP -TraefikUrl $script:TraefikUrl -ExtraHeaders $script:Browser | Out-Null
+            Test-HttpRequest -Endpoint "/crowdsec-internal/challenge/fpscanner.js" -IP $script:BotIP -TraefikUrl $script:TraefikUrl -ExtraHeaders $script:Browser | Out-Null
+            Test-HttpRequest -Endpoint "/crowdsec-internal/challenge/pow-worker.js" -IP $script:BotIP -TraefikUrl $script:TraefikUrl -ExtraHeaders $script:Browser | Out-Null
+            Test-HttpRequest -Endpoint "/crowdsec-internal/challenge/submit" -IP $script:BotIP -TraefikUrl $script:TraefikUrl `
+                -Method POST -Body "{}" -ExtraHeaders ($script:Browser + @{ "Content-Type" = "application/json" }) | Out-Null
+
+            $pushed = Wait-ForCondition -Description "BOT appsec dropped to increase" -TimeoutSeconds 30 -RetryIntervalSeconds 2 -Condition {
+                return ((Get-BotAppsecDropped) -gt $before)
+            }
+            $pushed.Success | Should -Be $true -Because "the challenge page is a drop"
+            Start-Sleep -Seconds 12
+            ((Get-BotAppsecDropped) - $before) | Should -Be 1 -Because "fpscanner.js, pow-worker.js and submit are the same solve as the page"
         }
     }
 

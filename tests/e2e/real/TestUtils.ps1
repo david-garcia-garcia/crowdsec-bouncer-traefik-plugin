@@ -557,12 +557,14 @@ function Get-CscliBouncerMetrics {
     }
 }
 
+# Sum one cscli bouncer metric over every bouncer, or only $Bouncer (the cscli bouncer name) when set.
 function Get-CscliBouncerMetricValue {
     param(
         [AllowEmptyString()]
         [string]$Origin,
         [string]$Name,
-        [string]$Unit
+        [string]$Unit,
+        [string]$Bouncer = ""
     )
 
     $metrics = Get-CscliBouncerMetrics
@@ -577,6 +579,9 @@ function Get-CscliBouncerMetricValue {
 
     $total = [int64]0
     foreach ($bouncerName in @($bouncers.Keys)) {
+        if ($Bouncer -and $bouncerName -ne $Bouncer) {
+            continue
+        }
         $origins = $bouncers[$bouncerName]
         if ($null -eq $origins -or -not $origins.ContainsKey($Origin)) {
             continue
