@@ -99,3 +99,13 @@ Regression test: AppSec HTTP 200 on `/crowdsec-internal/challenge/custom.js` is 
 - Failure-action spec says passthrough continues to `next` for every path; the ticket carves challenge-prefix paths out of that continue.
 - Devdocs already say never send the prefix to origin; the live spec and code do not.
 - Upstream https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403 point 4 is the source of the ask; do not copy that patch. Closed fork PR 192 targeted `main` and the old root `bouncer.go`; this change is on `master` / `pkg/bouncer/bouncer.go`.
+
+## Folded in: action-rule skips on the challenge prefix and on ambiguous paths
+Added on 2026-11-15 by a parallel session working on the owner's behalf from the fork's upstream review (problems 7 and 8); it pushed `dcfef748` to this branch. Change folder: `openspec/changes/archive/2026-11-15-action-rule-skips-challenge-and-ambiguous-paths/`.
+
+- Problem 7: a broad `bypass` / `bypassAppsec` action rule (for example `\.js$`) skipped AppSec on `/crowdsec-internal/challenge/*`, so the challenge scripts reached origin and the challenge could not be solved. Desired: an action rule MUST NOT skip AppSec under that prefix; the LAPI skip stays. Upstream: issue https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/393, PR https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/413 ("`/crowdsec-internal/challenge/` is always sent to AppSec").
+- Problem 8: a `bypass*` path rule matched a path with more than one reading (`..;`, `%5C`, leftover percent-encoding, dot or empty segments), so a request the backend resolves elsewhere skipped AppSec. Desired: such a path contributes no skip and is inspected (fail-safe, not blocked). Upstream: PR https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/413 (single-reading rule of `crowdsecAppsecExcludedLocations`).
+- Do not copy those patches: upstream edits its root `bouncer.go` / `pkg/location`; this fork uses `bouncerActionRules`.
+- Out of scope: ban/captcha path rules evaded by an ambiguous path the backend resolves into their prefix.
+
+Upstream map for the parts already above: the challenge-prefix 404 is https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/402 / PR 403 point 4; counting a challenge once is PR 403 point 5.

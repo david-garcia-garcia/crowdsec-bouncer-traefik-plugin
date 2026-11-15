@@ -3,6 +3,7 @@ package httprule
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -355,6 +356,12 @@ func TestSingleReadingPath(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "http://example.com"+tc.target, nil)
 		if got := SingleReadingPath(req.URL); got != tc.want {
 			t.Errorf("SingleReadingPath(%q)=%v want %v (Path=%q RawPath=%q)", tc.target, got, tc.want, req.URL.Path, req.URL.RawPath)
+		}
+	}
+	// Non-origin-form targets: CONNECT host:port and OPTIONS * have no leading '/'.
+	for _, target := range []*url.URL{{Path: ""}, {Path: "*"}, {Host: "example.com:443"}} {
+		if SingleReadingPath(target) {
+			t.Errorf("SingleReadingPath(%#v)=true, want false without a leading '/'", target)
 		}
 	}
 	if SingleReadingPath(nil) {

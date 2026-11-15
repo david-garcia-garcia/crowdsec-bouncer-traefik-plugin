@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -97,7 +98,7 @@ func (set *ActionSet) Fold(httpReq *http.Request) ActionMatch {
 	if set == nil {
 		return match
 	}
-	pathChecked, pathAmbiguous := false, false
+	reading := pathReading{requestURL: httpReq.URL}
 	for _, i := range set.Matching(httpReq) {
 		if set.Ban(i) {
 			if match.BanName == "" {
@@ -111,17 +112,11 @@ func (set *ActionSet) Fold(httpReq *http.Request) ActionMatch {
 		if !set.SkipLapi(i) && !set.SkipAppsec(i) {
 			continue
 		}
-		if set.set.hasPath(i) {
-			if !pathChecked {
-				pathAmbiguous = !SingleReadingPath(httpReq.URL)
-				pathChecked = true
+		if set.set.hasPath(i) && reading.ambiguous() {
+			if match.AmbiguousPathName == "" {
+				match.AmbiguousPathName = set.Name(i)
 			}
-			if pathAmbiguous {
-				if match.AmbiguousPathName == "" {
-					match.AmbiguousPathName = set.Name(i)
-				}
-				continue
-			}
+			continue
 		}
 		if set.SkipLapi(i) {
 			match.SkipLapi = true
@@ -131,6 +126,22 @@ func (set *ActionSet) Fold(httpReq *http.Request) ActionMatch {
 		}
 	}
 	return match
+}
+
+// pathReading answers SingleReadingPath once per Fold, on the first path row that would skip a leg.
+type pathReading struct {
+	requestURL      *url.URL
+	checked         bool
+	hasManyReadings bool
+}
+
+// ambiguous reports whether the request path has more than one reading.
+func (r *pathReading) ambiguous() bool {
+	if !r.checked {
+		r.hasManyReadings = !SingleReadingPath(r.requestURL)
+		r.checked = true
+	}
+	return r.hasManyReadings
 }
 
 // Name is the authoring name at index i. Empty when the set is nil or i is out of range.
