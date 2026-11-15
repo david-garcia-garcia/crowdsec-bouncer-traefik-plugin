@@ -36,6 +36,10 @@ const msgUnauthenticated = "Remediation component is not authenticated."
 // msgUnexpectedListenerStatus is the debounced WARN when the listener status is not 200, 401, 403, or 500.
 const msgUnexpectedListenerStatus = "The remediation component returned an unexpected status code"
 
+// msgUnreachable is the Error when AppSec gives no HTTP response. On a transport failure it is
+// debounced and carries the cause in attr "error" (DNS, refused, timeout, TLS).
+const msgUnreachable = "appsecQuery:unreachable"
+
 // Structured AppSec JSON action values CrowdSec 1.8 puts in the envelope body.
 const (
 	ActionAllow     = "allow"
@@ -149,13 +153,14 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 
 	current := c.currentTransport()
 	if current == nil || current.httpClient == nil {
-		c.log.Error("appsecQuery:unreachable")
-		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
+		c.log.Error(msgUnreachable)
+		return resultForFailureAction(pol.FailureAction, msgUnreachable)
 	}
 	res, err := current.httpClient.Do(appsecReq)
 	if err != nil {
-		c.log.Error("appsecQuery:unreachable")
-		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
+		// Keep the message fixed and the cause in an attr: Debounced keys on the message text.
+		logger.Debounced(c.log, slog.LevelError, 5*time.Second, msgUnreachable, "error", err)
+		return resultForFailureAction(pol.FailureAction, msgUnreachable+": "+err.Error())
 	}
 	// Drain every live response, including unexpected statuses, so keep-alive can reuse the slot.
 	defer c.drainResponse(res)
