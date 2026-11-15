@@ -17,17 +17,17 @@ Master was merged in at a192cb60 (it brought #191, #194, #198, #201, #206, #207,
 **End users.** None.
 
 ## Merge readiness
-Ready for review. 0 items remain.
+In progress. 0 items remain.
 
 Priority: P3 — usage-metric counting is inflated and the spec is wrong, with no data loss or unsafe behaviour
-Reviewed head: 3243da17
+Reviewed head: 2a36bcc8
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43744117356 |
+| Overall readiness | 1/6 | Not ready |
+| CI proof | 1/6 | not seen |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,7 +37,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-10-13-count-challenge-once pushed | `git` |
 | OpenSpec | count-challenge-drop-once | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/197 | pr-host |
-| CI | build 43744117356 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43744117356 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43744117356 |
+| CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -56,7 +56,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-13-count-challenge-once on branch 2026-10-13-count-challenge-once targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/197; CI build 43744117356 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43744117356.
+Ticket 2026-10-13-count-challenge-once on branch 2026-10-13-count-challenge-once targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/197; CI not seen.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -85,7 +85,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 3243da171310e22809a268c2d66101e98da23be6 | Card must match the branch you measured |
+| Reviewed head | 2a36bcc87f39bd0e359790a6f7c699049515b76b | Card must match the branch you measured |
 
 ### Stored data model
 None.
