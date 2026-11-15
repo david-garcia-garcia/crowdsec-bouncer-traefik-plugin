@@ -6,7 +6,7 @@ The effect is inflated `blockedRequests` and dropped-bytes figures for any deplo
 Priority: P3 — usage-metric counting is inflated and the spec is wrong, with no data loss or unsafe behaviour
 
 ## Implementation
-`handleAppsecResponseServeHTTP` in `pkg/bouncer/bouncer.go` now skips `recordDropped` when the request path starts with the new constant `/crowdsec-internal/challenge/` (helper `isCrowdsecChallengeCallbackPath`). Any other path, including the challenge page itself, is still counted once with origin `appsec`. Bans, plugin captcha and other AppSec relays are untouched, and no labels or metrics POST shape changed. A regression test relays the same challenge envelope on `/protected` (expects 1) and on `/crowdsec-internal/challenge/submit` (expects 0), read through `TestDroppedCount`.
+`handleAppsecResponseServeHTTP` in `pkg/bouncer/bouncer.go` now skips `recordDropped` when the request path starts with the new constant `/crowdsec-internal/challenge/` (helper `isCrowdsecChallengeCallbackPath`). Any other path, including the challenge page itself, is still counted once with origin `appsec`. Bans, plugin captcha and other AppSec relays are untouched, and no labels or metrics POST shape changed. A regression test relays the same challenge envelope on `/protected` (expects 1 request and bytes > 0) and on `/crowdsec-internal/challenge/submit` (expects 0 requests and 0 bytes), read through `TestDroppedCount` and `TestDroppedByteCount`.
 
 Master was merged in at a192cb60 (it brought #191, #194, #198, #201, #206, #207, #208, #209). The only conflict was in `pkg/bouncer/bouncer.go`, where both sides added a const and master renamed the literal "appsec" to `originAppsec`; the resolution keeps both and the skip path uses `originAppsec`. The OpenSpec delta (`count-challenge-drop-once`) was rebuilt on master's post-#206 requirement text, so archiving it does not revert #206. Locally, `go test ./...` and `golangci-lint` passed after the merge.
 
@@ -17,17 +17,17 @@ Master was merged in at a192cb60 (it brought #191, #194, #198, #201, #206, #207,
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: P3 — usage-metric counting is inflated and the spec is wrong, with no data loss or unsafe behaviour
-Reviewed head: ba381f31
+Reviewed head: 1d1474ff
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43744838085 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -37,7 +37,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-10-13-count-challenge-once pushed | `git` |
 | OpenSpec | count-challenge-drop-once | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/197 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 43744838085 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43744838085 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43744838085 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -56,7 +56,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-10-13-count-challenge-once on branch 2026-10-13-count-challenge-once targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/197; CI not seen.
+Ticket 2026-10-13-count-challenge-once on branch 2026-10-13-count-challenge-once targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/197; CI build 43744838085 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/43744838085.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -85,7 +85,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | ba381f31845d79e7562ae98308c51cfde4798fab | Card must match the branch you measured |
+| Reviewed head | 1d1474ff3b85c4cb019c02bec43631a1d7530b2a | Card must match the branch you measured |
 
 ### Stored data model
 None.
