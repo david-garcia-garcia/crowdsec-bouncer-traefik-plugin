@@ -1,0 +1,16 @@
+issueKey: 2026-10-13-appsec-unexpected-status
+jobName: AppSec unexpected status follows failure action
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 5f508af864c351afd8f99ed249fc4e673c630c66984b8af017c7230b9e717497
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: appsec-unexpected-status-failure-action
+pr: { id: 191, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/191 }

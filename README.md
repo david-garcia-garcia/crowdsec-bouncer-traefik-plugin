@@ -128,7 +128,7 @@ What the visitor gets for each CrowdSec remediation ([CrowdSec bouncers](https:/
 
 | Remediation | What the user gets |
 | ----------- | ------------------ |
-| `ban`       | A ban page (or an empty body) with status `bouncerRemediationStatusCode` (default 403). |
+| `ban`       | A ban page (or an empty body) with status `bouncerRemediationStatusCode` (default 403). An AppSec ban whose `http_status` is 429, such as a CrowdSec `RateLimit()` block, keeps 429. |
 | `captcha`   | A captcha page. Once solved, the visitor is redirected back to the page they asked for and is not challenged again for `captchaGracePeriodSeconds` (default 24 hours). See [examples/captcha](examples/captcha/README.md). |
 
 Captcha providers:
@@ -152,7 +152,9 @@ This plugin supports [AppSec](https://doc.crowdsec.net/docs/next/appsec/intro/),
 
 AppSec requires CrowdSec 1.6.0 or later.
 
-**Bot detection (CrowdSec 1.8+).** CrowdSec can answer a suspicious request with a JavaScript challenge page instead of a ban. This works out of the box once AppSec is enabled. The challenge page calls back to URLs under `/crowdsec-internal/challenge/`, and those calls must go through this middleware so CrowdSec can verify them. If the middleware already covers every path of the host, you are done. If it only covers some paths (for example `/api`), add a router for ``PathPrefix(`/crowdsec-internal/challenge`)`` with the same middleware. See [CrowdSec bot detection](https://docs.crowdsec.net/docs/next/appsec/bot_detection/intro.md).
+**Bot detection (CrowdSec 1.8+).** CrowdSec can answer a suspicious request with a JavaScript challenge page instead of a ban. This works out of the box once AppSec is enabled. The challenge page calls back to URLs under `/crowdsec-internal/challenge/`, and those calls must go through this middleware so CrowdSec can verify them. The proof is POSTed to `/crowdsec-internal/challenge/submit` and must reach AppSec with the full form. The default `appsecBodyLimit` of 10MB is enough. A smaller positive limit cuts the proof short. `0` means no limit: the whole body is sent. If the middleware already covers every path of the host, you are done. If it only covers some paths (for example `/api`), add a router for ``PathPrefix(`/crowdsec-internal/challenge`)`` with the same middleware. See [CrowdSec bot detection](https://docs.crowdsec.net/docs/next/appsec/bot_detection/intro.md).
+
+**Captcha from AppSec.** An AppSec rule or hook can ask for a captcha instead of a ban (`SetRemediation("captcha")`). CrowdSec sends no page with that answer, so the router serves its own captcha, the same one it uses for a CrowdSec captcha decision. Configure a captcha provider on that router; without one, the visitor gets the ban page (`ban:captcha-downgrade`). A solved captcha lets the visitor through AppSec captchas for the grace period; AppSec bans still apply. The captcha form posts back to the same URL and goes through AppSec first. If AppSec lets that POST through, the plugin still recognises it by the hidden field `crowdsec_captcha_challenge=v1` and checks the answer, so a replaced captcha template must keep that field. AppSec actions this plugin does not know, sent without a page, are served as a ban (`ban:appsec-action-empty`).
 
 More information in the [CrowdSec AppSec documentation](https://doc.crowdsec.net/docs/next/appsec/intro/).
 
@@ -421,6 +423,7 @@ The value is `what:why` or `what:why:origin`, separated by colons with no spaces
 | `ban:cache-fail` | Redis was unreachable. |
 | `ban:appsec` | Blocked by AppSec. |
 | `ban:appsec-challenge-empty` | AppSec asked for a bot challenge but sent no page, so a ban was served instead. |
+| `ban:appsec-action-empty` | AppSec returned an action this plugin cannot show (for example a custom `SetRemediation("tarpit")`) and sent no page, so a ban was served instead. |
 | `ban:appsec-failure` | AppSec was unreachable, and the failure action is `ban`. |
 | `ban:captcha-downgrade` | A captcha was due, but this router has no captcha configured, so a ban was served. |
 | `captcha:rules` | Captcha from a `bouncerActionRules` rule. |
@@ -428,7 +431,7 @@ The value is `what:why` or `what:why:origin`, separated by colons with no spaces
 | `captcha:lapi-failure` | LAPI was unreachable, and the failure action is `captcha`. |
 | `captcha:stream-unhealthy` | Decisions could not be refreshed for too long, and the failure action is `captcha`. |
 | `captcha:appsec-failure` | AppSec was unreachable, and the failure action is `captcha`. |
-| `captcha:appsec` | AppSec asked for a captcha. |
+| `captcha:appsec` | AppSec asked for a captcha, and this router served its own captcha page. |
 | `captcha:challenge` | AppSec served a bot-detection challenge. |
 | `captcha:solved` | The visitor just solved the captcha and is being redirected back. |
 | `error:client-disconnected` | The client disconnected while AppSec was reading the request body. Not a ban. |
@@ -592,6 +595,14 @@ This middleware sets up the captcha provider and shares it as `captchaInstanceNa
 **CaptchaFilePath** (string, default `/captcha.html`)
 Path to the captcha page template. Content-Type is inferred from the extension.
 
+A custom template must put this hidden field inside its challenge form:
+
+```html
+<input type="hidden" name="crowdsec_captcha_challenge" value="v1">
+```
+
+The plugin uses it to recognise a leftover challenge form. Example: the visitor has the captcha open in two tabs, solves it in one, then submits the other. With the field, that second POST is redirected and never reaches your application. Without it, the captcha still works, but the second POST is forwarded to the backend (a route that only accepts GET answers 405). The provider's response field (`g-recaptcha-response`, `h-captcha-response`, ...) is not used for this, because your application's own forms may embed the same widget. When the loaded template does not contain the field, the plugin logs `crowdsec captcha template missing challenge marker` at startup.
+
 **CaptchaGateBindIp** (bool, default `true`)
 Tie a solved captcha to the visitor's IP. When `false`, the cookie alone is enough, even if the visitor's IP changes.
 
@@ -617,7 +628,7 @@ Site key from the captcha provider.
 Timeout in seconds when validating a captcha with the provider. Must be at least `1`.
 
 **AppsecBodyLimit** (int64, default `10485760` / 10 MB)
-Send at most this many bytes of the request body to AppSec. `0` means no limit. Only POST, PUT, PATCH, and DELETE bodies are sent.
+Send at most this many bytes of the request body to AppSec. `0` means no limit: the whole body is sent. Only POST, PUT, PATCH, and DELETE bodies are sent. `/crowdsec-internal/challenge/submit` must reach AppSec with the full form. The default 10MB is enough. A smaller positive limit cuts the proof short.
 
 **appsecEnabled** (bool, default `false`)
 This middleware connects to AppSec and shares the connection as `appsecInstanceName`. AppSec checks every request that passed the decision check, whatever the LAPI mode.
@@ -711,7 +722,7 @@ When Redis cannot be reached, ban (`true`) or let the request through (`false`).
 Response header that tells why a request was blocked or challenged. Empty disables it. See [See the verdict in access logs](#see-the-verdict-in-access-logs).
 
 **BouncerRemediationStatusCode** (int, default `403`)
-HTTP status for a ban.
+HTTP status for a ban. An AppSec ban whose `http_status` is 429 (CrowdSec `RateLimit()`, CrowdSec 1.8.2+) is answered with 429 whatever this value is, so clients can back off. Every other AppSec ban uses this value.
 
 **BouncerTraceHeadersCustomName** (string, default `""`)
 Request header copied into the ban page as `{{ .TraceID }}`. See [Put a request id on the ban page](#put-a-request-id-on-the-ban-page).

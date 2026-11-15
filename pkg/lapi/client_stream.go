@@ -36,7 +36,7 @@ func (c *Client) startStream(config *configuration.Config, log *slog.Logger) err
 		c.decisionStore.HydrateRange()
 	}
 	go c.handleStreamTicker()
-	c.streamStop = startStreamTicker(config.LapiUpdateIntervalSeconds, log, func() {
+	c.streamTimer = startPollTimer("stream", config.LapiUpdateIntervalSeconds, log, func() {
 		c.handleStreamTicker()
 	})
 	return nil
@@ -158,8 +158,8 @@ func (c *Client) fetchAndApplyStreamDecisions() (int, int, error) {
 		if decisionscope.NormalizeScope(decision.Scope) == decisionscope.ScopeRange {
 			cidr := strings.TrimSpace(decision.Value)
 			origin := MetricsOrigin(decision.Origin, decision.Scenario)
-			kind := decisionscope.RemediationValue(decision.Type)
-			if kind != "" && cidr != "" {
+			kind := c.ingestRemediationKind(decision.Type)
+			if cidr != "" {
 				rangeUpserts[cidr] = decisionstore.KindOriginString(kind, origin)
 				newCount++
 			}

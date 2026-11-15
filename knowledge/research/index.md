@@ -53,12 +53,12 @@ description: Official hCaptcha siteverify behavior this product relies on.
 ## recaptcha
 priority: normal
 local: index_ext_recaptcha.md
-description: Official Google reCAPTCHA siteverify and Enterprise assessments/widget behavior this product relies on.
+description: Official Google reCAPTCHA siteverify, classic v2 widget, and Enterprise assessments/widget behavior this product relies on.
 
 ## cloudflare
 priority: normal
 local: index_ext_cloudflare.md
-description: Official Cloudflare Turnstile siteverify behavior this product relies on.
+description: Official Cloudflare Turnstile siteverify and browser-widget behavior this product relies on.
 
 ## capjs
 priority: normal

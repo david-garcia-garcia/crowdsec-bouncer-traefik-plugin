@@ -1,5 +1,5 @@
 {
-  "model_default": "cursor-grok-4.6-high",
+  "model_default": "grok-4.7-high-fast",
   "model_opd-archive": "",
   "model_opd-codereview": "",
   "model_opd-commandments": "",
@@ -23,5 +23,9 @@
   "model_opd-speclibrarian": "",
   "model_opd-workflow": "",
   "interaction_language": "en",
-  "coding_language": "en"
+  "coding_language": "en",
+  "hosts": {
+    "pr": "github",
+    "ci": "github"
+  }
 }

@@ -1,3 +1,5 @@
-devstate/
+/devstate/*
+!/devstate/staging/
+!/devstate/staging/**
 
 /openspec/changes/archive/

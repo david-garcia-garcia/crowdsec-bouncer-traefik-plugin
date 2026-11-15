@@ -23,34 +23,39 @@ func writeRoutingCaptchaTemplate(t *testing.T) string {
 	return path
 }
 
-func Test_IsCaptchaFormPost(t *testing.T) {
-	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
+// challengeMarkerBody is urlencoded challenge marker crowdsec_captcha_challenge=v1.
+func challengeMarkerBody() string {
+	return challengeMarkerName + "=" + challengeMarkerValue
+}
 
-	formPOST := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader("dummy-captcha-response=token"))
+func Test_HasChallengeMarker(t *testing.T) {
+	client := &Client{}
+
+	formPOST := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader(challengeMarkerBody()))
 	formPOST.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	if !client.IsCaptchaFormPost(formPOST) {
-		t.Fatal("POST with provider field must be a captcha-form POST")
+	if !client.HasChallengeMarker(formPOST) {
+		t.Fatal("POST with challenge marker must carry the challenge marker")
 	}
 
 	ordinaryPOST := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader("other=1"))
 	ordinaryPOST.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	if client.IsCaptchaFormPost(ordinaryPOST) {
-		t.Fatal("POST without provider field must not be a captcha-form POST")
+	if client.HasChallengeMarker(ordinaryPOST) {
+		t.Fatal("POST without challenge marker must not carry the challenge marker")
 	}
 
-	queryGET := httptest.NewRequest(http.MethodGet, "/protected?dummy-captcha-response=token", nil)
-	if client.IsCaptchaFormPost(queryGET) {
-		t.Fatal("GET with provider field in query is not a form POST")
+	queryGET := httptest.NewRequest(http.MethodGet, "/protected?"+challengeMarkerBody(), nil)
+	if client.HasChallengeMarker(queryGET) {
+		t.Fatal("GET with challenge marker in query is not a form POST")
 	}
 }
 
-func Test_IsCaptchaFormPost_ordinaryPostKeepsItsBody(t *testing.T) {
-	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
+func Test_HasChallengeMarker_ordinaryPostKeepsItsBody(t *testing.T) {
+	client := &Client{}
 	payload := "comment=hello&other=1"
 	req := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader(payload))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	if client.IsCaptchaFormPost(req) {
-		t.Fatal("POST without provider field must not be a captcha-form POST")
+	if client.HasChallengeMarker(req) {
+		t.Fatal("POST without challenge marker must not carry the challenge marker")
 	}
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -64,14 +69,14 @@ func Test_IsCaptchaFormPost_ordinaryPostKeepsItsBody(t *testing.T) {
 	}
 }
 
-func Test_IsCaptchaFormPost_overMaxBodyReachesOriginIntact(t *testing.T) {
-	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
-	// A token cannot be this big, so the upload must pass through untouched even
-	// though it does contain the provider field name.
-	payload := "dummy-captcha-response=token&blob=" + strings.Repeat("a", captchaFormMaxBytes)
+func Test_HasChallengeMarker_overMaxBodyReachesOriginIntact(t *testing.T) {
+	client := &Client{}
+	// A challenge marker cannot be this big, so the upload must pass through
+	// untouched even though it does contain the challenge marker name.
+	payload := challengeMarkerBody() + "&blob=" + strings.Repeat("a", captchaFormMaxBytes)
 	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(payload))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	if client.IsCaptchaFormPost(req) {
+	if client.HasChallengeMarker(req) {
 		t.Fatal("body over captchaFormMaxBytes must not be treated as a captcha form")
 	}
 	body, err := io.ReadAll(req.Body)
@@ -83,13 +88,13 @@ func Test_IsCaptchaFormPost_overMaxBodyReachesOriginIntact(t *testing.T) {
 	}
 }
 
-func Test_IsCaptchaFormPost_unknownContentLength(t *testing.T) {
-	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
+func Test_HasChallengeMarker_unknownContentLength(t *testing.T) {
+	client := &Client{}
 
-	small := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader("dummy-captcha-response=token"))
+	small := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader(challengeMarkerBody()))
 	small.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	small.ContentLength = -1
-	if !client.IsCaptchaFormPost(small) {
+	if !client.HasChallengeMarker(small) {
 		t.Fatal("chunked captcha form must still be detected")
 	}
 
@@ -97,7 +102,7 @@ func Test_IsCaptchaFormPost_unknownContentLength(t *testing.T) {
 	large := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(payload))
 	large.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	large.ContentLength = -1
-	if client.IsCaptchaFormPost(large) {
+	if client.HasChallengeMarker(large) {
 		t.Fatal("chunked body over the cap must not be treated as a captcha form")
 	}
 	body, err := io.ReadAll(large.Body)
@@ -109,12 +114,12 @@ func Test_IsCaptchaFormPost_unknownContentLength(t *testing.T) {
 	}
 }
 
-func Test_IsCaptchaFormPost_multipartForm(t *testing.T) {
-	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
+func Test_HasChallengeMarker_multipartForm(t *testing.T) {
+	client := &Client{}
 
 	var solved bytes.Buffer
 	writer := multipart.NewWriter(&solved)
-	if err := writer.WriteField("dummy-captcha-response", "token"); err != nil {
+	if err := writer.WriteField(challengeMarkerName, challengeMarkerValue); err != nil {
 		t.Fatal(err)
 	}
 	if err := writer.Close(); err != nil {
@@ -122,8 +127,8 @@ func Test_IsCaptchaFormPost_multipartForm(t *testing.T) {
 	}
 	req := httptest.NewRequest(http.MethodPost, "/protected", bytes.NewReader(solved.Bytes()))
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	if !client.IsCaptchaFormPost(req) {
-		t.Fatal("multipart POST carrying the provider field must be a captcha-form POST")
+	if !client.HasChallengeMarker(req) {
+		t.Fatal("multipart POST carrying the challenge marker must carry the challenge marker")
 	}
 
 	var upload bytes.Buffer
@@ -137,8 +142,8 @@ func Test_IsCaptchaFormPost_multipartForm(t *testing.T) {
 	payload := upload.Bytes()
 	otherReq := httptest.NewRequest(http.MethodPost, "/protected", bytes.NewReader(payload))
 	otherReq.Header.Set("Content-Type", otherWriter.FormDataContentType())
-	if client.IsCaptchaFormPost(otherReq) {
-		t.Fatal("multipart POST without the provider field must not be a captcha-form POST")
+	if client.HasChallengeMarker(otherReq) {
+		t.Fatal("multipart POST without the challenge marker must not carry the challenge marker")
 	}
 	body, err := io.ReadAll(otherReq.Body)
 	if err != nil {
@@ -149,15 +154,15 @@ func Test_IsCaptchaFormPost_multipartForm(t *testing.T) {
 	}
 }
 
-func Test_IsCaptchaFormPost_alreadyParsedPostForm(t *testing.T) {
-	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
-	req := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader("dummy-captcha-response=token"))
+func Test_HasChallengeMarker_alreadyParsedPostForm(t *testing.T) {
+	client := &Client{}
+	req := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader(challengeMarkerBody()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if err := req.ParseForm(); err != nil {
 		t.Fatal(err)
 	}
 	// Body is drained, so only the parsed PostForm can answer.
-	if !client.IsCaptchaFormPost(req) {
+	if !client.HasChallengeMarker(req) {
 		t.Fatal("already-parsed captcha form must be detected without rereading Body")
 	}
 
@@ -166,8 +171,55 @@ func Test_IsCaptchaFormPost_alreadyParsedPostForm(t *testing.T) {
 	if err := parsedOther.ParseForm(); err != nil {
 		t.Fatal(err)
 	}
-	if client.IsCaptchaFormPost(parsedOther) {
-		t.Fatal("already-parsed ordinary form must not be a captcha-form POST")
+	if client.HasChallengeMarker(parsedOther) {
+		t.Fatal("already-parsed ordinary form must not carry the challenge marker")
+	}
+}
+
+func Test_HasChallengeMarker_tokenFieldIsNotTheMarker(t *testing.T) {
+	client := &Client{widget: Widget{TokenField: "dummy-captcha-response"}}
+
+	vendorOnly := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader("dummy-captcha-response=token"))
+	vendorOnly.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if client.HasChallengeMarker(vendorOnly) {
+		t.Fatal("POST with TokenField and no challenge marker must not carry the challenge marker")
+	}
+
+	markerOnly := &Client{}
+	markerPOST := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader(challengeMarkerBody()))
+	markerPOST.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if !markerOnly.HasChallengeMarker(markerPOST) {
+		t.Fatal("POST with challenge marker and no TokenField must carry the challenge marker")
+	}
+
+	wrongValue := httptest.NewRequest(http.MethodPost, "/protected", strings.NewReader(challengeMarkerName+"=v2"))
+	wrongValue.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if client.HasChallengeMarker(wrongValue) {
+		t.Fatal("POST with challenge marker value other than v1 must not carry the challenge marker")
+	}
+}
+
+func Test_shippedChallengePagesIncludeLeftoverFormMarker(t *testing.T) {
+	pages := []string{
+		filepath.Join("..", "..", "captcha.html"),
+		filepath.Join("..", "..", "examples", "captcha", "captcha.html"),
+		filepath.Join("..", "..", "examples", "custom-captcha", "captcha.html"),
+		filepath.Join("..", "..", "tests", "e2e", "real", "config", "captcha-dummy.html"),
+		filepath.Join("..", "..", "tests", "e2e", "mock", "scenarios", "captcha", "captcha.html"),
+		filepath.Join("..", "..", "tests", "e2e", "mock", "scenarios", "captcha-ban-origins", "captcha.html"),
+	}
+	for _, path := range pages {
+		raw, err := os.ReadFile(path) //nolint:gosec // shipped challenge-page fixtures
+		if err != nil {
+			t.Fatal(err)
+		}
+		page := string(raw)
+		if !strings.Contains(page, challengeMarkerName) {
+			t.Fatalf("%s must contain challenge marker name %q", path, challengeMarkerName)
+		}
+		if !strings.Contains(page, challengeMarkerValue) {
+			t.Fatalf("%s must contain challenge marker value %q", path, challengeMarkerValue)
+		}
 	}
 }
 

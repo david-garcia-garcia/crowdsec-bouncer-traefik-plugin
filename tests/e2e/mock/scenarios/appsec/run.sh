@@ -24,6 +24,9 @@ body() {
   assert_body_contains "http://127.0.0.1:${WEB_PORT}/foo/challenge" "e2e-challenge" -H "X-Forwarded-For: 1.2.3.4"
   assert_header "http://127.0.0.1:${WEB_PORT}/foo/challenge" "Set-Cookie" "__crowdsec_challenge=e2e; Path=/; HttpOnly" -H "X-Forwarded-For: 1.2.3.4"
 
+  echo "[$SCENARIO] AppSec captcha on a router without captcha is a downgrade ban (403)"
+  assert_status "http://127.0.0.1:${WEB_PORT}/foo/appsec-captcha" 403 -H "X-Forwarded-For: 1.2.3.4"
+
   echo "[$SCENARIO] request that return 500 must be blocked (bouncerAppsecFailureAction=ban) (AppSec 500)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo/500" 403 -H "X-Forwarded-For: 1.2.3.4"
 

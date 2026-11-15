@@ -387,6 +387,23 @@ services:
       - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-waf-only.plugin.bouncer.reclaimgraceseconds=2"
 
+      - "traefik.http.routers.ratelimit.rule=PathPrefix(`/ratelimit`)"
+      - "traefik.http.routers.ratelimit.entrypoints=web"
+      - "traefik.http.routers.ratelimit.middlewares=bouncer-ratelimit@docker"
+      - "traefik.http.middlewares.bouncer-ratelimit.plugin.bouncer.appsecEnabled=true"
+      - "traefik.http.middlewares.bouncer-ratelimit.plugin.bouncer.appsecHost=crowdsec:7422"
+      - "traefik.http.middlewares.bouncer-ratelimit.plugin.bouncer.appsecHttpTimeoutSeconds=${HTTP_TIMEOUT_SECONDS:-30}"
+      - "traefik.http.middlewares.bouncer-ratelimit.plugin.bouncer.appsecKey=c51a1c70000000000000000000000005"
+      - "traefik.http.middlewares.bouncer-ratelimit.plugin.bouncer.bouncerBanFilePath=/e2e-ban.html"
+      - "traefik.http.middlewares.bouncer-ratelimit.plugin.bouncer.bouncerEnabled=true"
+      - "traefik.http.middlewares.bouncer-ratelimit.plugin.bouncer.bouncerForwardedHeadersCustomName=X-Forwarded-For"
+      - "traefik.http.middlewares.bouncer-ratelimit.plugin.bouncer.bouncerForwardedHeadersTrustedIps=172.28.0.1/32"
+      - "traefik.http.middlewares.bouncer-ratelimit.plugin.bouncer.bouncerRemediationHeadersCustomName=X-Crowdsec-Remediation"
+      - "traefik.http.middlewares.bouncer-ratelimit.plugin.bouncer.lapiEnabled=false"
+      - "traefik.http.middlewares.bouncer-ratelimit.plugin.bouncer.logformat=json"
+      - "traefik.http.middlewares.bouncer-ratelimit.plugin.bouncer.loglevel=DEBUG"
+      - "traefik.http.middlewares.bouncer-ratelimit.plugin.bouncer.reclaimgraceseconds=2"
+
       - "traefik.http.routers.waf-fail-ban.rule=PathPrefix(`/waf-fail-ban`)"
       - "traefik.http.routers.waf-fail-ban.entrypoints=web"
       - "traefik.http.routers.waf-fail-ban.middlewares=bouncer-waf-fail-ban@docker"
@@ -512,6 +529,7 @@ services:
       - "traefik.http.routers.lapi-fail-ban.service=whoami"
       - "traefik.http.routers.lapi-fail-pass.service=whoami"
       - "traefik.http.routers.waf-only.service=whoami"
+      - "traefik.http.routers.ratelimit.service=whoami"
       - "traefik.http.routers.waf-fail-ban.service=whoami"
       - "traefik.http.routers.waf-fail-pass.service=whoami"
       - "traefik.http.routers.status-429.service=whoami"
@@ -529,7 +547,7 @@ services:
       - "traefik.enable=false"
 
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.8.0
+    image: crowdsecurity/crowdsec:v1.8.2
     container_name: "crowdsec-test"
     restart: unless-stopped
     environment:
@@ -587,6 +605,8 @@ services:
       - "./acquis.yaml:/etc/crowdsec/acquis.yaml:ro"
       - "./acquis.d:/etc/crowdsec/acquis.d:ro"
       - "./appsec-configs/e2e-origin-scheme-grant.yaml:/etc/crowdsec/appsec-configs/e2e-origin-scheme-grant.yaml:ro"
+      - "./appsec-configs/e2e-rate-limit.yaml:/etc/crowdsec/appsec-configs/e2e-rate-limit.yaml:ro"
+      - "./appsec-configs/e2e-captcha-verdict.yaml:/etc/crowdsec/appsec-configs/e2e-captcha-verdict.yaml:ro"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.crowdsec-challenge.rule=PathPrefix(`/crowdsec-internal/challenge`)"

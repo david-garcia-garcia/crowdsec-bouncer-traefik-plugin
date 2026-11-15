@@ -20,6 +20,7 @@ const (
 	headerReasonCacheFail            = "cache-fail"
 	headerReasonAppsec               = "appsec"
 	headerReasonAppsecChallengeEmpty = "appsec-challenge-empty"
+	headerReasonAppsecActionEmpty    = "appsec-action-empty"
 	headerReasonAppsecFailure        = "appsec-failure"
 	headerReasonCaptchaDowngrade     = "captcha-downgrade"
 	headerReasonChallenge            = "challenge"
@@ -68,11 +69,9 @@ func headerReasonFromOrigin(origin string) string {
 	}
 }
 
-// formatAppsecRelayHeader is the structured header for a non-ban AppSec envelope.
+// formatAppsecRelayHeader is the structured header for a relayed AppSec envelope (challenge, or an unknown action with a body).
 func formatAppsecRelayHeader(action string) string {
 	switch action {
-	case appsec.ActionCaptcha:
-		return formatRemediationHeader(headerKindCaptcha, headerReasonAppsec, "")
 	case appsec.ActionChallenge:
 		return formatRemediationHeader(headerKindCaptcha, headerReasonChallenge, "")
 	default:

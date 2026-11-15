@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Challenge is relayed to the client
-When the structured `action` is neither empty, `allow`, nor `ban`, the bouncer SHALL write `http_status`, `user_headers`, `user_cookies` (as `Set-Cookie`), and `user_body_content` to the client and MUST NOT call `next`. `http_status` of zero SHALL be treated as 200. `http_status` outside 100–999 SHALL fall back to `bouncerRemediationStatusCode`. Missing `Content-Type` SHALL fall back to `banTemplateContentType` when that is set. When `bouncerRemediationHeadersCustomName` is configured, a `challenge` action with non-empty `user_body_content` SHALL set that header to `captcha:challenge`. Any other non-allow, non-ban, non-captcha action SHALL set that header to `{sanitized-action}:appsec`, where sanitized-action is the AppSec action trimmed, with CR/LF/TAB stripped, and `:` replaced by `_` so kind stays one field. `allow` or empty MUST NOT reach relay. A relay whose request path is under `/crowdsec-internal/challenge/` MUST NOT increment `dropped` (unit `request` or unit `byte`). A challenge relay on any other path SHALL increment `dropped` once (request and bytes). Ban, plugin captcha, and remediations that are not this AppSec relay stay counted as today. A `challenge` action with empty `user_body_content` SHALL ban instead of writing an empty page, and when the header name is configured the value SHALL be `ban:appsec-challenge-empty`. `user_headers` of the same name SHALL replace any existing header of that name on the writer (MUST NOT append a second value). Hop-by-hop names and `Set-Cookie` in `user_headers` SHALL be skipped. Each `user_cookies` entry SHALL be written as its own `Set-Cookie` header (MUST NOT join entries with commas).
+When the structured `action` is `challenge` with non-empty `user_body_content`, or is not empty, `allow`, `ban`, `captcha`, or `challenge` and has non-empty `user_body_content`, the bouncer SHALL write `http_status`, `user_headers`, `user_cookies` (as `Set-Cookie`), and `user_body_content` to the client and MUST NOT call `next`. `http_status` of zero SHALL be treated as 200. `http_status` outside 100–999 SHALL fall back to `bouncerRemediationStatusCode`. Missing `Content-Type` SHALL fall back to `banTemplateContentType` when that is set. When `bouncerRemediationHeadersCustomName` is configured, a `challenge` action with non-empty `user_body_content` SHALL set that header to `captcha:challenge`. Any other relayed action SHALL set that header to `{sanitized-action}:appsec`, where sanitized-action is the AppSec action trimmed, with CR/LF/TAB stripped, and `:` replaced by `_` so kind stays one field. `allow`, empty, and `captcha` MUST NOT reach relay. A relay whose request path is under `/crowdsec-internal/challenge/` MUST NOT increment `dropped` (unit `request` or unit `byte`). A relay on any other path SHALL increment `dropped` once (request and bytes). Bans and captcha-gate remediations are not this relay and stay counted as today. A `challenge` action with empty `user_body_content` SHALL ban instead of writing an empty page, and when the header name is configured the value SHALL be `ban:appsec-challenge-empty`. An action other than `allow`, `ban`, `captcha`, or `challenge` with empty `user_body_content` SHALL ban with the operator ban page (template reason `APPSEC`, metrics origin `appsec`) instead of writing an empty page, and when the header name is configured the value SHALL be `ban:appsec-action-empty`. `user_headers` of the same name SHALL replace any existing header of that name on the writer (MUST NOT append a second value). Hop-by-hop names and `Set-Cookie` in `user_headers` SHALL be skipped. Each `user_cookies` entry SHALL be written as its own `Set-Cookie` header (MUST NOT join entries with commas).
 
 #### Scenario: Challenge HTML and cookie are served
 - **WHEN** AppSec returns a parseable `action` `challenge` with `http_status` 200, HTML body, Content-Type, and a `__crowdsec_challenge` cookie
@@ -22,9 +22,17 @@ When the structured `action` is neither empty, `allow`, nor `ban`, the bouncer S
 - **THEN** the response header `X-Remediation` is `ban:appsec-challenge-empty`
 
 #### Scenario: Unknown AppSec action header is action:appsec
-- **WHEN** AppSec returns a parseable `action` other than `allow`, `ban`, `captcha`, or `challenge`
+- **WHEN** AppSec returns a parseable `action` other than `allow`, `ban`, `captcha`, or `challenge` with non-empty `user_body_content`
 - **AND** `bouncerRemediationHeadersCustomName` is `X-Remediation`
-- **THEN** the response header `X-Remediation` is that action, sanitized, plus `:appsec`
+- **THEN** the client receives that body
+- **AND** the response header `X-Remediation` is that action, sanitized, plus `:appsec`
+
+#### Scenario: Unknown AppSec action without a body is a ban
+- **WHEN** AppSec returns `{"action":"tarpit","http_status":403}` with no `user_body_content`
+- **AND** `bouncerRemediationHeadersCustomName` is `X-Remediation`
+- **THEN** the client receives the operator ban page with `bouncerRemediationStatusCode`
+- **AND** the response header `X-Remediation` is `ban:appsec-action-empty`
+- **AND** the backend is not called
 
 #### Scenario: Missing http_status defaults to 200
 - **WHEN** a challenge envelope omits `http_status` or sets it to 0
