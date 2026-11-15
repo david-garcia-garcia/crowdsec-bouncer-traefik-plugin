@@ -6,10 +6,29 @@ import (
 	"time"
 )
 
-// pollTimer runs one Client loop (stream or usage-metrics) on a stdlib timer until stop.
-// It has no select on purpose: yaegi v0.16.1 shares one select case slice per statement
-// across every goroutine that runs it, so the loops of different Clients could take each
-// other's ticks and stops. time.AfterFunc is the stdlib timer (same reason as reclaim grace).
+// pollTimer runs one Client loop (the stream poll or the usage-metrics push): it calls work,
+// waits one interval after work returns, and repeats until stop.
+//
+// Why it exists: Traefik runs this plugin under yaegi v0.16.1, which builds one case list per
+// select statement and shares it across every goroutine that runs that statement. Each LAPI
+// middleware owns its own Client, so with several middlewares, or with an old Client in
+// reclaim grace beside a new one, the loops of different Clients would run the same select
+// and could take each other's ticks or stop signals. A Client could then stop polling for
+// good while still reporting healthy, with no error logged. So pollTimer has no select:
+// time.AfterFunc runs fire on the stdlib timer goroutine, fire re-arms the timer after work,
+// and stop sets a flag and stops the timer. Reclaim grace uses AfterFunc for the same reason.
+// Test_lapiHasNoSelectStatement keeps select out of pkg/lapi.
+//
+// Why it differs from upstream: upstream fixed the same yaegi problem in
+// maxlerebourg/crowdsec-bouncer-traefik-plugin PR 399 with `for range ticker.C { go work() }`.
+// That is enough there because upstream's tickers are process-wide and never stopped. Here
+// every Client is stopped on Sleep and Close, and Ticker.Stop does not close C, so a goroutine
+// ranging over it would block forever and keep the Client, decision store included, alive
+// after every reload. Upstream also runs each tick's work concurrently; here the next poll is
+// scheduled only after work returns, so one Client never overlaps its own polls.
+//
+// A plain `for { time.Sleep(interval); if stopped { return }; work() }` loop would also avoid
+// select, but its goroutine would outlive stop by up to one interval, still holding the Client.
 type pollTimer struct {
 	mu      sync.Mutex
 	timer   *time.Timer
