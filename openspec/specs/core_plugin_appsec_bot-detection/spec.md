@@ -12,22 +12,25 @@ The bouncer SHALL pass the address from `pkg/ip.GetRemoteIP` into `appsec.Client
 - **THEN** the AppSec request includes that address in `X-Crowdsec-Appsec-Ip`
 
 ### Requirement: Structured AppSec JSON is parsed on the AppSec client
-`appsec.Client.Query` SHALL read a bounded AppSec response body (1 MiB) on HTTP 200 and HTTP 403 and, when that body is JSON with a non-empty `action`, return that structured result together with a nil error. Fields SHALL be `action`, `http_status`, `user_body_content`, `user_cookies`, and `user_headers`. An empty body, invalid JSON, or JSON without `action` on HTTP 200 SHALL pass (nil error; the result is an allow action). HTTP 500 and every other listener status SHALL honor `bouncerAppsecFailureAction` (`passthrough` | `ban` | `captcha`) instead of `FailureBlock` / `UnreachableBlock`, including when the body is JSON with a non-empty `action`. A transport failure with no HTTP response SHALL honor that action too. HTTP 403 with an empty body or invalid JSON SHALL stay fail-closed ban. The response body SHALL be drained so the AppSec HTTP client can reuse the connection.
+`appsec.Client.Query` SHALL read a bounded AppSec response body (1 MiB) on HTTP 200 and HTTP 403 and, when that body is JSON with a non-empty `action`, return that structured result together with a nil error. Fields SHALL be `action`, `http_status`, `user_body_content`, `user_cookies`, and `user_headers`. An empty body, invalid JSON, or JSON without `action` on HTTP 200 SHALL pass (nil error; the result is an allow action). HTTP 500 and every other listener status SHALL honor `bouncerAppsecFailureAction` (`passthrough` | `ban` | `captcha`) instead of `FailureBlock` / `UnreachableBlock`, including when the body is JSON with a non-empty `action`. A transport failure with no HTTP response SHALL honor that action too. HTTP 403 with an empty body or invalid JSON SHALL stay fail-closed ban. The response body SHALL be drained so the AppSec HTTP client can reuse the connection. Allow or empty 200 MUST NOT call `next` when the URL path has prefix `/crowdsec-internal/challenge/` (`Unanswered AppSec challenge-prefix paths terminate`).
 
 #### Scenario: Allow JSON passes
 - **WHEN** AppSec returns HTTP 200 with `{"action":"allow"}`
+- **AND** the URL path is not under `/crowdsec-internal/challenge/`
 - **THEN** `Query` returns a nil error and the request proceeds to `next`
 
 #### Scenario: Empty 200 still passes
 - **WHEN** AppSec returns HTTP 200 with an empty body
+- **AND** the URL path is not under `/crowdsec-internal/challenge/`
 - **THEN** `Query` returns a nil error and the request proceeds to `next`
 
 #### Scenario: HTTP 401 passthrough allows
 - **WHEN** AppSec returns HTTP 401 with no parseable JSON `action` and `bouncerAppsecFailureAction` is `passthrough`
+- **AND** the URL path is not under `/crowdsec-internal/challenge/`
 - **THEN** `Query` returns a nil error and the request proceeds to `next`
 
 ### Requirement: Challenge is relayed to the client
-When the structured `action` is `challenge` with non-empty `user_body_content`, or is not empty, `allow`, `ban`, `captcha`, or `challenge` and has non-empty `user_body_content`, the bouncer SHALL write `http_status`, `user_headers`, `user_cookies` (as `Set-Cookie`), and `user_body_content` to the client and MUST NOT call `next`. `http_status` of zero SHALL be treated as 200. `http_status` outside 100–999 SHALL fall back to `bouncerRemediationStatusCode`. Missing `Content-Type` SHALL fall back to `banTemplateContentType` when that is set. When `bouncerRemediationHeadersCustomName` is configured, a `challenge` action with non-empty `user_body_content` SHALL set that header to `captcha:challenge`. Any other relayed action SHALL set that header to `{sanitized-action}:appsec`, where sanitized-action is the AppSec action trimmed, with CR/LF/TAB stripped, and `:` replaced by `_` so kind stays one field. `allow`, empty, and `captcha` MUST NOT reach relay. `blockedRequests` SHALL increment. A `challenge` action with empty `user_body_content` SHALL ban instead of writing an empty page, and when the header name is configured the value SHALL be `ban:appsec-challenge-empty`. An action other than `allow`, `ban`, `captcha`, or `challenge` with empty `user_body_content` SHALL ban with the operator ban page (template reason `APPSEC`, metrics origin `appsec`) instead of writing an empty page, and when the header name is configured the value SHALL be `ban:appsec-action-empty`. `user_headers` of the same name SHALL replace any existing header of that name on the writer (MUST NOT append a second value). Hop-by-hop names and `Set-Cookie` in `user_headers` SHALL be skipped. Each `user_cookies` entry SHALL be written as its own `Set-Cookie` header (MUST NOT join entries with commas).
+When the structured `action` is `challenge` with non-empty `user_body_content`, or is not empty, `allow`, `ban`, `captcha`, or `challenge` and has non-empty `user_body_content`, the bouncer SHALL write `http_status`, `user_headers`, `user_cookies` (as `Set-Cookie`), and `user_body_content` to the client and MUST NOT call `next`. `http_status` of zero SHALL be treated as 200. `http_status` outside 100–999 SHALL fall back to `bouncerRemediationStatusCode`. Missing `Content-Type` SHALL fall back to `banTemplateContentType` when that is set. When `bouncerRemediationHeadersCustomName` is configured, a `challenge` action with non-empty `user_body_content` SHALL set that header to `captcha:challenge`. Any other relayed action SHALL set that header to `{sanitized-action}:appsec`, where sanitized-action is the AppSec action trimmed, with CR/LF/TAB stripped, and `:` replaced by `_` so kind stays one field. `allow`, empty, and `captcha` MUST NOT reach relay. A relay whose request path is under `/crowdsec-internal/challenge/` MUST NOT increment `dropped` (unit `request` or unit `byte`). A relay on any other path SHALL increment `dropped` once (request and bytes). Bans and captcha-gate remediations are not this relay and stay counted as today. A `challenge` action with empty `user_body_content` SHALL ban instead of writing an empty page, and when the header name is configured the value SHALL be `ban:appsec-challenge-empty`. An action other than `allow`, `ban`, `captcha`, or `challenge` with empty `user_body_content` SHALL ban with the operator ban page (template reason `APPSEC`, metrics origin `appsec`) instead of writing an empty page, and when the header name is configured the value SHALL be `ban:appsec-action-empty`. `user_headers` of the same name SHALL replace any existing header of that name on the writer (MUST NOT append a second value). Hop-by-hop names and `Set-Cookie` in `user_headers` SHALL be skipped. Each `user_cookies` entry SHALL be written as its own `Set-Cookie` header (MUST NOT join entries with commas).
 
 #### Scenario: Challenge HTML and cookie are served
 - **WHEN** AppSec returns a parseable `action` `challenge` with `http_status` 200, HTML body, Content-Type, and a `__crowdsec_challenge` cookie
@@ -75,6 +78,16 @@ When the structured `action` is `challenge` with non-empty `user_body_content`, 
 #### Scenario: Each user_cookies value is its own Set-Cookie
 - **WHEN** AppSec returns a challenge with two `user_cookies` values
 - **THEN** the client has two `Set-Cookie` headers, one per value
+
+#### Scenario: Challenge page increments dropped once
+- **WHEN** AppSec returns a parseable `action` `challenge` with non-empty `user_body_content`
+- **AND** the request path is `/protected`
+- **THEN** usage-metrics `dropped` / `request` for origin `appsec` increments by 1
+
+#### Scenario: Challenge callback does not increment dropped
+- **WHEN** AppSec returns a parseable `action` `challenge` with non-empty `user_body_content`
+- **AND** the request path is `/crowdsec-internal/challenge/submit`
+- **THEN** usage-metrics `dropped` / `request` for origin `appsec` does not increment
 
 ### Requirement: Structured ban keeps the operator ban template
 When the structured `action` is `ban`, the bouncer SHALL use the existing `handleBanServeHTTP` path (operator `banTemplate` / remediation status) and MUST NOT write `user_body_content` as the ban page. The remediation custom header, when configured, SHALL be set to `ban:appsec`. The client status SHALL be 429 when the structured `http_status` is 429 (CrowdSec `RateLimit()`), whatever `bouncerRemediationStatusCode` is. Any other `http_status`, including zero or missing, SHALL use `bouncerRemediationStatusCode`.
@@ -167,3 +180,49 @@ When the AppSec leg (a verdict, or failure action `passthrough`) did not write a
 - **WHEN** AppSec allows a POST that carries `crowdsec_captcha_challenge=v1`
 - **AND** this router did not subscribe to captcha
 - **THEN** the backend receives the POST
+
+### Requirement: Unanswered AppSec challenge-prefix paths terminate
+When AppSec is in use for this request (the bouncer subscribed to AppSec; an action rule cannot skip AppSec on this prefix, see "Action rules cannot skip AppSec on the challenge prefix") and the URL path has prefix `/crowdsec-internal/challenge/`, and neither AppSec nor the router captcha gate wrote a response, the bouncer SHALL write HTTP 404 and MUST NOT call `next`. A challenge, captcha, or ban envelope for that path SHALL still be written as today. Paths outside that prefix SHALL keep allow → `next`. Trusted IPs that already skip the bouncer before AppSec SHALL stay skipped. The bouncer MUST NOT add a new trusted-IP exception.
+
+#### Scenario: AppSec allow on custom.js is 404
+- **WHEN** AppSec is in use
+- **AND** AppSec returns HTTP 200 with `{"action":"allow"}` for `GET /crowdsec-internal/challenge/custom.js`
+- **THEN** the client status is 404
+- **AND** `next` is not called
+
+#### Scenario: Normal allow still calls next
+- **WHEN** AppSec is in use
+- **AND** AppSec returns HTTP 200 with `{"action":"allow"}` for a path outside `/crowdsec-internal/challenge/`
+- **THEN** `next` is called
+
+#### Scenario: Challenge envelope still relays
+- **WHEN** AppSec returns a parseable `action` `challenge` with non-empty `user_body_content` for a path under `/crowdsec-internal/challenge/`
+- **THEN** the client receives that envelope
+- **AND** `next` is not called
+
+#### Scenario: Captcha-form POST the gate passes on a challenge path is 404
+- **WHEN** AppSec allows a POST carrying `crowdsec_captcha_challenge=v1` to a path under `/crowdsec-internal/challenge/`
+- **AND** the router captcha gate does not write a response for it (no usable captcha, or the path is a widget asset)
+- **THEN** the client status is 404
+- **AND** `next` is not called
+
+#### Scenario: Solved captcha action rule on a challenge path is 404
+- **WHEN** a captcha action rule matches a path under `/crowdsec-internal/challenge/`
+- **AND** AppSec allows the request and the visitor already holds a valid captcha gate cookie
+- **THEN** the client status is 404
+- **AND** `next` is not called
+
+### Requirement: Action rules cannot skip AppSec on the challenge prefix
+When a matching `bypass` or `bypassAppsec` action rule would skip AppSec and the URL path has prefix `/crowdsec-internal/challenge/`, the bouncer SHALL NOT skip AppSec for that request: CrowdSec, not the site, owns that prefix, and the challenge cannot be solved unless AppSec answers its scripts and submit. A LAPI skip from the same rows SHALL stay. The bouncer SHALL log TRACE `foldActionRules` with attr `challengePathKeepsAppsec`. Upstream: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/393, https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/413.
+
+#### Scenario: Static-asset bypass rule still queries AppSec for a challenge script
+- **WHEN** `bouncerActionRules` contains `{name: static, path: "\.js$", action: [bypass]}`
+- **AND** the request is `GET /crowdsec-internal/challenge/fpscanner.js`
+- **THEN** AppSec `Query` runs for that request
+- **AND** the LAPI leg is still skipped
+
+#### Scenario: Bypass rule on an allowed challenge path is 404
+- **WHEN** `bouncerActionRules` contains `{name: appsec, path: "^/crowdsec-internal/challenge/", action: [bypassAppsec]}`
+- **AND** AppSec returns HTTP 200 with `{"action":"allow"}` for `GET /crowdsec-internal/challenge/custom.js`
+- **THEN** the client status is 404
+- **AND** `next` is not called

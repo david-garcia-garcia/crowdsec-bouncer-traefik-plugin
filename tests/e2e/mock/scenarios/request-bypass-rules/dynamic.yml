@@ -1,7 +1,7 @@
 http:
   routers:
     r:
-      rule: "PathPrefix(`/foo`) || PathPrefix(`/healthz`) || PathPrefix(`/lapi-skip`)"
+      rule: "PathPrefix(`/foo`) || PathPrefix(`/healthz`) || PathPrefix(`/lapi-skip`) || PathPrefix(`/skipzone`)"
       entryPoints:
         - web
       service: backend
@@ -22,6 +22,10 @@ http:
           bouncerActionRules:
             - name: appsec-skip
               path: ^/foo/403-skip$
+              action:
+                - bypassAppsec
+            - name: appsec-skipzone
+              path: ^/skipzone/
               action:
                 - bypassAppsec
             - name: healthz

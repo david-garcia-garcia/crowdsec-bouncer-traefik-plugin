@@ -69,6 +69,10 @@ const msgCaptchaUnsubscribed = "crowdsec bouncer captcha unsubscribed"
 // originAppsec is the usage-metrics origin of a remediation an AppSec verdict decided.
 const originAppsec = "appsec"
 
+// crowdsecChallengeCallbackPrefix is the CrowdSec 1.8 bot-detection script and submit path prefix.
+// AppSec must answer these paths: an unanswered result is 404, never origin, and a relay here is not a new drop.
+const crowdsecChallengeCallbackPrefix = "/crowdsec-internal/challenge/"
+
 // New returns a per-router handler. Clients arrive later through ReceiveLAPI, ReceiveAppSec, and ReceiveCaptcha.
 func New(next http.Handler, name string, config *configuration.Config, subscribeLAPI, subscribeAppSec, subscribeCaptcha bool, log *slog.Logger) (*Bouncer, error) {
 	log = log.With("traefikName", name)
@@ -214,7 +218,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	}
 
 	// Return ASAP a ban that comes from an action rule
-	match := b.actionRules.Fold(req.Request)
+	match := b.foldActionRules(req)
 	if match.BanName != "" {
 		logger.Trace(b.log, "ServeHTTP", "ip", req.IPAddrString(), "actionRule", match.BanName)
 		b.handleRemediationServeHTTP(rw, req, decisionscope.BannedValue, lapi.OriginPluginRules(match.BanName))
@@ -297,7 +301,22 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 
 // serveAppSec reports whether AppSec or a captcha rule wrote the response.
 // A cleared captcha gate or a widget asset did not write. False means ServeHTTP calls next.
+// When AppSec is in use and nothing wrote, the challenge prefix gets 404 so origin is not called.
 func (b *Bouncer) serveAppSec(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
+	if b.answerAppSec(rw, req, match) {
+		return true
+	}
+	// Nothing answered (allow, failure-action passthrough, or a cleared captcha gate):
+	// the challenge prefix still must not reach origin.
+	if !match.SkipAppsec && b.subscribeAppSec && isCrowdsecChallengeCallbackPath(req.URL.Path) {
+		http.NotFound(rw, req.Request)
+		return true
+	}
+	return false
+}
+
+// answerAppSec runs the captcha rule or AppSec for this request. True means the response was written.
+func (b *Bouncer) answerAppSec(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
 	if match.CaptchaName != "" {
 		return b.applyCaptchaRuleServeHTTP(rw, req, match)
 	}
@@ -309,10 +328,7 @@ func (b *Bouncer) serveAppSec(rw http.ResponseWriter, req clientrequest.Request,
 	}
 	// AppSec judged this request alone. A captcha form POST it let through is
 	// still the answer to an earlier captcha, so the gate validates it.
-	if b.isCaptchaFormAnswer(req) {
-		return b.serveAppsecCaptchaGate(rw, req)
-	}
-	return false
+	return b.isCaptchaFormAnswer(req) && b.serveAppsecCaptchaGate(rw, req)
 }
 
 // usableCaptcha is this router's captcha client when it can serve the gate: subscribed, published, and Valid.
@@ -556,9 +572,32 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientrequest
 	return true
 }
 
+// foldActionRules reduces the action rules for req.
+// The challenge prefix belongs to CrowdSec, not to the site: AppSec must answer it to solve the challenge,
+// so a bypass or bypassAppsec rule that also matches it does not skip AppSec there. LAPI skips stay.
+func (b *Bouncer) foldActionRules(req clientrequest.Request) httprule.ActionMatch {
+	match := b.actionRules.Fold(req.Request)
+	if match.AmbiguousPathName != "" {
+		logger.Trace(b.log, "foldActionRules", "ip", req.IPAddrString(), "ambiguousPathRule", match.AmbiguousPathName)
+	}
+	if match.SkipAppsec && isCrowdsecChallengeCallbackPath(req.URL.Path) {
+		logger.Trace(b.log, "foldActionRules", "ip", req.IPAddrString(), "challengePathKeepsAppsec", true)
+		match.SkipAppsec = false
+	}
+	return match
+}
+
+// isCrowdsecChallengeCallbackPath reports script and submit paths under /crowdsec-internal/challenge/.
+func isCrowdsecChallengeCallbackPath(path string) bool {
+	return strings.HasPrefix(path, crowdsecChallengeCallbackPrefix)
+}
+
 // handleAppsecResponseServeHTTP writes a structured AppSec envelope (challenge HTML, cookies, headers) to the client.
 func (b *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req clientrequest.Request, decision *appsec.Response) {
-	b.recordDropped(req, originAppsec, "")
+	// Challenge scripts and submit are the same solve as the page; do not count them as extra drops.
+	if !isCrowdsecChallengeCallbackPath(req.URL.Path) {
+		b.recordDropped(req, originAppsec, "")
+	}
 
 	// Copy AppSec-supplied headers, skipping hop-by-hop names and Set-Cookie (cookies have their own field).
 	for name, values := range decision.UserHeaders {

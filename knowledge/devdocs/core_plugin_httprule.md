@@ -15,7 +15,7 @@ One authoring row beside `Rule`: unique `name`, `action` tokens, and embedded pr
 _Avoid_: first-match-wins fold, putting `name` / `action` on `Rule`
 
 **ActionSet**:
-The compiled list `httprule.NewActionSet` returns. Predicate match stays on `Set`; names and tokens sit beside it. `Matching` returns every hit. `Fold` reduces those hits to `ActionMatch`: first ban name, first captcha name, OR of the skip flags. A ban row contributes only its name.
+The compiled list `httprule.NewActionSet` returns. Predicate match stays on `Set`; names and tokens sit beside it. `Matching` returns every hit. `Fold` reduces those hits to `ActionMatch`: first ban name, first captcha name, OR of the skip flags. A ban row contributes only its name. A row with a `path` predicate contributes no skip when `SingleReadingPath(req.URL)` is false; its captcha still counts and `AmbiguousPathName` names the first such row.
 _Avoid_: interpreting action tokens inside `Set.Match`
 
 ## Overview
@@ -28,6 +28,7 @@ Compile request exemptions once with `httprule.New`. Config holds `[]ActionRule`
 - Do not import this plugin's other packages from `pkg/httprule`.
 - Method: unanchored Go RE2 `MatchString` on `req.Method`. Do not insert `^` or `$`. Do not lowercase. Do not force `(?i)`. Omit or empty after trim is any. Optional single leading `!` (outside the pattern) negates (`!POST`, `!^POST$`). `!!` and `!` with an empty pattern fail `New`.
 - Path: unanchored `MatchString` on `req.URL.Path` as `net/http` decoded it. Do not rebuild from `RequestURI`, `EscapedPath`, or AppSec forwarded URI. Host is not in the path. Query is not in the path.
+- `SingleReadingPath(*url.URL)`: true only when `Path == EscapedPath()`, every byte is in `A-Z a-z 0-9 - . _ ~ ! $ & ' ( ) + , = : @ /`, `path.Clean` (trailing slash kept) leaves it unchanged, and no segment is dots only. Same criterion as upstream `pkg/location` (PR 413). `Fold` uses it to drop skips; `Set.Match` / `Matching` do not.
 - Host: unanchored `MatchString` on the hostname of `req.Host`. When `net.SplitHostPort` succeeds, match that host (`example.com:443` → `example.com`, `[::1]:443` → `::1`). When it fails, match `req.Host` unchanged. Do not read the Host header map. Do not include scheme, port, or path. Omit or empty after trim is any. No leading `!`. A host-only rule is valid.
 - Headers: compile names with `textproto.CanonicalMIMEHeaderKey`. AND across names. Empty pattern means the header is present. Otherwise RE2 against each value; one hit is enough. Use `req.Header[canonical]`, not `Header.Get`.
 - Cookies: same predicate shape; names are case-sensitive. Parse the Cookie header once per request only when this Set has a cookie predicate.
@@ -49,12 +50,15 @@ match := set.Fold(httpReq)
 - `pkg/httprule/rule.go`
 - `pkg/httprule/set.go`
 - `pkg/httprule/action.go`
+- `pkg/httprule/path.go` (`SingleReadingPath`)
 - `pkg/configuration/configuration.go` (`BouncerActionRules`)
 - `pkg/bouncer/bouncer.go` (`actionRules`)
 
 ## Gotchas
 
 - Unanchored `health` matches `/unhealthy`. Operators who want an exact path write `^/health$`.
+- Anchoring does not stop path confusion: Traefik v3.7.11 forwards `/healthz/..;/admin`, `/healthz/%2E%2E;/admin` (decoded to `..;`) and `/healthz/..%5Cadmin` unchanged, and `^/healthz/` matches them. A Java servlet backend reads `..;` as `..`. That is why `Fold` drops skips on such paths.
+- `%20` and other percent-encoding make a path ambiguous too, so a bypass path rule no longer skips those requests. Fail-safe: the leg inspects them.
 - Host match text is the hostname only. `example.com:443` matches `^example.com$`. `[::1]:443` matches `^::1$`, not `^\[::1\]$`.
 - Method `^post$` does not match `POST`. Write `(?i)` or `^POST$`.
 - `example.com://health` does not match path `/health`.

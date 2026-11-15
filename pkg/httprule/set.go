@@ -90,6 +90,11 @@ func (set *Set) Matching(httpReq *http.Request) []int {
 	return hits
 }
 
+// hasPath reports whether the rule at index i has a path predicate.
+func (set *Set) hasPath(i int) bool {
+	return set != nil && i >= 0 && i < len(set.rules) && set.rules[i].pathRe != nil
+}
+
 // compileRule rejects invalid syntax and a rule whose every predicate is any.
 func compileRule(rule Rule) (compiledRule, error) {
 	methodAny, methodNeg, methodRe, err := compileMethod(rule.Method)

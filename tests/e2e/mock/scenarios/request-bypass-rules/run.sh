@@ -26,6 +26,15 @@ body() {
   echo "[$SCENARIO] AppSec 403 URI must be skipped on an AppSec-matching path (HTTP 200)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo/403-skip" 200 -H "X-Forwarded-For: 5.6.7.8"
 
+  echo "[$SCENARIO] AppSec prefix rule must skip a plain path under it (HTTP 200)"
+  assert_status "http://127.0.0.1:${WEB_PORT}/skipzone/403" 200 -H "X-Forwarded-For: 5.6.7.8"
+
+  # Traefik forwards these unchanged; a Java backend reads ..; as .. and an IIS backend reads \ as /.
+  echo "[$SCENARIO] AppSec prefix rule must not skip a path with more than one reading (HTTP 403)"
+  assert_status "http://127.0.0.1:${WEB_PORT}/skipzone/..;/403" 403 --path-as-is -H "X-Forwarded-For: 5.6.7.8"
+  assert_status "http://127.0.0.1:${WEB_PORT}/skipzone/%2E%2E;/403" 403 --path-as-is -H "X-Forwarded-For: 5.6.7.8"
+  assert_status "http://127.0.0.1:${WEB_PORT}/skipzone/..%5C403" 403 --path-as-is -H "X-Forwarded-For: 5.6.7.8"
+
   echo "[$SCENARIO] LAPI match must not skip AppSec (HTTP 403)"
   assert_status "http://127.0.0.1:${WEB_PORT}/lapi-skip/403" 403 -H "X-Forwarded-For: 5.6.7.8"
 
