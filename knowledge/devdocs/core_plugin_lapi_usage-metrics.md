@@ -20,7 +20,7 @@ _Avoid_: leftover origin string, storing the origin name on every slot, a report
 
 ## Overview
 
-Call `IncProcessed` once the client address parsed, and `IncDropped` on each remediating response. A `GetRemoteIP` error is HTTP 502 with neither counter. A remediating drop also calls `IncDroppedBytes` with `req.EstimatedSize()`. Stream/alone `active_decisions` is a DecisionStore snapshot at POST (memory recounts after PublishTick; Redis is empty). The Client ticker POSTs `v1/usage-metrics` through the `MetricsReporter` Client holds. `IncProcessed` is lock-free (`atomic.AddInt64`); `IncDropped` and `IncDroppedBytes` take the reporter `metricsMu` because drops already left the allow path.
+Call `IncProcessed` once the client address parsed, and `IncDropped` on each remediating response (an AppSec relay under `/crowdsec-internal/challenge/` is not one; `core_plugin_appsec.md`). A `GetRemoteIP` error is HTTP 502 with neither counter. A remediating drop also calls `IncDroppedBytes` with `req.EstimatedSize()`. Stream/alone `active_decisions` is a DecisionStore snapshot at POST (memory recounts after PublishTick; Redis is empty). The Client ticker POSTs `v1/usage-metrics` through the `MetricsReporter` Client holds. `IncProcessed` is lock-free (`atomic.AddInt64`); `IncDropped` and `IncDroppedBytes` take the reporter `metricsMu` because drops already left the allow path.
 
 ## How to use
 
