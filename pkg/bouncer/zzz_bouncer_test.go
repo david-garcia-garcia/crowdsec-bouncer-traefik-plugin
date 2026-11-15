@@ -753,7 +753,7 @@ func TestHandleNextServeHTTP_clientDisconnected(t *testing.T) {
 		t.Fatalf("dropped ban count=%d want 0", got)
 	}
 	logged := logBuf.String()
-	if !strings.Contains(logged, "client disconnected while buffering AppSec body") {
+	if !strings.Contains(logged, "client disconnected while buffering the request body") {
 		t.Fatalf("TRACE log missing disconnect line: %s", logged)
 	}
 

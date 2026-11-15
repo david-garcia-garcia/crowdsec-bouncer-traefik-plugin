@@ -2,7 +2,6 @@ package appsec
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,13 +10,13 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/admission"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/wafhop"
 )
 
 const (
@@ -53,15 +52,13 @@ type Policy struct {
 // ErrFailureCaptcha tells the bouncer to run pkg/captcha instead of ban or next.
 var ErrFailureCaptcha = errors.New("failureAction captcha")
 
-// ErrClientDisconnected is a classified client disconnect while buffering a readable body.
+// ErrClientDisconnected is wafhop.ErrClientDisconnected: the client left while its body was buffered.
 // Query MUST NOT call AppSec or apply FailureAction; the bouncer stops without a ban.
-var ErrClientDisconnected = errors.New("appsecQuery:clientDisconnected")
+var ErrClientDisconnected = wafhop.ErrClientDisconnected
 
-// ErrClientBodyRead is any other failure reading the client body while buffering it for AppSec
-// (for example the server read timeout on a slow HTTP/2 upload). The request never arrived whole,
-// so it is not an AppSec verdict and not FailureAction: Query does not call AppSec and the bouncer
-// answers 400 without a ban and without dropped metrics.
-var ErrClientBodyRead = errors.New("appsecQuery:clientBodyRead")
+// ErrClientBodyRead is wafhop.ErrClientBodyRead: any other failure reading the client body.
+// Query does not call AppSec and does not apply FailureAction; the bouncer answers 400 without a ban.
+var ErrClientBodyRead = wafhop.ErrClientBodyRead
 
 // ErrGateSkip is a denied AppSec admission. Query MUST NOT call AppSec or apply FailureAction.
 var ErrGateSkip = errors.New("appsecQuery:unhealthySkip")
@@ -104,33 +101,8 @@ func appsecAllow() *Response {
 	return &Response{Action: ActionAllow}
 }
 
-func isBodyUnreadable(httpReq *http.Request) bool {
-	return httpReq.Body != nil && httpReq.Body != http.NoBody && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
-}
-
-// isClientGoneBodyReadErr reports disconnect or cancel while buffering a readable client body.
-// The canceled request context is the primary signal: net/http cancels it before the body read
-// fails when an HTTP/2 stream is reset (the error is an unexported stream error that does not wrap
-// context.Canceled) and when an HTTP/1.1 connection read fails (TCP reset, read timeout).
-func isClientGoneBodyReadErr(httpReq *http.Request, err error) bool {
-	return httpReq.Context().Err() != nil ||
-		errors.Is(err, context.Canceled) ||
-		errors.Is(err, context.DeadlineExceeded) ||
-		errors.Is(err, io.ErrUnexpectedEOF)
-}
-
-// isMethodWithBody reports whether an unreadable body on this method is a drop candidate.
-func isMethodWithBody(method string) bool {
-	switch method {
-	case http.MethodPost, http.MethodPut, http.MethodPatch:
-		return true
-	default:
-		return false
-	}
-}
-
 // isMethodWithForwardableBody reports whether a readable body on this method is copied to AppSec.
-// Deliberately wider than isMethodWithBody: a DELETE body is worth inspecting, but an unreadable
+// Deliberately wider than wafhop.IsMethodWithBody: a DELETE body is worth inspecting, but an unreadable
 // DELETE body is not a drop candidate. Keep the two sets separate.
 func isMethodWithForwardableBody(method string) bool {
 	switch method {
@@ -141,22 +113,10 @@ func isMethodWithForwardableBody(method string) bool {
 	}
 }
 
-// isHopByHopHeader reports whether a header is connection-scoped (RFC 7230 section 6.1, errata 4522)
-// and therefore must not be forwarded to the AppSec listener.
-func isHopByHopHeader(name string) bool {
-	switch strings.ToLower(name) {
-	case "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
-		"te", "trailer", "transfer-encoding", "upgrade":
-		return true
-	default:
-		return false
-	}
-}
-
 // Query forwards the request to this AppSec HTTP client.
 // The status table in the body is the CrowdSec AppSec protocol this method follows.
 func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error) {
-	ticket, admitErr := c.admitAppsecHop(req.Context())
+	ticket, admitErr := c.admitAppsecHop(req)
 	if admitErr != nil {
 		return nil, admitErr
 	}
@@ -171,16 +131,16 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 	current := c.currentTransport()
 	if current == nil || current.httpClient == nil {
 		c.log.Error("appsecQuery:unreachable")
-		c.reportGate(ticket, false)
+		c.gate.Record(ticket, false)
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
 	res, err := current.httpClient.Do(appsecReq)
 	if err != nil {
-		if errors.Is(req.Context().Err(), context.Canceled) {
+		if wafhop.IsInboundCanceled(req.Request, err) {
 			return nil, ErrClientDisconnected
 		}
 		c.log.Error("appsecQuery:unreachable")
-		c.reportGate(ticket, false)
+		c.gate.Record(ticket, false)
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
 	// Drain every live response, including unexpected statuses, so keep-alive can reuse the slot.
@@ -202,19 +162,19 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 	// protocol sentence. Any other code uses FailureAction and logs a WARN debounced on that message text.
 	if res.StatusCode == http.StatusInternalServerError {
 		logger.Debounced(c.log, slog.LevelInfo, 5*time.Second, "appsecQuery:failure")
-		c.reportGate(ticket, false)
+		c.gate.Record(ticket, false)
 		return resultForFailureAction(pol.FailureAction, "appsecQuery statusCode:500")
 	}
 	if res.StatusCode == http.StatusUnauthorized {
 		logger.Debounced(c.log, slog.LevelWarn, 5*time.Second, msgUnauthenticated)
 		// The listener answered: a wrong key is a configuration error, not an outage, so it does
 		// not spend the gate budget and FailureAction keeps applying on every request.
-		c.reportGate(ticket, true)
+		c.gate.Record(ticket, true)
 		return resultForFailureAction(pol.FailureAction, "appsecQuery statusCode:401")
 	}
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusForbidden {
 		logger.Debounced(c.log, slog.LevelWarn, 5*time.Second, msgUnexpectedListenerStatus, "statusCode", res.StatusCode)
-		c.reportGate(ticket, false)
+		c.gate.Record(ticket, false)
 		return resultForFailureAction(pol.FailureAction, fmt.Sprintf("appsecQuery statusCode:%d", res.StatusCode))
 	}
 
@@ -223,12 +183,12 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 		// Io errors use FailureAction; oversized bodies stay as dest (allow 200 / error otherwise).
 		if errors.Is(err, errAppsecReadBody) {
 			c.log.Info("appsecQuery:failure")
-			c.reportGate(ticket, false)
+			c.gate.Record(ticket, false)
 			return resultForFailureAction(pol.FailureAction, err.Error())
 		}
 		return nil, err
 	}
-	c.reportGate(ticket, true)
+	c.gate.Record(ticket, true)
 	// Only 200 and 403 reach here. interpretAppsecBody turns a missing action into allow or a ban.
 	decision, err := interpretAppsecBody(res.StatusCode, body, c.log)
 	if err != nil {
@@ -238,22 +198,16 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 }
 
 // admitAppsecHop consults the Gate. An unadmitted ticket is a skip. Cancel does not Report.
-func (c *Client) admitAppsecHop(ctx context.Context) (admission.Ticket, error) {
-	ticket, allowErr := c.gate.Admit(ctx)
+func (c *Client) admitAppsecHop(req clientrequest.Request) (admission.Ticket, error) {
+	ticket, allowErr := c.gate.Admit(req.Context())
 	if allowErr != nil {
-		if errors.Is(allowErr, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
+		if wafhop.IsInboundCanceled(req.Request, allowErr) {
 			return admission.Ticket{}, ErrClientDisconnected
 		}
 		c.log.Error("fail to admit AppSec request", "error", allowErr)
 		return admission.Ticket{}, allowErr
 	}
 	return ticket, nil
-}
-
-func (c *Client) reportGate(ticket admission.Ticket, success bool) {
-	if err := c.gate.Report(ticket, success); err != nil {
-		c.log.Error("fail to report AppSec admission outcome", "error", err, "success", success)
-	}
 }
 
 // newAppsecForwardRequest builds the AppSec listener request, copying client headers and identity.
@@ -269,14 +223,7 @@ func (c *Client) newAppsecForwardRequest(req clientrequest.Request, pol Policy) 
 	}
 	// Omit hop-by-hop headers (Transfer-Encoding among them) and the client Content-Length;
 	// the length is rebuilt below from the bytes actually forwarded.
-	for key, headers := range req.Header {
-		if isHopByHopHeader(key) || strings.EqualFold(key, "Content-Length") {
-			continue
-		}
-		for _, value := range headers {
-			appsecReq.Header.Add(key, value)
-		}
-	}
+	wafhop.CopyEndToEndHeaders(appsecReq.Header, req.Header, "Content-Length")
 	// POST is the only outbound method that carries bytes; a bodyless GET gets no length header.
 	if appsecReq.Method == http.MethodPost {
 		appsecReq.Header.Set("Content-Length", strconv.FormatInt(appsecReq.ContentLength, 10))
@@ -304,29 +251,19 @@ func (c *Client) newAppsecForwardRequest(req clientrequest.Request, pol Policy) 
 // body) toward AppSec. The original verb always travels on X-Crowdsec-Appsec-Verb.
 func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol Policy) (*http.Request, error) {
 	switch {
-	case isBodyUnreadable(httpReq):
-		if isMethodWithBody(httpReq.Method) && configuration.EffectiveFailureAction(pol.FailureAction) != configuration.FailureActionPassthrough {
+	case wafhop.IsBodyUnreadable(httpReq):
+		if wafhop.IsMethodWithBody(httpReq.Method) && configuration.EffectiveFailureAction(pol.FailureAction) != configuration.FailureActionPassthrough {
 			return nil, resultForFailureActionErr(pol.FailureAction, "appsecQuery:unreadableBody dropped")
 		}
 		req, _ := http.NewRequest(http.MethodGet, target, nil)
 		return req, nil
-	case httpReq.Body != nil && httpReq.Body != http.NoBody && isMethodWithForwardableBody(httpReq.Method):
-		// Readable body: cap with LimitReader only when the operator set a positive limit.
-		var bodyBuffer bytes.Buffer
-		bodyReader := io.Reader(httpReq.Body)
-		if c.appsecBodyLimit > 0 {
-			bodyReader = io.LimitReader(httpReq.Body, c.appsecBodyLimit)
-		}
-		teeReader := io.TeeReader(bodyReader, &bodyBuffer)
-		bodyBytes, err := io.ReadAll(teeReader)
+	case wafhop.HasBody(httpReq) && isMethodWithForwardableBody(httpReq.Method):
+		// AppSec forwards the first appsecBodyLimit bytes (0 means no cap); the rest still reaches origin.
+		bodyBytes, err := wafhop.ReadBody(httpReq, c.appsecBodyLimit, wafhop.TruncateAtLimit)
 		if err != nil {
-			if isClientGoneBodyReadErr(httpReq, err) {
-				return nil, ErrClientDisconnected
-			}
-			return nil, fmt.Errorf("%w: %s", ErrClientBodyRead, err.Error())
+			return nil, err
 		}
-		httpReq.Body = io.NopCloser(io.MultiReader(&bodyBuffer, httpReq.Body))
-		req, _ := http.NewRequest(http.MethodPost, target, bytes.NewBuffer(bodyBytes))
+		req, _ := http.NewRequest(http.MethodPost, target, bytes.NewReader(bodyBytes))
 		req.ContentLength = int64(len(bodyBytes))
 		return req, nil
 	default:

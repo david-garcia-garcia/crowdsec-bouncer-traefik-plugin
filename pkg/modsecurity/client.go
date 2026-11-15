@@ -33,13 +33,10 @@ const gateKey = "modsec"
 // defaultDenyVerbsWithBody is the omitted/nil deny list.
 var defaultDenyVerbsWithBody = []string{"HEAD", "GET", "DELETE", "OPTIONS", "TRACE", "CONNECT"} //nolint:gochecknoglobals
 
-const defaultPoolCap int64 = 5 * 1024 * 1024
-
 // Client is the reclaim value for one CRS sidecar listener.
 type Client struct {
 	mu sync.Mutex
 
-	bodyBufferPool    *sync.Pool
 	bodyLimit         int64
 	closed            bool
 	denyVerbsWithBody map[string]bool
@@ -51,7 +48,6 @@ type Client struct {
 	middlewareName    string
 	modsecURL         string
 	pluginVersion     string
-	poolCap           int64
 	sessionKey        string
 	sleeping          bool
 }
@@ -77,7 +73,6 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, m
 		return nil, err
 	}
 	client := &Client{
-		bodyBufferPool:    newBodyBufferPool(),
 		bodyLimit:         EffectiveBodyLimit(config.ModsecBodyLimit),
 		denyVerbsWithBody: createMethodSet(config.ModsecDenyVerbsWithBody),
 		gate:              gate,
@@ -87,7 +82,6 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, m
 		middlewareName:    middlewareName,
 		modsecURL:         strings.TrimSuffix(strings.TrimSpace(config.ModsecURL), "/"),
 		pluginVersion:     pluginVersion,
-		poolCap:           defaultPoolCap,
 		sessionKey:        bindKey,
 	}
 	client.incarnation = fmt.Sprintf("%p", client)

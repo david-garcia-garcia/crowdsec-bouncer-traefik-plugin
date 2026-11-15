@@ -3,7 +3,7 @@
 ## Language
 
 **ModSec Client**:
-The reclaim value for one OWASP CRS sidecar inspect listener (`pkg/modsecurity`). Opened by ownership key (middleware name plus `modsecUrl`, `modsecHttpTimeoutSeconds`, `modsecBodyLimit`, `modsecDenyVerbsWithBody`, and the unhealthy-backoff knobs). Owns sidecar HTTP, the body pool, deny-verbs, and the admission gate. Not the AppSec Client and not CrowdSec AppSec JSON.
+The reclaim value for one OWASP CRS sidecar inspect listener (`pkg/modsecurity`). Opened by ownership key (middleware name plus `modsecUrl`, `modsecHttpTimeoutSeconds`, `modsecBodyLimit`, `modsecDenyVerbsWithBody`, and the unhealthy-backoff knobs). Owns sidecar HTTP, deny-verbs, and the admission gate. Body buffering is `pkg/wafhop` (no pool). Not the AppSec Client and not CrowdSec AppSec JSON.
 _Avoid_: AppSec client, `modSecurityUrl`, FailMode as ownership, `atomic.Pointer[T]`, `X-Crowdsec-Appsec-*`
 
 **Admission gate**:
@@ -22,7 +22,7 @@ _Avoid_: FailureAction, FailMode, copying Gate into this repository, a public un
 - Hash `OwnershipKey` from middleware name plus `modsecUrl`, timeout, body limit, deny-verbs-with-body, and the four unhealthy-backoff knobs. Slot name, `bouncerEnabled`, bounce knobs, LAPI, AppSec, captcha, and per-router `bouncerModsecFailMode` stay off it.
 - When `modsecUnhealthyBackOffPeriodSecs` is greater than 0, build one `backendbackoff.Gate` from dest utilities `v1.0.7`. Period `0` or omitted builds no gate (default `0`). Omitted threshold is `5`. Omitted ratio is packaged `0.30`. Omitted max period equals the base period. Do not set `Jitter` or `TTL`.
 - Omitted or nil `modsecDenyVerbsWithBody` is `HEAD`, `GET`, `DELETE`, `OPTIONS`, `TRACE`, `CONNECT`. An explicit empty list denies nothing. A listed method with a readable body byte is HTTP 400, does not call the sidecar, and does not call `next`, including after the gate has tripped.
-- Omitted `modsecBodyLimit` is 8388608 (8 MiB). `0` is unlimited. A positive limit caps the inbound copy; exceeding it is HTTP 413 and does not call the sidecar.
+- Omitted `modsecBodyLimit` is 8388608 (8 MiB). `0` also means 8 MiB (`EffectiveBodyLimit`); there is no unlimited value. Exceeding it is HTTP 413 and does not call the sidecar.
 - `newHTTPClient` sets `Timeout` from `modsecHttpTimeoutSeconds` (default 10) and `CheckRedirect` so a sidecar 3xx is a copied block (`http.ErrUseLastResponse`).
 - `Close` Closes a non-nil Gate and idle sidecar HTTP. Safe to call more than once. Sleep/Wake only log; ModSec has no tickers.
 
@@ -43,9 +43,8 @@ err = reclaim.SetAlias(modsecurity.OwnershipKey(&config, name), instanceAlias("m
 
 - `pkg/modsecurity/client.go`
 - `pkg/modsecurity/session.go` (`OwnershipKey`, `Prepare`, `Open`)
-- `pkg/modsecurity/gate.go`
 - `pkg/modsecurity/client_http.go`
-- `pkg/modsecurity/body.go`
+- `pkg/wafhop/body.go` (shared body rules)
 - `pkg/configuration/configuration.go` (`modsec*` knobs)
 - `plugin.go`
 

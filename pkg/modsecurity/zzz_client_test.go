@@ -140,7 +140,7 @@ func TestInspect_defaultDenyGetWithBody(t *testing.T) {
 	defer client.Close()
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/", strings.NewReader("x"))
-	if !client.Inspect(rw, req, configuration.ModsecFailModeOpen, "") {
+	if !inspectForTest(t, client, rw, req, configuration.ModsecFailModeOpen, "") {
 		t.Fatal("GET with body must write 400")
 	}
 	if rw.Code != http.StatusBadRequest {
@@ -168,7 +168,7 @@ func TestInspect_explicitEmptyDenyListInspectsGetWithBody(t *testing.T) {
 	defer client.Close()
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/", strings.NewReader("x"))
-	if client.Inspect(rw, req, configuration.ModsecFailModeOpen, "") {
+	if inspectForTest(t, client, rw, req, configuration.ModsecFailModeOpen, "") {
 		t.Fatal("empty deny list must continue after inspect")
 	}
 	if sidecarHits != 1 {
@@ -200,12 +200,12 @@ func TestInspect_zeroBodyLimitUsesDefault(t *testing.T) {
 	}
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader(strings.Repeat("a", 64)))
-	if client.Inspect(rw, req, configuration.ModsecFailModeOpen, "") {
+	if inspectForTest(t, client, rw, req, configuration.ModsecFailModeOpen, "") {
 		t.Fatal("small body under the default limit must continue")
 	}
 	over := httptest.NewRecorder()
 	big := strings.Repeat("a", int(configuration.DefaultModsecBodyLimit)+1)
-	if !client.Inspect(over, httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader(big)), configuration.ModsecFailModeOpen, "") {
+	if !inspectForTest(t, client, over, httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader(big)), configuration.ModsecFailModeOpen, "") {
 		t.Fatal("body over the 8 MiB default must write")
 	}
 	if over.Code != http.StatusRequestEntityTooLarge {
@@ -241,7 +241,7 @@ func TestInspect_bodyOverLimitIs413(t *testing.T) {
 	defer client.Close()
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("12345"))
-	if !client.Inspect(rw, req, configuration.ModsecFailModeOpen, "") {
+	if !inspectForTest(t, client, rw, req, configuration.ModsecFailModeOpen, "") {
 		t.Fatal("over-limit body must write")
 	}
 	if rw.Code != http.StatusRequestEntityTooLarge {

@@ -145,3 +145,8 @@ priority: normal
 local: core_plugin_modsecurity_inspect.md
 description: How this plugin copies an inbound request to the CRS sidecar and classifies allow, copied block, or WAF failure.
 
+## WAF-leg shared request rules
+priority: normal
+local: core_plugin_wafhop_shared-request.md
+description: How AppSec and ModSec share body buffering, client-gone classification, and the hop-by-hop list through pkg/wafhop while keeping their own limits and fallbacks.
+

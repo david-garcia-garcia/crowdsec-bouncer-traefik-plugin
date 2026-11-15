@@ -28,7 +28,7 @@ The plugin SHALL send a copy of the inbound request to `modsecUrl`. The sidecar 
 - **AND** the plugin does not follow the redirect
 
 ### Requirement: Inspect copy reuses inbound identity owners
-The inspect copy SHALL set sidecar request `Host` to inbound `req.Host`. It SHALL copy Traefik's headers as Traefik left them. It MUST NOT set `X-Real-IP`. It MUST NOT append `RemoteAddr` to `X-Forwarded-For`. Plugin remediations and logs SHALL keep using `pkg/ip.GetRemoteIP` then `clientrequest.New`. Sidecar `REMOTE_ADDR` SHALL stay the Traefik-to-sidecar hop unless the CRS image is configured with `REMOTEIP_*` / `REAL_IP_*` (not this plugin).
+The inspect copy SHALL set sidecar request `Host` to inbound `req.Host`. It SHALL copy Traefik's headers as Traefik left them, minus the shared hop-by-hop list and `Content-Length` (`core_plugin_wafhop_shared-request`). It MUST NOT set `X-Real-IP`. It MUST NOT append `RemoteAddr` to `X-Forwarded-For`. Plugin remediations and logs SHALL keep using `pkg/ip.GetRemoteIP` then `clientrequest.New`. Sidecar `REMOTE_ADDR` SHALL stay the Traefik-to-sidecar hop unless the CRS image is configured with `REMOTEIP_*` / `REAL_IP_*` (not this plugin).
 
 #### Scenario: Host is inbound Host
 - **WHEN** the inbound request Host is `example.com:443`
@@ -39,14 +39,14 @@ The inspect copy SHALL set sidecar request `Host` to inbound `req.Host`. It SHAL
 - **THEN** the sidecar request has no `X-Real-IP` added by this plugin
 
 ### Requirement: Copied block omits hop-by-hop response headers
-When forwarding a sidecar 3xx/4xx block, the plugin SHALL omit hop-by-hop response headers (`Connection`, `Keep-Alive`, `Transfer-Encoding`, `Upgrade`, `Proxy-*`, `Te`, `Trailer`) and `Server`.
+When forwarding a sidecar 3xx/4xx block, the plugin SHALL omit the shared hop-by-hop list (`wafhop.IsHopByHopHeader`) and `Server`.
 
 #### Scenario: Connection is not copied from the block
 - **WHEN** the sidecar 403 includes `Connection: close`
 - **THEN** the client response does not include that `Connection` value from the sidecar
 
 ### Requirement: FailMode applies to inspect failure and unhealthy skip
-Per-router `bouncerModsecFailMode` SHALL be `open` (default, call `next`) or `close` (empty HTTP 502, do not call `next`). Empty SHALL be `open`. Other values SHALL fail `New`. It SHALL apply to sidecar transport errors, sidecar 5xx, an already-unhealthy gate skip, and a missing subscribed ModSec client. It MUST NOT apply to copied 3xx/4xx. Inbound cancel (`context.Canceled`) SHALL write empty HTTP 502, MUST NOT Report the gate, and MUST NOT use failMode (no `next`).
+Per-router `bouncerModsecFailMode` SHALL be `open` (default, call `next`) or `close` (empty HTTP 502, do not call `next`). Empty SHALL be `open`. Other values SHALL fail `New`. It SHALL apply to sidecar transport errors (including the sidecar client timeout), sidecar 5xx, an already-unhealthy gate skip, a missing subscribed ModSec client, and an unreadable body on POST, PUT, or PATCH. It MUST NOT apply to copied 3xx/4xx. An inbound cancel before or during the sidecar hop SHALL be `wafhop.ErrClientDisconnected`: nothing written by ModSec, no gate Record, no failMode, no `next` (`core_plugin_wafhop_shared-request`).
 
 #### Scenario: Default open on sidecar 5xx
 - **WHEN** `bouncerModsecFailMode` is omitted and the sidecar returns HTTP 500
@@ -57,10 +57,10 @@ Per-router `bouncerModsecFailMode` SHALL be `open` (default, call `next`) or `cl
 - **THEN** the response is empty HTTP 502
 - **AND** `next` is not called
 
-#### Scenario: Inbound cancel is empty 502
+#### Scenario: Inbound cancel is client disconnected
 - **WHEN** the inbound context is canceled before or during the sidecar hop
-- **THEN** the response is empty HTTP 502
-- **AND** the gate is not Reported
+- **THEN** ModSec writes nothing and the bouncer answers client disconnected
+- **AND** the gate is not Recorded
 - **AND** `next` is not called
 
 ### Requirement: Gate skip uses failMode and does not call the sidecar

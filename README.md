@@ -433,7 +433,7 @@ cs-modsec:
       modsecUrl: http://waf:8080
 ```
 
-WebSocket handshakes are inspected like any other GET; after an allow, the upgraded connection goes straight to the origin. `bypass` and `bypassModsec` skip this inspect. `modsecUnhealthyBackOffPeriodSecs` defaults to `0` (every request still reaches the sidecar). AppSec skip-after-trip is different: omitted `appsecUnhealthyBackOffPeriodSecs` is `30`, so after enough AppSec failures the gate skips AppSec and does **not** apply `bouncerAppsecFailureAction`. Set `appsecUnhealthyBackOffPeriodSecs: 0` to keep per-request FailureAction with no skip.
+WebSocket handshakes are inspected like any other GET (the sidecar copy carries no `Upgrade` or `Connection` header); after an allow, the upgraded connection goes straight to the origin. With AppSec on the same router, the request body is read once and shared by both legs, and each leg keeps its own limit: `appsecBodyLimit` cuts what AppSec sees, `modsecBodyLimit` rejects a larger body with 413. A POST, PUT, or PATCH body streamed over HTTP/2 or HTTP/3 without a length (gRPC, for example) is never buffered by either leg. `bypass` and `bypassModsec` skip this inspect. `modsecUnhealthyBackOffPeriodSecs` defaults to `0` (every request still reaches the sidecar). AppSec skip-after-trip is different: omitted `appsecUnhealthyBackOffPeriodSecs` is `30`, so after enough AppSec failures the gate skips AppSec and does **not** apply `bouncerAppsecFailureAction`. Set `appsecUnhealthyBackOffPeriodSecs: 0` to keep per-request FailureAction with no skip.
 
 Each gate logs two lines per outage, not one per skipped request: `crowdsec appsec backoff started` / `crowdsec modsec backoff started` (WARN, with `retryIn`) when it starts skipping, and `crowdsec appsec backoff ended` / `crowdsec modsec backoff ended` (INFO) when a probe request succeeds again.
 
@@ -810,7 +810,7 @@ IPs or ranges of the proxies in front of Traefik (for example Cloudflare's range
 What to do when LAPI cannot give an answer: `ban`, `passthrough`, or `captcha`. In `live` and `none`, this also applies when a country, AS, or other header-scope lookup fails. See [Choose what happens when CrowdSec is down](#choose-what-happens-when-crowdsec-is-down).
 
 **bouncerModsecFailMode** (string, default `open`)
-Per-router behavior when ModSec inspect fails (sidecar 5xx, transport error, missing client, or a gate skip): `open` continues to the origin, `close` writes an empty HTTP 502. Copied 3xx/4xx blocks are not failMode.
+Per-router behavior when ModSec inspect fails (sidecar 5xx, transport error or timeout, missing client, a gate skip, or a POST/PUT/PATCH body streamed over HTTP/2 or HTTP/3 without a length, which is never buffered; with `open` such a request is inspected on its headers only): `open` continues to the origin, `close` writes an empty HTTP 502. Copied 3xx/4xx blocks are not failMode.
 
 **BouncerOriginBasedDecisionRemap** (map[string]map[string]string, default `{}`)
 Turn bans or captchas from specific origins into a captcha or a pass on this router. See [Show a community ban as a captcha](#show-a-community-ban-as-a-captcha).

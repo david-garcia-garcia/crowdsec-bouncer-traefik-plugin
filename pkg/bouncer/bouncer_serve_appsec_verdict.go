@@ -8,6 +8,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/wafhop"
 )
 
 // answerAppsecVerdict writes the response for the verdict Query returned.
@@ -74,7 +75,7 @@ func (b *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req clie
 
 	// Copy AppSec-supplied headers, skipping hop-by-hop names and Set-Cookie (cookies have their own field).
 	for name, values := range decision.UserHeaders {
-		if isHopByHopHeader(name) || strings.EqualFold(name, "Set-Cookie") {
+		if wafhop.IsHopByHopHeader(name) || strings.EqualFold(name, "Set-Cookie") {
 			continue
 		}
 		rw.Header()[http.CanonicalHeaderKey(name)] = values
@@ -106,15 +107,5 @@ func (b *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req clie
 	}
 	if _, err := rw.Write([]byte(decision.UserBodyContent)); err != nil {
 		b.log.Warn("handleAppsecResponseServeHTTP could not write appsec response", "ip", req.IPAddrString(), "error", err)
-	}
-}
-
-// isHopByHopHeader reports names that must not be copied from AppSec onto the client response.
-func isHopByHopHeader(name string) bool {
-	switch http.CanonicalHeaderKey(name) {
-	case "Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization", "Te", "Trailers", "Transfer-Encoding", "Upgrade":
-		return true
-	default:
-		return false
 	}
 }

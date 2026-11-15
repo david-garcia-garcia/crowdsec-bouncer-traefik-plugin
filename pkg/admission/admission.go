@@ -126,6 +126,13 @@ func (g *Gate) Report(ticket Ticket, success bool) error {
 	return nil
 }
 
+// Record is Report for the request path: a failed Report is logged at ERROR, not returned.
+func (g *Gate) Record(ticket Ticket, success bool) {
+	if err := g.Report(ticket, success); err != nil {
+		g.log.Error("fail to report "+g.key+" admission outcome", "error", err, "success", success)
+	}
+}
+
 // BackingOff reports whether the last transition logged was MsgStarted.
 func (g *Gate) BackingOff() bool {
 	if g == nil {

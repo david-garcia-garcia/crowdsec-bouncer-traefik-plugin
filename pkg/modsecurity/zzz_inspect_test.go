@@ -3,6 +3,7 @@ package modsecurity
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/wafhop"
 )
 
 func TestInspect_cleanGETAllows(t *testing.T) {
@@ -33,7 +35,7 @@ func TestInspect_cleanGETAllows(t *testing.T) {
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://example.com:443/", nil)
 	req.Host = "example.com:443"
-	if client.Inspect(rw, req, configuration.ModsecFailModeOpen, "X-Remediation") {
+	if inspectForTest(t, client, rw, req, configuration.ModsecFailModeOpen, "X-Remediation") {
 		t.Fatal("2xx must continue")
 	}
 	if rw.Body.Len() != 0 {
@@ -56,7 +58,7 @@ func TestInspect_copiedBlockOmitsHopByHopAndSetsHeader(t *testing.T) {
 	defer client.Close()
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/?test=../etc", nil)
-	if !client.Inspect(rw, req, configuration.ModsecFailModeOpen, "X-Remediation") {
+	if !inspectForTest(t, client, rw, req, configuration.ModsecFailModeOpen, "X-Remediation") {
 		t.Fatal("403 must write")
 	}
 	if rw.Code != http.StatusForbidden {
@@ -94,7 +96,7 @@ func TestInspect_sidecar3xxIsBlockNotFollowed(t *testing.T) {
 	defer client.Close()
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
-	if !client.Inspect(rw, req, configuration.ModsecFailModeOpen, "") {
+	if !inspectForTest(t, client, rw, req, configuration.ModsecFailModeOpen, "") {
 		t.Fatal("302 must write")
 	}
 	if rw.Code != http.StatusFound {
@@ -117,7 +119,7 @@ func TestInspect_sidecar5xxUsesFailMode(t *testing.T) {
 	defer client.Close()
 
 	openRW := httptest.NewRecorder()
-	if client.Inspect(openRW, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeOpen, "X-Remediation") {
+	if inspectForTest(t, client, openRW, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeOpen, "X-Remediation") {
 		t.Fatal("open 5xx must continue")
 	}
 	if strings.Contains(openRW.Body.String(), "sidecar-5xx-marker") {
@@ -128,7 +130,7 @@ func TestInspect_sidecar5xxUsesFailMode(t *testing.T) {
 	}
 
 	closeRW := httptest.NewRecorder()
-	if !client.Inspect(closeRW, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeClose, "X-Remediation") {
+	if !inspectForTest(t, client, closeRW, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeClose, "X-Remediation") {
 		t.Fatal("close 5xx must write 502")
 	}
 	if closeRW.Code != http.StatusBadGateway {
@@ -139,7 +141,8 @@ func TestInspect_sidecar5xxUsesFailMode(t *testing.T) {
 	}
 }
 
-func TestInspect_inboundCancelIsEmpty502(t *testing.T) {
+// An inbound cancel during the sidecar call is the shared client-disconnected outcome: nothing written.
+func TestInspect_inboundCancelIsClientDisconnected(t *testing.T) {
 	started := make(chan struct{})
 	release := make(chan struct{})
 	sidecar := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
@@ -159,16 +162,15 @@ func TestInspect_inboundCancelIsEmpty502(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil).WithContext(ctx)
 	done := make(chan struct{})
 	rw := httptest.NewRecorder()
+	var inspectErr error
 	go func() {
 		defer close(done)
-		_ = client.Inspect(rw, req, configuration.ModsecFailModeOpen, "")
+		_, inspectErr = client.Inspect(rw, req, configuration.ModsecFailModeOpen, "")
 	}()
 	<-started
 	cancel()
 	<-done
-	if rw.Code != http.StatusBadGateway {
-		t.Fatalf("status=%d want 502", rw.Code)
-	}
+	assertClientDisconnectedUnwritten(t, rw, inspectErr)
 }
 
 func TestInspect_gateSkipUsesFailMode(t *testing.T) {
@@ -188,15 +190,15 @@ func TestInspect_gateSkipUsesFailMode(t *testing.T) {
 	}
 	defer client.Close()
 	first := httptest.NewRecorder()
-	if client.Inspect(first, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeOpen, "") {
+	if inspectForTest(t, client, first, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeOpen, "") {
 		t.Fatal("first 500 open must continue")
 	}
 	second := httptest.NewRecorder()
-	if client.Inspect(second, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeOpen, "") {
+	if inspectForTest(t, client, second, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeOpen, "") {
 		t.Fatal("gate skip open must continue")
 	}
 	closeRW := httptest.NewRecorder()
-	if !client.Inspect(closeRW, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeClose, "") {
+	if !inspectForTest(t, client, closeRW, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeClose, "") {
 		t.Fatal("gate skip close must write 502")
 	}
 	if closeRW.Code != http.StatusBadGateway {
@@ -217,14 +219,14 @@ func TestInspect_sidecarTransportErrorUsesFailMode(t *testing.T) {
 	}
 	defer client.Close()
 	openRW := httptest.NewRecorder()
-	if client.Inspect(openRW, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeOpen, "X-Remediation") {
+	if inspectForTest(t, client, openRW, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeOpen, "X-Remediation") {
 		t.Fatal("open transport error must continue")
 	}
 	if openRW.Header().Get("X-Remediation") != "" {
 		t.Fatal("fail-open must omit remediation header")
 	}
 	closeRW := httptest.NewRecorder()
-	if !client.Inspect(closeRW, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeClose, "X-Remediation") {
+	if !inspectForTest(t, client, closeRW, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeClose, "X-Remediation") {
 		t.Fatal("close transport error must write 502")
 	}
 	if closeRW.Code != http.StatusBadGateway {
@@ -261,18 +263,17 @@ func TestInspect_inboundCancelDoesNotTripGate(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil).WithContext(ctx)
 	done := make(chan struct{})
 	rw := httptest.NewRecorder()
+	var inspectErr error
 	go func() {
 		defer close(done)
-		_ = client.Inspect(rw, req, configuration.ModsecFailModeOpen, "")
+		_, inspectErr = client.Inspect(rw, req, configuration.ModsecFailModeOpen, "")
 	}()
 	<-started
 	cancel()
 	<-done
-	if rw.Code != http.StatusBadGateway {
-		t.Fatalf("status=%d want 502", rw.Code)
-	}
+	assertClientDisconnectedUnwritten(t, rw, inspectErr)
 	later := httptest.NewRecorder()
-	if client.Inspect(later, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeOpen, "") {
+	if inspectForTest(t, client, later, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeOpen, "") {
 		t.Fatal("later hop after cancel must still be admitted")
 	}
 	if sidecarHits != 2 {
@@ -295,12 +296,12 @@ func TestInspect_denyGetWithBodyAfterGateTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	if client.Inspect(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeOpen, "") {
+	if inspectForTest(t, client, httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.ModsecFailModeOpen, "") {
 		t.Fatal("first 500 open must continue")
 	}
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/", strings.NewReader("x"))
-	if !client.Inspect(rw, req, configuration.ModsecFailModeClose, "") {
+	if !inspectForTest(t, client, rw, req, configuration.ModsecFailModeClose, "") {
 		t.Fatal("GET with body must write 400")
 	}
 	if rw.Code != http.StatusBadRequest {
@@ -326,7 +327,7 @@ func TestInspect_doesNotAppendRemoteAddrToXFF(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
 	req.Header.Set("X-Forwarded-For", "203.0.113.9")
 	req.RemoteAddr = "192.0.2.1:1234"
-	if client.Inspect(httptest.NewRecorder(), req, configuration.ModsecFailModeOpen, "") {
+	if inspectForTest(t, client, httptest.NewRecorder(), req, configuration.ModsecFailModeOpen, "") {
 		t.Fatal("allow must continue")
 	}
 	if gotXFF != "203.0.113.9" {
@@ -345,7 +346,7 @@ func TestInspect_413OmitsRemediationHeader(t *testing.T) {
 	defer client.Close()
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("ab"))
-	if !client.Inspect(rw, req, configuration.ModsecFailModeClose, "X-Remediation") {
+	if !inspectForTest(t, client, rw, req, configuration.ModsecFailModeClose, "X-Remediation") {
 		t.Fatal("413 must write")
 	}
 	if rw.Header().Get("X-Remediation") != "" {
@@ -366,7 +367,7 @@ func TestInspect_restoresBodyForNext(t *testing.T) {
 	}
 	defer client.Close()
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("payload"))
-	if client.Inspect(httptest.NewRecorder(), req, configuration.ModsecFailModeOpen, "") {
+	if inspectForTest(t, client, httptest.NewRecorder(), req, configuration.ModsecFailModeOpen, "") {
 		t.Fatal("allow must continue")
 	}
 	got, _ := io.ReadAll(req.Body)
@@ -374,3 +375,115 @@ func TestInspect_restoresBodyForNext(t *testing.T) {
 		t.Fatalf("restored body=%q want payload", got)
 	}
 }
+
+// inspectForTest is Inspect for cases that must not end in a client-body error.
+func inspectForTest(t *testing.T, client *Client, rw http.ResponseWriter, req *http.Request, failMode, header string) bool {
+	t.Helper()
+	wrote, err := client.Inspect(rw, req, failMode, header)
+	if err != nil {
+		t.Fatalf("Inspect err=%v", err)
+	}
+	return wrote
+}
+
+func assertClientDisconnectedUnwritten(t *testing.T, rw *httptest.ResponseRecorder, err error) {
+	t.Helper()
+	if !errors.Is(err, wafhop.ErrClientDisconnected) {
+		t.Fatalf("err=%v want wafhop.ErrClientDisconnected", err)
+	}
+	if rw.Body.Len() != 0 || len(rw.Header()) != 0 {
+		t.Fatalf("Inspect must leave the response to the bouncer, got headers=%v body=%q", rw.Header(), rw.Body.String())
+	}
+}
+
+// A streamed HTTP/2 body is never buffered (gRPC would hang). A POST cannot be inspected, so failMode
+// decides; a GET is inspected on headers alone.
+func TestInspect_unreadableBodyFollowsAppsecRule(t *testing.T) {
+	sidecarBodies := []string{}
+	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got, _ := io.ReadAll(r.Body)
+		sidecarBodies = append(sidecarBodies, string(got))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer sidecar.Close()
+	cfg := testModsecConfig(sidecar.URL)
+	cfg.ModsecDenyVerbsWithBody = []string{}
+	client, err := New(cfg, slog.Default(), "test", "n", "k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	streamed := func(method string) *http.Request {
+		req := httptest.NewRequest(method, "http://example.com/", nil)
+		req.ProtoMajor = 2
+		req.ContentLength = -1
+		req.Body = io.NopCloser(&blockingReader{})
+		return req
+	}
+
+	closeRW := httptest.NewRecorder()
+	if !inspectForTest(t, client, closeRW, streamed(http.MethodPost), configuration.ModsecFailModeClose, "") || closeRW.Code != http.StatusBadGateway {
+		t.Fatalf("streamed POST on close: code=%d want 502", closeRW.Code)
+	}
+	if inspectForTest(t, client, httptest.NewRecorder(), streamed(http.MethodPost), configuration.ModsecFailModeOpen, "") {
+		t.Fatal("streamed POST on open must continue")
+	}
+	if inspectForTest(t, client, httptest.NewRecorder(), streamed(http.MethodGet), configuration.ModsecFailModeClose, "") {
+		t.Fatal("streamed GET must be inspected on headers and continue")
+	}
+	if len(sidecarBodies) != 2 || sidecarBodies[0] != "" || sidecarBodies[1] != "" {
+		t.Fatalf("sidecar must get headers only, bodies=%q", sidecarBodies)
+	}
+}
+
+// A client that resets mid-upload is the shared client-disconnected outcome, not a 502.
+func TestInspect_clientGoneMidBodyIsClientDisconnected(t *testing.T) {
+	client, err := New(testModsecConfig("http://127.0.0.1:1"), slog.Default(), "test", "n", "k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/", nil)
+	req.Body = io.NopCloser(io.MultiReader(strings.NewReader("part"), &errReader{err: io.ErrUnexpectedEOF}))
+	rw := httptest.NewRecorder()
+	_, inspectErr := client.Inspect(rw, req, configuration.ModsecFailModeClose, "")
+	assertClientDisconnectedUnwritten(t, rw, inspectErr)
+}
+
+// The sidecar copy carries no hop-by-hop header, so an HTTPS sidecar speaking HTTP/2 accepts a WebSocket handshake.
+func TestInspect_sidecarCopyOmitsHopByHop(t *testing.T) {
+	var seen http.Header
+	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = r.Header.Clone()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer sidecar.Close()
+	client, err := New(testModsecConfig(sidecar.URL), slog.Default(), "test", "n", "k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/ws", nil)
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Upgrade", "websocket")
+	req.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+	if inspectForTest(t, client, httptest.NewRecorder(), req, configuration.ModsecFailModeClose, "") {
+		t.Fatal("2xx must continue")
+	}
+	if seen.Get("Upgrade") != "" || seen.Get("Sec-WebSocket-Key") == "" {
+		t.Fatalf("sidecar headers=%v", seen)
+	}
+	if req.Header.Get("Upgrade") != "websocket" {
+		t.Fatal("the inbound request keeps its Upgrade header for next")
+	}
+}
+
+type blockingReader struct{}
+
+func (*blockingReader) Read([]byte) (int, error) {
+	select {}
+}
+
+type errReader struct{ err error }
+
+func (e *errReader) Read([]byte) (int, error) { return 0, e.err }
