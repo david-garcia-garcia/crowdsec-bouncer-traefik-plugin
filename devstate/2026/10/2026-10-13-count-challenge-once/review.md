@@ -99,3 +99,8 @@ head: 4042324ee95c8be6910ac766ba8ef52254cf11af
 phase: archive
 verdict: in progress
 head: ea80bf03eff90c981913c584357e59b038189865
+
+## implement (2026-11-15)
+phase: implement
+verdict: ready for review
+head: 0149af35e931268c16b8d9b5a03c87fdecc6452f
