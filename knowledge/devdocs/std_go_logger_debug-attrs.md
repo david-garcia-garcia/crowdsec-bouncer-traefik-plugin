@@ -45,7 +45,8 @@ b.log.Error("serveLAPI:Get", "ip", req.IPAddrString(), "error", lookupErr)
 ## Key files
 
 - `pkg/logger/logger.go` — `LevelTrace`, `Trace`, `ReplaceAttr` names
-- `pkg/bouncer/bouncer.go` — construct-time DEBUG `Bouncer initialized`, `ServeHTTP` and `serveLAPI` Trace
+- `pkg/bouncer/bouncer.go` — construct-time DEBUG `Bouncer initialized`, `ServeHTTP` Trace
+- `pkg/bouncer/bouncer_serve_lapi.go` — `serveLAPI` Trace
 - `pkg/bouncer/scope_trace.go` — `appendScopesGroup`
 
 ## Gotchas

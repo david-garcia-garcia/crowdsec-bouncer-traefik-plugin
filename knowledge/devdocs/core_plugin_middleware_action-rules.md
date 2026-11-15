@@ -42,7 +42,7 @@ b.next.ServeHTTP(rw, req.Request)
 
 - `pkg/httprule/action.go` (`ActionRule`, `NewActionSet`, `Fold`)
 - `pkg/configuration/configuration.go` (`BouncerActionRules`)
-- `pkg/bouncer/bouncer.go` (ServeHTTP)
+- `pkg/bouncer/bouncer.go` (`ServeHTTP`, `foldActionRules`)
 - `pkg/bouncer/remediation_header.go` (`headerReasonFromOrigin` prefix `plugin:rules:`)
 - `pkg/lapi/client_metrics.go` (`OriginPluginRules`)
 
