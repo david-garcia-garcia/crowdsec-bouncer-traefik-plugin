@@ -418,9 +418,12 @@ func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
 	}
 }
 
-// TestHandleNextServeHTTPAppsecBanStatus proves AppSec RateLimit() bans reach the client as 429.
+// TestHandleNextServeHTTPAppsecBanStatus proves an AppSec ban reaches the client with its http_status.
 // Upstream https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/421: the listener
-// answers 403 with {"action":"ban","http_status":429}. Every other ban status keeps remediationStatusCode.
+// answers 403 with {"action":"ban","http_status":429} for RateLimit(). Upstream
+// https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/436 relays any http_status from
+// 200 to 599 (SetReturnCode(), user_blocked_http_code). Zero, missing, or out-of-range values keep
+// remediationStatusCode.
 func TestHandleNextServeHTTPAppsecBanStatus(t *testing.T) {
 	tests := []struct {
 		name                  string
@@ -434,7 +437,14 @@ func TestHandleNextServeHTTPAppsecBanStatus(t *testing.T) {
 		{name: "rate limit wins over configured status", envelope: `{"action":"ban","http_status":429}`, method: http.MethodGet, remediationStatusCode: http.StatusServiceUnavailable, wantStatus: http.StatusTooManyRequests, wantBody: "<html>ban 192.0.2.10</html>"},
 		{name: "rate limit HEAD has no body", envelope: `{"action":"ban","http_status":429}`, method: http.MethodHead, remediationStatusCode: http.StatusForbidden, wantStatus: http.StatusTooManyRequests, wantBody: ""},
 		{name: "plain ban", envelope: `{"action":"ban","http_status":403}`, method: http.MethodGet, remediationStatusCode: http.StatusForbidden, wantStatus: http.StatusForbidden, wantBody: "<html>ban 192.0.2.10</html>"},
-		{name: "custom user code", envelope: `{"action":"ban","http_status":418}`, method: http.MethodGet, remediationStatusCode: http.StatusForbidden, wantStatus: http.StatusForbidden, wantBody: "<html>ban 192.0.2.10</html>"},
+		{name: "default 403 wins over configured status", envelope: `{"action":"ban","http_status":403}`, method: http.MethodGet, remediationStatusCode: http.StatusServiceUnavailable, wantStatus: http.StatusForbidden, wantBody: "<html>ban 192.0.2.10</html>"},
+		{name: "custom user code", envelope: `{"action":"ban","http_status":418}`, method: http.MethodGet, remediationStatusCode: http.StatusForbidden, wantStatus: http.StatusTeapot, wantBody: "<html>ban 192.0.2.10</html>"},
+		{name: "lowest relayed code", envelope: `{"action":"ban","http_status":200}`, method: http.MethodGet, remediationStatusCode: http.StatusForbidden, wantStatus: http.StatusOK, wantBody: "<html>ban 192.0.2.10</html>"},
+		{name: "highest relayed code", envelope: `{"action":"ban","http_status":599}`, method: http.MethodGet, remediationStatusCode: http.StatusForbidden, wantStatus: 599, wantBody: "<html>ban 192.0.2.10</html>"},
+		{name: "no content code has no body", envelope: `{"action":"ban","http_status":204}`, method: http.MethodGet, remediationStatusCode: http.StatusForbidden, wantStatus: http.StatusNoContent, wantBody: ""},
+		{name: "invalid user code", envelope: `{"action":"ban","http_status":99}`, method: http.MethodGet, remediationStatusCode: http.StatusForbidden, wantStatus: http.StatusForbidden, wantBody: "<html>ban 192.0.2.10</html>"},
+		{name: "informational code", envelope: `{"action":"ban","http_status":199}`, method: http.MethodGet, remediationStatusCode: http.StatusServiceUnavailable, wantStatus: http.StatusServiceUnavailable, wantBody: "<html>ban 192.0.2.10</html>"},
+		{name: "code above range", envelope: `{"action":"ban","http_status":600}`, method: http.MethodGet, remediationStatusCode: http.StatusServiceUnavailable, wantStatus: http.StatusServiceUnavailable, wantBody: "<html>ban 192.0.2.10</html>"},
 		{name: "missing http_status", envelope: `{"action":"ban"}`, method: http.MethodGet, remediationStatusCode: http.StatusServiceUnavailable, wantStatus: http.StatusServiceUnavailable, wantBody: "<html>ban 192.0.2.10</html>"},
 	}
 	banTemplate, err := template.New("ban").Parse("<html>ban {{.ClientIP}}</html>")

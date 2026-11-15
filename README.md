@@ -128,7 +128,7 @@ What the visitor gets for each CrowdSec remediation ([CrowdSec bouncers](https:/
 
 | Remediation | What the user gets |
 | ----------- | ------------------ |
-| `ban`       | A ban page (or an empty body) with status `bouncerRemediationStatusCode` (default 403). An AppSec ban whose `http_status` is 429, such as a CrowdSec `RateLimit()` block, keeps 429. |
+| `ban`       | A ban page (or an empty body) with status `bouncerRemediationStatusCode` (default 403). An AppSec ban keeps the `http_status` CrowdSec sends instead: 403 by default, 429 for a `RateLimit()` block, or the code set with `user_blocked_http_code` or `SetReturnCode()`. |
 | `captcha`   | A captcha page. Once solved, the visitor is redirected back to the page they asked for and is not challenged again for `captchaGracePeriodSeconds` (default 24 hours). See [examples/captcha](examples/captcha/README.md). |
 
 Captcha providers:
@@ -772,7 +772,7 @@ When Redis cannot be reached, ban (`true`) or let the request through (`false`).
 Response header that tells why a request was blocked or challenged. Empty disables it. See [See the verdict in access logs](#see-the-verdict-in-access-logs).
 
 **BouncerRemediationStatusCode** (int, default `403`)
-HTTP status for a ban. An AppSec ban whose `http_status` is 429 (CrowdSec `RateLimit()`, CrowdSec 1.8.2+) is answered with 429 whatever this value is, so clients can back off. Every other AppSec ban uses this value.
+HTTP status for a ban from the LAPI, a failure action, or an action rule. It does not set the status of an AppSec ban. An AppSec ban is answered with the `http_status` of the AppSec response when it is between 200 and 599. CrowdSec sets that value to 403 unless `user_blocked_http_code` or [SetReturnCode()](https://docs.crowdsec.net/docs/appsec/hooks/#on_match) changes it, and to 429 for a `RateLimit()` block (CrowdSec 1.8.2+). To change the status of AppSec bans, set `user_blocked_http_code` in the CrowdSec appsec-config. This value applies only when the AppSec response has no valid `http_status`. A 204 or 304 status is sent without the ban page.
 
 **BouncerTraceHeadersCustomName** (string, default `""`)
 Request header copied into the ban page as `{{ .TraceID }}`. See [Put a request id on the ban page](#put-a-request-id-on-the-ban-page).

@@ -379,13 +379,19 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientrequest.R
 }
 
 // appsecBanStatusCode is the client status for an AppSec ban.
-// CrowdSec RateLimit() bans carry http_status 429, which the client must see to back off.
-// Every other AppSec ban status keeps bouncerRemediationStatusCode.
+// CrowdSec always sends http_status on a ban: 429 for RateLimit(), the SetReturnCode() or
+// user_blocked_http_code value, else 403. A value from 200 to 599 is relayed as is.
+// Zero, missing, or out-of-range values keep bouncerRemediationStatusCode.
 func (b *Bouncer) appsecBanStatusCode(decision *appsec.Response) int {
-	if decision.HTTPStatus == http.StatusTooManyRequests {
-		return http.StatusTooManyRequests
+	if decision.HTTPStatus >= http.StatusOK && decision.HTTPStatus <= 599 {
+		return decision.HTTPStatus
 	}
 	return b.remediationStatusCode
+}
+
+// statusAllowsBody reports whether net/http lets a response with statusCode carry a body.
+func statusAllowsBody(statusCode int) bool {
+	return statusCode != http.StatusNoContent && statusCode != http.StatusNotModified
 }
 
 // handleBanStatusServeHTTP writes the operator ban template for this client with statusCode.
@@ -400,7 +406,7 @@ func (b *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req clientreq
 	rw.Header().Set("Content-Type", b.banTemplateContentType)
 	rw.Header().Set("Cache-Control", "no-cache, no-store")
 	rw.WriteHeader(statusCode)
-	if b.banTemplate == nil || req.Method == http.MethodHead {
+	if b.banTemplate == nil || req.Method == http.MethodHead || !statusAllowsBody(statusCode) {
 		return
 	}
 	templateData := map[string]string{
