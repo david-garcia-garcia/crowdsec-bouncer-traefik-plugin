@@ -25,6 +25,12 @@ When AppSec is in use for this request (the bouncer subscribed to AppSec and the
 - **THEN** the client status is 404
 - **AND** `next` is not called
 
+#### Scenario: Solved captcha action rule on a challenge path is 404
+- **WHEN** a captcha action rule matches a path under `/crowdsec-internal/challenge/`
+- **AND** AppSec allows the request and the visitor already holds a valid captcha gate cookie
+- **THEN** the client status is 404
+- **AND** `next` is not called
+
 ## MODIFIED Requirements
 
 ### Requirement: Structured AppSec JSON is parsed on the AppSec client

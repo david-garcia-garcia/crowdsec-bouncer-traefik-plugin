@@ -406,3 +406,28 @@ func TestAppsecCaptchaVerdict_markerPostOnChallengePathNeverReachesOrigin(t *tes
 		})
 	}
 }
+
+// TestAppsecChallengePath_solvedCaptchaRuleNeverReachesOrigin proves a captcha action rule
+// whose gate is already solved does not reopen the challenge prefix to origin.
+func TestAppsecChallengePath_solvedCaptchaRuleNeverReachesOrigin(t *testing.T) {
+	client := testSiteverifyCaptchaClient(t)
+	cookieValue := solveTestGateCookie(t, client)
+	b, next, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusOK, `{"action":"allow"}`), client)
+	b.actionRules = mustPathAction(t, "site", "^/", httprule.ActionCaptcha)
+
+	for _, target := range []string{"/crowdsec-internal/challenge/custom.js", "/protected"} {
+		next.called = false
+		req := httptest.NewRequest(http.MethodGet, "http://example.com"+target, nil)
+		req.AddCookie(&http.Cookie{Name: "crowdsec_captcha_gate", Value: cookieValue})
+		rw := httptest.NewRecorder()
+		continueAfterLAPIForTest(b, rw, testClientRequest(req, testCaptchaRemoteIP))
+
+		onChallengePath := strings.HasPrefix(target, "/crowdsec-internal/challenge/")
+		if next.called == onChallengePath {
+			t.Fatalf("%s: next called=%v, want %v", target, next.called, !onChallengePath)
+		}
+		if onChallengePath && rw.Code != http.StatusNotFound {
+			t.Fatalf("%s: status=%d want 404", target, rw.Code)
+		}
+	}
+}
