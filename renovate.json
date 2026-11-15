@@ -36,10 +36,12 @@
       "datasourceTemplate": "github-tags"
     },
     {
-      "description": "Plugin tag cloned by the init container in the Traefik Helm values (--branch=vX)",
+      "description": "Plugin self-pin in the Traefik Helm values (version: \"vX\")",
       "customType": "regex",
       "managerFilePatterns": ["/^examples/kubernetes/traefik/values\\.ya?ml$/"],
-      "matchStrings": ["--branch=(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"],
+      "matchStrings": [
+        "version:\\s*\"(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)\""
+      ],
       "depNameTemplate": "david-garcia-garcia/crowdsec-bouncer-traefik-plugin",
       "datasourceTemplate": "github-tags"
     },

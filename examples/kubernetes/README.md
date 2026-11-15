@@ -13,7 +13,6 @@ Run all the commands from this directory.
 
 - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) and [Helm](https://helm.sh/docs/intro/install/)
 - A cluster whose container runtime is containerd: [kind](https://kind.sigs.k8s.io/), k3s, k3d, `minikube start --container-runtime=containerd` and most managed clusters. If your nodes run Docker, set `container_runtime: docker` in `crowdsec/values.yml`, otherwise CrowdSec cannot parse the Traefik logs.
-- Outbound access to GitHub from the cluster: Traefik's init container clones the plugin from it.
 
 With kind:
 
@@ -55,7 +54,7 @@ kubectl -n traefik rollout status deployment/traefik
 
 What `traefik/values.yml` sets:
 
-- **The plugin, as a local plugin.** The Traefik plugin catalog does not serve this fork, so `experimental.plugins` cannot download it. Instead, the `fetch-bouncer-plugin` init container clones the release tag given in its `--branch` argument into an `emptyDir`, and `experimental.localPlugins` mounts it at `/plugins-local/src/github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin`. To try another version, change the tag. If the cluster cannot reach GitHub, put the sources in any other volume and point `volumeName` at it.
+- `experimental.plugins` downloads the plugin from the Traefik plugin catalog when Traefik starts.
 - `volumes` mounts the `crowdsec-bouncer-key` secret in `/etc/traefik/crowdsec`.
 - `accessLog` writes JSON access logs for the CrowdSec agent. It keeps the `User-Agent` header, which the `crowdsecurity/traefik` parser reads, and drops the others so that cookies and `Authorization` headers stay out of the logs.
 - `externalTrafficPolicy: Local` keeps the client IP on the LoadBalancer service. With the default `Cluster` policy, nodes rewrite the source address and every request looks like it comes from a node. If Traefik sits behind another proxy or a CDN, see `bouncerForwardedHeadersTrustedIps` in the [main README](../../README.md) and [examples/behind-proxy](../behind-proxy/README.md).
@@ -99,11 +98,10 @@ kubectl -n crowdsec exec deployment/crowdsec-lapi -- cscli bouncers list
 kubectl -n crowdsec exec daemonset/crowdsec-agent -- cscli metrics show acquisition parsers
 ```
 
-Read the Traefik logs, and the init container's if the plugin does not load:
+Read the Traefik logs:
 
 ```bash
 kubectl -n traefik logs deployment/traefik -f
-kubectl -n traefik logs deployment/traefik -c fetch-bouncer-plugin
 ```
 
 Open the Traefik dashboard at [localhost:8080/dashboard/](http://localhost:8080/dashboard/):
