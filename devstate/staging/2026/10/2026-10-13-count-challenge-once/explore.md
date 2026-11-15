@@ -23,6 +23,17 @@ Outside facts: `knowledge/research/ext_crowdsec_appsec_bot-detection/` (callback
 - Rejected: reopen/copy closed PR 195 (wrong base `main`, reimplemented JSON parse). Rejected: copy upstream PR 403. Rejected: a new AppSec JSON parser. Rejected: skip inside `recordDropped` (would affect ban/captcha). Rejected: challenge-path 404 (out of scope).
 - Regression: challenge envelope on `/protected` increments `TestDroppedCount` by 1; same envelope on `/crowdsec-internal/challenge/submit` does not.
 
+Folded from PR 196 (`devstate/2026/10/2026-10-13-terminate-challenge-paths/explore.md`):
+
+- Seam: `serveAppSec`, after AppSec did not write and there is no captcha-rule fallthrough, when `subscribeAppSec && !SkipAppsec` and `URL.Path` has prefix `/crowdsec-internal/challenge/`: write 404 and return true. `ServeHTTP` then does not call `next`.
+- Keep `applyAppsecServeHTTP` as the writer of relay/ban/captcha-failure. Do not 404 there, so a matched captcha action rule still serves the plugin gate.
+- Paths outside the prefix stay allow → `next`. Trusted IPs stay the existing skip in `ServeHTTP`.
+- Live contract: `openspec/specs/core_plugin_appsec_bot-detection/spec.md` (MODIFIED: allow/empty 200 must not call `next` on the prefix). Also fold a carve-out into `openspec/specs/core_plugin_appsec_failure-action/spec.md` (passthrough continues to `next` except this prefix when AppSec was in use). README bot-detection sentence.
+- Rejected: copy maxlerebourg PR 403 patch (different tree: root `bouncer.go`; ticket forbids copy).
+- Rejected: 404 inside `applyAppsecServeHTTP` (would block captcha-rule fallthrough).
+- Rejected: new trusted-IP exception (ticket: reuse the existing skip).
+- Shared helper: both parts use one prefix constant `crowdsecChallengeCallbackPrefix` and `isCrowdsecChallengeCallbackPath` in `pkg/bouncer/bouncer.go`.
+
 ## Open questions
 
 - Q: Which request path field implements the challenge-callback prefix?
@@ -40,3 +51,28 @@ Outside facts: `knowledge/research/ext_crowdsec_appsec_bot-detection/` (callback
   Decision: assumed — skip is only in handleAppsecResponseServeHTTP and is path-based. Ban and pkg/captcha never enter that function so they stay counted. AppSec captcha on a normal path still counts. A captcha envelope on the callback prefix would skip (same shared relay); that case is not in the regression.
   By: explore
   Update (implement, after merging master #206): an AppSec `captcha` no longer reaches the relay; it goes to the captcha gate (`handleCaptchaKindServeHTTP`), which keeps its own `recordDropped`. Only `challenge` and bodied unknown actions reach the relay, so the path skip applies to those alone.
+
+- Q: (folded from PR 196) Does the prefix include exact `/crowdsec-internal/challenge` with no trailing slash?
+  Rank: additive asked — new membership test this change adds; Desired names `/crowdsec-internal/challenge/`
+  Decision: assumed — `strings.HasPrefix(path, "/crowdsec-internal/challenge/")` as written. The regression path is `custom.js` under that slash.
+  By: explore
+
+- Q: (folded from PR 196) Where does 404 run so a captcha action rule still writes the plugin gate?
+  Rank: bounded asked — existing `applyAppsecServeHTTP` has 2 production callers in `pkg/bouncer`; Desired says captcha envelope still written as today
+  Decision: resolved — 404 in `serveAppSec` after the captcha-rule branch, not inside `applyAppsecServeHTTP`.
+  By: explore
+
+- Q: (folded from PR 196) Does SkipAppsec on a challenge path 404 or call `next`?
+  Rank: additive asked — Desired says "when AppSec is in use for this request"
+  Decision: assumed — SkipAppsec is not AppSec in use; still `next`. No extra skip-rule exception.
+  By: explore
+
+- Q: (folded from PR 196) Which 404 helper?
+  Rank: additive asked — Desired says respond 404
+  Decision: assumed — `http.NotFound(rw, req.Request)` (stdlib 404 + Not Found body).
+  By: explore
+
+- Q: (folded from PR 196) Who owns client trust for this path?
+  Rank: additive asked — identity already chosen before AppSec
+  Decision: resolved — reuse `trustedClients.Checker` skip in `ServeHTTP`; do not re-derive trust here.
+  By: explore

@@ -70,6 +70,7 @@ const msgCaptchaUnsubscribed = "crowdsec bouncer captcha unsubscribed"
 const originAppsec = "appsec"
 
 // crowdsecChallengeCallbackPrefix is the CrowdSec 1.8 bot-detection script and submit path prefix.
+// AppSec must answer these paths: an unanswered result is 404, never origin, and a relay here is not a new drop.
 const crowdsecChallengeCallbackPrefix = "/crowdsec-internal/challenge/"
 
 // New returns a per-router handler. Clients arrive later through ReceiveLAPI, ReceiveAppSec, and ReceiveCaptcha.
@@ -298,15 +299,6 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 	return true
 }
 
-// appsecChallengePathPrefix is the CrowdSec bot-detection callback prefix.
-// AppSec must answer these paths; unanswered results must not reach origin.
-const appsecChallengePathPrefix = "/crowdsec-internal/challenge/"
-
-// isAppsecChallengePath reports whether this URL path is under the CrowdSec challenge prefix.
-func isAppsecChallengePath(path string) bool {
-	return strings.HasPrefix(path, appsecChallengePathPrefix)
-}
-
 // serveAppSec reports whether AppSec or a captcha rule wrote the response.
 // A cleared captcha gate or a widget asset did not write. False means ServeHTTP calls next.
 // When AppSec is in use and nothing wrote, the challenge prefix gets 404 so origin is not called.
@@ -316,7 +308,7 @@ func (b *Bouncer) serveAppSec(rw http.ResponseWriter, req clientrequest.Request,
 	}
 	// Nothing answered (allow, failure-action passthrough, or a cleared captcha gate):
 	// the challenge prefix still must not reach origin.
-	if !match.SkipAppsec && b.subscribeAppSec && isAppsecChallengePath(req.URL.Path) {
+	if !match.SkipAppsec && b.subscribeAppSec && isCrowdsecChallengeCallbackPath(req.URL.Path) {
 		http.NotFound(rw, req.Request)
 		return true
 	}

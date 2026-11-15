@@ -45,3 +45,14 @@ On master, `pkg/bouncer/bouncer.go` `handleAppsecResponseServeHTTP` calls `recor
 ## Tensions
 - Spec vs ticket: `core_plugin_appsec_bot-detection` currently requires `blockedRequests` SHALL increment on every challenge relay; this ticket asks to carve out `/crowdsec-internal/challenge/` so a solve is one drop, not four.
 - Closed PR 195 targeted `main` and reimplemented challenge JSON parsing that master already has; this run MUST NOT reopen it and MUST target `master`.
+
+## Folded in: PR 197 also carries PR 196
+Requested by the owner in chat on 2026-11-15: fold https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/196 (`2026-10-13-terminate-challenge-paths`) into this PR; both act on the `/crowdsec-internal/challenge/` prefix. That run's own requirement stays at `devstate/2026/10/2026-10-13-terminate-challenge-paths/requirement.md`. Its Desired, verbatim:
+
+When AppSec is in use for this request and the URL path is under `/crowdsec-internal/challenge/`, and AppSec did not itself produce a response the bouncer is relaying or a ban the bouncer is writing, respond 404 and do not call `next`. A real challenge, captcha, or ban envelope for that path is still written as today. Paths outside the prefix are unchanged. Do not add a new trusted-IP exception; trusted IPs that already skip the bouncer before this code stay as they are.
+
+Update the live spec and the README sentence that says the prefix is safe whenever the middleware covers the host.
+
+Regression test: AppSec HTTP 200 on `/crowdsec-internal/challenge/custom.js` is 404 and `next` is not called. A normal path that AppSec allows still calls `next`. Run the tests on this machine.
+
+Upstream source for that part: https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403 point 4. Do not copy that patch.
