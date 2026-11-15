@@ -152,7 +152,7 @@ This plugin supports [AppSec](https://doc.crowdsec.net/docs/next/appsec/intro/),
 
 AppSec requires CrowdSec 1.6.0 or later.
 
-**Bot detection (CrowdSec 1.8+).** CrowdSec can answer a suspicious request with a JavaScript challenge page instead of a ban. This works out of the box once AppSec is enabled. The challenge page calls back to URLs under `/crowdsec-internal/challenge/`, and those calls must go through this middleware so CrowdSec can verify them. The proof is POSTed to `/crowdsec-internal/challenge/submit` and must reach AppSec with the full form. The default `appsecBodyLimit` of 10MB is enough. A smaller positive limit cuts the proof short. `0` means no limit: the whole body is sent. If the middleware already covers every path of the host, you are done. If it only covers some paths (for example `/api`), add a router for ``PathPrefix(`/crowdsec-internal/challenge`)`` with the same middleware. See [CrowdSec bot detection](https://docs.crowdsec.net/docs/next/appsec/bot_detection/intro.md).
+**Bot detection (CrowdSec 1.8+).** CrowdSec can answer a suspicious request with a JavaScript challenge page instead of a ban. This works out of the box once AppSec is enabled. The challenge page calls back to URLs under `/crowdsec-internal/challenge/`, and those calls must go through this middleware so CrowdSec can verify them. The proof is POSTed to `/crowdsec-internal/challenge/submit` and must reach AppSec with the full form. The default `appsecBodyLimit` of 10MB is enough. A smaller positive limit cuts the proof short. `0` means no limit: the whole body is sent. If the middleware already covers every path of the host, you are done. If it only covers some paths (for example `/api`), add a router for ``PathPrefix(`/crowdsec-internal/challenge`)`` with the same middleware. A Content-Security-Policy set by a `headers` middleware listed before this one breaks the challenge: see [Keep a Content-Security-Policy without breaking the challenge or the captcha](#keep-a-content-security-policy-without-breaking-the-challenge-or-the-captcha). See [CrowdSec bot detection](https://docs.crowdsec.net/docs/next/appsec/bot_detection/intro.md).
 
 **Captcha from AppSec.** An AppSec rule or hook can ask for a captcha instead of a ban (`SetRemediation("captcha")`). CrowdSec sends no page with that answer, so the router serves its own captcha, the same one it uses for a CrowdSec captcha decision. Configure a captcha provider on that router; without one, the visitor gets the ban page (`ban:captcha-downgrade`). A solved captcha lets the visitor through AppSec captchas for the grace period; AppSec bans still apply. The captcha form posts back to the same URL and goes through AppSec first. If AppSec lets that POST through, the plugin still recognises it by the hidden field `crowdsec_captcha_challenge=v1` and checks the answer, so a replaced captcha template must keep that field. AppSec actions this plugin does not know, sent without a page, are served as a ban (`ban:appsec-action-empty`).
 
@@ -476,6 +476,46 @@ bouncerOriginBasedDecisionRemap:
 - Rules do not chain: with `ban: captcha` and `captcha: pass`, a ban becomes a captcha, not a pass.
 
 The router needs a captcha configured; otherwise the remapped captcha is served as a ban. Two routers sharing one LAPI connection can remap differently.
+
+### Keep a Content-Security-Policy without breaking the challenge or the captcha
+
+Two pages served by this plugin need scripts that a strict Content-Security-Policy (CSP) blocks:
+
+- The AppSec bot-detection challenge runs inline scripts and a `blob:` worker. CrowdSec sends the CSP it needs with every challenge, and the plugin replaces any CSP already on the response with it, as the [challenge protocol](https://docs.crowdsec.net/docs/next/appsec/bot_detection/challenge_protocol/) requires.
+- The captcha page loads the provider's script (hCaptcha, reCAPTCHA, Turnstile, …) from the provider's domain and runs inline scripts.
+
+If your policy forbids them, the visitor gets a blank page or a captcha that never shows, and the browser console reports `Refused to execute inline script` or `Refused to load the script`. The challenge or the captcha can never be solved.
+
+Where you list Traefik's `headers` middleware decides whether your policy reaches these pages. That middleware does not set its response headers when the request passes through it. It sets them when the response is written, on top of whatever the middlewares after it set. This holds for `contentSecurityPolicy` and for `customResponseHeaders`.
+
+- Listed **before** this plugin, it overwrites the challenge's CSP and also applies to the captcha page. No setting of this plugin can prevent it.
+- Listed **after** this plugin, it never runs when the plugin answers (ban, captcha, challenge), so those pages get none of its headers. Responses from your application still get them.
+
+Put your CSP in its own `headers` middleware listed after this plugin. Your other security headers (HSTS, `X-Frame-Options`, …) can stay in one listed before it, so they reach every page:
+
+```yaml
+http:
+  routers:
+    my-router:
+      rule: Host(`app.example`)
+      service: my-service
+      middlewares:
+        - security-headers # before: every response, plugin pages included
+        - crowdsec
+        - csp # after: only responses from your application
+  middlewares:
+    security-headers:
+      headers:
+        frameDeny: true
+        stsSeconds: 31536000
+    csp:
+      headers:
+        contentSecurityPolicy: "default-src 'self'"
+```
+
+The ban and captcha pages then have no CSP. To give them one, put a `<meta http-equiv="Content-Security-Policy">` tag in your own template (`bouncerBanFilePath`, `captchaFilePath`). On the captcha page it must allow the provider's script and the inline scripts.
+
+CrowdSec describes the same conflict, and the nginx setup, in [enabling bot detection](https://docs.crowdsec.net/docs/next/appsec/bot_detection/enable#content-security-policy).
 
 ### Let a LAN or VPN through
 
