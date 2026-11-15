@@ -1,0 +1,16 @@
+issueKey: 2026-11-14-lapi-multi-client-ticker
+jobName: 2026-11-14-lapi-multi-client-ticker
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: isolate-lapi-poll-loops-across-clients
+pr: { id: 208, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/208 }
+qualify: qualified-with-gaps
+src: f467f4152c5d07ce
