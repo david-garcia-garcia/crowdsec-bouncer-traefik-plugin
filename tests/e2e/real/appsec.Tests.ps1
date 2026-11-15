@@ -99,4 +99,36 @@ Describe "CrowdSec Bouncer Real AppSec Tests" {
             $response.StatusCode | Should -Be 403
         }
     }
+
+    # CrowdSec AppSec RateLimit() (config/appsec-configs/e2e-rate-limit.yaml, 2/m per client IP).
+    # Upstream maxlerebourg/crowdsec-bouncer-traefik-plugin#421: the client must see 429, not 403.
+    Context "AppSec RateLimit()" -Tag "appsec" {
+        BeforeEach {
+            Clear-TraefikAccessLogs
+            Remove-AllTestDecisions
+        }
+
+        It "Should answer the request over the limit with 429 and the ban page" {
+            # The bucket lives in CrowdSec memory per client IP; a fresh IP per run starts full.
+            $rateLimitIP = "172.19.$(Get-Random -Minimum 100 -Maximum 250).$(Get-Random -Minimum 1 -Maximum 250)"
+
+            # Requests under the limit reach the origin.
+            foreach ($attempt in 1..2) {
+                $allowed = Test-HttpRequest -Endpoint "/ratelimit" -IP $rateLimitIP -TraefikUrl $script:TraefikUrl
+                $allowed.StatusCode | Should -Be 200 -Because "request $attempt of 2 is under the 2/m budget"
+                $allowed.Content | Should -Match "Hostname:"
+            }
+
+            # The next request is over the limit: the bouncer keeps AppSec's 429 on the operator ban page.
+            $blocked = Test-HttpRequest -Endpoint "/ratelimit" -IP $rateLimitIP -TraefikUrl $script:TraefikUrl
+            $blocked.StatusCode | Should -Be 429 -Because "AppSec RateLimit() bans carry http_status 429; content=$($blocked.Content)"
+            $blocked.Content | Should -Match "E2E_CUSTOM_BAN_PAGE_MARKER"
+            [string]$blocked.Headers["X-Crowdsec-Remediation"] | Should -Be "ban:appsec"
+        }
+
+        It "Should keep bouncerRemediationStatusCode for a CRS ban on the same listener" {
+            $response = Test-HttpRequest -Endpoint "/ratelimit?id=1%27%20OR%20%271%27%3D%271" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl
+            $response.StatusCode | Should -Be 403 -Because "only an AppSec ban with http_status 429 changes the status"
+        }
+    }
 }

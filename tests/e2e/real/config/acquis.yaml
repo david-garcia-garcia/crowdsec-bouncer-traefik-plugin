@@ -1,5 +1,7 @@
 listen_addr: 0.0.0.0:7422
-appsec_config: crowdsecurity/crs-inband
+appsec_configs:
+  - crowdsecurity/crs-inband
+  - e2e/rate-limit
 name: e2eAppSec
 source: appsec
 labels:

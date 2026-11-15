@@ -357,8 +357,23 @@ func (b *Bouncer) recordDropped(req clientrequest.Request, origin, remediation s
 	}
 }
 
-// handleBanServeHTTP writes the operator ban template for this client.
+// handleBanServeHTTP writes the operator ban template for this client with bouncerRemediationStatusCode.
 func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientrequest.Request, reason, headerReason, origin string) {
+	b.handleBanStatusServeHTTP(rw, req, reason, headerReason, origin, b.remediationStatusCode)
+}
+
+// appsecBanStatusCode is the client status for an AppSec ban.
+// CrowdSec RateLimit() bans carry http_status 429, which the client must see to back off.
+// Every other AppSec ban status keeps bouncerRemediationStatusCode.
+func (b *Bouncer) appsecBanStatusCode(decision *appsec.Response) int {
+	if decision.HTTPStatus == http.StatusTooManyRequests {
+		return http.StatusTooManyRequests
+	}
+	return b.remediationStatusCode
+}
+
+// handleBanStatusServeHTTP writes the operator ban template for this client with statusCode.
+func (b *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req clientrequest.Request, reason, headerReason, origin string, statusCode int) {
 	b.recordDropped(req, origin, "ban")
 
 	if b.remediationCustomHeader != "" {
@@ -368,7 +383,7 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientrequest.R
 	}
 	rw.Header().Set("Content-Type", b.banTemplateContentType)
 	rw.Header().Set("Cache-Control", "no-cache, no-store")
-	rw.WriteHeader(b.remediationStatusCode)
+	rw.WriteHeader(statusCode)
 	if b.banTemplate == nil || req.Method == http.MethodHead {
 		return
 	}
@@ -512,7 +527,7 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientrequest
 	switch decision.Action {
 	case appsec.ActionBan:
 		b.warnCaptchaSuperseded(req, match)
-		b.handleBanServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsec, originAppsec)
+		b.handleBanStatusServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsec, originAppsec, b.appsecBanStatusCode(decision))
 		return true
 	case appsec.ActionCaptcha:
 		// CrowdSec sends captcha without a page: the bouncer renders its own captcha.
