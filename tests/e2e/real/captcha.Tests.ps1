@@ -294,5 +294,69 @@ Describe "CrowdSec Bouncer Captcha Remediation Tests" {
             $sqli.Content | Should -Not -Match "E2E captcha challenge"
         }
     }
+
+    # CrowdSec answers SetRemediation("captcha") with {"action":"captcha","http_status":403}
+    # and no page (config/appsec-configs/e2e-captcha-verdict.yaml). The router serves its own captcha.
+    Context "AppSec captcha verdict" -Tag "captcha", "appsec" {
+        BeforeEach {
+            Clear-TraefikAccessLogs
+            Remove-AllTestDecisions
+        }
+
+        It "Should serve the router captcha and pass once solved when AppSec asks on every request" {
+            $ip = "172.19.0.52"
+
+            $page = Test-HttpRequest -Endpoint "/captcha-appsec/verdict" -IP $ip -TraefikUrl $script:TraefikUrl
+            $page.StatusCode | Should -Be 200 -Because "the router renders its captcha page; content=$($page.Content)"
+            $page.Content | Should -Match "E2E captcha challenge"
+            [string]$page.Headers["X-Crowdsec-Remediation"] | Should -Be "captcha:appsec"
+
+            # AppSec answers the form POST with captcha again; the gate validates the token.
+            $formHeaders = @{ "Content-Type" = "application/x-www-form-urlencoded" }
+            $solve = Test-HttpRequest -Endpoint "/captcha-appsec/verdict" -IP $ip -TraefikUrl $script:TraefikUrl `
+                -Method POST -Body "crowdsec_captcha_challenge=v1&dummy-captcha-response=ok" -ExtraHeaders $formHeaders `
+                -MaximumRedirection 0
+            $solve.StatusCode | Should -Be 302
+            [string]$solve.Headers["Set-Cookie"] | Should -Match "crowdsec_captcha_gate="
+            [string]$solve.Headers["X-Crowdsec-Remediation"] | Should -Be "captcha:solved"
+            $cookieHeaders = @{ Cookie = (([string]$solve.Headers["Set-Cookie"]) -split ';')[0].Trim() }
+
+            # AppSec still says captcha; the gate cookie lets the request through.
+            $passed = Test-HttpRequest -Endpoint "/captcha-appsec/verdict" -IP $ip -TraefikUrl $script:TraefikUrl `
+                -ExtraHeaders $cookieHeaders
+            $passed.StatusCode | Should -Be 200
+            $passed.Content | Should -Match "Hostname:"
+        }
+
+        It "Should validate the captcha form POST that AppSec lets through" {
+            $ip = "172.19.0.53"
+
+            $page = Test-HttpRequest -Endpoint "/captcha-appsec/verdict-get" -IP $ip -TraefikUrl $script:TraefikUrl
+            $page.StatusCode | Should -Be 200
+            $page.Content | Should -Match "E2E captcha challenge"
+            [string]$page.Headers["X-Crowdsec-Remediation"] | Should -Be "captcha:appsec"
+
+            # The hook asks on GET only: CrowdSec allows this POST, and the challenge marker keeps it off the origin.
+            $formHeaders = @{ "Content-Type" = "application/x-www-form-urlencoded" }
+            $solve = Test-HttpRequest -Endpoint "/captcha-appsec/verdict-get" -IP $ip -TraefikUrl $script:TraefikUrl `
+                -Method POST -Body "crowdsec_captcha_challenge=v1&dummy-captcha-response=ok" -ExtraHeaders $formHeaders `
+                -MaximumRedirection 0
+            $solve.StatusCode | Should -Be 302 -Because "the plugin validates the answer instead of forwarding it; content=$($solve.Content)"
+            $solve.Content | Should -Not -Match "Hostname:"
+            [string]$solve.Headers["Set-Cookie"] | Should -Match "crowdsec_captcha_gate="
+            $cookieHeaders = @{ Cookie = (([string]$solve.Headers["Set-Cookie"]) -split ';')[0].Trim() }
+
+            $passed = Test-HttpRequest -Endpoint "/captcha-appsec/verdict-get" -IP $ip -TraefikUrl $script:TraefikUrl `
+                -ExtraHeaders $cookieHeaders
+            $passed.StatusCode | Should -Be 200
+            $passed.Content | Should -Match "Hostname:"
+        }
+
+        It "Should ban when the router has no captcha" {
+            $response = Test-HttpRequest -Endpoint "/waf-only/captcha-verdict" -IP "172.19.0.54" -TraefikUrl $script:TraefikUrl
+            $response.StatusCode | Should -Be 403 -Because "no captcha on /waf-only downgrades the AppSec captcha to a ban"
+            $response.Content | Should -Not -Match "E2E captcha challenge"
+        }
+    }
 }
 

@@ -606,6 +606,7 @@ services:
       - "./acquis.d:/etc/crowdsec/acquis.d:ro"
       - "./appsec-configs/e2e-origin-scheme-grant.yaml:/etc/crowdsec/appsec-configs/e2e-origin-scheme-grant.yaml:ro"
       - "./appsec-configs/e2e-rate-limit.yaml:/etc/crowdsec/appsec-configs/e2e-rate-limit.yaml:ro"
+      - "./appsec-configs/e2e-captcha-verdict.yaml:/etc/crowdsec/appsec-configs/e2e-captcha-verdict.yaml:ro"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.crowdsec-challenge.rule=PathPrefix(`/crowdsec-internal/challenge`)"
