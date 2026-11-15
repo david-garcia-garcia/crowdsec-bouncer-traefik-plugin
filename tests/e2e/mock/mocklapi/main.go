@@ -230,6 +230,12 @@ func main() {
 					_, _ = w.Write([]byte(`{"action":"tarpit","http_status":403}`))
 					return
 				}
+				// A ban with SetReturnCode(418): the bouncer answers with that status.
+				if strings.Contains(uri, "appsec-418") {
+					w.WriteHeader(http.StatusForbidden)
+					_, _ = w.Write([]byte(`{"action":"ban","http_status":418}`))
+					return
+				}
 				if strings.Contains(uri, "challenge") {
 					w.WriteHeader(http.StatusForbidden)
 					_, _ = w.Write([]byte(`{"action":"challenge","http_status":200,"user_body_content":"<html>e2e-challenge</html>","user_cookies":["__crowdsec_challenge=e2e; Path=/; HttpOnly"],"user_headers":{"Content-Type":["text/html"]}}`))

@@ -13,7 +13,7 @@ description: How Traefik New reclaims a LAPI Client, an AppSec Client, and a cap
 ## Ban page
 priority: normal
 local: core_plugin_middleware_ban-page.md
-description: How handleBanServeHTTP and handleBanStatusServeHTTP write the operator ban response (status, including the AppSec 429 exception, Content-Type, Cache-Control, optional template).
+description: How handleBanServeHTTP and handleBanStatusServeHTTP write the operator ban response (status, including the relayed AppSec ban http_status, Content-Type, Cache-Control, optional template).
 
 ## Instance slots
 priority: normal

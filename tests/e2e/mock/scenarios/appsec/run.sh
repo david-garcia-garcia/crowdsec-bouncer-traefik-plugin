@@ -19,6 +19,9 @@ body() {
   echo "[$SCENARIO] request that return 403 must be blocked (AppSec 403)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo/403" 403 -H "X-Forwarded-For: 1.2.3.4"
 
+  echo "[$SCENARIO] AppSec ban with http_status 418 (SetReturnCode) is answered with 418"
+  assert_status "http://127.0.0.1:${WEB_PORT}/foo/appsec-418" 418 -H "X-Forwarded-For: 1.2.3.4"
+
   echo "[$SCENARIO] structured challenge JSON is relayed (status/body/cookie)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo/challenge" 200 -H "X-Forwarded-For: 1.2.3.4"
   assert_body_contains "http://127.0.0.1:${WEB_PORT}/foo/challenge" "e2e-challenge" -H "X-Forwarded-For: 1.2.3.4"
