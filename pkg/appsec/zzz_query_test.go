@@ -37,7 +37,8 @@ func Test_appsecQuery_clientDisconnected(t *testing.T) {
 			assertClientDisconnectedQuery(t, goneCase.err, configuration.FailureActionPassthrough)
 		})
 	}
-	t.Run("unclassified read error keeps GetBody wrap", assertUnclassifiedBodyReadStillGetBody)
+	t.Run("any read error with a canceled request context disconnects", assertCanceledContextReadErrIsDisconnect)
+	t.Run("unclassified read error with a live context is ErrClientBodyRead", assertUnclassifiedBodyReadIsClientBodyRead)
 }
 
 func Test_isBodyUnreadable(t *testing.T) {

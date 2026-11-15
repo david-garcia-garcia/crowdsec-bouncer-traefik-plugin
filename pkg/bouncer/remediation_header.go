@@ -25,6 +25,7 @@ const (
 	headerReasonCaptchaDowngrade     = "captcha-downgrade"
 	headerReasonChallenge            = "challenge"
 	headerReasonClientDisconnected   = "client-disconnected"
+	headerReasonClientBodyRead       = "client-body-read"
 
 	listsHeaderPrefix = "lists_"
 )

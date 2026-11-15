@@ -3,6 +3,7 @@ package bouncer
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"net"
 	"net/http"
@@ -753,6 +754,92 @@ func TestHandleNextServeHTTP_clientDisconnected(t *testing.T) {
 			t.Fatalf("INFO log should be empty, got %s", infoBuf.String())
 		}
 	})
+}
+
+// newBodyReadTestBouncer is a bouncer with AppSec and LAPI metrics whose origin and AppSec hits are counted.
+func newBodyReadTestBouncer(t *testing.T, failureAction string) (*Bouncer, *lapi.Client, *bool, *int) {
+	t.Helper()
+	appsecHits := new(int)
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		*appsecHits++
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(appsecServer.Close)
+	appsecURL, err := url.Parse(appsecServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lapiClient, _ := lapi.NewTestClient(logger.New("ERROR", ""))
+	lapi.AttachTestMetricsReporter(lapiClient)
+	nextCalled := new(bool)
+	b := &Bouncer{
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			*nextCalled = true
+		}),
+		appsecFailureAction:     failureAction,
+		remediationStatusCode:   http.StatusForbidden,
+		remediationCustomHeader: "X-Remediation",
+		log:                     logger.New("ERROR", ""),
+	}
+	bindTestLAPI(b, lapiClient)
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	return b, lapiClient, nextCalled, appsecHits
+}
+
+// TestHandleNextServeHTTP_clientBodyRead covers upstream PR #401: a client body that cannot be read
+// whole while the client is still connected is answered 400, never a ban, whatever the failure action.
+func TestHandleNextServeHTTP_clientBodyRead(t *testing.T) {
+	for _, failureAction := range []string{configuration.FailureActionBan, configuration.FailureActionPassthrough, configuration.FailureActionCaptcha} {
+		t.Run(failureAction, func(t *testing.T) {
+			b, lapiClient, nextCalled, appsecHits := newBodyReadTestBouncer(t, failureAction)
+			req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", failingBodyForDisconnectTest{err: errors.New("i/o timeout")})
+			req.ContentLength = 100
+			rw := httptest.NewRecorder()
+			continueAfterLAPIForTest(b, rw, testClientRequest(req, "192.0.2.10"))
+			if *nextCalled {
+				t.Fatal("origin must not run when the client body could not be read")
+			}
+			if *appsecHits != 0 {
+				t.Fatalf("AppSec called %d times, want 0", *appsecHits)
+			}
+			if rw.Code != http.StatusBadRequest {
+				t.Fatalf("status=%d want %d", rw.Code, http.StatusBadRequest)
+			}
+			if got := rw.Header().Get("X-Remediation"); got != "error:client-body-read" {
+				t.Fatalf("header=%q want %q", got, "error:client-body-read")
+			}
+			if got := lapiClient.TestDroppedCount(lapi.OriginPluginAppsecFailure, "ipv4", "ban"); got != 0 {
+				t.Fatalf("dropped ban count=%d want 0", got)
+			}
+			if got := lapiClient.TestDroppedCount(lapi.OriginPluginAppsecFailure, "ipv4", "captcha"); got != 0 {
+				t.Fatalf("dropped captcha count=%d want 0", got)
+			}
+		})
+	}
+}
+
+// TestHandleNextServeHTTP_canceledContextReadErrIsDisconnect covers an HTTP/2 stream reset: net/http
+// cancels the request context and the body read fails with an error that does not wrap context.Canceled.
+func TestHandleNextServeHTTP_canceledContextReadErrIsDisconnect(t *testing.T) {
+	b, lapiClient, nextCalled, appsecHits := newBodyReadTestBouncer(t, configuration.FailureActionBan)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", failingBodyForDisconnectTest{err: errors.New("stream error: stream ID 1; CANCEL")}).WithContext(ctx)
+	req.ContentLength = 100
+	rw := &statusWatchRecorder{ResponseRecorder: httptest.NewRecorder()}
+	continueAfterLAPIForTest(b, rw, testClientRequest(req, "192.0.2.10"))
+	if *nextCalled || *appsecHits != 0 {
+		t.Fatalf("next=%v appsecHits=%d, want neither", *nextCalled, *appsecHits)
+	}
+	if rw.wroteStatus {
+		t.Fatalf("must not WriteHeader; got status %d", rw.Code)
+	}
+	if got := rw.Header().Get("X-Remediation"); got != "error:client-disconnected" {
+		t.Fatalf("header=%q want %q", got, "error:client-disconnected")
+	}
+	if got := lapiClient.TestDroppedCount(lapi.OriginPluginAppsecFailure, "ipv4", "ban"); got != 0 {
+		t.Fatalf("dropped ban count=%d want 0", got)
+	}
 }
 
 func TestTwoBouncersDistinctLapiFailureActions(t *testing.T) {

@@ -56,6 +56,12 @@ var ErrFailureCaptcha = errors.New("failureAction captcha")
 // Query MUST NOT call AppSec or apply FailureAction; the bouncer stops without a ban.
 var ErrClientDisconnected = errors.New("appsecQuery:clientDisconnected")
 
+// ErrClientBodyRead is any other failure reading the client body while buffering it for AppSec
+// (for example the server read timeout on a slow HTTP/2 upload). The request never arrived whole,
+// so it is not an AppSec verdict and not FailureAction: Query does not call AppSec and the bouncer
+// answers 400 without a ban and without dropped metrics.
+var ErrClientBodyRead = errors.New("appsecQuery:clientBodyRead")
+
 // errAppsecReadBody is the io failure from readCappedAppsecBody (not an oversized body).
 var errAppsecReadBody = errors.New("appsecQuery:readBody")
 
@@ -99,8 +105,12 @@ func isBodyUnreadable(httpReq *http.Request) bool {
 }
 
 // isClientGoneBodyReadErr reports disconnect or cancel while buffering a readable client body.
-func isClientGoneBodyReadErr(err error) bool {
-	return errors.Is(err, context.Canceled) ||
+// The canceled request context is the primary signal: net/http cancels it before the body read
+// fails when an HTTP/2 stream is reset (the error is an unexported stream error that does not wrap
+// context.Canceled) and when an HTTP/1.1 connection read fails (TCP reset, read timeout).
+func isClientGoneBodyReadErr(httpReq *http.Request, err error) bool {
+	return httpReq.Context().Err() != nil ||
+		errors.Is(err, context.Canceled) ||
 		errors.Is(err, context.DeadlineExceeded) ||
 		errors.Is(err, io.ErrUnexpectedEOF)
 }
@@ -268,10 +278,10 @@ func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol 
 		teeReader := io.TeeReader(bodyReader, &bodyBuffer)
 		bodyBytes, err := io.ReadAll(teeReader)
 		if err != nil {
-			if isClientGoneBodyReadErr(err) {
+			if isClientGoneBodyReadErr(httpReq, err) {
 				return nil, ErrClientDisconnected
 			}
-			return nil, fmt.Errorf("appsecQuery:GetBody %w", err)
+			return nil, fmt.Errorf("%w: %s", ErrClientBodyRead, err.Error())
 		}
 		httpReq.Body = io.NopCloser(io.MultiReader(&bodyBuffer, httpReq.Body))
 		req, _ := http.NewRequest(http.MethodPost, target, bytes.NewBuffer(bodyBytes))

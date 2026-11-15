@@ -23,6 +23,7 @@ func TestFormatRemediationHeader(t *testing.T) {
 		{name: "empty kind does not invent allow pass", kind: "", reason: headerReasonLAPI, origin: "crowdsec", want: ""},
 		{name: "empty reason does not invent allow pass", kind: headerKindBan, reason: "", origin: "crowdsec", want: ""},
 		{name: "disconnect exact", kind: headerKindError, reason: headerReasonClientDisconnected, origin: "", want: "error:client-disconnected"},
+		{name: "client body read exact", kind: headerKindError, reason: headerReasonClientBodyRead, origin: "", want: "error:client-body-read"},
 		{name: "captcha lapi origin", kind: headerKindCaptcha, reason: headerReasonLAPI, origin: "cscli", want: "captcha:lapi:cscli"},
 	}
 	for _, tt := range tests {

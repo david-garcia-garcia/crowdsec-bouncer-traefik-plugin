@@ -132,13 +132,22 @@ AppSec HTTP construct SHALL set `http.Client.Timeout` and the stored timeout sec
 - **AND** two Client incarnations exist
 
 ### Requirement: Client disconnect while buffering is not an AppSec query
-When `Query` copies a readable POST, PUT, PATCH, or DELETE body and `io.ReadAll` fails with `context.Canceled`, `context.DeadlineExceeded`, or `io.ErrUnexpectedEOF`, `Query` SHALL return `ErrClientDisconnected` and MUST NOT send a request to the AppSec listener. `bouncerAppsecFailureAction` SHALL NOT change that result. Unclassified body-read errors SHALL keep `appsecQuery:GetBody`. Serving the disconnect (TRACE, optional remediation header, no ban, no origin) is owned by `core_plugin_middleware_bouncer`.
+When `Query` copies a readable POST, PUT, PATCH, or DELETE body and `io.ReadAll` fails, `Query` SHALL return `ErrClientDisconnected` when the inbound request context is already canceled or the error is `context.Canceled`, `context.DeadlineExceeded`, or `io.ErrUnexpectedEOF`. The canceled context SHALL be checked first: net/http cancels it before the read fails on an HTTP/2 stream reset (an error that does not wrap `context.Canceled`) and on an HTTP/1.1 connection read failure (TCP reset, server read timeout). Any other read error SHALL return `ErrClientBodyRead`, with the read error text in the message. In both cases `Query` MUST NOT send a request to the AppSec listener, and `bouncerAppsecFailureAction` SHALL NOT change the result. A client-body read error MUST NOT surface as an AppSec ban. Serving both results is owned by `core_plugin_middleware_bouncer`.
 
 #### Scenario: Canceled body does not reach AppSec
 - **WHEN** buffering a readable POST body fails with `context.Canceled`
 - **THEN** `Query` returns `ErrClientDisconnected`
 - **AND** the AppSec listener is not called
 - **AND** `bouncerAppsecFailureAction: ban` does not change that
+
+#### Scenario: HTTP/2 stream reset is a disconnect
+- **WHEN** an HTTP/2 client resets the stream (RST_STREAM CANCEL) while its readable body is buffered
+- **THEN** `Query` returns `ErrClientDisconnected`, although the read error does not wrap `context.Canceled`
+
+#### Scenario: Slow HTTP/2 upload past the server read timeout
+- **WHEN** the server read timeout fires while a readable HTTP/2 body is buffered and the request context is not canceled
+- **THEN** `Query` returns `ErrClientBodyRead`
+- **AND** the AppSec listener is not called
 
 ### Requirement: AppSec identity JSON reuses the session marshaler
 AppSec reclaim identity JSON SHALL be produced only by the marshaler in `pkg/appsec/session.go`. Implementations MUST NOT reconstruct that payload in `pkg/configuration` or `pkg/bouncer`. That marshaler SHALL keep `scheme` / `host` / `path` / `key` and SHALL rename `tlsCertificateBouncer` / `tlsCertificateBouncerKey` to `tlsClientCertificate` / `tlsClientKey`. Transport fields still spelled `appsecTLSCertificateBouncer` SHALL use `TLSClientCertificate` / `TLSClientKey`. A field-name change SHALL change the hash. A process restart SHALL build a new Client.

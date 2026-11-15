@@ -1,6 +1,7 @@
 package appsec
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -117,7 +118,9 @@ func assertClientDisconnectedQuery(t *testing.T, readErr error, failureAction st
 	}
 }
 
-func assertUnclassifiedBodyReadStillGetBody(t *testing.T) {
+// assertUnclassifiedBodyReadIsClientBodyRead checks that a read failure with a live request context
+// is ErrClientBodyRead (answered 400 by the bouncer), never a GetBody ban, even with passthrough.
+func assertUnclassifiedBodyReadIsClientBodyRead(t *testing.T) {
 	t.Helper()
 	var appsecHits int
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
@@ -127,16 +130,41 @@ func assertUnclassifiedBodyReadStillGetBody(t *testing.T) {
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
 	client := newQueryClient(appsecURL, appsecServer.Client())
-	sentinel := errors.New("disk read fault")
-	_, err := client.Query(withTestAddress(newReadablePostWithFailingBody(sentinel)), Policy{FailureAction: configuration.FailureActionPassthrough})
-	if err == nil {
-		t.Fatal("Query() expected error for unclassified body read failure")
+	for _, failureAction := range []string{configuration.FailureActionBan, configuration.FailureActionPassthrough} {
+		_, err := client.Query(withTestAddress(newReadablePostWithFailingBody(errors.New("disk read fault"))), Policy{FailureAction: failureAction})
+		if !errors.Is(err, ErrClientBodyRead) {
+			t.Fatalf("failureAction=%s: Query() error %v want ErrClientBodyRead", failureAction, err)
+		}
+		if errors.Is(err, ErrClientDisconnected) {
+			t.Fatalf("failureAction=%s: Query() error %v must not be ErrClientDisconnected", failureAction, err)
+		}
+		if !strings.Contains(err.Error(), "disk read fault") {
+			t.Fatalf("failureAction=%s: Query() error %q want the read error text", failureAction, err.Error())
+		}
 	}
-	if !errors.Is(err, sentinel) {
-		t.Fatalf("Query() error %v want wrap of %v", err, sentinel)
+	if appsecHits != 0 {
+		t.Fatalf("AppSec server called %d times, want 0", appsecHits)
 	}
-	if !strings.Contains(err.Error(), "appsecQuery:GetBody") {
-		t.Fatalf("Query() error %q want appsecQuery:GetBody prefix", err.Error())
+}
+
+// assertCanceledContextReadErrIsDisconnect checks that any read error is a client disconnect once
+// the request context is canceled (HTTP/2 stream reset, HTTP/1.1 TCP reset or read timeout).
+func assertCanceledContextReadErrIsDisconnect(t *testing.T) {
+	t.Helper()
+	var appsecHits int
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		appsecHits++
+		rw.WriteHeader(http.StatusOK)
+	}))
+	defer appsecServer.Close()
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	client := newQueryClient(appsecURL, appsecServer.Client())
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := newReadablePostWithFailingBody(errors.New("stream error: stream ID 1; CANCEL")).WithContext(ctx)
+	_, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionBan})
+	if !errors.Is(err, ErrClientDisconnected) {
+		t.Fatalf("Query() error %v want ErrClientDisconnected", err)
 	}
 	if appsecHits != 0 {
 		t.Fatalf("AppSec server called %d times, want 0", appsecHits)

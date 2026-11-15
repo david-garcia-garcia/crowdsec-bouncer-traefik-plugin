@@ -431,6 +431,19 @@ func (b *Bouncer) handleClientDisconnectedServeHTTP(rw http.ResponseWriter, req 
 	}
 }
 
+// handleClientBodyReadServeHTTP answers 400 when the client body could not be read whole for
+// AppSec and the client is still connected (for example the server read timeout on a slow HTTP/2
+// upload). Not a ban: no ban template, no dropped metrics, no origin, no FailureAction.
+func (b *Bouncer) handleClientBodyReadServeHTTP(rw http.ResponseWriter, req clientrequest.Request, err error) {
+	b.log.Debug("client body read failed while buffering AppSec body", "ip", req.IPAddrString(), "error", err)
+	if b.remediationCustomHeader != "" {
+		if value := formatRemediationHeader(headerKindError, headerReasonClientBodyRead, ""); value != "" {
+			rw.Header().Set(b.remediationCustomHeader, value)
+		}
+	}
+	http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+}
+
 // resolveDroppedOrigin returns origin when it is set.
 // Otherwise it asks the published LAPI client for the name of originID.
 func (b *Bouncer) resolveDroppedOrigin(origin string, originID uint16) string {
@@ -526,6 +539,10 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientrequest
 	decision, err := appsecClient.Query(req, pol)
 	if errors.Is(err, appsec.ErrClientDisconnected) {
 		b.handleClientDisconnectedServeHTTP(rw, req)
+		return true
+	}
+	if errors.Is(err, appsec.ErrClientBodyRead) {
+		b.handleClientBodyReadServeHTTP(rw, req, err)
 		return true
 	}
 	if errors.Is(err, appsec.ErrFailureCaptcha) {

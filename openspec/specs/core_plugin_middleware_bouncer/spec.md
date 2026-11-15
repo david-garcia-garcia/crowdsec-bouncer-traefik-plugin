@@ -137,6 +137,16 @@ When AppSec `Query` returns `ErrClientDisconnected`, the bouncer SHALL stop with
 - **AND** the response is not a ban
 - **AND** if `bouncerRemediationHeadersCustomName` is `X-Remediation` the response header value is `error:client-disconnected`
 
+### Requirement: Client body read failure during AppSec body buffer is a 400, not a ban
+When AppSec `Query` returns `ErrClientBodyRead`, the bouncer SHALL answer HTTP 400 `Bad Request` without calling origin. It SHALL NOT write a ban template or `BouncerRemediationStatusCode`, and SHALL NOT increment LAPI dropped-request metrics. It SHALL log the read error at DEBUG. When `bouncerRemediationHeadersCustomName` is set, it SHALL set that response header to `error:client-body-read` (kind `error`, reason `client-body-read`; no third field). `bouncerAppsecFailureAction` SHALL NOT change this path.
+
+#### Scenario: Slow upload past the read timeout is not a CrowdSec 403
+- **WHEN** AppSec is enabled and the readable body cannot be read whole while the client is still connected
+- **THEN** origin is not called
+- **AND** the response is HTTP 400, not a ban
+- **AND** no dropped request is counted
+- **AND** if `bouncerRemediationHeadersCustomName` is `X-Remediation` the response header value is `error:client-body-read`
+
 ### Requirement: Captcha verdict without a published client is a ban
 When the remediation kind is captcha and the loaded captcha binding is empty or not valid, the bouncer SHALL remediate as a ban. It MUST NOT construct a fallback local captcha client on the request path or in `bouncer.New`. A bounce-only middleware MUST NOT build a captcha client from leftover `captcha*` owner-read keys.
 
@@ -231,6 +241,7 @@ Closed reasons never take a third field. The closed vocabulary is:
 | `captcha:challenge` | AppSec bot-detection `action: challenge` with non-empty body |
 | `captcha:solved` | 302 after a successful solve (token pass or second-tab captcha-form POST) |
 | `error:client-disconnected` | Client gone during AppSec body copy |
+| `error:client-body-read` | Client body could not be read whole during AppSec body copy (HTTP 400) |
 
 LAPI third field SHALL be the usage-metrics origin already returned by `LookupRemediation` / `LiveLookup` (`MetricsOrigin`), after strip of CR/LF/TAB and rewriting only the prefix `lists:` → `lists_`. Empty origin omits the third field. The plugin MUST NOT globally replace remaining colons. The plugin MUST NOT change `MetricsOrigin` or DecisionStore packing. Plugin origins, including `plugin:rules:<name>`, and AppSec specials are reason tokens, never a third field. A metrics origin that starts with `plugin:rules:` SHALL map to closed reason `rules` (no third field). Client address stays `pkg/ip.GetRemoteIP` on `clientRequest`; this header MUST NOT reconstruct identity.
 
