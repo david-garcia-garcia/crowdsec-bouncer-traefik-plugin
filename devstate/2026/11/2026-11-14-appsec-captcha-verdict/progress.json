@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-11-14-appsec-captcha-verdict",
+  "jobName": "2026-11-14-appsec-captcha-verdict",
+  "startedAt": "2026-11-14T19:14:14.427Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T19:16:59.205Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T19:19:59.833Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T19:22:59.361Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T20:02:16.625Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T20:09:32.472Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T20:10:26.459Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T20:11:08.579Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-14T20:20:39.232Z"
+    }
+  }
+}

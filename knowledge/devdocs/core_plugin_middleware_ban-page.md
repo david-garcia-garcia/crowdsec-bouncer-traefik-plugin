@@ -17,7 +17,7 @@ Ban kind (and captcha fallbacks that ban) share one writer. Pass `headerReason` 
 - Do not add extra directives (`private`, `max-age`, `must-revalidate`, `Pragma`).
 - Ban paths call `handleBanServeHTTP` (status `remediationStatusCode`). Only the AppSec ban calls `handleBanStatusServeHTTP` with `appsecBanStatusCode`, which keeps 429 for a CrowdSec `RateLimit()` ban. Do not honour other AppSec `http_status` values on the ban page.
 - Do not emit Cache-Control from AppSec relay; copy `user_headers` as they arrive (`core_plugin_appsec`).
-- Pass an explicit `headerReason` into `handleBanServeHTTP` next to template `reason` and metrics `origin`. When `remediationCustomHeader` is set, write `formatRemediationHeader("ban", headerReason, origin)`. Closed reasons never take a third field; `lapi` plus a non-empty origin appends the encoded origin. Do not infer captcha-downgrade / `appsec` / `appsec-challenge-empty` from origin alone.
+- Pass an explicit `headerReason` into `handleBanServeHTTP` next to template `reason` and metrics `origin`. When `remediationCustomHeader` is set, write `formatRemediationHeader("ban", headerReason, origin)`. Closed reasons never take a third field; `lapi` plus a non-empty origin appends the encoded origin. Do not infer captcha-downgrade / `appsec` / `appsec-challenge-empty` / `appsec-action-empty` from origin alone.
 - Do not share a helper package with captcha `ServeHTTP`. Captcha does not import the closed table; the bouncer formats the challenge-page value.
 
 ## Pattern snippet

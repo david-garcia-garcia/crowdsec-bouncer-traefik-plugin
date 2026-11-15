@@ -245,10 +245,11 @@ func Test_appsecQuery_challengeJSON(t *testing.T) {
 	}
 }
 
+// Test_appsecQuery_captchaJSON parses the envelope CrowdSec sends for SetRemediation("captcha"): action and status, no page.
 func Test_appsecQuery_captchaJSON(t *testing.T) {
 	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusForbidden)
-		_, _ = rw.Write([]byte(`{"action":"captcha","http_status":403,"user_body_content":"<html>captcha</html>"}`))
+		_, _ = rw.Write([]byte(`{"action":"captcha","http_status":403}`))
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
@@ -259,7 +260,7 @@ func Test_appsecQuery_captchaJSON(t *testing.T) {
 	if decision == nil || decision.Action != ActionCaptcha {
 		t.Fatalf("Query() want captcha, got %#v", decision)
 	}
-	if decision.HTTPStatus != http.StatusForbidden || decision.UserBodyContent != "<html>captcha</html>" {
+	if decision.HTTPStatus != http.StatusForbidden || decision.UserBodyContent != "" {
 		t.Fatalf("Query() captcha fields: %#v", decision)
 	}
 }

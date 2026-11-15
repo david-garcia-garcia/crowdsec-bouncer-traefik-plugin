@@ -8,7 +8,7 @@ _Avoid_: captcha gate cookie, `{ip}_captcha`, prefix bypass
 
 **Unsubscribed captcha**:
 A captcha-kind remediation on a Bouncer that never subscribed to captcha (`subscribeCaptcha` false: bounce on, empty `CaptchaInstanceName`).
-_Avoid_: subscribed-unpublished, `!Valid`, AppSec JSON `action: captcha`
+_Avoid_: subscribed-unpublished, `!Valid`
 
 **Challenge marker**:
 Hidden field `crowdsec_captcha_challenge` with value `v1` that `HasChallengeMarker` reads after Check is true. Owned by `pkg/captcha`, not Config and not `gatePayloadVersion`.
@@ -32,13 +32,14 @@ _Avoid_: `CaptchaCustomValidateURL`, the bundled default `captcha.html`
 
 ## Overview
 
-`handleRemediationServeHTTP` sends captcha kind to `handleCaptchaKindServeHTTP` (WARN-and-ban when this router never subscribed). A subscribed, usable client then routes after cookie grace and first-solve 302. A widget asset or a cleared gate returns false and does not call next. Cookie mint stays on `core_plugin_middleware_captcha-gate`.
+`handleRemediationServeHTTP` sends captcha kind to `handleCaptchaKindServeHTTP` (WARN-and-ban when this router never subscribed). `serveAppsecCaptchaGate` is the AppSec entry to the same handler (`core_plugin_appsec.md`): an AppSec `captcha` verdict, or a challenge-marker POST AppSec let through. A subscribed, usable client then routes after cookie grace and first-solve 302. A widget asset or a cleared gate returns false and does not call next. Cookie mint stays on `core_plugin_middleware_captcha-gate`.
 
 ## How to use
 
 - When kind is captcha and `subscribeCaptcha` is false, WARN `crowdsec bouncer captcha unsubscribed` with `leg` `captcha` and `instanceName` (empty when unsubscribed), then ban with `headerReason` `captcha-downgrade` (`ban:captcha-downgrade` when the remediation header is set). Do not emit `ip`. Do not call `GetRemoteIP`. Emit on every remediating request.
 - Do not WARN when subscribed. Empty or `!Valid` still ban without this stem (`headerReason` `captcha-downgrade`).
 - Load the published captcha Client. Empty or `!Valid` remediates as ban with `headerReason` `captcha-downgrade`. Do not construct a local client on the request path or in bounce-only `New`.
+- The caller passes the challenge-page header reason and the downgrade ban template reason: `handleRemediationServeHTTP` passes `headerReasonFromOrigin(origin)` and `LAPI`; `serveAppsecCaptchaGate` passes `appsec` and `APPSEC`. Do not derive the AppSec reason from origin `appsec` (that maps to `lapi`).
 - Pass this router's `remediationCustomHeader` and the already-formatted challenge-page value into `ServeHTTP(rw, req, …)`. Pass the header name into `WriteSolvedRedirect`. Do not store the header on Client.
 - Sequence a loaded Valid client as: custom-resource path returns false → Check-true form POST 302 → other Check-true requests return false → `captcha.ServeHTTP` (HEAD included). Else ban. Do not call AppSec or next from this handler.
 - HEAD under a subscribed, usable captcha remediation gets the challenge page, never the ban page. That is ratified; do not "fix" it back to ban. A HEAD on a custom-resource path still reaches origin.
@@ -59,7 +60,7 @@ _Avoid_: `CaptchaCustomValidateURL`, the bundled default `captcha.html`
 
 ## Gotchas
 
-- Unsubscribed captcha WARN is router subscription, not identity. Do not add `ip`. Do not treat AppSec JSON `action: captcha` as this signal.
+- Unsubscribed captcha WARN is router subscription, not identity. Do not add `ip`. An AppSec `captcha` verdict on a router without captcha is captcha kind too, so it WARNs and downgrades like any other source.
 - Built-in provider CDN URLs are not a match set, and their `ChallengeURL` renders empty.
 - Empty `captchaCustomChallengeUrl` keeps JsURL-path only; it is not a required custom field. A non-empty custom-provider value that names no absolute path is rejected by `validateEnabledCaptchaSettings` — that is master's owner, not a rival `validateConfiguredCaptcha`.
 - A challenge marker hidden inside an over-cap POST is deliberately missed; keeping the upload body intact for origin matters more.

@@ -219,6 +219,7 @@ Closed reasons never take a third field. The closed vocabulary is:
 | `ban:cache-fail` | Redis/cache fail-closed |
 | `ban:appsec` | AppSec JSON `action: ban` |
 | `ban:appsec-challenge-empty` | AppSec `action: challenge` with empty body (fail-closed to ban page) |
+| `ban:appsec-action-empty` | AppSec action other than `allow` / `ban` / `captcha` / `challenge` with empty body (fail-closed to ban page) |
 | `ban:appsec-failure` | AppSec down / unusable verdict, fail-closed ban |
 | `ban:captcha-downgrade` | Kind was captcha; this router served a ban page (unsubscribed / unpublished / invalid captcha client) |
 | `captcha:rules` | Matching action rule applied captcha |
@@ -226,7 +227,7 @@ Closed reasons never take a third field. The closed vocabulary is:
 | `captcha:lapi-failure` | LAPI fail-closed captcha |
 | `captcha:stream-unhealthy` | Stream fail-closed captcha |
 | `captcha:appsec-failure` | AppSec fail-closed captcha |
-| `captcha:appsec` | AppSec JSON `action: captcha` (envelope relay, not pkg/captcha) |
+| `captcha:appsec` | Router captcha page for an AppSec JSON `action: captcha`, or for a challenge-marker POST that AppSec let through |
 | `captcha:challenge` | AppSec bot-detection `action: challenge` with non-empty body |
 | `captcha:solved` | 302 after a successful solve (token pass or second-tab captcha-form POST) |
 | `error:client-disconnected` | Client gone during AppSec body copy |
@@ -282,6 +283,16 @@ The bouncer SHALL format ban, AppSec relay, disconnect, captcha-downgrade, and c
 - **WHEN** `bouncerRemediationHeadersCustomName` is empty
 - **AND** the bouncer writes a ban page
 - **THEN** no structured remediation header is set
+
+#### Scenario: AppSec captcha verdict is captcha:appsec
+- **WHEN** `bouncerRemediationHeadersCustomName` is set
+- **AND** AppSec returns `action` `captcha` and this router serves its captcha challenge page
+- **THEN** the header value is `captcha:appsec`
+
+#### Scenario: Bodyless unknown AppSec action is ban:appsec-action-empty
+- **WHEN** `bouncerRemediationHeadersCustomName` is set
+- **AND** AppSec returns an action other than `allow`, `ban`, `captcha`, or `challenge` with empty `user_body_content`
+- **THEN** the header value is `ban:appsec-action-empty`
 
 ### Requirement: Action rules fold every matching row
 The bouncer SHALL expose one public Config list `bouncerActionRules`. Default empty (omit or empty list) SHALL match nothing (setting off). Each row SHALL have `name`, `action`, and the same request predicates as dest `httprule.Rule` (`method`, `path`, `host`, `headers`, `cookies`). An omitted predicate, or `path` / `host` / `method` empty after trim, or an empty `headers` / `cookies` map, SHALL mean any for that predicate. Set predicates on one row SHALL all match (AND).

@@ -1,0 +1,17 @@
+# CrowdSec answers these paths with {"action":"captcha","http_status":403} and
+# no body, the envelope a SetRemediation("captcha") rule produces. pre_eval
+# SetRemediation only takes effect on an in-band interrupt, so DropRequest
+# provides one. The alert carries no remediation: no LAPI decision follows.
+# /captcha-appsec/verdict-get asks on GET only, so CrowdSec allows the captcha
+# form POST and the plugin must still validate it.
+name: e2e/captcha-verdict
+inband:
+  pre_eval:
+    - filter: 'req.URL.Path in ["/captcha-appsec/verdict", "/waf-only/captcha-verdict"]'
+      apply:
+        - SetRemediation("captcha")
+        - DropRequest("e2e captcha verdict")
+    - filter: 'req.URL.Path == "/captcha-appsec/verdict-get" && req.Method == "GET"'
+      apply:
+        - SetRemediation("captcha")
+        - DropRequest("e2e captcha verdict on GET")
