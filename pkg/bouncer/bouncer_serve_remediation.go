@@ -36,11 +36,7 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientrequest.R
 func (b *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req clientrequest.Request, reason, headerReason, origin string, statusCode int) {
 	b.recordDropped(req, origin, "ban")
 
-	if b.remediationCustomHeader != "" {
-		if value := formatRemediationHeader(headerKindBan, headerReason, origin); value != "" {
-			rw.Header().Set(b.remediationCustomHeader, value)
-		}
-	}
+	b.setRemediationHeader(rw, headerKindBan, headerReason, origin)
 	rw.Header().Set("Content-Type", b.banTemplateContentType)
 	rw.Header().Set("Cache-Control", "no-cache, no-store")
 	rw.WriteHeader(statusCode)

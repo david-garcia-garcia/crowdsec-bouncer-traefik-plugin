@@ -36,7 +36,7 @@ rw.WriteHeader(statusCode)
 ## Key files
 
 - `pkg/bouncer/bouncer_serve_remediation.go` (`handleBanServeHTTP`, `handleBanStatusServeHTTP`)
-- `pkg/bouncer/bouncer_serve_appsec.go` (`appsecBanStatusCode`)
+- `pkg/bouncer/bouncer_serve_appsec_verdict.go` (`appsecBanStatusCode`)
 - `pkg/bouncer/remediation_header.go`
 
 ## Gotchas

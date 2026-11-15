@@ -1,6 +1,7 @@
 package bouncer
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
@@ -41,6 +42,17 @@ func formatRemediationHeader(kind, reason, origin string) string {
 		return kind + ":" + reason + ":" + encoded
 	}
 	return kind + ":" + reason
+}
+
+// setRemediationHeader sets bouncerRemediationHeadersCustomName to kind:reason for this response.
+// It does nothing when the operator did not name the header or the value is empty.
+func (b *Bouncer) setRemediationHeader(rw http.ResponseWriter, kind, reason, origin string) {
+	if b.remediationCustomHeader == "" {
+		return
+	}
+	if value := formatRemediationHeader(kind, reason, origin); value != "" {
+		rw.Header().Set(b.remediationCustomHeader, value)
+	}
 }
 
 // encodeHeaderOrigin strips CR/LF/TAB and rewrites only the lists: prefix to lists_.
