@@ -592,6 +592,14 @@ This middleware sets up the captcha provider and shares it as `captchaInstanceNa
 **CaptchaFilePath** (string, default `/captcha.html`)
 Path to the captcha page template. Content-Type is inferred from the extension.
 
+A custom template must put this hidden field inside its challenge form:
+
+```html
+<input type="hidden" name="crowdsec_captcha_challenge" value="v1">
+```
+
+The plugin uses it to recognise a leftover challenge form. Example: the visitor has the captcha open in two tabs, solves it in one, then submits the other. With the field, that second POST is redirected and never reaches your application. Without it, the captcha still works, but the second POST is forwarded to the backend (a route that only accepts GET answers 405). The provider's response field (`g-recaptcha-response`, `h-captcha-response`, ...) is not used for this, because your application's own forms may embed the same widget. When the loaded template does not contain the field, the plugin logs `crowdsec captcha template missing challenge marker` at startup.
+
 **CaptchaGateBindIp** (bool, default `true`)
 Tie a solved captcha to the visitor's IP. When `false`, the cookie alone is enough, even if the visitor's IP changes.
 
