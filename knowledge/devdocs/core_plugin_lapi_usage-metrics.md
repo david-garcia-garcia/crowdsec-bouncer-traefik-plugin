@@ -53,7 +53,8 @@ lapiClient.IncDroppedBytes(origin, req.IPType(), req.EstimatedSize())
 - `pkg/lapi/client.go` (`metricsReporter` field and ticker wiring)
 - `pkg/decisionstore/memory_pack.go`
 - `pkg/ip/network.go` (`Family`, `FamilyOfIP`, `FamilyOfHostOrCIDR`)
-- `pkg/bouncer/bouncer.go`
+- `pkg/bouncer/bouncer.go` (`IncProcessed` in `ServeHTTP`)
+- `pkg/bouncer/bouncer_serve_remediation.go` (`recordDropped`)
 
 ## Gotchas
 

@@ -61,6 +61,7 @@ decision, err := b.appsecClient.Query(req, pol)
 - `pkg/appsec/client_http.go`
 - `pkg/appsec/session.go`
 - `pkg/bouncer/bouncer.go`
+- `pkg/bouncer/bouncer_serve_appsec.go`
 - `pkg/bouncer/remediation_header.go`
 - `pkg/clientrequest/request.go`
 

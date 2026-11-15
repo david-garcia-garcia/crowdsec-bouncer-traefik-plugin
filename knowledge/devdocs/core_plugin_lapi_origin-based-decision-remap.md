@@ -35,7 +35,8 @@ kind, origin = b.appliedLAPIRemediation(kind, origin, originID)
 - `pkg/configuration/configuration.go` (`BouncerOriginBasedDecisionRemap`)
 - `pkg/configuration/origin_based_decision_remap.go`
 - `pkg/bouncer/origin_based_decision_remap.go`
-- `pkg/bouncer/bouncer.go` (`New` copy, ServeHTTP apply)
+- `pkg/bouncer/bouncer.go` (`New` copy)
+- `pkg/bouncer/bouncer_serve_lapi.go` (`serveLAPI` apply)
 - `pkg/lapi/client_decisions.go` (`ingestRemediationKind`)
 - `pkg/lapi/client_stream.go`
 

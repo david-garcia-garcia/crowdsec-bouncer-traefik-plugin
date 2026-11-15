@@ -53,6 +53,8 @@ _Avoid_: `CaptchaCustomValidateURL`, the bundled default `captcha.html`
 ## Key files
 
 - `pkg/bouncer/bouncer.go`
+- `pkg/bouncer/bouncer_serve_captcha.go`
+- `pkg/bouncer/bouncer_serve_appsec.go`
 - `pkg/bouncer/remediation_header.go`
 - `pkg/captcha/captcha.go`
 - `pkg/captcha/form.go`
