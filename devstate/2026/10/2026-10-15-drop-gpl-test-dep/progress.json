@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-10-15-drop-gpl-test-dep",
+  "jobName": "2026-10-15-drop-gpl-test-dep",
+  "startedAt": "2026-10-15T04:04:13.303Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-15T04:11:47.119Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-15T04:31:33.710Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-15T04:52:51.560Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-15T05:20:33.819Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-15T05:29:53.535Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-15T05:37:12.780Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-15T05:42:48.409Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-15T05:50:56.062Z"
+    }
+  }
+}

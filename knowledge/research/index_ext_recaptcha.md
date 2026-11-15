@@ -5,6 +5,11 @@ priority: normal
 local: ext_recaptcha_siteverify/
 description: Official Google reCAPTCHA /siteverify request fields and remoteip contract.
 
+## Widget
+priority: normal
+local: ext_recaptcha_widget/
+description: Official Google reCAPTCHA v2 (classic) checkbox and invisible browser widget, form POST parameter, and callbacks.
+
 ## Assessments API
 priority: normal
 local: ext_recaptcha_enterprise_assessments/

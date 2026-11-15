@@ -8,15 +8,19 @@ _Avoid_: captcha gate cookie, `{ip}_captcha`, prefix bypass
 
 **Unsubscribed captcha**:
 A captcha-kind remediation on a Bouncer that never subscribed to captcha (`subscribeCaptcha` false: bounce on, empty `CaptchaInstanceName`).
-_Avoid_: subscribed-unpublished, `!Valid`, AppSec JSON `action: captcha`
+_Avoid_: subscribed-unpublished, `!Valid`
+
+**Challenge marker**:
+Hidden field `crowdsec_captcha_challenge` with value `v1` that `HasChallengeMarker` reads after Check is true. Owned by `pkg/captcha`, not Config and not `gatePayloadVersion`.
+_Avoid_: TokenField as the challenge marker, gate cookie version, a Traefik key
 
 **Solved-form POST**:
-A POST whose provider response field is non-empty in a body of at most `captchaFormMaxBytes` (64KiB), read by `IsCaptchaFormPost`. Not a GET with a query token, and not an over-cap upload that happens to contain the field name.
-_Avoid_: ordinary POST, query-only token, first-solve Validate
+A POST whose challenge marker `crowdsec_captcha_challenge` equals `v1` in a body of at most `captchaFormMaxBytes` (64KiB), read by `HasChallengeMarker`. Not a GET with a query token, and not an over-cap upload that happens to contain the field name.
+_Avoid_: ordinary POST, query-only token, first-solve Validate, TokenField as the challenge marker
 
 **First-verify reader**:
-`captchaResponseFromRequest`, used only by `Validate` on a request the plugin answers itself. It may `ParseForm` and truncate at 1MiB because that request is never forwarded.
-_Avoid_: calling it from routing, sharing it with `IsCaptchaFormPost`
+`readFieldFromRequest`, used only by `Validate` on a request the plugin answers itself. It may `ParseForm` and truncate at 1MiB because that request is never forwarded.
+_Avoid_: calling it from routing, sharing it with `HasChallengeMarker`
 
 **Custom challenge resource**:
 A same-origin browser widget path stored from `CaptchaCustomJsURL` and optional `captchaCustomChallengeUrl` on a custom provider. Matched exact path only.
@@ -28,17 +32,18 @@ _Avoid_: `CaptchaCustomValidateURL`, the bundled default `captcha.html`
 
 ## Overview
 
-`handleRemediationServeHTTP` sends captcha kind to `handleCaptchaKindServeHTTP` (WARN-and-ban when this router never subscribed). A subscribed, usable client then routes after cookie grace and first-solve 302. A widget asset or a cleared gate returns false and does not call next. Cookie mint stays on `core_plugin_middleware_captcha-gate`.
+`handleRemediationServeHTTP` sends captcha kind to `handleCaptchaKindServeHTTP` (WARN-and-ban when this router never subscribed). `serveAppsecCaptchaGate` is the AppSec entry to the same handler (`core_plugin_appsec.md`): an AppSec `captcha` verdict, or a challenge-marker POST AppSec let through. A subscribed, usable client then routes after cookie grace and first-solve 302. A widget asset or a cleared gate returns false and does not call next. Cookie mint stays on `core_plugin_middleware_captcha-gate`.
 
 ## How to use
 
 - When kind is captcha and `subscribeCaptcha` is false, WARN `crowdsec bouncer captcha unsubscribed` with `leg` `captcha` and `instanceName` (empty when unsubscribed), then ban with `headerReason` `captcha-downgrade` (`ban:captcha-downgrade` when the remediation header is set). Do not emit `ip`. Do not call `GetRemoteIP`. Emit on every remediating request.
 - Do not WARN when subscribed. Empty or `!Valid` still ban without this stem (`headerReason` `captcha-downgrade`).
 - Load the published captcha Client. Empty or `!Valid` remediates as ban with `headerReason` `captcha-downgrade`. Do not construct a local client on the request path or in bounce-only `New`.
+- The caller passes the challenge-page header reason and the downgrade ban template reason: `handleRemediationServeHTTP` passes `headerReasonFromOrigin(origin)` and `LAPI`; `serveAppsecCaptchaGate` passes `appsec` and `APPSEC`. Do not derive the AppSec reason from origin `appsec` (that maps to `lapi`).
 - Pass this router's `remediationCustomHeader` and the already-formatted challenge-page value into `ServeHTTP(rw, req, …)`. Pass the header name into `WriteSolvedRedirect`. Do not store the header on Client.
 - Sequence a loaded Valid client as: custom-resource path returns false → Check-true form POST 302 → other Check-true requests return false → `captcha.ServeHTTP` (HEAD included). Else ban. Do not call AppSec or next from this handler.
 - HEAD under a subscribed, usable captcha remediation gets the challenge page, never the ban page. That is ratified; do not "fix" it back to ban. A HEAD on a custom-resource path still reaches origin.
-- Detect form POST with `IsCaptchaFormPost`. It is a reader of its own, not `captchaResponseFromRequest`: routing may still forward the request, so it caps at 64KiB, reads urlencoded and multipart, answers from `PostForm` when the form was already parsed, and restores `Body` plus `ContentLength` when it answers no. Keep the two callers apart.
+- Detect a challenge-marker POST with `HasChallengeMarker`. It is a reader of its own, not `readFieldFromRequest`: routing may still forward the request, so it caps at 64KiB, reads urlencoded and multipart, reads a body with no usable Content-Type as urlencoded, answers from `PostForm` when the form was already parsed, and restores `Body` plus `ContentLength` when it answers no. After Check is true, look up challenge marker `crowdsec_captcha_challenge=v1`. Do not treat `widget.TokenField` as the challenge marker. Do not require `widget.TokenField` to be set. Keep the two callers apart.
 - After Check, call `WriteSolvedRedirect`: `302 Found` to `req.URL.String()`, set the remediation header to `captcha:solved` when configured (no third field). Do not remint the gate cookie. Do not call siteverify.
 - Match custom assets with `IsCustomResourceRequest`. `configuration.CustomCaptchaResourcePath` is the one owner of which configured value names a browser path; `Client.New` calls it for `CaptchaCustomJsURL` and optional `captchaCustomChallengeUrl` (custom provider only) and compares the stored paths to `req.URL.Path`. Ignore host and query. Never `CaptchaCustomValidateURL`. Never a prefix.
 - Render the endpoint through template `ChallengeURL` (execute map sibling of `FrontendJS`). Captcha templates use `{{` / `}}`, unlike the ban template's `[[` / `]]`. Wire it in `examples/custom-captcha`, not in the bundled default `captcha.html`.
@@ -50,12 +55,13 @@ _Avoid_: `CaptchaCustomValidateURL`, the bundled default `captcha.html`
 - `pkg/bouncer/bouncer.go`
 - `pkg/bouncer/remediation_header.go`
 - `pkg/captcha/captcha.go`
+- `pkg/captcha/form.go`
 - `pkg/configuration/configuration.go`
 
 ## Gotchas
 
-- Unsubscribed captcha WARN is router subscription, not identity. Do not add `ip`. Do not treat AppSec JSON `action: captcha` as this signal.
+- Unsubscribed captcha WARN is router subscription, not identity. Do not add `ip`. An AppSec `captcha` verdict on a router without captcha is captcha kind too, so it WARNs and downgrades like any other source.
 - Built-in provider CDN URLs are not a match set, and their `ChallengeURL` renders empty.
 - Empty `captchaCustomChallengeUrl` keeps JsURL-path only; it is not a required custom field. A non-empty custom-provider value that names no absolute path is rejected by `validateEnabledCaptchaSettings` — that is master's owner, not a rival `validateConfiguredCaptcha`.
-- A captcha token hidden inside an over-cap POST is deliberately missed; keeping the upload body intact for origin matters more.
+- A challenge marker hidden inside an over-cap POST is deliberately missed; keeping the upload body intact for origin matters more.
 - Yaegi v0.16: do not put `atomic.Pointer[T]` on a struct consumed from another package.

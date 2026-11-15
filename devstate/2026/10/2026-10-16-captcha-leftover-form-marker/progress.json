@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-10-16-captcha-leftover-form-marker",
+  "jobName": "2026-10-16-captcha-leftover-form-marker",
+  "startedAt": "2026-10-16T03:43:31.409Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-16T03:49:40.040Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-16T04:02:54.227Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-16T04:12:07.407Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-16T04:27:51.806Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-16T04:36:31.375Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-16T04:42:48.240Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-16T04:49:00.535Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-10-16T04:57:42.643Z"
+    }
+  }
+}

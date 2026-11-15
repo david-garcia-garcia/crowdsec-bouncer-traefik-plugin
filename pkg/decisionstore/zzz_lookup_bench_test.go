@@ -8,7 +8,6 @@ import (
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
-	ttl_map "github.com/leprosus/golang-ttl-map"
 )
 
 const benchLiveEntries = 100_000
@@ -72,18 +71,6 @@ func benchSnapshotGet(snapshot map[string]LiveSlot) func(string) lookupHit {
 		}
 		slotKind := unpackKindCode(slot.Word & packedKindMask)
 		return lookupHit{kind: slotKind, origin: "o"}
-	}
-}
-
-func BenchmarkHeapRetained_TTLMap100k(b *testing.B) {
-	b.ReportAllocs()
-	for range b.N {
-		heap := ttl_map.New()
-		for n := range benchLiveEntries {
-			key := fmt.Sprintf("10.%d.%d.%d", n>>16&0xff, n>>8&0xff, n&0xff)
-			heap.Set(key, uint32('t'), 3600)
-		}
-		b.SetBytes(benchLiveEntries * 100)
 	}
 }
 

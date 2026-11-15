@@ -9,8 +9,8 @@ import (
 	"net/url"
 )
 
-// captchaFormMaxBytes is the largest POST body inspected for a provider token.
-// Provider tokens are small, so a bigger body is origin traffic and is left alone.
+// captchaFormMaxBytes is the largest POST body inspected for the challenge marker.
+// The challenge marker is small, so a bigger body is origin traffic and is left alone.
 const captchaFormMaxBytes = 64 << 10
 
 // peekCaptchaFormBody reads up to captchaFormMaxBytes and always leaves r.Body readable.

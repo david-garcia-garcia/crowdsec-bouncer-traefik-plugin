@@ -25,7 +25,7 @@ Construct once in `ServeHTTP` after `pkg/ip.GetRemoteIP`. Captcha gate Secure an
 - Do not assign `IPAddrString`, `IPAddr`, scheme, or AbsoluteURL after construction. Do not write scheme onto the live `*http.Request`.
 - Pass `req` into captcha `ServeHTTP` / `Check` / `Validate` / `setGateCookie` and AppSec `Query`. Do not pass a parallel `remoteIP` string.
 - Estimate dropped bytes with `req.EstimatedSize()` at drop time. Do not read `Body`. Do not call `httputil.DumpRequest` or `Request.Write`.
-- Leave path-only captcha helpers (`IsCustomResourceRequest`, `IsCaptchaFormPost`, `WriteSolvedRedirect`, `gateCookieValue`, `RequestDomain`) on `*http.Request` / host string.
+- Leave path-only captcha helpers (`IsCustomResourceRequest`, `HasChallengeMarker`, `WriteSolvedRedirect`, `gateCookieValue`, `RequestDomain`) on `*http.Request` / host string.
 - AppSec copies `AbsoluteURL()` onto `X-Crowdsec-Appsec-Uri`. Do not rebuild proto-then-TLS in captcha or AppSec. Do not copy GetRemoteIP hop trust into those packages.
 
 ## Pattern snippet

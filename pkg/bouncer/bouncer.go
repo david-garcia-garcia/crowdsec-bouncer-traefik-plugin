@@ -66,6 +66,9 @@ type Bouncer struct {
 const msgBanTemplateUnavailable = "crowdsec bouncer ban template unavailable"
 const msgCaptchaUnsubscribed = "crowdsec bouncer captcha unsubscribed"
 
+// originAppsec is the usage-metrics origin of a remediation an AppSec verdict decided.
+const originAppsec = "appsec"
+
 // New returns a per-router handler. Clients arrive later through ReceiveLAPI, ReceiveAppSec, and ReceiveCaptcha.
 func New(next http.Handler, name string, config *configuration.Config, subscribeLAPI, subscribeAppSec, subscribeCaptcha bool, log *slog.Logger) (*Bouncer, error) {
 	log = log.With("traefikName", name)
@@ -308,21 +311,43 @@ func (b *Bouncer) serveAppSec(rw http.ResponseWriter, req clientrequest.Request,
 	if match.CaptchaName != "" {
 		return b.applyCaptchaRuleServeHTTP(rw, req, match)
 	}
-	if match.SkipAppsec {
-		return false
-	}
-	if !b.subscribeAppSec {
+	if match.SkipAppsec || !b.subscribeAppSec {
 		return false
 	}
 	if b.applyAppsecServeHTTP(rw, req, match) {
 		return true
 	}
-	// Unanswered AppSec (allow or failure-action passthrough) on the challenge prefix must not reach origin.
+	// AppSec judged this request alone. A captcha form POST it let through is
+	// still the answer to an earlier captcha, so the gate validates it.
+	if b.isCaptchaFormAnswer(req) && b.serveAppsecCaptchaGate(rw, req) {
+		return true
+	}
+	// Nothing answered (allow, failure-action passthrough, or a cleared captcha gate):
+	// the challenge prefix still must not reach origin.
 	if isAppsecChallengePath(req.URL.Path) {
 		http.NotFound(rw, req.Request)
 		return true
 	}
 	return false
+}
+
+// usableCaptcha is this router's captcha client when it can serve the gate: subscribed, published, and Valid.
+// Nil means a captcha here is a downgrade ban.
+func (b *Bouncer) usableCaptcha() *captcha.Client {
+	if !b.subscribeCaptcha {
+		return nil
+	}
+	captchaClient := b.loadedCaptcha()
+	if captchaClient == nil || !captchaClient.Valid {
+		return nil
+	}
+	return captchaClient
+}
+
+// isCaptchaFormAnswer reports whether req is a challenge-form POST this router's captcha gate can answer.
+func (b *Bouncer) isCaptchaFormAnswer(req clientrequest.Request) bool {
+	captchaClient := b.usableCaptcha()
+	return captchaClient != nil && captchaClient.HasChallengeMarker(req.Request)
 }
 
 // applyLapiFailureAction applies this router's LAPI failure action.
@@ -348,8 +373,23 @@ func (b *Bouncer) recordDropped(req clientrequest.Request, origin, remediation s
 	}
 }
 
-// handleBanServeHTTP writes the operator ban template for this client.
+// handleBanServeHTTP writes the operator ban template for this client with bouncerRemediationStatusCode.
 func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientrequest.Request, reason, headerReason, origin string) {
+	b.handleBanStatusServeHTTP(rw, req, reason, headerReason, origin, b.remediationStatusCode)
+}
+
+// appsecBanStatusCode is the client status for an AppSec ban.
+// CrowdSec RateLimit() bans carry http_status 429, which the client must see to back off.
+// Every other AppSec ban status keeps bouncerRemediationStatusCode.
+func (b *Bouncer) appsecBanStatusCode(decision *appsec.Response) int {
+	if decision.HTTPStatus == http.StatusTooManyRequests {
+		return http.StatusTooManyRequests
+	}
+	return b.remediationStatusCode
+}
+
+// handleBanStatusServeHTTP writes the operator ban template for this client with statusCode.
+func (b *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req clientrequest.Request, reason, headerReason, origin string, statusCode int) {
 	b.recordDropped(req, origin, "ban")
 
 	if b.remediationCustomHeader != "" {
@@ -359,7 +399,7 @@ func (b *Bouncer) handleBanServeHTTP(rw http.ResponseWriter, req clientrequest.R
 	}
 	rw.Header().Set("Content-Type", b.banTemplateContentType)
 	rw.Header().Set("Cache-Control", "no-cache, no-store")
-	rw.WriteHeader(b.remediationStatusCode)
+	rw.WriteHeader(statusCode)
 	if b.banTemplate == nil || req.Method == http.MethodHead {
 		return
 	}
@@ -416,23 +456,30 @@ func (b *Bouncer) handleRemediationServeHTTP(rw http.ResponseWriter, req clientr
 	kind := decisionscope.RemediationKind(remediation)
 	logger.Trace(b.log, "handleRemediationServeHTTP", "ip", req.IPAddrString(), "remediation", kind)
 	if kind == decisionscope.CaptchaValue {
-		return b.handleCaptchaKindServeHTTP(rw, req, origin)
+		return b.handleCaptchaKindServeHTTP(rw, req, configuration.ReasonLAPI, headerReasonFromOrigin(origin), origin)
 	}
 	b.handleBanServeHTTP(rw, req, configuration.ReasonLAPI, headerReasonFromOrigin(origin), origin)
 	return true
 }
 
-// handleCaptchaKindServeHTTP writes a challenge, a solved-form redirect, or a downgrade ban.
+// serveAppsecCaptchaGate serves this router's captcha gate for AppSec: a captcha verdict, or a captcha form POST AppSec let through.
 // False means a widget asset or a cleared gate, and the caller continues.
-func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientrequest.Request, origin string) bool {
+func (b *Bouncer) serveAppsecCaptchaGate(rw http.ResponseWriter, req clientrequest.Request) bool {
+	return b.handleCaptchaKindServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsec, originAppsec)
+}
+
+// handleCaptchaKindServeHTTP writes a challenge, a solved-form redirect, or a downgrade ban.
+// Parameters follow handleBanServeHTTP: banReason is the ban template reason on a downgrade, headerReason names the challenge page.
+// False means a widget asset or a cleared gate, and the caller continues.
+func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientrequest.Request, banReason, headerReason, origin string) bool {
 	if !b.subscribeCaptcha {
 		b.log.Warn(msgCaptchaUnsubscribed, "leg", "captcha", "instanceName", b.captchaInstanceName)
-		b.handleBanServeHTTP(rw, req, configuration.ReasonLAPI, headerReasonCaptchaDowngrade, origin)
+		b.handleBanServeHTTP(rw, req, banReason, headerReasonCaptchaDowngrade, origin)
 		return true
 	}
-	captchaClient := b.loadedCaptcha()
-	if captchaClient == nil || !captchaClient.Valid {
-		b.handleBanServeHTTP(rw, req, configuration.ReasonLAPI, headerReasonCaptchaDowngrade, origin)
+	captchaClient := b.usableCaptcha()
+	if captchaClient == nil {
+		b.handleBanServeHTTP(rw, req, banReason, headerReasonCaptchaDowngrade, origin)
 		return true
 	}
 
@@ -441,9 +488,9 @@ func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientr
 		return false
 	}
 
-	// A valid gate cookie plus a captcha-form POST is a second-tab submit, not origin traffic.
+	// A valid gate cookie plus the challenge marker is a second-tab submit, not origin traffic.
 	if captchaClient.Check(req) {
-		if captchaClient.IsCaptchaFormPost(req.Request) {
+		if captchaClient.HasChallengeMarker(req.Request) {
 			captchaClient.WriteSolvedRedirect(rw, req.Request, b.remediationCustomHeader)
 			return true
 		}
@@ -451,7 +498,7 @@ func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientr
 	}
 
 	b.recordDropped(req, origin, "captcha")
-	challengeValue := formatRemediationHeader(headerKindCaptcha, headerReasonFromOrigin(origin), origin)
+	challengeValue := formatRemediationHeader(headerKindCaptcha, headerReason, origin)
 	captchaClient.ServeHTTP(rw, req, b.remediationCustomHeader, challengeValue)
 	return true
 }
@@ -496,16 +543,29 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientrequest
 	switch decision.Action {
 	case appsec.ActionBan:
 		b.warnCaptchaSuperseded(req, match)
-		b.handleBanServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsec, "appsec")
+		b.handleBanStatusServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsec, originAppsec, b.appsecBanStatusCode(decision))
 		return true
+	case appsec.ActionCaptcha:
+		// CrowdSec sends captcha without a page: the bouncer renders its own captcha.
+		if match.CaptchaName != "" {
+			return false
+		}
+		return b.serveAppsecCaptchaGate(rw, req)
 	case appsec.ActionChallenge:
 		if decision.UserBodyContent == "" {
 			b.warnCaptchaSuperseded(req, match)
-			b.handleBanServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsecChallengeEmpty, "appsec")
+			b.handleBanServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsecChallengeEmpty, originAppsec)
 			return true
 		}
 		if match.CaptchaName != "" {
 			return false
+		}
+	default:
+		// An action this bouncer cannot render, with no page to relay, must not become an empty page.
+		if decision.UserBodyContent == "" {
+			b.warnCaptchaSuperseded(req, match)
+			b.handleBanServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsecActionEmpty, originAppsec)
+			return true
 		}
 	}
 	b.handleAppsecResponseServeHTTP(rw, req, decision)
@@ -514,7 +574,7 @@ func (b *Bouncer) applyAppsecServeHTTP(rw http.ResponseWriter, req clientrequest
 
 // handleAppsecResponseServeHTTP writes a structured AppSec envelope (challenge HTML, cookies, headers) to the client.
 func (b *Bouncer) handleAppsecResponseServeHTTP(rw http.ResponseWriter, req clientrequest.Request, decision *appsec.Response) {
-	b.recordDropped(req, "appsec", "")
+	b.recordDropped(req, originAppsec, "")
 
 	// Copy AppSec-supplied headers, skipping hop-by-hop names and Set-Cookie (cookies have their own field).
 	for name, values := range decision.UserHeaders {

@@ -348,67 +348,6 @@ func TestHandleNextServeHTTPChallengeCSPReplacesAndCookiesStaySeparate(t *testin
 	}
 }
 
-func TestHandleNextServeHTTPRelaysStructuredAppsecCaptcha(t *testing.T) {
-	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte(`{
-			"action":"captcha",
-			"http_status":403,
-			"user_body_content":"<html>captcha</html>",
-			"user_cookies":["captcha=pending; Path=/; HttpOnly"],
-			"user_headers":{
-				"Content-Type":["text/html"],
-				"Cache-Control":["no-store"]
-			}
-		}`))
-	}, nil)
-	defer appsecServer.Close()
-
-	recorder := httptest.NewRecorder()
-	continueAfterLAPIForTest(b, recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
-
-	if recorder.Code != http.StatusForbidden {
-		t.Fatalf("expected captcha status 403, got %d", recorder.Code)
-	}
-	if got := recorder.Body.String(); got != "<html>captcha</html>" {
-		t.Fatalf("expected appsec captcha body, got %q", got)
-	}
-	if got := recorder.Header().Get("Content-Type"); got != "text/html" {
-		t.Fatalf("expected Content-Type relayed, got %q", got)
-	}
-	if got := recorder.Header().Get("Set-Cookie"); got != "captcha=pending; Path=/; HttpOnly" {
-		t.Fatalf("expected Set-Cookie relayed, got %q", got)
-	}
-	if got := recorder.Header().Get("X-Remediation"); got != "captcha:appsec" {
-		t.Fatalf("expected custom remediation header captcha:appsec, got %q", got)
-	}
-}
-
-func TestHandleNextServeHTTPEmptyCaptchaBodyRelaysStatus(t *testing.T) {
-	banTemplate, err := template.New("ban").Parse("<html>operator ban for {{.ClientIP}}</html>")
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte(`{"action":"captcha","http_status":403}`))
-	}, banTemplate)
-	defer appsecServer.Close()
-
-	recorder := httptest.NewRecorder()
-	continueAfterLAPIForTest(b, recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
-
-	if recorder.Code != http.StatusForbidden {
-		t.Fatalf("expected captcha status 403, got %d", recorder.Code)
-	}
-	if got := recorder.Body.String(); got != "" {
-		t.Fatalf("expected empty captcha body, got %q", got)
-	}
-	if got := recorder.Header().Get("X-Remediation"); got != "captcha:appsec" {
-		t.Fatalf("expected custom remediation header captcha:appsec, got %q", got)
-	}
-}
-
 func TestHandleNextServeHTTPLegacyAppsecForbiddenFallsBackToBan(t *testing.T) {
 	b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
@@ -449,6 +388,57 @@ func TestHandleNextServeHTTPStructuredBanKeepsBanTemplate(t *testing.T) {
 	}
 	if got := recorder.Header().Get("X-Remediation"); got != "ban:appsec" {
 		t.Fatalf("expected remediation header ban:appsec, got %q", got)
+	}
+}
+
+// TestHandleNextServeHTTPAppsecBanStatus proves AppSec RateLimit() bans reach the client as 429.
+// Upstream https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/421: the listener
+// answers 403 with {"action":"ban","http_status":429}. Every other ban status keeps remediationStatusCode.
+func TestHandleNextServeHTTPAppsecBanStatus(t *testing.T) {
+	tests := []struct {
+		name                  string
+		envelope              string
+		method                string
+		remediationStatusCode int
+		wantStatus            int
+		wantBody              string
+	}{
+		{name: "rate limit", envelope: `{"action":"ban","http_status":429}`, method: http.MethodGet, remediationStatusCode: http.StatusForbidden, wantStatus: http.StatusTooManyRequests, wantBody: "<html>ban 192.0.2.10</html>"},
+		{name: "rate limit wins over configured status", envelope: `{"action":"ban","http_status":429}`, method: http.MethodGet, remediationStatusCode: http.StatusServiceUnavailable, wantStatus: http.StatusTooManyRequests, wantBody: "<html>ban 192.0.2.10</html>"},
+		{name: "rate limit HEAD has no body", envelope: `{"action":"ban","http_status":429}`, method: http.MethodHead, remediationStatusCode: http.StatusForbidden, wantStatus: http.StatusTooManyRequests, wantBody: ""},
+		{name: "plain ban", envelope: `{"action":"ban","http_status":403}`, method: http.MethodGet, remediationStatusCode: http.StatusForbidden, wantStatus: http.StatusForbidden, wantBody: "<html>ban 192.0.2.10</html>"},
+		{name: "custom user code", envelope: `{"action":"ban","http_status":418}`, method: http.MethodGet, remediationStatusCode: http.StatusForbidden, wantStatus: http.StatusForbidden, wantBody: "<html>ban 192.0.2.10</html>"},
+		{name: "missing http_status", envelope: `{"action":"ban"}`, method: http.MethodGet, remediationStatusCode: http.StatusServiceUnavailable, wantStatus: http.StatusServiceUnavailable, wantBody: "<html>ban 192.0.2.10</html>"},
+	}
+	banTemplate, err := template.New("ban").Parse("<html>ban {{.ClientIP}}</html>")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b, appsecServer := testBouncerWithAppsec(t, func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(tt.envelope))
+			}, banTemplate)
+			defer appsecServer.Close()
+			b.remediationStatusCode = tt.remediationStatusCode
+
+			recorder := httptest.NewRecorder()
+			continueAfterLAPIForTest(b, recorder, testClientRequest(httptest.NewRequest(tt.method, "http://example.com/login", nil), "192.0.2.10"))
+
+			if recorder.Code != tt.wantStatus {
+				t.Fatalf("expected status %d, got %d", tt.wantStatus, recorder.Code)
+			}
+			if got := recorder.Body.String(); got != tt.wantBody {
+				t.Fatalf("expected the operator ban page %q, got %q", tt.wantBody, got)
+			}
+			if got := recorder.Header().Get("X-Remediation"); got != "ban:appsec" {
+				t.Fatalf("expected remediation header ban:appsec, got %q", got)
+			}
+			if got := recorder.Header().Get("Cache-Control"); got != "no-cache, no-store" {
+				t.Fatalf("expected the ban Cache-Control, got %q", got)
+			}
+		})
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"text/template"
@@ -45,6 +46,10 @@ type Client struct {
 }
 
 const msgCaptchaTemplateUnavailable = "crowdsec captcha template unavailable"
+
+// msgCaptchaTemplateMarkerMissing warns that a loaded challenge template does not emit the challenge
+// marker. The template still first-solves, but a leftover tab's second submit is forwarded to origin.
+const msgCaptchaTemplateMarkerMissing = "crowdsec captcha template missing challenge marker"
 
 // New fills widget, verifier, template, and gate fields. Empty provider leaves Valid false.
 // New is the only provider switch. Each named provider calls its pair function.
@@ -91,7 +96,20 @@ func (c *Client) New(log *slog.Logger, httpClient *http.Client, provider, js, ch
 	c.template = challengeTemplate
 	c.templateContentType = contentType
 	c.gracePeriodSeconds = gracePeriodSeconds
+	c.warnIfChallengeMarkerMissing(captchaTemplatePath)
 	return nil
+}
+
+// warnIfChallengeMarkerMissing logs one WARN when the challenge template source does not name
+// challengeMarkerName. Startup only; it never changes Valid. A template that cannot be re-read stays silent:
+// GetTemplate already loaded it.
+func (c *Client) warnIfChallengeMarkerMissing(captchaTemplatePath string) {
+	//nolint:gosec
+	source, err := os.ReadFile(captchaTemplatePath)
+	if err != nil || strings.Contains(string(source), challengeMarkerName) {
+		return
+	}
+	c.log.Warn(msgCaptchaTemplateMarkerMissing, "marker", challengeMarkerName+"="+challengeMarkerValue)
 }
 
 // HTTPClientForTest returns the HTTP client the captcha Client uses for its verifier. Tests only.
@@ -173,20 +191,26 @@ func (c *Client) IsCustomResourceRequest(r *http.Request) bool {
 	return false
 }
 
-// IsCaptchaFormPost reports whether this POST carries a non-empty provider response field.
+// challengeMarkerName is the hidden field that marks a CrowdSec challenge form.
+// Shipped challenge pages emit the same name. Not a Config key.
+const challengeMarkerName = "crowdsec_captcha_challenge"
+
+// challengeMarkerValue is the only marker value that counts as a CrowdSec challenge POST.
+const challengeMarkerValue = "v1"
+
+// HasChallengeMarker reports whether this POST carries challenge marker crowdsec_captcha_challenge=v1.
 // Its caller may still forward the request, so it never consumes the body: a POST that
-// turns out not to be a captcha form reaches origin intact. Validate uses
+// does not carry the marker reaches origin intact. Validate uses
 // readFieldFromRequest instead, which is free to consume the body.
-func (c *Client) IsCaptchaFormPost(r *http.Request) bool {
-	if r == nil || r.Method != http.MethodPost || c.widget.TokenField == "" {
+func (*Client) HasChallengeMarker(r *http.Request) bool {
+	if r == nil || r.Method != http.MethodPost {
 		return false
 	}
-	field := c.widget.TokenField
 	// Something upstream already parsed the form; rereading Body would find nothing.
 	if r.PostForm != nil {
-		return r.PostForm.Get(field) != ""
+		return r.PostForm.Get(challengeMarkerName) == challengeMarkerValue
 	}
-	// A declared body over the cap is origin traffic; do not buffer it to hunt for a token.
+	// A declared body over the cap is origin traffic; do not buffer it to hunt for the challenge marker.
 	if r.ContentLength > captchaFormMaxBytes {
 		return false
 	}
@@ -194,7 +218,7 @@ func (c *Client) IsCaptchaFormPost(r *http.Request) bool {
 	if !withinCap {
 		return false
 	}
-	return formFieldValue(r.Header.Get("Content-Type"), body, field) != ""
+	return formFieldValue(r.Header.Get("Content-Type"), body, challengeMarkerName) == challengeMarkerValue
 }
 
 // WriteSolvedRedirect issues 302 to the same URL without reminting the gate cookie.

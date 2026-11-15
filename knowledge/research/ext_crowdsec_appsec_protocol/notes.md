@@ -61,6 +61,17 @@ Challenge-protocol extra rules ([challenge protocol](https://docs.crowdsec.net/d
 - `403` + empty body or invalid JSON → `ban`.
 - Do not leak the AppSec JSON envelope to the browser on a block.
 
+## `captcha` is an official action and never carries a page
+
+Fetched 2026-11-14 from source, not docs summaries.
+
+- CrowdSec defines four remediations: `BanRemediation = "ban"`, `CaptchaRemediation = "captcha"`, `AllowRemediation = "allow"`, `ChallengeRemediation = "challenge"`. Config validation lists them as "the officially supported remediation(s)" and only warns on any other `default_remediation`. v1.6.0 already listed `ban`, `captcha`, `log`. ([appsec.go](https://github.com/crowdsecurity/crowdsec/blob/e20782bb3c532f0b9b9a469c0bdaa003588ec8e5/pkg/appsec/appsec.go), extract `.sources/appsec-generate-response.md`)
+- `GenerateResponse` fills `user_body_content`, `user_cookies`, `user_headers` **only for `challenge`**. `ban` and `captcha` send `action` plus `http_status` (`UserHTTPResponseCode`, else `UserBlockedHTTPCode`, default 403). So a real `captcha` envelope is always `{"action":"captcha","http_status":403}` (or the operator's `SetReturnCode`). ([appsec.go](https://github.com/crowdsecurity/crowdsec/blob/e20782bb3c532f0b9b9a469c0bdaa003588ec8e5/pkg/appsec/appsec.go))
+- `SetRemediation(x)` stores any string without validation. An unknown action takes `GenerateResponse`'s `default` branch: same status logic as ban/captcha, no body. ([waf_helpers.go](https://github.com/crowdsecurity/crowdsec/blob/e20782bb3c532f0b9b9a469c0bdaa003588ec8e5/pkg/appsec/waf_helpers.go))
+- Docs agree: hooks pass `ban` and `captcha` "as-is to the remediation component"; protocol and challenge-protocol pages call `ban` and `captcha` verdicts the remediation component "renders from its own templates", unlike `challenge`. Rule examples use `SetRemediation('captcha')`. ([hooks](https://docs.crowdsec.net/docs/appsec/hooks), [protocol](https://docs.crowdsec.net/docs/appsec/protocol), [challenge protocol](https://docs.crowdsec.net/docs/appsec/bot_detection/challenge_protocol))
+- Reference bouncer `crowdsecurity/lua-cs-bouncer@4aad1df`: AppSec `captcha` is served with the bouncer's own captcha; the captcha form submission is validated **before** querying AppSec (the form posts back to the URI that triggered it); a solved captcha is remembered per source (LAPI vs AppSec); unsupported remediations go through `FALLBACK_REMEDIATION` (ban by default); `challenge` without a body bans. ([crowdsec.lua](https://github.com/crowdsecurity/lua-cs-bouncer/blob/4aad1df/lib/crowdsec.lua), extract `.sources/lua-appsec-captcha.md`)
+- Upstream Traefik plugin `maxlerebourg/crowdsec-bouncer-traefik-plugin@e93151a0` (PR [#403](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403) commit 3): AppSec `captcha` with a configured provider and a non-HEAD request → solved (IP cache) passes, otherwise the captcha page; no provider or HEAD → ban; every action other than `challenge` / `captcha` → ban. The form POST is validated only when AppSec answers it with `captcha` again; checking the submission before AppSec was left out.
+
 ## `500` / `401` / unexpected / timeout are failures
 
 Spec: timeout, `500`, `401`, and similar response failures all share one fallback field `appsec_failure_action`. Default **passthrough** (let the request through). Possible values: `passthrough`, `ban`, `captcha`. Default timeout **200ms** (`appsec_timeout`). AppSec forwarding is a blocking wait. ([bouncer specs](https://docs.crowdsec.net/docs/next/contributing/specs/bouncer_appsec_specs.md))
@@ -79,9 +90,11 @@ Follow source for what `maxlerebourg/crowdsec-bouncer-traefik-plugin@04d92887` d
 - Any other non-200, including protocol `401` and protocol `403`, returns an error and the request is banned. The plugin does **not** parse the `403` JSON `action` body.
 - It does not send `X-Crowdsec-Appsec-Http-Version`.
 
+Community PR [maxlerebourg/crowdsec-bouncer-traefik-plugin#403](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/pull/403) (2026-10-12, merge `e0505f98`, issue 402 point 2) maps 401 and every other unexpected status onto the same `crowdsecAppsecFailureBlock` branch as 500, logs `Error(fmt.Sprintf("appsecQuery:failure statusCode:%d"))`, and keeps 502/503/504 as unreachable. 403 still parses JSON before that default. That PR does not exist on this fork's `master`; this fork already replaced the bools with `bouncerAppsecFailureAction` and still bans a bare 401.
+
 ## References
 
 - Official: [WAF / Bouncer communication protocol](https://docs.crowdsec.net/docs/appsec/protocol), [challenge protocol](https://docs.crowdsec.net/docs/next/appsec/bot_detection/challenge_protocol.md), [bouncer AppSec specs](https://docs.crowdsec.net/docs/next/contributing/specs/bouncer_appsec_specs.md)
-- Source: `github.com/crowdsecurity/crowdsec@3d5c4d9b:pkg/appsec/request.go` (`applyHTTPVersion`), `github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin@04d92887:bouncer.go`
+- Source: `github.com/crowdsecurity/crowdsec@3d5c4d9b:pkg/appsec/request.go` (`applyHTTPVersion`), `github.com/crowdsecurity/crowdsec@e20782bb:pkg/appsec/appsec.go` (`GenerateResponse`), `github.com/crowdsecurity/lua-cs-bouncer@4aad1df:lib/crowdsec.lua`, `github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin@04d92887:bouncer.go`
 - Related finding: `ext_crowdsec_bouncers_failure-action/`
 - Extracts: `.sources/`
