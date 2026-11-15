@@ -27,7 +27,7 @@ git clone --depth 1 --branch v1.2.0 https://github.com/david-garcia-garcia/traef
 docker compose -f examples/geoenrich-decisions/docker-compose.yml up -d
 ```
 
-The compose file loads **this tree** as a local Traefik plugin so `bouncerDecisionScopeHeaders` works before it is in a catalog release. Geoblock is also local (`useunsafe` is required). Switch both to catalog plugins after a bouncer release that includes this key; keep geoblock `settings.useunsafe=true`.
+The compose file loads **this checkout** as a local Traefik plugin, like the other compose examples. Geoblock is also local (`useunsafe` is required). `bouncerDecisionScopeHeaders` is in catalog releases from `v1.9.0`: to use catalog plugins instead, swap in the commented `experimental.plugins` lines and drop the matching bind-mounts; keep geoblock `settings.useunsafe=true`.
 
 Traefik 3.5+ is required for geoblock.
 

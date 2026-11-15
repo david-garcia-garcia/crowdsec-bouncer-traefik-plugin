@@ -36,9 +36,12 @@
       "datasourceTemplate": "github-tags"
     },
     {
-      "description": "Plugin self-pin in the Traefik Helm values (version: \"vX\")",
+      "description": "Plugin catalog pin in the install examples: Kubernetes Helm values and binary-vm static config (version: \"vX\")",
       "customType": "regex",
-      "managerFilePatterns": ["/^examples/kubernetes/traefik/values\\.ya?ml$/"],
+      "managerFilePatterns": [
+        "/^examples/kubernetes/traefik/values\\.ya?ml$/",
+        "/^examples/binary-vm/files/traefik/traefik\\.ya?ml$/"
+      ],
       "matchStrings": [
         "version:\\s*\"(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)\""
       ],

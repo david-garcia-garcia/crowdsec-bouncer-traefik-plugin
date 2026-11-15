@@ -23,7 +23,7 @@ description: How named LAPI, AppSec, and captcha slots Publish and Subscribe thr
 ## Local plugin
 priority: normal
 local: core_plugin_middleware_local-plugin.md
-description: How this unpublished fork is loaded by Traefik (import equals go.mod, localPlugins, no catalog version).
+description: How Traefik loads this fork (import equals go.mod; localPlugins from a checkout, pinned catalog release in install examples).
 
 ## Config validation
 priority: normal

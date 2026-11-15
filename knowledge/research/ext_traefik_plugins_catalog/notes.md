@@ -12,23 +12,25 @@ The download URL is `{pluginsURL}download/{moduleName}/{version}` (`https://plug
 
 Owner: `github.com/traefik/traefik@f6b7940b761abe0d16ee4b03588a0318481d86d8:pkg/plugins/client.go` (`Download`). That commit split the helper; v3.7.11 (`faa1eb59`) already has the same `pluginsURL` on `manager.go`. Extract: `.sources/client.go.md`.
 
-Measured 2026-09-18 (GET, no body saved):
+Measured 2026-11-15 (GET, no body saved):
 
 | moduleName | version | HTTP |
 |---|---|---|
-| `github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin` | `v1.7.1` | 200 |
-| `github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin` | `v1.7.1` | 404 |
-| `github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin` | `vX.Y.Z` | 404 |
+| `github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin` | `v1.8.2` | 500 |
+| `github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin` | `v1.9.0` … `v1.9.6` | 200 (`application/zip`) |
+| `github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin` | `v1.8.1` | 200 |
 
-Authority: inference from those responses. Official docs do not publish a “404 means unpublished” sentence; `Download` treats any non-200 as failure. Extract: `.sources/catalog-download-status.md`.
+Traefik v3.7.18 with `experimental.plugins.bouncer` (`moduleName` this module, `version: v1.9.6`), run as uid 65532 with a read-only root filesystem and a writable `/plugins-storage`, downloads `archives/.../v1.9.6.zip` and extracts it under `sources/` without error.
 
-## Catalog will not list a fork
+Superseded measurement, 2026-09-18: this module returned 404 at `v1.7.1` and `vX.Y.Z`. It was taken before the catalog listed the module (see below). Extract: `.sources/catalog-download-status.md`.
+
+## Catalog listing
 
 The catalog polls public GitHub daily. Checklist includes: **the repository is not a fork — forks are not added**. Also required: `traefik-plugin` topic, `.traefik.yml` with `testData`, `go.mod`, git tags, vendored deps.
 
 Owner: [Developing Traefik Plugins](https://plugins.traefik.io/create). Extract: `.sources/developing-traefik-plugins.md`.
 
-This GitHub repo is a fork of `maxlerebourg/crowdsec-bouncer-traefik-plugin`. Catalog listing of this module is not something a later in-tree change can satisfy without leaving the fork relationship (out of scope).
+Measured 2026-11-15: the GitHub API reports this repository with `"fork": false`, and `https://plugins.traefik.io/api/services/plugins?query=david-garcia-garcia` lists `github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin` (`displayName` `CrowdSec Bouncer Traefik Plugin (david-garcia-garcia)`, `latestVersion` `v1.9.6`, `createdAt` `2026-09-21T08:02:30Z`). The catalog therefore serves release tags of this module, from `v1.9.0`. Extract: `.sources/catalog-download-status.md`.
 
 ## Alias is the routing key
 
