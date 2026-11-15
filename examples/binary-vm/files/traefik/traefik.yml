@@ -27,13 +27,13 @@ providers:
 # Plugin configuration
 ################################################################
 
-# Catalog download of this fork 404s. Copy this repository to
-# ./plugins-local/src/github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
-# relative to the Traefik process working directory.
+# Traefik downloads this release from the plugin catalog at startup, into
+# ./plugins-storage relative to its working directory (/etc/traefik).
 experimental:
-  localPlugins:
+  plugins:
     bouncer:
       moduleName: github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
+      version: "v1.9.6"
 
 ################################################################
 # Certificate Resolver

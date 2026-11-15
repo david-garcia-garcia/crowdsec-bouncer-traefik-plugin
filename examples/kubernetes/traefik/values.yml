@@ -1,20 +1,30 @@
-image:
-  tag: v3.7.11
-
-logs:
-  general:
-    level: DEBUG
-  access:
-    enabled: true
-    format: json
-    fields:
-      headers: 
-        defaultmode: keep
-
-# Catalog download of this fork 404s. Mount or copy this repository to
-# plugins-local/src/github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
-# on the Traefik pod (hostPath, ConfigMap, or init copy).
 experimental:
-  localPlugins:
+  plugins:
     bouncer:
-      moduleName: "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin"
+      moduleName: github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
+      version: "v1.9.6"
+
+volumes:
+  - name: crowdsec-bouncer-key
+    mountPath: /etc/traefik/crowdsec
+    type: secret
+
+log:
+  level: INFO
+
+accessLog:
+  enabled: true
+  format: json
+  fields:
+    headers:
+      defaultMode: drop
+      names:
+        User-Agent: keep
+
+ingressRoute:
+  dashboard:
+    enabled: true
+
+service:
+  spec:
+    externalTrafficPolicy: Local
