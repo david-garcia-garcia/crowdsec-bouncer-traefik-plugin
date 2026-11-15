@@ -49,7 +49,7 @@ All four parts sit in `pkg/bouncer/bouncer.go` and `pkg/httprule`, and the prefi
 In progress. 1 items remain.
 
 Priority: P1 — unanswered challenge paths can reach origin, and bypass rules can let ambiguous paths skip AppSec; the metrics over-count is P2.
-Reviewed head: 52f21152
+Reviewed head: ce821359
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -121,7 +121,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 8 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 52f21152eb8ed2e18a7bee58aeb0a4a91b8c136e | Card must match the branch you measured |
+| Reviewed head | ce821359cba275b2af430438052069f5410e646c | Card must match the branch you measured |
 
 ### Stored data model
 None.
