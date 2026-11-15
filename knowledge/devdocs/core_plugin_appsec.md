@@ -65,6 +65,7 @@ decision, err := b.appsecClient.Query(req, pol)
 - A matched captcha action rule wins over a non-empty AppSec challenge envelope. Empty challenge body still fail-closed bans (`headerReasonAppsecChallengeEmpty`) and WARNs `warnCaptchaSuperseded`.
 - Empty-challenge fail-closed runs in `applyAppsecServeHTTP` before `handleAppsecResponseServeHTTP` and before `WriteHeader`. Do not commit status first.
 - Relay replaces same-name `user_headers` (assign, do not `Add`) and `Add`s each `user_cookies` string as its own `Set-Cookie`.
+- That replace only beats headers already on the writer. Traefik's `headers` middleware (`contentSecurityPolicy` and `customResponseHeaders`) wraps the writer in `middlewares.ResponseModifier` and `Set`s its headers inside `WriteHeader`, after the plugin. Listed before the bouncer, it overwrites the challenge CSP; listed after, it never runs on a plugin answer. No plugin code fixes this: deleting or loosening the CSP is overwritten the same way, and `Unwrap()` past the modifier would skip every outer wrapper and drop the operator's other security headers. The README section "Keep a Content-Security-Policy without breaking the challenge or the captcha" tells operators to list the CSP `headers` middleware after the bouncer.
 - Missing `http_status` is 200. Values outside 100–999 use `remediationStatusCode`.
 - Do not send `/crowdsec-internal/challenge/*` to origin.
 - `Query` `captcha` failure action is `ErrFailureCaptcha` → `pkg/captcha`. Do not treat that error as AppSec JSON `action: captcha`.
