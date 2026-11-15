@@ -36,32 +36,30 @@
       "datasourceTemplate": "github-tags"
     },
     {
-      "description": "Plugin self-pin in the Traefik Helm values (version: \"vX\")",
+      "description": "Plugin tag cloned by the init container in the Traefik Helm values (--branch=vX)",
       "customType": "regex",
       "managerFilePatterns": ["/^examples/kubernetes/traefik/values\\.ya?ml$/"],
-      "matchStrings": [
-        "version:\\s*\"(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)\""
-      ],
+      "matchStrings": ["--branch=(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"],
       "depNameTemplate": "david-garcia-garcia/crowdsec-bouncer-traefik-plugin",
       "datasourceTemplate": "github-tags"
     },
     {
-      "description": "Traefik image tag in the Traefik Helm values (no repository key, so match by file)",
+      "description": "Traefik Helm chart pin in the Kubernetes example README. Each chart version ships its own Traefik image, so the values set no image.tag",
       "customType": "regex",
-      "managerFilePatterns": ["/^examples/kubernetes/traefik/values\\.ya?ml$/"],
-      "matchStrings": ["tag:\\s*(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"],
+      "managerFilePatterns": ["/^examples/kubernetes/README\\.md$/"],
+      "matchStrings": ["traefik/traefik --version (?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)"],
       "depNameTemplate": "traefik",
-      "datasourceTemplate": "docker"
+      "datasourceTemplate": "helm",
+      "registryUrlTemplate": "https://traefik.github.io/charts"
     },
     {
-      "description": "Crowdsec image tag in the Crowdsec Helm values (no repository key, so match by file)",
+      "description": "CrowdSec Helm chart pin in the Kubernetes example README. Each chart version ships its own CrowdSec image: an older image.tag breaks the LAPI, so the values set none",
       "customType": "regex",
-      "managerFilePatterns": [
-        "/^examples/kubernetes/crowdsec/values\\.ya?ml$/"
-      ],
-      "matchStrings": ["tag:\\s*(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"],
-      "depNameTemplate": "crowdsecurity/crowdsec",
-      "datasourceTemplate": "docker"
+      "managerFilePatterns": ["/^examples/kubernetes/README\\.md$/"],
+      "matchStrings": ["crowdsec/crowdsec --version (?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)"],
+      "depNameTemplate": "crowdsec",
+      "datasourceTemplate": "helm",
+      "registryUrlTemplate": "https://crowdsecurity.github.io/helm-charts"
     },
     {
       "description": "Pinned Traefik binary in the e2e mock suite (TRAEFIK_VERSION:-vX in common.sh)",

@@ -1,20 +1,55 @@
-image:
-  tag: v3.7.11
+# The Traefik plugin catalog does not serve this fork, so Traefik loads it as a
+# local plugin. An init container clones a release tag into an emptyDir, and
+# the chart mounts it at plugins-local/src/<module>.
+deployment:
+  additionalVolumes:
+    - name: bouncer-plugin
+      emptyDir: {}
+  initContainers:
+    - name: fetch-bouncer-plugin
+      image: alpine/git:v2.54.1
+      args:
+        - clone
+        - --depth=1
+        - --branch=v1.9.6
+        - https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin.git
+        - /plugin
+      env:
+        - name: HOME
+          value: /tmp
+      volumeMounts:
+        - name: bouncer-plugin
+          mountPath: /plugin
 
-logs:
-  general:
-    level: DEBUG
-  access:
-    enabled: true
-    format: json
-    fields:
-      headers: 
-        defaultmode: keep
-
-# Catalog download of this fork 404s. Mount or copy this repository to
-# plugins-local/src/github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
-# on the Traefik pod (hostPath, ConfigMap, or init copy).
 experimental:
   localPlugins:
     bouncer:
-      moduleName: "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin"
+      moduleName: github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
+      mountPath: /plugins-local/src/github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
+      type: localPath
+      volumeName: bouncer-plugin
+
+volumes:
+  - name: crowdsec-bouncer-key
+    mountPath: /etc/traefik/crowdsec
+    type: secret
+
+log:
+  level: INFO
+
+accessLog:
+  enabled: true
+  format: json
+  fields:
+    headers:
+      defaultMode: drop
+      names:
+        User-Agent: keep
+
+ingressRoute:
+  dashboard:
+    enabled: true
+
+service:
+  spec:
+    externalTrafficPolicy: Local
