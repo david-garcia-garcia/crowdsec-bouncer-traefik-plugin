@@ -1,0 +1,28 @@
+# AppSec admission gate with the shipped defaults: no appsecUnhealthy* key and no
+# bouncerAppsecFailureAction, so the period is 30 s, the budget 5, and the action ban.
+# The listener is waf-5xx (nginx answering 503 on every path), a listener outage.
+http:
+  routers:
+    waf-backoff-default:
+      rule: PathPrefix(`/waf-backoff-default`)
+      entryPoints: [web]
+      middlewares: [bouncer-waf-backoff-default]
+      service: whoami@docker
+  middlewares:
+    bouncer-waf-backoff-default:
+      plugin:
+        bouncer:
+          appsecEnabled: "true"
+          appsecHost: waf-5xx:80
+          appsecHttpTimeoutSeconds: "2"
+          appsecKey: c51a1c70000000000000000000000005
+          appsecPath: /waf-backoff-default
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          reclaimGraceSeconds: "2"
