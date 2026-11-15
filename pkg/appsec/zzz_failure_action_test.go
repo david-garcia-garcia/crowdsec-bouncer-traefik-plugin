@@ -135,6 +135,52 @@ func Test_appsecQuery_failureActionOnUnreachable(t *testing.T) {
 	}
 }
 
+// Test_appsecQuery_unreachableLogsCauseOnce proves a transport failure logs its cause once per window.
+// Upstream issue maxlerebourg/crowdsec-bouncer-traefik-plugin#238.
+func Test_appsecQuery_unreachableLogsCauseOnce(t *testing.T) {
+	logger.ResetDebounceForTest()
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	}))
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	httpClient := appsecServer.Client()
+	appsecServer.Close()
+	var sink bytes.Buffer
+	log := slog.New(slog.NewJSONHandler(&sink, &slog.HandlerOptions{Level: slog.LevelError}))
+	client := NewTestClient(appsecURL, httpClient, log)
+	req := buildTestRequest()
+
+	for range 2 {
+		decision, err := client.Query(req, Policy{FailureAction: configuration.FailureActionPassthrough})
+		if err != nil {
+			t.Fatalf("passthrough on unreachable: %v", err)
+		}
+		if decision == nil || decision.Action != ActionAllow {
+			t.Fatalf("passthrough on unreachable want allow, got %#v", decision)
+		}
+	}
+	if got := strings.Count(sink.String(), msgUnreachable); got != 1 {
+		t.Fatalf("unreachable Error count %d, log %s", got, sink.String())
+	}
+	if !strings.Contains(sink.String(), `"level":"ERROR"`) {
+		t.Fatalf("unreachable not logged at Error: %s", sink.String())
+	}
+	if !strings.Contains(sink.String(), `"error":`) || !strings.Contains(sink.String(), "dial tcp") {
+		t.Fatalf("unreachable log missing the transport cause: %s", sink.String())
+	}
+
+	_, err := client.Query(req, Policy{FailureAction: configuration.FailureActionBan})
+	if err == nil {
+		t.Fatal("ban on unreachable expected an error")
+	}
+	if !strings.HasPrefix(err.Error(), msgUnreachable+": ") || !strings.Contains(err.Error(), "dial tcp") {
+		t.Fatalf("ban error missing the transport cause: %v", err)
+	}
+	if got := strings.Count(sink.String(), msgUnreachable); got != 1 {
+		t.Fatalf("unreachable Error not debounced across failure actions, count %d, log %s", got, sink.String())
+	}
+}
+
 // Test_appsecQuery_failureActionOnResponseBodyReadError proves a body io error uses FailureAction.
 func Test_appsecQuery_failureActionOnResponseBodyReadError(t *testing.T) {
 	client := NewTestClient(&url.URL{Scheme: "http", Host: "appsec.example"}, &http.Client{Transport: failBodyRoundTripper{}}, logger.New("INFO", ""))
