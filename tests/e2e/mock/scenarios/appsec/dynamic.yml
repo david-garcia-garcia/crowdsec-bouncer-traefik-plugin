@@ -20,6 +20,7 @@ http:
           appsecEnabled: "true"
           appsecHost: "@@APPSEC_HOST@@"
           appsecScheme: http
+          appsecUnhealthyBackOffPeriodSecs: "0"
           bouncerAppsecFailureAction: ban
           bouncerEnabled: "true"
           bouncerForwardedHeadersTrustedIps:

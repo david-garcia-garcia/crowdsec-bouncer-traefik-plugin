@@ -1,6 +1,7 @@
 package configuration
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -175,6 +176,24 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	cfgCaptchaE2LeftoverKeysNotSecret.CaptchaSiteKey = ""
 	cfgCaptchaE3BounceNoName := getMinimalConfig()
 	cfgCaptchaE3BounceNoName.BouncerEnabled = true
+	cfgModsecE2LeftoverName := getMinimalConfig()
+	cfgModsecE2LeftoverName.ModsecInstanceName = "shared"
+	cfgModsecE3BounceNoName := getMinimalConfig()
+	cfgModsecE3BounceNoName.BouncerEnabled = true
+	cfgModsecEnabledEmptyURL := getMinimalConfig()
+	cfgModsecEnabledEmptyURL.ModsecEnabled = true
+	cfgModsecEnabledURL := getMinimalConfig()
+	cfgModsecEnabledURL.ModsecEnabled = true
+	cfgModsecEnabledURL.ModsecURL = "http://waf:8080"
+	cfgModsecDisabledEmptyURL := getMinimalConfig()
+	cfgModsecFailModeBan := getMinimalConfig()
+	cfgModsecFailModeBan.BouncerModsecFailMode = "ban"
+	cfgAppsecBackoffNegative := getMinimalConfig()
+	cfgAppsecBackoffNegative.AppsecUnhealthyBackOffPeriodSecs = -1
+	cfgAppsecBackoffZero := getMinimalConfig()
+	cfgAppsecBackoffZero.AppsecUnhealthyBackOffPeriodSecs = 0
+	cfgModsecBodyZero := getMinimalConfig()
+	cfgModsecBodyZero.ModsecBodyLimit = 0
 	cfgUnknownAction := getMinimalConfig()
 	cfgUnknownAction.BouncerAppsecFailureAction = "block"
 	cfgEmptyAction := getMinimalConfig()
@@ -352,6 +371,15 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 		{name: "Leftover captcha instance name with nothing enabled fails", args: args{config: cfgCaptchaE2LeftoverName}, wantErr: true},
 		{name: "Leftover captcha keys are not E2 secrets", args: args{config: cfgCaptchaE2LeftoverKeysNotSecret}, wantErr: false},
 		{name: "Bouncer with captcha off and no name succeeds", args: args{config: cfgCaptchaE3BounceNoName}, wantErr: false},
+		{name: "Leftover ModSec instance name with nothing enabled fails", args: args{config: cfgModsecE2LeftoverName}, wantErr: true},
+		{name: "Bouncer with ModSec off and no name succeeds", args: args{config: cfgModsecE3BounceNoName}, wantErr: false},
+		{name: "Enabled ModSec with empty URL fails", args: args{config: cfgModsecEnabledEmptyURL}, wantErr: true, wantErrContains: "ModsecURL"},
+		{name: "Enabled ModSec with absolute URL passes", args: args{config: cfgModsecEnabledURL}, wantErr: false},
+		{name: "Disabled ModSec with empty URL passes", args: args{config: cfgModsecDisabledEmptyURL}, wantErr: false},
+		{name: "Unknown ModSec failMode fails", args: args{config: cfgModsecFailModeBan}, wantErr: true, wantErrContains: "BouncerModsecFailMode"},
+		{name: "Negative AppSec backoff fails", args: args{config: cfgAppsecBackoffNegative}, wantErr: true, wantErrContains: "AppsecUnhealthyBackOffPeriodSecs"},
+		{name: "Zero AppSec backoff disables the gate", args: args{config: cfgAppsecBackoffZero}, wantErr: false},
+		{name: "Zero ModSec body limit is unlimited", args: args{config: cfgModsecBodyZero}, wantErr: false},
 		{name: "Provider set with empty site and secret", args: args{config: cfgEmptyKeysDefaultBan}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},
 		{name: "Provider set with only site empty", args: args{config: cfgOnlySiteEmpty}, wantErr: true, wantErrContains: "CaptchaSiteKey: cannot be empty when CaptchaProvider is set"},
 		{name: "Provider set with only secret empty", args: args{config: cfgOnlySecretEmpty}, wantErr: true, wantErrContains: "CaptchaSecretKey: cannot be empty when CaptchaProvider is set"},
@@ -1094,4 +1122,44 @@ func TestForwardedHeadersInsecure(t *testing.T) {
 			t.Fatal("ValidateParams = nil want error")
 		}
 	})
+}
+
+// TestNew_ModsecAndAppsecBackoffDefaults pins CreateConfig values for the ModSec leg and AppSec gate.
+func TestNew_ModsecAndAppsecBackoffDefaults(t *testing.T) {
+	cfg := New()
+	if cfg.ModsecEnabled {
+		t.Fatal("ModsecEnabled default = true want false")
+	}
+	if cfg.ModsecBodyLimit != DefaultModsecBodyLimit {
+		t.Fatalf("ModsecBodyLimit=%d want %d", cfg.ModsecBodyLimit, DefaultModsecBodyLimit)
+	}
+	if cfg.ModsecHTTPTimeoutSeconds != 10 {
+		t.Fatalf("ModsecHTTPTimeoutSeconds=%d want 10", cfg.ModsecHTTPTimeoutSeconds)
+	}
+	if cfg.ModsecUnhealthyBackOffPeriodSecs != 0 {
+		t.Fatalf("Modsec backoff=%d want 0", cfg.ModsecUnhealthyBackOffPeriodSecs)
+	}
+	if cfg.BouncerModsecFailMode != ModsecFailModeOpen {
+		t.Fatalf("BouncerModsecFailMode=%q want %q", cfg.BouncerModsecFailMode, ModsecFailModeOpen)
+	}
+	if cfg.AppsecUnhealthyBackOffPeriodSecs != DefaultAppsecUnhealthyBackOffPeriodSecs {
+		t.Fatalf("Appsec backoff=%d want %d", cfg.AppsecUnhealthyBackOffPeriodSecs, DefaultAppsecUnhealthyBackOffPeriodSecs)
+	}
+	if cfg.AppsecUnhealthyFailureThreshold != DefaultUnhealthyFailureThreshold {
+		t.Fatalf("Appsec threshold=%d want %d", cfg.AppsecUnhealthyFailureThreshold, DefaultUnhealthyFailureThreshold)
+	}
+	if cfg.AppsecUnhealthyFailureRatio != DefaultUnhealthyFailureRatio {
+		t.Fatalf("Appsec ratio=%v want %v", cfg.AppsecUnhealthyFailureRatio, DefaultUnhealthyFailureRatio)
+	}
+}
+
+// TestConfig_sourceCamelCaseURLIgnored pins Traefik decode dropping source-plugin modSecurityUrl.
+func TestConfig_sourceCamelCaseURLIgnored(t *testing.T) {
+	var cfg Config
+	if err := json.Unmarshal([]byte(`{"modSecurityUrl":"http://waf:80","modsecUrl":""}`), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ModsecURL != "" {
+		t.Fatalf("ModsecURL=%q; source camelCase must not bind", cfg.ModsecURL)
+	}
 }

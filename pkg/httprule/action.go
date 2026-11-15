@@ -14,6 +14,7 @@ const (
 	ActionBypass       = "bypass"
 	ActionBypassAppsec = "bypassAppsec"
 	ActionBypassLapi   = "bypassLapi"
+	ActionBypassModsec = "bypassModsec" //nolint:gosec // G101: action token, not a credential
 	ActionCaptcha      = "captcha"
 )
 
@@ -38,6 +39,7 @@ type actionTokens struct {
 	captcha    bool
 	skipAppsec bool
 	skipLapi   bool
+	skipModsec bool
 }
 
 // NewActionSet validates names and action tokens, then compiles predicates with New.
@@ -70,7 +72,7 @@ func NewActionSet(rules []ActionRule) (*ActionSet, error) {
 
 // ActionMatch is every matching row reduced for one request.
 // BanName and CaptchaName are the first matching rule of that token. Empty means none.
-// SkipLapi and SkipAppsec are OR'd across every non-ban hit. A ban row contributes only its name.
+// SkipLapi, SkipAppsec, and SkipModsec are OR'd across every non-ban hit. A ban row contributes only its name.
 // AmbiguousPathName is the first matching rule with a path predicate whose skips were dropped
 // because the request path has more than one reading (see SingleReadingPath). Empty means none.
 type ActionMatch struct {
@@ -79,6 +81,7 @@ type ActionMatch struct {
 	CaptchaName       string
 	SkipAppsec        bool
 	SkipLapi          bool
+	SkipModsec        bool
 }
 
 // Matching returns every matching index in list order. Cookie is parsed once when needed.
@@ -109,7 +112,7 @@ func (set *ActionSet) Fold(httpReq *http.Request) ActionMatch {
 		if set.Captcha(i) && match.CaptchaName == "" {
 			match.CaptchaName = set.Name(i)
 		}
-		if !set.SkipLapi(i) && !set.SkipAppsec(i) {
+		if !set.SkipLapi(i) && !set.SkipAppsec(i) && !set.SkipModsec(i) {
 			continue
 		}
 		if set.set.hasPath(i) && reading.ambiguous() {
@@ -123,6 +126,9 @@ func (set *ActionSet) Fold(httpReq *http.Request) ActionMatch {
 		}
 		if set.SkipAppsec(i) {
 			match.SkipAppsec = true
+		}
+		if set.SkipModsec(i) {
+			match.SkipModsec = true
 		}
 	}
 	return match
@@ -172,6 +178,11 @@ func (set *ActionSet) SkipAppsec(i int) bool {
 	return set != nil && i >= 0 && i < len(set.tokens) && set.tokens[i].skipAppsec
 }
 
+// SkipModsec reports whether the row at index i skips ModSec (bypass or bypassModsec).
+func (set *ActionSet) SkipModsec(i int) bool {
+	return set != nil && i >= 0 && i < len(set.tokens) && set.tokens[i].skipModsec
+}
+
 // compileActionName trims name, rejects empty, colon, and duplicates.
 func compileActionName(raw string, seen map[string]struct{}) (string, error) {
 	name := strings.TrimSpace(raw)
@@ -211,10 +222,13 @@ func compileActionTokens(raw []string) (actionTokens, error) {
 		case ActionBypass:
 			parsed.skipLapi = true
 			parsed.skipAppsec = true
+			parsed.skipModsec = true
 		case ActionBypassLapi:
 			parsed.skipLapi = true
 		case ActionBypassAppsec:
 			parsed.skipAppsec = true
+		case ActionBypassModsec:
+			parsed.skipModsec = true
 		default:
 			return actionTokens{}, fmt.Errorf("action: unknown %q", token)
 		}

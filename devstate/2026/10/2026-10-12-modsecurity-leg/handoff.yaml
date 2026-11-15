@@ -1,0 +1,16 @@
+issueKey: 2026-10-12-modsecurity-leg
+jobName: 2026-10-12-modsecurity-leg
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: 2026-10-04-bouncer-refactor
+qualify: qualified-with-gaps
+src: 48ef18668a6ec73f46f69b5dc4da0ffbf458c49bdb7b7f6c8c90495eaaee5813
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: modsecurity-leg
+pr: { id: 190, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/190 }

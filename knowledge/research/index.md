@@ -74,3 +74,8 @@ description: Official Myra EU CAPTCHA verify API and browser widget this product
 priority: normal
 local: index_ext_yaegi.md
 description: Official yaegi interpreter behavior this product relies on.
+
+## traefik-modsecurity
+priority: normal
+local: index_ext_traefik-modsecurity.md
+description: Facts about the traefik-modsecurity plugin this product may reuse.

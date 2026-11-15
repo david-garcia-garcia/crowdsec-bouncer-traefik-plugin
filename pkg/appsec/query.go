@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/admission"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -61,6 +62,9 @@ var ErrClientDisconnected = errors.New("appsecQuery:clientDisconnected")
 // so it is not an AppSec verdict and not FailureAction: Query does not call AppSec and the bouncer
 // answers 400 without a ban and without dropped metrics.
 var ErrClientBodyRead = errors.New("appsecQuery:clientBodyRead")
+
+// ErrGateSkip is a denied AppSec admission. Query MUST NOT call AppSec or apply FailureAction.
+var ErrGateSkip = errors.New("appsecQuery:unhealthySkip")
 
 // errAppsecReadBody is the io failure from readCappedAppsecBody (not an oversized body).
 var errAppsecReadBody = errors.New("appsecQuery:readBody")
@@ -152,6 +156,13 @@ func isHopByHopHeader(name string) bool {
 // Query forwards the request to this AppSec HTTP client.
 // The status table in the body is the CrowdSec AppSec protocol this method follows.
 func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error) {
+	ticket, admitErr := c.admitAppsecHop(req.Context())
+	if admitErr != nil {
+		return nil, admitErr
+	}
+	if !ticket.Admitted {
+		return nil, ErrGateSkip
+	}
 	appsecReq, err := c.newAppsecForwardRequest(req, pol)
 	if err != nil {
 		return nil, err
@@ -160,11 +171,16 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 	current := c.currentTransport()
 	if current == nil || current.httpClient == nil {
 		c.log.Error("appsecQuery:unreachable")
+		c.reportGate(ticket, false)
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
 	res, err := current.httpClient.Do(appsecReq)
 	if err != nil {
+		if errors.Is(req.Context().Err(), context.Canceled) {
+			return nil, ErrClientDisconnected
+		}
 		c.log.Error("appsecQuery:unreachable")
+		c.reportGate(ticket, false)
 		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
 	}
 	// Drain every live response, including unexpected statuses, so keep-alive can reuse the slot.
@@ -186,14 +202,19 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 	// protocol sentence. Any other code uses FailureAction and logs a WARN debounced on that message text.
 	if res.StatusCode == http.StatusInternalServerError {
 		logger.Debounced(c.log, slog.LevelInfo, 5*time.Second, "appsecQuery:failure")
+		c.reportGate(ticket, false)
 		return resultForFailureAction(pol.FailureAction, "appsecQuery statusCode:500")
 	}
 	if res.StatusCode == http.StatusUnauthorized {
 		logger.Debounced(c.log, slog.LevelWarn, 5*time.Second, msgUnauthenticated)
+		// The listener answered: a wrong key is a configuration error, not an outage, so it does
+		// not spend the gate budget and FailureAction keeps applying on every request.
+		c.reportGate(ticket, true)
 		return resultForFailureAction(pol.FailureAction, "appsecQuery statusCode:401")
 	}
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusForbidden {
 		logger.Debounced(c.log, slog.LevelWarn, 5*time.Second, msgUnexpectedListenerStatus, "statusCode", res.StatusCode)
+		c.reportGate(ticket, false)
 		return resultForFailureAction(pol.FailureAction, fmt.Sprintf("appsecQuery statusCode:%d", res.StatusCode))
 	}
 
@@ -202,16 +223,37 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 		// Io errors use FailureAction; oversized bodies stay as dest (allow 200 / error otherwise).
 		if errors.Is(err, errAppsecReadBody) {
 			c.log.Info("appsecQuery:failure")
+			c.reportGate(ticket, false)
 			return resultForFailureAction(pol.FailureAction, err.Error())
 		}
 		return nil, err
 	}
+	c.reportGate(ticket, true)
 	// Only 200 and 403 reach here. interpretAppsecBody turns a missing action into allow or a ban.
 	decision, err := interpretAppsecBody(res.StatusCode, body, c.log)
 	if err != nil {
 		return nil, err
 	}
 	return decision, nil
+}
+
+// admitAppsecHop consults the Gate. An unadmitted ticket is a skip. Cancel does not Report.
+func (c *Client) admitAppsecHop(ctx context.Context) (admission.Ticket, error) {
+	ticket, allowErr := c.gate.Admit(ctx)
+	if allowErr != nil {
+		if errors.Is(allowErr, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
+			return admission.Ticket{}, ErrClientDisconnected
+		}
+		c.log.Error("fail to admit AppSec request", "error", allowErr)
+		return admission.Ticket{}, allowErr
+	}
+	return ticket, nil
+}
+
+func (c *Client) reportGate(ticket admission.Ticket, success bool) {
+	if err := c.gate.Report(ticket, success); err != nil {
+		c.log.Error("fail to report AppSec admission outcome", "error", err, "success", success)
+	}
 }
 
 // newAppsecForwardRequest builds the AppSec listener request, copying client headers and identity.

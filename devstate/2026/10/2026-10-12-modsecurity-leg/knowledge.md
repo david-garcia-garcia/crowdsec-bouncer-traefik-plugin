@@ -1,0 +1,16 @@
+# Knowledge
+- created knowledge/research/ext_traefik-modsecurity_backoff/
+- created knowledge/research/ext_traefik-modsecurity_inspect/
+- created knowledge/research/ext_traefik-modsecurity_e2e/
+- updated knowledge/research/domains.md
+- updated knowledge/research/index.md
+- created knowledge/research/index_ext_traefik-modsecurity.md
+- created knowledge/devdocs/core_plugin_modsecurity_client.md
+- created knowledge/devdocs/core_plugin_modsecurity_inspect.md
+- updated knowledge/devdocs/index_core_plugin.md
+- updated knowledge/devdocs/core_plugin_middleware.md
+- updated knowledge/devdocs/core_plugin_middleware_instance-slots.md
+- updated knowledge/devdocs/core_plugin_middleware_config-validation.md
+- updated knowledge/devdocs/core_plugin_appsec.md
+- updated knowledge/devdocs/core_plugin_middleware_action-rules.md
+- updated knowledge/devdocs/build_e2e_real.md

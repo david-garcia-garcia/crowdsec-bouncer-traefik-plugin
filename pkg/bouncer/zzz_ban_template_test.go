@@ -17,7 +17,7 @@ func TestNew_banTemplateUnavailableWarnsAndServesEmptyBody(t *testing.T) {
 		log, sink := newTestLogSink(slog.LevelWarn)
 		cfg := configuration.New()
 		cfg.BouncerBanFilePath = ""
-		b, err := New(next, "test", cfg, false, false, false, log)
+		b, err := New(next, "test", cfg, false, false, false, false, log)
 		if err != nil {
 			t.Fatalf("New() error = %v", err)
 		}
@@ -41,7 +41,7 @@ func TestNew_banTemplateUnavailableWarnsAndServesEmptyBody(t *testing.T) {
 		log, sink := newTestLogSink(slog.LevelWarn)
 		cfg := configuration.New()
 		cfg.BouncerBanFilePath = filepath.Join(t.TempDir(), "missing-ban.html")
-		b, err := New(next, "test", cfg, false, false, false, log)
+		b, err := New(next, "test", cfg, false, false, false, false, log)
 		if err != nil {
 			t.Fatalf("New() error = %v", err)
 		}

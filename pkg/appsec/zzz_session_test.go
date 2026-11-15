@@ -49,6 +49,7 @@ func TestOpen_P2KnobChangeSplitsClient(t *testing.T) {
 		{name: "bodyLimit", mut: func(c *configuration.Config) { c.AppsecBodyLimit = 200 }},
 		{name: "tls", mut: func(c *configuration.Config) { c.AppsecTLSInsecureVerify = false }},
 		{name: "timeout", mut: func(c *configuration.Config) { c.AppsecHTTPTimeoutSeconds = 30 }},
+		{name: "backoff", mut: func(c *configuration.Config) { c.AppsecUnhealthyBackOffPeriodSecs = 30 }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

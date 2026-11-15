@@ -89,6 +89,9 @@ func (b *Bouncer) applyAppsecFailureAction(rw http.ResponseWriter, req clientreq
 // False means a captcha kind did not write.
 func (b *Bouncer) answerAppsecQueryError(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, err error) bool {
 	switch {
+	case errors.Is(err, appsec.ErrGateSkip):
+		// The admission gate is backing off: AppSec was not called and FailureAction does not apply.
+		return false
 	case errors.Is(err, appsec.ErrClientDisconnected):
 		b.handleClientDisconnectedServeHTTP(rw, req)
 		return true

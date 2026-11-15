@@ -57,7 +57,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        domain: [lapi, appsec, lifecycle]
+        domain: [lapi, appsec, lifecycle, modsec]
     steps:
       - uses: actions/checkout@v7
       - name: Install Pester
