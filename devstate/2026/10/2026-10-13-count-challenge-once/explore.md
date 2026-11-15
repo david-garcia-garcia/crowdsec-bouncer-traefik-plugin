@@ -23,7 +23,7 @@ Outside facts: `knowledge/research/ext_crowdsec_appsec_bot-detection/` (callback
 - Rejected: reopen/copy closed PR 195 (wrong base `main`, reimplemented JSON parse). Rejected: copy upstream PR 403. Rejected: a new AppSec JSON parser. Rejected: skip inside `recordDropped` (would affect ban/captcha). Rejected: challenge-path 404 (out of scope).
 - Regression: challenge envelope on `/protected` increments `TestDroppedCount` by 1; same envelope on `/crowdsec-internal/challenge/submit` does not.
 
-Folded from PR 196 (`devstate/2026/10/2026-10-13-terminate-challenge-paths/explore.md`):
+Folded from PR 196 explore:
 
 - Seam: `serveAppSec`, after AppSec did not write and there is no captcha-rule fallthrough, when `subscribeAppSec && !SkipAppsec` and `URL.Path` has prefix `/crowdsec-internal/challenge/`: write 404 and return true. `ServeHTTP` then does not call `next`.
 - Keep `applyAppsecServeHTTP` as the writer of relay/ban/captcha-failure. Do not 404 there, so a matched captcha action rule still serves the plugin gate.

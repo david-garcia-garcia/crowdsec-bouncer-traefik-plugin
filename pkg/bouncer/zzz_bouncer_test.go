@@ -642,6 +642,30 @@ func TestHandleNextServeHTTPAllowKeepsChallengePathsFromOrigin(t *testing.T) {
 			t.Fatalf("status=%d want 404", rw.Code)
 		}
 	})
+	// AppSec not in use for this request: the 404 guard does not apply and the request reaches next.
+	t.Run("appsec bypass rule custom.js", func(t *testing.T) {
+		b, nextCalled := newAllowBouncer()
+		b.actionRules = mustPathAction(t, "appsec", "^/crowdsec-internal/challenge/", httprule.ActionBypassAppsec)
+		rw := httptest.NewRecorder()
+		continueAfterLAPIForTest(b, rw, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/crowdsec-internal/challenge/custom.js", nil), "192.0.2.10"))
+		if !*nextCalled || rw.Code == http.StatusNotFound {
+			t.Fatalf("next=%v status=%d, want next called and no 404 when AppSec is skipped", *nextCalled, rw.Code)
+		}
+	})
+	t.Run("appsec not subscribed custom.js", func(t *testing.T) {
+		nextCalled := false
+		b := &Bouncer{
+			log: logger.New("ERROR", ""),
+			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				nextCalled = true
+			}),
+		}
+		rw := httptest.NewRecorder()
+		continueAfterLAPIForTest(b, rw, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/crowdsec-internal/challenge/custom.js", nil), "192.0.2.10"))
+		if !nextCalled || rw.Code == http.StatusNotFound {
+			t.Fatalf("next=%v status=%d, want next called and no 404 without AppSec", nextCalled, rw.Code)
+		}
+	})
 }
 
 // failingBodyForDisconnectTest simulates a readable POST whose Read fails mid-copy.
