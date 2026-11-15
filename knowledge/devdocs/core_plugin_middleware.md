@@ -106,6 +106,7 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 - `pkg/bouncer/bouncer.go`
 - `pkg/bouncer/bouncer_serve_lapi.go`
 - `pkg/bouncer/bouncer_serve_appsec.go`
+- `pkg/bouncer/bouncer_serve_appsec_verdict.go`
 - `pkg/bouncer/bouncer_serve_captcha.go`
 - `pkg/bouncer/bouncer_serve_remediation.go`
 - `pkg/bouncer/remediation_header.go`
