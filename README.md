@@ -502,7 +502,14 @@ List the proxy's addresses in `bouncerForwardedHeadersTrustedIps` and set `bounc
 - `passthrough` — let it through. If LAPI is down, AppSec still checks the request.
 - `captcha` — show a captcha. Requires a captcha on this router.
 
-In `stream` and `alone` LAPI modes, the plugin keeps using the decisions it already has when LAPI is down. The failure action only applies to clients without a known decision, after `lapiUpdateMaxFailure` failed refreshes. The same action applies while the connection is not published yet, including right after startup or a reload.
+When the LAPI failure action applies depends on the LAPI mode:
+
+- **`stream` and `alone`.** The plugin keeps using the decisions it already has when LAPI is down. The failure action only applies to clients without a known decision, after `lapiUpdateMaxFailure` failed refreshes.
+- **`live` and `none`.** A client that is not in the cache is looked up in LAPI on the request itself (`none` has no cache). If LAPI does not answer, the failure action applies to that request right away. There is no failure counter, so `lapiUpdateMaxFailure` has no effect. The failed lookup is not cached: the next request asks LAPI again. In `live`, decisions already in the cache keep applying until they expire.
+
+In every mode, the failure action also applies while the connection is not published yet, including right after startup or a reload.
+
+To let traffic through while LAPI is down in `live` or `none`, set `bouncerLapiFailureAction: passthrough`. The original plugin used `updateMaxFailure: -1` for this. That key does not exist here, and Traefik ignores unknown keys without an error.
 
 ### Match a country or an ASN
 
@@ -800,7 +807,7 @@ Do not verify LAPI's certificate. Not for production.
 Seconds between decision refreshes in `stream`. Fixed to `7200` in `alone`.
 
 **LapiUpdateMaxFailure** (int64, default `0`)
-`stream` and `alone` only. Number of failed refreshes tolerated before `bouncerLapiFailureAction` applies to clients without a known decision. `0` reacts on the first failure; `-1` never. Known decisions keep applying.
+`stream` and `alone` only. Number of failed refreshes tolerated before `bouncerLapiFailureAction` applies to clients without a known decision. `0` reacts on the first failure; `-1` never. Known decisions keep applying. In `live` and `none` it has no effect: `bouncerLapiFailureAction` applies on the first failed lookup. To let traffic through while LAPI is down there, use `bouncerLapiFailureAction: passthrough`. See [Choose what happens when CrowdSec is down](#choose-what-happens-when-crowdsec-is-down).
 
 **LogFilePath** (string, default `""`)
 Write logs to this file instead of stdout/stderr. Must be writable by Traefik.
