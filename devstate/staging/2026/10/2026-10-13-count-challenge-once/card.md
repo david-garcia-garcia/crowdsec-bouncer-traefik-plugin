@@ -20,7 +20,7 @@ Master was merged in at a192cb60 (it brought #191, #194, #198, #201, #206, #207,
 In progress. 0 items remain.
 
 Priority: P3 — usage-metric counting is inflated and the spec is wrong, with no data loss or unsafe behaviour
-Reviewed head: 58e4cd0f
+Reviewed head: ba381f31
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -85,7 +85,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 2 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 58e4cd0ffee37412587e99976845efa197e092f3 | Card must match the branch you measured |
+| Reviewed head | ba381f31845d79e7562ae98308c51cfde4798fab | Card must match the branch you measured |
 
 ### Stored data model
 None.
