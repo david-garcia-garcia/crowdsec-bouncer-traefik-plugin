@@ -147,6 +147,10 @@ Captcha providers:
 
 To serve captchas, set `captchaEnabled: true` together with the `captcha*` settings. Setting only `captchaProvider` is not enough.
 
+The page that ships with the plugin is ready to use. It shows the site name, asks the visitor to verify they are human, and embeds the provider widget. Set `captchaFilePath` only if you want your own HTML.
+
+![Built-in captcha page: the site name, a verify-you-are-human prompt, and the provider widget](.assets/captcha.png)
+
 ## AppSec
 
 This plugin supports [AppSec](https://doc.crowdsec.net/docs/next/appsec/intro/), CrowdSec's WAF, which offers:
