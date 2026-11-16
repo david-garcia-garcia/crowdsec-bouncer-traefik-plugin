@@ -9,19 +9,19 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/admission"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
-func gatedAppsecClient(t *testing.T, host string, period, threshold int64) *Client {
+func gatedAppsecClient(t *testing.T, host string, period int64) *Client {
 	t.Helper()
 	cfg := testAppsecConfig(host)
 	cfg.AppsecUnhealthyBackOffPeriodSecs = period
-	cfg.AppsecUnhealthyFailureThreshold = threshold
-	cfg.AppsecUnhealthyFailureRatio = configuration.DefaultUnhealthyFailureRatio
 	client, err := New(cfg, logger.New("ERROR", ""), "test", "n", "k")
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +50,7 @@ func TestNew_defaultBackoffBuildsGate(t *testing.T) {
 }
 
 func TestNew_zeroBackoffDisablesGate(t *testing.T) {
-	client := gatedAppsecClient(t, "127.0.0.1:1", 0, 5)
+	client := gatedAppsecClient(t, "127.0.0.1:1", 0)
 	if client.GateForTest() != nil {
 		t.Fatal("appsecUnhealthyBackOffPeriodSecs 0 must not build a gate")
 	}
@@ -64,22 +64,24 @@ func TestQuery_gateSkipDoesNotCallAppSecOrFailureAction(t *testing.T) {
 	}))
 	defer srv.Close()
 	u, _ := url.Parse(srv.URL)
-	client := gatedAppsecClient(t, u.Host, 30, 1)
+	client := gatedAppsecClient(t, u.Host, 30)
 
-	_, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan})
-	if err == nil {
-		t.Fatal("admitted 500 must apply FailureAction")
-	}
-	if errors.Is(err, ErrGateSkip) {
-		t.Fatal("first 500 is an admitted miss, not a gate skip")
+	for i := range admission.TripFailures {
+		_, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan})
+		if err == nil {
+			t.Fatalf("admitted 500 #%d must apply FailureAction", i+1)
+		}
+		if errors.Is(err, ErrGateSkip) {
+			t.Fatalf("500 #%d is an admitted miss, not a gate skip", i+1)
+		}
 	}
 
 	_, skipErr := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan})
 	if !errors.Is(skipErr, ErrGateSkip) {
 		t.Fatalf("tripped gate want ErrGateSkip, got %v", skipErr)
 	}
-	if hits != 1 {
-		t.Fatalf("AppSec hits=%d want 1", hits)
+	if hits != admission.TripFailures {
+		t.Fatalf("AppSec hits=%d want %d", hits, admission.TripFailures)
 	}
 }
 
@@ -89,7 +91,7 @@ func TestQuery_admittedMissStillUsesFailureAction(t *testing.T) {
 	}))
 	defer srv.Close()
 	u, _ := url.Parse(srv.URL)
-	client := gatedAppsecClient(t, u.Host, 30, 5)
+	client := gatedAppsecClient(t, u.Host, 30)
 
 	_, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough})
 	if err != nil {
@@ -102,51 +104,58 @@ func TestQuery_admittedMissStillUsesFailureAction(t *testing.T) {
 }
 
 func Test_appsecQuery_hopCancelDoesNotTripGate(t *testing.T) {
-	started := make(chan struct{})
-	release := make(chan struct{})
+	// More canceled hops than the failure budget: none of them may count as an AppSec failure.
+	var mu sync.Mutex
 	hits := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	block := true
+	started := make(chan struct{}, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		hits++
-		if hits == 1 {
-			close(started)
-			<-release
+		blocking := block
+		mu.Unlock()
+		if blocking {
+			started <- struct{}{}
+			<-r.Context().Done()
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
-	defer close(release)
 	u, _ := url.Parse(srv.URL)
 	cfg := testAppsecConfig(u.Host)
 	cfg.AppsecHTTPTimeoutSeconds = 30
 	cfg.AppsecUnhealthyBackOffPeriodSecs = 30
-	cfg.AppsecUnhealthyFailureThreshold = 1
-	cfg.AppsecUnhealthyFailureRatio = configuration.DefaultUnhealthyFailureRatio
 	client, err := New(cfg, logger.New("ERROR", ""), "test", "n", "k")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	httpReq := httptest.NewRequest(http.MethodGet, "http://localhost/", nil).WithContext(ctx)
-	done := make(chan struct{})
-	var hopErr error
-	go func() {
-		defer close(done)
-		_, hopErr = client.Query(withTestAddress(httpReq), Policy{FailureAction: configuration.FailureActionBan})
-	}()
-	<-started
-	cancel()
-	<-done
-	if !errors.Is(hopErr, ErrClientDisconnected) {
-		t.Fatalf("hop cancel want ErrClientDisconnected, got %v", hopErr)
+	for i := range admission.TripFailures + 1 {
+		ctx, cancel := context.WithCancel(context.Background())
+		httpReq := httptest.NewRequest(http.MethodGet, "http://localhost/", nil).WithContext(ctx)
+		done := make(chan error, 1)
+		go func() {
+			_, hopErr := client.Query(withTestAddress(httpReq), Policy{FailureAction: configuration.FailureActionBan})
+			done <- hopErr
+		}()
+		<-started
+		cancel()
+		if hopErr := <-done; !errors.Is(hopErr, ErrClientDisconnected) {
+			t.Fatalf("hop cancel #%d want ErrClientDisconnected, got %v", i+1, hopErr)
+		}
 	}
+	mu.Lock()
+	block = false
+	mu.Unlock()
 	_, laterErr := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan})
 	if laterErr != nil {
-		t.Fatalf("later hop after cancel: %v", laterErr)
+		t.Fatalf("later hop after cancels must reach AppSec, got %v", laterErr)
 	}
-	if hits != 2 {
-		t.Fatalf("AppSec hits=%d want 2", hits)
+	mu.Lock()
+	defer mu.Unlock()
+	if want := admission.TripFailures + 2; hits != want {
+		t.Fatalf("AppSec hits=%d want %d", hits, want)
 	}
 }
 
@@ -163,8 +172,6 @@ func TestQuery_backoffLogsStartedAndEndedOnce(t *testing.T) {
 	u, _ := url.Parse(srv.URL)
 	cfg := testAppsecConfig(u.Host)
 	cfg.AppsecUnhealthyBackOffPeriodSecs = 10
-	cfg.AppsecUnhealthyFailureThreshold = 1
-	cfg.AppsecUnhealthyFailureRatio = configuration.DefaultUnhealthyFailureRatio
 	var logs bytes.Buffer
 	client, err := New(cfg, slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})), "test", "n", "k")
 	if err != nil {
@@ -175,7 +182,9 @@ func TestQuery_backoffLogsStartedAndEndedOnce(t *testing.T) {
 	client.GateForTest().Inner().SetNowForTest(func() time.Time { return now })
 	pol := Policy{FailureAction: configuration.FailureActionPassthrough}
 
-	_, _ = client.Query(buildTestRequest(), pol)
+	for range admission.TripFailures {
+		_, _ = client.Query(buildTestRequest(), pol)
+	}
 	for i := range 3 {
 		if _, skipErr := client.Query(buildTestRequest(), pol); !errors.Is(skipErr, ErrGateSkip) {
 			t.Fatalf("request %d want ErrGateSkip, got %v", i, skipErr)

@@ -7,7 +7,7 @@ Dest already has three reclaim legs (LAPI, AppSec, captcha) with own vs bounce a
 **Goals:**
 
 - Copy the captcha-leg wiring pattern (`openOwned` / `claimOwned` / `Watch` / rollback) to a fourth group `modsec`. Do not rewrite `plugin.go` into an N-leg registry.
-- Absorb source `pkg/modsecurity` inspect, gate, deny-verbs, and body cap into dest-shaped types and JSON stems.
+- Absorb source `pkg/modsecurity` inspect, gate, and body cap into dest-shaped types and JSON stems.
 - Put `backendbackoff.Gate` on `appsec.Client` and on `modsecurity.Client`. One gate per listener.
 - Port source Pester families that this stack can host as domain `modsec`.
 
@@ -18,7 +18,9 @@ Dest already has three reclaim legs (LAPI, AppSec, captcha) with own vs bounce a
 - Changing LAPI or captcha product behavior except fourth-leg Open/claim/Watch/rollback.
 - Public `X-Waf-Status` request header (dest remediation header owns `ban:modsec`).
 - Source unused `unhealthyWafFailureWindowSecs` knob.
-- Source `maxBodySizeBytesForPool` as a public knob (pool stays internal).
+- Source `maxBodySizeBytesForPool` and its body pool (`pkg/wafhop` buffers each body once, shared with AppSec).
+- Source `denyVerbsWithBody`: the plugin keeps no method list; CRS judges a body on any method.
+- Source backoff ratio, threshold, and max-period knobs: the trip rule is fixed in `pkg/admission`.
 - Bombardier benches as product tests.
 
 ## Decisions
@@ -29,23 +31,25 @@ Dest already has three reclaim legs (LAPI, AppSec, captcha) with own vs bounce a
 
 3. **`modsecUrl` absolute URL, not AppSec host/path/scheme/key/TLS.** Source is a sidecar base URL. Alternative: clone AppSec URL pieces — rejected (explore: only the last layer matches).
 
-4. **FailMode per-router on Bouncer; Gate on Client.** Matches dest AppSec FailureAction vs Client identity. Alternative: source stored failMode on the shared Plugin — rejected (dest siblings put fallback on the Bouncer).
+4. **Failure action per-router on Bouncer; Gate on Client.** `bouncerModsecFailureAction` takes the LAPI/AppSec values (`passthrough` | `ban` | `captcha`) with default `passthrough`. Alternative: source `failMode` (`open` | `close`, empty 502) — rejected: a third fallback vocabulary, and an empty 502 tells the visitor nothing. Alternative: source stored failMode on the shared Plugin — rejected (dest siblings put fallback on the Bouncer).
 
-5. **AppSec skip-after-trip is pass; ModSec skip-after-trip follows failMode.** Desired: down AppSec must not take ingress down. ModSec default failMode `open` already passes. Alternative: retarget AppSec FailureAction default to passthrough — rejected (live spec default `ban`; backoff is the extra layer).
+5. **Skip-after-trip is pass on both legs.** Desired: a down WAF must not take ingress down. While a gate skips, the request continues without that WAF and without its failure action; failures before the trip still apply it. Alternative: ModSec skip follows the failure action — rejected (with `ban` a tripped gate would ban every request, the outcome the gate exists to stop). Alternative: retarget AppSec FailureAction default to passthrough — rejected (live spec default `ban`; backoff is the extra layer).
 
-6. **AppSec backoff default 30; ModSec backoff default 0.** Source README says set AppSec-equivalent to 30+ for the commissioned outcome; ModSec fail-open does not need it. Alternative: copy source default 0 onto AppSec — rejected (Desired would not hold without an operator step).
+6. **AppSec backoff default 30; ModSec backoff default 0; the period is the only knob.** Source README says set AppSec-equivalent to 30+ for the commissioned outcome; ModSec default `passthrough` does not need it. The trip rule (`admission.TripFailures` 5, `admission.FailureRatio` 0.30) and a fixed cooldown live in `pkg/admission`. Alternative: copy source default 0 onto AppSec — rejected (Desired would not hold without an operator step). Alternative: expose ratio, threshold, and max period — rejected (knobs nobody can tune without the utilities internals).
 
 7. **`bypassModsec` / `bypass` on action rules.** No `modsecBypassRules`. See deviations.md.
 
-8. **`modsecBodyLimit` `0` means 8 MiB.** Same as source Prepare (omit-fill). An unlimited value was rejected in review: the inbound body is held in memory, so `0` would be an unbounded allocation per request.
+8. **`modsecBodyLimit` must be at least 1.** Omitted is 8 MiB. `0` fails `New` on the ModSec owner instead of silently meaning 8 MiB. An unlimited value was rejected in review: the inbound body is held in memory, so `0` would be an unbounded allocation per request.
 
 9. **Identity owners.** Plugin remediations: `pkg/ip.GetRemoteIP` then `clientrequest.New`. Sidecar Host: inbound `req.Host`. Sidecar REMOTE_ADDR: Traefik forwardedheaders plus CRS RemoteIP config. Do not set `X-Real-IP`; do not append `RemoteAddr` to XFF.
 
-10. **ServeHTTP order.** trusted → action-rule ban → LAPI → AppSec → captcha write → ModSec → `next`. Unsolved captcha still short-circuits before CRS (do not change captcha product behavior). AppSec gate skip does not return.
+10. **ServeHTTP order.** trusted → action-rule ban → LAPI → AppSec → captcha write → ModSec → `next`. Unsolved captcha still short-circuits before CRS (do not change captcha product behavior). A gate skip on either leg does not return.
+
+13. **`Inspect` returns the verdict; the bouncer writes.** `Inspect(req, failureAction)` returns `nil, nil` (allow), a response (block), or a typed error (`ErrUnavailable`, `ErrGateSkip`, `ErrBodyTooLarge`, client-body errors). `serveModSec` owns the header, metrics, `WriteBlock`, 413, and the failure action, like the other legs. Sidecar unavailability logs one debounced ERROR per 5 s.
 
 11. **Import Gate, do not vendor-copy.** `github.com/david-garcia-garcia/traefik-middleware-utilities/backendbackoff` at dest `v1.0.7`. Implement vendors the package.
 
-12. **E2e Apache CRS first.** New domain `modsec` in `PesterDomains.ps1` and e2e.yml matrix. Nginx-drain only if the same harness can switch. Port: allow, `../etc` block, 413, deny GET-with-body, failMode, backoff skip, action-rule skip.
+12. **E2e Apache CRS first.** New domain `modsec` in `PesterDomains.ps1` and e2e.yml matrix. Nginx-drain only if the same harness can switch. Port: allow, `../etc` block, 413, failure actions, backoff skip, action-rule skip. CRS (not the plugin) blocks a GET body (920170). AppSec and ModSec together on one router, and a real outage and recovery per leg, get their own files (`waf_dual.Tests.ps1`, `waf_backoff.Tests.ps1`).
 
 ## Risks / Trade-offs
 
@@ -56,7 +60,7 @@ Dest already has three reclaim legs (LAPI, AppSec, captcha) with own vs bounce a
 
 ## Migration Plan
 
-- New keys only for ModSec. Existing AppSec YAML keeps working; omitted AppSec backoff enables the 30s gate.
+- New keys only for ModSec. Existing AppSec YAML keeps working; omitted AppSec backoff enables the 30s gate. AppSec ratio, threshold, and max-period keys from earlier drafts of this branch never shipped.
 - README: how to configure the ModSec leg; drop `traefik-modsecurity` from Traefik Security; name the AppSec skip-after-trip behavior.
 - Rollback: revert the change; dest three-leg tree has no ModSec keys to decode.
 

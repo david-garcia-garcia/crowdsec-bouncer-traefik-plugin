@@ -12,18 +12,20 @@ import (
 	"github.com/david-garcia-garcia/traefik-middleware-utilities/backendbackoff"
 )
 
-// Config is the backoff knobs for one leg plus its two transition log lines.
+// TripFailures is the failure budget: each failure spends one unit and each success earns back
+// FailureRatio/(1-FailureRatio). With both values the gate trips after 5 failures in a row, or when
+// failures stay above about 30% of requests. Fixed on purpose: only the cooldown is an operator knob.
+const (
+	TripFailures = 5
+	FailureRatio = 0.30
+)
+
+// Config is the cooldown for one leg plus its two transition log lines.
 type Config struct {
 	// Leg names the backend in errors and is the gate key ("appsec", "modsec").
 	Leg string
-	// PeriodSecs is the base cooldown. 0 or less builds no gate.
+	// PeriodSecs is the cooldown after a trip. 0 or less builds no gate.
 	PeriodSecs int64
-	// MaxPeriodSecs caps the cooldown. 0 keeps it equal to PeriodSecs.
-	MaxPeriodSecs int64
-	// FailureThreshold is the failure budget before a trip. 0 uses the utilities default.
-	FailureThreshold int64
-	// FailureRatio is the tolerated failure ratio. 0 uses the utilities default.
-	FailureRatio float64
 	// MsgStarted is the WARN line logged when the leg enters backoff.
 	MsgStarted string
 	// MsgEnded is the INFO line logged when the leg is healthy again.
@@ -51,25 +53,19 @@ type Ticket struct {
 }
 
 // New builds a Gate when cfg.PeriodSecs is greater than zero, else returns nil.
-// Jitter and TTL stay unset so a partial utilities Config disables jitter.
+// The cooldown is fixed (no exponential growth). Jitter and TTL stay unset so a partial
+// utilities Config disables jitter.
 func New(cfg Config, log *slog.Logger) (*Gate, error) {
 	if cfg.PeriodSecs <= 0 {
 		return nil, nil //nolint:nilnil // omitted backoff means no gate
 	}
-	base := time.Duration(cfg.PeriodSecs) * time.Second
-	maxCooldown := base
-	if cfg.MaxPeriodSecs > 0 {
-		maxCooldown = time.Duration(cfg.MaxPeriodSecs) * time.Second
-	}
-	gateCfg := backendbackoff.Config{
-		TripFailures: int(cfg.FailureThreshold),
-		BaseCooldown: base,
-		MaxCooldown:  maxCooldown,
-	}
-	if cfg.FailureRatio > 0 {
-		gateCfg.FailureRatio = cfg.FailureRatio
-	}
-	inner, err := backendbackoff.New(gateCfg)
+	cooldown := time.Duration(cfg.PeriodSecs) * time.Second
+	inner, err := backendbackoff.New(backendbackoff.Config{
+		TripFailures: TripFailures,
+		FailureRatio: FailureRatio,
+		BaseCooldown: cooldown,
+		MaxCooldown:  cooldown,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("%s admission gate: %w", cfg.Leg, err)
 	}

@@ -40,7 +40,7 @@ type Bouncer struct {
 	appsecInstanceName       string
 	captchaInstanceName      string
 	modsecInstanceName       string
-	modsecFailMode           string
+	modsecFailureAction      string
 	subscribeLAPI            bool
 	subscribeAppSec          bool
 	subscribeCaptcha         bool
@@ -115,7 +115,7 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 		appsecInstanceName:       config.AppsecInstanceName,
 		captchaInstanceName:      config.CaptchaInstanceName,
 		modsecInstanceName:       config.ModsecInstanceName,
-		modsecFailMode:           configuration.EffectiveModsecFailMode(config.BouncerModsecFailMode),
+		modsecFailureAction:      configuration.EffectiveModsecFailureAction(config.BouncerModsecFailureAction),
 		subscribeLAPI:            subscribeLAPI,
 		subscribeAppSec:          subscribeAppSec,
 		subscribeCaptcha:         subscribeCaptcha,

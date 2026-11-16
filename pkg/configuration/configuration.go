@@ -37,6 +37,7 @@ const (
 	ReasonTECH                  = "TECHNICAL_ISSUE"
 	ReasonLAPI                  = "LAPI"
 	ReasonAPPSEC                = "APPSEC"
+	ReasonMODSEC                = "MODSEC"
 	HcaptchaProvider            = "hcaptcha"
 	RecaptchaProvider           = "recaptcha"
 	RecaptchaEnterpriseProvider = "recaptcha-enterprise"
@@ -57,18 +58,10 @@ const (
 	FailureActionBan = "ban"
 	// FailureActionCaptcha remediates with pkg/captcha when LAPI or AppSec is down.
 	FailureActionCaptcha = "captcha"
-	// ModsecFailModeOpen continues to next when ModSec inspect fails.
-	ModsecFailModeOpen = "open"
-	// ModsecFailModeClose writes empty HTTP 502 when ModSec inspect fails.
-	ModsecFailModeClose = "close"
 	// DefaultModsecBodyLimit is 8 MiB when modsecBodyLimit is omitted.
 	DefaultModsecBodyLimit int64 = 8 * 1024 * 1024
 	// DefaultAppsecUnhealthyBackOffPeriodSecs is the AppSec gate cooldown when omitted.
 	DefaultAppsecUnhealthyBackOffPeriodSecs int64 = 30
-	// DefaultUnhealthyFailureThreshold is the packaged gate trip count.
-	DefaultUnhealthyFailureThreshold int64 = 5
-	// DefaultUnhealthyFailureRatio is the packaged gate failure ratio.
-	DefaultUnhealthyFailureRatio = 0.30
 )
 
 // Config the plugin configuration. Fields are alphabetical by json tag so
@@ -91,9 +84,6 @@ type Config struct {
 	AppsecTLSClientKeyFile              string                       `json:"appsecTlsClientKeyFile,omitempty"`
 	AppsecTLSInsecureVerify             bool                         `json:"appsecTlsInsecureVerify,omitempty"`
 	AppsecUnhealthyBackOffPeriodSecs    int64                        `json:"appsecUnhealthyBackOffPeriodSecs,omitempty"`
-	AppsecUnhealthyFailureRatio         float64                      `json:"appsecUnhealthyFailureRatio,omitempty"`
-	AppsecUnhealthyFailureThreshold     int64                        `json:"appsecUnhealthyFailureThreshold,omitempty"`
-	AppsecUnhealthyMaxBackOffPeriodSecs int64                        `json:"appsecUnhealthyMaxBackOffPeriodSecs,omitempty"`
 	BouncerActionRules                  []httprule.ActionRule        `json:"bouncerActionRules,omitempty"`
 	BouncerAppsecFailureAction          string                       `json:"bouncerAppsecFailureAction,omitempty"`
 	BouncerBanFilePath                  string                       `json:"bouncerBanFilePath,omitempty"`
@@ -104,7 +94,7 @@ type Config struct {
 	BouncerForwardedHeadersInsecure     bool                         `json:"bouncerForwardedHeadersInsecure,omitempty"`
 	BouncerForwardedHeadersTrustedIPs   []string                     `json:"bouncerForwardedHeadersTrustedIps,omitempty"`
 	BouncerLapiFailureAction            string                       `json:"bouncerLapiFailureAction,omitempty"`
-	BouncerModsecFailMode               string                       `json:"bouncerModsecFailMode,omitempty"`
+	BouncerModsecFailureAction          string                       `json:"bouncerModsecFailureAction,omitempty"`
 	BouncerOriginBasedDecisionRemap     map[string]map[string]string `json:"bouncerOriginBasedDecisionRemap,omitempty"`
 	BouncerRedisUnreachableBlock        bool                         `json:"bouncerRedisUnreachableBlock,omitempty"`
 	BouncerRemediationHeadersCustomName string                       `json:"bouncerRemediationHeadersCustomName,omitempty"`
@@ -171,14 +161,10 @@ type Config struct {
 	LogFormat                           string                       `json:"logFormat,omitempty"`
 	LogLevel                            string                       `json:"logLevel,omitempty"`
 	ModsecBodyLimit                     int64                        `json:"modsecBodyLimit,omitempty"`
-	ModsecDenyVerbsWithBody             []string                     `json:"modsecDenyVerbsWithBody,omitempty"`
 	ModsecEnabled                       bool                         `json:"modsecEnabled,omitempty"`
 	ModsecHTTPTimeoutSeconds            int64                        `json:"modsecHttpTimeoutSeconds,omitempty"`
 	ModsecInstanceName                  string                       `json:"modsecInstanceName,omitempty"`
 	ModsecUnhealthyBackOffPeriodSecs    int64                        `json:"modsecUnhealthyBackOffPeriodSecs,omitempty"`
-	ModsecUnhealthyFailureRatio         float64                      `json:"modsecUnhealthyFailureRatio,omitempty"`
-	ModsecUnhealthyFailureThreshold     int64                        `json:"modsecUnhealthyFailureThreshold,omitempty"`
-	ModsecUnhealthyMaxBackOffPeriodSecs int64                        `json:"modsecUnhealthyMaxBackOffPeriodSecs,omitempty"`
 	ModsecURL                           string                       `json:"modsecUrl,omitempty"`
 	ReclaimGraceSeconds                 int64                        `json:"reclaimGraceSeconds,omitempty"`
 }
@@ -224,13 +210,13 @@ func EffectiveFailureAction(action string) string {
 	return action
 }
 
-// EffectiveModsecFailMode maps empty config to open (plugin default).
-func EffectiveModsecFailMode(mode string) string {
-	trimmed := strings.TrimSpace(mode)
-	if trimmed == "" {
-		return ModsecFailModeOpen
+// EffectiveModsecFailureAction maps empty config to passthrough: unlike LAPI and AppSec,
+// a ModSec sidecar outage lets traffic through unless the operator asks otherwise.
+func EffectiveModsecFailureAction(action string) string {
+	if action == "" {
+		return FailureActionPassthrough
 	}
-	return strings.ToLower(trimmed)
+	return action
 }
 
 // New creates the default plugin configuration.
@@ -245,8 +231,6 @@ func New() *Config {
 		AppsecScheme:                        "",
 		AppsecTLSInsecureVerify:             false,
 		AppsecUnhealthyBackOffPeriodSecs:    DefaultAppsecUnhealthyBackOffPeriodSecs,
-		AppsecUnhealthyFailureRatio:         DefaultUnhealthyFailureRatio,
-		AppsecUnhealthyFailureThreshold:     DefaultUnhealthyFailureThreshold,
 		BouncerActionRules:                  []httprule.ActionRule{},
 		BouncerAppsecFailureAction:          FailureActionBan,
 		BouncerBanFilePath:                  "",
@@ -257,7 +241,7 @@ func New() *Config {
 		BouncerForwardedHeadersInsecure:     false,
 		BouncerForwardedHeadersTrustedIPs:   []string{},
 		BouncerLapiFailureAction:            FailureActionBan,
-		BouncerModsecFailMode:               ModsecFailModeOpen,
+		BouncerModsecFailureAction:          FailureActionPassthrough,
 		BouncerOriginBasedDecisionRemap:     map[string]map[string]string{},
 		BouncerRedisUnreachableBlock:        true,
 		BouncerRemediationHeadersCustomName: "",
@@ -307,8 +291,6 @@ func New() *Config {
 		ModsecEnabled:                       false,
 		ModsecHTTPTimeoutSeconds:            10,
 		ModsecUnhealthyBackOffPeriodSecs:    0,
-		ModsecUnhealthyFailureRatio:         DefaultUnhealthyFailureRatio,
-		ModsecUnhealthyFailureThreshold:     DefaultUnhealthyFailureThreshold,
 		ReclaimGraceSeconds:                 30,
 	}
 }
@@ -836,8 +818,9 @@ func validateParamsRequired(config *Config) error {
 	}
 	requiredInt0 := map[string]int64{
 		"AppsecBodyLimit":                  config.AppsecBodyLimit,
+		"AppsecUnhealthyBackOffPeriodSecs": config.AppsecUnhealthyBackOffPeriodSecs,
 		"LapiMetricsUpdateIntervalSeconds": config.LapiMetricsUpdateIntervalSeconds,
-		"ModsecBodyLimit":                  config.ModsecBodyLimit,
+		"ModsecUnhealthyBackOffPeriodSecs": config.ModsecUnhealthyBackOffPeriodSecs,
 		"ReclaimGraceSeconds":              config.ReclaimGraceSeconds,
 	}
 	for key, val := range requiredInt0 {
@@ -869,6 +852,9 @@ func validateParamsRequired(config *Config) error {
 	if err := validateFailureAction("BouncerAppsecFailureAction", config.BouncerAppsecFailureAction, captchaInstanceReady); err != nil {
 		return err
 	}
+	if err := validateFailureAction("BouncerModsecFailureAction", config.BouncerModsecFailureAction, captchaInstanceReady); err != nil {
+		return err
+	}
 	if _, err := httprule.NewActionSet(config.BouncerActionRules); err != nil {
 		return fmt.Errorf("BouncerActionRules: %w", err)
 	}
@@ -888,61 +874,17 @@ func validateParamsRequired(config *Config) error {
 	if !contains([]string{HTTP, HTTPS, ""}, config.AppsecScheme) {
 		return errors.New("AppsecScheme: must be one of 'http' or 'https'")
 	}
-	if err := validateModsecFailMode(config.BouncerModsecFailMode); err != nil {
-		return err
-	}
-	if err := validateBackoffKnobs(
-		"AppsecUnhealthyBackOffPeriodSecs", config.AppsecUnhealthyBackOffPeriodSecs,
-		"AppsecUnhealthyMaxBackOffPeriodSecs", config.AppsecUnhealthyMaxBackOffPeriodSecs,
-		"AppsecUnhealthyFailureThreshold", config.AppsecUnhealthyFailureThreshold,
-		"AppsecUnhealthyFailureRatio", config.AppsecUnhealthyFailureRatio,
-	); err != nil {
-		return err
-	}
-	return validateBackoffKnobs(
-		"ModsecUnhealthyBackOffPeriodSecs", config.ModsecUnhealthyBackOffPeriodSecs,
-		"ModsecUnhealthyMaxBackOffPeriodSecs", config.ModsecUnhealthyMaxBackOffPeriodSecs,
-		"ModsecUnhealthyFailureThreshold", config.ModsecUnhealthyFailureThreshold,
-		"ModsecUnhealthyFailureRatio", config.ModsecUnhealthyFailureRatio,
-	)
-}
-
-// validateModsecFailMode accepts empty (open at runtime), open, or close, case-insensitive.
-func validateModsecFailMode(mode string) error {
-	if strings.TrimSpace(mode) == "" {
-		return nil
-	}
-	normalized := strings.ToLower(strings.TrimSpace(mode))
-	if !contains([]string{ModsecFailModeOpen, ModsecFailModeClose}, normalized) {
-		return errors.New("BouncerModsecFailMode: must be one of 'open' or 'close'")
-	}
 	return nil
 }
 
-// validateBackoffKnobs rejects a negative period, a max below the base when max is set, a negative threshold, and a ratio outside [0, 1).
-func validateBackoffKnobs(periodName string, period int64, maxName string, maxPeriod int64, thresholdName string, threshold int64, ratioName string, ratio float64) error {
-	if period < 0 {
-		return errors.New(periodName + ": cannot be less than 0")
-	}
-	if maxPeriod < 0 {
-		return errors.New(maxName + ": cannot be less than 0")
-	}
-	if maxPeriod > 0 && maxPeriod < period {
-		return errors.New(maxName + ": cannot be less than " + periodName)
-	}
-	if threshold < 0 {
-		return errors.New(thresholdName + ": cannot be less than 0")
-	}
-	if ratio < 0 || ratio >= 1 {
-		return errors.New(ratioName + ": must be greater than or equal to 0 and less than 1")
-	}
-	return nil
-}
-
-// validateModsecURL rejects an empty or non-absolute http(s) URL when ModSec is owned.
+// validateModsecURL rejects, when ModSec is owned, an empty or non-absolute http(s) URL and a body
+// limit below 1 byte: the whole body is held in memory, so there is no unlimited value.
 func validateModsecURL(config *Config) error {
 	if !config.ModsecEnabled {
 		return nil
+	}
+	if config.ModsecBodyLimit < 1 {
+		return errors.New("ModsecBodyLimit: cannot be less than 1")
 	}
 	raw := strings.TrimSpace(config.ModsecURL)
 	if raw == "" {

@@ -1,0 +1,81 @@
+# CrowdSec LAPI + AppSec + an OWASP CRS sidecar, all enforced by one Traefik middleware.
+# Run from the repository root: make run_modsecurity
+services:
+  traefik:
+    image: "traefik:v3.7.11"
+    container_name: "traefik"
+    restart: unless-stopped
+    command:
+      - "--accesslog"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--accesslog.fields.headers.names.X-Crowdsec-Remediation=keep"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--entrypoints.web.address=:80"
+      - "--experimental.localplugins.bouncer.modulename=github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - logs-modsecurity:/var/log/traefik
+      - ./dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - ./../../:/plugins-local/src/github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
+    ports:
+      - 8000:80
+    depends_on:
+      - crowdsec
+      - waf
+
+  whoami:
+    image: traefik/whoami
+    container_name: "whoami"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.whoami.loadbalancer.server.port=80"
+
+  # Inspect-only CRS sidecar. Not exposed: only Traefik talks to it.
+  waf:
+    image: owasp/modsecurity-crs:4.3.0-apache-alpine-202406090906
+    container_name: "waf"
+    restart: unless-stopped
+    environment:
+      PARANOIA: "1"
+      ANOMALY_INBOUND: "5"
+      ANOMALY_OUTBOUND: "4"
+      # CRS allows only GET HEAD POST OPTIONS by default (rule 911100). Add what your API uses.
+      ALLOWED_METHODS: "GET HEAD POST OPTIONS PUT PATCH DELETE"
+      MODSEC_RULE_ENGINE: "On"
+      # The image rejects a non-file body over 128 KiB with 413. Align with modsecBodyLimit.
+      MODSEC_REQ_BODY_NOFILES_LIMIT: "1048576"
+      MODSEC_REQ_BODY_LIMIT: "1048576"
+      MODSEC_AUDIT_ENGINE: "Off"
+      # Networks Traefik reaches the sidecar from. Never 0.0.0.0/0.
+      REMOTEIP_INT_PROXY: "10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
+    volumes:
+      - ./crs-apache/httpd-vhosts.conf:/usr/local/apache2/conf/extra/httpd-vhosts.conf:ro
+      - ./crs-rules/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf:/etc/modsecurity.d/owasp-crs/rules/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf:ro
+    labels:
+      - "traefik.enable=false"
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:v1.8.2
+    container_name: "crowdsec"
+    restart: unless-stopped
+    environment:
+      COLLECTIONS: "crowdsecurity/traefik crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules crowdsecurity/modsecurity"
+      CUSTOM_HOSTNAME: crowdsec
+      BOUNCER_KEY_TRAEFIK: 40796d93c2958f9e58345514e67740e5
+    volumes:
+      - ./acquis.yaml:/etc/crowdsec/acquis.yaml:ro
+      - logs-modsecurity:/var/log/traefik:ro
+      # Lets CrowdSec read the sidecar's logs (source: docker in acquis.yaml).
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - crowdsec-db-modsecurity:/var/lib/crowdsec/data/
+      - crowdsec-config-modsecurity:/etc/crowdsec/
+    labels:
+      - "traefik.enable=false"
+
+volumes:
+  logs-modsecurity:
+  crowdsec-db-modsecurity:
+  crowdsec-config-modsecurity:

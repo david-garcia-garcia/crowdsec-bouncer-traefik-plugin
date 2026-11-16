@@ -1,12 +1,33 @@
-# AppSec admission gate with the shipped defaults: no appsecUnhealthy* key and no
-# bouncerAppsecFailureAction, so the period is 30 s, the budget 5, and the action ban.
-# The listener is waf-5xx (nginx answering 503 on every path), a listener outage.
+# Admission gates (backoff) for both WAF legs.
+#
+# waf-backoff-default: AppSec with the shipped defaults (no appsecUnhealthyBackOffPeriodSecs,
+#   no bouncerAppsecFailureAction): cooldown 30 s, failure budget 5, action ban. The listener
+#   is waf-5xx (nginx answering 503 on every path), a permanent outage.
+#
+# appsec-cycle: AppSec through appsec-flaky (nginx proxy to the CRS listener 7422) plus the
+#   healthy ModSec sidecar waf. waf_backoff.Tests.ps1 stops and starts appsec-flaky-test.
+#
+# modsec-cycle: ModSec through waf-flaky (second CRS sidecar) plus the healthy AppSec
+#   listener 7424 (no CRS, drops "appsec-drop" paths). The test stops and starts waf-flaky-test.
+#
+# Both cycle routes use a 10 s cooldown and the ban failure action, so each admitted failure
+# shows as ban:<leg>-failure until the gate trips.
 http:
   routers:
     waf-backoff-default:
       rule: PathPrefix(`/waf-backoff-default`)
       entryPoints: [web]
       middlewares: [bouncer-waf-backoff-default]
+      service: whoami@docker
+    appsec-cycle:
+      rule: PathPrefix(`/appsec-cycle`)
+      entryPoints: [web]
+      middlewares: [bouncer-appsec-cycle]
+      service: whoami@docker
+    modsec-cycle:
+      rule: PathPrefix(`/modsec-cycle`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec-cycle]
       service: whoami@docker
   middlewares:
     bouncer-waf-backoff-default:
@@ -25,4 +46,47 @@ http:
           lapiEnabled: "false"
           logFormat: json
           logLevel: DEBUG
+          reclaimGraceSeconds: "2"
+    bouncer-appsec-cycle:
+      plugin:
+        bouncer:
+          appsecEnabled: "true"
+          appsecHost: appsec-flaky:80
+          appsecHttpTimeoutSeconds: "2"
+          appsecKey: c51a1c70000000000000000000000005
+          appsecUnhealthyBackOffPeriodSecs: "10"
+          bouncerAppsecFailureAction: ban
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          modsecEnabled: "true"
+          modsecHttpTimeoutSeconds: "10"
+          modsecUrl: http://waf:8080
+          reclaimGraceSeconds: "2"
+    bouncer-modsec-cycle:
+      plugin:
+        bouncer:
+          appsecEnabled: "true"
+          appsecHost: crowdsec:7424
+          appsecHttpTimeoutSeconds: "10"
+          appsecKey: c51a1c70000000000000000000000005
+          appsecUnhealthyBackOffPeriodSecs: "0"
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerModsecFailureAction: ban
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          modsecEnabled: "true"
+          modsecHttpTimeoutSeconds: "2"
+          modsecUnhealthyBackOffPeriodSecs: "10"
+          modsecUrl: http://waf-flaky:8080
           reclaimGraceSeconds: "2"

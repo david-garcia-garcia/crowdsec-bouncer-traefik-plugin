@@ -495,6 +495,44 @@ function Invoke-WebSocketEcho {
     }
 }
 
+# First value of a response header as a string, or "" when the response does not carry it.
+function Get-ResponseHeader {
+    param(
+        [Parameter(Mandatory)]$Response,
+        [Parameter(Mandatory)][string]$Name
+    )
+    if (-not $Response.Headers) {
+        return ""
+    }
+    $value = $Response.Headers[$Name]
+    if ($null -eq $value) {
+        return ""
+    }
+    if ($value -is [System.Array]) {
+        return [string]$value[0]
+    }
+    return [string]$value
+}
+
+# UTC timestamp for `docker logs --since`, a little in the past so a line written as the test starts is kept.
+function Get-LogSince {
+    return (Get-Date).ToUniversalTime().AddSeconds(-2).ToString('yyyy-MM-ddTHH:mm:ssZ')
+}
+
+# Lines a container logged since $Since that contain every string in $Contains (plain text, not regex).
+function Get-ContainerLogLines {
+    param(
+        [Parameter(Mandatory)][string]$Container,
+        [Parameter(Mandatory)][string]$Since,
+        [string[]]$Contains = @()
+    )
+    $lines = (docker logs --since $Since $Container 2>&1 | Out-String) -split "`r?`n"
+    return @($lines | Where-Object {
+            $line = $_
+            $line -and @($Contains | Where-Object { -not $line.Contains($_) }).Count -eq 0
+        })
+}
+
 # Helper function to read and parse Traefik access logs
 function Get-TraefikAccessLogs {
     param(

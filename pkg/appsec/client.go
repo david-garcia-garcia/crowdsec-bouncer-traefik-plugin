@@ -87,13 +87,10 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, m
 		return nil, err
 	}
 	gate, err := admission.New(admission.Config{
-		Leg:              gateKey,
-		PeriodSecs:       config.AppsecUnhealthyBackOffPeriodSecs,
-		MaxPeriodSecs:    config.AppsecUnhealthyMaxBackOffPeriodSecs,
-		FailureThreshold: config.AppsecUnhealthyFailureThreshold,
-		FailureRatio:     config.AppsecUnhealthyFailureRatio,
-		MsgStarted:       MsgBackoffStarted,
-		MsgEnded:         MsgBackoffEnded,
+		Leg:        gateKey,
+		PeriodSecs: config.AppsecUnhealthyBackOffPeriodSecs,
+		MsgStarted: MsgBackoffStarted,
+		MsgEnded:   MsgBackoffEnded,
 	}, log)
 	if err != nil {
 		return nil, err

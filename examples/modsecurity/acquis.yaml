@@ -1,0 +1,23 @@
+# Traefik access logs: CrowdSec's usual HTTP scenarios.
+filenames:
+  - /var/log/traefik/access.log
+labels:
+  type: traefik
+
+---
+# AppSec listener the plugin queries (appsecHost: crowdsec:7422).
+listen_addr: 0.0.0.0:7422
+appsec_config: crowdsecurity/appsec-default
+name: appsec
+source: appsec
+labels:
+  type: appsec
+
+---
+# The CRS sidecar's error log: one line per rule hit, with rule id, message, URI, and client IP.
+# crowdsecurity/modsecurity parses it (type: modsecurity) and bans IPs that keep tripping CRS.
+source: docker
+container_name:
+  - waf
+labels:
+  type: modsecurity

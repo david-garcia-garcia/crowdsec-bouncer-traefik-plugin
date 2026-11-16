@@ -5,7 +5,7 @@ CrowdsecConnection reports remediation-component usage metrics to CrowdSec LAPI 
 ## Requirements
 
 ### Requirement: Dropped items use official labels
-Each dropped request SHALL increment a `dropped` item with unit `request`. Labels SHALL include `ip_type` (`ipv4` or `ipv6`) from the `net.IP` `pkg/ip.GetRemoteIP` already yielded (`To4()` non-nil is ipv4, otherwise ipv6; empty when that parse is missing). The request path MUST NOT parse `RemoteAddr` again and MUST NOT classify `ip_type` by parsing the client string (`ip.Family` on the string). When the drop applies a LAPI or AppSec remediation, labels SHALL include `remediation` (`ban` or `captcha`). `origin` SHALL be the decision origin, except CrowdSec `lists` origin SHALL be sent as `lists:` plus the decision scenario. AppSec remediations SHALL use `origin=appsec`. Drops with no CrowdSec decision SHALL send a plugin origin so they appear as `cscli metrics show bouncers` origin rows: `plugin:tech_cachefail` when a cache error is fail-closed; `plugin:tech_streamfail` when stream is unhealthy; `plugin:lapi_failure` for live LAPI errors; `plugin:appsec_failure` for AppSec failure-action. Those paths MUST NOT reuse `crowdsec`, `cscli`, `CAPI`, `appsec`, or `lists:`. Range-only cache hits SHALL send `origin` from the winning Range CIDR’s stored suffix when that suffix is present. A letter-only `range-index` line MAY omit `origin`. The plugin MUST NOT send a `scenario` item label, including when the DecisionStore has interned the raw LAPI scenario. The plugin MUST NOT send `labels.type=traefik_plugin`.
+Each dropped request SHALL increment a `dropped` item with unit `request`. Labels SHALL include `ip_type` (`ipv4` or `ipv6`) from the `net.IP` `pkg/ip.GetRemoteIP` already yielded (`To4()` non-nil is ipv4, otherwise ipv6; empty when that parse is missing). The request path MUST NOT parse `RemoteAddr` again and MUST NOT classify `ip_type` by parsing the client string (`ip.Family` on the string). When the drop applies a LAPI, AppSec, or ModSec remediation, labels SHALL include `remediation` (`ban` or `captcha`). `origin` SHALL be the decision origin, except CrowdSec `lists` origin SHALL be sent as `lists:` plus the decision scenario. AppSec remediations SHALL use `origin=appsec`. A ModSec copied block SHALL use `origin=modsec` with `remediation=ban`. Drops with no CrowdSec decision SHALL send a plugin origin so they appear as `cscli metrics show bouncers` origin rows: `plugin:tech_cachefail` when a cache error is fail-closed; `plugin:tech_streamfail` when stream is unhealthy; `plugin:lapi_failure` for live LAPI errors; `plugin:appsec_failure` for AppSec failure-action; `plugin:modsec_failure` for ModSec failure-action. Those paths MUST NOT reuse `crowdsec`, `cscli`, `CAPI`, `appsec`, `modsec`, or `lists:`. Range-only cache hits SHALL send `origin` from the winning Range CIDR’s stored suffix when that suffix is present. A letter-only `range-index` line MAY omit `origin`. The plugin MUST NOT send a `scenario` item label, including when the DecisionStore has interned the raw LAPI scenario. The plugin MUST NOT send `labels.type=traefik_plugin`.
 
 #### Scenario: List decision drop
 - **WHEN** a request is banned by a decision whose origin is `lists` and scenario is `firehol_level1`
@@ -43,6 +43,11 @@ Each dropped request SHALL increment a `dropped` item with unit `request`. Label
 #### Scenario: AppSec failure-action uses plugin origin
 - **WHEN** AppSec is unreachable and the failure action bans
 - **THEN** the `dropped` item has `origin=plugin:appsec_failure`
+
+#### Scenario: ModSec block and failure-action origins
+- **WHEN** the CRS sidecar blocks the request
+- **THEN** the `dropped` item has `origin=modsec` and `remediation=ban`
+- **AND** when the sidecar is unreachable and `bouncerModsecFailureAction` bans, the `dropped` item has `origin=plugin:modsec_failure`
 
 #### Scenario: Interned scenario is not a label
 - **WHEN** stream has interned a raw LAPI scenario on an Ip ban and that ban drops a request

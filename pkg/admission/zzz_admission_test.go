@@ -14,16 +14,15 @@ const (
 	testEnded   = "test backoff ended"
 )
 
-func newTestGate(t *testing.T, threshold int64) (*Gate, *bytes.Buffer, *time.Time) {
+func newTestGate(t *testing.T) (*Gate, *bytes.Buffer, *time.Time) {
 	t.Helper()
 	var buf bytes.Buffer
 	log := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	gate, err := New(Config{
-		Leg:              "test",
-		PeriodSecs:       10,
-		FailureThreshold: threshold,
-		MsgStarted:       testStarted,
-		MsgEnded:         testEnded,
+		Leg:        "test",
+		PeriodSecs: 10,
+		MsgStarted: testStarted,
+		MsgEnded:   testEnded,
 	}, log)
 	if err != nil {
 		t.Fatal(err)
@@ -50,6 +49,14 @@ func report(t *testing.T, gate *Gate, ticket Ticket, success bool) {
 	}
 }
 
+// trip spends the whole failure budget with consecutive failures.
+func trip(t *testing.T, gate *Gate) {
+	t.Helper()
+	for range TripFailures {
+		report(t, gate, admit(t, gate), false)
+	}
+}
+
 func TestNew_zeroPeriodIsNilGateThatAdmits(t *testing.T) {
 	gate, err := New(Config{Leg: "test"}, slog.Default())
 	if err != nil {
@@ -69,8 +76,8 @@ func TestNew_zeroPeriodIsNilGateThatAdmits(t *testing.T) {
 }
 
 func TestGate_logsStartedOnceAcrossSkippedRequests(t *testing.T) {
-	gate, buf, _ := newTestGate(t, 1)
-	report(t, gate, admit(t, gate), false)
+	gate, buf, _ := newTestGate(t)
+	trip(t, gate)
 	for i := range 5 {
 		if admit(t, gate).Admitted {
 			t.Fatalf("request %d must be skipped after the trip", i)
@@ -88,8 +95,8 @@ func TestGate_logsStartedOnceAcrossSkippedRequests(t *testing.T) {
 }
 
 func TestGate_successfulProbeLogsEndedOnce(t *testing.T) {
-	gate, buf, now := newTestGate(t, 1)
-	report(t, gate, admit(t, gate), false)
+	gate, buf, now := newTestGate(t)
+	trip(t, gate)
 	if admit(t, gate).Admitted {
 		t.Fatal("must skip after the trip")
 	}
@@ -110,8 +117,8 @@ func TestGate_successfulProbeLogsEndedOnce(t *testing.T) {
 }
 
 func TestGate_failedProbeStaysSilent(t *testing.T) {
-	gate, buf, now := newTestGate(t, 1)
-	report(t, gate, admit(t, gate), false)
+	gate, buf, now := newTestGate(t)
+	trip(t, gate)
 	_ = admit(t, gate)
 	*now = now.Add(11 * time.Second)
 	report(t, gate, admit(t, gate), false)
@@ -127,9 +134,9 @@ func TestGate_failedProbeStaysSilent(t *testing.T) {
 }
 
 func TestGate_inFlightSuccessDoesNotEndBackoff(t *testing.T) {
-	gate, buf, _ := newTestGate(t, 1)
+	gate, buf, _ := newTestGate(t)
 	inFlight := admit(t, gate)
-	report(t, gate, admit(t, gate), false)
+	trip(t, gate)
 	if admit(t, gate).Admitted {
 		t.Fatal("must skip after the trip")
 	}
@@ -143,8 +150,8 @@ func TestGate_inFlightSuccessDoesNotEndBackoff(t *testing.T) {
 }
 
 func TestGate_failuresBelowThresholdDoNotLog(t *testing.T) {
-	gate, buf, _ := newTestGate(t, 5)
-	for i := range 3 {
+	gate, buf, _ := newTestGate(t)
+	for i := range TripFailures - 1 {
 		ticket := admit(t, gate)
 		if !ticket.Admitted {
 			t.Fatalf("request %d must be admitted under the threshold", i)
@@ -153,5 +160,30 @@ func TestGate_failuresBelowThresholdDoNotLog(t *testing.T) {
 	}
 	if buf.Len() != 0 {
 		t.Fatalf("no transition expected, got\n%s", buf.String())
+	}
+}
+
+func TestGate_tripsOnTheFifthConsecutiveFailure(t *testing.T) {
+	gate, _, _ := newTestGate(t)
+	for i := range TripFailures - 1 {
+		report(t, gate, admit(t, gate), false)
+		if !admit(t, gate).Admitted {
+			t.Fatalf("failure %d is under the budget: the next request must be admitted", i+1)
+		}
+	}
+	report(t, gate, admit(t, gate), false)
+	if admit(t, gate).Admitted {
+		t.Fatalf("failure %d spends the budget: the next request must be skipped", TripFailures)
+	}
+}
+
+func TestGate_cooldownDoesNotGrowAfterAFailedProbe(t *testing.T) {
+	gate, _, now := newTestGate(t)
+	trip(t, gate)
+	*now = now.Add(11 * time.Second)
+	report(t, gate, admit(t, gate), false)
+	*now = now.Add(11 * time.Second)
+	if !admit(t, gate).Admitted {
+		t.Fatal("the cooldown is fixed: a second probe must be admitted after the same period")
 	}
 }

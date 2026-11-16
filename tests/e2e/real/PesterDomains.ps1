@@ -1,8 +1,10 @@
 # CI partition of tests/e2e/real/*.Tests.ps1.
 # lapi: request decisions from LAPI (stream and live modes, ban, scopes, trusted IPs, metrics).
-# appsec: AppSec (including the default admission gate), captcha, and the Redis decision cache.
+# appsec: AppSec, captcha, and the Redis decision cache.
 # lifecycle: instance severance (late bind, reclaim, name collisions).
-# modsec: inspect-only Apache CRS sidecar (allow, CRS block, body, deny GET-with-body, failMode, backoff, WebSocket, skip).
+# modsec: the WAF legs. ModSec alone (CRS block, body, failure actions, WebSocket, skip), AppSec and
+#   ModSec on one router (order, per-leg bypass, shared body), and the backoff gate of both legs
+#   through a real outage and recovery (stops and starts appsec-flaky-test and waf-flaky-test).
 # Local `make e2e_pester` still runs every file. Each CI job runs one domain.
 
 $script:PesterDomainFiles = @{
@@ -21,7 +23,6 @@ $script:PesterDomainFiles = @{
     )
     appsec = @(
         'appsec.Tests.ps1'
-        'appsec_backoff.Tests.ps1'
         'captcha.Tests.ps1'
         'origin_scheme.Tests.ps1'
         'redis_cache.Tests.ps1'
@@ -31,6 +32,8 @@ $script:PesterDomainFiles = @{
     )
     modsec = @(
         'modsec.Tests.ps1'
+        'waf_dual.Tests.ps1'
+        'waf_backoff.Tests.ps1'
     )
 }
 

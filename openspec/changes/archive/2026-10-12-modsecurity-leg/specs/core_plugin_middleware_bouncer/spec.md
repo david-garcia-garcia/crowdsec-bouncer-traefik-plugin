@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: ServeHTTP runs ModSec after AppSec and captcha write
-When the bouncer subscribed to ModSec and no earlier writer returned, ServeHTTP SHALL run ModSec inspect after LAPI and AppSec and after an existing captcha-flag write (unsolved captcha still short-circuits before ModSec). A valid captcha gate cookie SHALL fall through to ModSec then `next`. Trusted clients SHALL skip LAPI, AppSec, and ModSec. Action-rule ban SHALL return before any WAF. AppSec FailureAction ban on an admitted miss SHALL return before ModSec. AppSec gate skip SHALL NOT return: ServeHTTP SHALL continue to ModSec when subscribed.
+When the bouncer subscribed to ModSec and no earlier writer returned, ServeHTTP SHALL run ModSec inspect after LAPI and AppSec and after an existing captcha-flag write (unsolved captcha still short-circuits before ModSec). A valid captcha gate cookie SHALL fall through to ModSec then `next`. Trusted clients SHALL skip LAPI, AppSec, and ModSec. Action-rule ban SHALL return before any WAF. AppSec FailureAction ban on an admitted miss SHALL return before ModSec. AppSec gate skip SHALL NOT return: ServeHTTP SHALL continue to ModSec when subscribed. A ModSec copied block, HTTP 413, or a ModSec failure action `ban` (or an unsolved `captcha`) SHALL return before `next`. A ModSec gate skip SHALL NOT return and SHALL NOT apply the ModSec failure action: ServeHTTP SHALL continue to `next`.
 
 #### Scenario: CRS runs after AppSec allow
 - **WHEN** the bouncer subscribed to AppSec and ModSec
@@ -20,6 +20,12 @@ When the bouncer subscribed to ModSec and no earlier writer returned, ServeHTTP 
 - **AND** the bouncer subscribed to ModSec
 - **THEN** AppSec is not called
 - **AND** ModSec inspect still runs
+
+#### Scenario: ModSec gate skip continues to next
+- **WHEN** the ModSec Gate denies admission
+- **AND** `bouncerModsecFailureAction` is `ban`
+- **THEN** the sidecar is not called
+- **AND** the request reaches `next` with no remediation header
 
 ## MODIFIED Requirements
 
@@ -52,7 +58,7 @@ The per-router bouncer SHALL hold four optional bound clients as `atomic.Value` 
 - **AND** concurrent ServeHTTP Unbox of that field does not panic from a torn `any`
 
 ### Requirement: A missing subscribed client uses that leg's failure action
-A missing subscribed LAPI client SHALL use this router's LAPI failure action. A missing subscribed AppSec client SHALL use this router's AppSec failure action when the request reaches AppSec. A missing subscribed captcha client SHALL ban a captcha verdict. A missing subscribed ModSec client SHALL use this router's `bouncerModsecFailMode` when the request reaches ModSec. `New` MUST NOT wait for a client to be published. A leg the bouncer did not subscribe to is not part of that check.
+A missing subscribed LAPI client SHALL use this router's LAPI failure action. A missing subscribed AppSec client SHALL use this router's AppSec failure action when the request reaches AppSec. A missing subscribed captcha client SHALL ban a captcha verdict. A missing subscribed ModSec client SHALL use this router's `bouncerModsecFailureAction` when the request reaches ModSec. `New` MUST NOT wait for a client to be published. A leg the bouncer did not subscribe to is not part of that check.
 
 #### Scenario: AppSec-only subscriber ignores a missing LAPI client
 - **WHEN** the bouncer subscribes only to AppSec and LAPI is not subscribed
@@ -67,10 +73,15 @@ A missing subscribed LAPI client SHALL use this router's LAPI failure action. A 
 - **WHEN** the bouncer subscribes to captcha, captcha is not published, and the verdict is captcha
 - **THEN** the response is a ban
 
-#### Scenario: Missing ModSec uses failMode
-- **WHEN** the bouncer subscribes to ModSec, ModSec is not published, and `bouncerModsecFailMode` is `close`
+#### Scenario: Missing ModSec uses the ModSec failure action
+- **WHEN** the bouncer subscribes to ModSec, ModSec is not published, and `bouncerModsecFailureAction` is `ban`
 - **AND** the request reaches ModSec
-- **THEN** the response is empty HTTP 502
+- **THEN** the response is the ban template with `ban:modsec-failure`
+
+#### Scenario: Missing ModSec with the default passes
+- **WHEN** the bouncer subscribes to ModSec, ModSec is not published, and `bouncerModsecFailureAction` is omitted
+- **AND** the request reaches ModSec
+- **THEN** the request reaches `next`
 
 ### Requirement: A failed New releases the holders it already opened
 `New` SHALL bind every reclaim `Open` it makes (decision store, LAPI client, AppSec client, captcha client, ModSec client) to one context derived from the constructor context, and SHALL release that context on every path where it returns an error. A constructor that fails after an earlier `Open` succeeded MUST NOT leave that incarnation held: with zero table grace its `Close` hook SHALL run, and a stream ticker it started MUST NOT keep polling LAPI. The derived context SHALL stay a child of the constructor context, so cancelling Traefik's context still releases the holders of a `New` that succeeded. The success path MUST NOT release it.
@@ -120,16 +131,18 @@ Closed reasons never take a third field. The closed vocabulary is:
 | `ban:appsec-challenge-empty` | AppSec `action: challenge` with empty body (fail-closed to ban page) |
 | `ban:appsec-failure` | AppSec down / unusable verdict, fail-closed ban |
 | `ban:modsec` | CRS sidecar copied 3xx/4xx block |
+| `ban:modsec-failure` | ModSec sidecar down / unpublished, failure action `ban` (RemediationReason `MODSEC`) |
 | `ban:captcha-downgrade` | Kind was captcha; this router served a ban page (unsubscribed / unpublished / invalid captcha client) |
 | `captcha:rules` | Matching action rule applied captcha |
 | `captcha:lapi` / `captcha:lapi:<origin>` | CrowdSec decision type captcha (same origin encoding) |
 | `captcha:lapi-failure` | LAPI fail-closed captcha |
 | `captcha:stream-unhealthy` | Stream fail-closed captcha |
 | `captcha:appsec-failure` | AppSec fail-closed captcha |
+| `captcha:modsec-failure` | ModSec sidecar down / unpublished, failure action `captcha` |
 | `captcha:appsec` | AppSec JSON `action: captcha` (envelope relay, not pkg/captcha) |
 | `captcha:challenge` | AppSec bot-detection `action: challenge` with non-empty body |
 | `captcha:solved` | 302 after a successful solve (token pass or second-tab captcha-form POST) |
-| `error:client-disconnected` | Client gone during AppSec body copy |
+| `error:client-disconnected` | Client gone during an AppSec or ModSec body copy |
 
 LAPI third field SHALL be the usage-metrics origin already returned by `LookupRemediation` / `LiveLookup` (`MetricsOrigin`), after strip of CR/LF/TAB and rewriting only the prefix `lists:` → `lists_`. Empty origin omits the third field. The plugin MUST NOT globally replace remaining colons. The plugin MUST NOT change `MetricsOrigin` or DecisionStore packing. Plugin origins, including `plugin:rules:<name>`, and AppSec specials are reason tokens, never a third field. A metrics origin that starts with `plugin:rules:` SHALL map to closed reason `rules` (no third field). Client address stays `pkg/ip.GetRemoteIP` on `clientRequest`; this header MUST NOT reconstruct identity.
 
@@ -188,6 +201,12 @@ The bouncer SHALL format ban, AppSec relay, disconnect, captcha-downgrade, and c
 - **AND** the sidecar returns HTTP 403
 - **THEN** the header value is `ban:modsec`
 
+#### Scenario: ModSec failure ban is ban:modsec-failure
+- **WHEN** `bouncerRemediationHeadersCustomName` is set
+- **AND** the sidecar is unreachable and `bouncerModsecFailureAction` is `ban`
+- **THEN** the header value is `ban:modsec-failure`
+- **AND** the usage-metrics origin is `plugin:modsec_failure`
+
 
 ### Requirement: Action rules fold every matching row
 The bouncer SHALL expose one public Config list `bouncerActionRules`. Default empty (omit or empty list) SHALL match nothing (setting off). Each row SHALL have `name`, `action`, and the same request predicates as dest `httprule.Rule` (`method`, `path`, `host`, `headers`, `cookies`). An omitted predicate, or `path` / `host` / `method` empty after trim, or an empty `headers` / `cookies` map, SHALL mean any for that predicate. Set predicates on one row SHALL all match (AND).
@@ -202,7 +221,7 @@ After a `GetRemoteIP` error (HTTP 502, not a ban), `IncProcessed`, and the trust
 - Else fold every match: `bypass` or `bypassLapi` SHALL skip LAPI; `bypass` or `bypassAppsec` SHALL skip AppSec; `bypass` or `bypassModsec` SHALL skip ModSec; any `captcha` token SHALL set a captcha flag. Skips SHALL add; they MUST NOT cancel each other or a captcha flag.
 - A LAPI skip SHALL skip `LookupRemediation`, `LiveLookup`, missing-subscribed-LAPI failure action, and stream/alone unhealthy failure action.
 - An AppSec skip SHALL skip AppSec `Query` and the AppSec body buffer on that path.
-- A ModSec skip SHALL skip sidecar inspect, body buffer, deny-verbs-with-body, the admission gate, and missing-subscribed-ModSec failMode.
+- A ModSec skip SHALL skip sidecar inspect, body buffer, the admission gate, and the missing-subscribed-ModSec failure action.
 - `captcha` MUST NOT return immediately. Legs that were not skipped SHALL still run. An active LAPI ban, or a fail-closed ban from that leg (lookup error, stream/alone unhealthy, failure action `ban`), SHALL prevail over the captcha rule and SHALL keep that leg's origin, not `plugin:rules:`. An AppSec `ban` verdict, or an AppSec failure-action `ban`, SHALL prevail over the captcha rule and SHALL keep origin `appsec` / `plugin:appsec_failure`. Those drops SHALL log WARN `warnCaptchaSuperseded` with attributes `name` (the first matching captcha row that lost) and dest `ip`. The plugin MUST NOT log attr `header` for this WARN.
 - An AppSec `challenge` with non-empty body is not a ban and MUST NOT override the captcha rule (MUST NOT relay; apply the plugin gate). An AppSec `challenge` with empty `UserBodyContent` SHALL stay dest fail-closed ban (`ban:appsec-challenge-empty`, origin `appsec`) and therefore SHALL prevail over the captcha rule like `ban`. Empty-challenge dest when no captcha rule matched MUST NOT change.
 - A CrowdSec captcha decision SHALL be unchanged: the rule MUST NOT replace that outcome, the metrics origin SHALL stay the CrowdSec origin, and AppSec for that decision SHALL stay after a valid captcha gate cookie, not before the challenge page.
@@ -368,7 +387,6 @@ Cookies SHALL use the same predicate shape as headers against that cookie's valu
 - **AND** the query string would otherwise trip CRS
 - **THEN** ServeHTTP does not call the sidecar
 - **AND** it does not buffer the body for ModSec
-- **AND** it does not apply deny-verbs-with-body
 
 #### Scenario: Bypass skips ModSec as well
 - **WHEN** a matching row is `{action: [bypass]}`

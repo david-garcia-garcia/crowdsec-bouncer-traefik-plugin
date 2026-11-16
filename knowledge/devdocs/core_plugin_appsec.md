@@ -3,12 +3,12 @@
 ## Language
 
 **AppSec Client**:
-The reclaim value for one CrowdSec AppSec listener (`pkg/appsec`). Keyed by middleware name plus host, path, resolved key, body limit, TLS, `appsecHttpTimeoutSeconds`, and the unhealthy-backoff knobs. Owns JSON parse, HTTP+auth, and the admission gate. Not the LAPI Client.
+The reclaim value for one CrowdSec AppSec listener (`pkg/appsec`). Keyed by middleware name plus host, path, resolved key, body limit, TLS, `appsecHttpTimeoutSeconds`, and `appsecUnhealthyBackOffPeriodSecs`. Owns JSON parse, HTTP+auth, and the admission gate. Not the LAPI Client.
 _Avoid_: CrowdsecConnection, `AppsecQuery` on LAPI, LAPI captcha, `atomic.Pointer[T]`, Adopt-only timeout or TLS
 
 **Gate skip**:
-A denied AppSec admission (`ErrGateSkip`). Query does not call AppSec and does not apply `bouncerAppsecFailureAction`. The bouncer continues (then ModSec if subscribed). Not an admitted miss and not client disconnected.
-_Avoid_: FailureAction, FailMode, treating skip as ban, Reporting a denied Allow
+A denied AppSec admission (`ErrGateSkip`). Query does not call AppSec and does not apply `bouncerAppsecFailureAction`. The bouncer continues (then ModSec if subscribed). ModSec skips the same way (`modsecurity.ErrGateSkip`). Not an admitted miss and not client disconnected.
+_Avoid_: FailureAction, treating skip as ban, Reporting a denied Allow
 
 **Structured AppSec response**:
 JSON CrowdSec 1.8 AppSec returns to the bouncer (`action`, `http_status`, `user_body_content`, `user_cookies`, `user_headers`). Listener HTTP 403 carries a remediation envelope; listener 200 is allow.
@@ -36,8 +36,8 @@ _Avoid_: GetBody ban, unreadable body, FailureAction passthrough
 ## How to use
 
 - Enable with existing `appsecEnabled`. Do not add a bot-detection plugin key.
-- Open with `appsec.Open` (reclaim by middleware name plus AppSec URL+key+body limit+TLS+`appsecHttpTimeoutSeconds`+unhealthy-backoff knobs). A knob change is a new Client. Do not construct the AppSec client inside `lapi.New`. Do not use `atomic.Pointer[T]`.
-- When `appsecUnhealthyBackOffPeriodSecs` is greater than 0, hold one `backendbackoff.Gate` from dest utilities `v1.0.7`. Default period is 30. `0` builds no gate. Omitted threshold is `5`. Omitted ratio is packaged `0.30`. Omitted max period equals the base. Do not set `Jitter` or `TTL`. `Close` Closes a non-nil Gate.
+- Open with `appsec.Open` (reclaim by middleware name plus AppSec URL+key+body limit+TLS+`appsecHttpTimeoutSeconds`+`appsecUnhealthyBackOffPeriodSecs`). A knob change is a new Client. Do not construct the AppSec client inside `lapi.New`. Do not use `atomic.Pointer[T]`.
+- When `appsecUnhealthyBackOffPeriodSecs` is greater than 0, `admission.New` builds one gate on `backendbackoff.Gate` from dest utilities `v1.0.7`. Default period is 30. `0` builds no gate. The period is the only knob: the trip rule is fixed in `pkg/admission` (`TripFailures` 5, `FailureRatio` 0.30; each failure spends 1, each success earns back `0.30/0.70`, so 5 failures in a row trip), and the cooldown does not grow (max equals the base). Do not set `Jitter` or `TTL`. `Close` Closes a non-nil Gate.
 - Query `Allow`s before the AppSec hop. Denied Allow returns `ErrGateSkip`: do not call AppSec, do not apply FailureAction. `applyAppsecServeHTTP` treats that error as continue (then ModSec if subscribed). Admitted transport failure, HTTP 500, an unexpected listener status, or a response-body io error `Record`s failure then applies FailureAction. HTTP 401 `Record`s success (configuration error, not an outage) and still applies FailureAction. A usable verdict `Record`s success. Inbound cancel (`wafhop.IsInboundCanceled`) does not Record.
 - `newTransport` sets `http.Client.Timeout` and stored `httpTimeoutSeconds` from `cfg.AppsecHTTPTimeoutSeconds`. Do not inherit from a shared default. Store the knob so `fieldsDiffer` sees a timeout change. Query uses that stored client.
 - `action` allow or empty 200 → `next`, except `/crowdsec-internal/challenge/`. `ban` → `handleBanStatusServeHTTP` with `headerReason` `appsec` (`ban:appsec` when the remediation header is set) and the status from `appsecBanStatusCode`: an `http_status` from 200 to 599 is relayed (403 by default, 429 for `RateLimit()`, or the `SetReturnCode()` value); zero, missing, or out of range uses `remediationStatusCode`. `captcha` → `serveAppsecCaptchaGate` (captcha gate, origin `appsec`, header `captcha:appsec`, downgrade ban reason `APPSEC` with `ban:captcha-downgrade`); never relay its `http_status` or body. Non-empty `challenge` → relay. Missing or empty-string `challenge` `user_body_content` → `handleBanServeHTTP` with `headerReason` `appsec-challenge-empty` (`ban:appsec-challenge-empty`) before `WriteHeader`. Any other action: non-empty body → relay; empty body → `handleBanServeHTTP` with `headerReason` `appsec-action-empty`. With a matched captcha action rule, `captcha` and non-empty `challenge` return false so the rule's gate runs.
@@ -64,7 +64,7 @@ decision, err := b.appsecClient.Query(req, pol)
 
 - `pkg/appsec/`
 - `pkg/appsec/query.go`
-- `pkg/appsec/gate.go`
+- `pkg/admission/admission.go`
 - `pkg/appsec/client_http.go`
 - `pkg/appsec/session.go`
 - `pkg/bouncer/bouncer.go`
@@ -92,5 +92,5 @@ decision, err := b.appsecClient.Query(req, pol)
 - Do not strip header names listed in the client's own `Connection` header, even though RFC 7230 tells a proxy to. This forward is an inspection copy, so that rule would let a client hide `Cookie` (or anything else) from the WAF. The static hop-by-hop list in `wafhop.IsHopByHopHeader` is the whole filter, for ModSec too.
 - Classify AppSec response-body io failures with `errors.Is` on the package-local sentinel. Do not match the `appsecQuery:readBody` prefix. Oversized AppSec bodies stay a different error and skip FailureAction.
 - Do not pass `0` into `io.LimitReader` (`N <= 0` is immediate EOF).
-- AppSec TLS, body limit, `appsecHttpTimeoutSeconds`, and the unhealthy-backoff knobs live on the ownership key. A change is a new Client. Do not apply those knobs with `AdoptTransport`.
+- AppSec TLS, body limit, `appsecHttpTimeoutSeconds`, and `appsecUnhealthyBackOffPeriodSecs` live on the ownership key. A change is a new Client. Do not apply those knobs with `AdoptTransport`.
 - Do not copy Gate into this repository. Do not treat a denied Allow as FailureAction even when that action is `ban`. Real-stack AppSec routes pin `appsecUnhealthyBackOffPeriodSecs: 0` so FailureAction cases are not skipped by the default gate.

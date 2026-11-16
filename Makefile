@@ -63,6 +63,9 @@ run_tlsauth:
 run_appsec:
 	docker compose -f examples/appsec-enabled/docker-compose.yml up -d --remove-orphans
 
+run_modsecurity:
+	docker compose -f examples/modsecurity/docker-compose.yml up -d --remove-orphans
+
 run_custom_captcha:
 	docker compose -f examples/custom-captcha/docker-compose.yml up -d --remove-orphans
 

@@ -1,0 +1,49 @@
+http:
+  routers:
+    app:
+      rule: PathPrefix(`/`)
+      entryPoints: [web]
+      middlewares: [crowdsec]
+      service: whoami@docker
+    admin:
+      rule: PathPrefix(`/admin`)
+      entryPoints: [web]
+      middlewares: [crowdsec-admin]
+      service: whoami@docker
+
+  middlewares:
+    # Connects to LAPI, AppSec, and the CRS sidecar, shares the three connections as "shared",
+    # and protects every path but /admin. A sidecar outage lets the request through
+    # (passthrough, the default).
+    crowdsec:
+      plugin:
+        bouncer:
+          bouncerEnabled: true
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: true
+          lapiHost: crowdsec:8080
+          lapiInstanceName: shared
+          lapiKey: 40796d93c2958f9e58345514e67740e5
+          lapiMode: stream
+          appsecEnabled: true
+          appsecHost: crowdsec:7422
+          appsecInstanceName: shared
+          modsecEnabled: true
+          modsecInstanceName: shared
+          modsecUrl: http://waf:8080
+          # Keep it at or below MODSEC_REQ_BODY_NOFILES_LIMIT on the sidecar.
+          modsecBodyLimit: 1048576
+          # After 5 sidecar failures in a row, skip ModSec for 30 s instead of waiting on it.
+          modsecUnhealthyBackOffPeriodSecs: 30
+
+    # Reuses the same three connections for /admin. Only its own request settings differ:
+    # here a sidecar outage bans instead of letting the request through.
+    crowdsec-admin:
+      plugin:
+        bouncer:
+          bouncerEnabled: true
+          bouncerModsecFailureAction: ban
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiInstanceName: shared
+          appsecInstanceName: shared
+          modsecInstanceName: shared

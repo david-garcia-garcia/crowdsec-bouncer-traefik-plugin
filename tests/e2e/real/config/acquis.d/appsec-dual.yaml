@@ -1,0 +1,10 @@
+# AppSec listener for the dual-leg routes (AppSec + ModSec on one router).
+# It runs no CRS: a CRS payload on /dual is decided by the ModSec sidecar alone,
+# and e2e/dual-vpatch gives AppSec its own deterministic block.
+listen_addr: 0.0.0.0:7424
+appsec_configs:
+  - e2e/dual-vpatch
+name: e2eAppSecDual
+source: appsec
+labels:
+  type: appsec

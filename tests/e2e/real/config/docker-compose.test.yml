@@ -48,6 +48,8 @@ services:
       - dummy-captcha
       - waf
       - waf-5xx
+      - waf-flaky
+      - appsec-flaky
       - echo-ws
 
   # Always-pass siteverify so Pester can POST a dummy form and assert the gate cookie.
@@ -566,6 +568,36 @@ services:
     labels:
       - "traefik.enable=false"
 
+  # Second CRS sidecar for the ModSec backoff lifecycle: waf_backoff.Tests.ps1 stops and
+  # starts it to simulate a sidecar outage. Same image and inspect-only overlay as waf.
+  waf-flaky:
+    image: owasp/modsecurity-crs:4.3.0-apache-alpine-202406090906
+    container_name: "waf-flaky-test"
+    restart: unless-stopped
+    environment:
+      - PARANOIA=1
+      - ANOMALY_INBOUND=5
+      - ANOMALY_OUTBOUND=4
+      - MODSEC_RULE_ENGINE=On
+      - MODSEC_AUDIT_ENGINE=Off
+      - "REMOTEIP_INT_PROXY=10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
+    volumes:
+      - ./crs-apache/httpd-vhosts.drain.conf:/usr/local/apache2/conf/extra/httpd-vhosts.conf:ro
+    labels:
+      - "traefik.enable=false"
+
+  # AppSec proxy for the AppSec backoff lifecycle (see appsec-flaky.conf).
+  appsec-flaky:
+    image: nginx:alpine
+    container_name: "appsec-flaky-test"
+    restart: unless-stopped
+    depends_on:
+      - crowdsec
+    volumes:
+      - ./appsec-flaky.conf:/etc/nginx/conf.d/default.conf:ro
+    labels:
+      - "traefik.enable=false"
+
   waf-5xx:
     image: nginx:alpine
     container_name: "waf-5xx-test"
@@ -656,6 +688,7 @@ services:
       - "./appsec-configs/e2e-origin-scheme-grant.yaml:/etc/crowdsec/appsec-configs/e2e-origin-scheme-grant.yaml:ro"
       - "./appsec-configs/e2e-rate-limit.yaml:/etc/crowdsec/appsec-configs/e2e-rate-limit.yaml:ro"
       - "./appsec-configs/e2e-captcha-verdict.yaml:/etc/crowdsec/appsec-configs/e2e-captcha-verdict.yaml:ro"
+      - "./appsec-configs/e2e-dual-vpatch.yaml:/etc/crowdsec/appsec-configs/e2e-dual-vpatch.yaml:ro"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.crowdsec-challenge.rule=PathPrefix(`/crowdsec-internal/challenge`)"

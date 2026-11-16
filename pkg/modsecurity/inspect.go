@@ -5,44 +5,54 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/wafhop"
 )
 
+// sidecarBodyDrainLimit caps how much of an unused sidecar body is drained, so keep-alive can reuse the slot.
 const sidecarBodyDrainLimit = 256 << 10
 
-const headerReasonModsec = "modsec"
+// MsgUnavailable is the debounced ERROR line when the sidecar gives no verdict.
+const MsgUnavailable = "crowdsec modsec sidecar unavailable"
 
-// Inspect copies req to the CRS sidecar and classifies the status.
-// failMode is per-router open|close. remediationHeader is the optional ban:modsec name.
-// True means the response was written. False with a nil error means the caller continues to next.
-// wafhop.ErrClientDisconnected and wafhop.ErrClientBodyRead come back unwritten: the bouncer answers
-// them the same way for every WAF leg.
-func (c *Client) Inspect(rw http.ResponseWriter, req *http.Request, failMode, remediationHeader string) (bool, error) {
-	if c.rejectDeniedVerbBody(rw, req) {
-		return true, nil
-	}
+var (
+	// ErrUnavailable means the sidecar gave no verdict: unreachable, timeout, HTTP 5xx, a request that
+	// could not be built, or a streamed body it cannot see. The bouncer applies bouncerModsecFailureAction.
+	ErrUnavailable = errors.New("modsecInspect:unavailable")
+	// ErrGateSkip means the admission gate is backing off and the sidecar was not called.
+	// As for AppSec, the bouncer continues without ModSec and without the failure action.
+	ErrGateSkip = errors.New("modsecInspect:unhealthySkip")
+	// ErrBodyTooLarge means the body is over modsecBodyLimit. The bouncer answers 413.
+	ErrBodyTooLarge = wafhop.ErrBodyTooLarge
+)
+
+// Inspect copies req to the CRS sidecar and classifies its status. It never writes the client response.
+//
+//   - nil, nil: allow (sidecar 2xx). The caller continues to next.
+//   - resp, nil: block (sidecar 3xx or 4xx). The caller sends it with WriteBlock, which closes it.
+//   - nil, err: ErrUnavailable, ErrGateSkip, ErrBodyTooLarge, wafhop.ErrClientDisconnected, or
+//     wafhop.ErrClientBodyRead.
+//
+// failureAction is the router's bouncerModsecFailureAction. It only decides what a POST, PUT, or PATCH
+// body streamed without a length means: passthrough inspects its headers only, any other action is
+// ErrUnavailable. That is the AppSec rule.
+func (c *Client) Inspect(req *http.Request, failureAction string) (*http.Response, error) {
 	var body []byte
 	switch {
 	case wafhop.IsBodyUnreadable(req):
-		// Same rule as AppSec: a streamed HTTP/2 or HTTP/3 body is never buffered. On a body method
-		// the sidecar cannot see the body, so that is a WAF failure (failMode); otherwise inspect headers only.
-		if wafhop.IsMethodWithBody(req.Method) && ApplyFailMode(rw, failMode) {
-			c.log.Debug("modsecInspect:unreadableBody dropped", "method", req.Method)
-			return true, nil
+		if wafhop.IsMethodWithBody(req.Method) && configuration.EffectiveModsecFailureAction(failureAction) != configuration.FailureActionPassthrough {
+			return nil, fmt.Errorf("%w: streamed %s body without a length", ErrUnavailable, req.Method)
 		}
 	case wafhop.HasBody(req):
 		read, err := wafhop.ReadBody(req, c.bodyLimit, wafhop.RejectOverLimit)
-		if errors.Is(err, wafhop.ErrBodyTooLarge) {
-			c.log.Warn("request body too large", "maxBodySizeBytes", c.bodyLimit)
-			http.Error(rw, "Request body too large", http.StatusRequestEntityTooLarge)
-			return true, nil
-		}
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 		body = read
 	}
@@ -50,20 +60,17 @@ func (c *Client) Inspect(rw http.ResponseWriter, req *http.Request, failMode, re
 	ticket, admitErr := c.gate.Admit(req.Context())
 	if admitErr != nil {
 		if wafhop.IsInboundCanceled(req, admitErr) {
-			return false, wafhop.ErrClientDisconnected
+			return nil, wafhop.ErrClientDisconnected
 		}
-		c.log.Error("fail to admit WAF request", "error", admitErr)
-		return ApplyFailMode(rw, failMode), nil
+		return nil, fmt.Errorf("%w: admission: %s", ErrUnavailable, admitErr.Error())
 	}
 	if !ticket.Admitted {
-		return ApplyFailMode(rw, failMode), nil
+		return nil, ErrGateSkip
 	}
 
 	proxyReq, err := http.NewRequestWithContext(req.Context(), req.Method, c.modsecURL+req.URL.RequestURI(), bytes.NewReader(body))
 	if err != nil {
-		c.log.Error("fail to prepare forwarded request", "error", err)
-		http.Error(rw, "", http.StatusBadGateway)
-		return true, nil
+		return nil, fmt.Errorf("%w: build request: %s", ErrUnavailable, err.Error())
 	}
 	// The sidecar sees the end-to-end request. Hop-by-hop headers belong to the client connection,
 	// and Content-Length is rebuilt from the bytes forwarded.
@@ -73,65 +80,50 @@ func (c *Client) Inspect(rw http.ResponseWriter, req *http.Request, failMode, re
 	resp, err := c.httpClient.Do(proxyReq)
 	if err != nil {
 		if wafhop.IsInboundCanceled(req, err) {
-			return false, wafhop.ErrClientDisconnected
+			return nil, wafhop.ErrClientDisconnected
 		}
 		c.gate.Record(ticket, false)
-		c.log.Error("fail to send HTTP request to modsec", "host", sidecarLogHost(c.modsecURL))
-		return ApplyFailMode(rw, failMode), nil
+		logger.Debounced(c.log, slog.LevelError, 5*time.Second, MsgUnavailable, "host", sidecarLogHost(c.modsecURL), "reason", "unreachable")
+		return nil, fmt.Errorf("%w: %s", ErrUnavailable, err.Error())
 	}
-	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			c.log.Error("fail to close WAF response body", "error", closeErr)
-		}
-	}()
 
-	if resp.StatusCode >= 300 && resp.StatusCode < 500 {
+	switch {
+	case resp.StatusCode >= 300 && resp.StatusCode < 500:
 		c.gate.Record(ticket, true)
-		if remediationHeader != "" {
-			rw.Header().Set(remediationHeader, "ban:"+headerReasonModsec)
-		}
-		forwardResponse(resp, rw)
-		c.discardSidecarBody(resp.Body)
-		return true, nil
-	}
-	c.discardSidecarBody(resp.Body)
-	if resp.StatusCode >= 500 {
+		return resp, nil
+	case resp.StatusCode >= 500:
+		c.closeSidecarBody(resp.Body)
 		c.gate.Record(ticket, false)
-		c.log.Error("fail to send HTTP request to modsec", "error", fmt.Errorf("waf status %d", resp.StatusCode))
-		return ApplyFailMode(rw, failMode), nil
+		logger.Debounced(c.log, slog.LevelError, 5*time.Second, MsgUnavailable, "host", sidecarLogHost(c.modsecURL), "reason", "status", "statusCode", resp.StatusCode)
+		return nil, fmt.Errorf("%w: sidecar status %d", ErrUnavailable, resp.StatusCode)
+	default:
+		c.closeSidecarBody(resp.Body)
+		c.gate.Record(ticket, true)
+		return nil, nil //nolint:nilnil // a nil response with a nil error is the allow verdict
 	}
-	c.gate.Record(ticket, true)
-	return false, nil
 }
 
-// rejectDeniedVerbBody writes HTTP 400 when a listed method carries a readable body byte.
-func (c *Client) rejectDeniedVerbBody(rw http.ResponseWriter, req *http.Request) bool {
-	if !c.denyVerbsWithBody[req.Method] || !wafhop.HasBody(req) {
-		return false
+// WriteBlock copies a sidecar block to the visitor and closes it: end-to-end headers except Server,
+// the status, then the page ModSecurity produced. A header already on rw keeps its value unless the
+// sidecar sends the same name.
+func WriteBlock(rw http.ResponseWriter, resp *http.Response) {
+	defer func() { _ = resp.Body.Close() }()
+	dst := rw.Header()
+	for name := range resp.Header {
+		dst.Del(name)
 	}
-	limitedBody := http.MaxBytesReader(rw, req.Body, 1)
-	testByte := make([]byte, 1)
-	if n, _ := limitedBody.Read(testByte); n > 0 {
-		c.log.Warn("HTTP request should not have a body, rejecting", "method", req.Method)
-		http.Error(rw, "HTTP "+req.Method+" requests should not have a body", http.StatusBadRequest)
-		return true
-	}
-	return false
+	wafhop.CopyEndToEndHeaders(dst, resp.Header, "Server")
+	rw.WriteHeader(resp.StatusCode)
+	_, _ = io.Copy(rw, resp.Body)
 }
 
-// ApplyFailMode writes an empty HTTP 502 on close and reports true. Open writes nothing and reports false.
-func ApplyFailMode(rw http.ResponseWriter, failMode string) bool {
-	if configuration.EffectiveModsecFailMode(failMode) == configuration.ModsecFailModeClose {
-		http.Error(rw, "", http.StatusBadGateway)
-		return true
-	}
-	return false
-}
-
-// discardSidecarBody drains leftover sidecar bytes so the HTTP slot can be reused.
-func (c *Client) discardSidecarBody(body io.Reader) {
+// closeSidecarBody drains leftover sidecar bytes and closes the body so the HTTP slot can be reused.
+func (c *Client) closeSidecarBody(body io.ReadCloser) {
 	if _, errDrain := io.Copy(io.Discard, io.LimitReader(body, sidecarBodyDrainLimit)); errDrain != nil {
 		c.log.Debug("modsecInspect:drainBody", "error", errDrain)
+	}
+	if errClose := body.Close(); errClose != nil {
+		c.log.Debug("modsecInspect:closeBody", "error", errClose)
 	}
 }
 
@@ -142,15 +134,4 @@ func sidecarLogHost(modsecURL string) string {
 		return "unknown"
 	}
 	return parsed.Host
-}
-
-// forwardResponse copies the sidecar block to the visitor: end-to-end headers except Server, then the body.
-func forwardResponse(resp *http.Response, rw http.ResponseWriter) {
-	dst := rw.Header()
-	for name := range resp.Header {
-		dst.Del(name)
-	}
-	wafhop.CopyEndToEndHeaders(dst, resp.Header, "Server")
-	rw.WriteHeader(resp.StatusCode)
-	_, _ = io.Copy(rw, resp.Body)
 }

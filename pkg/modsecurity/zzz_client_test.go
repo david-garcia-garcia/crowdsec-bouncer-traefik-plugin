@@ -2,11 +2,7 @@ package modsecurity
 
 import (
 	"context"
-	"io"
 	"log/slog"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -128,126 +124,5 @@ func TestNew_positiveBackoffBuildsGateAndCloseClosesIt(t *testing.T) {
 	client.Close()
 	if err := client.GateForTest().Inner().Report(gateKey, true); err == nil {
 		t.Fatal("closed gate must reject Report")
-	}
-}
-
-func TestInspect_defaultDenyGetWithBody(t *testing.T) {
-	cfg := testModsecConfig("http://127.0.0.1:1")
-	client, err := New(cfg, slog.Default(), "test", "n", "k")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-	rw := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/", strings.NewReader("x"))
-	if !inspectForTest(t, client, rw, req, configuration.ModsecFailModeOpen, "") {
-		t.Fatal("GET with body must write 400")
-	}
-	if rw.Code != http.StatusBadRequest {
-		t.Fatalf("status=%d want 400", rw.Code)
-	}
-}
-
-func TestInspect_explicitEmptyDenyListInspectsGetWithBody(t *testing.T) {
-	sidecarHits := 0
-	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sidecarHits++
-		body, _ := io.ReadAll(r.Body)
-		if string(body) != "x" {
-			t.Errorf("sidecar body=%q want x", body)
-		}
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer sidecar.Close()
-	cfg := testModsecConfig(sidecar.URL)
-	cfg.ModsecDenyVerbsWithBody = []string{}
-	client, err := New(cfg, slog.Default(), "test", "n", "k")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-	rw := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/", strings.NewReader("x"))
-	if inspectForTest(t, client, rw, req, configuration.ModsecFailModeOpen, "") {
-		t.Fatal("empty deny list must continue after inspect")
-	}
-	if sidecarHits != 1 {
-		t.Fatalf("sidecar hits=%d want 1", sidecarHits)
-	}
-}
-
-func TestInspect_zeroBodyLimitUsesDefault(t *testing.T) {
-	sidecarHits := 0
-	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sidecarHits++
-		body, _ := io.ReadAll(r.Body)
-		if len(body) != 64 {
-			t.Errorf("sidecar body len=%d want 64", len(body))
-		}
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer sidecar.Close()
-	cfg := testModsecConfig(sidecar.URL)
-	cfg.ModsecBodyLimit = 0
-	cfg.ModsecDenyVerbsWithBody = []string{}
-	client, err := New(cfg, slog.Default(), "test", "n", "k")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-	if client.bodyLimit != configuration.DefaultModsecBodyLimit {
-		t.Fatalf("bodyLimit=%d want default %d", client.bodyLimit, configuration.DefaultModsecBodyLimit)
-	}
-	rw := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader(strings.Repeat("a", 64)))
-	if inspectForTest(t, client, rw, req, configuration.ModsecFailModeOpen, "") {
-		t.Fatal("small body under the default limit must continue")
-	}
-	over := httptest.NewRecorder()
-	big := strings.Repeat("a", int(configuration.DefaultModsecBodyLimit)+1)
-	if !inspectForTest(t, client, over, httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader(big)), configuration.ModsecFailModeOpen, "") {
-		t.Fatal("body over the 8 MiB default must write")
-	}
-	if over.Code != http.StatusRequestEntityTooLarge {
-		t.Fatalf("status=%d want 413", over.Code)
-	}
-	if sidecarHits != 1 {
-		t.Fatalf("sidecar hits=%d want 1", sidecarHits)
-	}
-}
-
-func TestOwnershipKey_zeroBodyLimitSharesDefaultClient(t *testing.T) {
-	omitted := testModsecConfig("http://127.0.0.1:1")
-	zero := testModsecConfig("http://127.0.0.1:1")
-	zero.ModsecBodyLimit = 0
-	if OwnershipKey(omitted, "n") != OwnershipKey(zero, "n") {
-		t.Fatal("modsecBodyLimit 0 and omitted must share one Client")
-	}
-}
-
-func TestInspect_bodyOverLimitIs413(t *testing.T) {
-	sidecarHits := 0
-	sidecar := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		sidecarHits++
-	}))
-	defer sidecar.Close()
-	cfg := testModsecConfig(sidecar.URL)
-	cfg.ModsecBodyLimit = 4
-	cfg.ModsecDenyVerbsWithBody = []string{}
-	client, err := New(cfg, slog.Default(), "test", "n", "k")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-	rw := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("12345"))
-	if !inspectForTest(t, client, rw, req, configuration.ModsecFailModeOpen, "") {
-		t.Fatal("over-limit body must write")
-	}
-	if rw.Code != http.StatusRequestEntityTooLarge {
-		t.Fatalf("status=%d want 413", rw.Code)
-	}
-	if sidecarHits != 0 {
-		t.Fatalf("sidecar hits=%d want 0", sidecarHits)
 	}
 }

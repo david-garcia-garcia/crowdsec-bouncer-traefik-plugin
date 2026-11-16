@@ -30,26 +30,22 @@ const (
 // gateKey is the admission leg name and gate key.
 const gateKey = "modsec"
 
-// defaultDenyVerbsWithBody is the omitted/nil deny list.
-var defaultDenyVerbsWithBody = []string{"HEAD", "GET", "DELETE", "OPTIONS", "TRACE", "CONNECT"} //nolint:gochecknoglobals
-
 // Client is the reclaim value for one CRS sidecar listener.
 type Client struct {
 	mu sync.Mutex
 
-	bodyLimit         int64
-	closed            bool
-	denyVerbsWithBody map[string]bool
-	gate              *admission.Gate
-	httpClient        *http.Client
-	incarnation       string
-	instanceName      string
-	log               *slog.Logger
-	middlewareName    string
-	modsecURL         string
-	pluginVersion     string
-	sessionKey        string
-	sleeping          bool
+	bodyLimit      int64
+	closed         bool
+	gate           *admission.Gate
+	httpClient     *http.Client
+	incarnation    string
+	instanceName   string
+	log            *slog.Logger
+	middlewareName string
+	modsecURL      string
+	pluginVersion  string
+	sessionKey     string
+	sleeping       bool
 }
 
 // New constructs a ModSec Client. Call Prepare first. Close releases the Gate and idle HTTP.
@@ -61,28 +57,24 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, m
 		"sessionKey", bindKey,
 	)
 	gate, err := admission.New(admission.Config{
-		Leg:              gateKey,
-		PeriodSecs:       config.ModsecUnhealthyBackOffPeriodSecs,
-		MaxPeriodSecs:    config.ModsecUnhealthyMaxBackOffPeriodSecs,
-		FailureThreshold: config.ModsecUnhealthyFailureThreshold,
-		FailureRatio:     config.ModsecUnhealthyFailureRatio,
-		MsgStarted:       MsgBackoffStarted,
-		MsgEnded:         MsgBackoffEnded,
+		Leg:        gateKey,
+		PeriodSecs: config.ModsecUnhealthyBackOffPeriodSecs,
+		MsgStarted: MsgBackoffStarted,
+		MsgEnded:   MsgBackoffEnded,
 	}, log)
 	if err != nil {
 		return nil, err
 	}
 	client := &Client{
-		bodyLimit:         EffectiveBodyLimit(config.ModsecBodyLimit),
-		denyVerbsWithBody: createMethodSet(config.ModsecDenyVerbsWithBody),
-		gate:              gate,
-		httpClient:        newHTTPClient(config.ModsecHTTPTimeoutSeconds),
-		instanceName:      config.ModsecInstanceName,
-		log:               log,
-		middlewareName:    middlewareName,
-		modsecURL:         strings.TrimSuffix(strings.TrimSpace(config.ModsecURL), "/"),
-		pluginVersion:     pluginVersion,
-		sessionKey:        bindKey,
+		bodyLimit:      config.ModsecBodyLimit,
+		gate:           gate,
+		httpClient:     newHTTPClient(config.ModsecHTTPTimeoutSeconds),
+		instanceName:   config.ModsecInstanceName,
+		log:            log,
+		middlewareName: middlewareName,
+		modsecURL:      strings.TrimSuffix(strings.TrimSpace(config.ModsecURL), "/"),
+		pluginVersion:  pluginVersion,
+		sessionKey:     bindKey,
 	}
 	client.incarnation = fmt.Sprintf("%p", client)
 	client.log.Info(MsgInstanceStarted, "incarnation", client.incarnation, "reason", "started")
@@ -157,24 +149,4 @@ func (c *Client) bindIdentity(middlewareName, bindKey string) {
 	if c.sessionKey == "" {
 		c.sessionKey = bindKey
 	}
-}
-
-// EffectiveBodyLimit maps 0 (or less) to the 8 MiB default, as the source plugin did. There is no unlimited value.
-func EffectiveBodyLimit(limit int64) int64 {
-	if limit <= 0 {
-		return configuration.DefaultModsecBodyLimit
-	}
-	return limit
-}
-
-// createMethodSet converts HTTP methods to an uppercase set. Nil uses the default list; empty denies nothing.
-func createMethodSet(methods []string) map[string]bool {
-	if methods == nil {
-		methods = defaultDenyVerbsWithBody
-	}
-	set := make(map[string]bool, len(methods))
-	for _, method := range methods {
-		set[strings.ToUpper(method)] = true
-	}
-	return set
 }

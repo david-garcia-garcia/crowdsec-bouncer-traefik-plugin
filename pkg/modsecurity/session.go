@@ -16,30 +16,22 @@ import (
 const ownerKeyPrefix = "modsec:owner:"
 
 // ownership is the ModSec Open-key payload: middleware name plus sidecar knobs.
-// Slot name, bounce, failMode, LAPI, AppSec, and captcha stay off it.
+// Slot name, bounce, the per-router failure action, LAPI, AppSec, and captcha stay off it.
 type ownership struct {
-	MiddlewareName                string   `json:"middlewareName"`
-	URL                           string   `json:"url"`
-	HTTPTimeoutSeconds            int64    `json:"httpTimeoutSeconds"`
-	BodyLimit                     int64    `json:"bodyLimit"`
-	DenyVerbsWithBody             []string `json:"denyVerbsWithBody"`
-	UnhealthyBackOffPeriodSecs    int64    `json:"unhealthyBackOffPeriodSecs"`
-	UnhealthyMaxBackOffPeriodSecs int64    `json:"unhealthyMaxBackOffPeriodSecs"`
-	UnhealthyFailureThreshold     int64    `json:"unhealthyFailureThreshold"`
-	UnhealthyFailureRatio         float64  `json:"unhealthyFailureRatio"`
+	MiddlewareName             string `json:"middlewareName"`
+	URL                        string `json:"url"`
+	HTTPTimeoutSeconds         int64  `json:"httpTimeoutSeconds"`
+	BodyLimit                  int64  `json:"bodyLimit"`
+	UnhealthyBackOffPeriodSecs int64  `json:"unhealthyBackOffPeriodSecs"`
 }
 
 func ownershipFrom(cfg *configuration.Config, middlewareName string) ownership {
 	return ownership{
-		MiddlewareName:                middlewareName,
-		URL:                           cfg.ModsecURL,
-		HTTPTimeoutSeconds:            cfg.ModsecHTTPTimeoutSeconds,
-		BodyLimit:                     EffectiveBodyLimit(cfg.ModsecBodyLimit),
-		DenyVerbsWithBody:             cfg.ModsecDenyVerbsWithBody,
-		UnhealthyBackOffPeriodSecs:    cfg.ModsecUnhealthyBackOffPeriodSecs,
-		UnhealthyMaxBackOffPeriodSecs: cfg.ModsecUnhealthyMaxBackOffPeriodSecs,
-		UnhealthyFailureThreshold:     cfg.ModsecUnhealthyFailureThreshold,
-		UnhealthyFailureRatio:         cfg.ModsecUnhealthyFailureRatio,
+		MiddlewareName:             middlewareName,
+		URL:                        cfg.ModsecURL,
+		HTTPTimeoutSeconds:         cfg.ModsecHTTPTimeoutSeconds,
+		BodyLimit:                  cfg.ModsecBodyLimit,
+		UnhealthyBackOffPeriodSecs: cfg.ModsecUnhealthyBackOffPeriodSecs,
 	}
 }
 
