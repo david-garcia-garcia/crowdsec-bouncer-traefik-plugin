@@ -23,17 +23,17 @@ The token is read before the single-reading path check that `bypass`, `bypassLap
 **End users.** An API client under a captcha decision gets its API response on the routes the operator exempted, instead of a captcha page.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 0 items remain.
 
 Priority: P2 — real operator pain (API integrations break while a captcha applies) with workarounds that give up more protection than needed
-Reviewed head: 53661509
+Reviewed head: 2b949f15
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/44771324922 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -43,7 +43,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-11-20-action-rule-bypass-captcha pushed | `git` |
 | OpenSpec | action-rule-bypass-captcha | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/223 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 44771324922 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/44771324922 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/44771324922 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -66,7 +66,7 @@ None.
 None.
 
 ## How this fits together
-Ticket 2026-11-20-action-rule-bypass-captcha on branch 2026-11-20-action-rule-bypass-captcha targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/223; CI not seen.
+Ticket 2026-11-20-action-rule-bypass-captcha on branch 2026-11-20-action-rule-bypass-captcha targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/223; CI build 44771324922 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/44771324922.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -95,7 +95,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 6 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 53661509b13b133d04fe285656fbdf5078e04c4d | Card must match the branch you measured |
+| Reviewed head | 2b949f15d9b8aefcc57c98fa27eb4c4c23a412ad | Card must match the branch you measured |
 
 ### Stored data model
 None.

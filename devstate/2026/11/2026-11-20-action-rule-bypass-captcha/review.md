@@ -39,3 +39,8 @@ head: 005797705f71e2fca8cdb3975ba3e81d3b3f013b
 phase: archive
 verdict: in progress
 head: 53661509b13b133d04fe285656fbdf5078e04c4d
+
+## pullrequest (2026-11-20)
+phase: pullrequest
+verdict: ready for review
+head: 2b949f15d9b8aefcc57c98fa27eb4c4c23a412ad
