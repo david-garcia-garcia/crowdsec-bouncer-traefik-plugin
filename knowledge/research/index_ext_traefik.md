@@ -30,3 +30,7 @@ priority: normal
 local: ext_traefik_forwardedheaders_x-forwarded-proto/
 description: How Traefik's entrypoint XForwarded sanitizes X-Forwarded-Proto before plugin middleware runs.
 
+## Entrypoint request path
+priority: normal
+local: ext_traefik_entrypoints_request-path/
+description: How the Traefik entry point normalizes, sanitizes, and filters the request path before a plugin middleware and the backend see it.
