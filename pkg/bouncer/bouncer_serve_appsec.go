@@ -49,7 +49,7 @@ func (b *Bouncer) answerAppSec(rw http.ResponseWriter, req clientrequest.Request
 	}
 	// AppSec judged this request alone. A captcha form POST it let through is
 	// still the answer to an earlier captcha, so the gate validates it.
-	return b.isCaptchaFormAnswer(req) && b.serveAppsecCaptchaGate(rw, req)
+	return b.isCaptchaFormAnswer(req) && b.serveAppsecCaptchaGate(rw, req, match)
 }
 
 // applyAppsecServeHTTP runs this router's AppSec check.
@@ -75,7 +75,7 @@ func (b *Bouncer) applyAppsecFailureAction(rw http.ResponseWriter, req clientreq
 	case configuration.FailureActionPassthrough:
 		return false
 	case configuration.FailureActionCaptcha:
-		return b.captchaAppsecFailure(rw, req)
+		return b.captchaAppsecFailure(rw, req, match)
 	default:
 		b.banAppsecFailure(rw, req, match)
 		return true
@@ -98,7 +98,7 @@ func (b *Bouncer) answerAppsecQueryError(rw http.ResponseWriter, req clientreque
 		b.handleClientBodyReadServeHTTP(rw, req, "appsec", err)
 		return true
 	case errors.Is(err, appsec.ErrFailureCaptcha):
-		return b.captchaAppsecFailure(rw, req)
+		return b.captchaAppsecFailure(rw, req, match)
 	default:
 		b.log.Debug("applyAppsecServeHTTP", "ip", req.IPAddrString(), "isWaf", true, "error", err)
 		b.banAppsecFailure(rw, req, match)
@@ -107,8 +107,11 @@ func (b *Bouncer) answerAppsecQueryError(rw http.ResponseWriter, req clientreque
 }
 
 // captchaAppsecFailure serves the captcha gate for the AppSec failure action.
-// False means a widget asset or a cleared gate, and the caller continues.
-func (b *Bouncer) captchaAppsecFailure(rw http.ResponseWriter, req clientrequest.Request) bool {
+// False means a widget asset, a cleared gate, or a bypassCaptcha rule, and the caller continues.
+func (b *Bouncer) captchaAppsecFailure(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
+	if b.bypassesCaptcha(req, match) {
+		return false
+	}
 	return b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginAppsecFailure)
 }
 

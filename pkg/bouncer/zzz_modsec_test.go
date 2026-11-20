@@ -264,3 +264,32 @@ func assertModsecFailureBan(t *testing.T, rw *httptest.ResponseRecorder, passed 
 		t.Fatalf("body=%q want the ban template with reason %s", rw.Body.String(), configuration.ReasonMODSEC)
 	}
 }
+
+// TestServeHTTP_modsecFailureActionCaptcha proves the ModSec failure action captcha serves the gate
+// with captcha:modsec-failure, and that a bypassCaptcha rule lets the request through instead,
+// as it does for the AppSec failure action captcha.
+func TestServeHTTP_modsecFailureActionCaptcha(t *testing.T) {
+	hits := 0
+	b, passed := testModsecBouncer(t, configuration.FailureActionCaptcha, []httprule.ActionRule{{
+		Name:   "api",
+		Action: []string{httprule.ActionBypassCaptcha},
+		Rule:   httprule.Rule{Path: "^/api/"},
+	}})
+	bindTestCaptcha(b, testCaptchaClient(t, "/fast.js", "", "", nil))
+	bindTestModSec(b, failingModsec(t, 0, &hits))
+
+	rw := httptest.NewRecorder()
+	b.ServeHTTP(rw, testModsecRequest("/catalog"))
+	if *passed || rw.Header().Get("X-Remediation") != "captcha:modsec-failure" {
+		t.Fatalf("outside the rule want captcha:modsec-failure, passed=%v header=%q", *passed, rw.Header().Get("X-Remediation"))
+	}
+
+	rw = httptest.NewRecorder()
+	b.ServeHTTP(rw, testModsecRequest("/api/items"))
+	if !*passed || rw.Header().Get("X-Remediation") != "" {
+		t.Fatalf("bypassCaptcha must reach origin without a remediation header, passed=%v header=%q", *passed, rw.Header().Get("X-Remediation"))
+	}
+	if hits != 2 {
+		t.Fatalf("sidecar hits=%d want 2: bypassCaptcha skips no leg", hits)
+	}
+}

@@ -32,7 +32,7 @@ _Avoid_: `CaptchaCustomValidateURL`, the bundled default `captcha.html`
 
 ## Overview
 
-`handleRemediationServeHTTP` sends captcha kind to `handleCaptchaKindServeHTTP` (WARN-and-ban when this router never subscribed). `serveAppsecCaptchaGate` is the AppSec entry to the same handler (`core_plugin_appsec.md`): an AppSec `captcha` verdict, or a challenge-marker POST AppSec let through. A subscribed, usable client then routes after cookie grace and first-solve 302. A widget asset or a cleared gate returns false and does not call next. Cookie mint stays on `core_plugin_middleware_captcha-gate`.
+`handleRemediationServeHTTP` sends captcha kind to `handleCaptchaKindServeHTTP` (WARN-and-ban when this router never subscribed). `serveAppsecCaptchaGate` is the AppSec entry to the same handler (`core_plugin_appsec.md`): an AppSec `captcha` verdict, or a challenge-marker POST AppSec let through. A subscribed, usable client then routes after cookie grace and first-solve 302. A widget asset or a cleared gate returns false and does not call next. A request a `bypassCaptcha` action rule matched never reaches this handler: its callers ask `bypassesCaptcha` first and return false (`core_plugin_middleware_action-rules.md`). Cookie mint stays on `core_plugin_middleware_captcha-gate`.
 
 ## How to use
 

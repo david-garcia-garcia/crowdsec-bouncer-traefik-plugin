@@ -10,12 +10,13 @@ import (
 
 // Action tokens on one ActionRule. Order in the authoring array does not matter.
 const (
-	ActionBan          = "ban"
-	ActionBypass       = "bypass"
-	ActionBypassAppsec = "bypassAppsec"
-	ActionBypassLapi   = "bypassLapi"
-	ActionBypassModsec = "bypassModsec" //nolint:gosec // G101: action token, not a credential
-	ActionCaptcha      = "captcha"
+	ActionBan           = "ban"
+	ActionBypass        = "bypass"
+	ActionBypassAppsec  = "bypassAppsec"
+	ActionBypassCaptcha = "bypassCaptcha"
+	ActionBypassLapi    = "bypassLapi"
+	ActionBypassModsec  = "bypassModsec" //nolint:gosec // G101: action token, not a credential
+	ActionCaptcha       = "captcha"
 )
 
 // ActionRule is one authoring row: unique name, action tokens, and Rule predicates.
@@ -35,11 +36,12 @@ type ActionSet struct {
 
 // actionTokens is the parsed action array for one compiled row.
 type actionTokens struct {
-	ban        bool
-	captcha    bool
-	skipAppsec bool
-	skipLapi   bool
-	skipModsec bool
+	ban           bool
+	bypassCaptcha bool
+	captcha       bool
+	skipAppsec    bool
+	skipLapi      bool
+	skipModsec    bool
 }
 
 // NewActionSet validates names and action tokens, then compiles predicates with New.
@@ -71,13 +73,15 @@ func NewActionSet(rules []ActionRule) (*ActionSet, error) {
 }
 
 // ActionMatch is every matching row reduced for one request.
-// BanName and CaptchaName are the first matching rule of that token. Empty means none.
+// BanName, CaptchaName and BypassCaptchaName are the first matching rule of that token. Empty means none.
+// BypassCaptchaName means the request gets no captcha, so CaptchaName is empty whenever it is set.
 // SkipLapi, SkipAppsec, and SkipModsec are OR'd across every non-ban hit. A ban row contributes only its name.
 // AmbiguousPathName is the first matching rule with a path predicate whose skips were dropped
 // because the request path has more than one reading (see SingleReadingPath). Empty means none.
 type ActionMatch struct {
 	AmbiguousPathName string
 	BanName           string
+	BypassCaptchaName string
 	CaptchaName       string
 	SkipAppsec        bool
 	SkipLapi          bool
@@ -94,8 +98,9 @@ func (set *ActionSet) Matching(httpReq *http.Request) []int {
 
 // Fold reduces every matching row. A nil set matches nothing.
 // The first ban name wins and that row contributes nothing else. Skip flags OR. The first captcha name wins.
+// The first bypassCaptcha name wins, and it clears the captcha name: a request that gets no captcha has no captcha rule.
 // A row with a path predicate skips no leg when the path has more than one reading: its regex saw
-// one reading and the backend may serve another. Its captcha token still applies.
+// one reading and the backend may serve another. Its captcha and bypassCaptcha tokens still apply.
 func (set *ActionSet) Fold(httpReq *http.Request) ActionMatch {
 	var match ActionMatch
 	if set == nil {
@@ -111,6 +116,9 @@ func (set *ActionSet) Fold(httpReq *http.Request) ActionMatch {
 		}
 		if set.Captcha(i) && match.CaptchaName == "" {
 			match.CaptchaName = set.Name(i)
+		}
+		if set.BypassCaptcha(i) && match.BypassCaptchaName == "" {
+			match.BypassCaptchaName = set.Name(i)
 		}
 		if !set.SkipLapi(i) && !set.SkipAppsec(i) && !set.SkipModsec(i) {
 			continue
@@ -130,6 +138,9 @@ func (set *ActionSet) Fold(httpReq *http.Request) ActionMatch {
 		if set.SkipModsec(i) {
 			match.SkipModsec = true
 		}
+	}
+	if match.BypassCaptchaName != "" {
+		match.CaptchaName = ""
 	}
 	return match
 }
@@ -168,6 +179,11 @@ func (set *ActionSet) Captcha(i int) bool {
 	return set != nil && i >= 0 && i < len(set.tokens) && set.tokens[i].captcha
 }
 
+// BypassCaptcha reports whether the row at index i has a bypassCaptcha token.
+func (set *ActionSet) BypassCaptcha(i int) bool {
+	return set != nil && i >= 0 && i < len(set.tokens) && set.tokens[i].bypassCaptcha
+}
+
 // SkipLapi reports whether the row at index i skips LAPI (bypass or bypassLapi).
 func (set *ActionSet) SkipLapi(i int) bool {
 	return set != nil && i >= 0 && i < len(set.tokens) && set.tokens[i].skipLapi
@@ -198,7 +214,7 @@ func compileActionName(raw string, seen map[string]struct{}) (string, error) {
 	return name, nil
 }
 
-// compileActionTokens rejects empty, unknown, duplicate, and ban mixed with other tokens.
+// compileActionTokens rejects empty, unknown, duplicate, ban mixed with other tokens, and captcha with bypassCaptcha.
 func compileActionTokens(raw []string) (actionTokens, error) {
 	if len(raw) == 0 {
 		return actionTokens{}, errors.New("action: empty")
@@ -229,12 +245,17 @@ func compileActionTokens(raw []string) (actionTokens, error) {
 			parsed.skipAppsec = true
 		case ActionBypassModsec:
 			parsed.skipModsec = true
+		case ActionBypassCaptcha:
+			parsed.bypassCaptcha = true
 		default:
 			return actionTokens{}, fmt.Errorf("action: unknown %q", token)
 		}
 	}
 	if parsed.ban && len(seen) > 1 {
 		return actionTokens{}, errors.New("action: ban must be alone")
+	}
+	if parsed.captcha && parsed.bypassCaptcha {
+		return actionTokens{}, errors.New("action: captcha with bypassCaptcha")
 	}
 	return parsed, nil
 }

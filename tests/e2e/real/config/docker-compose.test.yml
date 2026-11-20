@@ -2,7 +2,7 @@ name: crowdsec-bouncer-e2e
 
 services:
   traefik:
-    image: "traefik:v3.7.11"
+    image: "traefik:v3.7.19"
     container_name: "traefik-test"
     restart: unless-stopped
     command:
@@ -669,6 +669,8 @@ services:
       BOUNCER_KEY_ENTERPRISE_SCORE: "c51a1c70000000000000000000000019"
       BOUNCER_KEY_ACTION_RULES: "c51a1c7000000000000000000000001a"
       BOUNCER_KEY_CAPTCHA_APPSEC: "c51a1c7000000000000000000000001b"
+      BOUNCER_KEY_BYPASS_CAPTCHA: "c51a1c7000000000000000000000001c"
+      BOUNCER_KEY_BYPASS_CAPTCHA_PATHS: "c51a1c7000000000000000000000001d"
       # Disable aggressive collections that cause 150k decision issue
       DISABLE_COLLECTIONS: "crowdsecurity/iptables crowdsecurity/linux crowdsecurity/sshd"
       # Enable debugging

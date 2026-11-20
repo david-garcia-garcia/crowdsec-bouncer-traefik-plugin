@@ -58,15 +58,25 @@ func (b *Bouncer) serveModSec(rw http.ResponseWriter, req clientrequest.Request,
 }
 
 // applyModsecFailureAction applies bouncerModsecFailureAction when the sidecar gave no verdict
-// or no ModSec client is published. False means passthrough, or a captcha gate the client cleared.
+// or no ModSec client is published. False means passthrough, a captcha gate the client cleared,
+// or a bypassCaptcha rule.
 func (b *Bouncer) applyModsecFailureAction(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
 	switch b.modsecFailureAction {
 	case configuration.FailureActionPassthrough:
 		return false
 	case configuration.FailureActionCaptcha:
-		return b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginModsecFailure)
+		return b.captchaModsecFailure(rw, req, match)
 	default:
 		b.banWarnCaptchaRule(rw, req, match, configuration.ReasonMODSEC, headerReasonModsecFailure, lapi.OriginPluginModsecFailure)
 		return true
 	}
+}
+
+// captchaModsecFailure serves the captcha gate for the ModSec failure action.
+// False means a widget asset, a cleared gate, or a bypassCaptcha rule, and the caller continues.
+func (b *Bouncer) captchaModsecFailure(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
+	if b.bypassesCaptcha(req, match) {
+		return false
+	}
+	return b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginModsecFailure)
 }

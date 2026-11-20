@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-11-20-action-rule-bypass-captcha",
+  "jobName": "2026-11-20-action-rule-bypass-captcha",
+  "startedAt": "2026-11-20T15:40:14.421Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-20T15:43:22.936Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-20T15:49:39.253Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-20T15:52:12.532Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-20T16:09:07.223Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-20T16:12:42.722Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-20T16:13:43.450Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-20T16:14:02.747Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-20T16:20:39.967Z"
+    }
+  }
+}

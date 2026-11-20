@@ -57,6 +57,60 @@ function Add-TestDecision {
     return $true
 }
 
+# Helper function to create an Ip decision with a chosen decision origin (lists, CAPI, ...).
+# cscli can only write the cscli and cscli-import origins, so this posts an alert to LAPI
+# as a machine, which is how the CrowdSec engine stores blocklist and community decisions.
+function Add-TestOriginDecision {
+    param(
+        [string]$IP,
+        [string]$Origin,
+        [string]$Scenario,
+        [string]$Type = "ban",
+        [string]$Duration = "1h",
+        [string]$CrowdSecApiUrl = "http://localhost:8081"
+    )
+
+    Write-Host "➕ Adding $Type decision for $IP with origin $Origin ($Scenario)" -ForegroundColor Yellow
+
+    $machine = "e2e-origin-injector"
+    $password = "e2e-origin-injector-password"
+    $result = docker exec crowdsec-test sh -c "cscli machines add $machine --password $password -f /dev/null --force 2>&1"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to register the test machine: $result"
+    }
+
+    # LAPI rejects a machine login whose User-Agent is not "<name>/<version>".
+    $userAgent = "e2e-origin-injector/1.0"
+    $login = @{ machine_id = $machine; password = $password; scenarios = @() } | ConvertTo-Json
+    $auth = Invoke-RestMethod -Uri "$CrowdSecApiUrl/v1/watchers/login" -Method Post -ContentType "application/json" -UserAgent $userAgent -Body $login -TimeoutSec 10
+
+    $now = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $alerts = @(
+        @{
+            scenario         = $Scenario
+            scenario_hash    = ""
+            scenario_version = ""
+            message          = "Integration test $Origin decision"
+            events_count     = 1
+            start_at         = $now
+            stop_at          = $now
+            capacity         = 0
+            leakspeed        = "0"
+            simulated        = $false
+            events           = @()
+            source           = @{ scope = "Ip"; value = $IP }
+            decisions        = @(
+                @{ origin = $Origin; scenario = $Scenario; scope = "Ip"; value = $IP; type = $Type; duration = $Duration }
+            )
+        }
+    )
+    $body = ConvertTo-Json -InputObject $alerts -Depth 10
+    $null = Invoke-RestMethod -Uri "$CrowdSecApiUrl/v1/alerts" -Method Post -ContentType "application/json" -UserAgent $userAgent -Headers @{ Authorization = "Bearer $($auth.token)" } -Body $body -TimeoutSec 10
+
+    Write-Host "✅ Decision added successfully via LAPI alert" -ForegroundColor Green
+    return $true
+}
+
 # Helper function to create a Range decision using cscli --range
 function Add-TestRangeDecision {
     param(
@@ -203,6 +257,57 @@ function Invoke-HttpNoRedirect {
     finally {
         $client.Dispose()
         $handler.Dispose()
+    }
+}
+
+# GET with the request target written on the wire exactly as given.
+# Invoke-WebRequest and HttpClient resolve dot segments and re-encode the path before
+# sending, so a path such as /api/../admin or /api/%2e%2e/admin never reaches Traefik.
+function Invoke-RawHttpGet {
+    param(
+        [string]$RequestTarget,
+        [string]$IP,
+        [string]$TraefikHost = "localhost",
+        [int]$Port = 8000,
+        [int]$TimeoutSec = 10
+    )
+
+    $client = [System.Net.Sockets.TcpClient]::new()
+    $client.ReceiveTimeout = $TimeoutSec * 1000
+    $client.SendTimeout = $TimeoutSec * 1000
+    try {
+        $client.Connect($TraefikHost, $Port)
+        $stream = $client.GetStream()
+        $requestText = "GET $RequestTarget HTTP/1.1`r`nHost: ${TraefikHost}:$Port`r`nX-Forwarded-For: $IP`r`nUser-Agent: Integration-Test-Client`r`nConnection: close`r`n`r`n"
+        $requestBytes = [System.Text.Encoding]::ASCII.GetBytes($requestText)
+        $stream.Write($requestBytes, 0, $requestBytes.Length)
+
+        $reader = [System.IO.StreamReader]::new($stream, [System.Text.Encoding]::UTF8)
+        $raw = $reader.ReadToEnd()
+    }
+    finally {
+        $client.Dispose()
+    }
+
+    $headerEnd = $raw.IndexOf("`r`n`r`n")
+    if ($headerEnd -lt 0) {
+        return @{ StatusCode = 0; Headers = @{}; Content = $raw }
+    }
+    $headerLines = $raw.Substring(0, $headerEnd) -split "`r`n"
+    $statusCode = 0
+    if ($headerLines[0] -match '^HTTP/\d\.\d (\d{3})') {
+        $statusCode = [int]$Matches[1]
+    }
+    $headerMap = @{}
+    foreach ($line in ($headerLines | Select-Object -Skip 1)) {
+        $name, $value = $line -split ':\s*', 2
+        $headerMap[$name] = $value
+    }
+    # Content keeps any chunked framing; callers only search it for markers.
+    return @{
+        StatusCode = $statusCode
+        Headers    = $headerMap
+        Content    = $raw.Substring($headerEnd + 4)
     }
 }
 

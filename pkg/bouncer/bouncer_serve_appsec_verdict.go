@@ -12,8 +12,9 @@ import (
 )
 
 // answerAppsecVerdict writes the response for the verdict Query returned.
-// True means the response was written. False means allow, or a captcha or challenge verdict
-// that a matched captcha action rule answers instead, and the caller may continue.
+// True means the response was written. False means allow, a captcha or challenge verdict
+// that a matched captcha action rule answers instead, or a captcha verdict on a request
+// a bypassCaptcha rule matched, and the caller may continue.
 func (b *Bouncer) answerAppsecVerdict(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, decision *appsec.Response) bool {
 	if decision == nil || decision.Action == "" || decision.Action == appsec.ActionAllow {
 		return false
@@ -28,7 +29,7 @@ func (b *Bouncer) answerAppsecVerdict(rw http.ResponseWriter, req clientrequest.
 		if match.CaptchaName != "" {
 			return false
 		}
-		return b.serveAppsecCaptchaGate(rw, req)
+		return b.serveAppsecCaptchaGate(rw, req, match)
 	case appsec.ActionChallenge:
 		if decision.UserBodyContent == "" {
 			b.banAppsecVerdict(rw, req, match, headerReasonAppsecChallengeEmpty)

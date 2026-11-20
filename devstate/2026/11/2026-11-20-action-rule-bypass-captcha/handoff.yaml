@@ -1,0 +1,18 @@
+issueKey: 2026-11-20-action-rule-bypass-captcha
+jobName: 2026-11-20-action-rule-bypass-captcha
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 12d0ebbae6e574f4b896bbcd14b21603893c19f577d58327982e3c1ecc5b10a8
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: action-rule-bypass-captcha
+pr:
+  id: 223
+  url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/223
