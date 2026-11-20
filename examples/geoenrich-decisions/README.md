@@ -75,4 +75,4 @@ In [`dynamic.yml`](dynamic.yml):
 
 Client IP identity stays `X-Forwarded-For`. The entrypoint trusts Docker/LAN CIDRs so that header is not client-spoofable from outside those networks.
 
-See the plugin README `bouncerDecisionScopeHeaders` section for Country/AS normalize rules (`XX`/`T1` do not match).
+See [Decisions](../../docs/concepts.md#decisions) for Country/AS normalize rules (`XX`/`T1` do not match).
