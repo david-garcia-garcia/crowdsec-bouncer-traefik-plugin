@@ -14,11 +14,11 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+In progress. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 80266e97
-Owner decision: None.
+Reviewed head: 87483aad
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -42,16 +42,21 @@ Owner decision: None.
 None.
 
 ## Deviations from the ask
-None.
+- taken: each bucket carries `match: {method, path, host, headers, cookies}`. → the same `httprule.Rule` predicates are squashed onto the bucket row (`name`, `path`, `host`, …, `key`, `requests`, `window`, `action`), exactly as a `bouncerActionRules` row carries them. `match` and `key` stay separate concepts; only the nesting goes. — `pkg/httprule/action.go (ActionRule embeds Rule with mapstructure:",squash")` — one authoring shape for "which requests" across the plugin, and one less nesting level in Traefik plugin config, where only list → object → list depth is proven by the existing e2e.. Requester: not asked.
+
 
 ## Follow-up issues
-None.
+- [ ] [Extract a common leg abstraction from `plugin.go` and `Bouncer`](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/knowledge/debt/2026-11-20-extract-common-leg-abstraction.md) — each published leg is copied by hand into five places in `plugin.go` and `Bouncer`; the owner asked to suggest a shared leg unit before the next leg, and the Open-only rate-limit leg does not need it.
+
 
 ## How this fits together
 Ticket 2026-11-20-add-redis-rate-limit-leg on branch 2026-11-20-add-redis-rate-limit-leg targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/228; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Does the existing `bypass` action also skip the rate limit? | additive asked — new `bypassRateLimit` token and `SkipRateLimit` field in `pkg/httprule/action.go`; requirement semantics 5 and open decision 1 | assumed — no. Only `bypassRateLimit` skips the rate limit; `bypass` keeps meaning "skip LAPI and AppSec". The `Fold` skip guard change has 1 caller (`pkg/bouncer/bouncer.go:196`). | explore |
+
 
 ## Findings
 None.
@@ -66,7 +71,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 80266e972bb3813c79a3cea4298fd7ec05cae09e | Card must match the branch you measured |
+| Reviewed head | 87483aad6352f08a6d56f6cfff035430a18d166e | Card must match the branch you measured |
 
 ### Stored data model
 None.
