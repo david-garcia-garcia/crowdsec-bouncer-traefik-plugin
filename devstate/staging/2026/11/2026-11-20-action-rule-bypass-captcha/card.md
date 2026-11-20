@@ -26,7 +26,7 @@ The token is read before the single-reading path check that `bypass`, `bypassLap
 In progress. 0 items remain.
 
 Priority: P2 — real operator pain (API integrations break while a captcha applies) with workarounds that give up more protection than needed
-Reviewed head: 00579770
+Reviewed head: 53661509
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -49,9 +49,14 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [core_plugin_lapi_origin-based-decision-remap](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-action-rule-bypass-captcha/openspec/changes/action-rule-bypass-captcha/proposal.md) — modified
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-action-rule-bypass-captcha/openspec/changes/action-rule-bypass-captcha/proposal.md) — modified
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-action-rule-bypass-captcha/openspec/changes/action-rule-bypass-captcha/proposal.md) — modified
+- [core_plugin_lapi_origin-based-decision-remap](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-action-rule-bypass-captcha/openspec/changes/archive/2026-11-20-action-rule-bypass-captcha/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-action-rule-bypass-captcha/openspec/changes/archive/2026-11-20-action-rule-bypass-captcha/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-action-rule-bypass-captcha/openspec/changes/archive/2026-11-20-action-rule-bypass-captcha/proposal.md) — modified
+
+Completed:
+- [core_plugin_lapi_origin-based-decision-remap](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-action-rule-bypass-captcha/openspec/specs/core_plugin_lapi_origin-based-decision-remap/spec.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-action-rule-bypass-captcha/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-action-rule-bypass-captcha/openspec/specs/core_plugin_middleware_config-validation/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -88,9 +93,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 3 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 6 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 005797705f71e2fca8cdb3975ba3e81d3b3f013b | Card must match the branch you measured |
+| Reviewed head | 53661509b13b133d04fe285656fbdf5078e04c4d | Card must match the branch you measured |
 
 ### Stored data model
 None.
