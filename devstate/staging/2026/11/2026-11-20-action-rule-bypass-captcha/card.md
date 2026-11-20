@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 5f4b5e95
-Owner decision: None.
+Reviewed head: 7a1984a3
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -51,7 +51,10 @@ None.
 Ticket 2026-11-20-action-rule-bypass-captcha on branch 2026-11-20-action-rule-bypass-captcha targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/223; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Does a ban that `bouncerOriginBasedDecisionRemap` softens to a captcha pass on a `bypassCaptcha` request? | bounded asked — changes `appliedLAPIRemediation`, 2 call sites found in `pkg/` and root `*.go`, both migrated here; requirement Desired "a ban softened to a captcha … stays a ban". | assumed — no, it stays a ban. Proposed in chat and not objected to; not in the caller's last message word for word. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +69,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 5f4b5e95b95abe50739cb0654a6e2013079804e2 | Card must match the branch you measured |
+| Reviewed head | 7a1984a3935ff4d6e7df32176a3739145e821f93 | Card must match the branch you measured |
 
 ### Stored data model
 None.
