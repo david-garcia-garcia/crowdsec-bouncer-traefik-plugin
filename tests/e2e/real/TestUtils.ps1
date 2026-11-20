@@ -57,7 +57,7 @@ function Add-TestDecision {
     return $true
 }
 
-# Helper function to create an Ip ban with a chosen decision origin (lists, CAPI, ...).
+# Helper function to create an Ip decision with a chosen decision origin (lists, CAPI, ...).
 # cscli can only write the cscli and cscli-import origins, so this posts an alert to LAPI
 # as a machine, which is how the CrowdSec engine stores blocklist and community decisions.
 function Add-TestOriginDecision {
@@ -65,11 +65,12 @@ function Add-TestOriginDecision {
         [string]$IP,
         [string]$Origin,
         [string]$Scenario,
+        [string]$Type = "ban",
         [string]$Duration = "1h",
         [string]$CrowdSecApiUrl = "http://localhost:8081"
     )
 
-    Write-Host "➕ Adding ban decision for $IP with origin $Origin ($Scenario)" -ForegroundColor Yellow
+    Write-Host "➕ Adding $Type decision for $IP with origin $Origin ($Scenario)" -ForegroundColor Yellow
 
     $machine = "e2e-origin-injector"
     $password = "e2e-origin-injector-password"
@@ -99,7 +100,7 @@ function Add-TestOriginDecision {
             events           = @()
             source           = @{ scope = "Ip"; value = $IP }
             decisions        = @(
-                @{ origin = $Origin; scenario = $Scenario; scope = "Ip"; value = $IP; type = "ban"; duration = $Duration }
+                @{ origin = $Origin; scenario = $Scenario; scope = "Ip"; value = $IP; type = $Type; duration = $Duration }
             )
         }
     )
@@ -256,6 +257,57 @@ function Invoke-HttpNoRedirect {
     finally {
         $client.Dispose()
         $handler.Dispose()
+    }
+}
+
+# GET with the request target written on the wire exactly as given.
+# Invoke-WebRequest and HttpClient resolve dot segments and re-encode the path before
+# sending, so a path such as /api/../admin or /api/%2e%2e/admin never reaches Traefik.
+function Invoke-RawHttpGet {
+    param(
+        [string]$RequestTarget,
+        [string]$IP,
+        [string]$TraefikHost = "localhost",
+        [int]$Port = 8000,
+        [int]$TimeoutSec = 10
+    )
+
+    $client = [System.Net.Sockets.TcpClient]::new()
+    $client.ReceiveTimeout = $TimeoutSec * 1000
+    $client.SendTimeout = $TimeoutSec * 1000
+    try {
+        $client.Connect($TraefikHost, $Port)
+        $stream = $client.GetStream()
+        $requestText = "GET $RequestTarget HTTP/1.1`r`nHost: ${TraefikHost}:$Port`r`nX-Forwarded-For: $IP`r`nUser-Agent: Integration-Test-Client`r`nConnection: close`r`n`r`n"
+        $requestBytes = [System.Text.Encoding]::ASCII.GetBytes($requestText)
+        $stream.Write($requestBytes, 0, $requestBytes.Length)
+
+        $reader = [System.IO.StreamReader]::new($stream, [System.Text.Encoding]::UTF8)
+        $raw = $reader.ReadToEnd()
+    }
+    finally {
+        $client.Dispose()
+    }
+
+    $headerEnd = $raw.IndexOf("`r`n`r`n")
+    if ($headerEnd -lt 0) {
+        return @{ StatusCode = 0; Headers = @{}; Content = $raw }
+    }
+    $headerLines = $raw.Substring(0, $headerEnd) -split "`r`n"
+    $statusCode = 0
+    if ($headerLines[0] -match '^HTTP/\d\.\d (\d{3})') {
+        $statusCode = [int]$Matches[1]
+    }
+    $headerMap = @{}
+    foreach ($line in ($headerLines | Select-Object -Skip 1)) {
+        $name, $value = $line -split ':\s*', 2
+        $headerMap[$name] = $value
+    }
+    # Content keeps any chunked framing; callers only search it for markers.
+    return @{
+        StatusCode = $statusCode
+        Headers    = $headerMap
+        Content    = $raw.Substring($headerEnd + 4)
     }
 }
 

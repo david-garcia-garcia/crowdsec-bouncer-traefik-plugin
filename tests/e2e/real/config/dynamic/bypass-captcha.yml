@@ -1,0 +1,88 @@
+# A bypassCaptcha action rule on two routers that serve a LAPI captcha.
+# Under <prefix>/api/ a captcha is never served: the request continues.
+# Any other path under the prefix gets the captcha as usual. Bans apply everywhere.
+# /bypass-captcha also runs AppSec. /bypass-captcha-paths does not, so the path the
+# rule sees is decided by Traefik alone and no CRS rule hides the outcome.
+http:
+  routers:
+    bypass-captcha:
+      rule: PathPrefix(`/bypass-captcha`)
+      entryPoints: [web]
+      middlewares: [bouncer-bypass-captcha]
+      service: whoami@docker
+    bypass-captcha-paths:
+      rule: PathPrefix(`/bypass-captcha-paths`)
+      entryPoints: [web]
+      middlewares: [bouncer-bypass-captcha-paths]
+      service: whoami@docker
+  middlewares:
+    bouncer-bypass-captcha:
+      plugin:
+        bouncer:
+          appsecEnabled: "true"
+          appsecHost: crowdsec:7422
+          appsecHttpTimeoutSeconds: "30"
+          bouncerActionRules:
+            - name: api-no-captcha
+              path: ^/bypass-captcha/api/
+              action:
+                - bypassCaptcha
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          captchaCustomJsUrl: http://widget.example/bypass-captcha/widget.js
+          captchaCustomKey: dummy-captcha
+          captchaCustomResponse: dummy-captcha-response
+          captchaCustomValidateUrl: http://dummy-captcha/siteverify
+          captchaEnabled: "true"
+          captchaFilePath: /e2e-captcha.html
+          captchaGateBindIp: "true"
+          captchaGateSecret: test-gate-secret
+          captchaProvider: custom
+          captchaSecretKey: e2e-dummy-secret
+          captchaSiteKey: e2e-dummy-site
+          lapiEnabled: "true"
+          lapiHost: crowdsec:8080
+          lapiHttpTimeoutSeconds: "30"
+          lapiKey: "c51a1c7000000000000000000000001c"
+          lapiMetricsUpdateIntervalSeconds: "10"
+          lapiMode: none
+          lapiUpdateIntervalSeconds: "5"
+          logFormat: json
+          logLevel: DEBUG
+          reclaimGraceSeconds: "2"
+    bouncer-bypass-captcha-paths:
+      plugin:
+        bouncer:
+          bouncerActionRules:
+            - name: api-no-captcha
+              path: ^/bypass-captcha-paths/api/
+              action:
+                - bypassCaptcha
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          captchaCustomJsUrl: http://widget.example/bypass-captcha-paths/widget.js
+          captchaCustomKey: dummy-captcha
+          captchaCustomResponse: dummy-captcha-response
+          captchaCustomValidateUrl: http://dummy-captcha/siteverify
+          captchaEnabled: "true"
+          captchaFilePath: /e2e-captcha.html
+          captchaGateBindIp: "true"
+          captchaGateSecret: test-gate-secret
+          captchaProvider: custom
+          captchaSecretKey: e2e-dummy-secret
+          captchaSiteKey: e2e-dummy-site
+          lapiEnabled: "true"
+          lapiHost: crowdsec:8080
+          lapiHttpTimeoutSeconds: "30"
+          lapiKey: "c51a1c7000000000000000000000001d"
+          lapiMode: none
+          lapiUpdateIntervalSeconds: "5"
+          logFormat: json
+          logLevel: DEBUG
+          reclaimGraceSeconds: "2"

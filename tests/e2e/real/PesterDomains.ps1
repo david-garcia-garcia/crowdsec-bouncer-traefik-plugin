@@ -21,6 +21,7 @@ $script:PesterDomainFiles = @{
     appsec = @(
         'appsec.Tests.ps1'
         'captcha.Tests.ps1'
+        'bypass_captcha.Tests.ps1'
         'origin_scheme.Tests.ps1'
         'redis_cache.Tests.ps1'
     )

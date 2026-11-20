@@ -579,13 +579,14 @@ Match on what the client cannot choose for another resource: the path, the host,
 
 | Request sent | Path the plugin and your application receive | Captcha bypassed |
 | ------------ | -------------------------------------------- | ---------------- |
-| `/api/../admin`, `/api/%2e%2e/admin`, `/api/..\admin` | `/admin` | No. Traefik resolved the path before the plugin. |
+| `/api/../admin`, `/api/%2e%2e/admin` | `/admin` | No. Traefik resolved the path before the plugin. |
 | `/api/..;/admin` | `/admin` from Traefik v3.7.18. Unchanged on earlier versions. | No from v3.7.18. Yes on earlier versions. |
 | `/api/..%2Fadmin`, `/api/..%5Cadmin`, `/api/..%3B/admin`, `/api/%252e%252e/admin` | Unchanged | Yes |
+| `/api/..\admin` | `/api/..%5Cadmin`. Traefik encodes the backslash and does not resolve it. | Yes |
 
-The last row is the limit. Traefik does not decode `%2F` (`/`), `%5C` (`\`), `%3B` (`;`) or `%25` (`%`) by default, so the request still starts with `/api/` and the rule matches. Your application receives the same encoded path. If it decodes those characters and then resolves `..`, it serves `/admin` to a client that should have seen a captcha. Anchoring the pattern does not prevent this. Bans are not affected: a banned client stays banned on every path.
+The last two rows are the limit. Traefik does not decode `%2F` (`/`), `%5C` (`\`), `%3B` (`;`) or `%25` (`%`) by default, so the request still starts with `/api/` and the rule matches. Your application receives the same encoded path. If it decodes those characters and then resolves `..`, it serves `/admin` to a client that should have seen a captcha. Anchoring the pattern does not prevent this. Bans are not affected: a banned client stays banned on every path.
 
-To close it, make Traefik reject those encoded characters on the entry point. It then answers HTTP 400 before the plugin runs:
+To close it, make Traefik reject those encoded characters on the entry point. It then answers HTTP 400 before the plugin runs, also for a raw `\`:
 
 ```yaml
 # Traefik static configuration (CLI flags)
