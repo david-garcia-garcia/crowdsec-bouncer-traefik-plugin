@@ -14,7 +14,8 @@ import (
 )
 
 // serveLAPI reports whether LAPI wrote the response.
-// False means ServeHTTP continues with AppSec. A cleared captcha gate and a widget asset do not write.
+// False means ServeHTTP continues with AppSec. A cleared captcha gate, a widget asset, and a captcha
+// on a request a bypassCaptcha rule matched do not write.
 func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
 	if match.SkipLapi || !b.subscribeLAPI {
 		return false
@@ -40,7 +41,7 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 			b.banWarnCaptchaRule(rw, req, match, configuration.ReasonTECH, headerReasonCacheFail, lapi.OriginPluginTechCacheFail)
 			return true
 		}
-		kind, origin = b.appliedLAPIRemediation(kind, origin, originID)
+		kind, origin = b.appliedLAPIRemediation(match, kind, origin, originID)
 		switch {
 		case decisionscope.IsActiveRemediation(kind):
 			logger.Trace(b.log, "serveLAPI", appendScopesGroup([]any{"ip", req.IPAddrString(), "remediation", kind}, scopes)...)
@@ -68,7 +69,7 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 				return b.applyLapiFailureAction(rw, req, match, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
 			}
 		}
-		kind, origin = b.appliedLAPIRemediation(kind, origin, 0)
+		kind, origin = b.appliedLAPIRemediation(match, kind, origin, 0)
 		if kind == decisionscope.NoBannedValue {
 			return false
 		}

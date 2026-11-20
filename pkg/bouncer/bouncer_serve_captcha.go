@@ -9,6 +9,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 const msgCaptchaUnsubscribed = "crowdsec bouncer captcha unsubscribed"
@@ -41,9 +42,23 @@ func (b *Bouncer) applyCaptchaRuleServeHTTP(rw http.ResponseWriter, req clientre
 	return b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginRules(match.CaptchaName))
 }
 
+// bypassesCaptcha reports whether a bypassCaptcha action rule matched, so this request gets no captcha.
+// A caller that would serve the captcha gate returns false instead, as for a cleared gate: nothing is
+// written and the request continues. TRACE only: the condition is client-driven.
+func (b *Bouncer) bypassesCaptcha(req clientrequest.Request, match httprule.ActionMatch) bool {
+	if match.BypassCaptchaName == "" {
+		return false
+	}
+	logger.Trace(b.log, "bypassCaptcha", "ip", req.IPAddrString(), "name", match.BypassCaptchaName)
+	return true
+}
+
 // serveAppsecCaptchaGate serves this router's captcha gate for AppSec: a captcha verdict, or a captcha form POST AppSec let through.
-// False means a widget asset or a cleared gate, and the caller continues.
-func (b *Bouncer) serveAppsecCaptchaGate(rw http.ResponseWriter, req clientrequest.Request) bool {
+// False means a widget asset, a cleared gate, or a bypassCaptcha rule, and the caller continues.
+func (b *Bouncer) serveAppsecCaptchaGate(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
+	if b.bypassesCaptcha(req, match) {
+		return false
+	}
 	return b.handleCaptchaKindServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsec, originAppsec)
 }
 
@@ -92,10 +107,15 @@ func (b *Bouncer) warnCaptchaSuperseded(req clientrequest.Request, match httprul
 
 // remediateWarnCaptchaRuleOnBan writes kind and origin.
 // When kind is a ban and a captcha action rule also matched, it warns that the rule lost.
-// False means a captcha kind did not write.
+// False means a captcha kind did not write: a widget asset, a cleared gate, or a bypassCaptcha rule.
 func (b *Bouncer) remediateWarnCaptchaRuleOnBan(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, kind, origin string) bool {
-	if decisionscope.RemediationKind(kind) == decisionscope.BannedValue {
+	switch decisionscope.RemediationKind(kind) {
+	case decisionscope.BannedValue:
 		b.warnCaptchaSuperseded(req, match)
+	case decisionscope.CaptchaValue:
+		if b.bypassesCaptcha(req, match) {
+			return false
+		}
 	}
 	return b.handleRemediationServeHTTP(rw, req, kind, origin)
 }

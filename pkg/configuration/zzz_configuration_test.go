@@ -313,6 +313,10 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	cfgUnknownActionToken.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{"pass"}, Rule: httprule.Rule{Path: "^/x$"}}}
 	cfgDuplicateAction := getMinimalConfig()
 	cfgDuplicateAction.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBypass, httprule.ActionBypass}, Rule: httprule.Rule{Path: "^/x$"}}}
+	cfgCaptchaWithBypassCaptcha := getMinimalConfig()
+	cfgCaptchaWithBypassCaptcha.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionCaptcha, httprule.ActionBypassCaptcha}, Rule: httprule.Rule{Path: "^/x$"}}}
+	cfgBypassCaptchaWithSkip := getMinimalConfig()
+	cfgBypassCaptchaWithSkip.BouncerActionRules = []httprule.ActionRule{{Name: "api", Action: []string{httprule.ActionBypassCaptcha, httprule.ActionBypassAppsec}, Rule: httprule.Rule{Path: "^/api/"}}}
 	cfgBanWithSkip := getMinimalConfig()
 	cfgBanWithSkip.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBan, httprule.ActionBypass}, Rule: httprule.Rule{Path: "^/x$"}}}
 	cfgCaptchaNoClient := getMinimalConfig()
@@ -396,6 +400,8 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 		{name: "Unknown action token fails", args: args{config: cfgUnknownActionToken}, wantErr: true, wantErrContains: "action: unknown"},
 		{name: "Duplicate action token fails", args: args{config: cfgDuplicateAction}, wantErr: true, wantErrContains: "action: duplicate"},
 		{name: "Ban mixed with skip fails", args: args{config: cfgBanWithSkip}, wantErr: true, wantErrContains: "action: ban must be alone"},
+		{name: "Captcha mixed with bypassCaptcha fails", args: args{config: cfgCaptchaWithBypassCaptcha}, wantErr: true, wantErrContains: "action: captcha with bypassCaptcha"},
+		{name: "bypassCaptcha with a leg skip passes", args: args{config: cfgBypassCaptchaWithSkip}, wantErr: false},
 		{name: "Captcha without captcha client still passes ValidateParams", args: args{config: cfgCaptchaNoClient}, wantErr: false},
 		{name: "Custom json validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "json")}, wantErr: false},
 		{name: "Custom form validate body accepted", args: args{config: newCustomValidateBodyConfig(t, "form")}, wantErr: false},

@@ -254,6 +254,8 @@ func TestNewActionSet_rejectsNameAndAction(t *testing.T) {
 		{name: "duplicate token", rules: []ActionRule{{Name: "x", Action: []string{ActionBypass, ActionBypass}, Rule: Rule{Path: "^/x$"}}}, wantErr: "action: duplicate"},
 		{name: "ban with skip", rules: []ActionRule{{Name: "x", Action: []string{ActionBan, ActionBypass}, Rule: Rule{Path: "^/x$"}}}, wantErr: "action: ban must be alone"},
 		{name: "ban with captcha", rules: []ActionRule{{Name: "x", Action: []string{ActionBan, ActionCaptcha}, Rule: Rule{Path: "^/x$"}}}, wantErr: "action: ban must be alone"},
+		{name: "ban with bypassCaptcha", rules: []ActionRule{{Name: "x", Action: []string{ActionBan, ActionBypassCaptcha}, Rule: Rule{Path: "^/x$"}}}, wantErr: "action: ban must be alone"},
+		{name: "captcha with bypassCaptcha", rules: []ActionRule{{Name: "x", Action: []string{ActionCaptcha, ActionBypassCaptcha}, Rule: Rule{Path: "^/x$"}}}, wantErr: "action: captcha with bypassCaptcha"},
 		{name: "fully empty predicates", rules: []ActionRule{{Name: "x", Action: []string{ActionBypass}}}, wantErr: "empty"},
 	}
 	for _, tt := range tests {
@@ -387,5 +389,65 @@ func TestActionSet_foldAmbiguousPathDropsPathSkipsOnly(t *testing.T) {
 	hostOnly := set.Fold(httptest.NewRequest(http.MethodGet, "http://internal.example/healthz/..;/admin", nil))
 	if want := (ActionMatch{AmbiguousPathName: "healthz", CaptchaName: "login-captcha", SkipLapi: true}); hostOnly != want {
 		t.Fatalf("host-only Fold=%+v want %+v", hostOnly, want)
+	}
+}
+
+// TestNewActionSet_bypassCaptchaSkipsNoLeg proves bypassCaptcha is its own token: it skips neither leg,
+// and it may share a row with the leg skips.
+func TestNewActionSet_bypassCaptchaSkipsNoLeg(t *testing.T) {
+	set := mustNewActionSet(t, []ActionRule{
+		{Name: "api", Action: []string{ActionBypassCaptcha}, Rule: Rule{Path: "^/api/"}},
+		{Name: "api-no-waf", Action: []string{ActionBypassCaptcha, ActionBypassAppsec}, Rule: Rule{Path: "^/api/upload"}},
+	})
+	if !set.BypassCaptcha(0) || set.SkipLapi(0) || set.SkipAppsec(0) || set.Captcha(0) || set.Ban(0) {
+		t.Fatal("bypassCaptcha alone must set only the captcha bypass")
+	}
+	if !set.BypassCaptcha(1) || set.SkipLapi(1) || !set.SkipAppsec(1) {
+		t.Fatal("bypassCaptcha with bypassAppsec must keep both tokens")
+	}
+	if set.BypassCaptcha(2) || (*ActionSet)(nil).BypassCaptcha(0) {
+		t.Fatal("out of range and nil set must report no captcha bypass")
+	}
+}
+
+// TestActionSet_foldBypassCaptcha proves the first bypassCaptcha row is named, that it clears the
+// captcha rule of another matching row, and that a ban row still wins.
+func TestActionSet_foldBypassCaptcha(t *testing.T) {
+	set := mustNewActionSet(t, []ActionRule{
+		{Name: "shop-captcha", Action: []string{ActionCaptcha}, Rule: Rule{Host: `^shop\.example$`}},
+		{Name: "api", Action: []string{ActionBypassCaptcha}, Rule: Rule{Path: "^/api/"}},
+		{Name: "api-v2", Action: []string{ActionBypassCaptcha}, Rule: Rule{Path: "^/api/v2/"}},
+		{Name: "api-admin-ban", Action: []string{ActionBan}, Rule: Rule{Path: "^/api/admin"}},
+	})
+	outside := set.Fold(httptest.NewRequest(http.MethodGet, "http://shop.example/catalog", nil))
+	if want := (ActionMatch{CaptchaName: "shop-captcha"}); outside != want {
+		t.Fatalf("outside Fold=%+v want %+v", outside, want)
+	}
+	api := set.Fold(httptest.NewRequest(http.MethodGet, "http://shop.example/api/v2/items", nil))
+	if want := (ActionMatch{BypassCaptchaName: "api"}); api != want {
+		t.Fatalf("api Fold=%+v want %+v", api, want)
+	}
+	banned := set.Fold(httptest.NewRequest(http.MethodGet, "http://shop.example/api/admin", nil))
+	if want := (ActionMatch{BanName: "api-admin-ban", BypassCaptchaName: "api"}); banned != want {
+		t.Fatalf("banned Fold=%+v want %+v", banned, want)
+	}
+}
+
+// TestActionSet_foldBypassCaptchaIgnoresPathReading proves a bypassCaptcha path row applies its regex
+// as written: on a path with more than one reading the captcha bypass stays, while the leg skip of
+// the same row is still dropped.
+func TestActionSet_foldBypassCaptchaIgnoresPathReading(t *testing.T) {
+	set := mustNewActionSet(t, []ActionRule{
+		{Name: "api", Action: []string{ActionBypassCaptcha, ActionBypassLapi}, Rule: Rule{Path: "^/api/"}},
+	})
+	clean := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/api/items", nil))
+	if want := (ActionMatch{BypassCaptchaName: "api", SkipLapi: true}); clean != want {
+		t.Fatalf("clean Fold=%+v want %+v", clean, want)
+	}
+	for _, target := range []string{"/api/..;/admin", "/api/..%2Fadmin", "/api/..%5Cadmin", "/api/items%20x"} {
+		ambiguous := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com"+target, nil))
+		if want := (ActionMatch{AmbiguousPathName: "api", BypassCaptchaName: "api"}); ambiguous != want {
+			t.Errorf("%s Fold=%+v want %+v", target, ambiguous, want)
+		}
 	}
 }
