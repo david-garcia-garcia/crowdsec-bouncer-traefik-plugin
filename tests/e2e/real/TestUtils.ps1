@@ -531,6 +531,113 @@ function Wait-ForCondition {
     }
 }
 
+# Open a WebSocket, send each message, and return the echoed payloads in order.
+# Ported from traefik-modsecurity scripts/TestHelpers.ps1. Skips an echo-server greeting frame.
+function Invoke-WebSocketEcho {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Uri,
+        [Parameter(Mandatory)]
+        [string[]]$Message,
+        [int]$TimeoutSec = 10
+    )
+
+    $ws = [System.Net.WebSockets.ClientWebSocket]::new()
+    $cts = [System.Threading.CancellationTokenSource]::new()
+    $cts.CancelAfter([TimeSpan]::FromSeconds($TimeoutSec))
+    try {
+        $null = $ws.ConnectAsync([Uri]$Uri, $cts.Token).GetAwaiter().GetResult()
+        if ($ws.State -ne [System.Net.WebSockets.WebSocketState]::Open) {
+            throw "WebSocket connect finished in state $($ws.State)"
+        }
+
+        $echoed = [System.Collections.Generic.List[string]]::new()
+        foreach ($payload in $Message) {
+            $sendBytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
+            $sendSegment = [System.ArraySegment[byte]]::new($sendBytes)
+            $null = $ws.SendAsync(
+                $sendSegment,
+                [System.Net.WebSockets.WebSocketMessageType]::Text,
+                $true,
+                $cts.Token
+            ).GetAwaiter().GetResult()
+
+            $recvBuffer = [byte[]]::new(4096)
+            $recvSegment = [System.ArraySegment[byte]]::new($recvBuffer)
+            $matched = $false
+            while ($true) {
+                $received = $ws.ReceiveAsync($recvSegment, $cts.Token).GetAwaiter().GetResult()
+                if ($received.MessageType -eq [System.Net.WebSockets.WebSocketMessageType]::Close) {
+                    throw "WebSocket closed before payload was echoed: $payload"
+                }
+                $text = [System.Text.Encoding]::UTF8.GetString($recvBuffer, 0, $received.Count)
+                # echo-server may write a greeting before it echoes.
+                if ($text -eq $payload) {
+                    $echoed.Add($text)
+                    $matched = $true
+                    break
+                }
+            }
+            if (-not $matched) {
+                throw "WebSocket did not echo payload: $payload"
+            }
+            if ($ws.State -ne [System.Net.WebSockets.WebSocketState]::Open) {
+                throw "WebSocket not Open after echo of $payload (state $($ws.State))"
+            }
+        }
+
+        $null = $ws.CloseAsync(
+            [System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure,
+            "done",
+            $cts.Token
+        ).GetAwaiter().GetResult()
+
+        return ,$echoed.ToArray()
+    }
+    finally {
+        $ws.Dispose()
+        $cts.Dispose()
+    }
+}
+
+# First value of a response header as a string, or "" when the response does not carry it.
+function Get-ResponseHeader {
+    param(
+        [Parameter(Mandatory)]$Response,
+        [Parameter(Mandatory)][string]$Name
+    )
+    if (-not $Response.Headers) {
+        return ""
+    }
+    $value = $Response.Headers[$Name]
+    if ($null -eq $value) {
+        return ""
+    }
+    if ($value -is [System.Array]) {
+        return [string]$value[0]
+    }
+    return [string]$value
+}
+
+# UTC timestamp for `docker logs --since`, a little in the past so a line written as the test starts is kept.
+function Get-LogSince {
+    return (Get-Date).ToUniversalTime().AddSeconds(-2).ToString('yyyy-MM-ddTHH:mm:ssZ')
+}
+
+# Lines a container logged since $Since that contain every string in $Contains (plain text, not regex).
+function Get-ContainerLogLines {
+    param(
+        [Parameter(Mandatory)][string]$Container,
+        [Parameter(Mandatory)][string]$Since,
+        [string[]]$Contains = @()
+    )
+    $lines = (docker logs --since $Since $Container 2>&1 | Out-String) -split "`r?`n"
+    return @($lines | Where-Object {
+            $line = $_
+            $line -and @($Contains | Where-Object { -not $line.Contains($_) }).Count -eq 0
+        })
+}
+
 # Helper function to read and parse Traefik access logs
 function Get-TraefikAccessLogs {
     param(

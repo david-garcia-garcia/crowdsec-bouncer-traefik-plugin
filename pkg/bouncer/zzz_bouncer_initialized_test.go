@@ -28,7 +28,7 @@ func TestNew_BouncerInitializedTrustedIPs(t *testing.T) {
 			cfg := configuration.New()
 			cfg.BouncerForwardedHeadersTrustedIPs = tc.forwarded
 			cfg.BouncerClientTrustedIPs = tc.client
-			if _, err := New(next, "test", cfg, false, false, false, log); err != nil {
+			if _, err := New(next, "test", cfg, false, false, false, false, log); err != nil {
 				t.Fatalf("New() error = %v", err)
 			}
 			rec := bouncerInitializedRecord(t, sink.String())

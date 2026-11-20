@@ -1,0 +1,157 @@
+# ModSec leg alone: inspect-only Apache CRS sidecar (waf), one failing address for each
+# bouncerModsecFailureAction, WebSocket, and bypassModsec. Distinct PathPrefix values.
+http:
+  routers:
+    modsec-allow:
+      rule: PathPrefix(`/modsec-allow`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec]
+      service: whoami@docker
+    modsec-crs:
+      rule: PathPrefix(`/modsec-crs`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec]
+      service: whoami@docker
+    modsec-body:
+      rule: PathPrefix(`/modsec-body`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec-body]
+      service: whoami@docker
+    modsec-fail-pass:
+      rule: PathPrefix(`/modsec-fail-pass`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec-fail-pass]
+      service: whoami@docker
+    modsec-fail-ban:
+      rule: PathPrefix(`/modsec-fail-ban`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec-fail-ban]
+      service: whoami@docker
+    modsec-fail-captcha:
+      rule: PathPrefix(`/modsec-fail-captcha`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec-fail-captcha]
+      service: whoami@docker
+    modsec-ws:
+      rule: PathPrefix(`/modsec-ws`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec]
+      service: echo-ws@docker
+    modsec-skip:
+      rule: PathPrefix(`/modsec-skip`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec-skip]
+      service: whoami@docker
+  middlewares:
+    bouncer-modsec:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          modsecEnabled: "true"
+          modsecHttpTimeoutSeconds: "10"
+          modsecUrl: http://waf:8080
+          reclaimGraceSeconds: "2"
+    bouncer-modsec-body:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          modsecBodyLimit: "1024"
+          modsecEnabled: "true"
+          modsecHttpTimeoutSeconds: "10"
+          modsecUrl: http://waf:8080
+          reclaimGraceSeconds: "2"
+    # 127.0.0.1:9 inside the Traefik container refuses every connection: a sidecar outage.
+    bouncer-modsec-fail-pass:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerModsecFailureAction: passthrough
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          modsecEnabled: "true"
+          modsecHttpTimeoutSeconds: "2"
+          modsecUrl: http://127.0.0.1:9
+          reclaimGraceSeconds: "2"
+    bouncer-modsec-fail-ban:
+      plugin:
+        bouncer:
+          bouncerBanFilePath: /e2e-ban.html
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerModsecFailureAction: ban
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          modsecEnabled: "true"
+          modsecHttpTimeoutSeconds: "2"
+          modsecUrl: http://127.0.0.1:9
+          reclaimGraceSeconds: "2"
+    bouncer-modsec-fail-captcha:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerModsecFailureAction: captcha
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          captchaCustomJsUrl: http://widget.example/modsec-fail-captcha/widget.js
+          captchaCustomKey: dummy-captcha
+          captchaCustomResponse: dummy-captcha-response
+          captchaCustomValidateUrl: http://dummy-captcha/siteverify
+          captchaEnabled: "true"
+          captchaFilePath: /e2e-captcha.html
+          captchaGateBindIp: "true"
+          captchaGateSecret: test-gate-secret
+          captchaProvider: custom
+          captchaSecretKey: e2e-dummy-secret
+          captchaSiteKey: e2e-dummy-site
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          modsecEnabled: "true"
+          modsecHttpTimeoutSeconds: "2"
+          modsecUrl: http://127.0.0.1:9
+          reclaimGraceSeconds: "2"
+    bouncer-modsec-skip:
+      plugin:
+        bouncer:
+          bouncerActionRules:
+            - name: skip-modsec
+              path: ^/modsec-skip/ok
+              action:
+                - bypassModsec
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          modsecEnabled: "true"
+          modsecHttpTimeoutSeconds: "10"
+          modsecUrl: http://waf:8080
+          reclaimGraceSeconds: "2"

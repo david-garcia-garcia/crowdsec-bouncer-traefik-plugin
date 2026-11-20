@@ -17,6 +17,7 @@ import (
 	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/modsecurity"
 )
 
 // Bouncer is one Traefik router handler. It is not the reclaim value.
@@ -27,7 +28,8 @@ type Bouncer struct {
 	banTemplate              *template.Template
 	banTemplateContentType   string
 	captchaBound             atomic.Value      // *captcha.Client; typed nil when empty
-	trustedClients           *ip.PoolStrategy  // client addresses that skip LAPI and AppSec
+	modsecBound              atomic.Value      // *modsecurity.Client; typed nil when empty
+	trustedClients           *ip.PoolStrategy  // client addresses that skip LAPI, AppSec, and ModSec
 	decisionScopeHeaders     map[string]string // CrowdSec header scope → request header
 	enabled                  bool
 	forwardedCustomHeader    string
@@ -37,9 +39,12 @@ type Bouncer struct {
 	lapiInstanceName         string
 	appsecInstanceName       string
 	captchaInstanceName      string
+	modsecInstanceName       string
+	modsecFailureAction      string
 	subscribeLAPI            bool
 	subscribeAppSec          bool
 	subscribeCaptcha         bool
+	subscribeModsec          bool
 	redisUnreachableBlock    bool  // per-router Redis fail-closed
 	defaultDecisionSeconds   int64 // per-router live-cache TTL passed into LiveLookup
 	log                      *slog.Logger
@@ -47,9 +52,11 @@ type Bouncer struct {
 	lapiReceived             *lapi.Client
 	appsecReceived           *appsec.Client
 	captchaReceived          *captcha.Client
+	modsecReceived           *modsecurity.Client
 	lapiReceiveSeen          bool
 	appsecReceiveSeen        bool
 	captchaReceiveSeen       bool
+	modsecReceiveSeen        bool
 	name                     string
 	next                     http.Handler
 	remediationCustomHeader  string
@@ -61,8 +68,8 @@ type Bouncer struct {
 
 const msgBanTemplateUnavailable = "crowdsec bouncer ban template unavailable"
 
-// New returns a per-router handler. Clients arrive later through ReceiveLAPI, ReceiveAppSec, and ReceiveCaptcha.
-func New(next http.Handler, name string, config *configuration.Config, subscribeLAPI, subscribeAppSec, subscribeCaptcha bool, log *slog.Logger) (*Bouncer, error) {
+// New returns a per-router handler. Clients arrive later through ReceiveLAPI, ReceiveAppSec, ReceiveCaptcha, and ReceiveModSec.
+func New(next http.Handler, name string, config *configuration.Config, subscribeLAPI, subscribeAppSec, subscribeCaptcha, subscribeModsec bool, log *slog.Logger) (*Bouncer, error) {
 	log = log.With("traefikName", name)
 	hopChecker, _ := ip.NewChecker(log, config.BouncerForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(log, config.BouncerClientTrustedIPs)
@@ -107,9 +114,12 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 		lapiInstanceName:         config.LapiInstanceName,
 		appsecInstanceName:       config.AppsecInstanceName,
 		captchaInstanceName:      config.CaptchaInstanceName,
+		modsecInstanceName:       config.ModsecInstanceName,
+		modsecFailureAction:      configuration.EffectiveModsecFailureAction(config.BouncerModsecFailureAction),
 		subscribeLAPI:            subscribeLAPI,
 		subscribeAppSec:          subscribeAppSec,
 		subscribeCaptcha:         subscribeCaptcha,
+		subscribeModsec:          subscribeModsec,
 		redisUnreachableBlock:    config.BouncerRedisUnreachableBlock,
 		defaultDecisionSeconds:   config.LapiDefaultDecisionSeconds,
 		log:                      log,
@@ -163,7 +173,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	logger.Trace(b.log, "ServeHTTP", "ip", req.IPAddrString(), "isTrusted", isTrusted)
 	if isTrusted {
 		b.next.ServeHTTP(rw, req.Request)
-		// Trusted clients skip LAPI and AppSec.
+		// Trusted clients skip LAPI, AppSec, and ModSec.
 		return
 	}
 
@@ -184,6 +194,9 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		return
 	}
 	if b.serveAppSec(rw, req, match) {
+		return
+	}
+	if b.serveModSec(rw, req, match) {
 		return
 	}
 	b.next.ServeHTTP(rw, req.Request)

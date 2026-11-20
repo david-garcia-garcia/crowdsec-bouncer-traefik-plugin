@@ -170,6 +170,7 @@ $svc
           logFormat: json
           reclaimGraceSeconds: "2"
           lapiUpdateIntervalSeconds: "5"
+          appsecUnhealthyBackOffPeriodSecs: "0"
           bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
             - "172.28.0.1/32"

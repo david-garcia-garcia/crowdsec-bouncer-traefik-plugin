@@ -16,6 +16,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/wafhop"
 )
 
 // Test_appsecQuery_clientDisconnected is a regression for
@@ -39,35 +40,6 @@ func Test_appsecQuery_clientDisconnected(t *testing.T) {
 	}
 	t.Run("any read error with a canceled request context disconnects", assertCanceledContextReadErrIsDisconnect)
 	t.Run("unclassified read error with a live context is ErrClientBodyRead", assertUnclassifiedBodyReadIsClientBodyRead)
-}
-
-func Test_isBodyUnreadable(t *testing.T) {
-	realBody := func() io.ReadCloser { return io.NopCloser(strings.NewReader("data")) }
-	tests := []struct {
-		name          string
-		protoMajor    int
-		contentLength int64
-		body          io.ReadCloser
-		want          bool
-	}{
-		{name: "http2 grpc stream without content-length", protoMajor: 2, contentLength: -1, body: realBody(), want: true},
-		{name: "http3 stream without content-length", protoMajor: 3, contentLength: -1, body: realBody(), want: true},
-		{name: "http2 with content-length", protoMajor: 2, contentLength: 42, body: realBody(), want: false},
-		{name: "http1.1 chunked without content-length", protoMajor: 1, contentLength: -1, body: realBody(), want: false},
-		{name: "http2 without body", protoMajor: 2, contentLength: -1, body: nil, want: false},
-		{name: "http2 with http.NoBody", protoMajor: 2, contentLength: -1, body: http.NoBody, want: false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req, _ := http.NewRequest(http.MethodPost, "http://localhost", nil)
-			req.ProtoMajor = tt.protoMajor
-			req.ContentLength = tt.contentLength
-			req.Body = tt.body
-			if got := isBodyUnreadable(req); got != tt.want {
-				t.Errorf("isBodyUnreadable() = %v, want %v", got, tt.want)
-			}
-		})
-	}
 }
 
 func Test_appsecQuery_streamingDoesNotBlock(t *testing.T) {
@@ -573,33 +545,6 @@ func Test_appsecQuery_forwardsHTTPVersion(t *testing.T) {
 	}
 }
 
-// Test_isHopByHopHeader checks the RFC 7230 section 6.1 set and that end-to-end headers pass.
-func Test_isHopByHopHeader(t *testing.T) {
-	tests := []struct {
-		name string
-		want bool
-	}{
-		{name: "Connection", want: true},
-		{name: "keep-alive", want: true},
-		{name: "Proxy-Authenticate", want: true},
-		{name: "Proxy-Authorization", want: true},
-		{name: "TE", want: true},
-		{name: "Trailer", want: true},
-		{name: "Transfer-Encoding", want: true},
-		{name: "Upgrade", want: true},
-		{name: "Content-Type", want: false},
-		{name: "Cookie", want: false},
-		{name: "Content-Length", want: false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := isHopByHopHeader(tt.name); got != tt.want {
-				t.Errorf("isHopByHopHeader(%q) = %v, want %v", tt.name, got, tt.want)
-			}
-		})
-	}
-}
-
 // Test_isMethodWithForwardableBody proves the readable-forward set stays wider than the drop set.
 func Test_isMethodWithForwardableBody(t *testing.T) {
 	tests := []struct {
@@ -620,8 +565,8 @@ func Test_isMethodWithForwardableBody(t *testing.T) {
 			if got := isMethodWithForwardableBody(tt.method); got != tt.wantForward {
 				t.Errorf("isMethodWithForwardableBody(%q) = %v, want %v", tt.method, got, tt.wantForward)
 			}
-			if got := isMethodWithBody(tt.method); got != tt.wantDropSet {
-				t.Errorf("isMethodWithBody(%q) = %v, want %v", tt.method, got, tt.wantDropSet)
+			if got := wafhop.IsMethodWithBody(tt.method); got != tt.wantDropSet {
+				t.Errorf("wafhop.IsMethodWithBody(%q) = %v, want %v", tt.method, got, tt.wantDropSet)
 			}
 		})
 	}
