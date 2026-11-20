@@ -26,7 +26,7 @@ The token is read before the single-reading path check that `bypass`, `bypassLap
 In progress. 0 items remain.
 
 Priority: P2 — real operator pain (API integrations break while a captcha applies) with workarounds that give up more protection than needed
-Reviewed head: 4b16f1ed
+Reviewed head: 00579770
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -90,7 +90,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 3 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 4b16f1ed963554f2ffe886d65f9c37dd7b1b4941 | Card must match the branch you measured |
+| Reviewed head | 005797705f71e2fca8cdb3975ba3e81d3b3f013b | Card must match the branch you measured |
 
 ### Stored data model
 None.
