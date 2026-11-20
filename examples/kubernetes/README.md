@@ -57,7 +57,7 @@ What `traefik/values.yml` sets:
 - `experimental.plugins` downloads the plugin from the Traefik plugin catalog when Traefik starts.
 - `volumes` mounts the `crowdsec-bouncer-key` secret in `/etc/traefik/crowdsec`.
 - `accessLog` writes JSON access logs for the CrowdSec agent. It keeps the `User-Agent` header, which the `crowdsecurity/traefik` parser reads, and drops the others so that cookies and `Authorization` headers stay out of the logs.
-- `externalTrafficPolicy: Local` keeps the client IP on the LoadBalancer service. With the default `Cluster` policy, nodes rewrite the source address and every request looks like it comes from a node. If Traefik sits behind another proxy or a CDN, see `bouncerForwardedHeadersTrustedIps` in the [main README](../../README.md) and [examples/behind-proxy](../behind-proxy/README.md).
+- `externalTrafficPolicy: Local` keeps the client IP on the LoadBalancer service. With the default `Cluster` policy, nodes rewrite the source address and every request looks like it comes from a node. If Traefik sits behind another proxy or a CDN, see [`bouncerForwardedHeadersTrustedIps`](../../docs/configuration.md#bouncerforwardedheaderstrustedips) and [examples/behind-proxy](../behind-proxy/README.md).
 
 #### Install the middleware and whoami
 
