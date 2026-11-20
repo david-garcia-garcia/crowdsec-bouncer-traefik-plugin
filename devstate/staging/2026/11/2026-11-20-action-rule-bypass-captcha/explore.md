@@ -64,30 +64,36 @@ Outside facts used: `knowledge/research/ext_traefik_entrypoints_request-path/` (
 
 ## Open questions
 
-- Q: Does a `bypassCaptcha` rule with a `path` use the single-reading path guard?
-  Rank: additive asked — new token on a new branch of `Fold`; requirement Desired "applies its regex as written".
-  Decision: resolved — no, by the caller's decision. The measurement shows the premise holds for `..`, `%2e%2e` and `\`, and for `..;` from Traefik v3.7.18, and does not hold by default for `%2F`, `%5C`, `%3B` and double encoding. The README states both lists and the entry point options that reject the second.
-  By: explore
 - Q: Does a ban that `bouncerOriginBasedDecisionRemap` softens to a captcha pass on a `bypassCaptcha` request?
   Rank: bounded asked — changes `appliedLAPIRemediation`, 2 call sites found in `pkg/` and root `*.go`, both migrated here; requirement Desired "a ban softened to a captcha … stays a ban".
   Decision: assumed — no, it stays a ban. Proposed in chat and not objected to; not in the caller's last message word for word.
   By: explore
+
+- Q: Does a `bypassCaptcha` rule with a `path` use the single-reading path guard?
+  Rank: additive asked — new token on a new branch of `Fold`; requirement Desired "applies its regex as written".
+  Decision: resolved — no, by the caller's decision. The measurement shows the premise holds for `..`, `%2e%2e` and `\`, and for `..;` from Traefik v3.7.18, and does not hold by default for `%2F`, `%5C`, `%3B` and double encoding. The README states both lists and the entry point options that reject the second.
+  By: explore
+
 - Q: Does a LAPI or AppSec failure action `captcha` pass on a `bypassCaptcha` request?
   Rank: additive asked — new early return in functions whose `false` already means continue; requirement Desired "LAPI or AppSec failure action `captcha` pass".
   Decision: assumed — yes. During an outage these requests are let through, the same as failure action `passthrough`. The README says so.
   By: explore
+
 - Q: What happens on a router with no usable captcha, where a captcha is served as a ban today?
   Rank: additive incidental — new early return before the downgrade ban; no requirement line names this case.
   Decision: assumed — the request passes. The decision was a captcha, and the rule says these requests get none; turning it into a ban would make the action depend on whether a captcha provider is configured.
   By: explore
+
 - Q: What happens to a captcha form POST (challenge marker) on a `bypassCaptcha` request?
   Rank: additive incidental — same early return in `serveAppsecCaptchaGate`; no requirement line names this case.
   Decision: assumed — it reaches the backend like any other request. A path that never shows a captcha has no form to answer.
   By: explore
+
 - Q: Is the AppSec bot-detection `challenge` covered?
   Rank: additive asked — no code on that path changes; requirement Desired "the AppSec bot-detection `challenge` is not covered".
   Decision: resolved — no. Its header value is `captcha:challenge`, so the README names it under "does not apply".
   By: explore
+
 - Q: Which Traefik version may the README assume for the path behaviour?
   Rank: additive incidental — documentation only; no requirement line names a version.
   Decision: assumed — state what was measured (v3.7.11 and v3.7.19) and the documented version of the `..;` change (v3.7.18). Do not claim a minimum supported Traefik version.

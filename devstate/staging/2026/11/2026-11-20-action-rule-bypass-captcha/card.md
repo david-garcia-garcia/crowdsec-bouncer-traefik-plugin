@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 64251a2b
+Reviewed head: 5f4b5e95
 Owner decision: None.
 
 ## Review scores
@@ -66,7 +66,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 64251a2b8c2945416c267887531087f4307a2ae0 | Card must match the branch you measured |
+| Reviewed head | 5f4b5e95b95abe50739cb0654a6e2013079804e2 | Card must match the branch you measured |
 
 ### Stored data model
 None.
