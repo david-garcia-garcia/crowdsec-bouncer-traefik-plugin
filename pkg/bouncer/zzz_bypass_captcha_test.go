@@ -1,6 +1,7 @@
 package bouncer
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -10,7 +11,9 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
@@ -286,5 +289,90 @@ func TestBypassCaptcha_pathRegexAppliesAsWritten(t *testing.T) {
 		if !*passed {
 			t.Errorf("%s: the path regex matched, so the captcha must be bypassed, got %d %q", target, rw.Code, rw.Body.String())
 		}
+	}
+}
+
+// testBypassCaptchaLiveBouncer is a live-mode router with the /api/ bypassCaptcha rule. Its LAPI answers
+// every per-IP query with one decision of decisionType and origin, so the first request takes the live lookup.
+func testBypassCaptchaLiveBouncer(t *testing.T, remap map[string]map[string]string, decisionType, origin string) (*Bouncer, *bool) {
+	t.Helper()
+	log := logger.New("ERROR", "")
+	lapiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("ip") == "" {
+			_, _ = w.Write([]byte("null"))
+			return
+		}
+		_ = json.NewEncoder(w).Encode([]lapi.Decision{{
+			Value: r.URL.Query().Get("ip"), Type: decisionType, Duration: "1h", Origin: origin, Scope: "ip",
+		}})
+	}))
+	t.Cleanup(lapiServer.Close)
+	lapiURL, err := url.Parse(lapiServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lapiClient, err := lapi.New(&configuration.Config{
+		LapiHTTPTimeoutSeconds: 10,
+		LapiHost:               lapiURL.Host,
+		LapiKey:                "test-key",
+		LapiMode:               configuration.LiveMode,
+		LapiPath:               "/",
+		LapiScheme:             lapiURL.Scheme,
+		LapiTLSInsecureVerify:  true,
+	}, log, "test", decisionstore.NewMemory(log), "bypass-captcha-live", "bypass-captcha-live")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(lapiClient.Close)
+	clientChecker, err := ip.NewChecker(log, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	passed := false
+	b := &Bouncer{
+		enabled:                  true,
+		trustedClients:           &ip.PoolStrategy{Checker: clientChecker},
+		log:                      log,
+		remediationStatusCode:    http.StatusForbidden,
+		remediationCustomHeader:  "X-Remediation",
+		banTemplateContentType:   "text/html; charset=utf-8",
+		originBasedDecisionRemap: copyOriginBasedDecisionRemap(remap),
+		actionRules:              apiBypassCaptchaRules(t),
+		subscribeLAPI:            true,
+		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			passed = true
+		}),
+	}
+	b.lapiBound.Store(lapiClient)
+	bindTestCaptcha(b, testCaptchaClient(t, "/fast.js", "", "", nil))
+	return b, &passed
+}
+
+// TestBypassCaptcha_liveLookup proves the live lookup behaves as the cache lookup: a captcha decision
+// lets a /api/ request through, a ban the remap softens to a captcha stays a ban there, and the same
+// softened ban is a captcha outside the rule.
+func TestBypassCaptcha_liveLookup(t *testing.T) {
+	softened := map[string]map[string]string{"CAPI": {"ban": "captcha"}}
+	for _, tc := range []struct {
+		name         string
+		remap        map[string]map[string]string
+		decisionType string
+		origin       string
+		target       string
+		wantPassed   bool
+		wantHeader   string
+	}{
+		{name: "captcha decision continues", decisionType: "captcha", origin: "crowdsec", target: "/api/items", wantPassed: true},
+		{name: "captcha decision outside the rule", decisionType: "captcha", origin: "crowdsec", target: "/catalog", wantHeader: "captcha:lapi:crowdsec"},
+		{name: "softened ban stays a ban", remap: softened, decisionType: "ban", origin: "CAPI", target: "/api/items", wantHeader: "ban:lapi:CAPI"},
+		{name: "softened ban outside the rule", remap: softened, decisionType: "ban", origin: "CAPI", target: "/catalog", wantHeader: "captcha:lapi:CAPI"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b, passed := testBypassCaptchaLiveBouncer(t, tc.remap, tc.decisionType, tc.origin)
+			rw := serveBypassCaptchaRequest(b, tc.target)
+			if *passed != tc.wantPassed || rw.Header().Get("X-Remediation") != tc.wantHeader {
+				t.Fatalf("passed=%v header=%q status=%d, want passed=%v header=%q", *passed, rw.Header().Get("X-Remediation"), rw.Code, tc.wantPassed, tc.wantHeader)
+			}
+		})
 	}
 }

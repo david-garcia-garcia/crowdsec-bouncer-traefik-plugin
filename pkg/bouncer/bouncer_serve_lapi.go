@@ -45,7 +45,7 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 		switch {
 		case decisionscope.IsActiveRemediation(kind):
 			logger.Trace(b.log, "serveLAPI", appendScopesGroup([]any{"ip", req.IPAddrString(), "remediation", kind}, scopes)...)
-			return b.remediateWarnCaptchaRuleOnBan(rw, req, match, kind, b.resolveDroppedOrigin(origin, originID))
+			return b.remediateUnderActionRules(rw, req, match, kind, b.resolveDroppedOrigin(origin, originID))
 		case kind == decisionscope.NoBannedValue:
 			return false
 		}
@@ -74,7 +74,7 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 			return false
 		}
 		logger.Trace(b.log, "serveLAPI:LiveLookup", appendScopesGroup([]any{"ip", req.IPAddrString(), "isBanned", kind}, scopes)...)
-		return b.remediateWarnCaptchaRuleOnBan(rw, req, match, kind, origin)
+		return b.remediateUnderActionRules(rw, req, match, kind, origin)
 	}
 	return true
 }
@@ -87,7 +87,7 @@ func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req clientreque
 	case configuration.FailureActionPassthrough:
 		return false
 	case configuration.FailureActionCaptcha:
-		return b.remediateWarnCaptchaRuleOnBan(rw, req, match, decisionscope.CaptchaValue, origin)
+		return b.remediateUnderActionRules(rw, req, match, decisionscope.CaptchaValue, origin)
 	default:
 		b.banWarnCaptchaRule(rw, req, match, banReason, headerReasonFromOrigin(origin), origin)
 		return true

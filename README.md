@@ -566,6 +566,8 @@ The rule skips no check. The plugin still looks up CrowdSec decisions and still 
 
 `captcha` and `bypassCaptcha` in the same rule are rejected when the configuration loads.
 
+Match on what the client cannot choose for another resource: the path, the host, the method. Do not write a `bypassCaptcha` rule on a header or a cookie the client sets, such as `User-Agent` or `X-Requested-With`. Any visitor could add it and skip the captcha on every page.
+
 **What you give up.** On the matching requests a captcha no longer slows anyone down. A client that CrowdSec wanted to challenge can call those routes freely, and during a LAPI or AppSec outage with failure action `captcha` they are let through as with `passthrough`. Only bans stop a client there. If one known integration is the reason for the rule and it has a fixed address, [`bouncerClientTrustedIps`](#let-a-lan-or-vpn-through) for that address is the narrower setting.
 
 **How the path is matched.** The `path` pattern runs as written on the path the plugin receives, for every request. The other skip actions (`bypass`, `bypassLapi`, `bypassAppsec`) switch themselves off on a path with percent-encoding or other ambiguous characters. `bypassCaptcha` does not, so `/api/items%20x` works. It relies on Traefik having cleaned the path first. Measured on Traefik v3.7.11 and v3.7.19 with the rule above:

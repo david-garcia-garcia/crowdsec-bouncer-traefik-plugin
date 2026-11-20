@@ -105,10 +105,11 @@ func (b *Bouncer) warnCaptchaSuperseded(req clientrequest.Request, match httprul
 	b.log.Warn("warnCaptchaSuperseded", "ip", req.IPAddrString(), "name", match.CaptchaName)
 }
 
-// remediateWarnCaptchaRuleOnBan writes kind and origin.
+// remediateUnderActionRules writes kind and origin as the matched action rules allow.
 // When kind is a ban and a captcha action rule also matched, it warns that the rule lost.
+// When kind is a captcha and a bypassCaptcha rule matched, it writes nothing.
 // False means a captcha kind did not write: a widget asset, a cleared gate, or a bypassCaptcha rule.
-func (b *Bouncer) remediateWarnCaptchaRuleOnBan(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, kind, origin string) bool {
+func (b *Bouncer) remediateUnderActionRules(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, kind, origin string) bool {
 	switch decisionscope.RemediationKind(kind) {
 	case decisionscope.BannedValue:
 		b.warnCaptchaSuperseded(req, match)

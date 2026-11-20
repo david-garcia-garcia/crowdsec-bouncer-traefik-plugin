@@ -5,7 +5,7 @@
 
 ## 2. Captcha bypass in the request path
 
-- [x] 2.1 `pkg/bouncer/bouncer_serve_captcha.go`: predicate `bypassesCaptcha` with the TRACE; `remediateWarnCaptchaRuleOnBan` and `serveAppsecCaptchaGate` ask it.
+- [x] 2.1 `pkg/bouncer/bouncer_serve_captcha.go`: predicate `bypassesCaptcha` with the TRACE; `remediateUnderActionRules` (renamed from `remediateWarnCaptchaRuleOnBan`) and `serveAppsecCaptchaGate` ask it.
 - [x] 2.2 `pkg/bouncer/bouncer_serve_appsec.go`, `bouncer_serve_appsec_verdict.go`: `captchaAppsecFailure` and `serveAppsecCaptchaGate` take the match; callers pass it.
 - [x] 2.3 `pkg/bouncer/bouncer_serve_lapi.go`, `origin_based_decision_remap.go`: `appliedLAPIRemediation` keeps a stored ban when the remap gives a captcha on a captcha-bypass request.
 - [x] 2.4 Tests in a new `pkg/bouncer` test file: one case per captcha source, the unchanged cases (bans, challenge, request outside the rule), the router without a captcha, and the remap edges.
