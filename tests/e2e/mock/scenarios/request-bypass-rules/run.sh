@@ -29,10 +29,14 @@ body() {
   echo "[$SCENARIO] AppSec prefix rule must skip a plain path under it (HTTP 200)"
   assert_status "http://127.0.0.1:${WEB_PORT}/skipzone/403" 200 -H "X-Forwarded-For: 5.6.7.8"
 
-  # Traefik forwards these unchanged; a Java backend reads ..; as .. and an IIS backend reads \ as /.
+  # From Traefik v3.7.18 these leave the prefix before the plugin runs: Traefik resolves ..; like ..
+  # and the request is /403, which no router serves. Earlier versions forwarded them unchanged.
+  echo "[$SCENARIO] Traefik must resolve a ..; segment out of the AppSec prefix (HTTP 404)"
+  assert_status "http://127.0.0.1:${WEB_PORT}/skipzone/..;/403" 404 --path-as-is -H "X-Forwarded-For: 5.6.7.8"
+  assert_status "http://127.0.0.1:${WEB_PORT}/skipzone/%2E%2E;/403" 404 --path-as-is -H "X-Forwarded-For: 5.6.7.8"
+
+  # Traefik forwards this one unchanged; an IIS backend reads \ as /.
   echo "[$SCENARIO] AppSec prefix rule must not skip a path with more than one reading (HTTP 403)"
-  assert_status "http://127.0.0.1:${WEB_PORT}/skipzone/..;/403" 403 --path-as-is -H "X-Forwarded-For: 5.6.7.8"
-  assert_status "http://127.0.0.1:${WEB_PORT}/skipzone/%2E%2E;/403" 403 --path-as-is -H "X-Forwarded-For: 5.6.7.8"
   assert_status "http://127.0.0.1:${WEB_PORT}/skipzone/..%5C403" 403 --path-as-is -H "X-Forwarded-For: 5.6.7.8"
 
   echo "[$SCENARIO] LAPI match must not skip AppSec (HTTP 403)"
