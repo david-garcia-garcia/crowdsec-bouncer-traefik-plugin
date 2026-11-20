@@ -57,6 +57,59 @@ function Add-TestDecision {
     return $true
 }
 
+# Helper function to create an Ip ban with a chosen decision origin (lists, CAPI, ...).
+# cscli can only write the cscli and cscli-import origins, so this posts an alert to LAPI
+# as a machine, which is how the CrowdSec engine stores blocklist and community decisions.
+function Add-TestOriginDecision {
+    param(
+        [string]$IP,
+        [string]$Origin,
+        [string]$Scenario,
+        [string]$Duration = "1h",
+        [string]$CrowdSecApiUrl = "http://localhost:8081"
+    )
+
+    Write-Host "➕ Adding ban decision for $IP with origin $Origin ($Scenario)" -ForegroundColor Yellow
+
+    $machine = "e2e-origin-injector"
+    $password = "e2e-origin-injector-password"
+    $result = docker exec crowdsec-test sh -c "cscli machines add $machine --password $password -f /dev/null --force 2>&1"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to register the test machine: $result"
+    }
+
+    # LAPI rejects a machine login whose User-Agent is not "<name>/<version>".
+    $userAgent = "e2e-origin-injector/1.0"
+    $login = @{ machine_id = $machine; password = $password; scenarios = @() } | ConvertTo-Json
+    $auth = Invoke-RestMethod -Uri "$CrowdSecApiUrl/v1/watchers/login" -Method Post -ContentType "application/json" -UserAgent $userAgent -Body $login -TimeoutSec 10
+
+    $now = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $alerts = @(
+        @{
+            scenario         = $Scenario
+            scenario_hash    = ""
+            scenario_version = ""
+            message          = "Integration test $Origin decision"
+            events_count     = 1
+            start_at         = $now
+            stop_at          = $now
+            capacity         = 0
+            leakspeed        = "0"
+            simulated        = $false
+            events           = @()
+            source           = @{ scope = "Ip"; value = $IP }
+            decisions        = @(
+                @{ origin = $Origin; scenario = $Scenario; scope = "Ip"; value = $IP; type = "ban"; duration = $Duration }
+            )
+        }
+    )
+    $body = ConvertTo-Json -InputObject $alerts -Depth 10
+    $null = Invoke-RestMethod -Uri "$CrowdSecApiUrl/v1/alerts" -Method Post -ContentType "application/json" -UserAgent $userAgent -Headers @{ Authorization = "Bearer $($auth.token)" } -Body $body -TimeoutSec 10
+
+    Write-Host "✅ Decision added successfully via LAPI alert" -ForegroundColor Green
+    return $true
+}
+
 # Helper function to create a Range decision using cscli --range
 function Add-TestRangeDecision {
     param(
