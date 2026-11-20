@@ -15,7 +15,7 @@ AppSec `action` `challenge`. The bouncer writes that envelope to the browser unl
 _Avoid_: CrowdSec LAPI captcha remediation
 
 **AppSec captcha verdict**:
-AppSec `action` `captcha`. CrowdSec sends it without a page (`GenerateResponse` fills a body only for `challenge`; `knowledge/research/ext_crowdsec_appsec_protocol/`), so the bouncer serves this router's captcha gate with origin `appsec` (`serveAppsecCaptchaGate`). Not a relayed envelope.
+AppSec `action` `captcha`. CrowdSec sends it without a page (`GenerateResponse` fills a body only for `challenge`; `knowledge/research/ext_crowdsec_appsec_protocol/`), so the bouncer serves this router's captcha gate with origin `appsec` (`serveAppsecCaptchaGate`). Not a relayed envelope. On a request a `bypassCaptcha` action rule matched, nothing is written and the request continues (`core_plugin_middleware_action-rules.md`).
 _Avoid_: AppSec captcha HTML, envelope relay, `bouncerAppsecFailureAction` captcha
 
 **Client disconnected**:

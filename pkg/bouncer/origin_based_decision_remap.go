@@ -5,6 +5,7 @@ import (
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
 )
 
 const listsOriginPrefix = "lists:"
@@ -111,12 +112,24 @@ func originBasedDecisionRemapEdges(metricsOrigin string, table map[string]map[st
 }
 
 // appliedLAPIRemediation remaps a lookup/live LAPI kind for this router and resolves packed origin.
-func (b *Bouncer) appliedLAPIRemediation(kind, origin string, originID uint16) (string, string) {
+// On a request a bypassCaptcha rule matched, a ban the remap would soften to a captcha stays a ban:
+// the captcha would be bypassed, and the ban would end as a pass in two hops.
+func (b *Bouncer) appliedLAPIRemediation(match httprule.ActionMatch, kind, origin string, originID uint16) (string, string) {
 	if b == nil || len(b.originBasedDecisionRemap) == 0 {
 		return kind, origin
 	}
 	if origin == "" {
 		origin = b.resolveDroppedOrigin("", originID)
 	}
-	return b.applyOriginBasedDecisionRemap(kind, origin), origin
+	applied := b.applyOriginBasedDecisionRemap(kind, origin)
+	if match.BypassCaptchaName != "" && isBanSoftenedToCaptcha(kind, applied) {
+		return kind, origin
+	}
+	return applied, origin
+}
+
+// isBanSoftenedToCaptcha reports whether the remap turned a stored ban into an applied captcha.
+func isBanSoftenedToCaptcha(stored, applied string) bool {
+	return decisionscope.RemediationKind(stored) == decisionscope.BannedValue &&
+		decisionscope.RemediationKind(applied) == decisionscope.CaptchaValue
 }

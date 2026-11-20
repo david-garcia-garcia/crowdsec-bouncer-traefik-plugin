@@ -19,6 +19,7 @@ Stream Ip/header, stream Range, and live/none query store ingest kind: `Remediat
 - Copy trimmed weaken edges in `bouncer.New` (`copyOriginBasedDecisionRemap`). Do not hash them into `SessionKey` or live `Key`. Do not copy them onto `lapi.Client`.
 - Store with `MetricsOrigin` then `ingestRemediationKind` on stream Put, Range upsert, and live query. `RemediationValue` stays empty for unknown types so remap to-tokens can mean "not a code".
 - After a successful `LookupRemediation` or `LiveLookup`, call `appliedLAPIRemediation` before `IsActiveRemediation`. Resolve packed origin ids when the table is non-empty.
+- Pass the request's `httprule.ActionMatch`. When a `bypassCaptcha` action rule matched (`core_plugin_middleware_action-rules.md`), an edge `ban: captcha` is not applied and the stored ban stays a ban: the captcha would be bypassed and the ban would end as a pass. `ban: pass` and `captcha: pass` still apply.
 - Empty table: ban stays `t`, captcha stays `c`. Unknown type stores as ban (`t`) at ingest and TRACE-logs `handleStreamCache:unknownType`. `pass` applies as `NoBannedValue`.
 - Reject invalid edges in `ValidateParams`. Do not require `captchaProvider`; missing provider still falls back to ban rendering for applied captcha.
 
@@ -27,7 +28,7 @@ Stream Ip/header, stream Range, and live/none query store ingest kind: `Remediat
 ```go
 kind, origin, originID, err := b.lapiClient.LookupRemediation(req.IPAddrString(), req.IPAddr(), scopes)
 // ... handle err ...
-kind, origin = b.appliedLAPIRemediation(kind, origin, originID)
+kind, origin = b.appliedLAPIRemediation(match, kind, origin, originID)
 ```
 
 ## Key files
