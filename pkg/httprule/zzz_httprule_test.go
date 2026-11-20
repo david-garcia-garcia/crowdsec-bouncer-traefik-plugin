@@ -391,12 +391,12 @@ func TestSingleReadingPath(t *testing.T) {
 
 func TestActionSet_foldAmbiguousPathDropsPathSkipsOnly(t *testing.T) {
 	set := mustNewActionSet(t, []ActionRule{
-		{Name: "healthz", Action: []string{ActionBypassAppsec}, Rule: Rule{Path: "^/healthz(/|$)"}},
+		{Name: "healthz", Action: []string{ActionBypassAppsec, ActionBypassModsec}, Rule: Rule{Path: "^/healthz(/|$)"}},
 		{Name: "login-captcha", Action: []string{ActionCaptcha, ActionBypassLapi}, Rule: Rule{Path: "^/healthz/"}},
 		{Name: "internal-host", Action: []string{ActionBypassLapi}, Rule: Rule{Host: `^internal\.example$`}},
 	})
 	clean := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/healthz/live", nil))
-	if want := (ActionMatch{CaptchaName: "login-captcha", SkipAppsec: true, SkipLapi: true}); clean != want {
+	if want := (ActionMatch{CaptchaName: "login-captcha", SkipAppsec: true, SkipLapi: true, SkipModsec: true}); clean != want {
 		t.Fatalf("clean Fold=%+v want %+v", clean, want)
 	}
 	ambiguous := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/healthz/..;/admin", nil))

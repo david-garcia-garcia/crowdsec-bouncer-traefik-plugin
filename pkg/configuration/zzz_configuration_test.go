@@ -186,6 +186,22 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	cfgModsecEnabledURL.ModsecEnabled = true
 	cfgModsecEnabledURL.ModsecURL = "http://waf:8080"
 	cfgModsecDisabledEmptyURL := getMinimalConfig()
+	modsecURLCase := func(raw string) *Config {
+		cfg := getMinimalConfig()
+		cfg.ModsecEnabled = true
+		cfg.ModsecURL = raw
+		return cfg
+	}
+	cfgModsecTimeoutZero := getMinimalConfig()
+	cfgModsecTimeoutZero.ModsecHTTPTimeoutSeconds = 0
+	cfgModsecCaptchaOwner := getMinimalConfig()
+	cfgModsecCaptchaOwner.BouncerModsecFailureAction = FailureActionCaptcha
+	cfgModsecCaptchaOwner.CaptchaEnabled = true
+	cfgModsecCaptchaOwner.CaptchaProvider = HcaptchaProvider
+	cfgModsecCaptchaOwner.CaptchaSiteKey = "site"
+	cfgModsecCaptchaOwner.CaptchaSecretKey = "secret"
+	cfgModsecCaptchaOwner.CaptchaGateSecret = "gate-secret"
+	cfgModsecCaptchaOwner.CaptchaFilePath = captchaTemplate
 	cfgModsecFailureActionOpen := getMinimalConfig()
 	cfgModsecFailureActionOpen.BouncerModsecFailureAction = "open"
 	cfgModsecFailureActionBan := getMinimalConfig()
@@ -390,6 +406,13 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 		{name: "Enabled ModSec with empty URL fails", args: args{config: cfgModsecEnabledEmptyURL}, wantErr: true, wantErrContains: "ModsecURL"},
 		{name: "Enabled ModSec with absolute URL passes", args: args{config: cfgModsecEnabledURL}, wantErr: false},
 		{name: "Disabled ModSec with empty URL passes", args: args{config: cfgModsecDisabledEmptyURL}, wantErr: false},
+		{name: "Enabled ModSec with a relative URL fails", args: args{config: modsecURLCase("waf:8080/inspect")}, wantErr: true, wantErrContains: "ModsecURL"},
+		{name: "Enabled ModSec with an ftp URL fails", args: args{config: modsecURLCase("ftp://waf:8080")}, wantErr: true, wantErrContains: "ModsecURL"},
+		{name: "Enabled ModSec with a URL query fails", args: args{config: modsecURLCase("http://waf:8080?x=1")}, wantErr: true, wantErrContains: "ModsecURL"},
+		{name: "Enabled ModSec with a URL fragment fails", args: args{config: modsecURLCase("http://waf:8080#x")}, wantErr: true, wantErrContains: "ModsecURL"},
+		{name: "Enabled ModSec with a path prefix passes", args: args{config: modsecURLCase("https://waf:8443/inspect")}, wantErr: false},
+		{name: "ModSec HTTP timeout 0 fails", args: args{config: cfgModsecTimeoutZero}, wantErr: true, wantErrContains: "ModsecHTTPTimeoutSeconds"},
+		{name: "ModSec failure action captcha with a captcha owner passes", args: args{config: cfgModsecCaptchaOwner}, wantErr: false},
 		{name: "Old ModSec failMode value open fails", args: args{config: cfgModsecFailureActionOpen}, wantErr: true, wantErrContains: "BouncerModsecFailureAction"},
 		{name: "ModSec failure action ban passes", args: args{config: cfgModsecFailureActionBan}, wantErr: false},
 		{name: "ModSec failure action captcha without a captcha instance fails", args: args{config: cfgModsecFailureActionCaptchaNoInstance}, wantErr: true, wantErrContains: "BouncerModsecFailureAction"},

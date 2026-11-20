@@ -146,7 +146,7 @@ HTTP 200 and HTTP 403 with parseable AppSec JSON `action` values (`allow`, `ban`
 - **THEN** those three JSON keys are not fields on `Config` and do not change runtime behavior
 
 ### Requirement: Unhealthy skip is not a failure action
-When the AppSec admission gate denies Allow, `bouncerAppsecFailureAction` SHALL NOT choose ban, passthrough, or captcha. The skip SHALL NOT call AppSec. The request SHALL continue (then ModSec if subscribed). FailureAction SHALL still apply to an admitted miss (HTTP 500, unreachable, unreadable body, response-body io error). Default FailureAction SHALL remain `ban`.
+When the AppSec admission gate denies Allow, `bouncerAppsecFailureAction` SHALL NOT choose ban, passthrough, or captcha. The skip SHALL NOT call AppSec. The request SHALL continue (then ModSec if subscribed). FailureAction SHALL still apply to an admitted miss (HTTP 500, unreachable, response-body io error), to an admission error other than inbound cancel (for example a gate closed on reclaim), and to an unreadable body while the gate is not backing off. While the gate is backing off, an unreadable body SHALL be a skip like any other request. Default FailureAction SHALL remain `ban`.
 
 #### Scenario: After trip, skip is pass even when FailureAction is ban
 - **WHEN** the AppSec Gate denies Allow

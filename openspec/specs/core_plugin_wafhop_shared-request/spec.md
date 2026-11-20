@@ -5,7 +5,7 @@
 ## Requirements
 
 ### Requirement: One body rule set for every WAF leg
-AppSec and ModSec SHALL decide body shape with `wafhop.HasBody`, `wafhop.IsBodyUnreadable` (a body on HTTP/2 or later with unknown length), and `wafhop.IsMethodWithBody` (POST, PUT, PATCH). Neither leg SHALL read an unreadable body. On an unreadable body with a body method, each leg SHALL apply its own failure action unless that action is `passthrough` (`bouncerAppsecFailureAction`, `bouncerModsecFailureAction`); otherwise it SHALL inspect headers only. Neither leg SHALL keep a private copy of these predicates.
+AppSec and ModSec SHALL decide body shape with `wafhop.HasBody`, `wafhop.IsBodyUnreadable` (a body on HTTP/2 or later with unknown length), and `wafhop.IsMethodWithBody` (POST, PUT, PATCH). Neither leg SHALL read an unreadable body. On an unreadable body with a body method, each leg SHALL apply its own failure action unless that action is `passthrough` (`bouncerAppsecFailureAction`, `bouncerModsecFailureAction`); otherwise it SHALL inspect headers only. While that leg's admission gate is backing off, the unreadable body SHALL be a gate skip, not the failure action, and no ticket SHALL be taken for it. Neither leg SHALL keep a private copy of these predicates.
 
 #### Scenario: ModSec does not read a gRPC stream
 - **WHEN** a POST arrives over HTTP/2 with no Content-Length

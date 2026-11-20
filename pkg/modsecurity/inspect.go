@@ -41,12 +41,16 @@ var (
 //
 // failureAction is the router's bouncerModsecFailureAction. It only decides what a POST, PUT, or PATCH
 // body streamed without a length means: passthrough inspects its headers only, any other action is
-// ErrUnavailable. That is the AppSec rule.
+// ErrUnavailable, or ErrGateSkip while the gate is backing off. That is the AppSec rule.
 func (c *Client) Inspect(req *http.Request, failureAction string) (*http.Response, error) {
 	var body []byte
 	switch {
 	case wafhop.IsBodyUnreadable(req):
 		if wafhop.IsMethodWithBody(req.Method) && configuration.EffectiveModsecFailureAction(failureAction) != configuration.FailureActionPassthrough {
+			// No sidecar call, so no ticket: while backing off this is a skip, not the failure action.
+			if c.gate.BackingOff() {
+				return nil, ErrGateSkip
+			}
 			return nil, fmt.Errorf("%w: streamed %s body without a length", ErrUnavailable, req.Method)
 		}
 	case wafhop.HasBody(req):

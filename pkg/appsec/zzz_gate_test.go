@@ -204,3 +204,92 @@ func TestQuery_backoffLogsStartedAndEndedOnce(t *testing.T) {
 		t.Fatalf("%q lines=%d want 1\n%s", MsgBackoffEnded, got, logs.String())
 	}
 }
+
+// trippedAppsecClient returns a gated client whose AppSec answered 500 TripFailures times, so the gate is backing off.
+// Later calls get status from next.
+func trippedAppsecClient(t *testing.T, next *int) (*Client, *int) {
+	t.Helper()
+	hits := new(int)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		*hits++
+		if *hits <= admission.TripFailures {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(*next)
+	}))
+	t.Cleanup(srv.Close)
+	u, _ := url.Parse(srv.URL)
+	client := gatedAppsecClient(t, u.Host, 30)
+	for range admission.TripFailures {
+		_, _ = client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough})
+	}
+	if _, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan}); !errors.Is(err, ErrGateSkip) {
+		t.Fatalf("gate must be backing off, got %v", err)
+	}
+	return client, hits
+}
+
+// TestQuery_unreadableBodyWhileBackingOffIsGateSkip proves a streamed body is a gate skip, not the failure
+// action, while AppSec is backing off: the same rule as every other request, and as the ModSec leg.
+func TestQuery_unreadableBodyWhileBackingOffIsGateSkip(t *testing.T) {
+	status := http.StatusOK
+	client, _ := trippedAppsecClient(t, &status)
+	done := make(chan struct{})
+	defer close(done)
+	_, err := client.Query(withTestAddress(newStreamingRequest(done)), Policy{FailureAction: configuration.FailureActionBan})
+	if !errors.Is(err, ErrGateSkip) {
+		t.Fatalf("streamed body while backing off want ErrGateSkip, got %v", err)
+	}
+}
+
+// TestQuery_admissionErrorUsesFailureAction proves a gate that cannot answer (closed on reclaim) applies
+// the failure action like any other AppSec outage, and never bans under passthrough.
+func TestQuery_admissionErrorUsesFailureAction(t *testing.T) {
+	hits := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	u, _ := url.Parse(srv.URL)
+	client := gatedAppsecClient(t, u.Host, 30)
+	client.GateForTest().Close()
+
+	decision, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough})
+	if err != nil || decision == nil || decision.Action != ActionAllow {
+		t.Fatalf("passthrough want allow, got %+v %v", decision, err)
+	}
+	if _, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionCaptcha}); !errors.Is(err, ErrFailureCaptcha) {
+		t.Fatalf("captcha want ErrFailureCaptcha, got %v", err)
+	}
+	if _, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan}); err == nil || errors.Is(err, ErrGateSkip) {
+		t.Fatalf("ban want a failure error, got %v", err)
+	}
+	if hits != 0 {
+		t.Fatalf("AppSec hits=%d want 0", hits)
+	}
+}
+
+// TestQuery_bodyReadErrorDoesNotHoldProbe proves a client body error after the cooldown does not take
+// the half-open probe: the body is read before admission, so the next request is the probe.
+func TestQuery_bodyReadErrorDoesNotHoldProbe(t *testing.T) {
+	status := http.StatusOK
+	client, hits := trippedAppsecClient(t, &status)
+	later := time.Now().Add(31 * time.Second)
+	client.GateForTest().Inner().SetNowForTest(func() time.Time { return later })
+
+	if _, err := client.Query(withTestAddress(newReadablePostWithFailingBody(errors.New("i/o timeout"))), Policy{FailureAction: configuration.FailureActionBan}); err == nil || errors.Is(err, ErrGateSkip) {
+		t.Fatalf("body read error want a client error, got %v", err)
+	}
+	decision, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan})
+	if err != nil || decision == nil || decision.Action != ActionAllow {
+		t.Fatalf("next request must be the probe and pass, got %+v %v", decision, err)
+	}
+	if *hits != admission.TripFailures+1 {
+		t.Fatalf("AppSec hits=%d want %d", *hits, admission.TripFailures+1)
+	}
+	if client.GateForTest().BackingOff() {
+		t.Fatal("a successful probe must end the backoff")
+	}
+}

@@ -66,6 +66,10 @@ var ErrGateSkip = errors.New("appsecQuery:unhealthySkip")
 // errAppsecReadBody is the io failure from readCappedAppsecBody (not an oversized body).
 var errAppsecReadBody = errors.New("appsecQuery:readBody")
 
+// errUnreadableBody means a POST, PUT, or PATCH body streamed without a length under a failure action
+// other than passthrough. Query turns it into the failure action, or a gate skip while backing off.
+var errUnreadableBody = errors.New("appsecQuery:unreadableBody")
+
 // resultForFailureAction maps a configured fallback to allow, captcha, or an error ban.
 func resultForFailureAction(action, errMsg string) (*Response, error) {
 	switch configuration.EffectiveFailureAction(action) {
@@ -76,12 +80,6 @@ func resultForFailureAction(action, errMsg string) (*Response, error) {
 	default:
 		return nil, errors.New(errMsg)
 	}
-}
-
-// resultForFailureActionErr is resultForFailureAction when only an error is needed (request build).
-func resultForFailureActionErr(action, errMsg string) error {
-	_, err := resultForFailureAction(action, errMsg)
-	return err
 }
 
 // Response is the structured AppSec JSON envelope CrowdSec 1.8 returns for a remediation.
@@ -115,17 +113,29 @@ func isMethodWithForwardableBody(method string) bool {
 
 // Query forwards the request to this AppSec HTTP client.
 // The status table in the body is the CrowdSec AppSec protocol this method follows.
+//
+// The body is read before admission, so a client error never holds a ticket the gate waits on.
 func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error) {
+	appsecReq, err := c.newAppsecForwardRequest(req, pol)
+	if errors.Is(err, errUnreadableBody) {
+		// No AppSec call, so no ticket: while backing off this is a skip, not the failure action.
+		if c.gate.BackingOff() {
+			return nil, ErrGateSkip
+		}
+		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreadableBody dropped")
+	}
+	if err != nil {
+		return nil, err
+	}
 	ticket, admitErr := c.admitAppsecHop(req)
-	if admitErr != nil {
+	if errors.Is(admitErr, ErrClientDisconnected) {
 		return nil, admitErr
+	}
+	if admitErr != nil {
+		return resultForFailureAction(pol.FailureAction, "appsecQuery:admission")
 	}
 	if !ticket.Admitted {
 		return nil, ErrGateSkip
-	}
-	appsecReq, err := c.newAppsecForwardRequest(req, pol)
-	if err != nil {
-		return nil, err
 	}
 
 	current := c.currentTransport()
@@ -253,7 +263,7 @@ func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol 
 	switch {
 	case wafhop.IsBodyUnreadable(httpReq):
 		if wafhop.IsMethodWithBody(httpReq.Method) && configuration.EffectiveFailureAction(pol.FailureAction) != configuration.FailureActionPassthrough {
-			return nil, resultForFailureActionErr(pol.FailureAction, "appsecQuery:unreadableBody dropped")
+			return nil, errUnreadableBody
 		}
 		req, _ := http.NewRequest(http.MethodGet, target, nil)
 		return req, nil

@@ -206,7 +206,7 @@ Request bodies:
 
 - The plugin holds the body in memory, up to `modsecBodyLimit` (8 MiB by default), sends it to the sidecar with its `Content-Length`, and hands the same bytes to your application.
 - With AppSec on the same router, the body is read once and shared. `appsecBodyLimit` still cuts what AppSec sees; `modsecBodyLimit` rejects a larger body with 413.
-- A POST, PUT, or PATCH body streamed over HTTP/2 or HTTP/3 without a length (gRPC, for example) is never buffered. With `passthrough` the sidecar sees its headers only; with `ban` or `captcha` the failure action applies.
+- A POST, PUT, or PATCH body streamed over HTTP/2 or HTTP/3 without a length (gRPC, for example) is never buffered. With `passthrough` the sidecar sees its headers only; with `ban` or `captcha` the failure action applies, except while the backoff gate skips the sidecar.
 - WebSocket handshakes are inspected like any GET. After an allow, the upgraded connection goes straight to your application.
 
 The plugin itself has no list of methods that may carry a body. CRS decides: a body on `GET` or `HEAD` is blocked by rules 920170 and 920171 at paranoia level 1, and you can add your own rule for other methods (see [Tune CRS](#tune-crs)).
@@ -1222,7 +1222,7 @@ Name under which the sidecar connection is shared, or which one to use. See [Mid
 Cooldown in seconds of the ModSec backoff gate, same rule as `appsecUnhealthyBackOffPeriodSecs`: after 5 sidecar failures in a row, the sidecar is skipped for this long, without `bouncerModsecFailureAction`. `0` turns the gate off. Set on the middleware that connects to the sidecar.
 
 **ModsecURL** (string, no default)
-Absolute `http` or `https` URL of the inspect-only sidecar, for example `http://waf:8080`. Required when `modsecEnabled` is true. The request path and query are appended to it.
+Absolute `http` or `https` URL of the inspect-only sidecar, for example `http://waf:8080`. Required when `modsecEnabled` is true. The request path and query are appended to it, so it must not have a query or fragment of its own.
 
 **ReclaimGraceSeconds** (int64, default `30`)
 How long a LAPI, AppSec, or ModSec connection stays open after no middleware uses it, so a Traefik config reload can reuse it instead of reconnecting. `0` closes it immediately. Only the first value loaded in the Traefik process applies.

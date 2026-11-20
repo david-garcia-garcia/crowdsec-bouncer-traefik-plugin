@@ -6,11 +6,13 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/admission"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
@@ -366,3 +368,42 @@ func (*blockingReader) Read([]byte) (int, error) {
 type errReader struct{ err error }
 
 func (e *errReader) Read([]byte) (int, error) { return 0, e.err }
+
+// TestInspect_unreadableBodyWhileBackingOffIsGateSkip proves a streamed body is a gate skip, not the
+// failure action, while the sidecar is backing off: the same rule as AppSec.
+func TestInspect_unreadableBodyWhileBackingOffIsGateSkip(t *testing.T) {
+	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "down", http.StatusServiceUnavailable)
+	}))
+	defer sidecar.Close()
+	cfg := testModsecConfig(sidecar.URL)
+	cfg.ModsecUnhealthyBackOffPeriodSecs = 30
+	client := newTestClient(t, cfg)
+	for range admission.TripFailures {
+		mustFail(t, client, getRequest("http://example.com/"), configuration.FailureActionBan, ErrUnavailable)
+	}
+	mustFail(t, client, getRequest("http://example.com/"), configuration.FailureActionBan, ErrGateSkip)
+	streamed := httptest.NewRequest(http.MethodPost, "http://example.com/", nil)
+	streamed.ProtoMajor = 2
+	streamed.ContentLength = -1
+	streamed.Body = io.NopCloser(&blockingReader{})
+	mustFail(t, client, streamed, configuration.FailureActionBan, ErrGateSkip)
+}
+
+// TestInspect_hangHonorsModsecTimeout mirrors TestQuery_HangHonorsAppsecOverride: a sidecar that never
+// answers is ErrUnavailable after modsecHttpTimeoutSeconds, not after a default timeout.
+func TestInspect_hangHonorsModsecTimeout(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	cfg := testModsecConfig("http://" + listener.Addr().String())
+	cfg.ModsecHTTPTimeoutSeconds = 1
+	client := newTestClient(t, cfg)
+	started := time.Now()
+	mustFail(t, client, getRequest("http://example.com/"), configuration.FailureActionPassthrough, ErrUnavailable)
+	if elapsed := time.Since(started); elapsed >= 4*time.Second {
+		t.Fatalf("Inspect took %v, want about the 1s timeout", elapsed)
+	}
+}

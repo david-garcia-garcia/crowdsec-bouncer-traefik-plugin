@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 )
 
@@ -111,7 +112,8 @@ func bufferBody(httpReq *http.Request, limit int64) ([]byte, error) {
 	src := httpReq.Body
 	var buf bytes.Buffer
 	reader := io.Reader(src)
-	if limit > 0 {
+	// At math.MaxInt64, limit+1 overflows and LimitReader would read nothing: read the whole body instead.
+	if limit > 0 && limit < math.MaxInt64 {
 		reader = io.LimitReader(src, limit+1)
 		// Grow only under a cap: ContentLength is the client's word and must not size an unbounded buffer.
 		if httpReq.ContentLength > 0 && httpReq.ContentLength <= limit {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -223,3 +224,18 @@ func (c *countingBody) Close() error {
 type failingReader struct{ err error }
 
 func (f *failingReader) Read([]byte) (int, error) { return 0, f.err }
+
+// TestReadBody_maxInt64LimitReadsAll proves the largest limit does not overflow into an empty body
+// for the WAF and for next, in either mode.
+func TestReadBody_maxInt64LimitReadsAll(t *testing.T) {
+	for _, mode := range []LimitMode{TruncateAtLimit, RejectOverLimit} {
+		req := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("hello world"))
+		got, err := ReadBody(req, math.MaxInt64, mode)
+		if err != nil || string(got) != "hello world" {
+			t.Fatalf("mode %v: got %q err=%v", mode, got, err)
+		}
+		if rest := readAllBody(t, req); rest != "hello world" {
+			t.Fatalf("mode %v: next reads %q", mode, rest)
+		}
+	}
+}

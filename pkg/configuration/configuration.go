@@ -894,6 +894,10 @@ func validateModsecURL(config *Config) error {
 	if err != nil || !parsed.IsAbs() || parsed.Host == "" || !contains([]string{HTTP, HTTPS}, strings.ToLower(parsed.Scheme)) {
 		return errors.New("ModsecURL: must be an absolute http or https URL")
 	}
+	// The request URI is appended to ModsecURL: a query or fragment would hide the real path from CRS.
+	if parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
+		return errors.New("ModsecURL: must not have a query or fragment")
+	}
 	return nil
 }
 

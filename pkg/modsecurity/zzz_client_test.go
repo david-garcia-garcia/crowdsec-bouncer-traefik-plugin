@@ -126,3 +126,30 @@ func TestNew_positiveBackoffBuildsGateAndCloseClosesIt(t *testing.T) {
 		t.Fatal("closed gate must reject Report")
 	}
 }
+
+// TestOpen_connectionKnobsSplitClient mirrors TestKey_TimeoutKnobsChangeIdentity: a router that changes
+// the sidecar URL, the timeout, or the body limit gets its own Client.
+func TestOpen_connectionKnobsSplitClient(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+	ctx := context.Background()
+	base, err := Open(ctx, testModsecConfig("http://127.0.0.1:1"), slog.Default(), "same", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, change := range map[string]func(*configuration.Config){
+		"url":       func(c *configuration.Config) { c.ModsecURL = "http://127.0.0.1:2" },
+		"timeout":   func(c *configuration.Config) { c.ModsecHTTPTimeoutSeconds = 30 },
+		"bodyLimit": func(c *configuration.Config) { c.ModsecBodyLimit = 1024 },
+	} {
+		cfg := testModsecConfig("http://127.0.0.1:1")
+		change(cfg)
+		other, err := Open(ctx, cfg, slog.Default(), "same", "test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if other == base {
+			t.Fatalf("%s change must open a new Client", name)
+		}
+	}
+}
