@@ -11,7 +11,6 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 // originAppsec is the usage-metrics origin of a remediation an AppSec verdict decided.
@@ -89,11 +88,14 @@ func (b *Bouncer) applyAppsecFailureAction(rw http.ResponseWriter, req clientreq
 // False means a captcha kind did not write.
 func (b *Bouncer) answerAppsecQueryError(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, err error) bool {
 	switch {
+	case errors.Is(err, appsec.ErrGateSkip):
+		// The admission gate is backing off: AppSec was not called and FailureAction does not apply.
+		return false
 	case errors.Is(err, appsec.ErrClientDisconnected):
-		b.handleClientDisconnectedServeHTTP(rw, req)
+		b.handleClientDisconnectedServeHTTP(rw, req, "appsec")
 		return true
 	case errors.Is(err, appsec.ErrClientBodyRead):
-		b.handleClientBodyReadServeHTTP(rw, req, err)
+		b.handleClientBodyReadServeHTTP(rw, req, "appsec", err)
 		return true
 	case errors.Is(err, appsec.ErrFailureCaptcha):
 		return b.captchaAppsecFailure(rw, req, match)
@@ -121,20 +123,4 @@ func (b *Bouncer) banAppsecFailure(rw http.ResponseWriter, req clientrequest.Req
 // isCrowdsecChallengeCallbackPath reports script and submit paths under /crowdsec-internal/challenge/.
 func isCrowdsecChallengeCallbackPath(path string) bool {
 	return strings.HasPrefix(path, crowdsecChallengeCallbackPrefix)
-}
-
-// handleClientDisconnectedServeHTTP sets the client-disconnected remediation header.
-// It does not ban and does not call next. The caller returns so ServeHTTP stops.
-func (b *Bouncer) handleClientDisconnectedServeHTTP(rw http.ResponseWriter, req clientrequest.Request) {
-	logger.Trace(b.log, "client disconnected while buffering AppSec body", "ip", req.IPAddrString())
-	b.setRemediationHeader(rw, headerKindError, headerReasonClientDisconnected, "")
-}
-
-// handleClientBodyReadServeHTTP answers 400 when the client body could not be read whole for
-// AppSec and the client is still connected (for example the server read timeout on a slow HTTP/2
-// upload). Not a ban: no ban template, no dropped metrics, no origin, no FailureAction.
-func (b *Bouncer) handleClientBodyReadServeHTTP(rw http.ResponseWriter, req clientrequest.Request, err error) {
-	b.log.Debug("client body read failed while buffering AppSec body", "ip", req.IPAddrString(), "error", err)
-	b.setRemediationHeader(rw, headerKindError, headerReasonClientBodyRead, "")
-	http.Error(rw, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 }

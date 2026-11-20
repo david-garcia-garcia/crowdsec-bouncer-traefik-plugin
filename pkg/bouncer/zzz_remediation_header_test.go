@@ -51,6 +51,7 @@ func TestHeaderReasonFromOrigin(t *testing.T) {
 		{origin: lapi.OriginPluginAppsecFailure, want: headerReasonAppsecFailure},
 		{origin: lapi.OriginPluginRateLimit("login"), want: headerReasonRateLimit},
 		{origin: lapi.OriginPluginRateLimitFailure, want: headerReasonRateLimitFailure},
+		{origin: lapi.OriginPluginModsecFailure, want: headerReasonModsecFailure},
 		{origin: "crowdsec", want: headerReasonLAPI},
 		{origin: "lists:firehol_level1", want: headerReasonLAPI},
 		{origin: "", want: headerReasonLAPI},

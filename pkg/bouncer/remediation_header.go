@@ -25,6 +25,8 @@ const (
 	headerReasonAppsecFailure        = "appsec-failure"
 	headerReasonRateLimit            = "ratelimit"
 	headerReasonRateLimitFailure     = "ratelimit-failure"
+	headerReasonModsec               = "modsec"
+	headerReasonModsecFailure        = "modsec-failure"
 	headerReasonCaptchaDowngrade     = "captcha-downgrade"
 	headerReasonChallenge            = "challenge"
 	headerReasonClientDisconnected   = "client-disconnected"
@@ -96,6 +98,8 @@ func headerReasonFromOrigin(origin string) string {
 		return headerReasonAppsecFailure
 	case lapi.OriginPluginRateLimitFailure:
 		return headerReasonRateLimitFailure
+	case lapi.OriginPluginModsecFailure:
+		return headerReasonModsecFailure
 	default:
 		return headerReasonLAPI
 	}

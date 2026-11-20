@@ -1,6 +1,6 @@
 // Package crowdsec_bouncer_traefik_plugin is the Traefik Yaegi entry (CreateConfig / New).
 //
-// Each New is one middleware. Per leg (LAPI, AppSec, captcha) it may own a Client, bounce
+// Each New is one middleware. Per leg (LAPI, AppSec, captcha, ModSec) it may own a Client, bounce
 // against a named instance, both, or neither.
 //
 //	Open:          reclaim holder. Keeps that Client alive (stream ticker, HTTP).
@@ -33,6 +33,7 @@ import (
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/modsecurity"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ratelimit"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
@@ -41,6 +42,7 @@ const (
 	legLAPI    = "lapi"
 	legAppSec  = "appsec"
 	legCaptcha = "captcha"
+	legModsec  = "modsec"
 )
 
 // instanceAlias is this plugin's opaque reclaim name for one published slot.
@@ -60,7 +62,7 @@ func CreateConfig() *configuration.Config {
 // New snapshots Traefik's config, Opens owned legs, publishes their instance names,
 // and returns a Bouncer that ServeHTTP-Loads those names via Watch.
 //
-// lapiEnabled / appsecEnabled / captchaEnabled = own (Open + SetAlias).
+// lapiEnabled / appsecEnabled / captchaEnabled / modsecEnabled = own (Open + SetAlias).
 // bouncerEnabled + a non-empty instance name = bounce (Watch). Those axes are independent.
 // rateLimitEnabled = Open the rate-limit counter only; it has no instance name and no Watch.
 //
@@ -93,6 +95,9 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 	if err = captcha.Prepare(&config, log, name); err != nil {
 		return nil, err
 	}
+	if err = modsecurity.Prepare(&config, log, name); err != nil {
+		return nil, err
+	}
 
 	// Holder lease for everything this New Opens. Cancel only on error (named err).
 	bindCtx, releaseHolders := context.WithCancel(ctx)
@@ -117,7 +122,8 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 	subscribeLAPI := config.BouncerEnabled && config.LapiInstanceName != ""
 	subscribeAppSec := config.BouncerEnabled && config.AppsecInstanceName != ""
 	subscribeCaptcha := config.BouncerEnabled && config.CaptchaInstanceName != ""
-	route, err := bouncer.New(next, name, &config, subscribeLAPI, subscribeAppSec, subscribeCaptcha, log)
+	subscribeModsec := config.BouncerEnabled && config.ModsecInstanceName != ""
+	route, err := bouncer.New(next, name, &config, subscribeLAPI, subscribeAppSec, subscribeCaptcha, subscribeModsec, log)
 	if err != nil {
 		return nil, err
 	}
@@ -134,6 +140,9 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 	if subscribeCaptcha {
 		reclaim.Watch(ctx, instanceAlias(legCaptcha, config.CaptchaInstanceName), (*captcha.Client)(nil), route.ReceiveCaptcha)
 	}
+	if subscribeModsec {
+		reclaim.Watch(ctx, instanceAlias(legModsec, config.ModsecInstanceName), (*modsecurity.Client)(nil), route.ReceiveModSec)
+	}
 	return route, nil
 }
 
@@ -146,7 +155,10 @@ func openOwned(bindCtx context.Context, config *configuration.Config, log *slog.
 	if err := openOwnedLeg(bindCtx, config, log, name, config.AppsecEnabled, legAppSec); err != nil {
 		return err
 	}
-	return openOwnedLeg(bindCtx, config, log, name, config.CaptchaEnabled, legCaptcha)
+	if err := openOwnedLeg(bindCtx, config, log, name, config.CaptchaEnabled, legCaptcha); err != nil {
+		return err
+	}
+	return openOwnedLeg(bindCtx, config, log, name, config.ModsecEnabled, legModsec)
 }
 
 func openOwnedLeg(bindCtx context.Context, config *configuration.Config, log *slog.Logger, name string, enabled bool, group string) error {
@@ -163,6 +175,9 @@ func openOwnedLeg(bindCtx context.Context, config *configuration.Config, log *sl
 		return err
 	case legCaptcha:
 		_, err := captcha.Open(bindCtx, config, log, name, pluginVersion)
+		return err
+	case legModsec:
+		_, err := modsecurity.Open(bindCtx, config, log, name, pluginVersion)
 		return err
 	}
 	return nil
@@ -193,28 +208,44 @@ func openRateLimit(bindCtx context.Context, config *configuration.Config, log *s
 
 // claimOwned publishes each owned instance name (SetAlias) to the Client Open just
 // created. A taken name fails New. A later claim failure clears already-published
-// legs (LAPI and AppSec when captcha's SetAlias fails) so we do not leave a
-// half-claimed owner.
+// legs so we do not leave a half-claimed owner. Order matches openOwned.
 func claimOwned(config *configuration.Config, log *slog.Logger, name string) error {
 	if err := claimOwnedLeg(config, log, name, config.LapiEnabled, legLAPI); err != nil {
 		return err
 	}
 	if err := claimOwnedLeg(config, log, name, config.AppsecEnabled, legAppSec); err != nil {
-		if config.LapiEnabled {
-			reclaim.ClearPublisher(name, legLAPI)
-		}
+		clearClaimedPublishers(config, name, legLAPI)
 		return err
 	}
-	err := claimOwnedLeg(config, log, name, config.CaptchaEnabled, legCaptcha)
-	if err != nil {
-		if config.LapiEnabled {
-			reclaim.ClearPublisher(name, legLAPI)
+	if err := claimOwnedLeg(config, log, name, config.CaptchaEnabled, legCaptcha); err != nil {
+		clearClaimedPublishers(config, name, legLAPI, legAppSec)
+		return err
+	}
+	if err := claimOwnedLeg(config, log, name, config.ModsecEnabled, legModsec); err != nil {
+		clearClaimedPublishers(config, name, legLAPI, legAppSec, legCaptcha)
+		return err
+	}
+	return nil
+}
+
+// clearClaimedPublishers drops SetAlias for owned groups already published in this New.
+func clearClaimedPublishers(config *configuration.Config, name string, groups ...string) {
+	for _, group := range groups {
+		enabled := false
+		switch group {
+		case legLAPI:
+			enabled = config.LapiEnabled
+		case legAppSec:
+			enabled = config.AppsecEnabled
+		case legCaptcha:
+			enabled = config.CaptchaEnabled
+		case legModsec:
+			enabled = config.ModsecEnabled
 		}
-		if config.AppsecEnabled {
-			reclaim.ClearPublisher(name, legAppSec)
+		if enabled {
+			reclaim.ClearPublisher(name, group)
 		}
 	}
-	return err
 }
 
 func claimOwnedLeg(config *configuration.Config, log *slog.Logger, name string, enabled bool, group string) error {
@@ -228,6 +259,8 @@ func claimOwnedLeg(config *configuration.Config, log *slog.Logger, name string, 
 		return claimAlias(appsec.Key(config, name), group, config.AppsecInstanceName, name, log)
 	case legCaptcha:
 		return claimAlias(captcha.OwnershipKey(config, name), group, config.CaptchaInstanceName, name, log)
+	case legModsec:
+		return claimAlias(modsecurity.OwnershipKey(config, name), group, config.ModsecInstanceName, name, log)
 	}
 	return nil
 }

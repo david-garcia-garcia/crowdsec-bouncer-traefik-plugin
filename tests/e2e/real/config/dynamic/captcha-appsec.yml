@@ -15,6 +15,7 @@ http:
           appsecEnabled: "true"
           appsecHost: crowdsec:7422
           appsecHttpTimeoutSeconds: "30"
+          appsecUnhealthyBackOffPeriodSecs: "0"
           bouncerActionRules:
             - name: force-captcha
               path: ^/captcha-appsec/rule$

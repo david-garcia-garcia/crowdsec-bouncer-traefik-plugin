@@ -9,13 +9,14 @@ import (
 )
 
 // Action tokens on one ActionRule. Order in the authoring array does not matter.
-// ActionBypass skips LAPI and AppSec; only ActionBypassRateLimit skips the rate limit.
+// ActionBypass skips LAPI, AppSec, and ModSec; only ActionBypassRateLimit skips the rate limit.
 const (
 	ActionBan             = "ban"
 	ActionBypass          = "bypass"
 	ActionBypassAppsec    = "bypassAppsec"
 	ActionBypassCaptcha   = "bypassCaptcha"
 	ActionBypassLapi      = "bypassLapi"
+	ActionBypassModsec    = "bypassModsec" //nolint:gosec // G101: action token, not a credential
 	ActionBypassRateLimit = "bypassRateLimit"
 	ActionCaptcha         = "captcha"
 )
@@ -42,6 +43,7 @@ type actionTokens struct {
 	captcha       bool
 	skipAppsec    bool
 	skipLapi      bool
+	skipModsec    bool
 	skipRateLimit bool
 }
 
@@ -76,7 +78,7 @@ func NewActionSet(rules []ActionRule) (*ActionSet, error) {
 // ActionMatch is every matching row reduced for one request.
 // BanName, CaptchaName and BypassCaptchaName are the first matching rule of that token. Empty means none.
 // BypassCaptchaName means the request gets no captcha, so CaptchaName is empty whenever it is set.
-// SkipLapi, SkipAppsec and SkipRateLimit are OR'd across every non-ban hit. A ban row contributes only its name.
+// SkipLapi, SkipAppsec, SkipModsec, and SkipRateLimit are OR'd across every non-ban hit. A ban row contributes only its name.
 // AmbiguousPathName is the first matching rule with a path predicate whose skips were dropped
 // because the request path has more than one reading (see SingleReadingPath). Empty means none.
 type ActionMatch struct {
@@ -86,6 +88,7 @@ type ActionMatch struct {
 	CaptchaName       string
 	SkipAppsec        bool
 	SkipLapi          bool
+	SkipModsec        bool
 	SkipRateLimit     bool
 }
 
@@ -135,6 +138,9 @@ func (set *ActionSet) Fold(httpReq *http.Request) ActionMatch {
 		}
 		if set.SkipAppsec(i) {
 			match.SkipAppsec = true
+		}
+		if set.SkipModsec(i) {
+			match.SkipModsec = true
 		}
 		if set.SkipRateLimit(i) {
 			match.SkipRateLimit = true
@@ -195,14 +201,19 @@ func (set *ActionSet) SkipAppsec(i int) bool {
 	return set != nil && i >= 0 && i < len(set.tokens) && set.tokens[i].skipAppsec
 }
 
+// SkipModsec reports whether the row at index i skips ModSec (bypass or bypassModsec).
+func (set *ActionSet) SkipModsec(i int) bool {
+	return set != nil && i >= 0 && i < len(set.tokens) && set.tokens[i].skipModsec
+}
+
 // SkipRateLimit reports whether the row at index i skips the rate limit (bypassRateLimit only).
 func (set *ActionSet) SkipRateLimit(i int) bool {
 	return set != nil && i >= 0 && i < len(set.tokens) && set.tokens[i].skipRateLimit
 }
 
-// skipsLeg reports whether the row at index i skips any leg: LAPI, AppSec, or the rate limit.
+// skipsLeg reports whether the row at index i skips any leg: LAPI, AppSec, ModSec, or the rate limit.
 func (set *ActionSet) skipsLeg(i int) bool {
-	return set.SkipLapi(i) || set.SkipAppsec(i) || set.SkipRateLimit(i)
+	return set.SkipLapi(i) || set.SkipAppsec(i) || set.SkipModsec(i) || set.SkipRateLimit(i)
 }
 
 // CompileRowName trims the name of one authoring row (an action rule or a rate-limit bucket) and
@@ -245,10 +256,13 @@ func compileActionTokens(raw []string) (actionTokens, error) {
 		case ActionBypass:
 			parsed.skipLapi = true
 			parsed.skipAppsec = true
+			parsed.skipModsec = true
 		case ActionBypassLapi:
 			parsed.skipLapi = true
 		case ActionBypassAppsec:
 			parsed.skipAppsec = true
+		case ActionBypassModsec:
+			parsed.skipModsec = true
 		case ActionBypassCaptcha:
 			parsed.bypassCaptcha = true
 		case ActionBypassRateLimit:

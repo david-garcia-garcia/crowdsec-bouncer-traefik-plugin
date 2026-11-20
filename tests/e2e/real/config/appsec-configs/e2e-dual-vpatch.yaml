@@ -1,0 +1,10 @@
+# A stand-in virtual patch for listener 7424: AppSec drops any path containing
+# "appsec-drop" and allows everything else. No CRS runs on this listener, so the
+# dual-leg tests can tell an AppSec block (ban:appsec) from a ModSec one (ban:modsec).
+name: e2e/dual-vpatch
+default_remediation: ban
+inband:
+  pre_eval:
+    - filter: 'req.URL.Path contains "appsec-drop"'
+      apply:
+        - DropRequest("e2e dual virtual patch")

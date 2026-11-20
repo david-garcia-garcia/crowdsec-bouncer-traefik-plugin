@@ -1,0 +1,40 @@
+# AppSec and ModSec on one router. AppSec is listener 7424 (e2e/dual-vpatch: no CRS,
+# drops any path containing "appsec-drop"); ModSec is the CRS sidecar waf. The origin
+# is echo-ws, which echoes the request it got, body included.
+http:
+  routers:
+    dual:
+      rule: PathPrefix(`/dual`)
+      entryPoints: [web]
+      middlewares: [bouncer-dual]
+      service: echo-ws@docker
+  middlewares:
+    bouncer-dual:
+      plugin:
+        bouncer:
+          appsecEnabled: "true"
+          appsecHost: crowdsec:7424
+          appsecHttpTimeoutSeconds: "10"
+          appsecKey: c51a1c70000000000000000000000005
+          appsecUnhealthyBackOffPeriodSecs: "0"
+          bouncerActionRules:
+            - name: dual-no-appsec
+              path: ^/dual/no-appsec/
+              action:
+                - bypassAppsec
+            - name: dual-no-modsec
+              path: ^/dual/no-modsec/
+              action:
+                - bypassModsec
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          modsecEnabled: "true"
+          modsecHttpTimeoutSeconds: "10"
+          modsecUrl: http://waf:8080
+          reclaimGraceSeconds: "2"

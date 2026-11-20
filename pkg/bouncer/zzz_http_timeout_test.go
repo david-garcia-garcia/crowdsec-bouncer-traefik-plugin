@@ -15,7 +15,7 @@ func TestNew_BounceOnlyDoesNotConstructCaptcha(t *testing.T) {
 	cfg.CaptchaSiteKey = "site"
 	cfg.CaptchaSecretKey = "secret"
 	cfg.CaptchaGateSecret = "gate-secret"
-	route, err := New(next, "test", cfg, false, false, false, logger.New("ERROR", ""))
+	route, err := New(next, "test", cfg, false, false, false, false, logger.New("ERROR", ""))
 	if err != nil {
 		t.Fatalf("New = %v", err)
 	}

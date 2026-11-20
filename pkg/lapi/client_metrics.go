@@ -26,6 +26,7 @@ const (
 	OriginPluginTechStreamFail    = "plugin:tech_streamfail"    // stream unhealthy
 	OriginPluginLapiFailure       = "plugin:lapi_failure"       // live LAPI lookup error
 	OriginPluginAppsecFailure     = "plugin:appsec_failure"     // AppSec failure-action
+	OriginPluginModsecFailure     = "plugin:modsec_failure"     // ModSec failure-action
 	OriginPluginRulesPrefix       = "plugin:rules:"             // action-rule applied ban or captcha
 	OriginPluginRateLimitPrefix   = "plugin:ratelimit:"         // rate-limit bucket denied
 	OriginPluginRateLimitFailure  = "plugin:ratelimit_failure"  // rate-limit failure-action

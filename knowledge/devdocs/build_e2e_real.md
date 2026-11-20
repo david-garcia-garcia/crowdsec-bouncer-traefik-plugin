@@ -12,7 +12,7 @@ _Avoid_: real-stack, Docker e2e
 
 ## Overview
 
-Use this suite when the check must include Traefik’s plugin loader and a real Crowdsec (cscli decisions, stream/live, AppSec CRS). Keep mock e2e for fast plugin-only CI.
+Use this suite when the check must include Traefik’s plugin loader and a real Crowdsec (cscli decisions, stream/live, AppSec CRS) or the inspect-only Apache CRS sidecar (ModSec leg). Keep mock e2e for fast plugin-only CI.
 
 ## How to use
 
@@ -28,7 +28,12 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 - Real-stack compose and file-provider YAML set `reclaimGraceSeconds: 2` so reclaim dispose is not the production 30s. Instance-severance R2/R5 wait 3s, not 40.
 - Every LAPI-owning compose label and mock YAML must set `lapiEnabled: true`. AppSec-only is `false` plus `appsecEnabled: true` (`/waf-only`, mock `appsec`).
 - Country matching uses traefik-geoblock enrich on a **public** `X-Forwarded-For`. Do not inject a client-set country header for that case.
-- CI runs this suite as three jobs, `e2e (docker + pester / lapi)`, `e2e (docker + pester / appsec)`, and `e2e (docker + pester / lifecycle)`, from `tests/e2e/real/PesterDomains.ps1`. Each job boots its own stack. `make e2e_pester` still runs every file. `e2e (binary + mock LAPI)` stays the mock job; `e2e (go + dragonfly)` is DecisionStore `go test` against Dragonfly (`build_e2e_go-redis.md`).
+- CI runs this suite as four jobs, `e2e (docker + pester / lapi)`, `e2e (docker + pester / appsec)`, `e2e (docker + pester / lifecycle)`, and `e2e (docker + pester / modsec)`, from `tests/e2e/real/PesterDomains.ps1`. Each job boots its own stack. `make e2e_pester` still runs every file. `e2e (binary + mock LAPI)` stays the mock job; `e2e (go + dragonfly)` is DecisionStore `go test` against Dragonfly (`build_e2e_go-redis.md`).
+- Domain `modsec` runs the WAF legs: `modsec.Tests.ps1`, `waf_dual.Tests.ps1`, and `waf_backoff.Tests.ps1`. They need compose services `waf` (`waf-modsec-test`, inspect-only Apache CRS, `owasp/modsecurity-crs:4.3.0-apache-alpine-202406090906`, drain vhost), `waf-flaky` (`waf-flaky-test`, a second CRS sidecar with the same image and overlay), `waf-5xx` (nginx that returns 503), `appsec-flaky` (`appsec-flaky-test`, nginx `config/appsec-flaky.conf` that proxies to `crowdsec:7422`), and `echo-ws` (echoes the request, body included). Client identity stays `X-Forwarded-For`.
+- `modsec.Tests.ps1` (`config/dynamic/modsec.yml`) is ModSec alone: allow, a CRS block proven by the rule id in the sidecar log (`docker logs waf-modsec-test`), a GET body blocked by CRS rule 920170, an OPTIONS clean body that passes, an XSS in a POST body, the body replayed to origin, 413 over `modsecBodyLimit` without a sidecar call, the three `bouncerModsecFailureAction` values against `127.0.0.1:9`, WebSocket, and `bypassModsec`. Routes: `/modsec-allow`, `/modsec-crs`, `/modsec-body`, `/modsec-fail-pass`, `/modsec-fail-ban`, `/modsec-fail-captcha`, `/modsec-ws`, `/modsec-skip/*`.
+- `waf_dual.Tests.ps1` (`config/dynamic/waf-dual.yml`, router `/dual` on `echo-ws`) runs AppSec and ModSec on one router. AppSec is listener 7424 (`config/acquis.d/appsec-dual.yaml`, appsec config `e2e/dual-vpatch` in `config/appsec-configs/e2e-dual-vpatch.yaml`): no CRS, `DropRequest` when the path contains `appsec-drop`. So `ban:appsec` and `ban:modsec` tell the legs apart. It covers order, an AppSec block that never reaches the sidecar (a unique marker missing from the sidecar log), `bypassAppsec` and `bypassModsec` per leg, and one body shared by both legs and replayed to origin.
+- `waf_backoff.Tests.ps1` (`config/dynamic/waf-backoff.yml`) covers the admission gate of both legs. `/waf-backoff-default` is AppSec with no `appsecUnhealthy*` key and no FailureAction, pointed at `waf-5xx`: a fresh stack answers 5 bans then skips AppSec (origin 200) and logs one `crowdsec appsec backoff started`. The gate state lives in the Traefik process for 30 s, so a rerun on the same stack may start already tripped; the case asserts bans equal listener hits and never more than 5. `/appsec-cycle` (AppSec through `appsec-flaky`, plus ModSec on `waf`) and `/modsec-cycle` (ModSec on `waf-flaky`, plus AppSec on 7424) use a 10 s cooldown and the `ban` failure action. Each cycle stops its container (`appsec-flaky-test` or `waf-flaky-test`), sees 5 `ban:<leg>-failure`, then a skip with no failure action while the other leg still blocks, then starts the container and waits for the probe to reopen the leg. It asserts exactly one `backoff started` and one `backoff ended` line per outage. `AfterAll` always starts the container again.
+- AppSec compose labels and mock AppSec YAML pin `appsecUnhealthyBackOffPeriodSecs: 0` so FailureAction cases are not skipped by the packaged AppSec gate (default 30).
 
 ## Pattern snippet
 
@@ -41,9 +46,16 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 ## Key files
 
 - `tests/e2e/real/Test-Integration.ps1`
+- `tests/e2e/real/PesterDomains.ps1`
 - `tests/e2e/real/config/docker-compose.test.yml`
 - `tests/e2e/real/config/dynamic/dynamic-scopes.yml`
+- `tests/e2e/real/config/dynamic/modsec.yml`
+- `tests/e2e/real/config/dynamic/waf-dual.yml`
+- `tests/e2e/real/config/dynamic/waf-backoff.yml`
 - `tests/e2e/real/instance_severance.Tests.ps1`
+- `tests/e2e/real/modsec.Tests.ps1`
+- `tests/e2e/real/waf_dual.Tests.ps1`
+- `tests/e2e/real/waf_backoff.Tests.ps1`
 - `tests/e2e/real/rate_limit.Tests.ps1`
 - `tests/e2e/real/config/dynamic/rate-limit.yml`
 - `tests/e2e/real/*.Tests.ps1`
@@ -56,7 +68,7 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 - Redis-cache cases need Dragonfly (`docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.2`) on the compose network as `dragonfly:6379`.
 - Do not put a second Redis route under `PathPrefix(`/redis-cache`)` (for example `/redis-cache-hold`). Traefik can apply the short-TTL middleware to that path; the restart proof uses `/hold-redis`.
 - Redis cache keys are the client IP. A long-TTL restart case MUST use a different `X-Forwarded-For` than a short-TTL case, or a cache hit will keep the 2s key and never `SET EX 120`.
-- AppSec cases need Crowdsec `appsec-crs-inband` and `acquis.yaml` on 7422; first boot downloads CRS.
+- AppSec cases need Crowdsec `appsec-crs-inband` and `acquis.yaml` on 7422; first boot downloads CRS. ModSec CRS is a separate inspect-only sidecar (`waf`), not Crowdsec AppSec. Listener 7424 runs no CRS on purpose, so a CRS payload on `/dual` and `/modsec-cycle` is decided by the sidecar alone.
 - The 7422 listener also loads local `e2e/rate-limit` (`config/appsec-configs/e2e-rate-limit.yaml`): `RateLimit()` 2/m per client IP on `/ratelimit`, which needs Crowdsec `v1.8.2`+. The bucket lives in Crowdsec memory and survives between Pester runs on the same container, so the case picks a fresh `X-Forwarded-For` each run.
 - The 7422 listener also loads local `e2e/captcha-verdict` (`config/appsec-configs/e2e-captcha-verdict.yaml`): `pre_eval` `SetRemediation("captcha")` plus `DropRequest` (a pre_eval remediation only applies on an in-band interrupt) on `/captcha-appsec/verdict` and `/waf-only/captcha-verdict`, and on GET only for `/captcha-appsec/verdict-get`. Crowdsec answers `{"action":"captcha","http_status":403}` with no body; the alert carries no remediation, so no LAPI decision follows. `captcha.Tests.ps1` "AppSec captcha verdict" solves it on the `captcha-appsec` router with the dummy verifier.
 - Usage-metrics cases (`usage_metrics.Tests.ps1`) need `lapiMetricsUpdateIntervalSeconds=10` on `/stream`, `/trusted`, and `/appsec`. Default 600s would miss CI. `/stream` and `/trusted` MUST NOT share a LAPI key: two stream owners with the same host and key both `New`, but CrowdSec has one stream cursor per hashed key and this process logs `crowdsec lapi stream collision`. Each stream middleware POSTs on its own ticker.
@@ -65,10 +77,10 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 - The file-provider stream bouncer uses `BOUNCER_KEY_TRAEFIK_SCOPES`. Do not share one LAPI stream key with the docker-label `/stream` middleware: polls race the CrowdSec cursor (`crowdsec lapi stream collision`). Isolation is a second bouncer API key.
 - Captcha solve uses `captchaProvider: custom` and compose service `dummy-captcha` (`POST /siteverify` always `{"success":true}`). Pester POSTs `dummy-captcha-response` and asserts `crowdsec_captcha_gate`. Do not call hCaptcha/Turnstile.
 - Traefik drops unused keys. An old-key-only `banHtmlFilePath` / `captchaHtmlFilePath` label serves CreateConfig defaults, not the suite HTML.
-- Extra coverage routes (`/header-none`, `/lapi-fail-*`, `/waf-only`, `/waf-fail-*`, `/status-429`, `/short-captcha`) share the same `whoami` origin. Do not put them under `PathPrefix(/appsec)` or `PathPrefix(/captcha)`.
+- Extra coverage routes (`/header-none`, `/lapi-fail-*`, `/waf-only`, `/waf-fail-*`, `/status-429`, `/short-captcha`, `/modsec-*`) share the same `whoami` origin. Do not put them under `PathPrefix(/appsec)` or `PathPrefix(/captcha)`.
 - Username/AS/Country placeholder cases use `/header-none` (file-provider `bouncerDecisionScopeHeaders`, no geoblock). Do not inject `CF-IPCountry` on `/scope-none` — geoblock overwrites `X-IPCountry`.
 - CrowdSec `type=allow` over a ban is not in this suite. The Pester file and the storage follow-up live in `knowledge/debt/2026-09-19-multiple-decisions-per-cache-key.md`.
-- LAPI/AppSec failure-action routes point at `crowdsec:9` with `lapiHttpTimeoutSeconds=2` and `appsecHttpTimeoutSeconds=2`. Do not `docker pause` Crowdsec; that would stall the shared LAPI.
+- LAPI/AppSec failure-action routes point at `crowdsec:9` with `lapiHttpTimeoutSeconds=2` and `appsecHttpTimeoutSeconds=2`. Do not `docker pause` Crowdsec; that would stall the shared LAPI. A real outage stops a container only one route uses (`appsec-flaky-test`, `waf-flaky-test`), never `crowdsec` or `waf`.
 - Docker labels for `LapiHost` are `lapihost`. `lapishost` (extra `s`) does not match; Traefik drops it and CreateConfig keeps `crowdsec:8080`.
 - Rate-limit cases (`rate_limit.Tests.ps1`, `config/dynamic/rate-limit.yml`) count in the stack's Dragonfly, and a counter outlives its run by two windows. Each run picks one random `10.x.y.0/24` and each case its own host in it; never reuse a fixed `X-Forwarded-For`. The bucket list (objects with a nested `key` list) is file provider only. `/rate-limit/` owns a LAPI client with `BOUNCER_KEY_RATE_LIMIT` and `lapiMetricsUpdateIntervalSeconds: 10` for the `plugin:ratelimit:<bucket>` drop; the `-down-` routers point at `dragonfly:1`.
 - Compose IPAM is `172.28.0.0/16` (gateway `172.28.0.1`) so docker-label `bouncerForwardedHeadersTrustedIPs` can pin that gateway without colliding with a common `172.20.0.0/16` on the same Docker engine. File-provider routes still trust `172.16.0.0/12`.

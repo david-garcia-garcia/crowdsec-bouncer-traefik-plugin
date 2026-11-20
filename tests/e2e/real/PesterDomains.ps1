@@ -2,6 +2,9 @@
 # lapi: request decisions from LAPI (stream and live modes, ban, scopes, trusted IPs, metrics).
 # appsec: AppSec, captcha, the Redis decision cache, and the Redis rate limit.
 # lifecycle: instance severance (late bind, reclaim, name collisions).
+# modsec: the WAF legs. ModSec alone (CRS block, body, failure actions, WebSocket, skip), AppSec and
+#   ModSec on one router (order, per-leg bypass, shared body), and the backoff gate of both legs
+#   through a real outage and recovery (stops and starts appsec-flaky-test and waf-flaky-test).
 # Local `make e2e_pester` still runs every file. Each CI job runs one domain.
 
 $script:PesterDomainFiles = @{
@@ -28,6 +31,11 @@ $script:PesterDomainFiles = @{
     )
     lifecycle = @(
         'instance_severance.Tests.ps1'
+    )
+    modsec = @(
+        'modsec.Tests.ps1'
+        'waf_dual.Tests.ps1'
+        'waf_backoff.Tests.ps1'
     )
 }
 

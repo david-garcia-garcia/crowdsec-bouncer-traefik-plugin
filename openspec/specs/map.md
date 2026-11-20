@@ -25,6 +25,7 @@ Allowlist of root + domain: `openspec/specs/domains.md`.
 - ip
 - lapi
 - middleware
+- modsecurity
 
 ## std
 

@@ -39,6 +39,7 @@ const (
 	ReasonTECH                  = "TECHNICAL_ISSUE"
 	ReasonLAPI                  = "LAPI"
 	ReasonAPPSEC                = "APPSEC"
+	ReasonMODSEC                = "MODSEC"
 	ReasonRateLimit             = "RATE_LIMIT"
 	HcaptchaProvider            = "hcaptcha"
 	RecaptchaProvider           = "recaptcha"
@@ -60,6 +61,10 @@ const (
 	FailureActionBan = "ban"
 	// FailureActionCaptcha remediates with pkg/captcha when LAPI or AppSec is down.
 	FailureActionCaptcha = "captcha"
+	// DefaultModsecBodyLimit is 8 MiB when modsecBodyLimit is omitted.
+	DefaultModsecBodyLimit int64 = 8 * 1024 * 1024
+	// DefaultAppsecUnhealthyBackOffPeriodSecs is the AppSec gate cooldown when omitted.
+	DefaultAppsecUnhealthyBackOffPeriodSecs int64 = 30
 	// RateLimitStoreRedis is the only rate-limit store in this version.
 	RateLimitStoreRedis = "redis"
 )
@@ -83,6 +88,7 @@ type Config struct {
 	AppsecTLSClientKey                  string                       `json:"appsecTlsClientKey,omitempty"`
 	AppsecTLSClientKeyFile              string                       `json:"appsecTlsClientKeyFile,omitempty"`
 	AppsecTLSInsecureVerify             bool                         `json:"appsecTlsInsecureVerify,omitempty"`
+	AppsecUnhealthyBackOffPeriodSecs    int64                        `json:"appsecUnhealthyBackOffPeriodSecs,omitempty"`
 	BouncerActionRules                  []httprule.ActionRule        `json:"bouncerActionRules,omitempty"`
 	BouncerAppsecFailureAction          string                       `json:"bouncerAppsecFailureAction,omitempty"`
 	BouncerBanFilePath                  string                       `json:"bouncerBanFilePath,omitempty"`
@@ -93,6 +99,7 @@ type Config struct {
 	BouncerForwardedHeadersInsecure     bool                         `json:"bouncerForwardedHeadersInsecure,omitempty"`
 	BouncerForwardedHeadersTrustedIPs   []string                     `json:"bouncerForwardedHeadersTrustedIps,omitempty"`
 	BouncerLapiFailureAction            string                       `json:"bouncerLapiFailureAction,omitempty"`
+	BouncerModsecFailureAction          string                       `json:"bouncerModsecFailureAction,omitempty"`
 	BouncerOriginBasedDecisionRemap     map[string]map[string]string `json:"bouncerOriginBasedDecisionRemap,omitempty"`
 	BouncerRedisUnreachableBlock        bool                         `json:"bouncerRedisUnreachableBlock,omitempty"`
 	BouncerRemediationHeadersCustomName string                       `json:"bouncerRemediationHeadersCustomName,omitempty"`
@@ -158,6 +165,12 @@ type Config struct {
 	LogFilePath                         string                       `json:"logFilePath,omitempty"`
 	LogFormat                           string                       `json:"logFormat,omitempty"`
 	LogLevel                            string                       `json:"logLevel,omitempty"`
+	ModsecBodyLimit                     int64                        `json:"modsecBodyLimit,omitempty"`
+	ModsecEnabled                       bool                         `json:"modsecEnabled,omitempty"`
+	ModsecHTTPTimeoutSeconds            int64                        `json:"modsecHttpTimeoutSeconds,omitempty"`
+	ModsecInstanceName                  string                       `json:"modsecInstanceName,omitempty"`
+	ModsecUnhealthyBackOffPeriodSecs    int64                        `json:"modsecUnhealthyBackOffPeriodSecs,omitempty"`
+	ModsecURL                           string                       `json:"modsecUrl,omitempty"`
 	RateLimitBuckets                    []ratelimit.BucketRule       `json:"rateLimitBuckets,omitempty"`
 	RateLimitEnabled                    bool                         `json:"rateLimitEnabled,omitempty"`
 	RateLimitFailureAction              string                       `json:"rateLimitFailureAction,omitempty"`
@@ -213,6 +226,15 @@ func EffectiveFailureAction(action string) string {
 	return action
 }
 
+// EffectiveModsecFailureAction maps empty config to passthrough: unlike LAPI and AppSec,
+// a ModSec sidecar outage lets traffic through unless the operator asks otherwise.
+func EffectiveModsecFailureAction(action string) string {
+	if action == "" {
+		return FailureActionPassthrough
+	}
+	return action
+}
+
 // New creates the default plugin configuration.
 func New() *Config {
 	return &Config{
@@ -224,6 +246,7 @@ func New() *Config {
 		AppsecPath:                          "/",
 		AppsecScheme:                        "",
 		AppsecTLSInsecureVerify:             false,
+		AppsecUnhealthyBackOffPeriodSecs:    DefaultAppsecUnhealthyBackOffPeriodSecs,
 		BouncerActionRules:                  []httprule.ActionRule{},
 		BouncerAppsecFailureAction:          FailureActionBan,
 		BouncerBanFilePath:                  "",
@@ -234,6 +257,7 @@ func New() *Config {
 		BouncerForwardedHeadersInsecure:     false,
 		BouncerForwardedHeadersTrustedIPs:   []string{},
 		BouncerLapiFailureAction:            FailureActionBan,
+		BouncerModsecFailureAction:          FailureActionPassthrough,
 		BouncerOriginBasedDecisionRemap:     map[string]map[string]string{},
 		BouncerRedisUnreachableBlock:        true,
 		BouncerRemediationHeadersCustomName: "",
@@ -279,6 +303,10 @@ func New() *Config {
 		LogFilePath:                         "",
 		LogFormat:                           "common",
 		LogLevel:                            LogINFO,
+		ModsecBodyLimit:                     DefaultModsecBodyLimit,
+		ModsecEnabled:                       false,
+		ModsecHTTPTimeoutSeconds:            10,
+		ModsecUnhealthyBackOffPeriodSecs:    0,
 		RateLimitBuckets:                    []ratelimit.BucketRule{},
 		RateLimitEnabled:                    false,
 		RateLimitFailureAction:              FailureActionPassthrough,
@@ -434,6 +462,10 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		}
 	}
 
+	if err := validateModsecURL(config); err != nil {
+		return err
+	}
+
 	if err := validateOpenVsSubscribe(config); err != nil {
 		return err
 	}
@@ -500,7 +532,11 @@ func validateOpenVsSubscribe(config *Config) error {
 		return err
 	}
 	// Captcha E2 is leftover captchaInstanceName only; leftover captcha* is not a secret.
-	return validateLegOpenVsSubscribe("Captcha", config.BouncerEnabled, config.CaptchaEnabled, config.CaptchaInstanceName, false)
+	if err := validateLegOpenVsSubscribe("Captcha", config.BouncerEnabled, config.CaptchaEnabled, config.CaptchaInstanceName, false); err != nil {
+		return err
+	}
+	// ModSec E2 is leftover modsecInstanceName only; leftover owner-read modsec* is not a secret.
+	return validateLegOpenVsSubscribe("ModSec", config.BouncerEnabled, config.ModsecEnabled, config.ModsecInstanceName, false)
 }
 
 func validateLegOpenVsSubscribe(leg string, bounceEnabled, owned bool, instanceName string, secretPresent bool) error {
@@ -858,7 +894,9 @@ func validateParamsRequired(config *Config) error {
 	}
 	requiredInt0 := map[string]int64{
 		"AppsecBodyLimit":                  config.AppsecBodyLimit,
+		"AppsecUnhealthyBackOffPeriodSecs": config.AppsecUnhealthyBackOffPeriodSecs,
 		"LapiMetricsUpdateIntervalSeconds": config.LapiMetricsUpdateIntervalSeconds,
+		"ModsecUnhealthyBackOffPeriodSecs": config.ModsecUnhealthyBackOffPeriodSecs,
 		"ReclaimGraceSeconds":              config.ReclaimGraceSeconds,
 	}
 	for key, val := range requiredInt0 {
@@ -873,6 +911,7 @@ func validateParamsRequired(config *Config) error {
 		"AppsecHTTPTimeoutSeconds":            config.AppsecHTTPTimeoutSeconds,
 		"CaptchaSiteverifyHTTPTimeoutSeconds": config.CaptchaSiteverifyHTTPTimeoutSeconds,
 		"CaptchaGracePeriodSeconds":           config.CaptchaGracePeriodSeconds,
+		"ModsecHTTPTimeoutSeconds":            config.ModsecHTTPTimeoutSeconds,
 	}
 	for key, val := range requiredInt1 {
 		if val < 1 {
@@ -887,6 +926,9 @@ func validateParamsRequired(config *Config) error {
 		return err
 	}
 	if err := validateFailureAction("BouncerAppsecFailureAction", config.BouncerAppsecFailureAction, captchaInstanceReady); err != nil {
+		return err
+	}
+	if err := validateFailureAction("BouncerModsecFailureAction", config.BouncerModsecFailureAction, captchaInstanceReady); err != nil {
 		return err
 	}
 	if _, err := httprule.NewActionSet(config.BouncerActionRules); err != nil {
@@ -907,6 +949,30 @@ func validateParamsRequired(config *Config) error {
 	}
 	if !contains([]string{HTTP, HTTPS, ""}, config.AppsecScheme) {
 		return errors.New("AppsecScheme: must be one of 'http' or 'https'")
+	}
+	return nil
+}
+
+// validateModsecURL rejects, when ModSec is owned, an empty or non-absolute http(s) URL and a body
+// limit below 1 byte: the whole body is held in memory, so there is no unlimited value.
+func validateModsecURL(config *Config) error {
+	if !config.ModsecEnabled {
+		return nil
+	}
+	if config.ModsecBodyLimit < 1 {
+		return errors.New("ModsecBodyLimit: cannot be less than 1")
+	}
+	raw := strings.TrimSpace(config.ModsecURL)
+	if raw == "" {
+		return errors.New("ModsecURL: cannot be empty when ModsecEnabled is true")
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || !parsed.IsAbs() || parsed.Host == "" || !contains([]string{HTTP, HTTPS}, strings.ToLower(parsed.Scheme)) {
+		return errors.New("ModsecURL: must be an absolute http or https URL")
+	}
+	// The request URI is appended to ModsecURL: a query or fragment would hide the real path from CRS.
+	if parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
+		return errors.New("ModsecURL: must not have a query or fragment")
 	}
 	return nil
 }

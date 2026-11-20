@@ -14,13 +14,17 @@ _Avoid_: leftover AppSec host/CA/key, `lapiMode: appsec`, CrowdsecAppsecEnabled
 The Config field that means this router will open a captcha Client. Same field `New` uses for `captcha.Open`. A set `captchaProvider` is not this field.
 _Avoid_: leftover bouncerCaptcha*, leftover captchaProvider as own, implicit own from provider
 
+**ModsecEnabled**:
+The Config field that means this router will open a ModSec Client. Same field `New` uses for `modsecurity.Open`. A leftover `modsecUrl` is not this field.
+_Avoid_: leftover `modSecurityUrl`, implying own from URL, AppSec enabled
+
 **Owner-read captcha settings**:
 The `captcha*` / `Captcha*` Config knobs `pkg/captcha` reads when `captchaEnabled` is true. Not `captchaEnabled` / `captchaInstanceName`, and not bounce-decision `Bouncer*` fields even when a value is the word `captcha`.
 _Avoid_: bouncerCaptcha*, nested captcha map, bounce-decision captcha as owner-read
 
 **Config domain prefix**:
 The operator label on `configuration.Config` (Go field and JSON tag). It does not travel past the package that owns the value.
-_Avoid_: nested YAML, old-key alias, repeating the prefix inside `pkg/lapi`, `pkg/appsec`, or `pkg/captcha`
+_Avoid_: nested YAML, old-key alias, repeating the prefix inside `pkg/lapi`, `pkg/appsec`, `pkg/captcha`, or `pkg/modsecurity`
 
 **Config validation**:
 The `ValidateParams` startup gate `plugin.New` runs on the config snapshot before `lapi.Prepare`.
@@ -32,12 +36,12 @@ _Avoid_: sharedLogFiles, reclaim value, log owner
 
 ## Overview
 
-`ValidateParams` is `New`'s constructor gate. When it fails, `New` returns a nil handler and that error and does not open LAPI. File-backed secrets go through `GetVariable`, which Stats and reads `<key>File` when that path is non-empty. Gate each `GetVariable` call behind the flag that uses that secret. Captcha site and secret keys are required whenever `captchaEnabled` is true, including `lapiMode: alone` and the default `ban` failure action. AppSec URL, key-file, and HTTPS CA run only when `AppsecEnabled` is true. `validateLogging` still `OpenFile`s a non-empty `LogFilePath` even when `logger.NewWithFormat` already holds that path. Close that handle after a successful open.
+`ValidateParams` is `New`'s constructor gate. When it fails, `New` returns a nil handler and that error and does not open LAPI. File-backed secrets go through `GetVariable`, which Stats and reads `<key>File` when that path is non-empty. Gate each `GetVariable` call behind the flag that uses that secret. Captcha site and secret keys are required whenever `captchaEnabled` is true, including `lapiMode: alone` and the default `ban` failure action. AppSec URL, key-file, and HTTPS CA run only when `AppsecEnabled` is true. ModSec URL and body limit run only when `ModsecEnabled` is true. `validateLogging` still `OpenFile`s a non-empty `LogFilePath` even when `logger.NewWithFormat` already holds that path. Close that handle after a successful open.
 
 ## How to use
 
 - Run `ValidateParams` on `&config` after the snapshot and before `lapi.Prepare`.
-- Keep `LapiHTTPTimeoutSeconds`, `AppsecHTTPTimeoutSeconds`, and `CaptchaSiteverifyHTTPTimeoutSeconds` in `requiredInt1` (`< 1` invalid). Each knob defaults to 10. Nothing inherits. Do not add `EffectiveHTTPTimeoutSeconds` or three inherit wrappers.
+- Keep `LapiHTTPTimeoutSeconds`, `AppsecHTTPTimeoutSeconds`, `CaptchaSiteverifyHTTPTimeoutSeconds`, and `ModsecHTTPTimeoutSeconds` in `requiredInt1` (`< 1` invalid). Each knob defaults to 10. Nothing inherits. Do not add `EffectiveHTTPTimeoutSeconds` or three inherit wrappers. Keep `AppsecBodyLimit`, `AppsecUnhealthyBackOffPeriodSecs`, and `ModsecUnhealthyBackOffPeriodSecs` in `requiredInt0` (`< 0` invalid, `<name>: cannot be less than 0`). `ModsecBodyLimit` is not in that map: `validateModsecURL` rejects it below 1 when ModSec is owned.
 - Resolve `LapiRedisPassword` / `LapiRedisPasswordFile` only when `lapiRedisEnabled` is true.
 - When Redis is off, do not Stat or read a leftover `lapiRedisPasswordFile`.
 - When Redis is on, keep today's file-error fail. Accept an empty password with an empty file path.
@@ -51,9 +55,12 @@ _Avoid_: sharedLogFiles, reclaim value, log owner
 - `bouncer.New` warns once with `crowdsec bouncer ban template unavailable` and the same `reason` values when the ban file is empty or not loadable, keeps `banTemplate` nil, and succeeds. Ban GET stays status with an empty body. Do not warn from `bouncer.New` about `CaptchaFilePath`. Do not invent bundled default templates.
 - After CAPI (alone) or LAPI (other modes), call `validateAppsecURLKeyAndTLS` only when `config.AppsecEnabled`. Do not hide that `if` only inside a LAPI wrapper — alone never calls it.
 - Reuse `AppsecEnabled`. Do not re-derive from leftover AppSec fields or `lapiMode`.
-- Reject `lapiMode: appsec` (E4). Gate LAPI URL/keys on `LapiEnabled`. Reject leftover instance name or secret when bounce and owner flags are both false (E2). Captcha E2 is leftover `captchaInstanceName` only; leftover owner-read `captcha*` is not a secret. Leftover `bouncerCaptcha*` never reaches `New`.
+- Reject `lapiMode: appsec` (E4). Gate LAPI URL/keys on `LapiEnabled`. Reject leftover instance name or secret when bounce and owner flags are both false (E2). Captcha E2 is leftover `captchaInstanceName` only; leftover owner-read `captcha*` is not a secret. Leftover `bouncerCaptcha*` never reaches `New`. ModSec E2 is leftover `modsecInstanceName` only; leftover owner-read `modsec*` is not a secret.
+- When `ModsecEnabled` is true, reject `modsecBodyLimit` below 1 (`ModsecBodyLimit: cannot be less than 1`; no unlimited value) and an empty or non-absolute http(s) `modsecUrl`. When the flag is false, both still pass.
+- Validate `bouncerModsecFailureAction` with `validateFailureAction`, like LAPI and AppSec: empty (passthrough at runtime), `passthrough`, `ban`, or `captcha`. The old `open` / `close` values fail `New`.
+- The only backoff knobs are `appsecUnhealthyBackOffPeriodSecs` and `modsecUnhealthyBackOffPeriodSecs` (negative fails, `0` disables that leg's gate). The trip rule is fixed in `pkg/admission`; there is no ratio, threshold, or max-period knob to validate.
 - `LapiEnabled` and `CaptchaEnabled` default false. Tests and compose that Open LAPI or own captcha must set the flag true. A set `captchaProvider` does not own captcha.
-- `captcha` on `bouncerLapiFailureAction` / `bouncerAppsecFailureAction` is legal only when this router has a captcha instance name after owner-fill (`captchaEnabled` omit fills to the Traefik name). Error text names `captcha requires a captcha instance name`.
+- `captcha` on `bouncerLapiFailureAction` / `bouncerAppsecFailureAction` / `bouncerModsecFailureAction` is legal only when this router has a captcha instance name after owner-fill (`captchaEnabled` omit fills to the Traefik name). Error text names `captcha requires a captcha instance name`.
 - Call `httprule.NewActionSet` on `BouncerActionRules`. An omitted or empty list passes (that setting is off). A fully empty rule (path, host, headers, and cookies absent AND method any) fails `ValidateParams`; a method-only or host-only rule passes. Empty name, colon in name, duplicate name, empty/unknown/duplicate action, or `ban` mixed with other tokens fail. `!!` and a leading `!` with an empty pattern fail. Invalid RE2 fails. Error text names `BouncerActionRules`. `plugin.New` returns a nil handler and that error without opening LAPI. Do not ignore an invalid pattern. Do not fail because captcha is unusable. `ValidateParams` discards the compiled set; `bouncer.New` compiles again to store it.
 - Own-axis captcha keys are `captchaEnabled` and `captchaInstanceName`. Owner-read settings are `captcha*` / `Captcha*`.
 - Keep the helper's empty-key pass and explicit-`https` CA parse. Do not fail an empty AppSec key at `ValidateParams`.
@@ -76,6 +83,10 @@ if config.AppsecEnabled {
 	if err := validateAppsecURLKeyAndTLS(config); err != nil {
 		return err
 	}
+}
+// validateModsecURL returns nil when ModsecEnabled is false.
+if err := validateModsecURL(config); err != nil {
+	return err
 }
 ```
 
@@ -105,7 +116,7 @@ _ = checkFile.Close()
 
 ## Key files
 
-- `pkg/configuration/configuration.go` (`ValidateParams`, `validateEnabledCaptchaSettings`, `validateCaptchaCredentialsAndTemplates`, `GetTemplate`, `TemplateUnavailableReason`, `GetVariable`, `validateLogging`)
+- `pkg/configuration/configuration.go` (`ValidateParams`, `validateEnabledCaptchaSettings`, `validateCaptchaCredentialsAndTemplates`, `GetTemplate`, `TemplateUnavailableReason`, `GetVariable`, `validateLogging`, `validateModsecURL`, `validateFailureAction`)
 - `pkg/httprule` (`New`, `NewActionSet`)
 - `pkg/captcha/captcha.go` (`Client.New` captcha-template WARN)
 - `pkg/bouncer/bouncer.go` (`New` ban-template WARN)
@@ -123,6 +134,7 @@ _ = checkFile.Close()
 - Leftover invalid AppSec CA or missing key file boots when AppSec is off (live, stream, none, and alone). `lapiMode: appsec` is rejected.
 - Empty AppSec key after a successful lookup still passes; `appsec.Prepare` copies the LAPI key.
 - CA parse still triggers on explicit `AppsecScheme == https`, not inherit-https.
-- A fully empty action rule, invalid name/action, or invalid RE2 fails `ValidateParams` with `BouncerActionRules`; do not ignore it. Empty lists pass. Leftover `bouncerAppsecBypassRules` / `bouncerLapiBypassRules` / `bouncerDecisionHeader` never reach `New`.
+- A fully empty action rule, invalid name/action, or invalid RE2 fails `ValidateParams` with `BouncerActionRules`; do not ignore it. Empty lists pass. Leftover `bouncerAppsecBypassRules` / `bouncerLapiBypassRules` / `bouncerDecisionHeader` / `modSecurityUrl` never reach `New`.
+- Enabled ModSec with an empty or relative URL, or with `modsecBodyLimit: 0`, fails. Disabled ModSec with an empty URL or a zero limit passes. `bouncerModsecFailureAction: open` (the old FailMode value) fails; `captcha` without a captcha instance name fails.
 - `NewWithFormat` warns and uses stdout when the path is not writable. `ValidateParams` must still fail so `plugin.New` does not start.
 - Do not put the writability-check handle on `pkg/reclaim` or add `sync.Once` / a package global for this close. `sharedLogFiles` is the process-lifetime owner.
