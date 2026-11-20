@@ -27,11 +27,18 @@ const (
 	OriginPluginLapiFailure       = "plugin:lapi_failure"       // live LAPI lookup error
 	OriginPluginAppsecFailure     = "plugin:appsec_failure"     // AppSec failure-action
 	OriginPluginRulesPrefix       = "plugin:rules:"             // action-rule applied ban or captcha
+	OriginPluginRateLimitPrefix   = "plugin:ratelimit:"         // rate-limit bucket denied
+	OriginPluginRateLimitFailure  = "plugin:ratelimit_failure"  // rate-limit failure-action
 )
 
 // OriginPluginRules is the usage-metrics origin for a matching action rule of the winning kind.
 func OriginPluginRules(name string) string {
 	return OriginPluginRulesPrefix + name
+}
+
+// OriginPluginRateLimit is the usage-metrics origin for a deny by the rate-limit bucket bucketName.
+func OriginPluginRateLimit(bucketName string) string {
+	return OriginPluginRateLimitPrefix + bucketName
 }
 
 // crowdsecQueryFunc POSTs through the Client's current LAPI transport.

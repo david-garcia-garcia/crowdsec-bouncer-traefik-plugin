@@ -33,6 +33,7 @@ import (
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ratelimit"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -61,6 +62,7 @@ func CreateConfig() *configuration.Config {
 //
 // lapiEnabled / appsecEnabled / captchaEnabled = own (Open + SetAlias).
 // bouncerEnabled + a non-empty instance name = bounce (Watch). Those axes are independent.
+// rateLimitEnabled = Open the rate-limit counter only; it has no instance name and no Watch.
 //
 // Open binds bindCtx, a child of Traefik's constructor ctx. The table has no Release:
 // cancel bindCtx on a failed New so a half-built constructor does not leave a stream
@@ -103,6 +105,10 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 	if err = openOwned(bindCtx, &config, log, name); err != nil {
 		return nil, err
 	}
+	rateLimitClient, err := openRateLimit(bindCtx, &config, log, name)
+	if err != nil {
+		return nil, err
+	}
 	if err = claimOwned(&config, log, name); err != nil {
 		return nil, err
 	}
@@ -114,6 +120,10 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 	route, err := bouncer.New(next, name, &config, subscribeLAPI, subscribeAppSec, subscribeCaptcha, log)
 	if err != nil {
 		return nil, err
+	}
+	// Before the handler is returned, so no request can race the plain field.
+	if rateLimitClient != nil {
+		route.AttachRateLimit(rateLimitClient)
 	}
 	if subscribeLAPI {
 		reclaim.Watch(ctx, instanceAlias(legLAPI, config.LapiInstanceName), (*lapi.Client)(nil), route.ReceiveLAPI)
@@ -156,6 +166,29 @@ func openOwnedLeg(bindCtx context.Context, config *configuration.Config, log *sl
 		return err
 	}
 	return nil
+}
+
+// openRateLimit opens this middleware's rate-limit counter on bindCtx when the leg is enabled.
+// It is never published under an instance name, so it has no alias and no Watch.
+// Nil means the leg is off: no counter, no Redis dial, no password file read.
+func openRateLimit(bindCtx context.Context, config *configuration.Config, log *slog.Logger, name string) (*ratelimit.Client, error) {
+	if !config.RateLimitEnabled {
+		return nil, nil //nolint:nilnil // a disabled leg has no counter and no error
+	}
+	password, err := configuration.GetVariable(config, "RateLimitRedisPassword")
+	if err != nil {
+		return nil, err
+	}
+	syncRate, err := configuration.RateLimitSyncRateDuration(config)
+	if err != nil {
+		return nil, err
+	}
+	return ratelimit.Open(bindCtx, name, ratelimit.RedisSettings{
+		Database: config.RateLimitRedisDatabase,
+		Host:     config.RateLimitRedisHost,
+		Password: password,
+		SyncRate: syncRate,
+	}, log)
 }
 
 // claimOwned publishes each owned instance name (SetAlias) to the Client Open just

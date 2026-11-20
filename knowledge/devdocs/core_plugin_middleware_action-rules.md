@@ -13,10 +13,10 @@ Compile `bouncerActionRules` once into `*httprule.ActionSet`. After trusted-IP, 
 ## How to use
 
 - Store `BouncerActionRules` on Config. Default `[]`. Compile with `httprule.NewActionSet` in `ValidateParams` (wrap `BouncerActionRules: %w`, discard) and again in `bouncer.New` (store). Do not compile on the request path.
-- Tokens: `ban`, `bypass`, `bypassLapi`, `bypassAppsec`, `bypassCaptcha`, `captcha`. Array order does not matter. `bypass` sets skipLapi and skipAppsec. `ban` must be the only token on that row. `captcha` and `bypassCaptcha` cannot share a row.
+- Tokens: `ban`, `bypass`, `bypassLapi`, `bypassAppsec`, `bypassCaptcha`, `bypassRateLimit`, `captcha`. Array order does not matter. `bypass` sets skipLapi and skipAppsec, not skipRateLimit; only `bypassRateLimit` skips the rate limit (`core_plugin_ratelimit.md`). `ban` must be the only token on that row. `captcha` and `bypassCaptcha` cannot share a row.
 - `bypassCaptcha` skips no leg. It means this request gets no captcha from this router. Ask `b.bypassesCaptcha(req, match)` in a function that would serve the captcha gate and return `false` (nothing written, the caller continues), as `remediateUnderActionRules`, `captchaAppsecFailure` and `serveAppsecCaptchaGate` do. Do not call `handleCaptchaKindServeHTTP` or `handleRemediationServeHTTP` with a captcha kind from a new path without asking it first. `Fold` already cleared `CaptchaName`, so no captcha rule runs and an AppSec `challenge` page is still relayed.
 - `appliedLAPIRemediation` takes the match: on a bypassCaptcha request a stored ban that `bouncerOriginBasedDecisionRemap` would soften to a captcha stays a ban.
-- After trusted-IP, call `foldActionRules` once (it wraps `ActionSet.Fold`). It clears `SkipAppsec` under `/crowdsec-internal/challenge/` (`isCrowdsecChallengeCallbackPath`) so the challenge stays solvable; LAPI skips stay. `Fold` already dropped the skips of a path rule on an ambiguous path (`httprule.SingleReadingPath`). Both log TRACE only (`challengePathKeepsAppsec`, `ambiguousPathRule`). Any ban → `handleRemediationServeHTTP` ban with `lapi.OriginPluginRules(match.BanName)` and return. Pass that match into `serveLAPI` and `serveAppSec`.
+- After trusted-IP, call `foldActionRules` once (it wraps `ActionSet.Fold`). It clears `SkipAppsec` under `/crowdsec-internal/challenge/` (`isCrowdsecChallengeCallbackPath`) so the challenge stays solvable; LAPI skips stay. `Fold` already dropped the skips of a path rule on an ambiguous path (`httprule.SingleReadingPath`). Both log TRACE only (`challengePathKeepsAppsec`, `ambiguousPathRule`). Any ban → `handleRemediationServeHTTP` ban with `lapi.OriginPluginRules(match.BanName)` and return. Pass that match into `serveLAPI`, `serveRateLimit`, and `serveAppSec`.
 - `serveLAPI` returns false when LAPI does not write the response (skip LAPI, no subscription, clean miss, passthrough, cleared captcha gate, widget asset, bypassed captcha). `serveAppSec` then runs with the same match. A captcha rule queries AppSec first, then serves the plugin gate. Skip AppSec skips that query in `serveAppSec` and `applyCaptchaRuleServeHTTP`.
 - Captcha flag still runs after LAPI when LAPI did not write. LAPI/AppSec ban (including fail-closed) prevails; WARN `warnCaptchaSuperseded` with attrs `ip` and `name` (the captcha rule). Non-empty AppSec challenge does not override the captcha rule; empty challenge body stays dest fail-closed ban.
 - Do not put captcha or skip flags on the inbound request (`core_plugin_clientrequest_inbound-request.md`). Fold once in `ServeHTTP`. A cleared gate and a widget asset return false from the captcha handler so that same match reaches `serveAppSec`.
@@ -32,6 +32,9 @@ if match.BanName != "" {
 	return
 }
 if b.serveLAPI(rw, req, match) {
+	return
+}
+if b.serveRateLimit(rw, req, match) {
 	return
 }
 if b.serveAppSec(rw, req, match) {

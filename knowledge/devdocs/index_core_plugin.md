@@ -135,3 +135,8 @@ priority: normal
 local: core_plugin_middleware_action-rules.md
 description: How bouncerActionRules compile once and fold every matching ban, skip, and captcha token after trusted-IP.
 
+
+## Rate-limit leg
+priority: normal
+local: core_plugin_ratelimit.md
+description: How the Redis rate-limit Client is opened per middleware and how bucket rows compile once and are charged between the LAPI and AppSec steps.

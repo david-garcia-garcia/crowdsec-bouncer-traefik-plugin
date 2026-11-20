@@ -173,8 +173,8 @@ Live contract: `core_plugin_middleware_bouncer` (pipeline, action tokens, verdic
   By: propose
 - Q: Do Traefik providers carry the bucket list (list of objects with a nested `key` list) in plugin config?
   Rank: additive asked — config shape of new keys; requirement Unknowns
-  Decision: assumed — file provider: yes, same decode as `bouncerActionRules` (e2e `action-rules.yml`) plus one more list level; flattening the predicates (`deviations.md`) removes the nested `match` object. Docker labels and the Kubernetes CRD were not measured; implement adds a decode test with Traefik's decoder settings and a file-provider e2e, docs show YAML only.
-  By: explore
+  Decision: resolved — file provider: yes. Measured by `tests/e2e/real/rate_limit.Tests.ps1` on Traefik v3.7.19 with `config/dynamic/rate-limit.yml` (flat predicates, nested `key` list, string `window`, quoted `requests: "3"` through `WeaklyTypedInput`): 7/7 passed. No Go decode test: `mapstructure` is not a module dependency and `go.mod` stays unchanged (design 15). Docker labels and the Kubernetes CRD stay unmeasured; README shows YAML only and says so.
+  By: implement
 - Q: Does a `path` predicate on a bucket inherit the ambiguous-path evasion already recorded for ban/captcha rules?
   Rank: additive incidental — predicate reuse; no criterion names it
   Decision: assumed — yes, same `httprule` matching; an alternate encoding can miss a `path`-matched bucket. Existing debt: `knowledge/debt/2026-11-15-ban-captcha-path-rules-ambiguous-path-evasion.md`. A catch-all bucket without `path` is not affected.

@@ -138,3 +138,18 @@ func (c *Client) TestDroppedByteCount(origin, ipType string) int64 {
 	defer c.metricsReporter.metricsMu.Unlock()
 	return c.metricsReporter.windowCounters[key]
 }
+
+// TestProcessedCount is the processed count for ipType (ipv4 or ipv6) since the last report.
+func (c *Client) TestProcessedCount(ipType string) int64 {
+	if c == nil || c.metricsReporter == nil {
+		return 0
+	}
+	switch ipType {
+	case "ipv4":
+		return atomic.LoadInt64(&c.metricsReporter.processedIPv4)
+	case "ipv6":
+		return atomic.LoadInt64(&c.metricsReporter.processedIPv6)
+	default:
+		return atomic.LoadInt64(&c.metricsReporter.processedUnknown)
+	}
+}

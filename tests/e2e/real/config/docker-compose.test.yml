@@ -593,6 +593,7 @@ services:
       BOUNCER_KEY_CAPTCHA_APPSEC: "c51a1c7000000000000000000000001b"
       BOUNCER_KEY_BYPASS_CAPTCHA: "c51a1c7000000000000000000000001c"
       BOUNCER_KEY_BYPASS_CAPTCHA_PATHS: "c51a1c7000000000000000000000001d"
+      BOUNCER_KEY_RATE_LIMIT: "c51a1c7000000000000000000000001e"
       # Disable aggressive collections that cause 150k decision issue
       DISABLE_COLLECTIONS: "crowdsecurity/iptables crowdsecurity/linux crowdsecurity/sshd"
       # Enable debugging

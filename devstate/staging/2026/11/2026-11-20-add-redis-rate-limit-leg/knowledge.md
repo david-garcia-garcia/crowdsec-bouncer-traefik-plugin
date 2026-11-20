@@ -8,3 +8,10 @@
 - created knowledge/debt/2026-11-20-rate-limit-captcha-action.md
 - created knowledge/debt/2026-11-20-rate-limit-ratelimit-response-headers.md
 - created knowledge/debt/2026-11-20-rate-limit-redis-backoff-gate.md
+- created knowledge/devdocs/core_plugin_ratelimit.md
+- updated knowledge/devdocs/index_core_plugin.md
+- updated knowledge/devdocs/core_plugin_middleware.md
+- updated knowledge/devdocs/core_plugin_middleware_action-rules.md
+- updated knowledge/devdocs/core_plugin_httprule.md
+- updated knowledge/devdocs/build_e2e_real.md
+- updated knowledge/devdocs/build_e2e_go-redis.md
