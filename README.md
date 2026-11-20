@@ -12,7 +12,7 @@ A CrowdSec bouncer for Traefik. For every request it decides, based on CrowdSec,
 It is a rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin). What changed:
 
 - **AI-first.** OpenSpec specs, a knowledge base, and intensive test coverage, including mock and real-stack harnesses.
-- **Detailed metrics in CrowdSec.** Blocked requests are reported per decision origin and per blocklist, so they show up broken down in `cscli metrics` and the CrowdSec Console. See [LAPI metrics reporting](#lapi-metrics-reporting).
+- **Detailed metrics in CrowdSec.** Blocked requests and their estimated bytes are reported per decision origin and per blocklist, so they show up broken down in `cscli metrics` and the CrowdSec Console. See [LAPI metrics reporting](#lapi-metrics-reporting).
 - **reCAPTCHA Enterprise.** Checkbox and score keys, plus classic reCAPTCHA, hCaptcha, Turnstile, and custom widgets.
 - **EU CAPTCHA.** Provider `eucaptcha`.
 - **Self-hosted custom captchas.** With `captchaProvider: custom`, the widget script and challenge endpoint (`captchaCustomJsUrl`, `captchaCustomChallengeUrl`) can sit behind the protected router: visitors waiting for a captcha can still load them. The answer can also be validated with a JSON body (`captchaCustomValidateBody: json`), as [Cap](https://capjs.js.org/) expects. See [Variables](#variables).
@@ -193,11 +193,16 @@ The plugin reports what it did back to CrowdSec through LAPI's usage-metrics end
 
 - Requests processed, split by IPv4 and IPv6.
 - Requests dropped, split by remediation (ban or captcha) and by **decision origin**: your own CrowdSec detections, manual `cscli` decisions, the community blocklist (CAPI), and each subscribed blocklist on its own.
+- Estimated bytes dropped, split by the same decision origins. The estimate is the size of each blocked request (its URL, headers, and declared body length); the plugin does not read the body to measure it.
 - The number of active decisions held in memory.
 
 You can read these with `cscli metrics show bouncers`, and the CrowdSec Console shows them per origin:
 
 ![CrowdSec Console: requests dropped per origin](.assets/dashboard_origins.jpg)
+
+The Console also shows the estimated bytes dropped per origin:
+
+![CrowdSec Console: estimated bytes dropped per origin](.assets/dashboard_bytes.jpg)
 
 ## Middleware Architecture
 

@@ -85,6 +85,41 @@ Describe "CrowdSec Bouncer usage-metrics" {
             $active.Success | Should -Be $true -Because "stream must report at least one active cscli decision"
         }
 
+        # Upstream reported every drop as "Unknown" in cscli and the Console
+        # (maxlerebourg/crowdsec-bouncer-traefik-plugin#355, #356, fixed there by PR #431).
+        # A blocklist must show under its own name, and the community blocklist under CAPI.
+        It "Should record <MetricsOrigin> origin dropped and active_decisions after a ban from origin <Origin>" -ForEach @(
+            @{ Origin = "lists"; Scenario = "firehol_level1"; MetricsOrigin = "lists:firehol_level1"; IP = "172.19.0.93" }
+            @{ Origin = "CAPI"; Scenario = "crowdsecurity/http-probing"; MetricsOrigin = "CAPI"; IP = "172.19.0.94" }
+        ) {
+            Add-TestOriginDecision -IP $IP -Origin $Origin -Scenario $Scenario
+
+            $blocked = Wait-ForCondition -Description "stream to ban $IP" -TimeoutSeconds 30 -RetryIntervalSeconds 2 -Condition {
+                $response = Test-HttpRequest -Endpoint "/stream" -IP $IP -TraefikUrl $script:TraefikUrl
+                return ($response.StatusCode -in @(403, 429))
+            }
+            $blocked.Success | Should -Be $true -Because "stream must apply the $Origin ban before metrics can count a drop"
+
+            $droppedBefore = Get-CscliBouncerMetricValue -Origin $MetricsOrigin -Name "dropped" -Unit "request"
+            $null = Test-HttpRequest -Endpoint "/stream" -IP $IP -TraefikUrl $script:TraefikUrl
+
+            $dropped = Wait-ForCondition -Description "$MetricsOrigin dropped requests in cscli metrics" -TimeoutSeconds 20 -RetryIntervalSeconds 1 -Condition {
+                $after = Get-CscliBouncerMetricValue -Origin $MetricsOrigin -Name "dropped" -Unit "request"
+                return ($after -gt $droppedBefore)
+            }
+            $dropped.Success | Should -Be $true -Because "a /stream hit banned by origin $Origin must POST dropped with origin=$MetricsOrigin"
+
+            $active = Wait-ForCondition -Description "$MetricsOrigin active_decisions gauge in cscli metrics" -TimeoutSeconds 20 -RetryIntervalSeconds 1 -Condition {
+                $gauge = Get-CscliBouncerMetricValue -Origin $MetricsOrigin -Name "active_decisions" -Unit "ip"
+                return ($gauge -ge 1)
+            }
+            $active.Success | Should -Be $true -Because "stream must report at least one active $MetricsOrigin decision"
+
+            if ($MetricsOrigin -ne $Origin) {
+                Get-CscliBouncerMetricValue -Origin $Origin -Name "dropped" -Unit "request" | Should -Be 0 -Because "a blocklist drop is reported per list, never under the bare $Origin origin"
+            }
+        }
+
         It "Should record appsec origin dropped after a CRS injection" {
             $response = Test-HttpRequest -Endpoint "/appsec?id=1%27%20OR%20%271%27%3D%271" -IP $script:AppsecIP -TraefikUrl $script:TraefikUrl
             $response.StatusCode | Should -Be 403 -Because "OWASP CRS inband must block the SQLi probe"
