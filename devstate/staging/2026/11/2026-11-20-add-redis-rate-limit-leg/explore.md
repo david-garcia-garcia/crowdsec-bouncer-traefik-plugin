@@ -105,12 +105,12 @@ Live contract: `core_plugin_middleware_bouncer` (pipeline, action tokens, verdic
   By: explore
 - Q: Should buckets support `action: captcha` in this PR?
   Rank: additive asked — new action value on a unit this change creates; requirement open decision 2
-  Decision: assumed — no. Ship `deny` and `log`. `handleCaptchaKindServeHTTP` lets a solved gate cookie through, so a captcha bucket would stop limiting every solved client; that exemption is the unanswered decision. Follow-up: `knowledge/debt/2026-11-20-rate-limit-captcha-action.md`.
-  By: explore
+  Decision: assumed — no. Ship `deny` and `log`; `action: captcha` fails `ValidateParams` with a not-supported-in-this-version error instead of being accepted. `handleCaptchaKindServeHTTP` lets a solved gate cookie through, so a captcha bucket would stop limiting every solved client; that exemption is the unanswered decision. Follow-up: `knowledge/debt/2026-11-20-rate-limit-captcha-action.md`.
+  By: propose
 - Q: What does the leg do when Redis is unreachable?
   Rank: additive asked — new per-router setting; requirement open decision 3
-  Decision: assumed — `rateLimitFailureAction` default `passthrough` (fail open), also accepting `ban` and `captcha` via the existing validator (`deviations.md`). Applied whenever `Take` returns an error, including buffered mode's retained flush error.
-  By: explore
+  Decision: assumed — `rateLimitFailureAction` default `passthrough` (fail open), also accepting `ban` and `captcha` via the existing validator (`deviations.md`). Applied whenever `Take` returns an error, including buffered mode's retained flush error; the first error stops the bucket walk and the local verdict that came with it is ignored. A failure-action captcha honours `bypassCaptcha`, as the LAPI and AppSec failure captchas do (design decision 11).
+  By: propose
 - Q: Do empty `rateLimitRedis*` settings default to `lapiRedis*`?
   Rank: additive asked — new config keys; requirement open decision 4
   Decision: assumed — no. Separate, explicit settings mirroring `lapiRedisHost/Password/PasswordFile/Database` (no read hosts: windowcounter writes on every path).
@@ -121,12 +121,12 @@ Live contract: `core_plugin_middleware_bouncer` (pipeline, action tokens, verdic
   By: explore
 - Q: Is there an in-memory store for single-replica users?
   Rank: additive asked — `rateLimitStore` value; requirement open decision 6
-  Decision: assumed — not in this PR. `windowcounter` is Redis-only and the only in-memory limiter, `tokenbucket.Memory`, carries the fail-open below. Follow-up: `knowledge/debt/2026-11-20-rate-limit-token-bucket-and-memory-store.md`.
-  By: explore
+  Decision: assumed — not in this PR. `rateLimitStore` ships with the single accepted value `redis` (default); `memory` fails `ValidateParams` with a not-supported-in-this-version error, so a config written for the full shape fails loudly instead of being dropped by Traefik's decode. `windowcounter` is Redis-only and the only in-memory limiter, `tokenbucket.Memory`, carries the fail-open below. Follow-up: `knowledge/debt/2026-11-20-rate-limit-token-bucket-and-memory-store.md`.
+  By: propose
 - Q: Can the plugin expose `tokenBucket` at the pinned utilities `v1.0.7`?
   Rank: additive asked — algorithm value of a unit this change creates; requirement Unknowns ("bump … or work around")
-  Decision: assumed — no. Measured fail-open at maxDelay 0 under flood (rate 1000/s: 3029 admitted vs 1999); fix is upstream PR #54, open and in no tag; no workaround on the published surface. Propose decides whether `algorithm` ships with the single value `slidingWindow` or is omitted until tokenBucket lands.
-  By: explore
+  Decision: assumed — no. Measured fail-open at maxDelay 0 under flood (rate 1000/s: 3029 admitted vs 1999); fix is upstream PR #54, open and in no tag; no workaround on the published surface. `algorithm` ships with the single accepted value `slidingWindow` (default); `tokenBucket` and a set `burst` fail `ValidateParams` (Traefik drops unknown keys silently, so omitting the fields would turn a token-bucket config into a sliding window without a word).
+  By: propose
 - Q: Do the open `windowcounter` defects block building on `v1.0.7`?
   Rank: additive asked — vendoring a package at the existing pin; requirement Unknowns (BUGS.md entries at the pinned tag)
   Decision: assumed — no. Five listed defects are fixed at v1.0.7 (repros pass). Still present: stale previous window in buffered mode across replicas (#63) and EXPIRE not retried in exact mode (#60). Keep the asked `rateLimitSyncRate` default 200ms, document the replica bound, bump later: `knowledge/debt/2026-11-20-bump-utilities-windowcounter-fixes.md`.
@@ -157,20 +157,20 @@ Live contract: `core_plugin_middleware_bouncer` (pipeline, action tokens, verdic
   By: explore
 - Q: How are rate-limit drops counted when no LAPI client is bound, and with which labels?
   Rank: additive asked — new origin constant; requirement ("bucket name is used in … metrics")
-  Decision: assumed — `recordDropped(req, "plugin:ratelimit:<bucket>", "ban")` on `deny` only; nothing when no LAPI client is bound (same as rule bans today); `log` buckets are not drops.
-  By: explore
+  Decision: assumed — `recordDropped(req, "plugin:ratelimit:<bucket>", "ban")` on `deny`; failure action `ban` / `captcha` counts origin `plugin:ratelimit_failure` (sibling of `plugin:appsec_failure`); nothing when no LAPI client is bound (same as rule bans today); `log` buckets, skips, and `passthrough` are not drops.
+  By: propose
 - Q: How does `rateLimitStatusCode` relate to `bouncerRemediationStatusCode`, and which headers go out on a deny?
   Rank: additive asked — new setting and headers; requirement `rateLimitStatusCode`, `rateLimitResponseHeaders`
-  Decision: assumed — independent; deny uses `handleBanStatusServeHTTP` with `rateLimitStatusCode` (ban template, body only when the status allows one). `rateLimitResponseHeaders: true` sends `Retry-After` (RFC 9110) = seconds left in the current window; `RateLimit-*` (IETF draft) deferred.
-  By: explore
+  Decision: assumed — independent; deny uses `handleBanStatusServeHTTP` with `rateLimitStatusCode` (ban template, body only when the status allows one). `rateLimitResponseHeaders: true` sends `Retry-After` (RFC 9110) = seconds to the bucket's next window boundary, at least 1. `RateLimit-*` (IETF draft) deferred: `knowledge/debt/2026-11-20-rate-limit-ratelimit-response-headers.md`.
+  By: propose
 - Q: What does a Redis outage cost per request?
   Rank: additive incidental — request-path latency bound of a unit this change creates; no criterion names it
-  Decision: assumed — bound it in propose: per-request context deadline on `Take` and a `simpleredis.Config` like `decisionstore` (dial 2s, command 1s, pool 8). `simpleredis` retries with backoff and has no circuit breaker; a backoff gate is not in this slice.
-  By: explore
+  Decision: assumed — bounded at 250ms per request: one `context.WithTimeout(req.Context(), 250ms)` around the whole rate-limit step (all buckets), and the leg's own `simpleredis.Config` (dial 200ms, command 250ms, pool 8, default retries). `simpleredis` binds the earlier deadline over dial, send, and retries, so the step cannot exceed the budget; a refused port returns sooner; buffered mode touches Redis once per new key per window. No public knob. A backoff gate that skips Redis after repeated failures is not in this slice: `knowledge/debt/2026-11-20-rate-limit-redis-backoff-gate.md`.
+  By: propose
 - Q: How are several matching buckets evaluated?
   Rank: additive asked — evaluation order of a unit this change creates; requirement semantics 3–4
-  Decision: assumed — list order; every matching bucket with a key value is charged until the first `deny` bucket over its limit, which answers and stops (later buckets not charged); `log` buckets never stop; `final: true` stops after that bucket; a missing key value skips the bucket. Denied hits still count (windowcounter increments before comparing), so a flooding client stays limited.
-  By: explore
+  Decision: assumed — list order; every matching bucket with a key value is charged until the first `deny` bucket over its limit, which answers and stops (later buckets not charged); `log` buckets never stop; `final: true` stops after that bucket; a missing key value skips the bucket (and its `final`); the first counter error stops the walk and applies the failure action. Denied hits still count (windowcounter increments before comparing), so a flooding client stays limited.
+  By: propose
 - Q: Do Traefik providers carry the bucket list (list of objects with a nested `key` list) in plugin config?
   Rank: additive asked — config shape of new keys; requirement Unknowns
   Decision: assumed — file provider: yes, same decode as `bouncerActionRules` (e2e `action-rules.yml`) plus one more list level; flattening the predicates (`deviations.md`) removes the nested `match` object. Docker labels and the Kubernetes CRD were not measured; implement adds a decode test with Traefik's decoder settings and a file-provider e2e, docs show YAML only.

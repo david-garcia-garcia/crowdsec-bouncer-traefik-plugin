@@ -8,3 +8,7 @@
   Why: `windowcounter` at v1.0.7 still has the stale-previous (PR #63) and EXPIRE-not-retried (PR #60) defects; bump when they are tagged.
 - [ ] note large  `knowledge/debt/2026-11-20-rate-limit-captcha-action.md`
   Why: a bucket `captcha` action would exempt every client holding a solved gate cookie; that exemption is the requirement's unanswered open decision 2.
+- [ ] note large  `knowledge/debt/2026-11-20-rate-limit-ratelimit-response-headers.md`
+  Why: the requirement lists `RateLimit-*` headers beside `Retry-After`; the IETF draft's header shape is unsettled and windowcounter has no remaining count, so this change sends `Retry-After` only.
+- [ ] note large  `knowledge/debt/2026-11-20-rate-limit-redis-backoff-gate.md`
+  Why: a blackholed Redis costs each request the full 250ms rate-limit budget for the whole outage; no gate skips Redis after repeated failures.
