@@ -7,7 +7,7 @@
 name: e2e/captcha-verdict
 inband:
   pre_eval:
-    - filter: 'req.URL.Path in ["/captcha-appsec/verdict", "/waf-only/captcha-verdict"]'
+    - filter: 'req.URL.Path in ["/captcha-appsec/verdict", "/waf-only/captcha-verdict", "/bypass-captcha/captcha-verdict", "/bypass-captcha/api/captcha-verdict"]'
       apply:
         - SetRemediation("captcha")
         - DropRequest("e2e captcha verdict")

@@ -244,7 +244,9 @@ try {
             (Wait-ForHttpStatus -Url "http://localhost:8000/waf-fail-ban" -ExpectedStatusCodes @(403) -TimeoutSeconds 180).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/status-429" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
             (Wait-ForHttpStatus -Url "http://localhost:8000/short-captcha" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
-            (Wait-ForHttpStatus -Url "http://localhost:8000/captcha-appsec" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success
+            (Wait-ForHttpStatus -Url "http://localhost:8000/captcha-appsec" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/bypass-captcha" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success,
+            (Wait-ForHttpStatus -Url "http://localhost:8000/bypass-captcha-paths" -ExpectedStatusCodes @(200) -TimeoutSeconds 180).Success
         )
         
         if ($servicesReady -contains $false) {
