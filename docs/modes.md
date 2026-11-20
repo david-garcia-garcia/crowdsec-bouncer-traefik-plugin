@@ -1,6 +1,6 @@
 # CrowdSec modes
 
-How this plugin fetches decisions and what happens on a request. The README lists a one-line summary of each `CrowdsecMode`; this page is the sequence for each path.
+How this plugin fetches decisions and what happens on a request. [Concepts](concepts.md#lapi-modes) lists a one-line summary of each `lapiMode`; this page is the sequence for each path.
 
 ## none
 
