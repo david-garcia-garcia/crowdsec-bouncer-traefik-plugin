@@ -184,14 +184,14 @@ func TestRealRedis_bucketEditKeepsTheCount(t *testing.T) {
 	charge := func(client *Client) Verdict {
 		ctx, cancel := context.WithTimeout(context.Background(), StepBudget)
 		defer cancel()
-		return client.Buckets().Charge(ctx, client, middlewareName, httptest.NewRequest(http.MethodGet, "http://example.com/login", nil), net.ParseIP("198.51.100.9"))
+		return client.Buckets().Charge(ctx, client, middlewareName, httptest.NewRequest(http.MethodGet, "http://example.com/login", nil), net.ParseIP("198.51.100.9"), false)
 	}
 	before, err := Open(context.Background(), middlewareName, settingsFor(3), slog.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
 	for hit := 1; hit <= 3; hit++ {
-		if verdict := charge(before); verdict.Err != nil || verdict.DenyBucket != "" {
+		if verdict := charge(before); verdict.Err != nil || verdict.RateLimit.Name != "" {
 			t.Fatalf("hit %d before the edit: %+v, want allowed", hit, verdict)
 		}
 	}
@@ -207,8 +207,8 @@ func TestRealRedis_bucketEditKeepsTheCount(t *testing.T) {
 		if verdict.Err != nil {
 			t.Fatalf("hit %d after the edit: %v", hit, verdict.Err)
 		}
-		if wantDenied := hit == 6; (verdict.DenyBucket == "login") != wantDenied {
-			t.Fatalf("hit %d after the edit: deny bucket %q, want denied=%v (count kept from before the edit)", hit, verdict.DenyBucket, wantDenied)
+		if wantLimited := hit == 6; (verdict.RateLimit.Name == "login") != wantLimited {
+			t.Fatalf("hit %d after the edit: ratelimit bucket %q, want limited=%v (count kept from before the edit)", hit, verdict.RateLimit.Name, wantLimited)
 		}
 	}
 }

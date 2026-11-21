@@ -53,29 +53,35 @@ func (counter *testCounter) takesOn(bucket string) int {
 	return total
 }
 
-// chargeTest charges one request from clientIP to method target.
+// chargeTest charges one request from clientIP to method target, for a client without a captcha gate.
 func chargeTest(set *BucketSet, counter Counter, method, target, clientIP string) Verdict {
-	return set.Charge(context.Background(), counter, "edge", httptest.NewRequest(method, "http://example.com"+target, nil), net.ParseIP(clientIP))
+	return chargeTestWithGate(set, counter, method, target, clientIP, false)
 }
 
-// TestCharge_firstDenyAnswersAndLaterBucketsAreNotCharged is the spec scenario with login then per-ip.
-func TestCharge_firstDenyAnswersAndLaterBucketsAreNotCharged(t *testing.T) {
+// chargeTestWithGate charges one request from clientIP to method target; gateCleared says the client
+// holds the router's valid captcha gate.
+func chargeTestWithGate(set *BucketSet, counter Counter, method, target, clientIP string, gateCleared bool) Verdict {
+	return set.Charge(context.Background(), counter, "edge", httptest.NewRequest(method, "http://example.com"+target, nil), net.ParseIP(clientIP), gateCleared)
+}
+
+// TestCharge_firstRateLimitAnswersAndLaterBucketsAreNotCharged is the spec scenario with login then per-ip.
+func TestCharge_firstRateLimitAnswersAndLaterBucketsAreNotCharged(t *testing.T) {
 	set := mustNewTestBucketSet(t, []BucketRule{
 		{Name: "login", Requests: 1, Window: "1m", Rule: httprule.Rule{Method: "^POST$", Path: "^/login$"}, Key: []KeyPart{{From: KeyFromIP}}},
 		{Name: "per-ip", Requests: 100, Window: "1m", Key: []KeyPart{{From: KeyFromIP}}},
 	})
 	counter := newTestCounter()
-	if verdict := chargeTest(set, counter, http.MethodPost, "/login", "198.51.100.1"); verdict.DenyBucket != "" || verdict.Err != nil {
+	if verdict := chargeTest(set, counter, http.MethodPost, "/login", "198.51.100.1"); verdict.RateLimit.Name != "" || verdict.Err != nil {
 		t.Fatalf("first verdict=%+v", verdict)
 	}
 	verdict := chargeTest(set, counter, http.MethodPost, "/login", "198.51.100.1")
-	if verdict.DenyBucket != "login" || verdict.RetryAfter < time.Second || verdict.RetryAfter > time.Minute {
-		t.Fatalf("second verdict=%+v want deny by login", verdict)
+	if verdict.RateLimit.Name != "login" || verdict.RateLimit.RetryAfter < time.Second || verdict.RateLimit.RetryAfter > time.Minute {
+		t.Fatalf("second verdict=%+v want the ratelimit answer of login", verdict)
 	}
 	if got := counter.takesOn("per-ip"); got != 1 {
 		t.Fatalf("per-ip charged %d times, want 1", got)
 	}
-	if verdict := chargeTest(set, counter, http.MethodGet, "/login", "198.51.100.1"); verdict.DenyBucket != "" {
+	if verdict := chargeTest(set, counter, http.MethodGet, "/login", "198.51.100.1"); verdict.RateLimit.Name != "" {
 		t.Fatalf("GET /login must not match login: %+v", verdict)
 	}
 }
@@ -89,8 +95,8 @@ func TestCharge_logBucketNeverStops(t *testing.T) {
 	counter := newTestCounter()
 	for request := 1; request <= 3; request++ {
 		verdict := chargeTest(set, counter, http.MethodGet, "/", "198.51.100.1")
-		if verdict.DenyBucket != "" {
-			t.Fatalf("request %d denied by %s", request, verdict.DenyBucket)
+		if verdict.RateLimit.Name != "" {
+			t.Fatalf("request %d answered by %s", request, verdict.RateLimit.Name)
 		}
 		wantExceeded := request > 1
 		if (len(verdict.Exceeded) == 1) != wantExceeded {
@@ -115,8 +121,8 @@ func TestCharge_finalStopsEvaluation(t *testing.T) {
 	})
 	counter := newTestCounter()
 	for range 5 {
-		if verdict := chargeTest(set, counter, http.MethodGet, "/app.js", "198.51.100.1"); verdict.DenyBucket != "" {
-			t.Fatalf("app.js denied by %s", verdict.DenyBucket)
+		if verdict := chargeTest(set, counter, http.MethodGet, "/app.js", "198.51.100.1"); verdict.RateLimit.Name != "" {
+			t.Fatalf("app.js answered by %s", verdict.RateLimit.Name)
 		}
 	}
 	if got := counter.takesOn("catch-all"); got != 0 {
@@ -126,8 +132,8 @@ func TestCharge_finalStopsEvaluation(t *testing.T) {
 		t.Fatalf("token charged %d times without Authorization", got)
 	}
 	chargeTest(set, counter, http.MethodGet, "/index.html", "198.51.100.2")
-	if verdict := chargeTest(set, counter, http.MethodGet, "/index.html", "198.51.100.2"); verdict.DenyBucket != "catch-all" {
-		t.Fatalf("index.html verdict=%+v want deny by catch-all", verdict)
+	if verdict := chargeTest(set, counter, http.MethodGet, "/index.html", "198.51.100.2"); verdict.RateLimit.Name != "catch-all" {
+		t.Fatalf("index.html verdict=%+v want the ratelimit answer of catch-all", verdict)
 	}
 }
 
@@ -141,7 +147,7 @@ func TestCharge_counterErrorStopsTheWalk(t *testing.T) {
 	counter := newTestCounter()
 	counter.failBucket = "second"
 	verdict := chargeTest(set, counter, http.MethodGet, "/", "198.51.100.1")
-	if verdict.Err == nil || !strings.Contains(verdict.Err.Error(), "bucket second") || verdict.DenyBucket != "" {
+	if verdict.Err == nil || !strings.Contains(verdict.Err.Error(), "bucket second") || verdict.RateLimit.Name != "" {
 		t.Fatalf("verdict=%+v want error from bucket second", verdict)
 	}
 	if counter.takesOn("first") != 1 || counter.takesOn("third") != 0 {
@@ -152,16 +158,16 @@ func TestCharge_counterErrorStopsTheWalk(t *testing.T) {
 // TestCharge_nilSetOrCounterChargesNothing proves the step is inert without a set or a counter.
 func TestCharge_nilSetOrCounterChargesNothing(t *testing.T) {
 	var nilSet *BucketSet
-	if verdict := chargeTest(nilSet, newTestCounter(), http.MethodGet, "/", "198.51.100.1"); verdict.DenyBucket != "" || verdict.Err != nil {
+	if verdict := chargeTest(nilSet, newTestCounter(), http.MethodGet, "/", "198.51.100.1"); verdict.RateLimit.Name != "" || verdict.Err != nil {
 		t.Fatalf("nil set verdict=%+v", verdict)
 	}
 	set := mustNewTestBucketSet(t, []BucketRule{validTestBucket("b")})
-	if verdict := chargeTest(set, nil, http.MethodGet, "/", "198.51.100.1"); verdict.DenyBucket != "" || verdict.Err != nil {
+	if verdict := chargeTest(set, nil, http.MethodGet, "/", "198.51.100.1"); verdict.RateLimit.Name != "" || verdict.Err != nil {
 		t.Fatalf("nil counter verdict=%+v", verdict)
 	}
 }
 
-// TestCharge_retryAfterIsTheCounterRetryAfterRoundedUp proves the deny verdict carries the counter's
+// TestCharge_retryAfterIsTheCounterRetryAfterRoundedUp proves the ratelimit verdict carries the counter's
 // RetryAfter rounded up to whole seconds, at least 1s.
 func TestCharge_retryAfterIsTheCounterRetryAfterRoundedUp(t *testing.T) {
 	for _, tc := range []struct {
@@ -178,8 +184,114 @@ func TestCharge_retryAfterIsTheCounterRetryAfterRoundedUp(t *testing.T) {
 		counter := newTestCounter()
 		counter.retryAfter = tc.counter
 		chargeTest(set, counter, http.MethodGet, "/", "198.51.100.1")
-		if verdict := chargeTest(set, counter, http.MethodGet, "/", "198.51.100.1"); verdict.RetryAfter != tc.want {
-			t.Fatalf("counter RetryAfter %s: Charge RetryAfter=%s want %s", tc.counter, verdict.RetryAfter, tc.want)
+		if verdict := chargeTest(set, counter, http.MethodGet, "/", "198.51.100.1"); verdict.RateLimit.RetryAfter != tc.want {
+			t.Fatalf("counter RetryAfter %s: Charge RetryAfter=%s want %s", tc.counter, verdict.RateLimit.RetryAfter, tc.want)
 		}
+	}
+}
+
+// softCaptchaHardRateLimitBuckets are the spec's stacked buckets on one client address: per-ip-soft
+// (captcha, 2 per minute) and per-ip-hard (ratelimit, 4 per minute), in list order softFirst or reversed.
+func softCaptchaHardRateLimitBuckets(softFirst bool) []BucketRule {
+	soft := BucketRule{Name: "per-ip-soft", Action: ActionCaptcha, Requests: 2, Window: "1m", Key: []KeyPart{{From: KeyFromIP}}}
+	hard := BucketRule{Name: "per-ip-hard", Action: ActionRateLimit, Requests: 4, Window: "1m", Key: []KeyPart{{From: KeyFromIP}}}
+	if softFirst {
+		return []BucketRule{soft, hard}
+	}
+	return []BucketRule{hard, soft}
+}
+
+// TestCharge_stackedRateLimitIsTheHardCeiling proves, in both list orders, that a client that never
+// solves gets requests 1-2 through, the captcha bucket on 3-4, and the ratelimit bucket on 5: a captcha
+// bucket over its limit does not stop the walk, and ratelimit wins over captcha.
+func TestCharge_stackedRateLimitIsTheHardCeiling(t *testing.T) {
+	for _, softFirst := range []bool{true, false} {
+		set := mustNewTestBucketSet(t, softCaptchaHardRateLimitBuckets(softFirst))
+		counter := newTestCounter()
+		for request := 1; request <= 5; request++ {
+			verdict := chargeTest(set, counter, http.MethodGet, "/", "198.51.100.1")
+			wantCaptcha, wantRateLimit := "", ""
+			switch {
+			case request == 5:
+				wantRateLimit = "per-ip-hard"
+			case request >= 3:
+				wantCaptcha = "per-ip-soft"
+			}
+			if verdict.Err != nil || verdict.RateLimit.Name != wantRateLimit || (wantRateLimit == "" && verdict.Captcha.Name != wantCaptcha) {
+				t.Fatalf("softFirst=%v request %d: verdict=%+v want ratelimit %q captcha %q", softFirst, request, verdict, wantRateLimit, wantCaptcha)
+			}
+			if wantCaptcha != "" && verdict.Captcha.RetryAfter != 15*time.Second {
+				t.Fatalf("softFirst=%v request %d: captcha RetryAfter=%s want the counter's 15s", softFirst, request, verdict.Captcha.RetryAfter)
+			}
+		}
+		if got := counter.takesOn("per-ip-hard"); got != 5 {
+			t.Fatalf("softFirst=%v: per-ip-hard charged %d times, want 5 (a kept captcha bucket must not stop the walk)", softFirst, got)
+		}
+	}
+}
+
+// TestCharge_gateClearedSkipsCaptchaBuckets proves, in both list orders, that a client with a cleared
+// gate is not counted by captcha buckets and still meets the ratelimit bucket on request 5.
+func TestCharge_gateClearedSkipsCaptchaBuckets(t *testing.T) {
+	for _, softFirst := range []bool{true, false} {
+		set := mustNewTestBucketSet(t, softCaptchaHardRateLimitBuckets(softFirst))
+		counter := newTestCounter()
+		for request := 1; request <= 5; request++ {
+			verdict := chargeTestWithGate(set, counter, http.MethodGet, "/", "198.51.100.1", true)
+			wantRateLimit := ""
+			if request == 5 {
+				wantRateLimit = "per-ip-hard"
+			}
+			if verdict.Err != nil || verdict.Captcha.Name != "" || verdict.RateLimit.Name != wantRateLimit {
+				t.Fatalf("softFirst=%v request %d: verdict=%+v want ratelimit %q and no captcha", softFirst, request, verdict, wantRateLimit)
+			}
+		}
+		if got := counter.takesOn("per-ip-soft"); got != 0 {
+			t.Fatalf("softFirst=%v: per-ip-soft charged %d times with a cleared gate, want 0", softFirst, got)
+		}
+	}
+}
+
+// TestCharge_finalOnASkippedCaptchaBucketDoesNotApply proves a final captcha bucket stops the walk for
+// an unsolved client and not for a client with a cleared gate, whose later buckets are still charged.
+func TestCharge_finalOnASkippedCaptchaBucketDoesNotApply(t *testing.T) {
+	set := mustNewTestBucketSet(t, []BucketRule{
+		{Name: "soft", Action: ActionCaptcha, Final: true, Requests: 100, Window: "1m", Key: []KeyPart{{From: KeyFromIP}}},
+		{Name: "catch-all", Requests: 1, Window: "1m", Key: []KeyPart{{From: KeyFromIP}}},
+	})
+	counter := newTestCounter()
+	for range 2 {
+		if verdict := chargeTest(set, counter, http.MethodGet, "/", "198.51.100.1"); verdict.RateLimit.Name != "" {
+			t.Fatalf("unsolved client: verdict=%+v, the final captcha bucket must stop the walk", verdict)
+		}
+	}
+	if got := counter.takesOn("catch-all"); got != 0 {
+		t.Fatalf("catch-all charged %d times behind a final captcha bucket", got)
+	}
+	chargeTestWithGate(set, counter, http.MethodGet, "/", "198.51.100.2", true)
+	if verdict := chargeTestWithGate(set, counter, http.MethodGet, "/", "198.51.100.2", true); verdict.RateLimit.Name != "catch-all" {
+		t.Fatalf("cleared gate: verdict=%+v want the ratelimit answer of catch-all", verdict)
+	}
+}
+
+// TestCharge_counterErrorAfterAKeptCaptchaBucket proves a counter error after a captcha bucket over its
+// limit stops the walk and returns the error, and that log buckets over their limit are still reported
+// beside a kept captcha bucket.
+func TestCharge_counterErrorAfterAKeptCaptchaBucket(t *testing.T) {
+	set := mustNewTestBucketSet(t, []BucketRule{
+		{Name: "soft", Action: ActionCaptcha, Requests: 1, Window: "1m", Key: []KeyPart{{From: KeyFromIP}}},
+		{Name: "dry-run", Action: ActionLog, Requests: 1, Window: "1m", Key: []KeyPart{{From: KeyFromIP}}},
+		{Name: "hard", Requests: 100, Window: "1m", Key: []KeyPart{{From: KeyFromIP}}},
+	})
+	counter := newTestCounter()
+	chargeTest(set, counter, http.MethodGet, "/", "198.51.100.1")
+	verdict := chargeTest(set, counter, http.MethodGet, "/", "198.51.100.1")
+	if verdict.Err != nil || verdict.Captcha.Name != "soft" || len(verdict.Exceeded) != 1 || verdict.Exceeded[0].Name != "dry-run" {
+		t.Fatalf("second request: verdict=%+v want captcha soft and dry-run logged", verdict)
+	}
+	counter.failBucket = "hard"
+	verdict = chargeTest(set, counter, http.MethodGet, "/", "198.51.100.1")
+	if verdict.Err == nil || !strings.Contains(verdict.Err.Error(), "bucket hard") || verdict.RateLimit.Name != "" {
+		t.Fatalf("third request: verdict=%+v want the error of bucket hard", verdict)
 	}
 }

@@ -27,11 +27,11 @@ import (
 // testRateLimitClientIP is the client address every rate-limit request comes from unless a test says otherwise.
 const testRateLimitClientIP = "198.51.100.20"
 
-// testRateLimitRetryAfter is the RetryAfter testRateLimitCounter returns on a deny; Retry-After must round it up to 8.
+// testRateLimitRetryAfter is the RetryAfter testRateLimitCounter returns over the limit; Retry-After must round it up to 8.
 const testRateLimitRetryAfter = 7*time.Second + 300*time.Millisecond
 
 // testRateLimitCounter is an in-memory ratelimit.Counter. err makes every Take fail; block makes every
-// Take wait for its context. A denied Take carries testRateLimitRetryAfter.
+// Take wait for its context. A Take over the limit carries testRateLimitRetryAfter.
 type testRateLimitCounter struct {
 	block  bool
 	counts map[string]int64
@@ -101,7 +101,7 @@ func newTestRateLimitRoute(t *testing.T, name string, cfg *configuration.Config,
 	return b
 }
 
-// perIPTestBucket is a catch-all deny bucket that allows requests per minute per client address.
+// perIPTestBucket is a catch-all ratelimit bucket that allows requests per minute per client address.
 func perIPTestBucket(name string, requests int) ratelimit.BucketRule {
 	return ratelimit.BucketRule{Name: name, Requests: requests, Window: "1m", Key: []ratelimit.KeyPart{{From: ratelimit.KeyFromIP}}}
 }
@@ -162,9 +162,9 @@ func (fixture *testRateLimitFixture) serve(method, target, clientIP string) *htt
 	return rw
 }
 
-// TestRateLimit_denyAnswersWithStatusRetryAfterAndHeader proves the deny response: rateLimitStatusCode,
+// TestRateLimit_ratelimitAnswersWithStatusRetryAfterAndHeader proves the ratelimit answer: rateLimitStatusCode,
 // the ban template with RATE_LIMIT, Retry-After, Cache-Control, the header, and one drop.
-func TestRateLimit_denyAnswersWithStatusRetryAfterAndHeader(t *testing.T) {
+func TestRateLimit_ratelimitAnswersWithStatusRetryAfterAndHeader(t *testing.T) {
 	fixture := newTestRateLimitFixture(t, []ratelimit.BucketRule{perIPTestBucket("login", 1)}, nil)
 	if rw := fixture.serve(http.MethodGet, "/login", testRateLimitClientIP); !fixture.next.called || rw.Header().Get("X-Remediation") != "" {
 		t.Fatalf("first request must pass without a header, got %d %q", rw.Code, rw.Header().Get("X-Remediation"))
@@ -197,7 +197,7 @@ func TestRateLimit_denyAnswersWithStatusRetryAfterAndHeader(t *testing.T) {
 }
 
 // TestRateLimit_statusAndHeadersSettings proves rateLimitStatusCode is separate from the ban status,
-// rateLimitResponseHeaders false sends no Retry-After, and a HEAD deny has no body.
+// rateLimitResponseHeaders false sends no Retry-After, and a HEAD ratelimit answer has no body.
 func TestRateLimit_statusAndHeadersSettings(t *testing.T) {
 	fixture := newTestRateLimitFixture(t, []ratelimit.BucketRule{perIPTestBucket("login", 1)}, func(cfg *configuration.Config) {
 		cfg.BouncerRemediationStatusCode = http.StatusForbidden
@@ -208,7 +208,7 @@ func TestRateLimit_statusAndHeadersSettings(t *testing.T) {
 	fixture.serve(http.MethodHead, "/", testRateLimitClientIP)
 	rw := fixture.serve(http.MethodHead, "/", testRateLimitClientIP)
 	if rw.Code != http.StatusServiceUnavailable || rw.Body.Len() != 0 {
-		t.Fatalf("HEAD deny: status %d body %q, want 503 and no body", rw.Code, rw.Body.String())
+		t.Fatalf("HEAD ratelimit answer: status %d body %q, want 503 and no body", rw.Code, rw.Body.String())
 	}
 	if got := rw.Header().Get("Retry-After"); got != "" {
 		t.Fatalf("Retry-After=%q with rateLimitResponseHeaders false", got)
@@ -237,8 +237,8 @@ func TestRateLimit_requestsThatNeverReachTheStepAreNotCharged(t *testing.T) {
 	}
 }
 
-// TestRateLimit_deniedRequestDoesNotReachAppsec proves the step runs before AppSec.
-func TestRateLimit_deniedRequestDoesNotReachAppsec(t *testing.T) {
+// TestRateLimit_answeredRequestDoesNotReachAppsec proves the step runs before AppSec.
+func TestRateLimit_answeredRequestDoesNotReachAppsec(t *testing.T) {
 	fixture := newTestRateLimitFixture(t, []ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, nil)
 	queries := fixture.bindCountingAppSec(t)
 	fixture.serve(http.MethodGet, "/", testRateLimitClientIP)
@@ -246,11 +246,11 @@ func TestRateLimit_deniedRequestDoesNotReachAppsec(t *testing.T) {
 		t.Fatalf("second request status %d want 429", rw.Code)
 	}
 	if got := queries.Load(); got != 1 {
-		t.Fatalf("AppSec queried %d times, want 1 (the denied request must not reach it)", got)
+		t.Fatalf("AppSec queried %d times, want 1 (the answered request must not reach it)", got)
 	}
 }
 
-// TestRateLimit_captchaRuleComesAfterTheRateLimit proves a deny wins over a matching captcha rule and warns that it lost.
+// TestRateLimit_captchaRuleComesAfterTheRateLimit proves a ratelimit answer wins over a matching captcha rule and warns that it lost.
 func TestRateLimit_captchaRuleComesAfterTheRateLimit(t *testing.T) {
 	fixture := newTestRateLimitFixture(t, []ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, nil)
 	fixture.b.actionRules = mustPathAction(t, "site-captcha", "^/", httprule.ActionCaptcha)
@@ -262,7 +262,7 @@ func TestRateLimit_captchaRuleComesAfterTheRateLimit(t *testing.T) {
 	}
 	rw := fixture.serve(http.MethodGet, "/", testRateLimitClientIP)
 	if rw.Code != http.StatusTooManyRequests || rw.Header().Get("X-Remediation") != "ban:ratelimit:per-ip" {
-		t.Fatalf("second request: %d %q want the rate-limit deny", rw.Code, rw.Header().Get("X-Remediation"))
+		t.Fatalf("second request: %d %q want the ratelimit answer", rw.Code, rw.Header().Get("X-Remediation"))
 	}
 	if logged := sink.String(); !strings.Contains(logged, `"msg":"warnCaptchaSuperseded"`) || !strings.Contains(logged, `"name":"site-captcha"`) {
 		t.Fatalf("want WARN warnCaptchaSuperseded naming site-captcha, got %s", logged)
@@ -298,8 +298,8 @@ func TestRateLimit_actionRuleSkips(t *testing.T) {
 	}
 }
 
-// TestRateLimit_logBucketNeverDenies proves a log bucket logs INFO over its limit, sets no header, and drops nothing.
-func TestRateLimit_logBucketNeverDenies(t *testing.T) {
+// TestRateLimit_logBucketNeverAnswers proves a log bucket logs INFO over its limit, sets no header, and drops nothing.
+func TestRateLimit_logBucketNeverAnswers(t *testing.T) {
 	logBucket := perIPTestBucket("dry-run", 1)
 	logBucket.Action = ratelimit.ActionLog
 	fixture := newTestRateLimitFixture(t, []ratelimit.BucketRule{logBucket}, nil)
@@ -363,7 +363,7 @@ func TestRateLimit_failureActions(t *testing.T) {
 				t.Fatalf("next=%v status=%d header=%q, want next=%v status=%d header=%q", fixture.next.called, rw.Code, rw.Header().Get("X-Remediation"), tc.wantNext, tc.wantStatus, tc.wantHeader)
 			}
 			assertRateLimitFailureDrop(t, fixture.lapiClient, tc.wantDrop)
-			assertRateLimitFailureLoggedAtDebug(t, sink.String(), tc.wantHeader == "ban:captcha-downgrade")
+			assertRateLimitFailureLoggedAtDebug(t, sink.String())
 		})
 	}
 }
@@ -383,14 +383,14 @@ func assertRateLimitFailureDrop(t *testing.T, lapiClient *lapi.Client, wantDrop 
 	}
 }
 
-// assertRateLimitFailureLoggedAtDebug expects DEBUG serveRateLimit with the counter error and no ERROR.
-// WARN is allowed only for the captcha downgrade, which warns that the router has no captcha.
-func assertRateLimitFailureLoggedAtDebug(t *testing.T, logged string, captchaDowngrade bool) {
+// assertRateLimitFailureLoggedAtDebug expects DEBUG serveRateLimit with the counter error and no WARN or
+// ERROR, the captcha downgrade on a router without a captcha included.
+func assertRateLimitFailureLoggedAtDebug(t *testing.T, logged string) {
 	t.Helper()
 	if !strings.Contains(logged, `"msg":"serveRateLimit"`) || !strings.Contains(logged, `"error":"bucket per-ip: redis: unreachable"`) {
 		t.Fatalf("want DEBUG serveRateLimit with the error, got %s", logged)
 	}
-	if strings.Contains(logged, `"level":"ERROR"`) || (!captchaDowngrade && strings.Contains(logged, `"level":"WARN"`)) {
+	if strings.Contains(logged, `"level":"ERROR"`) || strings.Contains(logged, `"level":"WARN"`) {
 		t.Fatalf("a counter error must not log WARN or ERROR per request: %s", logged)
 	}
 }

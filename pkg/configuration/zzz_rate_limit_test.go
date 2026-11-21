@@ -78,7 +78,8 @@ func Test_ValidateParams_rateLimit(t *testing.T) {
 			c.RateLimitBuckets[0].Key = []ratelimit.KeyPart{{From: ratelimit.KeyFromPath, Pattern: "^/t/[^/]+/"}}
 		}), wantErr: []string{"RateLimitBuckets", "capture group"}},
 		{name: "token bucket", config: with(func(c *Config) { c.RateLimitBuckets[0].Algorithm = "tokenBucket" }), wantErr: []string{"RateLimitBuckets", "tokenBucket"}},
-		{name: "captcha action", config: with(func(c *Config) { c.RateLimitBuckets[0].Action = "captcha" }), wantErr: []string{"RateLimitBuckets", "captcha"}},
+		{name: "captcha action", config: with(func(c *Config) { c.RateLimitBuckets[0].Action = "captcha" })},
+		{name: "deny action", config: with(func(c *Config) { c.RateLimitBuckets[0].Action = "deny" }), wantErr: []string{"RateLimitBuckets", "bucket 0", `"ratelimit"`, `"captcha"`, `"log"`}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

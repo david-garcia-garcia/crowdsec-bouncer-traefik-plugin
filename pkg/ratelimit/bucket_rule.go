@@ -15,10 +15,13 @@ const (
 	KeyFromQuery  = "query"
 )
 
-// Bucket actions over the limit. ActionDeny is the default.
+// Bucket actions over the limit. ActionRateLimit is the default.
+// ActionRateLimit answers with the rate-limit status at once; ActionCaptcha answers with the subscribing
+// router's captcha when no ratelimit bucket answers; ActionLog only logs.
 const (
-	ActionDeny = "deny"
-	ActionLog  = "log"
+	ActionCaptcha   = "captcha"
+	ActionLog       = "log"
+	ActionRateLimit = "ratelimit"
 )
 
 // AlgorithmSlidingWindow is the only counting algorithm in this version, and the default.

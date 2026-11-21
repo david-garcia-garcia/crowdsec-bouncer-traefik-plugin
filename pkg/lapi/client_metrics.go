@@ -37,7 +37,7 @@ func OriginPluginRules(name string) string {
 	return OriginPluginRulesPrefix + name
 }
 
-// OriginPluginRateLimit is the usage-metrics origin for a deny by the rate-limit bucket bucketName.
+// OriginPluginRateLimit is the usage-metrics origin for an answer of the rate-limit bucket bucketName: the ratelimit answer or the captcha challenge.
 func OriginPluginRateLimit(bucketName string) string {
 	return OriginPluginRateLimitPrefix + bucketName
 }

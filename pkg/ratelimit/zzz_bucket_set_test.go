@@ -46,8 +46,8 @@ func TestNewBucketSet_rejectsEachRowError(t *testing.T) {
 		{name: "window 1500ms", rules: with(func(b *BucketRule) { b.Window = "1500ms" }), wantErr: "bucket 0: window: must be a whole number of seconds"},
 		{name: "window abc", rules: with(func(b *BucketRule) { b.Window = "abc" }), wantErr: "bucket 0: window:"},
 		{name: "window empty", rules: with(func(b *BucketRule) { b.Window = "" }), wantErr: "bucket 0: window:"},
-		{name: "action captcha", rules: with(func(b *BucketRule) { b.Action = "captcha" }), wantErr: "bucket 0: action: captcha is not supported in this version"},
-		{name: "action unknown", rules: with(func(b *BucketRule) { b.Action = "block" }), wantErr: "bucket 0: action: must be one of"},
+		{name: "action deny", rules: with(func(b *BucketRule) { b.Action = "deny" }), wantErr: `bucket 0: action: must be one of "ratelimit", "captcha", or "log"`},
+		{name: "action unknown", rules: with(func(b *BucketRule) { b.Action = "block" }), wantErr: `bucket 0: action: must be one of "ratelimit", "captcha", or "log"`},
 		{name: "algorithm tokenBucket", rules: with(func(b *BucketRule) { b.Algorithm = "tokenBucket" }), wantErr: "bucket 0: algorithm: tokenBucket is not supported in this version"},
 		{name: "algorithm unknown", rules: with(func(b *BucketRule) { b.Algorithm = "fixed" }), wantErr: "bucket 0: algorithm: must be"},
 		{name: "burst set", rules: with(func(b *BucketRule) { b.Burst = 10 }), wantErr: "bucket 0: burst: is not supported in this version"},
@@ -74,7 +74,7 @@ func TestNewBucketSet_rejectsEachRowError(t *testing.T) {
 }
 
 // TestNewBucketSet_acceptsCatchAllAndDefaults proves a row with no predicate passes, and that action and
-// algorithm default to deny and slidingWindow.
+// algorithm default to ratelimit and slidingWindow.
 func TestNewBucketSet_acceptsCatchAllAndDefaults(t *testing.T) {
 	set := mustNewTestBucketSet(t, []BucketRule{
 		{Name: "per-ip", Requests: 300, Window: "1m", Key: []KeyPart{{From: KeyFromIP}}},
@@ -87,7 +87,7 @@ func TestNewBucketSet_acceptsCatchAllAndDefaults(t *testing.T) {
 	if len(set.buckets) != 2 {
 		t.Fatalf("buckets=%d", len(set.buckets))
 	}
-	if got := set.buckets[0]; got.action != ActionDeny || got.requests != 300 || got.window.Seconds() != 60 || got.final {
+	if got := set.buckets[0]; got.action != ActionRateLimit || got.requests != 300 || got.window.Seconds() != 60 || got.final {
 		t.Fatalf("bucket 0=%+v", got)
 	}
 	if got := set.buckets[1]; got.action != ActionLog || !got.final || len(got.key) != 2 || got.key[1].pattern == nil {
@@ -95,5 +95,28 @@ func TestNewBucketSet_acceptsCatchAllAndDefaults(t *testing.T) {
 	}
 	if _, err := NewBucketSet(nil); err != nil {
 		t.Fatalf("empty list err=%v", err)
+	}
+	if set.HasCaptchaBucket() {
+		t.Fatal("a set of ratelimit and log buckets must not report a captcha bucket")
+	}
+}
+
+// TestNewBucketSet_acceptsEachAction proves ratelimit, captcha, and log compile as themselves, and that
+// only a set with a captcha bucket reports one (a nil set reports none).
+func TestNewBucketSet_acceptsEachAction(t *testing.T) {
+	for _, action := range []string{ActionRateLimit, ActionCaptcha, ActionLog} {
+		bucket := validTestBucket("b")
+		bucket.Action = " " + action + " "
+		set := mustNewTestBucketSet(t, []BucketRule{validTestBucket("first"), bucket})
+		if got := set.buckets[1].action; got != action {
+			t.Fatalf("action %q compiled as %q", action, got)
+		}
+		if got, want := set.HasCaptchaBucket(), action == ActionCaptcha; got != want {
+			t.Fatalf("action %q: HasCaptchaBucket=%v want %v", action, got, want)
+		}
+	}
+	var nilSet *BucketSet
+	if nilSet.HasCaptchaBucket() {
+		t.Fatal("a nil set must not report a captcha bucket")
 	}
 }

@@ -13,8 +13,9 @@ import (
 // BucketSet is a compiled rateLimitBuckets list. Predicates of every bucket share one httprule.Set,
 // so Matching returns the buckets that match a request in list order.
 type BucketSet struct {
-	buckets    []compiledBucket
-	predicates *httprule.Set
+	buckets          []compiledBucket
+	hasCaptchaBucket bool
+	predicates       *httprule.Set
 }
 
 // compiledBucket is one bucket after validation: everything Charge needs besides its predicates.
@@ -49,6 +50,7 @@ func NewBucketSet(rules []BucketRule) (*BucketSet, error) {
 		}
 		seenNames[compiled.name] = struct{}{}
 		set.buckets = append(set.buckets, compiled)
+		set.hasCaptchaBucket = set.hasCaptchaBucket || compiled.action == ActionCaptcha
 		predicateRows = append(predicateRows, rule.Rule)
 	}
 	// Every row compiled on its own above, so the whole list compiles too.
@@ -58,6 +60,11 @@ func NewBucketSet(rules []BucketRule) (*BucketSet, error) {
 	}
 	set.predicates = predicates
 	return set, nil
+}
+
+// HasCaptchaBucket reports whether a bucket of the set answers with a captcha. False on a nil set.
+func (set *BucketSet) HasCaptchaBucket() bool {
+	return set != nil && set.hasCaptchaBucket
 }
 
 // compileBucket validates one row. seen holds the names of the rows before it.
@@ -113,17 +120,16 @@ func validateAlgorithm(algorithm string, burst int) error {
 	return nil
 }
 
-// compileBucketAction maps empty to deny and rejects anything but deny and log. captcha says it is deferred.
+// compileBucketAction maps empty to ratelimit and rejects anything but ratelimit, captcha, and log
+// (the round-1 deny included), naming the accepted values.
 func compileBucketAction(raw string) (string, error) {
 	switch action := strings.TrimSpace(raw); action {
 	case "":
-		return ActionDeny, nil
-	case ActionDeny, ActionLog:
+		return ActionRateLimit, nil
+	case ActionRateLimit, ActionCaptcha, ActionLog:
 		return action, nil
-	case "captcha":
-		return "", errors.New("action: captcha is not supported in this version")
 	default:
-		return "", fmt.Errorf("action: must be one of %q or %q", ActionDeny, ActionLog)
+		return "", fmt.Errorf("action: must be one of %q, %q, or %q", ActionRateLimit, ActionCaptcha, ActionLog)
 	}
 }
 
