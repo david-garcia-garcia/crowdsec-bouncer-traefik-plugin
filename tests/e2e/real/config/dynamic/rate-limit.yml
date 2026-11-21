@@ -1,9 +1,11 @@
-# The Redis rate limit on four routers, against the stack's Dragonfly (rate_limit.Tests.ps1).
+# The Redis rate limit on five routers, against the stack's Dragonfly (rate_limit.Tests.ps1).
 # File provider only: the bucket list is a list of objects with a nested key list.
 # /rate-limit/ owns a LAPI client with its own key and a 10s metrics interval, so a deny
 # reaches cscli as a drop; a bypassRateLimit rule exempts /rate-limit/health.
 # Sync rate 0 (exact mode) so each hit is counted in Dragonfly before the verdict.
-# /rate-limit-log/ only logs. The two -down- routers point at a port where nothing listens.
+# /rate-limit-log/ only logs. The three -down- routers point at a port where nothing listens:
+# -down-pass and -down-ban run in exact mode, where an outage reaches the failure action;
+# -down-local keeps the default buffered sync rate, where an outage keeps the replica's local limit.
 http:
   routers:
     rate-limit:
@@ -25,6 +27,11 @@ http:
       rule: PathPrefix(`/rate-limit-down-ban/`)
       entryPoints: [web]
       middlewares: [bouncer-rate-limit-down-ban]
+      service: whoami@docker
+    rate-limit-down-local:
+      rule: PathPrefix(`/rate-limit-down-local/`)
+      entryPoints: [web]
+      middlewares: [bouncer-rate-limit-down-local]
       service: whoami@docker
   middlewares:
     bouncer-rate-limit:
@@ -99,8 +106,30 @@ http:
           rateLimitEnabled: "true"
           rateLimitFailureAction: passthrough
           rateLimitRedisHost: dragonfly:1
+          rateLimitSyncRate: "0"
           reclaimGraceSeconds: "2"
     bouncer-rate-limit-down-ban:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          logFormat: json
+          logLevel: DEBUG
+          rateLimitBuckets:
+            - name: per-ip
+              requests: 1
+              window: 1m
+              key:
+                - from: ip
+          rateLimitEnabled: "true"
+          rateLimitFailureAction: ban
+          rateLimitRedisHost: dragonfly:1
+          rateLimitSyncRate: "0"
+          reclaimGraceSeconds: "2"
+    bouncer-rate-limit-down-local:
       plugin:
         bouncer:
           bouncerEnabled: "true"

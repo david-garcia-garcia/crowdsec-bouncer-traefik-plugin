@@ -68,7 +68,9 @@ In buffered mode, one replica MAY admit more than the limit by up to the hits th
 ### Requirement: A Redis failure applies the rate-limit failure action within a fixed time budget
 The whole rate-limit step of one request SHALL run under a deadline of 250ms derived from the request context. Each Redis command SHALL use at most that remaining budget, including connection dial and retries. When the request context ends first, the step SHALL stop with that error.
 
-When counting a hit returns an error (Redis unreachable, timeout, a failed flush retained in buffered mode, or the deadline), the step SHALL stop evaluating buckets and SHALL apply `rateLimitFailureAction`:
+In buffered mode (`rateLimitSyncRate` > 0) a Redis outage SHALL NOT be an error: `windowcounter` (utilities v1.0.9+) keeps counting on this replica, starting from zero for a key it has not read yet, answers with a nil error, skips Redis for one sync rate after a failure, and retries after that. Buckets SHALL then deny on this replica's local count, and `rateLimitFailureAction` SHALL NOT apply.
+
+When counting a hit returns an error (in exact mode: Redis unreachable or timeout; in either mode: the deadline or the request context), the step SHALL stop evaluating buckets and SHALL apply `rateLimitFailureAction`:
 
 - `passthrough` (default): the request continues to the AppSec step as if no bucket denied it. No remediation header. No drop is counted.
 - `ban`: the ban page with `bouncerRemediationStatusCode`, remediation header `ban:ratelimit-failure`, drop origin `plugin:ratelimit_failure`.
@@ -79,21 +81,27 @@ When the counter returns an error together with a local verdict, the failure act
 Each failing request SHALL log at DEBUG with the client address and the error. The plugin MUST NOT log a WARN or ERROR per failing request.
 
 #### Scenario: Unreachable Redis with passthrough lets the request through
-- **WHEN** `rateLimitFailureAction` is `passthrough` and Redis is unreachable
+- **WHEN** `rateLimitSyncRate` is `0`, `rateLimitFailureAction` is `passthrough`, and Redis is unreachable
 - **THEN** the request reaches the backend
 - **AND** the request spends no more than the 250ms budget in the rate-limit step
 
 #### Scenario: Unreachable Redis with ban answers the ban page
-- **WHEN** `rateLimitFailureAction` is `ban` and Redis is unreachable
+- **WHEN** `rateLimitSyncRate` is `0`, `rateLimitFailureAction` is `ban`, and Redis is unreachable
 - **AND** `bouncerRemediationHeadersCustomName` is `X-Remediation`
 - **THEN** the response status is `bouncerRemediationStatusCode`
 - **AND** `X-Remediation` is `ban:ratelimit-failure`
 
+#### Scenario: Unreachable Redis in buffered mode keeps the local limit
+- **WHEN** `rateLimitSyncRate` is `200ms`, `rateLimitFailureAction` is `ban`, Redis is unreachable, and a bucket allows 1 request per minute
+- **THEN** the first request from a client reaches the backend
+- **AND** the second is denied with `rateLimitStatusCode` and remediation header `ban:ratelimit:<bucket>`, not `ban:ratelimit-failure`
+
 #### Scenario: Failure-action captcha honours bypassCaptcha
-- **WHEN** `rateLimitFailureAction` is `captcha` and Redis is unreachable
+- **WHEN** `rateLimitSyncRate` is `0`, `rateLimitFailureAction` is `captcha`, and Redis is unreachable
 - **AND** a `bypassCaptcha` action rule matches the request
 - **THEN** the request continues to the AppSec step
 
 #### Scenario: Slow Redis does not hold the request past the budget
 - **WHEN** Redis accepts the connection but does not answer
-- **THEN** the rate-limit step returns within the 250ms budget and applies `rateLimitFailureAction`
+- **THEN** the rate-limit step returns within the 250ms budget
+- **AND** in exact mode it applies `rateLimitFailureAction`

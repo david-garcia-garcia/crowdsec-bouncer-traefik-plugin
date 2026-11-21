@@ -84,7 +84,11 @@ func (g *Gate) Admit(ctx context.Context) (Ticket, error) {
 	if g == nil {
 		return Ticket{Admitted: true}, nil
 	}
-	allowed, wait, err := g.inner.Allow(ctx, g.key)
+	// backendbackoff v1.0.9 dropped the context from Allow; keep the early exit on a finished request.
+	if err := ctx.Err(); err != nil {
+		return Ticket{}, err
+	}
+	allowed, wait, err := g.inner.Allow(g.key)
 	if err != nil {
 		return Ticket{}, err
 	}

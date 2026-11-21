@@ -60,20 +60,44 @@ func TestOpen_sharesOneClientPerMiddlewareAndSettings(t *testing.T) {
 	}
 }
 
-// TestOpen_deadRedisFailsAtTakeWithinTheBudget proves Open does not dial and that a Take against a dead
-// address errors within the step budget, in exact and buffered mode.
+// TestOpen_deadRedisFailsAtTakeWithinTheBudget proves Open does not dial and that an exact-mode Take
+// against a dead address errors within the step budget.
 func TestOpen_deadRedisFailsAtTakeWithinTheBudget(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
-	for _, syncRate := range []time.Duration{0, 200 * time.Millisecond} {
-		t.Run(syncRate.String(), func(t *testing.T) {
-			client, err := Open(context.Background(), "edge", deadRedisTestSettings(syncRate), slog.Default())
-			if err != nil {
-				t.Fatalf("Open against a dead address must succeed: %v", err)
-			}
-			defer client.Close()
-			assertTakeFailsWithinBudget(t, client)
-		})
+	client, err := Open(context.Background(), "edge", deadRedisTestSettings(0), slog.Default())
+	if err != nil {
+		t.Fatalf("Open against a dead address must succeed: %v", err)
+	}
+	defer client.Close()
+	assertTakeFailsWithinBudget(t, client)
+}
+
+// TestOpen_deadRedisBufferedKeepsTheLocalLimit proves a buffered Take against a dead address answers
+// within the step budget with no error and keeps this replica's limit (windowcounter v1.0.9+).
+func TestOpen_deadRedisBufferedKeepsTheLocalLimit(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+	client, err := Open(context.Background(), "edge", deadRedisTestSettings(200*time.Millisecond), slog.Default())
+	if err != nil {
+		t.Fatalf("Open against a dead address must succeed: %v", err)
+	}
+	defer client.Close()
+	key := "rl:edge:b:" + t.Name()
+	for hit := 1; hit <= 3; hit++ {
+		ctx, cancel := context.WithTimeout(context.Background(), StepBudget)
+		started := time.Now()
+		allowed, _, takeErr := client.Take(ctx, key, 2, time.Minute)
+		cancel()
+		if takeErr != nil {
+			t.Fatalf("hit %d: buffered Take must not fail on a Redis outage: %v", hit, takeErr)
+		}
+		if elapsed := time.Since(started); elapsed > StepBudget+100*time.Millisecond {
+			t.Fatalf("hit %d: Take took %s, budget %s", hit, elapsed, StepBudget)
+		}
+		if want := hit <= 2; allowed != want {
+			t.Fatalf("hit %d: allowed=%v, want %v (local limit 2)", hit, allowed, want)
+		}
 	}
 }
 

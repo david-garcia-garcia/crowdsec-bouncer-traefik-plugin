@@ -695,7 +695,7 @@ The value is `what:why` or `what:why:origin`, separated by colons with no spaces
 | `ban:modsec` | Blocked by the ModSecurity CRS sidecar. The visitor got the sidecar's response. |
 | `ban:modsec-failure` | The ModSecurity sidecar gave no verdict, and the failure action is `ban`. |
 | `ban:ratelimit:<bucket>` | A rate-limit bucket with `action: deny` is over its limit. The third field is the bucket name. |
-| `ban:ratelimit-failure` | The rate-limit Redis could not answer, and `rateLimitFailureAction` is `ban`. |
+| `ban:ratelimit-failure` | The rate-limit Redis could not answer (see [When Redis is down](#limit-how-often-a-client-calls-a-route)), and `rateLimitFailureAction` is `ban`. |
 | `ban:captcha-downgrade` | A captcha was due, but this router has no captcha configured, so a ban was served. |
 | `captcha:rules` | Captcha from a `bouncerActionRules` rule. |
 | `captcha:lapi` / `captcha:lapi:<origin>` | Captcha from a CrowdSec decision. |
@@ -703,7 +703,7 @@ The value is `what:why` or `what:why:origin`, separated by colons with no spaces
 | `captcha:stream-unhealthy` | Decisions could not be refreshed for too long, and the failure action is `captcha`. |
 | `captcha:appsec-failure` | AppSec was unreachable, and the failure action is `captcha`. |
 | `captcha:modsec-failure` | The ModSecurity sidecar gave no verdict, and the failure action is `captcha`. |
-| `captcha:ratelimit-failure` | The rate-limit Redis could not answer, and `rateLimitFailureAction` is `captcha`. |
+| `captcha:ratelimit-failure` | The rate-limit Redis could not answer (see [When Redis is down](#limit-how-often-a-client-calls-a-route)), and `rateLimitFailureAction` is `captcha`. |
 | `captcha:appsec` | AppSec asked for a captcha, and this router served its own captcha page. |
 | `captcha:challenge` | AppSec served a bot-detection challenge. |
 | `captcha:solved` | The visitor just solved the captcha and is being redirected back. |
@@ -909,9 +909,9 @@ rateLimitBuckets:
 
 **The answer.** HTTP `rateLimitStatusCode` (default 429) with the ban page, `Retry-After`, and the verdict header `ban:ratelimit:<bucket>`. `Retry-After` is the number of seconds until the bucket's current window ends; the next request can still be denied, because the previous window still counts towards the estimate. A deny is reported to CrowdSec as a drop under `plugin:ratelimit:<bucket>`. `bypassRateLimit` in a [`bouncerActionRules`](#variables) rule exempts matching requests, for example a health check. `bypass` does not skip the rate limit.
 
-**When Redis is down.** `rateLimitFailureAction` decides: `passthrough` (default), `ban`, or `captcha`. The rate limit of one request waits for Redis 250ms at most, all buckets together.
+**When Redis is down.** It depends on `rateLimitSyncRate`. With the default buffered mode, each replica keeps counting on its own and denies a client over the limit on that replica, starting from zero for a counter it had not read yet; it stops calling Redis for one sync interval after a failure, then tries again. With `rateLimitSyncRate: 0`, `rateLimitFailureAction` decides: `passthrough` (default), `ban`, or `captcha`. The rate limit of one request waits for Redis 250ms at most, all buckets together. In either mode, a bucket reached after that time applies `rateLimitFailureAction`.
 
-**Accuracy across replicas.** With the default `rateLimitSyncRate: 200ms`, each replica counts locally and writes to Redis every 200ms, reading a counter from Redis the first time it sees it in a window. A replica can then admit more than the limit by the hits the other replicas have not written yet. `rateLimitSyncRate: 0` sends every hit to Redis before answering: exact counts, two Redis round trips per counted bucket (three on a counter's first hit in a window), one bucket after another.
+**Accuracy across replicas.** With the default `rateLimitSyncRate: 200ms`, each replica counts locally and writes to Redis every 200ms, reading a counter from Redis the first time it sees it in a window. A replica can then admit more than the limit by the hits the other replicas have not written yet. `rateLimitSyncRate: 0` sends every hit to Redis before answering: exact counts, two Redis round trips per counted bucket, one bucket after another.
 
 **Limits of this version.**
 
@@ -1300,7 +1300,7 @@ The rate-limit buckets, checked in list order. Required when `rateLimitEnabled` 
 Turn on the rate limit for this router. When `false`, no other `rateLimit*` setting is read or checked.
 
 **RateLimitFailureAction** (string, default `passthrough`)
-What to do when the rate-limit Redis cannot answer within 250ms: `passthrough`, `ban`, or `captcha` (requires a captcha on this router).
+What to do when the rate-limit Redis cannot answer: `passthrough`, `ban`, or `captcha` (requires a captcha on this router). With the default buffered `rateLimitSyncRate`, an unreachable Redis does not trigger it: each replica keeps its own count. It applies with `rateLimitSyncRate: 0`, and in either mode to a bucket reached after the 250ms the rate limit may spend on Redis.
 
 **RateLimitRedisDatabase** (string, default `""`)
 Redis database number for the rate-limit counters.

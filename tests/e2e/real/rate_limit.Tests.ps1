@@ -21,6 +21,7 @@ BeforeAll {
             @{ Path = "/rate-limit-log/ready"; Status = 200 }
             @{ Path = "/rate-limit-down-pass/ready"; Status = 200 }
             @{ Path = "/rate-limit-down-ban/ready"; Status = 403 }
+            @{ Path = "/rate-limit-down-local/ready"; Status = @(200, 429) }
         )) {
         $ready = Wait-ForHttpStatus -Url "$($script:TraefikUrl)$($route.Path)" -Headers @{ "X-Forwarded-For" = (Get-RateLimitClientIP -HostNumber 250) } -ExpectedStatusCodes @($route.Status) -TimeoutSeconds 60
         if (-not $ready.Success) {
@@ -121,6 +122,18 @@ Describe "Redis rate limit" {
             $response = Test-HttpRequest -Endpoint "/rate-limit-down-ban/page" -IP $ip -TraefikUrl $script:TraefikUrl
             $response.StatusCode | Should -Be 403 -Because "the failure action ban uses bouncerRemediationStatusCode"
             [string]$response.Headers["X-Crowdsec-Remediation"] | Should -Be "ban:ratelimit-failure"
+        }
+
+        It "Should keep the replica's local limit in buffered mode instead of the failure action" {
+            $ip = Get-RateLimitClientIP -HostNumber 22
+
+            $allowed = Test-HttpRequest -Endpoint "/rate-limit-down-local/page" -IP $ip -TraefikUrl $script:TraefikUrl
+            $allowed.StatusCode | Should -Be 200 -Because "the first request is within the local limit of 1"
+            [string]$allowed.Headers["X-Crowdsec-Remediation"] | Should -BeNullOrEmpty
+
+            $denied = Test-HttpRequest -Endpoint "/rate-limit-down-local/page" -IP $ip -TraefikUrl $script:TraefikUrl
+            $denied.StatusCode | Should -Be 429 -Because "a buffered outage keeps counting locally, so failure action ban never applies"
+            [string]$denied.Headers["X-Crowdsec-Remediation"] | Should -Be "ban:ratelimit:per-ip"
         }
     }
 }

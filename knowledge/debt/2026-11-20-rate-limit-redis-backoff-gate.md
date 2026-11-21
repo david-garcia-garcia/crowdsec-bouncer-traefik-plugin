@@ -6,7 +6,7 @@ Action: note
 
 ## Why this follow-up
 
-During a Redis outage every request that needs Redis spends up to the 250ms step budget before `rateLimitFailureAction` applies. A blackholed Redis host (no refusal, no answer) turns that into a fixed added latency on most requests for the whole outage.
+In exact mode (`rateLimitSyncRate: 0`), during a Redis outage every request that needs Redis spends up to the 250ms step budget before `rateLimitFailureAction` applies. Buffered mode is mostly covered since utilities v1.0.9: `windowcounter` skips Redis for one sync rate after a failure and keeps a local count. A blackholed Redis host (no refusal, no answer) turns that into a fixed added latency on most requests for the whole outage.
 
 ## Why it was not taken
 

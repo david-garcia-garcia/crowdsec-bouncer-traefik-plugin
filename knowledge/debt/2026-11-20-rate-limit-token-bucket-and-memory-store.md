@@ -10,7 +10,7 @@ The requested rate-limit design has two algorithms (`slidingWindow`, `tokenBucke
 
 ## Why it was not taken
 
-Upstream blocker. `tokenbucket` at the pinned utilities `v1.0.7` admits refunded consumes: refund is decided in whole microseconds and admit in truncated nanoseconds. Measured on a rate-limiter shape (maxDelay 0, hot key under flood): rate 1000/s admitted 3029 where the correct bucket admits 1999. The returned `wait` is the truncated value, so the plugin cannot correct it on the published surface. The fix is upstream PR #54 (open, in no tag). The only in-memory limiter in the module is `tokenbucket.Memory`, so the memory store carries the same defect. Finding: `knowledge/research/ext_traefik-middleware-utilities_tokenbucket/`.
+Upstream blocker. `tokenbucket` at the pinned utilities `v1.0.7` admits refunded consumes: refund is decided in whole microseconds and admit in truncated nanoseconds. Measured on a rate-limiter shape (maxDelay 0, hot key under flood): rate 1000/s admitted 3029 where the correct bucket admits 1999. The returned `wait` is the truncated value, so the plugin cannot correct it on the published surface. The fix is upstream PR #54, tagged in utilities `v1.0.9` (pinned since 2026-11-21); the algorithm and store are still not built. The only in-memory limiter in the module is `tokenbucket.Memory`, so the memory store carries the same defect. Finding: `knowledge/research/ext_traefik-middleware-utilities_tokenbucket/`.
 
 ## Risks
 

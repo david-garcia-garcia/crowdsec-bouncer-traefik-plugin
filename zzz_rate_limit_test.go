@@ -131,13 +131,16 @@ func TestNew_RateLimitReleasedWhenNewFailsAfterOpen(t *testing.T) {
 	}
 }
 
-// TestNew_RateLimitDeadRedisFailureAction proves an unreachable Redis does not fail New, and that the
-// returned handler applies the failure action: passthrough reaches the backend, ban answers ban:ratelimit-failure.
+// TestNew_RateLimitDeadRedisFailureAction proves an unreachable Redis does not fail New, and that in exact
+// mode (rateLimitSyncRate 0) the returned handler applies the failure action: passthrough reaches the
+// backend, ban answers ban:ratelimit-failure.
 func TestNew_RateLimitDeadRedisFailureAction(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
-	passthrough, err := New(context.Background(), testNextOK(), cfgRateLimitDeadRedis(), "rl-passthrough")
+	passthroughCfg := cfgRateLimitDeadRedis()
+	passthroughCfg.RateLimitSyncRate = "0"
+	passthrough, err := New(context.Background(), testNextOK(), passthroughCfg, "rl-passthrough")
 	if err != nil {
 		t.Fatalf("an unreachable Redis must not fail New: %v", err)
 	}
@@ -148,6 +151,7 @@ func TestNew_RateLimitDeadRedisFailureAction(t *testing.T) {
 	}
 
 	banCfg := cfgRateLimitDeadRedis()
+	banCfg.RateLimitSyncRate = "0"
 	banCfg.RateLimitFailureAction = configuration.FailureActionBan
 	ban, err := New(context.Background(), testNextOK(), banCfg, "rl-ban")
 	if err != nil {
@@ -157,5 +161,31 @@ func TestNew_RateLimitDeadRedisFailureAction(t *testing.T) {
 	ban.ServeHTTP(rw, reqForIP("203.0.113.42"))
 	if rw.Code != http.StatusForbidden || rw.Header().Get("X-Remediation") != "ban:ratelimit-failure" {
 		t.Fatalf("ban: status %d header %q, want 403 ban:ratelimit-failure", rw.Code, rw.Header().Get("X-Remediation"))
+	}
+}
+
+// TestNew_RateLimitDeadRedisBufferedKeepsTheLocalLimit proves that with the default buffered sync rate a
+// Redis outage does not reach the failure action: the replica keeps counting locally and denies over the limit.
+func TestNew_RateLimitDeadRedisBufferedKeepsTheLocalLimit(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	cfg := cfgRateLimitDeadRedis()
+	cfg.RateLimitFailureAction = configuration.FailureActionBan
+	handler, err := New(context.Background(), testNextOK(), cfg, "rl-buffered-outage")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for hit := 1; hit <= 5; hit++ {
+		rw := httptest.NewRecorder()
+		handler.ServeHTTP(rw, reqForIP("203.0.113.43"))
+		if rw.Code != http.StatusOK || rw.Header().Get("X-Remediation") != "" {
+			t.Fatalf("hit %d: status %d header %q, want 200 within the local limit", hit, rw.Code, rw.Header().Get("X-Remediation"))
+		}
+	}
+	rw := httptest.NewRecorder()
+	handler.ServeHTTP(rw, reqForIP("203.0.113.43"))
+	if rw.Code != http.StatusTooManyRequests || rw.Header().Get("X-Remediation") != "ban:ratelimit:per-ip" {
+		t.Fatalf("hit 6: status %d header %q, want 429 ban:ratelimit:per-ip", rw.Code, rw.Header().Get("X-Remediation"))
 	}
 }

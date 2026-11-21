@@ -8,7 +8,7 @@ import (
 
 // TestYaegi_OpenChargeClose runs the rate-limit leg under Yaegi v0.16.1, the way Traefik loads it:
 // Open (reclaim, simpleredis, vendored windowcounter) in exact and buffered mode against a dead
-// address, a Charge through the Counter interface that must return the counter error, a Charge on an
+// address (exact mode returns the counter error, buffered mode keeps the local limit), a Charge on an
 // interpreted counter that must deny, and Close.
 func TestYaegi_OpenChargeClose(t *testing.T) {
 	yaegitest.Run(t, yaegitest.GoPath(t), yaegiRateLimitProgram)
@@ -60,11 +60,18 @@ func main() {
 			exitWithFailure("Open: " + err.Error())
 		}
 		var counter ratelimit.Counter = client
-		ctx, cancel := context.WithTimeout(context.Background(), ratelimit.StepBudget)
-		verdict := set.Charge(ctx, counter, "yaegi", httptest.NewRequest("GET", "http://example.com/", nil), clientIP)
-		cancel()
-		if verdict.Err == nil {
-			exitWithFailure("Charge against a dead address must return the counter error")
+		var verdicts [2]ratelimit.Verdict
+		for i := range verdicts {
+			ctx, cancel := context.WithTimeout(context.Background(), ratelimit.StepBudget)
+			verdicts[i] = set.Charge(ctx, counter, "yaegi", httptest.NewRequest("GET", "http://example.com/", nil), clientIP)
+			cancel()
+		}
+		if syncRate == 0 {
+			if verdicts[0].Err == nil {
+				exitWithFailure("exact Charge against a dead address must return the counter error")
+			}
+		} else if verdicts[0].Err != nil || verdicts[1].Err != nil || verdicts[0].DenyBucket != "" || verdicts[1].DenyBucket != "per-ip" {
+			exitWithFailure("buffered Charge against a dead address must keep the local limit without an error")
 		}
 		client.Close()
 	}

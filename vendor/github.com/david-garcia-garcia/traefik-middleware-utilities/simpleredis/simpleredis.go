@@ -2,6 +2,7 @@
 package simpleredis
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +20,8 @@ const (
 	RedisNoAuth           = "redis:noauth"
 	RedisIssue            = "redis:issue?"
 	RedisUnsupportedReply = "redis:unsupported-reply"
+	// RedisTLS is a deterministic TLS rejection: an untrusted or misnamed server certificate, a server TLS alert, or a non-TLS peer.
+	RedisTLS = "redis:tls"
 )
 
 // Exported sentinels. Match with errors.Is or IsMiss / IsUnreachable / IsPoolWait, not string equality.
@@ -29,6 +32,9 @@ var (
 	ErrNoAuth           = errors.New(RedisNoAuth)
 	ErrIssue            = errors.New(RedisIssue)
 	ErrUnsupportedReply = errors.New(RedisUnsupportedReply)
+	// ErrTLS is a TLS rejection the operator must fix (certificates, names, versions). It is not retried and does
+	// not wrap ErrUnreachable, so IsUnreachable is false for it.
+	ErrTLS = errors.New(RedisTLS)
 )
 
 // ErrPoolWait is pool saturation. It wraps ErrUnreachable so callers matching the broad condition keep working.
@@ -42,7 +48,9 @@ var (
 	errNoAuth           = ErrNoAuth
 	errIssue            = ErrIssue
 	errUnsupportedReply = ErrUnsupportedReply
-	// errNotFromNew is a client that did not come from New (nil in-use-turn channel). Error() is redis:unreachable. Distinct from errUnreachable so MaxRetries does not sleep a programming error. Wraps ErrUnreachable so IsUnreachable stays true.
+	// errTLS is the TLS rejection sentinel the session returns bare, so Error() is exactly redis:tls.
+	errTLS = ErrTLS
+	// errNotFromNew is a client that did not come from New (zero in-use-turn cap). Error() is redis:unreachable. Distinct from errUnreachable so MaxRetries does not sleep a programming error. Wraps ErrUnreachable so IsUnreachable stays true.
 	errNotFromNew = fmt.Errorf("%w", ErrUnreachable)
 )
 
@@ -59,8 +67,11 @@ func IsPoolWait(err error) bool { return errors.Is(err, ErrPoolWait) }
 // Pool, timeout, and retry knobs live on Config and are frozen at New; they are not fields on this type.
 type SimpleRedis struct {
 	host     string
+	user     string
 	pass     string
 	database string
+	// tlsConfig is New's clone of Config.TLS; nil means plain TCP.
+	tlsConfig *tls.Config
 
 	maxRetries      int
 	minRetryBackoff time.Duration
@@ -78,8 +89,18 @@ type SimpleRedis struct {
 	idleConnsMu sync.Mutex
 	idleConns   []*pooledConn
 	closed      atomic.Bool
-	// inUseTurns is a PoolSize-buffered semaphore of concurrent in-use sockets. Idle sockets do not hold a turn.
-	inUseTurns chan struct{}
+	// inUseMu guards the in-use-turn semaphore (freeTurns and turnWaiters; turnCap is frozen in New).
+	// It is a mutex and not a channel because session source has no select (pool.go borrowSocket says why).
+	// Idle sockets do not hold a turn.
+	inUseMu sync.Mutex
+	// freeTurns is how many in-use turns are free. It is above zero only while turnWaiters is empty:
+	// a give-back with a waiter queued hands the turn to that waiter instead.
+	freeTurns int
+	// turnCap is the in-use-turn cap New froze from PoolSize; it is read without inUseMu because it never
+	// changes after New. Zero means the client did not come from New.
+	turnCap int
+	// turnWaiters is the FIFO of borrows waiting for a turn past PoolSize.
+	turnWaiters []*turnWaiter
 	// overFrees counts in-use-turn returns that were dropped because the semaphore was already full.
 	overFrees atomic.Int64
 
@@ -88,7 +109,7 @@ type SimpleRedis struct {
 	groupWrite   groupWritePath
 }
 
-// New copies cfg onto a client and builds the in-use-turn channel. Does not dial. Call before concurrent use.
+// New copies cfg onto a client and builds the in-use-turn semaphore. Does not dial. Call before concurrent use.
 // An explicit MaxIdleConns above PoolSize returns ErrMaxIdleConnsAbovePoolSize and a nil client; a defaulted one follows PoolSize.
 func New(cfg Config) (*SimpleRedis, error) {
 	cfg, err := cfg.applyDefaults()
@@ -97,8 +118,10 @@ func New(cfg Config) (*SimpleRedis, error) {
 	}
 	sr := &SimpleRedis{
 		host:            cfg.Host,
+		user:            cfg.User,
 		pass:            cfg.Pass,
 		database:        cfg.Database,
+		tlsConfig:       cfg.TLS.Clone(),
 		maxRetries:      cfg.MaxRetries,
 		minRetryBackoff: cfg.MinRetryBackoff,
 		maxRetryBackoff: cfg.MaxRetryBackoff,
@@ -166,7 +189,7 @@ func (sr *SimpleRedis) IdleTimeout() time.Duration {
 	return defaultIdleTimeout
 }
 
-// DialTimeout is the per-attempt TCP dial bound New froze.
+// DialTimeout is the per-attempt dial bound New froze: the TCP connect plus the TLS handshake when TLS is set.
 func (sr *SimpleRedis) DialTimeout() time.Duration {
 	if sr.dialTimeout > 0 {
 		return sr.dialTimeout
