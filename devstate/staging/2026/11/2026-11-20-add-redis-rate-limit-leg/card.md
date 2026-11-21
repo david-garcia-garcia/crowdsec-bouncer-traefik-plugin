@@ -45,7 +45,7 @@ Proof:
 In progress. 1 items remain.
 
 Priority: P2 — real operator pain (no rate limit in the edge WAF), with a workaround outside the plugin.
-Reviewed head: 8aeec33e
+Reviewed head: 6ca0c573
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -114,7 +114,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 2 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 8aeec33e6de080c2adf23f1753af4df5da883df3 | Card must match the branch you measured |
+| Reviewed head | 6ca0c5738e4e41816d98fdd4b41def07614f66ac | Card must match the branch you measured |
 
 ### Stored data model
 - **New store**: Redis (the rate-limit Redis: `rateLimitRedisHost`, `rateLimitRedisDatabase`, `rateLimitRedisPassword`/`File`; it is a separate client from the decision-cache Redis, `plugin.go:189-207`, `pkg/ratelimit/client.go:99-113`). New key family: sliding-window hit counters.
