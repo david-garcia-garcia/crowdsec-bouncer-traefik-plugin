@@ -83,7 +83,7 @@ func newTestRateLimitFixture(t *testing.T, buckets []ratelimit.BucketRule, chang
 		change(cfg)
 	}
 	next := &recordedNextRequest{}
-	b, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { next.called = true }), "edge", cfg, false, false, false, false, logger.New("ERROR", ""))
+	b, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { next.called = true }), "edge", cfg, Subscriptions{}, logger.New("ERROR", ""))
 	if err != nil {
 		t.Fatal(err)
 	}

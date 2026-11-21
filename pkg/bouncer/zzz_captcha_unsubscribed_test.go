@@ -68,7 +68,7 @@ func TestHandleRemediationServeHTTP_subscribedUnpublishedDoesNotWarnUnsubscribed
 	log, sink := newTestLogSink(slog.LevelWarn)
 	b, originCalled := testCaptchaRoutingBouncer(t, nil)
 	b.log = log
-	b.subscribeCaptcha = true
+	b.captchaLeg.subscribed = true
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	rw := httptest.NewRecorder()
 	b.handleRemediationServeHTTP(rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli")

@@ -1,6 +1,7 @@
 package lapi
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"sync/atomic"
@@ -14,9 +15,12 @@ import (
 )
 
 // NewTestClient returns an in-memory Client with a memory DecisionStore.
+// Its incarnation is set as New sets it, so a bouncer binding tells it apart from nil.
 func NewTestClient(log *slog.Logger) (*Client, *decisionstore.Store) {
 	store := decisionstore.NewMemory(log)
-	return &Client{decisionStore: store, log: log, crowdsecMode: configuration.StreamMode}, store
+	client := &Client{decisionStore: store, log: log, crowdsecMode: configuration.StreamMode}
+	client.incarnation = fmt.Sprintf("%p", client)
+	return client, store
 }
 
 // SetCrowdsecModeForTest sets crowdsecMode for tests that bind a client onto a bouncer.

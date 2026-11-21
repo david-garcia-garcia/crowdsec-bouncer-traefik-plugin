@@ -29,7 +29,7 @@ func TestServeHTTP_UnboundLAPIUsesFailureAction(t *testing.T) {
 	t.Run("ban", func(t *testing.T) {
 		b, _, passed := testForcedDecisionBouncer(t, nil, nil, nil, false)
 		bindTestLAPI(b, nil)
-		b.subscribeLAPI = true
+		b.lapiLeg.subscribed = true
 		b.lapiFailureAction = configuration.FailureActionBan
 		b.remediationCustomHeader = "X-Remediation"
 		rw := httptest.NewRecorder()
@@ -44,7 +44,7 @@ func TestServeHTTP_UnboundLAPIUsesFailureAction(t *testing.T) {
 	t.Run("passthrough", func(t *testing.T) {
 		b, _, passed := testForcedDecisionBouncer(t, nil, nil, nil, false)
 		bindTestLAPI(b, nil)
-		b.subscribeLAPI = true
+		b.lapiLeg.subscribed = true
 		b.lapiFailureAction = configuration.FailureActionPassthrough
 		rw := httptest.NewRecorder()
 		b.ServeHTTP(rw, testForcedDecisionRequest(""))
@@ -125,10 +125,10 @@ func TestServeHTTP_UnparseableClientIPRejects(t *testing.T) {
 
 func TestReceiveLAPI_WarnsWhenHeaderScopeIsNotPolled(t *testing.T) {
 	log, sink := newTestLogSink(slog.LevelWarn)
-	b, _, _ := testForcedDecisionBouncer(t, log, nil, nil, false)
+	b, client, _ := testForcedDecisionBouncer(t, log, nil, nil, false)
 	b.decisionScopeHeaders = map[string]string{decisionscope.ScopeCountry: "CF-IPCountry"}
-	b.receiveLAPI()
-	b.receiveLAPI()
+	b.traceBinding(&b.lapiLeg, client.Incarnation(), b.warnMissingStreamScopes)
+	b.traceBinding(&b.lapiLeg, client.Incarnation(), b.warnMissingStreamScopes)
 	logged := sink.String()
 	if strings.Count(logged, "crowdsec bouncer stream scopes missing") != 1 {
 		t.Fatalf("want one missing-scope WARN, got %s", logged)
@@ -140,8 +140,8 @@ func TestReceiveLAPI_WarnsWhenHeaderScopeIsNotPolled(t *testing.T) {
 
 func TestReceiveLAPI_QuietWhenNoHeaderScopes(t *testing.T) {
 	log, sink := newTestLogSink(slog.LevelWarn)
-	b, _, _ := testForcedDecisionBouncer(t, log, nil, nil, false)
-	b.receiveLAPI()
+	b, client, _ := testForcedDecisionBouncer(t, log, nil, nil, false)
+	b.traceBinding(&b.lapiLeg, client.Incarnation(), b.warnMissingStreamScopes)
 	if strings.Contains(sink.String(), "stream scopes missing") {
 		t.Fatalf("no header scopes must not warn, got %s", sink.String())
 	}
@@ -151,7 +151,7 @@ func TestHandleNextServeHTTP_UnpublishedAppSecUsesFailureAction(t *testing.T) {
 	newBouncer := func(action string) (*Bouncer, *bool) {
 		passed := false
 		b := &Bouncer{
-			subscribeAppSec:       true,
+			appsecLeg:             legBinding{subscribed: true},
 			appsecFailureAction:   action,
 			remediationStatusCode: http.StatusForbidden,
 			log:                   logger.New("ERROR", ""),

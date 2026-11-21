@@ -98,7 +98,7 @@ func TestServeHTTP_appsecFailureDropCountsUnderFailureOrigin(t *testing.T) {
 	b, _ := testModsecBouncer(t, configuration.FailureActionPassthrough, nil)
 	b.appsecFailureAction = configuration.FailureActionBan
 	bindTestAppSec(b, nil)
-	b.subscribeAppSec = true
+	b.appsecLeg.subscribed = true
 	lapiClient := withTestMetrics(b)
 	rw := serveModsecAfterLAPI(b, "/")
 	if rw.Header().Get("X-Remediation") != "ban:appsec-failure" {

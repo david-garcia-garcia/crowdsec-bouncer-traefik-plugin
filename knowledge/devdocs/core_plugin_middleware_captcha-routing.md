@@ -7,7 +7,7 @@ The captcha-kind path of `handleRemediationServeHTTP`: unsubscribed WARN-then-ba
 _Avoid_: captcha gate cookie, `{ip}_captcha`, prefix bypass
 
 **Unsubscribed captcha**:
-A captcha-kind remediation on a Bouncer that never subscribed to captcha (`subscribeCaptcha` false: bounce on, empty `CaptchaInstanceName`).
+A captcha-kind remediation on a Bouncer that never subscribed to captcha (`Subscriptions.Captcha` false: bounce on, empty `CaptchaInstanceName`).
 _Avoid_: subscribed-unpublished, `!Valid`
 
 **Challenge marker**:
@@ -36,7 +36,7 @@ _Avoid_: `CaptchaCustomValidateURL`, the bundled default `captcha.html`
 
 ## How to use
 
-- When kind is captcha and `subscribeCaptcha` is false, WARN `crowdsec bouncer captcha unsubscribed` with `leg` `captcha` and `instanceName` (empty when unsubscribed), then ban with `headerReason` `captcha-downgrade` (`ban:captcha-downgrade` when the remediation header is set). Do not emit `ip`. Do not call `GetRemoteIP`. Emit on every remediating request.
+- When kind is captcha and the route does not subscribe to captcha (`Subscriptions.Captcha` false), WARN `crowdsec bouncer captcha unsubscribed` with `leg` `captcha` and `instanceName` (empty when unsubscribed), then ban with `headerReason` `captcha-downgrade` (`ban:captcha-downgrade` when the remediation header is set). Do not emit `ip`. Do not call `GetRemoteIP`. Emit on every remediating request.
 - Do not WARN when subscribed. Empty or `!Valid` still ban without this stem (`headerReason` `captcha-downgrade`).
 - Load the published captcha Client. Empty or `!Valid` remediates as ban with `headerReason` `captcha-downgrade`. Do not construct a local client on the request path or in bounce-only `New`.
 - The caller passes the challenge-page header reason and the downgrade ban template reason: `handleRemediationServeHTTP` passes `headerReasonFromOrigin(origin)` and `LAPI`; `serveAppsecCaptchaGate` passes `appsec` and `APPSEC`. Do not derive the AppSec reason from origin `appsec` (that maps to `lapi`).

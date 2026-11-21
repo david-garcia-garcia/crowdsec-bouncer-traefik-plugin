@@ -329,7 +329,7 @@ func TestAppsecCaptchaVerdict_markerPostWithUnusableCaptchaReachesOrigin(t *test
 	}{
 		{name: "subscribed but unpublished", bind: func(b *Bouncer) {
 			bindTestCaptcha(b, nil)
-			b.subscribeCaptcha = true
+			b.captchaLeg.subscribed = true
 		}},
 		{name: "subscribed but not Valid", bind: func(b *Bouncer) {
 			bindTestCaptcha(b, &captcha.Client{})

@@ -141,7 +141,7 @@ func TestServeHTTP_modsecSkipDoesNotInspect(t *testing.T) {
 func TestServeHTTP_missingModsecUsesFailureAction(t *testing.T) {
 	passB, passPassed := testModsecBouncer(t, configuration.FailureActionPassthrough, nil)
 	bindTestModSec(passB, nil)
-	passB.subscribeModsec = true
+	passB.modsecLeg.subscribed = true
 	passB.ServeHTTP(httptest.NewRecorder(), testModsecRequest("/"))
 	if !*passPassed {
 		t.Fatal("missing ModSec with passthrough must reach origin")
@@ -149,7 +149,7 @@ func TestServeHTTP_missingModsecUsesFailureAction(t *testing.T) {
 
 	banB, banPassed := testModsecBouncer(t, configuration.FailureActionBan, nil)
 	bindTestModSec(banB, nil)
-	banB.subscribeModsec = true
+	banB.modsecLeg.subscribed = true
 	rw := httptest.NewRecorder()
 	banB.ServeHTTP(rw, testModsecRequest("/"))
 	assertModsecFailureBan(t, rw, *banPassed)

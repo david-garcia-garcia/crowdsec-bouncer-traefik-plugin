@@ -61,7 +61,7 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 - Snapshot first: `config := *rawConfig`, then work on `&config` for the rest of `New`. Never write through Traefik's pointer.
 - After the snapshot, do not copy leftover YAML keys or peer aliases into `BouncerBanFilePath` / `CaptchaFilePath`. Traefik’s decode of those two fields is the only owner.
 - Derive `bindCtx, releaseHolders := context.WithCancel(ctx)` before the first `Open`, and release it from a `defer` that fires only when the named `err` is non-nil.
-- Call `lapi.Prepare` then `appsec.Prepare` then `captcha.Prepare` then `modsecurity.Prepare` (each fills an omitted instance name when that leg is owned; AppSec key/scheme copy only when AppSec is enabled). When `lapiEnabled`: `lapi.Open` (do not read `lapiMode` to pick an entry point; mode stays on `Config`). When `appsecEnabled`: `appsec.Open`. When `captchaEnabled`: `captcha.Open`. When `modsecEnabled`: `modsecurity.Open`. Then `reclaim.SetAlias` with group `lapi`/`appsec`/`captcha`/`modsec`. A later claim failure `ClearPublisher`s already-published groups in open order. When this `New` did not Open a leg, `reclaim.ClearPublisher(name, group)`. `bouncer.New` takes subscribe flags, not client pointers. `Watch` after New. Open key: `core_plugin_lapi_reclaim-key.md`. Stream `scopes=`: `core_plugin_lapi_scope-union.md`. Slots: `core_plugin_middleware_instance-slots.md`.
+- Walk the `publishedLegs()` table (LAPI, AppSec, captcha, ModSec) for every per-leg step; do not wire a leg by hand (`core_plugin_middleware_instance-slots.md`). Call each `prepare` (`lapi.Prepare`, `appsec.Prepare`, `captcha.Prepare`, `modsecurity.Prepare`: each fills an omitted instance name when that leg is owned; AppSec key/scheme copy only when AppSec is enabled). Then each enabled leg's `open` (`lapi.Open` does not read `lapiMode` to pick an entry point; mode stays on `Config`). Then `reclaim.SetAlias` with group `lapi`/`appsec`/`captcha`/`modsec`. A later claim failure `ClearPublisher`s the enabled legs before it in table order. When this `New` did not Open a leg, `reclaim.ClearPublisher(name, group)`. `bouncer.New` takes one `bouncer.Subscriptions` value, not client pointers. `Watch` after New. Open key: `core_plugin_lapi_reclaim-key.md`. Stream `scopes=`: `core_plugin_lapi_scope-union.md`. Slots: `core_plugin_middleware_instance-slots.md`.
 - `ServeHTTP` Loads `atomic.Value` only, except the rate-limit counter: a plain field `AttachRateLimit` sets before `New` returns. Order after trusted-IP and action-rule ban: LAPI, rate limit (`serveRateLimit`), AppSec, ModSec, `next`. A missing subscribed LAPI or AppSec client uses that leg's failure action. A missing subscribed captcha client bans a captcha verdict. A missing subscribed ModSec client uses that router's `bouncerModsecFailureAction` (`core_plugin_modsecurity_inspect.md`). Do not block `New`. Do not put a startup flag on the client.
 - When a captcha owner Opens the captcha `http.Client`, set `Timeout` from `cfg.CaptchaSiteverifyHTTPTimeoutSeconds`. Siteverify and assessments share that client. Publish it. Do not construct captcha on bounce-only.
 - When `rateLimitEnabled`: `openRateLimit` Opens the rate-limit Client on the same bind context, after `openOwned` and before `claimOwned`. It has no alias and no Watch; `route.AttachRateLimit` hands it to the Bouncer before `New` returns (`core_plugin_ratelimit.md`).
@@ -80,22 +80,26 @@ Traefik Yaegi loads `CreateConfig` and `New` from the module-root package. `New`
 ```go
 func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config, name string) (handler http.Handler, err error) {
 	config := *rawConfig
-	_ = lapi.Prepare(&config, log, name)
-	_ = appsec.Prepare(&config, log, name)
-	_ = captcha.Prepare(&config, log, name)
-	_ = modsecurity.Prepare(&config, log, name)
+	legs := publishedLegs()
+	for _, leg := range legs {
+		_ = leg.prepare(&config, log, name)
+	}
 	bindCtx, releaseHolders := context.WithCancel(ctx)
 	defer func() {
 		if err != nil {
 			releaseHolders()
 		}
 	}()
-	if config.LapiEnabled {
-		lapiClient, err = lapi.Open(bindCtx, &config, log, name, pluginVersion)
+	err = openOwned(bindCtx, legs, &config, log, name)
+	err = claimOwned(legs, &config, log, name)
+	var subscriptions bouncer.Subscriptions
+	for _, leg := range legs {
+		if leg.subscribes(&config) {
+			leg.subscribe(&subscriptions)
+		}
 	}
-	err = reclaim.SetAlias(lapi.OwnershipKey(&config, name), instanceAlias("lapi", config.LapiInstanceName), name, "lapi")
-	handler, err = bouncer.New(next, name, &config, subscribeLAPI, subscribeAppSec, subscribeCaptcha, subscribeModsec, log)
-	return handler, err
+	route, err := bouncer.New(next, name, &config, subscriptions, log)
+	return route, err
 }
 ```
 
