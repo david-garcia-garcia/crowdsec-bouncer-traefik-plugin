@@ -39,3 +39,8 @@ head: 19d9b07a38664a2736fa7489e673954114952483
 phase: pullrequest
 verdict: ready for review
 head: 28f6a70e36e8904c3ea60fea89ca2f97167cabab
+
+## prepare (2026-11-21)
+phase: prepare
+verdict: in progress
+head: 19d6f9bf69a8f0e927081135a84dcf696520dc16
