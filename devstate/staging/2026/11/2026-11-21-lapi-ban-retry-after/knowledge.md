@@ -12,3 +12,4 @@
 - updated knowledge/devdocs/core_plugin_middleware_action-rules.md
 - updated knowledge/devdocs/core_plugin_middleware_captcha-routing.md
 - updated knowledge/devdocs/build_e2e_real.md
+- deleted knowledge/debt/2026-11-21-spec-map-missing-wafhop.md

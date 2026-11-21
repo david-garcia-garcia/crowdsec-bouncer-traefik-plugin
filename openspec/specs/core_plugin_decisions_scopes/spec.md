@@ -152,7 +152,7 @@ Request lookup SHALL consult Range membership from the Store. Nil or empty membe
 - **WHEN** Range membership holds a ban that contains the client IP
 - **THEN** the request is remediating from that membership
 ### Requirement: Remediation values carry kind then origin
-An Ip, header-scope, or Range remediation SHALL start with the ban/captcha/none letter (`t` / `c` / `f`). Redis slots and Range Helper metadata SHALL use `KindOriginString` (kind, then newline, then origin; bare kind when origin is empty). Leftover U+001F, `RemediationWithOrigin`, and `RemediationOrigin` MUST NOT exist. `RemediationKind` SHALL live in `pkg/decisionscope` and SHALL return the first letter only. `range-index` stays one key whose records are `cidr=kind` plus an optional origin line. Packed intern ids SHALL NOT appear in that blob. `IsActiveRemediation`, `PreferRemediation`, and request lookup SHALL use that letter. In-process Range membership SHALL return the stored string of the winning CIDR (ban over captcha; if several bans contain the IP, the longest-prefix matching ban). Request lookup SHALL be `Store.LookupRemediation` (memory packed words; Redis `KindOriginString`). Origin name SHALL be resolved from the DecisionStore intern table only when the winning kind is remediating. The allow-path packed read MUST NOT take a second intern lock. Lookup key *shapes* (client IP, `scope:value`, `range-index`) MUST NOT change; `HeaderScopeKey` and `IPCacheKey` SHALL live in `pkg/decisionstore`. Client address SHALL reuse `pkg/ip.GetRemoteIP` / `clientRequest.remoteIP`. A value that is only the letter SHALL keep matching.
+An Ip, header-scope, or Range remediation SHALL start with the ban/captcha/none letter (`t` / `c` / `f`). Range Helper metadata SHALL use `KindOriginString` (kind, then newline, then origin; bare kind when origin is empty). Redis slots SHALL start with those same kind and origin lines; when present, the third line is the raw scenario and the fourth line is the decision end (`core_plugin_decisionstore_store`). Leftover U+001F, `RemediationWithOrigin`, and `RemediationOrigin` MUST NOT exist. `RemediationKind` SHALL live in `pkg/decisionscope` and SHALL return the first letter only. `range-index` stays one key whose records are `cidr=kind` plus an optional origin line. Packed intern ids SHALL NOT appear in that blob. `IsActiveRemediation`, `PreferRemediation`, and request lookup SHALL use that letter. In-process Range membership SHALL return the stored string of the winning CIDR (ban over captcha; if several bans contain the IP, the longest-prefix matching ban). Request lookup SHALL be `Store.LookupRemediation` (memory packed words; Redis slot values). Origin name SHALL be resolved from the DecisionStore intern table only when the winning kind is remediating. The allow-path packed read MUST NOT take a second intern lock. Lookup key *shapes* (client IP, `scope:value`, `range-index`) MUST NOT change; `HeaderScopeKey` and `IPCacheKey` SHALL live in `pkg/decisionstore`. Client address SHALL reuse `pkg/ip.GetRemoteIP` / `clientRequest.remoteIP`. A value that is only the letter SHALL keep matching.
 
 #### Scenario: Newline suffixed ban still remediates
 - **WHEN** Redis holds `t` plus a newline and `crowdsec` for the client IP
@@ -180,6 +180,12 @@ An Ip, header-scope, or Range remediation SHALL start with the ban/captcha/none 
 - **WHEN** the store holds a kind-only packed word with origin id `0` for the client IP
 - **THEN** the request is remediating for that kind
 - **AND** origin name is empty
+
+#### Scenario: Redis value with scenario and end still remediates
+- **WHEN** Redis holds `t`, `crowdsec`, `ssh-bf`, and an end line on four lines for the client IP
+- **THEN** the request is banned
+- **AND** lookup origin is `crowdsec`
+
 ### Requirement: Range hit recovers stored remediation from the winning prefix
 When in-process Range membership remediates a client IP, it SHALL return the utilities Helper metadata already held on the winning prefix of the matching ban or captcha set. It MUST NOT re-parse `storedByCIDR` on that request. Nil or empty membership SHALL still be a miss. Ban SHALL still win over captcha. Range metadata SHALL be `KindOriginString` (kind plus optional newline origin). The client address SHALL remain the `net.IP` already produced by `pkg/ip.GetRemoteIP`. The `range-index` blob format SHALL stay `cidr=kind` plus optional origin line. Ban and captcha MUST stay on separate Helpers. `Helper.Contains` and `Count` SHALL use the published utilities RLock (`traefik-middleware-utilities` v1.0.7). IPv4 `familyWalk` SHALL be the published four-byte walk. This plugin MUST NOT re-patch `vendor/.../iplookup`.
 
@@ -191,7 +197,7 @@ When in-process Range membership remediates a client IP, it SHALL return the uti
 - **WHEN** membership holds a wide ban with origin `crowdsec` and a narrower ban with origin `cscli` that both contain the client IP
 - **THEN** remediation is the narrower stored string
 ### Requirement: Live IP cache slot is the IP query result
-When live mode writes a client-address store entry after a LAPI lookup, that entry SHALL be the client-address (`?ip=`) query result only. Header-mapped remediations SHALL stay on the header-scope keys. `LiveLookup` SHALL return `(kind, origin, error)` fields and MUST NOT concat-then-split. Memo SHALL be Store Put (same Store as stream; no `liveStore` type). A clean client-address query SHALL write the none payload on the client-address key even when a header-mapped query remediates. A remediating client-address query SHALL write that client-address remediation on the client-address key. When a header-mapped query fails and the merged verdict is not active, the lookup MUST NOT write a none payload on the client-address key.
+When live mode writes a client-address store entry after a LAPI lookup, that entry SHALL be the client-address (`?ip=`) query result only. Header-mapped remediations SHALL stay on the header-scope keys. `LiveLookup` SHALL return `(kind, origin, decision time left, error)` fields and MUST NOT concat-then-split. The time left SHALL be the duration LAPI returned for the decision `preferLiveResult` kept; zero SHALL mean unknown. Memo SHALL be Store Put (same Store as stream; no `liveStore` type). A clean client-address query SHALL write the none payload on the client-address key even when a header-mapped query remediates. A remediating client-address query SHALL write that client-address remediation on the client-address key. When a header-mapped query fails and the merged verdict is not active, the lookup MUST NOT write a none payload on the client-address key.
 
 #### Scenario: Header ban does not land on the IP key
 - **WHEN** live mode queries a clean client address and a mapped Country ban `FR`
@@ -202,6 +208,11 @@ When live mode writes a client-address store entry after a LAPI lookup, that ent
 #### Scenario: Later header identity does not inherit the ban
 - **WHEN** the previous write has happened and a later Store lookup uses the same client address with Country `DE`
 - **THEN** that lookup does not remediate from the `FR` ban
+
+#### Scenario: LiveLookup returns the winning decision's duration
+- **WHEN** live mode queries a client address that LAPI captchas with duration `10m` and a mapped Country that LAPI bans with duration `2h`
+- **THEN** `LiveLookup` returns kind ban and a time left of `2h`
+
 ### Requirement: Range index upsert and remove match the same network
 `upsertIndexCIDR` and `removeCIDRFromIndex` SHALL treat two CIDR strings as the same `range-index` line when both parse as IP networks and the parsed network addresses are equal and the prefix lengths match (mask ones and bits). They MUST NOT compare `ParseCIDR`'s first (unmasked) IP. When either side fails to parse, they SHALL fall back to raw-text equality so identical unparseable lines still match. A same-network hit SHALL replace or drop every matching line. A replace or append SHALL persist the incoming CIDR text and MUST NOT rewrite that line to `(*net.IPNet).String()`. This leaf MUST NOT sweep-rewrite leftover spellings the call did not name. `ApplyRangeBatch` SHALL keep one read, removals then upserts, and one write; a failed GET that is not a miss SHALL still return and MUST NOT write.
 
