@@ -48,13 +48,17 @@ func formatRemediationHeader(kind, reason, origin string) string {
 }
 
 // headerThirdField is the third header field a reason carries: the encoded metrics origin for lapi, the
-// bucket name (the origin after plugin:ratelimit:) for ratelimit. Every other reason has none.
+// bucket name (the origin after plugin:ratelimit:) for ratelimit, and none for the ratelimit origin without
+// a bucket (plugin:ratelimit). Every other reason has none.
 func headerThirdField(reason, origin string) string {
 	switch reason {
 	case headerReasonLAPI:
 		return encodeHeaderOrigin(origin)
 	case headerReasonRateLimit:
-		return stripHeaderCtl(strings.TrimPrefix(origin, lapi.OriginPluginRateLimitPrefix))
+		if !strings.HasPrefix(origin, lapi.OriginPluginRateLimitPrefix) {
+			return ""
+		}
+		return stripHeaderCtl(origin[len(lapi.OriginPluginRateLimitPrefix):])
 	default:
 		return ""
 	}
@@ -96,6 +100,8 @@ func headerReasonFromOrigin(origin string) string {
 		return headerReasonStreamUnhealthy
 	case lapi.OriginPluginAppsecFailure:
 		return headerReasonAppsecFailure
+	case lapi.OriginPluginRateLimitChallengeForm:
+		return headerReasonRateLimit
 	case lapi.OriginPluginRateLimitFailure:
 		return headerReasonRateLimitFailure
 	case lapi.OriginPluginModsecFailure:

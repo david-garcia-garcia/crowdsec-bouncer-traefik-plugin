@@ -133,10 +133,28 @@ A `captcha` bucket that answers SHALL serve the subscribing router's captcha cha
 ### Requirement: The captcha page's own requests are not charged
 When the subscribing router has a usable captcha client, a request for one of that captcha's same-origin widget assets (custom provider) and a request that carries the challenge-form marker `crowdsec_captcha_challenge=v1` SHALL skip every bucket: none is charged, none answers, and the failure action does not apply. On a router without a usable captcha client these requests SHALL be charged like any other. The request that follows a solve SHALL be charged like any other.
 
+A widget asset SHALL continue to the AppSec step. A challenge-form POST SHALL be answered by the router's captcha gate when the bound policy can answer with a captcha (a `captcha` bucket, or `rateLimitFailureAction: captcha`) and no `bypassCaptcha` action rule matched: a valid answer gets the 302 solved redirect with header `captcha:solved` and the gate cookie; any other answer gets the challenge page again with header `captcha:ratelimit` (no third field: no bucket answered) and one `captcha` drop under origin `plugin:ratelimit`. Otherwise the POST SHALL continue to the AppSec step. This holds whether or not the router also subscribes to AppSec.
+
 #### Scenario: Verification POST is not charged
 - **WHEN** a client whose `captcha` and `ratelimit` buckets are both over their limits posts the challenge form with the marker
 - **THEN** no bucket counter moves
 - **AND** the request is not answered by a bucket
+
+#### Scenario: Verification POST solves the challenge without AppSec
+- **WHEN** a router with a usable captcha and no AppSec subscription served the challenge for `per-ip-soft`
+- **AND** the client posts the challenge form with the marker and a valid answer
+- **THEN** the response is 302 with header `captcha:solved` and the gate cookie
+- **AND** the form does not reach the application and no bucket counter moves
+
+#### Scenario: Verification POST with a wrong answer gets the challenge again
+- **WHEN** the client posts the challenge form with the marker and an answer the provider rejects
+- **THEN** the response is the challenge page with header `captcha:ratelimit`
+- **AND** usage metrics count one `captcha` drop under origin `plugin:ratelimit`
+
+#### Scenario: Verification POST on a policy without a captcha answer continues
+- **WHEN** the bound policy has only `ratelimit` and `log` buckets and failure action `passthrough`
+- **AND** a client posts a form with the marker on a router with a usable captcha
+- **THEN** no bucket counter moves and the request continues to the AppSec step
 
 #### Scenario: Widget asset is not charged
 - **WHEN** the router's captcha uses the custom provider and a client fetches one of its widget asset paths

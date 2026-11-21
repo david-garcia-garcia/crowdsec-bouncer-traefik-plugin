@@ -31,20 +31,26 @@ const (
 // serveRateLimit charges req to the buckets of the rate-limit client this route subscribes to, under this
 // route's own name, and answers with that client's policy. True means the response was written: a
 // ratelimit bucket over its limit, a captcha bucket over its limit, or the failure action when the
-// counter could not answer.
+// counter could not answer; or this router's captcha gate answering a challenge-form POST.
 // False means the request continues to the AppSec step: no subscription or an unpublished owner, a
-// bypassRateLimit rule, a request of this router's captcha page, no bucket that answers, failure action
-// passthrough, or a failure captcha that a cleared gate or a bypassCaptcha rule let through.
+// bypassRateLimit rule, a widget asset of this router's captcha page, a challenge-form POST the gate did
+// not answer, no bucket that answers, failure action passthrough, or a failure captcha that a cleared gate
+// or a bypassCaptcha rule let through.
 func (b *Bouncer) serveRateLimit(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
 	client := b.loadedRateLimit()
 	if client == nil || match.SkipRateLimit {
 		return false
 	}
-	// The captcha page's own requests (widget assets, the challenge-form POST) are not charged.
+	// The captcha page's own requests are not charged: widget assets continue, and the challenge-form
+	// POST goes to the captcha gate when this policy can challenge.
 	captchaClient := b.usableCaptcha()
-	if isCaptchaPageRequest(captchaClient, req) {
+	if captchaClient != nil && captchaClient.IsCustomResourceRequest(req.Request) {
 		logger.Trace(b.log, "serveRateLimit", "ip", req.IPAddrString(), "captchaPage", true)
 		return false
+	}
+	if b.isCaptchaFormAnswer(req) {
+		logger.Trace(b.log, "serveRateLimit", "ip", req.IPAddrString(), "captchaForm", true)
+		return b.answerRateLimitChallengeForm(rw, req, match, client)
 	}
 	buckets := client.Buckets()
 	policy := client.Policy()
@@ -79,13 +85,18 @@ func (b *Bouncer) serveRateLimit(rw http.ResponseWriter, req clientrequest.Reque
 	return false
 }
 
-// isCaptchaPageRequest reports whether req belongs to the captcha page captchaClient serves: one of its
-// same-origin widget assets (custom provider) or a challenge-form POST. A nil client serves no page.
-func isCaptchaPageRequest(captchaClient *captcha.Client, req clientrequest.Request) bool {
-	if captchaClient == nil {
+// answerRateLimitChallengeForm answers a challenge-form POST on a router with a usable captcha. No bucket
+// charges it. When client's policy can answer with a captcha (a captcha bucket or failure action captcha),
+// the POST answers a challenge this leg may have served, so this router's captcha gate validates it, as
+// AppSec does for a form it let through: the solved redirect with the gate cookie, or the challenge page
+// again with header captcha:ratelimit and drop origin plugin:ratelimit (no bucket answered).
+// False means the request continues: a policy without a captcha answer, a bypassCaptcha rule, or a gate
+// that did not write.
+func (b *Bouncer) answerRateLimitChallengeForm(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, client *ratelimit.Client) bool {
+	if !rateLimitAnswersWithCaptcha(client) || b.bypassesCaptcha(req, match) {
 		return false
 	}
-	return captchaClient.IsCustomResourceRequest(req.Request) || captchaClient.HasChallengeMarker(req.Request)
+	return b.handleCaptchaKindServeHTTP(rw, req, configuration.ReasonRateLimit, headerReasonRateLimit, lapi.OriginPluginRateLimitChallengeForm)
 }
 
 // answerRateLimit is the ratelimit answer for bucket: the ban page with the owner's status code,

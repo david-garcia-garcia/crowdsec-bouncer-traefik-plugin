@@ -30,6 +30,8 @@ const (
 	OriginPluginRulesPrefix       = "plugin:rules:"             // action-rule applied ban or captcha
 	OriginPluginRateLimitPrefix   = "plugin:ratelimit:"         // rate-limit bucket denied
 	OriginPluginRateLimitFailure  = "plugin:ratelimit_failure"  // rate-limit failure-action
+	// OriginPluginRateLimitChallengeForm is the rate-limit leg's captcha gate answering a challenge-form POST: no bucket answered.
+	OriginPluginRateLimitChallengeForm = "plugin:ratelimit"
 )
 
 // OriginPluginRules is the usage-metrics origin for a matching action rule of the winning kind.

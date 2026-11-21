@@ -370,3 +370,82 @@ func TestRateLimit_stackedCaptchaAndRateLimitBuckets(t *testing.T) {
 		t.Fatalf("a solved client moved the captcha bucket counter: %v", keys)
 	}
 }
+
+// solvedChallengeFormPost is the challenge-form POST of the test captcha page: the marker plus an answer
+// testSiteverifyCaptchaClient accepts.
+func solvedChallengeFormPost() *http.Request {
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/protected", strings.NewReader("crowdsec_captcha_challenge=v1&dummy-captcha-response=ok"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return req
+}
+
+// TestRateLimit_challengeFormPostGoesToTheCaptchaGate proves a challenge-form POST on a router with a usable
+// captcha and no AppSec is never charged, and is answered by the captcha gate when the policy can answer with
+// a captcha: a valid answer gets the solved redirect and the gate cookie, a missing answer gets the challenge
+// page again with captcha:ratelimit and a captcha drop under plugin:ratelimit. A bypassCaptcha rule, or a
+// policy without a captcha answer, lets it continue; without a usable captcha it is charged like any request.
+func TestRateLimit_challengeFormPostGoesToTheCaptchaGate(t *testing.T) {
+	captchaPolicy := []ratelimit.BucketRule{perIPSoftTestCaptchaBucket(1), perIPTestBucket("per-ip-hard", 2)}
+	for _, tc := range []struct {
+		name          string
+		buckets       []ratelimit.BucketRule
+		failureAction string
+		captcha       bool
+		bypassCaptcha bool
+		form          func() *http.Request
+		wantStatus    int
+		wantHeader    string
+		wantNext      bool
+		wantGate      bool
+		wantCharged   bool
+	}{
+		{name: "valid answer", buckets: captchaPolicy, captcha: true, form: solvedChallengeFormPost, wantStatus: http.StatusFound, wantHeader: "captcha:solved", wantGate: true},
+		{name: "missing answer", buckets: captchaPolicy, captcha: true, form: challengeMarkerPost, wantStatus: http.StatusOK, wantHeader: "captcha:ratelimit"},
+		{name: "failure action captcha without captcha buckets", buckets: []ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, failureAction: configuration.FailureActionCaptcha, captcha: true, form: solvedChallengeFormPost, wantStatus: http.StatusFound, wantHeader: "captcha:solved", wantGate: true},
+		{name: "bypassCaptcha rule", buckets: captchaPolicy, captcha: true, bypassCaptcha: true, form: solvedChallengeFormPost, wantStatus: http.StatusOK, wantNext: true},
+		{name: "policy without a captcha answer", buckets: []ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, failureAction: configuration.FailureActionPassthrough, captcha: true, form: solvedChallengeFormPost, wantStatus: http.StatusOK, wantNext: true},
+		{name: "no usable captcha", buckets: captchaPolicy, form: solvedChallengeFormPost, wantStatus: http.StatusTooManyRequests, wantHeader: "ban:ratelimit:per-ip-hard", wantCharged: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := newTestRateLimitFixture(t, tc.buckets, func(cfg *configuration.Config) {
+				cfg.RateLimitFailureAction = tc.failureAction
+			})
+			if tc.captcha {
+				fixture.bindUsableTestCaptcha(t)
+			}
+			if tc.bypassCaptcha {
+				fixture.b.actionRules = mustPathAction(t, "form", "^/protected$", httprule.ActionBypassCaptcha)
+			}
+			// Put the client over every bucket of the policy first.
+			for range 3 {
+				fixture.serve(http.MethodGet, "/", testRateLimitClientIP)
+			}
+			chargedBefore := fixture.counter.takes.Load()
+			rw := fixture.serveRequest(tc.form(), testRateLimitClientIP)
+			if rw.Code != tc.wantStatus || rw.Header().Get("X-Remediation") != tc.wantHeader || fixture.next.called != tc.wantNext {
+				t.Fatalf("status %d header %q next=%v, want %d %q next=%v (body %q)", rw.Code, rw.Header().Get("X-Remediation"), fixture.next.called, tc.wantStatus, tc.wantHeader, tc.wantNext, rw.Body.String())
+			}
+			if hasGateCookie(rw) != tc.wantGate {
+				t.Fatalf("gate cookie=%v want %v", hasGateCookie(rw), tc.wantGate)
+			}
+			if charged := fixture.counter.takes.Load() - chargedBefore; (charged != 0) != tc.wantCharged {
+				t.Fatalf("charged %d times, want charged=%v", charged, tc.wantCharged)
+			}
+			if tc.wantHeader == "captcha:ratelimit" {
+				assertChallengeFormChallengedAgain(t, fixture, rw)
+			}
+		})
+	}
+}
+
+// assertChallengeFormChallengedAgain checks a challenge-form POST the gate rejected: the challenge page and
+// one captcha drop under the rate-limit origin without a bucket.
+func assertChallengeFormChallengedAgain(t *testing.T, fixture *testRateLimitFixture, rw *httptest.ResponseRecorder) {
+	t.Helper()
+	if got := fixture.lapiClient.TestDroppedCount(lapi.OriginPluginRateLimitChallengeForm, "ipv4", "captcha"); got != 1 {
+		t.Fatalf("captcha drops under %s=%d want 1", lapi.OriginPluginRateLimitChallengeForm, got)
+	}
+	if rw.Body.String() != "CAPTCHA_CHALLENGE_PAGE" {
+		t.Fatalf("body %q, want the challenge page", rw.Body.String())
+	}
+}
