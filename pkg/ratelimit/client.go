@@ -121,8 +121,8 @@ func newClient(settings RedisSettings, log *slog.Logger) (*Client, error) {
 	return client, nil
 }
 
-// Take counts one hit on key and reports whether it is within limit per window (Counter).
-func (c *Client) Take(ctx context.Context, key string, limit int64, window time.Duration) (allowed bool, estimated float64, err error) {
+// Take counts one hit on key and returns whether it is within limit per window, with RetryAfter on a deny (Counter).
+func (c *Client) Take(ctx context.Context, key string, limit int64, window time.Duration) (Status, error) {
 	return c.limiter.Take(ctx, key, limit, window)
 }
 

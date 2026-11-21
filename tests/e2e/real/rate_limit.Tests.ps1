@@ -32,8 +32,13 @@ BeforeAll {
 
 Describe "Redis rate limit" {
     Context "deny bucket" -Tag "ratelimit" {
-        It "Should answer 429 with Retry-After and ban:ratelimit:login after the limit" {
+        It "Should answer 429 with the counter's Retry-After and ban:ratelimit:login after the limit" {
             $ip = Get-RateLimitClientIP -HostNumber 1
+            # Keep the four hits in one 1m window: wait out its last 5 seconds.
+            $secondsToWindowEnd = 60 - ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() % 60)
+            if ($secondsToWindowEnd -lt 5) {
+                Start-Sleep -Seconds ($secondsToWindowEnd + 1)
+            }
 
             foreach ($attempt in 1..3) {
                 $allowed = Test-HttpRequest -Endpoint "/rate-limit/login" -IP $ip -TraefikUrl $script:TraefikUrl
@@ -43,9 +48,12 @@ Describe "Redis rate limit" {
             $denied = Test-HttpRequest -Endpoint "/rate-limit/login" -IP $ip -TraefikUrl $script:TraefikUrl
             $denied.StatusCode | Should -Be 429
             [string]$denied.Headers["X-Crowdsec-Remediation"] | Should -Be "ban:ratelimit:login"
+            $secondsToWindowEnd = 60 - ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() % 60)
             $retryAfter = [int]([string]$denied.Headers["Retry-After"])
-            $retryAfter | Should -BeGreaterOrEqual 1
-            $retryAfter | Should -BeLessOrEqual 60 -Because "Retry-After is the time to the end of the 1m window"
+            # 4 hits on a limit of 3: no admit in this window (no previous count to wait out). In the next one the
+            # 4 weigh 4 x (1 - t/60), and 1 + that fits in 3 from t = 30s: Retry-After = time to window end + 30s.
+            $retryAfter | Should -BeGreaterOrEqual ($secondsToWindowEnd + 29) -Because "the next admit is 30s into the next window"
+            $retryAfter | Should -BeLessOrEqual ($secondsToWindowEnd + 31) -Because "the next admit is 30s into the next window"
         }
 
         It "Should not limit another client address with that counter" {

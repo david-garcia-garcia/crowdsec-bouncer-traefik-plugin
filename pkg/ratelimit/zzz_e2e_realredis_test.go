@@ -45,7 +45,7 @@ func waitRealRedis(addr string, budget time.Duration) error {
 		if err != nil {
 			return err
 		}
-		_, _, last := client.Take(context.Background(), "rl:wait", 1_000_000, realRedisWindow)
+		_, last := client.Take(context.Background(), "rl:wait", 1_000_000, realRedisWindow)
 		client.Close()
 		if last == nil {
 			return nil
@@ -78,7 +78,10 @@ func realRedisTestKey(t *testing.T) string {
 // waitAwayFromWindowEnd waits out the last 5 seconds of the current window, so the hits of one case
 // fall in one window.
 func waitAwayFromWindowEnd(window time.Duration) {
-	if remaining := retryAfterAt(time.Now(), window); remaining < 5*time.Second {
+	windowSec := int64(window / time.Second)
+	now := time.Now()
+	windowEnd := time.Unix((now.Unix()/windowSec+1)*windowSec, 0)
+	if remaining := windowEnd.Sub(now); remaining < 5*time.Second {
 		time.Sleep(remaining + 100*time.Millisecond)
 	}
 }
@@ -88,11 +91,11 @@ func takeRealRedisTest(t *testing.T, client *Client, key string) bool {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), StepBudget)
 	defer cancel()
-	allowed, _, err := client.Take(ctx, key, realRedisLimit, realRedisWindow)
+	status, err := client.Take(ctx, key, realRedisLimit, realRedisWindow)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return allowed
+	return status.Allowed
 }
 
 // TestRealRedis_exactModeDeniesTheHitAfterTheLimit proves sync rate 0 denies request requests+1.
@@ -144,7 +147,7 @@ func TestRealRedis_twoClientsShareACounter(t *testing.T) {
 	}
 }
 
-// TestRealRedis_deadAddressReturnsAnError proves an unreachable server is an error, not a verdict.
+// TestRealRedis_deadAddressReturnsAnError proves an unreachable server is an error, not a verdict, in exact mode.
 func TestRealRedis_deadAddressReturnsAnError(t *testing.T) {
 	client, err := newClient(RedisSettings{Host: "127.0.0.1:1"}, slog.Default())
 	if err != nil {
@@ -153,7 +156,7 @@ func TestRealRedis_deadAddressReturnsAnError(t *testing.T) {
 	defer client.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), StepBudget)
 	defer cancel()
-	if _, _, err := client.Take(ctx, realRedisTestKey(t), realRedisLimit, realRedisWindow); err == nil {
+	if _, err := client.Take(ctx, realRedisTestKey(t), realRedisLimit, realRedisWindow); err == nil {
 		t.Fatal("dead address must return an error")
 	}
 }

@@ -14,26 +14,32 @@ import (
 )
 
 // testCounter is an in-memory Counter: every Take counts, then compares with limit.
-// failBucket makes every Take on a key of that bucket return an error.
+// failBucket makes every Take on a key of that bucket return an error. retryAfter is the RetryAfter of
+// a denied Take (default 15s).
 type testCounter struct {
 	counts     map[string]int64
 	failBucket string
+	retryAfter time.Duration
 	takes      []string
 }
 
 // newTestCounter returns an empty testCounter.
 func newTestCounter() *testCounter {
-	return &testCounter{counts: map[string]int64{}}
+	return &testCounter{counts: map[string]int64{}, retryAfter: 15 * time.Second}
 }
 
 // Take counts one hit on key and reports whether the count is within limit.
-func (counter *testCounter) Take(_ context.Context, key string, limit int64, _ time.Duration) (allowed bool, estimated float64, err error) {
+func (counter *testCounter) Take(_ context.Context, key string, limit int64, _ time.Duration) (Status, error) {
 	counter.takes = append(counter.takes, key)
 	if counter.failBucket != "" && strings.Contains(key, ":"+counter.failBucket+":") {
-		return true, 0, errors.New("redis: unreachable")
+		return Status{}, errors.New("redis: unreachable")
 	}
 	counter.counts[key]++
-	return counter.counts[key] <= limit, float64(counter.counts[key]), nil
+	status := Status{Allowed: counter.counts[key] <= limit, Limit: limit, Estimated: float64(counter.counts[key])}
+	if !status.Allowed {
+		status.RetryAfter = counter.retryAfter
+	}
+	return status, nil
 }
 
 // takesOn is how many Takes hit a key of bucket.
@@ -155,23 +161,25 @@ func TestCharge_nilSetOrCounterChargesNothing(t *testing.T) {
 	}
 }
 
-// TestRetryAfterAt_isTimeToTheWindowBoundary proves second 45 of a 60s window gives 15s, on the unix grid.
-func TestRetryAfterAt_isTimeToTheWindowBoundary(t *testing.T) {
-	windowStart := time.Unix(1_800_000_000/60*60, 0)
-	if got := retryAfterAt(windowStart.Add(45*time.Second), time.Minute); got != 15*time.Second {
-		t.Fatalf("second 45: got %s want 15s", got)
-	}
-	if got := retryAfterAt(windowStart, time.Minute); got != time.Minute {
-		t.Fatalf("second 0: got %s want 60s", got)
-	}
-	if got := retryAfterAt(windowStart.Add(59*time.Second+900*time.Millisecond), time.Minute); got != time.Second {
-		t.Fatalf("last second: got %s want 1s", got)
-	}
-	set := mustNewTestBucketSet(t, []BucketRule{{Name: "b", Requests: 1, Window: "60s"}})
-	set.now = func() time.Time { return windowStart.Add(45 * time.Second) }
-	counter := newTestCounter()
-	chargeTest(set, counter, http.MethodGet, "/", "198.51.100.1")
-	if verdict := chargeTest(set, counter, http.MethodGet, "/", "198.51.100.1"); verdict.RetryAfter != 15*time.Second {
-		t.Fatalf("Charge RetryAfter=%s want 15s", verdict.RetryAfter)
+// TestCharge_retryAfterIsTheCounterRetryAfterRoundedUp proves the deny verdict carries the counter's
+// RetryAfter rounded up to whole seconds, at least 1s.
+func TestCharge_retryAfterIsTheCounterRetryAfterRoundedUp(t *testing.T) {
+	for _, tc := range []struct {
+		counter time.Duration
+		want    time.Duration
+	}{
+		{0, time.Second},
+		{300 * time.Millisecond, time.Second},
+		{time.Second, time.Second},
+		{14*time.Second + 200*time.Millisecond, 15 * time.Second},
+		{15 * time.Second, 15 * time.Second},
+	} {
+		set := mustNewTestBucketSet(t, []BucketRule{{Name: "b", Requests: 1, Window: "60s"}})
+		counter := newTestCounter()
+		counter.retryAfter = tc.counter
+		chargeTest(set, counter, http.MethodGet, "/", "198.51.100.1")
+		if verdict := chargeTest(set, counter, http.MethodGet, "/", "198.51.100.1"); verdict.RetryAfter != tc.want {
+			t.Fatalf("counter RetryAfter %s: Charge RetryAfter=%s want %s", tc.counter, verdict.RetryAfter, tc.want)
+		}
 	}
 }

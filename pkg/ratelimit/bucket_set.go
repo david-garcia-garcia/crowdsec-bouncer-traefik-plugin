@@ -14,7 +14,6 @@ import (
 // so Matching returns the buckets that match a request in list order.
 type BucketSet struct {
 	buckets    []compiledBucket
-	now        func() time.Time
 	predicates *httprule.Set
 }
 
@@ -40,7 +39,7 @@ type compiledKeyPart struct {
 // NewBucketSet validates every row and compiles predicates and key patterns once.
 // Inner errors are index-prefixed bucket %d. A row with no predicate matches every request.
 func NewBucketSet(rules []BucketRule) (*BucketSet, error) {
-	set := &BucketSet{buckets: make([]compiledBucket, 0, len(rules)), now: time.Now}
+	set := &BucketSet{buckets: make([]compiledBucket, 0, len(rules))}
 	predicateRows := make([]httprule.Rule, 0, len(rules))
 	seenNames := make(map[string]struct{}, len(rules))
 	for i, rule := range rules {

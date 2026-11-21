@@ -10,7 +10,7 @@ The requirement asks `rateLimitResponseHeaders` to send `Retry-After` "(+ RateLi
 
 ## Why it was not taken
 
-The `RateLimit-*` fields are an IETF draft whose header names and syntax have changed between revisions (`RateLimit-Limit` / `-Remaining` / `-Reset` versus `RateLimit` plus `RateLimit-Policy`). Picking one is a product choice nobody made. `windowcounter.Take` returns a sliding-window estimate, not a remaining count, so a `Remaining` value would be derived and could disagree with the next verdict in buffered mode.
+The `RateLimit-*` fields are an IETF draft whose header names and syntax have changed between revisions (`RateLimit-Limit` / `-Remaining` / `-Reset` versus `RateLimit` plus `RateLimit-Policy`). Picking one is a product choice nobody made. Since utilities v1.0.10, `windowcounter.Take` returns a `Status` with `Limit`, `Remaining`, `Reset`, and `RetryAfter` (`ratelimit.Status` in this repo), so the values exist; in buffered mode `Remaining` is this replica's view and can still disagree with another replica's next verdict. The header shape is the open choice.
 
 ## Risks
 

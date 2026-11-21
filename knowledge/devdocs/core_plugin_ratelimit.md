@@ -53,11 +53,11 @@ if verdict.Err != nil {
 
 ## Gotchas
 
-- `windowcounter` at the `v1.0.9` pin is vendored as published. Do not patch `vendor/`; CI re-vendors. Exact mode is one EVAL (INCR, EXPIRE when the key has no TTL) plus one GET of the previous window per counted bucket; the buffered flush is one EVAL per batch of up to 256 keys.
+- `windowcounter` at the `v1.0.10` pin is vendored as published. Do not patch `vendor/`; CI re-vendors. Exact mode is one EVAL (INCR, EXPIRE when the key has no TTL) plus one GET of the previous window per counted bucket; the buffered flush is one EVAL per batch of up to 256 keys.
 - Buffered mode answers a Redis outage with a nil error and this replica's local count (utilities PR #62), skipping Redis for one sync rate after each failure. The failure action therefore only applies in exact mode or when the step deadline or request context ends. Tests that need a counter error against a dead address use `rateLimitSyncRate: 0`.
 - A hit is counted even when it is denied, so a client that keeps sending stays limited.
 - Windows are whole seconds of at least 1s; `windowcounter` would only fail at `Take`, so `NewBucketSet` rejects them at startup.
-- `Retry-After` is the time to the window boundary on the `unix / window` grid, not a promise that the next request passes.
+- `Retry-After` is `windowcounter.Status.RetryAfter` (utilities v1.0.10+) rounded up to whole seconds, at least 1s, in `Charge`. It is the next admit with no other traffic; hits sent before it still count and push it out. `ratelimit.Status` aliases `windowcounter.Status` so `pkg/bouncer` (depguard) and test fakes do not import the vendored package.
 - A `path`-matched bucket has the same alternate-encoding gap as ban and captcha rules (`knowledge/debt/2026-11-15-ban-captcha-path-rules-ambiguous-path-evasion.md`). A catch-all bucket does not, unless an earlier `final` bucket with a `path` condition matches the encoded path and stops the walk before it.
 - Only the file provider is proven to decode the bucket list (real-stack `config/dynamic/rate-limit.yml`). Traefik drops unknown keys, which is why `algorithm`, `burst`, and `rateLimitStore` exist only to reject `tokenBucket`, a set burst, and `memory`.
 - In exact mode a blackholed Redis costs every request up to `StepBudget` for the whole outage; there is no backoff gate (`knowledge/debt/2026-11-20-rate-limit-redis-backoff-gate.md`). Buffered mode only pays it on the requests that land when `windowcounter` retries Redis.

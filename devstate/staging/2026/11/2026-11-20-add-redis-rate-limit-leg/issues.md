@@ -10,7 +10,7 @@
 - [ ] note large  `knowledge/debt/2026-11-20-rate-limit-captcha-action.md`
   Why: a bucket `captcha` action would exempt every client holding a solved gate cookie; that exemption is the requirement's unanswered open decision 2.
 - [ ] note large  `knowledge/debt/2026-11-20-rate-limit-ratelimit-response-headers.md`
-  Why: the requirement lists `RateLimit-*` headers beside `Retry-After`; the IETF draft's header shape is unsettled and windowcounter has no remaining count, so this change sends `Retry-After` only.
+  Why: the requirement lists `RateLimit-*` headers beside `Retry-After`; the IETF draft's header shape is unsettled, so this change sends `Retry-After` only (since utilities v1.0.10 the counter does return Limit, Remaining and Reset).
 - [ ] note large  `knowledge/debt/2026-11-20-rate-limit-redis-backoff-gate.md`
   Why: in exact mode (`rateLimitSyncRate: 0`) a blackholed Redis costs each request the full 250ms rate-limit budget for the whole outage; no gate skips Redis after repeated failures. Buffered mode skips Redis for one sync rate after a failure (utilities v1.0.9).
 - [ ] note large  `knowledge/debt/2026-11-21-single-reading-path-spec-names-bypassratelimit.md`

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -27,8 +26,11 @@ import (
 // testRateLimitClientIP is the client address every rate-limit request comes from unless a test says otherwise.
 const testRateLimitClientIP = "198.51.100.20"
 
-// testRateLimitCounter is an in-memory ratelimit.Counter. err makes every Take fail (with an allowed
-// local verdict, as buffered mode returns it); block makes every Take wait for its context.
+// testRateLimitRetryAfter is the RetryAfter testRateLimitCounter returns on a deny; Retry-After must round it up to 8.
+const testRateLimitRetryAfter = 7*time.Second + 300*time.Millisecond
+
+// testRateLimitCounter is an in-memory ratelimit.Counter. err makes every Take fail; block makes every
+// Take wait for its context. A denied Take carries testRateLimitRetryAfter.
 type testRateLimitCounter struct {
 	block  bool
 	counts map[string]int64
@@ -37,17 +39,21 @@ type testRateLimitCounter struct {
 }
 
 // Take counts one hit on key and reports whether the count is within limit.
-func (counter *testRateLimitCounter) Take(ctx context.Context, key string, limit int64, _ time.Duration) (allowed bool, estimated float64, err error) {
+func (counter *testRateLimitCounter) Take(ctx context.Context, key string, limit int64, _ time.Duration) (ratelimit.Status, error) {
 	counter.takes.Add(1)
 	if counter.block {
 		<-ctx.Done()
-		return false, 0, ctx.Err()
+		return ratelimit.Status{}, ctx.Err()
 	}
 	if counter.err != nil {
-		return true, 0, counter.err
+		return ratelimit.Status{}, counter.err
 	}
 	counter.counts[key]++
-	return counter.counts[key] <= limit, float64(counter.counts[key]), nil
+	status := ratelimit.Status{Allowed: counter.counts[key] <= limit, Limit: limit, Estimated: float64(counter.counts[key])}
+	if !status.Allowed {
+		status.RetryAfter = testRateLimitRetryAfter
+	}
+	return status, nil
 }
 
 // testRateLimitFixture is one router with the rate limit on, a stream LAPI client that counts usage
@@ -133,9 +139,8 @@ func TestRateLimit_denyAnswersWithStatusRetryAfterAndHeader(t *testing.T) {
 	if rw.Body.String() != "banned reason="+configuration.ReasonRateLimit {
 		t.Fatalf("body=%q", rw.Body.String())
 	}
-	retryAfter, err := strconv.Atoi(rw.Header().Get("Retry-After"))
-	if err != nil || retryAfter < 1 || retryAfter > 60 {
-		t.Fatalf("Retry-After=%q want 1..60", rw.Header().Get("Retry-After"))
+	if got := rw.Header().Get("Retry-After"); got != "8" {
+		t.Fatalf("Retry-After=%q want 8: the counter's 7.3s rounded up", got)
 	}
 	if got := rw.Header().Get("X-Remediation"); got != "ban:ratelimit:login" {
 		t.Fatalf("X-Remediation=%q", got)

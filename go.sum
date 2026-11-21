@@ -1,4 +1,4 @@
-github.com/david-garcia-garcia/traefik-middleware-utilities v1.0.9 h1:KCAzBNiUDjq8lgAMjoFStfSkcmAI/UIxYUHwgFN+Wjc=
-github.com/david-garcia-garcia/traefik-middleware-utilities v1.0.9/go.mod h1:oQP+EKFW8Wa+iWd9VuHuqS/8jeMKZWs/jJr0O8WKfEQ=
+github.com/david-garcia-garcia/traefik-middleware-utilities v1.0.10 h1:HzkmDIciCIDEq6bwY74E2XTzgMbnjYAuH0VStQw8Iy4=
+github.com/david-garcia-garcia/traefik-middleware-utilities v1.0.10/go.mod h1:oQP+EKFW8Wa+iWd9VuHuqS/8jeMKZWs/jJr0O8WKfEQ=
 github.com/traefik/yaegi v0.16.1 h1:f1De3DVJqIDKmnasUF6MwmWv1dSEEat0wcpXhD2On3E=
 github.com/traefik/yaegi v0.16.1/go.mod h1:4eVhbPb3LnD2VigQjhYbEJ69vDRFdT2HQNrXx8eEwUY=

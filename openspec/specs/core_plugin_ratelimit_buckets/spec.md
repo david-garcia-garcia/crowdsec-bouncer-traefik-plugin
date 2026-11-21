@@ -88,14 +88,14 @@ For a request that reaches the rate-limit step, the plugin SHALL walk `rateLimit
 ### Requirement: A deny bucket answers with the rate-limit status and Retry-After
 A denying bucket SHALL answer with the router's ban page and status `rateLimitStatusCode` (default 429). The body rules SHALL be those of the ban page: no body for `HEAD`, 204, or 304, and an empty body when no ban template is loaded. `Cache-Control: no-cache, no-store` SHALL be set. The ban template SHALL receive `RemediationReason` `RATE_LIMIT`. `bouncerRemediationStatusCode` SHALL NOT change this status.
 
-When `rateLimitResponseHeaders` is true (default), the response SHALL carry `Retry-After` with the whole number of seconds until the bucket's current window ends, at least 1. When false, no `Retry-After` is sent. `RateLimit-*` headers SHALL NOT be sent.
+When `rateLimitResponseHeaders` is true (default), the response SHALL carry `Retry-After` with the counter's `RetryAfter` for that hit (`windowcounter.Status`, utilities v1.0.10+): the time until the first whole second at which one more hit on the same key is admitted with no other traffic, sliding-window weight included. It SHALL be rounded up to whole seconds, at least 1. When false, no `Retry-After` is sent. `RateLimit-*` headers SHALL NOT be sent.
 
 The remediation header, when configured, SHALL be `ban:ratelimit:<bucket name>`. A deny SHALL count one usage-metrics drop with origin `plugin:ratelimit:<bucket name>` and remediation `ban` (`core_plugin_lapi_usage-metrics`).
 
 #### Scenario: Deny answers 429 with Retry-After
-- **WHEN** a `deny` bucket `login` with `window: 60s` is over its limit at second 45 of its window
+- **WHEN** a `deny` bucket `login` with `requests: 3` and `window: 60s` denies a client's fourth hit at second 45 of its window, with no hits in the previous window
 - **THEN** the status is 429
-- **AND** `Retry-After` is `15`
+- **AND** `Retry-After` is `45`: 15s to the window end, then 30s until 1 + 4 x (1 - t/60) fits in 3
 - **AND** the remediation header is `ban:ratelimit:login` when `bouncerRemediationHeadersCustomName` is set
 
 #### Scenario: Status code setting is separate from the ban status

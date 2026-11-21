@@ -17,7 +17,8 @@ type ExceededBucket struct {
 
 // Verdict is what charging one request decided.
 // DenyBucket is the deny bucket that answers the request; empty means no bucket denied.
-// RetryAfter is the time to that bucket's next window boundary (at least 1s).
+// RetryAfter is the counter's RetryAfter for that bucket, rounded up to whole seconds (at least 1s): when
+// one more request from the same key is admitted if the client sends nothing else meanwhile.
 // Exceeded lists the log buckets over their limit, in list order.
 // Err is the first counter error; the walk stopped there and the caller applies the failure action.
 type Verdict struct {
@@ -46,17 +47,17 @@ func (set *BucketSet) Charge(ctx context.Context, counter Counter, middlewareNam
 			continue
 		}
 		// Count, then compare: a denied hit still counts, so a client that keeps sending stays limited.
-		allowed, _, err := counter.Take(ctx, key, bucket.requests, bucket.window)
+		status, err := counter.Take(ctx, key, bucket.requests, bucket.window)
 		if err != nil {
 			verdict.Err = fmt.Errorf("bucket %s: %w", bucket.name, err)
 			return verdict
 		}
-		if !allowed && bucket.action == ActionDeny {
+		if !status.Allowed && bucket.action == ActionDeny {
 			verdict.DenyBucket = bucket.name
-			verdict.RetryAfter = retryAfterAt(set.now(), bucket.window)
+			verdict.RetryAfter = wholeSecondsAtLeastOne(status.RetryAfter)
 			return verdict
 		}
-		if !allowed && bucket.action == ActionLog {
+		if !status.Allowed && bucket.action == ActionLog {
 			verdict.Exceeded = append(verdict.Exceeded, ExceededBucket{Name: bucket.name, Requests: bucket.requests, Window: bucket.window})
 		}
 		if bucket.final {
@@ -66,17 +67,11 @@ func (set *BucketSet) Charge(ctx context.Context, counter Counter, middlewareNam
 	return verdict
 }
 
-// retryAfterAt is the time from now to the end of the current window, on the whole-second grid the
-// sliding-window counter starts its windows on (unix seconds divided by the window). At least 1s.
-// The next request is not promised to pass: the previous window still weighs in.
-func retryAfterAt(now time.Time, window time.Duration) time.Duration {
-	windowSec := int64(window / time.Second)
-	if windowSec < 1 {
+// wholeSecondsAtLeastOne rounds d up to whole seconds, at least 1s: Retry-After is whole seconds, and
+// rounding down would send the client back before the counter admits it.
+func wholeSecondsAtLeastOne(d time.Duration) time.Duration {
+	if d <= time.Second {
 		return time.Second
 	}
-	remaining := windowSec - now.Unix()%windowSec
-	if remaining < 1 {
-		remaining = 1
-	}
-	return time.Duration(remaining) * time.Second
+	return (d + time.Second - 1).Truncate(time.Second)
 }

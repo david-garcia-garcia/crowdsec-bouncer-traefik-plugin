@@ -270,7 +270,7 @@ The real-stack Pester suite SHALL run the rate-limit leg inside Traefik's plugin
 
 #### Scenario: Deny after the limit on real Traefik
 - **WHEN** a client sends `requests + 1` requests to a route whose `deny` bucket allows `requests` per window
-- **THEN** the last response is 429 with `Retry-After`
+- **THEN** the last response is 429 with `Retry-After` equal to the counter's next admit (for 4 hits on a limit of 3 per minute: the time to the window end plus 30s, within 1s)
 - **AND** the remediation header is `ban:ratelimit:<bucket>`
 
 #### Scenario: Redis down with passthrough

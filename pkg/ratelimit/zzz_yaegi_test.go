@@ -32,9 +32,14 @@ type denyAfterOne struct {
 	hits map[string]int64
 }
 
-func (counter *denyAfterOne) Take(ctx context.Context, key string, limit int64, window time.Duration) (bool, float64, error) {
+func (counter *denyAfterOne) Take(ctx context.Context, key string, limit int64, window time.Duration) (ratelimit.Status, error) {
 	counter.hits[key]++
-	return counter.hits[key] <= 1, float64(counter.hits[key]), nil
+	allowed := counter.hits[key] <= 1
+	status := ratelimit.Status{Allowed: allowed, Limit: limit, Estimated: float64(counter.hits[key])}
+	if !allowed {
+		status.RetryAfter = 2500 * time.Millisecond
+	}
+	return status, nil
 }
 
 func exitWithFailure(message string) {
@@ -78,7 +83,7 @@ func main() {
 	var fake ratelimit.Counter = &denyAfterOne{hits: map[string]int64{}}
 	first := set.Charge(context.Background(), fake, "yaegi", httptest.NewRequest("GET", "http://example.com/", nil), clientIP)
 	second := set.Charge(context.Background(), fake, "yaegi", httptest.NewRequest("GET", "http://example.com/", nil), clientIP)
-	if first.DenyBucket != "" || second.DenyBucket != "per-ip" || second.RetryAfter < time.Second {
+	if first.DenyBucket != "" || second.DenyBucket != "per-ip" || second.RetryAfter != 3*time.Second {
 		exitWithFailure("interpreted counter: want the second request denied by per-ip")
 	}
 }

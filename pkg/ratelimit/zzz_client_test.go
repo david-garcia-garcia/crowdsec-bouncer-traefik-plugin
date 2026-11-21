@@ -87,7 +87,7 @@ func TestOpen_deadRedisBufferedKeepsTheLocalLimit(t *testing.T) {
 	for hit := 1; hit <= 3; hit++ {
 		ctx, cancel := context.WithTimeout(context.Background(), StepBudget)
 		started := time.Now()
-		allowed, _, takeErr := client.Take(ctx, key, 2, time.Minute)
+		status, takeErr := client.Take(ctx, key, 2, time.Minute)
 		cancel()
 		if takeErr != nil {
 			t.Fatalf("hit %d: buffered Take must not fail on a Redis outage: %v", hit, takeErr)
@@ -95,8 +95,8 @@ func TestOpen_deadRedisBufferedKeepsTheLocalLimit(t *testing.T) {
 		if elapsed := time.Since(started); elapsed > StepBudget+100*time.Millisecond {
 			t.Fatalf("hit %d: Take took %s, budget %s", hit, elapsed, StepBudget)
 		}
-		if want := hit <= 2; allowed != want {
-			t.Fatalf("hit %d: allowed=%v, want %v (local limit 2)", hit, allowed, want)
+		if want := hit <= 2; status.Allowed != want {
+			t.Fatalf("hit %d: allowed=%v, want %v (local limit 2)", hit, status.Allowed, want)
 		}
 	}
 }
@@ -157,7 +157,7 @@ func assertTakeFailsWithinBudget(t *testing.T, client *Client) {
 	ctx, cancel := context.WithTimeout(context.Background(), StepBudget)
 	defer cancel()
 	started := time.Now()
-	_, _, err := client.Take(ctx, "rl:edge:b:"+t.Name(), 5, time.Minute)
+	_, err := client.Take(ctx, "rl:edge:b:"+t.Name(), 5, time.Minute)
 	if err == nil {
 		t.Fatal("Take must fail")
 	}
