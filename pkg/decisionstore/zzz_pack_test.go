@@ -39,7 +39,7 @@ func TestPackOverflowUsesGenericOrigin(t *testing.T) {
 }
 
 func TestUnpackKindOriginString(t *testing.T) {
-	hit := unpackFromString(KindOriginString(decisionscope.BannedValue, "crowdsec"))
+	hit, _ := unpackFromString(KindOriginString(decisionscope.BannedValue, "crowdsec"))
 	if hit.kind != decisionscope.BannedValue || hit.origin != "crowdsec" || hit.scenario != "" {
 		t.Fatalf("hit %+v", hit)
 	}
@@ -97,8 +97,8 @@ func TestPackSaturatesOriginPast12Bits(t *testing.T) {
 	}
 }
 
-func TestLiveSlotStaysEightBytes(t *testing.T) {
-	if got := unsafe.Sizeof(LiveSlot{}); got != 8 {
-		t.Fatalf("LiveSlot %d bytes, want 8", got)
+func TestLiveSlotIsTwelveBytes(t *testing.T) {
+	if got := unsafe.Sizeof(LiveSlot{}); got != 12 {
+		t.Fatalf("LiveSlot %d bytes, want 12", got)
 	}
 }

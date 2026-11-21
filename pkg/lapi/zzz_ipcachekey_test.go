@@ -31,7 +31,7 @@ func lookupAsRequest(client *Client, remoteIP string) (string, error) {
 	if ipAddr != nil {
 		remoteIP = ipAddr.String()
 	}
-	kind, _, _, err := client.LookupRemediation(remoteIP, ipAddr, nil)
+	kind, _, _, _, err := client.LookupRemediation(remoteIP, ipAddr, nil)
 	return kind, err
 }
 
@@ -142,7 +142,7 @@ func liveRequests(t *testing.T, addresses []string) int64 {
 		if kind != "" {
 			continue
 		}
-		if _, _, err := client.LiveLookup(canonical, nil, 60); err != nil {
+		if _, _, _, err := client.LiveLookup(canonical, nil, 60); err != nil {
 			t.Fatalf("live lookup %q: %v", address, err)
 		}
 	}
@@ -185,7 +185,7 @@ func TestLiveLookup_MemoKeepsBanWhenLAPIClears(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	client := newTestLiveClient(t, server)
-	kind, _, err := client.LiveLookup("1.2.3.4", nil, 60)
+	kind, _, _, err := client.LiveLookup("1.2.3.4", nil, 60)
 	if err == nil || kind != decisionscope.BannedValue {
 		t.Fatalf("first live lookup kind %q err %v", kind, err)
 	}

@@ -67,8 +67,10 @@ func (c *Client) streamPutItem(item Decision, duration int64) (decisionstore.Dec
 	if decisionstore.SlotKey(scope, item.Value) == "" {
 		return decisionstore.Decision{}, false
 	}
+	// Stream keeps the slot exactly as long as the decision lasts, so TTL and decision duration match.
 	return decisionstore.Decision{
-		Scope: scope, Value: item.Value, Kind: kind, Origin: origin, Scenario: item.Scenario, DurationSec: duration,
+		Scope: scope, Value: item.Value, Kind: kind, Origin: origin, Scenario: item.Scenario,
+		DurationSec: duration, DecisionDurationSec: duration,
 	}, true
 }
 
@@ -130,7 +132,7 @@ func (c *Client) queryLiveDecisions(rawQuery string) (liveResult, error) {
 	}, nil
 }
 
-// liveResult is one live/none LAPI query: kind, metrics origin, raw scenario, and decision TTL.
+// liveResult is one live/none LAPI query: kind, metrics origin, raw scenario, and the decision's LAPI duration.
 type liveResult struct {
 	kind     string
 	origin   string
@@ -195,19 +197,21 @@ func (c *Client) cacheLiveScope(scope, identifier string, result liveResult, isL
 		return
 	}
 	if !decisionscope.IsActiveRemediation(result.kind) {
-		c.memoLive(scope, identifier, decisionscope.NoBannedValue, "", "", defaultDecisionSeconds)
+		c.memoLive(scope, identifier, decisionscope.NoBannedValue, "", "", defaultDecisionSeconds, 0)
 		return
 	}
-	c.memoLive(scope, identifier, result.kind, result.origin, result.scenario, liveCacheTTL(result.duration, defaultDecisionSeconds))
+	c.memoLive(scope, identifier, result.kind, result.origin, result.scenario, liveCacheTTL(result.duration, defaultDecisionSeconds), int64(result.duration.Seconds()))
 }
 
 // memoLive writes a live/none TTL slot through the decision store.
-func (c *Client) memoLive(scope, value, kind, origin, scenario string, durationSec int64) {
+// durationSec is the capped cache TTL; decisionDurationSec is the full LAPI decision duration (0 for a clean memo).
+func (c *Client) memoLive(scope, value, kind, origin, scenario string, durationSec, decisionDurationSec int64) {
 	if c == nil || c.decisionStore == nil {
 		return
 	}
 	c.decisionStore.Put(decisionstore.Decision{
-		Scope: scope, Value: value, Kind: kind, Origin: origin, Scenario: scenario, DurationSec: durationSec,
+		Scope: scope, Value: value, Kind: kind, Origin: origin, Scenario: scenario,
+		DurationSec: durationSec, DecisionDurationSec: decisionDurationSec,
 	})
 }
 

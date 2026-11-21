@@ -24,7 +24,7 @@ func BenchmarkLookupStreamMiss_100kSeq(b *testing.B) {
 	get := benchSnapshotGet(snapshot)
 	b.ResetTimer()
 	for range b.N {
-		kind, origin := lookupHits(get, remoteIP, ipAddr, scopes, membership)
+		kind, origin, _ := lookupHits(get, remoteIP, ipAddr, scopes, membership)
 		_ = kind
 		_ = origin
 	}
@@ -38,7 +38,7 @@ func BenchmarkLookupStreamMiss_100kParallel(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			kind, origin := lookupHits(get, remoteIP, ipAddr, scopes, membership)
+			kind, origin, _ := lookupHits(get, remoteIP, ipAddr, scopes, membership)
 			_ = kind
 			_ = origin
 		}

@@ -3,6 +3,7 @@ package lapi
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
@@ -10,6 +11,7 @@ import (
 
 // LiveLookup queries LAPI for one IP and mapped header scopes (none/live mode).
 // defaultDecisionSeconds is the live-cache TTL the caller wants for this lookup.
+// decisionLeft is the LAPI duration of the decision the merge kept, for an active kind only (0 = unknown).
 //
 // The returned error carries two different meanings and the caller separates them by the
 // remediation kind, never by the error alone:
@@ -18,19 +20,20 @@ import (
 //	non-active remediation + non-nil error -> LAPI failed; apply BouncerLapiFailureAction
 //
 // Any query this lookup makes can fail that way: the IP query and every header-scope query.
-func (c *Client) LiveLookup(remoteIP string, scopes map[string]string, defaultDecisionSeconds int64) (kind string, origin string, err error) {
+func (c *Client) LiveLookup(remoteIP string, scopes map[string]string, defaultDecisionSeconds int64) (kind string, origin string, decisionLeft time.Duration, err error) {
 	return c.handleNoStreamCache(remoteIP, scopes, defaultDecisionSeconds)
 }
 
 // handleNoStreamCache queries LAPI for the client address and each mapped header, writes the
-// IP query result to the client-address cache key, and returns the PreferRemediation merge.
-func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, defaultDecisionSeconds int64) (string, string, error) {
+// IP query result to the client-address cache key, and returns the PreferRemediation merge
+// with the winner's decision duration.
+func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, defaultDecisionSeconds int64) (string, string, time.Duration, error) {
 	isLiveMode := c.crowdsecMode == configuration.LiveMode
 	// remoteIP is already canonical on clientRequest. Do not re-parse it for the memo key.
 	// LAPI ?ip= matches numerically and does not care about spelling.
 	chosen, err := c.queryLiveDecisions(fmt.Sprintf("ip=%v", remoteIP))
 	if err != nil {
-		return "", "", err
+		return "", "", 0, err
 	}
 	// Keep the IP query result for the client-address slot. Header merge mutates chosen.
 	ipResult := chosen
@@ -48,21 +51,29 @@ func (c *Client) handleNoStreamCache(remoteIP string, scopes map[string]string, 
 	// A clean IP result is not written when a header query failed (fail-closed).
 	if isLiveMode && defaultDecisionSeconds > 0 {
 		if decisionscope.IsActiveRemediation(ipResult.kind) {
-			c.memoLive(decisionscope.ScopeIP, remoteIP, ipResult.kind, ipResult.origin, ipResult.scenario, liveCacheTTL(ipResult.duration, defaultDecisionSeconds))
+			c.memoLive(decisionscope.ScopeIP, remoteIP, ipResult.kind, ipResult.origin, ipResult.scenario, liveCacheTTL(ipResult.duration, defaultDecisionSeconds), int64(ipResult.duration.Seconds()))
 		} else if scopeErr == nil {
-			c.memoLive(decisionscope.ScopeIP, remoteIP, decisionscope.NoBannedValue, "", "", defaultDecisionSeconds)
+			c.memoLive(decisionscope.ScopeIP, remoteIP, decisionscope.NoBannedValue, "", "", defaultDecisionSeconds, 0)
 		}
 	}
 	// An active remediation is a real decision, so it outranks a scope failure and comes back with
 	// the "banned" error. A scope failure must never downgrade or mask it.
 	if decisionscope.IsActiveRemediation(chosen.kind) {
-		return chosen.kind, chosen.origin, errors.New("handleNoStreamCache:banned")
+		return chosen.kind, chosen.origin, liveDecisionLeft(chosen.duration), errors.New("handleNoStreamCache:banned")
 	}
 	// A failed scope query is not "no decision". Report it the way a failed IP query is already
 	// reported - empty remediation plus the error - so the caller applies
 	// BouncerLapiFailureAction. Caching the unverified allow would outlive the outage.
 	if scopeErr != nil {
-		return "", "", scopeErr
+		return "", "", 0, scopeErr
 	}
-	return decisionscope.NoBannedValue, "", nil
+	return decisionscope.NoBannedValue, "", 0, nil
+}
+
+// liveDecisionLeft is the time left on a decision LAPI just returned with duration. A non-positive duration is unknown (0).
+func liveDecisionLeft(duration time.Duration) time.Duration {
+	if duration <= 0 {
+		return 0
+	}
+	return duration
 }

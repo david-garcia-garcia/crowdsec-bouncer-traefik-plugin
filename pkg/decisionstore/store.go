@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"sync/atomic"
+	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
@@ -22,10 +23,11 @@ type engine struct {
 	putMany      func([]Decision)
 	deleteMany   func([]Decision)
 	activeCounts func() map[ActiveCountKey]int64 // memory: last PublishTick walk; Redis: always empty
-	lookup       func(string, net.IP, map[string]string, *RangeMembership) (string, string, uint16, error)
-	applyRange   func(map[string]string, []string) error
-	rangeIndex   func() (string, error)
-	close        func()
+	// lookup returns kind, origin, origin id, and the winning decision time left (0 = unknown).
+	lookup     func(string, net.IP, map[string]string, *RangeMembership) (string, string, uint16, time.Duration, error)
+	applyRange func(map[string]string, []string) error
+	rangeIndex func() (string, error)
+	close      func()
 }
 
 // memoryEngine binds *memory methods into engine funcs.
@@ -189,7 +191,8 @@ func (s *Store) DeleteMany(items []Decision) {
 }
 
 // LookupRemediation is the request path for stream/alone and live/none.
-func (s *Store) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string) (kind string, origin string, originID uint16, err error) {
+// decisionLeft is the time left on the decision the merge chose, on the engine clock at lookup (0 = unknown).
+func (s *Store) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string) (kind string, origin string, originID uint16, decisionLeft time.Duration, err error) {
 	return s.engine.lookup(remoteIP, ipAddr, scopes, s.RangeMembership())
 }
 

@@ -31,7 +31,7 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 
 	// live, stream, and alone consult the cache.
 	if crowdsecMode == configuration.LiveMode || crowdsecMode == configuration.StreamMode || crowdsecMode == configuration.AloneMode {
-		kind, origin, originID, lookupErr := lapiClient.LookupRemediation(req.IPAddrString(), req.IPAddr(), scopes)
+		kind, origin, originID, decisionLeft, lookupErr := lapiClient.LookupRemediation(req.IPAddrString(), req.IPAddr(), scopes)
 		if lookupErr != nil {
 			if errors.Is(lookupErr, decisionstore.ErrUnreachable) && !b.redisUnreachableBlock {
 				b.log.Error("serveLAPI:Get", "ip", req.IPAddrString(), "redisUnreachable", true)
@@ -45,7 +45,7 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 		switch {
 		case decisionscope.IsActiveRemediation(kind):
 			logger.Trace(b.log, "serveLAPI", appendScopesGroup([]any{"ip", req.IPAddrString(), "remediation", kind}, scopes)...)
-			return b.remediateUnderActionRules(rw, req, match, kind, b.resolveDroppedOrigin(origin, originID))
+			return b.remediateUnderActionRules(rw, req, match, kind, b.resolveDroppedOrigin(origin, originID), decisionLeft)
 		case kind == decisionscope.NoBannedValue:
 			return false
 		}
@@ -62,7 +62,7 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 	}
 
 	if crowdsecMode == configuration.LiveMode || crowdsecMode == configuration.NoneMode {
-		kind, origin, lookupErr := lapiClient.LiveLookup(req.IPAddrString(), scopes, b.defaultDecisionSeconds)
+		kind, origin, decisionLeft, lookupErr := lapiClient.LiveLookup(req.IPAddrString(), scopes, b.defaultDecisionSeconds)
 		if lookupErr != nil {
 			b.log.Debug("serveLAPI:LiveLookup", "error", lookupErr.Error())
 			if !decisionscope.IsActiveRemediation(kind) {
@@ -74,7 +74,7 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 			return false
 		}
 		logger.Trace(b.log, "serveLAPI:LiveLookup", appendScopesGroup([]any{"ip", req.IPAddrString(), "isBanned", kind}, scopes)...)
-		return b.remediateUnderActionRules(rw, req, match, kind, origin)
+		return b.remediateUnderActionRules(rw, req, match, kind, origin, decisionLeft)
 	}
 	return true
 }
@@ -87,7 +87,7 @@ func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req clientreque
 	case configuration.FailureActionPassthrough:
 		return false
 	case configuration.FailureActionCaptcha:
-		return b.remediateUnderActionRules(rw, req, match, decisionscope.CaptchaValue, origin)
+		return b.remediateUnderActionRules(rw, req, match, decisionscope.CaptchaValue, origin, noLAPIDecisionEnd)
 	default:
 		b.banWarnCaptchaRule(rw, req, match, banReason, headerReasonFromOrigin(origin), origin)
 		return true

@@ -231,7 +231,7 @@ func TestHunt_StreamAppliesDeletedBeforeNew(t *testing.T) {
 	if err := client.handleStreamCache(); err != nil {
 		t.Fatalf("replacement poll: %v", err)
 	}
-	kind, _, _, err := client.LookupRemediation(ipValue, net.ParseIP(ipValue), nil)
+	kind, _, _, _, err := client.LookupRemediation(ipValue, net.ParseIP(ipValue), nil)
 	if err != nil || kind != decisionscope.BannedValue {
 		t.Fatalf("same-window IP replacement must stay banned, got %q err %v", kind, err)
 	}
@@ -256,7 +256,7 @@ func TestHunt_StreamRangeAppliesDeletedBeforeNew(t *testing.T) {
 	if err := client.handleStreamCache(); err != nil {
 		t.Fatalf("replacement poll: %v", err)
 	}
-	got, _, _, err := client.LookupRemediation("10.1.2.3", net.ParseIP("10.1.2.3"), nil)
+	got, _, _, _, err := client.LookupRemediation("10.1.2.3", net.ParseIP("10.1.2.3"), nil)
 	if err != nil || !decisionscope.IsActiveRemediation(got) {
 		t.Fatalf("same-window Range replacement must stay banned, got %q err %v", got, err)
 	}

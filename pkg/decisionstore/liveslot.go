@@ -6,10 +6,13 @@ import (
 )
 
 // LiveSlot is one in-memory stream/alone decision keyed by Ip or header-scope string.
-// ExpiresAt is elapsed whole seconds on the package clock, not wall Unix.
+// ExpiresAt (store TTL end) and DecisionEnd (decision end, 0 = unknown) are elapsed whole
+// seconds on the package clock, not wall Unix. Stream sets both to the same second; a live
+// memo keeps ExpiresAt at the capped cache end and DecisionEnd at the decision end.
 type LiveSlot struct {
-	Word      uint32
-	ExpiresAt int32
+	Word        uint32
+	ExpiresAt   int32
+	DecisionEnd int32
 }
 
 // elapsedStart is the process-wide memory slot clock. time.Since uses its monotonic reading.
@@ -46,7 +49,28 @@ func expiryFromDuration(durationSec int64) int32 {
 	return int32(elapsedExpiresAt)
 }
 
-// LiveSlotFromPack builds a slot from a packed word and CrowdSec duration seconds.
-func LiveSlotFromPack(word uint32, durationSec int64) LiveSlot {
-	return LiveSlot{Word: word, ExpiresAt: expiryFromDuration(durationSec)}
+// decisionEndFromDuration is the elapsed DecisionEnd for a decision's remaining seconds, or 0 when unknown.
+// A known end is at least elapsedBias, so it never collides with the 0 sentinel.
+func decisionEndFromDuration(decisionDurationSec int64) int32 {
+	if decisionDurationSec <= 0 {
+		return 0
+	}
+	return expiryFromDuration(decisionDurationSec)
+}
+
+// LiveSlotFromPack builds a slot from a packed word, the store TTL seconds, and the decision's remaining seconds.
+func LiveSlotFromPack(word uint32, durationSec, decisionDurationSec int64) LiveSlot {
+	return LiveSlot{
+		Word:        word,
+		ExpiresAt:   expiryFromDuration(durationSec),
+		DecisionEnd: decisionEndFromDuration(decisionDurationSec),
+	}
+}
+
+// decisionLeft is the time left on this slot's decision at elapsed now. Zero when the end is unknown or past.
+func (slot LiveSlot) decisionLeft(now int32) time.Duration {
+	if slot.DecisionEnd <= now {
+		return 0
+	}
+	return time.Duration(slot.DecisionEnd-now) * time.Second
 }

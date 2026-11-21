@@ -49,10 +49,11 @@ func AttachTestInternStore(client *Client) *decisionstore.Store {
 	return store
 }
 
-// SeedLiveSnapshotForTest publishes one stream/alone memory slot for bouncer tests.
+// SeedLiveSnapshotForTest publishes one stream/alone memory slot for bouncer tests. Like stream apply,
+// the decision lasts as long as the slot (durationSec is both the TTL and the decision duration).
 func SeedLiveSnapshotForTest(store *decisionstore.Store, key, kind, origin string, durationSec int64) {
 	store.SeedSlotForTest(decisionstore.Decision{
-		Scope: decisionscope.ScopeIP, Value: key, Kind: kind, Origin: origin, DurationSec: durationSec,
+		Scope: decisionscope.ScopeIP, Value: key, Kind: kind, Origin: origin, DurationSec: durationSec, DecisionDurationSec: durationSec,
 	})
 }
 

@@ -25,10 +25,10 @@ func TestHandleStreamCache_SkipsUndecodableDuration(t *testing.T) {
 	if err := client.handleStreamCache(); err != nil {
 		t.Fatal(err)
 	}
-	if kind, _, _, err := client.LookupRemediation(skipped, net.ParseIP(skipped), nil); err != nil || kind != "" {
+	if kind, _, _, _, err := client.LookupRemediation(skipped, net.ParseIP(skipped), nil); err != nil || kind != "" {
 		t.Fatalf("bad duration must be skipped, got %q err %v", kind, err)
 	}
-	if kind, _, _, err := client.LookupRemediation(kept, net.ParseIP(kept), nil); err != nil || kind != decisionscope.BannedValue {
+	if kind, _, _, _, err := client.LookupRemediation(kept, net.ParseIP(kept), nil); err != nil || kind != decisionscope.BannedValue {
 		t.Fatalf("sibling decision = %q err %v", kind, err)
 	}
 }
@@ -65,11 +65,11 @@ func TestHandleStreamCache_FlushesAtPutManyChunk(t *testing.T) {
 	}
 	for _, index := range []int{0, decisionstore.PutManyChunk - 1, decisionstore.PutManyChunk} {
 		oldIP := testChunkIP(1, index)
-		if kind, _, _, lookupErr := client.LookupRemediation(oldIP, net.ParseIP(oldIP), nil); lookupErr != nil || kind != "" {
+		if kind, _, _, _, lookupErr := client.LookupRemediation(oldIP, net.ParseIP(oldIP), nil); lookupErr != nil || kind != "" {
 			t.Fatalf("deleted %s = %q err %v", oldIP, kind, lookupErr)
 		}
 		newIP := testChunkIP(2, index)
-		if kind, _, _, lookupErr := client.LookupRemediation(newIP, net.ParseIP(newIP), nil); lookupErr != nil || kind != decisionscope.BannedValue {
+		if kind, _, _, _, lookupErr := client.LookupRemediation(newIP, net.ParseIP(newIP), nil); lookupErr != nil || kind != decisionscope.BannedValue {
 			t.Fatalf("added %s = %q err %v", newIP, kind, lookupErr)
 		}
 	}

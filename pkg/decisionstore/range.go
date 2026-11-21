@@ -43,7 +43,7 @@ func ApplyRangeIndex(index string, upserts map[string]string, removals []string)
 		if network == "" || !decisionscope.IsActiveRemediation(stored) {
 			continue
 		}
-		hit := unpackFromString(stored)
+		hit, _ := unpackFromString(stored)
 		records = upsertRangeRecord(records, network, hit.kind, hit.origin)
 	}
 	return formatRangeRecords(records)

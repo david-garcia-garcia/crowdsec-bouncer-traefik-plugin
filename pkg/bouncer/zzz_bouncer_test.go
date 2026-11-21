@@ -166,7 +166,7 @@ func TestHandleBanServeHTTPWithDifferentMethods(t *testing.T) {
 			}
 			rw := httptest.NewRecorder()
 			req := &http.Request{Method: tt.method}
-			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", headerReasonLAPI, "")
+			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", headerReasonLAPI, "", noLAPIDecisionEnd)
 			if rw.Code != http.StatusForbidden {
 				t.Errorf("Expected status code 403, got %d", rw.Code)
 			}
@@ -219,7 +219,7 @@ func TestHandleBanServeHTTPTrustedTraceID(t *testing.T) {
 			if tt.headerValue != "" {
 				req.Header.Set("X-Request-Id", tt.headerValue)
 			}
-			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", headerReasonLAPI, "")
+			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", headerReasonLAPI, "", noLAPIDecisionEnd)
 			body := rw.Body.String()
 			if body != tt.wantBody {
 				t.Errorf("body=%q want %q", body, tt.wantBody)
@@ -249,7 +249,7 @@ func TestHandleBanServeHTTPContentType(t *testing.T) {
 			}
 			rw := httptest.NewRecorder()
 			req := &http.Request{Method: http.MethodGet}
-			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", headerReasonLAPI, "")
+			b.handleBanServeHTTP(rw, testClientRequest(req, "0.0.0.0"), "TEST", headerReasonLAPI, "", noLAPIDecisionEnd)
 			if got := rw.Header().Get("Content-Type"); got != tt.banTemplateContentType {
 				t.Errorf("Expected Content-Type %q, got %q", tt.banTemplateContentType, got)
 			}

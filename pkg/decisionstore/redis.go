@@ -172,11 +172,13 @@ func (r *redis) BeginTick() {}
 // PublishTick is a no-op: Redis key TTL is the expiry.
 func (r *redis) PublishTick(int32) {}
 
-// PutMany is SET of kind+origin strings. Same DurationSec share one MSetEX, chunked at PutManyChunk.
+// PutMany is SET of slot values (kind, origin, scenario, decision end). Same DurationSec share one
+// MSetEX, chunked at PutManyChunk. The end is wall-clock Unix seconds because replicas share the value.
 func (r *redis) PutMany(items []Decision) {
 	if r == nil || r.writer == nil || len(items) == 0 {
 		return
 	}
+	nowUnix := time.Now().Unix()
 	namesByTTL := map[int64][]string{}
 	valuesByTTL := map[int64][][]byte{}
 	for _, item := range items {
@@ -185,8 +187,9 @@ func (r *redis) PutMany(items []Decision) {
 			continue
 		}
 		ttl := item.DurationSec
+		hit := lookupHit{kind: item.Kind, origin: item.Origin, scenario: item.Scenario}
 		namesByTTL[ttl] = append(namesByTTL[ttl], prefixed(r.prefix, key))
-		valuesByTTL[ttl] = append(valuesByTTL[ttl], []byte(packToString(lookupHit{kind: item.Kind, origin: item.Origin, scenario: item.Scenario})))
+		valuesByTTL[ttl] = append(valuesByTTL[ttl], []byte(packToString(hit, decisionEndUnix(nowUnix, item.DecisionDurationSec))))
 	}
 	for ttl, names := range namesByTTL {
 		r.msetexGrouped(names, valuesByTTL[ttl], ttl)
@@ -231,22 +234,46 @@ func (r *redis) activeCounts() map[ActiveCountKey]int64 {
 }
 
 // LookupRemediation reads Redis (Ip, header scopes) then merges Range from membership.
-func (r *redis) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (kind string, origin string, originID uint16, err error) {
+// decisionLeft is the winner's end line minus this replica's wall clock (0 = unknown or past).
+func (r *redis) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (kind string, origin string, originID uint16, decisionLeft time.Duration, err error) {
 	if r == nil {
-		return "", "", 0, nil
+		return "", "", 0, 0, nil
 	}
 	found, err := r.getMany(lookupKeys(remoteIP, scopes))
 	if err != nil {
-		return "", "", 0, err
+		return "", "", 0, 0, err
 	}
-	kind, origin = lookupHits(func(key string) lookupHit {
+	now := time.Now()
+	kind, origin, decisionLeft = lookupHits(func(key string) lookupHit {
 		value, ok := found[key]
 		if !ok || value == "" {
 			return lookupHit{}
 		}
-		return unpackFromString(value)
+		hit, endUnix := unpackFromString(value)
+		hit.left = leftUntilUnix(endUnix, now)
+		return hit
 	}, remoteIP, ipAddr, scopes, membership)
-	return kind, origin, originID, nil
+	return kind, origin, originID, decisionLeft, nil
+}
+
+// decisionEndUnix is the wall-clock Unix second a decision with decisionDurationSec left ends, or 0 when unknown.
+func decisionEndUnix(nowUnix, decisionDurationSec int64) int64 {
+	if decisionDurationSec <= 0 {
+		return 0
+	}
+	return nowUnix + decisionDurationSec
+}
+
+// leftUntilUnix is the time from now to the wall-clock end endUnix. Zero when the end is unknown or already past.
+func leftUntilUnix(endUnix int64, now time.Time) time.Duration {
+	if endUnix <= 0 {
+		return 0
+	}
+	left := time.Unix(endUnix, 0).Sub(now)
+	if left <= 0 {
+		return 0
+	}
+	return left
 }
 
 // ApplyRangeBatch upserts and removes Range lines with one Redis read and one write.

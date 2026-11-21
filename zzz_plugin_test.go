@@ -349,7 +349,7 @@ func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 		t.Fatalf("bouncer B: got %d want 200", rb.Code)
 	}
 
-	kind, _, _, err := testRoute(t, hb).LapiClient().LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil)
+	kind, _, _, _, err := testRoute(t, hb).LapiClient().LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil)
 	if err == nil && kind == decisionscope.BannedValue {
 		t.Fatal("B's store must not contain A's ban")
 	}
