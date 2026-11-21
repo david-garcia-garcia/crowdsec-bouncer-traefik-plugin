@@ -11,6 +11,6 @@ src: 9a859d886601a205
 localTests: none
 requirement: requirement.md
 comments: none
-explore: none
+explore: explore.md
 change: none
 pr: { id: 229, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/229 }
