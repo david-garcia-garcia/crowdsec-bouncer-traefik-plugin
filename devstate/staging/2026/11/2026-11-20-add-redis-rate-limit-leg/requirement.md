@@ -5,6 +5,7 @@ Two rounds on the same ticket, branch, and PR #228.
 
 - **Round 1** (2026-11-20): the caller spec (`ticket/source.md`), copied in full, then its grounding sections (suffixed `— round 1`). Implemented, reviewed, OpenSpec change `add-redis-rate-limit-leg` archived and synced. Kept as history; its grounding was measured on `origin/master` @ `44e2151b`.
 - **Round 2** (2026-11-21): the caller spec addendum (`ticket/source-round2.md`), copied in full, then the live grounding sections `## Current (code)`, `## Out of scope`, `## Unknowns`, `## Tensions`. Where round 2 and round 1 disagree, round 2 wins (it replaces the bucket actions and answers round-1 open decision 2).
+  - **Addendum B** (2026-11-21, added after round-2 prepare, before explore; appended to `ticket/source-round2.md`): the rate-limit leg becomes a shared leg published under an instance name like LAPI, AppSec, captcha and ModSec, with the policy centralized on the owner, counters keyed per subscribing router, and the common leg abstraction extracted first in this PR. Copied in full after the round-2 addendum's `## Housekeeping`; grounded in the same live sections (rows marked "addendum B"). It reverses round 1's "Open-only" rate-limit leg and its out-of-scope row.
 
 ---
 
@@ -285,6 +286,54 @@ solved in Pester).
 
 ---
 
+# Round 2 addendum B — the rate-limit leg is a shared leg (2026-11-21)
+
+Same round, same branch, same PR #228. Added after round-2 prepare, before explore. Round 2 now carries both the
+bucket actions above and this addendum.
+
+## Human ask (verbatim, chat 2026-11-21)
+
+The conductor quoted the round-1 debt note `knowledge/debt/2026-11-20-extract-common-leg-abstraction.md`
+("The rate-limit leg … is Open-only: it is not published under an instance name (requirement Out of scope) …").
+The human answered:
+
+> el ratelimiter SÍ que necesita ser shared, como el resto de legs
+
+Asked what the owner shares with subscribed routers, the human answered (verbatim):
+
+> lo que pasa es que tengo varias topologías de aplicación, todas con la misma configuración de buckets, etc. y me
+> gustaría que eso estuviera centralizdo
+
+## Human decisions (chat 2026-11-21) — DECIDED, not assumed
+
+1. **Shared leg.** The rate-limit leg is published under an instance name like LAPI, AppSec, captcha and ModSec:
+   an owner middleware Opens it and publishes it (`SetAlias`); routers subscribe (`Watch` / `Receive`) with
+   `bouncerEnabled` + the instance name. Round 1's "Open-only" shape and its out-of-scope row
+   ("Publishing the rate limit leg as a shared instance … not asked") are reversed.
+2. **Centralized policy.** The bucket list and the rest of the rate-limit policy live on the owner, so several
+   application topologies share one configuration. (Conductor reading, to confirm in explore: the owner carries the
+   Redis connection, `rateLimitSyncRate`, `rateLimitBuckets`, `rateLimitFailureAction`, `rateLimitStatusCode`,
+   `rateLimitResponseHeaders`; a subscriber carries only the instance name.)
+3. **Counters per subscribing router** (option chosen: "Por router (Recomendado)"). Same policy, each application
+   keeps its own budget: the counter key stays `rl:<subscribing router middleware name>:<bucket>:<hash>`, so a
+   client that exhausts a limit on app A still has its full budget on app B. Not `rl:<instance>:…`.
+4. **Extract the common leg abstraction in this PR** (option chosen: "Extraer en este PR (Recomendado)"):
+   first a behaviour-preserving commit that moves the four published legs (LAPI, AppSec, captcha, ModSec) onto one
+   leg descriptor (existing tests green), then the rate-limit leg enters as one more descriptor. No fifth hand copy.
+   This takes the debt note `knowledge/debt/2026-11-20-extract-common-leg-abstraction.md` (close its `issues.md`
+   row, delete the file). Note: that debt note says "three existing legs"; the code has four (ModSec included).
+
+## Conductor assumptions for this round (human did not answer; revisit at review)
+
+- The instance-name setting follows the other legs' naming (`rateLimitInstanceName`), and the own / bounce axes
+  follow `plugin.go`'s existing rules (`rateLimitEnabled` = own, `bouncerEnabled` + instance name = bounce).
+- The captcha-bucket behaviour of this round (downgrade, `bypassCaptcha`, gate check) is decided per request on the
+  **subscribing** router (its captcha subscription), not on the owner.
+- Not in this round: the single-EVAL + local over-limit-cache load design, Redis TLS / ACL user settings
+  (simpleredis v1.0.9 supports them), and `RateLimit-*` headers. Each stays a follow-up.
+
+---
+
 ## Current (code)
 
 Round 2. Measured on the PR #228 head (`88f8efbd`, round 1 merged into the branch; `origin/master` @ `82498271` is its ancestor and has no rate-limit code: `git grep rateLimitBuckets origin/master` finds nothing, and no tag contains the branch head, so `deny` is unreleased). One entry path per claim.
@@ -325,6 +374,54 @@ Tests and housekeeping:
 - Rate-limit e2e — `tests/e2e/real/rate_limit.Tests.ps1`, `tests/e2e/real/config/dynamic/rate-limit.yml` (Dragonfly, `rateLimitSyncRate: "0"`, four routers, none with a captcha). A rate-limit router with a captcha — `not found`.
 - Debt note taken by this round — `knowledge/debt/2026-11-20-rate-limit-captcha-action.md`; its row — run `issues.md` (`note large … rate-limit-captcha-action.md`); the round-1 open question — run `explore.md` (L106–108, "Should buckets support `action: captcha` in this PR?", assumed no).
 
+Shared rate-limit leg (addendum B). Measured on the branch head `417f2785` (round 2 so far: utilities bumped to v1.0.10, Retry-After from the counter; no bucket-action or shared-leg code yet; `origin/master` still `82498271`). One entry path per claim.
+
+How the four published legs are wired today:
+
+- Leg group names — `plugin.go` (`legLAPI = "lapi"`, `legAppSec = "appsec"`, `legCaptcha = "captcha"`, `legModsec = "modsec"`); alias string `alias:<leg>:<instanceName>` — `plugin.go` (`instanceAlias`). A rate-limit leg constant or alias group — `not found`.
+- Instance-name owner fill — `pkg/captcha/session.go` (`Prepare`: `captchaEnabled` and an empty `captchaInstanceName` → the Traefik name); the other three legs' `Prepare` do the same fill, and `plugin.go` `New` calls all four by hand before `openOwned`. A rate-limit `Prepare` — `not found`.
+- Own axis — `plugin.go` (`openOwned` → `openOwnedLeg`): fixed order LAPI, AppSec, captcha, ModSec; a leg whose `*Enabled` is false gets `reclaim.ClearPublisher(name, group)`; an enabled leg hits a `switch group` arm calling `lapi.Open` / `appsec.Open` / `captcha.Open` / `modsecurity.Open` with `(bindCtx, config, log, name, pluginVersion)`.
+- Publish and rollback — `plugin.go` (`claimOwned` → `claimOwnedLeg` → `claimAlias` → `reclaim.SetAlias(key, instanceAlias(group, instanceName), publisher, group)`; a taken name logs ERROR `crowdsec instance name taken` and fails `New`). Rollback is written by hand: each later claim failure calls `clearClaimedPublishers` with the earlier legs (LAPI; LAPI + AppSec; LAPI + AppSec + captcha), which re-reads each leg's `*Enabled` in its own `switch`.
+- Ownership keys per leg — `plugin.go` (`claimOwnedLeg`: `lapi.OwnershipKey(config, name)`, `appsec.Key(config, name)` (AppSec has no `OwnershipKey` name), `captcha.OwnershipKey(config, name)`, `modsecurity.OwnershipKey(config, name)`). Each hashes the owner's middleware name plus owner knobs, e.g. `pkg/captcha/session.go` (`ownershipFrom`: `MiddlewareName`, provider, keys, `GracePeriodSeconds`, …).
+- Bounce axis — `plugin.go` (`New`: `subscribe<Leg> := config.BouncerEnabled && config.<Leg>InstanceName != ""` four times, passed to `bouncer.New`, then one `reclaim.Watch(ctx, instanceAlias(leg, name), (*<pkg>.Client)(nil), route.Receive<Leg>)` per subscribed leg). An owner with `bouncerEnabled` subscribes to its own alias because `Prepare` filled the name.
+- `bouncer.New` signature — `pkg/bouncer/bouncer.go` (`New(next, name, config, subscribeLAPI, subscribeAppSec, subscribeCaptcha, subscribeModsec bool, log)`).
+- Per-leg router state — `pkg/bouncer/bouncer.go` (`Bouncer`: `<leg>Bound atomic.Value`, `subscribe<Leg> bool`, `<leg>Received *<pkg>.Client`, `<leg>ReceiveSeen bool`, `<leg>InstanceName string` for each of the four; one `bindingMu` for all).
+- Per-leg receive trio — `pkg/bouncer/bouncer_leg_captcha.go` (`loadedCaptcha` = `reclaim.Unbox(&b.captchaBound)`; `ReceiveCaptcha(published any)` = guard on `subscribeCaptcha`, `storeBinding`, `receiveCaptcha`; `receiveCaptcha` traces bind / unbind under `bindingMu` with the Client's `Incarnation()`). The same trio is copied in `bouncer_leg_lapi.go` (plus a header-scope warning in `receiveLAPI`, and `LapiClient` / `SameLapiClient`), `bouncer_leg_appsec.go`, `bouncer_leg_modsec.go`; shared helpers in `pkg/bouncer/bouncer_leg_utils.go` (`storeBinding`, `traceBouncerBinding`).
+- Common leg abstraction (one descriptor iterated by `openOwned` / `claimOwned` / `New`, one binding type on `Bouncer`) — `not found`. Go generics in `plugin.go` or `pkg/` — `not found` (`grep '\[T '`); whether Yaegi runs a generic binding type — not measured.
+- Published-leg contract — `openspec/specs/core_plugin_middleware_instance-slots/spec.md` (L83 "Captcha publishes on reclaim group captcha", L119 "ModSec publishes on reclaim group modsec": exclusive publish, generation-aware Clear, multi-leg rollback, and "Captcha-claim failure SHALL also `ClearPublisher` ModSec"). A rate-limit group — `not found`.
+- Owner / subscriber split in user docs — `README.md` (L464–476: connection table with four rows LAPI, AppSec, captcha, ModSec; "A middleware that only protects … keeps its own request settings (status code, captcha, trusted IPs, behavior when CrowdSec or a WAF is down, response headers)"; "all four can be called `shared`"). A rate-limit row — `not found`.
+- Leftover-setting checks — `pkg/configuration/configuration.go` (`validateOpenVsSubscribe` → `validateLegOpenVsSubscribe` for LAPI, AppSec, Captcha, ModSec only: a leftover instance name or secret fails only when neither `bouncerEnabled` nor the leg's `*Enabled` is set; owner-read settings on a subscriber are not checked, "leftover captcha* is not a secret", "leftover owner-read modsec* is not a secret"). A rate-limit entry — `not found`.
+- Captcha readiness on a router — `pkg/configuration/configuration.go` (`captchaInstanceNameReadyAfterOwnerFill`: true when `captchaInstanceName` is set or `captchaEnabled` will fill it; evaluated on the router whose config is being validated).
+
+How the rate-limit leg is wired today:
+
+- Open — `plugin.go` (`openRateLimit`, called between `openOwned` and `claimOwned`; comment "It is never published under an instance name, so it has no alias and no Watch"; `New` comment "rateLimitEnabled = Open the rate-limit counter only; it has no instance name and no Watch"). It is not in `openOwned` / `claimOwned`, so no `ClearPublisher` when the flag drops and no rollback entry.
+- Client and ownership key — `pkg/ratelimit/client.go` (`Open(ctx, middlewareName, RedisSettings, log)` → `reclaim.OpenWithHooks(OwnershipKey(middlewareName, settings), …)`; `OwnershipKey` = `ratelimit:owner:` + FNV-64a of JSON `{middlewareName, host, password, database, syncRate}`; `Client` holds the `windowcounter.Limiter`, the `simpleredis` client, an incarnation string, a log). No `Incarnation()` method on the rate-limit Client (the other four Clients have one).
+- Lifecycle hooks — `pkg/ratelimit/client.go` (`reclaim.Hooks{Sleep, Wake, Close}`: `Sleep` flushes buffered hits and stops the flush timer, `Wake` restarts it, `Close` is idempotent: last flush, then Redis close; log lines `crowdsec ratelimit instance started|sleeping|waking|closed`).
+- Attach — `pkg/bouncer/bouncer.go` (`AttachRateLimit(counter ratelimit.Counter)` sets the plain field `rateLimitCounter` once, before `New` returns the handler; `plugin.go` comment "so no request can race the plain field"). A Watch-fed or atomic counter field — `not found`.
+- Bucket compile and per-router policy — `pkg/bouncer/bouncer.go` (`New`: `ratelimit.NewBucketSet(config.RateLimitBuckets)` only when `config.RateLimitEnabled`; `rateLimitFailureAction` via `EffectiveRateLimitFailureAction`, `rateLimitResponseHeaders`, `rateLimitStatusCode` stored per router).
+- Counter key — `pkg/bouncer/bouncer_serve_ratelimit.go` (`serveRateLimit` passes `b.name`, the router's own middleware name, to `Charge`) → `pkg/ratelimit/key.go` (`redisCounterKey`: `rl:<middlewareName>:<bucket>:<16 hex of SHA-256>`). Today the owner name and the counter name are the same `name`.
+- When a router charges — `pkg/bouncer/bouncer_serve_ratelimit.go` (`serveRateLimit` returns false when `rateLimitCounter` or `rateLimitBuckets` is nil, or `SkipRateLimit`); `pkg/bouncer/bouncer.go` (`ServeHTTP` passes through when `bouncerEnabled` is false, default false, so a `rateLimitEnabled` router without `bouncerEnabled` opens a counter and charges nothing).
+- Config fields — `pkg/configuration/configuration.go` (L174–184 `RateLimitBuckets`, `RateLimitEnabled`, `RateLimitFailureAction`, `RateLimitRedisDatabase`, `RateLimitRedisHost`, `RateLimitRedisPassword`, `RateLimitRedisPasswordFile`, `RateLimitResponseHeaders`, `RateLimitStatusCode`, `RateLimitStore`, `RateLimitSyncRate`; defaults L319–328). `RateLimitInstanceName` — `not found` in code.
+- Validation — `pkg/configuration/configuration.go` (`ValidateParams` runs `validateRateLimit` only when `RateLimitEnabled`: store, host, password file, sync rate, `rateLimitFailureAction` with `captchaInstanceNameReadyAfterOwnerFill(config)` of the same router, status code, non-empty buckets, `NewBucketSet`).
+- Live spec "not published" — `openspec/specs/core_plugin_ratelimit_client/spec.md` (L8: ownership key from the middleware name and Redis settings, "Two routers that use the same middleware SHALL share one counter"; L10: "The counter SHALL NOT be published under an instance name and SHALL NOT be watched by another middleware. Bucket rows, `rateLimitFailureAction`, `rateLimitStatusCode`, and `rateLimitResponseHeaders` SHALL NOT be part of the ownership key; they stay per router.").
+- Live validation spec — `openspec/specs/core_plugin_middleware_config-validation/spec.md` (L466–476: `rateLimit*` read only when `rateLimitEnabled`; `rateLimitFailureAction: captcha` needs a captcha instance name after owner-fill).
+- Devdocs leg term — `knowledge/devdocs/core_plugin_ratelimit.md` (L6 "Never published under an instance name; no alias, no Watch."; L7 `_Avoid_: rate limiter instance, rateLimitInstanceName, publishing it with SetAlias, …`).
+- Devdocs validation term — `knowledge/devdocs/core_plugin_middleware_config-validation.md` (L20–23 `RateLimitEnabled`: "this router opens the rate-limit Client and charges `rateLimitBuckets`"; `_Avoid_: … rateLimitInstanceName`).
+- README rate-limit section — `README.md` (L862 "every Traefik replica that runs the same middleware counts into the same total"; L1297 `RateLimitBuckets` reference; no instance-name setting).
+- Debt note taken by addendum B — `knowledge/debt/2026-11-20-extract-common-leg-abstraction.md` ("Each published leg (LAPI, AppSec, captcha)", "rewrites the three existing legs"; ModSec is missing although `plugin.go` has four); its row — run `issues.md` (first row, `note large`, Why ends "the Open-only rate-limit leg does not need it").
+
+Tests that pin the current wiring:
+
+- Rate-limit constructor — `zzz_rate_limit_test.go` (`TestNew_RateLimitDisabledOpensNothing`, `TestNew_RateLimitSharesOneCounter` peeks `ratelimit.OwnershipKey` under the router's own name, `TestNew_RateLimitReleasedWhenNewFailsAfterOpen` pins `openRateLimit` before `claimOwned`, `TestNew_RateLimitDeadRedisFailureAction`, `TestNew_RateLimitDeadRedisBufferedKeepsTheLocalLimit`).
+- Rate-limit router — `pkg/bouncer/zzz_rate_limit_test.go` (calls `AttachRateLimit` directly, e.g. L97, L380).
+- Rate-limit Client — `pkg/ratelimit/zzz_client_test.go` (`TestOpen_sharesOneClientPerMiddlewareAndSettings`, …) and `pkg/ratelimit/zzz_yaegi_test.go` (`TestYaegi_OpenChargeClose`).
+- Captcha owner / subscriber — `zzz_constructor_test.go` (`TestNew_CaptchaOwnerOmitFillsTraefikName`, `TestNew_CaptchaSubscriberBeforePublishBans`, `TestNew_CaptchaHolderWithBounceOffStillPublishes`, `TestNew_CaptchaInstanceNameCollisionFails`, …).
+- ModSec owner / subscriber and rollback — `zzz_modsec_plugin_test.go` (`TestNew_ModsecSubscriberUsesOwnerClient`, `TestNew_ModsecInstanceNameCollisionFails`, `TestNew_CaptchaClaimFailureClearsModsecPublisher`).
+- Receive side — `pkg/bouncer/zzz_servehttp_gaps_test.go` (`TestReceiveLAPI_*`, `TestHandleNextServeHTTP_UnpublishedAppSecUsesFailureAction`); `pkg/bouncer/zzz_store_binding_test.go`.
+- Leftover rate-limit settings — `pkg/configuration/zzz_rate_limit_test.go` (`Test_ValidateParams_disabledRateLimitIgnoresLeftovers`).
+- Published-leg severance e2e — `tests/e2e/real/instance_severance.Tests.ps1` (greps `"leg":"appsec"` lifecycle logs). Rate-limit e2e — `tests/e2e/real/config/dynamic/rate-limit.yml` (five routers since `410c30ca`, each with its own `rateLimitEnabled` middleware; no owner / subscriber pair).
+
 ## Out of scope
 
 Round 2, inferred extras, listed and not taken:
@@ -335,7 +432,11 @@ Round 2, inferred extras, listed and not taken:
 - Changing `bypassCaptcha` anywhere outside a `captcha` bucket (decision 2 scopes the different meaning to buckets).
 - Changing `rateLimitFailureAction: captcha`, which still fails at startup without a captcha instance name (see `## Tensions`); not asked.
 - Exempting CrowdSec AppSec's own challenge traffic (`/crowdsec-internal/challenge/`) from buckets: decision 5 names the captcha page's requests (widget assets, verification POST), not AppSec's challenge.
-- The other round-1 debt notes (`tokenBucket` / memory store, `RateLimit-*` headers, Redis backoff gate, windowcounter bump, common leg abstraction, single-reading-path spec): not reopened.
+- The other round-1 debt notes (`tokenBucket` / memory store, Redis backoff gate, windowcounter bump, single-reading-path spec): not reopened. The common leg abstraction note is no longer in this list: addendum B decision 4 takes it.
+- Addendum B non-goals (conductor, "Not in this round"): the single-EVAL + local over-limit-cache load design; Redis TLS / ACL user settings on `rateLimitRedis*`; `RateLimit-*` response headers (its round-1 debt note stays open). Each stays a follow-up.
+- Counters shared across subscribers (`rl:<instance>:…`): addendum B decision 3 rejects it.
+- Per-subscriber overrides of the owner's bucket list or policy: not asked (decision 2 centralizes the policy).
+- The leg / instance / backend vocabulary rename (`knowledge/debt/2026-09-23-leg-instance-backend-vocabulary.md`): decision 4 asks for a shared leg unit, not a rename of the existing terms.
 
 ## Unknowns
 
@@ -352,6 +453,20 @@ Explore owns these.
 - `log` bucket INFO per request vs the "never per request" rule — not raised by the human; whether round 2 touches it.
 - E2E shape: how the stack's dummy captcha and Dragonfly combine on one router; client-address isolation per case (round-1 rule) with a gate cookie possibly bound to IP.
 
+Addendum B (shared rate-limit leg). "B-n" below is addendum B decision n.
+
+- What the owner publishes: the `ratelimit.Client` alone (today only the limiter and the Redis client, `pkg/ratelimit/client.go`) with each subscriber compiling the owner's buckets, or a published value that carries the compiled `BucketSet` and the policy (`rateLimitFailureAction`, `rateLimitStatusCode`, `rateLimitResponseHeaders`). If the policy is published, whether it joins the ownership key (a bucket edit opens a new Client and a new counter generation) or is republished on the same Client.
+- What a subscriber does with its own `rateLimit*` settings: ignored as owner-read leftovers (the captcha / ModSec precedent in `validateOpenVsSubscribe`), rejected at startup, or allowed as overrides. The conductor reading of B-2 puts everything on the owner and only the instance name on the subscriber; not confirmed.
+- What `rateLimitEnabled` means after B-1 on a router that also has `bouncerEnabled`: own only (conductor assumption) or own + charge here (round-1 meaning). Whether an omitted `rateLimitInstanceName` fills the Traefik name when owned (other legs' `Prepare`), so a round-1 style config (one middleware, `rateLimitEnabled` + `bouncerEnabled`, no instance name) keeps charging through its own alias.
+- A subscriber whose owner is not published yet, or whose owner went away: pass through (today `rateLimitCounter == nil` skips the leg), or apply `rateLimitFailureAction`, and whose failure action (owner's or subscriber's). Other legs differ: an unpublished AppSec uses the failure action, an unpublished captcha bans (`pkg/bouncer/zzz_servehttp_gaps_test.go`, `zzz_constructor_test.go`).
+- Startup validation of `rateLimitFailureAction: captcha` and of `action: captcha` buckets once the policy lives on the owner but the captcha subscription lives on the subscriber: today `validateRateLimit` checks `captchaInstanceNameReadyAfterOwnerFill` on the router that carries the policy; after B-2 the owner may have no captcha while its subscribers do, and the reverse. Interacts with round-2 decision 3 (runtime downgrade, no startup failure) for buckets.
+- "Counters per subscribing router" (B-3) vs the key's unit: `Charge` keys by the middleware name (`b.name`), so two Traefik routers that use the same subscriber middleware share one counter (live spec "Two routers that use the same middleware SHALL share one counter"). Whether "per router" means per subscriber middleware (the conductor's key `rl:<subscribing router middleware name>:…` reads that way) or per Traefik router.
+- Shape of the leg descriptor (B-4): which fields (group, `*Enabled`, instance name, `Prepare`, `Open`, ownership key, Watch empty value, receive hook, trace name) and how per-leg extras survive: the LAPI header-scope warning in `receiveLAPI`, `LapiClient` / `SameLapiClient`, AppSec's `Key` (not `OwnershipKey`), and the hand-written rollback order including the spec line "Captcha-claim failure SHALL also `ClearPublisher` ModSec". Whether a generic binding type runs under Yaegi (no generics in the repo today; not measured).
+- What proves "behaviour-preserving" for the four legs: existing unit tests plus `tests/e2e/real/instance_severance.Tests.ps1`, or new tests that pin the lifecycle log lines (`crowdsec bouncer bound|unbound` trace attrs, `crowdsec instance name taken`) that the instance-slots spec ("Lifecycle logs match e2e grep contract") makes part of the contract.
+- Rate-limit Client identity for bind / unbind traces: it has an incarnation string but no `Incarnation()` method (`pkg/ratelimit/client.go`); whether it gains one to fit the shared binding.
+- How the debt note's "three legs" error and its row's "the Open-only rate-limit leg does not need it" are corrected: the row cannot be deleted (`opd-workflow § Issues`), so implement marks it `[x]` with a `Taken:` line and deletes the debt file; whether anything else (card summary) needs the four-leg correction.
+- E2E for the shared leg: an owner and two subscribers on the Dragonfly stack proving one policy and separate budgets (B-2, B-3), and severance when the owner is removed.
+
 ## Tensions
 
 - Decision 5 ("never counted or blocked by any bucket") vs decision 2's rationale ("a rate limit must not become unlimited"): a client that always sends the challenge marker, or only fetches widget assets, is never limited by any bucket, and each verification POST costs a call to the captcha provider.
@@ -362,3 +477,14 @@ Explore owns these.
 - Decision 4 accepts what the round-1 debt note warned about (`knowledge/debt/2026-11-20-rate-limit-captcha-action.md`): a bot that solved one captcha is exempt from `captcha` buckets for `captchaGracePeriodSeconds` (default 86400s). The addendum's answer is stacking a `ratelimit` bucket; nothing enforces that a `captcha` bucket has one.
 - Rename vs synced specs: round 1's archived and synced specs, README, devdocs, and e2e all say `deny` (see `## Current (code)`); the rename touches live `openspec/specs/*` that round 1 just wrote, plus the devdocs `_Avoid_` term "per-bucket captcha".
 - Header vocabulary: the round-1 caller spec (semantics 7) and the addendum table name `captcha:ratelimit:<bucket>`, but no README, live spec, or devdoc lists it (`grep` finds none); it is a new value in the closed table of `openspec/specs/core_plugin_middleware_bouncer/spec.md` and `README.md` (L697 area).
+
+Addendum B (shared rate-limit leg):
+
+- B-1 (publish the leg) vs round-1 artifacts that say the opposite and were just synced: `openspec/specs/core_plugin_ratelimit_client/spec.md` L10 ("SHALL NOT be published … SHALL NOT be watched"), `knowledge/devdocs/core_plugin_ratelimit.md` L6–7 ("Never published"; `_Avoid_: rateLimitInstanceName, publishing it with SetAlias`), `knowledge/devdocs/core_plugin_middleware_config-validation.md` L23 (`_Avoid_: rateLimitInstanceName`), the `plugin.go` comments on `New` and `openRateLimit`, the README connection table (four legs), and the round-1 `## Out of scope — round 1` row "Publishing the rate limit leg as a shared instance … not asked". The human reversed that row; the artifacts must follow.
+- B-2 (policy centralized on the owner; conductor reading: failure action, status code, response headers too) vs the live spec ("Bucket rows, `rateLimitFailureAction`, `rateLimitStatusCode`, and `rateLimitResponseHeaders` … stay per router") and the README owner / subscriber rule for every other leg ("A middleware that only protects … keeps its own request settings (status code, captcha, …, behavior when CrowdSec or a WAF is down, response headers)"). The rate-limit leg would be the first leg whose request-time answers live on the owner.
+- B-3 (counters keyed by the subscriber's name) vs the ownership key (owner's name): today both are the same `name` (`plugin.go` `openRateLimit`, `pkg/bouncer/bouncer_serve_ratelimit.go`); after B-1 the Client is keyed by the owner and the counters by each subscriber, so the code must stop assuming they match. Also "per router" in B-3 vs the per-middleware key (see `## Unknowns`).
+- Captcha on the owner's buckets vs captcha on the subscriber: the conductor assumption decides the captcha-bucket behaviour (downgrade, `bypassCaptcha`, gate check) on the subscribing router, but the `captcha` action lives in the owner's bucket list and `validateRateLimit` checks captcha readiness on the router that carries the policy.
+- `rateLimitEnabled` = own (conductor assumption) vs its round-1 meaning "this router opens the rate-limit Client and charges `rateLimitBuckets`" (`knowledge/devdocs/core_plugin_middleware_config-validation.md`, `bouncer.New` compiling buckets only on `RateLimitEnabled`). Unreleased (PR #228 unmerged), so no user break, but the live spec and devdocs change meaning.
+- B-4 (extract the abstraction in this PR) vs the debt note's reason for not taking it ("a refactor of shipped wiring with no rate-limit criterion behind it") and PR size: one PR now carries the round-1 leg, the round-2 bucket actions, a refactor of four shipped legs (LAPI, AppSec, captcha, ModSec, all on `master`), and the shared leg. The human approved it and asked for a separate behaviour-preserving commit first, with existing tests green.
+- B-4 vs the debt note's text: it names three legs (LAPI, AppSec, captcha) and three `bouncer_leg_*.go` files; the code has four (`bouncer_leg_modsec.go`, `legModsec`). The addendum flags it; the descriptor must cover ModSec's place in the rollback order.
+- Round-2 `## Out of scope` (as first written) said the common leg abstraction note was "not reopened"; B-4 reverses it (removed from that list in this update).
