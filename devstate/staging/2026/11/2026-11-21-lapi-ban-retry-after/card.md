@@ -38,14 +38,14 @@ The decision's time left is read where the decision is read, and it travels as o
 Ready for review. 1 items remain.
 
 Priority: P2 — real end-user and operator pain on routers set to 429, with limited blast radius (the default 403 is unaffected and clients can still retry on their own schedule)
-Reviewed head: 85300168
+Reviewed head: 35a0dd61
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/commit/524684821d4563f808dc816d7055a5eb9817ec17/checks |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/commit/35a0dd61298223b7a0369db7e803d7aa51ba4bb4/checks |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -55,7 +55,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-11-21-lapi-ban-retry-after pushed | `git` |
 | OpenSpec | lapi-ban-retry-after | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/229 | pr-host |
-| CI | build 44942342228 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/commit/524684821d4563f808dc816d7055a5eb9817ec17/checks | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/commit/524684821d4563f808dc816d7055a5eb9817ec17/checks |
+| CI | build 44944052562 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/commit/35a0dd61298223b7a0369db7e803d7aa51ba4bb4/checks | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/commit/35a0dd61298223b7a0369db7e803d7aa51ba4bb4/checks |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -73,10 +73,11 @@ Worktree:
 
 ## Follow-up issues
 - [ ] [`LookupRemediation` origin id is always 0](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/knowledge/debt/2026-11-21-lookup-remediation-origin-id-always-zero.md) — `Store.LookupRemediation` always returns origin id 0 although the catalog promises it; callers lean on the origin name.
+- [ ] [Add the `wafhop` component to `openspec/specs/map.md`](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/knowledge/debt/2026-11-21-spec-map-missing-wafhop.md) — `openspec/specs/map.md` lacks the `wafhop` component on master, so `validate-spec-map` fails before any archive move.
 
 
 ## How this fits together
-Ticket 2026-11-21-lapi-ban-retry-after on branch 2026-11-21-lapi-ban-retry-after targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/229; CI build 44942342228 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/commit/524684821d4563f808dc816d7055a5eb9817ec17/checks.
+Ticket 2026-11-21-lapi-ban-retry-after on branch 2026-11-21-lapi-ban-retry-after targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/229; CI build 44944052562 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/commit/35a0dd61298223b7a0369db7e803d7aa51ba4bb4/checks.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -105,9 +106,11 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 853001686e2d027cde606ede52fc813753de5cdc | Card must match the branch you measured |
+| Reviewed head | 35a0dd61298223b7a0369db7e803d7aa51ba4bb4 | Card must match the branch you measured |
 
 ### Stored data model
 - **Redis** (shared decision store), Ip and header-scope slot value (key `<prefix><ip>` / `<prefix><scope:value>`), field **decision end** — **added** as a 4th newline-separated line after kind, origin, scenario: wall-clock Unix seconds, written by `redis.PutMany` as `now.Unix() + DecisionDurationSec` when that duration is positive (stream apply and live memo both set it); empty origin/scenario lines are kept as placeholders (`t\n\n\n<end>`). With no end the value is byte-identical to before. Key names, TTL (`msetexGrouped` by `DurationSec`) and the `range-index` blob (`KindOriginString(..., 0)`) are unchanged (`pkg/decisionstore/redis_pack.go`, `pkg/decisionstore/redis.go`). migration: missing — no migration artifact in the pin; none deploys this field: the new reader treats values without a usable end as unknown and old values expire by TTL (`openspec/changes/lapi-ban-retry-after/design.md`, Migration Plan).
   - Rollback, previous reader (`.pin_diff/base/pkg/decisionstore/redis_pack.go`, v1.9.4–v1.9.7 shape): `strings.Cut` for kind, then `strings.Cut` for origin, the rest is the scenario. On a 4-line value kind and origin come out correct, and the end is folded into `scenario` (`ssh-bf\n<end>`, or `\n<end>` when the scenario is empty). Base `lookupHits` returns only kind and origin (`.pin_diff/base/pkg/decisionstore/lookup.go`), so that scenario is never used. Stays correct.
   - Rollback, one-cut reader (`splitKindOrigin` in `pkg/decisionstore/pack.go` at tag v1.9.3, confirmed by the caller with `git grep` on that tag): the kind stays correct (`RemediationKind` of the first line), and the origin becomes everything after the kind. That already happens for every 3-line value. New on top of that: a decision that used to be stored as `t` or `t\n<origin>` (no scenario) now carries an end too, so this reader gets a polluted origin where before it read it correctly or as empty. This affects only the origin, not the kind. It is not a red flag under `opd-redflags` (nothing removed, renamed or retyped).
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
