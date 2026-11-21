@@ -56,6 +56,8 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 - `tests/e2e/real/modsec.Tests.ps1`
 - `tests/e2e/real/waf_dual.Tests.ps1`
 - `tests/e2e/real/waf_backoff.Tests.ps1`
+- `tests/e2e/real/rate_limit.Tests.ps1`
+- `tests/e2e/real/config/dynamic/rate-limit.yml`
 - `tests/e2e/real/*.Tests.ps1`
 - `.github/workflows/e2e.yml`
 
@@ -80,4 +82,5 @@ Use this suite when the check must include Traefik’s plugin loader and a real 
 - CrowdSec `type=allow` over a ban is not in this suite. The Pester file and the storage follow-up live in `knowledge/debt/2026-09-19-multiple-decisions-per-cache-key.md`.
 - LAPI/AppSec failure-action routes point at `crowdsec:9` with `lapiHttpTimeoutSeconds=2` and `appsecHttpTimeoutSeconds=2`. Do not `docker pause` Crowdsec; that would stall the shared LAPI. A real outage stops a container only one route uses (`appsec-flaky-test`, `waf-flaky-test`), never `crowdsec` or `waf`.
 - Docker labels for `LapiHost` are `lapihost`. `lapishost` (extra `s`) does not match; Traefik drops it and CreateConfig keeps `crowdsec:8080`.
+- Rate-limit cases (`rate_limit.Tests.ps1`, `config/dynamic/rate-limit.yml`) count in the stack's Dragonfly, and a counter outlives its run by two windows. Each run picks one random `10.x.y.0/24` and each case its own host in it; never reuse a fixed `X-Forwarded-For`. The bucket list (objects with a nested `key` list) is file provider only. `/rate-limit/` owns a LAPI client with `BOUNCER_KEY_RATE_LIMIT` and `lapiMetricsUpdateIntervalSeconds: 10` for the `plugin:ratelimit:<bucket>` drop; the `-down-` routers point at `dragonfly:1`.
 - Compose IPAM is `172.28.0.0/16` (gateway `172.28.0.1`) so docker-label `bouncerForwardedHeadersTrustedIPs` can pin that gateway without colliding with a common `172.20.0.0/16` on the same Docker engine. File-provider routes still trust `172.16.0.0/12`.

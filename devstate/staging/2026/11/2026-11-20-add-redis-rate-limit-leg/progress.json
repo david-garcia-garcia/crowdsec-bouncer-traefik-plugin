@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-11-20-add-redis-rate-limit-leg",
+  "jobName": "2026-11-20-add-redis-rate-limit-leg",
+  "startedAt": "2026-11-20T22:40:21.737Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-20T22:44:38.240Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-20T22:56:44.789Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-20T23:09:54.960Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-20T23:53:05.462Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-21T00:17:03.079Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-21T00:23:40.375Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-21T00:30:18.130Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-21T00:39:35.865Z"
+    }
+  }
+}

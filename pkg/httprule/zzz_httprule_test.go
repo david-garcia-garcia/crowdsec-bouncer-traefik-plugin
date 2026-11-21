@@ -469,3 +469,80 @@ func TestActionSet_foldBypassCaptchaIgnoresPathReading(t *testing.T) {
 		}
 	}
 }
+
+// TestNewActionSet_bypassRateLimitSkipsOnlyTheRateLimit proves the token parses on its own, that bypass
+// does not set it, and that ban still has to be alone.
+func TestNewActionSet_bypassRateLimitSkipsOnlyTheRateLimit(t *testing.T) {
+	set := mustNewActionSet(t, []ActionRule{
+		{Name: "health", Action: []string{ActionBypassRateLimit}, Rule: Rule{Path: "^/health$"}},
+		{Name: "api", Action: []string{ActionBypass}, Rule: Rule{Path: "^/api/"}},
+	})
+	if !set.SkipRateLimit(0) || set.SkipLapi(0) || set.SkipAppsec(0) || set.SkipModsec(0) || set.Captcha(0) || set.Ban(0) {
+		t.Fatal("bypassRateLimit alone must set only the rate-limit skip")
+	}
+	if set.SkipRateLimit(1) || !set.SkipLapi(1) || !set.SkipAppsec(1) || !set.SkipModsec(1) {
+		t.Fatal("bypass must skip LAPI, AppSec, and ModSec, not the rate limit")
+	}
+	if set.SkipRateLimit(2) || (*ActionSet)(nil).SkipRateLimit(0) {
+		t.Fatal("out of range and nil set must report no rate-limit skip")
+	}
+	api := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/api/items", nil))
+	if want := (ActionMatch{SkipAppsec: true, SkipLapi: true, SkipModsec: true}); api != want {
+		t.Fatalf("bypass Fold=%+v want %+v", api, want)
+	}
+	_, err := NewActionSet([]ActionRule{{Name: "x", Action: []string{ActionBan, ActionBypassRateLimit}, Rule: Rule{Path: "^/x$"}}})
+	if err == nil || !strings.Contains(err.Error(), "rule 0: action: ban must be alone") {
+		t.Fatalf("ban with bypassRateLimit err=%v", err)
+	}
+}
+
+// TestActionSet_foldBypassRateLimit proves rate-limit skips OR across rows and that a path row on a
+// path with more than one reading drops the rate-limit skip like the other leg skips.
+func TestActionSet_foldBypassRateLimit(t *testing.T) {
+	set := mustNewActionSet(t, []ActionRule{
+		{Name: "health", Action: []string{ActionBypassRateLimit}, Rule: Rule{Path: "^/x/"}},
+		{Name: "lapi", Action: []string{ActionBypassLapi}, Rule: Rule{Path: "^/x/"}},
+	})
+	clean := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/x/y", nil))
+	if want := (ActionMatch{SkipLapi: true, SkipRateLimit: true}); clean != want {
+		t.Fatalf("clean Fold=%+v want %+v", clean, want)
+	}
+	ambiguous := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/x/..;/y", nil))
+	if want := (ActionMatch{AmbiguousPathName: "health"}); ambiguous != want {
+		t.Fatalf("ambiguous Fold=%+v want %+v", ambiguous, want)
+	}
+}
+
+// TestNewWithCatchAll_ruleWithNoPredicateMatchesEverything proves the catch-all compile keeps an empty
+// row, while New still rejects it and both reject invalid RE2.
+func TestNewWithCatchAll_ruleWithNoPredicateMatchesEverything(t *testing.T) {
+	set, err := NewWithCatchAll([]Rule{{}, {Path: "^/login$"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []string{"/", "/login", "/anything?q=1"} {
+		hits := set.Matching(httptest.NewRequest(http.MethodPost, "http://example.com"+target, nil))
+		if len(hits) == 0 || hits[0] != 0 {
+			t.Fatalf("%s Matching=%v want catch-all first", target, hits)
+		}
+	}
+	if _, err := New([]Rule{{}}); err == nil || !strings.Contains(err.Error(), "rule 0: empty") {
+		t.Fatalf("New({}) err=%v want rule 0: empty", err)
+	}
+	for _, build := range []func([]Rule) (*Set, error){New, NewWithCatchAll} {
+		if _, err := build([]Rule{{Path: "("}}); err == nil {
+			t.Fatal("invalid RE2 must fail both compiles")
+		}
+	}
+}
+
+// TestRequestHostname_dropsThePort proves the exported host owner reads req.Host without its port.
+func TestRequestHostname_dropsThePort(t *testing.T) {
+	for host, want := range map[string]string{"example.com:443": "example.com", "[::1]:443": "::1", "example.com": "example.com"} {
+		req := httptest.NewRequest(http.MethodGet, "http://placeholder/", nil)
+		req.Host = host
+		if got := RequestHostname(req); got != want {
+			t.Errorf("RequestHostname(%q)=%q want %q", host, got, want)
+		}
+	}
+}

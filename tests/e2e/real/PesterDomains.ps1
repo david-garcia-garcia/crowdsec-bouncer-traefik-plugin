@@ -1,6 +1,6 @@
 # CI partition of tests/e2e/real/*.Tests.ps1.
 # lapi: request decisions from LAPI (stream and live modes, ban, scopes, trusted IPs, metrics).
-# appsec: AppSec, captcha, and the Redis decision cache.
+# appsec: AppSec, captcha, the Redis decision cache, and the Redis rate limit.
 # lifecycle: instance severance (late bind, reclaim, name collisions).
 # modsec: the WAF legs. ModSec alone (CRS block, body, failure actions, WebSocket, skip), AppSec and
 #   ModSec on one router (order, per-leg bypass, shared body), and the backoff gate of both legs
@@ -25,6 +25,7 @@ $script:PesterDomainFiles = @{
         'appsec.Tests.ps1'
         'captcha.Tests.ps1'
         'bypass_captcha.Tests.ps1'
+        'rate_limit.Tests.ps1'
         'origin_scheme.Tests.ps1'
         'redis_cache.Tests.ps1'
     )

@@ -23,6 +23,8 @@ const (
 	headerReasonAppsecChallengeEmpty = "appsec-challenge-empty"
 	headerReasonAppsecActionEmpty    = "appsec-action-empty"
 	headerReasonAppsecFailure        = "appsec-failure"
+	headerReasonRateLimit            = "ratelimit"
+	headerReasonRateLimitFailure     = "ratelimit-failure"
 	headerReasonModsec               = "modsec"
 	headerReasonModsecFailure        = "modsec-failure"
 	headerReasonCaptchaDowngrade     = "captcha-downgrade"
@@ -33,17 +35,29 @@ const (
 	listsHeaderPrefix = "lists_"
 )
 
-// formatRemediationHeader joins kind:reason, or kind:reason:origin when reason is lapi and origin is non-empty.
-// Empty kind or reason returns empty; it does not invent allow: pass.
+// formatRemediationHeader joins kind:reason, or kind:reason:third when the reason carries a third field
+// and it is non-empty (headerThirdField). Empty kind or reason returns empty; it does not invent allow: pass.
 func formatRemediationHeader(kind, reason, origin string) string {
 	if kind == "" || reason == "" {
 		return ""
 	}
-	encoded := encodeHeaderOrigin(origin)
-	if reason == headerReasonLAPI && encoded != "" {
-		return kind + ":" + reason + ":" + encoded
+	if third := headerThirdField(reason, origin); third != "" {
+		return kind + ":" + reason + ":" + third
 	}
 	return kind + ":" + reason
+}
+
+// headerThirdField is the third header field a reason carries: the encoded metrics origin for lapi, the
+// bucket name (the origin after plugin:ratelimit:) for ratelimit. Every other reason has none.
+func headerThirdField(reason, origin string) string {
+	switch reason {
+	case headerReasonLAPI:
+		return encodeHeaderOrigin(origin)
+	case headerReasonRateLimit:
+		return stripHeaderCtl(strings.TrimPrefix(origin, lapi.OriginPluginRateLimitPrefix))
+	default:
+		return ""
+	}
 }
 
 // setRemediationHeader sets bouncerRemediationHeadersCustomName to kind:reason for this response.
@@ -72,6 +86,9 @@ func headerReasonFromOrigin(origin string) string {
 	if strings.HasPrefix(origin, lapi.OriginPluginRulesPrefix) {
 		return headerReasonRules
 	}
+	if strings.HasPrefix(origin, lapi.OriginPluginRateLimitPrefix) {
+		return headerReasonRateLimit
+	}
 	switch origin {
 	case lapi.OriginPluginLapiFailure:
 		return headerReasonLAPIFailure
@@ -79,6 +96,8 @@ func headerReasonFromOrigin(origin string) string {
 		return headerReasonStreamUnhealthy
 	case lapi.OriginPluginAppsecFailure:
 		return headerReasonAppsecFailure
+	case lapi.OriginPluginRateLimitFailure:
+		return headerReasonRateLimitFailure
 	case lapi.OriginPluginModsecFailure:
 		return headerReasonModsecFailure
 	default:

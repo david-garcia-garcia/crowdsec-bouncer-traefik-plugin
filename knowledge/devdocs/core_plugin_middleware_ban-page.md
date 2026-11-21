@@ -3,7 +3,7 @@
 ## Language
 
 **Ban page**:
-The operator remediation HTTP response `handleBanStatusServeHTTP` writes: a status (`remediationStatusCode` through `handleBanServeHTTP`; the AppSec `http_status` from 200 to 599 for an AppSec ban), `Content-Type` from the ban template, optional template body. Not AppSec envelope relay and not captcha `ServeHTTP`.
+The operator remediation HTTP response `handleBanStatusServeHTTP` writes: a status (`remediationStatusCode` through `handleBanServeHTTP`; the AppSec `http_status` from 200 to 599 for an AppSec ban; `rateLimitStatusCode` for a rate-limit deny), `Content-Type` from the ban template, optional template body. Not AppSec envelope relay and not captcha `ServeHTTP`.
 _Avoid_: AppSec `user_body_content`, captcha challenge HTML
 
 ## Overview
@@ -15,9 +15,10 @@ Ban kind (and captcha fallbacks that ban) share one writer. Pass `headerReason` 
 - Set `Cache-Control: no-cache, no-store` next to `Content-Type` and before `WriteHeader`.
 - HEAD and nil-template bans inherit that Set the same way `Content-Type` already does.
 - Do not add extra directives (`private`, `max-age`, `must-revalidate`, `Pragma`).
-- Ban paths call `handleBanServeHTTP` (status `remediationStatusCode`). Only the AppSec ban calls `handleBanStatusServeHTTP` with `appsecBanStatusCode`, which relays the AppSec `http_status` when it is from 200 to 599 (CrowdSec always sends one: 403 by default, 429 for `RateLimit()`, or the `SetReturnCode()` / `user_blocked_http_code` value) and falls back to `remediationStatusCode` otherwise. Do not swap the 403 for `remediationStatusCode`: the bouncer cannot tell the default from `SetReturnCode(403)`.
+- Ban paths call `handleBanServeHTTP` (status `remediationStatusCode`). The AppSec ban calls `handleBanStatusServeHTTP` with `appsecBanStatusCode`, which relays the AppSec `http_status` when it is from 200 to 599 (CrowdSec always sends one: 403 by default, 429 for `RateLimit()`, or the `SetReturnCode()` / `user_blocked_http_code` value) and falls back to `remediationStatusCode` otherwise. Do not swap the 403 for `remediationStatusCode`: the bouncer cannot tell the default from `SetReturnCode(403)`.
+- The rate-limit deny is the other direct caller: `handleBanStatusServeHTTP` with `rateLimitStatusCode` (default 429, independent of `remediationStatusCode`), after `Retry-After` is set on `rw` (`core_plugin_ratelimit.md`). The rate-limit failure action `ban` goes through `handleBanServeHTTP`.
 - Do not emit Cache-Control from AppSec relay; copy `user_headers` as they arrive (`core_plugin_appsec`).
-- Pass an explicit `headerReason` into `handleBanServeHTTP` next to template `reason` and metrics `origin`. When `remediationCustomHeader` is set, write `formatRemediationHeader("ban", headerReason, origin)`. Closed reasons never take a third field; `lapi` plus a non-empty origin appends the encoded origin. Do not infer captcha-downgrade / `appsec` / `appsec-challenge-empty` / `appsec-action-empty` from origin alone.
+- Pass an explicit `headerReason` into `handleBanServeHTTP` next to template `reason` and metrics `origin`. When `remediationCustomHeader` is set, write `formatRemediationHeader("ban", headerReason, origin)`. Closed reasons never take a third field; `lapi` plus a non-empty origin appends the encoded origin, and `ratelimit` appends the bucket name (`ban:ratelimit:<bucket>`). Do not infer captcha-downgrade / `appsec` / `appsec-challenge-empty` / `appsec-action-empty` from origin alone.
 - Do not share a helper package with captcha `ServeHTTP`. Captcha does not import the closed table; the bouncer formats the challenge-page value.
 
 ## Pattern snippet

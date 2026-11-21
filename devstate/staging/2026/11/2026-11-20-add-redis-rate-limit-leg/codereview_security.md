@@ -1,0 +1,14 @@
+# Security
+
+1. [judgement] Client-controlled trust — `pkg/ratelimit/charge.go:69` — `final` works like a skip of every later bucket, but a bucket's `path` predicate is matched as written (no single-reading check), so a client can send an encoded path that Traefik forwards (e.g. `/static/..%2Flogin`, decoded `URL.Path` `/static/../login`) into a `final` path bucket and step out of a later catch-all or login bucket; `bypassRateLimit` drops its skip on such a path, `final` does not, and README.md:919 / core_plugin_ratelimit.md:61 say a bucket without `path` "is not affected", which is false when a `final` path bucket comes before it
+   Fix: Ignore `final` (keep charging later buckets) when the bucket has a `path` predicate and `httprule` finds the path ambiguous, as `Fold` does for leg skips; or state the gap in README limits and the devdoc
+   Status: done
+   Argument: Applied the documentation alternative: README limits and `core_plugin_ratelimit.md` now state that an encoded path can match a `final` path bucket and skip later buckets. The code alternative (ignore `final` on an ambiguous path) is a behaviour change, not taken unattended.
+2. [judgement] Client-controlled trust — `pkg/ratelimit/key.go:80` — an `ip` key part without `ipv6Prefix` counts the full /128, so an IPv6 client rotating addresses inside its own /64 gets a fresh counter on every request and is never limited; the README's leading example (`README.md:868`, bucket `login`, `from: ip`) has no `ipv6Prefix`, and the README limits list warns about header/cookie/query keys but not about this
+   Fix: Add `ipv6Prefix: 64` to the `login` example and one line in the limits list that a full IPv6 address is a per-address, not per-client, key
+   Status: skipped
+   Argument: judgement: `ipv6Prefix` is documented per key part; the example and a limits line are operator guidance, left for the docs pass.
+3. [judgement] Fail-open on deny — `pkg/bouncer/bouncer_serve_ratelimit.go:37` — every `Take` error goes to `rateLimitFailureAction` (default `passthrough`, `configuration.go:312`), and that includes `simpleredis` pool-wait errors when more than `redisPoolSize` (8, `pkg/ratelimit/client.go:27`) commands are in flight; a flood with many new keys (buffered mode: one GET per new key per window) or any flood in exact mode can then switch the limit off for every client of that middleware. The default is spec'd and documented as for an outage; the load threshold was not measured here
+   Fix: Say in README "When Redis is down" that a saturated Redis connection pool counts as a failure, and recommend `ban`/`captcha` where the limit guards abuse
+   Status: skipped
+   Argument: judgement: `passthrough` is the specified default (config-validation delta) and the failure action is the operator's choice; pool-wait under load was not measured.

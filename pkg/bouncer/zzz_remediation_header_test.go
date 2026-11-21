@@ -25,6 +25,10 @@ func TestFormatRemediationHeader(t *testing.T) {
 		{name: "disconnect exact", kind: headerKindError, reason: headerReasonClientDisconnected, origin: "", want: "error:client-disconnected"},
 		{name: "client body read exact", kind: headerKindError, reason: headerReasonClientBodyRead, origin: "", want: "error:client-body-read"},
 		{name: "captcha lapi origin", kind: headerKindCaptcha, reason: headerReasonLAPI, origin: "cscli", want: "captcha:lapi:cscli"},
+		{name: "rate-limit deny carries the bucket name", kind: headerKindBan, reason: headerReasonRateLimit, origin: lapi.OriginPluginRateLimit("login"), want: "ban:ratelimit:login"},
+		{name: "rate-limit bucket name is stripped of CR LF TAB", kind: headerKindBan, reason: headerReasonRateLimit, origin: lapi.OriginPluginRateLimit("lo\r\ngin\t"), want: "ban:ratelimit:login"},
+		{name: "rate-limit failure ban is closed", kind: headerKindBan, reason: headerReasonRateLimitFailure, origin: lapi.OriginPluginRateLimitFailure, want: "ban:ratelimit-failure"},
+		{name: "rate-limit failure captcha is closed", kind: headerKindCaptcha, reason: headerReasonRateLimitFailure, origin: lapi.OriginPluginRateLimitFailure, want: "captcha:ratelimit-failure"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -45,6 +49,8 @@ func TestHeaderReasonFromOrigin(t *testing.T) {
 		{origin: lapi.OriginPluginLapiFailure, want: headerReasonLAPIFailure},
 		{origin: lapi.OriginPluginTechStreamFail, want: headerReasonStreamUnhealthy},
 		{origin: lapi.OriginPluginAppsecFailure, want: headerReasonAppsecFailure},
+		{origin: lapi.OriginPluginRateLimit("login"), want: headerReasonRateLimit},
+		{origin: lapi.OriginPluginRateLimitFailure, want: headerReasonRateLimitFailure},
 		{origin: lapi.OriginPluginModsecFailure, want: headerReasonModsecFailure},
 		{origin: "crowdsec", want: headerReasonLAPI},
 		{origin: "lists:firehol_level1", want: headerReasonLAPI},

@@ -18,6 +18,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/modsecurity"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ratelimit"
 )
 
 // Bouncer is one Traefik router handler. It is not the reclaim value.
@@ -59,6 +60,11 @@ type Bouncer struct {
 	modsecReceiveSeen        bool
 	name                     string
 	next                     http.Handler
+	rateLimitBuckets         *ratelimit.BucketSet // nil when rateLimitEnabled is false
+	rateLimitCounter         ratelimit.Counter    // set once by AttachRateLimit before the handler is returned
+	rateLimitFailureAction   string               // per-router answer when the counter errors
+	rateLimitResponseHeaders bool
+	rateLimitStatusCode      int
 	remediationCustomHeader  string
 	remediationStatusCode    int
 	trustedHops              *ip.PoolStrategy // hops allowed to set the forwarded client header
@@ -84,6 +90,14 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 	actionRules, err := httprule.NewActionSet(config.BouncerActionRules)
 	if err != nil {
 		return nil, err
+	}
+	// Buckets compile only when this router runs the rate limit; the counter arrives through AttachRateLimit.
+	var rateLimitBuckets *ratelimit.BucketSet
+	if config.RateLimitEnabled {
+		rateLimitBuckets, err = ratelimit.NewBucketSet(config.RateLimitBuckets)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var banTemplate *template.Template
@@ -125,6 +139,10 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 		log:                      log,
 		name:                     name,
 		next:                     next,
+		rateLimitBuckets:         rateLimitBuckets,
+		rateLimitFailureAction:   configuration.EffectiveRateLimitFailureAction(config.RateLimitFailureAction),
+		rateLimitResponseHeaders: config.RateLimitResponseHeaders,
+		rateLimitStatusCode:      config.RateLimitStatusCode,
 		remediationCustomHeader:  config.BouncerRemediationHeadersCustomName,
 		remediationStatusCode:    config.BouncerRemediationStatusCode,
 		trustedHops:              &ip.PoolStrategy{Checker: hopChecker},
@@ -173,7 +191,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	logger.Trace(b.log, "ServeHTTP", "ip", req.IPAddrString(), "isTrusted", isTrusted)
 	if isTrusted {
 		b.next.ServeHTTP(rw, req.Request)
-		// Trusted clients skip LAPI, AppSec, and ModSec.
+		// Trusted clients skip LAPI, the rate limit, AppSec, and ModSec.
 		return
 	}
 
@@ -193,6 +211,9 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	if b.serveLAPI(rw, req, match) {
 		return
 	}
+	if b.serveRateLimit(rw, req, match) {
+		return
+	}
 	if b.serveAppSec(rw, req, match) {
 		return
 	}
@@ -200,6 +221,12 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		return
 	}
 	b.next.ServeHTTP(rw, req.Request)
+}
+
+// AttachRateLimit gives this router the counter its rate-limit buckets are charged to. New calls it
+// once, before it returns the handler, so ServeHTTP reads a plain field.
+func (b *Bouncer) AttachRateLimit(counter ratelimit.Counter) {
+	b.rateLimitCounter = counter
 }
 
 // foldActionRules reduces the action rules for req.

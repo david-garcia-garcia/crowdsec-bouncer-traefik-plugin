@@ -3,7 +3,7 @@
 ## Language
 
 **Go-layer real Redis e2e**:
-`go test` sources tagged `realredis` that dial a live Dragonfly (Redis protocol) instead of the in-process RESP stand-in, asserting DecisionStore behavior below Traefik’s HTTP surface.
+`go test` sources tagged `realredis` that dial a live Dragonfly (Redis protocol) instead of the in-process RESP stand-in, asserting DecisionStore and rate-limit Client behavior below Traefik’s HTTP surface.
 _Avoid_: Pester real-stack, mock LAPI e2e, `testStoreRedis`
 
 ## Overview
@@ -26,11 +26,12 @@ make test_realredis
 ## Key files
 
 - `pkg/decisionstore/zzz_e2e_realredis_test.go`
+- `pkg/ratelimit/zzz_e2e_realredis_test.go`
 - `tests/e2e/go/docker-compose.yml`
 - `.github/workflows/e2e.yml`
 
 ## Gotchas
 
 - The in-process RESP stand-in ignores `SET EX`; TTL expiry only belongs in this tagged suite.
-- Each test must use its own Redis key prefix (`t.Name()`) so parallel CI jobs on one Dragonfly do not share slots.
+- Each test must use its own Redis key prefix (`t.Name()`) so parallel CI jobs on one Dragonfly do not share slots. Rate-limit counters outlive a run by two windows, so those keys also carry a per-run nonce.
 - Do not boot Traefik or Crowdsec for these tests. That stack is `build_e2e_real.md`.

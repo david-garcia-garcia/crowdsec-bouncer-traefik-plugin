@@ -38,9 +38,20 @@ type valuePredicate struct {
 
 // New compiles rules once. An empty list matches nothing. Fully empty rules and invalid RE2 fail.
 func New(rules []Rule) (*Set, error) {
+	return compileSet(rules, false)
+}
+
+// NewWithCatchAll compiles rules like New, except that a rule whose every predicate is any
+// matches every request instead of failing. Invalid RE2 still fails.
+func NewWithCatchAll(rules []Rule) (*Set, error) {
+	return compileSet(rules, true)
+}
+
+// compileSet compiles every rule in list order. allowCatchAll keeps a rule with no predicate.
+func compileSet(rules []Rule, allowCatchAll bool) (*Set, error) {
 	set := &Set{rules: make([]compiledRule, 0, len(rules))}
 	for i, rule := range rules {
-		compiled, err := compileRule(rule)
+		compiled, err := compileRule(rule, allowCatchAll)
 		if err != nil {
 			return nil, fmt.Errorf("rule %d: %w", i, err)
 		}
@@ -95,8 +106,8 @@ func (set *Set) hasPath(i int) bool {
 	return set != nil && i >= 0 && i < len(set.rules) && set.rules[i].pathRe != nil
 }
 
-// compileRule rejects invalid syntax and a rule whose every predicate is any.
-func compileRule(rule Rule) (compiledRule, error) {
+// compileRule rejects invalid syntax, and a rule whose every predicate is any unless allowCatchAll is set.
+func compileRule(rule Rule, allowCatchAll bool) (compiledRule, error) {
 	methodAny, methodNeg, methodRe, err := compileMethod(rule.Method)
 	if err != nil {
 		return compiledRule{}, fmt.Errorf("method: %w", err)
@@ -117,7 +128,7 @@ func compileRule(rule Rule) (compiledRule, error) {
 	if err != nil {
 		return compiledRule{}, fmt.Errorf("cookies: %w", err)
 	}
-	if methodAny && pathRe == nil && hostRe == nil && len(headers) == 0 && len(cookies) == 0 {
+	if !allowCatchAll && methodAny && pathRe == nil && hostRe == nil && len(headers) == 0 && len(cookies) == 0 {
 		return compiledRule{}, errors.New("empty")
 	}
 	return compiledRule{
@@ -201,7 +212,7 @@ func (rule compiledRule) match(httpReq *http.Request, cookies []*http.Cookie) bo
 	if rule.pathRe != nil && !rule.pathRe.MatchString(path) {
 		return false
 	}
-	if rule.hostRe != nil && !rule.hostRe.MatchString(requestHostname(httpReq)) {
+	if rule.hostRe != nil && !rule.hostRe.MatchString(RequestHostname(httpReq)) {
 		return false
 	}
 	if !matchValuePredicates(rule.headers, httpReq.Header) {
@@ -210,8 +221,9 @@ func (rule compiledRule) match(httpReq *http.Request, cookies []*http.Cookie) bo
 	return matchCookies(rule.cookies, cookies)
 }
 
-// requestHostname is the hostname of req.Host. SplitHostPort success drops the port.
-func requestHostname(httpReq *http.Request) string {
+// RequestHostname is the hostname of req.Host. SplitHostPort success drops the port.
+// It is the one owner of the text a host predicate and a rate-limit host key read.
+func RequestHostname(httpReq *http.Request) string {
 	if hostname, _, err := net.SplitHostPort(httpReq.Host); err == nil {
 		return hostname
 	}
