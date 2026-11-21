@@ -12,3 +12,5 @@
   Why: the requirement lists `RateLimit-*` headers beside `Retry-After`; the IETF draft's header shape is unsettled and windowcounter has no remaining count, so this change sends `Retry-After` only.
 - [ ] note large  `knowledge/debt/2026-11-20-rate-limit-redis-backoff-gate.md`
   Why: a blackholed Redis costs each request the full 250ms rate-limit budget for the whole outage; no gate skips Redis after repeated failures.
+- [ ] note large  `knowledge/debt/2026-11-21-single-reading-path-spec-names-bypassratelimit.md`
+  Why: the live "Action-rule skips need a single-reading path" requirement omits `bypassRateLimit`, though the code and "Action rules fold every matching row" drop it on an ambiguous path too.

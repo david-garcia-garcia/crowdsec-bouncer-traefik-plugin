@@ -6,3 +6,7 @@ change: add-redis-rate-limit-leg
 - fold core_plugin_middleware_config-validation (added "Rate-limit settings are validated only when the leg is enabled") — confidence high
 - fold core_plugin_lapi_usage-metrics (added "Rate-limit drops use plugin origins") — confidence high
 - fold build_e2e_pester_crowdsec-stack (added "Real stack covers the Redis rate limit") — confidence medium
+
+## Archive (2026-11-21)
+FindSpecHost re-run: same six verdicts (4 fold, 2 new, 0 skip), confidence high. Synced into `openspec/specs/`; change moved to `openspec/changes/archive/2026-11-21-add-redis-rate-limit-leg/`.
+- core_plugin_middleware_bouncer: the two MODIFIED blocks were written before master's ModSec leg merged in. A full-block replace would have dropped ModSec text (`bypassModsec`, `ban:modsec`, `ban:modsec-failure`, `captcha:modsec-failure`, the ModSec skip bullet, two ModSec scenarios). Landed by a three-way merge (propose-time baseline, current baseline, delta): the rate-limit edits plus all ModSec text. Blank lines inserted between table rows and scenario bullets in those two blocks were dropped to match the delta layout.

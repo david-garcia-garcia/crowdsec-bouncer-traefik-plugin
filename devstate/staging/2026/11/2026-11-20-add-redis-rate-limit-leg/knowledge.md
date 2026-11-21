@@ -19,3 +19,4 @@
 - updated knowledge/devdocs/core_plugin_lapi_usage-metrics.md
 - updated knowledge/devdocs/core_plugin_middleware_ban-page.md
 - updated knowledge/devdocs/core_plugin_middleware_config-validation.md
+- created knowledge/debt/2026-11-21-single-reading-path-spec-names-bypassratelimit.md

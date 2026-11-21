@@ -26,6 +26,8 @@ Allowlist of root + domain: `openspec/specs/domains.md`.
 - lapi
 - middleware
 - modsecurity
+- ratelimit
+- wafhop
 
 ## std
 
