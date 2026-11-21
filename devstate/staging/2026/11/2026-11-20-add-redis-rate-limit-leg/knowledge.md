@@ -15,3 +15,7 @@
 - updated knowledge/devdocs/core_plugin_httprule.md
 - updated knowledge/devdocs/build_e2e_real.md
 - updated knowledge/devdocs/build_e2e_go-redis.md
+- updated knowledge/devdocs/core_plugin_ip.md
+- updated knowledge/devdocs/core_plugin_lapi_usage-metrics.md
+- updated knowledge/devdocs/core_plugin_middleware_ban-page.md
+- updated knowledge/devdocs/core_plugin_middleware_config-validation.md

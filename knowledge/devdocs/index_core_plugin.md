@@ -8,12 +8,12 @@ description: How LAPI Clients share one Store keyed by CrowdSec cursor SessionHe
 ## Middleware New
 priority: normal
 local: core_plugin_middleware.md
-description: How Traefik New reclaims a LAPI Client, an AppSec Client, a captcha Client, and a ModSec Client and returns a per-router Bouncer (`core_plugin_middleware_bouncer`).
+description: How Traefik New reclaims a LAPI Client, an AppSec Client, a captcha Client, a ModSec Client, and the rate-limit Client and returns a per-router Bouncer (`core_plugin_middleware_bouncer`).
 
 ## Ban page
 priority: normal
 local: core_plugin_middleware_ban-page.md
-description: How handleBanServeHTTP and handleBanStatusServeHTTP write the operator ban response (status, including the relayed AppSec ban http_status, Content-Type, Cache-Control, optional template).
+description: How handleBanServeHTTP and handleBanStatusServeHTTP write the operator ban response (status, including the relayed AppSec ban http_status and the rate-limit status, Content-Type, Cache-Control, optional template).
 
 ## Instance slots
 priority: normal

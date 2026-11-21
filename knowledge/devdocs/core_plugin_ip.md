@@ -34,6 +34,7 @@ Use `pkg/ip.NewChecker` for trusted hop and trusted client lists. The Checker st
 - Call `HostCIDR` to format a parseable bare address as `/32` or `/128` before `AddCIDR`.
 - Range stream/alone membership reuses two Helpers on the LAPI Client (`AddCIDR(network, remediation)` then `Contains` metadata). Checker stays `AddCIDR(cidr, "")`. Do not put Range in Checker. Do not put ban and captcha on one LPM tree.
 - One-CIDR questions (`InNetwork`) live in `pkg/ip/network.go`, not in Checker.
+- Mask a parsed address to its network with `MaskPrefix(ipAddr, ipv4Prefix, ipv6Prefix)` (`pkg/ip/network.go`). An IPv4-mapped IPv6 address counts as IPv4; a prefix of 0 returns the address unchanged; nil stays nil. The rate-limit `ip` key part calls it on `req.IPAddr()` (`core_plugin_ratelimit.md`). Do not re-parse the client string to mask it.
 - Classify an already-parsed address with `FamilyOfIP` for usage-metrics `ip_type`. Keep `Family` / `FamilyOfHostOrCIDR` for decision values. Do not parse `RemoteAddr`.
 
 ## Pattern snippet
