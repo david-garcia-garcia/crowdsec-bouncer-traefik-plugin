@@ -23,7 +23,7 @@ A second `pkg/intern.Table` on the same DecisionStore incarnation. Same type as 
 _Avoid_: reporter-owned table, packing intern ids into Redis or the range blob, a `scenario` usage-metrics label
 
 **Packed word**:
-A memory `uint32` of 2-bit kind (0 empty / 1 `t` / 2 `c` / 3 `f`), 12-bit origin intern id, 2-bit family (`1`=ipv4, `2`=ipv6, `0`=empty), and 16-bit scenario intern id. Unpack of a packed word returns ASCII `t`/`c`/`f`. Origin id greater than 4095 saturates to 0 with no log. Family is classified at Put with `FamilyOfHostOrCIDR`. The range-index blob stays `KindOriginString` (kind, optional newline, origin). Redis slots are the **Redis slot value**. `LiveSlot` is `{Word uint32, ExpiresAt int32, DecisionEnd int32}` (12 bytes; grown from 8 for the decision end, approved in `2026-11-21-lapi-ban-retry-after`).
+A memory `uint32` of 2-bit kind (0 empty / 1 `t` / 2 `c` / 3 `f`), 12-bit origin intern id, 2-bit family (`1`=ipv4, `2`=ipv6, `0`=empty), and 16-bit scenario intern id. Unpack of a packed word returns ASCII `t`/`c`/`f`. Origin id greater than 4095 saturates to 0 with no log. Family is classified at Put with `FamilyOfHostOrCIDR`. The range-index blob stays `KindOriginString` (kind, optional newline, origin). Redis slots are the **Redis slot value**. `LiveSlot` is `{Word uint32, ExpiresAt int32, DecisionEnd int32}` (12 bytes).
 _Avoid_: leftover U+001F, packing inside a cache bag, intern ids in the range-index blob, ParseIP on the ActiveCounts walk, `uint16(word>>8)` as origin id
 
 **KindOriginString**:
@@ -78,6 +78,8 @@ kind, origin, originID, decisionLeft, err := lapiClient.LookupRemediation(remote
 - `pkg/decisionstore/store.go`
 - `pkg/decisionstore/memory.go`
 - `pkg/decisionstore/memory_pack.go`
+- `pkg/decisionstore/liveslot.go` (`LiveSlot`, elapsed clock, `decisionLeft`)
+- `pkg/decisionstore/lookup.go` (`lookupHit`, `mergeLookupHit`)
 - `pkg/decisionstore/redis_pack.go`
 - `pkg/decisionstore/decision.go`
 - `pkg/decisionstore/redis.go`

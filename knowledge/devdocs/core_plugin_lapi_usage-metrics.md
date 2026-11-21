@@ -27,7 +27,7 @@ Call `IncProcessed` once the client address parsed, and `IncDropped` on each rem
 - Classify `ip_type` with `ip.FamilyOfIP` on the `net.IP` GetRemoteIP already yielded (`req.IPType()` on the request path; `New` stores that family). Do not parse `RemoteAddr`. Do not call `ip.Family` on the client string on the request path.
 - Build origin with `MetricsOrigin(decision.Origin, decision.Scenario)` before Store Put and before `IncDropped`.
 - AppSec remediations use `origin=appsec`. A ModSec copied block uses `origin=modsec` (`remediation=ban`). Fail-closed drops use `plugin:tech_cachefail`, `plugin:tech_streamfail`, `plugin:lapi_failure`, `plugin:appsec_failure`, or `plugin:modsec_failure`. Applied action-rule ban or captcha uses `plugin:rules:<name>`. A `GetRemoteIP` error is not one of these drops.
-- Persist origin on Redis Ip/header and Range-index via `KindOriginString`. Packed memory values use the DecisionStore origin intern table and pack raw scenario into the same word. Overflow Warns and keeps origin id 0 (`OriginName` empty). Bare letter-only Range lines still match and MAY omit origin. `ActiveCounts` is intern id + family; POST emits `OriginName(originID)` only. Do not send a `scenario` item label. The reporter does not own either intern table.
+- Persist origin on Redis Ip/header in the Redis slot value and on Range-index via `KindOriginString` (`core_plugin_decisionstore.md`). Packed memory values use the DecisionStore origin intern table and pack raw scenario into the same word. Overflow Warns and keeps origin id 0 (`OriginName` empty). Bare letter-only Range lines still match and MAY omit origin. `ActiveCounts` is intern id + family; POST emits `OriginName(originID)` only. Do not send a `scenario` item label. The reporter does not own either intern table.
 - Construct one `MetricsReporter` in `New` (`newMetricsReporter`). Bind `query` to `crowdsecQuery`. Do not store `*http.Client` on the reporter. The reporter logger is the LAPI constructor `log.With` child (`std_go_logger_nested`); do not pass `sessionKey` on `reportMetrics`.
 - Stamp `utc_startup_timestamp` once on the reporter at construct. Do not use `time.Now()` at each push. `feature_flags` must marshal as `[]`, not `{}`.
 - Keep `IncProcessed` / `IncDropped` / `IncDroppedBytes` as `Client` methods (thin forwards). A Client literal without a reporter no-ops those methods.
@@ -38,7 +38,7 @@ Call `IncProcessed` once the client address parsed, and `IncDropped` on each rem
 ## Pattern snippet
 
 ```go
-kind, origin, originID, err := lapiClient.LookupRemediation(req.IPAddrString(), req.IPAddr(), scopes)
+kind, origin, originID, decisionLeft, err := lapiClient.LookupRemediation(req.IPAddrString(), req.IPAddr(), scopes)
 if origin == "" {
 	origin = lapiClient.OriginName(originID)
 }
