@@ -14,17 +14,17 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-In progress. 1 items remain.
+Ready for review. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 5a6d1240
+Reviewed head: abea9b4d
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/44940274064 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -34,8 +34,8 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-11-21-lapi-ban-retry-after pushed | `git` |
 | OpenSpec | lapi-ban-retry-after | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/229 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 44940274064 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/44940274064 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/44940274064 |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
@@ -55,7 +55,7 @@ Worktree:
 
 
 ## How this fits together
-Ticket 2026-11-21-lapi-ban-retry-after on branch 2026-11-21-lapi-ban-retry-after targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/229; CI not seen.
+Ticket 2026-11-21-lapi-ban-retry-after on branch 2026-11-21-lapi-ban-retry-after targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/229; CI build 44940274064 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/44940274064.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -76,7 +76,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 5a6d1240525be688275ce06a1ba3800412a8d6de | Card must match the branch you measured |
+| Reviewed head | abea9b4d9c61e15eecd67b3ac05d67c23359de1d | Card must match the branch you measured |
 
 ### Stored data model
 None.
