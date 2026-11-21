@@ -45,7 +45,7 @@ Proof:
 In progress. 1 items remain.
 
 Priority: P2 — real operator pain (no rate limit in the edge WAF), with a workaround outside the plugin.
-Reviewed head: fb07fa78
+Reviewed head: 528bea40
 Owner decision: None.
 
 ## Review scores
@@ -96,7 +96,7 @@ Completed:
 
 
 ## Follow-up issues
-- [ ] [Extract a common leg abstraction from `plugin.go` and `Bouncer`](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/knowledge/debt/2026-11-20-extract-common-leg-abstraction.md) — each published leg is copied by hand into five places in `plugin.go` and `Bouncer`; the owner asked to suggest a shared leg unit before the next leg, and the Open-only rate-limit leg does not need it.
+- [ ] [Add the `tokenBucket` algorithm and the in-memory rate-limit store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/knowledge/debt/2026-11-20-rate-limit-token-bucket-and-memory-store.md) — each published leg is copied by hand into five places in `plugin.go` and `Bouncer`; the owner asked to suggest a shared leg unit before the next leg, and the Open-only rate-limit leg does not need it.
 
 
 ## How this fits together
@@ -126,7 +126,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 6 added / 13 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | fb07fa783cc7eec36c5cad71151d3acf8f6c8049 | Card must match the branch you measured |
+| Reviewed head | 528bea40d256af30da136ad14ee0d64910da2872 | Card must match the branch you measured |
 
 ### Stored data model
 - **New store**: Redis (the rate-limit Redis: `rateLimitRedisHost`, `rateLimitRedisDatabase`, `rateLimitRedisPassword`/`File`; it is a separate client from the decision-cache Redis, `plugin.go:189-207`, `pkg/ratelimit/client.go:99-113`). New key family: sliding-window hit counters.
