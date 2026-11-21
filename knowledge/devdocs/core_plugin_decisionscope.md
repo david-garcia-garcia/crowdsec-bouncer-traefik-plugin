@@ -43,7 +43,7 @@ Use `pkg/decisionscope` for letters, PreferRemediation, RequestScopeValues, Stre
 
 ```go
 scopes := decisionscope.RequestScopeValues(headers, req)
-kind, origin, originID, err := lapiClient.LookupRemediation(req.IPAddrString(), req.IPAddr(), scopes)
+kind, origin, originID, decisionLeft, err := lapiClient.LookupRemediation(req.IPAddrString(), req.IPAddr(), scopes)
 if origin == "" {
 	origin = lapiClient.OriginName(originID)
 }
@@ -71,7 +71,7 @@ lapiClient.IncDropped(origin, req.IPType(), "ban")
 - Ban wins across Ip, Range, and header hits. Do not return the first active Ip or Range captcha before considering a Country ban.
 - Shared Redis instances GET `range-index` through the Store and rebuild membership; without that hydrate they would miss every Range decision. There is no stream lease.
 - Trust the header the same way you trust `X-Forwarded-For`: only from a trusted hop (CDN or geoenrich in front of this middleware).
-- Redis Ip/header/Range-index values MAY be `t`/`c` plus newline plus a metrics origin (`KindOriginString`). Bare letters still match. Redis stays one `range-index` key. Packed intern ids are uint32 words on memory Ip/header slots only.
+- Redis Ip/header values are the Redis slot value (kind, origin, scenario, decision end; `core_plugin_decisionstore.md`). Range-index lines MAY be `t`/`c` plus newline plus a metrics origin (`KindOriginString`). Bare letters still match. Redis stays one `range-index` key. Packed intern ids are uint32 words on memory Ip/header slots only.
 - Request lookup is Store `LookupRemediation`. Resolve `OriginName` only on drop.
 - After a cache miss, stream/alone use stream health; live/none call `LiveLookup`. Do not name that split after Range membership.
 - CrowdSec does not canonicalize decision values — measured on v1.8.0, the stream hands back `2001:DB8::2` and `::ffff:192.0.2.4` exactly as submitted. LAPI `?ip=` does match numerically, so the spelling problem is ours alone and needs no LAPI workaround.

@@ -5,7 +5,7 @@ Writes one CrowdSec stream payload into the DecisionStore so a same-window repla
 ## Requirements
 
 ### Requirement: Stream apply writes deleted before new
-When the stream poller applies one CrowdSec `/v1/decisions/stream` payload, it SHALL apply every `deleted` decision before every `new` decision through `pkg/decisionstore.Store`. It SHALL call BeginTick before applying deletions and additions for that payload, apply every non-Range `deleted` entry with DeleteMany (flushing each `PutManyChunk`) before every non-Range `new` entry with PutMany (flushing each `PutManyChunk`) for the same value, then call PublishTick once after the full payload is applied. Range CIDRs SHALL be removed from the shared `range-index` blob before a replacement for that same CIDR is upserted, via one `ApplyRangeBatch` (one read, removals then upserts, one write). After apply, Range membership SHALL be rebuilt from that blob (`HydrateRange`). The poller MUST NOT keep a Client-held tick scratch map, MUST NOT branch between a live tick map and `cache.Client.Set`, and MUST NOT treat a stream lease (`updated` / `Acquire`) as this apply order. Intra-instance poll lock is owned by `core_plugin_lapi_stream-single-flight`. A Range apply that could not read the index SHALL be a failed poll so stream startup stays set and the retry asks for the full decision set.
+When the stream poller applies one CrowdSec `/v1/decisions/stream` payload, it SHALL apply every `deleted` decision before every `new` decision through `pkg/decisionstore.Store`. It SHALL call BeginTick before applying deletions and additions for that payload, apply every non-Range `deleted` entry with DeleteMany (flushing each `PutManyChunk`) before every non-Range `new` entry with PutMany (flushing each `PutManyChunk`) for the same value, then call PublishTick once after the full payload is applied. Each non-Range `new` entry SHALL carry its parsed CrowdSec duration as both the store TTL and the decision duration. Range CIDRs SHALL be removed from the shared `range-index` blob before a replacement for that same CIDR is upserted, via one `ApplyRangeBatch` (one read, removals then upserts, one write). After apply, Range membership SHALL be rebuilt from that blob (`HydrateRange`). The poller MUST NOT keep a Client-held tick scratch map, MUST NOT branch between a live tick map and `cache.Client.Set`, and MUST NOT treat a stream lease (`updated` / `Acquire`) as this apply order. Intra-instance poll lock is owned by `core_plugin_lapi_stream-single-flight`. A Range apply that could not read the index SHALL be a failed poll so stream startup stays set and the retry asks for the full decision set.
 
 #### Scenario: Same-window IP replacement stays banned
 - **WHEN** one stream payload contains a new Ip ban for `203.0.113.10` and a deleted prior for that same value
@@ -21,7 +21,7 @@ When the stream poller applies one CrowdSec `/v1/decisions/stream` payload, it S
 
 #### Scenario: Redis apply does not require a memory map publish
 - **WHEN** Redis backs the Store and a stream payload stores an Ip ban
-- **THEN** Redis holds `KindOriginString` for that Ip key without a memory-style map publish
+- **THEN** Redis holds the slot value for that Ip key (kind, origin, scenario, and the decision end on four lines) without a memory-style map publish
 
 #### Scenario: Range apply stays on ApplyRangeBatch
 - **WHEN** a stream payload carries Range upserts and removals

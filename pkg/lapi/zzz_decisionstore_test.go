@@ -18,7 +18,7 @@ func putBan(store *decisionstore.Store) {
 }
 
 func lookupBan(store *decisionstore.Store) (string, error) {
-	kind, _, originID, err := store.LookupRemediation("1.2.3.4", nil, nil)
+	kind, _, originID, _, err := store.LookupRemediation("1.2.3.4", nil, nil)
 	_ = originID
 	return kind, err
 }
@@ -109,13 +109,13 @@ func TestOpenDecisionStore_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.
 	putBan(store)
 
 	session := newTestRedisStore(t, redisServer.addr(), nil, SessionHex(cfg))
-	kind, _, _, getErr := session.LookupRemediation("1.2.3.4", nil, nil)
+	kind, getErr := remediationKindForTest(session.LookupRemediation("1.2.3.4", nil, nil))
 	if getErr != nil || kind != decisionscope.BannedValue {
 		t.Fatalf("SessionHex prefix lookup %q err %v", kind, getErr)
 	}
 
 	identity := newTestRedisStore(t, redisServer.addr(), nil, IdentityHex(cfg))
-	identKind, _, originID, identErr := identity.LookupRemediation("1.2.3.4", nil, nil)
+	identKind, _, originID, _, identErr := identity.LookupRemediation("1.2.3.4", nil, nil)
 	_ = originID
 	if identErr != nil || identKind != "" {
 		t.Fatalf("IdentityHex prefix lookup kind %q err %v, want empty kind", identKind, identErr)
@@ -255,7 +255,7 @@ func TestClientClose_LeavesSiblingRedisPoolLive(t *testing.T) {
 	}
 	putBan(first.decisionStore)
 	first.Close()
-	kind, _, _, getErr := second.decisionStore.LookupRemediation("1.2.3.4", nil, nil)
+	kind, getErr := remediationKindForTest(second.decisionStore.LookupRemediation("1.2.3.4", nil, nil))
 	if getErr != nil || kind != decisionscope.BannedValue {
 		t.Fatalf("after sibling Close lookup %q err %v", kind, getErr)
 	}
@@ -276,14 +276,13 @@ func TestOpenDecisionStore_LastHolderGraceClosesRedisPool(t *testing.T) {
 		t.Fatal(err)
 	}
 	putBan(store)
-	kind, _, _, getErr := store.LookupRemediation("1.2.3.4", nil, nil)
+	kind, getErr := remediationKindForTest(store.LookupRemediation("1.2.3.4", nil, nil))
 	if getErr != nil || kind != decisionscope.BannedValue {
 		t.Fatalf("before cancel lookup %q err %v", kind, getErr)
 	}
 	cancel()
 	time.Sleep(80 * time.Millisecond)
-	_, _, originID, closedErr := store.LookupRemediation("1.2.3.4", nil, nil)
-	_ = originID
+	closedErr := lookupErrForTest(store.LookupRemediation("1.2.3.4", nil, nil))
 	if closedErr == nil || !errors.Is(closedErr, decisionstore.ErrUnreachable) {
 		t.Fatalf("after last-holder grace lookup err %v, want unreachable", closedErr)
 	}

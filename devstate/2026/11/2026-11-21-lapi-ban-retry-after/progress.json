@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-11-21-lapi-ban-retry-after",
+  "jobName": "2026-11-21-lapi-ban-retry-after",
+  "startedAt": "2026-11-21T18:19:53.002Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-21T18:23:18.549Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-21T18:34:42.291Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-21T18:46:14.045Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-21T19:26:23.289Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-21T19:50:12.498Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-21T20:08:13.180Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-21T20:24:46.144Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-21T20:34:23.929Z"
+    }
+  }
+}

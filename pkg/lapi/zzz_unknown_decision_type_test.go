@@ -48,7 +48,7 @@ func TestLiveLookupUnknownTypeBans(t *testing.T) {
 	body := `[{"id":1,"origin":"CAPI","type":"challenge","scope":"Ip","value":"1.2.3.4","duration":"1h","scenario":"test"}]`
 	server := testLiveScopeLAPI(t, body, nil)
 	client := newTestLiveClient(t, server)
-	kind, origin, err := client.LiveLookup("1.2.3.4", nil, 0)
+	kind, origin, _, err := client.LiveLookup("1.2.3.4", nil, 0)
 	if err == nil {
 		t.Fatal("challenge must remediate")
 	}
@@ -61,7 +61,7 @@ func TestLiveLookupUnknownTypeBans(t *testing.T) {
 func TestLiveLookupEmptyListStaysNone(t *testing.T) {
 	server := testLiveScopeLAPI(t, "[]", nil)
 	client := newTestLiveClient(t, server)
-	kind, _, err := client.LiveLookup("1.2.3.4", nil, 0)
+	kind, _, _, err := client.LiveLookup("1.2.3.4", nil, 0)
 	if err != nil {
 		t.Fatalf("empty list: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestHandleStreamCacheRangeUnknownTypeStoresBan(t *testing.T) {
 	if err := client.handleStreamCache(); err != nil {
 		t.Fatalf("range poll: %v", err)
 	}
-	kind, origin, _, err := client.LookupRemediation("10.1.2.3", net.ParseIP("10.1.2.3"), nil)
+	kind, origin, _, _, err := client.LookupRemediation("10.1.2.3", net.ParseIP("10.1.2.3"), nil)
 	if err != nil || kind != decisionscope.BannedValue || origin != "CAPI" {
 		t.Fatalf("Range allow must store ban, got kind=%q origin=%q err=%v", kind, origin, err)
 	}

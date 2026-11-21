@@ -25,7 +25,7 @@ func TestMemoryDurationZeroMissesAfterPublish(t *testing.T) {
 			store.BeginTick()
 			store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: durationSec})
 			store.PublishTick(ElapsedNow())
-			kind, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+			kind, _, originID, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 			_ = originID
 			if err != nil || kind != "" {
 				t.Fatalf("duration %d must miss after publish, got kind %q err %v", durationSec, kind, err)
@@ -38,12 +38,12 @@ func TestMemoryTickPutHiddenUntilPublish(t *testing.T) {
 	store := NewMemory(logger.New("ERROR", ""))
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60})
-	kind, origin, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	kind, origin, originID, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	if err != nil || kind != "" {
 		t.Fatalf("tick Put must stay unpublished, kind %q origin %q id %d err %v", kind, origin, originID, err)
 	}
 	store.PublishTick(0)
-	kind, origin, originID, err = store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	kind, origin, originID, _, err = store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	if err != nil || kind != decisionscope.BannedValue {
 		t.Fatalf("kind %q origin %q id %d err %v", kind, origin, originID, err)
 	}
@@ -60,7 +60,7 @@ func TestMemoryTickDeleteOnlyMissesAfterPublish(t *testing.T) {
 	store.BeginTick()
 	store.Delete(decisionscope.ScopeIP, "203.0.113.10")
 	store.PublishTick(0)
-	kind, origin, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	kind, origin, originID, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	if err != nil || kind != "" {
 		t.Fatalf("tick Delete must miss after publish, kind %q origin %q id %d err %v", kind, origin, originID, err)
 	}
@@ -77,7 +77,7 @@ func TestMemoryInternOverflowPacksZero(t *testing.T) {
 	if strings.Contains(logged.String(), "intern overflow") {
 		t.Fatalf("origin overflow must stay silent, got %s", logged.String())
 	}
-	kind, _, originID, err := store.LookupRemediation("203.0.113.99", net.ParseIP("203.0.113.99"), nil)
+	kind, _, originID, _, err := store.LookupRemediation("203.0.113.99", net.ParseIP("203.0.113.99"), nil)
 	if err != nil || kind != decisionscope.BannedValue || originID != 0 {
 		t.Fatalf("kind %q id %d err %v", kind, originID, err)
 	}
@@ -101,7 +101,7 @@ func TestMemoryOriginPackSaturatesAt12Bits(t *testing.T) {
 	if strings.Contains(logged.String(), "intern overflow") {
 		t.Fatalf("origin saturate must stay silent, got %s", logged.String())
 	}
-	kind, _, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	kind, _, originID, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	if err != nil || kind != decisionscope.BannedValue || originID != 0 {
 		t.Fatalf("kind %q id %d err %v", kind, originID, err)
 	}
@@ -126,7 +126,7 @@ func TestMemoryListsInternTwice(t *testing.T) {
 		Origin: "lists:firehol_level1", Scenario: "firehol_level1", DurationSec: 60,
 	})
 	store.PublishTick(0)
-	kind, origin, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	kind, origin, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	if err != nil || kind != decisionscope.BannedValue || origin != "lists:firehol_level1" {
 		t.Fatalf("kind %q origin %q err %v", kind, origin, err)
 	}
@@ -153,7 +153,7 @@ func TestMemoryScenarioInternOverflowPacksZero(t *testing.T) {
 	if strings.Contains(logged.String(), "scenario intern overflow") {
 		t.Fatalf("scenario overflow must stay silent, got %s", logged.String())
 	}
-	kind, origin, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	kind, origin, _, _, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	if err != nil || kind != decisionscope.BannedValue || origin != "crowdsec" {
 		t.Fatalf("kind %q origin %q err %v", kind, origin, err)
 	}
@@ -177,11 +177,11 @@ func TestRedisPutHasNoInternId(t *testing.T) {
 	}
 	want := packToString(lookupHit{
 		kind: decisionscope.BannedValue, origin: "crowdsec", scenario: "ssh-bf",
-	})
+	}, 0)
 	if got != want {
 		t.Fatalf("redis payload %q, want %q", got, want)
 	}
-	kind, origin, originID, lookupErr := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
+	kind, origin, originID, _, lookupErr := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
 	if lookupErr != nil || kind != decisionscope.BannedValue || origin != "crowdsec" || originID != 0 {
 		t.Fatalf("kind %q origin %q id %d err %v", kind, origin, originID, lookupErr)
 	}

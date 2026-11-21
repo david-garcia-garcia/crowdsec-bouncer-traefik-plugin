@@ -112,7 +112,7 @@ func (b *Bouncer) captchaAppsecFailure(rw http.ResponseWriter, req clientrequest
 	if b.bypassesCaptcha(req, match) {
 		return false
 	}
-	return b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginAppsecFailure)
+	return b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginAppsecFailure, noLAPIDecisionEnd)
 }
 
 // banAppsecFailure writes the ban for an AppSec failure. When a captcha action rule also matched, it warns that the rule lost.

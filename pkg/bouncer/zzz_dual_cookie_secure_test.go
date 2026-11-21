@@ -105,7 +105,7 @@ func assertGateCookieSecure(t *testing.T, proto string, tlsOn, wantSecure bool) 
 	req := originFormRequest(http.MethodPost, "/protected", strings.NewReader(form.Encode()), proto, tlsOn)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rw := httptest.NewRecorder()
-	b.handleRemediationServeHTTP(rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli")
+	b.handleRemediationServeHTTP(rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli", noLAPIDecisionEnd)
 	got := cookieNamed(rw.Result().Cookies(), "crowdsec_captcha_gate")
 	if got == nil {
 		t.Fatal("missing crowdsec_captcha_gate")

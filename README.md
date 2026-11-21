@@ -140,7 +140,7 @@ What the visitor gets for each CrowdSec remediation ([CrowdSec bouncers](https:/
 
 | Remediation | What the user gets |
 | ----------- | ------------------ |
-| `ban`       | A ban page (or an empty body) with status `bouncerRemediationStatusCode` (default 403). An AppSec ban keeps the `http_status` CrowdSec sends instead: 403 by default, 429 for a `RateLimit()` block, or the code set with `user_blocked_http_code` or `SetReturnCode()`. |
+| `ban`       | A ban page (or an empty body) with status `bouncerRemediationStatusCode` (default 403). With 429, a LAPI ban also carries `Retry-After` (see `bouncerRemediationStatusCode`). An AppSec ban keeps the `http_status` CrowdSec sends instead: 403 by default, 429 for a `RateLimit()` block, or the code set with `user_blocked_http_code` or `SetReturnCode()`. |
 | `captcha`   | A captcha page. Once solved, the visitor is redirected back to the page they asked for and is not challenged again for `captchaGracePeriodSeconds` (default 24 hours). See [examples/captcha](examples/captcha/README.md). |
 
 Captcha providers:
@@ -1118,6 +1118,8 @@ Response header that tells why a request was blocked or challenged. Empty disabl
 
 **BouncerRemediationStatusCode** (int, default `403`)
 HTTP status for a ban from the LAPI, a failure action, or an action rule. It does not set the status of an AppSec ban. An AppSec ban is answered with the `http_status` of the AppSec response when it is between 200 and 599. CrowdSec sets that value to 403 unless `user_blocked_http_code` or [SetReturnCode()](https://docs.crowdsec.net/docs/appsec/hooks/#on_match) changes it, and to 429 for a `RateLimit()` block (CrowdSec 1.8.2+). To change the status of AppSec bans, set `user_blocked_http_code` in the CrowdSec appsec-config. This value applies only when the AppSec response has no valid `http_status`. A 204 or 304 status is sent without the ban page.
+
+With `429`, a ban from a LAPI decision also carries `Retry-After`: the seconds left on that decision, rounded up, at least `1`. With several decisions for the client, it is the end of the decision that produced the ban. A LAPI captcha decision served as a ban (router without a captcha, or captcha not usable) gets it too. In `live` mode the value is the decision's real end, not the end of the cached copy. There is no `Retry-After` with any other status, on an AppSec ban (even with AppSec `http_status` 429), on a failure-action or cache-failure ban, on an action-rule `ban`, on a captcha challenge page, or on a `Range` ban in `stream` or `alone` mode (the stored Range list has no end; `live` and `none` get the end from LAPI). With Redis, the end is stored as a wall-clock time, so instances that share Redis can differ by their clock skew. Decisions written by an older plugin version have no end and get no `Retry-After` until they expire.
 
 **BouncerTraceHeadersCustomName** (string, default `""`)
 Request header copied into the ban page as `{{ .TraceID }}`. See [Put a request id on the ban page](#put-a-request-id-on-the-ban-page).

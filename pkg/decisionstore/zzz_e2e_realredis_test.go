@@ -42,7 +42,7 @@ func waitRealRedis(addr string, budget time.Duration) error {
 	var last error
 	for {
 		store := NewRedis(logger.New("ERROR", ""), addr, nil, "", "", "wait")
-		_, _, _, last = store.LookupRemediation("203.0.113.254", nil, nil)
+		last = lookupErrForTest(store.LookupRemediation("203.0.113.254", nil, nil))
 		store.Close()
 		if last == nil {
 			return nil
@@ -135,7 +135,7 @@ func TestRealRedisSlotExpires(t *testing.T) {
 func TestRealRedisCloseUnreachable(t *testing.T) {
 	store := NewRedis(logger.New("ERROR", ""), realRedisAddr(), nil, "", "", strings.ReplaceAll(t.Name(), "/", "-"))
 	store.Close()
-	kind, _, _, err := store.LookupRemediation(backendBanIP, nil, nil)
+	kind, err := remediationKindForTest(store.LookupRemediation(backendBanIP, nil, nil))
 	if !errors.Is(err, ErrUnreachable) || err.Error() != "store:unreachable" {
 		t.Fatalf("want store:unreachable, got kind %q err %v", kind, err)
 	}
@@ -232,7 +232,7 @@ func TestRealRedisCloseTwiceThenUnreachable(t *testing.T) {
 	store := NewRedis(logger.New("ERROR", ""), realRedisAddr(), nil, "", "", strings.ReplaceAll(t.Name(), "/", "-"))
 	store.Close()
 	store.Close()
-	kind, _, _, err := store.LookupRemediation(backendBanIP, nil, nil)
+	kind, err := remediationKindForTest(store.LookupRemediation(backendBanIP, nil, nil))
 	if !errors.Is(err, ErrUnreachable) {
 		t.Fatalf("want store:unreachable after Close twice, got kind %q err %v", kind, err)
 	}
@@ -268,7 +268,7 @@ func TestRealRedisDeadReaderDoesNotFallBackToWriter(t *testing.T) {
 		Scope: decisionscope.ScopeIP, Value: backendBanIP,
 		Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec,
 	})
-	kind, _, _, err := store.LookupRemediation(backendBanIP, net.ParseIP(backendBanIP), nil)
+	kind, err := remediationKindForTest(store.LookupRemediation(backendBanIP, net.ParseIP(backendBanIP), nil))
 	if !errors.Is(err, ErrUnreachable) {
 		t.Fatalf("dead reader must not retry writer, kind %q err %v", kind, err)
 	}
@@ -327,7 +327,7 @@ func TestRealRedisExpandedRemoteIPMissesCanonicalSlot(t *testing.T) {
 		Scope: decisionscope.ScopeIP, Value: compressedV6,
 		Kind: decisionscope.BannedValue, Origin: backendOrigin, DurationSec: backendLiveTTLSec,
 	})
-	kind, _, _, err := store.LookupRemediation(expandedV6, net.ParseIP(expandedV6), nil)
+	kind, err := remediationKindForTest(store.LookupRemediation(expandedV6, net.ParseIP(expandedV6), nil))
 	if err != nil || kind != "" {
 		t.Fatalf("expanded remoteIP must miss canonical slot, kind %q err %v", kind, err)
 	}
@@ -511,4 +511,14 @@ func TestRealRedisLookupEmptyScopeIdentifierSkipsHeader(t *testing.T) {
 	})
 	mustMiss(t, store, backendBanIP, map[string]string{decisionscope.ScopeCountry: ""})
 	mustKind(t, store, backendBanIP, map[string]string{decisionscope.ScopeCountry: "FR"}, decisionscope.BannedValue, backendOrigin)
+}
+
+// remediationKindForTest keeps the kind and error of one LookupRemediation, for tests that check only the kind.
+func remediationKindForTest(kind, _ string, _ uint16, _ time.Duration, err error) (string, error) {
+	return kind, err
+}
+
+// lookupErrForTest keeps the error of one LookupRemediation, for tests that check only the error.
+func lookupErrForTest(_, _ string, _ uint16, _ time.Duration, err error) error {
+	return err
 }

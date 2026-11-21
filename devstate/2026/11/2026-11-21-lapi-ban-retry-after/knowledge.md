@@ -1,0 +1,15 @@
+# Knowledge
+- created knowledge/debt/2026-11-21-lookup-remediation-origin-id-always-zero.md
+- updated knowledge/devdocs/core_plugin_decisionstore.md
+- updated knowledge/devdocs/core_plugin_lapi_stream-apply.md
+- updated knowledge/devdocs/core_plugin_middleware_ban-page.md
+- created knowledge/debt/2026-11-21-spec-map-missing-wafhop.md
+- updated knowledge/devdocs/core_plugin_decisionstore.md
+- updated knowledge/devdocs/core_plugin_decisionscope.md
+- updated knowledge/devdocs/core_plugin_lapi_usage-metrics.md
+- updated knowledge/devdocs/core_plugin_lapi_origin-based-decision-remap.md
+- updated knowledge/devdocs/core_plugin_lapi_connection.md
+- updated knowledge/devdocs/core_plugin_middleware_action-rules.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-routing.md
+- updated knowledge/devdocs/build_e2e_real.md
+- deleted knowledge/debt/2026-11-21-spec-map-missing-wafhop.md

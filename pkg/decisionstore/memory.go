@@ -4,6 +4,7 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/intern"
 )
@@ -113,13 +114,14 @@ func (m *memory) PutMany(items []Decision) {
 	m.storePublished(next)
 }
 
-// putSlot writes one decision into slots.
+// putSlot writes one decision into slots: packed word, store TTL end, and decision end.
 func (m *memory) putSlot(slots map[string]LiveSlot, item Decision) {
 	key, _ := slotKeys(item.Scope, item.Value)
 	if key == "" {
 		return
 	}
-	slots[key] = LiveSlotFromPack(m.packToWord(lookupHit{kind: item.Kind, origin: item.Origin, scenario: item.Scenario}, item.Value), item.DurationSec)
+	word := m.packToWord(lookupHit{kind: item.Kind, origin: item.Origin, scenario: item.Scenario}, item.Value)
+	slots[key] = LiveSlotFromPack(word, item.DurationSec, item.DecisionDurationSec)
 }
 
 // DeleteMany drops canonical slots and prior Ip spellings from tick or the published map.
@@ -173,17 +175,20 @@ func (m *memory) activeCounts() map[ActiveCountKey]int64 {
 }
 
 // LookupRemediation reads the published snapshot (Ip, header scopes, Range). Expired slots miss.
-func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (kind string, origin string, originID uint16, err error) {
+// decisionLeft is the winner's DecisionEnd minus elapsed now (0 = unknown).
+func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (kind string, origin string, originID uint16, decisionLeft time.Duration, err error) {
 	slots := m.publishedMapValue()
 	now := elapsedNow()
-	kind, origin = lookupHits(func(key string) lookupHit {
+	kind, origin, decisionLeft = lookupHits(func(key string) lookupHit {
 		slot, ok := slots[key]
 		if !ok || (slot.ExpiresAt > 0 && slot.ExpiresAt <= now) {
 			return lookupHit{}
 		}
-		return m.unpackFromWord(slot.Word)
+		hit := m.unpackFromWord(slot.Word)
+		hit.decisionLeft = slot.decisionLeft(now)
+		return hit
 	}, remoteIP, ipAddr, scopes, membership)
-	return kind, origin, originID, nil
+	return kind, origin, originID, decisionLeft, nil
 }
 
 // ApplyRangeBatch mutates the in-process range-index blob.

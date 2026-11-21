@@ -2,18 +2,21 @@ package decisionstore
 
 import (
 	"net"
+	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 )
 
 // lookupHit is the decision both encodings pack and unpack: kind, origin name, scenario name.
+// decisionLeft is the time left on that decision at lookup, set by the engine that read the slot (0 = unknown).
 type lookupHit struct {
-	kind     string
-	origin   string
-	scenario string
+	kind         string
+	origin       string
+	scenario     string
+	decisionLeft time.Duration
 }
 
-// mergeLookupHit keeps ban over captcha and remembers the winner's origin name.
+// mergeLookupHit keeps ban over captcha and remembers the winner's origin name and time left.
 func mergeLookupHit(chosen lookupHit, incoming lookupHit) lookupHit {
 	if incoming.kind == "" {
 		return chosen
@@ -27,7 +30,8 @@ func mergeLookupHit(chosen lookupHit, incoming lookupHit) lookupHit {
 
 // lookupHits merges Ip, present header scopes, and Range. Ban on Ip skips Range membership.
 // hitForKey returns the unpacked slot. A zero hit is a miss.
-func lookupHits(hitForKey func(string) lookupHit, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string) {
+// Returns the winner's kind, origin, and time left. A Range winner has no end, so its time left is zero.
+func lookupHits(hitForKey func(string) lookupHit, remoteIP string, ipAddr net.IP, scopes map[string]string, membership *RangeMembership) (string, string, time.Duration) {
 	if hitForKey == nil {
 		hitForKey = func(string) lookupHit { return lookupHit{} }
 	}
@@ -40,12 +44,13 @@ func lookupHits(hitForKey func(string) lookupHit, remoteIP string, ipAddr net.IP
 		chosen = mergeLookupHit(chosen, hitForKey(HeaderScopeKey(scope, identifier)))
 	}
 	if membership != nil && decisionscope.RemediationKind(chosen.kind) != decisionscope.BannedValue {
-		chosen = mergeLookupHit(chosen, unpackFromString(membership.Remediation(ipAddr)))
+		rangeHit, _ := unpackFromString(membership.Remediation(ipAddr))
+		chosen = mergeLookupHit(chosen, rangeHit)
 	}
 	if chosen.kind == "" {
-		return "", ""
+		return "", "", 0
 	}
-	return decisionscope.RemediationKind(chosen.kind), chosen.origin
+	return decisionscope.RemediationKind(chosen.kind), chosen.origin, chosen.decisionLeft
 }
 
 // lookupKeys is the IP and present header-scope keys lookupHits reads. Range is membership, not a slot.

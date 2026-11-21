@@ -364,7 +364,7 @@ func TestLapiCaptchaDowngrade_keepsLapiBanReason(t *testing.T) {
 
 	rw := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
-	if !b.handleRemediationServeHTTP(rw, testClientRequest(req, testCaptchaRemoteIP), "captcha", "crowdsec") {
+	if !b.handleRemediationServeHTTP(rw, testClientRequest(req, testCaptchaRemoteIP), "captcha", "crowdsec", noLAPIDecisionEnd) {
 		t.Fatal("a downgrade ban must write the response")
 	}
 

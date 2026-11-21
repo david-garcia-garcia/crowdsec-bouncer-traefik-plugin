@@ -22,7 +22,7 @@ func (b *Bouncer) answerAppsecVerdict(rw http.ResponseWriter, req clientrequest.
 	switch decision.Action {
 	case appsec.ActionBan:
 		b.warnCaptchaSuperseded(req, match)
-		b.handleBanStatusServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsec, originAppsec, b.appsecBanStatusCode(decision))
+		b.handleBanStatusServeHTTP(rw, req, configuration.ReasonAPPSEC, headerReasonAppsec, originAppsec, b.appsecBanStatusCode(decision), noLAPIDecisionEnd)
 		return true
 	case appsec.ActionCaptcha:
 		// CrowdSec sends captcha without a page: the bouncer renders its own captcha.

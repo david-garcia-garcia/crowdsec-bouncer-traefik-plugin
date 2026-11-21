@@ -52,7 +52,7 @@ func TestHandleStreamCacheRangeStoresLAPIKind(t *testing.T) {
 	if err := client.handleStreamCache(); err != nil {
 		t.Fatalf("range poll: %v", err)
 	}
-	kind, origin, _, err := client.LookupRemediation("10.1.2.3", net.ParseIP("10.1.2.3"), nil)
+	kind, origin, _, _, err := client.LookupRemediation("10.1.2.3", net.ParseIP("10.1.2.3"), nil)
 	if err != nil || kind != decisionscope.BannedValue || origin != "CAPI" {
 		t.Fatalf("CAPI Range ban must store ban, got kind=%q origin=%q err=%v", kind, origin, err)
 	}
@@ -61,7 +61,7 @@ func TestHandleStreamCacheRangeStoresLAPIKind(t *testing.T) {
 func TestLiveLookupStoresLAPIKind(t *testing.T) {
 	server := testLiveScopeLAPI(t, testLiveBanBody("Ip", "1.2.3.4"), nil)
 	client := newTestLiveClient(t, server)
-	kind, origin, err := client.LiveLookup("1.2.3.4", nil, 0)
+	kind, origin, _, err := client.LiveLookup("1.2.3.4", nil, 0)
 	if err == nil {
 		t.Fatal("active live remediation returns the banned error")
 	}

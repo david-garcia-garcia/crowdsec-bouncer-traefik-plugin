@@ -1,0 +1,16 @@
+issueKey: 2026-11-21-lapi-ban-retry-after
+jobName: 2026-11-21-lapi-ban-retry-after
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: 9a859d886601a205
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: lapi-ban-retry-after
+pr: { id: 229, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/229 }

@@ -10,13 +10,16 @@ import (
 // Decision is one Ip or header-scope remediation (stream/alone or live/none).
 // ApplyRangeBatch uses Kind and Origin; the map key is the CIDR.
 // DeleteMany reads Scope and Value only. Empty Scenario is intern id 0.
+// DurationSec is the store TTL. DecisionDurationSec is the decision's remaining duration
+// (0 = unknown): stream apply sets both to the CrowdSec duration; a live memo caps only DurationSec.
 type Decision struct {
-	Scope       string
-	Value       string
-	Kind        string
-	Origin      string
-	Scenario    string
-	DurationSec int64
+	Scope               string
+	Value               string
+	Kind                string
+	Origin              string
+	Scenario            string
+	DurationSec         int64
+	DecisionDurationSec int64
 }
 
 // PutManyChunk is SimpleRedis maxMSetEXPairs. Redis PutMany and stream apply flush at this size.

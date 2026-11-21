@@ -78,5 +78,5 @@ func (b *Bouncer) captchaModsecFailure(rw http.ResponseWriter, req clientrequest
 	if b.bypassesCaptcha(req, match) {
 		return false
 	}
-	return b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginModsecFailure)
+	return b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginModsecFailure, noLAPIDecisionEnd)
 }

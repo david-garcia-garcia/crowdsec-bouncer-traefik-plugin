@@ -17,7 +17,7 @@ func TestHandleRemediationServeHTTP_unsubscribedCaptchaWarnsThenBans(t *testing.
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	for range 2 {
 		rw := httptest.NewRecorder()
-		b.handleRemediationServeHTTP(rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli")
+		b.handleRemediationServeHTTP(rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli", noLAPIDecisionEnd)
 		if *originCalled {
 			t.Fatal("unsubscribed captcha must not reach origin")
 		}
@@ -71,7 +71,7 @@ func TestHandleRemediationServeHTTP_subscribedUnpublishedDoesNotWarnUnsubscribed
 	b.subscribeCaptcha = true
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	rw := httptest.NewRecorder()
-	b.handleRemediationServeHTTP(rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli")
+	b.handleRemediationServeHTTP(rw, testClientRequest(req, testCaptchaRemoteIP), decisionscope.CaptchaValue, "cscli", noLAPIDecisionEnd)
 	if *originCalled {
 		t.Fatal("subscribed unpublished captcha must not reach origin")
 	}

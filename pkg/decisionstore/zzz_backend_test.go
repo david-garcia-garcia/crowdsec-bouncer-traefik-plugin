@@ -224,7 +224,7 @@ func lookupRemediation(store *Store, remoteIP string, scopes map[string]string) 
 	if ipAddr != nil {
 		remoteIP = ipAddr.String()
 	}
-	kind, origin, _, err := store.LookupRemediation(remoteIP, ipAddr, scopes)
+	kind, origin, _, _, err := store.LookupRemediation(remoteIP, ipAddr, scopes)
 	return kind, origin, err
 }
 

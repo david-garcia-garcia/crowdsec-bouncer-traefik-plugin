@@ -72,7 +72,7 @@ func testCaptchaRoutingBouncer(t *testing.T, client *captcha.Client) (*Bouncer, 
 
 // continueCaptchaForTest calls next when the captcha kind did not write.
 func continueCaptchaForTest(b *Bouncer, rw http.ResponseWriter, req clientrequest.Request, remediation string) {
-	if b.handleRemediationServeHTTP(rw, req, remediation, "cscli") {
+	if b.handleRemediationServeHTTP(rw, req, remediation, "cscli", noLAPIDecisionEnd) {
 		return
 	}
 	b.next.ServeHTTP(rw, req.Request)
