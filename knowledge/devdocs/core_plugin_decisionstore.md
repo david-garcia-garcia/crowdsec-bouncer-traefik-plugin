@@ -35,7 +35,7 @@ The Redis SET value for an Ip or header-scope key, written by `packToString(hit,
 _Avoid_: putting the end before the scenario (breaks v1.9.4–v1.9.7 readers), milliseconds, an elapsed-clock end in Redis
 
 **Decision time left**:
-What `Store.LookupRemediation` returns as `decisionLeft` beside kind, origin, and origin id: the time left on the decision the merge chose (`lookupHit.left`, kept by `mergeLookupHit`). Zero means unknown: no end stored, an end already past, or a Range winner (the blob has no end). `Decision.DecisionDurationSec` carries it on Put, apart from the store TTL `DurationSec`.
+What `Store.LookupRemediation` returns as `decisionLeft` beside kind, origin, and origin id: the time left on the decision the merge chose (`lookupHit.decisionLeft`, kept by `mergeLookupHit`). Zero means unknown: no end stored, an end already past, or a Range winner (the blob has no end). `Decision.DecisionDurationSec` carries it on Put, apart from the store TTL `DurationSec`.
 _Avoid_: reading the store TTL as the decision end (live caps it at `lapiDefaultDecisionSeconds`), "latest end among all hits"
 
 **Active counts**:

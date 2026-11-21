@@ -1,0 +1,14 @@
+# Standards
+
+1. [hard] Name for the scope — `pkg/decisionstore/lookup.go:16` — new `lookupHit` field `left` drops the clause it is about: every other layer of this change names the same role `decisionLeft` (`Store`/`memory`/`redis` `LookupRemediation` returns, `LiveSlot.decisionLeft`, the bouncer parameter), and beside `kind`/`origin`/`scenario` a bare `left` only reads once you open the comment
+   Fix: Rename the field to `decisionLeft` (`lookup.go:16`, `:53`; `memory.go:188`; `redis.go:253`; the devdoc "Decision time left" entry that cites `lookupHit.left`)
+   Status: done
+   Argument: Renamed `lookupHit.left` to `decisionLeft` in `lookup.go`, `memory.go`, `redis.go` and the decisionstore devdoc entry.
+2. [judgement] Data Clumps — `pkg/decisionstore/store.go:195` — the lookup result now travels as a five-value tuple `(kind, origin, originID, decisionLeft, err)` through `memory`, `redis`, the engine `lookup` func, `Store` and `lapi.Client` (`LiveLookup` returns four). The cost already shows in this diff: seven tuple-unpack shims across four packages (`zzz_plugin_test.go:606`, `pkg/decisionstore/zzz_e2e_realredis_test.go:517` and `:522`, `pkg/lapi/zzz_lookup_result_test.go:6`, `:11` and `:16`, `pkg/bouncer/zzz_retry_after_test.go:293`), and `remediationKindForTest` is copied verbatim in three of them. Design §3 rejected a result struct because the one production caller destructures it straight away; the shims are the cost of that choice
+   Fix: Return one named lookup-result value type from the engine, `Store.LookupRemediation` and `Client.LookupRemediation`. Its fields are only kind, origin, origin id and decision time left (no map, so it is Yaegi-safe). Tests then read `.Kind` and `.DecisionLeft` instead of adding a shim in each package
+   Status: skipped
+   Argument: judgement; design §3 rejected a lookup-result type on purpose (the one production caller destructures it at once), and the shims are test-only.
+3. [judgement] Duplicated Code — `pkg/lapi/client_live.go:54` — both live memo writers now derive the same two values from a `liveResult`: the TTL `liveCacheTTL(x.duration, defaultDecisionSeconds)` and, new in this diff, the decision duration `int64(x.duration.Seconds())`. They are here and in `cacheLiveScope` (`pkg/lapi/client_decisions.go:203`), and the clean-memo call with `0` is also duplicated (`client_live.go:56`, `client_decisions.go:200`). A future change to how a memo's end is derived has to hit both sites, or one memo path writes a wrong `Retry-After` end
+   Fix: Add one `memoLive` variant that takes the `liveResult` and `defaultDecisionSeconds` and computes the TTL and decision duration once, and call it from both `handleNoStreamCache` and `cacheLiveScope`
+   Status: skipped
+   Argument: judgement; two call sites with different memo keys and scopes, and folding them is a refactor outside the bounded ask.

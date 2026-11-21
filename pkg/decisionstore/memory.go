@@ -185,7 +185,7 @@ func (m *memory) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[st
 			return lookupHit{}
 		}
 		hit := m.unpackFromWord(slot.Word)
-		hit.left = slot.decisionLeft(now)
+		hit.decisionLeft = slot.decisionLeft(now)
 		return hit
 	}, remoteIP, ipAddr, scopes, membership)
 	return kind, origin, originID, decisionLeft, nil

@@ -1,0 +1,10 @@
+# Spec
+
+1. [judgement] Lookup origin id restated but never set — `pkg/decisionstore/memory.go:191` — the MODIFIED "DecisionStore owns the origin intern table" (`specs/core_plugin_decisionstore_store/spec.md:59`) and "Live stream and alone lookup uses one Store entry" (`specs/core_plugin_middleware_bouncer/spec.md:71`), both written by this change, say `LookupRemediation` returns the origin id. Memory (`memory.go:191`) and Redis (`redis.go:256`) still return the named `originID` without setting it, so it is always 0. This was already true on master and is recorded as debt (`knowledge/debt/2026-11-21-lookup-remediation-origin-id-always-zero.md`), with no deviations row
+   Fix: Either reword both deltas so they do not promise a real origin id (say it is reserved and always 0, see the debt note), or keep the wording and accept the debt note as the record. Do not fill the field in this change.
+   Status: skipped
+   Argument: judgement; pre-existing on master and already recorded as `knowledge/debt/2026-11-21-lookup-remediation-origin-id-always-zero.md` (issues.md note row), which the fix allows as the record.
+2. [judgement] Redis 429 unit case listed in task 3.3 is absent — `pkg/bouncer/zzz_retry_after_test.go:1` — task 3.3 (`tasks.md:22`) lists "Redis 4-line value at 429" among the bouncer tests. The file has no such case: its only Redis store is the unreachable one in `TestRetryAfter_cacheFailureBanHasNone`. The behavior is proven elsewhere: by the mock e2e `redis` scenario (`tests/e2e/mock/scenarios/redis/run.sh:19`, 4-line value with an end and 429 with `Retry-After` in `1..600`) and by the `pkg/decisionstore` Redis end tests
+   Fix: Add a bouncer test that serves a 429 ban from a Redis-backed store holding a 4-line value with an end, or change task 3.3 to point at the mock e2e `redis` scenario as the proof
+   Status: done
+   Argument: Took the second option: task 3.3 in `tasks.md` now names the mock e2e `redis` scenario and the `pkg/decisionstore` Redis end tests as the proof for a 4-line value at 429.

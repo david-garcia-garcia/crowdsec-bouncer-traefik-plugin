@@ -91,7 +91,7 @@ No data migration. Values keep their key names and TTLs, and new values add one 
 
 - Deploy: new instances write the 4th line. Old values are read with no end until they expire.
 - Rollback to v1.9.4–v1.9.7: their reader (`strings.Cut` twice, checked at tags v1.9.4, v1.9.5, v1.9.6, and v1.9.7) reads the kind and origin lines correctly and folds the end into the scenario. Their lookup never returns the scenario (`lookupHits` returns kind and origin at v1.9.7). Bans stay bans, origins stay correct.
-- Rollback to v1.9.3 or older: their reader (`splitKindOrigin`, one cut) puts every line after the kind into the origin. That has been true for every 3-line value since v1.9.4. The kind stays correct. This change does not open that gap; it only adds one more line to it.
+- Rollback to v1.9.3 or older: their reader (`splitKindOrigin`, one cut) puts every line after the kind into the origin. That has been true for every 3-line value since v1.9.4. The kind stays correct. This change widens that gap: a decision with no scenario (`t`, or `t` and an origin line), which v1.9.3 read cleanly, now carries an end line, so v1.9.3 reads a wrong origin label for it too. Only the metrics origin label is affected, never the kind.
 - Memory slots are process memory and do not survive a restart.
 
 Red flags (`opd-redflags`): none. The Redis change is a compatible addition, and no field is removed, renamed, or retyped. The memory slot is process memory. No `redflags.md` row.

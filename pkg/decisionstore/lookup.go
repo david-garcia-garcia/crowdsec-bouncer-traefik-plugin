@@ -8,12 +8,12 @@ import (
 )
 
 // lookupHit is the decision both encodings pack and unpack: kind, origin name, scenario name.
-// left is the time left on that decision at lookup, set by the engine that read the slot (0 = unknown).
+// decisionLeft is the time left on that decision at lookup, set by the engine that read the slot (0 = unknown).
 type lookupHit struct {
-	kind     string
-	origin   string
-	scenario string
-	left     time.Duration
+	kind         string
+	origin       string
+	scenario     string
+	decisionLeft time.Duration
 }
 
 // mergeLookupHit keeps ban over captcha and remembers the winner's origin name and time left.
@@ -50,7 +50,7 @@ func lookupHits(hitForKey func(string) lookupHit, remoteIP string, ipAddr net.IP
 	if chosen.kind == "" {
 		return "", "", 0
 	}
-	return decisionscope.RemediationKind(chosen.kind), chosen.origin, chosen.left
+	return decisionscope.RemediationKind(chosen.kind), chosen.origin, chosen.decisionLeft
 }
 
 // lookupKeys is the IP and present header-scope keys lookupHits reads. Range is membership, not a slot.

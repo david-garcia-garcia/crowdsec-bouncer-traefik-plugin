@@ -250,7 +250,7 @@ func (r *redis) LookupRemediation(remoteIP string, ipAddr net.IP, scopes map[str
 			return lookupHit{}
 		}
 		hit, endUnix := unpackFromString(value)
-		hit.left = leftUntilUnix(endUnix, now)
+		hit.decisionLeft = leftUntilUnix(endUnix, now)
 		return hit
 	}, remoteIP, ipAddr, scopes, membership)
 	return kind, origin, originID, decisionLeft, nil
