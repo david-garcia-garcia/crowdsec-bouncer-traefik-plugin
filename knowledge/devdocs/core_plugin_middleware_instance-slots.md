@@ -3,7 +3,7 @@
 ## Language
 
 **Slot**:
-One named LAPI, AppSec, captcha, or ModSec publish target keyed by group plus instance name. The four groups are separate, so all may use the string `shared`. Not the Client reclaim key.
+One named LAPI, AppSec, captcha, ModSec, or rate-limit publish target keyed by group plus instance name. The five groups are separate, so all may use the string `shared`. Not the Client reclaim key.
 _Avoid_: ownership key, SessionHex, DecisionStore, Traefik middleware name as the only key, a second slot table
 
 **Publish**:
@@ -32,11 +32,11 @@ _Avoid_: per-leg `<leg>Bound` / `<leg>Received` fields
 
 ## Overview
 
-Process-wide named slots sit between owner `Open` and bouncer bounce. Spec: `core_plugin_middleware_instance-slots`. Ownership Open keys live on `core_plugin_lapi_reclaim-key`, AppSec session, captcha `OwnershipKey` (middleware name plus instance-owned knobs including the recaptcha-enterprise knobs and `logLevel`, `logFilePath`, `logFormat`; `pkg/captcha/session.go`), and ModSec `OwnershipKey` (middleware name plus sidecar knobs; `pkg/modsecurity/session.go`). Constructor wiring: `core_plugin_middleware.md`.
+Process-wide named slots sit between owner `Open` and bouncer bounce. Spec: `core_plugin_middleware_instance-slots`. Ownership Open keys live on `core_plugin_lapi_reclaim-key`, AppSec session, captcha `OwnershipKey` (middleware name plus instance-owned knobs including the recaptcha-enterprise knobs and `logLevel`, `logFilePath`, `logFormat`; `pkg/captcha/session.go`), ModSec `OwnershipKey` (middleware name plus sidecar knobs; `pkg/modsecurity/session.go`), and rate-limit `OwnershipKey` (middleware name plus Redis settings, bucket rows, and policy; `pkg/ratelimit/client.go`). Constructor wiring: `core_plugin_middleware.md`.
 
 ## How to use
 
-- Named slots are opaque aliases on the reclaim table. This plugin encodes them as `alias:<leg>:<name>` in `instanceAlias`; the table never parses that string. `plugin.go` walks the `publishedLegs()` table: `prepare` each leg, `open` each enabled leg (`ClearPublisher` the others), `SetAlias` each enabled leg with group `lapi`/`appsec`/`captcha`/`modsec`, then `bouncer.New` with one `bouncer.Subscriptions` value, then `Watch` each subscribed leg. `Watch` drops that subscriber when its ctx is done.
+- Named slots are opaque aliases on the reclaim table. This plugin encodes them as `alias:<leg>:<name>` in `instanceAlias`; the table never parses that string. `plugin.go` walks the `publishedLegs()` table: `prepare` each leg, `open` each enabled leg (`ClearPublisher` the others), `SetAlias` each enabled leg with group `lapi`/`appsec`/`captcha`/`modsec`/`ratelimit`, then `bouncer.New` with one `bouncer.Subscriptions` value, then `Watch` each subscribed leg. `Watch` drops that subscriber when its ctx is done.
 - Add a published leg in three places, nothing else: one `publishedLeg` entry in `publishedLegs()` (`plugin.go`: group, enabled, instanceName, prepare, open, ownershipKey, subscribe, typed-nil empty, receive); one `legBinding` field on `Bouncer` plus a `Subscriptions` field, both set in `bouncer.New`; and a typed `loaded<Leg>()` plus exported `Receive<Leg>(published any)` that calls `receiveBinding` (`pkg/bouncer/bouncer_leg_<leg>.go`). Per-leg bind work (LAPI's stream-scope warning) is the `onBind` hook, not a copy of the trace.
 - Table order is open order, claim order, and rollback order: a failed claim clears every earlier enabled entry and nothing after it.
 - Hash captcha `OwnershipKey` from middleware name plus instance-owned captcha knobs including `logLevel`, `logFilePath`, and `logFormat`. Slot name, bounce, failure actions, and the remediation header stay off it.

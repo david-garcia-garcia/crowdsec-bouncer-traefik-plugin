@@ -174,6 +174,7 @@ type Config struct {
 	RateLimitBuckets                    []ratelimit.BucketRule       `json:"rateLimitBuckets,omitempty"`
 	RateLimitEnabled                    bool                         `json:"rateLimitEnabled,omitempty"`
 	RateLimitFailureAction              string                       `json:"rateLimitFailureAction,omitempty"`
+	RateLimitInstanceName               string                       `json:"rateLimitInstanceName,omitempty"`
 	RateLimitRedisDatabase              string                       `json:"rateLimitRedisDatabase,omitempty"`
 	RateLimitRedisHost                  string                       `json:"rateLimitRedisHost,omitempty"`
 	RateLimitRedisPassword              string                       `json:"rateLimitRedisPassword,omitempty"`
@@ -319,6 +320,7 @@ func New() *Config {
 		RateLimitBuckets:                    []ratelimit.BucketRule{},
 		RateLimitEnabled:                    false,
 		RateLimitFailureAction:              FailureActionPassthrough,
+		RateLimitInstanceName:               "",
 		RateLimitRedisDatabase:              "",
 		RateLimitRedisHost:                  "redis:6379",
 		RateLimitRedisPassword:              "",
@@ -479,7 +481,7 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		return err
 	}
 
-	// Rate-limit settings only when this router runs the leg; leftovers do not fail startup.
+	// Rate-limit settings only on the owner (rateLimitEnabled); a subscriber's leftovers do not fail startup.
 	if config.RateLimitEnabled {
 		if err := validateRateLimit(config); err != nil {
 			return err
@@ -489,7 +491,7 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 	return validateLogging(config)
 }
 
-// validateRateLimit checks every rate-limit setting of a router that runs the leg: store, Redis host,
+// validateRateLimit checks every rate-limit setting of the owner (rateLimitEnabled): store, Redis host,
 // password file, sync rate, failure action, status, and the bucket list (compiled, then discarded).
 func validateRateLimit(config *Config) error {
 	if config.RateLimitStore != RateLimitStoreRedis {
@@ -504,7 +506,8 @@ func validateRateLimit(config *Config) error {
 	if _, err := RateLimitSyncRateDuration(config); err != nil {
 		return err
 	}
-	if err := validateFailureAction("RateLimitFailureAction", config.RateLimitFailureAction, captchaInstanceNameReadyAfterOwnerFill(config)); err != nil {
+	// captcha needs no captcha instance here: the subscribing router decides at request time.
+	if err := validateFailureAction("RateLimitFailureAction", config.RateLimitFailureAction, true); err != nil {
 		return err
 	}
 	if config.RateLimitStatusCode < 100 || config.RateLimitStatusCode >= 600 {
@@ -545,7 +548,11 @@ func validateOpenVsSubscribe(config *Config) error {
 		return err
 	}
 	// ModSec E2 is leftover modsecInstanceName only; leftover owner-read modsec* is not a secret.
-	return validateLegOpenVsSubscribe("ModSec", config.BouncerEnabled, config.ModsecEnabled, config.ModsecInstanceName, false)
+	if err := validateLegOpenVsSubscribe("ModSec", config.BouncerEnabled, config.ModsecEnabled, config.ModsecInstanceName, false); err != nil {
+		return err
+	}
+	// Rate-limit E2 is leftover rateLimitInstanceName only; a subscriber ignores owner-read rateLimit*.
+	return validateLegOpenVsSubscribe("RateLimit", config.BouncerEnabled, config.RateLimitEnabled, config.RateLimitInstanceName, false)
 }
 
 func validateLegOpenVsSubscribe(leg string, bounceEnabled, owned bool, instanceName string, secretPresent bool) error {

@@ -42,6 +42,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/modsecurity"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ratelimit"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -92,12 +93,13 @@ func ownerConfig(variant string) *configuration.Config {
 	return config
 }
 
-// openedOwner is one owner's four Clients, opened under Yaegi.
+// openedOwner is one owner's five Clients, opened under Yaegi.
 type openedOwner struct {
-	lapi    *lapi.Client
-	appsec  *appsec.Client
-	captcha *captcha.Client
-	modsec  *modsecurity.Client
+	lapi      *lapi.Client
+	appsec    *appsec.Client
+	captcha   *captcha.Client
+	modsec    *modsecurity.Client
+	rateLimit *ratelimit.Client
 }
 
 func openOwner(variant string) openedOwner {
@@ -120,7 +122,16 @@ func openOwner(variant string) openedOwner {
 	if err != nil {
 		exitWithFailure("modsecurity.Open: " + err.Error())
 	}
-	return openedOwner{lapi: lapiClient, appsec: appsecClient, captcha: captchaClient, modsec: modsecClient}
+	rateLimitClient, err := ratelimit.Open(ctx, "yaegi-owner", ratelimit.Settings{
+		Buckets:      []ratelimit.BucketRule{{Name: "per-ip-" + variant, Requests: 5, Window: "1m", Key: []ratelimit.KeyPart{{From: ratelimit.KeyFromIP}}}},
+		InstanceName: "shared",
+		Policy:       ratelimit.Policy{FailureAction: "passthrough", ResponseHeaders: true, StatusCode: 429},
+		Redis:        ratelimit.RedisSettings{Host: "127.0.0.1:1"},
+	}, quiet)
+	if err != nil {
+		exitWithFailure("ratelimit.Open: " + err.Error())
+	}
+	return openedOwner{lapi: lapiClient, appsec: appsecClient, captcha: captchaClient, modsec: modsecClient, rateLimit: rateLimitClient}
 }
 
 func main() {
@@ -132,8 +143,9 @@ func main() {
 	routeConfig.AppsecInstanceName = "shared"
 	routeConfig.CaptchaInstanceName = "shared"
 	routeConfig.ModsecInstanceName = "shared"
+	routeConfig.RateLimitInstanceName = "shared"
 	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
-	subscriptions := bouncer.Subscriptions{LAPI: true, AppSec: true, Captcha: true, ModSec: true}
+	subscriptions := bouncer.Subscriptions{LAPI: true, AppSec: true, Captcha: true, ModSec: true, RateLimit: true}
 	route, err := bouncer.New(next, "yaegi-route", routeConfig, subscriptions, logger.NewWithFormat("TRACE", logPath, "json"))
 	if err != nil {
 		exitWithFailure("bouncer.New: " + err.Error())
@@ -155,6 +167,10 @@ func main() {
 		{
 			leg: "modsec", receive: route.ReceiveModSec, empty: (*modsecurity.Client)(nil), first: first.modsec, second: second.modsec,
 			firstIncarnation: first.modsec.Incarnation(), secondIncarnation: second.modsec.Incarnation(),
+		},
+		{
+			leg: "ratelimit", receive: route.ReceiveRateLimit, empty: (*ratelimit.Client)(nil), first: first.rateLimit, second: second.rateLimit,
+			firstIncarnation: first.rateLimit.Incarnation(), secondIncarnation: second.rateLimit.Incarnation(),
 		},
 	}
 	for _, leg := range legs {

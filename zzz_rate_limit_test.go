@@ -44,16 +44,142 @@ func enableTestRateLimit(c *configuration.Config, redisHost string) {
 // rateLimitTestOwnershipKey is the reclaim key New opens for cfg under middleware name.
 func rateLimitTestOwnershipKey(t *testing.T, cfg *configuration.Config, name string) string {
 	t.Helper()
-	syncRate, err := configuration.RateLimitSyncRateDuration(cfg)
+	if _, err := configuration.RateLimitSyncRateDuration(cfg); err != nil {
+		t.Fatal(err)
+	}
+	return ratelimit.OwnershipKey(name, rateLimitSettings(cfg))
+}
+
+// cfgRateLimitOwnerOnly owns the rate-limit leg against a dead Redis without bouncing: one per-ip
+// bucket of requests per minute, the given status code, and an instance name (empty fills to the Traefik name).
+func cfgRateLimitOwnerOnly(instanceName string, requests, statusCode int) *configuration.Config {
+	c := cfgRateLimitDeadRedis()
+	c.BouncerEnabled = false
+	c.RateLimitInstanceName = instanceName
+	c.RateLimitStatusCode = statusCode
+	c.RateLimitBuckets[0].Requests = requests
+	return c
+}
+
+// cfgRateLimitSubscriber bounces against rate-limit instance instanceName and sets no other rateLimit* key.
+func cfgRateLimitSubscriber(instanceName string) *configuration.Config {
+	c := getTestConfig()
+	c.LapiEnabled = false
+	c.LapiKey = ""
+	c.BouncerRemediationHeadersCustomName = "X-Remediation"
+	c.RateLimitInstanceName = instanceName
+	return c
+}
+
+// serveTestRequests sends count requests from clientIP through handler and returns the last status.
+func serveTestRequests(handler http.Handler, clientIP string, count int) int {
+	status := 0
+	// A slice, not range-over-int, because yaegi runs this file.
+	for range make([]struct{}, count) {
+		rw := httptest.NewRecorder()
+		handler.ServeHTTP(rw, reqForIP(clientIP))
+		status = rw.Code
+	}
+	return status
+}
+
+// publishedRateLimitIncarnation is the incarnation alias:ratelimit:<instanceName> publishes, or empty.
+func publishedRateLimitIncarnation(instanceName string) string {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	incarnation := ""
+	reclaim.Watch(ctx, instanceAlias(legRateLimit, instanceName), (*ratelimit.Client)(nil), func(published any) {
+		notice, _ := published.(reclaim.Published)
+		client, _ := notice.Value.(*ratelimit.Client)
+		incarnation = client.Incarnation()
+	})
+	return incarnation
+}
+
+// TestNew_RateLimitOwnerFillsAndPublishes proves an owner with an omitted rateLimitInstanceName
+// publishes its Client under its Traefik name, and that dropping rateLimitEnabled clears that alias.
+func TestNew_RateLimitOwnerFillsAndPublishes(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	if _, err := New(context.Background(), testNextOK(), cfgRateLimitOwnerOnly("", 3, http.StatusTooManyRequests), "rl-owner"); err != nil {
+		t.Fatal(err)
+	}
+	if publishedRateLimitIncarnation("rl-owner") == "" {
+		t.Fatal("an owner without an instance name must publish alias:ratelimit:rl-owner")
+	}
+	dropped := cfgRateLimitOwnerOnly("", 3, http.StatusTooManyRequests)
+	dropped.RateLimitEnabled = false
+	if _, err := New(context.Background(), testNextOK(), dropped, "rl-owner"); err != nil {
+		t.Fatal(err)
+	}
+	if published := publishedRateLimitIncarnation("rl-owner"); published != "" {
+		t.Fatalf("dropping rateLimitEnabled must clear the alias, still publishes %s", published)
+	}
+}
+
+// TestNew_RateLimitSubscribersShareTheOwnerPolicy proves two subscribers of one owner charge its bucket
+// and answer its status code, each under its own counter, and that an owner policy edit opens a new
+// Client the subscribers rebind to.
+func TestNew_RateLimitSubscribersShareTheOwnerPolicy(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	owner := cfgRateLimitOwnerOnly("shared", 3, http.StatusServiceUnavailable)
+	if _, err := New(context.Background(), testNextOK(), owner, "rl-owner"); err != nil {
+		t.Fatal(err)
+	}
+	appA, err := New(context.Background(), testNextOK(), cfgRateLimitSubscriber("shared"), "app-a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	return ratelimit.OwnershipKey(name, ratelimit.RedisSettings{
-		Database: cfg.RateLimitRedisDatabase,
-		Host:     cfg.RateLimitRedisHost,
-		Password: cfg.RateLimitRedisPassword,
-		SyncRate: syncRate,
-	})
+	appB, err := New(context.Background(), testNextOK(), cfgRateLimitSubscriber("shared"), "app-b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status := serveTestRequests(appA, "203.0.113.50", 3); status != http.StatusOK {
+		t.Fatalf("app-a third request: status %d, want 200", status)
+	}
+	if status := serveTestRequests(appA, "203.0.113.50", 1); status != http.StatusServiceUnavailable {
+		t.Fatalf("app-a fourth request: status %d, want the owner's 503", status)
+	}
+	if status := serveTestRequests(appB, "203.0.113.50", 3); status != http.StatusOK {
+		t.Fatalf("app-b third request: status %d, want 200 (separate counter)", status)
+	}
+	if status := serveTestRequests(appB, "203.0.113.50", 1); status != http.StatusServiceUnavailable {
+		t.Fatalf("app-b fourth request: status %d, want the owner's 503", status)
+	}
+
+	// Owner policy edit: a new Client under the same alias; app-a answers with the new status.
+	before := publishedRateLimitIncarnation("shared")
+	if _, err := New(context.Background(), testNextOK(), cfgRateLimitOwnerOnly("shared", 3, http.StatusTeapot), "rl-owner"); err != nil {
+		t.Fatal(err)
+	}
+	if after := publishedRateLimitIncarnation("shared"); after == "" || after == before {
+		t.Fatalf("a policy edit must publish a new Client, before %s after %s", before, after)
+	}
+	if status := serveTestRequests(appA, "203.0.113.51", 4); status != http.StatusTeapot {
+		t.Fatalf("app-a after the edit: status %d, want the new 418", status)
+	}
+}
+
+// TestNew_RateLimitSubscriberWithoutNameDoesNotCharge proves bouncerEnabled without rateLimitEnabled or
+// rateLimitInstanceName neither fills a name nor charges a published owner.
+func TestNew_RateLimitSubscriberWithoutNameDoesNotCharge(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	// The owner publishes under app-c, the name the route below would fill to if it filled.
+	if _, err := New(context.Background(), testNextOK(), cfgRateLimitOwnerOnly("app-c", 1, http.StatusTooManyRequests), "rl-owner-c"); err != nil {
+		t.Fatal(err)
+	}
+	unnamed, err := New(context.Background(), testNextOK(), cfgRateLimitSubscriber(""), "app-c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status := serveTestRequests(unnamed, "203.0.113.52", 3); status != http.StatusOK {
+		t.Fatalf("a route without rateLimitInstanceName must not charge, got %d", status)
+	}
 }
 
 // TestNew_RateLimitDisabledOpensNothing proves a disabled leg opens no counter and ignores a missing password file.

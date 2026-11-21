@@ -14,39 +14,62 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
-// deadRedisTestSettings points at a port where nothing listens; Open must not dial it.
-func deadRedisTestSettings(syncRate time.Duration) RedisSettings {
-	return RedisSettings{Host: "127.0.0.1:1", SyncRate: syncRate}
+// deadRedisTestSettings is one per-ip bucket and the default policy on a port where nothing listens;
+// Open must not dial it.
+func deadRedisTestSettings(syncRate time.Duration) Settings {
+	return Settings{
+		Buckets:      []BucketRule{{Name: "per-ip", Requests: 5, Window: "1m", Key: []KeyPart{{From: KeyFromIP}}}},
+		InstanceName: "shared",
+		Policy:       Policy{FailureAction: "passthrough", ResponseHeaders: true, StatusCode: 429},
+		Redis:        RedisSettings{Host: "127.0.0.1:1", SyncRate: syncRate},
+	}
 }
 
-// TestOpen_sharesOneClientPerMiddlewareAndSettings proves equal keys reuse the Client and a changed
-// sync rate, host, password, database, or middleware name opens another.
+// redisOnlyTestSettings is deadRedisTestSettings in exact mode pointed at redis instead.
+func redisOnlyTestSettings(redis RedisSettings) Settings {
+	settings := deadRedisTestSettings(0)
+	settings.Redis = redis
+	return settings
+}
+
+// TestOpen_sharesOneClientPerMiddlewareAndSettings proves equal keys reuse the Client, a changed
+// Redis setting, bucket row, policy setting, or middleware name opens another, and a changed
+// instance name keeps it.
 func TestOpen_sharesOneClientPerMiddlewareAndSettings(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
 	ctx := context.Background()
-	base := deadRedisTestSettings(200 * time.Millisecond)
-	first, err := Open(ctx, "edge", base, slog.Default())
+	first, err := Open(ctx, "edge", deadRedisTestSettings(200*time.Millisecond), slog.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
-	again, err := Open(ctx, "edge", base, slog.Default())
+	again, err := Open(ctx, "edge", deadRedisTestSettings(200*time.Millisecond), slog.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if first != again {
 		t.Fatal("equal middleware name and settings must share one Client")
 	}
-	changes := map[string]func(*RedisSettings, *string){
-		"syncRate":   func(settings *RedisSettings, _ *string) { settings.SyncRate = 0 },
-		"host":       func(settings *RedisSettings, _ *string) { settings.Host = "127.0.0.1:2" },
-		"password":   func(settings *RedisSettings, _ *string) { settings.Password = "secret" },
-		"database":   func(settings *RedisSettings, _ *string) { settings.Database = "1" },
-		"middleware": func(_ *RedisSettings, name *string) { *name = "edge-b" },
+	renamed := deadRedisTestSettings(200 * time.Millisecond)
+	renamed.InstanceName = "renamed"
+	if kept, renameErr := Open(ctx, "edge", renamed, slog.Default()); renameErr != nil || kept != first {
+		t.Fatalf("a changed instance name must keep the Client (err %v)", renameErr)
+	}
+	changes := map[string]func(*Settings, *string){
+		"syncRate":        func(settings *Settings, _ *string) { settings.Redis.SyncRate = 0 },
+		"host":            func(settings *Settings, _ *string) { settings.Redis.Host = "127.0.0.1:2" },
+		"password":        func(settings *Settings, _ *string) { settings.Redis.Password = "secret" },
+		"database":        func(settings *Settings, _ *string) { settings.Redis.Database = "1" },
+		"middleware":      func(_ *Settings, name *string) { *name = "edge-b" },
+		"bucket requests": func(settings *Settings, _ *string) { settings.Buckets[0].Requests = 6 },
+		"bucket path":     func(settings *Settings, _ *string) { settings.Buckets[0].Path = "^/login" },
+		"failureAction":   func(settings *Settings, _ *string) { settings.Policy.FailureAction = "ban" },
+		"statusCode":      func(settings *Settings, _ *string) { settings.Policy.StatusCode = 503 },
+		"responseHeaders": func(settings *Settings, _ *string) { settings.Policy.ResponseHeaders = false },
 	}
 	for name, change := range changes {
 		t.Run(name, func(t *testing.T) {
-			settings := base
+			settings := deadRedisTestSettings(200 * time.Millisecond)
 			middlewareName := "edge"
 			change(&settings, &middlewareName)
 			other, err := Open(ctx, middlewareName, settings, slog.Default())
@@ -57,6 +80,48 @@ func TestOpen_sharesOneClientPerMiddlewareAndSettings(t *testing.T) {
 				t.Fatalf("changed %s must open a new Client", name)
 			}
 		})
+	}
+}
+
+// TestOpen_carriesBucketsAndPolicy proves the Client keeps the compiled buckets and the policy it was
+// opened with, that its started line names the instance, and that a nil Client has no incarnation.
+func TestOpen_carriesBucketsAndPolicy(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+	sink := &lockedLogSink{}
+	log := slog.New(slog.NewJSONHandler(sink, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	settings := deadRedisTestSettings(0)
+	settings.Policy = Policy{FailureAction: "ban", ResponseHeaders: false, StatusCode: 503}
+	client, err := Open(context.Background(), "edge", settings, log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	if client.Buckets() == nil || client.Policy() != settings.Policy {
+		t.Fatalf("buckets=%v policy=%+v, want compiled buckets and %+v", client.Buckets(), client.Policy(), settings.Policy)
+	}
+	if client.Incarnation() == "" {
+		t.Fatal("an opened Client must have an incarnation")
+	}
+	started := sink.String()
+	for _, attr := range []string{`"msg":"` + msgInstanceStarted + `"`, `"leg":"ratelimit"`, `"instanceName":"shared"`, `"incarnation":"` + client.Incarnation() + `"`} {
+		if !strings.Contains(started, attr) {
+			t.Fatalf("started line lacks %s: %s", attr, started)
+		}
+	}
+	if got := (*Client)(nil).Incarnation(); got != "" {
+		t.Fatalf("nil Client incarnation %q, want empty", got)
+	}
+}
+
+// TestOpen_invalidBucketsFail proves Open compiles the bucket rows and fails on an invalid one.
+func TestOpen_invalidBucketsFail(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+	settings := deadRedisTestSettings(0)
+	settings.Buckets[0].Window = "500ms"
+	if _, err := Open(context.Background(), "edge", settings, slog.Default()); err == nil || !strings.Contains(err.Error(), "bucket 0") {
+		t.Fatalf("Open with an invalid bucket: error = %v, want one naming bucket 0", err)
 	}
 }
 
@@ -133,7 +198,7 @@ func TestClient_silentRedisAndClose(t *testing.T) {
 			silentConns <- conn
 		}
 	}()
-	client, err := Open(context.Background(), "edge", RedisSettings{Host: listener.Addr().String()}, slog.Default())
+	client, err := Open(context.Background(), "edge", redisOnlyTestSettings(RedisSettings{Host: listener.Addr().String()}), slog.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +263,7 @@ func TestClient_wrongPasswordLogsAtDebugOnly(t *testing.T) {
 	}()
 	sink := &lockedLogSink{}
 	log := slog.New(slog.NewJSONHandler(sink, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	client, err := Open(context.Background(), "edge", RedisSettings{Host: listener.Addr().String(), Password: "wrong"}, log)
+	client, err := Open(context.Background(), "edge", redisOnlyTestSettings(RedisSettings{Host: listener.Addr().String(), Password: "wrong"}), log)
 	if err != nil {
 		t.Fatal(err)
 	}

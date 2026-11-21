@@ -6,6 +6,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/modsecurity"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ratelimit"
 )
 
 func bindTestLAPI(b *Bouncer, client *lapi.Client) {
@@ -43,4 +44,11 @@ func bindTestModSec(b *Bouncer, client *modsecurity.Client) {
 		return
 	}
 	b.modsecLeg.bound.Store((*modsecurity.Client)(nil))
+}
+
+// bindTestRateLimit subscribes b to client, or unsubscribes it when client is nil. It stores a Box as
+// Watch does, so a later ReceiveRateLimit stores the same atomic.Value type.
+func bindTestRateLimit(b *Bouncer, client *ratelimit.Client) {
+	b.rateLimitLeg.subscribed = client != nil
+	b.storeBinding(&b.rateLimitLeg.bound, client)
 }

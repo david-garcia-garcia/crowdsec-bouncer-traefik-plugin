@@ -21,6 +21,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ratelimit"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
 // testRateLimitClientIP is the client address every rate-limit request comes from unless a test says otherwise.
@@ -56,8 +57,8 @@ func (counter *testRateLimitCounter) Take(ctx context.Context, key string, limit
 	return status, nil
 }
 
-// testRateLimitFixture is one router with the rate limit on, a stream LAPI client that counts usage
-// metrics, and an in-memory counter.
+// testRateLimitFixture is one router bound to a rate-limit client over an in-memory counter, and a
+// stream LAPI client that counts usage metrics.
 type testRateLimitFixture struct {
 	b          *Bouncer
 	counter    *testRateLimitCounter
@@ -66,14 +67,47 @@ type testRateLimitFixture struct {
 	store      *decisionstore.Store
 }
 
+// testRateLimitOwnerSettings is the Settings an owner with cfg opens: its buckets and its policy.
+func testRateLimitOwnerSettings(cfg *configuration.Config) ratelimit.Settings {
+	return ratelimit.Settings{
+		Buckets: cfg.RateLimitBuckets,
+		Policy: ratelimit.Policy{
+			FailureAction:   configuration.EffectiveRateLimitFailureAction(cfg.RateLimitFailureAction),
+			ResponseHeaders: cfg.RateLimitResponseHeaders,
+			StatusCode:      cfg.RateLimitStatusCode,
+		},
+	}
+}
+
+// newTestRateLimitClient is a rate-limit client over counter with the buckets and policy of an owner with cfg.
+func newTestRateLimitClient(t *testing.T, cfg *configuration.Config, counter ratelimit.Counter) *ratelimit.Client {
+	t.Helper()
+	client, err := ratelimit.NewTestClient(testRateLimitOwnerSettings(cfg), counter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return client
+}
+
+// newTestRateLimitRoute builds router name through New, subscribed to the rate limit, with a ban template.
+func newTestRateLimitRoute(t *testing.T, name string, cfg *configuration.Config, next *recordedNextRequest) *Bouncer {
+	t.Helper()
+	b, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { next.called = true }), name, cfg, Subscriptions{RateLimit: true}, logger.New("ERROR", ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.banTemplate = template.Must(template.New("ban").Parse("banned reason={{.RemediationReason}}"))
+	b.banTemplateContentType = "text/html; charset=utf-8"
+	return b
+}
+
 // perIPTestBucket is a catch-all deny bucket that allows requests per minute per client address.
 func perIPTestBucket(name string, requests int) ratelimit.BucketRule {
 	return ratelimit.BucketRule{Name: name, Requests: requests, Window: "1m", Key: []ratelimit.KeyPart{{From: ratelimit.KeyFromIP}}}
 }
 
-// newTestRateLimitFixture builds the router through New, so the buckets compile the way they do in production.
-func newTestRateLimitFixture(t *testing.T, buckets []ratelimit.BucketRule, change func(*configuration.Config)) *testRateLimitFixture {
-	t.Helper()
+// newTestRateLimitConfig is a bouncing router config whose rateLimit* settings are also the owner's.
+func newTestRateLimitConfig(buckets []ratelimit.BucketRule, change func(*configuration.Config)) *configuration.Config {
 	cfg := configuration.New()
 	cfg.BouncerEnabled = true
 	cfg.BouncerRemediationHeadersCustomName = "X-Remediation"
@@ -82,19 +116,22 @@ func newTestRateLimitFixture(t *testing.T, buckets []ratelimit.BucketRule, chang
 	if change != nil {
 		change(cfg)
 	}
+	return cfg
+}
+
+// newTestRateLimitFixture builds router edge through New and binds it to a rate-limit client whose
+// buckets and policy come from the same config, the way one middleware that owns and charges runs.
+func newTestRateLimitFixture(t *testing.T, buckets []ratelimit.BucketRule, change func(*configuration.Config)) *testRateLimitFixture {
+	t.Helper()
+	cfg := newTestRateLimitConfig(buckets, change)
 	next := &recordedNextRequest{}
-	b, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { next.called = true }), "edge", cfg, Subscriptions{}, logger.New("ERROR", ""))
-	if err != nil {
-		t.Fatal(err)
-	}
-	b.banTemplate = template.Must(template.New("ban").Parse("banned reason={{.RemediationReason}}"))
-	b.banTemplateContentType = "text/html; charset=utf-8"
+	b := newTestRateLimitRoute(t, "edge", cfg, next)
 	lapiClient, store := lapi.NewTestClient(b.log)
 	lapi.AttachTestMetricsReporter(lapiClient)
 	lapiClient.SetStreamHealthyForTest(true)
 	bindTestLAPI(b, lapiClient)
 	counter := &testRateLimitCounter{counts: map[string]int64{}}
-	b.AttachRateLimit(counter)
+	bindTestRateLimit(b, newTestRateLimitClient(t, cfg, counter))
 	return &testRateLimitFixture{b: b, counter: counter, lapiClient: lapiClient, next: next, store: store}
 }
 
@@ -374,21 +411,85 @@ func TestRateLimit_blockingCounterReturnsWithinTheBudget(t *testing.T) {
 	}
 }
 
-// TestRateLimit_offLeavesThePathUnchanged proves a router without a counter, or with the leg disabled, charges nothing.
+// TestRateLimit_offLeavesThePathUnchanged proves a router that does not subscribe to the rate limit, and
+// one whose owner is not published, pass every request with no header, no drop, and no charge.
 func TestRateLimit_offLeavesThePathUnchanged(t *testing.T) {
-	noCounter := newTestRateLimitFixture(t, []ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, nil)
-	noCounter.b.AttachRateLimit(nil)
-	disabled := newTestRateLimitFixture(t, []ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, func(cfg *configuration.Config) {
-		cfg.RateLimitEnabled = false
-	})
-	for _, fixture := range []*testRateLimitFixture{noCounter, disabled} {
+	unsubscribed := newTestRateLimitFixture(t, []ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, nil)
+	bindTestRateLimit(unsubscribed.b, nil)
+	unpublished := newTestRateLimitFixture(t, []ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, nil)
+	unpublished.b.ReceiveRateLimit(reclaim.Published{Value: (*ratelimit.Client)(nil)})
+	if !unpublished.b.rateLimitLeg.subscribed || unpublished.b.loadedRateLimit() != nil {
+		t.Fatal("the unpublished fixture must stay subscribed with no client")
+	}
+	for _, fixture := range []*testRateLimitFixture{unsubscribed, unpublished} {
 		for request := range 3 {
-			if fixture.serve(http.MethodGet, "/", testRateLimitClientIP); !fixture.next.called {
-				t.Fatalf("request %d must reach the backend", request)
+			if rw := fixture.serve(http.MethodGet, "/", testRateLimitClientIP); !fixture.next.called || rw.Header().Get("X-Remediation") != "" {
+				t.Fatalf("request %d: next=%v header %q, want the backend and no header", request, fixture.next.called, rw.Header().Get("X-Remediation"))
 			}
 		}
+		if got := fixture.counter.takes.Load(); got != 0 {
+			t.Fatalf("charged the counter %d times, want 0", got)
+		}
+		if got := fixture.lapiClient.TestDroppedCount(lapi.OriginPluginRateLimit("per-ip"), "ipv4", "ban"); got != 0 {
+			t.Fatalf("counted %d drops, want 0", got)
+		}
 	}
-	if got := disabled.counter.takes.Load(); got != 0 {
-		t.Fatalf("a disabled leg charged the counter %d times", got)
+}
+
+// TestRateLimit_subscribersKeepSeparateCounters proves two routers bound to one rate-limit client charge
+// its buckets under their own names, so each has its own budget.
+func TestRateLimit_subscribersKeepSeparateCounters(t *testing.T) {
+	cfg := newTestRateLimitConfig([]ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, nil)
+	counter := &testRateLimitCounter{counts: map[string]int64{}}
+	client := newTestRateLimitClient(t, cfg, counter)
+	nextA, nextB := &recordedNextRequest{}, &recordedNextRequest{}
+	appA := &testRateLimitFixture{b: newTestRateLimitRoute(t, "app-a", cfg, nextA), counter: counter, next: nextA}
+	appB := &testRateLimitFixture{b: newTestRateLimitRoute(t, "app-b", cfg, nextB), counter: counter, next: nextB}
+	bindTestRateLimit(appA.b, client)
+	bindTestRateLimit(appB.b, client)
+
+	appA.serve(http.MethodGet, "/", testRateLimitClientIP)
+	if rw := appA.serve(http.MethodGet, "/", testRateLimitClientIP); rw.Code != http.StatusTooManyRequests {
+		t.Fatalf("app-a second request: status %d, want 429", rw.Code)
+	}
+	if appB.serve(http.MethodGet, "/", testRateLimitClientIP); !appB.next.called {
+		t.Fatal("app-b first request must reach the backend: subscribers keep separate counters")
+	}
+	for key := range counter.counts {
+		if !strings.HasPrefix(key, "rl:app-a:per-ip:") && !strings.HasPrefix(key, "rl:app-b:per-ip:") {
+			t.Fatalf("counter key %q, want rl:<subscriber>:per-ip:<hash>", key)
+		}
+	}
+	if len(counter.counts) != 2 {
+		t.Fatalf("counter keys %v, want one per subscriber", counter.counts)
+	}
+}
+
+// TestRateLimit_ownerPolicyAnswersOnSubscriber proves a subscriber answers with the owner's status code,
+// Retry-After switch, and failure action, not with its own rateLimit* settings.
+func TestRateLimit_ownerPolicyAnswersOnSubscriber(t *testing.T) {
+	owner := newTestRateLimitConfig([]ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, func(cfg *configuration.Config) {
+		cfg.RateLimitStatusCode = http.StatusServiceUnavailable
+		cfg.RateLimitFailureAction = configuration.FailureActionPassthrough
+	})
+	subscriberConfig := newTestRateLimitConfig([]ratelimit.BucketRule{perIPTestBucket("per-ip", 100)}, func(cfg *configuration.Config) {
+		cfg.RateLimitEnabled = false
+		cfg.RateLimitStatusCode = http.StatusTeapot
+		cfg.RateLimitResponseHeaders = false
+		cfg.RateLimitFailureAction = configuration.FailureActionBan
+	})
+	counter := &testRateLimitCounter{counts: map[string]int64{}}
+	next := &recordedNextRequest{}
+	subscriber := &testRateLimitFixture{b: newTestRateLimitRoute(t, "app-a", subscriberConfig, next), counter: counter, next: next}
+	bindTestRateLimit(subscriber.b, newTestRateLimitClient(t, owner, counter))
+
+	subscriber.serve(http.MethodGet, "/", testRateLimitClientIP)
+	rw := subscriber.serve(http.MethodGet, "/", testRateLimitClientIP)
+	if rw.Code != http.StatusServiceUnavailable || rw.Header().Get("Retry-After") != "8" {
+		t.Fatalf("over the owner's limit: status %d Retry-After %q, want 503 and 8", rw.Code, rw.Header().Get("Retry-After"))
+	}
+	counter.err = errors.New("redis: unreachable")
+	if rw := subscriber.serve(http.MethodGet, "/", "198.51.100.21"); !subscriber.next.called || rw.Header().Get("X-Remediation") != "" {
+		t.Fatalf("counter error: next=%v header %q, want the owner's passthrough", subscriber.next.called, rw.Header().Get("X-Remediation"))
 	}
 }

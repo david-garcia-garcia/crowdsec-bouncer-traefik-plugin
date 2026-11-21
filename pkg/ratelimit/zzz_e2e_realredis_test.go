@@ -6,10 +6,15 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
 const (
@@ -158,5 +163,52 @@ func TestRealRedis_deadAddressReturnsAnError(t *testing.T) {
 	defer cancel()
 	if _, err := client.Take(ctx, realRedisTestKey(t), realRedisLimit, realRedisWindow); err == nil {
 		t.Fatal("dead address must return an error")
+	}
+}
+
+// TestRealRedis_bucketEditKeepsTheCount proves an owner's bucket edit opens a new Client that keeps
+// counting the same Redis key: bucket login allows 3, then 5 per window, and a client that already
+// sent 3 gets 2 more before the edited bucket answers.
+func TestRealRedis_bucketEditKeepsTheCount(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+	waitAwayFromWindowEnd(realRedisWindow)
+	middlewareName := fmt.Sprintf("edit-%d", time.Now().UnixNano())
+	settingsFor := func(requests int) Settings {
+		return Settings{
+			Buckets: []BucketRule{{Name: "login", Requests: requests, Window: "1m", Key: []KeyPart{{From: KeyFromIP}}}},
+			Policy:  Policy{FailureAction: "passthrough", ResponseHeaders: true, StatusCode: 429},
+			Redis:   RedisSettings{Host: realRedisAddr()},
+		}
+	}
+	charge := func(client *Client) Verdict {
+		ctx, cancel := context.WithTimeout(context.Background(), StepBudget)
+		defer cancel()
+		return client.Buckets().Charge(ctx, client, middlewareName, httptest.NewRequest(http.MethodGet, "http://example.com/login", nil), net.ParseIP("198.51.100.9"))
+	}
+	before, err := Open(context.Background(), middlewareName, settingsFor(3), slog.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for hit := 1; hit <= 3; hit++ {
+		if verdict := charge(before); verdict.Err != nil || verdict.DenyBucket != "" {
+			t.Fatalf("hit %d before the edit: %+v, want allowed", hit, verdict)
+		}
+	}
+	after, err := Open(context.Background(), middlewareName, settingsFor(5), slog.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after == before {
+		t.Fatal("a bucket edit must open a new Client")
+	}
+	for hit := 4; hit <= 6; hit++ {
+		verdict := charge(after)
+		if verdict.Err != nil {
+			t.Fatalf("hit %d after the edit: %v", hit, verdict.Err)
+		}
+		if wantDenied := hit == 6; (verdict.DenyBucket == "login") != wantDenied {
+			t.Fatalf("hit %d after the edit: deny bucket %q, want denied=%v (count kept from before the edit)", hit, verdict.DenyBucket, wantDenied)
+		}
 	}
 }

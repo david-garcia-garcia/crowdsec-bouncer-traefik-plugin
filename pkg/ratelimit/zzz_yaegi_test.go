@@ -7,9 +7,10 @@ import (
 )
 
 // TestYaegi_OpenChargeClose runs the rate-limit leg under Yaegi v0.16.1, the way Traefik loads it:
-// Open (reclaim, simpleredis, vendored windowcounter) in exact and buffered mode against a dead
-// address (exact mode returns the counter error, buffered mode keeps the local limit), a Charge on an
-// interpreted counter that must deny, and Close.
+// Open (reclaim, simpleredis, vendored windowcounter) with buckets and a policy in exact and buffered
+// mode against a dead address (exact mode returns the counter error, buffered mode keeps the local
+// limit), the Client's buckets, policy, and incarnation, a nil Client's empty incarnation, a Charge on
+// an interpreted counter that must deny, and Close.
 func TestYaegi_OpenChargeClose(t *testing.T) {
 	yaegitest.Run(t, yaegitest.GoPath(t), yaegiRateLimitProgram)
 }
@@ -48,22 +49,33 @@ func exitWithFailure(message string) {
 }
 
 func main() {
-	set, err := ratelimit.NewBucketSet([]ratelimit.BucketRule{{
+	buckets := []ratelimit.BucketRule{{
 		Name:     "per-ip",
 		Requests: 1,
 		Window:   "1m",
 		Key:      []ratelimit.KeyPart{{From: ratelimit.KeyFromIP, IPv4Prefix: 24}},
-	}})
-	if err != nil {
-		exitWithFailure("NewBucketSet: " + err.Error())
-	}
+	}}
+	policy := ratelimit.Policy{FailureAction: "ban", ResponseHeaders: true, StatusCode: 503}
 	clientIP := net.ParseIP("198.51.100.7")
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	if (*ratelimit.Client)(nil).Incarnation() != "" {
+		exitWithFailure("a nil Client must have an empty incarnation")
+	}
+	var set *ratelimit.BucketSet
 	for _, syncRate := range []time.Duration{0, 200 * time.Millisecond} {
-		client, err := ratelimit.Open(context.Background(), "yaegi", ratelimit.RedisSettings{Host: "127.0.0.1:1", SyncRate: syncRate}, log)
+		client, err := ratelimit.Open(context.Background(), "yaegi", ratelimit.Settings{
+			Buckets:      buckets,
+			InstanceName: "shared",
+			Policy:       policy,
+			Redis:        ratelimit.RedisSettings{Host: "127.0.0.1:1", SyncRate: syncRate},
+		}, log)
 		if err != nil {
 			exitWithFailure("Open: " + err.Error())
 		}
+		if client.Incarnation() == "" || client.Buckets() == nil || client.Policy() != policy {
+			exitWithFailure("Open must keep an incarnation, the compiled buckets, and the policy")
+		}
+		set = client.Buckets()
 		var counter ratelimit.Counter = client
 		var verdicts [2]ratelimit.Verdict
 		for i := range verdicts {

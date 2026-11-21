@@ -1,7 +1,7 @@
 // Package crowdsec_bouncer_traefik_plugin is the Traefik Yaegi entry (CreateConfig / New).
 //
-// Each New is one middleware. Per leg (LAPI, AppSec, captcha, ModSec) it may own a Client, bounce
-// against a named instance, both, or neither.
+// Each New is one middleware. Per leg (LAPI, AppSec, captcha, ModSec, rate limit) it may own a Client,
+// bounce against a named instance, both, or neither.
 //
 //	Open:          reclaim holder. Keeps that Client alive (stream ticker, HTTP).
 //	               Last holder gone → Sleep, then Close after table grace.
@@ -39,10 +39,11 @@ import (
 )
 
 const (
-	legLAPI    = "lapi"
-	legAppSec  = "appsec"
-	legCaptcha = "captcha"
-	legModsec  = "modsec"
+	legLAPI      = "lapi"
+	legAppSec    = "appsec"
+	legCaptcha   = "captcha"
+	legModsec    = "modsec"
+	legRateLimit = "ratelimit"
 )
 
 // publishedLeg is one leg New may own (Open + SetAlias) and subscribe to (Watch) under an instance name.
@@ -120,6 +121,63 @@ func publishedLegs() []publishedLeg {
 			empty:        (*modsecurity.Client)(nil),
 			receive:      func(route *bouncer.Bouncer) func(any) { return route.ReceiveModSec },
 		},
+		{
+			group:        legRateLimit,
+			enabled:      func(config *configuration.Config) bool { return config.RateLimitEnabled },
+			instanceName: func(config *configuration.Config) string { return config.RateLimitInstanceName },
+			prepare:      prepareRateLimit,
+			open: func(bindCtx context.Context, config *configuration.Config, log *slog.Logger, traefikName string) error {
+				_, err := ratelimit.Open(bindCtx, traefikName, rateLimitSettings(config), log)
+				return err
+			},
+			ownershipKey: func(config *configuration.Config, traefikName string) string {
+				return ratelimit.OwnershipKey(traefikName, rateLimitSettings(config))
+			},
+			subscribe: func(subscriptions *bouncer.Subscriptions) { subscriptions.RateLimit = true },
+			empty:     (*ratelimit.Client)(nil),
+			receive:   func(route *bouncer.Bouncer) func(any) { return route.ReceiveRateLimit },
+		},
+	}
+}
+
+// prepareRateLimit fills an omitted rateLimitInstanceName with the Traefik name and resolves the Redis
+// password (file, then field) only when owned. It also returns a sync-rate parse error, so
+// rateLimitSettings can build the Settings of an owner that got past prepare without one.
+// It lives here, not in pkg/ratelimit, because pkg/configuration imports pkg/ratelimit.
+func prepareRateLimit(config *configuration.Config, _ *slog.Logger, traefikName string) error {
+	if !config.RateLimitEnabled {
+		return nil
+	}
+	if strings.TrimSpace(config.RateLimitInstanceName) == "" {
+		config.RateLimitInstanceName = traefikName
+	}
+	password, err := configuration.GetVariable(config, "RateLimitRedisPassword")
+	if err != nil {
+		return err
+	}
+	config.RateLimitRedisPassword = password
+	_, err = configuration.RateLimitSyncRateDuration(config)
+	return err
+}
+
+// rateLimitSettings is what the owner's config puts on its rate-limit Client: Redis, buckets, policy,
+// and instance name. Call it after prepareRateLimit, which resolved the password and parsed the sync rate.
+func rateLimitSettings(config *configuration.Config) ratelimit.Settings {
+	syncRate, _ := configuration.RateLimitSyncRateDuration(config) // prepareRateLimit returned its error
+	return ratelimit.Settings{
+		Buckets:      config.RateLimitBuckets,
+		InstanceName: config.RateLimitInstanceName,
+		Policy: ratelimit.Policy{
+			FailureAction:   configuration.EffectiveRateLimitFailureAction(config.RateLimitFailureAction),
+			ResponseHeaders: config.RateLimitResponseHeaders,
+			StatusCode:      config.RateLimitStatusCode,
+		},
+		Redis: ratelimit.RedisSettings{
+			Database: config.RateLimitRedisDatabase,
+			Host:     config.RateLimitRedisHost,
+			Password: config.RateLimitRedisPassword,
+			SyncRate: syncRate,
+		},
 	}
 }
 
@@ -146,9 +204,9 @@ func CreateConfig() *configuration.Config {
 // New snapshots Traefik's config, Opens owned legs, publishes their instance names,
 // and returns a Bouncer that ServeHTTP-Loads those names via Watch.
 //
-// lapiEnabled / appsecEnabled / captchaEnabled / modsecEnabled = own (Open + SetAlias).
+// lapiEnabled / appsecEnabled / captchaEnabled / modsecEnabled / rateLimitEnabled = own (Open + SetAlias).
 // bouncerEnabled + a non-empty instance name = bounce (Watch). Those axes are independent.
-// rateLimitEnabled = Open the rate-limit counter only; it has no instance name and no Watch.
+// The rate-limit owner's Client carries its buckets and policy; a subscriber charges them under its own name.
 //
 // Open binds bindCtx, a child of Traefik's constructor ctx. The table has no Release:
 // cancel bindCtx on a failed New so a half-built constructor does not leave a stream
@@ -188,10 +246,6 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 	if err = openOwned(bindCtx, legs, &config, log, name); err != nil {
 		return nil, err
 	}
-	rateLimitClient, err := openRateLimit(bindCtx, &config, log, name)
-	if err != nil {
-		return nil, err
-	}
 	if err = claimOwned(legs, &config, log, name); err != nil {
 		return nil, err
 	}
@@ -206,10 +260,6 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 	route, err := bouncer.New(next, name, &config, subscriptions, log)
 	if err != nil {
 		return nil, err
-	}
-	// Before the handler is returned, so no request can race the plain field.
-	if rateLimitClient != nil {
-		route.AttachRateLimit(rateLimitClient)
 	}
 	for _, leg := range legs {
 		if leg.subscribes(&config) {
@@ -232,29 +282,6 @@ func openOwned(bindCtx context.Context, legs []publishedLeg, config *configurati
 		}
 	}
 	return nil
-}
-
-// openRateLimit opens this middleware's rate-limit counter on bindCtx when the leg is enabled.
-// It is never published under an instance name, so it has no alias and no Watch.
-// Nil means the leg is off: no counter, no Redis dial, no password file read.
-func openRateLimit(bindCtx context.Context, config *configuration.Config, log *slog.Logger, name string) (*ratelimit.Client, error) {
-	if !config.RateLimitEnabled {
-		return nil, nil //nolint:nilnil // a disabled leg has no counter and no error
-	}
-	password, err := configuration.GetVariable(config, "RateLimitRedisPassword")
-	if err != nil {
-		return nil, err
-	}
-	syncRate, err := configuration.RateLimitSyncRateDuration(config)
-	if err != nil {
-		return nil, err
-	}
-	return ratelimit.Open(bindCtx, name, ratelimit.RedisSettings{
-		Database: config.RateLimitRedisDatabase,
-		Host:     config.RateLimitRedisHost,
-		Password: password,
-		SyncRate: syncRate,
-	}, log)
 }
 
 // claimOwned publishes each owned instance name (SetAlias) to the Client Open just

@@ -17,18 +17,22 @@ import (
 // msgRateLimitExceeded is the INFO line for a log bucket over its limit.
 const msgRateLimitExceeded = "crowdsec bouncer rate limit exceeded"
 
-// serveRateLimit charges req to the rate-limit buckets. True means the response was written: a deny
+// serveRateLimit charges req to the buckets of the rate-limit client this route subscribes to, under this
+// route's own name, and answers with that client's policy. True means the response was written: a deny
 // bucket over its limit, or the failure action when the counter could not answer.
-// False means the request continues to the AppSec step: no counter, a bypassRateLimit rule, no deny,
-// failure action passthrough, or a failure captcha that a cleared gate or a bypassCaptcha rule let through.
+// False means the request continues to the AppSec step: no subscription or an unpublished owner, a
+// bypassRateLimit rule, no deny, failure action passthrough, or a failure captcha that a cleared gate or
+// a bypassCaptcha rule let through.
 func (b *Bouncer) serveRateLimit(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
-	if b.rateLimitCounter == nil || b.rateLimitBuckets == nil || match.SkipRateLimit {
+	client := b.loadedRateLimit()
+	if client == nil || match.SkipRateLimit {
 		return false
 	}
+	policy := client.Policy()
 	// One budget for every bucket and every Redis command of this request.
 	ctx, cancel := context.WithTimeout(req.Context(), ratelimit.StepBudget)
 	defer cancel()
-	verdict := b.rateLimitBuckets.Charge(ctx, b.rateLimitCounter, b.name, req.Request, req.IPAddr())
+	verdict := client.Buckets().Charge(ctx, client, b.name, req.Request, req.IPAddr())
 	// Log buckets over their limit: the dry run exists to be read.
 	for _, exceeded := range verdict.Exceeded {
 		b.log.Info(msgRateLimitExceeded, "ip", req.IPAddrString(), "bucket", exceeded.Name,
@@ -36,31 +40,31 @@ func (b *Bouncer) serveRateLimit(rw http.ResponseWriter, req clientrequest.Reque
 	}
 	if verdict.Err != nil {
 		b.log.Debug("serveRateLimit", "ip", req.IPAddrString(), "error", verdict.Err)
-		return b.applyRateLimitFailureAction(rw, req, match)
+		return b.applyRateLimitFailureAction(rw, req, match, policy.FailureAction)
 	}
 	if verdict.DenyBucket == "" {
 		return false
 	}
 	logger.Trace(b.log, "serveRateLimit", "ip", req.IPAddrString(), "bucket", verdict.DenyBucket)
-	b.denyRateLimit(rw, req, match, verdict)
+	b.denyRateLimit(rw, req, match, verdict, policy)
 	return true
 }
 
-// denyRateLimit writes the ban page with rateLimitStatusCode and Retry-After for the denying bucket.
-// When a captcha action rule also matched, it warns that the rule lost.
-func (b *Bouncer) denyRateLimit(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, verdict ratelimit.Verdict) {
+// denyRateLimit writes the ban page with the owner's status code and, when its policy says so, Retry-After
+// for the denying bucket. When a captcha action rule also matched, it warns that the rule lost.
+func (b *Bouncer) denyRateLimit(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, verdict ratelimit.Verdict, policy ratelimit.Policy) {
 	b.warnCaptchaSuperseded(req, match)
-	if b.rateLimitResponseHeaders {
+	if policy.ResponseHeaders {
 		rw.Header().Set("Retry-After", strconv.FormatInt(int64(verdict.RetryAfter/time.Second), 10))
 	}
 	b.handleBanStatusServeHTTP(rw, req, configuration.ReasonRateLimit, headerReasonRateLimit,
-		lapi.OriginPluginRateLimit(verdict.DenyBucket), b.rateLimitStatusCode)
+		lapi.OriginPluginRateLimit(verdict.DenyBucket), policy.StatusCode)
 }
 
-// applyRateLimitFailureAction applies this router's rate-limit failure action when the counter errored.
+// applyRateLimitFailureAction applies the owner's failureAction when the counter errored, on this router.
 // False means the response was not written, and the request continues to the AppSec step.
-func (b *Bouncer) applyRateLimitFailureAction(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
-	switch b.rateLimitFailureAction {
+func (b *Bouncer) applyRateLimitFailureAction(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, failureAction string) bool {
+	switch failureAction {
 	case configuration.FailureActionPassthrough:
 		return false
 	case configuration.FailureActionCaptcha:

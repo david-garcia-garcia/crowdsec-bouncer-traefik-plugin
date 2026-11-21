@@ -14,7 +14,6 @@ import (
 	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ratelimit"
 )
 
 // Bouncer is one Traefik router handler. It is not the reclaim value.
@@ -40,11 +39,7 @@ type Bouncer struct {
 	bindingMu                sync.Mutex // serializes bind / unbind traces of every leg
 	name                     string
 	next                     http.Handler
-	rateLimitBuckets         *ratelimit.BucketSet // nil when rateLimitEnabled is false
-	rateLimitCounter         ratelimit.Counter    // set once by AttachRateLimit before the handler is returned
-	rateLimitFailureAction   string               // per-router answer when the counter errors
-	rateLimitResponseHeaders bool
-	rateLimitStatusCode      int
+	rateLimitLeg             legBinding // *ratelimit.Client: the owner's counter, buckets, and policy
 	remediationCustomHeader  string
 	remediationStatusCode    int
 	trustedHops              *ip.PoolStrategy // hops allowed to set the forwarded client header
@@ -57,13 +52,15 @@ const msgBanTemplateUnavailable = "crowdsec bouncer ban template unavailable"
 // Subscriptions says which published legs a route subscribes to. plugin.go sets a leg when
 // bouncerEnabled is on and that leg's instance name is set.
 type Subscriptions struct {
-	LAPI    bool
-	AppSec  bool
-	Captcha bool
-	ModSec  bool
+	LAPI      bool
+	AppSec    bool
+	Captcha   bool
+	ModSec    bool
+	RateLimit bool
 }
 
-// New returns a per-router handler. Clients arrive later through ReceiveLAPI, ReceiveAppSec, ReceiveCaptcha, and ReceiveModSec.
+// New returns a per-router handler. Clients arrive later through ReceiveLAPI, ReceiveAppSec, ReceiveCaptcha,
+// ReceiveModSec, and ReceiveRateLimit.
 func New(next http.Handler, name string, config *configuration.Config, subscriptions Subscriptions, log *slog.Logger) (*Bouncer, error) {
 	log = log.With("traefikName", name)
 	hopChecker, _ := ip.NewChecker(log, config.BouncerForwardedHeadersTrustedIPs)
@@ -80,15 +77,6 @@ func New(next http.Handler, name string, config *configuration.Config, subscript
 	if err != nil {
 		return nil, err
 	}
-	// Buckets compile only when this router runs the rate limit; the counter arrives through AttachRateLimit.
-	var rateLimitBuckets *ratelimit.BucketSet
-	if config.RateLimitEnabled {
-		rateLimitBuckets, err = ratelimit.NewBucketSet(config.RateLimitBuckets)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	var banTemplate *template.Template
 	var banTemplateContentType string
 	if config.BouncerBanFilePath == "" {
@@ -109,6 +97,7 @@ func New(next http.Handler, name string, config *configuration.Config, subscript
 		appsecLeg:                legBinding{leg: "appsec", instanceName: config.AppsecInstanceName, subscribed: subscriptions.AppSec},
 		captchaLeg:               legBinding{leg: "captcha", instanceName: config.CaptchaInstanceName, subscribed: subscriptions.Captcha},
 		modsecLeg:                legBinding{leg: "modsec", instanceName: config.ModsecInstanceName, subscribed: subscriptions.ModSec},
+		rateLimitLeg:             legBinding{leg: "ratelimit", instanceName: config.RateLimitInstanceName, subscribed: subscriptions.RateLimit},
 		appsecFailureAction:      configuration.EffectiveFailureAction(config.BouncerAppsecFailureAction),
 		actionRules:              actionRules,
 		banTemplate:              banTemplate,
@@ -125,10 +114,6 @@ func New(next http.Handler, name string, config *configuration.Config, subscript
 		log:                      log,
 		name:                     name,
 		next:                     next,
-		rateLimitBuckets:         rateLimitBuckets,
-		rateLimitFailureAction:   configuration.EffectiveRateLimitFailureAction(config.RateLimitFailureAction),
-		rateLimitResponseHeaders: config.RateLimitResponseHeaders,
-		rateLimitStatusCode:      config.RateLimitStatusCode,
 		remediationCustomHeader:  config.BouncerRemediationHeadersCustomName,
 		remediationStatusCode:    config.BouncerRemediationStatusCode,
 		trustedHops:              &ip.PoolStrategy{Checker: hopChecker},
@@ -207,12 +192,6 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 		return
 	}
 	b.next.ServeHTTP(rw, req.Request)
-}
-
-// AttachRateLimit gives this router the counter its rate-limit buckets are charged to. New calls it
-// once, before it returns the handler, so ServeHTTP reads a plain field.
-func (b *Bouncer) AttachRateLimit(counter ratelimit.Counter) {
-	b.rateLimitCounter = counter
 }
 
 // foldActionRules reduces the action rules for req.

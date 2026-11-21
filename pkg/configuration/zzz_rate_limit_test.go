@@ -64,7 +64,7 @@ func Test_ValidateParams_rateLimit(t *testing.T) {
 		{name: "sync rate not a duration", config: with(func(c *Config) { c.RateLimitSyncRate = "fast" }), wantErr: []string{"RateLimitSyncRate"}},
 		{name: "negative sync rate", config: with(func(c *Config) { c.RateLimitSyncRate = "-1s" }), wantErr: []string{"RateLimitSyncRate", "negative"}},
 		{name: "unknown failure action", config: with(func(c *Config) { c.RateLimitFailureAction = "allow" }), wantErr: []string{"RateLimitFailureAction", "must be one of"}},
-		{name: "captcha failure action without a captcha instance", config: with(func(c *Config) { c.RateLimitFailureAction = FailureActionCaptcha }), wantErr: []string{"RateLimitFailureAction", "captcha requires a captcha instance name"}},
+		{name: "captcha failure action on an owner without a captcha instance", config: with(func(c *Config) { c.RateLimitFailureAction = FailureActionCaptcha })},
 		{name: "captcha failure action with a captcha instance", config: with(func(c *Config) {
 			c.RateLimitFailureAction = FailureActionCaptcha
 			c.BouncerEnabled = true
@@ -113,5 +113,32 @@ func Test_ValidateParams_disabledRateLimitIgnoresLeftovers(t *testing.T) {
 	cfg.RateLimitFailureAction = "allow"
 	if err := ValidateParams(cfg, logger.New("INFO", "")); err != nil {
 		t.Fatalf("disabled leg must ignore leftovers: %v", err)
+	}
+}
+
+// Test_ValidateParams_rateLimitOpenVsSubscribe covers the rate-limit row of the open-vs-subscribe matrix:
+// a leftover rateLimitInstanceName with nothing enabled fails (E2), and a subscriber ignores leftover
+// owner-read rateLimit* settings.
+func Test_ValidateParams_rateLimitOpenVsSubscribe(t *testing.T) {
+	log := logger.New("INFO", "")
+	leftoverName := getMinimalConfig()
+	leftoverName.RateLimitInstanceName = "shared"
+	if err := ValidateParams(leftoverName, log); err == nil || !strings.Contains(err.Error(), "RateLimit") {
+		t.Fatalf("leftover rateLimitInstanceName with nothing enabled: error = %v, want one naming RateLimit", err)
+	}
+
+	subscriber := getMinimalConfig()
+	subscriber.BouncerEnabled = true
+	subscriber.RateLimitInstanceName = "shared"
+	subscriber.RateLimitBuckets = []ratelimit.BucketRule{{Name: "x", Requests: 1, Window: "500ms"}}
+	subscriber.RateLimitStatusCode = 0
+	if err := ValidateParams(subscriber, log); err != nil {
+		t.Fatalf("a subscriber must ignore leftover owner-read rate-limit settings: %v", err)
+	}
+
+	owner := getRateLimitTestConfig()
+	owner.RateLimitInstanceName = "shared"
+	if err := ValidateParams(owner, log); err != nil {
+		t.Fatalf("an owner with an instance name and bouncerEnabled false must pass: %v", err)
 	}
 }

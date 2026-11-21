@@ -14,11 +14,12 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/modsecurity"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ratelimit"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
 // testLegInstanceName is the instance name every test leg publishes and subscribes to.
-// The four reclaim groups are separate, so one string serves all of them.
+// The five reclaim groups are separate, so one string serves all of them.
 const testLegInstanceName = "shared"
 
 // testLegFixture configures one published leg on a test middleware config.
@@ -43,7 +44,7 @@ type testBindingTrace struct {
 	hasIncarnation bool
 }
 
-// testLegFixtures returns the four published legs in plugin.go open and claim order.
+// testLegFixtures returns the five published legs in plugin.go open and claim order.
 // lapiHost is a live LAPI test server; modsecURL is a ModSec sidecar test server.
 func testLegFixtures(t *testing.T, lapiHost, modsecURL string) []testLegFixture {
 	t.Helper()
@@ -117,6 +118,20 @@ func testLegFixtures(t *testing.T, lapiHost, modsecURL string) []testLegFixture 
 			subscribe: func(config *configuration.Config) { config.ModsecInstanceName = testLegInstanceName },
 			incarnationOf: func(published any) string {
 				client, _ := published.(*modsecurity.Client)
+				return client.Incarnation()
+			},
+		},
+		{
+			leg:   legRateLimit,
+			empty: (*ratelimit.Client)(nil),
+			own: func(config *configuration.Config, variant string) {
+				enableTestRateLimit(config, testRateLimitDeadRedis)
+				config.RateLimitInstanceName = testLegInstanceName
+				config.RateLimitBuckets[0].Name = "per-ip-" + variant
+			},
+			subscribe: func(config *configuration.Config) { config.RateLimitInstanceName = testLegInstanceName },
+			incarnationOf: func(published any) string {
+				client, _ := published.(*ratelimit.Client)
 				return client.Incarnation()
 			},
 		},
