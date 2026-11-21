@@ -28,7 +28,7 @@ const (
 	OriginPluginAppsecFailure     = "plugin:appsec_failure"     // AppSec failure-action
 	OriginPluginModsecFailure     = "plugin:modsec_failure"     // ModSec failure-action
 	OriginPluginRulesPrefix       = "plugin:rules:"             // action-rule applied ban or captcha
-	OriginPluginRateLimitPrefix   = "plugin:ratelimit:"         // rate-limit bucket denied
+	OriginPluginRateLimitPrefix   = "plugin:ratelimit:"         // rate-limit bucket answered (ratelimit or captcha)
 	OriginPluginRateLimitFailure  = "plugin:ratelimit_failure"  // rate-limit failure-action
 	// OriginPluginRateLimitChallengeForm is the rate-limit leg's captcha gate answering a challenge-form POST: no bucket answered.
 	OriginPluginRateLimitChallengeForm = "plugin:ratelimit"

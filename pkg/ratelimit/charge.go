@@ -39,10 +39,10 @@ type Verdict struct {
 // key has a value. A ratelimit bucket over its limit stops the walk; the first captcha bucket over its
 // limit is kept and the walk goes on; a log bucket over its limit is recorded and the walk goes on; a
 // matching final bucket stops the walk after it; the first counter error stops the walk and is returned.
-// gateCleared (the client holds this router's valid captcha gate) skips every captcha bucket: it is not
+// skipCaptchaBuckets (the caller's client solved its captcha) skips every captcha bucket: it is not
 // charged, cannot answer, and its final does not apply, as for a bucket whose key has no value.
 // clientIP is the address GetRemoteIP resolved for the request. A nil set or counter charges nothing.
-func (set *BucketSet) Charge(ctx context.Context, counter Counter, middlewareName string, httpReq *http.Request, clientIP net.IP, gateCleared bool) Verdict {
+func (set *BucketSet) Charge(ctx context.Context, counter Counter, middlewareName string, httpReq *http.Request, clientIP net.IP, skipCaptchaBuckets bool) Verdict {
 	var verdict Verdict
 	if set == nil || counter == nil {
 		return verdict
@@ -51,7 +51,7 @@ func (set *BucketSet) Charge(ctx context.Context, counter Counter, middlewareNam
 	for _, i := range set.predicates.Matching(httpReq) {
 		bucket := &set.buckets[i]
 		// A solved client is not counted by captcha buckets.
-		if gateCleared && bucket.action == ActionCaptcha {
+		if skipCaptchaBuckets && bucket.action == ActionCaptcha {
 			continue
 		}
 		// A part without a value skips this bucket, its final included.
@@ -86,11 +86,11 @@ func (set *BucketSet) Charge(ctx context.Context, counter Counter, middlewareNam
 	return verdict
 }
 
-// wholeSecondsAtLeastOne rounds d up to whole seconds, at least 1s: Retry-After is whole seconds, and
+// wholeSecondsAtLeastOne rounds retryAfter up to whole seconds, at least 1s: Retry-After is whole seconds, and
 // rounding down would send the client back before the counter admits it.
-func wholeSecondsAtLeastOne(d time.Duration) time.Duration {
-	if d <= time.Second {
+func wholeSecondsAtLeastOne(retryAfter time.Duration) time.Duration {
+	if retryAfter <= time.Second {
 		return time.Second
 	}
-	return (d + time.Second - 1).Truncate(time.Second)
+	return (retryAfter + time.Second - 1).Truncate(time.Second)
 }

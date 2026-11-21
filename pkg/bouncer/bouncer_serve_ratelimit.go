@@ -37,8 +37,8 @@ const (
 // not answer, no bucket that answers, failure action passthrough, or a failure captcha that a cleared gate
 // or a bypassCaptcha rule let through.
 func (b *Bouncer) serveRateLimit(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
-	client := b.loadedRateLimit()
-	if client == nil || match.SkipRateLimit {
+	rateLimitClient := b.loadedRateLimit()
+	if rateLimitClient == nil || match.SkipRateLimit {
 		return false
 	}
 	// The captcha page's own requests are not charged: widget assets continue, and the challenge-form
@@ -50,17 +50,17 @@ func (b *Bouncer) serveRateLimit(rw http.ResponseWriter, req clientrequest.Reque
 	}
 	if b.isCaptchaFormAnswer(req) {
 		logger.Trace(b.log, "serveRateLimit", "ip", req.IPAddrString(), "captchaForm", true)
-		return b.answerRateLimitChallengeForm(rw, req, match, client)
+		return b.answerRateLimitChallengeForm(rw, req, match, rateLimitClient)
 	}
-	buckets := client.Buckets()
-	policy := client.Policy()
+	buckets := rateLimitClient.Buckets()
+	policy := rateLimitClient.Policy()
 	// A client holding this router's valid captcha gate is not counted by captcha buckets.
 	gateCleared := captchaClient != nil && buckets.HasCaptchaBucket() && captchaClient.Check(req)
 
 	// One budget for every bucket and every Redis command of this request.
 	ctx, cancel := context.WithTimeout(req.Context(), ratelimit.StepBudget)
 	defer cancel()
-	verdict := buckets.Charge(ctx, client, b.name, req.Request, req.IPAddr(), gateCleared)
+	verdict := buckets.Charge(ctx, rateLimitClient, b.name, req.Request, req.IPAddr(), gateCleared)
 
 	// Log buckets over their limit: the dry run exists to be read.
 	for _, exceeded := range verdict.Exceeded {
@@ -86,14 +86,14 @@ func (b *Bouncer) serveRateLimit(rw http.ResponseWriter, req clientrequest.Reque
 }
 
 // answerRateLimitChallengeForm answers a challenge-form POST on a router with a usable captcha. No bucket
-// charges it. When client's policy can answer with a captcha (a captcha bucket or failure action captcha),
+// charges it. When rateLimitClient's policy can answer with a captcha (a captcha bucket or failure action captcha),
 // the POST answers a challenge this leg may have served, so this router's captcha gate validates it, as
 // AppSec does for a form it let through: the solved redirect with the gate cookie, or the challenge page
 // again with header captcha:ratelimit and drop origin plugin:ratelimit (no bucket answered).
 // False means the request continues: a policy without a captcha answer, a bypassCaptcha rule, or a gate
 // that did not write.
-func (b *Bouncer) answerRateLimitChallengeForm(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, client *ratelimit.Client) bool {
-	if !rateLimitAnswersWithCaptcha(client) || b.bypassesCaptcha(req, match) {
+func (b *Bouncer) answerRateLimitChallengeForm(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, rateLimitClient *ratelimit.Client) bool {
+	if !rateLimitAnswersWithCaptcha(rateLimitClient) || b.bypassesCaptcha(req, match) {
 		return false
 	}
 	return b.handleCaptchaKindServeHTTP(rw, req, configuration.ReasonRateLimit, headerReasonRateLimit, lapi.OriginPluginRateLimitChallengeForm)
@@ -169,7 +169,7 @@ func (b *Bouncer) logRateLimitCaptchaDowngrade(req clientrequest.Request, origin
 	if b.captchaLeg.subscribed {
 		reason = "unusable"
 		logger.Debounced(b.log, slog.LevelError, rateLimitCaptchaUnusableInterval, msgRateLimitCaptchaUnavailable,
-			"reason", reason, "traefikName", b.name, "instanceName", b.rateLimitLeg.instanceName,
+			"reason", reason, "instanceName", b.rateLimitLeg.instanceName,
 			"captchaInstanceName", b.captchaLeg.instanceName)
 	}
 	b.log.Debug(msgRateLimitCaptchaDowngrade, "ip", req.IPAddrString(), "origin", origin, "reason", reason)

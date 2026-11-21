@@ -9,7 +9,9 @@ import (
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
 func TestServeHTTP_DisabledSkipsBan(t *testing.T) {
@@ -123,12 +125,22 @@ func TestServeHTTP_UnparseableClientIPRejects(t *testing.T) {
 	}
 }
 
+// newReceiveLAPIBouncer is a route that subscribes to LAPI and has not received a client yet, so
+// ReceiveLAPI runs its own bind hook.
+func newReceiveLAPIBouncer(log *slog.Logger) (*Bouncer, *lapi.Client) {
+	client, _ := lapi.NewTestClient(log)
+	b := &Bouncer{name: "edge", log: log}
+	b.lapiLeg.subscribed = true
+	b.lapiLeg.leg = "lapi"
+	return b, client
+}
+
 func TestReceiveLAPI_WarnsWhenHeaderScopeIsNotPolled(t *testing.T) {
 	log, sink := newTestLogSink(slog.LevelWarn)
-	b, client, _ := testForcedDecisionBouncer(t, log, nil, nil, false)
+	b, client := newReceiveLAPIBouncer(log)
 	b.decisionScopeHeaders = map[string]string{decisionscope.ScopeCountry: "CF-IPCountry"}
-	b.traceBinding(&b.lapiLeg, client.Incarnation(), b.warnMissingStreamScopes)
-	b.traceBinding(&b.lapiLeg, client.Incarnation(), b.warnMissingStreamScopes)
+	b.ReceiveLAPI(reclaim.Published{Value: client})
+	b.ReceiveLAPI(reclaim.Published{Value: client})
 	logged := sink.String()
 	if strings.Count(logged, "crowdsec bouncer stream scopes missing") != 1 {
 		t.Fatalf("want one missing-scope WARN, got %s", logged)
@@ -140,8 +152,8 @@ func TestReceiveLAPI_WarnsWhenHeaderScopeIsNotPolled(t *testing.T) {
 
 func TestReceiveLAPI_QuietWhenNoHeaderScopes(t *testing.T) {
 	log, sink := newTestLogSink(slog.LevelWarn)
-	b, client, _ := testForcedDecisionBouncer(t, log, nil, nil, false)
-	b.traceBinding(&b.lapiLeg, client.Incarnation(), b.warnMissingStreamScopes)
+	b, client := newReceiveLAPIBouncer(log)
+	b.ReceiveLAPI(reclaim.Published{Value: client})
 	if strings.Contains(sink.String(), "stream scopes missing") {
 		t.Fatalf("no header scopes must not warn, got %s", sink.String())
 	}

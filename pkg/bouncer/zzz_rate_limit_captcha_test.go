@@ -164,7 +164,8 @@ func TestRateLimit_captchaBucketWithoutUsableCaptcha(t *testing.T) {
 			})
 			tc.bind(t, fixture)
 			log, sink := newTestLogSink(slog.LevelDebug)
-			fixture.b.log = log
+			// bouncer.New adds traefikName with log.With; this literal route does not go through New.
+			fixture.b.log = log.With("traefikName", fixture.b.name)
 			fixture.serve(http.MethodGet, "/", testRateLimitClientIP)
 			for request := 2; request <= 4; request++ {
 				rw := fixture.serve(http.MethodGet, "/", testRateLimitClientIP)
@@ -215,7 +216,8 @@ func TestRateLimit_failureCaptchaWithoutUsableCaptcha(t *testing.T) {
 			}
 			fixture.counter.err = errors.New("redis: unreachable")
 			log, sink := newTestLogSink(slog.LevelDebug)
-			fixture.b.log = log
+			// bouncer.New adds traefikName with log.With; this literal route does not go through New.
+			fixture.b.log = log.With("traefikName", fixture.b.name)
 			for request := range 3 {
 				rw := fixture.serve(http.MethodGet, "/", testRateLimitClientIP)
 				if fixture.next.called || rw.Code != http.StatusForbidden || rw.Header().Get("X-Remediation") != "ban:captcha-downgrade" {
@@ -270,7 +272,8 @@ func TestRateLimit_bindLogsCaptchaUnavailableOncePerBind(t *testing.T) {
 				fixture.bindUsableTestCaptcha(t)
 			}
 			log, sink := newTestLogSink(slog.LevelDebug)
-			fixture.b.log = log
+			// bouncer.New adds traefikName with log.With; this literal route does not go through New.
+			fixture.b.log = log.With("traefikName", fixture.b.name)
 			client := newTestRateLimitClient(t, cfg, fixture.counter)
 			fixture.b.ReceiveRateLimit(reclaim.Published{Value: client})
 			for range 3 {

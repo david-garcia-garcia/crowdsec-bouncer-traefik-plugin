@@ -27,7 +27,7 @@ func (b *Bouncer) logRateLimitCaptchaUnsubscribed() {
 		return
 	}
 	b.log.Error(msgRateLimitCaptchaUnavailable,
-		"reason", "unsubscribed", "traefikName", b.name, "instanceName", b.rateLimitLeg.instanceName)
+		"reason", "unsubscribed", "instanceName", b.rateLimitLeg.instanceName)
 }
 
 // rateLimitAnswersWithCaptcha reports whether client's policy can answer with a captcha: a captcha bucket,

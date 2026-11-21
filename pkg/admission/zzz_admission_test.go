@@ -3,6 +3,7 @@ package admission
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"testing"
@@ -185,5 +186,23 @@ func TestGate_cooldownDoesNotGrowAfterAFailedProbe(t *testing.T) {
 	*now = now.Add(11 * time.Second)
 	if !admit(t, gate).Admitted {
 		t.Fatal("the cooldown is fixed: a second probe must be admitted after the same period")
+	}
+}
+
+func TestGate_canceledRequestDoesNotTakeTheProbe(t *testing.T) {
+	gate, _, now := newTestGate(t)
+	trip(t, gate)
+	*now = now.Add(11 * time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	ticket, err := gate.Admit(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled request: err=%v want context.Canceled", err)
+	}
+	if ticket.Admitted {
+		t.Fatal("a canceled request must not be admitted")
+	}
+	if !admit(t, gate).Admitted {
+		t.Fatal("the canceled request must leave the probe to the next request")
 	}
 }

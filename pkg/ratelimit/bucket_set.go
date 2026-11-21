@@ -121,7 +121,7 @@ func validateAlgorithm(algorithm string, burst int) error {
 }
 
 // compileBucketAction maps empty to ratelimit and rejects anything but ratelimit, captcha, and log
-// (the round-1 deny included), naming the accepted values.
+// (the former deny value included), naming the accepted values.
 func compileBucketAction(raw string) (string, error) {
 	switch action := strings.TrimSpace(raw); action {
 	case "":

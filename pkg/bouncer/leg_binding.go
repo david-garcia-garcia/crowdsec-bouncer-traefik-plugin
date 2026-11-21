@@ -30,26 +30,27 @@ func (b *Bouncer) receiveBinding(binding *legBinding, published any, loadIncarna
 	b.traceBinding(binding, loadIncarnation(), onBind)
 }
 
-// traceBinding traces the move from the last traced Client to current (its incarnation, empty for nil).
-// The same incarnation is a no-op. Replacing A by B traces unbound A, then bound B.
-func (b *Bouncer) traceBinding(binding *legBinding, current string, onBind func()) {
+// traceBinding traces the move from the last traced Client to the one whose incarnation is
+// currentIncarnation (empty for nil). The same incarnation is a no-op. Replacing A by B traces unbound A,
+// then bound B.
+func (b *Bouncer) traceBinding(binding *legBinding, currentIncarnation string, onBind func()) {
 	b.bindingMu.Lock()
 	defer b.bindingMu.Unlock()
-	if binding.traceSeen && current == binding.tracedIncarnation {
+	if binding.traceSeen && currentIncarnation == binding.tracedIncarnation {
 		return
 	}
-	previous := binding.tracedIncarnation
-	binding.tracedIncarnation = current
+	previousIncarnation := binding.tracedIncarnation
+	binding.tracedIncarnation = currentIncarnation
 	binding.traceSeen = true
 
-	// Release the previous Client, if any.
-	if previous != "" && previous != current {
-		b.traceBouncerBinding(false, binding.leg, binding.instanceName, previous)
+	// Release the previous Client, if any (the same incarnation returned above).
+	if previousIncarnation != "" {
+		b.traceBouncerBinding(false, binding.leg, binding.instanceName, previousIncarnation)
 	}
 
 	// Nothing bound now: an unbound line without incarnation only when nothing was bound before.
-	if current == "" {
-		if previous == "" {
+	if currentIncarnation == "" {
+		if previousIncarnation == "" {
 			b.traceBouncerBinding(false, binding.leg, binding.instanceName, "")
 		}
 		return
@@ -59,5 +60,5 @@ func (b *Bouncer) traceBinding(binding *legBinding, current string, onBind func(
 	if onBind != nil {
 		onBind()
 	}
-	b.traceBouncerBinding(true, binding.leg, binding.instanceName, current)
+	b.traceBouncerBinding(true, binding.leg, binding.instanceName, currentIncarnation)
 }
