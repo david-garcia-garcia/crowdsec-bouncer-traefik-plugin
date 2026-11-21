@@ -31,7 +31,7 @@ func lookupAsRequest(client *Client, remoteIP string) (string, error) {
 	if ipAddr != nil {
 		remoteIP = ipAddr.String()
 	}
-	kind, _, _, _, err := client.LookupRemediation(remoteIP, ipAddr, nil)
+	kind, err := remediationKindForTest(client.LookupRemediation(remoteIP, ipAddr, nil))
 	return kind, err
 }
 
@@ -142,7 +142,7 @@ func liveRequests(t *testing.T, addresses []string) int64 {
 		if kind != "" {
 			continue
 		}
-		if _, _, _, err := client.LiveLookup(canonical, nil, 60); err != nil {
+		if err := liveLookupErrForTest(client.LiveLookup(canonical, nil, 60)); err != nil {
 			t.Fatalf("live lookup %q: %v", address, err)
 		}
 	}

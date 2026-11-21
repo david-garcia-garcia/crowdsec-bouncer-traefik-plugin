@@ -1,0 +1,29 @@
+# A stream-mode router that answers LAPI bans with 429, so a ban carries Retry-After
+# (the seconds left on the stored decision). Its own bouncer key: a stream key shared
+# with /stream would race the CrowdSec cursor.
+http:
+  routers:
+    retry-after-stream:
+      rule: PathPrefix(`/retry-after-stream`)
+      entryPoints: [web]
+      middlewares: [bouncer-retry-after-stream]
+      service: whoami@docker
+  middlewares:
+    bouncer-retry-after-stream:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          bouncerRemediationStatusCode: "429"
+          lapiEnabled: "true"
+          lapiHost: crowdsec:8080
+          lapiHttpTimeoutSeconds: "30"
+          lapiKey: "c51a1c7000000000000000000000001e"
+          lapiMode: stream
+          lapiUpdateIntervalSeconds: "5"
+          logFormat: json
+          logLevel: DEBUG
+          reclaimGraceSeconds: "2"

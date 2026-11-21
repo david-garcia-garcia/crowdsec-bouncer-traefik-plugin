@@ -121,6 +121,14 @@ Describe "Basic CrowdSec Bouncer Integration Test" {
         Add-TestDecision -IP $script:TestIP -Type "ban" -Reason "status-429"
         $response = Test-HttpRequest -Endpoint "/status-429" -IP $script:TestIP -TraefikUrl $script:TraefikUrl
         $response.StatusCode | Should -Be 429 -Because "the coverage route sets bouncerRemediationStatusCode=429"
+        # Add-TestDecision defaults to a 1h ban: Retry-After is the seconds left on it, rounded up.
+        $retryAfter = [string]$response.Headers["Retry-After"]
+        $retryAfter | Should -Match '^\d+$' -Because "a LAPI ban answered 429 carries Retry-After, got '$retryAfter'"
+        [int]$retryAfter | Should -BeGreaterOrEqual 1
+        [int]$retryAfter | Should -BeLessOrEqual 3600
+        $forbidden = Test-HttpRequest -Endpoint "/whoami" -IP $script:TestIP -TraefikUrl $script:TraefikUrl
+        $forbidden.StatusCode | Should -Be 403 -Because "/whoami keeps the default status for the same ban"
+        $forbidden.Headers.ContainsKey("Retry-After") | Should -Be $false -Because "a ban answered 403 carries no Retry-After"
         Remove-TestDecision -IP $script:TestIP
     }
 

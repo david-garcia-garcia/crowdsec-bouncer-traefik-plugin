@@ -142,6 +142,41 @@ assert_header() {
   fi
 }
 
+# Print one response header value (case-insensitive name), or "<absent>" when the response has none.
+# Usage: response_header URL HEADER [curl args...]
+response_header() {
+  local url="$1" header="$2"
+  shift 2 || true
+  curl -s -D - -o /dev/null "$@" "$url" | tr -d '\r' \
+    | awk -v h="${header,,}" -F': ' 'tolower($1) == h { print $2; found = 1; exit } END { if (!found) print "<absent>" }'
+}
+
+# Assert a response header is an integer from MIN to MAX (case-insensitive name).
+# Usage: assert_header_int_between URL HEADER MIN MAX [curl args...]
+assert_header_int_between() {
+  local url="$1" header="$2" min="$3" max="$4"
+  shift 4 || true
+  local got
+  got=$(response_header "$url" "$header" "$@")
+  if [[ ! "$got" =~ ^[0-9]+$ ]] || (( got < min || got > max )); then
+    echo "assert_header_int_between: $url header $header expected an integer from $min to $max, got \"$got\"" | tee "$WORKDIR/failure.txt" >&2
+    return 1
+  fi
+}
+
+# Assert a response has no such header (case-insensitive name).
+# Usage: assert_header_absent URL HEADER [curl args...]
+assert_header_absent() {
+  local url="$1" header="$2"
+  shift 2 || true
+  local got
+  got=$(response_header "$url" "$header" "$@")
+  if [[ "$got" != "<absent>" ]]; then
+    echo "assert_header_absent: $url header $header expected absent, got \"$got\"" | tee "$WORKDIR/failure.txt" >&2
+    return 1
+  fi
+}
+
 # Assert a response body contains a substring.
 # Usage: assert_body_contains URL NEEDLE [curl args...]
 assert_body_contains() {

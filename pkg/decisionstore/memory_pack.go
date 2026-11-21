@@ -5,22 +5,23 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
-// Memory keeps each decision in an 8-byte LiveSlot: this uint32 plus an int32 expiry.
+// Memory keeps each decision in a 12-byte LiveSlot: this uint32 plus an int32 expiry
+// and an int32 decision end (the decision end feeds Retry-After on a live memo).
 // The word is 2-bit kind, 12-bit origin id, 2-bit family, 16-bit scenario id.
 // Origin and scenario names are stored once, in the memory intern tables.
 // Family is packed so ActiveCounts can group without parsing the address again.
 // Redis stores the same hit as text. These ids are process-local, so another
-// bouncer cannot decode them. Expiry stays outside both payloads.
+// bouncer cannot decode them. Expiry and decision end stay outside the word.
 //
 // Retained heap for 400k decisions. The map key is the IP. The value is the slot.
 // Kind, origin, and scenario are t, crowdsec, and crowdsecurity/http-probing.
 // Each total is the IP keys plus that map (values and buckets).
 //
-//	(A) packed word                          12.7 + 14.0 = 26.7 MB
+//	(A) packed word, 12-byte slot            12.7 + 21.0 = 33.7 MB  (8-byte slot: 26.7 MB)
 //	(B) struct of interned strings           12.7 + 42.0 = 54.7 MB
 //	(C) struct of private string copies      12.7 + 61.2 = 73.9 MB
 //
-// (B) and (C) are {kind, origin, scenario string, int32 expiry}, 56 bytes.
+// (B) and (C) are {kind, origin, scenario string, int32 expiry, int32 end}, 56 bytes.
 // Interning shares the 35 bytes of text. (C) copies those 35 bytes on every slot
 // (14.0 MB of characters, 19.2 MB once the allocator rounds them).
 const (

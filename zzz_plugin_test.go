@@ -349,7 +349,7 @@ func TestNew_TwoLAPIs_IsolatedBan(t *testing.T) {
 		t.Fatalf("bouncer B: got %d want 200", rb.Code)
 	}
 
-	kind, _, _, _, err := testRoute(t, hb).LapiClient().LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil)
+	kind, err := remediationKindForTest(testRoute(t, hb).LapiClient().LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil))
 	if err == nil && kind == decisionscope.BannedValue {
 		t.Fatal("B's store must not contain A's ban")
 	}
@@ -600,4 +600,9 @@ func TestNew_StreamIntervalChangeDuringGrace_WakesSameClient(t *testing.T) {
 	if testRoute(t, reloaded).LapiClient() == oldLapiClient {
 		t.Fatal("sleeping metrics-interval change must Open a new Client")
 	}
+}
+
+// remediationKindForTest keeps the kind and error of one LookupRemediation, for tests that check only the kind.
+func remediationKindForTest(kind, _ string, _ uint16, _ time.Duration, err error) (string, error) {
+	return kind, err
 }

@@ -213,6 +213,8 @@ Describe "CrowdSec Bouncer Real AppSec Tests" {
             $blocked.StatusCode | Should -Be 429 -Because "AppSec RateLimit() bans carry http_status 429; content=$($blocked.Content)"
             $blocked.Content | Should -Match "E2E_CUSTOM_BAN_PAGE_MARKER"
             [string]$blocked.Headers["X-Crowdsec-Remediation"] | Should -Be "ban:appsec"
+            # No LAPI decision is behind an AppSec ban, so its 429 carries no Retry-After.
+            $blocked.Headers.ContainsKey("Retry-After") | Should -Be $false -Because "Retry-After is only for LAPI bans"
         }
 
         It "Should keep bouncerRemediationStatusCode for a CRS ban on the same listener" {

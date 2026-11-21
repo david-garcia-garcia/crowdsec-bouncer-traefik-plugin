@@ -109,7 +109,7 @@ func TestOpenDecisionStore_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.
 	putBan(store)
 
 	session := newTestRedisStore(t, redisServer.addr(), nil, SessionHex(cfg))
-	kind, _, _, _, getErr := session.LookupRemediation("1.2.3.4", nil, nil)
+	kind, getErr := remediationKindForTest(session.LookupRemediation("1.2.3.4", nil, nil))
 	if getErr != nil || kind != decisionscope.BannedValue {
 		t.Fatalf("SessionHex prefix lookup %q err %v", kind, getErr)
 	}
@@ -255,7 +255,7 @@ func TestClientClose_LeavesSiblingRedisPoolLive(t *testing.T) {
 	}
 	putBan(first.decisionStore)
 	first.Close()
-	kind, _, _, _, getErr := second.decisionStore.LookupRemediation("1.2.3.4", nil, nil)
+	kind, getErr := remediationKindForTest(second.decisionStore.LookupRemediation("1.2.3.4", nil, nil))
 	if getErr != nil || kind != decisionscope.BannedValue {
 		t.Fatalf("after sibling Close lookup %q err %v", kind, getErr)
 	}
@@ -276,14 +276,13 @@ func TestOpenDecisionStore_LastHolderGraceClosesRedisPool(t *testing.T) {
 		t.Fatal(err)
 	}
 	putBan(store)
-	kind, _, _, _, getErr := store.LookupRemediation("1.2.3.4", nil, nil)
+	kind, getErr := remediationKindForTest(store.LookupRemediation("1.2.3.4", nil, nil))
 	if getErr != nil || kind != decisionscope.BannedValue {
 		t.Fatalf("before cancel lookup %q err %v", kind, getErr)
 	}
 	cancel()
 	time.Sleep(80 * time.Millisecond)
-	_, _, originID, _, closedErr := store.LookupRemediation("1.2.3.4", nil, nil)
-	_ = originID
+	closedErr := lookupErrForTest(store.LookupRemediation("1.2.3.4", nil, nil))
 	if closedErr == nil || !errors.Is(closedErr, decisionstore.ErrUnreachable) {
 		t.Fatalf("after last-holder grace lookup err %v, want unreachable", closedErr)
 	}

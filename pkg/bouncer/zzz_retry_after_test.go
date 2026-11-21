@@ -49,11 +49,11 @@ func serveRetryAfterRequest(b *Bouncer, method, target string) *httptest.Respons
 	return rw
 }
 
-// assertRetryAfterBetween fails unless the response is status with an integer Retry-After from minSeconds to maxSeconds.
-func assertRetryAfterBetween(t *testing.T, rw *httptest.ResponseRecorder, status int, minSeconds, maxSeconds int64) {
+// assertRetryAfterBetween fails unless the response is 429 with an integer Retry-After from minSeconds to maxSeconds.
+func assertRetryAfterBetween(t *testing.T, rw *httptest.ResponseRecorder, minSeconds, maxSeconds int64) {
 	t.Helper()
-	if rw.Code != status {
-		t.Fatalf("status %d, want %d (body %q)", rw.Code, status, rw.Body.String())
+	if rw.Code != http.StatusTooManyRequests {
+		t.Fatalf("status %d, want %d (body %q)", rw.Code, http.StatusTooManyRequests, rw.Body.String())
 	}
 	header := rw.Header().Get("Retry-After")
 	seconds, err := strconv.ParseInt(header, 10, 64)
@@ -76,7 +76,7 @@ func assertNoRetryAfter(t *testing.T, rw *httptest.ResponseRecorder, status int)
 func TestRetryAfter_streamBanAnswered429(t *testing.T) {
 	b, _, store := newRetryAfterStreamBouncer(t, http.StatusTooManyRequests, nil)
 	putRetryAfterTestDecision(store, decisionscope.BannedValue, "crowdsec", 3600)
-	assertRetryAfterBetween(t, serveRetryAfterRequest(b, http.MethodGet, "/"), http.StatusTooManyRequests, 1, 3600)
+	assertRetryAfterBetween(t, serveRetryAfterRequest(b, http.MethodGet, "/"), 1, 3600)
 }
 
 func TestRetryAfter_streamBanAnswered403HasNone(t *testing.T) {
@@ -89,7 +89,7 @@ func TestRetryAfter_headBanCarriesHeaderWithoutBody(t *testing.T) {
 	b, _, store := newRetryAfterStreamBouncer(t, http.StatusTooManyRequests, nil)
 	putRetryAfterTestDecision(store, decisionscope.BannedValue, "crowdsec", 3600)
 	rw := serveRetryAfterRequest(b, http.MethodHead, "/")
-	assertRetryAfterBetween(t, rw, http.StatusTooManyRequests, 1, 3600)
+	assertRetryAfterBetween(t, rw, 1, 3600)
 	if rw.Body.Len() != 0 {
 		t.Fatalf("HEAD body %q, want empty", rw.Body.String())
 	}
@@ -115,7 +115,7 @@ func TestRetryAfter_lapiCaptchaServedAsBan(t *testing.T) {
 			b, _, store := newRetryAfterStreamBouncer(t, http.StatusTooManyRequests, nil)
 			bindCaptcha(b)
 			putRetryAfterTestDecision(store, decisionscope.CaptchaValue, "crowdsec", 600)
-			assertRetryAfterBetween(t, serveRetryAfterRequest(b, http.MethodGet, "/"), http.StatusTooManyRequests, 1, 600)
+			assertRetryAfterBetween(t, serveRetryAfterRequest(b, http.MethodGet, "/"), 1, 600)
 		})
 	}
 }
@@ -136,7 +136,7 @@ func TestRetryAfter_captchaRuleLosingToLapiBan(t *testing.T) {
 	bindTestCaptcha(b, testCaptchaClient(t, "/fast.js", "", "", nil))
 	b.actionRules = mustPathAction(t, "challenge", "^/", httprule.ActionCaptcha)
 	putRetryAfterTestDecision(store, decisionscope.BannedValue, "crowdsec", 3600)
-	assertRetryAfterBetween(t, serveRetryAfterRequest(b, http.MethodGet, "/"), http.StatusTooManyRequests, 1, 3600)
+	assertRetryAfterBetween(t, serveRetryAfterRequest(b, http.MethodGet, "/"), 1, 3600)
 }
 
 func TestRetryAfter_actionRuleBanHasNoneEvenWithStoredBan(t *testing.T) {
@@ -153,7 +153,7 @@ func TestRetryAfter_actionRuleBanHasNoneEvenWithStoredBan(t *testing.T) {
 func TestRetryAfter_remapBanToCaptchaServedAsBan(t *testing.T) {
 	b, _, store := newRetryAfterStreamBouncer(t, http.StatusTooManyRequests, map[string]map[string]string{"CAPI": {"ban": "captcha"}})
 	putRetryAfterTestDecision(store, decisionscope.BannedValue, "CAPI", 3600)
-	assertRetryAfterBetween(t, serveRetryAfterRequest(b, http.MethodGet, "/"), http.StatusTooManyRequests, 1, 3600)
+	assertRetryAfterBetween(t, serveRetryAfterRequest(b, http.MethodGet, "/"), 1, 3600)
 }
 
 func TestRetryAfter_banKeptOnBypassCaptchaRequest(t *testing.T) {
@@ -165,7 +165,7 @@ func TestRetryAfter_banKeptOnBypassCaptchaRequest(t *testing.T) {
 	if rw.Header().Get("X-Remediation") != "ban:lapi:CAPI" {
 		t.Fatalf("X-Remediation %q, want the kept LAPI ban", rw.Header().Get("X-Remediation"))
 	}
-	assertRetryAfterBetween(t, rw, http.StatusTooManyRequests, 1, 3600)
+	assertRetryAfterBetween(t, rw, 1, 3600)
 }
 
 func TestRetryAfter_lapiFailureActionBanHasNone(t *testing.T) {
@@ -264,16 +264,16 @@ func newRetryAfterLiveBouncer(t *testing.T, duration string, defaultDecisionSeco
 
 func TestRetryAfter_liveMissBanCarriesLapiDuration(t *testing.T) {
 	b := newRetryAfterLiveBouncer(t, "90m", 60)
-	assertRetryAfterBetween(t, serveRetryAfterRequest(b, http.MethodGet, "/"), http.StatusTooManyRequests, 5399, 5400)
+	assertRetryAfterBetween(t, serveRetryAfterRequest(b, http.MethodGet, "/"), 5399, 5400)
 }
 
 func TestRetryAfter_liveCachedBanReportsDecisionEndNotCacheEnd(t *testing.T) {
 	b := newRetryAfterLiveBouncer(t, "4h", 60)
 	serveRetryAfterRequest(b, http.MethodGet, "/")
-	if _, _, _, decisionLeft, err := b.loadedLAPI().LookupRemediation(retryAfterTestIP, nil, nil); err != nil || decisionLeft <= 60*time.Second {
+	if decisionLeft, err := decisionLeftForTest(b.loadedLAPI().LookupRemediation(retryAfterTestIP, nil, nil)); err != nil || decisionLeft <= 60*time.Second {
 		t.Fatalf("memo left %v err %v, want the memo to hold the 4h decision end", decisionLeft, err)
 	}
-	assertRetryAfterBetween(t, serveRetryAfterRequest(b, http.MethodGet, "/"), http.StatusTooManyRequests, 61, 14400)
+	assertRetryAfterBetween(t, serveRetryAfterRequest(b, http.MethodGet, "/"), 61, 14400)
 }
 
 func TestRetryAfterSecondsRoundsUp(t *testing.T) {
@@ -287,4 +287,9 @@ func TestRetryAfterSecondsRoundsUp(t *testing.T) {
 			t.Errorf("retryAfterSeconds(%v) = %q, want %q", decisionLeft, got, want)
 		}
 	}
+}
+
+// decisionLeftForTest keeps the time left and error of one LookupRemediation.
+func decisionLeftForTest(_, _ string, _ uint16, decisionLeft time.Duration, err error) (time.Duration, error) {
+	return decisionLeft, err
 }

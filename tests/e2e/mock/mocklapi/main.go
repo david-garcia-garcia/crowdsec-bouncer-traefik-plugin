@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Decision is the subset of a LAPI decision the plugin actually reads.
@@ -74,8 +75,8 @@ func list(m map[string]Decision) []Decision {
 // --- Redis mock (RESP arrays as spoken by utilities/simpleredis, plus inline GET) ---
 
 // serveRedis is a hardcoded stand-in. When verdicts is true it plays a replica
-// that holds decisions: GET/MGET of 1.2.3.4 → "f" (clean), 1.2.3.5 → "t" (banned);
-// any other key is a miss ($-1). When verdicts is false it plays the primary
+// that holds decisions: GET/MGET of 1.2.3.4 → "f" (clean), 1.2.3.5 → "t" (banned, no end),
+// 1.2.3.7 → a ban whose end line is 600s after the read; any other key is a miss ($-1). When verdicts is false it plays the primary
 // and answers every GET/MGET with a miss, so a scenario can prove reads are served
 // from the replica and not the primary. SET, DEL, AUTH, SELECT get +OK.
 func serveRedis(addr string, verdicts bool) {
@@ -155,7 +156,21 @@ func redisGetReply(key string, verdicts bool) []byte {
 	if verdicts && strings.Contains(key, "1.2.3.5") {
 		return []byte("$1\r\nt\r\n")
 	}
+	if verdicts && strings.Contains(key, "1.2.3.7") {
+		return redisBulk(redisSlotValueEndingIn(600 * time.Second))
+	}
 	return []byte("$-1\r\n")
+}
+
+// redisSlotValueEndingIn is a four-line slot value (ban, origin, empty scenario, wall-clock end) for a
+// decision with left to run, computed per read so the value never goes stale.
+func redisSlotValueEndingIn(left time.Duration) string {
+	return "t\ncrowdsec\n\n" + strconv.FormatInt(time.Now().Add(left).Unix(), 10)
+}
+
+// redisBulk is value as one RESP bulk string.
+func redisBulk(value string) []byte {
+	return []byte("$" + strconv.Itoa(len(value)) + "\r\n" + value + "\r\n")
 }
 
 // redisMockReply returns the RESP bytes for one mock command.

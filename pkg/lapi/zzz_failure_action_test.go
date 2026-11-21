@@ -86,13 +86,13 @@ func TestLiveLookup_PerRouterTTLLastWrites(t *testing.T) {
 	}))
 	defer lapi.Close()
 	client := newTestLiveClient(t, lapi)
-	if _, _, _, err := client.LiveLookup("1.2.3.4", nil, 60); err != nil {
+	if err := liveLookupErrForTest(client.LiveLookup("1.2.3.4", nil, 60)); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, _, err := client.LiveLookup("1.2.3.4", nil, 1); err != nil {
+	if err := liveLookupErrForTest(client.LiveLookup("1.2.3.4", nil, 1)); err != nil {
 		t.Fatal(err)
 	}
-	kind, _, _, _, err := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil)
+	kind, err := remediationKindForTest(client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil))
 	if err != nil || kind == "" {
 		t.Fatal("last write must still be cached immediately")
 	}
@@ -174,21 +174,21 @@ func TestLiveLookup_IPSlotKeepsIPQueryResult(t *testing.T) {
 	if !decisionscope.IsActiveRemediation(value) {
 		t.Fatalf("merged lookup value %q, want an active remediation", value)
 	}
-	ipKind, _, _, _, ipErr := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil)
+	ipKind, ipErr := remediationKindForTest(client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), nil))
 	if ipErr != nil {
 		t.Fatalf("clean IP query must write the none payload on the IP key: %v", ipErr)
 	}
 	if ipKind != decisionscope.NoBannedValue {
 		t.Fatalf("IP key %q, want %q", ipKind, decisionscope.NoBannedValue)
 	}
-	headerKind, _, _, _, headerErr := client.LookupRemediation("203.0.113.99", net.ParseIP("203.0.113.99"), map[string]string{decisionscope.ScopeCountry: "FR"})
+	headerKind, headerErr := remediationKindForTest(client.LookupRemediation("203.0.113.99", net.ParseIP("203.0.113.99"), map[string]string{decisionscope.ScopeCountry: "FR"}))
 	if headerErr != nil {
 		t.Fatalf("Country FR must stay on HeaderScopeKey: %v", headerErr)
 	}
 	if !decisionscope.IsActiveRemediation(headerKind) {
 		t.Fatalf("Country header key %q, want an active remediation", headerKind)
 	}
-	kind, _, _, _, lookupErr := client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), map[string]string{decisionscope.ScopeCountry: "DE"})
+	kind, lookupErr := remediationKindForTest(client.LookupRemediation("1.2.3.4", net.ParseIP("1.2.3.4"), map[string]string{decisionscope.ScopeCountry: "DE"}))
 	if lookupErr != nil {
 		t.Fatalf("later Country DE lookup: %v", lookupErr)
 	}

@@ -99,6 +99,27 @@ Describe "CrowdSec Bouncer Stream Mode Tests" {
             # The entire operation should complete within the configured timeout
             $measureTime.TotalSeconds | Should -BeLessThan $script:HttpTimeoutSeconds
         }
+
+        It "Should answer a stream ban with 429 and Retry-After on a bouncerRemediationStatusCode 429 router" {
+            # config/dynamic/retry-after.yml: stream mode, status 429, its own bouncer key.
+            Add-TestDecision -IP $script:TestIPs.BannedIP -Type "ban" -Duration "1h"
+
+            $result = Wait-ForCondition -Description "Stream 429 router to block $($script:TestIPs.BannedIP)" -TimeoutSeconds 30 -RetryIntervalSeconds 2 -Condition {
+                $script:retryAfterResponse = Test-HttpRequest -Endpoint "/retry-after-stream" -IP $script:TestIPs.BannedIP -TraefikUrl $script:TraefikUrl
+                return ($script:retryAfterResponse.StatusCode -eq 429)
+            }
+            $result.Success | Should -Be $true -Because "the next stream poll stores the ban"
+            $blocked = $script:retryAfterResponse
+
+            # Retry-After is the seconds left on the stored 1h decision, rounded up.
+            $retryAfter = [string]$blocked.Headers["Retry-After"]
+            $retryAfter | Should -Match '^\d+$' -Because "a stream LAPI ban answered 429 carries Retry-After, got '$retryAfter'"
+            [int]$retryAfter | Should -BeGreaterOrEqual 1
+            [int]$retryAfter | Should -BeLessOrEqual 3600
+            [string]$blocked.Headers["X-Crowdsec-Remediation"] | Should -Be "ban:lapi:cscli"
+
+            Remove-TestDecision -IP $script:TestIPs.BannedIP
+        }
     }
 }
 

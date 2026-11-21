@@ -17,6 +17,13 @@ body() {
   echo "[$SCENARIO] banned IP must be blocked once the next stream poll lands (HTTP 403)"
   wait_for_status "http://127.0.0.1:${WEB_PORT}/foo" 403 45 -H "X-Forwarded-For: 1.2.3.4"
 
+  echo "[$SCENARIO] the 403 router sends no Retry-After"
+  assert_header_absent "http://127.0.0.1:${WEB_PORT}/foo" Retry-After -H "X-Forwarded-For: 1.2.3.4"
+
+  echo "[$SCENARIO] the 429 router answers the same ban with Retry-After = seconds left on the 5m decision"
+  wait_for_status "http://127.0.0.1:${WEB_PORT}/retry" 429 45 -H "X-Forwarded-For: 1.2.3.4"
+  assert_header_int_between "http://127.0.0.1:${WEB_PORT}/retry" Retry-After 1 300 -H "X-Forwarded-For: 1.2.3.4"
+
   echo "[$SCENARIO] non-banned IP must still pass (HTTP 200)"
   assert_status "http://127.0.0.1:${WEB_PORT}/foo" 200 -H "X-Forwarded-For: 5.6.7.8"
 

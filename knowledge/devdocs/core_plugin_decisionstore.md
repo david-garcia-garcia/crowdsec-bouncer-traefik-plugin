@@ -23,19 +23,27 @@ A second `pkg/intern.Table` on the same DecisionStore incarnation. Same type as 
 _Avoid_: reporter-owned table, packing intern ids into Redis or the range blob, a `scenario` usage-metrics label
 
 **Packed word**:
-A memory `uint32` of 2-bit kind (0 empty / 1 `t` / 2 `c` / 3 `f`), 12-bit origin intern id, 2-bit family (`1`=ipv4, `2`=ipv6, `0`=empty), and 16-bit scenario intern id. Unpack of a packed word returns ASCII `t`/`c`/`f`. Origin id greater than 4095 saturates to 0 with no log. Family is classified at Put with `FamilyOfHostOrCIDR`. Redis slots and the range-index blob stay `KindOriginString` (kind, optional newline, origin). `LiveSlot` stays `{uint32,int32}` (8 bytes).
+A memory `uint32` of 2-bit kind (0 empty / 1 `t` / 2 `c` / 3 `f`), 12-bit origin intern id, 2-bit family (`1`=ipv4, `2`=ipv6, `0`=empty), and 16-bit scenario intern id. Unpack of a packed word returns ASCII `t`/`c`/`f`. Origin id greater than 4095 saturates to 0 with no log. Family is classified at Put with `FamilyOfHostOrCIDR`. The range-index blob stays `KindOriginString` (kind, optional newline, origin). Redis slots are the **Redis slot value**. `LiveSlot` is `{Word uint32, ExpiresAt int32, DecisionEnd int32}` (12 bytes; grown from 8 for the decision end, approved in `2026-11-21-lapi-ban-retry-after`).
 _Avoid_: leftover U+001F, packing inside a cache bag, intern ids in the range-index blob, ParseIP on the ActiveCounts walk, `uint16(word>>8)` as origin id
 
 **KindOriginString**:
-The Redis SET value and the Range blob remediation: kind letter, then newline, then origin when origin is present. Letter-only is still a hit.
-_Avoid_: leftover, `RemediationWithOrigin`, U+001F
+The Range blob remediation: kind letter, then newline, then origin when origin is present. Letter-only is still a hit. It carries no end line.
+_Avoid_: leftover, `RemediationWithOrigin`, U+001F, calling it the Redis slot value
+
+**Redis slot value**:
+The Redis SET value for an Ip or header-scope key, written by `packToString(hit, endUnix)`: kind, origin, raw scenario, then the decision end in wall-clock Unix seconds, one per line. Trailing unset lines are omitted (bare kind when all are empty); a line before a set line is written empty. `unpackFromString` cuts kind, then origin, then splits the rest at its **last** newline: the tail is the end only when it parses as a positive integer. Fork readers from v1.9.4 fold the end into the scenario they never return.
+_Avoid_: putting the end before the scenario (breaks v1.9.4–v1.9.7 readers), milliseconds, an elapsed-clock end in Redis
+
+**Decision time left**:
+What `Store.LookupRemediation` returns as `decisionLeft` beside kind, origin, and origin id: the time left on the decision the merge chose (`lookupHit.left`, kept by `mergeLookupHit`). Zero means unknown: no end stored, an end already past, or a Range winner (the blob has no end). `Decision.DecisionDurationSec` carries it on Put, apart from the store TTL `DurationSec`.
+_Avoid_: reading the store TTL as the decision end (live caps it at `lapiDefaultDecisionSeconds`), "latest end among all hits"
 
 **Active counts**:
 The compact `{originID, family} → int64` group-by of published memory Ip and header-scope slots. Memory recounts after PublishTick by shifting origin id and family out of the packed word (family was classified at Put). Redis does not support this gauge (no slot inventory without SCAN or a second HASH). `ActiveCounts` is a snapshot copy for usage-metrics POST. Live Put does not PublishTick.
 _Avoid_: a reporter forget map, `usageMetricKey` in decisionstore, counting Range, a running Put/Delete peek map
 
 **Elapsed slot clock**:
-Process-wide `time.Time` at package load. Memory `LiveSlot.ExpiresAt` and `PublishTick(now int32)` use whole seconds from `time.Since` that origin plus two (`ElapsedNow()`), not wall Unix. `PublishTick(0)` skips the expiry sweep.
+Process-wide `time.Time` at package load. Memory `LiveSlot.ExpiresAt`, `LiveSlot.DecisionEnd`, and `PublishTick(now int32)` use whole seconds from `time.Since` that origin plus two (`ElapsedNow()`), not wall Unix. `PublishTick(0)` skips the expiry sweep.
 _Avoid_: `time.Now().Unix()` as PublishTick `now` on memory, treating `ExpiresAt` as wall Unix, homemade CAS on Unix elapsed
 
 ## Overview
@@ -45,7 +53,7 @@ Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx
 ## How to use
 
 - Call `lapi.OpenDecisionStore(ctx, cfg, log, name)` then `lapi.New(..., store)` (or `Open`, which Peek then Open the store first). `name` is Traefik `New(..., name)`. Reporter still omits `active_decisions` unless stream/alone.
-- Memory: in-process COW tick/published `map[string]LiveSlot` plus the Range blob. Maps stay non-nil. Each `LiveSlot.ExpiresAt` is int32 elapsed seconds on the package clock (eight-byte `{uint32,int32}` slots). Live PutMany copy-on-writes onto published (one clone, then sweep expired keys with `elapsedNow()`). Published slots are `atomic.Value` of `*publishedSlots`; lookup `Load`s and does not take `mu`. Expiry compare uses the same elapsed clock.
+- Memory: in-process COW tick/published `map[string]LiveSlot` plus the Range blob. Maps stay non-nil. Each `LiveSlot.ExpiresAt` (store TTL end) and `LiveSlot.DecisionEnd` (decision end, 0 = unknown) are int32 elapsed seconds on the package clock (twelve-byte `{uint32,int32,int32}` slots). Stream sets both to the same second; a live memo keeps `ExpiresAt` at the capped cache end and `DecisionEnd` at the LAPI decision end. Live PutMany copy-on-writes onto published (one clone, then sweep expired keys with `elapsedNow()`). Published slots are `atomic.Value` of `*publishedSlots`; lookup `Load`s and does not take `mu`. Expiry compare uses the same elapsed clock.
 - Redis: import `github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis` at `v1.0.7`. Prefix is `SessionHex` (cursor), not live `IdentityHex`. Logical keys are the client IP, header-scope key, and `range-index`. Writer plus optional readers; `nextReader` never retries the writer. MSetEX/DEL are void. Do not re-patch `vendor/.../iplookup` (Contains RLock and IPv4 four-byte walk are upstream).
 - Same SessionHex → same Store. Redis off: leftover host/password/database/read hosts do not fork SessionHex. Redis on: the whole Redis set is in SessionHex (read hosts sorted), so a Redis change is a new store. `createdBy` is write-once metadata, not a `New`-fail lock.
 - `streamReady` / `streamPollInFlight` stay on the store across Client reincarnation. Do not zero them in `lapi.New`. Stream skip is `TryBeginStreamPoll` (`core_plugin_lapi_stream-single-flight.md`).
@@ -53,7 +61,7 @@ Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx
 - Stream apply calls Store `BeginTick` / `DeleteMany` / `PutMany` / `PublishTick(ElapsedNow())` / `ApplyRangeBatch` (`core_plugin_lapi_stream-apply.md`). Memory `PublishTick(0)` skips expiry sweep; non-zero `now` drops tick slots where `ExpiresAt > 0 && ExpiresAt <= now`, then recounts `ActiveCounts` from packed origin id and family on the published map. Redis tick methods are no-ops and ignore `now`; Redis PutMany is MSetEX by TTL in `PutManyChunk` batches. Redis `ActiveCounts` is empty.
 - Snapshot origin×family counts with `Store.ActiveCounts` at usage-metrics POST. Do not store `usageMetricKey` or LAPI item JSON in decisionstore. `ApplyRangeBatch` is omitted from the walk. Redis does not support this gauge.
 - Captcha grace is the gate cookie (`core_plugin_middleware_captcha-gate.md`), not store keys.
-- Origin intern is a `pkg/intern.Table` on the memory engine. `OriginID` / `OriginName` forward to it. `Name` takes `RLock`. Resolve origin only on drop. Scenario intern is a second table on that same engine. Only memory constructs both tables. Redis does not intern. Pass raw LAPI scenario on `Decision.Scenario` (empty is intern id 0). Stream `streamPutItem` copies `item.Scenario`; live `memoLive` Puts the live pick's scenario. Origin stays `MetricsOrigin`. Do not grow `LookupRemediation` with a scenario id. Tests read interned names with `ScenarioNameForTest`. Lists intern twice (`lists:<name>` on origins, raw name on scenarios). Memory pack saturates origin ids above 4095. Redis Put and Range stay `KindOriginString`; intern ids are process-local.
+- Origin intern is a `pkg/intern.Table` on the memory engine. `OriginID` / `OriginName` forward to it. `Name` takes `RLock`. Resolve origin only on drop. Scenario intern is a second table on that same engine. Only memory constructs both tables. Redis does not intern. Pass raw LAPI scenario on `Decision.Scenario` (empty is intern id 0). Stream `streamPutItem` copies `item.Scenario`; live `memoLive` Puts the live pick's scenario. Origin stays `MetricsOrigin`. Do not grow `LookupRemediation` with a scenario id. Tests read interned names with `ScenarioNameForTest`. Lists intern twice (`lists:<name>` on origins, raw name on scenarios). Memory pack saturates origin ids above 4095. Redis Put writes the Redis slot value; Range stays `KindOriginString`; intern ids are process-local.
 - `Store.Close()` logs `crowdsec decision store closed` then drains Redis idle pools. Memory Close is a no-op drain. Call Close only from the store’s reclaim Close hook. Safe to call more than once on a real Redis store. Do not Close a nil `*Store`.
 - Install log-only Sleep/Wake (`crowdsec decision store sleeping` / `waking`). They MUST NOT drain Redis or drop maps. Create logs `crowdsec decision store started`. `reclaim_put|orphan|reclaim|dispose` stay DEBUG.
 
@@ -62,7 +70,7 @@ Open a DecisionStore with `lapi.OpenDecisionStore` on the same Traefik `New` ctx
 ```go
 store, err := lapi.OpenDecisionStore(ctx, cfg, log, name)
 lapiClient, err := lapi.New(cfg, log, pluginVersion, store)
-kind, origin, originID, err := lapiClient.LookupRemediation(remoteIP, ipAddr, scopes)
+kind, origin, originID, decisionLeft, err := lapiClient.LookupRemediation(remoteIP, ipAddr, scopes)
 ```
 
 ## Key files
@@ -84,6 +92,9 @@ kind, origin, originID, err := lapiClient.LookupRemediation(remoteIP, ipAddr, sc
 - `lapi.Client.Close` / `Sleep` must not Close the shared store. Sleep and Wake keep the DecisionStore warm.
 - Stream store-write TTL is `int64(duration.Seconds())` with no clamp; a sub-second CrowdSec duration becomes `0`.
 - Live and none writes use `liveCacheTTL` (substitute `defaultDecisionSeconds` when duration is empty). Stream must not use `liveCacheTTL`.
+- The live memo `DurationSec` is the capped `liveCacheTTL`; `DecisionDurationSec` is the full LAPI duration (0 on a clean `f` memo). Stream sets both to the parsed duration. A Put with `DecisionDurationSec` 0 stores no end, so its lookup returns time left 0.
+- Each engine turns the end into time left on its own clock at lookup: memory `DecisionEnd - elapsedNow()`, Redis `time.Unix(end, 0).Sub(now)`. A non-positive result is 0. Callers never see an elapsed or Unix value.
+- The Redis end is wall-clock Unix because replicas share the value; the elapsed clock is per process. Replicas can disagree by their clock skew; an end already past on the reading replica gives 0, never a negative.
 - After `Close()`, Redis Get/MGET/SET/DEL/MSetEX surface `store:unreachable` and must not open a new TCP connection.
 - Do not copy `SimpleRedis` by value after `New`. Dial 2s and command 1s (not utilities zero-Config defaults).
 - Memory expiry is elapsed-only: wall Unix in `PublishTick` or lookup would treat every slot as expired after stream apply.
