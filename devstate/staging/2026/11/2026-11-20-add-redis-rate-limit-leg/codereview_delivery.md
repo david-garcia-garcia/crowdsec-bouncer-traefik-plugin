@@ -2,45 +2,56 @@
 
 ## Motivation
 
-The plugin's legs answer CrowdSec decisions (LAPI), request inspection (AppSec, ModSec), and its own `bouncerActionRules`. None of them limits how often one client, token, or tenant calls a route. The owner wants this middleware to be the single edge WAF, so a rate limit belongs in it as another leg, not in a separate middleware.
+The owner wants one middleware to be the whole edge WAF: LAPI decisions, AppSec, captcha, and ModSec are already legs of it, shared between routers under an instance name. A cap on how often a client calls a route is the missing piece. Today it has to come from Traefik's own `rateLimit` middleware, a second middleware on every router, which counts each middleware on one source (the client address, one header, or the host). It cannot say "5 POSTs a minute per IP on `^/login$`, 300 a minute per tenant taken from `^/t/([^/]+)/`, 1000 a minute per /24 as a dry run" in one place, and it reports nothing to CrowdSec.
 
-The gap has two parts. First, nothing counts requests. A client can send `POST /login` as fast as it likes. Every one of those requests reaches AppSec, ModSec, and the backend until CrowdSec has read the logs and issued a decision. Second, the ask names two properties that a per-process counter cannot give. The counters must be shared through Redis, so that a limit of 5 per minute stays 5 when several Traefik replicas serve the same middleware. Buckets must also be named, and each must set two things apart: which requests count (method, path, host, header, cookie) and what the counter is per (client IP or network, header, cookie, query parameter, part of the path, host, method).
+The owner runs several application topologies with the same buckets. Without a shared policy, each router repeats the whole bucket list, Redis settings, status code, and failure behaviour, and an edit has to be made on every copy. Each application still needs its own budget: a client that uses up its limit on `api` must not lose its budget on `admin`.
 
-If this stays open, operators of this plugin have no way to cap request rates from it. They either run a second middleware outside the WAF pipeline, whose counts do not respect this plugin's trusted clients, action rules, or verdict header, or they let floods through to the inspection legs and the backend.
+One answer per limit is not enough either. A hard 429 on a soft limit blocks humans who browse fast. The owner wants a softer step first: over 300 requests a minute a client gets a captcha it can solve, and only over 1200 a minute does it get a 429. Requests from server-to-server API routes, which cannot solve a captcha, must still hit a limit.
 
-Priority: P2 — real operator pain (no rate limit in the edge WAF), with a workaround outside the plugin.
+Adding a fifth shared leg by hand would copy, once more, the per-leg wiring that LAPI, AppSec, captcha, and ModSec each repeat in `plugin.go` (prepare, open, claim with a hand-written rollback list, subscribe, Watch) and on `Bouncer` (bound value, received pointer, seen flag, instance name, receive trio). That debt was recorded with the instruction to propose a shared leg unit before the next leg.
+
+The counter library is in the pinned utilities module (v1.0.7) but not vendored there, and that tag still has the stale-previous-window and EXPIRE-not-retried defects, so the leg cannot be built on the current pin.
+
+Priority: P2 — real operator pain (no distributed, multi-bucket rate limit or shared policy in the WAF middleware) with a workaround in Traefik's own `rateLimit` middleware.
 
 ## Implementation
 
-A new package, `pkg/ratelimit`, holds the leg. Its Redis-backed counter is the `windowcounter` sliding window from `traefik-middleware-utilities`. That package is now vendored at the `v1.0.7` already pinned in `go.mod`, with no module bump. `plugin.New` opens the counter only when `rateLimitEnabled` is true, through `reclaim.OpenWithHooks`. The counter is keyed on the middleware name plus the Redis host, password, database, and sync rate, so routers of one middleware with the same settings share one counter. The counter's Sleep, Wake, and Close hooks follow the reclaim lifecycle, and Close also closes the Redis client. Opening it does not dial Redis. An unreachable Redis is a request-time error, not a startup failure. The leg has no instance name, alias, or Watch. A failed `New` releases the holder. The counter reaches the router through `Bouncer.AttachRateLimit` before the handler is returned.
+The utilities module moves from v1.0.7 to v1.0.10, which vendors `windowcounter` (the Redis sliding-window counter, with the defects fixed and a `Retry-After` it computes itself). `backendbackoff` dropped the context from `Allow`, so the admission gate now checks `ctx.Err()` itself before calling it.
 
-`bouncer.New` compiles the buckets once with `ratelimit.NewBucketSet`. The bucket predicates are the `bouncerActionRules` predicates (`httprule.Rule`, RE2), written flat on the bucket row. They compile through a new `httprule.NewWithCatchAll`, so a bucket with no predicate matches every request. Bucket names use the same rules as action-rule names (the shared `httprule.CompileRowName`: trimmed, non-empty, no colon, unique). The window must be a whole number of seconds and at least 1s. `requests` must be at least 1. Each key part is checked for a known source, a `name` where one is required, an IP prefix (allowed on `ip` only), and a `pattern` with a capture group. `algorithm: tokenBucket`, `burst`, bucket `action: captcha`, and `rateLimitStore` other than `redis` fail validation with a "not supported in this version" error, so Traefik's decode cannot drop them silently. `ValidateParams` checks rate-limit settings only when the leg is enabled.
+First, a refactor with no behaviour change. LAPI, AppSec, captcha, and ModSec move onto one `publishedLeg` table in `plugin.go`. Each entry holds plain values and funcs: group, enabled, instance name, prepare, open, ownership key, the empty value for `Watch`, receive, and subscribe. `New` loops over that table to prepare, open (`ClearPublisher` when the flag is off), claim, and subscribe. A failed claim clears every earlier enabled leg, the same lists as before. On `Bouncer`, one non-generic `legBinding` replaces the per-leg field groups. It keeps the last traced incarnation as a string, because Yaegi v0.16.1 cannot run generics or a binding with an `any` field. `bouncer.New` takes a `Subscriptions` value instead of four booleans. A new root test pins the `crowdsec bouncer bound|unbound` attributes and the claim rollback order for every leg. A Yaegi test runs the binding shapes.
 
-On the request path, a new `serveRateLimit` step runs after `serveLAPI` and before `serveAppSec`, which comes before `serveModSec`. That means trusted clients, action-rule bans, and requests LAPI already banned or challenged are never counted. One 250ms context covers every bucket and every Redis command of the step. The Redis client has a 200ms dial timeout and a pool of 8. `Charge` walks the matching buckets in list order:
+The rate limit is the fifth entry. `rateLimitEnabled` now means *own*. The owner fills an omitted `rateLimitInstanceName` with its Traefik name. It opens a `ratelimit.Client` that holds the Redis counter, the compiled bucket set, and the policy (failure action, status code, `Retry-After` switch), and publishes it as `alias:ratelimit:<name>`. The ownership key hashes the Redis settings and the whole policy, so editing a bucket opens a new Client, while Redis counts of buckets that kept their names survive. A router with `bouncerEnabled` and the instance name subscribes. It reads no `rateLimit*` setting of its own. If the policy is not published, the router lets the request through.
 
-- It reads the key parts. The client IP comes from the resolved address, masked by the new `ip.MaskPrefix`. The host comes from the now-exported `httprule.RequestHostname`. A missing value skips the bucket, including its `final`.
-- It hashes the parts into `rl:<middleware>:<bucket>:<16 hex of SHA-256>`, so raw header, cookie, or query values never reach Redis.
-- It counts the hit, then compares. A denied hit still counts.
+`serveRateLimit` runs after the LAPI step and before AppSec. It loads the bound Client on each request and walks the buckets inside a 250ms budget, keyed `rl:<subscriber middleware name>:<bucket>:<hash>`, so each router keeps its own count. The bucket conditions reuse the `httprule` predicates of `bouncerActionRules`, set directly on the bucket row. Key parts come from IP or network prefix, header, cookie, query, host, path, or method, each with an optional capture pattern. The walk works like this:
 
-The first `deny` bucket over its limit stops the walk. It answers through `handleBanStatusServeHTTP` with `rateLimitStatusCode` (default 429), with `Retry-After` set to the seconds until the bucket's current window ends (at least 1). The verdict header is `ban:ratelimit:<bucket>`: `formatRemediationHeader` now gives a third field to reason `ratelimit` as well as to `lapi`, with CR, LF, and TAB stripped. A drop is recorded under `plugin:ratelimit:<bucket>`. If a `captcha` action rule also matched, a WARN says it lost. A `log` bucket over its limit only logs INFO `crowdsec bouncer rate limit exceeded`. `final: true` stops after that bucket.
+- A `ratelimit` bucket over its limit answers at once: `rateLimitStatusCode`, `Retry-After`, `ban:ratelimit:<bucket>`.
+- A `captcha` bucket over its limit is kept, and the walk goes on, so a `ratelimit` bucket stacked after it still wins.
+- A `log` bucket over its limit only logs at INFO.
+- A counter error applies the failure action. With the default buffered sync, this happens only after the step budget runs out.
 
-The first counter error stops the walk and applies `rateLimitFailureAction`:
+The captcha pieces are decided on the subscribing router:
 
-- `passthrough` (the default) continues the request.
-- `ban` serves the ban page with `bouncerRemediationStatusCode` and the header `ban:ratelimit-failure`.
-- `captcha` honours `bypassCaptcha` and falls back to a ban when the router has no captcha.
+- A client holding a valid gate is not counted by `captcha` buckets.
+- When a `bypassCaptcha` rule matches, or the router has no usable captcha, a `captcha` bucket gives its `ratelimit` answer. An ERROR is logged once per bind when the router has no captcha subscription, and debounced to once every 5s when its captcha is unusable. Every such request also logs at DEBUG.
+- The captcha page's own requests (custom-provider widget assets, and form POSTs that carry the challenge marker) are never charged. On a router without AppSec, that form POST used to reach the application without anyone checking the answer, so the captcha could never be solved. When the policy can answer with a captcha, the router's captcha gate now validates the form itself: a right answer gets a 302 with the gate cookie, a wrong one gets the captcha page again with `captcha:ratelimit`.
 
-Failure drops are recorded under `plugin:ratelimit_failure`. A new action token, `bypassRateLimit`, sets `SkipRateLimit` in `ActionSet.Fold`, under the same ambiguous-path guard as the other skip tokens. `bypass` does not skip the rate limit.
+The startup check for captcha readiness is gone, because the policy lives on the owner and the captcha on the subscriber. A new `bypassRateLimit` action-rule token skips only this leg.
+
+Drops are recorded under `plugin:ratelimit:<bucket>` (`ban`, or `captcha` for the challenge page), under `plugin:ratelimit` for the gate answering a form, and under `plugin:ratelimit_failure` for the failure action.
 
 Proof:
 
-- Unit tests in `pkg/ratelimit`, `pkg/bouncer`, `pkg/configuration`, `pkg/httprule`, `pkg/ip`, and the plugin root.
-- A Yaegi test of open, charge, and close.
-- `realredis` Go tests against Dragonfly, which CI's realredis job and `make test_realredis` now run.
-- A real-stack Pester file on Traefik's file provider. It covers deny with `Retry-After`, per-IP separation, the `bypassRateLimit` health path, the cscli drop under `plugin:ratelimit:login`, a log bucket, and an unreachable Redis with failure actions `passthrough` and `ban`.
+- Unit tests for each package.
+- Yaegi tests for the rate-limit Client and the leg binding.
+- `realredis` tests on Dragonfly for `pkg/ratelimit`, added to the Makefile target and CI.
+- Real-stack Pester for:
+  - single-middleware buckets (`rate_limit.Tests.ps1`)
+  - one owner shared by two subscribers with separate budgets (`rate_limit_shared.Tests.ps1`)
+  - captcha, solve, then hard 429 on stacked buckets, plus the router-without-captcha and `bypassCaptcha` cases (`rate_limit_captcha.Tests.ps1`)
 
 ## What this changes
-**Operators.** A new opt-in leg: set `rateLimitEnabled: true` and add `rateLimitBuckets`; you can also set `rateLimitRedisHost` (default `redis:6379`, does not fall back to `lapiRedisHost`), `rateLimitRedisPassword`/`rateLimitRedisPasswordFile`, `rateLimitRedisDatabase`, `rateLimitSyncRate` (default `200ms`, `0` = exact), `rateLimitFailureAction` (default `passthrough`), `rateLimitStatusCode` (default 429), `rateLimitResponseHeaders`, the `bypassRateLimit` rule token, and watch the new header values `ban:ratelimit:<bucket>`, `ban:ratelimit-failure`, `captcha:ratelimit-failure` and drop origins `plugin:ratelimit:<bucket>`, `plugin:ratelimit_failure`; the bucket list is proven on the file provider only.
+
+**Operators.** New middleware settings turn on a Redis-backed rate limit and share it by instance name: `rateLimitEnabled`, `rateLimitInstanceName`, `rateLimitRedisHost`/`Password`/`PasswordFile`/`Database`, `rateLimitBuckets`, `rateLimitSyncRate`, `rateLimitFailureAction`, `rateLimitStatusCode`, `rateLimitResponseHeaders`, and `rateLimitStore`, plus a `bypassRateLimit` action-rule token; watch for the new verdict headers (`ban:ratelimit:<bucket>`, `captcha:ratelimit:<bucket>`, `*:ratelimit-failure`), the `plugin:ratelimit*` drop origins, INFO `crowdsec bouncer rate limit exceeded`, and ERROR `crowdsec bouncer rate limit captcha unavailable`.
 **Admin users.** None.
-**Developers.** New package `pkg/ratelimit` (`BucketRule`, `KeyPart`, `Counter`, `Open`, `OwnershipKey`, `StepBudget`), new exports `httprule.CompileRowName`, `httprule.NewWithCatchAll`, `httprule.RequestHostname`, `ip.MaskPrefix`, `lapi.OriginPluginRateLimit*`, `Bouncer.AttachRateLimit`, `configuration.RateLimitSyncRateDuration`, a vendored `windowcounter`, and `ServeHTTP` now runs the rate-limit step between LAPI and AppSec.
-**End users.** On routes where an operator enables a `deny` bucket, a client over the limit now gets the ban page with HTTP 429 (or the configured status) and a `Retry-After` header.
+**Developers.** `bouncer.New` now takes a `bouncer.Subscriptions` value instead of four subscription booleans, and a new published leg is one `publishedLeg` entry in `plugin.go` bound through `legBinding` (no generics, for Yaegi), not hand-written switches and fields.
+**End users.** A client over a bucket's limit now gets HTTP 429 with `Retry-After` on the ban page, or the router's captcha page, which it can solve to keep going until a hard `ratelimit` bucket stops it.

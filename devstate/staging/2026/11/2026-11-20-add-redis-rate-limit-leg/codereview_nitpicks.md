@@ -1,49 +1,74 @@
 # Nitpicks
 
-1. [hard] Clear conditions — `pkg/ratelimit/charge.go:66` — `if !allowed` appends to `verdict.Exceeded` (log buckets) only because the deny branch above returned; the reader must know the bucket action enum to see that this is the log-bucket case
-   Fix: `if !allowed && bucket.action == ActionLog` (compileBucketAction at `pkg/ratelimit/bucket_set.go:118` only yields ActionDeny or ActionLog, so behaviour is unchanged)
+1. [hard] Name for the scope — `pkg/bouncer/bouncer_serve_ratelimit.go:40` — `serveRateLimit` holds two leg clients and names only one of them: `client` (rate limit) beside `captchaClient`, so `buckets.Charge(ctx, client, …)` and the `client == nil` guard make the reader check which client is meant; the sibling serve methods name the leg (`lapiClient`, `appsecClient`)
+   Fix: Rename the local to `rateLimitClient` in `serveRateLimit`, and the parameter `client *ratelimit.Client` of `answerRateLimitChallengeForm` (line 95) to `rateLimitClient`, because that body also sends the request to the captcha gate
    Status: done
-   Argument: `charge.go`: `if !allowed && bucket.action == ActionLog`.
+   Argument: `client` renamed `rateLimitClient` in `serveRateLimit` and `answerRateLimitChallengeForm` (2a196881).
    Quote:
-   ```go
-   if !allowed && bucket.action == ActionDeny {
-       verdict.DenyBucket = bucket.name
-       verdict.RetryAfter = retryAfterAt(set.now(), bucket.window)
-       return verdict
-   }
-   if !allowed {
-       verdict.Exceeded = append(verdict.Exceeded, ExceededBucket{Name: bucket.name, Requests: bucket.requests, Window: bucket.window})
-   }
    ```
-2. [hard] Name for the scope — `pkg/ratelimit/zzz_yaegi_test.go:40` — the interpreted program's helper is named `fail`, a mood verb; its job is to print the message and exit the program with status 1
-   Fix: Rename to `exitWithFailure` (or `printAndExit`) and update its call sites in `main`
+   client := b.loadedRateLimit()
+   if client == nil || match.SkipRateLimit {
+   	return false
+   }
+   captchaClient := b.usableCaptcha()
+   ...
+   verdict := buckets.Charge(ctx, client, b.name, req.Request, req.IPAddr(), gateCleared)
+   ```
+2. [hard] Name for the scope — `pkg/ratelimit/charge.go:45` — `Charge` uses the bouncer's term for its new parameter (`gateCleared`, "holds this router's valid captcha gate"). Inside `pkg/ratelimit` this body only uses it to skip captcha buckets, and the package has no gate
+   Fix: Rename the parameter to `skipCaptchaBuckets` (or `captchaSolved`) in `Charge` and its doc. The caller's local `gateCleared` in `serveRateLimit` stays and is passed as the argument
    Status: done
-   Argument: Yaegi program helper renamed `exitWithFailure`, five call sites updated.
-3. [hard] Linear coding — `pkg/ratelimit/key.go:34` — `queryValues` nests the parse under `if !source.queryParsed` and again under `if source.httpReq.URL != nil`, returning at the bottom
-   Fix: Guard `if source.queryParsed { return source.query }`; set `queryParsed`; guard `if source.httpReq.URL == nil { return nil }`; then parse and return at the left margin
-   Status: done
-   Argument: `queryValues` uses early-return guards; parse at the left margin.
+   Argument: `Charge` parameter renamed `skipCaptchaBuckets` with its doc; the caller keeps `gateCleared` (2a196881).
    Quote:
-   ```go
-   func (source *keySource) queryValues() url.Values {
-       if !source.queryParsed {
-           source.queryParsed = true
-           if source.httpReq.URL != nil {
-               source.query = source.httpReq.URL.Query()
-           }
-       }
-       return source.query
+   ```
+   func (set *BucketSet) Charge(ctx context.Context, counter Counter, middlewareName string, httpReq *http.Request, clientIP net.IP, gateCleared bool) Verdict {
+   ...
+   		// A solved client is not counted by captcha buckets.
+   		if gateCleared && bucket.action == ActionCaptcha {
+   			continue
+   		}
+   ```
+3. [hard] Name for the scope — `pkg/ratelimit/charge.go:91` — new helper `wholeSecondsAtLeastOne` uses the placeholder parameter `d`, but the doc and its only caller pass the counter's RetryAfter
+   Fix: Rename `d` to `retryAfter`
+   Status: done
+   Argument: `d` renamed `retryAfter` (2a196881).
+   Quote:
+   ```
+   func wholeSecondsAtLeastOne(d time.Duration) time.Duration {
+   	if d <= time.Second {
+   		return time.Second
+   	}
+   	return (d + time.Second - 1).Truncate(time.Second)
    }
    ```
-4. [judgement] Name for the scope — `pkg/bouncer/remediation_header.go:52` — `headerThirdField` and the local `third` (line 44) name the value by its position in `kind:reason:third`, not by its role (the reason's detail: encoded metrics origin for lapi, bucket name for ratelimit)
-   Fix: Rename to `headerReasonDetail` and the local to `detail`
-   Status: skipped
-   Argument: judgement: cosmetic rename across the header helper and its tests; the doc comment already states the role per reason.
-5. [judgement] Linear coding — `pkg/httprule/set.go:131` — the edited gate prepends `!allowCatchAll` to five clauses that are one concept (every predicate is any), so the reader re-derives "catch-all rule" from the clause list
-   Fix: `matchesEveryRequest := methodAny && pathRe == nil && hostRe == nil && len(headers) == 0 && len(cookies) == 0`, then `if matchesEveryRequest && !allowCatchAll`
-   Status: skipped
-   Argument: judgement: the five clauses predate this change, which only added the flag; outside the lines this ticket owns.
-   Note:
+4. [hard] Name for the scope — `pkg/bouncer/leg_binding.go:35` — in `traceBinding`, `current` and `previous` are incarnation strings, not Clients. The block comments still say "Release the previous Client" and "Bind the new Client", so `current == ""` and `previous != ""` read as nil checks on a Client. The reader has to know that an empty incarnation stands for nil
+   Fix: Rename to `currentIncarnation` and `previousIncarnation`, keeping the stem of the field `tracedIncarnation`
+   Status: done
+   Argument: `current`/`previous` renamed `currentIncarnation`/`previousIncarnation` in `traceBinding` (2a196881).
+   Quote:
    ```
-   The five clauses predate this change; the diff only added !allowCatchAll to that line.
+   func (b *Bouncer) traceBinding(binding *legBinding, current string, onBind func()) {
+   	...
+   	previous := binding.tracedIncarnation
+   	binding.tracedIncarnation = current
+   	...
+   	// Release the previous Client, if any.
+   	if previous != "" && previous != current {
+   ```
+5. [hard] Clear conditions — `pkg/bouncer/leg_binding.go:46` — `previous != current` in the release guard can never be false at that point. When `traceSeen` is true and `current == tracedIncarnation`, the method already returned. When `traceSeen` is false, `previous` is `""` and the first clause already fails. The extra clause sends the reader looking for a case that does not exist
+   Fix: `if previous != "" {` (the same behaviour, shown by the early return above it)
+   Status: done
+   Argument: Release guard is now `if previousIncarnation != ""` with a comment that the same incarnation returned above (2a196881).
+   Quote:
+   ```
+   	if binding.traceSeen && current == binding.tracedIncarnation {
+   		return
+   	}
+   	previous := binding.tracedIncarnation
+   	binding.tracedIncarnation = current
+   	binding.traceSeen = true
+
+   	// Release the previous Client, if any.
+   	if previous != "" && previous != current {
+   		b.traceBouncerBinding(false, binding.leg, binding.instanceName, previous)
+   	}
    ```

@@ -1,27 +1,30 @@
 # Test coverage
 
-1. [hard] Edge case untested — `pkg/ratelimit/key.go:69` — an empty capture group (pattern matches, group 1 is "") is special-cased as a missing value (spec: "an empty value … SHALL skip the bucket"), but no key or charge test hits it; the only pattern-miss case (`pkg/ratelimit/zzz_key_test.go:55`) takes the `len(groups) < 2` arm
-   Quote:
-   ```
-   if len(groups) < 2 || groups[1] == "" {   // key.go:69
-   {From: KeyFromPath, Pattern: "^/u/([^/]+)/"},   // zzz_key_test.go:55, no match, never an empty group
-   ```
-   Fix: Add a key case such as `{From: path, Pattern: "^/t/([^/]*)/"}` on `/t//x` and assert the part reports missing (bucket not charged)
+1. [hard] Assertion does not prove the job — `pkg/bouncer/zzz_servehttp_gaps_test.go:126` — the leg-table refactor moved LAPI's stream-scope WARN into a bind hook that `ReceiveLAPI` wires (`pkg/bouncer/bouncer_leg_lapi.go:21`), but the edited test now calls `traceBinding` and passes `b.warnMissingStreamScopes` itself, so it stays green if `ReceiveLAPI` passes `nil` or another hook; no other test (unit, root, Pester) asserts `crowdsec bouncer stream scopes missing`
+   Fix: Drive `b.ReceiveLAPI(reclaim.Published{Value: client})` twice on a route with `lapiLeg.subscribed` and a header scope the client does not poll; assert exactly one WARN naming the scope, and none without header scopes
    Status: done
-   Argument: `TestCounterKey_eachSource` adds `^/t/([^/]*)/` on `/t//orders` and asserts the part is missing; mutation-checked (fails without the empty-group arm).
-2. [judgement] Edge case untested — `pkg/ratelimit/charge.go:57` — spec says an error returned with a local verdict is decided by the failure action and the local verdict is ignored; both fake counters return `allowed=true` with the error (`pkg/bouncer/zzz_rate_limit_test.go:47`, `pkg/ratelimit/zzz_charge_test.go:33`), so a Charge that honoured a local deny before the error would stay green
-   Fix: Make one fake return `false, n, err` and assert passthrough reaches the backend (and ban answers `ban:ratelimit-failure`, not `ban:ratelimit:<bucket>`)
-   Status: skipped
-   Argument: judgement: `Charge` returns on `err` before reading `allowed` (`charge.go:57`); a fake returning a local deny with the error is a guard test, not a missing outcome.
-3. [judgement] Happy path only — `pkg/bouncer/bouncer_serve_ratelimit.go:70` — failure action `captcha` returns `handleCaptchaKindServeHTTP`'s result so a valid gate cookie continues to AppSec (spec: "A valid gate cookie lets the request continue"); `TestRateLimit_failureActions` covers challenge, bypassCaptcha, and downgrade, not the cleared-gate arm
-   Fix: Add a failure-captcha case with a gate cookie that `Check` accepts and assert `next` is called with no remediation header and no drop
-   Status: skipped
-   Argument: judgement: the cleared-gate arm is the shared `handleCaptchaKindServeHTTP` return, not code this leg adds; a rate-limit case for it is an extra guard, left for a later pass.
-4. [judgement] Happy path only — `pkg/ratelimit/client.go:85` — the `Sleep`/`Wake` reclaim hooks (flush buffered hits when the last holder leaves, restart the flush timer on rebind within grace) are never asserted; every test runs `reclaim.ResetForTestWith(0)` and checks only share, new-on-change, and Close
-   Fix: With a non-zero grace, cancel the holder ctx, Open again, and assert the same Client is returned and still counts (or drop it if the realredis buffered test is meant to own it)
-   Status: skipped
-   Argument: judgement: Sleep/Wake delegate to the vendored limiter in one line each; a non-zero-grace reclaim test is an extra guard, left for a later pass.
-5. [judgement] Weak assertion — `pkg/ratelimit/key.go:111` — parts are joined with NUL so `("a","bc")` and `("ab","c")` hash apart (design 7, spec "joined with a NUL byte"); every key test uses one part or a missing part, so changing the separator to "" stays green
-   Fix: Add a two-part key case asserting `("a","bc")` and `("ab","c")` give different Redis keys
-   Status: skipped
-   Argument: judgement: a guard on an internal format choice (design 7), not a ticket outcome; left for a later pass.
+   Argument: TestReceiveLAPI_* now drive `b.ReceiveLAPI(reclaim.Published{Value: client})` on a route that subscribes and has received nothing; mutation check: passing a nil hook in ReceiveLAPI fails the WARN test (2a196881).
+   Quote:
+      ```
+      // pkg/bouncer/bouncer_leg_lapi.go:20 (production)
+      func (b *Bouncer) ReceiveLAPI(published any) {
+      	b.receiveBinding(&b.lapiLeg, published, func() string { return b.loadedLAPI().Incarnation() }, b.warnMissingStreamScopes)
+      }
+      // pkg/bouncer/zzz_servehttp_gaps_test.go:126 (test; was b.receiveLAPI() before this round)
+      b.traceBinding(&b.lapiLeg, client.Incarnation(), b.warnMissingStreamScopes)
+      b.traceBinding(&b.lapiLeg, client.Incarnation(), b.warnMissingStreamScopes)
+      ```
+2. [hard] Edge case untested — `pkg/admission/admission.go:88` — the utilities bump (backendbackoff v1.0.9 `Allow` lost its context) moved the finished-request early exit into `Gate.Admit`; no test calls `Admit` (or an AppSec/ModSec query) with a context that is already cancelled, so deleting the branch keeps every test green, and a cancelled request could then be admitted as the half-open probe while the leg backs off
+   Fix: In `pkg/admission/zzz_admission_test.go`, call `Admit` with a cancelled context on a gate (also one backing off) and assert `context.Canceled`, a ticket that is not admitted, and that the next request still gets the probe
+   Status: done
+   Argument: Added TestGate_canceledRequestDoesNotTakeTheProbe (trip, cooldown elapsed, Admit with a canceled ctx returns context.Canceled and no admission, next request gets the probe); mutation check: removing the ctx.Err branch fails it (2a196881).
+   Quote:
+      ```
+      // pkg/admission/admission.go:87 (production)
+      // backendbackoff v1.0.9 dropped the context from Allow; keep the early exit on a finished request.
+      if err := ctx.Err(); err != nil {
+      	return Ticket{}, err
+      }
+      // tests grepped: pkg/admission/zzz_admission_test.go Admit(context.Background()) only;
+      // appsec/modsecurity cancel tests cancel after the hop started (past Admit)
+      ```

@@ -22,3 +22,5 @@
 - created knowledge/debt/2026-11-21-single-reading-path-spec-names-bypassratelimit.md
 - created knowledge/debt/2026-11-21-rate-limit-captcha-marker-flood.md
 - created knowledge/debt/2026-11-21-instance-slots-replace-trace-scenario.md
+- created knowledge/debt/2026-11-21-rate-limit-marker-post-uncharged-without-gate.md
+- created knowledge/debt/2026-11-21-rate-limit-unpublished-owner-warn.md

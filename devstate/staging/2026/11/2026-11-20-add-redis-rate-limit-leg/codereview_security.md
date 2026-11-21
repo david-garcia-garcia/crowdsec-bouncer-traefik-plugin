@@ -1,14 +1,40 @@
 # Security
 
-1. [judgement] Client-controlled trust — `pkg/ratelimit/charge.go:69` — `final` works like a skip of every later bucket, but a bucket's `path` predicate is matched as written (no single-reading check), so a client can send an encoded path that Traefik forwards (e.g. `/static/..%2Flogin`, decoded `URL.Path` `/static/../login`) into a `final` path bucket and step out of a later catch-all or login bucket; `bypassRateLimit` drops its skip on such a path, `final` does not, and README.md:919 / core_plugin_ratelimit.md:61 say a bucket without `path` "is not affected", which is false when a `final` path bucket comes before it
-   Fix: Ignore `final` (keep charging later buckets) when the bucket has a `path` predicate and `httprule` finds the path ambiguous, as `Fold` does for leg skips; or state the gap in README limits and the devdoc
-   Status: done
-   Argument: Applied the documentation alternative: README limits and `core_plugin_ratelimit.md` now state that an encoded path can match a `final` path bucket and skip later buckets. The code alternative (ignore `final` on an ambiguous path) is a behaviour change, not taken unattended.
-2. [judgement] Client-controlled trust — `pkg/ratelimit/key.go:80` — an `ip` key part without `ipv6Prefix` counts the full /128, so an IPv6 client rotating addresses inside its own /64 gets a fresh counter on every request and is never limited; the README's leading example (`README.md:868`, bucket `login`, `from: ip`) has no `ipv6Prefix`, and the README limits list warns about header/cookie/query keys but not about this
-   Fix: Add `ipv6Prefix: 64` to the `login` example and one line in the limits list that a full IPv6 address is a per-address, not per-client, key
+1. [judgement] Client-controlled trust — `pkg/bouncer/bouncer_serve_ratelimit.go:51` — a POST carrying `crowdsec_captcha_challenge=v1` skips every bucket even when no captcha gate will answer it, so it reaches the application uncharged
+   Fix: Skip the buckets for a marker POST only when a captcha gate on this router will answer it; when `answerRateLimitChallengeForm` declines (a `bypassCaptcha` rule matched, or a policy without a captcha answer on a router with no AppSec step and no `captcha` rule for the request), charge it like any other request
    Status: skipped
-   Argument: judgement: `ipv6Prefix` is documented per key part; the example and a limits line are operator guidance, left for the docs pass.
-3. [judgement] Fail-open on deny — `pkg/bouncer/bouncer_serve_ratelimit.go:37` — every `Take` error goes to `rateLimitFailureAction` (default `passthrough`, `configuration.go:312`), and that includes `simpleredis` pool-wait errors when more than `redisPoolSize` (8, `pkg/ratelimit/client.go:27`) commands are in flight; a flood with many new keys (buffered mode: one GET per new key per window) or any flood in exact mode can then switch the limit off for every client of that middleware. The default is spec'd and documented as for an outage; the load threshold was not measured here
-   Fix: Say in README "When Redis is down" that a saturated Redis connection pool counts as a failure, and recommend `ban`/`captcha` where the limit guards abuse
+   Argument: judgement; changes the human-decided exemption for captcha-page traffic (decision 5) and the spec line "Otherwise the POST SHALL continue to the AppSec step". Needs a human decision; recorded as issues.md note `knowledge/debt/2026-11-21-rate-limit-marker-post-uncharged-without-gate.md`.
+   Quote:
+   ```go
+   if b.isCaptchaFormAnswer(req) {
+   	logger.Trace(b.log, "serveRateLimit", "ip", req.IPAddrString(), "captchaForm", true)
+   	return b.answerRateLimitChallengeForm(rw, req, match, client)
+   }
+   ```
+   Note:
+   ```
+   Source: the request body field (client). Sink: the bucket skip in serveRateLimit, then next.
+   Reachable whenever the router has a usable captcha (for example only to serve LAPI captcha decisions):
+   - Policy with only `ratelimit` buckets, router without an AppSec subscription: answerRateLimitChallengeForm
+     returns false at line 96, serveAppSec writes nothing, and the POST reaches origin with its body intact
+     (HasChallengeMarker does not consume it). Adding `&crowdsec_captcha_challenge=v1` to a form-encoded
+     login POST therefore disables a brute-force `ratelimit` bucket on POST /login.
+   - Any policy when a `bypassCaptcha` rule matches: line 96 returns false, serveAppsecCaptchaGate also
+     returns false on the bypass, and the POST reaches origin uncharged, although the README says a
+     bypassCaptcha request "get[s] the ratelimit answer of the captcha bucket instead ... so the limit still holds".
+   Distinct from the recorded follow-up 2026-11-21-rate-limit-captcha-marker-flood: that note's risk is a
+   siteverify flood while the gate answers each marker POST; here no gate answers and the protected
+   application endpoint itself is reached without being counted. The spec line "Otherwise the POST SHALL
+   continue to the AppSec step" permits it, hence judgement, not hard.
+   ```
+2. [judgement] Fail-open on deny — `pkg/bouncer/bouncer_serve_ratelimit.go:41` — a subscriber whose `rateLimitInstanceName` no owner publishes lets every request through with only a TRACE `crowdsec bouncer unbound` line, so a typo or a removed owner silently disables the limit
+   Fix: Keep the documented passthrough, but log a debounced WARN (as `logRateLimitCaptchaDowngrade` does with `logger.Debounced`) when a subscribed router serves a request with no bound rate-limit client
    Status: skipped
-   Argument: judgement: `passthrough` is the specified default (config-validation delta) and the failure action is the operator's choice; pool-wait under load was not measured.
+   Argument: judgement; the passthrough is the documented contract (spec "Missing rate-limit client charges nothing", README). A request-time WARN is new behaviour; recorded as issues.md note `knowledge/debt/2026-11-21-rate-limit-unpublished-owner-warn.md`.
+   Note:
+   ```
+   New in round 2: round 1 opened the counter on the router itself, so there was no unpublished-owner path.
+   Spec "Missing rate-limit client charges nothing" and README "When the policy is not loaded" document the
+   passthrough, so this is not hard; the gap is that nothing above TRACE tells the operator, whereas the
+   other legs apply a failure action and an unsubscribed captcha logs WARN or ERROR.
+   ```

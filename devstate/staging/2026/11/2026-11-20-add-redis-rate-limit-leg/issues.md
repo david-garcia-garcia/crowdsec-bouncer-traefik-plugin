@@ -21,3 +21,7 @@
   Why: the captcha page's own requests skip every rate-limit bucket (human decision 5), so a client that always sends the challenge marker is never charged and each marker POST costs a siteverify call.
 - [ ] note large  `knowledge/debt/2026-11-21-instance-slots-replace-trace-scenario.md`
   Why: the live instance-slots scenario "Replace A by B logs two bound lines" says no unbound line between them; the code logs unbound for A first, and the leg extraction pins the code.
+- [ ] note large  `knowledge/debt/2026-11-21-rate-limit-marker-post-uncharged-without-gate.md`
+  Why: a POST carrying the challenge marker skips every rate-limit bucket even when no captcha gate answers it (policy without a captcha answer and no AppSec, or a `bypassCaptcha` rule), so it reaches the application uncharged.
+- [ ] note large  `knowledge/debt/2026-11-21-rate-limit-unpublished-owner-warn.md`
+  Why: a subscriber whose rate-limit owner is not published passes every request with only a TRACE unbound line, so a typo or a removed owner silently disables the limit.
