@@ -45,7 +45,7 @@ Proof:
 In progress. 1 items remain.
 
 Priority: P2 — real operator pain (no rate limit in the edge WAF), with a workaround outside the plugin.
-Reviewed head: 19d6f9bf
+Reviewed head: a843ec47
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -98,7 +98,7 @@ Ticket 2026-11-20-add-redis-rate-limit-leg on branch 2026-11-20-add-redis-rate-l
 ## Explore Decisions
 | Question | Rank | Decision | By |
 | --- | --- | --- | --- |
-| Does the existing `bypass` action also skip the rate limit? | additive asked — new `bypassRateLimit` token and `SkipRateLimit` field in `pkg/httprule/action.go`; requirement semantics 5 and open decision 1 | assumed — no. Only `bypassRateLimit` skips the rate limit; `bypass` keeps meaning "skip LAPI and AppSec". The `Fold` skip guard change has 1 caller (`pkg/bouncer/bouncer.go:196`). | explore |
+| What does the rate-limit owner publish, and what is its ownership key? | additive asked — reshapes `ratelimit.Client` / `OwnershipKey` / `Open`, which round 1 of this same unmerged PR created; B-1 ("published under an instance name") and B-2 ("bucket list and the rest of the rate-limit policy live on the owner") | assumed — Options: (a) publish `*ratelimit.Client` that also carries the compiled `BucketSet` and the policy (`rateLimitFailureAction`, `rateLimitStatusCode`, `rateLimitResponseHeaders`), with that policy in the ownership key; (b) publish only the Redis counter and let each subscriber compile its own buckets; (c) keep the key on Redis settings and republish a changed policy on the same Client. Recommend (a). Why: B-2 needs the policy to travel with the published value, and (a) is the captcha precedent (`pkg/captcha/session.go` `ownershipFrom` keys every owner knob, so an owner edit opens a new Client and `SetAlias` repoints subscribers); (b) contradicts B-2; (c) mutates a Client that reclaim hands back for the same key while requests read it. Consequences: key = owner middleware name + Redis host/password/database + sync rate + bucket rows (JSON of `[]BucketRule`) + the three policy settings; a policy edit starts a new incarnation but does not reset counters (Redis keys are `rl:<subscriber>:<bucket>:<hash>` + window start, `pkg/ratelimit/key.go`, independent of the Client); renaming a bucket starts its counters at zero. | explore |
 
 
 ## Findings
@@ -122,7 +122,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 4 added / 8 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 19d6f9bf69a8f0e927081135a84dcf696520dc16 | Card must match the branch you measured |
+| Reviewed head | a843ec47cf435221095acca40972f58313844169 | Card must match the branch you measured |
 
 ### Stored data model
 - **New store**: Redis (the rate-limit Redis: `rateLimitRedisHost`, `rateLimitRedisDatabase`, `rateLimitRedisPassword`/`File`; it is a separate client from the decision-cache Redis, `plugin.go:189-207`, `pkg/ratelimit/client.go:99-113`). New key family: sliding-window hit counters.
