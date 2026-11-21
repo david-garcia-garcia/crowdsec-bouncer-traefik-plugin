@@ -105,7 +105,7 @@ func newClient(settings RedisSettings, log *slog.Logger) (*Client, error) {
 		IdleTimeout:    redisIdleTimeout,
 		DialTimeout:    redisDialTimeout,
 		CommandTimeout: StepBudget,
-		Logger:         log,
+		Logger:         debugCappedLogger(log),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("ratelimit: redis: %w", err)

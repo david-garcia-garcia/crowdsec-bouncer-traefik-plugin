@@ -1,6 +1,6 @@
 ## Why
 
-The plugin answers CrowdSec decisions (LAPI) and request inspection (AppSec), but it cannot cap how often one client, token, or tenant hits a route. Traefik's own `rateLimit` middleware keeps its counters in each Traefik process and only keys by source address or one request header. The owner wants this plugin to be the single edge WAF, with a limit that is shared across Traefik replicas through Redis and with named buckets that pick which requests count and what each counter is per.
+The plugin answers CrowdSec decisions (LAPI) and request inspection (AppSec), but it cannot cap how often one client, token, or tenant hits a route. Traefik's own `rateLimit` middleware can share its counters through Redis, but each middleware counts on one source (the client address, one request header, or the host) and has no named buckets. The owner wants this plugin to be the single edge WAF, with a limit that is shared across Traefik replicas through Redis and with named buckets that pick which requests count and what each counter is per.
 
 ## What Changes
 

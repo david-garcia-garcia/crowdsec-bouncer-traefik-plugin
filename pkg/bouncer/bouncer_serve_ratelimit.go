@@ -64,12 +64,18 @@ func (b *Bouncer) applyRateLimitFailureAction(rw http.ResponseWriter, req client
 	case configuration.FailureActionPassthrough:
 		return false
 	case configuration.FailureActionCaptcha:
-		if b.bypassesCaptcha(req, match) {
-			return false
-		}
-		return b.handleCaptchaKindServeHTTP(rw, req, configuration.ReasonRateLimit, headerReasonRateLimitFailure, lapi.OriginPluginRateLimitFailure)
+		return b.captchaRateLimitFailure(rw, req, match)
 	default:
 		b.banWarnCaptchaRule(rw, req, match, configuration.ReasonRateLimit, headerReasonRateLimitFailure, lapi.OriginPluginRateLimitFailure)
 		return true
 	}
+}
+
+// captchaRateLimitFailure serves the captcha gate for the rate-limit failure action.
+// False means a widget asset, a cleared gate, or a bypassCaptcha rule, and the caller continues.
+func (b *Bouncer) captchaRateLimitFailure(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
+	if b.bypassesCaptcha(req, match) {
+		return false
+	}
+	return b.handleCaptchaKindServeHTTP(rw, req, configuration.ReasonRateLimit, headerReasonRateLimitFailure, lapi.OriginPluginRateLimitFailure)
 }

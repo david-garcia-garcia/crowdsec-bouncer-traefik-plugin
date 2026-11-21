@@ -31,7 +31,7 @@ It is a rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github
 - **ModSecurity CRS in the same middleware.** `modsecEnabled` sends each request to an OWASP CRS sidecar after LAPI and AppSec, so one middleware is the whole edge WAF. A WAF that keeps failing is skipped for a cooldown instead of banning or slowing every request. See [ModSecurity (OWASP CRS)](#modsecurity-owasp-crs).
 - **Permanent rules with `bouncerActionRules`.** Ban, captcha, or skip checks for requests matching a path, host, method, header, or cookie, without any CrowdSec decision. For example, always show a captcha to a whole country or region by matching a country header such as `CF-IPCountry`, or skip all checks for a specific host. See [BouncerActionRules](#variables).
 - **No captcha on API routes with `bypassCaptcha`.** A `bouncerActionRules` action for requests that cannot solve a captcha, such as API calls from another server: where a captcha would be served, the request goes through. Bans still apply. See [Keep captchas off API routes](#keep-captchas-off-api-routes).
-- **Rate limit shared across Traefik replicas.** Named buckets, each with its own request match (path, host, method, header, cookie) and its own key (client IP or network, a header, a cookie, a query parameter, part of the path), count in Redis so every replica sees the same total. Traefik's own `rateLimit` middleware counts per process and keys only on the source address or one header. See [Limit how often a client calls a route](#limit-how-often-a-client-calls-a-route).
+- **Rate limit shared across Traefik replicas.** Named buckets, each with its own request match (path, host, method, header, cookie) and its own key (client IP or network, a header, a cookie, a query parameter, part of the path), count in Redis so every replica sees the same total. Traefik's own `rateLimit` middleware can also share its counters through Redis, but each middleware counts on one source (the client address, one header, or the host); this plugin adds named buckets with their own request match, keys built from several parts, log-only buckets, and drops reported to CrowdSec. See [Limit how often a client calls a route](#limit-how-often-a-client-calls-a-route).
 - **Detailed verdict header.** `bouncerRemediationHeadersCustomName` now tells not only what was done (ban or captcha) but why and from where: a CrowdSec decision and its origin (`ban:lapi:CAPI`, `ban:lapi:lists_firehol_level1`), AppSec, a rule, or an outage of LAPI or AppSec. Add it to your access logs to trace every blocked request back to its cause. The original plugin only sent `ban` or `captcha`. See [See the verdict in access logs](#see-the-verdict-in-access-logs).
 
 > [!TIP]
@@ -911,12 +911,12 @@ rateLimitBuckets:
 
 **When Redis is down.** `rateLimitFailureAction` decides: `passthrough` (default), `ban`, or `captcha`. The rate limit of one request waits for Redis 250ms at most, all buckets together.
 
-**Accuracy across replicas.** With the default `rateLimitSyncRate: 200ms`, each replica counts locally and writes to Redis every 200ms, reading a counter from Redis the first time it sees it in a window. A replica can then admit more than the limit by the hits the other replicas have not written yet. `rateLimitSyncRate: 0` sends every hit to Redis before answering: exact counts, one Redis round trip per counted request.
+**Accuracy across replicas.** With the default `rateLimitSyncRate: 200ms`, each replica counts locally and writes to Redis every 200ms, reading a counter from Redis the first time it sees it in a window. A replica can then admit more than the limit by the hits the other replicas have not written yet. `rateLimitSyncRate: 0` sends every hit to Redis before answering: exact counts, two Redis round trips per counted bucket (three on a counter's first hit in a window), one bucket after another.
 
 **Limits of this version.**
 
 - Only the sliding window on Redis. `algorithm: tokenBucket`, `burst`, `rateLimitStore: memory`, and `action: captcha` on a bucket fail at startup, and no `RateLimit-*` headers are sent.
-- A `path` condition is matched on the path Traefik passes to the plugin, as for `ban` and `captcha` rules: an encoded path can miss it (see [Keep captchas off API routes](#keep-captchas-off-api-routes), "How the path is matched"). A bucket without `path` is not affected.
+- A `path` condition is matched on the path Traefik passes to the plugin, as for `ban` and `captcha` rules: an encoded path can miss it (see [Keep captchas off API routes](#keep-captchas-off-api-routes), "How the path is matched"). An encoded path can also match a `final` bucket with a `path` condition and so skip the buckets after it, including buckets without `path`.
 - Header, cookie, and query values come from the client. A key on them limits that value, not the client: a client that changes the value gets a new counter. They also create one Redis key per distinct value; prefer sources with few values.
 - The bucket list has been tested with Traefik's file provider. Docker labels and the Kubernetes CRD may not carry a list of objects with a nested list.
 
@@ -1324,7 +1324,7 @@ Where counters are kept. Only `redis` in this version.
 How often each replica writes its local counts to Redis. `0` writes every hit before answering (exact counts). A positive value below `20ms` is treated as `20ms`.
 
 **ReclaimGraceSeconds** (int64, default `30`)
-How long a LAPI, AppSec, or ModSec connection stays open after no middleware uses it, so a Traefik config reload can reuse it instead of reconnecting. `0` closes it immediately. Only the first value loaded in the Traefik process applies.
+How long a LAPI, AppSec, ModSec, or rate-limit Redis connection stays open after no middleware uses it, so a Traefik config reload can reuse it instead of reconnecting. `0` closes it immediately. Only the first value loaded in the Traefik process applies.
 
 ### Configuration
 

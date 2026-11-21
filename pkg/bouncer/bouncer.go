@@ -140,7 +140,7 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 		name:                     name,
 		next:                     next,
 		rateLimitBuckets:         rateLimitBuckets,
-		rateLimitFailureAction:   configuration.EffectiveFailureAction(config.RateLimitFailureAction),
+		rateLimitFailureAction:   configuration.EffectiveRateLimitFailureAction(config.RateLimitFailureAction),
 		rateLimitResponseHeaders: config.RateLimitResponseHeaders,
 		rateLimitStatusCode:      config.RateLimitStatusCode,
 		remediationCustomHeader:  config.BouncerRemediationHeadersCustomName,

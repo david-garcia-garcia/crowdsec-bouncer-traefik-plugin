@@ -297,6 +297,7 @@ func TestRateLimit_failureActions(t *testing.T) {
 		wantDrop          string
 	}{
 		{name: "passthrough", action: configuration.FailureActionPassthrough, wantNext: true, wantStatus: http.StatusOK},
+		{name: "empty is passthrough", action: "", wantNext: true, wantStatus: http.StatusOK},
 		{name: "ban", action: configuration.FailureActionBan, wantStatus: http.StatusForbidden, wantHeader: "ban:ratelimit-failure", wantDrop: "ban"},
 		{name: "captcha", action: configuration.FailureActionCaptcha, captcha: true, wantStatus: http.StatusOK, wantHeader: "captcha:ratelimit-failure", wantDrop: "captcha"},
 		{name: "captcha with bypassCaptcha", action: configuration.FailureActionCaptcha, captcha: true, bypassCaptchaRule: true, wantNext: true, wantStatus: http.StatusOK},

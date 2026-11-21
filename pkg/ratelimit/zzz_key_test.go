@@ -61,6 +61,13 @@ func TestCounterKey_eachSource(t *testing.T) {
 			t.Errorf("part %+v must be missing", part)
 		}
 	}
+	// The pattern matches but its group is empty: the value is missing, not "".
+	emptyGroup := validTestBucket("b")
+	emptyGroup.Key = []KeyPart{{From: KeyFromPath, Pattern: "^/t/([^/]*)/"}}
+	emptyGroupReq := httptest.NewRequest(http.MethodGet, "http://x/t//orders", nil)
+	if _, found := testKeyOf(t, "edge", []BucketRule{emptyGroup}, emptyGroupReq, "198.51.100.7"); found {
+		t.Error("an empty capture group must be a missing value")
+	}
 }
 
 // TestCounterKey_groupsAndSeparates proves tenant capture, IPv6 /64 grouping, the fixed key of an empty

@@ -1,9 +1,12 @@
 package ratelimit
 
 import (
+	"bytes"
 	"context"
 	"log/slog"
 	"net"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -137,4 +140,69 @@ func assertTakeFailsWithinBudget(t *testing.T, client *Client) {
 	if elapsed := time.Since(started); elapsed > StepBudget+100*time.Millisecond {
 		t.Fatalf("Take took %s, budget %s", elapsed, StepBudget)
 	}
+}
+
+// TestClient_wrongPasswordLogsAtDebugOnly proves a Redis that rejects AUTH costs DEBUG lines only:
+// the simpleredis WARN and ERROR lines of each failed dial are capped at DEBUG.
+func TestClient_wrongPasswordLogsAtDebugOnly(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+	go func() {
+		for {
+			conn, acceptErr := listener.Accept()
+			if acceptErr != nil {
+				return
+			}
+			go func(conn net.Conn) {
+				defer func() { _ = conn.Close() }()
+				buf := make([]byte, 512)
+				for {
+					if _, readErr := conn.Read(buf); readErr != nil {
+						return
+					}
+					if _, writeErr := conn.Write([]byte("-WRONGPASS invalid username-password pair\r\n")); writeErr != nil {
+						return
+					}
+				}
+			}(conn)
+		}
+	}()
+	sink := &lockedLogSink{}
+	log := slog.New(slog.NewJSONHandler(sink, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	client, err := Open(context.Background(), "edge", RedisSettings{Host: listener.Addr().String(), Password: "wrong"}, log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	assertTakeFailsWithinBudget(t, client)
+	logs := sink.String()
+	if strings.Contains(logs, `"level":"WARN"`) || strings.Contains(logs, `"level":"ERROR"`) {
+		t.Fatalf("a failed dial must not log WARN or ERROR:\n%s", logs)
+	}
+	if !strings.Contains(logs, `"msg":"dial: redis:noauth"`) {
+		t.Fatalf("the library NOAUTH line must still be written at DEBUG:\n%s", logs)
+	}
+}
+
+// lockedLogSink is a log writer safe for the library goroutines that log while the test reads.
+type lockedLogSink struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (sink *lockedLogSink) Write(p []byte) (int, error) {
+	sink.mu.Lock()
+	defer sink.mu.Unlock()
+	return sink.buf.Write(p)
+}
+
+func (sink *lockedLogSink) String() string {
+	sink.mu.Lock()
+	defer sink.mu.Unlock()
+	return sink.buf.String()
 }

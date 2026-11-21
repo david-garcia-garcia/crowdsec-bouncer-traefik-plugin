@@ -37,7 +37,7 @@ func (counter *denyAfterOne) Take(ctx context.Context, key string, limit int64, 
 	return counter.hits[key] <= 1, float64(counter.hits[key]), nil
 }
 
-func fail(message string) {
+func exitWithFailure(message string) {
 	println(message)
 	os.Exit(1)
 }
@@ -50,21 +50,21 @@ func main() {
 		Key:      []ratelimit.KeyPart{{From: ratelimit.KeyFromIP, IPv4Prefix: 24}},
 	}})
 	if err != nil {
-		fail("NewBucketSet: " + err.Error())
+		exitWithFailure("NewBucketSet: " + err.Error())
 	}
 	clientIP := net.ParseIP("198.51.100.7")
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	for _, syncRate := range []time.Duration{0, 200 * time.Millisecond} {
 		client, err := ratelimit.Open(context.Background(), "yaegi", ratelimit.RedisSettings{Host: "127.0.0.1:1", SyncRate: syncRate}, log)
 		if err != nil {
-			fail("Open: " + err.Error())
+			exitWithFailure("Open: " + err.Error())
 		}
 		var counter ratelimit.Counter = client
 		ctx, cancel := context.WithTimeout(context.Background(), ratelimit.StepBudget)
 		verdict := set.Charge(ctx, counter, "yaegi", httptest.NewRequest("GET", "http://example.com/", nil), clientIP)
 		cancel()
 		if verdict.Err == nil {
-			fail("Charge against a dead address must return the counter error")
+			exitWithFailure("Charge against a dead address must return the counter error")
 		}
 		client.Close()
 	}
@@ -72,7 +72,7 @@ func main() {
 	first := set.Charge(context.Background(), fake, "yaegi", httptest.NewRequest("GET", "http://example.com/", nil), clientIP)
 	second := set.Charge(context.Background(), fake, "yaegi", httptest.NewRequest("GET", "http://example.com/", nil), clientIP)
 	if first.DenyBucket != "" || second.DenyBucket != "per-ip" || second.RetryAfter < time.Second {
-		fail("interpreted counter: want the second request denied by per-ip")
+		exitWithFailure("interpreted counter: want the second request denied by per-ip")
 	}
 }
 `

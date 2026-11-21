@@ -235,6 +235,15 @@ func EffectiveModsecFailureAction(action string) string {
 	return action
 }
 
+// EffectiveRateLimitFailureAction maps empty config to passthrough, the CreateConfig default:
+// a Redis outage lets traffic through unless the operator asks otherwise.
+func EffectiveRateLimitFailureAction(action string) string {
+	if action == "" {
+		return FailureActionPassthrough
+	}
+	return action
+}
+
 // New creates the default plugin configuration.
 func New() *Config {
 	return &Config{

@@ -8,13 +8,6 @@ import (
 	"time"
 )
 
-// Counter counts one hit on key and reports whether the sliding-window estimate is still within
-// limit per window. The hit is counted even when it is over the limit. *Client is the production
-// Counter; tests pass a fake.
-type Counter interface {
-	Take(ctx context.Context, key string, limit int64, window time.Duration) (allowed bool, estimated float64, err error)
-}
-
 // ExceededBucket is a log bucket that was over its limit for one request.
 type ExceededBucket struct {
 	Name     string
@@ -63,7 +56,7 @@ func (set *BucketSet) Charge(ctx context.Context, counter Counter, middlewareNam
 			verdict.RetryAfter = retryAfterAt(set.now(), bucket.window)
 			return verdict
 		}
-		if !allowed {
+		if !allowed && bucket.action == ActionLog {
 			verdict.Exceeded = append(verdict.Exceeded, ExceededBucket{Name: bucket.name, Requests: bucket.requests, Window: bucket.window})
 		}
 		if bucket.final {

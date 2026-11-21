@@ -32,12 +32,14 @@ type keySource struct {
 
 // queryValues parses the URL query on first use.
 func (source *keySource) queryValues() url.Values {
-	if !source.queryParsed {
-		source.queryParsed = true
-		if source.httpReq.URL != nil {
-			source.query = source.httpReq.URL.Query()
-		}
+	if source.queryParsed {
+		return source.query
 	}
+	source.queryParsed = true
+	if source.httpReq.URL == nil {
+		return nil
+	}
+	source.query = source.httpReq.URL.Query()
 	return source.query
 }
 
