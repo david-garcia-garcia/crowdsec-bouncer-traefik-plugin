@@ -1,0 +1,67 @@
+# One rate-limit owner and two subscribers, against the stack's Dragonfly (rate_limit_shared.Tests.ps1).
+# rl-shared-owner opens and publishes the rate-limit client under instance name rl-shared. It does not
+# bounce (bouncerEnabled false) and holds the whole policy: the bucket list and rateLimitStatusCode 503.
+# rl-shared-a and rl-shared-b only subscribe: each charges the owner's buckets under its own middleware
+# name, so each keeps its own budget. Exact mode (sync rate 0) so each hit is counted before the verdict.
+# The Pester file rewrites this file to remove the owner and to edit its bucket, then writes it back.
+# Subscribers log at TRACE for the "crowdsec bouncer bound|unbound" lines.
+http:
+  routers:
+    rl-shared-owner:
+      rule: PathPrefix(`/rl-shared-owner/`)
+      entryPoints: [web]
+      middlewares: [rl-shared-owner]
+      service: whoami@docker
+    rl-shared-a:
+      rule: PathPrefix(`/rl-shared-a/`)
+      entryPoints: [web]
+      middlewares: [rl-shared-a]
+      service: whoami@docker
+    rl-shared-b:
+      rule: PathPrefix(`/rl-shared-b/`)
+      entryPoints: [web]
+      middlewares: [rl-shared-b]
+      service: whoami@docker
+  middlewares:
+    rl-shared-owner:
+      plugin:
+        bouncer:
+          bouncerEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          rateLimitBuckets:
+            - name: per-ip
+              requests: "3"
+              window: 1h
+              key:
+                - from: ip
+          rateLimitEnabled: "true"
+          rateLimitInstanceName: rl-shared
+          rateLimitRedisHost: dragonfly:6379
+          rateLimitStatusCode: "503"
+          rateLimitSyncRate: "0"
+          reclaimGraceSeconds: "2"
+    rl-shared-a:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          logFormat: json
+          logLevel: TRACE
+          rateLimitInstanceName: rl-shared
+          reclaimGraceSeconds: "2"
+    rl-shared-b:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          logFormat: json
+          logLevel: TRACE
+          rateLimitInstanceName: rl-shared
+          reclaimGraceSeconds: "2"

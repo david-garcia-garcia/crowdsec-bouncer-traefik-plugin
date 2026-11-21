@@ -1,6 +1,6 @@
 # The Redis rate limit on five routers, against the stack's Dragonfly (rate_limit.Tests.ps1).
 # File provider only: the bucket list is a list of objects with a nested key list.
-# /rate-limit/ owns a LAPI client with its own key and a 10s metrics interval, so a deny
+# /rate-limit/ owns a LAPI client with its own key and a 10s metrics interval, so a ratelimit answer
 # reaches cscli as a drop; a bypassRateLimit rule exempts /rate-limit/health.
 # Sync rate 0 (exact mode) so each hit is counted in Dragonfly before the verdict.
 # /rate-limit-log/ only logs. The three -down- routers point at a port where nothing listens:

@@ -31,7 +31,7 @@ BeforeAll {
 }
 
 Describe "Redis rate limit" {
-    Context "deny bucket" -Tag "ratelimit" {
+    Context "ratelimit bucket" -Tag "ratelimit" {
         It "Should answer 429 with the counter's Retry-After and ban:ratelimit:login after the limit" {
             $ip = Get-RateLimitClientIP -HostNumber 1
             # Keep the four hits in one 1m window: wait out its last 5 seconds.
@@ -45,11 +45,11 @@ Describe "Redis rate limit" {
                 $allowed.StatusCode | Should -Be 200 -Because "request $attempt of 3 is within the limit"
                 [string]$allowed.Headers["X-Crowdsec-Remediation"] | Should -BeNullOrEmpty
             }
-            $denied = Test-HttpRequest -Endpoint "/rate-limit/login" -IP $ip -TraefikUrl $script:TraefikUrl
-            $denied.StatusCode | Should -Be 429
-            [string]$denied.Headers["X-Crowdsec-Remediation"] | Should -Be "ban:ratelimit:login"
+            $limited = Test-HttpRequest -Endpoint "/rate-limit/login" -IP $ip -TraefikUrl $script:TraefikUrl
+            $limited.StatusCode | Should -Be 429
+            [string]$limited.Headers["X-Crowdsec-Remediation"] | Should -Be "ban:ratelimit:login"
             $secondsToWindowEnd = 60 - ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() % 60)
-            $retryAfter = [int]([string]$denied.Headers["Retry-After"])
+            $retryAfter = [int]([string]$limited.Headers["Retry-After"])
             # 4 hits on a limit of 3: no admit in this window (no previous count to wait out). In the next one the
             # 4 weigh 4 x (1 - t/60), and 1 + that fits in 3 from t = 30s: Retry-After = time to window end + 30s.
             $retryAfter | Should -BeGreaterOrEqual ($secondsToWindowEnd + 29) -Because "the next admit is 30s into the next window"
@@ -82,7 +82,7 @@ Describe "Redis rate limit" {
             }
         }
 
-        It "Should count a deny as a drop under plugin:ratelimit:login in cscli" -Tag "metrics" {
+        It "Should count a ratelimit answer as a drop under plugin:ratelimit:login in cscli" -Tag "metrics" {
             $ip = Get-RateLimitClientIP -HostNumber 5
             $origin = "plugin:ratelimit:login"
             $before = Get-CscliBouncerMetricValue -Origin $origin -Name "dropped" -Unit "request"
@@ -96,12 +96,12 @@ Describe "Redis rate limit" {
                 $after = Get-CscliBouncerMetricValue -Origin $origin -Name "dropped" -Unit "request"
                 return ($after -gt $before)
             }
-            $reported.Success | Should -Be $true -Because "a rate-limit deny is a drop with the bucket origin"
+            $reported.Success | Should -Be $true -Because "a ratelimit answer is a drop with the bucket origin"
         }
     }
 
     Context "log bucket" -Tag "ratelimit" {
-        It "Should never deny and set no remediation header" {
+        It "Should never answer and set no remediation header" {
             $ip = Get-RateLimitClientIP -HostNumber 10
 
             foreach ($attempt in 1..3) {
@@ -139,9 +139,9 @@ Describe "Redis rate limit" {
             $allowed.StatusCode | Should -Be 200 -Because "the first request is within the local limit of 1"
             [string]$allowed.Headers["X-Crowdsec-Remediation"] | Should -BeNullOrEmpty
 
-            $denied = Test-HttpRequest -Endpoint "/rate-limit-down-local/page" -IP $ip -TraefikUrl $script:TraefikUrl
-            $denied.StatusCode | Should -Be 429 -Because "a buffered outage keeps counting locally, so failure action ban never applies"
-            [string]$denied.Headers["X-Crowdsec-Remediation"] | Should -Be "ban:ratelimit:per-ip"
+            $limited = Test-HttpRequest -Endpoint "/rate-limit-down-local/page" -IP $ip -TraefikUrl $script:TraefikUrl
+            $limited.StatusCode | Should -Be 429 -Because "a buffered outage keeps counting locally, so failure action ban never applies"
+            [string]$limited.Headers["X-Crowdsec-Remediation"] | Should -Be "ban:ratelimit:per-ip"
         }
     }
 }
