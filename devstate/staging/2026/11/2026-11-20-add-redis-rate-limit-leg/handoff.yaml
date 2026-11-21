@@ -12,5 +12,5 @@ localTests: passed
 requirement: requirement.md
 comments: none
 explore: explore.md
-change: add-redis-rate-limit-leg
+change: share-rate-limit-leg-and-bucket-actions
 pr: { id: 228, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/228 }

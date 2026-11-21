@@ -15,3 +15,7 @@
   Why: in exact mode (`rateLimitSyncRate: 0`) a blackholed Redis costs each request the full 250ms rate-limit budget for the whole outage; no gate skips Redis after repeated failures. Buffered mode skips Redis for one sync rate after a failure (utilities v1.0.9).
 - [ ] note large  `knowledge/debt/2026-11-21-single-reading-path-spec-names-bypassratelimit.md`
   Why: the live "Action-rule skips need a single-reading path" requirement omits `bypassRateLimit`, though the code and "Action rules fold every matching row" drop it on an ambiguous path too.
+- [ ] note large  `knowledge/debt/2026-11-21-rate-limit-captcha-marker-flood.md`
+  Why: the captcha page's own requests skip every rate-limit bucket (human decision 5), so a client that always sends the challenge marker is never charged and each marker POST costs a siteverify call.
+- [ ] note large  `knowledge/debt/2026-11-21-instance-slots-replace-trace-scenario.md`
+  Why: the live instance-slots scenario "Replace A by B logs two bound lines" says no unbound line between them; the code logs unbound for A first, and the leg extraction pins the code.
