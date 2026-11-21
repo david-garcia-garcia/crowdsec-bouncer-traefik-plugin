@@ -17,8 +17,8 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 1797b152
-Owner decision: None.
+Reviewed head: c4c39f10
+Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -42,7 +42,8 @@ Owner decision: None.
 None.
 
 ## Deviations from the ask
-None.
+- taken: decision 4 — "Range-scope bans carry no `Retry-After` in this change (the Range-index blob has no end)". → stream/alone Range bans (served from the Range-index blob) carry no header. In live/none, LAPI expands Range on the `?ip=` query and returns the decision with its `Duration`, so that ban carries `Retry-After` like any other LAPI ban answered 429. — `pkg/lapi/client_decisions.go (queryLiveDecisions parses the chosen decision's duration whatever its scope)` — decision 4's reason is the blob, which only stream/alone read. Following the letter in live/none would add a scope check to `queryLiveDecisions` only to hide an end it already knows.. Requester: not asked.
+
 
 ## Follow-up issues
 None.
@@ -51,7 +52,10 @@ None.
 Ticket 2026-11-21-lapi-ban-retry-after on branch 2026-11-21-lapi-ban-retry-after targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/229; CI not seen.
 
 ## Explore Decisions
-None.
+| Question | Rank | Decision | By |
+| --- | --- | --- | --- |
+| Does a LAPI captcha decision answered as a ban (unsubscribed captcha, unusable captcha client, remap, HEAD) carry `Retry-After`? | additive asked — passes an existing decision end to a branch that already exists; decision 7 names "unsubscribed captcha served as ban" | assumed — yes, when the status is 429. It is still a LAPI decision with a known end, and the response is a ban. This covers `handleCaptchaKindServeHTTP` downgrade reached from `serveLAPI` (unsubscribed or unusable client). The remap has no edge to ban (`pkg/configuration/origin_based_decision_remap.go:44`). A bypassCaptcha request that keeps a stored ban the remap would turn into a captcha keeps that ban's own end. HEAD: a usable captcha serves the challenge on HEAD (not a ban, no header). A HEAD ban carries the header with no body. | explore |
+
 
 ## Findings
 None.
@@ -66,7 +70,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 1797b15202b57243025b314d457d2183995bf2be | Card must match the branch you measured |
+| Reviewed head | c4c39f10eeff14dc528e98b6feeabe18138d52ed | Card must match the branch you measured |
 
 ### Stored data model
 None.
