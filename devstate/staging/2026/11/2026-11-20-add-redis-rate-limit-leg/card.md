@@ -42,17 +42,17 @@ Proof:
 **End users.** On routes where an operator enables a `deny` bucket, a client over the limit now gets the ban page with HTTP 429 (or the configured status) and a `Retry-After` header.
 
 ## Merge readiness
-In progress. 1 items remain.
+Ready for review. 1 items remain.
 
 Priority: P2 — real operator pain (no rate limit in the edge WAF), with a workaround outside the plugin.
-Reviewed head: 19d9b07a
+Reviewed head: 28f6a70e
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/228/checks |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -62,7 +62,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-11-20-add-redis-rate-limit-leg pushed | `git` |
 | OpenSpec | add-redis-rate-limit-leg | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/228 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 44844434111+44844434063 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/228/checks | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/228/checks |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -93,7 +93,7 @@ Completed:
 
 
 ## How this fits together
-Ticket 2026-11-20-add-redis-rate-limit-leg on branch 2026-11-20-add-redis-rate-limit-leg targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/228; CI not seen.
+Ticket 2026-11-20-add-redis-rate-limit-leg on branch 2026-11-20-add-redis-rate-limit-leg targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/228; CI build 44844434111+44844434063 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/228/checks.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -122,7 +122,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 4 added / 8 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 19d9b07a38664a2736fa7489e673954114952483 | Card must match the branch you measured |
+| Reviewed head | 28f6a70e36e8904c3ea60fea89ca2f97167cabab | Card must match the branch you measured |
 
 ### Stored data model
 - **New store**: Redis (the rate-limit Redis: `rateLimitRedisHost`, `rateLimitRedisDatabase`, `rateLimitRedisPassword`/`File`; it is a separate client from the decision-cache Redis, `plugin.go:189-207`, `pkg/ratelimit/client.go:99-113`). New key family: sliding-window hit counters.
