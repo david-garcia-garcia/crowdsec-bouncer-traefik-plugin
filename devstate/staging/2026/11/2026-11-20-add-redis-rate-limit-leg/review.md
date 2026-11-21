@@ -59,3 +59,8 @@ head: fb07fa783cc7eec36c5cad71151d3acf8f6c8049
 phase: implement
 verdict: in progress
 head: 528bea40d256af30da136ad14ee0d64910da2872
+
+## codereview (2026-11-21)
+phase: codereview
+verdict: in progress
+head: 970392bb57d67ec3783eb1c72e1534d2745e532c
