@@ -45,8 +45,8 @@ Proof:
 In progress. 1 items remain.
 
 Priority: P2 — real operator pain (no rate limit in the edge WAF), with a workaround outside the plugin.
-Reviewed head: a843ec47
-Owner decision: Required. See Explore Decisions.
+Reviewed head: fb07fa78
+Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -60,7 +60,7 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-11-20-add-redis-rate-limit-leg pushed | `git` |
-| OpenSpec | add-redis-rate-limit-leg | `openspec/` |
+| OpenSpec | share-rate-limit-leg-and-bucket-actions | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/228 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | passed | handoff.yaml localTests |
@@ -69,11 +69,18 @@ Owner decision: Required. See Explore Decisions.
 ## Specs
 Worktree:
 - [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-21-add-redis-rate-limit-leg/proposal.md) — modified
+- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/share-rate-limit-leg-and-bucket-actions/proposal.md) — modified
 - [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-21-add-redis-rate-limit-leg/proposal.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/share-rate-limit-leg-and-bucket-actions/proposal.md) — modified
 - [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-21-add-redis-rate-limit-leg/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/share-rate-limit-leg-and-bucket-actions/proposal.md) — modified
 - [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-21-add-redis-rate-limit-leg/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/share-rate-limit-leg-and-bucket-actions/proposal.md) — modified
+- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/share-rate-limit-leg-and-bucket-actions/proposal.md) — modified
 - [core_plugin_ratelimit_buckets](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-21-add-redis-rate-limit-leg/proposal.md) — added
+- [core_plugin_ratelimit_buckets](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/share-rate-limit-leg-and-bucket-actions/proposal.md) — added
 - [core_plugin_ratelimit_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-21-add-redis-rate-limit-leg/proposal.md) — added
+- [core_plugin_ratelimit_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/share-rate-limit-leg-and-bucket-actions/proposal.md) — added
 
 Completed:
 - [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/specs/build_e2e_pester_crowdsec-stack/spec.md) — modified
@@ -96,10 +103,7 @@ Completed:
 Ticket 2026-11-20-add-redis-rate-limit-leg on branch 2026-11-20-add-redis-rate-limit-leg targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/228; CI not seen.
 
 ## Explore Decisions
-| Question | Rank | Decision | By |
-| --- | --- | --- | --- |
-| What does the rate-limit owner publish, and what is its ownership key? | additive asked — reshapes `ratelimit.Client` / `OwnershipKey` / `Open`, which round 1 of this same unmerged PR created; B-1 ("published under an instance name") and B-2 ("bucket list and the rest of the rate-limit policy live on the owner") | assumed — Options: (a) publish `*ratelimit.Client` that also carries the compiled `BucketSet` and the policy (`rateLimitFailureAction`, `rateLimitStatusCode`, `rateLimitResponseHeaders`), with that policy in the ownership key; (b) publish only the Redis counter and let each subscriber compile its own buckets; (c) keep the key on Redis settings and republish a changed policy on the same Client. Recommend (a). Why: B-2 needs the policy to travel with the published value, and (a) is the captcha precedent (`pkg/captcha/session.go` `ownershipFrom` keys every owner knob, so an owner edit opens a new Client and `SetAlias` repoints subscribers); (b) contradicts B-2; (c) mutates a Client that reclaim hands back for the same key while requests read it. Consequences: key = owner middleware name + Redis host/password/database + sync rate + bucket rows (JSON of `[]BucketRule`) + the three policy settings; a policy edit starts a new incarnation but does not reset counters (Redis keys are `rl:<subscriber>:<bucket>:<hash>` + window start, `pkg/ratelimit/key.go`, independent of the Client); renaming a bucket starts its counters at zero. | explore |
-
+None.
 
 ## Findings
 None.
@@ -120,9 +124,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 4 added / 8 modified | Same list as ## Specs |
+| Specs in this PR | 6 added / 13 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | a843ec47cf435221095acca40972f58313844169 | Card must match the branch you measured |
+| Reviewed head | fb07fa783cc7eec36c5cad71151d3acf8f6c8049 | Card must match the branch you measured |
 
 ### Stored data model
 - **New store**: Redis (the rate-limit Redis: `rateLimitRedisHost`, `rateLimitRedisDatabase`, `rateLimitRedisPassword`/`File`; it is a separate client from the decision-cache Redis, `plugin.go:189-207`, `pkg/ratelimit/client.go:99-113`). New key family: sliding-window hit counters.

@@ -49,3 +49,8 @@ head: 19d6f9bf69a8f0e927081135a84dcf696520dc16
 phase: explore
 verdict: in progress
 head: a843ec47cf435221095acca40972f58313844169
+
+## propose (2026-11-21)
+phase: propose
+verdict: in progress
+head: fb07fa783cc7eec36c5cad71151d3acf8f6c8049
