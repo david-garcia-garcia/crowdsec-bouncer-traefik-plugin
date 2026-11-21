@@ -26,7 +26,7 @@ The decision's time left is read where the decision is read, and it travels as o
   - `pkg/lapi`: stream and live plumbing.
 
   Mock e2e adds 429 routers to the `stream-mode`, `live-mode` and `redis` scenarios. In `redis`, a canned 4-line value is used, and a bare `t` proves no header without an end. Real e2e extends `/status-429` and adds a stream 429 router (`config/dynamic/retry-after.yml`) with its own bouncer key. The AppSec `RateLimit()` 429 test now asserts no `Retry-After`.
-- **Docs.** README, devdocs and spec deltas are updated. Two follow-ups are filed as debt notes: the origin id that `LookupRemediation` returns is always 0, and `map.md` lacks `wafhop`.
+- **Docs.** README, devdocs and spec deltas are updated. One follow-up is filed as a debt note: the origin id that `LookupRemediation` returns is always 0. A second note (`map.md` lacked `wafhop`) was taken in archive, which added `wafhop` to the spec map.
 
 ## What this changes
 **Operators.** On a router with `bouncerRemediationStatusCode: 429`, LAPI bans now send `Retry-After`. Shared Redis slot values gain a fourth end line that v1.9.4+ instances still read. The value can be off by the clock skew between instances. Memory-store RAM grows with the 12-byte slot (about 26.7 → 33.7 MB at 400k decisions).
@@ -35,17 +35,17 @@ The decision's time left is read where the decision is read, and it travels as o
 **End users.** A client banned by a LAPI decision on a 429 router now gets `Retry-After` with the seconds left on that decision. A 403 ban, an AppSec ban, a failure ban, an action-rule ban and a stream/alone Range ban stay without it.
 
 ## Merge readiness
-Ready for review. 1 items remain.
+Ready for review. 1 item remains (the follow-up issue below).
 
 Priority: P2 — real end-user and operator pain on routers set to 429, with limited blast radius (the default 403 is unaffected and clients can still retry on their own schedule)
-Reviewed head: 094ce1d9
+Reviewed head: d45440e2
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
 | Overall readiness | 6/6 | Ready |
-| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/commit/1a037fc10fd00af3b30fd88b07a227824565a032/checks |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/commit/d45440e2be9fc359712ecaae144c9142b0a3b9a5/checks |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -55,7 +55,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-11-21-lapi-ban-retry-after pushed | `git` |
 | OpenSpec | lapi-ban-retry-after | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/229 | pr-host |
-| CI | build 44944942420 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/commit/1a037fc10fd00af3b30fd88b07a227824565a032/checks | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/commit/1a037fc10fd00af3b30fd88b07a227824565a032/checks |
+| CI | build 44946151975 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/commit/d45440e2be9fc359712ecaae144c9142b0a3b9a5/checks | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/commit/d45440e2be9fc359712ecaae144c9142b0a3b9a5/checks |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -82,7 +82,7 @@ Completed:
 
 
 ## How this fits together
-Ticket 2026-11-21-lapi-ban-retry-after on branch 2026-11-21-lapi-ban-retry-after targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/229; CI build 44944942420 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/commit/1a037fc10fd00af3b30fd88b07a227824565a032/checks.
+Ticket 2026-11-21-lapi-ban-retry-after on branch 2026-11-21-lapi-ban-retry-after targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/229; CI build 44946151975 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/commit/d45440e2be9fc359712ecaae144c9142b0a3b9a5/checks.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -94,14 +94,14 @@ Ticket 2026-11-21-lapi-ban-retry-after on branch 2026-11-21-lapi-ban-retry-after
 None.
 
 ## Axis review
-[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/devstate/staging/2026/11/2026-11-21-lapi-ban-retry-after/codereview_standards.md) — 3 total, 0 pending, 1 completed, 2 skipped
-[Nitpicks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/devstate/staging/2026/11/2026-11-21-lapi-ban-retry-after/codereview_nitpicks.md) — 1 total, 0 pending, 1 completed
-[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/devstate/staging/2026/11/2026-11-21-lapi-ban-retry-after/codereview_spec.md) — 2 total, 0 pending, 1 completed, 1 skipped
-[Scope](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/devstate/staging/2026/11/2026-11-21-lapi-ban-retry-after/codereview_scope.md) — 1 total, 0 pending, 0 completed, 1 skipped
-[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/devstate/staging/2026/11/2026-11-21-lapi-ban-retry-after/codereview_security.md) — 0 total, 0 pending, 0 completed
-[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/devstate/staging/2026/11/2026-11-21-lapi-ban-retry-after/codereview_performance.md) — 0 total, 0 pending, 0 completed
-[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/devstate/staging/2026/11/2026-11-21-lapi-ban-retry-after/codereview_dead.md) — 0 total, 0 pending, 0 completed
-[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/devstate/staging/2026/11/2026-11-21-lapi-ban-retry-after/codereview_coverage.md) — 1 total, 0 pending, 0 completed, 1 skipped
+[Standards](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/devstate/2026/11/2026-11-21-lapi-ban-retry-after/codereview_standards.md) — 3 total, 0 pending, 1 completed, 2 skipped
+[Nitpicks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/devstate/2026/11/2026-11-21-lapi-ban-retry-after/codereview_nitpicks.md) — 1 total, 0 pending, 1 completed
+[Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/devstate/2026/11/2026-11-21-lapi-ban-retry-after/codereview_spec.md) — 2 total, 0 pending, 1 completed, 1 skipped
+[Scope](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/devstate/2026/11/2026-11-21-lapi-ban-retry-after/codereview_scope.md) — 1 total, 0 pending, 0 completed, 1 skipped
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/devstate/2026/11/2026-11-21-lapi-ban-retry-after/codereview_security.md) — 0 total, 0 pending, 0 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/devstate/2026/11/2026-11-21-lapi-ban-retry-after/codereview_performance.md) — 0 total, 0 pending, 0 completed
+[Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/devstate/2026/11/2026-11-21-lapi-ban-retry-after/codereview_dead.md) — 0 total, 0 pending, 0 completed
+[Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-21-lapi-ban-retry-after/devstate/2026/11/2026-11-21-lapi-ban-retry-after/codereview_coverage.md) — 1 total, 0 pending, 0 completed, 1 skipped
 
 
 ## Agent review details
@@ -109,12 +109,12 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 8 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 4 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 094ce1d90f7040fb5ba6efebc735cfbdd8a50d25 | Card must match the branch you measured |
+| Reviewed head | d45440e2be9fc359712ecaae144c9142b0a3b9a5 | Card must match the branch you measured |
 
 ### Stored data model
-- **Redis** (shared decision store), Ip and header-scope slot value (key `<prefix><ip>` / `<prefix><scope:value>`), field **decision end** — **added** as a 4th newline-separated line after kind, origin, scenario: wall-clock Unix seconds, written by `redis.PutMany` as `now.Unix() + DecisionDurationSec` when that duration is positive (stream apply and live memo both set it); empty origin/scenario lines are kept as placeholders (`t\n\n\n<end>`). With no end the value is byte-identical to before. Key names, TTL (`msetexGrouped` by `DurationSec`) and the `range-index` blob (`KindOriginString(..., 0)`) are unchanged (`pkg/decisionstore/redis_pack.go`, `pkg/decisionstore/redis.go`). migration: missing — no migration artifact in the pin; none deploys this field: the new reader treats values without a usable end as unknown and old values expire by TTL (`openspec/changes/lapi-ban-retry-after/design.md`, Migration Plan).
+- **Redis** (shared decision store), Ip and header-scope slot value (key `<prefix><ip>` / `<prefix><scope:value>`), field **decision end** — **added** as a 4th newline-separated line after kind, origin, scenario: wall-clock Unix seconds, written by `redis.PutMany` as `now.Unix() + DecisionDurationSec` when that duration is positive (stream apply and live memo both set it); empty origin/scenario lines are kept as placeholders (`t\n\n\n<end>`). With no end the value is byte-identical to before. Key names, TTL (`msetexGrouped` by `DurationSec`) and the `range-index` blob (`KindOriginString(..., 0)`) are unchanged (`pkg/decisionstore/redis_pack.go`, `pkg/decisionstore/redis.go`). migration: missing — no migration artifact in the pin; none deploys this field: the new reader treats values without a usable end as unknown and old values expire by TTL (`openspec/changes/archive/2026-11-21-lapi-ban-retry-after/design.md`, Migration Plan).
   - Rollback, previous reader (`.pin_diff/base/pkg/decisionstore/redis_pack.go`, v1.9.4–v1.9.7 shape): `strings.Cut` for kind, then `strings.Cut` for origin, the rest is the scenario. On a 4-line value kind and origin come out correct, and the end is folded into `scenario` (`ssh-bf\n<end>`, or `\n<end>` when the scenario is empty). Base `lookupHits` returns only kind and origin (`.pin_diff/base/pkg/decisionstore/lookup.go`), so that scenario is never used. Stays correct.
   - Rollback, one-cut reader (`splitKindOrigin` in `pkg/decisionstore/pack.go` at tag v1.9.3, confirmed by the caller with `git grep` on that tag): the kind stays correct (`RemediationKind` of the first line), and the origin becomes everything after the kind. That already happens for every 3-line value. New on top of that: a decision that used to be stored as `t` or `t\n<origin>` (no scenario) now carries an end too, so this reader gets a polluted origin where before it read it correctly or as empty. This affects only the origin, not the kind. It is not a red flag under `opd-redflags` (nothing removed, renamed or retyped).
 
