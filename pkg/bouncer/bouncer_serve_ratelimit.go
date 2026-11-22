@@ -31,26 +31,27 @@ const (
 // serveRateLimit charges req to the buckets of the rate-limit client this route subscribes to, under this
 // route's own name, and answers with that client's policy. True means the response was written: a
 // ratelimit bucket over its limit, a captcha bucket over its limit, or the failure action when the
-// counter could not answer; or this router's captcha gate answering a challenge-form POST.
+// counter could not answer; or this router's captcha gate answering a challenge-form POST
+// (isRateLimitChallengeFormAnswer).
 // False means the request continues to the AppSec step: no subscription or an unpublished owner, a
-// bypassRateLimit rule, a widget asset of this router's captcha page, a challenge-form POST the gate did
-// not answer, no bucket that answers, failure action passthrough, or a failure captcha that a cleared gate
-// or a bypassCaptcha rule let through.
+// bypassRateLimit rule, a widget asset of this router's captcha page, no bucket that answers, failure
+// action passthrough, or a failure captcha that a cleared gate or a bypassCaptcha rule let through.
 func (b *Bouncer) serveRateLimit(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
 	rateLimitClient := b.loadedRateLimit()
 	if rateLimitClient == nil || match.SkipRateLimit {
 		return false
 	}
-	// The captcha page's own requests are not charged: widget assets continue, and the challenge-form
-	// POST goes to the captcha gate when this policy can challenge.
+	// The captcha page's own requests are not charged: widget assets continue, and a challenge-form POST
+	// that this router's captcha gate answers for the rate limit goes to that gate. Any other marker POST
+	// is charged below like any other request.
 	captchaClient := b.usableCaptcha()
 	if captchaClient != nil && captchaClient.IsCustomResourceRequest(req.Request) {
 		logger.Trace(b.log, "serveRateLimit", "ip", req.IPAddrString(), "captchaPage", true)
 		return false
 	}
-	if b.isCaptchaFormAnswer(req) {
+	if b.isRateLimitChallengeFormAnswer(req, match, captchaClient, rateLimitClient) {
 		logger.Trace(b.log, "serveRateLimit", "ip", req.IPAddrString(), "captchaForm", true)
-		return b.answerRateLimitChallengeForm(rw, req, match, rateLimitClient)
+		return b.handleCaptchaKindServeHTTP(rw, req, configuration.ReasonRateLimit, headerReasonRateLimit, lapi.OriginPluginRateLimitChallengeForm)
 	}
 	buckets := rateLimitClient.Buckets()
 	policy := rateLimitClient.Policy()
@@ -85,18 +86,18 @@ func (b *Bouncer) serveRateLimit(rw http.ResponseWriter, req clientrequest.Reque
 	return false
 }
 
-// answerRateLimitChallengeForm answers a challenge-form POST on a router with a usable captcha. No bucket
-// charges it. When rateLimitClient's policy can answer with a captcha (a captcha bucket or failure action captcha),
-// the POST answers a challenge this leg may have served, so this router's captcha gate validates it, as
-// AppSec does for a form it let through: the solved redirect with the gate cookie, or the challenge page
-// again with header captcha:ratelimit and drop origin plugin:ratelimit (no bucket answered).
-// False means the request continues: a policy without a captcha answer, a bypassCaptcha rule, or a gate
-// that did not write.
-func (b *Bouncer) answerRateLimitChallengeForm(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, rateLimitClient *ratelimit.Client) bool {
-	if !rateLimitAnswersWithCaptcha(rateLimitClient) || b.bypassesCaptcha(req, match) {
+// isRateLimitChallengeFormAnswer reports whether req is a challenge-form POST that this router's captcha
+// gate answers for the rate-limit step, so no bucket charges it: captchaClient (the usable captcha) is set,
+// rateLimitClient's policy can answer with a captcha (a captcha bucket or failure action captcha), no
+// bypassCaptcha rule matched, and the body carries the marker. The gate then validates the POST as AppSec
+// does for a form it let through: the solved redirect with the gate cookie, or the challenge page again
+// with header captcha:ratelimit and drop origin plugin:ratelimit (no bucket answered).
+// The body is read for the marker only after the other checks pass.
+func (b *Bouncer) isRateLimitChallengeFormAnswer(req clientrequest.Request, match httprule.ActionMatch, captchaClient *captcha.Client, rateLimitClient *ratelimit.Client) bool {
+	if captchaClient == nil || !rateLimitAnswersWithCaptcha(rateLimitClient) || match.BypassCaptchaName != "" {
 		return false
 	}
-	return b.handleCaptchaKindServeHTTP(rw, req, configuration.ReasonRateLimit, headerReasonRateLimit, lapi.OriginPluginRateLimitChallengeForm)
+	return captchaClient.HasChallengeMarker(req.Request)
 }
 
 // answerRateLimit is the ratelimit answer for bucket: the ban page with the owner's status code,

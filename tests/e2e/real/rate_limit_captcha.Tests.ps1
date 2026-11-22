@@ -143,6 +143,23 @@ Describe "Rate-limit captcha buckets" {
             [int]([string]$responses[2].Headers["Retry-After"]) | Should -BeGreaterThan 0
             $responses[2].Content | Should -Not -Match $script:CaptchaMarker
         }
+
+        It "Should charge a challenge-form POST on a bypassCaptcha path, where no captcha gate answers it" {
+            $ip = Get-CaptchaBucketClientIP -HostNumber 6
+            # The marker does not exempt a POST the gate will not answer: each one counts like any request.
+            $responses = @(foreach ($attempt in 1..3) {
+                    Test-HttpRequest -Endpoint "/rl-captcha/api/items" -IP $ip -TraefikUrl $script:TraefikUrl `
+                        -Method POST -Body $script:ChallengeForm -ExtraHeaders $script:FormHeaders -MaximumRedirection 0
+                })
+
+            foreach ($attempt in 0..1) {
+                $responses[$attempt].StatusCode | Should -Be 200 -Because "POST $($attempt + 1) is within per-ip-soft and reaches the application"
+                $responses[$attempt].Content | Should -Match "Hostname:"
+            }
+            $responses[2].StatusCode | Should -Be 429 -Because "the marker POSTs were charged: the third is over per-ip-soft, answered as ratelimit on a bypassCaptcha path"
+            [string]$responses[2].Headers["X-Crowdsec-Remediation"] | Should -Be "ban:ratelimit:per-ip-soft"
+            $responses[2].Content | Should -Not -Match "Hostname:"
+        }
     }
 
     Context "router without a captcha" -Tag "ratelimit" {

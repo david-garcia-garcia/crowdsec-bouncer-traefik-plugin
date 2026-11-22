@@ -52,6 +52,10 @@ The real-stack Pester suite SHALL run a subscriber that also subscribes to the s
 - **WHEN** a client over both limits posts the challenge form with the marker
 - **THEN** the response is not a rate-limit answer
 
+#### Scenario: Marker POST no gate answers is charged
+- **WHEN** a client posts a form with the marker on a route with a usable captcha whose policy has no captcha answer, or where a `bypassCaptcha` rule matches
+- **THEN** each POST is charged and the client reaches the `ratelimit` answer with `ban:ratelimit:<bucket>`
+
 #### Scenario: bypassCaptcha route gets a 429
 - **WHEN** a `bypassCaptcha` rule matches and the `captcha` bucket is over its limit
 - **THEN** the response is 429 with `ban:ratelimit:<soft bucket>`

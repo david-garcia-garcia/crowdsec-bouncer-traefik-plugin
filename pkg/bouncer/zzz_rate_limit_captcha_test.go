@@ -2,6 +2,7 @@ package bouncer
 
 import (
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -383,10 +384,11 @@ func solvedChallengeFormPost() *http.Request {
 }
 
 // TestRateLimit_challengeFormPostGoesToTheCaptchaGate proves a challenge-form POST on a router with a usable
-// captcha and no AppSec is never charged, and is answered by the captcha gate when the policy can answer with
-// a captcha: a valid answer gets the solved redirect and the gate cookie, a missing answer gets the challenge
-// page again with captcha:ratelimit and a captcha drop under plugin:ratelimit. A bypassCaptcha rule, or a
-// policy without a captcha answer, lets it continue; without a usable captcha it is charged like any request.
+// captcha and no AppSec is not charged only when the captcha gate answers it, that is when the policy can
+// answer with a captcha and no bypassCaptcha rule matched: a valid answer gets the solved redirect and the
+// gate cookie, a missing answer gets the challenge page again with captcha:ratelimit and a captcha drop under
+// plugin:ratelimit. With a bypassCaptcha rule, a policy without a captcha answer, or no usable captcha, it is
+// charged like any request, so an over-limit client gets the ratelimit answer.
 func TestRateLimit_challengeFormPostGoesToTheCaptchaGate(t *testing.T) {
 	captchaPolicy := []ratelimit.BucketRule{perIPSoftTestCaptchaBucket(1), perIPTestBucket("per-ip-hard", 2)}
 	for _, tc := range []struct {
@@ -405,8 +407,8 @@ func TestRateLimit_challengeFormPostGoesToTheCaptchaGate(t *testing.T) {
 		{name: "valid answer", buckets: captchaPolicy, captcha: true, form: solvedChallengeFormPost, wantStatus: http.StatusFound, wantHeader: "captcha:solved", wantGate: true},
 		{name: "missing answer", buckets: captchaPolicy, captcha: true, form: challengeMarkerPost, wantStatus: http.StatusOK, wantHeader: "captcha:ratelimit"},
 		{name: "failure action captcha without captcha buckets", buckets: []ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, failureAction: configuration.FailureActionCaptcha, captcha: true, form: solvedChallengeFormPost, wantStatus: http.StatusFound, wantHeader: "captcha:solved", wantGate: true},
-		{name: "bypassCaptcha rule", buckets: captchaPolicy, captcha: true, bypassCaptcha: true, form: solvedChallengeFormPost, wantStatus: http.StatusOK, wantNext: true},
-		{name: "policy without a captcha answer", buckets: []ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, failureAction: configuration.FailureActionPassthrough, captcha: true, form: solvedChallengeFormPost, wantStatus: http.StatusOK, wantNext: true},
+		{name: "bypassCaptcha rule", buckets: captchaPolicy, captcha: true, bypassCaptcha: true, form: solvedChallengeFormPost, wantStatus: http.StatusTooManyRequests, wantHeader: "ban:ratelimit:per-ip-hard", wantCharged: true},
+		{name: "policy without a captcha answer", buckets: []ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, failureAction: configuration.FailureActionPassthrough, captcha: true, form: solvedChallengeFormPost, wantStatus: http.StatusTooManyRequests, wantHeader: "ban:ratelimit:per-ip", wantCharged: true},
 		{name: "no usable captcha", buckets: captchaPolicy, form: solvedChallengeFormPost, wantStatus: http.StatusTooManyRequests, wantHeader: "ban:ratelimit:per-ip-hard", wantCharged: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -436,6 +438,58 @@ func TestRateLimit_challengeFormPostGoesToTheCaptchaGate(t *testing.T) {
 			}
 			if tc.wantHeader == "captcha:ratelimit" {
 				assertChallengeFormChallengedAgain(t, fixture, rw)
+			}
+		})
+	}
+}
+
+// readCountingBody is a test request body that counts the Read calls made on it.
+type readCountingBody struct {
+	reader io.Reader
+	reads  int
+}
+
+// Read reads from the wrapped reader and counts the call.
+func (body *readCountingBody) Read(p []byte) (int, error) {
+	body.reads++
+	return body.reader.Read(p)
+}
+
+// Close does nothing: the wrapped reader holds no resource.
+func (*readCountingBody) Close() error { return nil }
+
+// TestRateLimit_challengeFormBodyReadOnlyWhenTheGateAnswers proves the rate-limit step reads a POST body for
+// the challenge marker only after the policy and bypassCaptcha checks say the captcha gate would answer it:
+// a policy without a captcha answer or a bypassCaptcha rule charges the marker POST without one Read, and a
+// policy with a captcha answer reads it and hands it to the gate uncharged.
+func TestRateLimit_challengeFormBodyReadOnlyWhenTheGateAnswers(t *testing.T) {
+	captchaPolicy := []ratelimit.BucketRule{perIPSoftTestCaptchaBucket(5), perIPTestBucket("per-ip-hard", 10)}
+	for _, tc := range []struct {
+		name          string
+		buckets       []ratelimit.BucketRule
+		bypassCaptcha bool
+		wantRead      bool
+	}{
+		{name: "policy without a captcha answer", buckets: []ratelimit.BucketRule{perIPTestBucket("per-ip", 10)}},
+		{name: "bypassCaptcha rule", buckets: captchaPolicy, bypassCaptcha: true},
+		{name: "policy with a captcha answer", buckets: captchaPolicy, wantRead: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := newTestRateLimitFixture(t, tc.buckets, nil)
+			fixture.bindUsableTestCaptcha(t)
+			if tc.bypassCaptcha {
+				fixture.b.actionRules = mustPathAction(t, "form", "^/protected$", httprule.ActionBypassCaptcha)
+			}
+			req := challengeMarkerPost()
+			body := &readCountingBody{reader: req.Body}
+			req.Body = body
+			rw := fixture.serveRequest(req, testRateLimitClientIP)
+			charged := fixture.counter.takes.Load() != 0
+			if (body.reads != 0) != tc.wantRead || charged == tc.wantRead {
+				t.Fatalf("body reads %d charged=%v, want read=%v charged=%v (status %d header %q)", body.reads, charged, tc.wantRead, !tc.wantRead, rw.Code, rw.Header().Get("X-Remediation"))
+			}
+			if !tc.wantRead && !fixture.next.called {
+				t.Fatalf("an under-limit marker POST no gate answers must reach next: status %d header %q", rw.Code, rw.Header().Get("X-Remediation"))
 			}
 		})
 	}
