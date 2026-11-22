@@ -166,8 +166,6 @@ Describe "Rate-limit captcha buckets" {
         It "Should answer the captcha bucket with 429 and log the missing captcha once per bind, not per request" {
             $ip = Get-CaptchaBucketClientIP -HostNumber 10
             $router = "rl-captcha-nocaptcha"
-            $bindErrorsBefore = @(Get-RouterLogLines -TraefikName $router -Contains @("crowdsec bouncer rate limit captcha unavailable", '"reason":"unsubscribed"'))
-            $binds = @(Get-RouterLogLines -TraefikName $router -Contains @("crowdsec bouncer bound", '"leg":"ratelimit"'))
             $since = Get-LogSince
 
             $responses = Send-CaptchaBucketRequests -Endpoint "/rl-captcha-nocaptcha/page" -IP $ip -Count 4
@@ -180,10 +178,18 @@ Describe "Rate-limit captcha buckets" {
                 $responses[$attempt].Content | Should -Not -Match $script:CaptchaMarker
             }
 
-            $bindErrorsBefore.Count | Should -BeGreaterThan 0 -Because "the bind of a policy with a captcha bucket logs the missing captcha"
-            $bindErrorsBefore.Count | Should -Be $binds.Count -Because "one ERROR per bind of the rate-limit client"
-            $bindErrorsAfter = @(Get-RouterLogLines -TraefikName $router -Contains @("crowdsec bouncer rate limit captcha unavailable"))
-            $bindErrorsAfter.Count | Should -Be $bindErrorsBefore.Count -Because "the downgraded requests add no ERROR"
+            # One ERROR per bind, none per request. A reload of the dynamic files (another test file's rewrite)
+            # rebuilds this router, which binds again and logs one more ERROR, so compare ERRORs with binds
+            # instead of a count taken before the requests; poll because both lines reach the log asynchronously.
+            $script:BindCounts = ""
+            $perBind = Wait-ForCondition -Description "one captcha-unavailable ERROR per rate-limit bind on $router" -TimeoutSeconds 10 -RetryIntervalSeconds 0.5 -Condition {
+                $errors = @(Get-RouterLogLines -TraefikName $router -Contains @("crowdsec bouncer rate limit captcha unavailable"))
+                $unsubscribed = @($errors | Where-Object { $_.Contains('"reason":"unsubscribed"') })
+                $binds = @(Get-RouterLogLines -TraefikName $router -Contains @("crowdsec bouncer bound", '"leg":"ratelimit"'))
+                $script:BindCounts = "errors=$($errors.Count) unsubscribed=$($unsubscribed.Count) binds=$($binds.Count)"
+                return $binds.Count -gt 0 -and $errors.Count -eq $binds.Count -and $unsubscribed.Count -eq $binds.Count
+            }
+            $perBind.Success | Should -BeTrue -Because "each bind of a policy with a captcha bucket logs the missing captcha once and the downgraded requests add no ERROR ($($script:BindCounts))"
             $warns = @(Get-ContainerLogLines -Container "traefik-test" -Since $since -Contains @("crowdsec bouncer captcha unsubscribed"))
             $warns.Count | Should -Be 0 -Because "a rate-limit captcha downgrade never warns per request"
             $downgrades = @(Get-ContainerLogLines -Container "traefik-test" -Since $since -Contains @("rateLimitCaptchaDowngrade", $ip))

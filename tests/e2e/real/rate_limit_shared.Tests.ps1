@@ -211,33 +211,75 @@ Describe "Shared rate-limit leg" {
                 $response.Content | Should -Match "Hostname:"
                 [string]$response.Headers["X-Crowdsec-Remediation"] | Should -BeNullOrEmpty -Because "an unpublished owner is not a remediation"
             }
-            $unbound = @(Get-SharedLogLines -Since $since -Contains @("crowdsec bouncer unbound", '"leg":"ratelimit"', '"instanceName":"rl-shared"'))
-            $unbound.Count | Should -BeGreaterThan 0 -Because "the subscribers log the unbind of the rl-shared client"
-
-            # Each subscriber warns on the loss of its owner, at WARN, once for the loss and not per request.
-            $ownerWarnings = @{}
-            foreach ($subscriber in @("rl-shared-a", "rl-shared-b")) {
-                $warned = @(Get-SharedLogLines -Since $since -Contains @("crowdsec bouncer rate limit owner unavailable", '"level":"WARN"', "`"traefikName`":`"$subscriber", '"instanceName":"rl-shared"'))
-                $warned.Count | Should -BeGreaterThan 0 -Because "$subscriber logs WARN when its rate-limit owner stops being published"
-                $ownerWarnings[$subscriber] = $warned.Count
+            # Lifecycle lines reach `docker logs` asynchronously, and the file write (rm, cp, touch) can make
+            # Traefik reload more than once; under Yaegi each rebuilt subscriber logs one WARN when it starts
+            # without an owner. So poll with a deadline: the unbind and a WARN per subscriber must show up, and
+            # the WARN counts must stop moving (3 equal reads 1s apart) before the per-request check.
+            $ownerWarningCounts = {
+                $counts = @{}
+                foreach ($subscriber in @("rl-shared-a", "rl-shared-b")) {
+                    $counts[$subscriber] = @(Get-SharedLogLines -Since $since -Contains @("crowdsec bouncer rate limit owner unavailable", '"level":"WARN"', "`"traefikName`":`"$subscriber", '"instanceName":"rl-shared"')).Count
+                }
+                return $counts
             }
+            $script:WarnStable = 0
+            $script:WarnLast = ""
+            $settled = Wait-ForCondition -Description "owner-loss WARN per subscriber, settled" -TimeoutSeconds 30 -RetryIntervalSeconds 1 -Condition {
+                $unbound = @(Get-SharedLogLines -Since $since -Contains @("crowdsec bouncer unbound", '"leg":"ratelimit"', '"instanceName":"rl-shared"'))
+                $counts = & $ownerWarningCounts
+                if ($unbound.Count -eq 0 -or $counts["rl-shared-a"] -eq 0 -or $counts["rl-shared-b"] -eq 0) {
+                    $script:WarnStable = 0
+                    return $false
+                }
+                $current = "$($counts['rl-shared-a'])/$($counts['rl-shared-b'])"
+                if ($current -eq $script:WarnLast) {
+                    $script:WarnStable++
+                }
+                else {
+                    $script:WarnStable = 0
+                    $script:WarnLast = $current
+                }
+                return $script:WarnStable -ge 2
+            }
+            $settled.Success | Should -BeTrue -Because "each subscriber logs the unbind and WARN when its rate-limit owner stops being published (last WARN counts a/b: $($script:WarnLast))"
+
+            # Each subscriber warns once for the loss, not per request: 3 requests through each add no WARN.
+            $ownerWarnings = & $ownerWarningCounts
             Send-SharedRequests -Endpoint "/rl-shared-a/page" -IP $ip -Count 3 | Out-Null
             Send-SharedRequests -Endpoint "/rl-shared-b/page" -IP $ip -Count 3 | Out-Null
+            Start-Sleep -Seconds 2
+            $afterRequests = & $ownerWarningCounts
             foreach ($subscriber in @("rl-shared-a", "rl-shared-b")) {
-                $warned = @(Get-SharedLogLines -Since $since -Contains @("crowdsec bouncer rate limit owner unavailable", "`"traefikName`":`"$subscriber"))
-                $warned.Count | Should -Be $ownerWarnings[$subscriber] -Because "requests through $subscriber while its owner is gone add no WARN"
+                $afterRequests[$subscriber] | Should -Be $ownerWarnings[$subscriber] -Because "requests through $subscriber while its owner is gone add no WARN"
             }
 
             $since = Get-LogSince
             Write-SharedFile -Content $script:SharedFileCommitted
             $back = Wait-ForHttpStatus -Url "$($script:TraefikUrl)/rl-shared-a/page" -Headers @{ "X-Forwarded-For" = $ip } -ExpectedStatusCodes @(503) -TimeoutSeconds 15
             $back.Success | Should -BeTrue -Because "the over-limit client is answered again once the owner publishes; last=$($back.StatusCode)"
-            $bound = @(Get-SharedLogLines -Since $since -Contains @("crowdsec bouncer bound", '"leg":"ratelimit"', '"instanceName":"rl-shared"'))
-            $bound.Count | Should -BeGreaterThan 0 -Because "the subscribers log the bind of the republished client"
-            foreach ($subscriber in @("rl-shared-a", "rl-shared-b")) {
-                $available = @(Get-SharedLogLines -Since $since -Contains @("crowdsec bouncer rate limit owner available", '"level":"INFO"', "`"traefikName`":`"$subscriber", '"instanceName":"rl-shared"'))
-                $available.Count | Should -BeGreaterThan 0 -Because "$subscriber logs INFO when a rate-limit client binds after the WARN"
+            $backB = Wait-ForHttpStatus -Url "$($script:TraefikUrl)/rl-shared-b/page" -Headers @{ "X-Forwarded-For" = $ip } -ExpectedStatusCodes @(503) -TimeoutSeconds 15
+            $backB.Success | Should -BeTrue -Because "both subscribers bind the republished client; last=$($backB.StatusCode)"
+            # The reload that restores the owner rebuilds the subscribers too, in an order Traefik does not fix:
+            # a subscriber built before the owner starts without one (one WARN under Yaegi) and must log INFO
+            # when the owner binds; one built after it binds at once and logs neither. So every WARN since the
+            # restore must be followed by an INFO of the same subscriber, and each subscriber logs a bind.
+            $script:MissingReturnLines = @()
+            $returned = Wait-ForCondition -Description "rate-limit bind per subscriber and INFO after every WARN" -TimeoutSeconds 20 -RetryIntervalSeconds 0.5 -Condition {
+                $missing = @()
+                foreach ($subscriber in @("rl-shared-a", "rl-shared-b")) {
+                    if (@(Get-SharedLogLines -Since $since -Contains @("crowdsec bouncer bound", '"leg":"ratelimit"', "`"traefikName`":`"$subscriber", '"instanceName":"rl-shared"')).Count -eq 0) {
+                        $missing += "bound $subscriber"
+                    }
+                    $warned = @(Get-SharedLogLines -Since $since -Contains @("crowdsec bouncer rate limit owner unavailable", '"level":"WARN"', "`"traefikName`":`"$subscriber", '"instanceName":"rl-shared"')).Count
+                    $available = @(Get-SharedLogLines -Since $since -Contains @("crowdsec bouncer rate limit owner available", '"level":"INFO"', "`"traefikName`":`"$subscriber", '"instanceName":"rl-shared"')).Count
+                    if ($available -lt $warned) {
+                        $missing += "INFO $subscriber ($warned WARN, $available INFO)"
+                    }
+                }
+                $script:MissingReturnLines = $missing
+                return $missing.Count -eq 0
             }
+            $returned.Success | Should -BeTrue -Because "each subscriber binds the republished client and logs INFO after any WARN of the restore (missing: $($script:MissingReturnLines -join ', '))"
         }
 
         It "Should open a new client on a bucket edit and keep the count" {
