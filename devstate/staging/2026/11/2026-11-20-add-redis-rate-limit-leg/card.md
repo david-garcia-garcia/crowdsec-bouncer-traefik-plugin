@@ -55,7 +55,7 @@ Proof:
 In progress. 1 items remain.
 
 Priority: P2 — real operator pain (no distributed, multi-bucket rate limit or shared policy in the WAF middleware) with a workaround in Traefik's own `rateLimit` middleware.
-Reviewed head: 970392bb
+Reviewed head: 7bd7951f
 Owner decision: None.
 
 ## Review scores
@@ -106,7 +106,7 @@ Completed:
 
 
 ## Follow-up issues
-- [ ] [Add the `tokenBucket` algorithm and the in-memory rate-limit store](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/knowledge/debt/2026-11-20-rate-limit-token-bucket-and-memory-store.md) — each published leg is copied by hand into five places in `plugin.go` and `Bouncer`; the owner asked to suggest a shared leg unit before the next leg, and the Open-only rate-limit leg does not need it.
+- [ ] [Send `RateLimit-*` headers on rate-limit responses](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/knowledge/debt/2026-11-20-rate-limit-ratelimit-response-headers.md) — each published leg is copied by hand into five places in `plugin.go` and `Bouncer`; the owner asked to suggest a shared leg unit before the next leg, and the Open-only rate-limit leg does not need it.
 
 
 ## How this fits together
@@ -123,8 +123,8 @@ None.
 [Nitpicks](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/devstate/staging/2026/11/2026-11-20-add-redis-rate-limit-leg/codereview_nitpicks.md) — 5 total, 0 pending, 5 completed
 [Spec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/devstate/staging/2026/11/2026-11-20-add-redis-rate-limit-leg/codereview_spec.md) — 0 total, 0 pending, 0 completed
 [Scope](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/devstate/staging/2026/11/2026-11-20-add-redis-rate-limit-leg/codereview_scope.md) — 0 total, 0 pending, 0 completed
-[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/devstate/staging/2026/11/2026-11-20-add-redis-rate-limit-leg/codereview_security.md) — 2 total, 0 pending, 0 completed, 2 skipped
-[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/devstate/staging/2026/11/2026-11-20-add-redis-rate-limit-leg/codereview_performance.md) — 1 total, 0 pending, 0 completed, 1 skipped
+[Security](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/devstate/staging/2026/11/2026-11-20-add-redis-rate-limit-leg/codereview_security.md) — 2 total, 0 pending, 2 completed
+[Performance](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/devstate/staging/2026/11/2026-11-20-add-redis-rate-limit-leg/codereview_performance.md) — 1 total, 0 pending, 1 completed
 [Dead](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/devstate/staging/2026/11/2026-11-20-add-redis-rate-limit-leg/codereview_dead.md) — 0 total, 0 pending, 0 completed
 [Test coverage](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/devstate/staging/2026/11/2026-11-20-add-redis-rate-limit-leg/codereview_coverage.md) — 2 total, 0 pending, 2 completed
 
@@ -136,7 +136,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 6 added / 13 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 970392bb57d67ec3783eb1c72e1534d2745e532c | Card must match the branch you measured |
+| Reviewed head | 7bd7951f74ca0eb0aae82fcb9bed13a65b784197 | Card must match the branch you measured |
 
 ### Stored data model
 - **New store**: Redis/Dragonfly, the rate-limit Redis named by the owner's `rateLimitRedisHost`, `rateLimitRedisDatabase`, `rateLimitRedisPassword`/`File` (a separate client from the decision-cache Redis, `pkg/ratelimit/client.go:131,145`). New key family: sliding-window hit counters.
