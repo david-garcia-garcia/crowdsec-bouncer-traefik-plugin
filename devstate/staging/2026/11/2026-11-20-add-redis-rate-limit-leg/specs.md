@@ -10,6 +10,17 @@ change: share-rate-limit-leg-and-bucket-actions
 
 FindSpecHost (2026-11-21): 7 deltas, 7 fold, 0 new, 0 skip. Every delta modifies requirements its leaf already owns, so fold is the only host for those blocks; the added requirements per leaf stay within one–three, except `core_plugin_ratelimit_buckets` (four added, one of which replaces the removed validation block one-for-one, so three new behaviours). A REMOVED + ADDED pair is used where a kept scenario name would have stated the opposite of the new rule ("Captcha action is rejected", "Captcha failure action without a captcha instance fails"); OpenSpec 2.0 rejects a MODIFIED block that drops a scenario. The leg-descriptor extraction (task group 1) has no live promise of its own (Live catalog) and adds no delta; the instance-slots changes come from the fifth group only.
 
+## Archive (2026-11-22)
+FindSpecHost re-run (Task sub-agent, archive time): 7 deltas, 7 fold, 0 new, 0 skip; every MODIFIED / REMOVED / RENAMED header matches its leaf (the two MODIFIED blocks titled with a RENAMED TO name apply after the rename).
+- build_e2e_pester_crowdsec-stack — fold, high
+- core_plugin_lapi_usage-metrics — fold, high
+- core_plugin_middleware_bouncer — fold, high
+- core_plugin_middleware_config-validation — fold, high
+- core_plugin_middleware_instance-slots — fold, high
+- core_plugin_ratelimit_buckets — fold, medium: addendum C brought the ADDED blocks to seven (six new behaviours, three of them the token bucket), past the one–three fold threshold; kept fold because the delta also renames, modifies, and removes blocks only this leaf owns, and the proposal declares no new capability. A separate token-bucket leaf under `core_plugin_ratelimit` would need the change rewritten; left to the human.
+- core_plugin_ratelimit_client — fold, high (two ADDED blocks from the owner-unavailable work, not in the propose-time journal above)
+Synced with the OpenSpec 2.0 merge (RENAMED, REMOVED, MODIFIED full-block replace, ADDED; totals +13 ~17 -2 →2), checked first on a scratch copy: no scenario or code token dropped except those the REMOVED / MODIFIED blocks retire (`deny`, "Captcha action is rejected", "Token bucket is rejected", "Captcha failure action without a captcha instance fails"); `openspec validate --specs` 42/42, `validate-spec-map` (write, then check) and `validate-artifact-names` clean. Change moved to `openspec/changes/archive/2026-11-22-share-rate-limit-leg-and-bucket-actions/`.
+
 ---
 
 # Specs — round 1 (history)

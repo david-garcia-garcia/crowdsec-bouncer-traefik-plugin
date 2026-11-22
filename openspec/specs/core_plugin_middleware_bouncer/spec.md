@@ -13,7 +13,7 @@ The plugin SHALL export `CreateConfig` and `New` from the package Traefik loads 
 - **AND** `New` receives a non-ignored context used as the reclaim holder
 
 ### Requirement: Bouncer binds clients through atomic late bind
-The per-router bouncer SHALL hold four optional bound clients as `atomic.Value` fields (LAPI, AppSec, captcha, and ModSec), each able to hold a typed nil. Each field's stored concrete type SHALL stay `*reclaim.Box` (Yaegi). On every Watch publish into a bound field, the bouncer SHALL `Store` a new `*reclaim.Box{Value: .}` and MUST NOT assign `Box.Value` in place on a Box already published in that field. `ServeHTTP` SHALL `Load` those fields only and MUST NOT resolve instance names, Peek slot tables, or Open clients on the request path. Subscribers MUST NOT Bind reclaim on those clients. The bouncer SHALL read `lapiMode` from the loaded LAPI client on each request, not from a copy taken at `New`. When `bouncerEnabled` is false the handler SHALL call `next` without applying decisions while owners may still Open and publish.
+The per-router bouncer SHALL hold five optional bound clients as `atomic.Value` fields (LAPI, AppSec, captcha, ModSec, and the rate limit), each able to hold a typed nil. Each field's stored concrete type SHALL stay `*reclaim.Box` (Yaegi). On every Watch publish into a bound field, the bouncer SHALL `Store` a new `*reclaim.Box{Value: .}` and MUST NOT assign `Box.Value` in place on a Box already published in that field. `ServeHTTP` SHALL `Load` those fields only and MUST NOT resolve instance names, Peek slot tables, or Open clients on the request path. Subscribers MUST NOT Bind reclaim on those clients. The bouncer SHALL read `lapiMode` from the loaded LAPI client on each request, not from a copy taken at `New`. When `bouncerEnabled` is false the handler SHALL call `next` without applying decisions while owners may still Open and publish.
 
 #### Scenario: Nil LAPI client uses failure action for that leg
 - **WHEN** the bouncer subscribed to LAPI but the loaded value is empty
@@ -34,14 +34,19 @@ The per-router bouncer SHALL hold four optional bound clients as `atomic.Value` 
 - **THEN** `ServeHTTP` Loads the ModSec `atomic.Value` only
 - **AND** it does not Open or reconstruct a ModSec client on the request path
 
+#### Scenario: Rate-limit binding is Load-only
+- **WHEN** the bouncer subscribed to a rate-limit instance
+- **THEN** `ServeHTTP` Loads the rate-limit `atomic.Value` only
+- **AND** it does not Open a rate-limit client, dial Redis, or compile buckets on the request path
+
 #### Scenario: Bind update publishes a new Box
-- **WHEN** a Watch notice updates an already-bound LAPI, AppSec, captcha, or ModSec field
+- **WHEN** a Watch notice updates an already-bound LAPI, AppSec, captcha, ModSec, or rate-limit field
 - **THEN** the field's `atomic.Value` Stores a new `*reclaim.Box`
 - **AND** the previous Box's `Value` field is not written in place
 - **AND** concurrent ServeHTTP Unbox of that field does not panic from a torn `any`
 
 ### Requirement: A missing subscribed client uses that leg's failure action
-A missing subscribed LAPI client SHALL use this router's LAPI failure action. A missing subscribed AppSec client SHALL use this router's AppSec failure action when the request reaches AppSec. A missing subscribed captcha client SHALL ban a captcha verdict. A missing subscribed ModSec client SHALL use this router's `bouncerModsecFailureAction` when the request reaches ModSec. `New` MUST NOT wait for a client to be published. A leg the bouncer did not subscribe to is not part of that check.
+A missing subscribed LAPI client SHALL use this router's LAPI failure action. A missing subscribed AppSec client SHALL use this router's AppSec failure action when the request reaches AppSec. A missing subscribed captcha client SHALL ban a captcha verdict. A missing subscribed ModSec client SHALL use this router's `bouncerModsecFailureAction` when the request reaches ModSec. A missing subscribed rate-limit client SHALL charge no bucket and the request SHALL continue to the AppSec step; the router has no rate-limit failure action of its own, because the policy is the owner's, and it logs the loss once (`core_plugin_ratelimit_client` "A subscriber logs the loss and return of its rate-limit owner"). `New` MUST NOT wait for a client to be published. A leg the bouncer did not subscribe to is not part of that check.
 
 #### Scenario: AppSec-only subscriber ignores a missing LAPI client
 - **WHEN** the bouncer subscribes only to AppSec and LAPI is not subscribed
@@ -65,6 +70,12 @@ A missing subscribed LAPI client SHALL use this router's LAPI failure action. A 
 - **WHEN** the bouncer subscribes to ModSec, ModSec is not published, and `bouncerModsecFailureAction` is omitted
 - **AND** the request reaches ModSec
 - **THEN** the request reaches `next`
+
+#### Scenario: Missing rate-limit client charges nothing
+- **WHEN** the bouncer subscribes to rate-limit instance `shared` and no owner publishes it, or its owner went away
+- **THEN** the request continues to the AppSec step without a remediation header
+- **AND** no rate-limit drop is counted
+- **AND** no WARN is logged for the request itself
 
 ### Requirement: Bouncer does not own the stream ticker
 The per-router bouncer SHALL handle request policy (trusted IPs, ban/captcha pages, whether AppSec runs on pass, action rules, LAPI failure action, Redis fail-closed, and live-cache TTL) and MUST NOT start a process-wide stream ticker. Stream polling remains on the LAPI Client opened by an owner middleware.
@@ -190,7 +201,7 @@ The remediation header name SHALL stay on the Bouncer (`bouncerRemediationHeader
 - **AND** it is not `X-Owner`
 
 ### Requirement: Unsubscribed captcha kind warns then bans
-When the remediation kind is captcha and this bouncer did not subscribe to captcha, the bouncer SHALL emit WARN `crowdsec bouncer captcha unsubscribed` with attributes `leg` equal to `captcha` and `instanceName` (empty when unsubscribed) on every remediating request that reaches that path, then remediate as a ban. It MUST NOT emit an `ip` attribute on that WARN. It MUST NOT reconstruct the client address; identity stays `pkg/ip.GetRemoteIP` on `clientRequest`. It MUST NOT emit this WARN when the bouncer subscribed to captcha, including when the loaded captcha binding is empty or not valid. This WARN SHALL apply to every captcha-kind remediation that reaches the remediating handler (LAPI captcha kind, action-rule captcha, captcha failure-action).
+When the remediation kind is captcha and this bouncer did not subscribe to captcha, the bouncer SHALL emit WARN `crowdsec bouncer captcha unsubscribed` with attributes `leg` equal to `captcha` and `instanceName` (empty when unsubscribed) on every remediating request that reaches that path, then remediate as a ban. It MUST NOT emit an `ip` attribute on that WARN. It MUST NOT reconstruct the client address; identity stays `pkg/ip.GetRemoteIP` on `clientRequest`. It MUST NOT emit this WARN when the bouncer subscribed to captcha, including when the loaded captcha binding is empty or not valid. This WARN SHALL apply to every captcha-kind remediation that reaches the remediating handler (LAPI captcha kind, action-rule captcha, and the captcha failure action of the LAPI, AppSec, and ModSec legs). The rate-limit leg's captcha answers (a `captcha` bucket and the rate-limit failure action `captcha`) MUST NOT emit it; they log as `core_plugin_ratelimit_buckets` "Rate-limit captcha downgrades log on transitions" says.
 
 #### Scenario: Bounce-only captcha kind warns then bans
 - **WHEN** the bouncer did not subscribe to captcha
@@ -216,6 +227,12 @@ When the remediation kind is captcha and this bouncer did not subscribe to captc
 - **AND** the loaded captcha value is empty
 - **AND** the verdict is captcha
 - **THEN** the response is a ban
+- **AND** the log MUST NOT contain `crowdsec bouncer captcha unsubscribed`
+
+#### Scenario: Rate-limit captcha answer on an unsubscribed router does not warn
+- **WHEN** the bouncer did not subscribe to captcha
+- **AND** a rate-limit bucket with `action: captcha` answers a request
+- **THEN** the response is the `ratelimit` answer for that bucket
 - **AND** the log MUST NOT contain `crowdsec bouncer captcha unsubscribed`
 
 ### Requirement: Ban page sets Cache-Control
@@ -254,7 +271,7 @@ Closed reasons never take a third field, except `lapi` (the metrics origin) and 
 | `ban:appsec-failure` | AppSec down / unusable verdict, fail-closed ban |
 | `ban:modsec` | CRS sidecar copied 3xx/4xx block |
 | `ban:modsec-failure` | ModSec sidecar down / unpublished, failure action `ban` (RemediationReason `MODSEC`) |
-| `ban:ratelimit:<bucket>` | A rate-limit bucket with `action: deny` is over its limit; third field is the bucket name |
+| `ban:ratelimit:<bucket>` | A rate-limit bucket with `action: ratelimit` answered, or a `captcha` bucket answered as `ratelimit` (`bypassCaptcha`, or no usable captcha); third field is the bucket name |
 | `ban:ratelimit-failure` | Rate-limit counter could not answer, failure action `ban` |
 | `ban:captcha-downgrade` | Kind was captcha; this router served a ban page (unsubscribed / unpublished / invalid captcha client) |
 | `captcha:rules` | Matching action rule applied captcha |
@@ -263,14 +280,16 @@ Closed reasons never take a third field, except `lapi` (the metrics origin) and 
 | `captcha:stream-unhealthy` | Stream fail-closed captcha |
 | `captcha:appsec-failure` | AppSec fail-closed captcha |
 | `captcha:modsec-failure` | ModSec sidecar down / unpublished, failure action `captcha` |
+| `captcha:ratelimit:<bucket>` | Router captcha page for a rate-limit bucket with `action: captcha`; third field is the bucket name |
 | `captcha:ratelimit-failure` | Rate-limit counter could not answer, failure action `captcha` |
+| `captcha:ratelimit` | Router captcha page for a challenge-marker POST that the rate-limit leg's captcha gate answered with the challenge again (no bucket answered) |
 | `captcha:appsec` | Router captcha page for an AppSec JSON `action: captcha`, or for a challenge-marker POST that AppSec let through |
 | `captcha:challenge` | AppSec bot-detection `action: challenge` with non-empty body |
 | `captcha:solved` | 302 after a successful solve (token pass or second-tab captcha-form POST) |
 | `error:client-disconnected` | Client gone during an AppSec or ModSec body copy |
 | `error:client-body-read` | Client body could not be read whole during an AppSec or ModSec body copy (HTTP 400) |
 
-LAPI third field SHALL be the usage-metrics origin already returned by `LookupRemediation` / `LiveLookup` (`MetricsOrigin`), after strip of CR/LF/TAB and rewriting only the prefix `lists:` → `lists_`. Empty origin omits the third field. The plugin MUST NOT globally replace remaining colons. The plugin MUST NOT change `MetricsOrigin` or DecisionStore packing. Plugin origins, including `plugin:rules:<name>`, and AppSec specials are reason tokens, never a third field. A metrics origin that starts with `plugin:rules:` SHALL map to closed reason `rules` (no third field). A metrics origin that starts with `plugin:ratelimit:` SHALL map to reason `ratelimit` with the rest of the origin (the bucket name) as the third field, after the same CR/LF/TAB strip. Bucket names cannot contain `:`, so the value still splits into at most three fields. Origin `plugin:ratelimit_failure` SHALL map to closed reason `ratelimit-failure` (no third field). Client address stays `pkg/ip.GetRemoteIP` on `clientRequest`; this header MUST NOT reconstruct identity.
+LAPI third field SHALL be the usage-metrics origin already returned by `LookupRemediation` / `LiveLookup` (`MetricsOrigin`), after strip of CR/LF/TAB and rewriting only the prefix `lists:` → `lists_`. Empty origin omits the third field. The plugin MUST NOT globally replace remaining colons. The plugin MUST NOT change `MetricsOrigin` or DecisionStore packing. Plugin origins, including `plugin:rules:<name>`, and AppSec specials are reason tokens, never a third field. A metrics origin that starts with `plugin:rules:` SHALL map to closed reason `rules` (no third field). A metrics origin that starts with `plugin:ratelimit:` SHALL map to reason `ratelimit` with the rest of the origin (the bucket name) as the third field, after the same CR/LF/TAB strip. Bucket names cannot contain `:`, so the value still splits into at most three fields. Origin `plugin:ratelimit_failure` SHALL map to closed reason `ratelimit-failure` (no third field). Origin `plugin:ratelimit` (no bucket) SHALL map to reason `ratelimit` with no third field. Client address stays `pkg/ip.GetRemoteIP` on `clientRequest`; this header MUST NOT reconstruct identity.
 
 The bouncer SHALL format ban, AppSec relay, disconnect, captcha-downgrade, and captcha challenge-page values. `pkg/captcha` MUST NOT own the closed table. Challenge page SHALL receive the already-formatted value. Pass 302 and Check-true form POST SHALL write `captcha:solved` with no third field.
 
@@ -345,8 +364,13 @@ The bouncer SHALL format ban, AppSec relay, disconnect, captcha-downgrade, and c
 
 #### Scenario: Rate-limit deny carries the bucket name
 - **WHEN** `bouncerRemediationHeadersCustomName` is set
-- **AND** bucket `login` with `action: deny` is over its limit
+- **AND** bucket `login` with `action: ratelimit` is over its limit
 - **THEN** the header value is `ban:ratelimit:login`
+
+#### Scenario: Captcha bucket challenge carries the bucket name
+- **WHEN** `bouncerRemediationHeadersCustomName` is set
+- **AND** bucket `per-ip-soft` with `action: captcha` answers with this router's captcha challenge page
+- **THEN** the header value is `captcha:ratelimit:per-ip-soft`
 
 #### Scenario: Rate-limit failure is a closed reason
 - **WHEN** `bouncerRemediationHeadersCustomName` is set
@@ -624,11 +648,15 @@ The captcha sources that continue instead of writing SHALL be:
 - an AppSec `captcha` verdict;
 - the AppSec failure action `captcha` (missing client, or a query failure);
 - the ModSec failure action `captcha` (missing client, or no sidecar verdict);
-- a captcha challenge-form POST that AppSec let through.
+- the rate-limit failure action `captcha` (counter error);
+- a captcha challenge-form POST that AppSec let through;
+- a captcha challenge-form POST that the rate-limit step hands to the captcha gate.
 
 A bypassed captcha MUST NOT increment `dropped`, MUST NOT set the remediation header, and MUST NOT log WARN `crowdsec bouncer captcha unsubscribed`. It SHALL log TRACE `bypassCaptcha` with attrs `ip` and `name` (the rule). The bypass SHALL apply before the captcha downgrade: on a router with no usable captcha client the request also continues, it is not banned.
 
 When a captcha-bypass flag is set, `ActionMatch.CaptchaName` SHALL be empty even when another matching row carries `captcha`. No captcha rule applies to that request, and WARN `warnCaptchaSuperseded` MUST NOT be logged for it.
+
+A rate-limit bucket with `action: captcha` is the one exception: on a request a `bypassCaptcha` row matches, that bucket SHALL answer as a `ratelimit` bucket (`rateLimitStatusCode`, `Retry-After`, `ban:ratelimit:<bucket>`) instead of letting the request through, so a rate limit does not become unlimited (`core_plugin_ratelimit_buckets`).
 
 Everything that is not this router's captcha gate SHALL be unchanged: a `ban` row; a LAPI ban; a fail-closed ban from the LAPI leg; an AppSec `ban` verdict or failure-action `ban`; an AppSec `challenge` (relayed when it carries a page, `ban:appsec-challenge-empty` when it does not, although its header value starts with `captcha:`); and any other AppSec action.
 
@@ -673,6 +701,12 @@ A row with a `path` predicate SHALL apply `bypassCaptcha` on every request its r
 - **THEN** `ActionMatch.CaptchaName` is empty and `ActionMatch.BypassCaptchaName` is `api`
 - **AND** no captcha page is written
 
+#### Scenario: Captcha bucket answers as a rate limit
+- **WHEN** the rule `{name: api, path: "^/api/", action: [bypassCaptcha]}` matches
+- **AND** a rate-limit bucket `per-ip-soft` with `action: captcha` is over its limit for the client
+- **THEN** the response is `rateLimitStatusCode` with `ban:ratelimit:per-ip-soft`
+- **AND** `next` is not called
+
 #### Scenario: Request outside the rule still gets the captcha
 - **WHEN** the rule is `{name: api, path: "^/api/", action: [bypassCaptcha]}` and the request path is `/catalog`
 - **AND** the client has an active LAPI `captcha` decision
@@ -686,7 +720,7 @@ A row with a `path` predicate SHALL apply `bypassCaptcha` on every request its r
 - **AND** `ActionMatch.AmbiguousPathName` is `api`
 
 ### Requirement: The rate limit runs between the LAPI step and the AppSec step
-When `rateLimitEnabled` is true, ServeHTTP SHALL run the rate-limit step after the LAPI step and before the AppSec step. Requests that never reach it SHALL NOT be charged to any bucket: a `GetRemoteIP` error, a trusted client, a disabled bouncer, a matching action-rule `ban`, and a request the LAPI step answered (a CrowdSec ban, an unsolved CrowdSec captcha, a LAPI fail-closed ban or captcha). A request the LAPI step let through (no decision, a valid captcha gate cookie, a LAPI skip, failure action `passthrough`) SHALL reach the rate-limit step. The action-rule captcha gate and the AppSec query SHALL run after the rate-limit step, so a denied request never reaches AppSec. When `rateLimitEnabled` is false, the request path SHALL be unchanged.
+When the router subscribes to a rate-limit instance (`bouncerEnabled` and a `rateLimitInstanceName`, filled with the Traefik name on an owner), ServeHTTP SHALL run the rate-limit step after the LAPI step and before the AppSec step. Requests that never reach it SHALL NOT be charged to any bucket: a `GetRemoteIP` error, a trusted client, a disabled bouncer, a matching action-rule `ban`, and a request the LAPI step answered (a CrowdSec ban, an unsolved CrowdSec captcha, a LAPI fail-closed ban or captcha). A request the LAPI step let through (no decision, a valid captcha gate cookie, a LAPI skip, failure action `passthrough`) SHALL reach the rate-limit step. The action-rule captcha gate and the AppSec query SHALL run after the rate-limit step, so a request a bucket answered never reaches AppSec. When the router does not subscribe to a rate-limit instance, the request path SHALL be unchanged.
 
 The rate-limit step SHALL NOT increment `processed` a second time.
 
@@ -697,9 +731,9 @@ The rate-limit step SHALL NOT increment `processed` a second time.
 - **AND** the bucket counter for that client does not move
 
 #### Scenario: Denied request does not reach AppSec
-- **WHEN** a `deny` bucket is over its limit for the client
+- **WHEN** a `ratelimit` bucket is over its limit for the client
 - **AND** AppSec is enabled on the router
-- **THEN** the response is the rate-limit deny
+- **THEN** the response is the `ratelimit` answer
 - **AND** AppSec is not queried
 
 #### Scenario: Trusted client is not charged
@@ -707,6 +741,11 @@ The rate-limit step SHALL NOT increment `processed` a second time.
 - **THEN** the request reaches the backend and no bucket counter moves
 
 #### Scenario: Action-rule captcha comes after the rate limit
-- **WHEN** a `captcha` action rule matches the request and a `deny` bucket is over its limit for the client
-- **THEN** the response is the rate-limit deny, not the captcha page
+- **WHEN** a `captcha` action rule matches the request and a `ratelimit` bucket is over its limit for the client
+- **THEN** the response is the `ratelimit` answer, not the captcha page
 - **AND** WARN `warnCaptchaSuperseded` is logged with attribute `name` of that captcha rule
+
+#### Scenario: Owner without bouncerEnabled charges nothing
+- **WHEN** a middleware sets `rateLimitEnabled` and leaves `bouncerEnabled` false
+- **THEN** it publishes its rate-limit client
+- **AND** requests through it reach `next` without being charged
