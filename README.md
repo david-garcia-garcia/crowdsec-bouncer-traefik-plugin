@@ -81,6 +81,7 @@ flowchart LR
   CAPI["CAPI / community lists"]
   AppSec["AppSec"]
   ModSec["ModSecurity CRS sidecar"]
+  Redis["Redis (rate limit)"]
 
   User -->|"HTTP request"| Traefik
   Traefik -->|"User Http Request"| Plugin
@@ -91,6 +92,7 @@ flowchart LR
   Engine -->|"decisions"| LAPI
   CAPI -->|"remote blocklists"| LAPI
   LAPI -->|"decision lookup"| Plugin
+  Plugin -.->|"count this client"| Redis
   Plugin -.->|"this request?"| AppSec
   AppSec -.->|"allow / block"| Plugin
   Plugin -.->|"this request?"| ModSec
@@ -109,6 +111,30 @@ Users are blocked based on:
 This plugin only enforces decisions. It does not read logs; CrowdSec does that and produces the decisions.
 
 To share one CrowdSec connection between routers, or to use several CrowdSec engines in one Traefik, see [Middleware Architecture](#middleware-architecture).
+
+### Order of the checks
+
+On each request the middleware runs these steps in order. The first step that answers (ban page, captcha page, 429, or an error status) ends the request: later steps do not run and your application is not called.
+
+1. **Client IP.** The address comes from the [trusted proxy settings](#remediate-the-visitor-not-the-proxy). If it cannot be read, the answer is HTTP 502. An address in [`bouncerClientTrustedIps`](#let-a-lan-or-vpn-through) goes straight to your application: none of the steps below run.
+2. **`ban` action rule.** A matching [`bouncerActionRules`](#variables) row with `ban` answers here, before CrowdSec is asked.
+3. **LAPI decision.** A ban or captcha decision for the client IP, a range that contains it, or a mapped header scope.
+4. **Rate limit.** The buckets of the [rate limit](#limit-how-often-a-client-calls-a-route). A client that step 3 already banned or challenged is not counted.
+5. **AppSec, then the captcha of a `captcha` action rule.** With a `captcha` rule, AppSec is asked first; when it lets the request through, the client gets the captcha page, or goes on if it already solved one.
+6. **ModSecurity sidecar.** See [ModSecurity (OWASP CRS)](#modsecurity-owasp-crs).
+7. **Your application.**
+
+A step the router does not use (no LAPI, rate-limit, AppSec, or ModSec instance name) is skipped. Action rules skip single steps:
+
+| Action | LAPI | Rate limit | AppSec | ModSec |
+| ------ | ---- | ---------- | ------ | ------ |
+| `bypass` | skipped | runs | skipped | skipped |
+| `bypassLapi` | skipped | runs | runs | runs |
+| `bypassRateLimit` | runs | skipped | runs | runs |
+| `bypassAppsec` | runs | runs | skipped | runs |
+| `bypassModsec` | runs | runs | runs | skipped |
+
+Under `/crowdsec-internal/challenge/` a `bypass` or `bypassAppsec` rule does not skip AppSec (see [AppSec](#appsec)). A rule with a `path` skips nothing when the request path can be read more than one way (see [BouncerActionRules](#variables)).
 
 ## Decisions
 
@@ -193,7 +219,7 @@ flowchart LR
   Engine -->|"ban for IPs that keep tripping CRS"| LAPI
 ```
 
-The checks run in that order, and the first one that blocks answers: a request AppSec blocks never reaches the sidecar. `bouncerClientTrustedIps` skips all of them. `bypassModsec` in [BouncerActionRules](#variables) skips only the sidecar; `bypass` skips LAPI, AppSec, and the sidecar.
+The checks run in that order, and the first one that blocks answers: a request AppSec blocks never reaches the sidecar. When the router applies a [rate limit](#limit-how-often-a-client-calls-a-route), it runs between steps 1 and 2. `bouncerClientTrustedIps` skips all of them. `bypassModsec` in [BouncerActionRules](#variables) skips only the sidecar; `bypass` skips LAPI, AppSec, and the sidecar, not the rate limit. The full order is in [Order of the checks](#order-of-the-checks).
 
 The sidecar only inspects. After the CRS request phases (headers and body), Apache answers HTTP 200 itself; it never proxies to your application. The plugin reads its status:
 
@@ -857,7 +883,7 @@ Match on what the client cannot choose for another resource: the path, the host,
 
 **What you give up.** On the matching requests a captcha no longer slows anyone down. A client that CrowdSec wanted to challenge can call those routes freely, and during a LAPI, AppSec or ModSecurity outage with failure action `captcha` they are let through as with `passthrough`. Only bans stop a client there. If one known integration is the reason for the rule and it has a fixed address, [`bouncerClientTrustedIps`](#let-a-lan-or-vpn-through) for that address is the narrower setting.
 
-**How the path is matched.** The `path` pattern runs as written on the path the plugin receives, for every request. The other skip actions (`bypass`, `bypassLapi`, `bypassAppsec`, `bypassModsec`) switch themselves off on a path with percent-encoding or other ambiguous characters. `bypassCaptcha` does not, so `/api/items%20x` works. It relies on Traefik having cleaned the path first. Measured on Traefik v3.7.11 and v3.7.19 with the rule above:
+**How the path is matched.** The `path` pattern runs as written on the path the plugin receives, for every request. The other skip actions (`bypass`, `bypassLapi`, `bypassAppsec`, `bypassModsec`, `bypassRateLimit`) switch themselves off on a path with percent-encoding or other ambiguous characters. `bypassCaptcha` does not, so `/api/items%20x` works. It relies on Traefik having cleaned the path first. Measured on Traefik v3.7.11 and v3.7.19 with the rule above:
 
 | Request sent | Path the plugin and your application receive | Captcha bypassed |
 | ------------ | -------------------------------------------- | ---------------- |
@@ -947,7 +973,7 @@ http:
 
 **When the policy is not loaded.** A router whose `rateLimitInstanceName` no loaded middleware shares (removed, `rateLimitEnabled` turned off, or not loaded yet after a reload) lets every request through: nothing is counted and no verdict header is set. The router logs WARN `crowdsec bouncer rate limit owner unavailable` (with `instanceName`) once when it loses the policy, and INFO `crowdsec bouncer rate limit owner available` once when it gets one back. Traefik rebuilds routers on every reload; the WARN belongs to the middleware name (`traefikName`), not to one build, so a rebuild while the policy is still missing does not repeat it, and the INFO comes from whichever build of that name gets the policy back first, also one Traefik builds after the policy returns. If `rateLimitInstanceName` changes in between, the INFO names the new instance. A router that Traefik builds while no middleware shares the policy yet (at startup, or on a reload that builds it before the owner) logs both lines at once. A change to the buckets, the status code, the `Retry-After` switch, the failure action, the algorithm, or the Redis settings opens a new connection; counts already in Redis are kept for every bucket whose name did not change, and a renamed bucket starts from zero. A change of `rateLimitAlgorithm` starts every bucket from zero: the two algorithms keep separate Redis keys. Renaming `rateLimitInstanceName` keeps the connection.
 
-**Where it runs.** After the CrowdSec decision lookup and before AppSec, ModSecurity, and the captcha of a `captcha` rule. A client that CrowdSec already bans or challenges gets that answer and is not counted. A request answered by the rate limit never reaches AppSec or ModSecurity. Clients in `bouncerClientTrustedIps` and requests banned by a `ban` rule are not counted either.
+**Where it runs.** After the CrowdSec decision lookup and before AppSec, ModSecurity, and the captcha of a `captcha` rule (see [Order of the checks](#order-of-the-checks)). A client that CrowdSec already bans or challenges gets that answer and is not counted. A request answered by the rate limit never reaches AppSec or ModSecurity. Clients in `bouncerClientTrustedIps` and requests banned by a `ban` rule are not counted either.
 
 **Which requests a bucket counts.** The same conditions as a [`bouncerActionRules`](#variables) rule, written on the bucket: `method`, `path`, `host`, `headers`, `cookies`. A bucket with none counts every request.
 
@@ -1027,7 +1053,7 @@ The captcha page's own requests are not counted while the router has a usable ca
 
 ### Let a LAN or VPN through
 
-`bouncerClientTrustedIps` lets these client addresses skip all checks, including LAPI, AppSec, and ModSec. See [examples/trusted-ips](examples/trusted-ips/README.md).
+`bouncerClientTrustedIps` lets these client addresses skip all checks, including LAPI, the rate limit, AppSec, and ModSec. See [examples/trusted-ips](examples/trusted-ips/README.md).
 
 ```yaml
 bouncerClientTrustedIps:
@@ -1258,7 +1284,7 @@ bouncerActionRules:
 What to do when AppSec cannot give an answer (unreachable, error, or request body cannot be read): `ban`, `passthrough`, or `captcha`. While the backoff gate skips AppSec (`appsecUnhealthyBackOffPeriodSecs`), this action does not apply. See [Choose what happens when CrowdSec is down](#choose-what-happens-when-crowdsec-is-down).
 
 **BouncerClientTrustedIPs** ([]string, default `[]`)
-Client IPs or ranges that skip all checks, AppSec and ModSec included (LAN, VPN).
+Client IPs or ranges that skip all checks, the rate limit, AppSec, and ModSec included (LAN, VPN).
 
 **BouncerDecisionScopeHeaders** (map[string]string, default `{}`)
 Maps a CrowdSec scope (country, AS, or any custom one) to the request header holding its value. See [Decisions](#decisions).
