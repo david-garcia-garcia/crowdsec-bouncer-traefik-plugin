@@ -122,3 +122,25 @@ Each failing request SHALL log at DEBUG with the client address and the error. T
 - **WHEN** Redis accepts the connection but does not answer
 - **THEN** the rate-limit step returns within the 250ms budget
 - **AND** in exact mode it applies `rateLimitFailureAction`
+
+## ADDED Requirements
+
+### Requirement: A subscriber logs the loss and return of its rate-limit owner
+A rate-limit subscriber SHALL log WARN `crowdsec bouncer rate limit owner unavailable` (`traefikName`, `instanceName`) once each time it moves to no published rate-limit client. It SHALL log INFO `crowdsec bouncer rate limit owner available` (`traefikName`, `instanceName`, the bound client's `incarnation`) once, on the first bind after that WARN. Neither line SHALL be logged per request, on a repeated delivery of the same state, or when one client replaces another.
+
+#### Scenario: Owner removed logs one WARN
+- **WHEN** subscriber `app-a` of instance `shared` is bound and the owner of `shared` is removed
+- **AND** three requests then reach `app-a`
+- **THEN** WARN `crowdsec bouncer rate limit owner unavailable` with `traefikName` `app-a` and `instanceName` `shared` is logged once
+- **AND** the three requests reach the backend uncharged
+
+#### Scenario: Owner restored logs one INFO
+- **WHEN** the owner of `shared` publishes again after that WARN
+- **THEN** INFO `crowdsec bouncer rate limit owner available` with the new client's `incarnation` is logged once
+- **AND** publishing the same client again or replacing it by a new one logs neither line
+
+#### Scenario: Subscriber that starts before its owner
+- **WHEN** under Traefik's interpreter a subscriber of `shared` starts before any owner publishes `shared`
+- **THEN** it logs WARN `crowdsec bouncer rate limit owner unavailable` once
+- **AND** when the owner publishes, it logs INFO `crowdsec bouncer rate limit owner available` once
+- **AND** compiled Go, which does not deliver that first empty value, logs neither line

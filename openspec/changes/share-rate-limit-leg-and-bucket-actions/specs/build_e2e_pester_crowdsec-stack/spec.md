@@ -33,6 +33,7 @@ The real-stack Pester suite SHALL run one rate-limit owner without `bouncerEnabl
 - **WHEN** the dynamic file drops the owner and the reclaim grace passes
 - **THEN** subscribers pass requests through without a remediation header
 - **AND** Traefik logs `crowdsec bouncer unbound` with `"leg":"ratelimit"`
+- **AND** each subscriber logs WARN `crowdsec bouncer rate limit owner unavailable` once for that removal
 - **AND** when the owner is added back, the logs show `crowdsec bouncer bound` with `"leg":"ratelimit"` and an over-limit client is answered again
 
 #### Scenario: Bucket edit keeps the count

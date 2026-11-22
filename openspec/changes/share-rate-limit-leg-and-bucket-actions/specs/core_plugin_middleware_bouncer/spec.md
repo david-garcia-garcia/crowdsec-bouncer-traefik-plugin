@@ -34,7 +34,7 @@ The per-router bouncer SHALL hold five optional bound clients as `atomic.Value` 
 - **AND** concurrent ServeHTTP Unbox of that field does not panic from a torn `any`
 
 ### Requirement: A missing subscribed client uses that leg's failure action
-A missing subscribed LAPI client SHALL use this router's LAPI failure action. A missing subscribed AppSec client SHALL use this router's AppSec failure action when the request reaches AppSec. A missing subscribed captcha client SHALL ban a captcha verdict. A missing subscribed ModSec client SHALL use this router's `bouncerModsecFailureAction` when the request reaches ModSec. A missing subscribed rate-limit client SHALL charge no bucket and the request SHALL continue to the AppSec step; the router has no rate-limit failure action of its own, because the policy is the owner's. `New` MUST NOT wait for a client to be published. A leg the bouncer did not subscribe to is not part of that check.
+A missing subscribed LAPI client SHALL use this router's LAPI failure action. A missing subscribed AppSec client SHALL use this router's AppSec failure action when the request reaches AppSec. A missing subscribed captcha client SHALL ban a captcha verdict. A missing subscribed ModSec client SHALL use this router's `bouncerModsecFailureAction` when the request reaches ModSec. A missing subscribed rate-limit client SHALL charge no bucket and the request SHALL continue to the AppSec step; the router has no rate-limit failure action of its own, because the policy is the owner's, and it logs the loss once (`core_plugin_ratelimit_client` "A subscriber logs the loss and return of its rate-limit owner"). `New` MUST NOT wait for a client to be published. A leg the bouncer did not subscribe to is not part of that check.
 
 #### Scenario: AppSec-only subscriber ignores a missing LAPI client
 - **WHEN** the bouncer subscribes only to AppSec and LAPI is not subscribed
@@ -63,6 +63,7 @@ A missing subscribed LAPI client SHALL use this router's LAPI failure action. A 
 - **WHEN** the bouncer subscribes to rate-limit instance `shared` and no owner publishes it, or its owner went away
 - **THEN** the request continues to the AppSec step without a remediation header
 - **AND** no rate-limit drop is counted
+- **AND** no WARN is logged for the request itself
 
 ### Requirement: Structured remediation header values
 

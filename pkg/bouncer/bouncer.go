@@ -40,6 +40,7 @@ type Bouncer struct {
 	name                     string
 	next                     http.Handler
 	rateLimitLeg             legBinding // *ratelimit.Client: the owner's counter, buckets, and policy
+	rateLimitOwnerWarned     bool       // the owner-unavailable WARN is the last owner line logged; guarded by bindingMu
 	remediationCustomHeader  string
 	remediationStatusCode    int
 	trustedHops              *ip.PoolStrategy // hops allowed to set the forwarded client header

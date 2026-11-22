@@ -18,7 +18,7 @@ func (b *Bouncer) loadedLAPI() *lapi.Client {
 // published is a reclaim.Published. The same pointer is a no-op.
 // A newly bound client also warns when a header scope is not in the stream.
 func (b *Bouncer) ReceiveLAPI(published any) {
-	b.receiveBinding(&b.lapiLeg, published, func() string { return b.loadedLAPI().Incarnation() }, b.warnMissingStreamScopes)
+	b.receiveBinding(&b.lapiLeg, published, func() string { return b.loadedLAPI().Incarnation() }, b.warnMissingStreamScopes, nil)
 }
 
 // warnMissingStreamScopes warns when a decision scope header names a scope the bound LAPI client does not poll.

@@ -12,11 +12,37 @@ func (b *Bouncer) loadedRateLimit() *ratelimit.Client {
 	return client
 }
 
+const (
+	// msgRateLimitOwnerUnavailable is the WARN line when this route's rate-limit owner stops being published:
+	// every request now passes uncharged.
+	msgRateLimitOwnerUnavailable = "crowdsec bouncer rate limit owner unavailable"
+	// msgRateLimitOwnerAvailable is the INFO line when a rate-limit client binds after msgRateLimitOwnerUnavailable.
+	msgRateLimitOwnerAvailable = "crowdsec bouncer rate limit owner available"
+)
+
 // ReceiveRateLimit stores the published rate-limit client and traces the pointer change.
 // published is a reclaim.Published. The same pointer is a no-op.
-// A newly bound client also logs ERROR when its policy answers with a captcha this route does not subscribe to.
+// A move to no client logs WARN once, and the next bind logs INFO (bindRateLimitClient, warnRateLimitOwnerUnavailable).
 func (b *Bouncer) ReceiveRateLimit(published any) {
-	b.receiveBinding(&b.rateLimitLeg, published, func() string { return b.loadedRateLimit().Incarnation() }, b.logRateLimitCaptchaUnsubscribed)
+	b.receiveBinding(&b.rateLimitLeg, published, func() string { return b.loadedRateLimit().Incarnation() }, b.bindRateLimitClient, b.warnRateLimitOwnerUnavailable)
+}
+
+// bindRateLimitClient is the bind hook of a newly bound rate-limit client: INFO when it ends an
+// owner-unavailable WARN, then the captcha check of logRateLimitCaptchaUnsubscribed. It runs under bindingMu.
+func (b *Bouncer) bindRateLimitClient() {
+	if b.rateLimitOwnerWarned {
+		b.rateLimitOwnerWarned = false
+		b.log.Info(msgRateLimitOwnerAvailable,
+			"instanceName", b.rateLimitLeg.instanceName, "incarnation", b.loadedRateLimit().Incarnation())
+	}
+	b.logRateLimitCaptchaUnsubscribed()
+}
+
+// warnRateLimitOwnerUnavailable is the unbind hook of the rate-limit binding: WARN once per move to no
+// published owner, since this route then charges nothing. It runs under bindingMu, never per request.
+func (b *Bouncer) warnRateLimitOwnerUnavailable() {
+	b.rateLimitOwnerWarned = true
+	b.log.Warn(msgRateLimitOwnerUnavailable, "instanceName", b.rateLimitLeg.instanceName)
 }
 
 // logRateLimitCaptchaUnsubscribed logs ERROR once per bind when the bound rate-limit client's policy can

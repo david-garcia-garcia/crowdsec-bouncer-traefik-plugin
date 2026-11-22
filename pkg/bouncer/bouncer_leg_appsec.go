@@ -15,5 +15,5 @@ func (b *Bouncer) loadedAppSec() *appsec.Client {
 // ReceiveAppSec stores the published AppSec client and traces the pointer change.
 // published is a reclaim.Published. The same pointer is a no-op.
 func (b *Bouncer) ReceiveAppSec(published any) {
-	b.receiveBinding(&b.appsecLeg, published, func() string { return b.loadedAppSec().Incarnation() }, nil)
+	b.receiveBinding(&b.appsecLeg, published, func() string { return b.loadedAppSec().Incarnation() }, nil, nil)
 }

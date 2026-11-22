@@ -2,6 +2,7 @@ package crowdsec_bouncer_traefik_plugin //nolint:revive,stylecheck
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -313,5 +314,78 @@ func TestNew_RateLimitDeadRedisBufferedKeepsTheLocalLimit(t *testing.T) {
 	handler.ServeHTTP(rw, reqForIP("203.0.113.43"))
 	if rw.Code != http.StatusTooManyRequests || rw.Header().Get("X-Remediation") != "ban:ratelimit:per-ip" {
 		t.Fatalf("hit 6: status %d header %q, want 429 ban:ratelimit:per-ip", rw.Code, rw.Header().Get("X-Remediation"))
+	}
+}
+
+// countRateLimitOwnerLines is how many lines of logFilePath carry msg at level for subscriber app-a of
+// rate-limit instance shared.
+func countRateLimitOwnerLines(t *testing.T, logFilePath, msg, level string) int {
+	t.Helper()
+	total := 0
+	for _, entry := range readLogEntries(t, logFilePath, msg) {
+		// fmt.Sprint, not comma-ok assertions: yaegi runs this file.
+		if fmt.Sprint(entry["level"]) == level && fmt.Sprint(entry["traefikName"]) == "app-a" && fmt.Sprint(entry["instanceName"]) == "shared" {
+			total++
+		}
+	}
+	return total
+}
+
+// TestNew_RateLimitOwnerUnavailableWarnsOnTransitions proves, through New and the real Watch, that a
+// subscriber logs WARN "crowdsec bouncer rate limit owner unavailable" once when its owner is dropped and
+// INFO "crowdsec bouncer rate limit owner available" once when it returns, never per request. A subscriber
+// that starts before its owner warns once under Yaegi (Watch delivers the typed nil) and not in compiled
+// Go (Watch skips it); either way the first bind logs one INFO per WARN before it.
+func TestNew_RateLimitOwnerUnavailableWarnsOnTransitions(t *testing.T) {
+	logFilePath := newTestLogFile(t)
+	const warnMsg = "crowdsec bouncer rate limit owner unavailable"
+	const infoMsg = "crowdsec bouncer rate limit owner available"
+
+	// Subscribe before any owner publishes.
+	subscriberConfig := cfgRateLimitSubscriber("shared")
+	subscriberConfig.LogLevel = "INFO"
+	subscriberConfig.LogFormat = "json"
+	subscriberConfig.LogFilePath = logFilePath
+	appA, err := New(context.Background(), testNextOK(), subscriberConfig, "app-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	warnedBeforeOwner := countRateLimitOwnerLines(t, logFilePath, warnMsg, "WARN")
+	if warnedBeforeOwner > 1 {
+		t.Fatalf("subscribe before publish logged %d WARN lines, want at most one", warnedBeforeOwner)
+	}
+	t.Logf("subscribe before publish: %d WARN (1 under Yaegi, 0 in compiled Go)", warnedBeforeOwner)
+
+	// The owner publishes: one INFO per WARN before it.
+	if _, err := New(context.Background(), testNextOK(), cfgRateLimitOwnerOnly("shared", 3, http.StatusTooManyRequests), "rl-owner"); err != nil {
+		t.Fatal(err)
+	}
+	if got := countRateLimitOwnerLines(t, logFilePath, infoMsg, "INFO"); got != warnedBeforeOwner {
+		t.Fatalf("first bind: INFO lines=%d want %d", got, warnedBeforeOwner)
+	}
+
+	// The owner is dropped: one WARN, and requests pass without another.
+	dropped := cfgRateLimitOwnerOnly("shared", 3, http.StatusTooManyRequests)
+	dropped.RateLimitEnabled = false
+	dropped.RateLimitInstanceName = ""
+	if _, err := New(context.Background(), testNextOK(), dropped, "rl-owner"); err != nil {
+		t.Fatal(err)
+	}
+	if status := serveTestRequests(appA, "203.0.113.70", 5); status != http.StatusOK {
+		t.Fatalf("no owner: status %d, want 200", status)
+	}
+	if got := countRateLimitOwnerLines(t, logFilePath, warnMsg, "WARN"); got != warnedBeforeOwner+1 {
+		t.Fatalf("owner dropped: WARN lines=%d want %d", got, warnedBeforeOwner+1)
+	}
+
+	// The owner returns: one INFO, and the limit answers again.
+	if _, err := New(context.Background(), testNextOK(), cfgRateLimitOwnerOnly("shared", 3, http.StatusTooManyRequests), "rl-owner"); err != nil {
+		t.Fatal(err)
+	}
+	if got := countRateLimitOwnerLines(t, logFilePath, infoMsg, "INFO"); got != warnedBeforeOwner+1 {
+		t.Fatalf("owner restored: INFO lines=%d want %d", got, warnedBeforeOwner+1)
+	}
+	if got := countRateLimitOwnerLines(t, logFilePath, warnMsg, "WARN"); got != warnedBeforeOwner+1 {
+		t.Fatalf("owner restored: WARN lines=%d want %d", got, warnedBeforeOwner+1)
 	}
 }

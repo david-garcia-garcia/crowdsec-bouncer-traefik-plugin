@@ -14,5 +14,5 @@ func (b *Bouncer) loadedCaptcha() *captcha.Client {
 // ReceiveCaptcha stores the published captcha client and traces the pointer change.
 // published is a reclaim.Published. The same pointer is a no-op.
 func (b *Bouncer) ReceiveCaptcha(published any) {
-	b.receiveBinding(&b.captchaLeg, published, func() string { return b.loadedCaptcha().Incarnation() }, nil)
+	b.receiveBinding(&b.captchaLeg, published, func() string { return b.loadedCaptcha().Incarnation() }, nil, nil)
 }

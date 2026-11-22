@@ -493,3 +493,83 @@ func TestRateLimit_ownerPolicyAnswersOnSubscriber(t *testing.T) {
 		t.Fatalf("counter error: next=%v header %q, want the owner's passthrough", subscriber.next.called, rw.Header().Get("X-Remediation"))
 	}
 }
+
+// TestRateLimit_ownerUnavailableLogsOnTransitions proves a subscriber logs one WARN when its rate-limit owner
+// stops being published and one INFO when a client binds again, never per request, while requests pass
+// uncharged. "publish first" is the compiled-Go order (Watch skips the first typed nil); "empty first" is the
+// Yaegi order, where Watch delivers the typed nil to a subscriber that starts before its owner.
+func TestRateLimit_ownerUnavailableLogsOnTransitions(t *testing.T) {
+	t.Run("publish first", func(t *testing.T) { checkRateLimitOwnerTransitions(t, false) })
+	t.Run("empty first", func(t *testing.T) { checkRateLimitOwnerTransitions(t, true) })
+}
+
+// checkRateLimitOwnerTransitions runs subscriber app-a of instance shared through before the owner (an empty
+// delivery when emptyFirst), first bind, owner removed with requests, and owner restored, checking the owner
+// WARN / INFO counts after each step.
+func checkRateLimitOwnerTransitions(t *testing.T, emptyFirst bool) {
+	t.Helper()
+	cfg := newTestRateLimitConfig([]ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, func(cfg *configuration.Config) {
+		cfg.RateLimitEnabled = false
+		cfg.RateLimitInstanceName = "shared"
+	})
+	next := &recordedNextRequest{}
+	counter := &testRateLimitCounter{counts: map[string]int64{}}
+	fixture := &testRateLimitFixture{b: newTestRateLimitRoute(t, "app-a", cfg, next), counter: counter, next: next}
+	log, sink := newTestLogSink(slog.LevelDebug)
+	// bouncer.New adds traefikName with log.With; replace the logger the same way.
+	fixture.b.log = log.With("traefikName", fixture.b.name)
+	owner := newTestRateLimitConfig([]ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, nil)
+	empty := reclaim.Published{Value: (*ratelimit.Client)(nil)}
+
+	// Before any owner: Yaegi delivers the typed nil and warns once; Go delivers nothing.
+	wantWarn := 0
+	if emptyFirst {
+		fixture.b.ReceiveRateLimit(empty)
+		wantWarn = 1
+	}
+	assertRateLimitOwnerLines(t, sink, "before the owner", wantWarn, 0)
+
+	// The first bind ends a WARN with one INFO; without a WARN it logs nothing.
+	fixture.b.ReceiveRateLimit(reclaim.Published{Value: newTestRateLimitClient(t, owner, counter)})
+	assertRateLimitOwnerLines(t, sink, "first bind", wantWarn, wantWarn)
+
+	// The owner goes away: one WARN however often the empty value is delivered or requests arrive.
+	fixture.b.ReceiveRateLimit(empty)
+	fixture.b.ReceiveRateLimit(empty)
+	for range 3 {
+		if rw := fixture.serve(http.MethodGet, "/", testRateLimitClientIP); !fixture.next.called || rw.Header().Get("X-Remediation") != "" {
+			t.Fatalf("no owner: next=%v header %q, want the request through", fixture.next.called, rw.Header().Get("X-Remediation"))
+		}
+	}
+	if takes := counter.takes.Load(); takes != 0 {
+		t.Fatalf("no owner: charged %d times, want 0", takes)
+	}
+	assertRateLimitOwnerLines(t, sink, "owner removed", wantWarn+1, wantWarn)
+
+	// The owner returns: one INFO naming the new incarnation; the same client again and a replace log nothing.
+	second := newTestRateLimitClient(t, owner, counter)
+	fixture.b.ReceiveRateLimit(reclaim.Published{Value: second})
+	fixture.b.ReceiveRateLimit(reclaim.Published{Value: second})
+	fixture.b.ReceiveRateLimit(reclaim.Published{Value: newTestRateLimitClient(t, owner, counter)})
+	assertRateLimitOwnerLines(t, sink, "owner restored", wantWarn+1, wantWarn+1)
+	if got := countLogLines(sink.String(), `"msg":"`+msgRateLimitOwnerAvailable+`"`, `"incarnation":"`+second.Incarnation()+`"`); got != 1 {
+		t.Fatalf("INFO %q with incarnation %s lines=%d want 1: %s", msgRateLimitOwnerAvailable, second.Incarnation(), got, sink.String())
+	}
+}
+
+// assertRateLimitOwnerLines checks that sink holds wantWarn owner-unavailable WARN lines and wantInfo
+// owner-available INFO lines for app-a / shared, and no other WARN line.
+func assertRateLimitOwnerLines(t *testing.T, sink *syncLogSink, step string, wantWarn, wantInfo int) {
+	t.Helper()
+	logged := sink.String()
+	ownerAttrs := []string{`"traefikName":"app-a"`, `"instanceName":"shared"`}
+	if got := countLogLines(logged, append([]string{`"level":"WARN"`, `"msg":"` + msgRateLimitOwnerUnavailable + `"`}, ownerAttrs...)...); got != wantWarn {
+		t.Fatalf("%s: WARN %q lines=%d want %d: %s", step, msgRateLimitOwnerUnavailable, got, wantWarn, logged)
+	}
+	if got := countLogLines(logged, append([]string{`"level":"INFO"`, `"msg":"` + msgRateLimitOwnerAvailable + `"`}, ownerAttrs...)...); got != wantInfo {
+		t.Fatalf("%s: INFO %q lines=%d want %d: %s", step, msgRateLimitOwnerAvailable, got, wantInfo, logged)
+	}
+	if got := countLogLines(logged, `"level":"WARN"`); got != wantWarn {
+		t.Fatalf("%s: WARN lines=%d want %d: %s", step, got, wantWarn, logged)
+	}
+}

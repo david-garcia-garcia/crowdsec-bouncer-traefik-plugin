@@ -12,7 +12,7 @@ import (
 // TestYaegi_LegBindingReceiveAndLoad runs the leg bindings under Yaegi v0.16.1, the way Traefik
 // loads them: New with Subscriptions, then each Receive<Leg> with an empty, a published, the same,
 // a replaced, and an empty value. The program checks the bound / unbound trace sequence of every
-// leg and the LAPI client the route loads after each step.
+// leg, the LAPI client the route loads after each step, and the rate-limit owner WARN / INFO counts.
 func TestYaegi_LegBindingReceiveAndLoad(t *testing.T) {
 	dir := t.TempDir()
 	templatePath := filepath.Join(dir, "captcha.html")
@@ -24,7 +24,7 @@ func TestYaegi_LegBindingReceiveAndLoad(t *testing.T) {
 }
 
 // yaegiLegBindingProgram is the package main program TestYaegi_LegBindingReceiveAndLoad interprets.
-// The two %q verbs are the captcha template path and the TRACE log file path.
+// The two %q verbs are the captcha template path and the TRACE log file path; %% escapes the program's own verbs.
 const yaegiLegBindingProgram = `package main
 
 import (
@@ -202,12 +202,19 @@ func main() {
 		exitWithFailure("read log: " + err.Error())
 	}
 	var traced []string
+	ownerWarnings, ownerRecoveries := 0, 0
 	for _, line := range strings.Split(strings.TrimSpace(string(content)), "\n") {
 		entry := map[string]interface{}{}
 		if err := json.Unmarshal([]byte(line), &entry); err != nil {
 			exitWithFailure("log line is not JSON: " + line)
 		}
 		msg := fmt.Sprint(entry["msg"])
+		if msg == "crowdsec bouncer rate limit owner unavailable" && fmt.Sprint(entry["level"]) == "WARN" {
+			ownerWarnings++
+		}
+		if msg == "crowdsec bouncer rate limit owner available" && fmt.Sprint(entry["level"]) == "INFO" {
+			ownerRecoveries++
+		}
 		if msg != "crowdsec bouncer bound" && msg != "crowdsec bouncer unbound" {
 			continue
 		}
@@ -230,6 +237,11 @@ func main() {
 	}
 	if strings.Join(traced, "\n") != strings.Join(want, "\n") {
 		exitWithFailure("traces:\n" + strings.Join(traced, "\n") + "\nwant:\n" + strings.Join(want, "\n"))
+	}
+	// The rate-limit leg warns on each move to no Client (the first empty and the final clear) and logs
+	// INFO on the bind that ends the first warning; publishing the same Client and a replace log neither.
+	if ownerWarnings != 2 || ownerRecoveries != 1 {
+		exitWithFailure(fmt.Sprintf("rate limit owner lines: %%d WARN %%d INFO, want 2 and 1", ownerWarnings, ownerRecoveries))
 	}
 }
 `

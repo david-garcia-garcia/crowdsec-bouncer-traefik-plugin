@@ -214,12 +214,30 @@ Describe "Shared rate-limit leg" {
             $unbound = @(Get-SharedLogLines -Since $since -Contains @("crowdsec bouncer unbound", '"leg":"ratelimit"', '"instanceName":"rl-shared"'))
             $unbound.Count | Should -BeGreaterThan 0 -Because "the subscribers log the unbind of the rl-shared client"
 
+            # Each subscriber warns on the loss of its owner, at WARN, once for the loss and not per request.
+            $ownerWarnings = @{}
+            foreach ($subscriber in @("rl-shared-a", "rl-shared-b")) {
+                $warned = @(Get-SharedLogLines -Since $since -Contains @("crowdsec bouncer rate limit owner unavailable", '"level":"WARN"', "`"traefikName`":`"$subscriber", '"instanceName":"rl-shared"'))
+                $warned.Count | Should -BeGreaterThan 0 -Because "$subscriber logs WARN when its rate-limit owner stops being published"
+                $ownerWarnings[$subscriber] = $warned.Count
+            }
+            Send-SharedRequests -Endpoint "/rl-shared-a/page" -IP $ip -Count 3 | Out-Null
+            Send-SharedRequests -Endpoint "/rl-shared-b/page" -IP $ip -Count 3 | Out-Null
+            foreach ($subscriber in @("rl-shared-a", "rl-shared-b")) {
+                $warned = @(Get-SharedLogLines -Since $since -Contains @("crowdsec bouncer rate limit owner unavailable", "`"traefikName`":`"$subscriber"))
+                $warned.Count | Should -Be $ownerWarnings[$subscriber] -Because "requests through $subscriber while its owner is gone add no WARN"
+            }
+
             $since = Get-LogSince
             Write-SharedFile -Content $script:SharedFileCommitted
             $back = Wait-ForHttpStatus -Url "$($script:TraefikUrl)/rl-shared-a/page" -Headers @{ "X-Forwarded-For" = $ip } -ExpectedStatusCodes @(503) -TimeoutSeconds 15
             $back.Success | Should -BeTrue -Because "the over-limit client is answered again once the owner publishes; last=$($back.StatusCode)"
             $bound = @(Get-SharedLogLines -Since $since -Contains @("crowdsec bouncer bound", '"leg":"ratelimit"', '"instanceName":"rl-shared"'))
             $bound.Count | Should -BeGreaterThan 0 -Because "the subscribers log the bind of the republished client"
+            foreach ($subscriber in @("rl-shared-a", "rl-shared-b")) {
+                $available = @(Get-SharedLogLines -Since $since -Contains @("crowdsec bouncer rate limit owner available", '"level":"INFO"', "`"traefikName`":`"$subscriber", '"instanceName":"rl-shared"'))
+                $available.Count | Should -BeGreaterThan 0 -Because "$subscriber logs INFO when a rate-limit client binds after the WARN"
+            }
         }
 
         It "Should open a new client on a bucket edit and keep the count" {
