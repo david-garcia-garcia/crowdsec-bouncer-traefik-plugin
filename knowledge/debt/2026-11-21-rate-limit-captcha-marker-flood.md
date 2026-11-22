@@ -5,7 +5,7 @@ Size: large
 Action: note
 
 ## Why this follow-up
-Human decision 5 of round 2 says the captcha page's own requests are never counted or blocked by any rate-limit bucket. Change `share-rate-limit-leg-and-bucket-actions` recognises them on a router with a usable captcha by the custom-provider widget asset paths (`captcha.Client.IsCustomResourceRequest`) and by the challenge-form marker `crowdsec_captcha_challenge=v1` (`captcha.Client.HasChallengeMarker`). A client that puts the marker on every request, or only fetches widget assets, is therefore never charged, and each marker POST costs one call to the captcha provider's siteverify.
+Human decision 5 of round 2 says the captcha page's own requests are never counted or blocked by any rate-limit bucket. Change `share-rate-limit-leg-and-bucket-actions` recognises them on a router with a usable captcha by the custom-provider widget asset paths (`captcha.Client.IsCustomResourceRequest`) and by the challenge-form marker `crowdsec_captcha_challenge=v1` (`captcha.Client.HasChallengeMarker`). Since 2026-11-22 (human decision "Cobrarlo", e4e19906) the marker skips the buckets only on a POST that this router's captcha gate answers (usable captcha, a policy with a captcha answer, no `bypassCaptcha` rule); any other marker request is charged. A client that keeps posting the marker on such a router, or only fetches widget assets, is still never charged, and each marker POST costs one call to the captcha provider's siteverify.
 
 ## Why it was not taken
 The exemption is the human's decision for this round. A bound on it (for example a dedicated bucket or a cap for marker POSTs, or charging marker POSTs that fail verification) is new behaviour nobody asked for yet.
