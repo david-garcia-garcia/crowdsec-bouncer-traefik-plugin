@@ -18,7 +18,7 @@ description: How handleBanServeHTTP and handleBanStatusServeHTTP write the opera
 ## Instance slots
 priority: normal
 local: core_plugin_middleware_instance-slots.md
-description: How named LAPI, AppSec, captcha, and ModSec slots Publish and Subscribe through Yaegi-safe atomic.Value.
+description: How named LAPI, AppSec, captcha, ModSec, and rate-limit slots Publish and Subscribe through one published-leg table and Yaegi-safe atomic.Value bindings.
 
 ## Local plugin
 priority: normal
@@ -153,5 +153,5 @@ description: How AppSec and ModSec share body buffering, client-gone classificat
 ## Rate-limit leg
 priority: normal
 local: core_plugin_ratelimit.md
-description: How the Redis rate-limit Client is opened per middleware and how bucket rows compile once and are charged between the LAPI and AppSec steps.
+description: How the owner opens and publishes the Redis rate-limit Client with its buckets and policy, and how subscribers charge those buckets under their own name between the LAPI and AppSec steps.
 

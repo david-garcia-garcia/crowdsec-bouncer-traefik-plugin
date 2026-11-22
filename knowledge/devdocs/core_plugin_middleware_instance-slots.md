@@ -37,7 +37,7 @@ Process-wide named slots sit between owner `Open` and bouncer bounce. Spec: `cor
 ## How to use
 
 - Named slots are opaque aliases on the reclaim table. This plugin encodes them as `alias:<leg>:<name>` in `instanceAlias`; the table never parses that string. `plugin.go` walks the `publishedLegs()` table: `prepare` each leg, `open` each enabled leg (`ClearPublisher` the others), `SetAlias` each enabled leg with group `lapi`/`appsec`/`captcha`/`modsec`/`ratelimit`, then `bouncer.New` with one `bouncer.Subscriptions` value, then `Watch` each subscribed leg. `Watch` drops that subscriber when its ctx is done.
-- Add a published leg in three places, nothing else: one `publishedLeg` entry in `publishedLegs()` (`plugin.go`: group, enabled, instanceName, prepare, open, ownershipKey, subscribe, typed-nil empty, receive); one `legBinding` field on `Bouncer` plus a `Subscriptions` field, both set in `bouncer.New`; and a typed `loaded<Leg>()` plus exported `Receive<Leg>(published any)` that calls `receiveBinding` (`pkg/bouncer/bouncer_leg_<leg>.go`). Per-leg bind work (LAPI's stream-scope warning) is the `onBind` hook, not a copy of the trace.
+- Add a published leg in three places, nothing else: one `publishedLeg` entry in `publishedLegs()` (`plugin.go`: group, enabled, instanceName, prepare, open, ownershipKey, subscribe, typed-nil empty, receive); one `legBinding` field on `Bouncer` plus a `Subscriptions` field, both set in `bouncer.New`; and a typed `loaded<Leg>()` plus exported `Receive<Leg>(published any)` that calls `receiveBinding(binding, published, loadIncarnation, onBind, onUnbind)` (`pkg/bouncer/bouncer_leg_<leg>.go`). Per-leg receive work is a hook, not a copy of the trace: `onBind` runs before a bound line (LAPI's stream-scope warning; the rate limit's owner-available INFO and captcha check), `onUnbind` after the trace of a move to no Client (the rate limit's owner-unavailable WARN). Pass `nil` for a hook the leg does not need; both run under `bindingMu`, never per request.
 - Table order is open order, claim order, and rollback order: a failed claim clears every earlier enabled entry and nothing after it.
 - Hash captcha `OwnershipKey` from middleware name plus instance-owned captcha knobs including `logLevel`, `logFilePath`, and `logFormat`. Slot name, bounce, failure actions, and the remediation header stay off it.
 - Watchers `Store` a `reclaim.Box` only. The inner value is the client or typed nil. Never `Store(nil)` and never change the `atomic.Value` type (Yaegi panics). On each publish, `Store` a **new** `*Box`; do not assign `Box.Value` in place while ServeHTTP may `Unbox` the same pointer.
@@ -72,7 +72,7 @@ func (b *Bouncer) loadedModSec() *modsecurity.Client {
 }
 
 func (b *Bouncer) ReceiveModSec(published any) {
-	b.receiveBinding(&b.modsecLeg, published, func() string { return b.loadedModSec().Incarnation() }, nil)
+	b.receiveBinding(&b.modsecLeg, published, func() string { return b.loadedModSec().Incarnation() }, nil, nil)
 }
 ```
 

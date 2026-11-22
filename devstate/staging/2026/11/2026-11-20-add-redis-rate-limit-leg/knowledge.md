@@ -34,3 +34,12 @@
 - updated knowledge/devdocs/build_e2e_real.md
 - deleted knowledge/debt/2026-11-22-rate-limit-owner-return-info-after-reload.md
 - updated knowledge/devdocs/core_plugin_ratelimit.md
+- updated knowledge/devdocs/core_plugin_middleware.md
+- updated knowledge/devdocs/core_plugin_middleware_instance-slots.md
+- updated knowledge/devdocs/index_core_plugin.md
+- updated knowledge/devdocs/core_plugin_middleware_captcha-routing.md
+- updated knowledge/devdocs/core_plugin_middleware_action-rules.md
+- updated knowledge/devdocs/core_plugin_lapi_usage-metrics.md
+- updated knowledge/devdocs/core_plugin_appsec.md
+- updated knowledge/devdocs/core_plugin_modsecurity_client.md
+- updated knowledge/devdocs/core_plugin_decisionstore.md
