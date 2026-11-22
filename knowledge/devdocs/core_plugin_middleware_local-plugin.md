@@ -64,6 +64,7 @@ experimental:
 - `.traefik.yml`
 - `docker-compose.yml`
 - `README.md`
+- `docs/configuration.md`
 - `tests/e2e/mock/lib/traefik.yml`
 - `tests/e2e/real/config/docker-compose.test.yml`
 - `examples/kubernetes/traefik/values.yml`
