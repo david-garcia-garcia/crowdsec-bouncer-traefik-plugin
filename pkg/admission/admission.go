@@ -50,6 +50,8 @@ type Ticket struct {
 	Admitted bool
 	// probe marks an admission granted while the leg was backing off.
 	probe bool
+	// permit is the utilities generation for this admission. Report counts only when it still matches.
+	permit backendbackoff.Permit
 }
 
 // New builds a Gate when cfg.PeriodSecs is greater than zero, else returns nil.
@@ -84,17 +86,17 @@ func (g *Gate) Admit(ctx context.Context) (Ticket, error) {
 	if g == nil {
 		return Ticket{Admitted: true}, nil
 	}
-	// backendbackoff v1.0.9 dropped the context from Allow; keep the early exit on a finished request.
+	// Allow returns a Permit and takes no context; keep the early exit on a finished request.
 	if err := ctx.Err(); err != nil {
 		return Ticket{}, err
 	}
-	allowed, wait, err := g.inner.Allow(g.key)
+	permit, wait, err := g.inner.Allow(g.key)
 	if err != nil {
 		return Ticket{}, err
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if !allowed {
+	if !permit.Allowed() {
 		if !g.backingOff {
 			g.backingOff = true
 			g.log.Warn(g.msgStarted, "retryIn", wait.String(), "reason", "unhealthy")
@@ -102,19 +104,20 @@ func (g *Gate) Admit(ctx context.Context) (Ticket, error) {
 		return Ticket{}, nil
 	}
 	// Admitted while backing off: the gate let a probe through (or forgot the key).
-	return Ticket{Admitted: true, probe: g.backingOff}, nil
+	return Ticket{Admitted: true, probe: g.backingOff, permit: permit}, nil
 }
 
-// Report records a real backend attempt. A successful probe logs MsgEnded once.
-// A nil gate or an unadmitted ticket is a no-op.
+// Report records a real backend attempt. MsgEnded is logged only when a probe's report is applied.
+// A nil gate, an unadmitted ticket, or a stale permit does not log that line.
 func (g *Gate) Report(ticket Ticket, success bool) error {
 	if g == nil || !ticket.Admitted {
 		return nil
 	}
-	if err := g.inner.Report(g.key, success); err != nil {
+	applied, err := g.inner.Report(ticket.permit, success)
+	if err != nil {
 		return err
 	}
-	if !success || !ticket.probe {
+	if !success || !ticket.probe || !applied {
 		return nil
 	}
 	g.mu.Lock()

@@ -95,7 +95,7 @@ if verdict.Captcha.Name != "" {
 
 ## Gotchas
 
-- `windowcounter` and `tokenbucket` at the `v1.0.10` pin are vendored as published (`go mod vendor`). Do not patch `vendor/`; CI re-vendors. depguard `Main` allows both for `pkg/ratelimit`; `pkg/bouncer` imports neither.
+- `windowcounter` and `tokenbucket` at the `v1.0.12` pin are vendored as published (`go mod vendor`). Do not patch `vendor/`; CI re-vendors. depguard `Main` allows both for `pkg/ratelimit`; `pkg/bouncer` imports neither.
 - `tokenbucket.Redis` holds no goroutine and nothing to close; `Close` only closes the shared Redis client, and `Sleep` / `Wake` only log for a token-bucket Client. With `maxDelay` 0 the Lua refunds a take whose wait is positive, so stored tokens never go below 0 and an expired hash equals a full bucket (the Lua seeds `tokens = burst`). Measured under Yaegi v0.16.1: `zzz_yaegi_test.go` opens a token-bucket Client and charges it against a dead address; the real-stack Pester case runs it inside Traefik against Dragonfly. Exact mode is one EVAL (INCR, EXPIRE when the key has no TTL) plus one GET of the previous window per counted bucket; the buffered flush is one EVAL per batch of up to 256 keys.
 - Buffered mode answers a Redis outage with a nil error and this replica's local count (utilities PR #62), skipping Redis for one sync rate after each failure. The failure action therefore only applies in exact mode or when the step deadline or request context ends. Tests that need a counter error against a dead address use `rateLimitSyncRate: 0`.
 - With `slidingWindow` a hit is counted even when it is answered, so a client that keeps sending stays limited. With `tokenBucket` an answered hit takes no token: a client sending above the rate is admitted at the refill rate.

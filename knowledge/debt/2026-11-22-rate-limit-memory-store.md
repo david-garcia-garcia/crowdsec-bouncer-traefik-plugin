@@ -14,9 +14,9 @@ Not asked in round 2 addendum C, which took the other half of the round-1 note (
 
 ## Risks
 
-A memory store counts per Traefik replica, so N replicas admit up to N times each limit; the README would have to say so. `windowcounter` has no in-memory variant in utilities `v1.0.10`, so a memory store would serve only `tokenBucket` unless the sliding window gains one.
+A memory store counts per Traefik replica, so N replicas admit up to N times each limit; the README would have to say so. `windowcounter` has no in-memory variant in utilities `v1.0.12`, so a memory store would serve only `tokenBucket` unless the sliding window gains one.
 
 ## Context
 
 Current: `pkg/configuration/configuration.go` (`validateRateLimit` accepts only `RateLimitStoreRedis`), `pkg/ratelimit/client.go` (`Open` always builds a `simpleredis` client).
-Proposed: `tokenbucket.Memory` (utilities `v1.0.10`, same `Status` and clock as `tokenbucket.Redis`, fixed by PR #54 in `v1.0.9`) behind the existing `Counter` contract as a third adapter; decide what `slidingWindow` does with `memory` (reject, or a new in-memory window counter upstream).
+Proposed: `tokenbucket.Memory` (utilities `v1.0.12`, same `Status` and clock as `tokenbucket.Redis`, fixed by PR #54 in `v1.0.9`) behind the existing `Counter` contract as a third adapter; decide what `slidingWindow` does with `memory` (reject, or a new in-memory window counter upstream).

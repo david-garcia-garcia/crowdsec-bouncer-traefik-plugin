@@ -134,6 +134,70 @@ func TestGate_failedProbeStaysSilent(t *testing.T) {
 	}
 }
 
+// A probe whose lease expired reports after a newer probe was admitted. Only the newer
+// probe's permit matches the gate, so only its success may log ended.
+func TestGate_expiredProbeSuccessDoesNotLogEnded(t *testing.T) {
+	gate, buf, now := newTestGate(t)
+	trip(t, gate)
+	if admit(t, gate).Admitted {
+		t.Fatal("must skip after the trip")
+	}
+	*now = now.Add(11 * time.Second)
+	expired := admit(t, gate)
+	if !expired.Admitted {
+		t.Fatal("cooldown elapsed: the first probe must be admitted")
+	}
+	*now = now.Add(11 * time.Second)
+	probe := admit(t, gate)
+	if !probe.Admitted {
+		t.Fatal("probe lease expired: a new probe must be admitted")
+	}
+	report(t, gate, expired, true)
+	if strings.Contains(buf.String(), testEnded) {
+		t.Fatalf("an expired probe's success must not log ended\n%s", buf.String())
+	}
+	if !gate.BackingOff() {
+		t.Fatal("an expired probe's success must leave the gate backing off")
+	}
+	report(t, gate, probe, true)
+	if got := strings.Count(buf.String(), testEnded); got != 1 {
+		t.Fatalf("ended lines=%d want 1\n%s", got, buf.String())
+	}
+	if gate.BackingOff() {
+		t.Fatal("the current probe's success must clear backoff")
+	}
+}
+
+// A ticket admitted before the trip reports success while a probe is in flight. The gate
+// ignores it, so the probe still decides the outcome.
+func TestGate_staleTicketAfterAdmittedProbeDoesNotLogEnded(t *testing.T) {
+	gate, buf, now := newTestGate(t)
+	stale := admit(t, gate)
+	trip(t, gate)
+	if admit(t, gate).Admitted {
+		t.Fatal("must skip after the trip")
+	}
+	*now = now.Add(11 * time.Second)
+	probe := admit(t, gate)
+	if !probe.Admitted {
+		t.Fatal("cooldown elapsed: the probe must be admitted")
+	}
+	report(t, gate, stale, true)
+	if strings.Contains(buf.String(), testEnded) {
+		t.Fatal("a ticket admitted before the trip must not log ended after a probe is in flight")
+	}
+	if !gate.BackingOff() {
+		t.Fatal("a stale success must leave the gate backing off")
+	}
+	report(t, gate, probe, true)
+	if got := strings.Count(buf.String(), testEnded); got != 1 {
+		t.Fatalf("ended lines=%d want 1\n%s", got, buf.String())
+	}
+	if gate.BackingOff() {
+		t.Fatal("the real probe's success must clear backoff")
+	}
+}
+
 func TestGate_inFlightSuccessDoesNotEndBackoff(t *testing.T) {
 	gate, buf, _ := newTestGate(t)
 	inFlight := admit(t, gate)

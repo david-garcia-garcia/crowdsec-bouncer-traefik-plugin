@@ -2,4 +2,4 @@ module github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin
 
 go 1.22.12
 
-require github.com/david-garcia-garcia/traefik-middleware-utilities v1.0.10
+require github.com/david-garcia-garcia/traefik-middleware-utilities v1.0.12
