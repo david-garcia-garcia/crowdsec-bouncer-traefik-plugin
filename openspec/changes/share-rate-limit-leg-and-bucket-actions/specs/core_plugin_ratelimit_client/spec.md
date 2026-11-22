@@ -6,7 +6,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: The rate-limit client is opened on the owner with its policy
-When `rateLimitEnabled` is true, `New` SHALL open one rate-limit client on the bind context it already uses for the other legs, before it returns the handler. That middleware is the owner. The client SHALL hold the Redis counter, the owner's compiled `rateLimitBuckets`, and the owner's `rateLimitFailureAction`, `rateLimitStatusCode`, and `rateLimitResponseHeaders` (the policy). It SHALL be held in the process reclaim table under an ownership key built from the owner's Traefik middleware name, `rateLimitRedisHost`, the resolved Redis password, `rateLimitRedisDatabase`, the parsed `rateLimitSyncRate`, the bucket rows, and the three policy settings. `rateLimitInstanceName` and `bouncerEnabled` MUST NOT be part of that key. A reload that keeps those values SHALL reuse the same client within the table grace. A change to any of them SHALL open a new client; it SHALL NOT reset the Redis counters, so a bucket keeps its count unless it is renamed.
+When `rateLimitEnabled` is true, `New` SHALL open one rate-limit client on the bind context it already uses for the other legs, before it returns the handler. That middleware is the owner. The client SHALL hold the Redis counter, the owner's compiled `rateLimitBuckets`, and the owner's `rateLimitFailureAction`, `rateLimitStatusCode`, and `rateLimitResponseHeaders` (the policy). It SHALL be held in the process reclaim table under an ownership key built from the owner's Traefik middleware name, `rateLimitRedisHost`, the resolved Redis password, `rateLimitRedisDatabase`, the parsed `rateLimitSyncRate`, `rateLimitAlgorithm`, the bucket rows, and the three policy settings. `rateLimitInstanceName` and `bouncerEnabled` MUST NOT be part of that key. A reload that keeps those values SHALL reuse the same client within the table grace. A change to any of them SHALL open a new client; it SHALL NOT reset the Redis counters, so a bucket keeps its count unless it is renamed.
 
 The client SHALL be published under the owner's `rateLimitInstanceName` (`core_plugin_middleware_instance-slots`). Every router that subscribes to that name SHALL charge the owner's buckets and answer with the owner's policy. A router SHALL read its own `rateLimitBuckets`, `rateLimitFailureAction`, `rateLimitStatusCode`, `rateLimitResponseHeaders`, and `rateLimitRedis*` only when it has `rateLimitEnabled`; on any other router they SHALL be ignored.
 
@@ -36,6 +36,10 @@ When the client cannot be created (invalid Redis settings), `New` SHALL fail and
 - **WHEN** a reload changes the owner's `rateLimitSyncRate` from `200ms` to `0`
 - **THEN** the new configuration uses a new client
 
+#### Scenario: Changed algorithm opens a new client
+- **WHEN** a reload changes the owner's `rateLimitAlgorithm` from `slidingWindow` to `tokenBucket`
+- **THEN** the owner publishes a new client and its subscribers bind it
+
 #### Scenario: Bucket edit opens a new client and keeps the count
 - **WHEN** an owner reload changes bucket `login` from 3 to 5 requests per minute
 - **AND** a client already sent 3 requests through a subscriber in the current window
@@ -52,7 +56,7 @@ When the client cannot be created (invalid Redis settings), `New` SHALL fail and
 - **THEN** `New` returns a handler
 
 ### Requirement: Counters are shared across replicas through Redis keys
-Each bucket counter SHALL live in Redis under the key `rl:<middleware name>:<bucket name>:<key hash>` followed by the window start that the sliding window appends. `<middleware name>` SHALL be the Traefik name of the subscribing middleware that charges the request, not the owner's name. `<key hash>` SHALL be the first 16 hexadecimal characters of the SHA-256 of the bucket's key parts joined with a NUL byte. A bucket with an empty `key` list SHALL hash the empty string and so has one counter. Raw header, cookie, query, or path values SHALL NOT appear in Redis keys.
+Each bucket counter SHALL live in Redis under the key `rl:<middleware name>:<bucket name>:<key hash>` followed by the suffix of the owner's algorithm: `:<window start>` (one string per window) with `slidingWindow`, `:tb` (one hash holding the tokens and the last refill time) with `tokenBucket`. The two key sets SHALL NOT overlap, so switching `rateLimitAlgorithm` starts every bucket from zero and never reads the other algorithm's value. `<middleware name>` SHALL be the Traefik name of the subscribing middleware that charges the request, not the owner's name. `<key hash>` SHALL be the first 16 hexadecimal characters of the SHA-256 of the bucket's key parts joined with a NUL byte. A bucket with an empty `key` list SHALL hash the empty string and so has one counter. Raw header, cookie, query, or path values SHALL NOT appear in Redis keys.
 
 Two Traefik processes that run a subscribing middleware with the same name against the same Redis SHALL count into the same keys. Two Traefik routers that use the same subscribing middleware SHALL share its counters. Two subscribing middlewares with different names SHALL NOT share counters, even when they subscribe to the same client and their bucket names are equal.
 
@@ -76,12 +80,36 @@ Two Traefik processes that run a subscribing middleware with the same name again
 - **WHEN** a bucket keys on header `Authorization`
 - **THEN** the Redis key contains a hash and not the header value
 
+#### Scenario: Token-bucket key does not collide with sliding-window keys
+- **WHEN** subscriber `edge` charges bucket `login` with `tokenBucket`
+- **THEN** the counter key is `rl:edge:login:<key hash>:tb`
+- **AND** no `rl:edge:login:<key hash>:<window start>` key is written
+
+### Requirement: Sync rate trades accuracy for Redis round trips
+`rateLimitSyncRate` SHALL be a Go duration string. It SHALL be read only when the owner's `rateLimitAlgorithm` is `slidingWindow`; with `tokenBucket` every charged hit is one Redis round trip before the verdict whatever its value, and the value SHALL still be validated. `0` SHALL mean exact mode: every charged hit is one increment in Redis before the verdict. A positive value SHALL mean buffered mode: hits are counted locally, a key is read from Redis the first time this process sees it in a window, and local increments are written to Redis on that interval. A positive value below 20ms SHALL behave as 20ms. Default SHALL be `200ms`.
+
+In buffered mode, one replica MAY admit more than the limit by up to the hits the other replicas have not flushed yet. The README SHALL state this bound and that `tokenBucket` does not read the sync rate.
+
+#### Scenario: Exact mode denies at the limit on one process
+- **WHEN** `rateLimitSyncRate` is `0` and a bucket allows 5 requests per minute
+- **THEN** the sixth request from one client in that minute is denied
+
+#### Scenario: Buffered mode does not call Redis on every hit
+- **WHEN** `rateLimitSyncRate` is `200ms` and one client sends many requests to one bucket within 200ms
+- **THEN** Redis receives at most one read for that key and one write per flush interval for that key
+
+#### Scenario: Token bucket ignores the sync rate
+- **WHEN** `rateLimitAlgorithm` is `tokenBucket` and `rateLimitSyncRate` is `200ms`
+- **THEN** every charged hit is counted in Redis before its verdict
+
 ### Requirement: A Redis failure applies the rate-limit failure action within a fixed time budget
 The whole rate-limit step of one request SHALL run under a deadline of 250ms derived from the request context. Each Redis command SHALL use at most that remaining budget, including connection dial and retries. When the request context ends first, the step SHALL stop with that error.
 
 In buffered mode (`rateLimitSyncRate` > 0) a Redis outage SHALL NOT be an error: `windowcounter` (utilities v1.0.9+) keeps counting on this replica, starting from zero for a key it has not read yet, answers with a nil error, skips Redis for one sync rate after a failure, and retries after that. Buckets SHALL then answer on this replica's local count, and `rateLimitFailureAction` SHALL NOT apply.
 
-When counting a hit returns an error (in exact mode: Redis unreachable or timeout; in either mode: the deadline or the request context), the step SHALL stop evaluating buckets and SHALL apply the owner's `rateLimitFailureAction`, even when a `captcha` bucket was already over its limit in that walk:
+With `tokenBucket` there is no buffered mode: every take is one Redis round trip, so a Redis outage is an error as in exact mode.
+
+When counting a hit returns an error (in exact mode or with `tokenBucket`: Redis unreachable or timeout; in every mode: the deadline or the request context), the step SHALL stop evaluating buckets and SHALL apply the owner's `rateLimitFailureAction`, even when a `captcha` bucket was already over its limit in that walk:
 
 - `passthrough` (default): the request continues to the AppSec step as if no bucket answered. No remediation header. No drop is counted.
 - `ban`: the ban page with `bouncerRemediationStatusCode`, remediation header `ban:ratelimit-failure`, drop origin `plugin:ratelimit_failure`.
@@ -101,6 +129,10 @@ Each failing request SHALL log at DEBUG with the client address and the error. T
 - **AND** `bouncerRemediationHeadersCustomName` is `X-Remediation`
 - **THEN** the response status is `bouncerRemediationStatusCode`
 - **AND** `X-Remediation` is `ban:ratelimit-failure`
+
+#### Scenario: Unreachable Redis with a token bucket applies the failure action
+- **WHEN** `rateLimitAlgorithm` is `tokenBucket`, `rateLimitSyncRate` is `200ms`, `rateLimitFailureAction` is `ban`, and Redis is unreachable
+- **THEN** the response is the ban page with remediation header `ban:ratelimit-failure`
 
 #### Scenario: Unreachable Redis in buffered mode keeps the local limit
 - **WHEN** `rateLimitSyncRate` is `200ms`, `rateLimitFailureAction` is `ban`, Redis is unreachable, and a `ratelimit` bucket allows 1 request per minute

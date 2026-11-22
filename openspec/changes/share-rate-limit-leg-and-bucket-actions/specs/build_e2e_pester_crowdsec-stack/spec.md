@@ -1,12 +1,18 @@
 ## MODIFIED Requirements
 
 ### Requirement: Real stack covers the Redis rate limit
-The real-stack Pester suite SHALL run the rate-limit leg inside Traefik's plugin loader against the stack's Dragonfly service, configured through the file provider (the bucket list is a list of objects with nested lists, which Docker labels do not decode). It SHALL prove: a `ratelimit` bucket answers `rateLimitStatusCode` with `Retry-After` and remediation header `ban:ratelimit:<bucket>` after `requests` hits; a different client address is not limited by that counter; a `bypassRateLimit` action rule lets the over-limit client through; a `log` bucket never answers; an unreachable Redis with `rateLimitFailureAction: passthrough` lets the request through and with `ban` answers `ban:ratelimit-failure`; and a `ratelimit` answer reaches `cscli metrics` as a drop with origin `plugin:ratelimit:<bucket>`. Each case SHALL use a client address no other case uses, so counters left in Dragonfly by an earlier run or case cannot change the result. The file SHALL be listed in one CI Pester domain.
+The real-stack Pester suite SHALL run the rate-limit leg inside Traefik's plugin loader against the stack's Dragonfly service, configured through the file provider (the bucket list is a list of objects with nested lists, which Docker labels do not decode). It SHALL prove: a `ratelimit` bucket answers `rateLimitStatusCode` with `Retry-After` and remediation header `ban:ratelimit:<bucket>` after `requests` hits; a different client address is not limited by that counter; a `bypassRateLimit` action rule lets the over-limit client through; a `log` bucket never answers; an unreachable Redis with `rateLimitFailureAction: passthrough` lets the request through and with `ban` answers `ban:ratelimit-failure`; a `ratelimit` answer reaches `cscli metrics` as a drop with origin `plugin:ratelimit:<bucket>`; and an owner with `rateLimitAlgorithm: tokenBucket` admits `burst` requests at once, answers the next with 429 and a `Retry-After` equal to the refill time of one token, and admits again after that time. Each case SHALL use a client address no other case uses, so counters left in Dragonfly by an earlier run or case cannot change the result. The file SHALL be listed in one CI Pester domain.
 
 #### Scenario: Deny after the limit on real Traefik
 - **WHEN** a client sends `requests + 1` requests to a route whose `ratelimit` bucket allows `requests` per window
 - **THEN** the last response is 429 with `Retry-After` equal to the counter's next admit (for 4 hits on a limit of 3 per minute: the time to the window end plus 30s, within 1s)
 - **AND** the remediation header is `ban:ratelimit:<bucket>`
+
+#### Scenario: Token bucket burst and refill on real Traefik
+- **WHEN** a client sends `burst + 1` requests at once to a route whose owner sets `rateLimitAlgorithm: tokenBucket` and whose `ratelimit` bucket has `burst` 3, `requests: 1`, and `window: 5s`
+- **THEN** the first 3 responses come from the backend
+- **AND** the fourth is 429 with `Retry-After: 5` and remediation header `ban:ratelimit:<bucket>`
+- **AND** after `Retry-After` seconds the next request from that client reaches the backend
 
 #### Scenario: Redis down with passthrough
 - **WHEN** the middleware points `rateLimitRedisHost` at a port where nothing listens and `rateLimitFailureAction` is `passthrough`

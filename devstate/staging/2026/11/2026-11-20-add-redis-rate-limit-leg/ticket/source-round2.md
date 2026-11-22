@@ -131,3 +131,49 @@ Asked what the owner shares with subscribed routers, the human answered (verbati
   **subscribing** router (its captcha subscription), not on the owner.
 - Not in this round: the single-EVAL + local over-limit-cache load design, Redis TLS / ACL user settings
   (simpleredis v1.0.9 supports them), and `RateLimit-*` headers. Each stays a follow-up.
+
+---
+
+# Round 2 addendum C — limiter-level algorithm: tokenBucket or slidingWindow (2026-11-22)
+
+Same round, same branch, same PR #228. Added after round-2 codereview and its two human-decided fixes.
+
+## Human ask (verbatim, chat 2026-11-22)
+
+> Una cosa no me queda clara de la implementacion, donde elige el usuario si el ratelimiter es tockenbut o windowcounter¿?
+
+The conductor answered that only the sliding window exists (per-bucket `algorithm` only rejects `tokenBucket`), and
+recommended a separate PR. The human answered:
+
+> lo quiero en este PR porque esto es clave, el cuando el usuario configura el ratelimit debe poder configurarlo (no a
+> nivel de bucket sino de todo el limiter) si quiere usar tokenbucket o windowcounter
+
+## Conductor correction recorded
+
+The conductor first said the utilities library has no Redis token bucket. That was wrong: utilities `v1.0.10` (already
+pinned) has `tokenbucket.Redis` (Traefik's Lua token bucket via `simpleredis` EVAL, `NewRedis(redis, rate, burst,
+maxDelay, ttl)`, `Allow(ctx, key) (Status, error)`) and `tokenbucket.Memory`; `tokenbucket.Status` carries Allowed, Limit
+(= burst), Remaining, Period, Reset, RetryAfter, Delay. The over-admit defect of the round-1 debt note
+(`knowledge/debt/2026-11-20-rate-limit-token-bucket-and-memory-store.md`) is fixed by utilities PR #54, tagged in v1.0.9.
+`tokenbucket` is not vendored yet (not imported).
+
+## Human decision — DECIDED
+
+- The algorithm is chosen for the whole limiter, not per bucket: `tokenBucket` or the sliding window (`windowcounter`).
+
+## Conductor design proposal (sent to the human, who did not object; treat as assumed, revisit at review)
+
+- New owner setting `rateLimitAlgorithm: slidingWindow | tokenBucket`, default `slidingWindow`. It is part of the
+  centralized policy published by the owner (and of the ownership key); subscribers use the owner's algorithm.
+- Buckets keep `requests` per `window` for both algorithms; with `tokenBucket` it means a refill rate of
+  `requests / window` per second.
+- Optional per-bucket `burst`, valid only with `tokenBucket`, default = `requests`. One `tokenbucket.Redis` per bucket
+  (rate and burst are fixed at `NewRedis`), `maxDelay` 0 (no queuing, deny instead), a TTL that covers a full refill.
+- The per-bucket `algorithm` key goes away; setting it fails startup with a message pointing at `rateLimitAlgorithm`.
+- `rateLimitSyncRate` applies only to `slidingWindow` (the token bucket is one Redis EVAL per counted bucket);
+  documented, not rejected (its default is `200ms`).
+- Unchanged: actions `ratelimit | captcha | log`, precedence, `Retry-After` (from the token bucket's `RetryAfter`,
+  rounded up, at least 1s), failure action, counters per subscribing router, key prefix `rl:<router>:<bucket>:<hash>`
+  (the token bucket's Redis hash key must not collide with sliding-window keys of the same bucket after an algorithm
+  switch — decide a distinguishing suffix).
+- Out of scope: `rateLimitStore: memory` (not asked; per-replica; `tokenbucket.Memory` makes it a small follow-up).

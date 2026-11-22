@@ -27,3 +27,5 @@
 - [x] note large  `knowledge/debt/2026-11-21-rate-limit-unpublished-owner-warn.md`
   Why: a subscriber whose rate-limit owner is not published passes every request with only a TRACE unbound line, so a typo or a removed owner silently disables the limit.
   Taken: human decision 2026-11-22 ("WARN al desconectarse"); dcfd0393 logs WARN `crowdsec bouncer rate limit owner unavailable` once per move to no client and INFO `crowdsec bouncer rate limit owner available` on the bind that ends it, from the rate-limit binding's unbind and bind hooks, never per request.
+- [ ] note large  `knowledge/debt/2026-11-22-rate-limit-memory-store.md`
+  Why: `rateLimitStore: memory` still fails startup; round 2 addendum C takes only the `tokenBucket` half of the round-1 token-bucket-and-memory-store note, so the memory store moves to its own note.

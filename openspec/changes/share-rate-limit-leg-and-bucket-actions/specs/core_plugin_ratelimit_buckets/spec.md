@@ -6,7 +6,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Matching buckets are charged in list order
-For a request that reaches the rate-limit step, the plugin SHALL walk the buckets of the rate-limit client the router is bound to, in list order. For each bucket that matches and has a key value, it SHALL count one hit against that bucket's counter, then compare the sliding-window estimate with `requests` per `window`. A hit SHALL be counted even when it is over the limit.
+For a request that reaches the rate-limit step, the plugin SHALL walk the buckets of the rate-limit client the router is bound to, in list order. For each bucket that matches and has a key value, it SHALL count one hit against that bucket's counter with the owner's `rateLimitAlgorithm` (requirement "The owner chooses the counting algorithm of every bucket"), then decide whether that hit is over the limit. With `slidingWindow` a hit SHALL be counted even when it is over the limit. With `tokenBucket` a hit over the limit SHALL NOT consume a token.
 
 - A `ratelimit` bucket over its limit SHALL answer the request (requirement "A ratelimit bucket answers with the rate-limit status and Retry-After"). Later buckets SHALL NOT be charged.
 - A `captcha` bucket over its limit SHALL NOT stop the walk. The first such bucket in list order SHALL be kept, and when the walk ends without a `ratelimit` answer it SHALL answer the request (requirement "A captcha bucket answers with the router's captcha").
@@ -16,7 +16,7 @@ For a request that reaches the rate-limit step, the plugin SHALL walk the bucket
 - The answer SHALL follow the precedence `ratelimit` over `captcha` over `log`.
 - When no bucket answers, the request SHALL continue to the AppSec step.
 
-`action` SHALL default to `ratelimit`. `final` SHALL default to false. `algorithm` SHALL default to `slidingWindow`.
+`action` SHALL default to `ratelimit`. `final` SHALL default to false. `burst` SHALL default to `requests` and SHALL be read only with `tokenBucket`.
 
 #### Scenario: First deny bucket answers and later buckets are not charged
 - **WHEN** buckets `login` (`ratelimit`, 1 per minute) and `per-ip` (`ratelimit`, 100 per minute) both match `POST /login`
@@ -36,8 +36,13 @@ For a request that reaches the rate-limit step, the plugin SHALL walk the bucket
 - **THEN** repeated `GET /app.js` requests are never answered by the catch-all bucket
 
 #### Scenario: A denied client stays limited while it keeps sending
-- **WHEN** a `ratelimit` bucket allows 5 requests per minute and one client sends 1 request per second for 2 minutes
+- **WHEN** `rateLimitAlgorithm` is `slidingWindow`, a `ratelimit` bucket allows 5 requests per minute, and one client sends 1 request per second for 2 minutes
 - **THEN** that client is answered by the bucket for most of the second minute too, because answered hits are counted
+
+#### Scenario: A token bucket admits at the refill rate after a deny
+- **WHEN** `rateLimitAlgorithm` is `tokenBucket`, a `ratelimit` bucket allows 6 requests per minute with `burst` 2, and one client sends 1 request per second for 1 minute
+- **THEN** the first 2 requests reach the backend
+- **AND** after that about one request every 10 seconds reaches the backend and the others are answered by the bucket, because answered hits do not consume a token
 
 #### Scenario: A stacked ratelimit bucket is the hard ceiling
 - **WHEN** bucket `per-ip-soft` (`captcha`, 2 per minute) and bucket `per-ip-hard` (`ratelimit`, 4 per minute) both key on `from: ip`
@@ -60,7 +65,7 @@ For a request that reaches the rate-limit step, the plugin SHALL walk the bucket
 ### Requirement: A ratelimit bucket answers with the rate-limit status and Retry-After
 A `ratelimit` bucket that answers SHALL write the subscribing router's ban page with the owner's `rateLimitStatusCode` (default 429). The body rules SHALL be those of the ban page: no body for `HEAD`, 204, or 304, and an empty body when no ban template is loaded. `Cache-Control: no-cache, no-store` SHALL be set. The ban template SHALL receive `RemediationReason` `RATE_LIMIT`. `bouncerRemediationStatusCode` SHALL NOT change this status.
 
-When the owner's `rateLimitResponseHeaders` is true (default), the response SHALL carry `Retry-After` with the counter's `RetryAfter` for that hit (`windowcounter.Status`, utilities v1.0.10+): the time until the first whole second at which one more hit on the same key is admitted with no other traffic, sliding-window weight included. It SHALL be rounded up to whole seconds, at least 1. When false, no `Retry-After` is sent. `RateLimit-*` headers SHALL NOT be sent.
+When the owner's `rateLimitResponseHeaders` is true (default), the response SHALL carry `Retry-After` with the counter's `RetryAfter` for that hit: with `slidingWindow` (`windowcounter.Status`, utilities v1.0.10+) the time until the first whole second at which one more hit on the same key is admitted with no other traffic, sliding-window weight included; with `tokenBucket` (`tokenbucket.Status`) the time until the bucket holds one token again. It SHALL be rounded up to whole seconds, at least 1. When false, no `Retry-After` is sent. `RateLimit-*` headers SHALL NOT be sent.
 
 The remediation header, when configured, SHALL be `ban:ratelimit:<bucket name>`. The answer SHALL count one usage-metrics drop with origin `plugin:ratelimit:<bucket name>` and remediation `ban` (`core_plugin_lapi_usage-metrics`).
 
@@ -77,6 +82,11 @@ A `captcha` bucket that answers as `ratelimit` (requirement "A captcha bucket an
 - **THEN** a `ratelimit` bucket answers 503
 - **AND** a LAPI ban still answers 403
 
+#### Scenario: Token bucket Retry-After is the refill time
+- **WHEN** `rateLimitAlgorithm` is `tokenBucket` and a `ratelimit` bucket with `requests: 1`, `window: 10s`, and `burst: 2` answers a client's third request sent at once
+- **THEN** the status is 429
+- **AND** `Retry-After` is `10`
+
 #### Scenario: Response headers off
 - **WHEN** the owner's `rateLimitResponseHeaders` is false and a `ratelimit` bucket answers
 - **THEN** the response has no `Retry-After`
@@ -85,16 +95,16 @@ A `captcha` bucket that answers as `ratelimit` (requirement "A captcha bucket an
 
 ### Requirement: Bucket values not in this version fail validation
 **Reason**: `action` now accepts `ratelimit` (the round-1 `deny`, renamed), `captcha`, and `log`; the block rejected `captcha`. Replaced by "Bucket algorithm, action, and store values are validated".
-**Migration**: Rename `action: deny` to `action: ratelimit` (or omit it, the default). `tokenBucket`, `burst`, and `rateLimitStore: memory` stay rejected.
+**Migration**: Rename `action: deny` to `action: ratelimit` (or omit it, the default). Move a bucket's `algorithm` to the owner's `rateLimitAlgorithm`; `burst` is accepted with `rateLimitAlgorithm: tokenBucket`. `rateLimitStore: memory` stays rejected.
 
 ## ADDED Requirements
 
 ### Requirement: Bucket algorithm, action, and store values are validated
-`algorithm` SHALL accept only `slidingWindow`. `action` SHALL accept only `ratelimit`, `captcha`, and `log`. A row that sets `algorithm: tokenBucket` or `burst` SHALL fail `ValidateParams` with an error that names the row and says the value is not supported in this version. A row whose `action` is any other value, `deny` included, SHALL fail with an error that names the row and the accepted values. `rateLimitStore` SHALL accept only `redis`; `memory` SHALL fail as not supported in this version.
+A row that sets `algorithm`, whatever its value, SHALL fail `ValidateParams` with an error that names the row and `rateLimitAlgorithm`: the algorithm is chosen for the whole limiter. `action` SHALL accept only `ratelimit`, `captcha`, and `log`. A row whose `action` is any other value, `deny` included, SHALL fail with an error that names the row and the accepted values. `rateLimitStore` SHALL accept only `redis`; `memory` SHALL fail as not supported in this version.
 
-#### Scenario: Token bucket is rejected
+#### Scenario: A bucket algorithm points at the limiter setting
 - **WHEN** a bucket sets `algorithm: tokenBucket`
-- **THEN** `ValidateParams` fails with an error that names `RateLimitBuckets` and `tokenBucket`
+- **THEN** `ValidateParams` fails with an error that names `RateLimitBuckets`, `bucket 0`, and `rateLimitAlgorithm`
 
 #### Scenario: Deny action is rejected
 - **WHEN** a bucket sets `action: deny`
@@ -193,3 +203,38 @@ This covers both captcha answers of the leg: a `captcha` bucket and failure acti
 #### Scenario: Policy without a captcha answer logs nothing
 - **WHEN** a router without a captcha instance name binds a rate-limit client with only `ratelimit` and `log` buckets and failure action `passthrough`
 - **THEN** no ERROR `crowdsec bouncer rate limit captcha unavailable` is logged
+
+### Requirement: Burst and the limiter algorithm are validated
+`rateLimitAlgorithm` SHALL accept only `slidingWindow` and `tokenBucket`. `burst` SHALL be at least 1 when set. A row that sets `burst` while `rateLimitAlgorithm` is `slidingWindow` SHALL fail `ValidateParams` with an error that names the row and `rateLimitAlgorithm`. With `tokenBucket`, a row whose full refill (`burst` × `window` / `requests`) exceeds 8760h SHALL fail.
+
+#### Scenario: Burst with the sliding window is rejected
+- **WHEN** `rateLimitAlgorithm` is `slidingWindow` and a bucket sets `burst: 10`
+- **THEN** `ValidateParams` fails with an error that names `RateLimitBuckets` and `rateLimitAlgorithm`
+
+#### Scenario: Burst with the token bucket is accepted
+- **WHEN** `rateLimitAlgorithm` is `tokenBucket` and a bucket sets `requests: 60`, `window: 1m`, and `burst: 10`
+- **THEN** `ValidateParams` returns no error from that bucket
+
+#### Scenario: Unknown algorithm is rejected
+- **WHEN** `rateLimitAlgorithm` is `leakyBucket`
+- **THEN** `ValidateParams` fails with an error that names `RateLimitAlgorithm`
+
+### Requirement: The owner chooses the counting algorithm of every bucket
+The owner's `rateLimitAlgorithm` SHALL decide how every bucket of its rate-limit client counts, for every subscriber. Default SHALL be `slidingWindow` (`requests` per rolling `window`, honouring `rateLimitSyncRate`). Actions, the walk, precedence, `Retry-After` rounding, and the failure action SHALL be the same under both algorithms. The README SHALL state what each algorithm does with `requests`, `window`, `burst`, and a hit over the limit.
+
+#### Scenario: Subscribers use the owner's algorithm
+- **WHEN** the owner sets `rateLimitAlgorithm: tokenBucket` and a subscriber sets `rateLimitAlgorithm: slidingWindow` without `rateLimitEnabled`
+- **THEN** requests through the subscriber are counted by token buckets
+
+### Requirement: A token bucket refills at requests per window and holds up to burst
+With `tokenBucket`, each bucket SHALL be a token bucket in Redis that holds at most `burst` tokens (default `requests`), starts full, and refills at `requests` / `window` tokens per second. A charged hit takes one token; a hit that finds no whole token SHALL be answered at once and SHALL NOT consume a token (no queuing). Every charged hit SHALL be one Redis round trip. A bucket's state SHALL expire after a full refill (`burst` × `window` / `requests`, rounded up to whole seconds, at least 1s).
+
+#### Scenario: Burst requests pass at once, then the refill rate applies
+- **WHEN** `rateLimitAlgorithm` is `tokenBucket` and a `ratelimit` bucket has `requests: 1`, `window: 10s`, and `burst: 3`
+- **AND** one client sends 4 requests at once
+- **THEN** the first 3 reach the backend and the fourth is answered by the bucket
+- **AND** 10 seconds later one more request from that client reaches the backend
+
+#### Scenario: Default burst equals requests
+- **WHEN** `rateLimitAlgorithm` is `tokenBucket` and a bucket has `requests: 5`, `window: 1m`, and no `burst`
+- **THEN** a client that sends 6 requests at once gets the sixth answered by the bucket

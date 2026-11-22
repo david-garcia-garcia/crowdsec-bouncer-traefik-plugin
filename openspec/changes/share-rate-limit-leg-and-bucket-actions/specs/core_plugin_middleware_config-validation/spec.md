@@ -43,11 +43,12 @@ When `rateLimitEnabled` is true, `ValidateParams` SHALL fail, with an error that
 - `rateLimitStore` is not `redis` (default `redis`).
 - `rateLimitRedisHost` is empty after trim (default `redis:6379`).
 - `rateLimitRedisPasswordFile` is set and cannot be read (file-then-field lookup, as for `lapiRedisPasswordFile`). An empty password with no file SHALL pass.
-- `rateLimitSyncRate` is not a Go duration or is negative (default `200ms`; `0` is valid).
+- `rateLimitAlgorithm` is not `slidingWindow` or `tokenBucket` (default `slidingWindow`).
+- `rateLimitSyncRate` is not a Go duration or is negative (default `200ms`; `0` is valid; validated under both algorithms, read only by `slidingWindow`).
 - `rateLimitFailureAction` is not `passthrough`, `ban`, or `captcha` (default `passthrough`), with the same stems as `bouncerLapiFailureAction`.
 - `rateLimitStatusCode` is below 100 or 600 and above (default 429).
 - `rateLimitBuckets` is empty.
-- a bucket row fails. Inner errors SHALL be index-prefixed `bucket %d: …` and wrapped `RateLimitBuckets: %w`. A row SHALL fail when: `name` is empty after trim, contains `:`, or repeats another row's name; a `method`, `path`, `host`, `headers`, or `cookies` pattern is not valid Go RE2, or `method` is `!!` or a bare `!`; `requests` is below 1; `window` is not a Go duration, is below 1s, or is not a whole number of seconds; `action` is set and is not `ratelimit`, `captcha`, or `log`; `algorithm` is set and is not `slidingWindow`; `burst` is set; a key part has an unknown `from`; `name` is missing on a `header`, `cookie`, or `query` part or set on any other part; `ipv4Prefix` is outside 1–32 or `ipv6Prefix` outside 1–128, or either is set on a part that is not `from: ip`; `pattern` is not valid Go RE2 or has no capture group.
+- a bucket row fails. Inner errors SHALL be index-prefixed `bucket %d: …` and wrapped `RateLimitBuckets: %w`. A row SHALL fail when: `name` is empty after trim, contains `:`, or repeats another row's name; a `method`, `path`, `host`, `headers`, or `cookies` pattern is not valid Go RE2, or `method` is `!!` or a bare `!`; `requests` is below 1; `window` is not a Go duration, is below 1s, or is not a whole number of seconds; `action` is set and is not `ratelimit`, `captcha`, or `log`; `algorithm` is set to any value (the error names `rateLimitAlgorithm`); `burst` is below 0, or is set while `rateLimitAlgorithm` is `slidingWindow` (the error names `rateLimitAlgorithm`); with `tokenBucket`, the full refill `burst` × `window` / `requests` (`burst` defaulting to `requests`) exceeds 8760h; a key part has an unknown `from`; `name` is missing on a `header`, `cookie`, or `query` part or set on any other part; `ipv4Prefix` is outside 1–32 or `ipv6Prefix` outside 1–128, or either is set on a part that is not `from: ip`; `pattern` is not valid Go RE2 or has no capture group.
 
 A row with no predicate SHALL pass (it matches every request). `ValidateParams` SHALL compile and discard the bucket list; the owner's `New` SHALL compile it again into the rate-limit client. A `ValidateParams` failure SHALL cause `plugin.New` to return a nil handler and that error without opening any leg.
 
@@ -78,6 +79,14 @@ A row with no predicate SHALL pass (it matches every request). `ValidateParams` 
 
 #### Scenario: Captcha bucket on an owner without a captcha passes
 - **WHEN** `rateLimitEnabled` is true, a bucket sets `action: captcha`, and the owner has no captcha instance name
+- **THEN** `ValidateParams` returns no error from that bucket
+
+#### Scenario: Bucket algorithm fails and names the limiter setting
+- **WHEN** a bucket sets `algorithm: slidingWindow`
+- **THEN** `ValidateParams` fails with an error that names `RateLimitBuckets`, `bucket 0`, and `rateLimitAlgorithm`
+
+#### Scenario: Token bucket with burst passes
+- **WHEN** `rateLimitAlgorithm` is `tokenBucket` and a bucket sets `burst: 20`
 - **THEN** `ValidateParams` returns no error from that bucket
 
 #### Scenario: Deny action fails

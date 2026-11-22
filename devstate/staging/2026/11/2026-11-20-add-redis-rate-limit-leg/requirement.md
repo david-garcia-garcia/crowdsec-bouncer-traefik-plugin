@@ -6,6 +6,7 @@ Two rounds on the same ticket, branch, and PR #228.
 - **Round 1** (2026-11-20): the caller spec (`ticket/source.md`), copied in full, then its grounding sections (suffixed `— round 1`). Implemented, reviewed, OpenSpec change `add-redis-rate-limit-leg` archived and synced. Kept as history; its grounding was measured on `origin/master` @ `44e2151b`.
 - **Round 2** (2026-11-21): the caller spec addendum (`ticket/source-round2.md`), copied in full, then the live grounding sections `## Current (code)`, `## Out of scope`, `## Unknowns`, `## Tensions`. Where round 2 and round 1 disagree, round 2 wins (it replaces the bucket actions and answers round-1 open decision 2).
   - **Addendum B** (2026-11-21, added after round-2 prepare, before explore; appended to `ticket/source-round2.md`): the rate-limit leg becomes a shared leg published under an instance name like LAPI, AppSec, captcha and ModSec, with the policy centralized on the owner, counters keyed per subscribing router, and the common leg abstraction extracted first in this PR. Copied in full after the round-2 addendum's `## Housekeeping`; grounded in the same live sections (rows marked "addendum B"). It reverses round 1's "Open-only" rate-limit leg and its out-of-scope row.
+  - **Addendum C** (2026-11-22, added after round-2 code review and its two human-decided fixes; appended to `ticket/source-round2.md`): the operator chooses the counting algorithm for the whole limiter, `tokenBucket` or the sliding window, on the owner. Copied in full after addendum B's conductor assumptions; grounded in the same live sections (rows marked "addendum C"). It takes the `tokenBucket` half of the round-1 debt note `knowledge/debt/2026-11-20-rate-limit-token-bucket-and-memory-store.md`; the memory store stays out of scope.
 
 ---
 
@@ -334,6 +335,52 @@ Asked what the owner shares with subscribed routers, the human answered (verbati
 
 ---
 
+# Round 2 addendum C — limiter-level algorithm: tokenBucket or slidingWindow (2026-11-22)
+
+Same round, same branch, same PR #228. Added after round-2 codereview and its two human-decided fixes.
+
+## Human ask (verbatim, chat 2026-11-22)
+
+> Una cosa no me queda clara de la implementacion, donde elige el usuario si el ratelimiter es tockenbut o windowcounter¿?
+
+The conductor answered that only the sliding window exists (per-bucket `algorithm` only rejects `tokenBucket`), and
+recommended a separate PR. The human answered:
+
+> lo quiero en este PR porque esto es clave, el cuando el usuario configura el ratelimit debe poder configurarlo (no a
+> nivel de bucket sino de todo el limiter) si quiere usar tokenbucket o windowcounter
+
+## Conductor correction recorded
+
+The conductor first said the utilities library has no Redis token bucket. That was wrong: utilities `v1.0.10` (already
+pinned) has `tokenbucket.Redis` (Traefik's Lua token bucket via `simpleredis` EVAL, `NewRedis(redis, rate, burst,
+maxDelay, ttl)`, `Allow(ctx, key) (Status, error)`) and `tokenbucket.Memory`; `tokenbucket.Status` carries Allowed, Limit
+(= burst), Remaining, Period, Reset, RetryAfter, Delay. The over-admit defect of the round-1 debt note
+(`knowledge/debt/2026-11-20-rate-limit-token-bucket-and-memory-store.md`) is fixed by utilities PR #54, tagged in v1.0.9.
+`tokenbucket` is not vendored yet (not imported).
+
+## Human decision — DECIDED
+
+- The algorithm is chosen for the whole limiter, not per bucket: `tokenBucket` or the sliding window (`windowcounter`).
+
+## Conductor design proposal (sent to the human, who did not object; treat as assumed, revisit at review)
+
+- New owner setting `rateLimitAlgorithm: slidingWindow | tokenBucket`, default `slidingWindow`. It is part of the
+  centralized policy published by the owner (and of the ownership key); subscribers use the owner's algorithm.
+- Buckets keep `requests` per `window` for both algorithms; with `tokenBucket` it means a refill rate of
+  `requests / window` per second.
+- Optional per-bucket `burst`, valid only with `tokenBucket`, default = `requests`. One `tokenbucket.Redis` per bucket
+  (rate and burst are fixed at `NewRedis`), `maxDelay` 0 (no queuing, deny instead), a TTL that covers a full refill.
+- The per-bucket `algorithm` key goes away; setting it fails startup with a message pointing at `rateLimitAlgorithm`.
+- `rateLimitSyncRate` applies only to `slidingWindow` (the token bucket is one Redis EVAL per counted bucket);
+  documented, not rejected (its default is `200ms`).
+- Unchanged: actions `ratelimit | captcha | log`, precedence, `Retry-After` (from the token bucket's `RetryAfter`,
+  rounded up, at least 1s), failure action, counters per subscribing router, key prefix `rl:<router>:<bucket>:<hash>`
+  (the token bucket's Redis hash key must not collide with sliding-window keys of the same bucket after an algorithm
+  switch — decide a distinguishing suffix).
+- Out of scope: `rateLimitStore: memory` (not asked; per-replica; `tokenbucket.Memory` makes it a small follow-up).
+
+---
+
 ## Current (code)
 
 Round 2. Measured on the PR #228 head (`88f8efbd`, round 1 merged into the branch; `origin/master` @ `82498271` is its ancestor and has no rate-limit code: `git grep rateLimitBuckets origin/master` finds nothing, and no tag contains the branch head, so `deny` is unreleased). One entry path per claim.
@@ -422,6 +469,23 @@ Tests that pin the current wiring:
 - Leftover rate-limit settings — `pkg/configuration/zzz_rate_limit_test.go` (`Test_ValidateParams_disabledRateLimitIgnoresLeftovers`).
 - Published-leg severance e2e — `tests/e2e/real/instance_severance.Tests.ps1` (greps `"leg":"appsec"` lifecycle logs). Rate-limit e2e — `tests/e2e/real/config/dynamic/rate-limit.yml` (five routers since `410c30ca`, each with its own `rateLimitEnabled` middleware; no owner / subscriber pair).
 
+Limiter-level algorithm (addendum C). Measured on the branch head `a21abe4b` (round 2 implemented and reviewed; utilities pinned at `v1.0.10`). One entry path per claim.
+
+- Where the operator picks the algorithm today — `pkg/ratelimit/bucket_set.go` (`validateAlgorithm`, per bucket: empty or `slidingWindow` passes; `tokenBucket` fails `algorithm: tokenBucket is not supported in this version`; any other value fails `algorithm: must be "slidingWindow"`; any non-zero `burst` fails `burst: is not supported in this version`). A limiter-level setting `rateLimitAlgorithm` — `not found` (`pkg/configuration/configuration.go` L174–185 lists every `RateLimit*` field).
+- `algorithm` / `burst` row fields — `pkg/ratelimit/bucket_rule.go` (`BucketRule.Algorithm`, `BucketRule.Burst`; comment "exist only so NewBucketSet can reject values this version does not support, instead of Traefik dropping them silently"; `AlgorithmSlidingWindow` "is the only counting algorithm in this version").
+- Counter contract — `pkg/ratelimit/counter.go` (`type Status = windowcounter.Status`; `Counter.Take(ctx, key, limit int64, window) (Status, error)`; the hit "is counted even when it is over the limit").
+- Client construction — `pkg/ratelimit/client.go` (`newClient` always builds one `windowcounter.New(redis, settings.SyncRate)` on the `simpleredis` client; `Client.counter` is that limiter or a test fake; `Sleep` / `Wake` / `Close` call the limiter, then `Close` closes Redis).
+- Ownership key — `pkg/ratelimit/client.go` (`OwnershipKey` hashes `{buckets, middlewareName, policy, redis}`; no algorithm field).
+- Charging and Retry-After — `pkg/ratelimit/charge.go` (`Charge` calls `counter.Take(ctx, key, bucket.requests, bucket.window)` per bucket, "Count, then compare: an answered hit still counts"; `wholeSecondsAtLeastOne` rounds `RetryAfter` up to whole seconds, at least 1s).
+- Redis key — `pkg/ratelimit/key.go` (`redisCounterKey`: `rl:<middleware>:<bucket>:<16 hex>`, "The counter appends the window start"); vendored `windowcounter/limiter.go` (`redisWindowKey`: `{opaqueKey}:{windowStartUnix}`). A token-bucket key — `not found`.
+- Token bucket in the pinned library — module cache `traefik-middleware-utilities@v1.0.10/tokenbucket/redis.go` (`NewRedis(redis, rate float64, burst int64, maxDelay, ttl)`; `Allow(ctx, key)` is one `simpleredis` `Eval` of `allowScript`); `clock.go` (`validateClock`: rate > 0 and finite, burst >= 1, maxDelay >= 0, ttl a whole number of seconds >= 1s; `consumeOne` refunds the token when the wait exceeds maxDelay); `lua.go` (an empty hash seeds `tokens = burst`; `HSET last tokens` + `EXPIRE ttl` on every call); `status.go` (`Status{Allowed, Limit (= burst), Remaining, Period, Reset, RetryAfter, Delay}`). The `Redis` struct holds only the clock, `now`, and the Redis client (no goroutine, no Close). The library ships Yaegi tests (`tokenbucket/limiter_yaegi_test.go`, `memory_yaegi_test.go`).
+- `tokenbucket` in this module — not imported and not vendored (`vendor/modules.txt` lists `backendbackoff`, `iplookup`, `reclaim`, `simpleredis`, `traefikemulator`, `windowcounter`); `go.mod` pins `v1.0.10`. Lint allow-list — `.golangci.yml` (depguard `Main` allows `windowcounter`, not `tokenbucket`).
+- Yaegi exposure in CI — `.github/workflows/main.yml` ("Expose utilities on GOPATH for Yaegi" copies `vendor/github.com/david-garcia-garcia/traefik-middleware-utilities` into GOPATH); `pkg/yaegitest/interpreter.go` (`GoPath` links the same vendor tree). Whether the plugin runs `tokenbucket` under Yaegi v0.16.1 — not measured in this repo.
+- Specs that reject it today — `openspec/changes/share-rate-limit-leg-and-bucket-actions/specs/core_plugin_ratelimit_buckets/spec.md` ("Bucket algorithm, action, and store values are validated": `algorithm` accepts only `slidingWindow`, `tokenBucket` or `burst` fail); `.../core_plugin_middleware_config-validation/spec.md` (row rules "`algorithm` is set and is not `slidingWindow`; `burst` is set"); live `openspec/specs/core_plugin_ratelimit_client/spec.md` ("Sync rate trades accuracy for Redis round trips", sliding window only).
+- Docs that say it is not there — `README.md` L981 ("Only the sliding window on Redis. `algorithm: tokenBucket`, `burst`, and `rateLimitStore: memory` fail at startup"); `knowledge/devdocs/core_plugin_ratelimit.md` (L6 "one vendored `windowcounter.Limiter`", L15 `_Avoid_: ... token bucket`, L105 "`algorithm`, `burst`, and `rateLimitStore` exist only to reject").
+- Round-1 debt note — `knowledge/debt/2026-11-20-rate-limit-token-bucket-and-memory-store.md` (`tokenBucket` + `burst` and the memory store in one note; "Unblock: ... vendor `tokenbucket`, then add the algorithm and store (one `tokenbucket` limiter per bucket, since rate and burst are fixed at `New`)"); its run `issues.md` row (`[ ] note large`).
+- Real-stack rate-limit fixtures — `tests/e2e/real/config/dynamic/rate-limit.yml` (five routers, sliding window only), `tests/e2e/real/rate_limit.Tests.ps1`.
+
 ## Out of scope
 
 Round 2, inferred extras, listed and not taken:
@@ -437,6 +501,13 @@ Round 2, inferred extras, listed and not taken:
 - Counters shared across subscribers (`rl:<instance>:…`): addendum B decision 3 rejects it.
 - Per-subscriber overrides of the owner's bucket list or policy: not asked (decision 2 centralizes the policy).
 - The leg / instance / backend vocabulary rename (`knowledge/debt/2026-09-23-leg-instance-backend-vocabulary.md`): decision 4 asks for a shared leg unit, not a rename of the existing terms.
+
+Addendum C:
+
+- `rateLimitStore: memory` (conductor proposal: "not asked; per-replica; `tokenbucket.Memory` makes it a small follow-up"); the memory half of the round-1 debt note stays open.
+- A per-bucket algorithm (human decision: "no a nivel de bucket sino de todo el limiter").
+- Queuing a request instead of answering it (`maxDelay` > 0, Traefik's delayed admit): the proposal fixes `maxDelay` at 0.
+- `RateLimit-*` headers from the token bucket's `Limit` / `Remaining` / `Reset`: the round-1 debt note `knowledge/debt/2026-11-20-rate-limit-ratelimit-response-headers.md` stays open.
 
 ## Unknowns
 
@@ -467,6 +538,18 @@ Addendum B (shared rate-limit leg). "B-n" below is addendum B decision n.
 - How the debt note's "three legs" error and its row's "the Open-only rate-limit leg does not need it" are corrected: the row cannot be deleted (`opd-workflow § Issues`), so implement marks it `[x]` with a `Taken:` line and deletes the debt file; whether anything else (card summary) needs the four-leg correction.
 - E2E for the shared leg: an owner and two subscribers on the Dragonfly stack proving one policy and separate budgets (B-2, B-3), and severance when the owner is removed.
 
+Addendum C (limiter-level algorithm). The conductor's proposal answers most of these; explore records each as an open question.
+
+- Whether `tokenbucket.Redis` runs under Yaegi v0.16.1 inside this plugin (vendored, GOPATH layout); the library's own Yaegi tests pass upstream, not measured here.
+- The plugin-owned status Charge needs once `ratelimit.Status` can no longer alias `windowcounter.Status`, and how one `Counter` serves both libraries (the token bucket has no `limit` / `window` arguments: rate and burst are fixed at `NewRedis`).
+- `burst` default, bounds, and meaning under `slidingWindow` (proposal: default `requests`, only with `tokenBucket`).
+- TTL of the token-bucket hash ("a TTL that covers a full refill"): exact value, and what a full refill longer than a TTL Redis or Dragonfly accepts does.
+- The distinguishing suffix that keeps a token-bucket hash from colliding with a sliding-window string of the same bucket after an algorithm switch.
+- What a denied hit does to the count under each algorithm: the sliding window counts it (`windowcounter` increments before comparing), the token bucket with `maxDelay` 0 refunds it (`consumeOne`). The live scenario "A denied client stays limited while it keeps sending" assumes the first.
+- A Redis outage under `tokenBucket`: no buffered mode exists, so every take is one `EVAL`; whether the failure action then applies as in exact mode.
+- Whether `rateLimitSyncRate` stays in the ownership key under `tokenBucket`, where nothing reads it.
+- Real-stack proof: burst requests admitted at once, the next one 429 with a `Retry-After` matching the refill; and whether the Pester harness can assert a startup failure for a bucket `algorithm:`.
+
 ## Tensions
 
 - Decision 5 ("never counted or blocked by any bucket") vs decision 2's rationale ("a rate limit must not become unlimited"): a client that always sends the challenge marker, or only fetches widget assets, is never limited by any bucket, and each verification POST costs a call to the captcha provider.
@@ -488,3 +571,10 @@ Addendum B (shared rate-limit leg):
 - B-4 (extract the abstraction in this PR) vs the debt note's reason for not taking it ("a refactor of shipped wiring with no rate-limit criterion behind it") and PR size: one PR now carries the round-1 leg, the round-2 bucket actions, a refactor of four shipped legs (LAPI, AppSec, captcha, ModSec, all on `master`), and the shared leg. The human approved it and asked for a separate behaviour-preserving commit first, with existing tests green.
 - B-4 vs the debt note's text: it names three legs (LAPI, AppSec, captcha) and three `bouncer_leg_*.go` files; the code has four (`bouncer_leg_modsec.go`, `legModsec`). The addendum flags it; the descriptor must cover ModSec's place in the rollback order.
 - Round-2 `## Out of scope` (as first written) said the common leg abstraction note was "not reopened"; B-4 reverses it (removed from that list in this update).
+
+Addendum C (limiter-level algorithm):
+
+- Human decision (the algorithm belongs to the limiter) vs the per-bucket `algorithm` row field that round 1 shipped and round 2 kept to reject `tokenBucket` (`pkg/ratelimit/bucket_rule.go`, the `core_plugin_ratelimit_buckets` and `core_plugin_middleware_config-validation` deltas). Unreleased (PR #228 unmerged), so removing it breaks no user; the row field must still exist so Traefik does not drop it silently.
+- Conductor correction vs earlier records: the round-1 debt note and the round-2 grounding say `tokenBucket` waits on an upstream fix; utilities PR #54 is in `v1.0.9`, and this branch pins `v1.0.10`. The note's tokenBucket half is taken by this addendum; its memory half is not.
+- Same `requests` / `window` words, two meanings: a sliding-window bucket admits `requests` per rolling `window`; a token bucket refills at `requests / window` per second and admits up to `burst` at once. With the default `burst = requests` a client that waited a full window can send `requests` at once under both, but a token bucket also admits steady traffic at the refill rate after a deny, while the sliding window keeps counting denied hits.
+- `rateLimitSyncRate` default `200ms` vs `tokenBucket`, which never reads it (proposal: documented, not rejected).
