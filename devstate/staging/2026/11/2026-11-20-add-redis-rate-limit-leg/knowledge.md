@@ -24,3 +24,6 @@
 - created knowledge/debt/2026-11-21-instance-slots-replace-trace-scenario.md
 - created knowledge/debt/2026-11-21-rate-limit-marker-post-uncharged-without-gate.md
 - created knowledge/debt/2026-11-21-rate-limit-unpublished-owner-warn.md
+- deleted knowledge/debt/2026-11-21-rate-limit-marker-post-uncharged-without-gate.md
+- deleted knowledge/debt/2026-11-21-rate-limit-unpublished-owner-warn.md
+- updated knowledge/devdocs/core_plugin_ratelimit.md

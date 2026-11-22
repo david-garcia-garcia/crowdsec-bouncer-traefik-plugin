@@ -2,8 +2,8 @@
 
 1. [judgement] Client-controlled trust — `pkg/bouncer/bouncer_serve_ratelimit.go:51` — a POST carrying `crowdsec_captcha_challenge=v1` skips every bucket even when no captcha gate will answer it, so it reaches the application uncharged
    Fix: Skip the buckets for a marker POST only when a captcha gate on this router will answer it; when `answerRateLimitChallengeForm` declines (a `bypassCaptcha` rule matched, or a policy without a captcha answer on a router with no AppSec step and no `captcha` rule for the request), charge it like any other request
-   Status: skipped
-   Argument: judgement; changes the human-decided exemption for captcha-page traffic (decision 5) and the spec line "Otherwise the POST SHALL continue to the AppSec step". Needs a human decision; recorded as issues.md note `knowledge/debt/2026-11-21-rate-limit-marker-post-uncharged-without-gate.md`.
+   Status: done
+   Argument: human decision 2026-11-22 ("Cobrarlo"); e4e19906: a marker POST skips the buckets only when `isRateLimitChallengeFormAnswer` holds (usable captcha, policy with a captcha answer, no `bypassCaptcha` rule, then the marker); every other marker POST is charged. Spec rule "Otherwise the POST SHALL continue" replaced by the charged rule; debt note closed.
    Quote:
    ```go
    if b.isCaptchaFormAnswer(req) {
@@ -29,8 +29,8 @@
    ```
 2. [judgement] Fail-open on deny — `pkg/bouncer/bouncer_serve_ratelimit.go:41` — a subscriber whose `rateLimitInstanceName` no owner publishes lets every request through with only a TRACE `crowdsec bouncer unbound` line, so a typo or a removed owner silently disables the limit
    Fix: Keep the documented passthrough, but log a debounced WARN (as `logRateLimitCaptchaDowngrade` does with `logger.Debounced`) when a subscribed router serves a request with no bound rate-limit client
-   Status: skipped
-   Argument: judgement; the passthrough is the documented contract (spec "Missing rate-limit client charges nothing", README). A request-time WARN is new behaviour; recorded as issues.md note `knowledge/debt/2026-11-21-rate-limit-unpublished-owner-warn.md`.
+   Status: done
+   Argument: human decision 2026-11-22 ("WARN al desconectarse"); dcfd0393: passthrough kept; the rate-limit binding logs WARN `crowdsec bouncer rate limit owner unavailable` once per move to no client and INFO `crowdsec bouncer rate limit owner available` on the bind that ends it (transition, not per request, so no debounce). Debt note closed.
    Note:
    ```
    New in round 2: round 1 opened the counter on the router itself, so there was no unpublished-owner path.
